@@ -3,13 +3,26 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: AI Trading Dashboard API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: signals
+    description: AI signal operations
+  - name: trades
+    description: Trade execution and history
+  - name: portfolio
+    description: Portfolio and balance
+  - name: settings
+    description: Risk control settings
+  - name: logs
+    description: Activity logs
+  - name: backtest
+    description: Backtest simulation
+
 paths:
   /healthz:
     get:
@@ -24,6 +37,298 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /signals/latest:
+    get:
+      operationId: getLatestSignal
+      tags: [signals]
+      summary: Get latest AI signal
+      description: Returns the most recent AI-generated trading signal
+      parameters:
+        - name: symbol
+          in: query
+          required: false
+          schema:
+            type: string
+            default: BTCUSDT
+        - name: timeframe
+          in: query
+          required: false
+          schema:
+            type: string
+            default: 1H
+      responses:
+        "200":
+          description: Latest signal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Signal"
+
+  /signals/generate:
+    post:
+      operationId: generateSignal
+      tags: [signals]
+      summary: Generate a new AI signal
+      description: Triggers AI to generate a new trading signal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateSignalInput"
+      responses:
+        "200":
+          description: Generated signal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Signal"
+
+  /signals/history:
+    get:
+      operationId: getSignalHistory
+      tags: [signals]
+      summary: Get signal history
+      description: Returns list of past signals
+      responses:
+        "200":
+          description: Signal history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Signal"
+
+  /trades:
+    get:
+      operationId: getTrades
+      tags: [trades]
+      summary: Get trade history
+      description: Returns all past trades
+      responses:
+        "200":
+          description: Trade history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Trade"
+    post:
+      operationId: executeTrade
+      tags: [trades]
+      summary: Execute a trade
+      description: Executes a simulated trade (or real if live mode enabled)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecuteTradeInput"
+      responses:
+        "200":
+          description: Trade result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trade"
+
+  /trades/open:
+    get:
+      operationId: getOpenTrades
+      tags: [trades]
+      summary: Get open trades
+      description: Returns all currently open positions
+      responses:
+        "200":
+          description: Open trades
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Trade"
+
+  /trades/{id}/close:
+    post:
+      operationId: closeTrade
+      tags: [trades]
+      summary: Close a trade
+      description: Closes an open trade position
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Closed trade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trade"
+
+  /portfolio:
+    get:
+      operationId: getPortfolio
+      tags: [portfolio]
+      summary: Get portfolio overview
+      description: Returns portfolio balance, PnL, and stats
+      responses:
+        "200":
+          description: Portfolio data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Portfolio"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get risk control settings
+      description: Returns current risk control configuration
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update risk control settings
+      description: Updates risk control configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingsInput"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
+  /settings/kill-switch:
+    post:
+      operationId: toggleKillSwitch
+      tags: [settings]
+      summary: Toggle kill switch
+      description: Activates or deactivates the kill switch to stop all trading
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KillSwitchInput"
+      responses:
+        "200":
+          description: Kill switch status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KillSwitchStatus"
+
+  /logs:
+    get:
+      operationId: getLogs
+      tags: [logs]
+      summary: Get activity logs
+      description: Returns all signal and trade decision logs
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: Activity logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LogEntry"
+
+  /backtest/run:
+    post:
+      operationId: runBacktest
+      tags: [backtest]
+      summary: Run backtest simulation
+      description: Simulates past trades using historical patterns
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BacktestInput"
+      responses:
+        "200":
+          description: Backtest results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BacktestResult"
+
+  /candles:
+    get:
+      operationId: getCandles
+      tags: [signals]
+      summary: Get candlestick data
+      description: Returns OHLCV candle data for charting
+      parameters:
+        - name: symbol
+          in: query
+          required: false
+          schema:
+            type: string
+            default: BTCUSDT
+        - name: timeframe
+          in: query
+          required: false
+          schema:
+            type: string
+            default: 1H
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 200
+      responses:
+        "200":
+          description: Candle data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Candle"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [portfolio]
+      summary: Get dashboard summary
+      description: Returns high-level dashboard stats
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +339,407 @@ components:
       required:
         - status
 
+    Signal:
+      type: object
+      properties:
+        id:
+          type: string
+        symbol:
+          type: string
+        timeframe:
+          type: string
+        action:
+          type: string
+          enum: [BUY, SELL, HOLD]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 100
+        trend:
+          type: string
+          enum: [bullish, bearish, neutral]
+        reasoning:
+          type: string
+        price:
+          type: number
+        timestamp:
+          type: string
+        indicators:
+          type: object
+          properties:
+            rsi:
+              type: number
+            macd:
+              type: number
+            ema20:
+              type: number
+            ema50:
+              type: number
+      required:
+        - id
+        - symbol
+        - timeframe
+        - action
+        - confidence
+        - trend
+        - reasoning
+        - price
+        - timestamp
+
+    GenerateSignalInput:
+      type: object
+      properties:
+        symbol:
+          type: string
+          default: BTCUSDT
+        timeframe:
+          type: string
+          default: 1H
+      required:
+        - symbol
+        - timeframe
+
+    Trade:
+      type: object
+      properties:
+        id:
+          type: string
+        symbol:
+          type: string
+        side:
+          type: string
+          enum: [BUY, SELL]
+        amount:
+          type: number
+        price:
+          type: number
+        exitPrice:
+          type: number
+          nullable: true
+        pnl:
+          type: number
+          nullable: true
+        pnlPercent:
+          type: number
+          nullable: true
+        status:
+          type: string
+          enum: [open, closed, cancelled]
+        mode:
+          type: string
+          enum: [auto, manual, simulated]
+        signalId:
+          type: string
+          nullable: true
+        stopLoss:
+          type: number
+          nullable: true
+        takeProfit:
+          type: number
+          nullable: true
+        timestamp:
+          type: string
+        closedAt:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+      required:
+        - id
+        - symbol
+        - side
+        - amount
+        - price
+        - status
+        - mode
+        - timestamp
+
+    ExecuteTradeInput:
+      type: object
+      properties:
+        symbol:
+          type: string
+        side:
+          type: string
+          enum: [BUY, SELL]
+        amount:
+          type: number
+        signalId:
+          type: string
+          nullable: true
+        stopLoss:
+          type: number
+          nullable: true
+        takeProfit:
+          type: number
+          nullable: true
+        mode:
+          type: string
+          enum: [auto, manual, simulated]
+      required:
+        - symbol
+        - side
+        - amount
+        - mode
+
+    Portfolio:
+      type: object
+      properties:
+        balance:
+          type: number
+        initialBalance:
+          type: number
+        totalPnl:
+          type: number
+        totalPnlPercent:
+          type: number
+        openPositions:
+          type: integer
+        totalTrades:
+          type: integer
+        winRate:
+          type: number
+        todayTrades:
+          type: integer
+        todayPnl:
+          type: number
+      required:
+        - balance
+        - initialBalance
+        - totalPnl
+        - totalPnlPercent
+        - openPositions
+        - totalTrades
+        - winRate
+        - todayTrades
+        - todayPnl
+
+    Settings:
+      type: object
+      properties:
+        allocation:
+          type: number
+          default: 20
+        stopLossPercent:
+          type: number
+          default: 2
+        takeProfitPercent:
+          type: number
+          default: 4
+        maxTradesPerDay:
+          type: integer
+          default: 5
+        minConfidence:
+          type: number
+          default: 80
+        autoMode:
+          type: boolean
+          default: false
+        liveTrading:
+          type: boolean
+          default: false
+        killSwitch:
+          type: boolean
+          default: false
+        binanceApiKey:
+          type: string
+          nullable: true
+        binanceApiSecret:
+          type: string
+          nullable: true
+      required:
+        - allocation
+        - stopLossPercent
+        - takeProfitPercent
+        - maxTradesPerDay
+        - minConfidence
+        - autoMode
+        - liveTrading
+        - killSwitch
+
+    UpdateSettingsInput:
+      type: object
+      properties:
+        allocation:
+          type: number
+        stopLossPercent:
+          type: number
+        takeProfitPercent:
+          type: number
+        maxTradesPerDay:
+          type: integer
+        minConfidence:
+          type: number
+        autoMode:
+          type: boolean
+        liveTrading:
+          type: boolean
+        binanceApiKey:
+          type: string
+          nullable: true
+        binanceApiSecret:
+          type: string
+          nullable: true
+
+    KillSwitchInput:
+      type: object
+      properties:
+        active:
+          type: boolean
+      required:
+        - active
+
+    KillSwitchStatus:
+      type: object
+      properties:
+        killSwitch:
+          type: boolean
+        message:
+          type: string
+      required:
+        - killSwitch
+        - message
+
+    LogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [signal, trade, system, error]
+        level:
+          type: string
+          enum: [info, warn, error, success]
+        message:
+          type: string
+        details:
+          type: object
+          nullable: true
+        timestamp:
+          type: string
+      required:
+        - id
+        - type
+        - level
+        - message
+        - timestamp
+
+    BacktestInput:
+      type: object
+      properties:
+        symbol:
+          type: string
+          default: BTCUSDT
+        days:
+          type: integer
+          default: 30
+        allocation:
+          type: number
+          default: 20
+        stopLossPercent:
+          type: number
+          default: 2
+        takeProfitPercent:
+          type: number
+          default: 4
+        minConfidence:
+          type: number
+          default: 80
+      required:
+        - symbol
+        - days
+
+    BacktestResult:
+      type: object
+      properties:
+        symbol:
+          type: string
+        days:
+          type: integer
+        totalTrades:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        winRate:
+          type: number
+        totalProfit:
+          type: number
+        totalProfitPercent:
+          type: number
+        maxDrawdown:
+          type: number
+        trades:
+          type: array
+          items:
+            $ref: "#/components/schemas/Trade"
+      required:
+        - symbol
+        - days
+        - totalTrades
+        - wins
+        - losses
+        - winRate
+        - totalProfit
+        - totalProfitPercent
+        - maxDrawdown
+        - trades
+
+    Candle:
+      type: object
+      properties:
+        time:
+          type: integer
+          description: Unix timestamp in seconds
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        close:
+          type: number
+        volume:
+          type: number
+      required:
+        - time
+        - open
+        - high
+        - low
+        - close
+        - volume
+
+    DashboardSummary:
+      type: object
+      properties:
+        balance:
+          type: number
+        todayPnl:
+          type: number
+        todayPnlPercent:
+          type: number
+        openPositions:
+          type: integer
+        todayTrades:
+          type: integer
+        winRate:
+          type: number
+        lastSignal:
+          $ref: "#/components/schemas/Signal"
+          nullable: true
+        killSwitchActive:
+          type: boolean
+        autoModeActive:
+          type: boolean
+      required:
+        - balance
+        - todayPnl
+        - todayPnlPercent
+        - openPositions
+        - todayTrades
+        - winRate
+        - killSwitchActive
+        - autoModeActive
