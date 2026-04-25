@@ -1,0 +1,192 @@
+Enhance Natura AI by fixing UI layout issues, improving category filters, and expanding content/media to create a premium, scalable experience.
+
+========================
+PART 1 — CATEGORY PILLS FIX (CRITICAL BUG)
+========================
+
+Fix the category filter buttons:
+(All, Stress, Sleep, Energy, Immunity)
+
+Current issue:
+- Text is overflowing outside pill containers
+- Layout breaks on smaller screens
+
+Fix requirements:
+
+- Use horizontal scrollable container:
+  → flexDirection: 'row'
+  → overflow: 'scroll'
+  → no wrapping
+
+- Each pill:
+  → paddingHorizontal: 16–20
+  → paddingVertical: 8–10
+  → borderRadius: 999 (full pill)
+  → minWidth instead of fixed width
+
+- Text:
+  → numberOfLines: 1
+  → ellipsizeMode: 'tail'
+  → NEVER overflow container
+
+- Active state:
+  → filled background (green)
+  → white text
+
+- Inactive state:
+  → outlined or subtle background
+
+- Add spacing between pills (gap: 8–12px)
+
+Goal:
+Smooth horizontal scrolling pill system like premium apps (no breaking UI)
+
+========================
+PART 2 — IMAGE SYSTEM (VERY IMPORTANT)
+========================
+
+Current issue:
+- Only ~4 images reused → feels repetitive and low quality
+
+Fix:
+
+1. Expand image dataset:
+- Minimum 20–30 high-quality images
+
+Categories:
+- Teas (ginger, chamomile, green tea)
+- Herbs (maca, ashwagandha, rhodiola)
+- Foods (salads, smoothies, fruits)
+- Wellness scenes (relaxation, sleep, stress relief)
+
+2. Each recipe/remedy MUST:
+- Have a unique image
+- No obvious repetition in scroll
+
+3. Add fallback logic:
+- If no image → use category-based placeholder image
+
+4. Optimize:
+- Use compressed images (fast load)
+- Maintain consistent aspect ratio (16:9 or 4:3)
+
+Goal:
+App should feel rich, not recycled
+
+========================
+PART 3 — CARD UI POLISH
+========================
+
+Fix all card components:
+
+- Add consistent padding: 16–20px
+- Ensure text wraps properly:
+  → flexShrink: 1
+  → no overflow
+
+- Titles:
+  → max 2 lines
+  → ellipsis if too long
+
+- Description:
+  → max 2–3 lines
+
+- Add subtle elevation:
+  Light mode → soft shadow  
+  Dark mode → slightly lighter card background
+
+- Improve spacing between sections:
+  → marginBottom: 16–24
+
+========================
+PART 4 — BUTTON FIXES
+========================
+
+Fix all buttons (especially:
+“Start Guide”, “Add to Grocery”)
+
+- Full width where appropriate
+- Prevent text cutoff
+- Add proper padding:
+  → paddingVertical: 14–16
+  → paddingHorizontal: 16
+
+- Ensure text scales properly on small screens
+
+- Add press animation:
+  → slight scale (0.97)
+
+========================
+PART 5 — CONTENT DEPTH (IMPORTANT FOR VALUE)
+========================
+
+Enhance each remedy/recipe:
+
+Add:
+- “Why this helps” section (short explanation)
+- Optional:
+  → “Best time to use”
+  → “Tips”
+
+Example:
+“Ginger helps reduce nausea and supports digestion by stimulating gastric motility.”
+
+Goal:
+Make content feel intelligent + trustworthy
+
+========================
+PART 6 — AI COACH INTEGRATION (ENHANCE)
+========================
+
+Tie AI more into content:
+
+After user selects mood:
+- Highlight 1–2 recommended remedies on home screen
+
+Add section:
+“Recommended for you today”
+
+Use AI tone:
+- Personalized
+- Encouraging
+
+========================
+PART 7 — EMPTY STATE FIX
+========================
+
+If category has no results:
+
+Replace:
+“No recipes found”
+
+With:
+- Friendly message:
+  “No results here yet — try another category 🌿”
+
+- Optional button:
+  “Explore all remedies”
+
+========================
+PART 8 — PERFORMANCE + EXPERIENCE
+========================
+
+- Lazy load images
+- Smooth scrolling
+- Avoid layout shifts
+- Ensure no flickering between screens
+
+========================
+PART 9 — FINAL GOAL
+========================
+
+App should feel like:
+
+NOT:
+“A basic list app”
+
+BUT:
+“A premium AI wellness experience with rich content and smooth UI”
+
+========================
+END
+========================

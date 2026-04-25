@@ -130,9 +130,12 @@ export default function RecipesScreen() {
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <Feather name="book-open" size={40} color={colors.border} />
+                <Feather name="book-open" size={44} color={colors.border} />
                 <Text style={[styles.emptyTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
-                  No recipes found
+                  No results here yet
+                </Text>
+                <Text style={[styles.emptySubtitle, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+                  Try another category to find your perfect wellness recipe
                 </Text>
               </View>
             }

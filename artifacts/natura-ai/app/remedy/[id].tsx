@@ -16,11 +16,6 @@ import { useColors } from "@/hooks/useColors";
 import { useWellness } from "@/contexts/WellnessContext";
 import { REMEDIES, RECIPES } from "@/lib/data";
 
-const IMAGE_MAP = {
-  herbs: require("@/assets/images/herbs-hero.png"),
-  tea: require("@/assets/images/tea-recipe.png"),
-  bowl: require("@/assets/images/recipe-bowl.png"),
-};
 
 export default function RemedyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -127,9 +122,11 @@ export default function RemedyDetailScreen() {
     >
       <View style={styles.imageContainer}>
         <Image
-          source={IMAGE_MAP[item.imageKey]}
+          source={{ uri: item.imageUrl }}
           style={styles.heroImage}
           contentFit="cover"
+          transition={300}
+          placeholder={{ color: "#DDE5DD" }}
         />
         <TouchableOpacity
           onPress={() => router.back()}

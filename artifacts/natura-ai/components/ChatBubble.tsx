@@ -134,6 +134,27 @@ export function ChatBubble({ message }: { message: Message }) {
     );
   }
 
+  if (res.isEmergency) {
+    return (
+      <View style={styles.aiBubbleContainer}>
+        <View style={[styles.aiBubble, { backgroundColor: "#FFF0F0", borderColor: "#FFAAAA", borderRadius: colors.radius }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <Feather name="alert-triangle" size={18} color="#D32F2F" />
+            <Text style={[styles.sectionTitle, { color: "#D32F2F", fontFamily: "Inter_700Bold" }]}>
+              Emergency Alert
+            </Text>
+          </View>
+          <Text style={{ color: "#B71C1C", fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 21 }}>
+            {res.emergencyMessage}
+          </Text>
+          <Text style={{ color: "#B71C1C", fontFamily: "Inter_500Medium", fontSize: 13, marginTop: 12, lineHeight: 19 }}>
+            For immediate help: Call 911 (US) or your local emergency number.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   const allIngredients = [
     ...res.herbs.map((h) => h.name),
     ...res.teas.map((t) => t.name),

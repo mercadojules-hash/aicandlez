@@ -17,11 +17,6 @@ import { useWellness } from "@/contexts/WellnessContext";
 import { ChecklistItem } from "@/components/ChecklistItem";
 import { PLANS } from "@/lib/data";
 
-const IMAGE_MAP = {
-  herbs: require("@/assets/images/herbs-hero.png"),
-  tea: require("@/assets/images/tea-recipe.png"),
-  bowl: require("@/assets/images/recipe-bowl.png"),
-};
 
 export default function PlanDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -51,9 +46,11 @@ export default function PlanDetailScreen() {
     >
       <View style={styles.imageContainer}>
         <Image
-          source={IMAGE_MAP[plan.imageKey]}
+          source={{ uri: plan.imageUrl }}
           style={styles.heroImage}
           contentFit="cover"
+          transition={300}
+          placeholder={{ color: "#DDE5DD" }}
         />
         <View style={[styles.heroOverlay]}>
           <TouchableOpacity

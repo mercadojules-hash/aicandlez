@@ -1,0 +1,102 @@
+Add proper medical disclaimer system to Natura AI to meet App Store compliance and reduce liability.
+
+========================
+PART 1 — FIRST LAUNCH DISCLAIMER (MANDATORY)
+========================
+
+On first app open, show a full-screen modal:
+
+Title:
+"Important Health Disclaimer"
+
+Content:
+"Natura AI provides general wellness and educational information only. 
+It is not intended to diagnose, treat, cure, or prevent any disease. 
+Always consult a qualified healthcare provider before making changes to your health, diet, or treatment plan.
+
+If you are experiencing a medical emergency, call 911 immediately."
+
+UI Requirements:
+- Clean modal design (matches app theme)
+- Scrollable text if needed
+- Checkbox:
+  → "I understand and agree"
+
+- Button:
+  → "Continue"
+
+Behavior:
+- User MUST check box before continuing
+- Store acceptance (AsyncStorage / local state)
+- Show ONLY once unless reset
+
+========================
+PART 2 — PROFILE SCREEN DISCLAIMER
+========================
+
+Add section under "Medical Disclaimer":
+
+- Short version text:
+"This app provides wellness guidance only, not medical advice."
+
+- Add button:
+→ "View Full Disclaimer"
+
+This opens modal with full text (same as above)
+
+========================
+PART 3 — AI RESPONSE SAFETY LAYER
+========================
+
+Update AI tone rules:
+
+DO NOT:
+- Diagnose conditions
+- Prescribe treatment
+- Use definitive medical claims
+
+DO:
+- Use soft language:
+  → "may support"
+  → "traditionally used for"
+  → "can help with"
+
+Add optional footer (subtle):
+"Always consult a healthcare professional for medical concerns."
+
+========================
+PART 4 — HIGH-RISK TRIGGER PROTECTION (SMART ADD)
+========================
+
+If user inputs keywords like:
+- "chest pain"
+- "suicidal"
+- "can't breathe"
+- "severe pain"
+
+Override normal response:
+
+Show alert message:
+"This may require medical attention. Please seek immediate care or call emergency services."
+
+========================
+PART 5 — SETTINGS OPTION
+========================
+
+In Profile:
+Add:
+- "Reset onboarding & disclaimer"
+
+========================
+FINAL GOAL
+========================
+
+App should feel:
+✔ Safe
+✔ Professional
+✔ App Store compliant
+✔ Not giving medical advice
+
+========================
+END
+========================
