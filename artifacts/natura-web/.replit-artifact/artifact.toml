@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/natura-web/"
+title = "Natura AI Web"
+version = "1.0.0"
+id = "artifacts/natura-web"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/natura-web/" ]
+localPort = 19240
+
+[services.development]
+run = "pnpm --filter @workspace/natura-web run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/natura-web", "run", "build" ]
+publicDir = "artifacts/natura-web/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19240"
+BASE_PATH = "/natura-web/"
