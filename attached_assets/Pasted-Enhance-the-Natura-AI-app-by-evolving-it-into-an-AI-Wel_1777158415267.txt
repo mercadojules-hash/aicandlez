@@ -1,0 +1,157 @@
+Enhance the Natura AI app by evolving it into an AI Wellness Coach experience with habit tracking, streaks, and intelligent encouragement, while also adding Light/Dark theme support.
+
+========================
+PART 1 — AI WELLNESS COACH CORE
+========================
+
+Transform the app from a simple recommendation tool into an “AI Wellness Coach”.
+
+Add the following behavior:
+
+1. Daily Check-In (already exists — enhance it)
+- Keep the existing mood selection:
+  • Low Energy
+  • Stressed
+  • Not Well
+  • Feeling Good
+
+- After user selects mood:
+  → Show a personalized AI response
+  → Include tone like a supportive coach (not robotic)
+
+Example:
+“Nice — glad you're feeling good today. Let’s keep that momentum going.”
+
+2. AI Encouragement Layer
+After every check-in:
+- Display short dynamic encouragement message
+
+Examples:
+- “You’re building a strong wellness routine.”
+- “Small wins like this add up.”
+- “Consistency is where real change happens.”
+
+Tone:
+- Human
+- Supportive
+- Calm
+- Not clinical
+
+3. Streak Tracking System
+Add streak tracking logic:
+
+- Track:
+  • Daily check-in streak
+  • Completed suggestions (optional future)
+
+- Store:
+  • currentStreak
+  • longestStreak
+
+- Display:
+  • “🔥 3-day streak”
+  • “🌿 7-day wellness streak”
+  • “🏆 Best: 14 days”
+
+4. Smart Streak Messaging
+Show dynamic messages based on streak:
+
+Examples:
+- 1 day → “Great start — let’s build consistency.”
+- 3 days → “You’re on a 3-day streak — keep it going.”
+- 7 days → “One full week — that’s real progress.”
+- 14+ → “You’re creating a powerful habit.”
+
+5. Home Screen Upgrade
+Update Home screen to include:
+
+- Greeting:
+  “Good morning / afternoon”
+
+- Streak badge under greeting:
+  Example:
+  “🔥 3-day wellness streak”
+
+- Daily Check-In card (existing)
+- AI suggestion preview
+- Quick actions
+
+Goal:
+Make it feel like a coach dashboard, not just a tool.
+
+========================
+PART 2 — LIGHT / DARK (WELLNESS MODE)
+========================
+
+Add full theme system:
+
+1. Theme Modes:
+- Light Mode (Day)
+- Dark Mode (Night)
+
+2. System Behavior:
+- Default: follow device theme
+- Allow manual override in Profile
+
+3. Light Mode Colors:
+- Background: #F6F8F3
+- Primary: #5C7F5F
+- Text: #1E2A1F
+- Cards: #FFFFFF or slightly off-white
+
+4. Dark Mode Colors:
+- Background: #0F1412
+- Card: #1A221D
+- Accent: #7FBF8F
+- Text: #E8F0EA
+
+5. Branding UX:
+- Label toggle as:
+  “Wellness Mode”
+  (instead of just Dark Mode)
+
+Optional enhancement:
+- Auto switch to Dark Mode in evening hours
+
+========================
+PART 3 — UI IMPROVEMENTS (IMPORTANT)
+========================
+
+Fix layout issues:
+
+- Ensure all text wraps inside containers (no overflow)
+- Add consistent padding (16–20px)
+- Use flexbox with proper constraints:
+  → flexShrink: 1
+  → flexWrap: 'wrap'
+
+- Buttons:
+  • Ensure full width where needed
+  • Prevent text cutoff
+
+- Cards:
+  • Rounded corners
+  • Soft shadow (light mode)
+  • Subtle elevation (dark mode)
+
+========================
+PART 4 — EXPERIENCE GOAL
+========================
+
+Final result should feel like:
+
+NOT:
+“A list of remedies”
+
+BUT:
+“A personal AI wellness coach guiding daily habits”
+
+User should feel:
+- Supported
+- Motivated
+- Guided
+- Calm
+
+========================
+END
+========================

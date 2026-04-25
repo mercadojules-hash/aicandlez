@@ -39,6 +39,7 @@ interface WellnessContextValue {
   savedItems: SavedItem[];
   completedTasks: string[];
   streak: number;
+  longestStreak: number;
   lastCheckIn: DailyCheckIn | null;
   groceryList: GroceryItem[];
   checkIns: DailyCheckIn[];
@@ -58,6 +59,7 @@ const WellnessContext = createContext<WellnessContextValue>({
   savedItems: [],
   completedTasks: [],
   streak: 0,
+  longestStreak: 0,
   lastCheckIn: null,
   groceryList: [],
   checkIns: [],
@@ -75,6 +77,7 @@ const WellnessContext = createContext<WellnessContextValue>({
 const SAVED_KEY = "natura_saved";
 const TASKS_KEY = "natura_tasks";
 const STREAK_KEY = "natura_streak";
+const LONGEST_STREAK_KEY = "natura_longest_streak";
 const CHECKINS_KEY = "natura_checkins";
 const GROCERY_KEY = "natura_grocery";
 const TODAY_KEY = "natura_today_date";
@@ -87,6 +90,7 @@ export function WellnessProvider({ children }: { children: React.ReactNode }) {
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [completedTasks, setCompletedTasks] = useState<string[]>([]);
   const [streak, setStreak] = useState(0);
+  const [longestStreak, setLongestStreak] = useState(0);
   const [lastCheckIn, setLastCheckIn] = useState<DailyCheckIn | null>(null);
   const [groceryList, setGroceryList] = useState<GroceryItem[]>([]);
   const [checkIns, setCheckIns] = useState<DailyCheckIn[]>([]);
@@ -94,11 +98,12 @@ export function WellnessProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const [savedJson, tasksJson, streakStr, checkInsJson, groceryJson, lastDateStr] =
+        const [savedJson, tasksJson, streakStr, longestStreakStr, checkInsJson, groceryJson, lastDateStr] =
           await Promise.all([
             AsyncStorage.getItem(SAVED_KEY),
             AsyncStorage.getItem(TASKS_KEY),
             AsyncStorage.getItem(STREAK_KEY),
+            AsyncStorage.getItem(LONGEST_STREAK_KEY),
             AsyncStorage.getItem(CHECKINS_KEY),
             AsyncStorage.getItem(GROCERY_KEY),
             AsyncStorage.getItem(TODAY_KEY),
@@ -106,6 +111,7 @@ export function WellnessProvider({ children }: { children: React.ReactNode }) {
 
         if (savedJson) setSavedItems(JSON.parse(savedJson));
         if (streakStr) setStreak(Number(streakStr));
+        if (longestStreakStr) setLongestStreak(Number(longestStreakStr));
         if (checkInsJson) {
           const all: DailyCheckIn[] = JSON.parse(checkInsJson);
           setCheckIns(all);
@@ -178,8 +184,12 @@ export function WellnessProvider({ children }: { children: React.ReactNode }) {
       const newStreak = streak + 1;
       setStreak(newStreak);
       await AsyncStorage.setItem(STREAK_KEY, String(newStreak));
+      if (newStreak > longestStreak) {
+        setLongestStreak(newStreak);
+        await AsyncStorage.setItem(LONGEST_STREAK_KEY, String(newStreak));
+      }
     },
-    [streak]
+    [streak, longestStreak]
   );
 
   const addToGrocery = useCallback(async (items: string[]) => {
@@ -222,6 +232,7 @@ export function WellnessProvider({ children }: { children: React.ReactNode }) {
         savedItems,
         completedTasks,
         streak,
+        longestStreak,
         lastCheckIn,
         groceryList,
         checkIns,

@@ -13,7 +13,9 @@ import {
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { ChatBubble, TypingIndicator, type Message } from "@/components/ChatBubble";
+import { PremiumGate } from "@/components/PremiumGate";
 import { askAI } from "@/lib/ai";
 
 const SUGGESTIONS = [
@@ -24,16 +26,98 @@ const SUGGESTIONS = [
   "How can I support my immune system?",
 ];
 
+function UsageBanner({
+  used,
+  limit,
+  onUpgrade,
+}: {
+  used: number;
+  limit: number;
+  onUpgrade: () => void;
+}) {
+  const colors = useColors();
+  const remaining = Math.max(0, limit - used);
+  const fraction = Math.min(used / limit, 1);
+  const isExhausted = remaining === 0;
+
+  return (
+    <View
+      style={[
+        styles.usageBanner,
+        {
+          backgroundColor: isExhausted ? colors.destructive + "18" : colors.muted,
+          borderColor: isExhausted ? colors.destructive + "44" : colors.border,
+          borderRadius: 14,
+          marginHorizontal: 16,
+          marginTop: 10,
+        },
+      ]}
+    >
+      <View style={styles.usageBannerRow}>
+        <Feather
+          name={isExhausted ? "lock" : "zap"}
+          size={14}
+          color={isExhausted ? colors.destructive : colors.primary}
+        />
+        <Text
+          style={[
+            styles.usageBannerText,
+            {
+              color: isExhausted ? colors.destructive : colors.foreground,
+              fontFamily: "Inter_500Medium",
+              flex: 1,
+            },
+          ]}
+        >
+          {isExhausted
+            ? "Daily AI limit reached — upgrade for unlimited coaching"
+            : `${remaining} free AI response${remaining === 1 ? "" : "s"} remaining today`}
+        </Text>
+        <TouchableOpacity
+          onPress={onUpgrade}
+          style={[styles.upgradeChip, { backgroundColor: colors.primary, borderRadius: 12 }]}
+        >
+          <Text style={[styles.upgradeChipText, { fontFamily: "Inter_600SemiBold" }]}>
+            Upgrade
+          </Text>
+        </TouchableOpacity>
+      </View>
+      {/* Progress bar */}
+      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+        <View
+          style={[
+            styles.progressFill,
+            {
+              width: `${fraction * 100}%` as any,
+              backgroundColor: isExhausted ? colors.destructive : colors.primary,
+              borderRadius: 2,
+            },
+          ]}
+        />
+      </View>
+    </View>
+  );
+}
+
 export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { isPremium, freeAIUsage, incrementAIUsage, FREE_AI_LIMIT, openPaywall } = useSubscription();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
+  const canSend = isPremium || freeAIUsage < FREE_AI_LIMIT;
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
+
+    if (!canSend) {
+      openPaywall();
+      return;
+    }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     const userMsg: Message = {
@@ -45,6 +129,8 @@ export default function ChatScreen() {
     setMessages((prev) => [userMsg, ...prev]);
     setInput("");
     setLoading(true);
+
+    if (!isPremium) incrementAIUsage();
 
     try {
       const response = await askAI(text.trim());
@@ -68,9 +154,7 @@ export default function ChatScreen() {
     }
   };
 
-  const renderItem = ({ item }: { item: Message }) => (
-    <ChatBubble message={item} />
-  );
+  const renderItem = ({ item }: { item: Message }) => <ChatBubble message={item} />;
 
   return (
     <KeyboardAvoidingView
@@ -78,6 +162,7 @@ export default function ChatScreen() {
       behavior="padding"
       keyboardVerticalOffset={0}
     >
+      {/* Header */}
       <View
         style={[
           styles.header,
@@ -91,16 +176,30 @@ export default function ChatScreen() {
         <View style={[styles.aiAvatarLarge, { backgroundColor: colors.secondary }]}>
           <Feather name="activity" size={20} color={colors.primary} />
         </View>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={[styles.headerTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-            Natura AI
+            Natura AI Coach
           </Text>
           <Text style={[styles.headerSub, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-            Natural wellness guidance
+            {isPremium ? "Unlimited personalized guidance" : "Natural wellness guidance"}
           </Text>
         </View>
+        {isPremium && (
+          <View style={[styles.premiumBadge, { backgroundColor: colors.primary + "22", borderRadius: 12 }]}>
+            <Feather name="star" size={12} color={colors.primary} />
+            <Text style={[styles.premiumBadgeText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
+              Premium
+            </Text>
+          </View>
+        )}
       </View>
 
+      {/* Free tier usage banner */}
+      {!isPremium && (
+        <UsageBanner used={freeAIUsage} limit={FREE_AI_LIMIT} onUpgrade={openPaywall} />
+      )}
+
+      {/* Empty state */}
       {messages.length === 0 && (
         <View style={styles.emptyState}>
           <Text style={[styles.emptyTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
@@ -109,22 +208,27 @@ export default function ChatScreen() {
           <Text style={[styles.emptySubtitle, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
             Ask about herbs, teas, remedies, or wellness topics. All suggestions are educational only.
           </Text>
-          <View style={styles.suggestions}>
-            {SUGGESTIONS.map((s, i) => (
-              <TouchableOpacity
-                key={i}
-                onPress={() => sendMessage(s)}
-                style={[
-                  styles.suggestionChip,
-                  { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 20 },
-                ]}
-              >
-                <Text style={[styles.suggestionText, { color: colors.foreground, fontFamily: "Inter_400Regular" }]}>
-                  {s}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+
+          {!canSend ? (
+            <PremiumGate feature="Unlimited AI coaching" compact />
+          ) : (
+            <View style={styles.suggestions}>
+              {SUGGESTIONS.map((s, i) => (
+                <TouchableOpacity
+                  key={i}
+                  onPress={() => sendMessage(s)}
+                  style={[
+                    styles.suggestionChip,
+                    { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 20 },
+                  ]}
+                >
+                  <Text style={[styles.suggestionText, { color: colors.foreground, fontFamily: "Inter_400Regular" }]}>
+                    {s}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
       )}
 
@@ -134,19 +238,14 @@ export default function ChatScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         inverted
-        contentContainerStyle={[
-          styles.listContent,
-          {
-            paddingBottom: 16,
-            paddingTop: loading ? 0 : 16,
-          },
-        ]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 16, paddingTop: loading ? 0 : 16 }]}
         ListHeaderComponent={loading ? <TypingIndicator /> : null}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       />
 
+      {/* Input bar */}
       <View
         style={[
           styles.inputBar,
@@ -157,38 +256,54 @@ export default function ChatScreen() {
           },
         ]}
       >
-        <View
-          style={[
-            styles.inputContainer,
-            { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 24 },
-          ]}
-        >
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            placeholder="Ask about herbs, sleep, stress..."
-            placeholderTextColor={colors.mutedForeground}
-            style={[styles.input, { color: colors.foreground, fontFamily: "Inter_400Regular" }]}
-            multiline
-            returnKeyType="send"
-            onSubmitEditing={() => sendMessage(input)}
-            editable={!loading}
-          />
+        {!canSend ? (
           <TouchableOpacity
-            onPress={() => sendMessage(input)}
-            disabled={!input.trim() || loading}
+            onPress={openPaywall}
+            activeOpacity={0.85}
+            style={[styles.lockedInput, { backgroundColor: colors.muted, borderColor: colors.border, borderRadius: 16 }]}
+          >
+            <Feather name="lock" size={16} color={colors.mutedForeground} />
+            <Text style={[styles.lockedInputText, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+              Daily limit reached · Upgrade for unlimited
+            </Text>
+            <View style={[styles.upgradeSmallBtn, { backgroundColor: colors.primary, borderRadius: 10 }]}>
+              <Text style={[styles.upgradeSmallText, { fontFamily: "Inter_600SemiBold" }]}>Upgrade</Text>
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <View
             style={[
-              styles.sendButton,
-              { backgroundColor: input.trim() && !loading ? colors.primary : colors.muted, borderRadius: 20 },
+              styles.inputContainer,
+              { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 24 },
             ]}
           >
-            <Feather
-              name="arrow-up"
-              size={18}
-              color={input.trim() && !loading ? colors.primaryForeground : colors.mutedForeground}
+            <TextInput
+              value={input}
+              onChangeText={setInput}
+              placeholder="Ask about herbs, sleep, stress..."
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.input, { color: colors.foreground, fontFamily: "Inter_400Regular" }]}
+              multiline
+              returnKeyType="send"
+              onSubmitEditing={() => sendMessage(input)}
+              editable={!loading}
             />
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              onPress={() => sendMessage(input)}
+              disabled={!input.trim() || loading}
+              style={[
+                styles.sendButton,
+                { backgroundColor: input.trim() && !loading ? colors.primary : colors.muted, borderRadius: 20 },
+              ]}
+            >
+              <Feather
+                name="arrow-up"
+                size={18}
+                color={input.trim() && !loading ? colors.primaryForeground : colors.mutedForeground}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
         <Text style={[styles.inputDisclaimer, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
           Educational suggestions only — not medical advice
         </Text>
@@ -207,51 +322,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     gap: 12,
   },
-  aiAvatarLarge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  aiAvatarLarge: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   headerTitle: { fontSize: 17 },
   headerSub: { fontSize: 12, marginTop: 1 },
-  emptyState: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 32,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  suggestions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    justifyContent: "center",
-  },
-  suggestionChip: {
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
+  premiumBadge: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 5, gap: 4 },
+  premiumBadgeText: { fontSize: 11 },
+  usageBanner: { padding: 12, borderWidth: 1, gap: 10, marginBottom: 4 },
+  usageBannerRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  usageBannerText: { fontSize: 13, lineHeight: 18 },
+  upgradeChip: { paddingHorizontal: 10, paddingVertical: 6 },
+  upgradeChipText: { color: "#fff", fontSize: 12 },
+  progressTrack: { height: 3, borderRadius: 2 },
+  progressFill: { height: 3 },
+  emptyState: { flex: 1, paddingHorizontal: 24, paddingTop: 32 },
+  emptyTitle: { fontSize: 18, marginBottom: 8, textAlign: "center" },
+  emptySubtitle: { fontSize: 14, lineHeight: 21, textAlign: "center", marginBottom: 24 },
+  suggestions: { flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center" },
+  suggestionChip: { borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
   suggestionText: { fontSize: 13 },
-  listContent: {
-    paddingHorizontal: 0,
-  },
-  inputBar: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-  },
+  listContent: { paddingHorizontal: 0 },
+  inputBar: { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1 },
   inputContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -259,23 +349,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
-    maxHeight: 100,
-    marginRight: 8,
-  },
-  sendButton: {
-    width: 36,
-    height: 36,
+  input: { flex: 1, fontSize: 15, lineHeight: 22, maxHeight: 100, marginRight: 8 },
+  sendButton: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
+  lockedInput: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    padding: 14,
+    borderWidth: 1,
+    gap: 10,
   },
-  inputDisclaimer: {
-    fontSize: 10,
-    textAlign: "center",
-    marginTop: 6,
-    marginBottom: 4,
-  },
+  lockedInputText: { flex: 1, fontSize: 13 },
+  upgradeSmallBtn: { paddingHorizontal: 10, paddingVertical: 6 },
+  upgradeSmallText: { color: "#fff", fontSize: 12 },
+  inputDisclaimer: { fontSize: 10, textAlign: "center", marginTop: 6, marginBottom: 4 },
 });

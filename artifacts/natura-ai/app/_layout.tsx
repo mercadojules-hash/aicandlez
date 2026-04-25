@@ -14,6 +14,9 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { PaywallModal } from "@/components/PaywallModal";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { UserProvider } from "@/contexts/UserContext";
 import { WellnessProvider } from "@/contexts/WellnessContext";
 
@@ -23,19 +26,17 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="onboarding" />
-      <Stack.Screen
-        name="remedy/[id]"
-        options={{ presentation: "card", animation: "slide_from_right" }}
-      />
-      <Stack.Screen
-        name="plan/[id]"
-        options={{ presentation: "card", animation: "slide_from_right" }}
-      />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="legal" options={{ presentation: "card", animation: "slide_from_right" }} />
+        <Stack.Screen name="remedy/[id]" options={{ presentation: "card", animation: "slide_from_right" }} />
+        <Stack.Screen name="plan/[id]" options={{ presentation: "card", animation: "slide_from_right" }} />
+      </Stack>
+      <PaywallModal />
+    </>
   );
 }
 
@@ -61,11 +62,15 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
-              <UserProvider>
-                <WellnessProvider>
-                  <RootLayoutNav />
-                </WellnessProvider>
-              </UserProvider>
+              <ThemeProvider>
+                <SubscriptionProvider>
+                  <UserProvider>
+                    <WellnessProvider>
+                      <RootLayoutNav />
+                    </WellnessProvider>
+                  </UserProvider>
+                </SubscriptionProvider>
+              </ThemeProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
