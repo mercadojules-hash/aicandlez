@@ -1,0 +1,20 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "rSrgsAX4N6f_R80vhPrto"
+uri = "file://artifacts/natura-ai/assets/images/herbs-hero.png"
+type = "image"
+title = "herbs botanical flat lay"
+
+[[generated]]
+id = "HPOB7-K4yA-ntRCKjw7xH"
+uri = "file://artifacts/natura-ai/assets/images/tea-recipe.png"
+type = "image"
+title = "herbal tea wellness"
+
+[[generated]]
+id = "XSO8G5SNHnelaF9oLwNcb"
+uri = "file://artifacts/natura-ai/assets/images/recipe-bowl.png"
+type = "image"
+title = "wellness smoothie bowl"

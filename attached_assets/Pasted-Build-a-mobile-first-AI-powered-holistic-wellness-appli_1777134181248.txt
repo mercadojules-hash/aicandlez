@@ -1,0 +1,324 @@
+Build a mobile-first AI-powered holistic wellness application called "Natura AI".
+
+GOAL:
+A cross-platform mobile app (iOS + Android) that provides natural wellness guidance, personalized plans, habit tracking, AI memory, supplement suggestions, grocery lists, recipe generation, and daily routines.
+
+IMPORTANT:
+
+* This app provides educational wellness suggestions only.
+* Include a clear medical disclaimer on onboarding and settings.
+* No medical diagnosis, treatment, or medical claims.
+
+---
+
+TECH STACK:
+
+* Mobile: React Native with Expo
+* Backend: Node.js + Express
+* Database: SQLite (local) + optional cloud (Firebase or Supabase)
+* AI: OpenAI API (or mock AI responses if no key)
+* State: React Context or Zustand
+* Styling: Tailwind (NativeWind)
+
+---
+
+APP STRUCTURE:
+
+1. ONBOARDING
+
+* Welcome screen with Natura AI logo
+* REQUIRED disclaimer acceptance before continuing
+* Collect user preferences:
+
+  * Goals (sleep, stress, digestion, energy)
+  * Dietary preferences
+  * Allergies
+* Save profile locally
+
+---
+
+2. MAIN NAVIGATION (BOTTOM TABS)
+
+* Home
+* Ask AI
+* Plans
+* Recipes
+* Profile
+
+---
+
+3. HOME DASHBOARD
+
+* Greeting with user name
+* Daily wellness tip (AI-generated)
+* Daily “Quick Win” suggestion
+* Progress bar for daily routine
+* Recently saved remedies
+* Quick actions:
+
+  * Ask AI
+  * Generate plan
+  * Create recipe
+
+---
+
+4. AI CHAT (CORE FEATURE)
+   Input options:
+
+* Text input
+* Voice input (speech-to-text)
+
+AI returns structured response:
+
+* 🌿 Herbs
+* 🍵 Teas
+* 🥗 Foods
+* 💊 Supplements (safe wording only)
+* 💡 Why it helps
+
+Each suggestion includes:
+
+* Short explanation
+* Safety note
+
+Optional:
+
+* Text-to-speech output (AI reads results)
+
+---
+
+5. VISUAL REMEDY GUIDES (HIGH PRIORITY)
+   For every remedy or recipe:
+
+Display:
+
+* Title
+* Description
+* Step-by-step cards
+
+Each step includes:
+
+* Step number
+* Instruction
+* Image (placeholder or stock)
+
+Example:
+Step 1: Boil water
+Step 2: Add ginger
+Step 3: Steep
+Step 4: Drink
+
+Use:
+
+* Clean card UI
+* Scrollable layout
+
+---
+
+6. INTERACTIVE GUIDED MODE
+
+* “Start Guide” button
+* Walk user step-by-step
+* One step at a time
+* Next button
+* Optional timers (e.g., steep 10 minutes)
+* Optional voice playback
+
+---
+
+7. PERSONALIZED PLANS
+   Generate plans based on goals or symptoms:
+
+Example:
+“3-Day Stress Relief Plan”
+
+Include:
+
+* Morning routine
+* Afternoon habits
+* Evening routine
+* Foods + teas + supplements
+
+Allow:
+
+* Save plan
+* Edit plan
+* Regenerate plan
+
+---
+
+8. DAILY ROUTINE TRACKER (RETENTION FEATURE)
+
+* Checklist system
+* Daily completion score
+* Streak tracking
+* Progress bar
+
+Gamification:
+
+* “3-day streak”
+* Encouragement messages
+
+---
+
+9. GOAL PROGRESSION TRACKING
+
+* Daily check-in (1–5 scale):
+
+  * Energy
+  * Stress
+  * Sleep
+
+Display:
+
+* Weekly charts
+* AI insights:
+  “Your stress improved this week”
+
+---
+
+10. AI MEMORY (SMART PERSONALIZATION)
+    Store:
+
+* User goals
+* Preferences
+* Past queries
+* Saved items
+
+Use to:
+
+* Personalize responses
+* Avoid repetition
+* Suggest better plans over time
+
+---
+
+11. SUPPLEMENT RECOMMENDATIONS
+
+* General wellness supplements only
+* No dosage claims
+* Include safety disclaimers
+
+---
+
+12. GROCERY LIST GENERATOR
+    From plans or recipes:
+
+* Auto-create list
+* Check off items
+* Save lists
+
+---
+
+13. RECIPE BUILDER
+    User selects goal:
+    AI generates:
+
+* Recipe
+* Ingredients
+* Steps
+* Optional variations
+
+---
+
+14. SAVED COLLECTIONS
+    Users can save:
+
+* Remedies
+* Plans
+* Recipes
+
+Organize:
+
+* Favorites
+* My routines
+* Saved items
+
+---
+
+15. SMART NOTIFICATIONS (OPTIONAL)
+
+* Reminders:
+
+  * Drink tea
+  * Follow routine
+* User-controlled toggle
+
+---
+
+16. FREEMIUM MODEL
+    Free:
+
+* Limited AI queries per day
+* Basic plans
+
+Premium:
+
+* Unlimited AI queries
+* Advanced personalization
+* Saved history
+* Deeper insights
+
+Include upgrade prompts
+
+---
+
+17. SAFETY + COMPLIANCE
+
+* Use safe wording:
+  “May support”
+  “Traditionally used for”
+* Avoid medical claims
+* Include disclaimer wherever needed
+
+---
+
+18. UI DESIGN (VERY IMPORTANT)
+
+* LIGHT MODE ONLY
+* Calm, natural palette (soft whites, greens, beige)
+* Rounded cards
+* Clean spacing
+* Smooth animations
+* Minimal shadows
+* NO dark UI or heavy gradients
+
+---
+
+19. IMAGE HANDLING
+
+* Use placeholder images
+* Structure for future image API integration
+* Fallback icons if images are missing
+
+---
+
+20. LOGO INTEGRATION
+
+The logo file "natura-logo.png" has been uploaded.
+
+Use it in the app as follows:
+
+* Onboarding screen: large, centered logo
+* Home screen: small header logo
+* Splash screen: centered logo (optional)
+
+Design rules:
+
+* Do NOT stretch or distort the logo
+* Maintain proper spacing around the logo
+* Use only on light backgrounds
+* Do NOT add shadows, glow, or effects
+* Keep original colors
+
+---
+
+OUTPUT REQUIREMENTS:
+
+* Fully functional Expo mobile app
+* Working navigation (tabs)
+* AI responses (real or mocked)
+* Voice + text input support
+* Local storage for memory
+* Clean, premium UI
+* Structured code for scalability

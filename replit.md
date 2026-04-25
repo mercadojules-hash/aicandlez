@@ -60,4 +60,25 @@ Shared backend for trading operations.
 - `liveTrading` defaults to `false` — all trades simulated
 - To enable: implement `executeTrade(symbol, side, amount)` in `artifacts/api-server/src/lib/trading.ts` using `binance-api-node`
 
+### natura-ai (Expo/React Native @ /natura-ai)
+Mobile-first AI-powered holistic wellness app.
+
+**Features:**
+- Onboarding flow: Welcome → Disclaimer acceptance → Goal selection → Dietary preferences
+- AI Chat: Mock AI with keyword-based wellness responses for stress/sleep/digestion/energy/immunity
+- Wellness Plans: Curated multi-day plans with day-by-day activities, teas, foods, supplements
+- Remedy Guides: Step-by-step guided mode for herbal remedies
+- Recipes: Filter by goal, add ingredients to grocery list
+- Daily Routine Tracker: Checklist with morning/afternoon/evening tasks, progress bar, streaks
+- Grocery List: Accumulate ingredients from recipes/plans, check-off and clear
+- Saved Items: Bookmark remedies, plans, and recipes
+- Daily Check-In: Energy/stress/sleep scale, streak tracking
+- Profile: Stats, dietary prefs, allergies, reset onboarding
+
+**Design:** Light only — warm cream (#F8F6F0), forest green primary (#3D7A45), Inter font, radius 16
+**State:** AsyncStorage only (no backend) — UserContext + WellnessContext
+**AI:** Mock keyword-based responses in `lib/ai.ts` — no API key needed
+
+**Routes:** `/onboarding/*`, `/(tabs)` (Home, Ask AI, Plans, Recipes, Profile), `/remedy/[id]`, `/plan/[id]`
+
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.

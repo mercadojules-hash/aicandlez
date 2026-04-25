@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/natura-ai/"
+title = "Natura AI"
+version = "1.0.0"
+id = "artifacts/natura-ai"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/natura-ai/" ]
+localPort = 22060
+
+[services.development]
+run = "pnpm --filter @workspace/natura-ai run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/natura-ai", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/natura-ai", "run", "serve" ]
+
+[services.env]
+PORT = "22060"
+BASE_PATH = "/natura-ai/"
