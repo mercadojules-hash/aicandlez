@@ -1,0 +1,205 @@
+🚀 NATURA AI — FINAL BUILD + FIX PROMPT
+
+Fix the current Expo mobile app and upgrade it to a fully functional, interactive, production-ready app.
+
+---
+
+## 🔥 CRITICAL ISSUE TO FIX FIRST
+
+The app currently loads but behaves like a static image.
+Buttons are NOT clickable.
+
+Fix this completely:
+
+1. REMOVE any incompatible packages:
+
+   * expo-glass-effect
+   * expo-router/unstable-native-tabs
+   * any experimental navigation libraries
+
+2. IMPLEMENT proper navigation:
+   Use:
+
+   * @react-navigation/native
+   * @react-navigation/native-stack
+   * @react-navigation/bottom-tabs
+
+3. ENSURE ALL BUTTONS WORK:
+
+   * Wrap buttons in TouchableOpacity or Pressable
+   * Add working onPress handlers
+   * Each button must navigate or trigger an action
+
+4. VERIFY:
+
+   * Tapping buttons MUST respond
+   * Navigation between screens MUST work
+   * App must NOT freeze in Expo Go
+
+---
+
+## 📱 APP STRUCTURE (REQUIRED)
+
+SCREENS:
+
+1. OnboardingScreen
+
+   * Logo at top
+   * Headline: "Natural wellness, guided by AI"
+   * Feature cards (scrollable)
+   * "Get Started" button → goes to Main App
+
+2. HomeScreen
+
+   * Greeting
+   * Daily tip card
+   * Quick action buttons:
+
+     * Ask AI
+     * Generate Plan
+     * Recipes
+
+3. ChatScreen (AI)
+
+   * Text input
+   * Voice input button (UI only is fine)
+   * Response sections:
+     🌿 Herbs
+     🍵 Teas
+     🥗 Foods
+     💊 Supplements
+     💡 Why it helps
+
+4. PlansScreen
+
+   * Generated wellness plans
+   * Save / regenerate buttons
+
+5. RecipesScreen
+
+   * Recipe cards
+   * Click → detail page with steps + images
+
+6. ProfileScreen
+
+   * Preferences
+   * Saved items
+   * Disclaimer
+
+---
+
+## 🎨 UI DESIGN (PREMIUM — NOT DARK)
+
+Use a LIGHT, CLEAN wellness aesthetic:
+
+Background:
+#F6F8F3
+
+Primary Green:
+#5C7F5F
+
+Accent Green:
+#8FAF8F
+
+Text:
+#1F2A1F
+
+Cards:
+
+* White (#FFFFFF)
+* Soft shadow
+* Rounded corners (16–20px)
+
+DO NOT:
+
+* Use dark backgrounds
+* Use neon or harsh colors
+
+---
+
+## 🧠 AI BEHAVIOR (MOCK OK)
+
+If no API key:
+
+* Simulate AI responses with structured data
+
+Return format:
+
+{
+herbs: [],
+teas: [],
+foods: [],
+supplements: [],
+explanation: ""
+}
+
+---
+
+## 🖼️ LOGO IMPLEMENTATION (IMPORTANT)
+
+Use the uploaded Natura AI logo (icon version — no text).
+
+Apply it to:
+
+1. Onboarding screen (top center)
+2. Splash screen
+3. App icon
+
+---
+
+## 📲 GENERATE APP ICONS
+
+From the uploaded logo, generate:
+
+* 1024x1024 (main)
+* 512x512
+* 192x192
+* 180x180 (iOS)
+* 48x48 (favicon)
+
+REQUIREMENTS:
+
+* Keep full circular design visible
+* Do NOT crop edges
+* Add padding if needed
+* Background color MUST be:
+  #F6F8F3
+
+---
+
+## ⚡ PERFORMANCE REQUIREMENTS
+
+* App must run smoothly in Expo Go
+* No freezing
+* No blank screens
+* No console errors
+
+---
+
+## 📦 OUTPUT REQUIREMENTS
+
+* Fully working Expo app
+* Functional navigation
+* Clickable UI
+* Clean file structure
+* Responsive mobile layout
+
+---
+
+## 🔥 BONUS (IF POSSIBLE)
+
+* Add subtle animations (fade in, card lift)
+* Add loading states for AI responses
+* Add haptic feedback (optional)
+
+---
+
+## END RESULT:
+
+A REAL, usable mobile app — not a static mockup.
+
+Everything must be clickable, navigable, and functional.
+
+---
+
+Use the uploaded logo and begin fixing + rebuilding immediately.

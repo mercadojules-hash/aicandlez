@@ -60,7 +60,7 @@ export default function HomeScreen() {
           </Text>
         </View>
         <Image
-          source={require("@/assets/images/icon.png")}
+          source={require("@/assets/images/logo.png")}
           style={styles.headerLogo}
           contentFit="contain"
         />
