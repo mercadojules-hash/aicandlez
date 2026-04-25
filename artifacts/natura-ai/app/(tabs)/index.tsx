@@ -1,8 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React from "react";
 import {
+  Animated,
   Platform,
   ScrollView,
   StyleSheet,
@@ -12,10 +13,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useFadeIn, usePressScale } from "@/hooks/useFadeIn";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
 import { WellnessTipCard, RemedyCard } from "@/components/Cards";
 import { ChecklistItem } from "@/components/ChecklistItem";
+import { DailyCheckIn } from "@/components/DailyCheckIn";
 import { REMEDIES, ROUTINE_TASKS, getTodayTip, getQuickWin } from "@/lib/data";
 
 const MORNING_TASKS = ROUTINE_TASKS.filter((t) => t.category === "morning").slice(0, 3);
@@ -23,23 +26,60 @@ const AFTERNOON_TASKS = ROUTINE_TASKS.filter((t) => t.category === "afternoon").
 const EVENING_TASKS = ROUTINE_TASKS.filter((t) => t.category === "evening").slice(0, 2);
 const ALL_HOME_TASKS = [...MORNING_TASKS, ...AFTERNOON_TASKS, ...EVENING_TASKS];
 
+function AnimatedActionButton({
+  icon,
+  label,
+  route,
+  delay,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  route: string;
+  delay: number;
+}) {
+  const colors = useColors();
+  const { scale, onPressIn, onPressOut } = usePressScale();
+  const { opacity, translateY } = useFadeIn(350, delay);
+
+  return (
+    <Animated.View style={[{ flex: 1, opacity, transform: [{ translateY }, { scale }] }]}>
+      <TouchableOpacity
+        onPress={() => router.push(route as any)}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={[
+          styles.quickAction,
+          { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius - 4 },
+        ]}
+        activeOpacity={1}
+      >
+        <View style={[styles.quickActionIcon, { backgroundColor: colors.secondary, borderRadius: 22 }]}>
+          <Feather name={icon} size={20} color={colors.primary} />
+        </View>
+        <Text style={[styles.quickActionLabel, { color: colors.foreground, fontFamily: "Inter_500Medium" }]}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { profile } = useUser();
   const { toggleTask, isTaskDone, streak, saveItem, isSaved } = useWellness();
-  const [checkInVisible, setCheckInVisible] = useState(false);
-  const [checkIn, setCheckIn] = useState({ energy: 3, stress: 3, sleep: 3 });
 
   const tip = getTodayTip();
   const quickWin = getQuickWin();
   const completedCount = ALL_HOME_TASKS.filter((t) => isTaskDone(t.id)).length;
   const progressPct = ALL_HOME_TASKS.length > 0 ? completedCount / ALL_HOME_TASKS.length : 0;
 
-  const firstName = profile.name.split(" ")[0] || "Friend";
+  const firstName = profile.name ? profile.name.split(" ")[0] : "Friend";
   const hour = new Date().getHours();
-  const greeting =
-    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
+  const { opacity: headerOpacity, translateY: headerY } = useFadeIn(300, 0);
 
   return (
     <ScrollView
@@ -50,7 +90,13 @@ export default function HomeScreen() {
       }}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.headerRow}>
+      {/* Header */}
+      <Animated.View
+        style={[
+          styles.headerRow,
+          { opacity: headerOpacity, transform: [{ translateY: headerY }] },
+        ]}
+      >
         <View>
           <Text style={[styles.greeting, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
             {greeting},
@@ -59,18 +105,25 @@ export default function HomeScreen() {
             {firstName}
           </Text>
         </View>
-        <Image
-          source={require("@/assets/images/logo.png")}
-          style={styles.headerLogo}
-          contentFit="contain"
-        />
-      </View>
+        <View style={[styles.logoWrap, { backgroundColor: colors.secondary }]}>
+          <Image
+            source={require("@/assets/images/logo.png")}
+            style={styles.headerLogo}
+            contentFit="contain"
+          />
+        </View>
+      </Animated.View>
 
+      {/* Streak banner */}
       {streak > 0 && (
         <View
           style={[
             styles.streakBanner,
-            { backgroundColor: colors.accent + "20", borderColor: colors.accent + "40", borderRadius: colors.radius - 4 },
+            {
+              backgroundColor: colors.accent + "20",
+              borderColor: colors.accent + "40",
+              borderRadius: colors.radius - 4,
+            },
           ]}
         >
           <Feather name="zap" size={16} color={colors.accent} />
@@ -80,8 +133,13 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* Daily Check-In — PRIMARY FEATURE */}
+      <DailyCheckIn />
+
+      {/* Today's Tip */}
       <WellnessTipCard tip={tip} quickWin={quickWin} />
 
+      {/* Today's Routine */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
@@ -92,7 +150,12 @@ export default function HomeScreen() {
           </Text>
         </View>
         <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-          <View style={[styles.progressFill, { backgroundColor: colors.primary, width: `${progressPct * 100}%` }]} />
+          <View
+            style={[
+              styles.progressFill,
+              { backgroundColor: colors.primary, width: `${progressPct * 100}%` as any },
+            ]}
+          />
         </View>
         <View style={styles.taskList}>
           {ALL_HOME_TASKS.map((task) => (
@@ -108,6 +171,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* Wellness Remedies */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
@@ -136,33 +200,15 @@ export default function HomeScreen() {
         </ScrollView>
       </View>
 
+      {/* Quick Actions */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold", marginBottom: 14 }]}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold", marginBottom: 14, paddingHorizontal: 20 }]}>
           Quick Actions
         </Text>
         <View style={styles.quickActions}>
-          {[
-            { icon: "message-circle" as const, label: "Ask AI", route: "/(tabs)/chat" },
-            { icon: "list" as const, label: "My Plans", route: "/(tabs)/plans" },
-            { icon: "book-open" as const, label: "Recipes", route: "/(tabs)/recipes" },
-          ].map((action) => (
-            <TouchableOpacity
-              key={action.label}
-              onPress={() => router.push(action.route as any)}
-              style={[
-                styles.quickAction,
-                { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius - 4 },
-              ]}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: colors.secondary, borderRadius: 20 }]}>
-                <Feather name={action.icon} size={20} color={colors.primary} />
-              </View>
-              <Text style={[styles.quickActionLabel, { color: colors.foreground, fontFamily: "Inter_500Medium" }]}>
-                {action.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          <AnimatedActionButton icon="message-circle" label="Ask AI" route="/(tabs)/chat" delay={0} />
+          <AnimatedActionButton icon="list" label="My Plans" route="/(tabs)/plans" delay={80} />
+          <AnimatedActionButton icon="book-open" label="Recipes" route="/(tabs)/recipes" delay={160} />
         </View>
       </View>
     </ScrollView>
@@ -180,7 +226,14 @@ const styles = StyleSheet.create({
   },
   greeting: { fontSize: 14 },
   name: { fontSize: 26 },
-  headerLogo: { width: 44, height: 44 },
+  logoWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerLogo: { width: 36, height: 36 },
   streakBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -217,7 +270,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   quickAction: {
-    flex: 1,
     alignItems: "center",
     paddingVertical: 16,
     borderWidth: 1,

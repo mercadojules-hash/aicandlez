@@ -1,0 +1,231 @@
+🚀 NATURA AI — MUST-HAVE APP UPGRADE (INTERACTION + ENGAGEMENT + LOGO UPDATE)
+
+We are upgrading the existing Natura AI mobile app to a premium, highly interactive, daily-use product.
+
+---
+
+## 🟢 IMPORTANT UPDATE (LOGO)
+
+We are updating the app logo.
+
+Use the NEW attached logo (transparent PNG):
+
+Requirements:
+
+* Fully transparent background
+* Centered design
+* Do NOT crop the circular logo
+* Maintain padding around edges
+
+Update logo in:
+
+* App icon
+* Splash screen
+* Onboarding screen
+
+Regenerate icons:
+
+* 1024x1024 (main)
+* 512x512
+* 192x192
+* 180x180 (iOS)
+* 48x48
+
+---
+
+## 🔥 CORE GOAL
+
+Transform this app from a static UI into a:
+👉 Daily-use wellness assistant
+👉 Interactive experience
+👉 “Feels alive” product
+
+---
+
+## ❗ FIX ALL INTERACTION ISSUES
+
+Ensure:
+
+* ALL buttons are clickable
+* NO frozen screens
+* Proper navigation using React Navigation
+
+Use:
+
+* TouchableOpacity or Pressable
+* onPress handlers for every button
+
+Add:
+
+* Visual feedback on tap (scale or opacity change)
+
+---
+
+## ⚡ ADD SMOOTH ANIMATIONS (CRITICAL)
+
+Use:
+
+* react-native-reanimated or Animated API
+
+Add:
+
+* Fade-in on screen load
+* Card lift on press
+* Smooth transitions between screens
+* Loading animation when AI responds
+
+Goal:
+👉 App should feel fluid and responsive
+
+---
+
+## 🧠 ADD DAILY CHECK-IN (GAME CHANGER)
+
+On HomeScreen, add:
+
+Title:
+"How are you feeling today?"
+
+Options:
+
+* 😴 Low Energy
+* 😰 Stressed
+* 🤒 Not feeling well
+* 😌 Good
+
+When user selects:
+→ Immediately generate AI response:
+
+* Herbs
+* Tea
+* Foods
+* Quick action
+
+Make this the PRIMARY feature of the app.
+
+---
+
+## ⚡ MAKE AI RESPONSES FEEL PERSONAL
+
+Instead of generic responses, simulate personalization:
+
+Example:
+"Based on your stress levels, here’s what may help..."
+
+Use stored user preferences to influence responses.
+
+Even if mocked — must feel intelligent.
+
+---
+
+## 🧭 ADD “GUIDED MODE” (HIGH VALUE FEATURE)
+
+For remedies (e.g., Ginger Tea):
+
+Create step-by-step guided flow:
+
+Screen format:
+Step 1 → instruction → Next
+Step 2 → instruction → Next
+Step 3 → Done
+
+Include:
+
+* Progress indicator
+* Clean step cards
+* Optional image placeholder
+
+Goal:
+👉 Feels like a coach guiding the user
+
+---
+
+## ⚡ ADD ONE-TAP ACTIONS
+
+For every AI result, include buttons:
+
+* "Start Guide"
+* "Save"
+* "Add to Grocery List"
+
+Ensure all buttons:
+
+* Trigger real actions
+* Update local state
+
+---
+
+## 🛒 GROCERY LIST (INTERACTIVE)
+
+Allow:
+
+* Auto-generate from remedies/plans
+* Check/uncheck items
+* Save list locally
+
+---
+
+## 🎯 HOME SCREEN IMPROVEMENTS
+
+Add:
+
+* Daily tip card (AI-generated)
+* Recent activity (saved remedies)
+* Quick actions:
+
+  * Ask AI
+  * Generate Plan
+  * Recipes
+
+---
+
+## 🎨 UI DESIGN (KEEP THIS STYLE)
+
+Background:
+#F6F8F3
+
+Primary:
+#5C7F5F
+
+Accent:
+#8FAF8F
+
+Text:
+#1F2A1F
+
+Cards:
+
+* White
+* Rounded (16–20px)
+* Soft shadows
+
+DO NOT:
+
+* Use dark UI
+* Use harsh/neon colors
+
+---
+
+## ⚡ PERFORMANCE REQUIREMENTS
+
+* Must run smoothly in Expo Go
+* No freezing
+* No static screens
+* No console errors
+
+---
+
+## 📦 FINAL RESULT REQUIRED
+
+The app should:
+
+✔ Feel interactive (not static)
+✔ Have working navigation
+✔ Respond instantly to user input
+✔ Include daily engagement (check-in)
+✔ Guide users step-by-step
+✔ Feel like a real product
+
+---
+
+BEGIN IMPLEMENTATION IMMEDIATELY USING THE UPDATED LOGO.
