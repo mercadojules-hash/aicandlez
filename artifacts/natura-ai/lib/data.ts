@@ -836,3 +836,22 @@ export function getQuickWin(): string {
   const day = new Date().getDay();
   return wins[day % wins.length];
 }
+
+const CATEGORY_FALLBACKS: Record<string, string> = {
+  stress: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&q=80&fit=crop",
+  sleep: "https://images.unsplash.com/photo-1545389336-cf090694435e?w=600&q=80&fit=crop",
+  energy: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80&fit=crop",
+  immunity: "https://images.unsplash.com/photo-1490818787583-167e74326402?w=600&q=80&fit=crop",
+  digestion: "https://images.unsplash.com/photo-1563911302-7aca0ab7d5dd?w=600&q=80&fit=crop",
+  "stress & sleep": "https://images.unsplash.com/photo-1535268244668-749d57b63c7c?w=600&q=80&fit=crop",
+  "sleep & stress": "https://images.unsplash.com/photo-1546554137-cf5a9b4a228b?w=600&q=80&fit=crop",
+};
+
+const DEFAULT_FALLBACK =
+  "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=600&q=80&fit=crop";
+
+export function getImageUrl(category: string, provided?: string): string {
+  if (provided && provided.trim().length > 0) return provided;
+  const key = category?.toLowerCase() ?? "";
+  return CATEGORY_FALLBACKS[key] ?? DEFAULT_FALLBACK;
+}

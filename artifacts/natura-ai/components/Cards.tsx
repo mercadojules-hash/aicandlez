@@ -1,8 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import React from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useState } from "react";
 import {
+  Animated,
   Platform,
   StyleSheet,
   Text,
@@ -10,41 +12,122 @@ import {
   View,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { getImageUrl } from "@/lib/data";
 import type { Remedy, WellnessPlan, Recipe, DailyTip } from "@/lib/data";
 
-function CardImage({ imageUrl, height = 150 }: { imageUrl: string; height?: number }) {
+const useND = Platform.OS !== "web";
+
+interface CardImageProps {
+  imageUrl: string;
+  category?: string;
+  height?: number;
+  borderRadius?: number;
+  withGradient?: boolean;
+  gradientIntensity?: "soft" | "strong";
+}
+
+function CardImage({
+  imageUrl,
+  category = "",
+  height = 160,
+  borderRadius = 0,
+  withGradient = false,
+  gradientIntensity = "soft",
+}: CardImageProps) {
+  const [loaded, setLoaded] = useState(false);
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  const resolvedUrl = getImageUrl(category, imageUrl);
+
+  const handleLoad = () => {
+    setLoaded(true);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 350,
+      useNativeDriver: useND,
+    }).start();
+  };
+
+  const gradientColors =
+    gradientIntensity === "strong"
+      ? (["transparent", "rgba(0,0,0,0.70)"] as const)
+      : (["transparent", "rgba(0,0,0,0.45)"] as const);
+
   return (
-    <Image
-      source={{ uri: imageUrl }}
-      style={[styles.cardImage, { height }]}
-      contentFit="cover"
-      transition={300}
-      placeholder={{ color: "#DDE5DD" }}
-    />
+    <View
+      style={{
+        height,
+        borderRadius,
+        overflow: "hidden",
+        backgroundColor: "#D0DCCF",
+      }}
+    >
+      {/* Skeleton shimmer base */}
+      {!loaded && (
+        <View
+          style={[
+            StyleSheet.absoluteFillObject,
+            { backgroundColor: "#D0DCCF" },
+          ]}
+        />
+      )}
+
+      {/* The actual image fades in */}
+      <Animated.View
+        style={[StyleSheet.absoluteFillObject, { opacity: loaded ? 1 : fadeAnim }]}
+      >
+        <Image
+          source={{ uri: resolvedUrl }}
+          style={{ width: "100%", height: "100%" }}
+          contentFit="cover"
+          onLoad={handleLoad}
+          onError={() => {
+            setLoaded(true);
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: useND,
+            }).start();
+          }}
+        />
+      </Animated.View>
+
+      {/* Gradient overlay */}
+      {withGradient && (
+        <LinearGradient
+          colors={gradientColors}
+          style={StyleSheet.absoluteFillObject}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+        />
+      )}
+    </View>
   );
 }
 
-function cardShadow(isDark: boolean) {
+function cardShadow() {
   if (Platform.OS === "web") {
-    return isDark
-      ? { boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }
-      : { boxShadow: "0 2px 12px rgba(0,0,0,0.08)" };
+    return { boxShadow: "0 2px 14px rgba(0,0,0,0.09)" };
   }
-  return isDark
-    ? { elevation: 3 }
-    : {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 2,
-      };
+  return {
+    shadowColor: "#2A3E2A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  };
 }
 
 export function WellnessTipCard({ tip, quickWin }: { tip: DailyTip; quickWin: string }) {
   const colors = useColors();
   return (
-    <View style={[styles.tipCard, { backgroundColor: colors.primary, borderRadius: colors.radius }]}>
+    <View
+      style={[
+        styles.tipCard,
+        { backgroundColor: colors.primary, borderRadius: 20 },
+        cardShadow(),
+      ]}
+    >
       <View style={styles.tipTop}>
         <Text style={[styles.tipLabel, { color: colors.primaryForeground + "CC", fontFamily: "Inter_500Medium" }]}>
           TODAY'S TIP
@@ -57,7 +140,7 @@ export function WellnessTipCard({ tip, quickWin }: { tip: DailyTip; quickWin: st
       <Text style={[styles.tipBody, { color: colors.primaryForeground + "DD", fontFamily: "Inter_400Regular" }]}>
         {tip.body}
       </Text>
-      <View style={[styles.quickWinBox, { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: colors.radius - 6 }]}>
+      <View style={[styles.quickWinBox, { backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 12 }]}>
         <Feather name="zap" size={14} color={colors.primaryForeground} />
         <Text style={[styles.quickWinText, { color: colors.primaryForeground, fontFamily: "Inter_500Medium" }]}>
           Quick Win: {quickWin}
@@ -76,7 +159,6 @@ interface RemedyCardProps {
 
 export function RemedyCard({ remedy, onPress, isSaved, onSave }: RemedyCardProps) {
   const colors = useColors();
-  const shadow = cardShadow(false);
 
   return (
     <TouchableOpacity
@@ -84,50 +166,62 @@ export function RemedyCard({ remedy, onPress, isSaved, onSave }: RemedyCardProps
       activeOpacity={0.88}
       style={[
         styles.remedyCard,
-        { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius },
-        shadow,
+        { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 16 },
+        cardShadow(),
       ]}
     >
-      <View style={styles.remedyImageContainer}>
-        <CardImage imageUrl={remedy.imageUrl} height={130} />
-        <View style={[styles.categoryBadge, { backgroundColor: colors.primary + "EE", borderRadius: 20 }]}>
-          <Text style={[styles.categoryText, { color: "#fff", fontFamily: "Inter_600SemiBold" }]}>
-            {remedy.category}
-          </Text>
+      {/* Image block — always rendered, fixed height */}
+      <View style={{ borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: "hidden" }}>
+        <CardImage
+          imageUrl={remedy.imageUrl}
+          category={remedy.category}
+          height={140}
+          withGradient
+          gradientIntensity="soft"
+        />
+        {/* Overlaid badges */}
+        <View style={styles.imageOverlay}>
+          <View style={[styles.categoryBadge, { backgroundColor: colors.primary + "F0" }]}>
+            <Text style={[styles.badgeText, { color: "#fff", fontFamily: "Inter_600SemiBold" }]}>
+              {remedy.category}
+            </Text>
+          </View>
+          {onSave && (
+            <TouchableOpacity
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSave(); }}
+              style={styles.saveBtn}
+            >
+              <Feather name="bookmark" size={15} color={isSaved ? colors.primary : "#555"} />
+            </TouchableOpacity>
+          )}
         </View>
-        {onSave && (
-          <TouchableOpacity
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSave(); }}
-            style={[styles.saveButton, { backgroundColor: "rgba(255,255,255,0.92)", borderRadius: 20 }]}
-          >
-            <Feather name="bookmark" size={15} color={isSaved ? colors.primary : colors.mutedForeground} />
-          </TouchableOpacity>
-        )}
       </View>
-      <View style={styles.remedyContent}>
-        <Text numberOfLines={2} style={[styles.remedyTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
+
+      {/* Content */}
+      <View style={styles.cardContent}>
+        <Text numberOfLines={2} style={[styles.cardTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
           {remedy.title}
         </Text>
-        <Text numberOfLines={2} style={[styles.remedyDesc, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+        <Text numberOfLines={2} style={[styles.cardDesc, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
           {remedy.description}
         </Text>
-        {remedy.bestTime && (
+        {remedy.bestTime ? (
           <View style={[styles.bestTimeRow, { backgroundColor: colors.muted, borderRadius: 6 }]}>
-            <Feather name="clock" size={11} color={colors.primary} />
+            <Feather name="clock" size={10} color={colors.primary} />
             <Text numberOfLines={1} style={[styles.bestTimeText, { color: colors.primary, fontFamily: "Inter_500Medium" }]}>
               {remedy.bestTime}
             </Text>
           </View>
-        )}
-        <View style={styles.remedyMeta}>
+        ) : null}
+        <View style={styles.metaRow}>
           <View style={styles.metaItem}>
-            <Feather name="clock" size={12} color={colors.mutedForeground} />
+            <Feather name="clock" size={11} color={colors.mutedForeground} />
             <Text style={[styles.metaText, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
               {remedy.prepTime}
             </Text>
           </View>
           <View style={styles.metaItem}>
-            <Feather name="list" size={12} color={colors.mutedForeground} />
+            <Feather name="list" size={11} color={colors.mutedForeground} />
             <Text style={[styles.metaText, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
               {remedy.steps.length} steps
             </Text>
@@ -147,7 +241,6 @@ interface PlanCardProps {
 
 export function PlanCard({ plan, onPress, isSaved, onSave }: PlanCardProps) {
   const colors = useColors();
-  const shadow = cardShadow(false);
 
   return (
     <TouchableOpacity
@@ -155,44 +248,52 @@ export function PlanCard({ plan, onPress, isSaved, onSave }: PlanCardProps) {
       activeOpacity={0.88}
       style={[
         styles.planCard,
-        { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius },
-        shadow,
+        { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 16 },
+        cardShadow(),
       ]}
     >
-      <View style={{ position: "relative" }}>
-        <CardImage imageUrl={plan.imageUrl} height={180} />
-        <View style={[styles.planGradient, { borderTopLeftRadius: colors.radius, borderTopRightRadius: colors.radius }]} />
-        <View style={styles.planOverlay}>
-          <View style={[styles.durationBadge, { backgroundColor: colors.primary + "EE", borderRadius: 20 }]}>
-            <Text style={[styles.durationText, { color: "#fff", fontFamily: "Inter_600SemiBold" }]}>
+      {/* Hero image — tall, strong gradient */}
+      <View style={{ borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: "hidden" }}>
+        <CardImage
+          imageUrl={plan.imageUrl}
+          category={plan.goal}
+          height={185}
+          withGradient
+          gradientIntensity="strong"
+        />
+        <View style={styles.planImageOverlay}>
+          <View style={[styles.durationBadge, { backgroundColor: colors.primary + "F0" }]}>
+            <Text style={[styles.badgeText, { color: "#fff", fontFamily: "Inter_600SemiBold" }]}>
               {plan.duration}
             </Text>
           </View>
           {onSave && (
             <TouchableOpacity
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSave(); }}
-              style={[styles.saveButton, { backgroundColor: "rgba(255,255,255,0.92)", borderRadius: 20 }]}
+              style={styles.saveBtn}
             >
-              <Feather name="bookmark" size={15} color={isSaved ? colors.primary : colors.mutedForeground} />
+              <Feather name="bookmark" size={15} color={isSaved ? colors.primary : "#555"} />
             </TouchableOpacity>
           )}
         </View>
       </View>
-      <View style={styles.planContent}>
+
+      {/* Content */}
+      <View style={styles.cardContent}>
         <Text numberOfLines={2} style={[styles.planTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
           {plan.title}
         </Text>
-        <Text numberOfLines={2} style={[styles.planSubtitle, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+        <Text numberOfLines={2} style={[styles.cardDesc, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
           {plan.subtitle}
         </Text>
         <TouchableOpacity
           onPress={onPress}
-          style={[styles.startButton, { backgroundColor: colors.primary, borderRadius: colors.radius - 6 }]}
+          style={[styles.viewPlanBtn, { backgroundColor: colors.primary, borderRadius: 12 }]}
         >
-          <Text style={[styles.startButtonText, { color: colors.primaryForeground, fontFamily: "Inter_600SemiBold" }]}>
+          <Text style={[styles.viewPlanText, { color: "#fff", fontFamily: "Inter_600SemiBold" }]}>
             View Plan
           </Text>
-          <Feather name="arrow-right" size={14} color={colors.primaryForeground} />
+          <Feather name="arrow-right" size={14} color="#fff" />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -209,7 +310,6 @@ interface RecipeCardProps {
 
 export function RecipeCard({ recipe, onPress, onAddToGrocery, isSaved, onSave }: RecipeCardProps) {
   const colors = useColors();
-  const shadow = cardShadow(false);
 
   return (
     <TouchableOpacity
@@ -217,21 +317,32 @@ export function RecipeCard({ recipe, onPress, onAddToGrocery, isSaved, onSave }:
       activeOpacity={0.88}
       style={[
         styles.recipeCard,
-        { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius },
-        shadow,
+        { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 16 },
+        cardShadow(),
       ]}
     >
-      <View style={{ position: "relative" }}>
-        <CardImage imageUrl={recipe.imageUrl} height={170} />
-        <View style={[styles.recipeGoalBadge, { backgroundColor: colors.accent + "EE", borderRadius: 20 }]}>
-          <Text style={[styles.categoryText, { color: "#fff", fontFamily: "Inter_600SemiBold" }]}>
-            {recipe.goal}
-          </Text>
+      {/* Image with gradient */}
+      <View style={{ borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: "hidden" }}>
+        <CardImage
+          imageUrl={recipe.imageUrl}
+          category={recipe.goal}
+          height={175}
+          withGradient
+          gradientIntensity="soft"
+        />
+        <View style={styles.imageOverlay}>
+          <View style={[styles.goalBadge, { backgroundColor: colors.accent + "F0" }]}>
+            <Text style={[styles.badgeText, { color: "#fff", fontFamily: "Inter_600SemiBold" }]}>
+              {recipe.goal}
+            </Text>
+          </View>
         </View>
       </View>
-      <View style={styles.recipeContent}>
+
+      {/* Content */}
+      <View style={styles.cardContent}>
         <View style={styles.recipeHeader}>
-          <Text numberOfLines={2} style={[styles.remedyTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold", flex: 1 }]}>
+          <Text numberOfLines={2} style={[styles.cardTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold", flex: 1 }]}>
             {recipe.title}
           </Text>
           <View style={styles.recipeActions}>
@@ -247,26 +358,29 @@ export function RecipeCard({ recipe, onPress, onAddToGrocery, isSaved, onSave }:
             )}
           </View>
         </View>
-        <Text numberOfLines={2} style={[styles.remedyDesc, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+
+        <Text numberOfLines={2} style={[styles.cardDesc, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
           {recipe.description}
         </Text>
-        {recipe.whyItHelps && (
+
+        {recipe.whyItHelps ? (
           <View style={[styles.whyBox, { backgroundColor: colors.muted, borderRadius: 8 }]}>
             <Text numberOfLines={2} style={[styles.whyText, { color: colors.foreground, fontFamily: "Inter_400Regular" }]}>
               <Text style={{ fontFamily: "Inter_600SemiBold", color: colors.primary }}>Why it helps: </Text>
               {recipe.whyItHelps}
             </Text>
           </View>
-        )}
-        <View style={styles.remedyMeta}>
+        ) : null}
+
+        <View style={styles.metaRow}>
           <View style={styles.metaItem}>
-            <Feather name="clock" size={12} color={colors.mutedForeground} />
+            <Feather name="clock" size={11} color={colors.mutedForeground} />
             <Text style={[styles.metaText, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
               {recipe.prepTime}
             </Text>
           </View>
           <View style={styles.metaItem}>
-            <Feather name="tag" size={12} color={colors.mutedForeground} />
+            <Feather name="tag" size={11} color={colors.mutedForeground} />
             <Text style={[styles.metaText, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
               {recipe.category}
             </Text>
@@ -278,7 +392,6 @@ export function RecipeCard({ recipe, onPress, onAddToGrocery, isSaved, onSave }:
 }
 
 const styles = StyleSheet.create({
-  cardImage: { width: "100%", borderRadius: 0 },
   tipCard: { padding: 20, marginHorizontal: 16, marginBottom: 20 },
   tipTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   tipLabel: { fontSize: 11, letterSpacing: 1 },
@@ -287,37 +400,96 @@ const styles = StyleSheet.create({
   quickWinBox: { flexDirection: "row", alignItems: "flex-start", padding: 12, gap: 8 },
   quickWinText: { fontSize: 13, lineHeight: 19, flex: 1 },
 
-  remedyCard: { width: 230, borderWidth: 1, marginRight: 12, overflow: "hidden" },
-  remedyImageContainer: { position: "relative" },
-  categoryBadge: { position: "absolute", top: 10, left: 10, paddingHorizontal: 10, paddingVertical: 4 },
-  categoryText: { fontSize: 11, letterSpacing: 0.3 },
-  saveButton: { position: "absolute", top: 10, right: 10, width: 32, height: 32, alignItems: "center", justifyContent: "center" },
-  remedyContent: { padding: 14 },
-  remedyTitle: { fontSize: 14, marginBottom: 5, lineHeight: 20 },
-  remedyDesc: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
-  bestTimeRow: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 5, marginBottom: 10 },
+  remedyCard: {
+    width: 230,
+    borderWidth: 1,
+    marginRight: 12,
+    overflow: "hidden",
+  },
+  planCard: {
+    borderWidth: 1,
+    marginBottom: 16,
+    overflow: "hidden",
+  },
+  recipeCard: {
+    borderWidth: 1,
+    marginBottom: 16,
+    overflow: "hidden",
+  },
+
+  imageOverlay: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    right: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  planImageOverlay: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    right: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  categoryBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  goalBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  durationBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  badgeText: { fontSize: 11, letterSpacing: 0.3 },
+  saveBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  cardContent: { padding: 14 },
+  cardTitle: { fontSize: 14, lineHeight: 20, marginBottom: 5 },
+  cardDesc: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
+  bestTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginBottom: 10,
+  },
   bestTimeText: { fontSize: 11, flex: 1 },
-  remedyMeta: { flexDirection: "row", gap: 12 },
-  metaItem: { flexDirection: "row", alignItems: "center", gap: 4 },
-  metaText: { fontSize: 11 },
 
-  planCard: { borderWidth: 1, overflow: "hidden", marginBottom: 16 },
-  planGradient: { position: "absolute", bottom: 0, left: 0, right: 0, height: 60 },
-  planOverlay: { position: "absolute", top: 12, left: 12, right: 12, flexDirection: "row", justifyContent: "space-between" },
-  durationBadge: { paddingHorizontal: 10, paddingVertical: 4 },
-  durationText: { fontSize: 11, letterSpacing: 0.3 },
-  planContent: { padding: 16 },
   planTitle: { fontSize: 18, marginBottom: 6 },
-  planSubtitle: { fontSize: 14, lineHeight: 20, marginBottom: 14 },
-  startButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 12, gap: 6 },
-  startButtonText: { fontSize: 14 },
+  viewPlanBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    gap: 6,
+  },
+  viewPlanText: { fontSize: 14 },
 
-  recipeCard: { borderWidth: 1, marginBottom: 16, overflow: "hidden" },
-  recipeGoalBadge: { position: "absolute", top: 12, left: 12, paddingHorizontal: 10, paddingVertical: 4 },
-  recipeContent: { padding: 16 },
-  recipeHeader: { flexDirection: "row", alignItems: "flex-start", marginBottom: 8 },
+  recipeHeader: { flexDirection: "row", alignItems: "flex-start", marginBottom: 6 },
   recipeActions: { flexDirection: "row", gap: 6, marginLeft: 8, paddingTop: 2 },
   actionIcon: { padding: 4 },
   whyBox: { padding: 10, marginBottom: 10 },
   whyText: { fontSize: 12, lineHeight: 18 },
+
+  metaRow: { flexDirection: "row", gap: 12 },
+  metaItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+  metaText: { fontSize: 11 },
 });
