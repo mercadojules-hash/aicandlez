@@ -16,17 +16,12 @@ import { useColors } from "@/hooks/useColors";
 import { useFadeIn, usePressScale } from "@/hooks/useFadeIn";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
-import { WellnessTipCard, RemedyCard } from "@/components/Cards";
-import { ChecklistItem } from "@/components/ChecklistItem";
+import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { DailyCheckIn } from "@/components/DailyCheckIn";
-import { REMEDIES, ROUTINE_TASKS, getTodayTip, getQuickWin } from "@/lib/data";
+import { RemedyCard } from "@/components/Cards";
+import { REMEDIES } from "@/lib/data";
 
-const MORNING_TASKS = ROUTINE_TASKS.filter((t) => t.category === "morning").slice(0, 3);
-const AFTERNOON_TASKS = ROUTINE_TASKS.filter((t) => t.category === "afternoon").slice(0, 2);
-const EVENING_TASKS = ROUTINE_TASKS.filter((t) => t.category === "evening").slice(0, 2);
-const ALL_HOME_TASKS = [...MORNING_TASKS, ...AFTERNOON_TASKS, ...EVENING_TASKS];
-
-function AnimatedActionButton({
+function QuickActionBtn({
   icon,
   label,
   route,
@@ -39,24 +34,28 @@ function AnimatedActionButton({
 }) {
   const colors = useColors();
   const { scale, onPressIn, onPressOut } = usePressScale();
-  const { opacity, translateY } = useFadeIn(350, delay);
+  const { opacity, translateY } = useFadeIn(320, delay);
 
   return (
-    <Animated.View style={[{ flex: 1, opacity, transform: [{ translateY }, { scale }] }]}>
+    <Animated.View style={{ flex: 1, opacity, transform: [{ translateY }, { scale }] }}>
       <TouchableOpacity
         onPress={() => router.push(route as any)}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
-        style={[
-          styles.quickAction,
-          { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius - 4 },
-        ]}
         activeOpacity={1}
+        style={[
+          styles.qaBtn,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            borderRadius: colors.radius - 4,
+          },
+        ]}
       >
-        <View style={[styles.quickActionIcon, { backgroundColor: colors.secondary, borderRadius: 22 }]}>
+        <View style={[styles.qaIcon, { backgroundColor: colors.secondary, borderRadius: 22 }]}>
           <Feather name={icon} size={20} color={colors.primary} />
         </View>
-        <Text style={[styles.quickActionLabel, { color: colors.foreground, fontFamily: "Inter_500Medium" }]}>
+        <Text style={[styles.qaLabel, { color: colors.foreground, fontFamily: "Inter_500Medium" }]}>
           {label}
         </Text>
       </TouchableOpacity>
@@ -68,150 +67,99 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { profile } = useUser();
-  const { toggleTask, isTaskDone, streak, saveItem, isSaved } = useWellness();
+  const { streak, saveItem, isSaved } = useWellness();
 
-  const tip = getTodayTip();
-  const quickWin = getQuickWin();
-  const completedCount = ALL_HOME_TASKS.filter((t) => isTaskDone(t.id)).length;
-  const progressPct = ALL_HOME_TASKS.length > 0 ? completedCount / ALL_HOME_TASKS.length : 0;
-
-  const firstName = profile.name ? profile.name.split(" ")[0] : "Friend";
+  const firstName = profile.name ? profile.name.split(" ")[0] : null;
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const greeting =
+    hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
-  const { opacity: headerOpacity, translateY: headerY } = useFadeIn(300, 0);
+  const { opacity: hOpacity, translateY: hY } = useFadeIn(280, 0);
 
   return (
-    <ScrollView
-      style={[styles.scroll, { backgroundColor: colors.background }]}
-      contentContainerStyle={{
-        paddingTop: Platform.OS === "web" ? 67 : insets.top + 8,
-        paddingBottom: Platform.OS === "web" ? 34 + 84 : insets.bottom + 84,
-      }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <Animated.View
-        style={[
-          styles.headerRow,
-          { opacity: headerOpacity, transform: [{ translateY: headerY }] },
-        ]}
+    <>
+      <DisclaimerModal />
+      <ScrollView
+        style={[styles.scroll, { backgroundColor: colors.background }]}
+        contentContainerStyle={{
+          paddingTop: Platform.OS === "web" ? 67 : insets.top + 8,
+          paddingBottom: Platform.OS === "web" ? 34 + 84 : insets.bottom + 84,
+        }}
+        showsVerticalScrollIndicator={false}
       >
-        <View>
-          <Text style={[styles.greeting, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-            {greeting},
-          </Text>
-          <Text style={[styles.name, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-            {firstName}
-          </Text>
-        </View>
-        <View style={[styles.logoWrap, { backgroundColor: colors.secondary }]}>
-          <Image
-            source={require("@/assets/images/logo.png")}
-            style={styles.headerLogo}
-            contentFit="contain"
-          />
-        </View>
-      </Animated.View>
+        {/* Header */}
+        <Animated.View style={[styles.headerRow, { opacity: hOpacity, transform: [{ translateY: hY }] }]}>
+          <View>
+            <Text style={[styles.greetingText, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+              {greeting}{firstName ? `, ${firstName}` : ""} 👋
+            </Text>
+            <Text style={[styles.subGreeting, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
+              How are you feeling today?
+            </Text>
+          </View>
+          <View style={[styles.logoCircle, { backgroundColor: colors.secondary }]}>
+            <Image source={require("@/assets/images/logo.png")} style={styles.logoImg} contentFit="contain" />
+          </View>
+        </Animated.View>
 
-      {/* Streak banner */}
-      {streak > 0 && (
-        <View
-          style={[
-            styles.streakBanner,
-            {
-              backgroundColor: colors.accent + "20",
-              borderColor: colors.accent + "40",
-              borderRadius: colors.radius - 4,
-            },
-          ]}
-        >
-          <Feather name="zap" size={16} color={colors.accent} />
-          <Text style={[styles.streakText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
-            {streak}-day streak! Keep going!
-          </Text>
-        </View>
-      )}
-
-      {/* Daily Check-In — PRIMARY FEATURE */}
-      <DailyCheckIn />
-
-      {/* Today's Tip */}
-      <WellnessTipCard tip={tip} quickWin={quickWin} />
-
-      {/* Today's Routine */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-            Today's Routine
-          </Text>
-          <Text style={[styles.sectionMeta, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-            {completedCount}/{ALL_HOME_TASKS.length} done
-          </Text>
-        </View>
-        <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+        {/* Streak pill */}
+        {streak > 0 && (
           <View
             style={[
-              styles.progressFill,
-              { backgroundColor: colors.primary, width: `${progressPct * 100}%` as any },
+              styles.streakPill,
+              { backgroundColor: colors.accent + "22", borderColor: colors.accent + "44", borderRadius: 20 },
             ]}
-          />
-        </View>
-        <View style={styles.taskList}>
-          {ALL_HOME_TASKS.map((task) => (
-            <ChecklistItem
-              key={task.id}
-              label={task.label}
-              time={task.time}
-              checked={isTaskDone(task.id)}
-              onToggle={() => toggleTask(task.id)}
-              category={task.category}
-            />
-          ))}
-        </View>
-      </View>
-
-      {/* Wellness Remedies */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-            Wellness Remedies
-          </Text>
-          <TouchableOpacity onPress={() => router.push("/(tabs)/plans")}>
-            <Text style={[styles.seeAll, { color: colors.primary, fontFamily: "Inter_500Medium" }]}>
-              See all
+          >
+            <Feather name="zap" size={14} color={colors.accent} />
+            <Text style={[styles.streakText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
+              {streak}-day streak — keep going!
             </Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-          {REMEDIES.map((remedy) => (
-            <RemedyCard
-              key={remedy.id}
-              remedy={remedy}
-              onPress={() => router.push(`/remedy/${remedy.id}`)}
-              isSaved={isSaved(remedy.id)}
-              onSave={() => {
-                if (isSaved(remedy.id)) return;
-                saveItem({ id: remedy.id, type: "remedy", title: remedy.title, savedAt: new Date().toISOString() });
-              }}
-            />
-          ))}
-          <View style={{ width: 16 }} />
-        </ScrollView>
-      </View>
+          </View>
+        )}
 
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold", marginBottom: 14, paddingHorizontal: 20 }]}>
-          Quick Actions
-        </Text>
-        <View style={styles.quickActions}>
-          <AnimatedActionButton icon="message-circle" label="Ask AI" route="/(tabs)/chat" delay={0} />
-          <AnimatedActionButton icon="list" label="My Plans" route="/(tabs)/plans" delay={80} />
-          <AnimatedActionButton icon="book-open" label="Recipes" route="/(tabs)/recipes" delay={160} />
+        {/* ★ DAILY CHECK-IN — PRIMARY FEATURE ★ */}
+        <DailyCheckIn />
+
+        {/* Quick Actions */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
+            Quick Actions
+          </Text>
+          <View style={styles.qaRow}>
+            <QuickActionBtn icon="message-circle" label="Ask AI" route="/(tabs)/chat" delay={0} />
+            <QuickActionBtn icon="list" label="My Plans" route="/(tabs)/plans" delay={70} />
+            <QuickActionBtn icon="book-open" label="Recipes" route="/(tabs)/recipes" delay={140} />
+          </View>
         </View>
-      </View>
-    </ScrollView>
+
+        {/* Remedy Shelf */}
+        <View style={styles.section}>
+          <View style={styles.sectionRow}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
+              Wellness Remedies
+            </Text>
+            <TouchableOpacity onPress={() => router.push("/(tabs)/plans")}>
+              <Text style={[styles.seeAll, { color: colors.primary, fontFamily: "Inter_500Medium" }]}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.shelf}>
+            {REMEDIES.map((r) => (
+              <RemedyCard
+                key={r.id}
+                remedy={r}
+                onPress={() => router.push(`/remedy/${r.id}`)}
+                isSaved={isSaved(r.id)}
+                onSave={() => {
+                  if (!isSaved(r.id))
+                    saveItem({ id: r.id, type: "remedy", title: r.title, savedAt: new Date().toISOString() });
+                }}
+              />
+            ))}
+            <View style={{ width: 16 }} />
+          </ScrollView>
+        </View>
+      </ScrollView>
+    </>
   );
 }
 
@@ -220,66 +168,33 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  greeting: { fontSize: 14 },
-  name: { fontSize: 26 },
-  logoWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerLogo: { width: 36, height: 36 },
-  streakBanner: {
+  greetingText: { fontSize: 15, marginBottom: 4 },
+  subGreeting: { fontSize: 22, maxWidth: 230 },
+  logoCircle: { width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" },
+  logoImg: { width: 38, height: 38 },
+  streakPill: {
     flexDirection: "row",
     alignItems: "center",
+    alignSelf: "flex-start",
     marginHorizontal: 16,
     marginBottom: 16,
-    padding: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderWidth: 1,
-    gap: 8,
+    gap: 6,
   },
-  streakText: { fontSize: 14 },
+  streakText: { fontSize: 13 },
   section: { marginBottom: 28 },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 12,
-  },
-  sectionTitle: { fontSize: 18 },
-  sectionMeta: { fontSize: 13 },
+  sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, marginBottom: 14 },
+  sectionTitle: { fontSize: 18, paddingHorizontal: 20, marginBottom: 14 },
   seeAll: { fontSize: 14 },
-  progressBar: {
-    marginHorizontal: 20,
-    height: 6,
-    borderRadius: 3,
-    marginBottom: 14,
-  },
-  progressFill: { height: 6, borderRadius: 3 },
-  taskList: { paddingHorizontal: 20 },
-  horizontalScroll: { paddingLeft: 16 },
-  quickActions: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  quickAction: {
-    alignItems: "center",
-    paddingVertical: 16,
-    borderWidth: 1,
-    gap: 8,
-  },
-  quickActionIcon: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickActionLabel: { fontSize: 13, textAlign: "center" },
+  qaRow: { flexDirection: "row", paddingHorizontal: 20, gap: 10 },
+  qaBtn: { alignItems: "center", paddingVertical: 16, borderWidth: 1, gap: 8 },
+  qaIcon: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  qaLabel: { fontSize: 13, textAlign: "center" },
+  shelf: { paddingLeft: 16 },
 });

@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
-import { Animated } from "react-native";
+import { Animated, Platform } from "react-native";
+
+const useND = Platform.OS !== "web";
 
 export function useFadeIn(duration = 400, delay = 0) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -11,12 +13,12 @@ export function useFadeIn(duration = 400, delay = 0) {
         toValue: 1,
         duration,
         delay,
-        useNativeDriver: true,
+        useNativeDriver: useND,
       }),
       Animated.spring(translateY, {
         toValue: 0,
         delay,
-        useNativeDriver: true,
+        useNativeDriver: useND,
         tension: 80,
         friction: 12,
       }),
@@ -30,10 +32,10 @@ export function usePressScale(toScale = 0.97) {
   const scale = useRef(new Animated.Value(1)).current;
 
   const onPressIn = () =>
-    Animated.spring(scale, { toValue: toScale, useNativeDriver: true, tension: 200, friction: 10 }).start();
+    Animated.spring(scale, { toValue: toScale, useNativeDriver: useND, tension: 200, friction: 10 }).start();
 
   const onPressOut = () =>
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 10 }).start();
+    Animated.spring(scale, { toValue: 1, useNativeDriver: useND, tension: 200, friction: 10 }).start();
 
   return { scale, onPressIn, onPressOut };
 }

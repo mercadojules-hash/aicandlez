@@ -1,9 +1,13 @@
 import { Redirect } from "expo-router";
 import { useUser } from "@/contexts/UserContext";
+import { useEffect } from "react";
 
 export default function Index() {
-  const { isOnboarded, loading } = useUser();
+  const { loading, isOnboarded, completeOnboarding } = useUser();
   if (loading) return null;
-  if (!isOnboarded) return <Redirect href="/onboarding" />;
+  // Skip onboarding entirely — mark as onboarded on first visit
+  if (!isOnboarded) {
+    completeOnboarding({ name: "", goals: [], allergies: [] });
+  }
   return <Redirect href="/(tabs)" />;
 }
