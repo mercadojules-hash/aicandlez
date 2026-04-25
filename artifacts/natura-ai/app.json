@@ -14,13 +14,32 @@
       "backgroundColor": "#F6F8F3"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "UIStatusBarStyle": "UIStatusBarStyleDarkContent"
+      }
     },
     "android": {
-      "backgroundColor": "#F6F8F3"
+      "backgroundColor": "#F6F8F3",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#F6F8F3"
+      }
     },
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./public/favicon.png",
+      "bundler": "metro",
+      "name": "Natura AI",
+      "shortName": "Natura",
+      "description": "Natural wellness, guided by AI",
+      "themeColor": "#5C7F5F",
+      "backgroundColor": "#F6F8F3",
+      "preferRelatedApplications": false,
+      "display": "standalone",
+      "startUrl": "/",
+      "orientation": "portrait",
+      "lang": "en",
+      "scope": "/"
     },
     "plugins": [
       [

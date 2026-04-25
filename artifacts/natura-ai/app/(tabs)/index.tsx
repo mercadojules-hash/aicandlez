@@ -135,7 +135,7 @@ export default function HomeScreen() {
         {/* Remedy Shelf */}
         <View style={styles.section}>
           <View style={styles.sectionRow}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
+            <Text style={[styles.sectionTitleInRow, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
               Wellness Remedies
             </Text>
             <TouchableOpacity onPress={() => router.push("/(tabs)/plans")}>
@@ -191,7 +191,8 @@ const styles = StyleSheet.create({
   section: { marginBottom: 28 },
   sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, marginBottom: 14 },
   sectionTitle: { fontSize: 18, paddingHorizontal: 20, marginBottom: 14 },
-  seeAll: { fontSize: 14 },
+  sectionTitleInRow: { fontSize: 18, flexShrink: 1 },
+  seeAll: { fontSize: 14, flexShrink: 0, marginLeft: 8 },
   qaRow: { flexDirection: "row", paddingHorizontal: 20, gap: 10 },
   qaBtn: { alignItems: "center", paddingVertical: 16, borderWidth: 1, gap: 8 },
   qaIcon: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
