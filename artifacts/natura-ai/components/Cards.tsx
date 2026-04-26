@@ -42,6 +42,7 @@ function CardImage({
         {Platform.OS === "web" ? (
           // @ts-ignore — <img> is valid in the web bundle
           <img
+            key={image}
             src={image}
             alt=""
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
@@ -49,6 +50,7 @@ function CardImage({
           />
         ) : (
           <Image
+            key={image}
             source={{ uri: image }}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"

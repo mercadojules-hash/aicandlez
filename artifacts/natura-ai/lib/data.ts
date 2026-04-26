@@ -968,7 +968,9 @@ export function getItemImage(
 
   // 1. id-based lookup (primary — fastest path for all 28 known items)
   if (id && ITEM_IMAGE_URLS[id]) {
-    const url = ITEM_IMAGE_URLS[id];
+    // Append &v=<id> so every item's URL is unique at the string level,
+    // busting any browser/CDN cache left over from previous mapping changes.
+    const url = `${ITEM_IMAGE_URLS[id]}&v=${encodeURIComponent(id)}`;
     console.log("Image mapping:", id, url);
     if (_seenImageURLs.has(url)) {
       console.warn(`[getItemImage] duplicate detected for id "${id}"`);
@@ -979,7 +981,8 @@ export function getItemImage(
 
   // 2. Title-slug lookup (secondary — catches items reached by title only)
   if (slug && ITEM_IMAGE_URLS[slug]) {
-    const url = ITEM_IMAGE_URLS[slug];
+    const url = `${ITEM_IMAGE_URLS[slug]}&v=${encodeURIComponent(slug)}`;
+    console.log("Image mapping:", slug, url);
     if (_seenImageURLs.has(url)) {
       console.warn(`[getItemImage] duplicate detected for slug "${slug}"`);
     }
