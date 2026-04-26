@@ -1,0 +1,115 @@
+Fix ALL missing images by enforcing fallback at BOTH data and UI level.
+
+========================
+PART 1 — HARD FALLBACK FUNCTION
+========================
+
+Create ONE global function:
+
+function getSafeImage(item) {
+  if (item.image && item.image.length > 5) {
+    return item.image;
+  }
+
+  switch (item.category?.toLowerCase()) {
+    case "stress":
+      return "https://source.unsplash.com/600x400/?relaxation,tea";
+    case "sleep":
+      return "https://source.unsplash.com/600x400/?sleep,night";
+    case "energy":
+      return "https://source.unsplash.com/600x400/?smoothie,energy";
+    case "immunity":
+      return "https://source.unsplash.com/600x400/?healthy,food";
+    case "digestion":
+      return "https://source.unsplash.com/600x400/?tea,herbal";
+    default:
+      return "https://source.unsplash.com/600x400/?wellness";
+  }
+}
+
+========================
+PART 2 — FORCE USAGE EVERYWHERE
+========================
+
+CRITICAL:
+
+Replace ALL usages of:
+
+<Image source={{ uri: item.image }} />
+
+WITH:
+
+<Image source={{ uri: getSafeImage(item) }} />
+
+Apply this to:
+- Recipes
+- Remedies
+- Plans
+- Featured cards
+- ANY list rendering
+
+NO exceptions.
+
+========================
+PART 3 — HANDLE BROKEN IMAGES
+========================
+
+Even if URL exists, it may fail.
+
+Update Image component:
+
+<Image
+  source={{ uri: getSafeImage(item) }}
+  onError={(e) => {
+    e.currentTarget.setNativeProps({
+      src: "https://source.unsplash.com/600x400/?wellness"
+    });
+  }}
+/>
+
+This ensures:
+👉 even broken URLs never show blank
+
+========================
+PART 4 — FORCE IMAGE CONTAINER
+========================
+
+Every card MUST have:
+
+- height: 160px
+- backgroundColor: '#1E2A24'
+- borderRadius: 16
+- overflow: 'hidden'
+
+Even before image loads.
+
+========================
+PART 5 — DEBUG (IMPORTANT)
+========================
+
+Add temporary log:
+
+console.log("IMAGE USED:", getSafeImage(item));
+
+Run app and verify:
+👉 EVERY card logs a valid URL
+
+If ANY card logs undefined/null:
+→ data is broken → fix dataset
+
+========================
+PART 6 — OPTIONAL (CLEAN DATA)
+========================
+
+Loop through dataset once:
+
+items = items.map(item => ({
+  ...item,
+  image: getSafeImage(item)
+}));
+
+This permanently fixes stored data too.
+
+========================
+END
+========================

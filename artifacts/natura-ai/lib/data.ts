@@ -144,7 +144,7 @@ export const REMEDIES: Remedy[] = [
     safetyNote: "Safe for most adults in food amounts. Large doses may interact with blood thinners.",
     whyItHelps: "Ginger contains gingerols and shogaols — compounds traditionally associated with supporting gastric motility and easing digestive discomfort. Black pepper may enhance absorption.",
     bestTime: "Morning on an empty stomach, or after meals for digestive comfort.",
-    imageUrl: "https://images.unsplash.com/photo-1563911302-7aca0ab7d5dd?w=600&q=80&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1548199569-3e1c6aa8f469?w=600&q=80&fit=crop",
   },
   {
     id: "remedy-lavender-calm",
@@ -174,7 +174,7 @@ export const REMEDIES: Remedy[] = [
     safetyNote: "Lavender tea is generally safe. Avoid medicinal doses during pregnancy.",
     whyItHelps: "Lavender contains linalool and linalyl acetate, compounds traditionally used to support a calm nervous system. Ritual and routine cue the brain toward rest.",
     bestTime: "30–60 minutes before bed as part of your wind-down routine.",
-    imageUrl: "https://images.unsplash.com/photo-1611070820896-dd6be86d048c?w=600&q=80&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=600&q=80&fit=crop",
   },
   {
     id: "remedy-immunity-shot",
@@ -238,7 +238,7 @@ export const REMEDIES: Remedy[] = [
     safetyNote: "Ashwagandha is generally well-tolerated. Consult a healthcare provider if pregnant or on thyroid medication.",
     whyItHelps: "Ashwagandha is a renowned adaptogen that may help regulate cortisol and support the body's stress response. Warming spices like cinnamon and cardamom aid in digestion and grounding.",
     bestTime: "30–60 minutes before your intended sleep time.",
-    imageUrl: "https://images.unsplash.com/photo-1546554137-cf5a9b4a228b?w=600&q=80&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1544991936-9464e43bea92?w=600&q=80&fit=crop",
   },
   {
     id: "remedy-energy-smoothie",
@@ -333,7 +333,7 @@ export const REMEDIES: Remedy[] = [
     safetyNote: "Avoid if allergic to ragweed. Passionflower may enhance sedative medications.",
     whyItHelps: "Chamomile contains apigenin, which may bind to GABA receptors to promote relaxation. Passionflower has been traditionally used to ease anxiety-related sleeplessness.",
     bestTime: "45–60 minutes before your intended bedtime.",
-    imageUrl: "https://images.unsplash.com/photo-1543892679-0b1a40139c80?w=600&q=80&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1471091862366-7a1b48c6a3cd?w=600&q=80&fit=crop",
   },
   {
     id: "remedy-turmeric-tonic",
@@ -707,7 +707,7 @@ export const RECIPES: Recipe[] = [
     category: "Drinks",
     prepTime: "5 min",
     goal: "energy",
-    imageUrl: "https://images.unsplash.com/photo-1563911302-7aca0ab7d5dd?w=600&q=80&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1556909172-8c2f041fca1e?w=600&q=80&fit=crop",
     whyItHelps: "Ginger may stimulate circulation and digestion, while ACV may support blood sugar balance. Together they create a stimulating, energizing start to the day.",
     bestTime: "First thing in the morning before eating.",
     ingredients: [
@@ -837,21 +837,34 @@ export function getQuickWin(): string {
   return wins[day % wins.length];
 }
 
-const CATEGORY_FALLBACKS: Record<string, string> = {
-  stress: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&q=80&fit=crop",
-  sleep: "https://images.unsplash.com/photo-1545389336-cf090694435e?w=600&q=80&fit=crop",
-  energy: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80&fit=crop",
-  immunity: "https://images.unsplash.com/photo-1490818787583-167e74326402?w=600&q=80&fit=crop",
-  digestion: "https://images.unsplash.com/photo-1563911302-7aca0ab7d5dd?w=600&q=80&fit=crop",
-  "stress & sleep": "https://images.unsplash.com/photo-1535268244668-749d57b63c7c?w=600&q=80&fit=crop",
-  "sleep & stress": "https://images.unsplash.com/photo-1546554137-cf5a9b4a228b?w=600&q=80&fit=crop",
-};
-
-const DEFAULT_FALLBACK =
+const DEFAULT_FALLBACK_URL =
   "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=600&q=80&fit=crop";
+
+function getCategoryFallback(category: string): string {
+  const cat = (category ?? "").toLowerCase();
+  if (cat.includes("stress") && cat.includes("sleep")) return "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=600&q=80&fit=crop";
+  if (cat.includes("stress")) return "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=600&q=80&fit=crop";
+  if (cat.includes("sleep")) return "https://images.unsplash.com/photo-1471091862366-7a1b48c6a3cd?w=600&q=80&fit=crop";
+  if (cat.includes("energy")) return "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80&fit=crop";
+  if (cat.includes("immun")) return "https://images.unsplash.com/photo-1505144808419-1957a94ca61e?w=600&q=80&fit=crop";
+  if (cat.includes("digest")) return "https://images.unsplash.com/photo-1536304993831-10cdf90fbfb5?w=600&q=80&fit=crop";
+  return DEFAULT_FALLBACK_URL;
+}
+
+export function getSafeImage(item: {
+  imageUrl?: string;
+  category?: string;
+  goal?: string;
+}): string {
+  const url = item.imageUrl;
+  if (url && url.trim().length > 5) return url;
+  const cat = item.category ?? item.goal ?? "";
+  return getCategoryFallback(cat);
+}
 
 export function getImageUrl(category: string, provided?: string): string {
   if (provided && provided.trim().length > 0) return provided;
-  const key = category?.toLowerCase() ?? "";
-  return CATEGORY_FALLBACKS[key] ?? DEFAULT_FALLBACK;
+  return getCategoryFallback(category);
 }
+
+export { DEFAULT_FALLBACK_URL };
