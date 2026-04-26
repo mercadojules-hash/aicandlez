@@ -13,11 +13,27 @@
       "Pinch of cayenne (optional)"
     ],
     "steps": [
-      { "stepNumber": 1, "instruction": "Peel and thinly slice the fresh ginger root." },
-      { "stepNumber": 2, "instruction": "Bring water to a gentle boil in a small saucepan." },
-      { "stepNumber": 3, "instruction": "Add ginger slices and reduce to a simmer.", "duration": "7 minutes" },
-      { "stepNumber": 4, "instruction": "Remove from heat and strain the tea into a mug." },
-      { "stepNumber": 5, "instruction": "Add lemon juice, honey, and a pinch of cayenne if using. Stir and sip slowly." }
+      {
+        "stepNumber": 1,
+        "instruction": "Peel and thinly slice the fresh ginger root."
+      },
+      {
+        "stepNumber": 2,
+        "instruction": "Bring water to a gentle boil in a small saucepan."
+      },
+      {
+        "stepNumber": 3,
+        "instruction": "Add ginger slices and reduce to a simmer.",
+        "duration": "7 minutes"
+      },
+      {
+        "stepNumber": 4,
+        "instruction": "Remove from heat and strain the tea into a mug."
+      },
+      {
+        "stepNumber": 5,
+        "instruction": "Add lemon juice, honey, and a pinch of cayenne if using. Stir and sip slowly."
+      }
     ],
     "benefits": [
       "Supports healthy digestion",
@@ -47,11 +63,27 @@
       "1 tsp honey"
     ],
     "steps": [
-      { "stepNumber": 1, "instruction": "Brew the lavender and chamomile in hot water for 5 minutes, covered." },
-      { "stepNumber": 2, "instruction": "While tea steeps, prepare a small bowl of steaming water." },
-      { "stepNumber": 3, "instruction": "Add 3 drops of lavender essential oil to the steam bowl. Place a towel over your head and inhale deeply.", "duration": "3 minutes" },
-      { "stepNumber": 4, "instruction": "Strain your tea, add honey, and sit somewhere quiet." },
-      { "stepNumber": 5, "instruction": "Sip slowly while taking three deep belly breaths between each sip." }
+      {
+        "stepNumber": 1,
+        "instruction": "Brew the lavender and chamomile in hot water for 5 minutes, covered."
+      },
+      {
+        "stepNumber": 2,
+        "instruction": "While tea steeps, prepare a small bowl of steaming water."
+      },
+      {
+        "stepNumber": 3,
+        "instruction": "Add 3 drops of lavender essential oil to the steam bowl. Place a towel over your head and inhale deeply.",
+        "duration": "3 minutes"
+      },
+      {
+        "stepNumber": 4,
+        "instruction": "Strain your tea, add honey, and sit somewhere quiet."
+      },
+      {
+        "stepNumber": 5,
+        "instruction": "Sip slowly while taking three deep belly breaths between each sip."
+      }
     ],
     "benefits": [
       "Calms an overactive mind",
@@ -82,11 +114,26 @@
       "2 tbsp water"
     ],
     "steps": [
-      { "stepNumber": 1, "instruction": "Juice the fresh ginger (or grate and squeeze through a cloth)." },
-      { "stepNumber": 2, "instruction": "Combine ginger juice, turmeric, lemon juice, and water in a small glass." },
-      { "stepNumber": 3, "instruction": "Add a pinch of black pepper (activates turmeric's benefits) and honey." },
-      { "stepNumber": 4, "instruction": "Stir well until combined." },
-      { "stepNumber": 5, "instruction": "Drink in one shot on an empty stomach for best absorption." }
+      {
+        "stepNumber": 1,
+        "instruction": "Juice the fresh ginger (or grate and squeeze through a cloth)."
+      },
+      {
+        "stepNumber": 2,
+        "instruction": "Combine ginger juice, turmeric, lemon juice, and water in a small glass."
+      },
+      {
+        "stepNumber": 3,
+        "instruction": "Add a pinch of black pepper (activates turmeric's benefits) and honey."
+      },
+      {
+        "stepNumber": 4,
+        "instruction": "Stir well until combined."
+      },
+      {
+        "stepNumber": 5,
+        "instruction": "Drink in one shot on an empty stomach for best absorption."
+      }
     ],
     "benefits": [
       "Vitamin C from lemon",
@@ -117,11 +164,27 @@
       "Pinch of nutmeg"
     ],
     "steps": [
-      { "stepNumber": 1, "instruction": "Heat oat milk in a small saucepan over medium-low heat. Do not boil." },
-      { "stepNumber": 2, "instruction": "Whisk in ashwagandha powder, cinnamon, and cardamom." },
-      { "stepNumber": 3, "instruction": "Continue stirring until fully blended and steaming.", "duration": "3 minutes" },
-      { "stepNumber": 4, "instruction": "Remove from heat. Add honey and a pinch of nutmeg." },
-      { "stepNumber": 5, "instruction": "Pour into a mug and enjoy 30-60 minutes before bed." }
+      {
+        "stepNumber": 1,
+        "instruction": "Heat oat milk in a small saucepan over medium-low heat. Do not boil."
+      },
+      {
+        "stepNumber": 2,
+        "instruction": "Whisk in ashwagandha powder, cinnamon, and cardamom."
+      },
+      {
+        "stepNumber": 3,
+        "instruction": "Continue stirring until fully blended and steaming.",
+        "duration": "3 minutes"
+      },
+      {
+        "stepNumber": 4,
+        "instruction": "Remove from heat. Add honey and a pinch of nutmeg."
+      },
+      {
+        "stepNumber": 5,
+        "instruction": "Pour into a mug and enjoy 30-60 minutes before bed."
+      }
     ],
     "benefits": [
       "Adaptogenic stress support",
@@ -152,11 +215,28 @@
       "1/2 tsp spirulina (optional)"
     ],
     "steps": [
-      { "stepNumber": 1, "instruction": "Add coconut water to your blender first as the base." },
-      { "stepNumber": 2, "instruction": "Add the leafy greens and blend until smooth.", "duration": "30 seconds" },
-      { "stepNumber": 3, "instruction": "Add frozen banana, maca powder, and almond butter." },
-      { "stepNumber": 4, "instruction": "Blend until creamy. Add spirulina if using.", "duration": "30 seconds" },
-      { "stepNumber": 5, "instruction": "Pour into a glass and enjoy within 15 minutes for best nutritional value." }
+      {
+        "stepNumber": 1,
+        "instruction": "Add coconut water to your blender first as the base."
+      },
+      {
+        "stepNumber": 2,
+        "instruction": "Add the leafy greens and blend until smooth.",
+        "duration": "30 seconds"
+      },
+      {
+        "stepNumber": 3,
+        "instruction": "Add frozen banana, maca powder, and almond butter."
+      },
+      {
+        "stepNumber": 4,
+        "instruction": "Blend until creamy. Add spirulina if using.",
+        "duration": "30 seconds"
+      },
+      {
+        "stepNumber": 5,
+        "instruction": "Pour into a glass and enjoy within 15 minutes for best nutritional value."
+      }
     ],
     "benefits": [
       "Sustained energy",
@@ -187,11 +267,27 @@
       "1 cup raw honey (added after cooling)"
     ],
     "steps": [
-      { "stepNumber": 1, "instruction": "Combine elderberries, water, ginger, cinnamon, and cloves in a saucepan." },
-      { "stepNumber": 2, "instruction": "Bring to a boil, then reduce to a simmer.", "duration": "45 minutes" },
-      { "stepNumber": 3, "instruction": "Mash the berries and strain through a fine-mesh sieve." },
-      { "stepNumber": 4, "instruction": "Allow to cool to room temperature (important — heat destroys honey's enzymes)." },
-      { "stepNumber": 5, "instruction": "Stir in raw honey. Store in a glass jar in the refrigerator for up to 3 months." }
+      {
+        "stepNumber": 1,
+        "instruction": "Combine elderberries, water, ginger, cinnamon, and cloves in a saucepan."
+      },
+      {
+        "stepNumber": 2,
+        "instruction": "Bring to a boil, then reduce to a simmer.",
+        "duration": "45 minutes"
+      },
+      {
+        "stepNumber": 3,
+        "instruction": "Mash the berries and strain through a fine-mesh sieve."
+      },
+      {
+        "stepNumber": 4,
+        "instruction": "Allow to cool to room temperature (important — heat destroys honey's enzymes)."
+      },
+      {
+        "stepNumber": 5,
+        "instruction": "Stir in raw honey. Store in a glass jar in the refrigerator for up to 3 months."
+      }
     ],
     "benefits": [
       "Rich in antioxidants",
@@ -221,11 +317,27 @@
       "1 tsp honey"
     ],
     "steps": [
-      { "stepNumber": 1, "instruction": "Combine chamomile, passionflower, and lemon balm in a tea strainer." },
-      { "stepNumber": 2, "instruction": "Pour water that's just below boiling over the herbs (90°C/194°F)." },
-      { "stepNumber": 3, "instruction": "Cover and steep to keep volatile oils in the cup.", "duration": "7 minutes" },
-      { "stepNumber": 4, "instruction": "Remove strainer and allow to cool slightly." },
-      { "stepNumber": 5, "instruction": "Add honey, hold the warm cup, take 3 deep breaths before your first sip." }
+      {
+        "stepNumber": 1,
+        "instruction": "Combine chamomile, passionflower, and lemon balm in a tea strainer."
+      },
+      {
+        "stepNumber": 2,
+        "instruction": "Pour water that's just below boiling over the herbs (90°C/194°F)."
+      },
+      {
+        "stepNumber": 3,
+        "instruction": "Cover and steep to keep volatile oils in the cup.",
+        "duration": "7 minutes"
+      },
+      {
+        "stepNumber": 4,
+        "instruction": "Remove strainer and allow to cool slightly."
+      },
+      {
+        "stepNumber": 5,
+        "instruction": "Add honey, hold the warm cup, take 3 deep breaths before your first sip."
+      }
     ],
     "benefits": [
       "Calms an overactive mind",
@@ -256,11 +368,26 @@
       "1 cup warm water"
     ],
     "steps": [
-      { "stepNumber": 1, "instruction": "Warm the water — not boiling, just comfortably warm." },
-      { "stepNumber": 2, "instruction": "Add turmeric and black pepper and stir until dissolved." },
-      { "stepNumber": 3, "instruction": "Add lemon juice and apple cider vinegar." },
-      { "stepNumber": 4, "instruction": "Sweeten with honey and stir well." },
-      { "stepNumber": 5, "instruction": "Drink immediately for best potency." }
+      {
+        "stepNumber": 1,
+        "instruction": "Warm the water — not boiling, just comfortably warm."
+      },
+      {
+        "stepNumber": 2,
+        "instruction": "Add turmeric and black pepper and stir until dissolved."
+      },
+      {
+        "stepNumber": 3,
+        "instruction": "Add lemon juice and apple cider vinegar."
+      },
+      {
+        "stepNumber": 4,
+        "instruction": "Sweeten with honey and stir well."
+      },
+      {
+        "stepNumber": 5,
+        "instruction": "Drink immediately for best potency."
+      }
     ],
     "benefits": [
       "Anti-inflammatory support",
