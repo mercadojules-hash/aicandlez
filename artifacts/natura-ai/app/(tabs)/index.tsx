@@ -21,6 +21,7 @@ import type { DailyCheckIn } from "@/contexts/WellnessContext";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { DailyCheckIn as DailyCheckInComponent } from "@/components/DailyCheckIn";
 import { RemedyCard } from "@/components/Cards";
+import { RoutineSection } from "@/components/RoutineSection";
 import { REMEDIES } from "@/lib/data";
 
 function deriveMood(checkIn: DailyCheckIn | null): "stressed" | "low-energy" | "positive" | null {
@@ -272,7 +273,10 @@ export default function HomeScreen() {
           <AICoachBanner checkIn={lastCheckIn} streak={streak} />
         </View>
 
-        {/* ⑤ Quick Actions */}
+        {/* ⑤ Today's Routine */}
+        <RoutineSection />
+
+        {/* ⑥ Quick Actions */}
         <View style={styles.section}>
           <Text
             style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}

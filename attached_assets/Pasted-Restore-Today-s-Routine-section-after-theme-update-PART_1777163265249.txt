@@ -1,0 +1,98 @@
+Restore "Today's Routine" section after theme update
+
+========================
+PART 1 — ENSURE COMPONENT EXISTS
+========================
+
+Create (or confirm):
+
+<RoutineSection routine={routineData} />
+
+Place it ABOVE:
+
+<WellnessRemedies />
+
+Final layout order:
+
+<HomeHeader />
+<DailyCheckIn />
+<AI Coach Banner />
+<RoutineSection />   ← MUST BE HERE
+<WellnessRemedies />
+
+========================
+PART 2 — REMOVE BAD CONDITIONALS
+========================
+
+Replace:
+
+{routine && <RoutineSection />}
+
+WITH:
+
+<RoutineSection routine={routineData || []} />
+
+========================
+PART 3 — SAFE FALLBACK DATA
+========================
+
+Inside RoutineSection:
+
+const defaultRoutine = [
+  { title: "Warm lemon water", time: "7:00 AM", tag: "Morning" },
+  { title: "5-minute breathing", time: "7:15 AM", tag: "Morning" },
+  { title: "Morning stretch", time: "7:30 AM", tag: "Morning" },
+  { title: "Herbal tea break", time: "3:00 PM", tag: "Afternoon" },
+  { title: "Mindful walk", time: "4:00 PM", tag: "Afternoon" },
+  { title: "Digital sunset", time: "9:00 PM", tag: "Evening" },
+  { title: "Evening wind-down tea", time: "9:30 PM", tag: "Evening" }
+]
+
+const data = routine.length ? routine : defaultRoutine
+
+========================
+PART 4 — FIX THEME VISIBILITY
+========================
+
+Ensure styles:
+
+color: theme.textPrimary
+backgroundColor: theme.cardBackground
+
+DO NOT use:
+color: "#000" or "#fff"
+
+========================
+PART 5 — PROGRESS BAR
+========================
+
+Add:
+
+<Text>0/7 done</Text>
+
+Later you can make it dynamic:
+completedCount / totalCount
+
+========================
+PART 6 — VERIFY RENDER
+========================
+
+Checklist:
+
+✔ Section appears above "Wellness Remedies"  
+✔ Items show (not empty)  
+✔ Light + dark mode both visible  
+✔ No condition hiding it  
+
+========================
+RESULT
+========================
+
+✔ Routine section restored  
+✔ Works in both themes  
+✔ No blank state  
+✔ Matches previous version  
+
+========================
+END
+========================
