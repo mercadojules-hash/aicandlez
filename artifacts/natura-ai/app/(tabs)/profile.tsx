@@ -135,11 +135,22 @@ export default function ProfileScreen() {
 
   const handleReset = () => {
     Alert.alert(
-      "Reset Profile",
-      "This will clear all your data and restart the app. Are you sure?",
+      "Reset App Data",
+      "This will clear your profile and restart onboarding.",
       [
-        { text: "Cancel", style: "cancel" },
-        { text: "Reset", style: "destructive", onPress: () => resetOnboarding() },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: async () => {
+            console.log("CONFIRM PRESSED");
+            await resetOnboarding();
+            console.log("RESET CALLED");
+          },
+        },
       ]
     );
   };
