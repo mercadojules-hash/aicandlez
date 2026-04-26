@@ -918,10 +918,17 @@ export function getImageUrl(category: string, provided?: string): string {
   return getCategoryFallback(category);
 }
 
-export function getItemImage(item: { id?: string; title?: string }): string {
-  const query = encodeURIComponent((item.title ?? "wellness").toLowerCase().trim());
-  const sig = encodeURIComponent(item.id ?? "default");
-  return `https://source.unsplash.com/600x400/?${query}&sig=${sig}`;
+export function getItemImage(item: { title?: string }, index: number): string {
+  let query = "herbal tea";
+  const title = (item.title || "").toLowerCase();
+  if (title.includes("sleep")) query = "chamomile tea";
+  else if (title.includes("energy")) query = "green smoothie";
+  else if (title.includes("immunity")) query = "berries healthy";
+  else if (title.includes("ginger") || title.includes("digest")) query = "ginger tea";
+  else if (title.includes("lavender") || title.includes("calm")) query = "lavender tea";
+  else if (title.includes("stress")) query = "relaxing tea";
+  const uniqueSig = index;
+  return `https://source.unsplash.com/600x400/?${encodeURIComponent(query)}&sig=${uniqueSig}`;
 }
 
 export { DEFAULT_FALLBACK_URL };

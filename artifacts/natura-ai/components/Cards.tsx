@@ -18,7 +18,8 @@ import type { Remedy, WellnessPlan, Recipe, DailyTip } from "@/lib/data";
 const useND = Platform.OS !== "web";
 
 interface CardImageProps {
-  item: { id?: string; imageUrl?: string; category?: string; goal?: string; title?: string; ingredients?: string[] };
+  item: { title?: string };
+  index: number;
   height?: number;
   withGradient?: boolean;
   gradientIntensity?: "soft" | "strong";
@@ -26,11 +27,12 @@ interface CardImageProps {
 
 function CardImage({
   item,
+  index,
   height = 160,
   withGradient = false,
   gradientIntensity = "soft",
 }: CardImageProps) {
-  const resolvedUrl = getItemImage(item);
+  const resolvedUrl = getItemImage(item, index);
   const [imgSrc, setImgSrc] = useState<string>(resolvedUrl);
   const [loaded, setLoaded] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -132,12 +134,13 @@ export function WellnessTipCard({ tip, quickWin }: { tip: DailyTip; quickWin: st
 
 interface RemedyCardProps {
   remedy: Remedy;
+  index?: number;
   onPress: () => void;
   isSaved?: boolean;
   onSave?: () => void;
 }
 
-export function RemedyCard({ remedy, onPress, isSaved, onSave }: RemedyCardProps) {
+export function RemedyCard({ remedy, index = 0, onPress, isSaved, onSave }: RemedyCardProps) {
   const colors = useColors();
 
   return (
@@ -148,7 +151,7 @@ export function RemedyCard({ remedy, onPress, isSaved, onSave }: RemedyCardProps
     >
       {/* Image — always rendered, fixed height */}
       <View style={styles.imageWrapper}>
-        <CardImage item={remedy} height={160} withGradient gradientIntensity="soft" />
+        <CardImage item={remedy} index={index} height={160} withGradient gradientIntensity="soft" />
         <View style={styles.badgeRow}>
           <View style={[styles.badge, { backgroundColor: colors.primary + "F0" }]}>
             <Text style={[styles.badgeText, { fontFamily: "Inter_600SemiBold" }]}>{remedy.category}</Text>
@@ -201,12 +204,13 @@ export function RemedyCard({ remedy, onPress, isSaved, onSave }: RemedyCardProps
 
 interface PlanCardProps {
   plan: WellnessPlan;
+  index?: number;
   onPress: () => void;
   isSaved?: boolean;
   onSave?: () => void;
 }
 
-export function PlanCard({ plan, onPress, isSaved, onSave }: PlanCardProps) {
+export function PlanCard({ plan, index = 0, onPress, isSaved, onSave }: PlanCardProps) {
   const colors = useColors();
 
   return (
@@ -216,7 +220,7 @@ export function PlanCard({ plan, onPress, isSaved, onSave }: PlanCardProps) {
       style={[styles.planCard, { backgroundColor: colors.card, borderColor: colors.border }, cardShadow()]}
     >
       <View style={styles.imageWrapper}>
-        <CardImage item={{ imageUrl: plan.imageUrl, category: plan.goal, title: plan.title }} height={160} withGradient gradientIntensity="strong" />
+        <CardImage item={{ title: plan.title }} index={index} height={160} withGradient gradientIntensity="strong" />
         <View style={styles.badgeRow}>
           <View style={[styles.badge, { backgroundColor: colors.primary + "F0" }]}>
             <Text style={[styles.badgeText, { fontFamily: "Inter_600SemiBold" }]}>{plan.duration}</Text>
@@ -253,13 +257,14 @@ export function PlanCard({ plan, onPress, isSaved, onSave }: PlanCardProps) {
 
 interface RecipeCardProps {
   recipe: Recipe;
+  index?: number;
   onPress: () => void;
   onAddToGrocery?: () => void;
   isSaved?: boolean;
   onSave?: () => void;
 }
 
-export function RecipeCard({ recipe, onPress, onAddToGrocery, isSaved, onSave }: RecipeCardProps) {
+export function RecipeCard({ recipe, index = 0, onPress, onAddToGrocery, isSaved, onSave }: RecipeCardProps) {
   const colors = useColors();
 
   return (
@@ -269,7 +274,7 @@ export function RecipeCard({ recipe, onPress, onAddToGrocery, isSaved, onSave }:
       style={[styles.recipeCard, { backgroundColor: colors.card, borderColor: colors.border }, cardShadow()]}
     >
       <View style={styles.imageWrapper}>
-        <CardImage item={{ imageUrl: recipe.imageUrl, category: recipe.goal, title: recipe.title, ingredients: recipe.ingredients }} height={160} withGradient gradientIntensity="soft" />
+        <CardImage item={{ title: recipe.title }} index={index} height={160} withGradient gradientIntensity="soft" />
         <View style={styles.badgeRow}>
           <View style={[styles.badge, { backgroundColor: colors.accent + "F0" }]}>
             <Text style={[styles.badgeText, { fontFamily: "Inter_600SemiBold" }]}>{recipe.goal}</Text>

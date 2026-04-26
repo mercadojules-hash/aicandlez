@@ -77,10 +77,11 @@ export default function PlansScreen() {
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
               Curated wellness programs to support your goals
             </Text>
-            {PLANS.map((plan) => (
+            {PLANS.map((plan, index) => (
               <PlanCard
                 key={plan.id}
                 plan={plan}
+                index={index}
                 onPress={() => router.push(`/plan/${plan.id}`)}
                 isSaved={isSaved(plan.id)}
                 onSave={() => {
@@ -100,10 +101,11 @@ export default function PlansScreen() {
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
               Natural remedy guides with step-by-step instructions
             </Text>
-            {REMEDIES.map((remedy) => (
+            {REMEDIES.map((remedy, index) => (
               <View key={remedy.id} style={{ marginBottom: 16 }}>
                 <RemedyCard
                   remedy={remedy}
+                  index={index}
                   onPress={() => router.push(`/remedy/${remedy.id}`)}
                   isSaved={isSaved(remedy.id)}
                   onSave={() => {
@@ -138,13 +140,14 @@ export default function PlansScreen() {
                     <Text style={[styles.savedGroupLabel, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
                       Plans
                     </Text>
-                    {savedPlans.map((s) => {
+                    {savedPlans.map((s, index) => {
                       const plan = PLANS.find((p) => p.id === s.id);
                       if (!plan) return null;
                       return (
                         <PlanCard
                           key={plan.id}
                           plan={plan}
+                          index={index}
                           onPress={() => router.push(`/plan/${plan.id}`)}
                           isSaved
                           onSave={() => removeItem(plan.id)}
@@ -158,13 +161,14 @@ export default function PlansScreen() {
                     <Text style={[styles.savedGroupLabel, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
                       Remedies
                     </Text>
-                    {savedRemedies.map((s) => {
+                    {savedRemedies.map((s, index) => {
                       const remedy = REMEDIES.find((r) => r.id === s.id);
                       if (!remedy) return null;
                       return (
                         <View key={remedy.id} style={{ marginBottom: 16 }}>
                           <RemedyCard
                             remedy={remedy}
+                            index={index}
                             onPress={() => router.push(`/remedy/${remedy.id}`)}
                             isSaved
                             onSave={() => removeItem(remedy.id)}

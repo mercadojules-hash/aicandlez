@@ -108,9 +108,10 @@ export default function RecipesScreen() {
           <FlatList
             data={filtered}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
+            renderItem={({ item, index }) => (
               <RecipeCard
                 recipe={item}
+                index={index}
                 onPress={() => router.push(`/remedy/${item.id}`)}
                 isSaved={isSaved(item.id)}
                 onSave={() => {

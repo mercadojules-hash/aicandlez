@@ -317,10 +317,11 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             style={styles.shelf}
           >
-            {REMEDIES.map((r) => (
+            {REMEDIES.map((r, index) => (
               <RemedyCard
                 key={r.id}
                 remedy={r}
+                index={index}
                 onPress={() => router.push(`/remedy/${r.id}`)}
                 isSaved={isSaved(r.id)}
                 onSave={() => {
