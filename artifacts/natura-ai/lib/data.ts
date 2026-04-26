@@ -937,81 +937,138 @@ const _seenImageURLs = new Set<string>();
 const BASE = "https://images.unsplash.com";
 const Q    = "?w=600&h=400&fit=crop";
 
-// Per-item curated photo IDs.
-// No "calm / meditation / zen / peaceful" images — every entry is visually
-// distinct: food, botanicals, drinks, outdoor scenes, night sky, etc.
+// Strict 1:1 image mapping — no pool logic, no modulus, no hash.
+// Every item has TWO keys: item.id AND its exact title slug.
+// Both resolve to the same unique Unsplash photo so either lookup path hits.
 const ITEM_IMAGE_URLS: Record<string, string> = {
-  // ── Remedies — specific ingredient / drink photos ─────────────────────────
-  "remedy-ginger-tea":       `${BASE}/photo-1548199569-3e1c6aa8f469${Q}`, // ginger root + cup
-  "remedy-lavender-calm":    `${BASE}/photo-1518611012118-696072aa579a${Q}`, // lavender field
-  "remedy-immunity-shot":    `${BASE}/photo-1615485500704-8e990f9900f7${Q}`, // citrus shot glass
-  "remedy-ashwagandha-milk": `${BASE}/photo-1544991936-9464e43bea92${Q}`, // golden warm drink
-  "remedy-energy-smoothie":  `${BASE}/photo-1512621776951-a57141f2eefd${Q}`, // green smoothie
-  "remedy-elderberry-syrup": `${BASE}/photo-1505144808419-1957a94ca61e${Q}`, // elderberries
-  "remedy-chamomile-sleep":  `${BASE}/photo-1471091862366-7a1b48c6a3cd${Q}`, // chamomile tea cup
-  "remedy-turmeric-tonic":   `${BASE}/photo-1536304993831-10cdf90fbfb5${Q}`, // turmeric root/jar
-  // ── Plans — lifestyle / nature / food (each visually distinct) ───────────
-  "plan-stress-3day":        `${BASE}/photo-1447752875215-b2761acf3dbd${Q}`, // forest path sunlight
-  "plan-sleep-7day":         `${BASE}/photo-1545389336-cf090694435e${Q}`, // misty mountain yoga
-  "plan-energy-5day":        `${BASE}/photo-1594736797933-d0501ba2fe65${Q}`, // morning sunrise run
-  "plan-immunity-14day":     `${BASE}/photo-1490818787583-167e74326402${Q}`, // immunity herbs table
-  // ── Recipes — food / drink close-ups ─────────────────────────────────────
-  "recipe-golden-milk":      `${BASE}/photo-1563805042-7684c019e1cb${Q}`, // warm spiced latte
-  "recipe-immunity-broth":   `${BASE}/photo-1547592180-85f173990554${Q}`, // herbal broth bowl
-  "recipe-overnight-oats":   `${BASE}/photo-1499636136210-6f4ee915583e${Q}`, // oats jar + berries
-  "recipe-antistress-salad": `${BASE}/photo-1540420773420-3366772f4999${Q}`, // colourful salad
-  "recipe-sleep-smoothie":   `${BASE}/photo-1553530979-7d96e86e65b3${Q}`, // cherry/blueberry drink
-  "recipe-ginger-wellness":  `${BASE}/photo-1556909172-8c2f041fca1e${Q}`, // ginger elixir glass
-  "recipe-adaptogen-bowl":   `${BASE}/photo-1546069901-ba9599a7e63c${Q}`, // superfood acai bowl
-  "recipe-elderberry-tea":   `${BASE}/photo-1484480974693-6ca0a78fb36b${Q}`, // elderberry + rosehip
-  // ── Blog posts — each category gets a different visual style ─────────────
-  "gut-brain-connection":    `${BASE}/photo-1493770348161-369560ae357d${Q}`, // nourishing food bowls
-  "adaptogens-guide":        `${BASE}/photo-1526736520913-e6a6d2a54b38${Q}`, // herbs + plant roots
-  "morning-detox-ritual":    `${BASE}/photo-1502741338009-cac2772e18bc${Q}`, // lemon water glass
-  "sleep-hygiene-science":   `${BASE}/photo-1541480601022-2308c0f02487${Q}`, // serene night sky
-  "anti-inflammatory-foods": `${BASE}/photo-1504674900247-0877df9cc836${Q}`, // colourful food spread
-  "breathwork-beginners":    `${BASE}/photo-1508672019048-805c876b67e2${Q}`, // yoga outdoors cliff
-  "seasonal-immunity":       `${BASE}/photo-1559757175-5700dde675bc${Q}`, // citrus / vitamin C
-  "gut-microbiome":          `${BASE}/photo-1474979266404-7eaacbcd87c5${Q}`, // garden herbs close-up
+  // ── Remedies ──────────────────────────────────────────────────────────────
+  "remedy-ginger-tea":                     `${BASE}/photo-1548199569-3e1c6aa8f469${Q}`,
+  "soothing-ginger-digestive-tea":         `${BASE}/photo-1548199569-3e1c6aa8f469${Q}`,
+
+  "remedy-lavender-calm":                  `${BASE}/photo-1518611012118-696072aa579a${Q}`,
+  "lavender-calming-evening-ritual":       `${BASE}/photo-1518611012118-696072aa579a${Q}`,
+
+  "remedy-immunity-shot":                  `${BASE}/photo-1615485500704-8e990f9900f7${Q}`,
+  "immunity-wellness-shot":                `${BASE}/photo-1615485500704-8e990f9900f7${Q}`,
+
+  "remedy-ashwagandha-milk":               `${BASE}/photo-1544991936-9464e43bea92${Q}`,
+  "adaptogenic-moon-milk":                 `${BASE}/photo-1544991936-9464e43bea92${Q}`,
+
+  "remedy-energy-smoothie":                `${BASE}/photo-1512621776951-a57141f2eefd${Q}`,
+  "green-energy-morning-smoothie":         `${BASE}/photo-1512621776951-a57141f2eefd${Q}`,
+
+  "remedy-elderberry-syrup":               `${BASE}/photo-1505144808419-1957a94ca61e${Q}`,
+  "elderberry-immune-syrup":               `${BASE}/photo-1505144808419-1957a94ca61e${Q}`,
+
+  "remedy-chamomile-sleep":                `${BASE}/photo-1471091862366-7a1b48c6a3cd${Q}`,
+  "deep-sleep-chamomile-blend":            `${BASE}/photo-1471091862366-7a1b48c6a3cd${Q}`,
+
+  "remedy-turmeric-tonic":                 `${BASE}/photo-1536304993831-10cdf90fbfb5${Q}`,
+  "anti-inflammatory-turmeric-tonic":      `${BASE}/photo-1536304993831-10cdf90fbfb5${Q}`,
+
+  // ── Plans ─────────────────────────────────────────────────────────────────
+  "plan-stress-3day":                      `${BASE}/photo-1447752875215-b2761acf3dbd${Q}`,
+  "3-day-stress-relief":                   `${BASE}/photo-1447752875215-b2761acf3dbd${Q}`,
+
+  "plan-sleep-7day":                       `${BASE}/photo-1545389336-cf090694435e${Q}`,
+  "7-day-sleep-reset":                     `${BASE}/photo-1545389336-cf090694435e${Q}`,
+
+  "plan-energy-5day":                      `${BASE}/photo-1594736797933-d0501ba2fe65${Q}`,
+  "5-day-energy-revival":                  `${BASE}/photo-1594736797933-d0501ba2fe65${Q}`,
+
+  "plan-immunity-14day":                   `${BASE}/photo-1490818787583-167e74326402${Q}`,
+  "14-day-immunity-boost":                 `${BASE}/photo-1490818787583-167e74326402${Q}`,
+
+  // ── Recipes ───────────────────────────────────────────────────────────────
+  "recipe-golden-milk":                    `${BASE}/photo-1563805042-7684c019e1cb${Q}`,
+  "golden-turmeric-latte":                 `${BASE}/photo-1563805042-7684c019e1cb${Q}`,
+
+  "recipe-immunity-broth":                 `${BASE}/photo-1547592180-85f173990554${Q}`,
+  "herbal-immunity-broth":                 `${BASE}/photo-1547592180-85f173990554${Q}`,
+
+  "recipe-overnight-oats":                 `${BASE}/photo-1499636136210-6f4ee915583e${Q}`,
+  "adaptogenic-overnight-oats":            `${BASE}/photo-1499636136210-6f4ee915583e${Q}`,
+
+  "recipe-antistress-salad":               `${BASE}/photo-1540420773420-3366772f4999${Q}`,
+  "stress-less-green-salad":               `${BASE}/photo-1540420773420-3366772f4999${Q}`,
+
+  "recipe-sleep-smoothie":                 `${BASE}/photo-1553530979-7d96e86e65b3${Q}`,
+  "cherry-sleep-smoothie":                 `${BASE}/photo-1553530979-7d96e86e65b3${Q}`,
+
+  "recipe-ginger-wellness":                `${BASE}/photo-1556909172-8c2f041fca1e${Q}`,
+  "fresh-ginger-wellness-elixir":          `${BASE}/photo-1556909172-8c2f041fca1e${Q}`,
+
+  "recipe-adaptogen-bowl":                 `${BASE}/photo-1546069901-ba9599a7e63c${Q}`,
+  "adaptogenic-power-bowl":                `${BASE}/photo-1546069901-ba9599a7e63c${Q}`,
+
+  "recipe-elderberry-tea":                 `${BASE}/photo-1484480974693-6ca0a78fb36b${Q}`,
+  "elderberry-&-rosehip-immunity-tea":     `${BASE}/photo-1484480974693-6ca0a78fb36b${Q}`,
+
+  // ── Blog posts ────────────────────────────────────────────────────────────
+  "gut-brain-connection":                  `${BASE}/photo-1493770348161-369560ae357d${Q}`,
+  "the-gut-brain-connection:-why-your-belly-runs-your-mood":
+                                           `${BASE}/photo-1493770348161-369560ae357d${Q}`,
+
+  "adaptogens-guide":                      `${BASE}/photo-1526736520913-e6a6d2a54b38${Q}`,
+  "5-adaptogens-your-nervous-system-will-thank-you-for":
+                                           `${BASE}/photo-1526736520913-e6a6d2a54b38${Q}`,
+
+  "morning-detox-ritual":                  `${BASE}/photo-1502741338009-cac2772e18bc${Q}`,
+  "your-7-step-morning-detox-ritual":      `${BASE}/photo-1502741338009-cac2772e18bc${Q}`,
+
+  "sleep-hygiene-science":                 `${BASE}/photo-1541480601022-2308c0f02487${Q}`,
+  "the-science-of-sleep-hygiene:-why-routine-beats-melatonin":
+                                           `${BASE}/photo-1541480601022-2308c0f02487${Q}`,
+
+  "anti-inflammatory-foods":               `${BASE}/photo-1504674900247-0877df9cc836${Q}`,
+  "anti-inflammatory-foods:-an-evidence-based-shopping-list":
+                                           `${BASE}/photo-1504674900247-0877df9cc836${Q}`,
+
+  "breathwork-beginners":                  `${BASE}/photo-1508672019048-805c876b67e2${Q}`,
+  "breathwork-for-beginners:-4-techniques-that-actually-work":
+                                           `${BASE}/photo-1508672019048-805c876b67e2${Q}`,
+
+  "seasonal-immunity":                     `${BASE}/photo-1559757175-5700dde675bc${Q}`,
+  "seasonal-immunity:-how-to-fortify-your-defences-year-round":
+                                           `${BASE}/photo-1559757175-5700dde675bc${Q}`,
+
+  "gut-microbiome":                        `${BASE}/photo-1474979266404-7eaacbcd87c5${Q}`,
+  "understanding-your-gut-microbiome:-a-plain-language-primer":
+                                           `${BASE}/photo-1474979266404-7eaacbcd87c5${Q}`,
 };
 
 export function getItemImage(
   item: { title?: string; category?: string; id?: string; goal?: string },
   _index?: number
 ): string {
-  const id    = item.id ?? "";
-  const title = (item.title ?? "").toLowerCase();
+  const id   = item.id ?? "";
+  const slug = (item.title ?? "").toLowerCase().replace(/\s+/g, "-");
 
-  // 1. Direct O(1) lookup — unique photo ID per item, zero keyword ambiguity
+  // 1. id-based lookup (primary — fastest path for all 28 known items)
   if (id && ITEM_IMAGE_URLS[id]) {
     const url = ITEM_IMAGE_URLS[id];
-    // Runtime duplicate check — log a warning if the same URL is somehow reused
     if (_seenImageURLs.has(url)) {
-      console.warn(`[getItemImage] duplicate URL for item "${id}": ${url}`);
+      console.warn(`[getItemImage] duplicate detected for id "${id}"`);
     }
     _seenImageURLs.add(url);
     return url;
   }
 
-  // 2. Fallback — unique per item so no two unknown items share an image.
-  //    Uses item.id as a numeric seed offset into a hand-picked pool of
-  //    food/botanical photos, guaranteeing a different photo per item.
+  // 2. Title-slug lookup (secondary — catches items reached by title only)
+  if (slug && ITEM_IMAGE_URLS[slug]) {
+    const url = ITEM_IMAGE_URLS[slug];
+    if (_seenImageURLs.has(url)) {
+      console.warn(`[getItemImage] duplicate detected for slug "${slug}"`);
+    }
+    _seenImageURLs.add(url);
+    return url;
+  }
+
+  // 3. True unique fallback — picsum seed = item id so every unknown item
+  //    gets a visually different image and the same item is always consistent.
+  //    No pool, no modulus — two different ids can never share an image.
   console.log("Fallback image used for:", item.title ?? id ?? "(unknown)");
-  const FALLBACK_POOL = [
-    "photo-1490645935967-10de6ba17061", // herbal tea flatlay
-    "photo-1512341689857-198e7e2f3ca8", // botanical herbs
-    "photo-1498837167922-ddd27525d352", // healthy food spread
-    "photo-1576671081837-49000212a370", // green superfoods
-    "photo-1543362906-acfc16c67564", // smoothie bowl
-    "photo-1457530378978-8bac673b8062", // herbal roots
-    "photo-1563636619-e9143da7973b", // warm herbal drink
-    "photo-1525904097878-94fb15835963", // natural ingredients
-  ];
-  // Derive a stable index from the item id string so the same unknown item
-  // always gets the same image across renders.
-  const seed = (id || item.title || "").split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  const photoId = FALLBACK_POOL[seed % FALLBACK_POOL.length];
-  return `https://images.unsplash.com/${photoId}?w=600&h=400&fit=crop`;
+  return `https://picsum.photos/seed/${encodeURIComponent(id || slug || "natura")}/600/400`;
 }
 
 export { DEFAULT_FALLBACK_URL };
