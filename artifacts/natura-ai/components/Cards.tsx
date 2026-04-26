@@ -108,6 +108,7 @@ interface RemedyCardProps {
 
 export function RemedyCard({ remedy, image, onPress, isSaved, onSave }: RemedyCardProps) {
   const colors = useColors();
+  console.log("ITEM CHECK:", remedy.id, image);
 
   return (
     <TouchableOpacity
@@ -177,6 +178,7 @@ interface PlanCardProps {
 
 export function PlanCard({ plan, image, onPress, isSaved, onSave }: PlanCardProps) {
   const colors = useColors();
+  console.log("ITEM CHECK:", plan.id, image);
 
   return (
     <TouchableOpacity
@@ -231,6 +233,7 @@ interface RecipeCardProps {
 
 export function RecipeCard({ recipe, image, onPress, onAddToGrocery, isSaved, onSave }: RecipeCardProps) {
   const colors = useColors();
+  console.log("ITEM CHECK:", recipe.id, image);
 
   return (
     <TouchableOpacity
