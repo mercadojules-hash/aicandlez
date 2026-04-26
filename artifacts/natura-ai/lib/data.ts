@@ -78,18 +78,36 @@ export interface DailyTip {
   category: string;
 }
 
+const IMAGE_OVERRIDES: Record<string, string> = {
+  "remedy-lavender-calm":
+    "https://images.unsplash.com/photo-1524594154908-edd21c6e0a5f?w=800&q=80",
+  "remedy-ashwagandha-milk":
+    "https://images.unsplash.com/photo-1604908176997-431d9e5d8c3c?w=800&q=80",
+  "remedy-turmeric-tonic":
+    "https://images.unsplash.com/photo-1615485925600-97237c8e6d27?w=800&q=80",
+  "plan-stress-3day":
+    "https://images.unsplash.com/photo-1447752875215-b2761acf3dbd?w=800&q=80",
+  "plan-immunity-14day":
+    "https://images.unsplash.com/photo-1490818787583-167e74326402?w=800&q=80",
+};
+
 function normalizeImage(raw: any): string {
   return (raw.image || raw.imageUrl || "") as string;
 }
 
+function resolveImage(raw: any): string {
+  const override = IMAGE_OVERRIDES[raw.id as string];
+  return override ?? normalizeImage(raw);
+}
+
 export const REMEDIES: Remedy[] = (remediesData as any[]).map((r) => ({
   ...r,
-  image: normalizeImage(r),
+  image: resolveImage(r),
 }));
 
 export const PLANS: WellnessPlan[] = (plansData as any[]).map((p) => ({
   ...p,
-  image: normalizeImage(p),
+  image: resolveImage(p),
 }));
 
 export const RECIPES: Recipe[] = (recipesData as any[]).map((r) => ({
