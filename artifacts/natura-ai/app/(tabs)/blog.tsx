@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
-import { getItemImage, DEFAULT_FALLBACK_URL } from "@/lib/data";
+import { useWellness } from "@/contexts/WellnessContext";
 import { BLOG_POSTS, type BlogPost } from "@/lib/blogData";
 
 const ALL_CATEGORIES = [
@@ -21,7 +21,17 @@ const ALL_CATEGORIES = [
   ...Array.from(new Set(BLOG_POSTS.map((p) => p.category))),
 ];
 
-function BlogCard({ post }: { post: BlogPost }) {
+const FALLBACK_IMG = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&h=500&fit=crop";
+
+function BlogCard({
+  post,
+  isSaved,
+  onSave,
+}: {
+  post: BlogPost;
+  isSaved: boolean;
+  onSave: () => void;
+}) {
   const colors = useColors();
 
   return (
@@ -35,14 +45,14 @@ function BlogCard({ post }: { post: BlogPost }) {
         {Platform.OS === "web" ? (
           // @ts-ignore
           <img
-            src={getItemImage(post)}
+            src={post.image}
             alt={post.title}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            onError={(e: any) => { e.currentTarget.src = DEFAULT_FALLBACK_URL; }}
+            onError={(e: any) => { e.currentTarget.src = FALLBACK_IMG; }}
           />
         ) : (
           <Image
-            source={{ uri: getItemImage(post) }}
+            source={{ uri: post.image }}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
             cachePolicy="none"
@@ -60,6 +70,15 @@ function BlogCard({ post }: { post: BlogPost }) {
             {post.category}
           </Text>
         </View>
+
+        {/* Save button */}
+        <TouchableOpacity
+          style={[styles.saveBtn, { backgroundColor: "rgba(255,255,255,0.9)" }]}
+          onPress={onSave}
+          hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
+        >
+          <Feather name="bookmark" size={15} color={isSaved ? "#3A5C3A" : "#7A7060"} />
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
@@ -109,6 +128,7 @@ export default function BlogScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [activeCategory, setActiveCategory] = useState("All");
+  const { saveItem, removeItem, isSaved } = useWellness();
 
   const filtered =
     activeCategory === "All"
@@ -176,7 +196,19 @@ export default function BlogScreen() {
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <BlogCard post={item} />}
+        renderItem={({ item }) => (
+          <BlogCard
+            post={item}
+            isSaved={isSaved(item.id)}
+            onSave={() => {
+              if (isSaved(item.id)) {
+                removeItem(item.id);
+              } else {
+                saveItem({ id: item.id, type: "blog", title: item.title, savedAt: new Date().toISOString() });
+              }
+            }}
+          />
+        )}
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: Platform.OS === "web" ? 80 : insets.bottom + 80 },
@@ -251,6 +283,16 @@ const styles = StyleSheet.create({
     height: 190,
     backgroundColor: "#DDE5DD",
     position: "relative",
+  },
+  saveBtn: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
   categoryPill: {
     position: "absolute",

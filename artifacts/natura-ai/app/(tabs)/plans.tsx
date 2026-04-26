@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useWellness } from "@/contexts/WellnessContext";
 import { PlanCard, RemedyCard } from "@/components/Cards";
-import { PLANS, REMEDIES, getItemImage } from "@/lib/data";
+import { PLANS, REMEDIES } from "@/lib/data";
 
 const TABS = ["Plans", "Remedies", "Saved"] as const;
 type Tab = (typeof TABS)[number];
@@ -77,11 +77,11 @@ export default function PlansScreen() {
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
               Curated wellness programs to support your goals
             </Text>
-            {PLANS.map((plan, index) => (
+            {PLANS.map((plan) => (
               <PlanCard
                 key={plan.id}
                 plan={plan}
-                image={getItemImage(plan, index)}
+                image={plan.imageUrl}
                 onPress={() => router.push(`/plan/${plan.id}`)}
                 isSaved={isSaved(plan.id)}
                 onSave={() => {
@@ -101,11 +101,11 @@ export default function PlansScreen() {
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
               Natural remedy guides with step-by-step instructions
             </Text>
-            {REMEDIES.map((remedy, index) => (
+            {REMEDIES.map((remedy) => (
               <View key={remedy.id} style={{ marginBottom: 16 }}>
                 <RemedyCard
                   remedy={remedy}
-                  image={getItemImage(remedy, index)}
+                  image={remedy.imageUrl}
                   onPress={() => router.push(`/remedy/${remedy.id}`)}
                   isSaved={isSaved(remedy.id)}
                   onSave={() => {
@@ -140,14 +140,14 @@ export default function PlansScreen() {
                     <Text style={[styles.savedGroupLabel, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
                       Plans
                     </Text>
-                    {savedPlans.map((s, index) => {
+                    {savedPlans.map((s) => {
                       const plan = PLANS.find((p) => p.id === s.id);
                       if (!plan) return null;
                       return (
                         <PlanCard
                           key={plan.id}
                           plan={plan}
-                          image={getItemImage(plan, index)}
+                          image={plan.imageUrl}
                           onPress={() => router.push(`/plan/${plan.id}`)}
                           isSaved
                           onSave={() => removeItem(plan.id)}
@@ -161,14 +161,14 @@ export default function PlansScreen() {
                     <Text style={[styles.savedGroupLabel, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
                       Remedies
                     </Text>
-                    {savedRemedies.map((s, index) => {
+                    {savedRemedies.map((s) => {
                       const remedy = REMEDIES.find((r) => r.id === s.id);
                       if (!remedy) return null;
                       return (
                         <View key={remedy.id} style={{ marginBottom: 16 }}>
                           <RemedyCard
                             remedy={remedy}
-                            image={getItemImage(remedy, index)}
+                            image={remedy.imageUrl}
                             onPress={() => router.push(`/remedy/${remedy.id}`)}
                             isSaved
                             onSave={() => removeItem(remedy.id)}

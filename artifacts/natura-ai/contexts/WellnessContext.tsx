@@ -9,7 +9,7 @@ import React, {
 
 export interface SavedItem {
   id: string;
-  type: "remedy" | "plan" | "recipe";
+  type: "remedy" | "plan" | "recipe" | "blog";
   title: string;
   savedAt: string;
 }

@@ -12,14 +12,17 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
-import { getItemImage, DEFAULT_FALLBACK_URL } from "@/lib/data";
+import { useWellness } from "@/contexts/WellnessContext";
 import { BLOG_POSTS } from "@/lib/blogData";
 
+
+const FALLBACK_IMG = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&h=500&fit=crop";
 
 export default function BlogDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { saveItem, removeItem, isSaved } = useWellness();
 
   const post = BLOG_POSTS.find((p) => p.id === id);
 
@@ -51,14 +54,14 @@ export default function BlogDetailScreen() {
         {Platform.OS === "web" ? (
           // @ts-ignore
           <img
-            src={getItemImage(post)}
+            src={post.image}
             alt={post.title}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            onError={(e: any) => { e.currentTarget.src = DEFAULT_FALLBACK_URL; }}
+            onError={(e: any) => { e.currentTarget.src = FALLBACK_IMG; }}
           />
         ) : (
           <Image
-            source={{ uri: getItemImage(post) }}
+            source={{ uri: post.image }}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
             cachePolicy="none"
@@ -78,6 +81,24 @@ export default function BlogDetailScreen() {
           hitSlop={{ top: 12, left: 12, right: 12, bottom: 12 }}
         >
           <Feather name="arrow-left" size={20} color="#fff" />
+        </TouchableOpacity>
+
+        {/* Save button */}
+        <TouchableOpacity
+          style={[
+            styles.saveBtn,
+            { top: Platform.OS === "web" ? 20 : insets.top + 8 },
+          ]}
+          onPress={() => {
+            if (isSaved(post.id)) {
+              removeItem(post.id);
+            } else {
+              saveItem({ id: post.id, type: "blog", title: post.title, savedAt: new Date().toISOString() });
+            }
+          }}
+          hitSlop={{ top: 12, left: 12, right: 12, bottom: 12 }}
+        >
+          <Feather name="bookmark" size={20} color={isSaved(post.id) ? "#6DB86D" : "#fff"} />
         </TouchableOpacity>
       </View>
 
@@ -212,6 +233,16 @@ const styles = StyleSheet.create({
   backBtn: {
     position: "absolute",
     left: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(0,0,0,0.38)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveBtn: {
+    position: "absolute",
+    right: 16,
     width: 38,
     height: 38,
     borderRadius: 19,

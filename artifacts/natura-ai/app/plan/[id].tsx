@@ -15,7 +15,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useWellness } from "@/contexts/WellnessContext";
 import { ChecklistItem } from "@/components/ChecklistItem";
-import { PLANS, getItemImage, DEFAULT_FALLBACK_URL } from "@/lib/data";
+import { PLANS } from "@/lib/data";
+
+const FALLBACK_IMG = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&h=500&fit=crop";
 
 
 export default function PlanDetailScreen() {
@@ -48,14 +50,14 @@ export default function PlanDetailScreen() {
         {Platform.OS === "web" ? (
           // @ts-ignore
           <img
-            src={getItemImage(plan)}
+            src={plan.imageUrl}
             alt=""
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            onError={(e: any) => { e.currentTarget.src = DEFAULT_FALLBACK_URL; }}
+            onError={(e: any) => { e.currentTarget.src = FALLBACK_IMG; }}
           />
         ) : (
           <Image
-            source={{ uri: getItemImage(plan) }}
+            source={{ uri: plan.imageUrl }}
             style={styles.heroImage}
             contentFit="cover"
             cachePolicy="none"

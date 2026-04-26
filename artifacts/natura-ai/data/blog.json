@@ -1,0 +1,157 @@
+[
+  {
+    "id": "gut-brain-connection",
+    "title": "The Gut-Brain Connection: Why Your Belly Runs Your Mood",
+    "category": "Gut Health",
+    "categoryBg": "#E4EDE4",
+    "categoryText": "#2A4A2A",
+    "excerpt": "Your gut and brain are in constant conversation. Learn how the enteric nervous system shapes your mental wellbeing and what you can do about it.",
+    "image": "https://images.unsplash.com/photo-1493770348161-369560ae357d?w=800&h=500&fit=crop",
+    "readTime": "5 min read",
+    "publishedAt": "Apr 2025",
+    "content": [
+      "Your gut contains over 100 million nerve cells — more than your spinal cord — forming what scientists call the 'enteric nervous system.' This second brain communicates bidirectionally with your brain through the vagus nerve, producing about 95% of your body's serotonin along the way.",
+      "When gut flora is out of balance, the signals sent upstream change too. Studies now link dysbiosis (an imbalance in gut bacteria) to increased rates of anxiety, brain fog, and mood instability. Inflammation in the gut triggers inflammatory cytokines that cross the blood-brain barrier and directly impact neurotransmitter production.",
+      "Practical steps to support the gut-brain axis include eating fermented foods daily (kefir, kimchi, sauerkraut), prioritizing dietary fibre from diverse plant sources, and reducing ultra-processed foods that starve beneficial bacteria.",
+      "Stress management matters too — chronic cortisol disrupts the mucosal lining of the gut, increasing intestinal permeability. Practices like diaphragmatic breathing and gentle movement support vagal tone and, in turn, a calmer digestive system.",
+      "Start small: add one fermented food and one extra serving of vegetables to your daily routine this week. Gut healing is slow and cumulative, but the payoff — a calmer, clearer mind — is well worth the patience."
+    ]
+  },
+  {
+    "id": "adaptogens-guide",
+    "title": "5 Adaptogens Your Nervous System Will Thank You For",
+    "category": "Stress Relief",
+    "categoryBg": "#F0EDE4",
+    "categoryText": "#5C4020",
+    "excerpt": "From ashwagandha to rhodiola, adaptogens have been used for millennia to help the body handle stress. Here's what the research actually says.",
+    "image": "https://images.unsplash.com/photo-1526736520913-e6a6d2a54b38?w=800&h=500&fit=crop",
+    "readTime": "6 min read",
+    "publishedAt": "Apr 2025",
+    "content": [
+      "Adaptogens are a class of herbs and mushrooms that help the body resist physical, chemical, and biological stressors. Unlike stimulants, they work by modulating the HPA (hypothalamic-pituitary-adrenal) axis — normalising cortisol rather than forcing an artificial peak.",
+      "Ashwagandha (Withania somnifera) is the most studied. Meta-analyses show significant reductions in cortisol levels and self-reported stress after 8 weeks of supplementation. It also supports thyroid function and testosterone levels in men.",
+      "Rhodiola rosea excels at fighting mental fatigue. Athletes and students alike report better focus and reduced burnout within as little as two weeks. It works by influencing monoamine neurotransmitters — dopamine, serotonin, and norepinephrine.",
+      "Holy basil (Tulsi) is an Ayurvedic cornerstone for stress, blood sugar balance, and adrenal support. It is calming without being sedating and can be safely consumed as a tea daily.",
+      "Lion's Mane mushroom stands apart as a neuroprotective adaptogen. Clinical research shows it stimulates nerve growth factor (NGF), supporting cognitive clarity and memory alongside stress resilience.",
+      "Eleuthero (Siberian ginseng) rounds out the list as the classic endurance adaptogen — widely used in Soviet-era sport and military research to enhance performance under fatigue.",
+      "Quality matters. Look for standardised extracts from reputable suppliers, introduce one adaptogen at a time, and give each at least 4–6 weeks before judging results."
+    ]
+  },
+  {
+    "id": "morning-detox-ritual",
+    "title": "Your 7-Step Morning Detox Ritual",
+    "category": "Detox",
+    "categoryBg": "#E0EDE8",
+    "categoryText": "#1E4A38",
+    "excerpt": "True detoxification starts with daily habits, not expensive cleanses. These seven practices wake up your liver, lymph, and gut before breakfast.",
+    "image": "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&h=500&fit=crop",
+    "readTime": "4 min read",
+    "publishedAt": "Mar 2025",
+    "content": [
+      "The liver performs over 500 metabolic functions and works hardest during the night — processing hormones, filtering toxins, and rebuilding enzymes. Your morning routine can either support or sabotage that overnight work.",
+      "Step 1 — Hydrate before coffee: 500 ml of warm or room-temperature water rehydrates cells, stimulates peristalsis, and begins flushing metabolic waste. Add a squeeze of lemon for citrate, which supports bile production.",
+      "Step 2 — Dry body brushing: using a natural bristle brush in long strokes toward the heart stimulates lymphatic drainage — the body's waste removal superhighway that has no pump of its own.",
+      "Step 3 — 5 minutes of movement: gentle yoga twists or a short walk stimulate the digestive organs and support lymph flow. It does not have to be intense.",
+      "Step 4 — Tongue scraping: removes accumulated bacteria and metabolic waste from the tongue before it is reabsorbed, a cornerstone of Ayurvedic morning hygiene.",
+      "Step 5 — Breakfast with bitter greens: arugula, endive, or dandelion greens stimulate bile flow, which is essential for fat-soluble toxin excretion.",
+      "Step 6 — Limit morning caffeine: cortisol peaks naturally between 8–9 AM; adding caffeine on top amplifies stress hormones. Delay coffee by 90 minutes post-waking for a cleaner energy arc.",
+      "Step 7 — Deep breathing: the lungs eliminate about 70% of the body's metabolic waste as CO₂. Five rounds of slow, full breaths make a measurable difference."
+    ]
+  },
+  {
+    "id": "sleep-hygiene-science",
+    "title": "The Science of Sleep Hygiene: Why Routine Beats Melatonin",
+    "category": "Sleep",
+    "categoryBg": "#E8E4F0",
+    "categoryText": "#3A2A5A",
+    "excerpt": "Melatonin supplements help temporarily, but robust sleep hygiene rewires your circadian rhythm for lasting, restorative sleep.",
+    "image": "https://images.unsplash.com/photo-1541480601022-2308c0f02487?w=800&h=500&fit=crop",
+    "readTime": "5 min read",
+    "publishedAt": "Mar 2025",
+    "content": [
+      "Sleep is not passive. During deep NREM sleep the glymphatic system flushes amyloid beta (the precursor to Alzheimer's plaques) from the brain. During REM sleep emotional memories are processed and motor skills consolidated. Both require sufficient sleep depth, not just duration.",
+      "Melatonin signals the brain that night is approaching — it is a timing hormone, not a sedative. Supplementing with melatonin helps shift timing (ideal for jet lag or shift work) but does little for sleep architecture if the core hygiene is broken.",
+      "Light is the most powerful circadian signal. Morning bright light exposure within 30 minutes of waking anchors your biological clock. Blue light in the evening — from screens — delays melatonin onset by 1–3 hours, shunting the window for deep sleep later.",
+      "Temperature matters more than most people realise. Core body temperature must drop 1–2°C for sleep onset. A cool bedroom (16–19°C / 60–67°F), warm shower an hour before bed (which then triggers a counter-drop in core temperature), and breathable bedding all support this.",
+      "Consistency is the most underrated tool. Going to bed and rising at the same time — even on weekends — reinforces the circadian signal more powerfully than any supplement. Two nights of inconsistency can shift your chronotype by 1–2 hours.",
+      "If you struggle with sleep onset, try magnesium glycinate (300–400 mg, 30 min before bed), progressive muscle relaxation, or the 4-7-8 breathing method. These address the nervous system activation that blocks sleep, not just the timing."
+    ]
+  },
+  {
+    "id": "anti-inflammatory-foods",
+    "title": "Anti-Inflammatory Foods: An Evidence-Based Shopping List",
+    "category": "Nutrition",
+    "categoryBg": "#F0EAE0",
+    "categoryText": "#5C3A20",
+    "excerpt": "Chronic inflammation underlies most modern diseases. These foods don't just taste good — the research shows they actively lower inflammatory markers.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=500&fit=crop",
+    "readTime": "6 min read",
+    "publishedAt": "Feb 2025",
+    "content": [
+      "Inflammation is the body's repair mechanism — essential acutely, harmful when chronic. C-reactive protein (CRP) and interleukin-6 (IL-6) are the primary blood markers of chronic low-grade inflammation, and diet is one of the strongest levers we have to move them.",
+      "Extra virgin olive oil is the most studied anti-inflammatory fat. Oleocanthal, a phenolic compound found in high-quality EVOO, inhibits COX-1 and COX-2 enzymes with an effect comparable to a low dose of ibuprofen. Use it raw or at low heat.",
+      "Fatty fish (salmon, sardines, mackerel, anchovies) provide EPA and DHA — the long-chain omega-3 fatty acids that resolve inflammation at the cellular level. Two servings per week reduces CRP significantly in most meta-analyses.",
+      "Turmeric with black pepper: curcumin alone has poor bioavailability, but piperine in black pepper increases absorption by 2,000%. Aim for 500–1,000 mg curcumin with fat and black pepper, or use fresh turmeric liberally in cooking.",
+      "Dark berries — blueberries, tart cherries, blackcurrants — are dense with anthocyanins that inhibit NF-κB, a master switch for inflammatory gene expression. Post-exercise, tart cherry juice reduces muscle soreness as effectively as NSAIDs in some studies.",
+      "Leafy cruciferous vegetables (kale, broccoli, Brussels sprouts) contain sulforaphane, which activates the Nrf2 pathway — the body's own antioxidant defence system.",
+      "Foods to reduce: refined seed oils (sunflower, corn, soybean), refined carbohydrates, ultra-processed foods, and excess alcohol each upregulate inflammatory pathways. Replacing even half your seed oil intake with olive oil produces measurable changes within weeks."
+    ]
+  },
+  {
+    "id": "breathwork-beginners",
+    "title": "Breathwork for Beginners: 4 Techniques That Actually Work",
+    "category": "Breathwork",
+    "categoryBg": "#E4EAE8",
+    "categoryText": "#2A3A36",
+    "excerpt": "You breathe 22,000 times a day — most of those breaths are unconsciously dysregulated. Here's how to take back control in under five minutes.",
+    "image": "https://images.unsplash.com/photo-1508672019048-805c876b67e2?w=800&h=500&fit=crop",
+    "readTime": "4 min read",
+    "publishedAt": "Feb 2025",
+    "content": [
+      "Breathing is the only autonomic function you can consciously override — and that makes it a direct lever on your nervous system. Slow, controlled breathing activates the vagus nerve, increases heart rate variability (HRV), and shifts the body from sympathetic (fight-or-flight) to parasympathetic (rest-and-digest) dominance.",
+      "4-7-8 Breathing: Inhale through the nose for 4 counts, hold for 7, exhale through the mouth for 8. The extended exhale activates the parasympathetic response. Practise 4 rounds before bed or during a stressful moment. Most people feel a shift within 2 cycles.",
+      "Box Breathing (used by Navy SEALs): Inhale 4 counts — hold 4 — exhale 4 — hold 4. Repeat for 4–5 minutes. This creates CO₂ tolerance and a profound sense of calm without drowsiness. Ideal before a high-pressure situation.",
+      "Physiological Sigh: A double inhale through the nose (inhale fully, then sniff in a little more), followed by a long, slow exhale. This is the fastest single breath for reducing acute stress. Stanford research shows it works in a single breath cycle.",
+      "Diaphragmatic breathing: Place one hand on the chest, one on the belly. Breathe so only the belly hand rises. Shallow chest breathing is endemic in stressed adults and keeps the nervous system in a low-grade alert state. Five minutes of belly breathing daily retrains the default pattern.",
+      "Start with one technique for one week before adding another. Breathwork is most powerful as a daily practice — even 3–5 minutes first thing in the morning reshapes your baseline nervous system tone over time."
+    ]
+  },
+  {
+    "id": "seasonal-immunity",
+    "title": "Seasonal Immunity: How to Fortify Your Defences Year-Round",
+    "category": "Immunity",
+    "categoryBg": "#E8F0E4",
+    "categoryText": "#244A20",
+    "excerpt": "Immunity isn't something you scramble for when symptoms appear — it's a system you build through consistent daily habits across every season.",
+    "image": "https://images.unsplash.com/photo-1490818787583-167e74326402?w=800&h=500&fit=crop",
+    "readTime": "5 min read",
+    "publishedAt": "Jan 2025",
+    "content": [
+      "The immune system is not a single entity but a complex network of cells, proteins, and organs — from the mucosal lining of your gut to NK (natural killer) cells circulating in the blood. Fortifying it requires addressing multiple layers simultaneously.",
+      "Vitamin D is the most common deficiency linked to immune dysfunction. It acts as a hormone, regulating over 200 genes including key antimicrobial peptides. Blood levels below 30 ng/mL are associated with significantly higher rates of respiratory infection. Supplementation of 2,000–4,000 IU daily through autumn and winter is well-supported.",
+      "Zinc is the gatekeeper of immune cell development and proliferation. Even mild deficiency impairs T-cell function. Sources: oysters, pumpkin seeds, hemp seeds, and red meat. If supplementing, 15–30 mg/day in lozenge form at the onset of symptoms reduces cold duration in studies.",
+      "Sleep is immune medicine. During sleep, cytokines — proteins that coordinate immune response — are produced and released. Consistently sleeping less than 6 hours triples the risk of catching a cold in challenge studies. No supplement compensates for this deficit.",
+      "Cold water exposure (cold showers, swims) repeatedly activates brown fat, releases norepinephrine, and has been shown to reduce sick days by 30% in a Dutch randomised controlled trial. Start with 30-second cold finishes to your shower.",
+      "Seasonal eating aligns you with the micronutrients your body needs at each time of year. Root vegetables, squash, and dark greens in winter provide the mineral density and antioxidants that seasonal produce in other regions once delivered naturally."
+    ]
+  },
+  {
+    "id": "gut-microbiome",
+    "title": "Understanding Your Gut Microbiome: A Plain-Language Primer",
+    "category": "Gut Health",
+    "categoryBg": "#E4EDE4",
+    "categoryText": "#2A4A2A",
+    "excerpt": "38 trillion microorganisms call your gut home. Understanding what they do — and what disrupts them — is the foundation of modern preventive health.",
+    "image": "https://images.unsplash.com/photo-1559757175-5700dde675bc?w=800&h=500&fit=crop",
+    "readTime": "7 min read",
+    "publishedAt": "Jan 2025",
+    "content": [
+      "The human gut microbiome — the collective genome of all microorganisms in your digestive tract — contains 150 times more genes than the human genome. These organisms are not passengers; they actively shape immunity, metabolism, inflammation, and even behaviour.",
+      "Diversity is the single best predictor of a healthy microbiome. Studies consistently show that individuals with more diverse microbial communities have lower rates of obesity, inflammatory disease, and mental health conditions. The primary driver of diversity? Dietary variety — specifically, the number of different plant species consumed each week.",
+      "Short-chain fatty acids (SCFAs) — primarily butyrate, propionate, and acetate — are produced when gut bacteria ferment dietary fibre. Butyrate is the preferred fuel for colonocytes (colon cells), and low butyrate is strongly associated with leaky gut and colorectal disease.",
+      "Major disruptors of the microbiome include antibiotics (a single course can alter composition for 12 months), non-steroidal anti-inflammatory drugs (NSAIDs), artificial sweeteners, emulsifiers in processed food (carrageenan, polysorbate-80), chronic stress, and alcohol.",
+      "Rebuilding after disruption: prioritise prebiotic foods (garlic, onion, leeks, Jerusalem artichoke, green banana, oats), introduce fermented foods gradually, rotate the diversity of vegetables eaten each week, and consider a targeted probiotic if disruption was significant (antibiotic courses, GI illness).",
+      "Test rather than guess: gut microbiome testing has become more accessible and affordable. While interpretation of results is still evolving, identifying specific imbalances — such as low Lactobacillus or Bifidobacterium — can guide more targeted dietary and supplementation strategies."
+    ]
+  }
+]

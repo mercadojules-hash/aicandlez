@@ -1,0 +1,279 @@
+[
+  {
+    "id": "remedy-ginger-tea",
+    "title": "Soothing Ginger Digestive Tea",
+    "description": "A warming, traditional tea made from fresh ginger root to ease digestive discomfort and support gut motility.",
+    "category": "Digestion",
+    "prepTime": "10 min",
+    "ingredients": [
+      "1 inch fresh ginger root",
+      "2 cups filtered water",
+      "Juice of half a lemon",
+      "1 tsp raw honey",
+      "Pinch of cayenne (optional)"
+    ],
+    "steps": [
+      { "stepNumber": 1, "instruction": "Peel and thinly slice the fresh ginger root." },
+      { "stepNumber": 2, "instruction": "Bring water to a gentle boil in a small saucepan." },
+      { "stepNumber": 3, "instruction": "Add ginger slices and reduce to a simmer.", "duration": "7 minutes" },
+      { "stepNumber": 4, "instruction": "Remove from heat and strain the tea into a mug." },
+      { "stepNumber": 5, "instruction": "Add lemon juice, honey, and a pinch of cayenne if using. Stir and sip slowly." }
+    ],
+    "benefits": [
+      "Supports healthy digestion",
+      "May ease bloating and nausea",
+      "Anti-inflammatory properties"
+    ],
+    "safetyNote": "Generally safe in food amounts. Large therapeutic doses may interact with blood-thinning medications. Consult your healthcare provider if pregnant or on medications.",
+    "whyItHelps": "Ginger contains gingerols and shogaols that may support gastric motility and reduce inflammation in the digestive tract. Traditionally used across Asian and Ayurvedic medicine for thousands of years.",
+    "bestTime": "After meals or when experiencing digestive discomfort. Also effective as a morning digestive primer.",
+    "whenToUse": "After heavy meals, when experiencing bloating or nausea, or as a morning digestive reset.",
+    "whoFor": "Anyone experiencing digestive discomfort, bloating, nausea, or those wanting to proactively support gut health.",
+    "avoidIf": "Avoid large therapeutic doses if on blood-thinning medications. Culinary amounts are generally safe for everyone.",
+    "image": "https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=600&h=400&fit=crop",
+    "imageUrl": "https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=600&h=400&fit=crop"
+  },
+  {
+    "id": "remedy-lavender-calm",
+    "title": "Lavender Calming Evening Ritual",
+    "description": "A simple, sensory evening practice combining lavender steam and a calming herbal tea to ease anxiety and invite rest.",
+    "category": "Stress",
+    "prepTime": "15 min",
+    "ingredients": [
+      "2 tsp dried lavender flowers",
+      "1 tsp chamomile",
+      "1 cup hot water",
+      "3 drops lavender essential oil (for steam bowl)",
+      "1 tsp honey"
+    ],
+    "steps": [
+      { "stepNumber": 1, "instruction": "Brew the lavender and chamomile in hot water for 5 minutes, covered." },
+      { "stepNumber": 2, "instruction": "While tea steeps, prepare a small bowl of steaming water." },
+      { "stepNumber": 3, "instruction": "Add 3 drops of lavender essential oil to the steam bowl. Place a towel over your head and inhale deeply.", "duration": "3 minutes" },
+      { "stepNumber": 4, "instruction": "Strain your tea, add honey, and sit somewhere quiet." },
+      { "stepNumber": 5, "instruction": "Sip slowly while taking three deep belly breaths between each sip." }
+    ],
+    "benefits": [
+      "Calms an overactive mind",
+      "Supports stress relief",
+      "Creates a healthy sleep ritual"
+    ],
+    "safetyNote": "Avoid excessive internal use of lavender essential oil. Lavender tea is safe for most adults. Not recommended in medicinal doses during pregnancy.",
+    "whyItHelps": "Lavender contains linalool and linalyl acetate, compounds that interact with GABA receptors to promote a calm state. Inhalation directly affects the limbic system, which governs emotional responses.",
+    "bestTime": "45–60 minutes before bed, or any time acute stress or anxiety arises.",
+    "whenToUse": "In the evening when feeling anxious, overwhelmed, or struggling to wind down after a demanding day.",
+    "whoFor": "Those experiencing anxiety, chronic stress, difficulty transitioning from work mode to rest, or with a generally restless mind.",
+    "avoidIf": "Avoid excessive internal use of lavender essential oil. Consult a healthcare provider if pregnant.",
+    "image": "https://images.unsplash.com/photo-1530012351619-c9e168c6a0ef?w=600&h=400&fit=crop",
+    "imageUrl": "https://images.unsplash.com/photo-1530012351619-c9e168c6a0ef?w=600&h=400&fit=crop"
+  },
+  {
+    "id": "remedy-immunity-shot",
+    "title": "Immunity Wellness Shot",
+    "description": "A potent, traditional wellness shot combining ginger, turmeric, and citrus to support immune resilience.",
+    "category": "Immunity",
+    "prepTime": "5 min",
+    "ingredients": [
+      "1 inch fresh ginger",
+      "1 tsp turmeric powder",
+      "Juice of 1 lemon",
+      "Pinch of black pepper",
+      "1 tsp raw honey",
+      "2 tbsp water"
+    ],
+    "steps": [
+      { "stepNumber": 1, "instruction": "Juice the fresh ginger (or grate and squeeze through a cloth)." },
+      { "stepNumber": 2, "instruction": "Combine ginger juice, turmeric, lemon juice, and water in a small glass." },
+      { "stepNumber": 3, "instruction": "Add a pinch of black pepper (activates turmeric's benefits) and honey." },
+      { "stepNumber": 4, "instruction": "Stir well until combined." },
+      { "stepNumber": 5, "instruction": "Drink in one shot on an empty stomach for best absorption." }
+    ],
+    "benefits": [
+      "Vitamin C from lemon",
+      "Anti-inflammatory turmeric",
+      "Traditional immune support"
+    ],
+    "safetyNote": "Strong and potent — dilute if too intense. Avoid daily high-dose turmeric during pregnancy.",
+    "whyItHelps": "Turmeric's curcumin may support immune cell function. Ginger provides antimicrobial compounds. Lemon delivers vitamin C. Black pepper boosts curcumin absorption by up to 20x.",
+    "bestTime": "First thing in the morning on an empty stomach, or at the first sign of seasonal illness.",
+    "whenToUse": "First thing in the morning on an empty stomach, or at the very first sign of seasonal illness.",
+    "whoFor": "Those wanting to build immune resilience, during cold and flu season, or anyone recovering from illness.",
+    "avoidIf": "Dilute if stomach sensitivity occurs. Avoid high-dose turmeric if taking blood thinners or during pregnancy.",
+    "image": "https://images.unsplash.com/photo-1615485500704-8e990f9900f7?w=600&h=400&fit=crop",
+    "imageUrl": "https://images.unsplash.com/photo-1615485500704-8e990f9900f7?w=600&h=400&fit=crop"
+  },
+  {
+    "id": "remedy-ashwagandha-milk",
+    "title": "Adaptogenic Moon Milk",
+    "description": "A nourishing bedtime milk with ashwagandha and warming spices to support deep rest.",
+    "category": "Sleep & Stress",
+    "prepTime": "8 min",
+    "ingredients": [
+      "1 cup oat or almond milk",
+      "1 tsp ashwagandha powder",
+      "1/2 tsp cinnamon",
+      "1/4 tsp cardamom",
+      "1 tsp honey",
+      "Pinch of nutmeg"
+    ],
+    "steps": [
+      { "stepNumber": 1, "instruction": "Heat oat milk in a small saucepan over medium-low heat. Do not boil." },
+      { "stepNumber": 2, "instruction": "Whisk in ashwagandha powder, cinnamon, and cardamom." },
+      { "stepNumber": 3, "instruction": "Continue stirring until fully blended and steaming.", "duration": "3 minutes" },
+      { "stepNumber": 4, "instruction": "Remove from heat. Add honey and a pinch of nutmeg." },
+      { "stepNumber": 5, "instruction": "Pour into a mug and enjoy 30-60 minutes before bed." }
+    ],
+    "benefits": [
+      "Adaptogenic stress support",
+      "Promotes relaxation",
+      "Warming and nourishing"
+    ],
+    "safetyNote": "Ashwagandha is generally well-tolerated. Consult a healthcare provider if pregnant or on thyroid medication.",
+    "whyItHelps": "Ashwagandha is a renowned adaptogen that may help regulate cortisol and support the body's stress response. Warming spices like cinnamon and cardamom aid in digestion and grounding.",
+    "bestTime": "30–60 minutes before your intended sleep time.",
+    "whenToUse": "30–60 minutes before bedtime, especially during high-stress periods or when the mind is too active to rest.",
+    "whoFor": "Those under chronic stress, with sleep difficulties, racing thoughts at night, or seeking gentle hormonal and adrenal support.",
+    "avoidIf": "Consult a healthcare provider if pregnant, breastfeeding, or taking thyroid or immunosuppressant medication.",
+    "image": "https://images.unsplash.com/photo-1544991936-9464e43bea92?w=600&h=400&fit=crop",
+    "imageUrl": "https://images.unsplash.com/photo-1544991936-9464e43bea92?w=600&h=400&fit=crop"
+  },
+  {
+    "id": "remedy-energy-smoothie",
+    "title": "Green Energy Morning Smoothie",
+    "description": "A nutrient-dense smoothie to support sustained morning energy without the crash.",
+    "category": "Energy",
+    "prepTime": "5 min",
+    "ingredients": [
+      "1 cup spinach or kale",
+      "1 banana (frozen)",
+      "1 tsp maca powder",
+      "1 tbsp almond butter",
+      "1 cup coconut water",
+      "1/2 tsp spirulina (optional)"
+    ],
+    "steps": [
+      { "stepNumber": 1, "instruction": "Add coconut water to your blender first as the base." },
+      { "stepNumber": 2, "instruction": "Add the leafy greens and blend until smooth.", "duration": "30 seconds" },
+      { "stepNumber": 3, "instruction": "Add frozen banana, maca powder, and almond butter." },
+      { "stepNumber": 4, "instruction": "Blend until creamy. Add spirulina if using.", "duration": "30 seconds" },
+      { "stepNumber": 5, "instruction": "Pour into a glass and enjoy within 15 minutes for best nutritional value." }
+    ],
+    "benefits": [
+      "Sustained energy",
+      "B vitamins from greens",
+      "Adaptogenic maca support"
+    ],
+    "safetyNote": "Great for most people. If new to spirulina, start with a small amount.",
+    "whyItHelps": "Maca root may support energy and vitality at the cellular level. Leafy greens provide iron and B vitamins essential for energy metabolism. Frozen banana adds natural sugars for quick fuel.",
+    "bestTime": "Within 30 minutes of waking — before or as your breakfast.",
+    "whenToUse": "First thing in the morning as breakfast, or as a pre-workout energizer on days you need extra stamina.",
+    "whoFor": "Those with low morning energy, athletes, busy professionals, or anyone needing sustained mental and physical performance.",
+    "avoidIf": "If new to spirulina, introduce slowly — start with 1/4 tsp. Avoid if you have a tree nut allergy (almond butter).",
+    "image": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=400&fit=crop",
+    "imageUrl": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=400&fit=crop"
+  },
+  {
+    "id": "remedy-elderberry-syrup",
+    "title": "Elderberry Immune Syrup",
+    "description": "A rich, antioxidant-dense syrup used traditionally across cultures to support immune resilience.",
+    "category": "Immunity",
+    "prepTime": "30 min",
+    "ingredients": [
+      "1 cup dried elderberries",
+      "3 cups filtered water",
+      "1 tsp cinnamon",
+      "1/2 tsp cloves",
+      "1 inch fresh ginger",
+      "1 cup raw honey (added after cooling)"
+    ],
+    "steps": [
+      { "stepNumber": 1, "instruction": "Combine elderberries, water, ginger, cinnamon, and cloves in a saucepan." },
+      { "stepNumber": 2, "instruction": "Bring to a boil, then reduce to a simmer.", "duration": "45 minutes" },
+      { "stepNumber": 3, "instruction": "Mash the berries and strain through a fine-mesh sieve." },
+      { "stepNumber": 4, "instruction": "Allow to cool to room temperature (important — heat destroys honey's enzymes)." },
+      { "stepNumber": 5, "instruction": "Stir in raw honey. Store in a glass jar in the refrigerator for up to 3 months." }
+    ],
+    "benefits": [
+      "Rich in antioxidants",
+      "Traditional immune support",
+      "Anti-inflammatory properties"
+    ],
+    "safetyNote": "Never use raw elderberries — they must be cooked first. Do not give honey to children under 1 year.",
+    "whyItHelps": "Elderberries are rich in anthocyanins and flavonoids that may support immune cell activity. Traditionally used at the onset of seasonal illness across European folk medicine.",
+    "bestTime": "1 tablespoon daily as prevention, or 3x daily at the first sign of illness.",
+    "whenToUse": "Daily as a preventative ritual (1 tbsp), or increased to 3x daily at the very first sign of seasonal illness.",
+    "whoFor": "Adults and children over 1 year seeking immune resilience throughout cold and flu season.",
+    "avoidIf": "Never use raw elderberries — always cook first. Do not give honey to children under 1 year of age.",
+    "image": "https://images.unsplash.com/photo-1505144808419-1957a94ca61e?w=600&h=400&fit=crop",
+    "imageUrl": "https://images.unsplash.com/photo-1505144808419-1957a94ca61e?w=600&h=400&fit=crop"
+  },
+  {
+    "id": "remedy-chamomile-sleep",
+    "title": "Deep Sleep Chamomile Blend",
+    "description": "A classic, trusted blend of chamomile and passionflower to ease the mind and invite deep sleep.",
+    "category": "Sleep",
+    "prepTime": "10 min",
+    "ingredients": [
+      "2 tsp dried chamomile flowers",
+      "1 tsp passionflower herb",
+      "1 tsp lemon balm",
+      "1 cup hot water (just below boiling)",
+      "1 tsp honey"
+    ],
+    "steps": [
+      { "stepNumber": 1, "instruction": "Combine chamomile, passionflower, and lemon balm in a tea strainer." },
+      { "stepNumber": 2, "instruction": "Pour water that's just below boiling over the herbs (90°C/194°F)." },
+      { "stepNumber": 3, "instruction": "Cover and steep to keep volatile oils in the cup.", "duration": "7 minutes" },
+      { "stepNumber": 4, "instruction": "Remove strainer and allow to cool slightly." },
+      { "stepNumber": 5, "instruction": "Add honey, hold the warm cup, take 3 deep breaths before your first sip." }
+    ],
+    "benefits": [
+      "Calms an overactive mind",
+      "Supports sleep onset",
+      "Gentle and caffeine-free"
+    ],
+    "safetyNote": "Avoid if allergic to ragweed. Passionflower may enhance sedative medications.",
+    "whyItHelps": "Chamomile contains apigenin, which may bind to GABA receptors to promote relaxation. Passionflower has been traditionally used to ease anxiety-related sleeplessness.",
+    "bestTime": "45–60 minutes before your intended bedtime.",
+    "whenToUse": "45–60 minutes before bedtime as a consistent sleep ritual, or when experiencing anxiety-driven sleeplessness.",
+    "whoFor": "Those with difficulty falling asleep, anxiety-related insomnia, a racing mind at night, or who want to build a healthy sleep hygiene routine.",
+    "avoidIf": "Avoid if allergic to ragweed, daisies, or related plants. Passionflower may intensify the effects of sedative medications.",
+    "image": "https://images.unsplash.com/photo-1471091862366-7a1b48c6a3cd?w=600&h=400&fit=crop",
+    "imageUrl": "https://images.unsplash.com/photo-1471091862366-7a1b48c6a3cd?w=600&h=400&fit=crop"
+  },
+  {
+    "id": "remedy-turmeric-tonic",
+    "title": "Anti-Inflammatory Turmeric Tonic",
+    "description": "A vibrant daily tonic to support inflammation balance and overall cellular health.",
+    "category": "Immunity",
+    "prepTime": "5 min",
+    "ingredients": [
+      "1 tsp turmeric powder",
+      "Juice of 1/2 lemon",
+      "1 tsp apple cider vinegar",
+      "Pinch of black pepper",
+      "1/2 tsp honey",
+      "1 cup warm water"
+    ],
+    "steps": [
+      { "stepNumber": 1, "instruction": "Warm the water — not boiling, just comfortably warm." },
+      { "stepNumber": 2, "instruction": "Add turmeric and black pepper and stir until dissolved." },
+      { "stepNumber": 3, "instruction": "Add lemon juice and apple cider vinegar." },
+      { "stepNumber": 4, "instruction": "Sweeten with honey and stir well." },
+      { "stepNumber": 5, "instruction": "Drink immediately for best potency." }
+    ],
+    "benefits": [
+      "Anti-inflammatory support",
+      "Digestive aid",
+      "Liver support properties"
+    ],
+    "safetyNote": "Apple cider vinegar is acidic — rinse mouth with water after. Avoid high-dose turmeric if taking blood thinners.",
+    "whyItHelps": "Curcumin in turmeric may help modulate inflammatory pathways. ACV may support healthy digestion and blood sugar balance. Together, they create a potent morning tonic.",
+    "bestTime": "First thing in the morning before eating, on an empty stomach.",
+    "whenToUse": "First thing in the morning before eating, or when experiencing general sluggishness and inflammation.",
+    "whoFor": "Those seeking daily anti-inflammatory support, improved digestion, or a liver-supporting morning ritual.",
+    "avoidIf": "Rinse mouth after to protect tooth enamel from ACV acidity. Avoid high-dose turmeric if on blood-thinning medications.",
+    "image": "https://images.unsplash.com/photo-1536304993831-10cdf90fbfb5?w=600&h=400&fit=crop",
+    "imageUrl": "https://images.unsplash.com/photo-1536304993831-10cdf90fbfb5?w=600&h=400&fit=crop"
+  }
+]

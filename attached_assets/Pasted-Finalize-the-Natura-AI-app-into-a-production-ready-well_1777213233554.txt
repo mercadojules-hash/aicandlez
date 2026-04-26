@@ -1,0 +1,182 @@
+Finalize the Natura AI app into a production-ready wellness app with stable content, editable data, and core retention features.
+
+GOAL:
+This is the FINAL update. Eliminate unstable systems, add key features for retention, and allow content editing without touching logic again.
+
+----------------------------------------
+SECTION 1: REMOVE IMAGE COMPLEXITY (STABILITY)
+----------------------------------------
+
+- Delete getItemImage() completely
+- Remove ITEM_IMAGE_URLS, fallback logic, random image generation
+- Remove all unused image utilities
+
+----------------------------------------
+SECTION 2: DIRECT IMAGE CONTROL
+----------------------------------------
+
+Update all content items to include:
+
+{
+  id: "unique-id",
+  title: "Title",
+  category: "Category",
+  image: "https://...",
+  description: "...",
+}
+
+Update ALL components to use:
+
+source={{ uri: item.image }}
+
+----------------------------------------
+SECTION 3: CENTRALIZED EDITABLE CONTENT
+----------------------------------------
+
+Create:
+
+/data/remedies.json
+/data/blog.json
+/data/recipes.json
+/data/plans.json
+
+Load data from JSON (not hardcoded arrays)
+
+Add comment:
+
+// EDIT HERE: You can update images, titles, or add new items without changing code.
+
+----------------------------------------
+SECTION 4: PERSONALIZED "TODAY'S PLAN" (CORE FEATURE)
+----------------------------------------
+
+Add a section on the home screen:
+
+"Today's Plan for You"
+
+Logic:
+- Based on user-selected goal (stress, digestion, sleep)
+- Show:
+  - 1 remedy
+  - 1 action (breathing/journal)
+  - 1 recipe
+
+Example:
+Stress → breathing + calming tea + journaling
+
+----------------------------------------
+SECTION 5: ROUTINE BUILDER (RETENTION)
+----------------------------------------
+
+Enhance existing routine system:
+
+- Morning / Afternoon / Night sections
+- Checkbox completion
+- Save routines locally (AsyncStorage)
+
+Add:
+- "Save Routine"
+- "Load Routine"
+
+----------------------------------------
+SECTION 6: PROGRESS + STREAK SYSTEM
+----------------------------------------
+
+Add:
+
+- Daily completion tracking
+- Streak counter
+- Weekly summary
+
+Example:
+"You've completed 5 wellness actions this week"
+
+Store in local storage.
+
+----------------------------------------
+SECTION 7: CONTEXT-AWARE AI (SMART UPGRADE)
+----------------------------------------
+
+Upgrade Ask AI:
+
+Instead of generic answers:
+- If user asks about digestion → return remedies from data
+- If stress → suggest breathing + journaling + tea
+- If sleep → show sleep plan
+
+Use existing data files to generate responses.
+
+----------------------------------------
+SECTION 8: SAVE / FAVORITES SYSTEM
+----------------------------------------
+
+Add:
+
+- Save button on:
+  - Remedies
+  - Recipes
+  - Blog posts
+
+Store saved items locally.
+
+Create a new tab:
+"Saved"
+
+Display saved content there.
+
+----------------------------------------
+SECTION 9: SMART REMEDY DETAIL (DIFFERENTIATOR)
+----------------------------------------
+
+Update remedy detail screen to include:
+
+- "When to use"
+- "Who it's for"
+- "When to avoid"
+
+Add fields in JSON:
+
+whenToUse
+whoFor
+avoidIf
+
+----------------------------------------
+SECTION 10: CLEANUP + PERFORMANCE
+----------------------------------------
+
+- Remove all console logs
+- Remove unused imports
+- Ensure no warnings/errors
+
+----------------------------------------
+SECTION 11: PREP FOR FUTURE BACKEND
+----------------------------------------
+
+Structure data loading like:
+
+const remedies = require('../data/remedies.json')
+
+So it can later be replaced with API easily.
+
+----------------------------------------
+SECTION 12: FINAL VERIFICATION
+----------------------------------------
+
+Confirm:
+
+- No duplicate images
+- All images come from item.image
+- Content loads from JSON
+- Routine system works
+- Streak system updates
+- Saved system works
+- AI responses use app data
+
+----------------------------------------
+FINAL OUTPUT:
+Show me:
+1. One JSON data file example
+2. Home screen with "Today's Plan"
+3. Routine system code
+4. Saved system code
+5. Confirmation everything is complete

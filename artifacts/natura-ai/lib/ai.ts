@@ -1,3 +1,6 @@
+import { REMEDIES, RECIPES } from "./data";
+import { BLOG_POSTS } from "./blogData";
+
 export interface AIIngredient {
   name: string;
   explanation: string;
@@ -328,6 +331,67 @@ const DEFAULT_RESPONSE: AIResponse = {
   whyItHelps: "A holistic wellness approach combines nutrition, movement, rest, and stress management. These suggestions are general supports for everyday wellbeing.",
 };
 
+interface AppContextHint {
+  remedyTitle?: string;
+  remedyId?: string;
+  recipeTitle?: string;
+  recipeId?: string;
+  blogTitle?: string;
+  blogId?: string;
+}
+
+function getAppContext(topic: string): AppContextHint {
+  const lower = topic.toLowerCase();
+  const hint: AppContextHint = {};
+
+  const remedy = REMEDIES.find(
+    (r) =>
+      r.tags?.some((t: string) => lower.includes(t)) ||
+      r.title.toLowerCase().split(" ").some((w) => lower.includes(w)) ||
+      (r as any).whoFor?.toLowerCase().includes(lower.split(" ")[0])
+  );
+  if (remedy) {
+    hint.remedyTitle = remedy.title;
+    hint.remedyId = remedy.id;
+  }
+
+  const recipe = RECIPES.find(
+    (r) =>
+      r.tags?.some((t: string) => lower.includes(t)) ||
+      r.title.toLowerCase().split(" ").some((w) => lower.includes(w))
+  );
+  if (recipe) {
+    hint.recipeTitle = recipe.title;
+    hint.recipeId = recipe.id;
+  }
+
+  const post = BLOG_POSTS.find(
+    (p) =>
+      p.title.toLowerCase().split(" ").some((w) => w.length > 4 && lower.includes(w)) ||
+      p.category.toLowerCase() === lower.split(" ")[0]
+  );
+  if (post) {
+    hint.blogTitle = post.title;
+    hint.blogId = post.id;
+  }
+
+  return hint;
+}
+
+function enrichWhyItHelps(base: string, ctx: AppContextHint): string {
+  const parts: string[] = [base];
+  if (ctx.remedyTitle) {
+    parts.push(`In the Natura library, try the "${ctx.remedyTitle}" remedy for a hands-on starting point.`);
+  }
+  if (ctx.recipeTitle) {
+    parts.push(`The "${ctx.recipeTitle}" recipe is a great complementary addition to your routine.`);
+  }
+  if (ctx.blogTitle) {
+    parts.push(`Read "${ctx.blogTitle}" in the Blog tab for deeper guidance.`);
+  }
+  return parts.join(" ");
+}
+
 export function getAIResponse(query: string): AIResponse {
   const lower = query.toLowerCase();
 
@@ -345,22 +409,29 @@ export function getAIResponse(query: string): AIResponse {
     };
   }
 
+  let base: AIResponse;
+  let topicKey: string;
+
   if (lower.includes("stress") || lower.includes("anxiety") || lower.includes("nervous") || lower.includes("calm") || lower.includes("relax")) {
-    return { ...WELLNESS_DB.stress, query };
+    base = WELLNESS_DB.stress; topicKey = "stress";
+  } else if (lower.includes("sleep") || lower.includes("insomnia") || lower.includes("rest") || lower.includes("tired at night") || lower.includes("bedtime")) {
+    base = WELLNESS_DB.sleep; topicKey = "sleep";
+  } else if (lower.includes("digest") || lower.includes("bloat") || lower.includes("gut") || lower.includes("stomach") || lower.includes("nausea") || lower.includes("constipat")) {
+    base = WELLNESS_DB.digestion; topicKey = "digestion";
+  } else if (lower.includes("energy") || lower.includes("fatigue") || lower.includes("tired") || lower.includes("exhausted") || lower.includes("focus")) {
+    base = WELLNESS_DB.energy; topicKey = "energy";
+  } else if (lower.includes("immun") || lower.includes("cold") || lower.includes("flu") || lower.includes("sick") || lower.includes("infection")) {
+    base = WELLNESS_DB.immunity; topicKey = "immunity";
+  } else {
+    base = DEFAULT_RESPONSE; topicKey = query;
   }
-  if (lower.includes("sleep") || lower.includes("insomnia") || lower.includes("rest") || lower.includes("tired at night") || lower.includes("bedtime")) {
-    return { ...WELLNESS_DB.sleep, query };
-  }
-  if (lower.includes("digest") || lower.includes("bloat") || lower.includes("gut") || lower.includes("stomach") || lower.includes("nausea") || lower.includes("constipat")) {
-    return { ...WELLNESS_DB.digestion, query };
-  }
-  if (lower.includes("energy") || lower.includes("fatigue") || lower.includes("tired") || lower.includes("exhausted") || lower.includes("focus")) {
-    return { ...WELLNESS_DB.energy, query };
-  }
-  if (lower.includes("immun") || lower.includes("cold") || lower.includes("flu") || lower.includes("sick") || lower.includes("infection")) {
-    return { ...WELLNESS_DB.immunity, query };
-  }
-  return { ...DEFAULT_RESPONSE, query };
+
+  const ctx = getAppContext(topicKey);
+  return {
+    ...base,
+    query,
+    whyItHelps: enrichWhyItHelps(base.whyItHelps, ctx),
+  };
 }
 
 export async function askAI(query: string): Promise<AIResponse> {

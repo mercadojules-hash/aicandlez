@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useWellness } from "@/contexts/WellnessContext";
-import { REMEDIES, RECIPES, getItemImage, DEFAULT_FALLBACK_URL } from "@/lib/data";
+import { REMEDIES, RECIPES } from "@/lib/data";
 
 
 export default function RemedyDetailScreen() {
@@ -124,14 +124,14 @@ export default function RemedyDetailScreen() {
         {Platform.OS === "web" ? (
           // @ts-ignore
           <img
-            src={getItemImage(item)}
+            src={item.imageUrl}
             alt=""
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            onError={(e: any) => { e.currentTarget.src = DEFAULT_FALLBACK_URL; }}
+            onError={(e: any) => { e.currentTarget.src = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&h=400&fit=crop"; }}
           />
         ) : (
           <Image
-            source={{ uri: getItemImage(item) }}
+            source={{ uri: item.imageUrl }}
             style={styles.heroImage}
             contentFit="cover"
             cachePolicy="none"
@@ -242,6 +242,46 @@ export default function RemedyDetailScreen() {
             {item.safetyNote}
           </Text>
         </View>
+
+        {"whenToUse" in item && item.whenToUse && (
+          <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius - 4 }]}>
+            <View style={styles.infoCardHeader}>
+              <Feather name="sun" size={15} color={colors.primary} />
+              <Text style={[styles.infoCardLabel, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>When to use</Text>
+            </View>
+            <Text style={[styles.infoCardText, { color: colors.foreground, fontFamily: "Inter_400Regular" }]}>{item.whenToUse}</Text>
+          </View>
+        )}
+
+        {"whoFor" in item && item.whoFor && (
+          <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius - 4 }]}>
+            <View style={styles.infoCardHeader}>
+              <Feather name="user-check" size={15} color={colors.primary} />
+              <Text style={[styles.infoCardLabel, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>Good for</Text>
+            </View>
+            <Text style={[styles.infoCardText, { color: colors.foreground, fontFamily: "Inter_400Regular" }]}>{item.whoFor}</Text>
+          </View>
+        )}
+
+        {"avoidIf" in item && item.avoidIf && (
+          <View style={[styles.infoCard, { backgroundColor: colors.muted, borderColor: colors.border, borderRadius: colors.radius - 4 }]}>
+            <View style={styles.infoCardHeader}>
+              <Feather name="shield" size={15} color={colors.warning} />
+              <Text style={[styles.infoCardLabel, { color: colors.warning, fontFamily: "Inter_600SemiBold" }]}>Avoid if</Text>
+            </View>
+            <Text style={[styles.infoCardText, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>{item.avoidIf}</Text>
+          </View>
+        )}
+
+        {"whyItHelps" in item && item.whyItHelps && (
+          <View style={[styles.infoCard, { backgroundColor: colors.secondary, borderColor: colors.border, borderRadius: colors.radius - 4 }]}>
+            <View style={styles.infoCardHeader}>
+              <Feather name="zap" size={15} color={colors.primary} />
+              <Text style={[styles.infoCardLabel, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>Why it works</Text>
+            </View>
+            <Text style={[styles.infoCardText, { color: colors.foreground, fontFamily: "Inter_400Regular" }]}>{item.whyItHelps}</Text>
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -340,6 +380,26 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   safetyText: { fontSize: 13, lineHeight: 19, flex: 1 },
+  infoCard: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 14,
+    marginTop: 12,
+    gap: 8,
+  },
+  infoCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  infoCardLabel: {
+    fontSize: 13,
+    letterSpacing: 0.2,
+  },
+  infoCardText: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
   guideHeader: {
     flexDirection: "row",
     justifyContent: "space-between",

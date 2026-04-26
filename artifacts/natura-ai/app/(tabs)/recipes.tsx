@@ -15,7 +15,7 @@ import { useColors } from "@/hooks/useColors";
 import { useWellness } from "@/contexts/WellnessContext";
 import { RecipeCard } from "@/components/Cards";
 import { ChecklistItem } from "@/components/ChecklistItem";
-import { RECIPES, getItemImage } from "@/lib/data";
+import { RECIPES } from "@/lib/data";
 
 const GOAL_FILTERS = ["All", "stress", "sleep", "energy", "immunity"] as const;
 
@@ -108,10 +108,10 @@ export default function RecipesScreen() {
           <FlatList
             data={filtered}
             keyExtractor={(item) => item.id}
-            renderItem={({ item, index }) => (
+            renderItem={({ item }) => (
               <RecipeCard
                 recipe={item}
-                image={getItemImage(item, index)}
+                image={item.imageUrl}
                 onPress={() => router.push(`/remedy/${item.id}`)}
                 isSaved={isSaved(item.id)}
                 onSave={() => {

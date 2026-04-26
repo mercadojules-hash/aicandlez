@@ -12,8 +12,9 @@ import {
   View,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { DEFAULT_FALLBACK_URL } from "@/lib/data";
 import type { Remedy, WellnessPlan, Recipe, DailyTip } from "@/lib/data";
+
+const DEFAULT_FALLBACK_URL = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&h=500&fit=crop";
 
 const useND = Platform.OS !== "web";
 

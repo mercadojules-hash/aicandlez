@@ -22,7 +22,7 @@ import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { DailyCheckIn as DailyCheckInComponent } from "@/components/DailyCheckIn";
 import { RemedyCard } from "@/components/Cards";
 import { RoutineSection } from "@/components/RoutineSection";
-import { REMEDIES, getItemImage } from "@/lib/data";
+import { REMEDIES, RECIPES } from "@/lib/data";
 
 function deriveMood(checkIn: DailyCheckIn | null): "stressed" | "low-energy" | "positive" | null {
   if (!checkIn) return null;
@@ -167,6 +167,103 @@ function QuickActionBtn({
   );
 }
 
+type Goal = "stress" | "sleep" | "energy" | "immunity";
+
+const GOAL_PLAN: Record<Goal, { remedyId: string; recipeId: string; action: string }> = {
+  stress: { remedyId: "remedy-lavender-calm", recipeId: "recipe-antistress-salad", action: "5-min breathing exercise" },
+  sleep: { remedyId: "remedy-chamomile-sleep", recipeId: "recipe-sleep-smoothie", action: "Digital sunset 1hr before bed" },
+  energy: { remedyId: "remedy-energy-smoothie", recipeId: "recipe-overnight-oats", action: "10-min walk after lunch" },
+  immunity: { remedyId: "remedy-immunity-shot", recipeId: "recipe-golden-milk", action: "Take elderberry syrup" },
+};
+
+function TodaysPlan({ goals }: { goals: string[] }) {
+  const colors = useColors();
+  const primaryGoal = (goals[0]?.toLowerCase() ?? "") as Goal;
+  const plan = GOAL_PLAN[primaryGoal];
+
+  if (!plan) return null;
+
+  const remedy = REMEDIES.find((r) => r.id === plan.remedyId);
+  const recipe = RECIPES.find((r) => r.id === plan.recipeId);
+
+  if (!remedy && !recipe) return null;
+
+  const goalLabel = primaryGoal.charAt(0).toUpperCase() + primaryGoal.slice(1);
+
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionRow}>
+        <Text style={[styles.sectionTitleInRow, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
+          Today's Plan for You
+        </Text>
+        <View style={[styles.goalBadge, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}>
+          <Text style={[styles.goalBadgeText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
+            {goalLabel}
+          </Text>
+        </View>
+      </View>
+
+      <View style={{ paddingHorizontal: 16, gap: 10 }}>
+        {remedy && (
+          <TouchableOpacity
+            style={[styles.planItem, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius - 4 }]}
+            onPress={() => router.push(`/remedy/${remedy.id}`)}
+            activeOpacity={0.88}
+          >
+            <View style={[styles.planItemIcon, { backgroundColor: colors.secondary }]}>
+              <Text style={{ fontSize: 18 }}>🌿</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.planItemLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>Remedy</Text>
+              <Text style={[styles.planItemTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
+                {remedy.title}
+              </Text>
+              <Text style={[styles.planItemSub, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+                {remedy.prepTime} · {remedy.category}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        )}
+
+        {recipe && (
+          <TouchableOpacity
+            style={[styles.planItem, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius - 4 }]}
+            onPress={() => router.push(`/remedy/${recipe.id}`)}
+            activeOpacity={0.88}
+          >
+            <View style={[styles.planItemIcon, { backgroundColor: colors.secondary }]}>
+              <Text style={{ fontSize: 18 }}>🥗</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.planItemLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>Recipe</Text>
+              <Text style={[styles.planItemTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
+                {recipe.title}
+              </Text>
+              <Text style={[styles.planItemSub, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+                {recipe.prepTime} · {recipe.category}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        )}
+
+        <View style={[styles.planItem, { backgroundColor: colors.secondary, borderColor: colors.border, borderRadius: colors.radius - 4 }]}>
+          <View style={[styles.planItemIcon, { backgroundColor: colors.primary + "18" }]}>
+            <Text style={{ fontSize: 18 }}>⚡</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.planItemLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>Today's Action</Text>
+            <Text style={[styles.planItemTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
+              {plan.action}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function StreakPill({ streak, colors }: { streak: number; colors: ReturnType<typeof useColors> }) {
   if (streak <= 0) return null;
   const label =
@@ -273,7 +370,10 @@ export default function HomeScreen() {
           <AICoachBanner checkIn={lastCheckIn} streak={streak} />
         </View>
 
-        {/* ⑤ Today's Routine */}
+        {/* ⑤ Today's Plan */}
+        <TodaysPlan goals={profile.goals} />
+
+        {/* ⑥ Today's Routine */}
         <RoutineSection />
 
         {/* ⑥ Quick Actions */}
@@ -317,11 +417,11 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             style={styles.shelf}
           >
-            {REMEDIES.map((r, index) => (
+            {REMEDIES.map((r) => (
               <RemedyCard
                 key={r.id}
                 remedy={r}
-                image={getItemImage(r, index)}
+                image={r.imageUrl}
                 onPress={() => router.push(`/remedy/${r.id}`)}
                 isSaved={isSaved(r.id)}
                 onSave={() => {
@@ -432,4 +532,29 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   coachBtnSecondaryText: { fontSize: 14 },
+  goalBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  goalBadgeText: { fontSize: 12 },
+  planItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 13,
+    borderWidth: 1,
+    gap: 12,
+  },
+  planItemIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  planItemLabel: { fontSize: 11, letterSpacing: 0.5, marginBottom: 2 },
+  planItemTitle: { fontSize: 14, lineHeight: 19 },
+  planItemSub: { fontSize: 12, marginTop: 2 },
 });
