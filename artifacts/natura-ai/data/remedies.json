@@ -46,8 +46,8 @@
     "whenToUse": "After heavy meals, when experiencing bloating or nausea, or as a morning digestive reset.",
     "whoFor": "Anyone experiencing digestive discomfort, bloating, nausea, or those wanting to proactively support gut health.",
     "avoidIf": "Avoid large therapeutic doses if on blood-thinning medications. Culinary amounts are generally safe for everyone.",
-    "image": "https://images.unsplash.com/photo-1511920170033-f8396924c348?w=800&q=80&auto=format",
-    "imageUrl": "https://images.unsplash.com/photo-1511920170033-f8396924c348?w=800&q=80&auto=format"
+    "image": "https://images.unsplash.com/photo-1511920170033-f8396924c348?w=800&q=80&auto=format&fm=jpg",
+    "imageUrl": "https://images.unsplash.com/photo-1511920170033-f8396924c348?w=800&q=80&auto=format&fm=jpg"
   },
   {
     "id": "remedy-lavender-calm",
@@ -96,8 +96,8 @@
     "whenToUse": "In the evening when feeling anxious, overwhelmed, or struggling to wind down after a demanding day.",
     "whoFor": "Those experiencing anxiety, chronic stress, difficulty transitioning from work mode to rest, or with a generally restless mind.",
     "avoidIf": "Avoid excessive internal use of lavender essential oil. Consult a healthcare provider if pregnant.",
-    "image": "https://images.unsplash.com/photo-1524594154908-edd21c6e0a5f?w=800&q=80&auto=format",
-    "imageUrl": "https://images.unsplash.com/photo-1524594154908-edd21c6e0a5f?w=800&q=80&auto=format"
+    "image": "https://images.unsplash.com/photo-1524594154908-edd21c6e0a5f?w=800&q=80&auto=format&fm=jpg",
+    "imageUrl": "https://images.unsplash.com/photo-1524594154908-edd21c6e0a5f?w=800&q=80&auto=format&fm=jpg"
   },
   {
     "id": "remedy-immunity-shot",
@@ -146,8 +146,8 @@
     "whenToUse": "First thing in the morning on an empty stomach, or at the very first sign of seasonal illness.",
     "whoFor": "Those wanting to build immune resilience, during cold and flu season, or anyone recovering from illness.",
     "avoidIf": "Dilute if stomach sensitivity occurs. Avoid high-dose turmeric if taking blood thinners or during pregnancy.",
-    "image": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80&auto=format",
-    "imageUrl": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80&auto=format"
+    "image": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80&auto=format&fm=jpg",
+    "imageUrl": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80&auto=format&fm=jpg"
   },
   {
     "id": "remedy-ashwagandha-milk",
@@ -197,8 +197,8 @@
     "whenToUse": "30–60 minutes before bedtime, especially during high-stress periods or when the mind is too active to rest.",
     "whoFor": "Those under chronic stress, with sleep difficulties, racing thoughts at night, or seeking gentle hormonal and adrenal support.",
     "avoidIf": "Consult a healthcare provider if pregnant, breastfeeding, or taking thyroid or immunosuppressant medication.",
-    "image": "https://images.unsplash.com/photo-1604908176997-431d9e5d8c3c?w=800&q=80&auto=format",
-    "imageUrl": "https://images.unsplash.com/photo-1604908176997-431d9e5d8c3c?w=800&q=80&auto=format"
+    "image": "https://images.unsplash.com/photo-1604908176997-431d9e5d8c3c?w=800&q=80&auto=format&fm=jpg",
+    "imageUrl": "https://images.unsplash.com/photo-1604908176997-431d9e5d8c3c?w=800&q=80&auto=format&fm=jpg"
   },
   {
     "id": "remedy-energy-smoothie",
@@ -249,8 +249,8 @@
     "whenToUse": "First thing in the morning as breakfast, or as a pre-workout energizer on days you need extra stamina.",
     "whoFor": "Those with low morning energy, athletes, busy professionals, or anyone needing sustained mental and physical performance.",
     "avoidIf": "If new to spirulina, introduce slowly — start with 1/4 tsp. Avoid if you have a tree nut allergy (almond butter).",
-    "image": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&q=80&auto=format",
-    "imageUrl": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&q=80&auto=format"
+    "image": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&q=80&auto=format&fm=jpg",
+    "imageUrl": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&q=80&auto=format&fm=jpg"
   },
   {
     "id": "remedy-elderberry-syrup",
@@ -300,8 +300,8 @@
     "whenToUse": "Daily as a preventative ritual (1 tbsp), or increased to 3x daily at the very first sign of seasonal illness.",
     "whoFor": "Adults and children over 1 year seeking immune resilience throughout cold and flu season.",
     "avoidIf": "Never use raw elderberries — always cook first. Do not give honey to children under 1 year of age.",
-    "image": "https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?w=800&q=80&auto=format",
-    "imageUrl": "https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?w=800&q=80&auto=format"
+    "image": "https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?w=800&q=80&auto=format&fm=jpg",
+    "imageUrl": "https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?w=800&q=80&auto=format&fm=jpg"
   },
   {
     "id": "remedy-chamomile-sleep",
@@ -350,8 +350,8 @@
     "whenToUse": "45–60 minutes before bedtime as a consistent sleep ritual, or when experiencing anxiety-driven sleeplessness.",
     "whoFor": "Those with difficulty falling asleep, anxiety-related insomnia, a racing mind at night, or who want to build a healthy sleep hygiene routine.",
     "avoidIf": "Avoid if allergic to ragweed, daisies, or related plants. Passionflower may intensify the effects of sedative medications.",
-    "image": "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&q=80&auto=format",
-    "imageUrl": "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&q=80&auto=format"
+    "image": "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&q=80&auto=format&fm=jpg",
+    "imageUrl": "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&q=80&auto=format&fm=jpg"
   },
   {
     "id": "remedy-turmeric-tonic",
@@ -400,7 +400,7 @@
     "whenToUse": "First thing in the morning before eating, or when experiencing general sluggishness and inflammation.",
     "whoFor": "Those seeking daily anti-inflammatory support, improved digestion, or a liver-supporting morning ritual.",
     "avoidIf": "Rinse mouth after to protect tooth enamel from ACV acidity. Avoid high-dose turmeric if on blood-thinning medications.",
-    "image": "https://images.unsplash.com/photo-1615485925600-97237c8e6d27?w=800&q=80&auto=format",
-    "imageUrl": "https://images.unsplash.com/photo-1615485925600-97237c8e6d27?w=800&q=80&auto=format"
+    "image": "https://images.unsplash.com/photo-1615485925600-97237c8e6d27?w=800&q=80&auto=format&fm=jpg",
+    "imageUrl": "https://images.unsplash.com/photo-1615485925600-97237c8e6d27?w=800&q=80&auto=format&fm=jpg"
   }
 ]
