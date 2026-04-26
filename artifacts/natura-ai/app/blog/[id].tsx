@@ -12,10 +12,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { getItemImage, DEFAULT_FALLBACK_URL } from "@/lib/data";
 import { BLOG_POSTS } from "@/lib/blogData";
 
-const FALLBACK =
-  "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&h=500&fit=crop";
 
 export default function BlogDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -52,16 +51,14 @@ export default function BlogDetailScreen() {
         {Platform.OS === "web" ? (
           // @ts-ignore
           <img
-            src={post.image}
+            src={getItemImage(post)}
             alt={post.title}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            onError={(e: any) => {
-              e.currentTarget.src = FALLBACK;
-            }}
+            onError={(e: any) => { e.currentTarget.src = DEFAULT_FALLBACK_URL; }}
           />
         ) : (
           <Image
-            source={{ uri: post.image }}
+            source={{ uri: getItemImage(post) }}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
             cachePolicy="none"

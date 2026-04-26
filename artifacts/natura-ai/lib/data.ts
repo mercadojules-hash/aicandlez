@@ -838,7 +838,7 @@ export function getQuickWin(): string {
 }
 
 const DEFAULT_FALLBACK_URL =
-  "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=600&q=80&fit=crop";
+  "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&h=400&fit=crop";
 
 const IMAGE_KEYWORDS: Record<string, string> = {
   ginger:     "https://images.unsplash.com/photo-1548199569-3e1c6aa8f469?w=600&q=80&fit=crop",
@@ -918,91 +918,92 @@ export function getImageUrl(category: string, provided?: string): string {
   return getCategoryFallback(category);
 }
 
-export function getItemImage(item: { title?: string }, _index?: number): string {
+// ─── IMAGE GENERATION ────────────────────────────────────────────────────────
+// Each known item has a curated visual keyword string → visually distinct photo.
+// The "sig" param pins a deterministic result per item (same item = same image).
+// Unknown items fall back to title-based keyword extraction.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Direct Unsplash photo IDs — deterministic, no CDN keyword-match ambiguity.
+// Each item.id maps to a unique, curated photo URL (28 items, 28 unique IDs).
+// To change a photo: replace the photo-XXXXXXXXXX segment for that item.
+const BASE = "https://images.unsplash.com";
+const Q    = "?w=600&h=400&fit=crop";
+
+const ITEM_IMAGE_URLS: Record<string, string> = {
+  // ── Remedies ─────────────────────────────────────────────────────────────
+  "remedy-ginger-tea":       `${BASE}/photo-1548199569-3e1c6aa8f469${Q}`, // ginger root tea
+  "remedy-lavender-calm":    `${BASE}/photo-1518611012118-696072aa579a${Q}`, // lavender field
+  "remedy-immunity-shot":    `${BASE}/photo-1615485500704-8e990f9900f7${Q}`, // citrus wellness shot
+  "remedy-ashwagandha-milk": `${BASE}/photo-1544991936-9464e43bea92${Q}`, // warm golden drink
+  "remedy-energy-smoothie":  `${BASE}/photo-1512621776951-a57141f2eefd${Q}`, // green smoothie
+  "remedy-elderberry-syrup": `${BASE}/photo-1505144808419-1957a94ca61e${Q}`, // elderberries
+  "remedy-chamomile-sleep":  `${BASE}/photo-1471091862366-7a1b48c6a3cd${Q}`, // chamomile tea
+  "remedy-turmeric-tonic":   `${BASE}/photo-1536304993831-10cdf90fbfb5${Q}`, // turmeric root
+  // ── Plans ─────────────────────────────────────────────────────────────────
+  "plan-stress-3day":        `${BASE}/photo-1506126613408-eca07ce68773${Q}`, // meditation/stress
+  "plan-sleep-7day":         `${BASE}/photo-1545389336-cf090694435e${Q}`, // sleep/night calm
+  "plan-energy-5day":        `${BASE}/photo-1594736797933-d0501ba2fe65${Q}`, // morning energy
+  "plan-immunity-14day":     `${BASE}/photo-1490818787583-167e74326402${Q}`, // immunity herbs
+  // ── Recipes ───────────────────────────────────────────────────────────────
+  "recipe-golden-milk":      `${BASE}/photo-1563805042-7684c019e1cb${Q}`, // warm spiced latte
+  "recipe-immunity-broth":   `${BASE}/photo-1547592180-85f173990554${Q}`, // herbal broth bowl
+  "recipe-overnight-oats":   `${BASE}/photo-1499636136210-6f4ee915583e${Q}`, // oats jar + berries
+  "recipe-antistress-salad": `${BASE}/photo-1540420773420-3366772f4999${Q}`, // colorful salad
+  "recipe-sleep-smoothie":   `${BASE}/photo-1553530979-7d96e86e65b3${Q}`, // cherry smoothie
+  "recipe-ginger-wellness":  `${BASE}/photo-1556909172-8c2f041fca1e${Q}`, // ginger elixir glass
+  "recipe-adaptogen-bowl":   `${BASE}/photo-1546069901-ba9599a7e63c${Q}`, // superfood bowl
+  "recipe-elderberry-tea":   `${BASE}/photo-1484480974693-6ca0a78fb36b${Q}`, // elderberry rosehip
+  // ── Blog posts ────────────────────────────────────────────────────────────
+  "gut-brain-connection":    `${BASE}/photo-1493770348161-369560ae357d${Q}`, // nourishing food bowls
+  "adaptogens-guide":        `${BASE}/photo-1526736520913-e6a6d2a54b38${Q}`, // herbs + plant roots
+  "morning-detox-ritual":    `${BASE}/photo-1502741338009-cac2772e18bc${Q}`, // lemon water glass
+  "sleep-hygiene-science":   `${BASE}/photo-1541480601022-2308c0f02487${Q}`, // serene night sky
+  "anti-inflammatory-foods": `${BASE}/photo-1504674900247-0877df9cc836${Q}`, // colorful food spread
+  "breathwork-beginners":    `${BASE}/photo-1508672019048-805c876b67e2${Q}`, // yoga outdoors
+  "seasonal-immunity":       `${BASE}/photo-1559757175-5700dde675bc${Q}`, // citrus vitamin
+  "gut-microbiome":          `${BASE}/photo-1474979266404-7eaacbcd87c5${Q}`, // herbs in garden
+};
+
+export function getItemImage(
+  item: { title?: string; category?: string; id?: string; goal?: string },
+  _index?: number
+): string {
+  const id = item.id || "";
+
+  // Direct lookup — O(1), deterministic, no network keyword ambiguity
+  if (id && ITEM_IMAGE_URLS[id]) return ITEM_IMAGE_URLS[id];
+
+  // Fallback for unknown items: match by title keywords to closest known photo
   const title = (item.title || "").toLowerCase();
-
-  // Ginger tea (specific) — different from ginger elixir
   if (title.includes("ginger") && title.includes("tea"))
-    return "https://images.unsplash.com/photo-1548199569-3e1c6aa8f469?w=600&h=400&fit=crop";
-
-  // Ginger elixir / wellness shot / any other ginger
-  if (title.includes("elixir") || title.includes("ginger"))
-    return "https://images.unsplash.com/photo-1556909172-8c2f041fca1e?w=600&h=400&fit=crop";
-
-  // Lavender / calm
+    return ITEM_IMAGE_URLS["remedy-ginger-tea"];
   if (title.includes("lavender") || title.includes("calm"))
-    return "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=600&h=400&fit=crop";
-
-  // Wellness shot (citrus, not ginger)
-  if (title.includes("shot"))
-    return "https://images.unsplash.com/photo-1615485500704-8e990f9900f7?w=600&h=400&fit=crop";
-
-  // Elderberry syrup (specific) — different from elderberry tea
-  if (title.includes("elderberry") && title.includes("syrup"))
-    return "https://images.unsplash.com/photo-1505144808419-1957a94ca61e?w=600&h=400&fit=crop";
-
-  // Elderberry tea / any other elderberry
-  if (title.includes("elderberry"))
-    return "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=600&h=400&fit=crop";
-
-  // Chamomile — before generic sleep
+    return ITEM_IMAGE_URLS["remedy-lavender-calm"];
   if (title.includes("chamomile"))
-    return "https://images.unsplash.com/photo-1471091862366-7a1b48c6a3cd?w=600&h=400&fit=crop";
-
-  // Golden milk / latte — before turmeric (catches "Golden Turmeric Latte")
-  if (title.includes("golden") || title.includes("latte"))
-    return "https://images.unsplash.com/photo-1604908176997-4317c5f0d41c?w=600&h=400&fit=crop";
-
-  // Turmeric tonic
+    return ITEM_IMAGE_URLS["remedy-chamomile-sleep"];
   if (title.includes("turmeric"))
-    return "https://images.unsplash.com/photo-1536304993831-10cdf90fbfb5?w=600&h=400&fit=crop";
-
-  // Moon milk / ashwagandha
-  if (title.includes("moon") || title.includes("ashwagandha"))
-    return "https://images.unsplash.com/photo-1544991936-9464e43bea92?w=600&h=400&fit=crop";
-
-  // Cherry — before generic sleep (catches "Cherry Sleep Smoothie")
-  if (title.includes("cherry"))
-    return "https://images.unsplash.com/photo-1553530979-7d96e86e65b3?w=600&h=400&fit=crop";
-
-  // Oats / overnight — before adaptogen (catches "Adaptogenic Overnight Oats")
+    return ITEM_IMAGE_URLS["remedy-turmeric-tonic"];
+  if (title.includes("elderberry"))
+    return ITEM_IMAGE_URLS["recipe-elderberry-tea"];
   if (title.includes("oats") || title.includes("overnight"))
-    return "https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=600&h=400&fit=crop";
-
-  // Broth — before generic immunity
-  if (title.includes("broth"))
-    return "https://images.unsplash.com/photo-1547592180-85f173990554?w=600&h=400&fit=crop";
-
-  // Salad — before stress (catches "Stress-Less Green Salad")
+    return ITEM_IMAGE_URLS["recipe-overnight-oats"];
   if (title.includes("salad"))
-    return "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&h=400&fit=crop";
-
-  // Bowl
-  if (title.includes("bowl"))
-    return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&h=400&fit=crop";
-
-  // Stress / relief plan
-  if (title.includes("stress"))
-    return "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&h=400&fit=crop";
-
-  // Sleep reset plan — after chamomile/cherry
+    return ITEM_IMAGE_URLS["recipe-antistress-salad"];
+  if (title.includes("broth") || title.includes("soup"))
+    return ITEM_IMAGE_URLS["recipe-immunity-broth"];
+  if (title.includes("smoothie") || title.includes("shake"))
+    return ITEM_IMAGE_URLS["recipe-sleep-smoothie"];
   if (title.includes("sleep"))
-    return "https://images.unsplash.com/photo-1545389336-cf090694435e?w=600&h=400&fit=crop";
-
-  // Energy smoothie (specific) — different from energy revival plan
-  if (title.includes("energy") && title.includes("smoothie"))
-    return "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=400&fit=crop";
-
-  // Energy revival plan
+    return ITEM_IMAGE_URLS["plan-sleep-7day"];
   if (title.includes("energy"))
-    return "https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?w=600&h=400&fit=crop";
-
-  // Immunity boost plan — after shot/elderberry/broth
+    return ITEM_IMAGE_URLS["plan-energy-5day"];
   if (title.includes("immunity") || title.includes("immune"))
-    return "https://images.unsplash.com/photo-1490818787583-167e74326402?w=600&h=400&fit=crop";
+    return ITEM_IMAGE_URLS["plan-immunity-14day"];
+  if (title.includes("stress"))
+    return ITEM_IMAGE_URLS["plan-stress-3day"];
 
-  // Default fallback
-  return "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&h=400&fit=crop";
+  return DEFAULT_FALLBACK_URL;
 }
 
 export { DEFAULT_FALLBACK_URL };
