@@ -144,7 +144,7 @@ export const REMEDIES: Remedy[] = [
     safetyNote: "Safe for most adults in food amounts. Large doses may interact with blood thinners.",
     whyItHelps: "Ginger contains gingerols and shogaols — compounds traditionally associated with supporting gastric motility and easing digestive discomfort. Black pepper may enhance absorption.",
     bestTime: "Morning on an empty stomach, or after meals for digestive comfort.",
-    imageUrl: "https://images.unsplash.com/photo-1548199569-3e1c6aa8f469?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?ginger,tea,digestion,spice",
   },
   {
     id: "remedy-lavender-calm",
@@ -174,7 +174,7 @@ export const REMEDIES: Remedy[] = [
     safetyNote: "Lavender tea is generally safe. Avoid medicinal doses during pregnancy.",
     whyItHelps: "Lavender contains linalool and linalyl acetate, compounds traditionally used to support a calm nervous system. Ritual and routine cue the brain toward rest.",
     bestTime: "30–60 minutes before bed as part of your wind-down routine.",
-    imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?lavender,aromatherapy,calm,purple",
   },
   {
     id: "remedy-immunity-shot",
@@ -206,7 +206,7 @@ export const REMEDIES: Remedy[] = [
     safetyNote: "Strong and potent — dilute if too intense. Avoid daily high-dose turmeric during pregnancy.",
     whyItHelps: "Turmeric's curcumin may support immune cell function. Ginger provides antimicrobial compounds. Lemon delivers vitamin C. Black pepper boosts curcumin absorption by up to 20x.",
     bestTime: "First thing in the morning on an empty stomach, or at the first sign of seasonal illness.",
-    imageUrl: "https://images.unsplash.com/photo-1615485500704-8e990f9900f7?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?citrus,ginger,immunity,shot",
   },
   {
     id: "remedy-ashwagandha-milk",
@@ -238,7 +238,7 @@ export const REMEDIES: Remedy[] = [
     safetyNote: "Ashwagandha is generally well-tolerated. Consult a healthcare provider if pregnant or on thyroid medication.",
     whyItHelps: "Ashwagandha is a renowned adaptogen that may help regulate cortisol and support the body's stress response. Warming spices like cinnamon and cardamom aid in digestion and grounding.",
     bestTime: "30–60 minutes before your intended sleep time.",
-    imageUrl: "https://images.unsplash.com/photo-1544991936-9464e43bea92?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?ashwagandha,moon,milk,oat,warm",
   },
   {
     id: "remedy-energy-smoothie",
@@ -270,7 +270,7 @@ export const REMEDIES: Remedy[] = [
     safetyNote: "Great for most people. If new to spirulina, start with a small amount.",
     whyItHelps: "Maca root may support energy and vitality at the cellular level. Leafy greens provide iron and B vitamins essential for energy metabolism. Frozen banana adds natural sugars for quick fuel.",
     bestTime: "Within 30 minutes of waking — before or as your breakfast.",
-    imageUrl: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?green,smoothie,spinach,energy,morning",
   },
   {
     id: "remedy-elderberry-syrup",
@@ -302,7 +302,7 @@ export const REMEDIES: Remedy[] = [
     safetyNote: "Never use raw elderberries — they must be cooked first. Do not give honey to children under 1 year.",
     whyItHelps: "Elderberries are rich in anthocyanins and flavonoids that may support immune cell activity. Traditionally used at the onset of seasonal illness across European folk medicine.",
     bestTime: "1 tablespoon daily as prevention, or 3x daily at the first sign of illness.",
-    imageUrl: "https://images.unsplash.com/photo-1505144808419-1957a94ca61e?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?elderberry,purple,berry,syrup",
   },
   {
     id: "remedy-chamomile-sleep",
@@ -333,7 +333,7 @@ export const REMEDIES: Remedy[] = [
     safetyNote: "Avoid if allergic to ragweed. Passionflower may enhance sedative medications.",
     whyItHelps: "Chamomile contains apigenin, which may bind to GABA receptors to promote relaxation. Passionflower has been traditionally used to ease anxiety-related sleeplessness.",
     bestTime: "45–60 minutes before your intended bedtime.",
-    imageUrl: "https://images.unsplash.com/photo-1471091862366-7a1b48c6a3cd?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?chamomile,flower,herbal,tea,sleep",
   },
   {
     id: "remedy-turmeric-tonic",
@@ -365,7 +365,7 @@ export const REMEDIES: Remedy[] = [
     safetyNote: "Apple cider vinegar is acidic — rinse mouth with water after. Avoid high-dose turmeric if taking blood thinners.",
     whyItHelps: "Curcumin in turmeric may help modulate inflammatory pathways. ACV may support healthy digestion and blood sugar balance. Together, they create a potent morning tonic.",
     bestTime: "First thing in the morning before eating, on an empty stomach.",
-    imageUrl: "https://images.unsplash.com/photo-1536304993831-10cdf90fbfb5?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?turmeric,golden,tonic,anti-inflammatory",
   },
 ];
 
@@ -376,7 +376,7 @@ export const PLANS: WellnessPlan[] = [
     subtitle: "Reset your nervous system with gentle, natural support.",
     goal: "stress",
     duration: "3 days",
-    imageUrl: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?meditation,zen,calm,stress-relief",
     groceryList: [
       "Chamomile tea",
       "Lavender tea",
@@ -435,7 +435,7 @@ export const PLANS: WellnessPlan[] = [
     subtitle: "Rebuild healthy sleep habits with natural plant support.",
     goal: "sleep",
     duration: "7 days",
-    imageUrl: "https://images.unsplash.com/photo-1545389336-cf090694435e?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?sleep,moonlight,night,rest,peaceful",
     groceryList: [
       "Chamomile tea",
       "Valerian root tea",
@@ -467,7 +467,7 @@ export const PLANS: WellnessPlan[] = [
     subtitle: "Naturally boost vitality with adaptogens and nutrient-dense foods.",
     goal: "energy",
     duration: "5 days",
-    imageUrl: "https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?sunrise,vitality,energy,morning,yoga",
     groceryList: [
       "Maca powder",
       "Green tea",
@@ -501,7 +501,7 @@ export const PLANS: WellnessPlan[] = [
     subtitle: "Fortify your body's defenses with antioxidants and immune herbs.",
     goal: "immunity",
     duration: "14 days",
-    imageUrl: "https://images.unsplash.com/photo-1490818787583-167e74326402?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?immunity,herbs,citrus,garlic,health",
     groceryList: [
       "Elderberry syrup or dried elderberries",
       "Echinacea tea",
@@ -539,7 +539,7 @@ export const RECIPES: Recipe[] = [
     category: "Drinks",
     prepTime: "5 min",
     goal: "immunity",
-    imageUrl: "https://images.unsplash.com/photo-1615485500704-8e990f9900f7?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?golden,milk,turmeric,warm,latte",
     whyItHelps: "Curcumin in turmeric may support immune function and reduce low-grade inflammation. Black pepper activates curcumin absorption by up to 20x.",
     bestTime: "Morning, afternoon, or before bed as a warming ritual.",
     ingredients: [
@@ -572,7 +572,7 @@ export const RECIPES: Recipe[] = [
     category: "Soups",
     prepTime: "45 min",
     goal: "immunity",
-    imageUrl: "https://images.unsplash.com/photo-1547592180-85f173990554?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?broth,soup,bone,healing,nourishing",
     whyItHelps: "Garlic's allicin, turmeric's curcumin, and ginger's gingerols combine to create a powerful anti-microbial, anti-inflammatory base that may support immune defenses.",
     bestTime: "During periods of heightened immune need, or as a daily preventative in colder months.",
     ingredients: [
@@ -607,7 +607,7 @@ export const RECIPES: Recipe[] = [
     category: "Breakfast",
     prepTime: "5 min (+ overnight)",
     goal: "energy",
-    imageUrl: "https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?oats,overnight,breakfast,bowl,berries",
     whyItHelps: "Maca may support energy and stamina. Chia seeds provide omega-3s and fiber for sustained fullness. Oats offer slow-release carbohydrates for steady morning energy.",
     bestTime: "First meal of the day — prep the night before for a seamless morning routine.",
     ingredients: [
@@ -641,7 +641,7 @@ export const RECIPES: Recipe[] = [
     category: "Meals",
     prepTime: "10 min",
     goal: "stress",
-    imageUrl: "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?salad,greens,healthy,fresh,vegetables",
     whyItHelps: "Spinach and pumpkin seeds are rich in magnesium, which plays a key role in regulating the stress response. Walnuts provide omega-3s that may support brain health and mood.",
     bestTime: "Lunch or dinner — especially on high-stress days.",
     ingredients: [
@@ -674,7 +674,7 @@ export const RECIPES: Recipe[] = [
     category: "Drinks",
     prepTime: "5 min",
     goal: "sleep",
-    imageUrl: "https://images.unsplash.com/photo-1553530979-7d96e86e65b3?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?smoothie,banana,cherry,sleep,purple",
     whyItHelps: "Tart cherries are one of the few natural food sources of melatonin. Combined with banana's tryptophan and magnesium, this smoothie gently supports sleep onset.",
     bestTime: "30–60 minutes before bed — avoid anything heavy after this.",
     ingredients: [
@@ -707,7 +707,7 @@ export const RECIPES: Recipe[] = [
     category: "Drinks",
     prepTime: "5 min",
     goal: "energy",
-    imageUrl: "https://images.unsplash.com/photo-1556909172-8c2f041fca1e?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?ginger,lemon,wellness,drink,fresh",
     whyItHelps: "Ginger may stimulate circulation and digestion, while ACV may support blood sugar balance. Together they create a stimulating, energizing start to the day.",
     bestTime: "First thing in the morning before eating.",
     ingredients: [
@@ -740,7 +740,7 @@ export const RECIPES: Recipe[] = [
     category: "Meals",
     prepTime: "20 min",
     goal: "stress",
-    imageUrl: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?acai,bowl,superfoods,adaptogen,fruit",
     whyItHelps: "Adaptogens like ashwagandha help modulate the stress response. Sweet potato provides complex carbs that support serotonin production. Tahini provides magnesium and healthy fats.",
     bestTime: "Lunch or dinner during high-stress periods.",
     ingredients: [
@@ -774,7 +774,7 @@ export const RECIPES: Recipe[] = [
     category: "Drinks",
     prepTime: "10 min",
     goal: "immunity",
-    imageUrl: "https://images.unsplash.com/photo-1490818787583-167e74326402?w=600&q=80&fit=crop",
+    imageUrl: "https://source.unsplash.com/600x400/?elderberry,tea,rosehip,vitamin,herbal",
     whyItHelps: "Elderberry contains immune-supporting flavonoids. Rosehip is exceptionally high in vitamin C. Together they provide a potent antioxidant and immune support combination.",
     bestTime: "Daily as a preventative, or 3x daily at the onset of seasonal illness.",
     ingredients: [
