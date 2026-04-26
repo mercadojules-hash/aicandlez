@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useWellness } from "@/contexts/WellnessContext";
-import { REMEDIES, RECIPES } from "@/lib/data";
+import { REMEDIES, RECIPES, getItemImage, DEFAULT_FALLBACK_URL } from "@/lib/data";
 
 
 export default function RemedyDetailScreen() {
@@ -121,13 +121,22 @@ export default function RemedyDetailScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: item.imageUrl }}
-          style={styles.heroImage}
-          contentFit="cover"
-          transition={300}
-          placeholder={{ color: "#DDE5DD" }}
-        />
+        {Platform.OS === "web" ? (
+          // @ts-ignore
+          <img
+            src={getItemImage(item)}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            onError={(e: any) => { e.currentTarget.src = DEFAULT_FALLBACK_URL; }}
+          />
+        ) : (
+          <Image
+            source={{ uri: getItemImage(item) }}
+            style={styles.heroImage}
+            contentFit="cover"
+            cachePolicy="none"
+          />
+        )}
         <TouchableOpacity
           onPress={() => router.back()}
           style={[styles.backButton, { backgroundColor: "rgba(255,255,255,0.9)", borderRadius: 22 }]}

@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useWellness } from "@/contexts/WellnessContext";
 import { ChecklistItem } from "@/components/ChecklistItem";
-import { PLANS } from "@/lib/data";
+import { PLANS, getItemImage, DEFAULT_FALLBACK_URL } from "@/lib/data";
 
 
 export default function PlanDetailScreen() {
@@ -45,13 +45,22 @@ export default function PlanDetailScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: plan.imageUrl }}
-          style={styles.heroImage}
-          contentFit="cover"
-          transition={300}
-          placeholder={{ color: "#DDE5DD" }}
-        />
+        {Platform.OS === "web" ? (
+          // @ts-ignore
+          <img
+            src={getItemImage(plan)}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            onError={(e: any) => { e.currentTarget.src = DEFAULT_FALLBACK_URL; }}
+          />
+        ) : (
+          <Image
+            source={{ uri: getItemImage(plan) }}
+            style={styles.heroImage}
+            contentFit="cover"
+            cachePolicy="none"
+          />
+        )}
         <View style={[styles.heroOverlay]}>
           <TouchableOpacity
             onPress={() => router.back()}
