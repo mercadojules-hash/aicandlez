@@ -40,9 +40,11 @@ function SettingRow({
 }) {
   const colors = useColors();
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.7}
+    <Pressable
+      onPress={() => {
+        console.log("SETTING ROW PRESSED", label);
+        onPress && onPress();
+      }}
       style={[styles.settingRow, { borderBottomColor: colors.border }]}
     >
       <Feather name={icon} size={18} color={danger ? colors.destructive : colors.primary} />
@@ -57,7 +59,7 @@ function SettingRow({
       <View style={styles.settingRight}>
         {right ?? <Feather name="chevron-right" size={16} color={colors.mutedForeground} />}
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
