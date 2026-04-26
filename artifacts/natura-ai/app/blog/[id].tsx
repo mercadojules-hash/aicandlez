@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
 import {
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -49,21 +49,13 @@ export default function BlogDetailScreen() {
     >
       {/* Hero image */}
       <View style={styles.heroWrapper}>
-        {Platform.OS === "web" ? (
-          // @ts-ignore
-          <img
-            src={post.image}
-            alt={post.title}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : (
+        {post.image ? (
           <Image
             source={{ uri: post.image }}
             style={{ width: "100%", height: "100%" }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
+            resizeMode="cover"
           />
-        )}
+        ) : null}
 
         {/* Gradient overlay at bottom of image */}
         <View style={styles.heroGradient} />

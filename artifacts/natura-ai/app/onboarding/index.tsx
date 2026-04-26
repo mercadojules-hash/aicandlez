@@ -1,7 +1,7 @@
 import { router } from "expo-router";
-import { Image } from "expo-image";
 import React from "react";
 import {
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -40,7 +40,7 @@ export default function WelcomeScreen() {
           <Image
             source={require("@/assets/images/logo.png")}
             style={styles.logo}
-            contentFit="contain"
+            resizeMode="contain"
           />
         </View>
         <Text style={[styles.appName, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>

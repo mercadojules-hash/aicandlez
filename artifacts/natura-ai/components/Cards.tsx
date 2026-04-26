@@ -1,10 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
   Animated,
+  Image,
   Platform,
   StyleSheet,
   Text,
@@ -40,23 +40,11 @@ function CardImage({
     <View style={[styles.imageContainer, { height, backgroundColor: "#1E2A24" }]}>
       <View style={[StyleSheet.absoluteFillObject, styles.imageSkeleton]} />
       <View style={StyleSheet.absoluteFillObject}>
-        {Platform.OS === "web" ? (
-          // @ts-ignore — <img> is valid in the web bundle
-          <img
-            key={image}
-            src={image}
-            alt=""
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : (
-          <Image
-            key={image}
-            source={{ uri: image }}
-            style={{ width: "100%", height: "100%" }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-          />
-        )}
+        <Image
+          source={{ uri: image }}
+          style={{ width: "100%", height: "100%" }}
+          resizeMode="cover"
+        />
       </View>
       {withGradient && (
         <LinearGradient

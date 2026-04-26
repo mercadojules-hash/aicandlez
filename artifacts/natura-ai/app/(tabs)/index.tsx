@@ -1,10 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import React from "react";
 import {
   Animated,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -352,7 +352,7 @@ export default function HomeScreen() {
             <Image
               source={require("@/assets/images/logo.png")}
               style={styles.logoImg}
-              contentFit="contain"
+              resizeMode="contain"
             />
           </View>
         </Animated.View>

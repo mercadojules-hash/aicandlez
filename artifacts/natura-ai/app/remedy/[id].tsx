@@ -1,9 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -121,21 +121,13 @@ export default function RemedyDetailScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.imageContainer}>
-        {Platform.OS === "web" ? (
-          // @ts-ignore
-          <img
-            src={item.image}
-            alt=""
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : (
+        {item.image ? (
           <Image
             source={{ uri: item.image }}
-            style={styles.heroImage}
-            contentFit="cover"
-            cachePolicy="memory-disk"
+            style={{ width: "100%", height: "100%" }}
+            resizeMode="cover"
           />
-        )}
+        ) : null}
         <TouchableOpacity
           onPress={() => router.back()}
           style={[styles.backButton, { backgroundColor: "rgba(255,255,255,0.9)", borderRadius: 22 }]}

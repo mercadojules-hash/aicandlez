@@ -1,9 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import React, { useEffect, useState } from "react";
 import {
   Animated,
+  Image,
   Modal,
   Platform,
   ScrollView,
@@ -64,7 +64,7 @@ export function DisclaimerModal() {
           ]}
         >
           <View style={styles.logoRow}>
-            <Image source={require("@/assets/images/logo.png")} style={styles.logo} contentFit="contain" />
+            <Image source={require("@/assets/images/logo.png")} style={styles.logo} resizeMode="contain" />
           </View>
 
           <Text style={[styles.title, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>

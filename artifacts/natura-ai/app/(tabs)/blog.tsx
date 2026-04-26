@@ -1,9 +1,9 @@
 import { Feather } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   FlatList,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -40,21 +40,13 @@ function BlogCard({
     >
       {/* Hero image */}
       <View style={styles.imageWrapper}>
-        {Platform.OS === "web" ? (
-          // @ts-ignore
-          <img
-            src={post.image}
-            alt={post.title}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : (
+        {post.image ? (
           <Image
             source={{ uri: post.image }}
             style={{ width: "100%", height: "100%" }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
+            resizeMode="cover"
           />
-        )}
+        ) : null}
 
         {/* Category pill over image */}
         <View

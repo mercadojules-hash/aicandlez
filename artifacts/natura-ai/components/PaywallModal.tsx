@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import React, { useRef } from "react";
 import {
   Animated,
+  Image,
   Modal,
   Platform,
   ScrollView,
@@ -73,7 +73,7 @@ export function PaywallModal() {
             <Image
               source={require("@/assets/images/logo.png")}
               style={styles.logo}
-              contentFit="contain"
+              resizeMode="contain"
             />
             <Text style={[styles.headerTitle, { color: "#fff", fontFamily: "Inter_700Bold" }]}>
               Natura AI Coach
