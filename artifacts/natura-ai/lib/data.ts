@@ -993,34 +993,11 @@ export function getItemImage(
     return url;
   }
 
-  // 2. Fallback for unknown items — title-keyword match to nearest photo
-  //    (never "calm/meditation/zen" — always a concrete ingredient or scene)
-  if (title.includes("ginger") && title.includes("tea"))
-    return ITEM_IMAGE_URLS["remedy-ginger-tea"];
-  if (title.includes("lavender"))
-    return ITEM_IMAGE_URLS["remedy-lavender-calm"];
-  if (title.includes("chamomile"))
-    return ITEM_IMAGE_URLS["remedy-chamomile-sleep"];
-  if (title.includes("turmeric") || title.includes("golden"))
-    return ITEM_IMAGE_URLS["remedy-turmeric-tonic"];
-  if (title.includes("elderberry"))
-    return ITEM_IMAGE_URLS["recipe-elderberry-tea"];
-  if (title.includes("oats") || title.includes("overnight"))
-    return ITEM_IMAGE_URLS["recipe-overnight-oats"];
-  if (title.includes("salad"))
-    return ITEM_IMAGE_URLS["recipe-antistress-salad"];
-  if (title.includes("broth") || title.includes("soup"))
-    return ITEM_IMAGE_URLS["recipe-immunity-broth"];
-  if (title.includes("smoothie") || title.includes("shake"))
-    return ITEM_IMAGE_URLS["recipe-sleep-smoothie"];
-  if (title.includes("sleep"))
-    return ITEM_IMAGE_URLS["plan-sleep-7day"];
-  if (title.includes("energy"))
-    return ITEM_IMAGE_URLS["plan-energy-5day"];
-  if (title.includes("immunity") || title.includes("immune"))
-    return ITEM_IMAGE_URLS["plan-immunity-14day"];
-
-  return DEFAULT_FALLBACK_URL;
+  // 2. Fallback for unknown items — title-based unique query, no shared photos.
+  //    Uses item title as the search term + sig=id for a unique result.
+  //    "herbal" only (no "wellness") to avoid Unsplash's meditation-photo trap.
+  const rawTitle = item.title ?? id ?? "natura";
+  return `https://source.unsplash.com/featured/?${encodeURIComponent(rawTitle)},herbal&sig=${encodeURIComponent(id || rawTitle)}`;
 }
 
 export { DEFAULT_FALLBACK_URL };
