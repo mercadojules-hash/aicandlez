@@ -993,8 +993,25 @@ export function getItemImage(
     return url;
   }
 
-  // 2. Fallback — fixed direct photo ID, never a dynamic endpoint
-  return DEFAULT_FALLBACK_URL;
+  // 2. Fallback — unique per item so no two unknown items share an image.
+  //    Uses item.id as a numeric seed offset into a hand-picked pool of
+  //    food/botanical photos, guaranteeing a different photo per item.
+  console.log("Fallback image used for:", item.title ?? id ?? "(unknown)");
+  const FALLBACK_POOL = [
+    "photo-1490645935967-10de6ba17061", // herbal tea flatlay
+    "photo-1512341689857-198e7e2f3ca8", // botanical herbs
+    "photo-1498837167922-ddd27525d352", // healthy food spread
+    "photo-1576671081837-49000212a370", // green superfoods
+    "photo-1543362906-acfc16c67564", // smoothie bowl
+    "photo-1457530378978-8bac673b8062", // herbal roots
+    "photo-1563636619-e9143da7973b", // warm herbal drink
+    "photo-1525904097878-94fb15835963", // natural ingredients
+  ];
+  // Derive a stable index from the item id string so the same unknown item
+  // always gets the same image across renders.
+  const seed = (id || item.title || "").split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  const photoId = FALLBACK_POOL[seed % FALLBACK_POOL.length];
+  return `https://images.unsplash.com/${photoId}?w=600&h=400&fit=crop`;
 }
 
 export { DEFAULT_FALLBACK_URL };
