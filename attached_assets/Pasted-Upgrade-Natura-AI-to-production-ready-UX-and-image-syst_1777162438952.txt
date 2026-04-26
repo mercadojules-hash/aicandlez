@@ -1,0 +1,154 @@
+Upgrade Natura AI to production-ready UX and image system.
+
+========================
+PART 1 — REMOVE DUPLICATE CHECK-IN
+========================
+
+Only ONE "How are you feeling today?" at top.
+
+Delete all duplicates.
+
+========================
+PART 2 — ADD AI WELLNESS COACH (CORE FEATURE)
+========================
+
+Replace second section with:
+
+Title:
+"🧠 AI Wellness Coach"
+
+Dynamic message:
+
+- stressed → "You're feeling stressed. Let's slow things down today."
+- low energy → "Energy is low today. Here's a quick boost plan."
+- positive → "You're on a 3-day calm streak 🔥 keep going."
+
+Add streak-aware messaging.
+
+========================
+PART 3 — STREAK UI FIX
+========================
+
+Replace ⚡ with 🔥 everywhere
+
+Format:
+
+🔥 3 Day Streak — Keep going
+
+Style:
+- green glow
+- small badge under check-in
+
+========================
+PART 4 — CTA BUTTONS
+========================
+
+Under AI Coach:
+
+[ Get Today’s Plan ]
+[ Ask AI Coach ]
+
+========================
+PART 5 — SCREEN ORDER (IMPORTANT)
+========================
+
+1. Greeting
+2. Mood check-in
+3. 🔥 Streak
+4. 🧠 AI Coach (main feature)
+5. Quick Actions
+6. Remedies
+
+========================
+PART 6 — FIX IMAGE SYSTEM (CRITICAL)
+========================
+
+REMOVE random fallback images.
+
+Create function:
+
+getRelevantImage(item)
+
+Logic:
+
+1. Extract keywords from:
+- title
+- ingredients
+- tags
+
+2. Match keywords:
+
+const IMAGE_KEYWORDS = {
+  ginger: "ginger tea",
+  chamomile: "chamomile tea",
+  turmeric: "turmeric drink",
+  smoothie: "green smoothie",
+  berry: "berry smoothie",
+  lemon: "lemon water",
+  garlic: "garlic remedy"
+};
+
+3. Priority:
+ingredient > category
+
+========================
+PART 7 — FORCE IMAGE PER ITEM
+========================
+
+Every item must have:
+
+imageQuery: "ginger tea with lemon"
+
+Then:
+
+imageUrl = fetchUnsplash(imageQuery)
+
+No blank images allowed.
+
+========================
+PART 8 — STRICT CATEGORY FALLBACK (LAST RESORT)
+========================
+
+Only if no keyword match:
+
+stress → meditation scene  
+sleep → bed / night  
+energy → smoothie  
+immunity → herbs / citrus  
+digestion → tea  
+
+NO RANDOM IMAGES EVER
+
+========================
+PART 9 — VALIDATION CHECK
+========================
+
+Before render:
+
+If title contains keyword (e.g. "ginger")
+AND image does NOT match
+→ re-fetch correct image
+
+========================
+PART 10 — IMAGE LOADING UX
+========================
+
+- show skeleton loader
+- fade in image
+- NEVER flash wrong image
+
+========================
+PART 11 — MICROCOPY FIX
+========================
+
+Use:
+"How are you feeling today?"
+
+Use:
+"Here’s what I recommend today"
+
+Avoid robotic language.
+
+========================
+END
+========================

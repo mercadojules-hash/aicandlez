@@ -18,7 +18,7 @@ import type { Remedy, WellnessPlan, Recipe, DailyTip } from "@/lib/data";
 const useND = Platform.OS !== "web";
 
 interface CardImageProps {
-  item: { imageUrl?: string; category?: string; goal?: string };
+  item: { imageUrl?: string; category?: string; goal?: string; title?: string; ingredients?: string[] };
   height?: number;
   withGradient?: boolean;
   gradientIntensity?: "soft" | "strong";
@@ -216,7 +216,7 @@ export function PlanCard({ plan, onPress, isSaved, onSave }: PlanCardProps) {
       style={[styles.planCard, { backgroundColor: colors.card, borderColor: colors.border }, cardShadow()]}
     >
       <View style={styles.imageWrapper}>
-        <CardImage item={{ imageUrl: plan.imageUrl, category: plan.goal }} height={160} withGradient gradientIntensity="strong" />
+        <CardImage item={{ imageUrl: plan.imageUrl, category: plan.goal, title: plan.title }} height={160} withGradient gradientIntensity="strong" />
         <View style={styles.badgeRow}>
           <View style={[styles.badge, { backgroundColor: colors.primary + "F0" }]}>
             <Text style={[styles.badgeText, { fontFamily: "Inter_600SemiBold" }]}>{plan.duration}</Text>
@@ -269,7 +269,7 @@ export function RecipeCard({ recipe, onPress, onAddToGrocery, isSaved, onSave }:
       style={[styles.recipeCard, { backgroundColor: colors.card, borderColor: colors.border }, cardShadow()]}
     >
       <View style={styles.imageWrapper}>
-        <CardImage item={{ imageUrl: recipe.imageUrl, category: recipe.goal }} height={160} withGradient gradientIntensity="soft" />
+        <CardImage item={{ imageUrl: recipe.imageUrl, category: recipe.goal, title: recipe.title, ingredients: recipe.ingredients }} height={160} withGradient gradientIntensity="soft" />
         <View style={styles.badgeRow}>
           <View style={[styles.badge, { backgroundColor: colors.accent + "F0" }]}>
             <Text style={[styles.badgeText, { fontFamily: "Inter_600SemiBold" }]}>{recipe.goal}</Text>
