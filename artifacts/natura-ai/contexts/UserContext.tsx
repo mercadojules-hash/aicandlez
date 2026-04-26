@@ -79,13 +79,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const resetOnboarding = useCallback(async () => {
+    console.log("RESET BUTTON PRESSED");
     await Promise.all([
       AsyncStorage.removeItem(ONBOARDED_KEY),
       AsyncStorage.removeItem(PROFILE_KEY),
       AsyncStorage.removeItem("natura_disclaimer_v2"),
     ]);
+    console.log("STORAGE CLEARED");
     setProfile(defaultProfile);
     setIsOnboarded(false);
+    console.log("RESET COMPLETE");
   }, []);
 
   return (
