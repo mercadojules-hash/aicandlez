@@ -6,6 +6,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 
 const CONTENT: Record<string, { title: string; body: string[] }> = {
+  disclaimer: {
+    title: "Medical Disclaimer",
+    body: [
+      "Last updated: April 2026",
+      "Natura AI is designed for informational and wellness purposes only. It does not provide medical advice, diagnosis, or treatment.",
+      "Always consult a qualified healthcare provider before making decisions about your health, medications, or treatments.",
+      "Never disregard professional medical advice or delay seeking care because of information provided by this app.",
+      "If you are experiencing a medical emergency, call 911 or your local emergency number immediately.",
+      "By using this app, you acknowledge and agree that Natura AI is not a licensed medical provider and is not responsible for any outcomes related to the use of the information provided.",
+    ],
+  },
   privacy: {
     title: "Privacy Policy",
     body: [
@@ -42,7 +53,7 @@ const CONTENT: Record<string, { title: string; body: string[] }> = {
 export default function LegalScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { type } = useLocalSearchParams<{ type: "privacy" | "terms" }>();
+  const { type } = useLocalSearchParams<{ type: "privacy" | "terms" | "disclaimer" }>();
   const content = CONTENT[type ?? "privacy"];
 
   return (

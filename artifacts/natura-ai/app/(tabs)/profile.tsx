@@ -1,10 +1,12 @@
 import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
   Image,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -104,11 +106,32 @@ function ThemeToggle() {
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile, resetOnboarding } = useUser();
+  const { profile, updateProfile, resetOnboarding } = useUser();
   const { streak, savedItems, completedTasks, lastCheckIn } = useWellness();
   const { tier, isPremium, openPaywall } = useSubscription();
 
   const streakEmoji = streak >= 14 ? "🏆" : streak >= 7 ? "🌿" : "🔥";
+
+  const pickImage = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) return;
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+
+      if (!result.canceled) {
+        const uri = result.assets[0].uri;
+        await updateProfile({ image: uri });
+      }
+    } catch (e) {
+      console.log("Image pick error", e);
+    }
+  };
 
   const handleReset = () => {
     Alert.alert(
@@ -142,19 +165,21 @@ export default function ProfileScreen() {
           { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius },
         ]}
       >
-        {profile.image ? (
-          <Image
-            source={{ uri: profile.image }}
-            style={styles.avatar}
-            resizeMode="cover"
-          />
-        ) : (
-          <Image
-            source={DEFAULT_AVATAR}
-            style={styles.avatar}
-            resizeMode="contain"
-          />
-        )}
+        <Pressable onPress={pickImage}>
+          {profile.image ? (
+            <Image
+              source={{ uri: profile.image }}
+              style={styles.avatar}
+              resizeMode="cover"
+            />
+          ) : (
+            <Image
+              source={DEFAULT_AVATAR}
+              style={styles.avatar}
+              resizeMode="contain"
+            />
+          )}
+        </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[styles.profileName, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
             {profile.name || "Wellness Seeker"}
@@ -264,13 +289,7 @@ export default function ProfileScreen() {
         <SettingRow
           icon="info"
           label="Medical Disclaimer"
-          right={<View />}
-          onPress={() =>
-            Alert.alert(
-              "Medical Disclaimer",
-              "Natura AI provides educational wellness information only. Nothing in this app constitutes medical advice, diagnosis, or treatment. Always consult a qualified healthcare professional."
-            )
-          }
+          onPress={() => router.push({ pathname: "/legal", params: { type: "disclaimer" } })}
         />
       </View>
 

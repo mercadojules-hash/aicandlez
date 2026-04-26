@@ -1,0 +1,169 @@
+TASK: Finalize Natura AI Profile features
+
+GOALS:
+1. Add profile image upload (tap avatar)
+2. Ensure fallback logo still works
+3. Implement Medical Disclaimer screen and navigation
+
+--------------------------------------------------
+
+STRICT RULES:
+- DO NOT change layout or styling
+- DO NOT refactor unrelated files
+- DO NOT introduce new architecture
+- KEEP everything minimal and clean
+- ONLY touch Profile screen + add 1 new screen
+
+--------------------------------------------------
+
+PART 1 — PROFILE IMAGE UPLOAD
+
+1. Install if missing:
+expo install expo-image-picker
+
+2. In Profile screen:
+
+Import:
+import * as ImagePicker from 'expo-image-picker';
+import { Pressable } from 'react-native';
+
+Add function:
+
+const pickImage = async () => {
+  try {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+
+      setProfile(prev => ({
+        ...prev,
+        image: uri,
+      }));
+    }
+  } catch (e) {
+    console.log('Image pick error', e);
+  }
+};
+
+Wrap avatar:
+
+<Pressable onPress={pickImage}>
+  <Image
+    source={getAvatarSource(profile.image)}
+    style={{
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+    }}
+    resizeMode="cover"
+  />
+</Pressable>
+
+--------------------------------------------------
+
+PART 2 — MEDICAL DISCLAIMER SCREEN
+
+Create new file:
+
+/screens/MedicalDisclaimer.tsx
+
+CODE:
+
+import React from 'react';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
+
+export default function MedicalDisclaimer() {
+  return (
+    <ScrollView style={styles.container}>
+      <Text style={styles.title}>Medical Disclaimer</Text>
+
+      <Text style={styles.text}>
+        Natura AI is designed for informational and wellness purposes only.
+        It does not provide medical advice, diagnosis, or treatment.
+      </Text>
+
+      <Text style={styles.text}>
+        Always consult a qualified healthcare provider before making decisions
+        about your health, medications, or treatments.
+      </Text>
+
+      <Text style={styles.text}>
+        Never disregard professional medical advice or delay seeking care
+        because of information provided by this app.
+      </Text>
+
+      <Text style={styles.text}>
+        If you are experiencing a medical emergency, call 911 immediately.
+      </Text>
+
+      <Text style={styles.text}>
+        By using this app, you acknowledge and agree that Natura AI is not a
+        licensed medical provider and is not responsible for any outcomes
+        related to the use of the information provided.
+      </Text>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  text: {
+    fontSize: 16,
+    marginBottom: 12,
+    lineHeight: 22,
+  },
+});
+
+--------------------------------------------------
+
+PART 3 — NAVIGATION
+
+1. Add screen to navigator (Stack or similar):
+
+import MedicalDisclaimer from '../screens/MedicalDisclaimer';
+
+<Stack.Screen
+  name="MedicalDisclaimer"
+  component={MedicalDisclaimer}
+  options={{ title: 'Medical Disclaimer' }}
+/>
+
+2. Wire Profile screen button:
+
+Find existing "Medical Disclaimer" row
+
+Replace onPress with:
+
+onPress={() => navigation.navigate('MedicalDisclaimer')}
+
+--------------------------------------------------
+
+SUCCESS CRITERIA:
+
+- Avatar tap opens image picker
+- Selected image displays immediately
+- Logo still shows if no image
+- Medical Disclaimer screen opens correctly
+- No crashes
+- No layout changes
+
+--------------------------------------------------
+
+END TASK
