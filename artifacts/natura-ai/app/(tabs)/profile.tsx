@@ -321,13 +321,6 @@ export default function ProfileScreen() {
             }
           />
         )}
-        <SettingRow
-          icon="refresh-cw"
-          label="Reset App Data"
-          onPress={handleReset}
-          danger
-          right={<Feather name="chevron-right" size={16} color={colors.destructive} />}
-        />
       </View>
 
       <Text style={[styles.version, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>

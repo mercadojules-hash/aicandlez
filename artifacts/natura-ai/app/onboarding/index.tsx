@@ -47,7 +47,7 @@ export default function WelcomeScreen() {
           Natura AI
         </Text>
         <Text style={[styles.tagline, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-          Natural wellness, guided by AI
+          Your personal AI wellness coach
         </Text>
       </View>
 
@@ -89,7 +89,7 @@ export default function WelcomeScreen() {
         activeOpacity={0.85}
       >
         <Text style={[styles.buttonText, { color: colors.primaryForeground, fontFamily: "Inter_600SemiBold" }]}>
-          Get Started
+          Begin Your Journey
         </Text>
       </TouchableOpacity>
     </ScrollView>

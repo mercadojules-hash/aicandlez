@@ -1,0 +1,61 @@
+TASK: Final launch polish for Natura AI
+
+GOALS:
+1. Remove or hide the broken “Reset App Data” button from the Profile screen.
+2. Add a branded Natura AI splash / welcome screen using the existing Natura AI logo assets.
+3. Do NOT break existing onboarding, disclaimer modal, profile avatar, or navigation.
+
+STRICT RULES:
+- DO NOT refactor the app.
+- DO NOT change unrelated screens.
+- DO NOT alter existing profile upload logic.
+- DO NOT alter DisclaimerModal logic.
+- Keep changes minimal and production-safe.
+
+PART 1 — REMOVE RESET APP DATA
+
+In Profile screen:
+- Remove or comment out the “Reset App Data” SettingRow from the visible UI.
+- Do not delete resetOnboarding from context.
+- Just hide/remove the user-facing button so it no longer appears in production.
+
+SUCCESS:
+- Profile screen no longer shows “Reset App Data.”
+- No errors.
+- Existing profile page remains unchanged otherwise.
+
+PART 2 — ADD SPLASH / WELCOME SCREEN
+
+Create or update the opening splash/welcome screen to match the Natura AI branding:
+
+Visual style:
+- Dark green wellness background
+- Natura AI logo centered near the top
+- App name: “Natura AI”
+- Tagline: “Your personal AI wellness coach”
+- Soft green gradient / calming wellness feel
+- Optional subtle nature/mountain/leaf background if already available
+- Primary button: “Begin Your Journey”
+
+Use existing logo asset:
+- Use assets/images/logo.png or the existing Natura AI logo file already in the project.
+- Do not add random external images.
+
+Behavior:
+- On first launch, show this splash/welcome screen before onboarding if onboarding has not been completed.
+- Button “Begin Your Journey” should continue into the existing onboarding flow.
+- If user already completed onboarding, do not force them through splash again.
+
+IMPORTANT:
+- Keep existing DisclaimerModal behavior active.
+- Do not remove disclaimer acknowledgment.
+- Do not break tab navigation.
+
+SUCCESS:
+- Reset button is gone from Profile.
+- Splash/welcome screen appears for new users.
+- “Begin Your Journey” continues onboarding.
+- Existing users are not stuck.
+- App runs without crashes.
+
+END TASK
