@@ -921,21 +921,87 @@ export function getImageUrl(category: string, provided?: string): string {
 export function getItemImage(item: { title?: string }, _index?: number): string {
   const title = (item.title || "").toLowerCase();
 
-  if (title.includes("ginger") || title.includes("digest"))
+  // Ginger tea (specific) — different from ginger elixir
+  if (title.includes("ginger") && title.includes("tea"))
+    return "https://images.unsplash.com/photo-1548199569-3e1c6aa8f469?w=600&h=400&fit=crop";
+
+  // Ginger elixir / wellness shot / any other ginger
+  if (title.includes("elixir") || title.includes("ginger"))
+    return "https://images.unsplash.com/photo-1556909172-8c2f041fca1e?w=600&h=400&fit=crop";
+
+  // Lavender / calm
+  if (title.includes("lavender") || title.includes("calm"))
+    return "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=600&h=400&fit=crop";
+
+  // Wellness shot (citrus, not ginger)
+  if (title.includes("shot"))
+    return "https://images.unsplash.com/photo-1615485500704-8e990f9900f7?w=600&h=400&fit=crop";
+
+  // Elderberry syrup (specific) — different from elderberry tea
+  if (title.includes("elderberry") && title.includes("syrup"))
+    return "https://images.unsplash.com/photo-1505144808419-1957a94ca61e?w=600&h=400&fit=crop";
+
+  // Elderberry tea / any other elderberry
+  if (title.includes("elderberry"))
+    return "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=600&h=400&fit=crop";
+
+  // Chamomile — before generic sleep
+  if (title.includes("chamomile"))
+    return "https://images.unsplash.com/photo-1471091862366-7a1b48c6a3cd?w=600&h=400&fit=crop";
+
+  // Golden milk / latte — before turmeric (catches "Golden Turmeric Latte")
+  if (title.includes("golden") || title.includes("latte"))
     return "https://images.unsplash.com/photo-1604908176997-4317c5f0d41c?w=600&h=400&fit=crop";
 
-  if (title.includes("sleep"))
+  // Turmeric tonic
+  if (title.includes("turmeric"))
+    return "https://images.unsplash.com/photo-1536304993831-10cdf90fbfb5?w=600&h=400&fit=crop";
+
+  // Moon milk / ashwagandha
+  if (title.includes("moon") || title.includes("ashwagandha"))
+    return "https://images.unsplash.com/photo-1544991936-9464e43bea92?w=600&h=400&fit=crop";
+
+  // Cherry — before generic sleep (catches "Cherry Sleep Smoothie")
+  if (title.includes("cherry"))
+    return "https://images.unsplash.com/photo-1553530979-7d96e86e65b3?w=600&h=400&fit=crop";
+
+  // Oats / overnight — before adaptogen (catches "Adaptogenic Overnight Oats")
+  if (title.includes("oats") || title.includes("overnight"))
+    return "https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=600&h=400&fit=crop";
+
+  // Broth — before generic immunity
+  if (title.includes("broth"))
+    return "https://images.unsplash.com/photo-1547592180-85f173990554?w=600&h=400&fit=crop";
+
+  // Salad — before stress (catches "Stress-Less Green Salad")
+  if (title.includes("salad"))
+    return "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&h=400&fit=crop";
+
+  // Bowl
+  if (title.includes("bowl"))
+    return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&h=400&fit=crop";
+
+  // Stress / relief plan
+  if (title.includes("stress"))
     return "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&h=400&fit=crop";
 
+  // Sleep reset plan — after chamomile/cherry
+  if (title.includes("sleep"))
+    return "https://images.unsplash.com/photo-1545389336-cf090694435e?w=600&h=400&fit=crop";
+
+  // Energy smoothie (specific) — different from energy revival plan
+  if (title.includes("energy") && title.includes("smoothie"))
+    return "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=400&fit=crop";
+
+  // Energy revival plan
   if (title.includes("energy"))
-    return "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&h=400&fit=crop";
+    return "https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?w=600&h=400&fit=crop";
 
-  if (title.includes("lavender") || title.includes("calm"))
-    return "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=600&h=400&fit=crop";
+  // Immunity boost plan — after shot/elderberry/broth
+  if (title.includes("immunity") || title.includes("immune"))
+    return "https://images.unsplash.com/photo-1490818787583-167e74326402?w=600&h=400&fit=crop";
 
-  if (title.includes("immunity"))
-    return "https://images.unsplash.com/photo-1510626176961-4b57d4fbad03?w=600&h=400&fit=crop";
-
+  // Default fallback
   return "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&h=400&fit=crop";
 }
 
