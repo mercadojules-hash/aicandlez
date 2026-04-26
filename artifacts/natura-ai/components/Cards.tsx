@@ -30,33 +30,6 @@ function CardImage({
   withGradient = false,
   gradientIntensity = "soft",
 }: CardImageProps) {
-  const [errored, setErrored] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
-
-  const src = errored ? DEFAULT_FALLBACK_URL : image;
-
-  const handleLoad = () => {
-    setLoaded(true);
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 380,
-      useNativeDriver: useND,
-    }).start();
-  };
-
-  const handleError = () => {
-    setErrored(true);
-    if (!loaded) {
-      setLoaded(true);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: useND,
-      }).start();
-    }
-  };
-
   const gradientColors =
     gradientIntensity === "strong"
       ? (["transparent", "rgba(0,0,0,0.65)"] as const)
@@ -65,15 +38,24 @@ function CardImage({
   return (
     <View style={[styles.imageContainer, { height, backgroundColor: "#1E2A24" }]}>
       <View style={[StyleSheet.absoluteFillObject, styles.imageSkeleton]} />
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}>
-        <Image
-          source={{ uri: src }}
-          style={{ width: "100%", height: "100%" }}
-          contentFit="cover"
-          onLoad={handleLoad}
-          onError={handleError}
-        />
-      </Animated.View>
+      <View style={StyleSheet.absoluteFillObject}>
+        {Platform.OS === "web" ? (
+          // @ts-ignore — <img> is valid in the web bundle
+          <img
+            src={image}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            onError={(e: any) => { e.currentTarget.src = DEFAULT_FALLBACK_URL; }}
+          />
+        ) : (
+          <Image
+            source={{ uri: image }}
+            style={{ width: "100%", height: "100%" }}
+            contentFit="cover"
+            cachePolicy="none"
+          />
+        )}
+      </View>
       {withGradient && (
         <LinearGradient
           colors={gradientColors}
