@@ -31,6 +31,8 @@ function BlogCard({
   onSave: () => void;
 }) {
   const colors = useColors();
+  console.log("RENDER CHECK:", post.id, post.image);
+  if (!post.image) console.log("MISSING IMAGE:", post.id);
 
   return (
     <TouchableOpacity

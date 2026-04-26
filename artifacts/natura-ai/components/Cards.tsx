@@ -105,7 +105,8 @@ interface RemedyCardProps {
 
 export function RemedyCard({ remedy, image, onPress, isSaved, onSave }: RemedyCardProps) {
   const colors = useColors();
-  console.log("ITEM CHECK:", remedy.id, image);
+  console.log("RENDER CHECK:", remedy.id, image);
+  if (!image) console.log("MISSING IMAGE:", remedy.id);
 
   return (
     <TouchableOpacity
@@ -175,7 +176,8 @@ interface PlanCardProps {
 
 export function PlanCard({ plan, image, onPress, isSaved, onSave }: PlanCardProps) {
   const colors = useColors();
-  console.log("ITEM CHECK:", plan.id, image);
+  console.log("RENDER CHECK:", plan.id, image);
+  if (!image) console.log("MISSING IMAGE:", plan.id);
 
   return (
     <TouchableOpacity
@@ -230,7 +232,8 @@ interface RecipeCardProps {
 
 export function RecipeCard({ recipe, image, onPress, onAddToGrocery, isSaved, onSave }: RecipeCardProps) {
   const colors = useColors();
-  console.log("ITEM CHECK:", recipe.id, image);
+  console.log("RENDER CHECK:", recipe.id, image);
+  if (!image) console.log("MISSING IMAGE:", recipe.id);
 
   return (
     <TouchableOpacity
