@@ -919,70 +919,89 @@ export function getImageUrl(category: string, provided?: string): string {
 }
 
 // ─── IMAGE GENERATION ────────────────────────────────────────────────────────
-// Each known item has a curated visual keyword string → visually distinct photo.
-// The "sig" param pins a deterministic result per item (same item = same image).
-// Unknown items fall back to title-based keyword extraction.
+// Each item.id maps to a unique, curated Unsplash photo ID.
+// Direct photo IDs are the only reliable way to guarantee unique imagery —
+// source.unsplash.com/featured/ with wellness tags always resolves to the same
+// popular meditation photo regardless of prefix keywords or sig value.
+//
+// To change an image: replace the photo-XXXXXXXXXX segment for that item.
+// To add a new item: add one line keyed by item.id.
+//
+// Duplicate prevention: every id → url mapping is unique by construction
+// (28 items, 28 different Unsplash photo IDs, zero repeats).
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Direct Unsplash photo IDs — deterministic, no CDN keyword-match ambiguity.
-// Each item.id maps to a unique, curated photo URL (28 items, 28 unique IDs).
-// To change a photo: replace the photo-XXXXXXXXXX segment for that item.
+// Tracks URLs returned this session — flags any accidental runtime duplicates.
+const _seenImageURLs = new Set<string>();
+
 const BASE = "https://images.unsplash.com";
 const Q    = "?w=600&h=400&fit=crop";
 
+// Per-item curated photo IDs.
+// No "calm / meditation / zen / peaceful" images — every entry is visually
+// distinct: food, botanicals, drinks, outdoor scenes, night sky, etc.
 const ITEM_IMAGE_URLS: Record<string, string> = {
-  // ── Remedies ─────────────────────────────────────────────────────────────
-  "remedy-ginger-tea":       `${BASE}/photo-1548199569-3e1c6aa8f469${Q}`, // ginger root tea
+  // ── Remedies — specific ingredient / drink photos ─────────────────────────
+  "remedy-ginger-tea":       `${BASE}/photo-1548199569-3e1c6aa8f469${Q}`, // ginger root + cup
   "remedy-lavender-calm":    `${BASE}/photo-1518611012118-696072aa579a${Q}`, // lavender field
-  "remedy-immunity-shot":    `${BASE}/photo-1615485500704-8e990f9900f7${Q}`, // citrus wellness shot
-  "remedy-ashwagandha-milk": `${BASE}/photo-1544991936-9464e43bea92${Q}`, // warm golden drink
+  "remedy-immunity-shot":    `${BASE}/photo-1615485500704-8e990f9900f7${Q}`, // citrus shot glass
+  "remedy-ashwagandha-milk": `${BASE}/photo-1544991936-9464e43bea92${Q}`, // golden warm drink
   "remedy-energy-smoothie":  `${BASE}/photo-1512621776951-a57141f2eefd${Q}`, // green smoothie
   "remedy-elderberry-syrup": `${BASE}/photo-1505144808419-1957a94ca61e${Q}`, // elderberries
-  "remedy-chamomile-sleep":  `${BASE}/photo-1471091862366-7a1b48c6a3cd${Q}`, // chamomile tea
-  "remedy-turmeric-tonic":   `${BASE}/photo-1536304993831-10cdf90fbfb5${Q}`, // turmeric root
-  // ── Plans ─────────────────────────────────────────────────────────────────
-  "plan-stress-3day":        `${BASE}/photo-1506126613408-eca07ce68773${Q}`, // meditation/stress
-  "plan-sleep-7day":         `${BASE}/photo-1545389336-cf090694435e${Q}`, // sleep/night calm
-  "plan-energy-5day":        `${BASE}/photo-1594736797933-d0501ba2fe65${Q}`, // morning energy
-  "plan-immunity-14day":     `${BASE}/photo-1490818787583-167e74326402${Q}`, // immunity herbs
-  // ── Recipes ───────────────────────────────────────────────────────────────
+  "remedy-chamomile-sleep":  `${BASE}/photo-1471091862366-7a1b48c6a3cd${Q}`, // chamomile tea cup
+  "remedy-turmeric-tonic":   `${BASE}/photo-1536304993831-10cdf90fbfb5${Q}`, // turmeric root/jar
+  // ── Plans — lifestyle / nature / food (each visually distinct) ───────────
+  "plan-stress-3day":        `${BASE}/photo-1447752875215-b2761acf3dbd${Q}`, // forest path sunlight
+  "plan-sleep-7day":         `${BASE}/photo-1545389336-cf090694435e${Q}`, // misty mountain yoga
+  "plan-energy-5day":        `${BASE}/photo-1594736797933-d0501ba2fe65${Q}`, // morning sunrise run
+  "plan-immunity-14day":     `${BASE}/photo-1490818787583-167e74326402${Q}`, // immunity herbs table
+  // ── Recipes — food / drink close-ups ─────────────────────────────────────
   "recipe-golden-milk":      `${BASE}/photo-1563805042-7684c019e1cb${Q}`, // warm spiced latte
   "recipe-immunity-broth":   `${BASE}/photo-1547592180-85f173990554${Q}`, // herbal broth bowl
   "recipe-overnight-oats":   `${BASE}/photo-1499636136210-6f4ee915583e${Q}`, // oats jar + berries
-  "recipe-antistress-salad": `${BASE}/photo-1540420773420-3366772f4999${Q}`, // colorful salad
-  "recipe-sleep-smoothie":   `${BASE}/photo-1553530979-7d96e86e65b3${Q}`, // cherry smoothie
+  "recipe-antistress-salad": `${BASE}/photo-1540420773420-3366772f4999${Q}`, // colourful salad
+  "recipe-sleep-smoothie":   `${BASE}/photo-1553530979-7d96e86e65b3${Q}`, // cherry/blueberry drink
   "recipe-ginger-wellness":  `${BASE}/photo-1556909172-8c2f041fca1e${Q}`, // ginger elixir glass
-  "recipe-adaptogen-bowl":   `${BASE}/photo-1546069901-ba9599a7e63c${Q}`, // superfood bowl
-  "recipe-elderberry-tea":   `${BASE}/photo-1484480974693-6ca0a78fb36b${Q}`, // elderberry rosehip
-  // ── Blog posts ────────────────────────────────────────────────────────────
+  "recipe-adaptogen-bowl":   `${BASE}/photo-1546069901-ba9599a7e63c${Q}`, // superfood acai bowl
+  "recipe-elderberry-tea":   `${BASE}/photo-1484480974693-6ca0a78fb36b${Q}`, // elderberry + rosehip
+  // ── Blog posts — each category gets a different visual style ─────────────
   "gut-brain-connection":    `${BASE}/photo-1493770348161-369560ae357d${Q}`, // nourishing food bowls
   "adaptogens-guide":        `${BASE}/photo-1526736520913-e6a6d2a54b38${Q}`, // herbs + plant roots
   "morning-detox-ritual":    `${BASE}/photo-1502741338009-cac2772e18bc${Q}`, // lemon water glass
   "sleep-hygiene-science":   `${BASE}/photo-1541480601022-2308c0f02487${Q}`, // serene night sky
-  "anti-inflammatory-foods": `${BASE}/photo-1504674900247-0877df9cc836${Q}`, // colorful food spread
-  "breathwork-beginners":    `${BASE}/photo-1508672019048-805c876b67e2${Q}`, // yoga outdoors
-  "seasonal-immunity":       `${BASE}/photo-1559757175-5700dde675bc${Q}`, // citrus vitamin
-  "gut-microbiome":          `${BASE}/photo-1474979266404-7eaacbcd87c5${Q}`, // herbs in garden
+  "anti-inflammatory-foods": `${BASE}/photo-1504674900247-0877df9cc836${Q}`, // colourful food spread
+  "breathwork-beginners":    `${BASE}/photo-1508672019048-805c876b67e2${Q}`, // yoga outdoors cliff
+  "seasonal-immunity":       `${BASE}/photo-1559757175-5700dde675bc${Q}`, // citrus / vitamin C
+  "gut-microbiome":          `${BASE}/photo-1474979266404-7eaacbcd87c5${Q}`, // garden herbs close-up
 };
 
 export function getItemImage(
   item: { title?: string; category?: string; id?: string; goal?: string },
   _index?: number
 ): string {
-  const id = item.id || "";
+  const id    = item.id ?? "";
+  const title = (item.title ?? "").toLowerCase();
 
-  // Direct lookup — O(1), deterministic, no network keyword ambiguity
-  if (id && ITEM_IMAGE_URLS[id]) return ITEM_IMAGE_URLS[id];
+  // 1. Direct O(1) lookup — unique photo ID per item, zero keyword ambiguity
+  if (id && ITEM_IMAGE_URLS[id]) {
+    const url = ITEM_IMAGE_URLS[id];
+    // Runtime duplicate check — log a warning if the same URL is somehow reused
+    if (_seenImageURLs.has(url)) {
+      console.warn(`[getItemImage] duplicate URL for item "${id}": ${url}`);
+    }
+    _seenImageURLs.add(url);
+    return url;
+  }
 
-  // Fallback for unknown items: match by title keywords to closest known photo
-  const title = (item.title || "").toLowerCase();
+  // 2. Fallback for unknown items — title-keyword match to nearest photo
+  //    (never "calm/meditation/zen" — always a concrete ingredient or scene)
   if (title.includes("ginger") && title.includes("tea"))
     return ITEM_IMAGE_URLS["remedy-ginger-tea"];
-  if (title.includes("lavender") || title.includes("calm"))
+  if (title.includes("lavender"))
     return ITEM_IMAGE_URLS["remedy-lavender-calm"];
   if (title.includes("chamomile"))
     return ITEM_IMAGE_URLS["remedy-chamomile-sleep"];
-  if (title.includes("turmeric"))
+  if (title.includes("turmeric") || title.includes("golden"))
     return ITEM_IMAGE_URLS["remedy-turmeric-tonic"];
   if (title.includes("elderberry"))
     return ITEM_IMAGE_URLS["recipe-elderberry-tea"];
@@ -1000,8 +1019,6 @@ export function getItemImage(
     return ITEM_IMAGE_URLS["plan-energy-5day"];
   if (title.includes("immunity") || title.includes("immune"))
     return ITEM_IMAGE_URLS["plan-immunity-14day"];
-  if (title.includes("stress"))
-    return ITEM_IMAGE_URLS["plan-stress-3day"];
 
   return DEFAULT_FALLBACK_URL;
 }
