@@ -840,84 +840,6 @@ export function getQuickWin(): string {
 const DEFAULT_FALLBACK_URL =
   "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&h=400&fit=crop";
 
-const IMAGE_KEYWORDS: Record<string, string> = {
-  ginger:     "https://images.unsplash.com/photo-1548199569-3e1c6aa8f469?w=600&q=80&fit=crop",
-  chamomile:  "https://images.unsplash.com/photo-1471091862366-7a1b48c6a3cd?w=600&q=80&fit=crop",
-  lavender:   "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=600&q=80&fit=crop",
-  turmeric:   "https://images.unsplash.com/photo-1536304993831-10cdf90fbfb5?w=600&q=80&fit=crop",
-  ashwagandha:"https://images.unsplash.com/photo-1544991936-9464e43bea92?w=600&q=80&fit=crop",
-  elderberry: "https://images.unsplash.com/photo-1505144808419-1957a94ca61e?w=600&q=80&fit=crop",
-  berry:      "https://images.unsplash.com/photo-1505144808419-1957a94ca61e?w=600&q=80&fit=crop",
-  smoothie:   "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80&fit=crop",
-  green:      "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80&fit=crop",
-  lemon:      "https://images.unsplash.com/photo-1548199569-3e1c6aa8f469?w=600&q=80&fit=crop",
-  immunity:   "https://images.unsplash.com/photo-1505144808419-1957a94ca61e?w=600&q=80&fit=crop",
-  garlic:     "https://images.unsplash.com/photo-1615485500704-8e990f9900f7?w=600&q=80&fit=crop",
-  sleep:      "https://images.unsplash.com/photo-1471091862366-7a1b48c6a3cd?w=600&q=80&fit=crop",
-  energy:     "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80&fit=crop",
-  stress:     "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=600&q=80&fit=crop",
-  tea:        "https://images.unsplash.com/photo-1548199569-3e1c6aa8f469?w=600&q=80&fit=crop",
-  adaptogen:  "https://images.unsplash.com/photo-1544991936-9464e43bea92?w=600&q=80&fit=crop",
-};
-
-function getCategoryFallback(category: string): string {
-  const cat = (category ?? "").toLowerCase();
-  if (cat.includes("stress") && cat.includes("sleep")) return IMAGE_KEYWORDS.lavender;
-  if (cat.includes("stress")) return IMAGE_KEYWORDS.stress;
-  if (cat.includes("sleep")) return IMAGE_KEYWORDS.sleep;
-  if (cat.includes("energy") || cat.includes("drinks")) return IMAGE_KEYWORDS.smoothie;
-  if (cat.includes("immun")) return IMAGE_KEYWORDS.immunity;
-  if (cat.includes("digest")) return IMAGE_KEYWORDS.tea;
-  return DEFAULT_FALLBACK_URL;
-}
-
-function getRelevantImage(item: {
-  imageUrl?: string;
-  title?: string;
-  ingredients?: string[];
-  category?: string;
-  goal?: string;
-}): string {
-  const searchIn = (text: string): string | null => {
-    const lower = text.toLowerCase();
-    for (const [kw, url] of Object.entries(IMAGE_KEYWORDS)) {
-      if (lower.includes(kw)) return url;
-    }
-    return null;
-  };
-
-  if (item.ingredients) {
-    for (const ing of item.ingredients) {
-      const match = searchIn(ing);
-      if (match) return match;
-    }
-  }
-
-  if (item.title) {
-    const match = searchIn(item.title);
-    if (match) return match;
-  }
-
-  return getCategoryFallback(item.category ?? item.goal ?? "");
-}
-
-export function getSafeImage(item: {
-  imageUrl?: string;
-  category?: string;
-  goal?: string;
-  title?: string;
-  ingredients?: string[];
-}): string {
-  const url = item.imageUrl;
-  if (url && url.trim().length > 5) return url;
-  return getRelevantImage(item);
-}
-
-export function getImageUrl(category: string, provided?: string): string {
-  if (provided && provided.trim().length > 0) return provided;
-  return getCategoryFallback(category);
-}
-
 // ─── IMAGE GENERATION ────────────────────────────────────────────────────────
 // Each item.id maps to a unique, curated Unsplash photo ID.
 // Direct photo IDs are the only reliable way to guarantee unique imagery —
@@ -1047,6 +969,7 @@ export function getItemImage(
   // 1. id-based lookup (primary — fastest path for all 28 known items)
   if (id && ITEM_IMAGE_URLS[id]) {
     const url = ITEM_IMAGE_URLS[id];
+    console.log("Image mapping:", id, url);
     if (_seenImageURLs.has(url)) {
       console.warn(`[getItemImage] duplicate detected for id "${id}"`);
     }
