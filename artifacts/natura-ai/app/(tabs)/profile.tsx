@@ -19,7 +19,7 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
 
-const DEFAULT_AVATAR = "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg";
+const DEFAULT_AVATAR = require("@/assets/images/logo.png");
 
 const SCALE_LABELS = ["Very low", "Low", "Moderate", "Good", "Excellent"];
 
@@ -142,11 +142,19 @@ export default function ProfileScreen() {
           { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius },
         ]}
       >
-        <Image
-          source={{ uri: profile.image ? profile.image : DEFAULT_AVATAR }}
-          style={{ width: 60, height: 60, borderRadius: 30 }}
-          resizeMode="cover"
-        />
+        {profile.image ? (
+          <Image
+            source={{ uri: profile.image }}
+            style={styles.avatar}
+            resizeMode="cover"
+          />
+        ) : (
+          <Image
+            source={DEFAULT_AVATAR}
+            style={styles.avatar}
+            resizeMode="contain"
+          />
+        )}
         <View style={{ flex: 1 }}>
           <Text style={[styles.profileName, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
             {profile.name || "Wellness Seeker"}
