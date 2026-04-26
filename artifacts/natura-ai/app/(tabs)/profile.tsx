@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -10,12 +11,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
+
+const DEFAULT_AVATAR = "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg";
 
 const SCALE_LABELS = ["Very low", "Low", "Moderate", "Good", "Excellent"];
 
@@ -138,11 +142,11 @@ export default function ProfileScreen() {
           { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius },
         ]}
       >
-        <View style={[styles.avatar, { backgroundColor: colors.secondary }]}>
-          <Text style={[styles.avatarLetter, { color: colors.primary, fontFamily: "Inter_700Bold" }]}>
-            {(profile.name?.charAt(0) ?? "N").toUpperCase()}
-          </Text>
-        </View>
+        <Image
+          source={{ uri: profile.image ? profile.image : DEFAULT_AVATAR }}
+          style={{ width: 60, height: 60, borderRadius: 30 }}
+          resizeMode="cover"
+        />
         <View style={{ flex: 1 }}>
           <Text style={[styles.profileName, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
             {profile.name || "Wellness Seeker"}

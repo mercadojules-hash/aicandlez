@@ -9,6 +9,7 @@ import React, {
 
 export interface UserProfile {
   name: string;
+  image?: string;
   goals: string[];
   dietaryPreferences: string[];
   allergies: string[];
