@@ -111,7 +111,7 @@ export default function RecipesScreen() {
             renderItem={({ item }) => (
               <RecipeCard
                 recipe={item}
-                image={item.imageUrl}
+                image={item.image}
                 onPress={() => router.push(`/remedy/${item.id}`)}
                 isSaved={isSaved(item.id)}
                 onSave={() => {

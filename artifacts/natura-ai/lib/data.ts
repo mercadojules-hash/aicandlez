@@ -18,13 +18,13 @@ export interface Remedy {
   steps: RemedyStep[];
   benefits: string[];
   safetyNote: string;
-  imageUrl: string;
   image: string;
   whyItHelps?: string;
   bestTime?: string;
   whenToUse?: string;
   whoFor?: string;
   avoidIf?: string;
+  tags?: string[];
 }
 
 export interface PlanActivity {
@@ -51,7 +51,6 @@ export interface WellnessPlan {
     supplements: string[];
   }[];
   groceryList: string[];
-  imageUrl: string;
   image: string;
 }
 
@@ -66,10 +65,10 @@ export interface Recipe {
   steps: RemedyStep[];
   variations: string[];
   groceryList: string[];
-  imageUrl: string;
   image: string;
   whyItHelps?: string;
   bestTime?: string;
+  tags?: string[];
 }
 
 export interface DailyTip {
@@ -79,9 +78,24 @@ export interface DailyTip {
   category: string;
 }
 
-export const REMEDIES: Remedy[] = remediesData as Remedy[];
-export const PLANS: WellnessPlan[] = plansData as WellnessPlan[];
-export const RECIPES: Recipe[] = recipesData as Recipe[];
+function normalizeImage(raw: any): string {
+  return (raw.image || raw.imageUrl || "") as string;
+}
+
+export const REMEDIES: Remedy[] = (remediesData as any[]).map((r) => ({
+  ...r,
+  image: normalizeImage(r),
+}));
+
+export const PLANS: WellnessPlan[] = (plansData as any[]).map((p) => ({
+  ...p,
+  image: normalizeImage(p),
+}));
+
+export const RECIPES: Recipe[] = (recipesData as any[]).map((r) => ({
+  ...r,
+  image: normalizeImage(r),
+}));
 
 export const DAILY_TIPS: DailyTip[] = [
   {

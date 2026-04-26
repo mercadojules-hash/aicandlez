@@ -17,7 +17,6 @@ import { useWellness } from "@/contexts/WellnessContext";
 import { ChecklistItem } from "@/components/ChecklistItem";
 import { PLANS } from "@/lib/data";
 
-const FALLBACK_IMG = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&h=500&fit=crop";
 
 
 export default function PlanDetailScreen() {
@@ -50,17 +49,16 @@ export default function PlanDetailScreen() {
         {Platform.OS === "web" ? (
           // @ts-ignore
           <img
-            src={plan.imageUrl}
+            src={plan.image}
             alt=""
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            onError={(e: any) => { e.currentTarget.src = FALLBACK_IMG; }}
           />
         ) : (
           <Image
-            source={{ uri: plan.imageUrl }}
+            source={{ uri: plan.image }}
             style={styles.heroImage}
             contentFit="cover"
-            cachePolicy="none"
+            cachePolicy="memory-disk"
           />
         )}
         <View style={[styles.heroOverlay]}>

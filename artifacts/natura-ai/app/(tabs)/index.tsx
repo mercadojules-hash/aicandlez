@@ -421,7 +421,7 @@ export default function HomeScreen() {
               <RemedyCard
                 key={r.id}
                 remedy={r}
-                image={r.imageUrl}
+                image={r.image}
                 onPress={() => router.push(`/remedy/${r.id}`)}
                 isSaved={isSaved(r.id)}
                 onSave={() => {

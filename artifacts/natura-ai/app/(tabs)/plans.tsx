@@ -81,7 +81,7 @@ export default function PlansScreen() {
               <PlanCard
                 key={plan.id}
                 plan={plan}
-                image={plan.imageUrl}
+                image={plan.image}
                 onPress={() => router.push(`/plan/${plan.id}`)}
                 isSaved={isSaved(plan.id)}
                 onSave={() => {
@@ -105,7 +105,7 @@ export default function PlansScreen() {
               <View key={remedy.id} style={{ marginBottom: 16 }}>
                 <RemedyCard
                   remedy={remedy}
-                  image={remedy.imageUrl}
+                  image={remedy.image}
                   onPress={() => router.push(`/remedy/${remedy.id}`)}
                   isSaved={isSaved(remedy.id)}
                   onSave={() => {
@@ -147,7 +147,7 @@ export default function PlansScreen() {
                         <PlanCard
                           key={plan.id}
                           plan={plan}
-                          image={plan.imageUrl}
+                          image={plan.image}
                           onPress={() => router.push(`/plan/${plan.id}`)}
                           isSaved
                           onSave={() => removeItem(plan.id)}
@@ -168,7 +168,7 @@ export default function PlansScreen() {
                         <View key={remedy.id} style={{ marginBottom: 16 }}>
                           <RemedyCard
                             remedy={remedy}
-                            image={remedy.imageUrl}
+                            image={remedy.image}
                             onPress={() => router.push(`/remedy/${remedy.id}`)}
                             isSaved
                             onSave={() => removeItem(remedy.id)}

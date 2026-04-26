@@ -14,8 +14,6 @@ import {
 import { useColors } from "@/hooks/useColors";
 import type { Remedy, WellnessPlan, Recipe, DailyTip } from "@/lib/data";
 
-const DEFAULT_FALLBACK_URL = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&h=500&fit=crop";
-
 const useND = Platform.OS !== "web";
 
 interface CardImageProps {
@@ -36,6 +34,8 @@ function CardImage({
       ? (["transparent", "rgba(0,0,0,0.65)"] as const)
       : (["transparent", "rgba(0,0,0,0.42)"] as const);
 
+  if (!image) return null;
+
   return (
     <View style={[styles.imageContainer, { height, backgroundColor: "#1E2A24" }]}>
       <View style={[StyleSheet.absoluteFillObject, styles.imageSkeleton]} />
@@ -47,7 +47,6 @@ function CardImage({
             src={image}
             alt=""
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            onError={(e: any) => { e.currentTarget.src = DEFAULT_FALLBACK_URL; }}
           />
         ) : (
           <Image
@@ -55,7 +54,7 @@ function CardImage({
             source={{ uri: image }}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
-            cachePolicy="none"
+            cachePolicy="memory-disk"
           />
         )}
       </View>

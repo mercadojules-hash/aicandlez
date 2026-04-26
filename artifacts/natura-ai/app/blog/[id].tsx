@@ -16,8 +16,6 @@ import { useWellness } from "@/contexts/WellnessContext";
 import { BLOG_POSTS } from "@/lib/blogData";
 
 
-const FALLBACK_IMG = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&h=500&fit=crop";
-
 export default function BlogDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
@@ -57,14 +55,13 @@ export default function BlogDetailScreen() {
             src={post.image}
             alt={post.title}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            onError={(e: any) => { e.currentTarget.src = FALLBACK_IMG; }}
           />
         ) : (
           <Image
             source={{ uri: post.image }}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
-            cachePolicy="none"
+            cachePolicy="memory-disk"
           />
         )}
 

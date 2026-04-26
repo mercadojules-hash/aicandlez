@@ -21,8 +21,6 @@ const ALL_CATEGORIES = [
   ...Array.from(new Set(BLOG_POSTS.map((p) => p.category))),
 ];
 
-const FALLBACK_IMG = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&h=500&fit=crop";
-
 function BlogCard({
   post,
   isSaved,
@@ -48,14 +46,13 @@ function BlogCard({
             src={post.image}
             alt={post.title}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            onError={(e: any) => { e.currentTarget.src = FALLBACK_IMG; }}
           />
         ) : (
           <Image
             source={{ uri: post.image }}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
-            cachePolicy="none"
+            cachePolicy="memory-disk"
           />
         )}
 

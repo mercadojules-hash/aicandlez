@@ -124,17 +124,16 @@ export default function RemedyDetailScreen() {
         {Platform.OS === "web" ? (
           // @ts-ignore
           <img
-            src={item.imageUrl}
+            src={item.image}
             alt=""
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            onError={(e: any) => { e.currentTarget.src = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&h=400&fit=crop"; }}
           />
         ) : (
           <Image
-            source={{ uri: item.imageUrl }}
+            source={{ uri: item.image }}
             style={styles.heroImage}
             contentFit="cover"
-            cachePolicy="none"
+            cachePolicy="memory-disk"
           />
         )}
         <TouchableOpacity
