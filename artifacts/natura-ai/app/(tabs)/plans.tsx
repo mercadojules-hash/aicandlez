@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useWellness } from "@/contexts/WellnessContext";
 import { PlanCard, RemedyCard } from "@/components/Cards";
-import { PLANS, REMEDIES } from "@/lib/data";
+import { PLANS, REMEDIES, getItemImage } from "@/lib/data";
 
 const TABS = ["Plans", "Remedies", "Saved"] as const;
 type Tab = (typeof TABS)[number];
@@ -81,7 +81,7 @@ export default function PlansScreen() {
               <PlanCard
                 key={plan.id}
                 plan={plan}
-                index={index}
+                image={getItemImage(plan, index)}
                 onPress={() => router.push(`/plan/${plan.id}`)}
                 isSaved={isSaved(plan.id)}
                 onSave={() => {
@@ -105,7 +105,7 @@ export default function PlansScreen() {
               <View key={remedy.id} style={{ marginBottom: 16 }}>
                 <RemedyCard
                   remedy={remedy}
-                  index={index}
+                  image={getItemImage(remedy, index)}
                   onPress={() => router.push(`/remedy/${remedy.id}`)}
                   isSaved={isSaved(remedy.id)}
                   onSave={() => {
@@ -147,7 +147,7 @@ export default function PlansScreen() {
                         <PlanCard
                           key={plan.id}
                           plan={plan}
-                          index={index}
+                          image={getItemImage(plan, index)}
                           onPress={() => router.push(`/plan/${plan.id}`)}
                           isSaved
                           onSave={() => removeItem(plan.id)}
@@ -168,7 +168,7 @@ export default function PlansScreen() {
                         <View key={remedy.id} style={{ marginBottom: 16 }}>
                           <RemedyCard
                             remedy={remedy}
-                            index={index}
+                            image={getItemImage(remedy, index)}
                             onPress={() => router.push(`/remedy/${remedy.id}`)}
                             isSaved
                             onSave={() => removeItem(remedy.id)}

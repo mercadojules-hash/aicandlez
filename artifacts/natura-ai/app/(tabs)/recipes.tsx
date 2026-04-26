@@ -15,7 +15,7 @@ import { useColors } from "@/hooks/useColors";
 import { useWellness } from "@/contexts/WellnessContext";
 import { RecipeCard } from "@/components/Cards";
 import { ChecklistItem } from "@/components/ChecklistItem";
-import { RECIPES } from "@/lib/data";
+import { RECIPES, getItemImage } from "@/lib/data";
 
 const GOAL_FILTERS = ["All", "stress", "sleep", "energy", "immunity"] as const;
 
@@ -111,7 +111,7 @@ export default function RecipesScreen() {
             renderItem={({ item, index }) => (
               <RecipeCard
                 recipe={item}
-                index={index}
+                image={getItemImage(item, index)}
                 onPress={() => router.push(`/remedy/${item.id}`)}
                 isSaved={isSaved(item.id)}
                 onSave={() => {

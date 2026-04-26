@@ -22,7 +22,7 @@ import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { DailyCheckIn as DailyCheckInComponent } from "@/components/DailyCheckIn";
 import { RemedyCard } from "@/components/Cards";
 import { RoutineSection } from "@/components/RoutineSection";
-import { REMEDIES } from "@/lib/data";
+import { REMEDIES, getItemImage } from "@/lib/data";
 
 function deriveMood(checkIn: DailyCheckIn | null): "stressed" | "low-energy" | "positive" | null {
   if (!checkIn) return null;
@@ -321,7 +321,7 @@ export default function HomeScreen() {
               <RemedyCard
                 key={r.id}
                 remedy={r}
-                index={index}
+                image={getItemImage(r, index)}
                 onPress={() => router.push(`/remedy/${r.id}`)}
                 isSaved={isSaved(r.id)}
                 onSave={() => {

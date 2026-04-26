@@ -12,30 +12,29 @@ import {
   View,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { getItemImage, DEFAULT_FALLBACK_URL } from "@/lib/data";
+import { DEFAULT_FALLBACK_URL } from "@/lib/data";
 import type { Remedy, WellnessPlan, Recipe, DailyTip } from "@/lib/data";
 
 const useND = Platform.OS !== "web";
 
 interface CardImageProps {
-  item: { title?: string };
-  index: number;
+  image: string;
   height?: number;
   withGradient?: boolean;
   gradientIntensity?: "soft" | "strong";
 }
 
 function CardImage({
-  item,
-  index,
+  image,
   height = 160,
   withGradient = false,
   gradientIntensity = "soft",
 }: CardImageProps) {
-  const resolvedUrl = getItemImage(item, index);
-  const [imgSrc, setImgSrc] = useState<string>(resolvedUrl);
+  const [errored, setErrored] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  const src = errored ? DEFAULT_FALLBACK_URL : image;
 
   const handleLoad = () => {
     setLoaded(true);
@@ -47,7 +46,7 @@ function CardImage({
   };
 
   const handleError = () => {
-    setImgSrc(DEFAULT_FALLBACK_URL);
+    setErrored(true);
     if (!loaded) {
       setLoaded(true);
       Animated.timing(fadeAnim, {
@@ -65,21 +64,16 @@ function CardImage({
 
   return (
     <View style={[styles.imageContainer, { height, backgroundColor: "#1E2A24" }]}>
-      {/* Skeleton base — always behind image */}
       <View style={[StyleSheet.absoluteFillObject, styles.imageSkeleton]} />
-
-      {/* Fading image */}
       <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}>
         <Image
-          source={{ uri: imgSrc }}
+          source={{ uri: src }}
           style={{ width: "100%", height: "100%" }}
           contentFit="cover"
           onLoad={handleLoad}
           onError={handleError}
         />
       </Animated.View>
-
-      {/* Gradient overlay — always on top */}
       {withGradient && (
         <LinearGradient
           colors={gradientColors}
@@ -134,13 +128,13 @@ export function WellnessTipCard({ tip, quickWin }: { tip: DailyTip; quickWin: st
 
 interface RemedyCardProps {
   remedy: Remedy;
-  index?: number;
+  image: string;
   onPress: () => void;
   isSaved?: boolean;
   onSave?: () => void;
 }
 
-export function RemedyCard({ remedy, index = 0, onPress, isSaved, onSave }: RemedyCardProps) {
+export function RemedyCard({ remedy, image, onPress, isSaved, onSave }: RemedyCardProps) {
   const colors = useColors();
 
   return (
@@ -149,9 +143,8 @@ export function RemedyCard({ remedy, index = 0, onPress, isSaved, onSave }: Reme
       activeOpacity={0.88}
       style={[styles.remedyCard, { backgroundColor: colors.card, borderColor: colors.border }, cardShadow()]}
     >
-      {/* Image — always rendered, fixed height */}
       <View style={styles.imageWrapper}>
-        <CardImage item={remedy} index={index} height={160} withGradient gradientIntensity="soft" />
+        <CardImage image={image} height={160} withGradient gradientIntensity="soft" />
         <View style={styles.badgeRow}>
           <View style={[styles.badge, { backgroundColor: colors.primary + "F0" }]}>
             <Text style={[styles.badgeText, { fontFamily: "Inter_600SemiBold" }]}>{remedy.category}</Text>
@@ -204,13 +197,13 @@ export function RemedyCard({ remedy, index = 0, onPress, isSaved, onSave }: Reme
 
 interface PlanCardProps {
   plan: WellnessPlan;
-  index?: number;
+  image: string;
   onPress: () => void;
   isSaved?: boolean;
   onSave?: () => void;
 }
 
-export function PlanCard({ plan, index = 0, onPress, isSaved, onSave }: PlanCardProps) {
+export function PlanCard({ plan, image, onPress, isSaved, onSave }: PlanCardProps) {
   const colors = useColors();
 
   return (
@@ -220,7 +213,7 @@ export function PlanCard({ plan, index = 0, onPress, isSaved, onSave }: PlanCard
       style={[styles.planCard, { backgroundColor: colors.card, borderColor: colors.border }, cardShadow()]}
     >
       <View style={styles.imageWrapper}>
-        <CardImage item={{ title: plan.title }} index={index} height={160} withGradient gradientIntensity="strong" />
+        <CardImage image={image} height={160} withGradient gradientIntensity="strong" />
         <View style={styles.badgeRow}>
           <View style={[styles.badge, { backgroundColor: colors.primary + "F0" }]}>
             <Text style={[styles.badgeText, { fontFamily: "Inter_600SemiBold" }]}>{plan.duration}</Text>
@@ -257,14 +250,14 @@ export function PlanCard({ plan, index = 0, onPress, isSaved, onSave }: PlanCard
 
 interface RecipeCardProps {
   recipe: Recipe;
-  index?: number;
+  image: string;
   onPress: () => void;
   onAddToGrocery?: () => void;
   isSaved?: boolean;
   onSave?: () => void;
 }
 
-export function RecipeCard({ recipe, index = 0, onPress, onAddToGrocery, isSaved, onSave }: RecipeCardProps) {
+export function RecipeCard({ recipe, image, onPress, onAddToGrocery, isSaved, onSave }: RecipeCardProps) {
   const colors = useColors();
 
   return (
@@ -274,7 +267,7 @@ export function RecipeCard({ recipe, index = 0, onPress, onAddToGrocery, isSaved
       style={[styles.recipeCard, { backgroundColor: colors.card, borderColor: colors.border }, cardShadow()]}
     >
       <View style={styles.imageWrapper}>
-        <CardImage item={{ title: recipe.title }} index={index} height={160} withGradient gradientIntensity="soft" />
+        <CardImage image={image} height={160} withGradient gradientIntensity="soft" />
         <View style={styles.badgeRow}>
           <View style={[styles.badge, { backgroundColor: colors.accent + "F0" }]}>
             <Text style={[styles.badgeText, { fontFamily: "Inter_600SemiBold" }]}>{recipe.goal}</Text>
