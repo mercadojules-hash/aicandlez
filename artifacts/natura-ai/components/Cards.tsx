@@ -12,13 +12,13 @@ import {
   View,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { getSafeImage, DEFAULT_FALLBACK_URL } from "@/lib/data";
+import { getItemImage, DEFAULT_FALLBACK_URL } from "@/lib/data";
 import type { Remedy, WellnessPlan, Recipe, DailyTip } from "@/lib/data";
 
 const useND = Platform.OS !== "web";
 
 interface CardImageProps {
-  item: { imageUrl?: string; category?: string; goal?: string; title?: string; ingredients?: string[] };
+  item: { id?: string; imageUrl?: string; category?: string; goal?: string; title?: string; ingredients?: string[] };
   height?: number;
   withGradient?: boolean;
   gradientIntensity?: "soft" | "strong";
@@ -30,7 +30,7 @@ function CardImage({
   withGradient = false,
   gradientIntensity = "soft",
 }: CardImageProps) {
-  const resolvedUrl = getSafeImage(item);
+  const resolvedUrl = getItemImage(item);
   const [imgSrc, setImgSrc] = useState<string>(resolvedUrl);
   const [loaded, setLoaded] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;

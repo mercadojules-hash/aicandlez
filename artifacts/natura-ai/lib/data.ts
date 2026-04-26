@@ -918,4 +918,10 @@ export function getImageUrl(category: string, provided?: string): string {
   return getCategoryFallback(category);
 }
 
+export function getItemImage(item: { id?: string; title?: string }): string {
+  const query = encodeURIComponent((item.title ?? "wellness").toLowerCase().trim());
+  const sig = encodeURIComponent(item.id ?? "default");
+  return `https://source.unsplash.com/600x400/?${query}&sig=${sig}`;
+}
+
 export { DEFAULT_FALLBACK_URL };
