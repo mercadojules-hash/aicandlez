@@ -124,7 +124,7 @@ export default function RemedyDetailScreen() {
         {item.image ? (
           <Image
             source={{ uri: item.image }}
-            style={{ width: "100%", height: "100%" }}
+            style={{ width: "100%", height: 280 }}
             resizeMode="cover"
           />
         ) : null}
@@ -281,8 +281,7 @@ export default function RemedyDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
-  imageContainer: { position: "relative" },
-  heroImage: { width: "100%", height: 280 },
+  imageContainer: { position: "relative", width: "100%", height: 280 },
   backButton: {
     position: "absolute",
     top: 52,

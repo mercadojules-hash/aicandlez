@@ -37,15 +37,12 @@ function CardImage({
   if (!image) return null;
 
   return (
-    <View style={[styles.imageContainer, { height, backgroundColor: "#1E2A24" }]}>
-      <View style={[StyleSheet.absoluteFillObject, styles.imageSkeleton]} />
-      <View style={StyleSheet.absoluteFillObject}>
-        <Image
-          source={{ uri: image }}
-          style={{ width: "100%", height: "100%" }}
-          resizeMode="cover"
-        />
-      </View>
+    <View style={[styles.imageContainer, { height, width: "100%", backgroundColor: "#1E2A24" }]}>
+      <Image
+        source={{ uri: image }}
+        style={{ width: "100%", height }}
+        resizeMode="cover"
+      />
       {withGradient && (
         <LinearGradient
           colors={gradientColors}

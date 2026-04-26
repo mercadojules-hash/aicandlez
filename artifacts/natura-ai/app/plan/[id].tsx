@@ -49,7 +49,7 @@ export default function PlanDetailScreen() {
         {plan.image ? (
           <Image
             source={{ uri: plan.image }}
-            style={{ width: "100%", height: "100%" }}
+            style={{ width: "100%", height: 260 }}
             resizeMode="cover"
           />
         ) : null}
@@ -191,8 +191,7 @@ export default function PlanDetailScreen() {
 
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
-  imageContainer: { position: "relative" },
-  heroImage: { width: "100%", height: 260 },
+  imageContainer: { position: "relative", width: "100%", height: 260 },
   heroOverlay: {
     position: "absolute",
     top: 52,
