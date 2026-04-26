@@ -918,17 +918,25 @@ export function getImageUrl(category: string, provided?: string): string {
   return getCategoryFallback(category);
 }
 
-export function getItemImage(item: { title?: string }, index: number): string {
-  let query = "herbal tea";
+export function getItemImage(item: { title?: string }, _index?: number): string {
   const title = (item.title || "").toLowerCase();
-  if (title.includes("sleep")) query = "chamomile tea";
-  else if (title.includes("energy")) query = "green smoothie";
-  else if (title.includes("immunity")) query = "berries healthy";
-  else if (title.includes("ginger") || title.includes("digest")) query = "ginger tea";
-  else if (title.includes("lavender") || title.includes("calm")) query = "lavender tea";
-  else if (title.includes("stress")) query = "relaxing tea";
-  const uniqueSig = index;
-  return `https://source.unsplash.com/600x400/?${encodeURIComponent(query)}&sig=${uniqueSig}`;
+
+  if (title.includes("ginger") || title.includes("digest"))
+    return "https://images.unsplash.com/photo-1604908176997-4317c5f0d41c?w=600&h=400&fit=crop";
+
+  if (title.includes("sleep"))
+    return "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&h=400&fit=crop";
+
+  if (title.includes("energy"))
+    return "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&h=400&fit=crop";
+
+  if (title.includes("lavender") || title.includes("calm"))
+    return "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=600&h=400&fit=crop";
+
+  if (title.includes("immunity"))
+    return "https://images.unsplash.com/photo-1510626176961-4b57d4fbad03?w=600&h=400&fit=crop";
+
+  return "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&h=400&fit=crop";
 }
 
 export { DEFAULT_FALLBACK_URL };
