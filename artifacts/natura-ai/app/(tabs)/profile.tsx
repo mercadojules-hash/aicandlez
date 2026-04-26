@@ -306,11 +306,11 @@ export default function ProfileScreen() {
         />
       </View>
 
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold", marginBottom: 4 }]}>
-          Account
-        </Text>
-        {isPremium && (
+      {isPremium && (
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold", marginBottom: 4 }]}>
+            Account
+          </Text>
           <SettingRow
             icon="star"
             label="Manage Subscription"
@@ -320,8 +320,8 @@ export default function ProfileScreen() {
               ])
             }
           />
-        )}
-      </View>
+        </View>
+      )}
 
       <Text style={[styles.version, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
         Natura AI v1.0 · Made with 🌿
