@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Leaf } from "lucide-react";
+import { Leaf, Download } from "lucide-react";
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -32,6 +32,30 @@ export default function Welcome() {
       <div className="onboarding-disclaimer-box">
         <p>Educational wellness information only — not medical advice. Always consult a healthcare provider for health concerns.</p>
       </div>
+
+      <a
+        href="/api/download-zip"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          marginBottom: 12,
+          padding: "14px 20px",
+          backgroundColor: "#1E3D2B",
+          color: "#B8E6C1",
+          borderRadius: 12,
+          textDecoration: "none",
+          fontWeight: 600,
+          fontSize: 15,
+          border: "1.5px solid #2E6B42",
+          width: "100%",
+          boxSizing: "border-box",
+        }}
+      >
+        <Download size={18} color="#66BB6A" />
+        Download Project ZIP
+      </a>
 
       <div className="onboarding-actions">
         <button className="btn-primary" onClick={() => navigate(`${base}/onboarding/goals`)}>

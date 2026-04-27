@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health.js";
+import downloadRouter from "./download.js";
 import signalsRouter from "./signals.js";
 import tradesRouter from "./trades.js";
 import portfolioRouter from "./portfolio.js";
@@ -11,6 +12,7 @@ import candlesRouter from "./candles.js";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(downloadRouter);
 router.use(signalsRouter);
 router.use(tradesRouter);
 router.use(portfolioRouter);

@@ -120,8 +120,7 @@ export default function Profile() {
         </button>
 
         <a
-          href={`${import.meta.env.BASE_URL}natura-ai.zip`}
-          download="natura-ai.zip"
+          href="/api/download-zip"
           style={{
             display: "flex",
             alignItems: "center",
