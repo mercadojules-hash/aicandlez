@@ -15,8 +15,12 @@
     },
     "ios": {
       "supportsTablet": false,
+      "bundleIdentifier": "com.naturaai.app",
+      "buildNumber": "1",
       "infoPlist": {
-        "UIStatusBarStyle": "UIStatusBarStyleDarkContent"
+        "UIStatusBarStyle": "UIStatusBarStyleDarkContent",
+        "NSPhotoLibraryUsageDescription": "Allow Natura AI to access your photo library to update your profile picture.",
+        "NSCameraUsageDescription": "Allow Natura AI to access your camera to take a profile photo."
       }
     },
     "android": {
