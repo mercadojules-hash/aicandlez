@@ -4,7 +4,7 @@
     "slug": "natura-ai",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/natura-app-icon.png",
     "scheme": "natura-ai",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,

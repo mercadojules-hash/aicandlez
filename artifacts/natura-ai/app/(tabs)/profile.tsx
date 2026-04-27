@@ -21,7 +21,6 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
 
-const DEFAULT_AVATAR = require("@/assets/images/logo.png");
 
 const SCALE_LABELS = ["Very low", "Low", "Moderate", "Good", "Excellent"];
 
@@ -107,8 +106,12 @@ function ThemeToggle() {
 
 export default function ProfileScreen() {
   const colors = useColors();
+  const { isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { profile, updateProfile, resetOnboarding } = useUser();
+  const avatarFallback = isDark
+    ? require("@/assets/images/natura-light-logo.png")
+    : require("@/assets/images/natura-dark-logo.png");
   const { streak, savedItems, completedTasks, lastCheckIn } = useWellness();
   const { tier, isPremium, openPaywall } = useSubscription();
 
@@ -187,7 +190,7 @@ export default function ProfileScreen() {
             />
           ) : (
             <Image
-              source={DEFAULT_AVATAR}
+              source={avatarFallback}
               style={styles.avatar}
               resizeMode="contain"
             />

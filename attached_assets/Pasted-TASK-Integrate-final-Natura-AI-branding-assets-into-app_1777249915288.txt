@@ -1,0 +1,130 @@
+TASK: Integrate final Natura AI branding assets into app
+
+CONTEXT:
+The following final assets have been added to the project:
+
+assets/images/
+- natura-light-logo.png
+- natura-dark-logo.png
+- natura-app-icon.png
+- natura-splash-bg.png
+
+These are the FINAL production assets and must be used consistently.
+
+--------------------------------------------------
+
+GOALS:
+
+1. Use splash background for welcome screen
+2. Use correct logo depending on theme (light/dark)
+3. Set app icon for Expo configuration
+4. Ensure avatar fallback uses correct logo
+5. Do NOT break existing app logic
+
+--------------------------------------------------
+
+STRICT RULES:
+
+- DO NOT change onboarding logic
+- DO NOT change navigation
+- DO NOT refactor app
+- ONLY update asset usage
+- KEEP all functionality working
+
+--------------------------------------------------
+
+PART 1 — SPLASH / WELCOME SCREEN
+
+File: onboarding/index.tsx
+
+- Use natura-splash-bg.png as full screen background:
+
+import { ImageBackground } from 'react-native';
+
+<ImageBackground
+  source={require('../../assets/images/natura-splash-bg.png')}
+  style={{ flex: 1 }}
+  resizeMode="cover"
+>
+
+- REMOVE:
+  - logo
+  - title text
+  - tagline
+  - feature list
+
+- KEEP ONLY:
+  - "Begin Your Journey" button
+
+- Position button near bottom with padding
+
+--------------------------------------------------
+
+PART 2 — LOGO USAGE (LIGHT / DARK)
+
+Wherever logo is used in UI:
+
+- Detect theme (use existing theme logic if available)
+
+IF dark mode:
+  use natura-light-logo.png
+
+IF light mode:
+  use natura-dark-logo.png
+
+Example:
+
+const logo = isDarkMode
+  ? require('../assets/images/natura-light-logo.png')
+  : require('../assets/images/natura-dark-logo.png');
+
+--------------------------------------------------
+
+PART 3 — AVATAR FALLBACK
+
+Ensure avatar fallback uses LOGO ICON (not full text logo)
+
+Use:
+- center symbol from logo (if separate)
+OR
+- natura-light-logo.png scaled properly
+
+Ensure:
+- fits inside circle
+- no text overflow
+
+--------------------------------------------------
+
+PART 4 — APP ICON (EXPO CONFIG)
+
+Update app.json or app.config.js:
+
+{
+  "expo": {
+    "icon": "./assets/images/natura-app-icon.png"
+  }
+}
+
+IMPORTANT:
+- Do not modify other config settings
+
+--------------------------------------------------
+
+PART 5 — CLEANUP
+
+- Remove any old logo references
+- Remove duplicate assets
+- Ensure consistent usage across app
+
+--------------------------------------------------
+
+SUCCESS CRITERIA:
+
+- Splash screen matches premium design exactly
+- No duplicate text/logo on splash
+- Correct logo shows in light/dark modes
+- App icon is properly configured
+- Avatar fallback looks clean
+- App runs without crashes
+
+END TASK
