@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
 import { rm } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import archiver from "archiver";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -117,6 +119,38 @@ globalThis.__filename = __bannerUrl.fileURLToPath(import.meta.url);
 globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
+  });
+
+  // Generate natura-ai.zip and place it next to the server bundle.
+  // This runs at every build so it's always present in production,
+  // regardless of whether the zip was committed to git.
+  const workspaceRoot = path.resolve(artifactDir, "../..");
+  const naturaAiDir = path.resolve(workspaceRoot, "artifacts/natura-ai");
+  const zipDest = path.resolve(distDir, "natura-ai.zip");
+  await rm(zipDest, { force: true });
+  await new Promise((resolve, reject) => {
+    const output = createWriteStream(zipDest);
+    const archive = archiver("zip", { zlib: { level: 6 } });
+    output.on("close", () => {
+      console.log(`✅ natura-ai.zip generated (${archive.pointer()} bytes)`);
+      resolve();
+    });
+    archive.on("error", (err) => {
+      console.error("❌ Failed to generate natura-ai.zip:", err.message);
+      reject(err);
+    });
+    archive.pipe(output);
+    archive.glob("**/*", {
+      cwd: naturaAiDir,
+      dot: true,
+      ignore: [
+        "node_modules/**",
+        ".expo/**",
+        "dist/**",
+        ".git/**",
+      ],
+    });
+    archive.finalize();
   });
 }
 
