@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Zap, Bookmark, CheckCircle, RefreshCw } from "lucide-react";
+import { Zap, Bookmark, CheckCircle, RefreshCw, Download } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
@@ -118,6 +118,29 @@ export default function Profile() {
           <RefreshCw size={16} color="#6B6B6B" />
           <span>Reset profile & onboarding</span>
         </button>
+
+        <a
+          href="natura-ai.zip"
+          download="natura-ai.zip"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            marginTop: 12,
+            padding: "14px 20px",
+            backgroundColor: "#1E3D2B",
+            color: "#B8E6C1",
+            borderRadius: 12,
+            textDecoration: "none",
+            fontWeight: 600,
+            fontSize: 15,
+            border: "1.5px solid #2E6B42",
+          }}
+        >
+          <Download size={18} color="#66BB6A" />
+          Download Project ZIP
+        </a>
       </div>
     </Layout>
   );
