@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
+import fs from "fs";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 const rawPort = process.env.PORT;
@@ -29,6 +30,22 @@ if (!basePath) {
 export default defineConfig({
   base: basePath,
   plugins: [
+    {
+      name: "serve-zip-download",
+      configureServer(server) {
+        const zipPath = path.resolve(import.meta.dirname, "public/natura-ai.zip");
+        server.middlewares.use((req, res, next) => {
+          if (req.url?.endsWith("/natura-ai.zip")) {
+            res.setHeader("Content-Type", "application/zip");
+            res.setHeader("Content-Disposition", 'attachment; filename="natura-ai.zip"');
+            res.setHeader("Content-Length", String(fs.statSync(zipPath).size));
+            fs.createReadStream(zipPath).pipe(res);
+            return;
+          }
+          next();
+        });
+      },
+    },
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
