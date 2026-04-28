@@ -244,7 +244,8 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: 18,
     alignItems: "center",
+    justifyContent: "center",
     marginBottom: 8,
   },
-  buttonText: { fontSize: 16 },
+  buttonText: { fontSize: 16, textAlign: "center" },
 });

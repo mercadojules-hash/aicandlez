@@ -1,0 +1,183 @@
+I need you to update my Expo mobile app UI AND export a clean working ZIP.
+
+Follow these instructions EXACTLY:
+
+-----------------------------------
+PART 1 — UI FIXES (STRICT SCOPE)
+-----------------------------------
+
+Edit ONLY these files:
+- app/(tabs)/index.tsx
+- onboarding screen file where "Start My Wellness Journey" exists
+
+DO NOT modify:
+- imports
+- hooks
+- logic
+- navigation
+- any other files
+
+-----------------------------------
+TASK 1 — MOVE "Today's Routine"
+-----------------------------------
+
+In HomeScreen (app/(tabs)/index.tsx):
+
+Find:
+
+<DailyCheckInComponent />
+
+<TodaysPlan ... />
+
+<RoutineSection />
+
+Move <RoutineSection /> so it appears DIRECTLY under:
+
+<DailyCheckInComponent />
+
+Final order MUST be:
+
+<DailyCheckInComponent />
+<RoutineSection />
+<TodaysPlan ... />
+
+-----------------------------------
+TASK 2 — FIX BUTTON ICON ALIGNMENT
+-----------------------------------
+
+Inside function:
+AICoachBanner
+
+For BOTH buttons:
+
+- "Get Today's Plan"
+- "Ask AI Coach"
+
+DO NOT change:
+- TouchableOpacity
+- onPress
+- activeOpacity
+- styles
+
+ONLY replace the INNER content of each button.
+
+-----------------------------------
+PRIMARY BUTTON CONTENT:
+-----------------------------------
+
+<View style={{
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6
+}}>
+  <Feather name="calendar" size={16} color="#fff" />
+  <Text style={[styles.coachBtnPrimaryText, { fontFamily: "Inter_600SemiBold" }]}>
+    Get Today's Plan
+  </Text>
+</View>
+
+-----------------------------------
+SECONDARY BUTTON CONTENT:
+-----------------------------------
+
+<View style={{
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6
+}}>
+  <Feather name="message-circle" size={16} color={colors.primary} />
+  <Text style={[styles.coachBtnSecondaryText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
+    Ask AI Coach
+  </Text>
+</View>
+
+-----------------------------------
+TASK 3 — FIX ONBOARDING BUTTON
+-----------------------------------
+
+Find button:
+"Start My Wellness Journey"
+
+Inside TouchableOpacity:
+
+Ensure:
+
+alignItems: "center"
+justifyContent: "center"
+
+AND ensure the Text inside has:
+
+textAlign: "center"
+
+-----------------------------------
+PART 2 — CLEAN EXPORT (CRITICAL)
+-----------------------------------
+
+After applying ALL fixes:
+
+Create a clean standalone Expo project export.
+
+Requirements:
+
+- Export ONLY the Expo mobile app
+- Do NOT include:
+  server/
+  scripts/
+  backend code
+  unrelated files
+
+- Project MUST work with npm (NOT pnpm)
+- Remove:
+  "catalog:"
+  "workspace:*"
+  monorepo references
+
+- Ensure dependencies are standard npm versions
+
+-----------------------------------
+REQUIRED PROJECT STRUCTURE:
+-----------------------------------
+
+Include ONLY:
+
+app/
+assets/
+package.json
+app.json
+babel.config.js
+tsconfig.json (if needed)
+
+-----------------------------------
+VERIFY BEFORE EXPORT:
+-----------------------------------
+
+The app MUST run successfully with:
+
+npm install
+npx expo start
+
+No errors
+No missing modules
+No broken JSX
+
+-----------------------------------
+EXPORT REQUIREMENTS:
+-----------------------------------
+
+Create a ZIP file named:
+
+natura-ai.zip
+
+-----------------------------------
+VERY IMPORTANT:
+-----------------------------------
+
+Place natura-ai.zip in the Replit PREVIEW panel so it can be downloaded directly.
+
+-----------------------------------
+GOAL:
+-----------------------------------
+
+Deliver a clean, fully working Expo app with the UI fixes applied, ready for local use and App Store submission.

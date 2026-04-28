@@ -99,10 +99,12 @@ function AICoachBanner({
           activeOpacity={0.82}
           style={[styles.coachBtnPrimary, { backgroundColor: colors.primary, borderRadius: colors.radius - 6 }]}
         >
-          <Feather name="calendar" size={14} color="#fff" />
-          <Text style={[styles.coachBtnPrimaryText, { fontFamily: "Inter_600SemiBold" }]}>
-            Get Today's Plan
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            <Feather name="calendar" size={16} color="#fff" />
+            <Text style={[styles.coachBtnPrimaryText, { fontFamily: "Inter_600SemiBold" }]}>
+              Get Today's Plan
+            </Text>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => {
@@ -115,10 +117,12 @@ function AICoachBanner({
             { backgroundColor: colors.secondary, borderColor: colors.primary + "44", borderRadius: colors.radius - 6 },
           ]}
         >
-          <Feather name="message-circle" size={14} color={colors.primary} />
-          <Text style={[styles.coachBtnSecondaryText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
-            Ask AI Coach
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            <Feather name="message-circle" size={16} color={colors.primary} />
+            <Text style={[styles.coachBtnSecondaryText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
+              Ask AI Coach
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -360,21 +364,21 @@ export default function HomeScreen() {
         {/* ② Mood check-in */}
         <DailyCheckInComponent />
 
-        {/* ③ Streak pill — below check-in */}
+        {/* ③ Today's Routine — directly under check-in */}
+        <RoutineSection />
+
+        {/* ④ Streak pill */}
         <View style={styles.streakWrap}>
           <StreakPill streak={streak} colors={colors} />
         </View>
 
-        {/* ④ AI Wellness Coach */}
+        {/* ⑤ AI Wellness Coach */}
         <View style={styles.section}>
           <AICoachBanner checkIn={lastCheckIn} streak={streak} />
         </View>
 
-        {/* ⑤ Today's Plan */}
+        {/* ⑥ Today's Plan */}
         <TodaysPlan goals={profile.goals} />
-
-        {/* ⑥ Today's Routine */}
-        <RoutineSection />
 
         {/* ⑥ Quick Actions */}
         <View style={styles.section}>
