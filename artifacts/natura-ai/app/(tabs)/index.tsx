@@ -91,21 +91,38 @@ function AICoachBanner({
         {body}
       </Text>
       <View style={styles.coachBtns}>
+
+        {/* PRIMARY BUTTON */}
         <TouchableOpacity
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             router.push("/(tabs)/plans");
           }}
           activeOpacity={0.82}
-          style={[styles.coachBtnPrimary, { backgroundColor: colors.primary, borderRadius: colors.radius - 6 }]}
+          style={[
+            styles.coachBtnPrimary,
+            {
+              backgroundColor: colors.primary,
+              borderRadius: colors.radius - 6,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            },
+          ]}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%" }}>
-            <Feather name="calendar" size={16} color="#fff" style={{ marginRight: 6 }} />
-            <Text style={[styles.coachBtnPrimaryText, { fontFamily: "Inter_600SemiBold" }]}>
-              Get Today's Plan
-            </Text>
-          </View>
+          <Feather name="calendar" size={16} color="#fff" />
+          <Text
+            style={[
+              styles.coachBtnPrimaryText,
+              { fontFamily: "Inter_600SemiBold" },
+            ]}
+          >
+            Get Today's Plan
+          </Text>
         </TouchableOpacity>
+
+        {/* SECONDARY BUTTON */}
         <TouchableOpacity
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -114,16 +131,31 @@ function AICoachBanner({
           activeOpacity={0.82}
           style={[
             styles.coachBtnSecondary,
-            { backgroundColor: colors.secondary, borderColor: colors.primary + "44", borderRadius: colors.radius - 6 },
+            {
+              backgroundColor: colors.secondary,
+              borderColor: colors.primary + "44",
+              borderRadius: colors.radius - 6,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            },
           ]}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%" }}>
-            <Feather name="message-circle" size={16} color={colors.primary} style={{ marginRight: 6 }} />
-            <Text style={[styles.coachBtnSecondaryText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
-              Ask AI Coach
-            </Text>
-          </View>
+          <Feather name="message-circle" size={16} color={colors.primary} />
+          <Text
+            style={[
+              styles.coachBtnSecondaryText,
+              {
+                color: colors.primary,
+                fontFamily: "Inter_600SemiBold",
+              },
+            ]}
+          >
+            Ask AI Coach
+          </Text>
         </TouchableOpacity>
+
       </View>
     </View>
   );
