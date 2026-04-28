@@ -29,3 +29,9 @@ id = "Ey-zmyAL5R8AnFi5qmvUb"
 uri = "file://artifacts/natura-web/public/natura-ai.zip"
 type = "unspecified"
 title = "natura-ai.zip"
+
+[[outputs]]
+id = "iG2gn2e4_UFANc3_l3BFP"
+uri = "file://artifacts/natura-web/public/natura-yoga-ai.zip"
+type = "unspecified"
+title = "natura-yoga-ai.zip"

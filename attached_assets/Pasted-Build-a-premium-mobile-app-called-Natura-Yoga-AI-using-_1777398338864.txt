@@ -1,0 +1,202 @@
+Build a premium mobile app called **“Natura Yoga AI”** using React Native (Expo).
+
+GOAL:
+Create a complete yoga, breathwork, chakra, and AI-guided wellness app with progress tracking and daily engagement features.
+
+---
+
+APP STRUCTURE:
+
+1. SPLASH / ONBOARDING SCREEN
+
+* Logo centered (use leaf / wellness style placeholder)
+* Title: “Natura Yoga AI”
+* Subtitle: “Find your balance through movement and breath”
+* Button: “Begin Your Journey”
+* Smooth fade-in animation
+
+---
+
+2. HOME DASHBOARD
+
+Display:
+
+* Greeting: “Welcome back”
+* Daily Streak (🔥 X days)
+* Progress bar (top of screen)
+* Today’s Checklist:
+  • Complete a yoga flow
+  • Do a breathing session
+  • Review a chakra
+
+Sections:
+
+* Start Yoga Flow
+* Breathwork
+* Chakras
+* Meditation
+* AI Assistant
+
+---
+
+3. YOGA FLOW SYSTEM
+
+Create flows:
+
+* Morning Energy Flow
+* Stress Relief Flow
+* Sleep Wind Down
+
+Each flow:
+
+* Step-by-step poses
+* Pose name
+* Instructions
+* Timer (countdown)
+* Breath instruction
+* Hold indicator
+
+---
+
+4. BREATHWORK SYSTEM
+
+Include:
+
+* Box Breathing
+* 4-7-8 Breathing
+* Calm Breathing
+
+Features:
+
+* Animated breathing circle
+* Text cues: Inhale / Hold / Exhale
+* Timer-based session
+
+---
+
+5. CHAKRA SYSTEM
+
+Create 7 chakra entries:
+
+Each includes:
+
+* Name
+* Color
+* Meaning
+* Emotional association
+* Foods associated
+* Suggested yoga poses
+
+Display:
+
+* Scrollable cards
+* Clean UI with color-coded sections
+
+---
+
+6. MEDITATION SYSTEM
+
+* Simple guided meditation sessions (2–5 minutes)
+* Timer-based
+* Calm text guidance
+
+---
+
+7. AI ASSISTANT (IMPORTANT)
+
+Create a simple AI assistant screen:
+
+Input:
+“How are you feeling?”
+
+Return dynamic suggestions based on keywords:
+
+* stressed → suggest calming yoga + breathing
+* tired → suggest sleep flow
+* anxious → suggest breathwork + heart chakra
+
+(No external API required — simulate intelligent responses)
+
+---
+
+8. DAILY STREAK SYSTEM
+
+* Track daily activity
+* Increase streak if user completes:
+
+  * 1 yoga flow OR
+  * 1 breathing session
+
+Store locally using async storage
+
+---
+
+9. CHECKLIST SYSTEM
+
+Daily checklist:
+
+* Yoga Flow
+* Breathwork
+* Chakra review
+
+Mark items complete
+Update progress bar accordingly
+
+---
+
+10. PROGRESS BAR
+
+* Top of home screen
+* Reflect % of completed daily tasks
+
+---
+
+11. NAVIGATION
+
+Bottom Tabs:
+
+* Home
+* Flows
+* Breathe
+* Chakras
+* AI
+
+---
+
+12. UI DESIGN
+
+* Premium calming aesthetic
+* Earth tones (dark green, beige, soft gradients)
+* Rounded cards
+* Smooth animations
+* Clean typography
+* App Store quality visuals
+
+---
+
+13. TECH REQUIREMENTS
+
+* Use Expo (React Native)
+* Functional components
+* Clean file structure
+* Reusable components
+* Use AsyncStorage for streak + checklist
+* No backend required
+
+---
+
+OUTPUT REQUIREMENTS:
+
+* Fully working Expo app
+* No missing dependencies
+* No broken navigation
+* Ready to run with:
+  npm install
+  npx expo start
+
+---
+
+IMPORTANT:
+
+Do NOT leave placeholders or incomplete features.
+All listed features must be implemented in working form.
