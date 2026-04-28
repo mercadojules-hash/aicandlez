@@ -1,0 +1,251 @@
+Build a premium mobile app called **"Natura Yoga AI"** using Expo (React Native).
+
+GOAL:
+Create a clean, modern, image-driven yoga & wellness app that includes:
+
+* Yoga pose library (core feature)
+* Chakra education system
+* AI wellness assistant (basic working version)
+* Daily progress tracking with streaks
+* Checklist system for engagement
+
+STYLE:
+
+* Dark green / nature theme
+* Premium wellness aesthetic (similar to Calm / Headspace)
+* Smooth animations, rounded cards, soft shadows
+* Minimal, clean UI
+* Use consistent spacing and typography
+
+---
+
+APP STRUCTURE:
+
+---
+
+1. SPLASH / ONBOARDING SCREEN
+
+---
+
+* Full-screen gradient background (dark green tones)
+* Centered circular logo (leaf / wellness style)
+* Title: "Natura Yoga AI"
+* Subtitle: "Find your balance through movement & mindfulness"
+* CTA button: "Begin Your Journey"
+* Smooth fade-in animation
+
+---
+
+2. HOME DASHBOARD
+
+---
+
+Display:
+
+* Greeting ("Welcome back")
+
+* Daily Progress Bar (0–100%)
+
+* Streak counter (🔥 e.g. "3 day streak")
+
+* Quick action buttons (grid style):
+
+  * Yoga Flow
+  * Breath Work
+  * Chakras
+  * AI Coach
+
+* Today's Checklist:
+
+  * Complete a yoga flow
+  * Do a breathing session
+  * Review a chakra
+
+* Card: "AI Wellness Coach"
+  → opens chat screen
+
+---
+
+3. YOGA POSE SYSTEM (CORE FEATURE)
+
+---
+
+Create a scrollable list of yoga poses (minimum 12).
+
+Each pose must include:
+
+* Name
+* Image (use high-quality remote image URLs)
+* Difficulty (Beginner / Intermediate)
+* Duration suggestion
+* Step-by-step instructions
+* Breathing pattern guidance
+* Benefits list
+* Common mistakes
+* Hold timer button (simple countdown timer)
+
+Pose List (use these EXACT poses):
+
+1. Mountain Pose
+2. Downward Dog
+3. Warrior I
+4. Warrior II
+5. Child’s Pose
+6. Cobra Pose
+7. Bridge Pose
+8. Seated Forward Fold
+9. Tree Pose
+10. Cat-Cow
+11. Plank Pose
+12. Legs Up the Wall
+
+UI Requirements:
+
+* Each pose displayed as a card with image + title
+* Tap → opens detailed "pose blog screen"
+* Large hero image at top
+* Clean readable sections
+* Timer button at bottom
+
+---
+
+4. BREATHWORK SECTION
+
+---
+
+Include 3 breathing exercises:
+
+1. Box Breathing
+2. 4-7-8 Breathing
+3. Deep Belly Breathing
+
+Each includes:
+
+* Instructions
+* Animated breathing circle (expand/contract)
+* Timer
+
+---
+
+5. CHAKRA SYSTEM
+
+---
+
+Create 7 chakra cards:
+
+1. Root (Red)
+2. Sacral (Orange)
+3. Solar Plexus (Yellow)
+4. Heart (Green)
+5. Throat (Blue)
+6. Third Eye (Indigo)
+7. Crown (Purple)
+
+Each chakra detail screen must include:
+
+* Name + color theme
+* Symbol image (use placeholder remote images)
+* Meaning
+* Emotional association
+* Body location
+* Foods associated
+* Affirmation
+* Suggested breathing or yoga pose
+
+UI:
+
+* Color-coded cards
+* Smooth transitions
+* Clean readable layout
+
+---
+
+6. AI ASSISTANT (BASIC FUNCTIONAL)
+
+---
+
+Create a chat-style screen.
+
+User can input:
+
+* "I feel stressed"
+* "I can't sleep"
+* "I feel anxious"
+
+AI responds with:
+
+* Suggested yoga poses
+* Suggested breathing exercise
+* Suggested chakra focus
+
+IMPORTANT:
+Do NOT use real API keys.
+Mock responses with logic-based replies.
+
+Example:
+If user says "stress" →
+Return:
+
+* 2 yoga poses
+* 1 breathing method
+* 1 chakra suggestion
+
+---
+
+7. NAVIGATION
+
+---
+
+Bottom Tab Navigation with icons:
+
+* Home
+* Yoga
+* Breath
+* Chakras
+* AI
+
+---
+
+8. STATE MANAGEMENT
+
+---
+
+Track:
+
+* Completed checklist items
+* Daily progress %
+* Streak count (local state is fine)
+
+---
+
+9. PERFORMANCE
+
+---
+
+* Fast load
+* Optimized images
+* Clean component structure
+* No unused code
+
+---
+
+10. FINAL REQUIREMENTS
+
+---
+
+* App must run immediately with Expo
+* No placeholder errors
+* No broken navigation
+* Clean modular code structure
+* Use functional components
+* Use hooks (useState, useEffect)
+
+---
+
+IMPORTANT:
+This is a FULL BUILD request.
+Generate ALL files needed.
+Do NOT output partial code.
+Do NOT require follow-ups.
+
+The app should be fully functional on first run.

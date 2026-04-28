@@ -38,6 +38,7 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
         <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
         <Stack.Screen name="flow/[id]" options={{ animation: "slide_from_bottom", presentation: "modal" }} />
+        <Stack.Screen name="pose/[id]" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="breathwork/[id]" options={{ animation: "slide_from_bottom", presentation: "modal" }} />
         <Stack.Screen name="meditation/[id]" options={{ animation: "slide_from_bottom", presentation: "modal" }} />
       </Stack>

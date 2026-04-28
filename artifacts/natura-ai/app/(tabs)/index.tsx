@@ -43,7 +43,7 @@ function CheckItem({ label, done, onPress }: { label: string; done: boolean; onP
 }
 
 const quickActions = [
-  { label: "Yoga Flow", icon: "activity", route: "/(tabs)/flows", color: colors.accent },
+  { label: "Yoga Poses", icon: "activity", route: "/(tabs)/yoga", color: colors.accent },
   { label: "Breathe", icon: "wind", route: "/(tabs)/breathe", color: colors.primary },
   { label: "Chakras", icon: "circle", route: "/(tabs)/chakras", color: "#7c6ead" },
   { label: "AI Coach", icon: "message-circle", route: "/(tabs)/ai", color: "#6ea8ed" },

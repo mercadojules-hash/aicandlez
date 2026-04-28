@@ -33,9 +33,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="flows"
+        name="yoga"
         options={{
-          title: "Flows",
+          title: "Yoga",
           tabBarIcon: ({ color, size }) => <Feather name="activity" size={size} color={color} />,
         }}
       />
