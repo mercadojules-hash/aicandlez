@@ -1,0 +1,128 @@
+I need a VERY SMALL UI fix AND a full clean export of the app.
+
+Follow these instructions EXACTLY.
+
+-----------------------------------
+PART 1 — UI FIX (STRICT)
+-----------------------------------
+
+Edit ONLY this file:
+app/(tabs)/index.tsx
+
+Find:
+function AICoachBanner
+
+-----------------------------------
+TASK:
+Fix button icon alignment ONLY.
+
+Do NOT modify:
+- TouchableOpacity
+- onPress
+- activeOpacity
+- existing styles
+- layout outside the buttons
+
+ONLY replace the INNER content of BOTH buttons.
+
+-----------------------------------
+REPLACE WITH:
+
+PRIMARY BUTTON ("Get Today's Plan"):
+
+<View style={{
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  width: "100%"
+}}>
+  <Feather name="calendar" size={16} color="#fff" style={{ marginRight: 6 }} />
+  <Text style={[styles.coachBtnPrimaryText, { fontFamily: "Inter_600SemiBold" }]}>
+    Get Today's Plan
+  </Text>
+</View>
+
+-----------------------------------
+SECONDARY BUTTON ("Ask AI Coach"):
+
+<View style={{
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  width: "100%"
+}}>
+  <Feather name="message-circle" size={16} color={colors.primary} style={{ marginRight: 6 }} />
+  <Text style={[styles.coachBtnSecondaryText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
+    Ask AI Coach
+  </Text>
+</View>
+
+-----------------------------------
+VERIFY BEFORE CONTINUING:
+-----------------------------------
+
+- No JSX errors
+- App compiles successfully
+- Only alignment changed
+
+-----------------------------------
+PART 2 — CLEAN EXPORT
+-----------------------------------
+
+After applying the fix:
+
+Export ONLY the Expo mobile app.
+
+Do NOT include:
+- server/
+- scripts/
+- backend code
+- unrelated folders
+
+-----------------------------------
+PROJECT MUST:
+-----------------------------------
+
+- Use npm (NOT pnpm)
+- Have NO "workspace:*" or "catalog:" dependencies
+- Be standalone
+
+-----------------------------------
+REQUIRED FILES:
+-----------------------------------
+
+app/
+assets/
+package.json
+app.json
+babel.config.js
+tsconfig.json (if used)
+
+-----------------------------------
+VERIFY BEFORE EXPORT:
+-----------------------------------
+
+App MUST run successfully with:
+
+npm install
+npx expo start
+
+-----------------------------------
+EXPORT:
+-----------------------------------
+
+Create a ZIP file named:
+
+natura-ai.zip
+
+-----------------------------------
+VERY IMPORTANT:
+-----------------------------------
+
+Place natura-ai.zip in the Replit PREVIEW panel so it can be downloaded directly.
+
+-----------------------------------
+GOAL:
+-----------------------------------
+
+Deliver a clean, fully working Expo app with the button alignment fixed and ready for local use and App Store submission.

@@ -99,8 +99,8 @@ function AICoachBanner({
           activeOpacity={0.82}
           style={[styles.coachBtnPrimary, { backgroundColor: colors.primary, borderRadius: colors.radius - 6 }]}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
-            <Feather name="calendar" size={16} color="#fff" />
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%" }}>
+            <Feather name="calendar" size={16} color="#fff" style={{ marginRight: 6 }} />
             <Text style={[styles.coachBtnPrimaryText, { fontFamily: "Inter_600SemiBold" }]}>
               Get Today's Plan
             </Text>
@@ -117,8 +117,8 @@ function AICoachBanner({
             { backgroundColor: colors.secondary, borderColor: colors.primary + "44", borderRadius: colors.radius - 6 },
           ]}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
-            <Feather name="message-circle" size={16} color={colors.primary} />
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%" }}>
+            <Feather name="message-circle" size={16} color={colors.primary} style={{ marginRight: 6 }} />
             <Text style={[styles.coachBtnSecondaryText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
               Ask AI Coach
             </Text>
