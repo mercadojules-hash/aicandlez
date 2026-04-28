@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "rSrgsAX4N6f_R80vhPrto"
@@ -18,3 +17,9 @@ id = "XSO8G5SNHnelaF9oLwNcb"
 uri = "file://artifacts/natura-ai/assets/images/recipe-bowl.png"
 type = "image"
 title = "wellness smoothie bowl"
+
+[[outputs]]
+id = "p27Y4hg-ZCW2Fyqv6lpGO"
+uri = "file://DailyCheckIn_fixed.zip"
+type = "unspecified"
+title = "DailyCheckIn_fixed.zip"

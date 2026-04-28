@@ -195,7 +195,7 @@ function ResultView({
           hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
           style={[styles.resetBtn, { backgroundColor: colors.muted, borderRadius: 16 }]}
         >
-          <Feather name="refresh-cw" size={13} color={colors.mutedForeground} />
+          <Feather name="refresh-cw" size={13} color={colors.mutedForeground} style={{ marginRight: 5 }} />
           <Text style={[styles.resetLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>
             Check in again
           </Text>
@@ -209,7 +209,7 @@ function ResultView({
 
       {/* Encouragement */}
       <View style={[styles.encourageBox, { backgroundColor: colors.primary + "14", borderRadius: 12, borderColor: colors.primary + "30" }]}>
-        <Feather name="heart" size={13} color={colors.primary} />
+        <Feather name="heart" size={13} color={colors.primary} style={{ marginRight: 8 }} />
         <Text style={[styles.encourageText, { color: colors.primary, fontFamily: "Inter_500Medium" }]}>
           {result.encouragement}
         </Text>
@@ -248,7 +248,7 @@ function ResultView({
 
       {/* Why it helps */}
       <View style={[styles.whyBox, { backgroundColor: colors.muted, borderRadius: colors.radius - 8, borderColor: colors.border }]}>
-        <Feather name="info" size={13} color={colors.primary} />
+        <Feather name="info" size={13} color={colors.primary} style={{ marginRight: 8 }} />
         <Text style={[styles.whyText, { color: colors.foreground, fontFamily: "Inter_400Regular", flex: 1 }]}>
           <Text style={{ fontFamily: "Inter_600SemiBold", color: colors.primary }}>Why it may help: </Text>
           {res.whyItHelps}
@@ -265,7 +265,7 @@ function ResultView({
           activeOpacity={0.8}
           style={[styles.actionBtnPrimary, { backgroundColor: colors.primary, borderRadius: colors.radius - 6 }]}
         >
-          <Feather name="play" size={14} color="#fff" />
+          <Feather name="play" size={14} color="#fff" style={{ marginRight: 7 }} />
           <Text style={[styles.actionBtnPrimaryText, { fontFamily: "Inter_600SemiBold" }]}>Start Guide</Text>
         </TouchableOpacity>
 
@@ -279,7 +279,7 @@ function ResultView({
           activeOpacity={0.8}
           style={[styles.actionBtnSecondary, { backgroundColor: colors.secondary, borderRadius: colors.radius - 6 }]}
         >
-          <Feather name="shopping-cart" size={14} color={colors.primary} />
+          <Feather name="shopping-cart" size={14} color={colors.primary} style={{ marginRight: 7 }} />
           <Text style={[styles.actionBtnSecondaryText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
             {groceryAdded ? "Added ✓" : "Grocery"}
           </Text>
@@ -317,7 +317,7 @@ export function DailyCheckIn() {
       const encList = mood.encouragement;
       const encouragement = encList[Math.floor(Math.random() * encList.length)];
       setResult({ mood, response, encouragement });
-    } catch {
+    } catch (e) {
       setSelected(null);
     } finally {
       setLoading(false);
@@ -347,7 +347,7 @@ export function DailyCheckIn() {
         {!result ? (
           loading ? (
             <View style={styles.loadingState}>
-              <ActivityIndicator size="large" color={colors.primary} />
+              <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: 14 }} />
               <Text style={[styles.loadingTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
                 Analyzing your wellness...
               </Text>
@@ -381,13 +381,13 @@ export function DailyCheckIn() {
 const styles = StyleSheet.create({
   container: { marginHorizontal: 16, marginBottom: 28 },
   card: { borderWidth: 1, padding: 18 },
-  badge: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 14 },
-  badgeDot: { width: 7, height: 7, borderRadius: 4 },
+  badge: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
+  badgeDot: { width: 7, height: 7, borderRadius: 4, marginRight: 7 },
   badgeLabel: { fontSize: 11, letterSpacing: 0.9 },
   cardTitle: { fontSize: 22, marginBottom: 6 },
   cardSub: { fontSize: 13, lineHeight: 19, marginBottom: 20 },
-  moodGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  chipWrap: { width: "47.5%" },
+  moodGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+  chipWrap: { width: "48%", marginBottom: 10 },
   chip: {
     flexDirection: "column",
     alignItems: "center",
@@ -398,17 +398,17 @@ const styles = StyleSheet.create({
   },
   chipEmoji: { fontSize: 26, marginBottom: 6 },
   chipLabel: { fontSize: 14, textAlign: "center" },
-  loadingState: { paddingVertical: 28, alignItems: "center", gap: 14 },
-  loadingTitle: { fontSize: 18, textAlign: "center" },
+  loadingState: { paddingVertical: 28, alignItems: "center" },
+  loadingTitle: { fontSize: 18, textAlign: "center", marginBottom: 14 },
   loadingSub: { fontSize: 13, textAlign: "center", lineHeight: 19 },
   resultHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  moodPill: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 6, gap: 6 },
-  moodPillEmoji: { fontSize: 16 },
+  moodPill: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 6 },
+  moodPillEmoji: { fontSize: 16, marginRight: 6 },
   moodPillLabel: { fontSize: 13 },
-  resetBtn: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 7, gap: 5 },
+  resetBtn: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 7 },
   resetLabel: { fontSize: 12 },
   coachIntro: { fontSize: 15, lineHeight: 23, marginBottom: 12 },
-  encourageBox: { flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 12, marginBottom: 10, borderWidth: 1 },
+  encourageBox: { flexDirection: "row", alignItems: "flex-start", padding: 12, marginBottom: 10, borderWidth: 1 },
   encourageText: { fontSize: 13, lineHeight: 19, flex: 1 },
   streakBox: { padding: 10, marginBottom: 14 },
   streakBoxText: { fontSize: 12, textAlign: "center" },
@@ -417,16 +417,16 @@ const styles = StyleSheet.create({
   suggCard: { padding: 12, marginBottom: 6 },
   suggName: { fontSize: 14, marginBottom: 3 },
   suggExp: { fontSize: 12, lineHeight: 18 },
-  whyBox: { flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 12, marginBottom: 16, borderWidth: 1 },
+  whyBox: { flexDirection: "row", alignItems: "flex-start", padding: 12, marginBottom: 16, borderWidth: 1 },
   whyText: { fontSize: 13, lineHeight: 20 },
-  actionRow: { flexDirection: "row", gap: 10 },
+  actionRow: { flexDirection: "row" },
   actionBtnPrimary: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
-    gap: 7,
+    marginRight: 10,
   },
   actionBtnPrimaryText: { color: "#fff", fontSize: 14 },
   actionBtnSecondary: {
@@ -435,7 +435,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
-    gap: 7,
   },
   actionBtnSecondaryText: { fontSize: 14 },
 });
