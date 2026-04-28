@@ -1,13 +1,30 @@
-import { Redirect } from "expo-router";
-import { useUser } from "@/contexts/UserContext";
+import { useEffect } from "react";
+import { View, ActivityIndicator } from "react-native";
+import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { colors } from "../constants/theme";
 
 export default function Index() {
-  const { loading, isOnboarded } = useUser();
-  if (loading) return null;
-  // TEST MODE: force welcome screen (remove next line to restore normal behaviour)
-  // if (!isOnboarded) return <Redirect href="/onboarding" />;
-  return <Redirect href="/onboarding" />;
-  // PRODUCTION (restore when done testing):
-  // if (!isOnboarded) return <Redirect href="/onboarding" />;
-  // return <Redirect href="/(tabs)" />;
+  useEffect(() => {
+    checkOnboarding();
+  }, []);
+
+  async function checkOnboarding() {
+    try {
+      const done = await AsyncStorage.getItem("@natura_onboarded");
+      if (done === "true") {
+        router.replace("/(tabs)");
+      } else {
+        router.replace("/onboarding");
+      }
+    } catch {
+      router.replace("/onboarding");
+    }
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }}>
+      <ActivityIndicator color={colors.primary} />
+    </View>
+  );
 }

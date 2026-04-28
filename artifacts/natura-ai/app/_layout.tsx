@@ -1,47 +1,16 @@
-import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-  useFonts,
-} from "@expo-google-fonts/inter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { KeyboardProvider } from "react-native-keyboard-controller";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { PaywallModal } from "@/components/PaywallModal";
-import { ThemeProvider } from "@/contexts/ThemeContext";
-import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
-import { UserProvider } from "@/contexts/UserContext";
-import { WellnessProvider } from "@/contexts/WellnessContext";
+import { colors } from "../constants/theme";
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
-
-function RootLayoutNav() {
-  return (
-    <>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="legal" options={{ presentation: "card", animation: "slide_from_right" }} />
-        <Stack.Screen name="remedy/[id]" options={{ presentation: "card", animation: "slide_from_right" }} />
-        <Stack.Screen name="plan/[id]" options={{ presentation: "card", animation: "slide_from_right" }} />
-      </Stack>
-      <PaywallModal />
-    </>
-  );
-}
-
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
+  const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
@@ -49,32 +18,29 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    if (fontsLoaded) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <KeyboardProvider>
-              <ThemeProvider>
-                <SubscriptionProvider>
-                  <UserProvider>
-                    <WellnessProvider>
-                      <RootLayoutNav />
-                    </WellnessProvider>
-                  </UserProvider>
-                </SubscriptionProvider>
-              </ThemeProvider>
-            </KeyboardProvider>
-          </GestureHandlerRootView>
-        </QueryClientProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <StatusBar style="light" />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+          animation: "slide_from_right",
+        }}
+      >
+        <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
+        <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
+        <Stack.Screen name="flow/[id]" options={{ animation: "slide_from_bottom", presentation: "modal" }} />
+        <Stack.Screen name="breathwork/[id]" options={{ animation: "slide_from_bottom", presentation: "modal" }} />
+        <Stack.Screen name="meditation/[id]" options={{ animation: "slide_from_bottom", presentation: "modal" }} />
+      </Stack>
+    </GestureHandlerRootView>
   );
 }

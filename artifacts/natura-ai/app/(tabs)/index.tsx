@@ -1,596 +1,350 @@
-import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { router } from "expo-router";
-import React from "react";
+import { useEffect, useRef } from "react";
 import {
-  Animated,
-  Image,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Animated,
+  Dimensions,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useColors } from "@/hooks/useColors";
-import { useFadeIn, usePressScale } from "@/hooks/useFadeIn";
-import { useUser } from "@/contexts/UserContext";
-import { useWellness } from "@/contexts/WellnessContext";
-import type { DailyCheckIn } from "@/contexts/WellnessContext";
-import { DisclaimerModal } from "@/components/DisclaimerModal";
-import { DailyCheckIn as DailyCheckInComponent } from "@/components/DailyCheckIn";
-import { RemedyCard } from "@/components/Cards";
-import { RoutineSection } from "@/components/RoutineSection";
-import { REMEDIES, RECIPES } from "@/lib/data";
+import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { Feather } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { colors, spacing, radius, fontSizes } from "../../constants/theme";
+import { useStreak } from "../../hooks/useStreak";
+import { useChecklist } from "../../hooks/useChecklist";
 
-function deriveMood(checkIn: DailyCheckIn | null): "stressed" | "low-energy" | "positive" | null {
-  if (!checkIn) return null;
-  if (checkIn.stress >= 4) return "stressed";
-  if (checkIn.energy <= 2) return "low-energy";
-  return "positive";
-}
+const { width } = Dimensions.get("window");
 
-function AICoachBanner({
-  checkIn,
-  streak,
-}: {
-  checkIn: DailyCheckIn | null;
-  streak: number;
-}) {
-  const colors = useColors();
-  const mood = deriveMood(checkIn);
-
-  const headline =
-    mood === "stressed"
-      ? "You're feeling stressed."
-      : mood === "low-energy"
-      ? "Energy is low today."
-      : mood === "positive"
-      ? streak >= 3
-        ? `You're on a ${streak}-day streak 🔥`
-        : "You're doing well today."
-      : "Ready to start your day?";
-
-  const body =
-    mood === "stressed"
-      ? "Let's slow things down and find your calm."
-      : mood === "low-energy"
-      ? "Here's a quick boost plan to get you going."
-      : mood === "positive"
-      ? streak >= 3
-        ? "Keep that momentum — consistency is everything."
-        : "Here's what I recommend to keep you feeling great."
-      : "Check in above to get your personalized plan.";
-
+function ProgressBar({ value }: { value: number }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, { toValue: value, duration: 800, useNativeDriver: false }).start();
+  }, [value]);
+  const w = anim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
   return (
-    <View
-      style={[
-        styles.coachCard,
-        {
-          backgroundColor: colors.card,
-          borderColor: colors.border,
-          borderRadius: colors.radius,
-        },
-      ]}
-    >
-      <View style={styles.coachHeader}>
-        <Text style={[styles.coachIcon]}>🧠</Text>
-        <View style={{ flex: 1 }}>
-          <Text
-            style={[styles.coachLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}
-          >
-            AI WELLNESS COACH
-          </Text>
-          <Text style={[styles.coachHeadline, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-            {headline}
-          </Text>
-        </View>
-      </View>
-      <Text style={[styles.coachBody, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-        {body}
-      </Text>
-      <View style={styles.coachBtns}>
-
-        {/* PRIMARY BUTTON */}
-        <TouchableOpacity
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push("/(tabs)/plans");
-          }}
-          activeOpacity={0.82}
-          style={[
-            styles.coachBtnPrimary,
-            {
-              backgroundColor: colors.primary,
-              borderRadius: colors.radius - 6,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-            },
-          ]}
-        >
-          <Feather name="calendar" size={16} color="#fff" />
-          <Text
-            style={[
-              styles.coachBtnPrimaryText,
-              { fontFamily: "Inter_600SemiBold" },
-            ]}
-          >
-            Get Today's Plan
-          </Text>
-        </TouchableOpacity>
-
-        {/* SECONDARY BUTTON */}
-        <TouchableOpacity
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push("/(tabs)/chat");
-          }}
-          activeOpacity={0.82}
-          style={[
-            styles.coachBtnSecondary,
-            {
-              backgroundColor: colors.secondary,
-              borderColor: colors.primary + "44",
-              borderRadius: colors.radius - 6,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-            },
-          ]}
-        >
-          <Feather name="message-circle" size={16} color={colors.primary} />
-          <Text
-            style={[
-              styles.coachBtnSecondaryText,
-              {
-                color: colors.primary,
-                fontFamily: "Inter_600SemiBold",
-              },
-            ]}
-          >
-            Ask AI Coach
-          </Text>
-        </TouchableOpacity>
-
-      </View>
+    <View style={styles.progressTrack}>
+      <Animated.View style={[styles.progressFill, { width: w }]} />
     </View>
   );
 }
 
-function QuickActionBtn({
-  icon,
-  label,
-  route,
-  delay,
-}: {
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  route: string;
-  delay: number;
-}) {
-  const colors = useColors();
-  const { scale, onPressIn, onPressOut } = usePressScale();
-  const { opacity, translateY } = useFadeIn(320, delay);
-
+function CheckItem({ label, done, onPress }: { label: string; done: boolean; onPress: () => void }) {
   return (
-    <Animated.View style={{ flex: 1, opacity, transform: [{ translateY }, { scale }] }}>
-      <TouchableOpacity
-        onPress={() => router.push(route as any)}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        activeOpacity={1}
-        style={[
-          styles.qaBtn,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-            borderRadius: colors.radius - 4,
-          },
-        ]}
-      >
-        <View style={[styles.qaIcon, { backgroundColor: colors.secondary, borderRadius: 22 }]}>
-          <Feather name={icon} size={20} color={colors.primary} />
-        </View>
-        <Text style={[styles.qaLabel, { color: colors.foreground, fontFamily: "Inter_500Medium" }]}>
-          {label}
-        </Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
-
-type Goal = "stress" | "sleep" | "energy" | "immunity";
-
-const GOAL_PLAN: Record<Goal, { remedyId: string; recipeId: string; action: string }> = {
-  stress: { remedyId: "remedy-lavender-calm", recipeId: "recipe-antistress-salad", action: "5-min breathing exercise" },
-  sleep: { remedyId: "remedy-chamomile-sleep", recipeId: "recipe-sleep-smoothie", action: "Digital sunset 1hr before bed" },
-  energy: { remedyId: "remedy-energy-smoothie", recipeId: "recipe-overnight-oats", action: "10-min walk after lunch" },
-  immunity: { remedyId: "remedy-immunity-shot", recipeId: "recipe-golden-milk", action: "Take elderberry syrup" },
-};
-
-function TodaysPlan({ goals }: { goals: string[] }) {
-  const colors = useColors();
-  const primaryGoal = (goals[0]?.toLowerCase() ?? "") as Goal;
-  const plan = GOAL_PLAN[primaryGoal];
-
-  if (!plan) return null;
-
-  const remedy = REMEDIES.find((r) => r.id === plan.remedyId);
-  const recipe = RECIPES.find((r) => r.id === plan.recipeId);
-
-  if (!remedy && !recipe) return null;
-
-  const goalLabel = primaryGoal.charAt(0).toUpperCase() + primaryGoal.slice(1);
-
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionRow}>
-        <Text style={[styles.sectionTitleInRow, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-          Today's Plan for You
-        </Text>
-        <View style={[styles.goalBadge, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}>
-          <Text style={[styles.goalBadgeText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
-            {goalLabel}
-          </Text>
-        </View>
+    <TouchableOpacity style={styles.checkRow} onPress={onPress} activeOpacity={0.7}>
+      <View style={[styles.checkbox, done && styles.checkboxDone]}>
+        {done && <Feather name="check" size={14} color="#fff" />}
       </View>
-
-      <View style={{ paddingHorizontal: 16, gap: 10 }}>
-        {remedy && (
-          <TouchableOpacity
-            style={[styles.planItem, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius - 4 }]}
-            onPress={() => router.push(`/remedy/${remedy.id}`)}
-            activeOpacity={0.88}
-          >
-            <View style={[styles.planItemIcon, { backgroundColor: colors.secondary }]}>
-              <Text style={{ fontSize: 18 }}>🌿</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.planItemLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>Remedy</Text>
-              <Text style={[styles.planItemTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
-                {remedy.title}
-              </Text>
-              <Text style={[styles.planItemSub, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-                {remedy.prepTime} · {remedy.category}
-              </Text>
-            </View>
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-          </TouchableOpacity>
-        )}
-
-        {recipe && (
-          <TouchableOpacity
-            style={[styles.planItem, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius - 4 }]}
-            onPress={() => router.push(`/remedy/${recipe.id}`)}
-            activeOpacity={0.88}
-          >
-            <View style={[styles.planItemIcon, { backgroundColor: colors.secondary }]}>
-              <Text style={{ fontSize: 18 }}>🥗</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.planItemLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>Recipe</Text>
-              <Text style={[styles.planItemTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
-                {recipe.title}
-              </Text>
-              <Text style={[styles.planItemSub, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-                {recipe.prepTime} · {recipe.category}
-              </Text>
-            </View>
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-          </TouchableOpacity>
-        )}
-
-        <View style={[styles.planItem, { backgroundColor: colors.secondary, borderColor: colors.border, borderRadius: colors.radius - 4 }]}>
-          <View style={[styles.planItemIcon, { backgroundColor: colors.primary + "18" }]}>
-            <Text style={{ fontSize: 18 }}>⚡</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.planItemLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>Today's Action</Text>
-            <Text style={[styles.planItemTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
-              {plan.action}
-            </Text>
-          </View>
-        </View>
-      </View>
-    </View>
+      <Text style={[styles.checkLabel, done && styles.checkLabelDone]}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
-function StreakPill({ streak, colors }: { streak: number; colors: ReturnType<typeof useColors> }) {
-  if (streak <= 0) return null;
-  const label =
-    streak === 1
-      ? "1 Day Streak — Great start!"
-      : streak < 7
-      ? `${streak} Day Streak — Keep going`
-      : streak < 30
-      ? `${streak} Day Streak — You're on fire`
-      : `${streak} Day Streak — Incredible`;
-
-  return (
-    <View
-      style={[
-        styles.streakPill,
-        {
-          backgroundColor: colors.primary + "18",
-          borderColor: colors.primary + "40",
-          borderRadius: 20,
-          shadowColor: colors.primary,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-        },
-      ]}
-    >
-      <Text style={styles.streakFire}>🔥</Text>
-      <Text style={[styles.streakText, { color: colors.primary, fontFamily: "Inter_700Bold" }]}>
-        {label}
-      </Text>
-    </View>
-  );
-}
+const quickActions = [
+  { label: "Yoga Flow", icon: "activity", route: "/(tabs)/flows", color: colors.accent },
+  { label: "Breathe", icon: "wind", route: "/(tabs)/breathe", color: colors.primary },
+  { label: "Chakras", icon: "circle", route: "/(tabs)/chakras", color: "#7c6ead" },
+  { label: "AI Coach", icon: "message-circle", route: "/(tabs)/ai", color: "#6ea8ed" },
+];
 
 export default function HomeScreen() {
-  const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const { profile } = useUser();
-  const { streak, saveItem, isSaved, lastCheckIn } = useWellness();
-
-  const firstName = profile.name ? profile.name.split(" ")[0] : null;
+  const { streak } = useStreak();
+  const { checklist, markComplete, getProgress } = useChecklist();
+  const progress = getProgress();
   const hour = new Date().getHours();
   const greeting =
-    hour < 5
-      ? "Good night"
-      : hour < 12
-      ? "Good morning"
-      : hour < 17
-      ? "Good afternoon"
-      : "Good evening";
-
-  const { opacity: hOpacity, translateY: hY } = useFadeIn(280, 0);
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
-    <>
-      <DisclaimerModal />
-      <ScrollView
-        style={[styles.scroll, { backgroundColor: colors.background }]}
-        contentContainerStyle={{
-          paddingTop: Platform.OS === "web" ? 67 : insets.top + 8,
-          paddingBottom: Platform.OS === "web" ? 34 + 84 : insets.bottom + 84,
-        }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ① Greeting */}
-        <Animated.View
-          style={[styles.headerRow, { opacity: hOpacity, transform: [{ translateY: hY }] }]}
-        >
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
           <View>
-            <Text
-              style={[
-                styles.greetingText,
-                { color: colors.mutedForeground, fontFamily: "Inter_400Regular" },
-              ]}
-            >
-              {greeting}
-              {firstName ? `, ${firstName}` : ""} 👋
-            </Text>
-            <Text
-              style={[styles.subGreeting, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}
-            >
-              Your wellness coach
-            </Text>
+            <Text style={styles.greeting}>{greeting}</Text>
+            <Text style={styles.name}>Welcome back 🌿</Text>
           </View>
-          <View style={[styles.logoCircle, { backgroundColor: colors.secondary }]}>
-            <Image
-              source={require("@/assets/images/logo.png")}
-              style={styles.logoImg}
-              resizeMode="contain"
-            />
+          <View style={styles.streakBadge}>
+            <Text style={styles.streakFire}>🔥</Text>
+            <Text style={styles.streakNum}>{streak}</Text>
           </View>
-        </Animated.View>
-
-        {/* ② Mood check-in */}
-        <DailyCheckInComponent />
-
-        {/* ③ Today's Routine — directly under check-in */}
-        <RoutineSection />
-
-        {/* ④ Streak pill */}
-        <View style={styles.streakWrap}>
-          <StreakPill streak={streak} colors={colors} />
         </View>
 
-        {/* ⑤ AI Wellness Coach */}
+        {/* Progress */}
         <View style={styles.section}>
-          <AICoachBanner checkIn={lastCheckIn} streak={streak} />
-        </View>
-
-        {/* ⑥ Today's Plan */}
-        <TodaysPlan goals={profile.goals} />
-
-        {/* ⑥ Quick Actions */}
-        <View style={styles.section}>
-          <Text
-            style={[styles.sectionTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}
-          >
-            Quick Actions
+          <View style={styles.progressHeader}>
+            <Text style={styles.sectionTitle}>Daily Progress</Text>
+            <Text style={styles.progressPct}>{Math.round(progress * 100)}%</Text>
+          </View>
+          <ProgressBar value={progress} />
+          <Text style={styles.progressHint}>
+            {progress === 0
+              ? "Start your first practice today"
+              : progress < 1
+              ? "Keep going — you're almost there!"
+              : "Amazing! You completed today's goals 🎉"}
           </Text>
-          <View style={styles.qaRow}>
-            <QuickActionBtn icon="message-circle" label="Ask AI" route="/(tabs)/chat" delay={0} />
-            <QuickActionBtn icon="list" label="My Plans" route="/(tabs)/plans" delay={70} />
-            <QuickActionBtn
-              icon="book-open"
-              label="Recipes"
-              route="/(tabs)/recipes"
-              delay={140}
+        </View>
+
+        {/* Quick Actions */}
+        <Text style={[styles.sectionTitle, { paddingHorizontal: spacing.md, marginBottom: spacing.sm }]}>
+          Start Practicing
+        </Text>
+        <View style={styles.quickGrid}>
+          {quickActions.map((a) => (
+            <TouchableOpacity
+              key={a.label}
+              style={styles.quickCard}
+              onPress={() => router.push(a.route as any)}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[a.color + "33", a.color + "11"]}
+                style={styles.quickCardGrad}
+              >
+                <View style={[styles.quickIcon, { backgroundColor: a.color + "28" }]}>
+                  <Feather name={a.icon as any} size={22} color={a.color} />
+                </View>
+                <Text style={styles.quickLabel}>{a.label}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Daily Checklist */}
+        <View style={[styles.section, styles.card]}>
+          <Text style={styles.sectionTitle}>Today's Checklist</Text>
+          <View style={{ marginTop: spacing.sm }}>
+            <CheckItem
+              label="Complete a yoga flow"
+              done={checklist.yoga}
+              onPress={() => { if (!checklist.yoga) { markComplete("yoga"); router.push("/(tabs)/flows"); } }}
+            />
+            <CheckItem
+              label="Do a breathing session"
+              done={checklist.breathwork}
+              onPress={() => { if (!checklist.breathwork) { markComplete("breathwork"); router.push("/(tabs)/breathe"); } }}
+            />
+            <CheckItem
+              label="Review a chakra"
+              done={checklist.chakra}
+              onPress={() => { if (!checklist.chakra) { markComplete("chakra"); router.push("/(tabs)/chakras"); } }}
             />
           </View>
         </View>
 
-        {/* ⑥ Remedy Shelf */}
-        <View style={styles.section}>
-          <View style={styles.sectionRow}>
-            <Text
-              style={[
-                styles.sectionTitleInRow,
-                { color: colors.foreground, fontFamily: "Inter_700Bold" },
-              ]}
-            >
-              Wellness Remedies
-            </Text>
-            <TouchableOpacity onPress={() => router.push("/(tabs)/plans")}>
-              <Text style={[styles.seeAll, { color: colors.primary, fontFamily: "Inter_500Medium" }]}>
-                See all
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.shelf}
+        {/* AI Banner */}
+        <TouchableOpacity
+          style={styles.aiBanner}
+          onPress={() => router.push("/(tabs)/ai")}
+          activeOpacity={0.88}
+        >
+          <LinearGradient
+            colors={["#1a3a2e", "#0d2a20"]}
+            style={styles.aiBannerGrad}
           >
-            {REMEDIES.map((r) => (
-              <RemedyCard
-                key={r.id}
-                remedy={r}
-                image={r.image}
-                onPress={() => router.push(`/remedy/${r.id}`)}
-                isSaved={isSaved(r.id)}
-                onSave={() => {
-                  if (!isSaved(r.id))
-                    saveItem({
-                      id: r.id,
-                      type: "remedy",
-                      title: r.title,
-                      savedAt: new Date().toISOString(),
-                    });
-                }}
-              />
-            ))}
-            <View style={{ width: 16 }} />
-          </ScrollView>
-        </View>
+            <View style={styles.aiBannerLeft}>
+              <View style={styles.aiIcon}>
+                <Feather name="message-circle" size={22} color={colors.primary} />
+              </View>
+              <View>
+                <Text style={styles.aiBannerTitle}>AI Wellness Coach</Text>
+                <Text style={styles.aiBannerSub}>Get a personalised recommendation</Text>
+              </View>
+            </View>
+            <Feather name="chevron-right" size={20} color={colors.textDim} />
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <View style={{ height: 32 }} />
       </ScrollView>
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
-  headerRow: {
+  header: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
   },
-  greetingText: { fontSize: 15, marginBottom: 4 },
-  subGreeting: { fontSize: 22, maxWidth: 230 },
-  logoCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    alignItems: "center",
-    justifyContent: "center",
+  greeting: {
+    fontSize: fontSizes.sm,
+    fontFamily: "Inter_400Regular",
+    color: colors.textMuted,
+    marginBottom: 4,
   },
-  logoImg: { width: 38, height: 38 },
-
-  streakWrap: {
-    paddingHorizontal: 16,
-    marginBottom: 20,
-    marginTop: -8,
+  name: {
+    fontSize: fontSizes.xxl,
+    fontFamily: "Inter_700Bold",
+    color: colors.text,
   },
-  streakPill: {
+  streakBadge: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
+    backgroundColor: colors.card,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderWidth: 1,
-    gap: 7,
+    gap: 4,
   },
-  streakFire: { fontSize: 16 },
-  streakText: { fontSize: 13 },
-
-  section: { marginBottom: 28 },
-  sectionRow: {
+  streakFire: { fontSize: 18 },
+  streakNum: {
+    fontSize: fontSizes.lg,
+    fontFamily: "Inter_700Bold",
+    color: colors.text,
+  },
+  section: {
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    marginHorizontal: spacing.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sectionTitle: {
+    fontSize: fontSizes.md,
+    fontFamily: "Inter_600SemiBold",
+    color: colors.text,
+    marginBottom: 4,
+  },
+  progressHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 14,
+    marginBottom: spacing.sm,
   },
-  sectionTitle: { fontSize: 18, paddingHorizontal: 20, marginBottom: 14 },
-  sectionTitleInRow: { fontSize: 18, flexShrink: 1 },
-  seeAll: { fontSize: 14, flexShrink: 0, marginLeft: 8 },
-  qaRow: { flexDirection: "row", paddingHorizontal: 20, gap: 10 },
-  qaBtn: { alignItems: "center", paddingVertical: 16, borderWidth: 1, gap: 8 },
-  qaIcon: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  qaLabel: { fontSize: 13, textAlign: "center" },
-  shelf: { paddingLeft: 16 },
-
-  coachCard: {
-    marginHorizontal: 16,
-    borderWidth: 1,
-    padding: 18,
+  progressPct: {
+    fontSize: fontSizes.md,
+    fontFamily: "Inter_600SemiBold",
+    color: colors.primary,
   },
-  coachHeader: {
+  progressTrack: {
+    height: 8,
+    backgroundColor: colors.cardAlt,
+    borderRadius: radius.full,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
+  },
+  progressHint: {
+    marginTop: 8,
+    fontSize: fontSizes.xs,
+    fontFamily: "Inter_400Regular",
+    color: colors.textDim,
+  },
+  quickGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: spacing.md,
+    gap: 10,
+    marginBottom: spacing.md,
+  },
+  quickCard: {
+    width: (width - spacing.md * 2 - 10) / 2,
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quickCardGrad: {
+    padding: spacing.md,
     alignItems: "flex-start",
-    gap: 12,
-    marginBottom: 10,
+    gap: 10,
   },
-  coachIcon: { fontSize: 28, marginTop: 2 },
-  coachLabel: { fontSize: 11, letterSpacing: 0.9, marginBottom: 4 },
-  coachHeadline: { fontSize: 18, lineHeight: 24 },
-  coachBody: { fontSize: 14, lineHeight: 21, marginBottom: 16 },
-  coachBtns: { flexDirection: "row", gap: 10 },
-  coachBtnPrimary: {
-    flex: 1,
-    flexDirection: "row",
+  quickIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 13,
-    gap: 7,
   },
-  coachBtnPrimaryText: { color: "#fff", fontSize: 14 },
-  coachBtnSecondary: {
-    flex: 1,
+  quickLabel: {
+    fontSize: fontSizes.md,
+    fontFamily: "Inter_600SemiBold",
+    color: colors.text,
+  },
+  checkRow: {
     flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: colors.borderLight,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 13,
-    borderWidth: 1,
-    gap: 7,
   },
-  coachBtnSecondaryText: { fontSize: 14 },
-  goalBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
+  checkboxDone: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
-  goalBadgeText: { fontSize: 12 },
-  planItem: {
+  checkLabel: {
+    fontSize: fontSizes.md,
+    fontFamily: "Inter_400Regular",
+    color: colors.text,
+  },
+  checkLabelDone: {
+    color: colors.textDim,
+    textDecorationLine: "line-through",
+  },
+  aiBanner: {
+    marginHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  aiBannerGrad: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 13,
-    borderWidth: 1,
+    justifyContent: "space-between",
+    padding: spacing.md,
+  },
+  aiBannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
-  planItemIcon: {
+  aiIcon: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary + "20",
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
   },
-  planItemLabel: { fontSize: 11, letterSpacing: 0.5, marginBottom: 2 },
-  planItemTitle: { fontSize: 14, lineHeight: 19 },
-  planItemSub: { fontSize: 12, marginTop: 2 },
+  aiBannerTitle: {
+    fontSize: fontSizes.md,
+    fontFamily: "Inter_600SemiBold",
+    color: colors.text,
+  },
+  aiBannerSub: {
+    fontSize: fontSizes.sm,
+    fontFamily: "Inter_400Regular",
+    color: colors.textMuted,
+    marginTop: 2,
+  },
 });

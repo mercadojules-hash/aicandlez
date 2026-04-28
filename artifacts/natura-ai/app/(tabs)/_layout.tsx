@@ -1,45 +1,27 @@
-import { Feather } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import { Tabs } from "expo-router";
-import React from "react";
-import { Platform, StyleSheet, View } from "react-native";
-
-import { useColors } from "@/hooks/useColors";
+import { Feather } from "@expo/vector-icons";
+import { colors, fontSizes } from "../../constants/theme";
+import { Platform } from "react-native";
 
 export default function TabLayout() {
-  const colors = useColors();
-  const isIOS = Platform.OS === "ios";
-  const isWeb = Platform.OS === "web";
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.mutedForeground,
         headerShown: false,
         tabBarStyle: {
-          position: "absolute",
-          backgroundColor: isIOS ? "transparent" : colors.background,
-          borderTopWidth: 1,
+          backgroundColor: colors.card,
           borderTopColor: colors.border,
-          elevation: 0,
-          height: isWeb ? 84 : undefined,
+          borderTopWidth: 1,
+          paddingBottom: Platform.OS === "ios" ? 20 : 8,
+          paddingTop: 8,
+          height: Platform.OS === "ios" ? 80 : 64,
         },
-        tabBarBackground: () =>
-          isIOS ? (
-            <BlurView
-              intensity={80}
-              tint="light"
-              style={StyleSheet.absoluteFill}
-            />
-          ) : (
-            <View
-              style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]}
-            />
-          ),
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textDim,
         tabBarLabelStyle: {
+          fontSize: fontSizes.xs,
           fontFamily: "Inter_500Medium",
-          fontSize: 11,
+          marginTop: 2,
         },
       }}
     >
@@ -47,42 +29,35 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
+          tabBarIcon: ({ color, size }) => <Feather name="home" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="chat"
+        name="flows"
         options={{
-          title: "Ask AI",
-          tabBarIcon: ({ color }) => <Feather name="message-circle" size={22} color={color} />,
+          title: "Flows",
+          tabBarIcon: ({ color, size }) => <Feather name="activity" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="plans"
+        name="breathe"
         options={{
-          title: "Plans",
-          tabBarIcon: ({ color }) => <Feather name="list" size={22} color={color} />,
+          title: "Breathe",
+          tabBarIcon: ({ color, size }) => <Feather name="wind" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="recipes"
+        name="chakras"
         options={{
-          title: "Recipes",
-          tabBarIcon: ({ color }) => <Feather name="book-open" size={22} color={color} />,
+          title: "Chakras",
+          tabBarIcon: ({ color, size }) => <Feather name="circle" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="blog"
+        name="ai"
         options={{
-          title: "Learn",
-          tabBarIcon: ({ color }) => <Feather name="feather" size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} />,
+          title: "AI",
+          tabBarIcon: ({ color, size }) => <Feather name="message-circle" size={size} color={color} />,
         }}
       />
     </Tabs>
