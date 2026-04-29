@@ -67,6 +67,7 @@ function RootStack() {
         <Stack.Screen name="pose/[id]" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="breathwork/[id]" options={{ animation: "slide_from_bottom", presentation: "modal" }} />
         <Stack.Screen name="meditation/[id]" options={{ animation: "slide_from_bottom", presentation: "modal" }} />
+        <Stack.Screen name="profile" options={{ animation: "slide_from_right" }} />
       </Stack>
     </>
   );

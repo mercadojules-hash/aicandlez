@@ -8,14 +8,11 @@ import {
   Animated,
   Dimensions,
   Image,
-  Alert,
-  Platform,
 } from "react-native";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as ImagePicker from "expo-image-picker";
 import { spacing, radius, fontSizes } from "../../constants/theme";
 import { useStreak } from "../../hooks/useStreak";
 import { useChecklist } from "../../hooks/useChecklist";
@@ -28,33 +25,12 @@ const { width } = Dimensions.get("window");
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
 function AvatarButton() {
-  const { profile, updateProfile } = useUser();
+  const { profile } = useUser();
   const { colors } = useTheme();
-
-  const pickImage = async () => {
-    try {
-      if (Platform.OS !== "web") {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert("Permission needed", "Please allow photo library access to set a profile photo.");
-          return;
-        }
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets[0]) {
-        await updateProfile({ image: result.assets[0].uri });
-      }
-    } catch {}
-  };
 
   return (
     <TouchableOpacity
-      onPress={pickImage}
+      onPress={() => router.push("/profile" as any)}
       activeOpacity={0.8}
       style={[styles.avatarWrap, { borderColor: colors.primary + "60" }]}
     >

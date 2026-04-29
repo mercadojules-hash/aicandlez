@@ -7,6 +7,7 @@ import {
   Animated,
   Easing,
   Dimensions,
+  Platform,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -16,9 +17,130 @@ import { colors, spacing, radius, fontSizes } from "../../constants/theme";
 import { breathPatterns } from "../../data/breathwork";
 import { useStreak } from "../../hooks/useStreak";
 import { useChecklist } from "../../hooks/useChecklist";
+import { useSoundPreference } from "../../hooks/useSoundPreference";
 
 const { width } = Dimensions.get("window");
 const CIRCLE = width * 0.55;
+
+// ─── Web Audio breathing synthesis ───────────────────────────────────────────
+
+function useBreathAudio(enabled: boolean) {
+  const ctxRef  = useRef<any>(null);
+  const oscRef  = useRef<any>(null);
+  const gainRef = useRef<any>(null);
+  const ambRef  = useRef<any>(null);
+  const ambGainRef = useRef<any>(null);
+
+  const isWeb = Platform.OS === "web";
+
+  const getCtx = useCallback(() => {
+    if (!isWeb) return null;
+    try {
+      const AC = (globalThis as any).AudioContext || (globalThis as any).webkitAudioContext;
+      if (!AC) return null;
+      if (!ctxRef.current || ctxRef.current.state === "closed") {
+        ctxRef.current = new AC();
+      }
+      if (ctxRef.current.state === "suspended") ctxRef.current.resume();
+      return ctxRef.current;
+    } catch { return null; }
+  }, [isWeb]);
+
+  const startAmbient = useCallback((ctx: any) => {
+    if (ambRef.current) return;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.04, ctx.currentTime + 2);
+    gain.connect(ctx.destination);
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(110, ctx.currentTime);
+    osc.connect(gain);
+    osc.start();
+    ambRef.current = osc;
+    ambGainRef.current = gain;
+  }, []);
+
+  const playPhase = useCallback((label: string, duration: number) => {
+    if (!enabled) return;
+    const ctx = getCtx();
+    if (!ctx) return;
+
+    startAmbient(ctx);
+
+    // Stop previous oscillator
+    try {
+      if (gainRef.current) {
+        gainRef.current.gain.cancelScheduledValues(ctx.currentTime);
+        gainRef.current.gain.setValueAtTime(gainRef.current.gain.value, ctx.currentTime);
+        gainRef.current.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
+      }
+      setTimeout(() => { try { oscRef.current?.stop(); } catch {} }, 350);
+    } catch {}
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.connect(ctx.destination);
+
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.connect(gain);
+
+    const now = ctx.currentTime;
+    const dur = duration;
+
+    if (label === "Inhale") {
+      osc.frequency.setValueAtTime(270, now);
+      osc.frequency.linearRampToValueAtTime(490, now + dur);
+      gain.gain.linearRampToValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.18, now + 0.6);
+      gain.gain.setValueAtTime(0.18, now + dur - 0.3);
+      gain.gain.linearRampToValueAtTime(0.1, now + dur);
+    } else if (label.includes("Hold") || label === "Retention") {
+      osc.frequency.setValueAtTime(210, now);
+      gain.gain.linearRampToValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.07, now + 0.8);
+    } else {
+      // Exhale
+      osc.frequency.setValueAtTime(490, now);
+      osc.frequency.linearRampToValueAtTime(215, now + dur);
+      gain.gain.linearRampToValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.15, now + 0.6);
+      gain.gain.setValueAtTime(0.15, now + dur - 0.6);
+      gain.gain.linearRampToValueAtTime(0, now + dur);
+    }
+
+    osc.start();
+    oscRef.current = osc;
+    gainRef.current = gain;
+  }, [enabled, getCtx, startAmbient]);
+
+  const stopAll = useCallback(() => {
+    try {
+      if (gainRef.current && ctxRef.current) {
+        gainRef.current.gain.linearRampToValueAtTime(0, ctxRef.current.currentTime + 0.4);
+      }
+      if (ambGainRef.current && ctxRef.current) {
+        ambGainRef.current.gain.linearRampToValueAtTime(0, ctxRef.current.currentTime + 1.2);
+      }
+      setTimeout(() => {
+        try { oscRef.current?.stop(); } catch {}
+        try { ambRef.current?.stop(); } catch {}
+        oscRef.current = null; gainRef.current = null;
+        ambRef.current = null; ambGainRef.current = null;
+      }, 1400);
+    } catch {}
+  }, []);
+
+  useEffect(() => () => {
+    stopAll();
+    setTimeout(() => { try { ctxRef.current?.close(); } catch {} }, 1500);
+  }, []);
+
+  return { playPhase, stopAll };
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function BreathworkSession() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,10 +152,13 @@ export default function BreathworkSession() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [completed, setCompleted] = useState(false);
 
-  const circleScale = useRef(new Animated.Value(0.6)).current;
+  const { soundEnabled, setSoundEnabled } = useSoundPreference();
+  const audio = useBreathAudio(soundEnabled);
+
+  const circleScale   = useRef(new Animated.Value(0.6)).current;
   const circleOpacity = useRef(new Animated.Value(0.5)).current;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const animRef = useRef<Animated.CompositeAnimation | null>(null);
+  const animRef  = useRef<Animated.CompositeAnimation | null>(null);
 
   const { recordActivity } = useStreak();
   const { markComplete } = useChecklist();
@@ -44,7 +169,7 @@ export default function BreathworkSession() {
     (label: string, duration: number) => {
       animRef.current?.stop();
       const isInhale = label === "Inhale";
-      const isHold = label === "Hold";
+      const isHold = label.includes("Hold") || label === "Retention";
       const toScale = isInhale ? 1 : isHold ? (circleScale as any)._value : 0.6;
       const toOpacity = isInhale ? 1 : isHold ? (circleOpacity as any)._value : 0.5;
 
@@ -70,6 +195,7 @@ export default function BreathworkSession() {
     if (!started || !pattern || !phase) return;
     setTimeLeft(phase.duration);
     animatePhase(phase.label, phase.duration);
+    audio.playPhase(phase.label, phase.duration);
 
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
@@ -91,6 +217,7 @@ export default function BreathworkSession() {
     if (nextIdx >= pattern.phases.length) {
       const nextCycle = cycleNum + 1;
       if (nextCycle >= pattern.totalCycles) {
+        audio.stopAll();
         setCompleted(true);
         recordActivity();
         markComplete("breathwork");
@@ -164,6 +291,20 @@ export default function BreathworkSession() {
             ))}
           </View>
 
+          {/* Sound toggle on start screen */}
+          <TouchableOpacity
+            onPress={() => setSoundEnabled(!soundEnabled)}
+            style={[styles.soundToggleRow, { borderColor: colors.border, backgroundColor: colors.card }]}
+          >
+            <Feather name={soundEnabled ? "volume-2" : "volume-x"} size={16} color={soundEnabled ? pattern.color : colors.textDim} />
+            <Text style={[styles.soundToggleLabel, { color: soundEnabled ? colors.text : colors.textDim }]}>
+              Breathing audio {soundEnabled ? "on" : "off"}
+            </Text>
+            <View style={[styles.toggle, { backgroundColor: soundEnabled ? pattern.color : colors.cardAlt, borderColor: soundEnabled ? pattern.color : colors.border }]}>
+              <View style={[styles.toggleThumb, { transform: [{ translateX: soundEnabled ? 20 : 2 }] }]} />
+            </View>
+          </TouchableOpacity>
+
           <View style={styles.cyclesInfo}>
             <Feather name="repeat" size={16} color={colors.accent} />
             <Text style={styles.cyclesText}>{pattern.totalCycles} cycles total</Text>
@@ -192,21 +333,31 @@ export default function BreathworkSession() {
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.sessionHeader}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+        <TouchableOpacity onPress={() => { audio.stopAll(); router.back(); }} style={styles.closeBtn}>
           <Feather name="x" size={20} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.sessionTitle}>{pattern.title}</Text>
-        <Text style={styles.cycleLabel}>Cycle {cycleNum + 1}/{pattern.totalCycles}</Text>
+        <View style={styles.sessionHeaderRight}>
+          <TouchableOpacity
+            onPress={() => setSoundEnabled(!soundEnabled)}
+            style={[styles.soundBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <Feather
+              name={soundEnabled ? "volume-2" : "volume-x"}
+              size={16}
+              color={soundEnabled ? pattern.color : colors.textDim}
+            />
+          </TouchableOpacity>
+          <Text style={styles.cycleLabel}>Cycle {cycleNum + 1}/{pattern.totalCycles}</Text>
+        </View>
       </View>
 
-      {/* Overall progress bar */}
       <View style={styles.progressTrack}>
         <Animated.View
           style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: pattern.color }]}
         />
       </View>
 
-      {/* Breathing circle */}
       <View style={styles.circleArea}>
         <Animated.View
           style={[
@@ -236,7 +387,6 @@ export default function BreathworkSession() {
 
       <Text style={styles.instruction}>{phaseInstruction}</Text>
 
-      {/* Phase indicator */}
       <View style={styles.phaseRow}>
         {pattern.phases.map((p, i) => (
           <View
@@ -270,226 +420,61 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
   backBtn: {
     margin: spacing.md,
-    width: 40,
-    height: 40,
-    borderRadius: radius.full,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
+    width: 40, height: 40, borderRadius: radius.full,
+    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
+    alignItems: "center", justifyContent: "center",
   },
-  previewHero: {
-    alignItems: "center",
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.md,
-  },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  previewTitle: {
-    fontSize: fontSizes.xxl,
-    fontFamily: "Inter_700Bold",
-    color: colors.text,
-    marginBottom: 6,
-    textAlign: "center",
-  },
-  previewSub: {
-    fontSize: fontSizes.md,
-    fontFamily: "Inter_400Regular",
-    color: colors.textMuted,
-    textAlign: "center",
-  },
+  previewHero: { alignItems: "center", paddingVertical: spacing.xl, paddingHorizontal: spacing.md },
+  iconCircle: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", marginBottom: 16 },
+  previewTitle: { fontSize: fontSizes.xxl, fontFamily: "Inter_700Bold", color: colors.text, marginBottom: 6, textAlign: "center" },
+  previewSub: { fontSize: fontSizes.md, fontFamily: "Inter_400Regular", color: colors.textMuted, textAlign: "center" },
   previewBody: { flex: 1, paddingHorizontal: spacing.md },
-  previewDesc: {
-    fontSize: fontSizes.sm,
-    fontFamily: "Inter_400Regular",
-    color: colors.textMuted,
-    lineHeight: 22,
-    marginBottom: spacing.md,
-  },
-  sectionHead: {
-    fontSize: fontSizes.md,
-    fontFamily: "Inter_600SemiBold",
-    color: colors.text,
-    marginBottom: spacing.sm,
-  },
+  previewDesc: { fontSize: fontSizes.sm, fontFamily: "Inter_400Regular", color: colors.textMuted, lineHeight: 22, marginBottom: spacing.md },
+  sectionHead: { fontSize: fontSizes.md, fontFamily: "Inter_600SemiBold", color: colors.text, marginBottom: spacing.sm },
   phaseGrid: { flexDirection: "row", gap: 10, marginBottom: spacing.md },
-  phaseCard: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    alignItems: "center",
-    borderWidth: 1,
+  phaseCard: { flex: 1, backgroundColor: colors.card, borderRadius: radius.md, padding: spacing.sm, alignItems: "center", borderWidth: 1 },
+  phaseCardLabel: { fontSize: fontSizes.xs, fontFamily: "Inter_600SemiBold", marginBottom: 4 },
+  phaseCardDur: { fontSize: fontSizes.lg, fontFamily: "Inter_700Bold", color: colors.text },
+  soundToggleRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    borderWidth: 1, borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.sm,
   },
-  phaseCardLabel: {
-    fontSize: fontSizes.xs,
-    fontFamily: "Inter_600SemiBold",
-    marginBottom: 4,
-  },
-  phaseCardDur: {
-    fontSize: fontSizes.lg,
-    fontFamily: "Inter_700Bold",
-    color: colors.text,
-  },
+  soundToggleLabel: { flex: 1, fontSize: fontSizes.sm, fontFamily: "Inter_500Medium" },
+  toggle: { width: 46, height: 26, borderRadius: 13, borderWidth: 1.5, justifyContent: "center" },
+  toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: "#fff" },
   cyclesInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: colors.card, borderRadius: radius.md, padding: spacing.sm,
+    borderWidth: 1, borderColor: colors.border,
   },
-  cyclesText: {
-    fontSize: fontSizes.sm,
-    fontFamily: "Inter_500Medium",
-    color: colors.textMuted,
-  },
-  startBtnWrapper: {
-    padding: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  startBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    paddingVertical: 18,
-    borderRadius: radius.xl,
-  },
-  startBtnText: {
-    fontSize: fontSizes.lg,
-    fontFamily: "Inter_600SemiBold",
-    color: "#fff",
-  },
-  // Session
+  cyclesText: { fontSize: fontSizes.sm, fontFamily: "Inter_500Medium", color: colors.textMuted },
+  startBtnWrapper: { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+  startBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 18, borderRadius: radius.xl },
+  startBtnText: { fontSize: fontSizes.lg, fontFamily: "Inter_600SemiBold", color: "#fff" },
   sessionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sessionTitle: {
-    fontSize: fontSizes.sm,
-    fontFamily: "Inter_600SemiBold",
-    color: colors.text,
-  },
-  cycleLabel: {
-    fontSize: fontSizes.sm,
-    fontFamily: "Inter_500Medium",
-    color: colors.textDim,
-  },
-  progressTrack: {
-    height: 3,
-    backgroundColor: colors.cardAlt,
-  },
+  closeBtn: { width: 36, height: 36, borderRadius: radius.full, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  sessionTitle: { fontSize: fontSizes.sm, fontFamily: "Inter_600SemiBold", color: colors.text },
+  sessionHeaderRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  soundBtn: { width: 34, height: 34, borderRadius: radius.full, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  cycleLabel: { fontSize: fontSizes.sm, fontFamily: "Inter_500Medium", color: colors.textDim },
+  progressTrack: { height: 3, backgroundColor: colors.cardAlt },
   progressFill: { height: "100%" },
-  circleArea: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  outerRing: {
-    position: "absolute",
-    width: CIRCLE + 60,
-    height: CIRCLE + 60,
-    borderRadius: (CIRCLE + 60) / 2,
-    borderWidth: 1,
-  },
-  mainCircle: {
-    width: CIRCLE,
-    height: CIRCLE,
-    borderRadius: CIRCLE / 2,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-  },
-  phaseText: {
-    fontSize: fontSizes.lg,
-    fontFamily: "Inter_600SemiBold",
-    marginBottom: 4,
-  },
-  timerNum: {
-    fontSize: 56,
-    fontFamily: "Inter_700Bold",
-    lineHeight: 64,
-  },
-  timerSec: {
-    fontSize: fontSizes.sm,
-    fontFamily: "Inter_400Regular",
-    color: colors.textDim,
-  },
-  instruction: {
-    fontSize: fontSizes.sm,
-    fontFamily: "Inter_400Regular",
-    color: colors.textMuted,
-    textAlign: "center",
-    paddingHorizontal: spacing.xl,
-    marginBottom: spacing.xl,
-  },
-  phaseRow: {
-    flexDirection: "row",
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xl,
-    gap: 6,
-  },
-  phaseIndicator: {
-    borderRadius: radius.sm,
-    paddingVertical: 8,
-    alignItems: "center",
-    borderWidth: 1,
-    minWidth: 20,
-  },
-  phaseIndicatorLabel: {
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-  },
-  // Completion
-  completeTitle: {
-    fontSize: fontSizes.xxxl,
-    fontFamily: "Inter_700Bold",
-    color: colors.text,
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  completeSub: {
-    fontSize: fontSizes.lg,
-    fontFamily: "Inter_400Regular",
-    color: colors.textMuted,
-    textAlign: "center",
-    lineHeight: 28,
-    marginBottom: 40,
-  },
-  doneBtn: {
-    paddingHorizontal: 40,
-    paddingVertical: 18,
-    borderRadius: radius.xl,
-  },
-  doneBtnText: {
-    fontSize: fontSizes.lg,
-    fontFamily: "Inter_600SemiBold",
-    color: "#fff",
-  },
+  circleArea: { flex: 1, alignItems: "center", justifyContent: "center" },
+  outerRing: { position: "absolute", width: CIRCLE + 60, height: CIRCLE + 60, borderRadius: (CIRCLE + 60) / 2, borderWidth: 1 },
+  mainCircle: { width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2, alignItems: "center", justifyContent: "center", borderWidth: 2 },
+  phaseText: { fontSize: fontSizes.lg, fontFamily: "Inter_600SemiBold", marginBottom: 4 },
+  timerNum: { fontSize: 56, fontFamily: "Inter_700Bold", lineHeight: 64 },
+  timerSec: { fontSize: fontSizes.sm, fontFamily: "Inter_400Regular", color: colors.textDim },
+  instruction: { fontSize: fontSizes.sm, fontFamily: "Inter_400Regular", color: colors.textMuted, textAlign: "center", paddingHorizontal: spacing.xl, marginBottom: spacing.xl },
+  phaseRow: { flexDirection: "row", paddingHorizontal: spacing.md, paddingBottom: spacing.xl, gap: 6 },
+  phaseIndicator: { borderRadius: radius.sm, paddingVertical: 8, alignItems: "center", borderWidth: 1, minWidth: 20 },
+  phaseIndicatorLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  completeTitle: { fontSize: fontSizes.xxxl, fontFamily: "Inter_700Bold", color: colors.text, marginTop: 24, marginBottom: 12 },
+  completeSub: { fontSize: fontSizes.lg, fontFamily: "Inter_400Regular", color: colors.textMuted, textAlign: "center", lineHeight: 28, marginBottom: 40 },
+  doneBtn: { paddingHorizontal: 40, paddingVertical: 18, borderRadius: radius.xl },
+  doneBtnText: { fontSize: fontSizes.lg, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

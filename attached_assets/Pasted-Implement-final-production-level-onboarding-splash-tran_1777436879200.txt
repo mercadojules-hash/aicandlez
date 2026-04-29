@@ -1,0 +1,231 @@
+Implement final production-level onboarding, splash transition, breathing audio system, and UI polish.
+
+========================================
+1. SPLASH → WELCOME TRANSITION (PREMIUM UX)
+========================================
+
+A. SYSTEM SPLASH (FAST LOAD)
+
+- Use LOCAL asset only:
+  /assets/splash.png
+
+Design:
+- Dark green background (#0B2E1E)
+- Center Natura logo only
+- No text, no UI
+
+Expo config:
+"splash": {
+  "image": "./assets/splash.png",
+  "resizeMode": "contain",
+  "backgroundColor": "#0B2E1E"
+}
+
+----------------------------------------
+
+B. WELCOME SCREEN (IMMERSIVE)
+
+Create WelcomeScreen.tsx
+
+BACKGROUND IMAGE:
+Use this EXACT URL:
+https://apexdigital.design/wp-content/uploads/2026/04/natura-splash-page-2.png
+
+- Use ImageBackground
+- resizeMode: cover
+
+----------------------------------------
+
+ADD DARK OVERLAY:
+
+- LinearGradient (top transparent → bottom dark)
+- Improves readability for UI elements
+
+----------------------------------------
+
+ANIMATION FLOW (IMPORTANT):
+
+1. On mount:
+   - Show ONLY logo (centered)
+   - Background dimmed slightly
+
+2. After ~800ms:
+   - Fade OUT logo (opacity 1 → 0)
+   - Slight scale down (1 → 0.95)
+
+3. Simultaneously:
+   - Fade IN full background image
+   - Fade IN UI:
+        - Title
+        - Tagline
+        - Feature chips
+        - CTA button
+
+Timing:
+- 1.2–1.5 seconds total
+- Use ease-in-out
+
+----------------------------------------
+
+CTA BUTTON:
+
+Text:
+"Begin Your Journey"
+
+OnPress:
+navigate('Home')
+
+----------------------------------------
+
+========================================
+2. BREATHING SOUND SYSTEM (IMMERSIVE AUDIO)
+========================================
+
+Use Expo AV:
+
+import { Audio } from 'expo-av';
+
+----------------------------------------
+
+A. SOUND FILES
+
+Add to:
+/assets/sounds/
+
+Files:
+- inhale.mp3
+- hold.mp3
+- exhale.mp3
+
+----------------------------------------
+
+B. BREATHING PATTERN
+
+Example:
+4-7-8 breathing
+
+Phases:
+- Inhale
+- Hold
+- Exhale
+- Hold
+
+----------------------------------------
+
+C. SYNC AUDIO WITH BREATHING
+
+INHALE:
+- Play inhale.mp3
+- Smooth fade in
+
+HOLD:
+- Play hold.mp3 (low volume loop)
+
+EXHALE:
+- Play exhale.mp3
+- Gentle fade out
+
+----------------------------------------
+
+D. CONTROLS
+
+Add:
+- Sound toggle (ON/OFF)
+- Default: ON
+
+----------------------------------------
+
+E. OPTIONAL (HIGH-END TOUCH)
+
+Add low ambient background loop (very low volume)
+
+----------------------------------------
+
+========================================
+3. PROFILE ICON (TOP LEFT)
+========================================
+
+Add circular avatar (40x40):
+
+IF user has no image:
+- Show placeholder icon
+
+OnPress:
+→ Navigate to ProfileScreen
+
+----------------------------------------
+
+ProfileScreen:
+
+- Upload profile image
+- Edit name
+- Toggle theme
+- Toggle sound
+
+----------------------------------------
+
+========================================
+4. THEME SYSTEM (LIGHT / DARK / AUTO)
+========================================
+
+Create ThemeContext:
+
+Modes:
+- Dark (default)
+- Light
+- Auto (system)
+
+Apply globally:
+- Backgrounds
+- Text
+- Cards
+- Buttons
+
+----------------------------------------
+
+========================================
+5. FIX NAVIGATION (CRITICAL BUG)
+========================================
+
+Fix checklist links:
+
+- "Complete a yoga flow"
+    → navigate('Yoga')
+
+- "Do breathing session"
+    → navigate('Breathwork')
+
+- "Review a chakra"
+    → navigate('Chakra')
+
+Ensure all routes exist.
+
+----------------------------------------
+
+========================================
+6. PERFORMANCE OPTIMIZATION
+========================================
+
+- Preload welcome image (IMPORTANT)
+- Cache images
+- Prevent flicker
+- Optimize rendering
+
+----------------------------------------
+
+========================================
+FINAL EXPERIENCE
+========================================
+
+User flow:
+
+1. App opens → clean logo splash
+2. Logo fades → immersive welcome screen (your image)
+3. User taps CTA
+4. Smooth transition into app
+5. Breathing includes real-time sound guidance
+
+----------------------------------------
+
+Do NOT break existing chakra system or UI.
+Enhance only.
