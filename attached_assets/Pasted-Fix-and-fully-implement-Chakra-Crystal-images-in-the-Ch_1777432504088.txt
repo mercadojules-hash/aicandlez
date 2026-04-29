@@ -1,0 +1,126 @@
+Fix and fully implement Chakra Crystal images in the Chakra Detail screen.
+
+---
+
+1. ADD CRYSTAL DATA MAP
+
+---
+
+Create a crystal mapping:
+
+const chakraCrystals = {
+root: {
+name: "Red Jasper",
+image: "https://apexdigital.design/wp-content/uploads/2026/04/chakra-root-crystal.png",
+description: "Grounds and stabilizes energy, bringing deep comfort and security."
+},
+sacral: {
+name: "Carnelian",
+image: "https://apexdigital.design/wp-content/uploads/2026/04/chakra-sacral-carnelian-crystal.png",
+description: "Boosts creativity, passion, and emotional balance."
+},
+solar: {
+name: "Citrine",
+image: "https://apexdigital.design/wp-content/uploads/2026/04/solar-pexus-chakra-crystal.png",
+description: "Enhances confidence, personal power, and abundance."
+},
+heart: {
+name: "Green Aventurine",
+image: "https://apexdigital.design/wp-content/uploads/2026/04/chakra-heart-green-aventurine-crystal.png",
+description: "Promotes love, compassion, and emotional healing."
+},
+throat: {
+name: "Lapis Lazuli",
+image: "https://apexdigital.design/wp-content/uploads/2026/04/chakra-throat-lapis-lazuli-crystal.png",
+description: "Supports communication, truth, and self-expression."
+},
+thirdEye: {
+name: "Amethyst",
+image: "https://apexdigital.design/wp-content/uploads/2026/04/chakra-third-eye-amethyst-crystal.png",
+description: "Enhances intuition and clarity."
+},
+crown: {
+name: "Clear Quartz",
+image: "https://apexdigital.design/wp-content/uploads/2026/04/chakra-crown-clear-quartz-crystal.png",
+description: "Amplifies energy and spiritual connection."
+}
+};
+
+---
+
+2. FIX IMAGE RENDERING (CRITICAL)
+
+---
+
+Replace any incorrect usage with:
+
+<Image
+source={{ uri: chakraCrystals[chakra.id].image }}
+style={styles.crystalImage}
+/>
+
+Ensure:
+
+* DO NOT pass raw string directly
+* Must use { uri: ... }
+
+---
+
+3. DISPLAY CRYSTAL SECTION
+
+---
+
+Under "About" section, render:
+
+* Crystal title
+* Image (LEFT)
+* Name + description (RIGHT)
+
+---
+
+4. STYLE CRYSTAL CARD (PREMIUM LOOK)
+
+---
+
+Card:
+
+* padding: 12–16
+* borderRadius: 16
+* background slightly lighter than page
+
+Image:
+
+* width: 60
+* height: 60
+* borderRadius: 12
+* resizeMode: "cover"
+
+---
+
+5. ADD FALLBACK (IMPORTANT)
+
+---
+
+If image fails:
+
+* Show placeholder or hide image container
+* Prevent crash
+
+---
+
+6. DO NOT MODIFY OTHER FEATURES
+
+---
+
+Keep:
+
+* Chakra symbol
+* Pose section
+* Sound section
+* Layout
+
+---
+
+## END RESULT
+
+Crystal image loads correctly and displays clean, aligned, and premium

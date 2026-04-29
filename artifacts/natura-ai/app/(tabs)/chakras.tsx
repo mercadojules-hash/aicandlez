@@ -321,6 +321,38 @@ function MiniPlayer({ audio }: { audio: AudioControls }) {
   );
 }
 
+// ─── Crystal Card ─────────────────────────────────────────────────────────────
+
+function CrystalCard({ chakra }: { chakra: Chakra }) {
+  const [imgError, setImgError] = useState(false);
+
+  return (
+    <View style={[detail.crystalCard, { borderColor: chakra.color + "30" }]}>
+      <View style={[detail.crystalImgWrap, { borderColor: chakra.color + "40" }]}>
+        {!imgError && chakra.crystalImage ? (
+          <>
+            <Image
+              source={{ uri: chakra.crystalImage }}
+              style={detail.crystalImg}
+              resizeMode="cover"
+              onError={() => setImgError(true)}
+            />
+            <View style={[detail.crystalOverlay, { backgroundColor: chakra.color + "15" }]} />
+          </>
+        ) : (
+          <View style={[detail.crystalFallback, { backgroundColor: chakra.color + "25" }]}>
+            <Feather name="hexagon" size={22} color={chakra.color} />
+          </View>
+        )}
+      </View>
+      <View style={detail.crystalText}>
+        <Text style={detail.crystalName}>{chakra.crystalName}</Text>
+        <Text style={detail.crystalBenefit}>{chakra.crystalBenefit}</Text>
+      </View>
+    </View>
+  );
+}
+
 // ─── Chakra Detail Modal ──────────────────────────────────────────────────────
 
 function BulletRow({ text, color, icon }: { text: string; color: string; icon: string }) {
@@ -410,16 +442,7 @@ function ChakraDetail({
 
             {/* Crystal */}
             <Text style={detail.sectionHead}>Crystal</Text>
-            <View style={[detail.crystalCard, { borderColor: chakra.color + "30" }]}>
-              <View style={[detail.crystalImgWrap, { borderColor: chakra.color + "40" }]}>
-                <Image source={{ uri: chakra.crystalImage }} style={detail.crystalImg} resizeMode="cover" />
-                <View style={[detail.crystalOverlay, { backgroundColor: chakra.color + "15" }]} />
-              </View>
-              <View style={detail.crystalText}>
-                <Text style={detail.crystalName}>{chakra.crystalName}</Text>
-                <Text style={detail.crystalBenefit}>{chakra.crystalBenefit}</Text>
-              </View>
-            </View>
+            <CrystalCard chakra={chakra} />
 
             {/* Yoga Pose */}
             <Text style={detail.sectionHead}>Recommended Pose</Text>
@@ -702,9 +725,10 @@ const detail = StyleSheet.create({
     backgroundColor: colors.card, borderRadius: radius.lg,
     borderWidth: 1, padding: spacing.md,
   },
-  crystalImgWrap: { width: 72, height: 72, borderRadius: radius.md, overflow: "hidden", borderWidth: 1 },
+  crystalImgWrap: { width: 60, height: 60, borderRadius: 12, overflow: "hidden", borderWidth: 1 },
   crystalImg: { width: "100%", height: "100%" },
   crystalOverlay: { ...StyleSheet.absoluteFillObject },
+  crystalFallback: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center" },
   crystalText: { flex: 1 },
   crystalName: { fontSize: fontSizes.md, fontFamily: "Inter_600SemiBold", color: colors.text, marginBottom: 6 },
   crystalBenefit: { fontSize: fontSizes.xs, fontFamily: "Inter_400Regular", color: colors.textMuted, lineHeight: 18 },
