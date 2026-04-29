@@ -2,17 +2,20 @@ export interface Chakra {
   id: string;
   number: number;
   name: string;
+  subtitle: string;
   sanskrit: string;
   location: string;
   color: string;
   element: string;
-  meaning: string;
-  emotionalAssociation: string;
-  blockingSigns: string[];
+  mantra: string;
   affirmation: string;
+  description: string;
+  emotionalAssociation: string;
+  benefits: string[];
+  imbalances: string[];
   foods: string[];
   poses: string[];
-  mantra: string;
+  image: string;
 }
 
 export const chakras: Chakra[] = [
@@ -20,162 +23,231 @@ export const chakras: Chakra[] = [
     id: "root",
     number: 1,
     name: "Root Chakra",
+    subtitle: "I am",
     sanskrit: "Muladhara",
     location: "Base of spine",
-    color: "#e53935",
+    color: "#c0392b",
     element: "Earth",
-    meaning:
-      "The Root Chakra is your foundation — your sense of safety, security, and belonging in the physical world. It connects you to the earth and to your most basic survival needs.",
-    emotionalAssociation:
-      "Security, stability, trust, grounding, physical safety, financial security, and a sense of home",
-    blockingSigns: ["Anxiety and fear", "Financial insecurity", "Feeling ungrounded", "Lower back pain", "Fatigue"],
-    affirmation: "I am safe. I am grounded. I belong here.",
-    foods: ["Root vegetables", "Red foods", "Beets", "Radishes", "Carrots", "Potatoes", "Protein-rich foods"],
-    poses: ["Mountain Pose", "Warrior I", "Child's Pose", "Seated Forward Fold", "Squat"],
     mantra: "LAM",
+    affirmation: "I am safe. I am grounded. I belong here.",
+    description:
+      "The Root Chakra is your foundation — your sense of safety, security, and belonging in the physical world. It connects you to the earth and to your most basic survival needs. When balanced, you feel stable, secure, and at home in your body.",
+    emotionalAssociation:
+      "Security, stability, trust, grounding, and a sense of home",
+    benefits: [
+      "Deep sense of safety and security",
+      "Physical strength and vitality",
+      "Financial stability and groundedness",
+      "Strong connection to the present moment",
+      "Healthy boundaries and self-preservation",
+    ],
+    imbalances: [
+      "Chronic anxiety and unexplained fear",
+      "Financial insecurity or scarcity mindset",
+      "Feeling disconnected or ungrounded",
+      "Lower back pain and fatigue",
+      "Difficulty trusting others or the world",
+    ],
+    foods: ["Beets", "Radishes", "Carrots", "Potatoes", "Protein-rich foods"],
+    poses: ["Mountain Pose", "Warrior I", "Child's Pose", "Seated Forward Fold"],
+    image: "https://placehold.co/400x400/c0392b/FFFFFF?text=Muladhara",
   },
   {
     id: "sacral",
     number: 2,
     name: "Sacral Chakra",
-    sanskrit: "Svadhisthana",
-    location: "Lower abdomen, 2 inches below navel",
-    color: "#ff7043",
+    subtitle: "I feel",
+    sanskrit: "Swadhisthana",
+    location: "Lower abdomen",
+    color: "#e67e22",
     element: "Water",
-    meaning:
-      "The Sacral Chakra governs creativity, sensuality, pleasure, and emotional flow. It is the seat of your passion and your ability to experience joy and connection with others.",
-    emotionalAssociation:
-      "Creativity, pleasure, desire, intimacy, emotional fluidity, and the ability to give and receive",
-    blockingSigns: [
-      "Creative blocks",
-      "Intimacy issues",
-      "Emotional numbness",
-      "Lower back pain",
-      "Hip tightness",
-    ],
-    affirmation: "I embrace my creativity. I allow myself to feel.",
-    foods: ["Orange foods", "Oranges", "Mangoes", "Carrots", "Pumpkin", "Passion fruit", "Seeds"],
-    poses: ["Pigeon Pose", "Bound Angle", "Hip Circles", "Low Lunge", "Goddess Pose"],
     mantra: "VAM",
+    affirmation: "I embrace my creativity. I allow myself to feel fully.",
+    description:
+      "The Sacral Chakra governs creativity, sensuality, pleasure, and emotional flow. It is the seat of your passion and your ability to experience joy and connection with others. A balanced sacral chakra allows you to move through life with emotional fluidity and creative vitality.",
+    emotionalAssociation:
+      "Creativity, pleasure, desire, intimacy, and emotional fluidity",
+    benefits: [
+      "Emotional balance and resilience",
+      "Vibrant creativity and inspiration",
+      "Healthy relationships and intimacy",
+      "Ability to experience joy and pleasure",
+      "Fluid adaptability to change",
+    ],
+    imbalances: [
+      "Creative blocks and stagnation",
+      "Guilt around pleasure or desire",
+      "Emotional numbness or instability",
+      "Hip tightness and lower back pain",
+      "Difficulty in close relationships",
+    ],
+    foods: ["Oranges", "Mangoes", "Pumpkin", "Passion fruit", "Seeds"],
+    poses: ["Pigeon Pose", "Bound Angle", "Low Lunge", "Goddess Pose"],
+    image: "https://placehold.co/400x400/e67e22/FFFFFF?text=Swadhisthana",
   },
   {
     id: "solar-plexus",
     number: 3,
-    name: "Solar Plexus Chakra",
+    name: "Solar Plexus",
+    subtitle: "I do",
     sanskrit: "Manipura",
-    location: "Upper abdomen, above navel",
-    color: "#ffd600",
+    location: "Upper abdomen",
+    color: "#f1c40f",
     element: "Fire",
-    meaning:
-      "The Solar Plexus is your personal power center — your sense of self, confidence, and will. When balanced, you act from a place of strength and authentic purpose.",
-    emotionalAssociation:
-      "Confidence, self-esteem, personal power, discipline, decisiveness, and healthy boundaries",
-    blockingSigns: [
-      "Low self-esteem",
-      "Indecision",
-      "Digestive issues",
-      "Need for control",
-      "Feeling powerless",
-    ],
-    affirmation: "I am powerful. I trust myself completely.",
-    foods: ["Yellow foods", "Bananas", "Corn", "Pineapple", "Ginger", "Turmeric", "Whole grains", "Legumes"],
-    poses: ["Boat Pose", "Warrior III", "Plank", "Triangle Pose", "Twists"],
     mantra: "RAM",
+    affirmation: "I am powerful. I trust myself and my purpose completely.",
+    description:
+      "The Solar Plexus is your personal power center — your sense of self, confidence, and will. When balanced, you act from a place of authentic strength and purpose. This chakra fuels your ambition, discipline, and ability to manifest your intentions in the world.",
+    emotionalAssociation:
+      "Confidence, self-esteem, personal power, and healthy boundaries",
+    benefits: [
+      "Strong self-esteem and confidence",
+      "Clear motivation and sense of purpose",
+      "Healthy personal boundaries",
+      "Decisiveness and mental clarity",
+      "Robust digestion and physical energy",
+    ],
+    imbalances: [
+      "Low self-esteem and self-doubt",
+      "Indecision and lack of direction",
+      "Digestive issues and stomach tension",
+      "Excessive need for control",
+      "Feeling powerless or victimised",
+    ],
+    foods: ["Bananas", "Corn", "Pineapple", "Ginger", "Turmeric", "Legumes"],
+    poses: ["Boat Pose", "Warrior III", "Plank", "Triangle Pose"],
+    image: "https://placehold.co/400x400/d4ac0d/FFFFFF?text=Manipura",
   },
   {
     id: "heart",
     number: 4,
     name: "Heart Chakra",
+    subtitle: "I love",
     sanskrit: "Anahata",
     location: "Center of the chest",
-    color: "#43a047",
+    color: "#27ae60",
     element: "Air",
-    meaning:
-      "The Heart Chakra bridges the physical and spiritual realms. It is the home of love — both for others and for yourself. An open heart chakra allows you to give and receive without fear.",
-    emotionalAssociation:
-      "Unconditional love, compassion, empathy, forgiveness, joy, and inner peace",
-    blockingSigns: [
-      "Difficulty forgiving",
-      "Feeling isolated",
-      "Jealousy",
-      "Chest tightness",
-      "Trouble trusting",
-    ],
-    affirmation: "I am love. I give and receive love freely.",
-    foods: ["Green foods", "Leafy greens", "Broccoli", "Avocado", "Green tea", "Herbs", "Heart-healthy foods"],
-    poses: ["Camel Pose", "Cobra", "Bridge Pose", "Eagle Arms", "Wild Thing"],
     mantra: "YAM",
+    affirmation: "I am love. I give and receive love freely and openly.",
+    description:
+      "The Heart Chakra bridges the physical and spiritual realms. It is the home of love — both for others and for yourself. An open heart chakra allows you to give and receive without fear, to forgive with grace, and to live with genuine compassion for all beings.",
+    emotionalAssociation:
+      "Unconditional love, compassion, empathy, forgiveness, and inner peace",
+    benefits: [
+      "Deep emotional healing and forgiveness",
+      "Genuine empathy and compassion",
+      "Loving and nourishing relationships",
+      "Ability to give and receive freely",
+      "Radiant sense of inner peace",
+    ],
+    imbalances: [
+      "Difficulty forgiving self or others",
+      "Loneliness and emotional isolation",
+      "Jealousy and possessiveness",
+      "Chest tightness or breathing difficulties",
+      "Fear of intimacy and vulnerability",
+    ],
+    foods: ["Leafy greens", "Broccoli", "Avocado", "Green tea", "Fresh herbs"],
+    poses: ["Camel Pose", "Cobra", "Bridge Pose", "Wild Thing"],
+    image: "https://placehold.co/400x400/27ae60/FFFFFF?text=Anahata",
   },
   {
     id: "throat",
     number: 5,
     name: "Throat Chakra",
+    subtitle: "I speak",
     sanskrit: "Vishuddha",
     location: "Throat",
-    color: "#1e88e5",
+    color: "#2980b9",
     element: "Ether",
-    meaning:
-      "The Throat Chakra is the center of communication, truth, and authentic expression. When open, you speak your truth with clarity and listen with genuine presence.",
-    emotionalAssociation:
-      "Communication, self-expression, honesty, listening, creativity through voice, and authentic truth",
-    blockingSigns: [
-      "Difficulty speaking up",
-      "Fear of judgment",
-      "Sore throat",
-      "Neck tension",
-      "Feeling unheard",
-    ],
-    affirmation: "I speak my truth. My voice matters.",
-    foods: ["Blue and purple foods", "Blueberries", "Blackberries", "Figs", "Herbal teas", "Raw honey"],
-    poses: ["Fish Pose", "Shoulder Stand", "Neck Rolls", "Lion's Breath", "Plow Pose"],
     mantra: "HAM",
+    affirmation: "I speak my truth with clarity. My voice matters.",
+    description:
+      "The Throat Chakra is the center of communication, truth, and authentic expression. When open, you speak your truth with clarity and listen with genuine presence. This chakra governs all forms of expression — verbal, written, artistic — and your ability to live in alignment with your truth.",
+    emotionalAssociation:
+      "Communication, self-expression, honesty, and authentic truth",
+    benefits: [
+      "Clear and confident self-expression",
+      "Ability to speak your truth fearlessly",
+      "Active and empathic listening",
+      "Authentic creativity through voice and words",
+      "Integrity and alignment between thought and action",
+    ],
+    imbalances: [
+      "Difficulty speaking up or fear of judgment",
+      "Chronic sore throat or neck tension",
+      "Feeling unheard or misunderstood",
+      "Dishonesty or withholding your truth",
+      "Excessive talking without depth",
+    ],
+    foods: ["Blueberries", "Blackberries", "Figs", "Herbal teas", "Raw honey"],
+    poses: ["Fish Pose", "Shoulder Stand", "Neck Rolls", "Plow Pose"],
+    image: "https://placehold.co/400x400/2980b9/FFFFFF?text=Vishuddha",
   },
   {
     id: "third-eye",
     number: 6,
-    name: "Third Eye Chakra",
+    name: "Third Eye",
+    subtitle: "I see",
     sanskrit: "Ajna",
     location: "Between the eyebrows",
-    color: "#5e35b1",
+    color: "#6c3483",
     element: "Light",
-    meaning:
-      "The Third Eye is the seat of intuition, wisdom, and inner vision. It connects you to a deeper knowing beyond the rational mind — your inner guidance system.",
-    emotionalAssociation:
-      "Intuition, perception, imagination, clarity, wisdom, and the ability to see beyond the obvious",
-    blockingSigns: [
-      "Mental fog",
-      "Lack of intuition",
-      "Headaches",
-      "Overthinking",
-      "Disconnection from inner knowing",
-    ],
-    affirmation: "I trust my intuition. I see clearly.",
-    foods: ["Indigo foods", "Eggplant", "Purple cabbage", "Grapes", "Dark chocolate", "Omega-3 rich foods"],
-    poses: ["Child's Pose with forehead on mat", "Dolphin Pose", "Seated Meditation", "Forward Fold", "Eagle Pose"],
     mantra: "OM",
+    affirmation: "I trust my intuition. I see beyond what is visible.",
+    description:
+      "The Third Eye is the seat of intuition, wisdom, and inner vision. It connects you to a deeper knowing beyond the rational mind — your inner guidance system. When awakened, you perceive life with clarity, access higher wisdom, and trust the intelligence that lives within you.",
+    emotionalAssociation:
+      "Intuition, perception, imagination, clarity, and inner wisdom",
+    benefits: [
+      "Sharp intuition and inner knowing",
+      "Mental clarity and focused awareness",
+      "Vivid imagination and creative insight",
+      "Connection to higher wisdom and guidance",
+      "Ability to see patterns and deeper truths",
+    ],
+    imbalances: [
+      "Chronic mental fog and confusion",
+      "Lack of direction or spiritual disconnection",
+      "Recurring headaches or eye strain",
+      "Overthinking and analysis paralysis",
+      "Dismissing or ignoring your intuition",
+    ],
+    foods: ["Eggplant", "Purple cabbage", "Grapes", "Dark chocolate", "Omega-3 rich foods"],
+    poses: ["Child's Pose", "Dolphin Pose", "Seated Meditation", "Eagle Pose"],
+    image: "https://placehold.co/400x400/6c3483/FFFFFF?text=Ajna",
   },
   {
     id: "crown",
     number: 7,
     name: "Crown Chakra",
+    subtitle: "I understand",
     sanskrit: "Sahasrara",
     location: "Top of the head",
-    color: "#8e24aa",
+    color: "#7d3c98",
     element: "Consciousness",
-    meaning:
-      "The Crown Chakra connects you to universal consciousness, spiritual wisdom, and the divine. It is the gateway to enlightenment and your highest self.",
+    mantra: "OM",
+    affirmation: "I am connected to all that is. I am light, love, and wisdom.",
+    description:
+      "The Crown Chakra connects you to universal consciousness, spiritual wisdom, and the divine. It is the gateway to enlightenment and your highest self. When open, you experience a profound sense of unity with all life, deep inner peace, and an understanding that goes beyond words.",
     emotionalAssociation:
-      "Spiritual connection, unity, bliss, transcendence, universal love, and presence",
-    blockingSigns: [
-      "Feeling spiritually disconnected",
-      "Cynicism",
-      "Closed-mindedness",
-      "Chronic headaches",
-      "Existential depression",
+      "Spiritual connection, unity, bliss, and universal love",
+    benefits: [
+      "Deep peace and spiritual fulfilment",
+      "Sense of oneness with all life",
+      "Access to higher states of consciousness",
+      "Freedom from ego and fear",
+      "Profound trust in the flow of life",
     ],
-    affirmation: "I am connected to all that is. I am light.",
-    foods: ["Fasting and detox", "Light foods", "Fresh air", "Sunlight", "Stillness", "Meditation"],
-    poses: ["Savasana", "Headstand", "Lotus Pose", "Seated Meditation", "Tree Pose"],
-    mantra: "OM (silence)",
+    imbalances: [
+      "Spiritual disconnection and meaninglessness",
+      "Cynicism and closed-mindedness",
+      "Chronic headaches and sensitivity to light",
+      "Existential depression or loss of purpose",
+      "Inability to access stillness or presence",
+    ],
+    foods: ["Light foods", "Fasting", "Fresh air", "Sunlight", "Meditation"],
+    poses: ["Savasana", "Headstand", "Lotus Pose", "Tree Pose"],
+    image: "https://placehold.co/400x400/7d3c98/FFFFFF?text=Sahasrara",
   },
 ];

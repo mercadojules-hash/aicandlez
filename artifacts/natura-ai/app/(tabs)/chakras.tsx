@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
+  Image,
   Dimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -17,88 +18,187 @@ import { useChecklist } from "../../hooks/useChecklist";
 
 const { width } = Dimensions.get("window");
 
+// ─── Detail Modal ────────────────────────────────────────────────────────────
+
+function BulletRow({ text, color, icon }: { text: string; color: string; icon: string }) {
+  return (
+    <View style={detail.bulletRow}>
+      <View style={[detail.bulletIcon, { backgroundColor: color + "20" }]}>
+        <Feather name={icon as any} size={12} color={color} />
+      </View>
+      <Text style={detail.bulletText}>{text}</Text>
+    </View>
+  );
+}
+
 function ChakraDetail({ chakra, onClose }: { chakra: Chakra; onClose: () => void }) {
+  const glowColor = chakra.color + "30";
+
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet">
       <View style={[detail.container, { backgroundColor: colors.background }]}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Top */}
+        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+
+          {/* ── Hero ──────────────────────────────────────────────────────── */}
           <LinearGradient
-            colors={[chakra.color + "40", chakra.color + "10", colors.background]}
-            style={detail.heroGrad}
+            colors={[chakra.color + "60", chakra.color + "25", colors.background]}
+            style={detail.hero}
           >
+            {/* Close */}
             <TouchableOpacity style={detail.closeBtn} onPress={onClose}>
-              <Feather name="x" size={20} color={colors.text} />
+              <Feather name="x" size={18} color={colors.text} />
             </TouchableOpacity>
-            <View style={[detail.circle, { backgroundColor: chakra.color }]}>
-              <Text style={detail.circleNum}>{chakra.number}</Text>
+
+            {/* Number badge */}
+            <View style={[detail.badge, { backgroundColor: chakra.color + "30", borderColor: chakra.color + "60" }]}>
+              <Text style={[detail.badgeText, { color: chakra.color }]}>
+                {chakra.number} of 7
+              </Text>
             </View>
+
+            {/* Chakra image */}
+            <View style={[detail.imageWrap, { shadowColor: chakra.color }]}>
+              <Image
+                source={{ uri: chakra.image }}
+                style={detail.heroImage}
+                resizeMode="cover"
+              />
+              <View style={[detail.imageGlow, { backgroundColor: glowColor }]} />
+            </View>
+
+            {/* Name + subtitle */}
             <Text style={detail.heroName}>{chakra.name}</Text>
             <Text style={detail.heroSanskrit}>{chakra.sanskrit}</Text>
-            <View style={detail.heroRow}>
-              <View style={detail.heroPill}>
-                <Text style={detail.heroPillText}>📍 {chakra.location}</Text>
+
+            {/* Affirmation word pill */}
+            <View style={[detail.subtitlePill, { backgroundColor: chakra.color + "20", borderColor: chakra.color + "40" }]}>
+              <Text style={[detail.subtitlePillText, { color: chakra.color }]}>
+                ✦  "{chakra.subtitle}"
+              </Text>
+            </View>
+
+            {/* Location + element pills */}
+            <View style={detail.pillRow}>
+              <View style={detail.pill}>
+                <Feather name="map-pin" size={11} color={colors.textDim} />
+                <Text style={detail.pillText}>{chakra.location}</Text>
               </View>
-              <View style={detail.heroPill}>
-                <Text style={detail.heroPillText}>🌊 {chakra.element}</Text>
+              <View style={detail.pill}>
+                <Feather name="wind" size={11} color={colors.textDim} />
+                <Text style={detail.pillText}>{chakra.element}</Text>
               </View>
             </View>
           </LinearGradient>
 
+          {/* ── Mantra box ─────────────────────────────────────────────────── */}
           <View style={detail.body}>
-            {/* Mantra */}
             <View style={[detail.mantraBox, { borderColor: chakra.color + "50" }]}>
               <Text style={[detail.mantraLabel, { color: chakra.color }]}>Seed Mantra</Text>
               <Text style={[detail.mantraText, { color: chakra.color }]}>{chakra.mantra}</Text>
             </View>
 
-            {/* Meaning */}
+            {/* ── Description ───────────────────────────────────────────── */}
             <Text style={detail.sectionHead}>About This Chakra</Text>
-            <Text style={detail.body_text}>{chakra.meaning}</Text>
+            <Text style={detail.bodyText}>{chakra.description}</Text>
 
-            {/* Emotional */}
-            <Text style={detail.sectionHead}>Emotional Association</Text>
-            <Text style={detail.body_text}>{chakra.emotionalAssociation}</Text>
+            {/* ── Benefits ──────────────────────────────────────────────── */}
+            <Text style={detail.sectionHead}>Benefits When Balanced</Text>
+            <View style={detail.sectionCard}>
+              {chakra.benefits.map((b) => (
+                <BulletRow key={b} text={b} color={chakra.color} icon="check-circle" />
+              ))}
+            </View>
 
-            {/* Affirmation */}
-            <View style={[detail.affirmBox, { backgroundColor: chakra.color + "18" }]}>
-              <Text style={[detail.affirmLabel, { color: chakra.color }]}>✦ Affirmation</Text>
+            {/* ── Imbalances ────────────────────────────────────────────── */}
+            <Text style={detail.sectionHead}>Signs of Imbalance</Text>
+            <View style={detail.sectionCard}>
+              {chakra.imbalances.map((i) => (
+                <BulletRow key={i} text={i} color="#e67e22" icon="alert-circle" />
+              ))}
+            </View>
+
+            {/* ── Affirmation card ──────────────────────────────────────── */}
+            <View style={[detail.affirmCard, { backgroundColor: chakra.color + "15", borderColor: chakra.color + "40" }]}>
+              <Text style={[detail.affirmLabel, { color: chakra.color }]}>✦  Daily Affirmation</Text>
               <Text style={detail.affirmText}>"{chakra.affirmation}"</Text>
             </View>
 
-            {/* Blocking signs */}
-            <Text style={detail.sectionHead}>Signs of Imbalance</Text>
-            {chakra.blockingSigns.map((s) => (
-              <View key={s} style={detail.listRow}>
-                <View style={[detail.dot, { backgroundColor: chakra.color }]} />
-                <Text style={detail.listText}>{s}</Text>
-              </View>
-            ))}
-
-            {/* Foods */}
-            <Text style={detail.sectionHead}>Healing Foods</Text>
-            <View style={detail.chipGrid}>
-              {chakra.foods.map((f) => (
-                <View key={f} style={[detail.chip, { borderColor: chakra.color + "40" }]}>
-                  <Text style={[detail.chipText, { color: chakra.color }]}>{f}</Text>
+            {/* ── Related Poses ─────────────────────────────────────────── */}
+            <Text style={detail.sectionHead}>Related Yoga Poses</Text>
+            <View style={detail.poseGrid}>
+              {chakra.poses.map((p) => (
+                <View key={p} style={[detail.poseChip, { borderColor: chakra.color + "40" }]}>
+                  <Feather name="activity" size={11} color={chakra.color} />
+                  <Text style={[detail.poseChipText, { color: chakra.color }]}>{p}</Text>
                 </View>
               ))}
             </View>
 
-            {/* Poses */}
-            <Text style={detail.sectionHead}>Balancing Yoga Poses</Text>
-            {chakra.poses.map((p) => (
-              <View key={p} style={detail.listRow}>
-                <Feather name="check-circle" size={14} color={chakra.color} style={{ marginTop: 2 }} />
-                <Text style={detail.listText}>{p}</Text>
-              </View>
-            ))}
+            {/* ── Healing Foods ─────────────────────────────────────────── */}
+            <Text style={detail.sectionHead}>Healing Foods</Text>
+            <View style={detail.poseGrid}>
+              {chakra.foods.map((f) => (
+                <View key={f} style={[detail.foodChip, { borderColor: colors.border }]}>
+                  <Text style={detail.foodChipText}>{f}</Text>
+                </View>
+              ))}
+            </View>
 
-            <View style={{ height: 40 }} />
+            <View style={{ height: 48 }} />
           </View>
         </ScrollView>
       </View>
     </Modal>
+  );
+}
+
+// ─── List Screen ─────────────────────────────────────────────────────────────
+
+function ChakraCard({ chakra, onPress }: { chakra: Chakra; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+      <LinearGradient
+        colors={[chakra.color + "35", chakra.color + "10", "transparent"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.cardGrad}
+      >
+        {/* Left accent bar */}
+        <View style={[styles.accentBar, { backgroundColor: chakra.color }]} />
+
+        {/* Text content */}
+        <View style={styles.cardLeft}>
+          <View style={styles.cardTopRow}>
+            <Text style={[styles.cardNum, { color: chakra.color + "90" }]}>
+              {String(chakra.number).padStart(2, "0")}
+            </Text>
+            <View style={[styles.subtitlePill, { backgroundColor: chakra.color + "20" }]}>
+              <Text style={[styles.subtitleText, { color: chakra.color }]}>{chakra.subtitle}</Text>
+            </View>
+          </View>
+          <Text style={styles.cardName}>{chakra.name}</Text>
+          <Text style={styles.cardSanskrit}>{chakra.sanskrit}</Text>
+          <Text style={styles.cardSnippet} numberOfLines={2}>
+            {chakra.description.slice(0, 72)}…
+          </Text>
+        </View>
+
+        {/* Right: image */}
+        <View style={[styles.imageWrap, { borderColor: chakra.color + "50" }]}>
+          <Image
+            source={{ uri: chakra.image }}
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
+          <View style={[styles.imageOverlay, { backgroundColor: chakra.color + "20" }]} />
+        </View>
+
+        {/* Chevron */}
+        <View style={styles.chevronWrap}>
+          <Feather name="chevron-right" size={16} color={chakra.color + "80"} />
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
   );
 }
 
@@ -114,44 +214,24 @@ export default function ChakrasScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+
+        {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>The 7 Chakras</Text>
-          <Text style={styles.subtitle}>Your body's energy centres</Text>
+          <Text style={styles.title}>Chakra System</Text>
+          <Text style={styles.subtitle}>Your body's energy centers</Text>
         </View>
 
-        {/* Spine indicator */}
-        <View style={styles.spineRow}>
+        {/* Spectrum bar */}
+        <View style={styles.spectrumRow}>
           {chakras.map((c) => (
-            <View key={c.id} style={[styles.spineDot, { backgroundColor: c.color }]} />
+            <View key={c.id} style={[styles.spectrumDot, { backgroundColor: c.color }]} />
           ))}
         </View>
 
+        {/* Card list */}
         <View style={styles.list}>
           {chakras.map((chakra) => (
-            <TouchableOpacity
-              key={chakra.id}
-              style={styles.card}
-              onPress={() => handleOpen(chakra)}
-              activeOpacity={0.85}
-            >
-              <View style={[styles.colorBar, { backgroundColor: chakra.color }]} />
-              <View style={styles.cardContent}>
-                <View style={[styles.numCircle, { backgroundColor: chakra.color + "25" }]}>
-                  <Text style={[styles.numText, { color: chakra.color }]}>{chakra.number}</Text>
-                </View>
-                <View style={styles.cardText}>
-                  <Text style={styles.chakraName}>{chakra.name}</Text>
-                  <Text style={styles.chakraSanskrit}>{chakra.sanskrit}</Text>
-                  <Text style={styles.chakraLoc}>
-                    <Feather name="map-pin" size={11} color={colors.textDim} /> {chakra.location}
-                  </Text>
-                  <Text style={styles.chakraSnippet} numberOfLines={2}>
-                    {chakra.emotionalAssociation}
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={18} color={colors.textDim} />
-              </View>
-            </TouchableOpacity>
+            <ChakraCard key={chakra.id} chakra={chakra} onPress={() => handleOpen(chakra)} />
           ))}
         </View>
 
@@ -165,99 +245,133 @@ export default function ChakrasScreen() {
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
   header: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.sm,
   },
   title: {
     fontSize: fontSizes.xxl,
     fontFamily: "Inter_700Bold",
     color: colors.text,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.sm,
     fontFamily: "Inter_400Regular",
     color: colors.textMuted,
   },
-  spineRow: {
+  spectrumRow: {
     flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
-    marginBottom: spacing.md,
     paddingHorizontal: spacing.md,
+    gap: 6,
+    marginBottom: spacing.md,
   },
-  spineDot: {
+  spectrumDot: {
     flex: 1,
     height: 4,
     borderRadius: radius.full,
-    opacity: 0.7,
+    opacity: 0.8,
   },
-  list: { paddingHorizontal: spacing.md, gap: 10 },
+  list: {
+    paddingHorizontal: spacing.md,
+    gap: 10,
+  },
   card: {
-    flexDirection: "row",
-    backgroundColor: colors.card,
     borderRadius: radius.lg,
     overflow: "hidden",
+    backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  colorBar: { width: 5 },
-  cardContent: {
-    flex: 1,
+  cardGrad: {
     flexDirection: "row",
     alignItems: "center",
     padding: spacing.md,
     gap: 12,
   },
-  numCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.full,
+  accentBar: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    borderTopLeftRadius: radius.lg,
+    borderBottomLeftRadius: radius.lg,
+  },
+  cardLeft: {
+    flex: 1,
+    paddingLeft: 4,
+  },
+  cardTopRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 8,
+    marginBottom: 4,
   },
-  numText: {
-    fontSize: fontSizes.lg,
+  cardNum: {
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
+    letterSpacing: 1,
   },
-  cardText: { flex: 1 },
-  chakraName: {
-    fontSize: fontSizes.md,
+  subtitlePill: {
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  subtitleText: {
+    fontSize: 10,
     fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.5,
+  },
+  cardName: {
+    fontSize: fontSizes.md,
+    fontFamily: "Inter_700Bold",
     color: colors.text,
     marginBottom: 2,
   },
-  chakraSanskrit: {
+  cardSanskrit: {
     fontSize: fontSizes.xs,
     fontFamily: "Inter_500Medium",
     color: colors.accent,
-    marginBottom: 3,
+    marginBottom: 6,
   },
-  chakraLoc: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: colors.textDim,
-    marginBottom: 4,
-  },
-  chakraSnippet: {
+  cardSnippet: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: colors.textMuted,
     lineHeight: 16,
   },
+  imageWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.md,
+    overflow: "hidden",
+    borderWidth: 1,
+  },
+  cardImage: { width: "100%", height: "100%" },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  chevronWrap: { paddingLeft: 4 },
 });
 
 const detail = StyleSheet.create({
   container: { flex: 1 },
-  heroGrad: { paddingTop: 60, paddingBottom: 32, alignItems: "center", paddingHorizontal: spacing.md },
+  hero: {
+    paddingTop: 56,
+    paddingBottom: 32,
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+  },
   closeBtn: {
     position: "absolute",
-    top: 16,
+    top: 14,
     right: 16,
     backgroundColor: colors.card,
     borderRadius: radius.full,
@@ -265,33 +379,64 @@ const detail = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  circle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
+  badge: {
+    borderRadius: radius.full,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginBottom: 16,
   },
-  circleNum: {
-    fontSize: fontSizes.xxl,
-    fontFamily: "Inter_700Bold",
-    color: "#fff",
+  badgeText: {
+    fontSize: fontSizes.xs,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 1,
+  },
+  imageWrap: {
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    overflow: "hidden",
+    marginBottom: 18,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  heroImage: { width: "100%", height: "100%" },
+  imageGlow: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 65,
   },
   heroName: {
     fontSize: fontSizes.xxl,
     fontFamily: "Inter_700Bold",
     color: colors.text,
     marginBottom: 4,
+    textAlign: "center",
   },
   heroSanskrit: {
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.sm,
     fontFamily: "Inter_500Medium",
     color: colors.textMuted,
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  heroRow: { flexDirection: "row", gap: 8 },
-  heroPill: {
+  subtitlePill: {
+    borderRadius: radius.full,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  subtitlePillText: {
+    fontSize: fontSizes.md,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 1,
+  },
+  pillRow: { flexDirection: "row", gap: 8 },
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
     backgroundColor: colors.card,
     borderRadius: radius.full,
     paddingHorizontal: 12,
@@ -299,29 +444,29 @@ const detail = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  heroPillText: {
+  pillText: {
     fontSize: fontSizes.xs,
     fontFamily: "Inter_400Regular",
     color: colors.textMuted,
   },
-  body: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  body: { paddingHorizontal: spacing.md, paddingTop: spacing.md },
   mantraBox: {
     alignItems: "center",
     borderWidth: 1,
     borderRadius: radius.lg,
     paddingVertical: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   mantraLabel: {
     fontSize: fontSizes.xs,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 1.5,
+    letterSpacing: 2,
     marginBottom: 6,
   },
   mantraText: {
-    fontSize: fontSizes.xxxl,
+    fontSize: 36,
     fontFamily: "Inter_700Bold",
-    letterSpacing: 6,
+    letterSpacing: 8,
   },
   sectionHead: {
     fontSize: fontSizes.md,
@@ -330,64 +475,90 @@ const detail = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
-  body_text: {
+  bodyText: {
     fontSize: fontSizes.sm,
     fontFamily: "Inter_400Regular",
     color: colors.textMuted,
     lineHeight: 22,
   },
-  affirmBox: {
+  sectionCard: {
+    backgroundColor: colors.card,
     borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: spacing.md,
-    marginTop: spacing.md,
-    alignItems: "center",
+    gap: 10,
   },
-  affirmLabel: {
-    fontSize: fontSizes.xs,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  affirmText: {
-    fontSize: fontSizes.md,
-    fontFamily: "Inter_400Regular",
-    color: colors.text,
-    textAlign: "center",
-    lineHeight: 24,
-    fontStyle: "italic",
-  },
-  listRow: {
+  bulletRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
-    marginBottom: 8,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: 6,
+  bulletIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
   },
-  listText: {
+  bulletText: {
     flex: 1,
     fontSize: fontSizes.sm,
     fontFamily: "Inter_400Regular",
     color: colors.textMuted,
     lineHeight: 20,
   },
-  chipGrid: {
+  affirmCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.lg,
+    marginTop: spacing.lg,
+    alignItems: "center",
+  },
+  affirmLabel: {
+    fontSize: fontSizes.xs,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 1.5,
+    marginBottom: 10,
+  },
+  affirmText: {
+    fontSize: fontSizes.md,
+    fontFamily: "Inter_400Regular",
+    color: colors.text,
+    textAlign: "center",
+    lineHeight: 26,
+    fontStyle: "italic",
+  },
+  poseGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
   },
-  chip: {
+  poseChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
     borderWidth: 1,
     borderRadius: radius.full,
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 6,
+    backgroundColor: colors.card,
   },
-  chipText: {
+  poseChipText: {
     fontSize: fontSizes.xs,
     fontFamily: "Inter_500Medium",
+  },
+  foodChip: {
+    borderWidth: 1,
+    borderRadius: radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.card,
+  },
+  foodChipText: {
+    fontSize: fontSizes.xs,
+    fontFamily: "Inter_400Regular",
+    color: colors.textMuted,
   },
 });

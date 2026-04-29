@@ -1,0 +1,163 @@
+Upgrade the Chakra section into a premium, image-driven experience.
+
+GOAL:
+Create a visually rich Chakra system with symbols, colors, meanings, and education.
+
+--------------------------------------------------
+DATA STRUCTURE (7 CHAKRAS)
+--------------------------------------------------
+
+Create a chakraData array with:
+
+- id
+- name
+- subtitle
+- color
+- affirmation
+- description
+- benefits
+- imbalances
+- image (symbol/crystal image URL)
+
+Chakras:
+
+1. Root Chakra (Muladhara)
+- Color: Red
+- Affirmation: "I am"
+- Description: Foundation, safety, stability
+- Benefits: Grounding, security, strength
+- Imbalances: Anxiety, fear, instability
+
+2. Sacral Chakra (Swadhisthana)
+- Color: Orange
+- Affirmation: "I feel"
+- Description: Emotions, creativity, pleasure
+- Benefits: Emotional balance, creativity
+- Imbalances: Guilt, emotional instability
+
+3. Solar Plexus (Manipura)
+- Color: Yellow
+- Affirmation: "I do"
+- Description: Confidence, power, identity
+- Benefits: Self-esteem, motivation
+- Imbalances: Low confidence, control issues
+
+4. Heart Chakra (Anahata)
+- Color: Green
+- Affirmation: "I love"
+- Description: Love, compassion, connection
+- Benefits: Emotional healing, empathy
+- Imbalances: Loneliness, jealousy
+
+5. Throat Chakra (Vishuddha)
+- Color: Blue
+- Affirmation: "I speak"
+- Description: Communication, truth
+- Benefits: Expression, clarity
+- Imbalances: Fear of speaking, dishonesty
+
+6. Third Eye (Ajna)
+- Color: Indigo
+- Affirmation: "I see"
+- Description: Intuition, awareness
+- Benefits: Insight, clarity
+- Imbalances: Confusion, lack of direction
+
+7. Crown Chakra (Sahasrara)
+- Color: Purple
+- Affirmation: "I understand"
+- Description: Spiritual connection
+- Benefits: Peace, enlightenment
+- Imbalances: Disconnection, lack of purpose
+
+--------------------------------------------------
+UI: CHAKRA LIST SCREEN
+--------------------------------------------------
+
+Create a vertical scroll list of chakra cards:
+
+Each card:
+- Background color = chakra color (soft gradient)
+- Chakra name
+- Subtitle
+- Small symbol image (right side)
+- Rounded card design
+- Tap → navigate to Chakra Detail screen
+
+Add top title:
+"Chakra System"
+Subtitle:
+"Your body's energy centers"
+
+--------------------------------------------------
+UI: CHAKRA DETAIL SCREEN
+--------------------------------------------------
+
+When user taps a chakra:
+
+Create a full detail screen with:
+
+1. HERO SECTION
+- Large chakra image (symbol or crystal)
+- Chakra name
+- Affirmation (large text)
+
+2. DESCRIPTION SECTION
+- Short explanation of chakra
+
+3. BENEFITS SECTION
+- Bullet list with icons
+
+4. IMBALANCES SECTION
+- Bullet list with warning-style icons
+
+5. AFFIRMATION CARD
+- Highlighted box with affirmation text
+
+6. OPTIONAL (if time):
+"Related Practices"
+- Suggest 2–3 yoga poses
+
+--------------------------------------------------
+DESIGN STYLE
+--------------------------------------------------
+
+- Use dark theme (match existing app)
+- Use soft glow around chakra colors
+- Maintain rounded cards
+- Smooth transitions between screens
+- Premium mobile UI (like Calm / Headspace)
+
+--------------------------------------------------
+IMAGE HANDLING
+--------------------------------------------------
+
+Use placeholder image URLs for now:
+chakra.image = "https://..."
+
+I will replace them later with my own hosted images.
+
+--------------------------------------------------
+NAVIGATION
+--------------------------------------------------
+
+Add Chakra tab (already exists):
+- List screen → Detail screen
+
+--------------------------------------------------
+IMPORTANT
+--------------------------------------------------
+
+Do NOT break existing navigation.
+Do NOT remove Yoga system.
+Only enhance Chakra section.
+
+--------------------------------------------------
+FINAL RESULT
+--------------------------------------------------
+
+A fully functional Chakra system:
+- List screen
+- Detail screen
+- Smooth navigation
+- Clean UI
