@@ -1,0 +1,152 @@
+FINAL POLISH TASK — Upgrade the Natura Yoga AI “AI Wellness Coach” screen only.
+
+Do not change the splash screen.
+Do not change the home screen.
+Do not change bottom navigation.
+Do not change logo assets.
+Do not rename routes or files unless absolutely necessary.
+
+Goal:
+Make the AI Wellness Coach feel more intelligent, personal, and calming — premium Calm/Headspace style.
+
+Update the AI Wellness Coach flow from a simple mood picker into a guided conversation experience.
+
+Required changes:
+
+1. Keep the existing premium green/dark visual style.
+
+2. Replace the static “How are you feeling today?” flow with a dynamic check-in prompt.
+Use rotating prompts such as:
+- “How are you showing up today?”
+- “What do you need most right now?”
+- “How’s your energy feeling?”
+- “What’s been weighing on you today?”
+
+3. Keep four primary mood cards:
+- Feeling stressed
+- Low energy
+- Need focus
+- Just exploring
+
+4. When the user taps a mood:
+- Do not immediately jump to a session.
+- Show a short “AI thinking” state first:
+  “Understanding your energy…”
+- Add a subtle typing dots animation or soft loading animation.
+- Use a delay of about 1.2–1.8 seconds before showing the response.
+
+5. After the thinking state, show an AI response card/message bubble using this structure:
+- Reflection
+- Gentle personalization
+- Supportive transition
+- Session recommendation
+
+Example for Feeling stressed:
+“It sounds like things feel a bit overwhelming right now. Sometimes when your mind is carrying too much, your body feels it too. Let’s slow that down together.”
+
+Example for Low energy:
+“Your energy feels like it may need a softer start today. We’ll keep this gentle and restorative so you can reconnect without forcing anything.”
+
+Example for Need focus:
+“It sounds like your mind wants more clarity. Let’s create a little space so your attention can settle.”
+
+Example for Just exploring:
+“That’s a great place to begin. I’ll guide you into something simple, balanced, and easy to follow.”
+
+6. After the AI response appears, show two premium action buttons:
+- “Quick Reset” with label “2 min”
+- “Deeper Session” with label “5–8 min”
+
+7. When the user chooses Quick Reset or Deeper Session:
+Show a guided session panel with:
+- Personalized title based on the mood
+- Duration
+- 3 calming guidance steps
+- A primary “Start Session” button
+- A secondary “Choose another mood” button
+
+Session recommendations:
+Feeling stressed:
+Quick: “2-Minute Grounding Reset”
+Deep: “Calm Body, Calm Mind Flow”
+
+Low energy:
+Quick: “Gentle Energy Wake-Up”
+Deep: “Restorative Morning Flow”
+
+Need focus:
+Quick: “Clarity Breath Reset”
+Deep: “Focused Mind Yoga Flow”
+
+Just exploring:
+Quick: “Simple Breath Awareness”
+Deep: “Balanced Wellness Flow”
+
+8. Add post-session reflection behavior:
+After Start Session is tapped, show a simple completion/reflection state:
+“How do you feel now?”
+Buttons:
+- Better
+- Same
+- Still tense
+
+Then show a gentle follow-up response:
+Better:
+“That shift matters. Even a small reset can change the tone of your day.”
+Same:
+“That’s okay. Some days need a little more patience and support.”
+Still tense:
+“Thank you for noticing that. Let’s try something slower and more grounding.”
+
+9. Add lightweight local memory using AsyncStorage if available in this app.
+Store:
+- last selected mood
+- last selected session type
+- last check-in date
+- basic streak count
+
+If AsyncStorage is not already installed, do not break the app. Use safe fallback state and add a clear comment saying AsyncStorage can be wired later.
+
+10. Use the memory only for small personalization lines:
+Examples:
+- “Welcome back — let’s continue gently today.”
+- “You checked in recently. Let’s keep that rhythm going.”
+- “Last time you chose a quick reset. Want something simple again?”
+
+11. Remove or minimize the “Explore on your own” section from the AI Coach screen only.
+The AI Coach screen should feel focused and conversational, not like another menu page.
+
+12. Add premium polish:
+- Soft fade-in animations for AI messages
+- Gentle card transitions
+- Clean spacing
+- No clutter
+- No broken icons
+- No placeholder question marks
+- No debug text
+- No console warnings
+- Must work on Expo preview
+
+13. Keep all code compatible with the existing React Native Expo setup.
+
+14. Before finishing, test that:
+- AI tab opens normally
+- Mood cards are clickable
+- Thinking state appears
+- AI response appears
+- Quick Reset and Deeper Session work
+- Session panel appears
+- Start Session works
+- Reflection buttons work
+- User can choose another mood
+- No splash/home screen regression
+- No syntax errors
+- No missing imports
+
+Important:
+Make this update surgically. Only update the AI Wellness Coach screen and any tiny helper logic needed for local state/memory. Preserve the rest of the app exactly as-is.
+
+After completing, summarize:
+- Files changed
+- What was improved
+- Anything I need to test on my phone
