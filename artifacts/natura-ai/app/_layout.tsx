@@ -9,44 +9,69 @@ import {
   Inter_700Bold,
 } from "@expo-google-fonts/inter";
 import * as SplashScreen from "expo-splash-screen";
-import { Animated, View, StyleSheet } from "react-native";
+import { Animated, View, StyleSheet, Image } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider, useTheme } from "../contexts/ThemeContext";
 import { UserProvider } from "../contexts/UserContext";
-import { NaturaLogo } from "../components/NaturaLogo";
 
+// ─── Keep native splash visible until we're ready ────────────────────────────
 SplashScreen.preventAutoHideAsync();
 
-const MIN_SPLASH_MS = 1800;
+const MIN_SPLASH_MS = 2000;
+const LOGO_URL = "https://apexdigital.design/wp-content/uploads/2026/04/natura-logo-clean.png";
+
+// Preload branded logo so it shows instantly with no flicker
+Image.prefetch(LOGO_URL).catch(() => {});
+
+// ─── In-app splash overlay ────────────────────────────────────────────────────
+// Shown after the native OS splash hides — provides a seamless handoff.
+// Fades out once fonts + min delay are done.
 
 function AppSplash({ visible }: { visible: boolean }) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.82)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+  const scale   = useRef(new Animated.Value(0.90)).current;
+  const [mounted, setMounted] = useState(true);
 
+  // Subtle entrance spring
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1, damping: 14, stiffness: 120, useNativeDriver: true }),
-    ]).start();
+    Animated.spring(scale, {
+      toValue: 1,
+      damping: 18,
+      stiffness: 140,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
+  // Smooth fade-out once ready
   useEffect(() => {
     if (!visible) {
-      Animated.timing(opacity, { toValue: 0, duration: 500, useNativeDriver: true }).start();
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
     }
   }, [visible]);
 
-  if (!visible && opacity._value === 0) return null;
+  if (!mounted) return null;
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.splash, { opacity }]}>
       <View style={styles.splashBg} />
       <Animated.View style={{ alignItems: "center", transform: [{ scale }] }}>
-        <NaturaLogo size={88} showText />
+        <Image
+          source={{ uri: LOGO_URL }}
+          style={styles.logoImg}
+          resizeMode="contain"
+        />
       </Animated.View>
     </Animated.View>
   );
 }
+
+// ─── Navigation stack ─────────────────────────────────────────────────────────
 
 function RootStack() {
   const { colors, isDark } = useTheme();
@@ -73,6 +98,8 @@ function RootStack() {
   );
 }
 
+// ─── Root layout ──────────────────────────────────────────────────────────────
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -82,25 +109,35 @@ export default function RootLayout() {
   });
 
   const [minDelayDone, setMinDelayDone] = useState(false);
-  const showSplash = !fontsLoaded || !minDelayDone;
+  const [nativeSplashHidden, setNativeSplashHidden] = useState(false);
 
+  // Minimum time the splash must stay visible (premium feel)
   useEffect(() => {
     const t = setTimeout(() => setMinDelayDone(true), MIN_SPLASH_MS);
     return () => clearTimeout(t);
   }, []);
 
+  // Only hide native splash when BOTH fonts AND min delay are ready.
+  // This prevents a flash where the app appears before it's styled.
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
+    if (fontsLoaded && minDelayDone && !nativeSplashHidden) {
+      SplashScreen.hideAsync()
+        .then(() => setNativeSplashHidden(true))
+        .catch(() => setNativeSplashHidden(true));
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, minDelayDone, nativeSplashHidden]);
+
+  // In-app splash stays visible until native splash has been hidden
+  const showInAppSplash = !nativeSplashHidden;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <UserProvider>
+          {/* Render the app early so it's ready when splash hides */}
           {fontsLoaded ? <RootStack /> : null}
-          <AppSplash visible={showSplash} />
+          {/* Seamless branded overlay — fades out after native splash hides */}
+          <AppSplash visible={showInAppSplash} />
         </UserProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
@@ -116,6 +153,10 @@ const styles = StyleSheet.create({
   },
   splashBg: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#0d1f16",
+    backgroundColor: "#0B2E1F",
+  },
+  logoImg: {
+    width: 180,
+    height: 180,
   },
 });
