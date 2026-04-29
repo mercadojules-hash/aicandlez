@@ -18,9 +18,10 @@ import { useStreak } from "../../hooks/useStreak";
 import { useChecklist } from "../../hooks/useChecklist";
 import { useTheme, ThemeOverride } from "../../contexts/ThemeContext";
 import { useUser } from "../../contexts/UserContext";
-import { NaturaLogo } from "../../components/NaturaLogo";
 
 const { width } = Dimensions.get("window");
+
+const LOGO_URL = "https://apexdigital.design/wp-content/uploads/2026/04/natura-logo-clean.png";
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
@@ -37,12 +38,7 @@ function AvatarButton() {
       {profile.image ? (
         <Image source={{ uri: profile.image }} style={styles.avatarImg} />
       ) : (
-        <LinearGradient
-          colors={[colors.primary + "60", colors.primary + "28"]}
-          style={styles.avatarPlaceholder}
-        >
-          <Feather name="user" size={17} color={colors.primary} />
-        </LinearGradient>
+        <Image source={{ uri: LOGO_URL }} style={styles.avatarImg} resizeMode="contain" />
       )}
     </TouchableOpacity>
   );
@@ -149,16 +145,30 @@ export default function HomeScreen() {
   const { streak } = useStreak();
   const { checklist, markComplete, getProgress } = useChecklist();
   const { colors } = useTheme();
+  const [checklistExpanded, setChecklistExpanded] = useState(false);
+  const checklistAnim = useRef(new Animated.Value(0)).current;
+
   const progress = getProgress();
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
+  const toggleChecklist = () => {
+    const toValue = checklistExpanded ? 0 : 1;
+    setChecklistExpanded(!checklistExpanded);
+    Animated.timing(checklistAnim, { toValue, duration: 280, useNativeDriver: false }).start();
+  };
+
+  const checklistHeight = checklistAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 168],
+  });
+
   const quickActions = [
-    { label: "Yoga Poses", icon: "activity", route: "/(tabs)/yoga", color: colors.accent },
-    { label: "Breathe", icon: "wind", route: "/(tabs)/breathe", color: colors.primary },
-    { label: "Chakras", icon: "circle", route: "/(tabs)/chakras", color: "#7c6ead" },
-    { label: "AI Coach", icon: "message-circle", route: "/(tabs)/ai", color: "#6ea8ed" },
+    { label: "Yoga Poses", icon: "activity", route: "/(tabs)/yoga",    color: colors.accent },
+    { label: "Breathe",    icon: "wind",     route: "/(tabs)/breathe", color: colors.primary },
+    { label: "Chakras",    icon: "circle",   route: "/(tabs)/chakras", color: "#7c6ead" },
+    { label: "AI Coach",   icon: "message-circle", route: "/(tabs)/ai", color: "#6ea8ed" },
   ];
 
   return (
@@ -171,18 +181,17 @@ export default function HomeScreen() {
             <AvatarButton />
             <View>
               <Text style={[styles.greeting, { color: colors.textMuted }]}>{greeting}</Text>
-              <View style={styles.logoRow}>
-                <NaturaLogo size={22} />
-                <Text style={[styles.name, { color: colors.text }]}>Natura AI</Text>
-              </View>
+              <Text style={[styles.name, { color: colors.text }]}>Natura AI</Text>
             </View>
           </View>
           <View style={styles.headerRight}>
             <ThemeToggle />
-            <View style={[styles.streakBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={styles.streakFire}>🔥</Text>
-              <Text style={[styles.streakNum, { color: colors.text }]}>{streak}</Text>
-            </View>
+            {streak > 0 && (
+              <View style={[styles.streakBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Feather name="zap" size={14} color="#FFB74D" />
+                <Text style={[styles.streakNum, { color: colors.text }]}>{streak}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -200,7 +209,7 @@ export default function HomeScreen() {
               ? "Start your first practice today"
               : progress < 1
               ? "Keep going — you're almost there!"
-              : "Amazing! You completed today's goals 🎉"}
+              : "Amazing! You completed today's goals"}
           </Text>
         </View>
 
@@ -214,7 +223,7 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        {/* ── CHECKLIST ───────────────────────────────────────────────── */}
+        {/* ── CHECKLIST (collapsible) ──────────────────────────────────── */}
         <View
           style={[
             styles.card,
@@ -226,33 +235,54 @@ export default function HomeScreen() {
             },
           ]}
         >
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Today's Checklist</Text>
-          <View style={{ marginTop: spacing.sm }}>
-            <CheckItem
-              label="Complete a yoga flow"
-              done={checklist.yoga}
-              onPress={() => {
-                if (!checklist.yoga) markComplete("yoga");
-                router.push("/(tabs)/yoga");
-              }}
-            />
-            <CheckItem
-              label="Do a breathing session"
-              done={checklist.breathwork}
-              onPress={() => {
-                if (!checklist.breathwork) markComplete("breathwork");
-                router.push("/(tabs)/breathe");
-              }}
-            />
-            <CheckItem
-              label="Review a chakra"
-              done={checklist.chakra}
-              onPress={() => {
-                if (!checklist.chakra) markComplete("chakra");
-                router.push("/(tabs)/chakras");
-              }}
-            />
-          </View>
+          <TouchableOpacity
+            style={styles.checklistHeader}
+            onPress={toggleChecklist}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>
+              Today's Checklist
+            </Text>
+            <View style={styles.checklistMeta}>
+              <Text style={[styles.checklistCount, { color: colors.primary }]}>
+                {Object.values(checklist).filter(Boolean).length}/{Object.values(checklist).length}
+              </Text>
+              <Feather
+                name={checklistExpanded ? "chevron-up" : "chevron-down"}
+                size={16}
+                color={colors.textDim}
+              />
+            </View>
+          </TouchableOpacity>
+
+          <Animated.View style={{ height: checklistHeight, overflow: "hidden" }}>
+            <View style={{ marginTop: spacing.sm }}>
+              <CheckItem
+                label="Complete a yoga flow"
+                done={checklist.yoga}
+                onPress={() => {
+                  if (!checklist.yoga) markComplete("yoga");
+                  router.push("/(tabs)/yoga");
+                }}
+              />
+              <CheckItem
+                label="Do a breathing session"
+                done={checklist.breathwork}
+                onPress={() => {
+                  if (!checklist.breathwork) markComplete("breathwork");
+                  router.push("/(tabs)/breathe");
+                }}
+              />
+              <CheckItem
+                label="Review a chakra"
+                done={checklist.chakra}
+                onPress={() => {
+                  if (!checklist.chakra) markComplete("chakra");
+                  router.push("/(tabs)/chakras");
+                }}
+              />
+            </View>
+          </Animated.View>
         </View>
 
         {/* ── AI BANNER ───────────────────────────────────────────────── */}
@@ -299,13 +329,12 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-  logoRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   avatarWrap: {
     width: 40, height: 40, borderRadius: 20,
     borderWidth: 1.5, overflow: "hidden",
+    backgroundColor: "#0B2E1F",
   },
   avatarImg: { width: "100%", height: "100%" },
-  avatarPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
   greeting: { fontSize: fontSizes.xs, fontFamily: "Inter_400Regular", marginBottom: 2 },
   name: { fontSize: fontSizes.md, fontFamily: "Inter_700Bold" },
   themeBtn: {
@@ -317,9 +346,8 @@ const styles = StyleSheet.create({
   streakBadge: {
     flexDirection: "row", alignItems: "center",
     borderRadius: radius.full, borderWidth: 1,
-    paddingHorizontal: 12, paddingVertical: 7, gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6, gap: 4,
   },
-  streakFire: { fontSize: 16 },
   streakNum: { fontSize: fontSizes.md, fontFamily: "Inter_700Bold" },
   section: { marginBottom: spacing.md },
   card: {
@@ -351,6 +379,20 @@ const styles = StyleSheet.create({
   quickCardGrad: { padding: spacing.md, alignItems: "flex-start", gap: 10 },
   quickIcon: { width: 42, height: 42, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
   quickLabel: { fontSize: fontSizes.md, fontFamily: "Inter_600SemiBold" },
+  checklistHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  checklistMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  checklistCount: {
+    fontSize: fontSizes.sm,
+    fontFamily: "Inter_600SemiBold",
+  },
   checkRow: {
     flexDirection: "row", alignItems: "center",
     paddingVertical: 11, gap: 12,

@@ -1,0 +1,190 @@
+FINAL POLISH FOR NATURA YOGA AI (APP STORE READY)
+
+Apply all changes carefully without breaking existing functionality.
+
+----------------------------------------
+1. SPLASH SCREEN (CRITICAL FIX)
+----------------------------------------
+
+Goal: Premium, clean, logo-focused experience
+
+- REMOVE any dark overlay on the splash screen
+- Use the provided background image ONLY:
+  https://apexdigital.design/wp-content/uploads/2026/04/natura-splash-page-2.png
+
+- Ensure image fills full screen (cover, no stretching)
+
+- CENTER CONTENT vertically:
+  - Logo slightly above center
+  - Text directly below
+
+- LOGO:
+  - Size: ~140–160px width
+  - Crisp, not stretched
+  - Add VERY subtle soft glow behind logo (low opacity)
+
+- TEXT:
+  - Title: "Natura Yoga AI"
+    Font size: 20–24px
+    Font weight: semi-bold
+  - Subtitle: "Find your balance through movement and breath"
+    Font size: 12–14px
+    Opacity: ~0.7
+
+- SPACING:
+  - Logo → Title: 16px
+  - Title → Subtitle: 6px
+
+- REMOVE this text completely:
+  "No experience needed • Free forever"
+
+----------------------------------------
+2. FIX BROKEN BUTTON ICONS (QUESTION MARK BOXES)
+----------------------------------------
+
+- Replace any broken emoji/icons showing as "?" boxes
+- Use clean text OR proper icons (Lucide or native icons)
+
+Buttons should read:
+- Yoga
+- Breathwork
+- Chakras
+- Meditation
+
+Ensure:
+- Icons render correctly on iOS
+- No emoji placeholders
+
+----------------------------------------
+3. PROFILE SCREEN (LOGO FIX)
+----------------------------------------
+
+- Default avatar MUST use this logo:
+  (use existing logo URL already added)
+
+- Behavior:
+  - If user has NOT uploaded image → show logo
+  - If user uploads image → override logo
+
+- Style:
+  - Circular avatar
+  - Centered
+  - Proper padding (not cropped)
+
+----------------------------------------
+4. REMOVE TOP RIGHT BUG ( ? and "0" )
+----------------------------------------
+
+- Remove BOTH:
+  - Question mark icon
+  - "0" badge
+
+These are placeholder/debug elements and should NOT exist in production.
+
+----------------------------------------
+5. HOME SCREEN CLEANUP (REDUCE CLUTTER)
+----------------------------------------
+
+Goal: Reduce scrolling + improve clarity
+
+- Keep ONLY:
+  - Daily Progress
+  - 4 main cards:
+    • Yoga Poses
+    • Breathe
+    • Chakras
+    • AI Coach
+
+- Move extra sections BELOW or make collapsible:
+  - "Today's Checklist" → collapsible card
+  - Any extra content → "View More"
+
+- Ensure:
+  - First screen = NO scrolling needed
+  - Clean spacing between sections
+
+----------------------------------------
+6. AI WELLNESS COACH (MAKE IT FEEL LIKE AI)
+----------------------------------------
+
+Add personality and interaction.
+
+TOP SECTION:
+- Title: "AI Wellness Coach"
+- Subtitle:
+  "Your AI wellness guide"
+  "Based on your energy, I’ll guide your next session."
+
+----------------------------------------
+MOOD OPTIONS (UPDATE TEXT)
+----------------------------------------
+
+Replace with:
+
+- "Feeling stressed"
+- "Low energy"
+- "Need focus"
+- "Just exploring"
+
+----------------------------------------
+INTERACTION (IMPORTANT)
+----------------------------------------
+
+When user taps a mood:
+
+Show immediate response:
+
+Example (stressed):
+"Got it. Let’s slow things down."
+
+Then display:
+- Recommended session list:
+  • 3 min breathing reset
+  • Light yoga flow
+  • Calm focus session
+
+Add:
+- Primary button:
+  "Start Session"
+- Secondary options below
+
+----------------------------------------
+ANIMATION
+----------------------------------------
+
+- Add slight scale animation on tap (subtle)
+- Smooth transition to recommendation (no abrupt changes)
+
+----------------------------------------
+7. GENERAL UI POLISH
+----------------------------------------
+
+- Ensure:
+  - Proper padding everywhere
+  - Consistent spacing
+  - No overlapping elements
+  - No UI glitches
+
+- App should feel:
+  Clean, premium, minimal
+
+----------------------------------------
+FINAL GOAL
+----------------------------------------
+
+App should feel like:
+Calm / Headspace level quality
+
+- Logo is the hero
+- AI Coach feels intelligent
+- No broken UI elements
+- No unnecessary clutter
+
+----------------------------------------
+
+DO NOT:
+- Add new features
+- Break navigation
+- Change app structure
+
+ONLY polish and fix UI/UX.
