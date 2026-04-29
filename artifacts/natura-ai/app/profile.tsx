@@ -19,7 +19,7 @@ import { spacing, radius, fontSizes } from "../constants/theme";
 import { useTheme, ThemeOverride } from "../contexts/ThemeContext";
 import { useUser } from "../contexts/UserContext";
 import { useSoundPreference } from "../hooks/useSoundPreference";
-import { NaturaLogo } from "../components/NaturaLogo";
+const LOGO_URL = "https://apexdigital.design/wp-content/uploads/2026/04/natura-logo-clean.png";
 
 const THEME_OPTIONS: { label: string; icon: string; value: ThemeOverride }[] = [
   { label: "Dark", icon: "moon", value: "dark" },
@@ -82,12 +82,13 @@ export default function ProfileScreen() {
             {profile.image ? (
               <Image source={{ uri: profile.image }} style={styles.avatarImg} />
             ) : (
-              <LinearGradient
-                colors={[colors.primary + "60", colors.primary + "28"]}
-                style={styles.avatarPlaceholder}
-              >
-                <NaturaLogo size={48} />
-              </LinearGradient>
+              <View style={[styles.avatarPlaceholder, { backgroundColor: "#0B2E1F" }]}>
+                <Image
+                  source={{ uri: LOGO_URL }}
+                  style={{ width: 80, height: 80 }}
+                  resizeMode="contain"
+                />
+              </View>
             )}
             <View style={[styles.avatarEditBadge, { backgroundColor: colors.primary }]}>
               <Feather name="camera" size={12} color="#fff" />
@@ -192,7 +193,7 @@ export default function ProfileScreen() {
 
           {/* App info */}
           <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <NaturaLogo size={32} />
+            <Image source={{ uri: LOGO_URL }} style={{ width: 36, height: 36 }} resizeMode="contain" />
             <View>
               <Text style={[styles.infoTitle, { color: colors.text }]}>Natura Yoga AI</Text>
               <Text style={[styles.infoVersion, { color: colors.textDim }]}>Version 1.0.0</Text>

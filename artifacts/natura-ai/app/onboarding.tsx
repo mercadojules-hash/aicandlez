@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
-  ImageBackground,
   Image,
 } from "react-native";
 import { router } from "expo-router";
@@ -14,46 +13,48 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import { colors, radius, fontSizes, spacing } from "../constants/theme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { NaturaLogo } from "../components/NaturaLogo";
 
 const { width, height } = Dimensions.get("window");
-const BG_IMAGE = "https://apexdigital.design/wp-content/uploads/2026/04/natura-splash-page-2.png";
 
-// Preload image on module load
-Image.prefetch(BG_IMAGE).catch(() => {});
+const LOGO_URL   = "https://apexdigital.design/wp-content/uploads/2026/04/natura-logo-clean.png";
+const SPLASH_URL = "https://apexdigital.design/wp-content/uploads/2026/04/natura-splash-page-2.png";
+
+// Preload both images immediately
+Image.prefetch(LOGO_URL).catch(() => {});
+Image.prefetch(SPLASH_URL).catch(() => {});
 
 export default function OnboardingScreen() {
-  // Phase 1: logo fade-in
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoScale  = useRef(new Animated.Value(0.82)).current;
-
-  // Phase 2: logo fade-out
-  const logoExitOpacity = useRef(new Animated.Value(1)).current;
-  const logoExitScale   = useRef(new Animated.Value(1)).current;
-
-  // Phase 3: content fade-in
-  const contentOpacity  = useRef(new Animated.Value(0)).current;
-  const contentSlide    = useRef(new Animated.Value(24)).current;
-
-  // Overlay: starts dark → lightens as content reveals
-  const overlayOpacity  = useRef(new Animated.Value(0.72)).current;
+  // Stage 1: logo fades in
+  const logoOpacity  = useRef(new Animated.Value(0)).current;
+  const logoScale    = useRef(new Animated.Value(0.78)).current;
+  // Stage 1 exit: logo fades out
+  const logoExitOp   = useRef(new Animated.Value(1)).current;
+  const logoExitSc   = useRef(new Animated.Value(1)).current;
+  // Stage 2: splash bg fades in
+  const splashOpacity = useRef(new Animated.Value(0)).current;
+  // Stage 2: dark overlay lightens slightly
+  const overlayOp    = useRef(new Animated.Value(0.85)).current;
+  // Stage 2: content fades in
+  const contentOp    = useRef(new Animated.Value(0)).current;
+  const contentSlide = useRef(new Animated.Value(28)).current;
 
   useEffect(() => {
     Animated.sequence([
-      // Phase 1: logo appears (0–600ms)
+      // Stage 1 — logo appears (0–700ms)
       Animated.parallel([
-        Animated.timing(logoOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.spring(logoScale, { toValue: 1, damping: 14, stiffness: 130, useNativeDriver: true }),
+        Animated.timing(logoOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.spring(logoScale, { toValue: 1, damping: 14, stiffness: 120, useNativeDriver: true }),
       ]),
-      // Hold 200ms
-      Animated.delay(200),
-      // Phase 2 + 3: logo fades out, content + bg reveal (800ms+)
+      // Hold 400ms
+      Animated.delay(400),
+      // Stage 2 — logo out, splash + content in (1100ms–2600ms)
       Animated.parallel([
-        Animated.timing(logoExitOpacity, { toValue: 0, duration: 450, useNativeDriver: true }),
-        Animated.timing(logoExitScale,   { toValue: 0.94, duration: 450, useNativeDriver: true }),
-        Animated.timing(overlayOpacity,  { toValue: 0.52, duration: 700, useNativeDriver: true }),
-        Animated.timing(contentOpacity,  { toValue: 1,    duration: 650, useNativeDriver: true }),
-        Animated.timing(contentSlide,    { toValue: 0,    duration: 650, useNativeDriver: true }),
+        Animated.timing(logoExitOp,    { toValue: 0, duration: 500, useNativeDriver: true }),
+        Animated.timing(logoExitSc,    { toValue: 0.92, duration: 500, useNativeDriver: true }),
+        Animated.timing(splashOpacity, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(overlayOp,     { toValue: 0.55, duration: 900, useNativeDriver: true }),
+        Animated.timing(contentOp,     { toValue: 1, duration: 750, useNativeDriver: true }),
+        Animated.timing(contentSlide,  { toValue: 0, duration: 750, useNativeDriver: true }),
       ]),
     ]).start();
   }, []);
@@ -63,60 +64,61 @@ export default function OnboardingScreen() {
     router.replace("/(tabs)");
   };
 
+  const logoAnimStyle = {
+    opacity: Animated.multiply(logoOpacity, logoExitOp),
+    transform: [{ scale: Animated.multiply(logoScale, logoExitSc) as any }],
+  };
+
   return (
     <View style={styles.root}>
-      {/* Background image */}
-      <ImageBackground
-        source={{ uri: BG_IMAGE }}
-        style={StyleSheet.absoluteFillObject}
+      {/* Always-visible dark green base */}
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: "#0B2E1F" }]} />
+
+      {/* Stage 2: full splash image fades in */}
+      <Animated.Image
+        source={{ uri: SPLASH_URL }}
+        style={[StyleSheet.absoluteFillObject, styles.splashImg, { opacity: splashOpacity }]}
         resizeMode="cover"
       />
 
-      {/* Dark gradient overlay — animated opacity */}
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: overlayOpacity }]}>
+      {/* Dark overlay for readability */}
+      <Animated.View
+        style={[StyleSheet.absoluteFillObject, { opacity: overlayOp }]}
+        pointerEvents="none"
+      >
         <LinearGradient
-          colors={["rgba(10,24,16,0.85)", "rgba(8,20,13,0.92)"]}
+          colors={["rgba(11,46,31,0.9)", "rgba(8,20,14,0.95)"]}
           style={StyleSheet.absoluteFillObject}
         />
       </Animated.View>
 
-      {/* Bottom gradient for text readability */}
+      {/* Bottom gradient for text area */}
       <LinearGradient
-        colors={["transparent", "rgba(8,18,12,0.96)"]}
+        colors={["transparent", "rgba(8,18,12,0.97)"]}
         style={styles.bottomGrad}
         pointerEvents="none"
       />
 
-      {/* Phase 1: Logo only (centered) */}
-      <Animated.View
-        style={[
-          styles.logoPhase,
-          {
-            opacity: Animated.multiply(logoOpacity, logoExitOpacity),
-            transform: [
-              { scale: Animated.multiply(logoScale, logoExitScale) as any },
-            ],
-          },
-        ]}
-        pointerEvents="none"
-      >
-        <NaturaLogo size={100} />
+      {/* Stage 1: logo only, centered */}
+      <Animated.View style={[styles.logoStage, logoAnimStyle]} pointerEvents="none">
+        <Image
+          source={{ uri: LOGO_URL }}
+          style={styles.logoImg}
+          resizeMode="contain"
+        />
       </Animated.View>
 
-      {/* Phase 2: Full UI content */}
+      {/* Stage 2: full UI content */}
       <Animated.View
         style={[
           styles.content,
-          {
-            opacity: contentOpacity,
-            transform: [{ translateY: contentSlide }],
-          },
+          { opacity: contentOp, transform: [{ translateY: contentSlide }] },
         ]}
       >
-        {/* Logo + wordmark */}
+        {/* Wordmark row */}
         <View style={styles.brandRow}>
-          <NaturaLogo size={48} />
-          <View style={styles.brandText}>
+          <Image source={{ uri: LOGO_URL }} style={styles.brandLogo} resizeMode="contain" />
+          <View>
             <Text style={styles.appName}>Natura Yoga AI</Text>
             <Text style={styles.appTagline}>Wellness for mind, body & soul</Text>
           </View>
@@ -155,16 +157,21 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0a1810" },
+  root: { flex: 1 },
+  splashImg: { width: "100%", height: "100%" },
   bottomGrad: {
     position: "absolute",
     bottom: 0, left: 0, right: 0,
-    height: height * 0.65,
+    height: height * 0.68,
   },
-  logoPhase: {
+  logoStage: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
+  },
+  logoImg: {
+    width: 180,
+    height: 180,
   },
   content: {
     flex: 1,
@@ -175,15 +182,15 @@ const styles = StyleSheet.create({
   brandRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    marginBottom: 28,
+    gap: 12,
+    marginBottom: 24,
   },
-  brandText: { flex: 1 },
+  brandLogo: { width: 44, height: 44 },
   appName: {
-    fontSize: fontSizes.xl,
+    fontSize: fontSizes.lg,
     fontFamily: "Inter_700Bold",
     color: colors.text,
-    marginBottom: 3,
+    marginBottom: 2,
   },
   appTagline: {
     fontSize: fontSizes.xs,
@@ -196,13 +203,13 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 42,
     letterSpacing: 0.3,
-    marginBottom: 28,
+    marginBottom: 24,
   },
   pillsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 36,
+    marginBottom: 32,
   },
   pill: {
     backgroundColor: "rgba(78,173,124,0.18)",
@@ -225,7 +232,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.45,
     shadowRadius: 14,
     elevation: 8,
   },

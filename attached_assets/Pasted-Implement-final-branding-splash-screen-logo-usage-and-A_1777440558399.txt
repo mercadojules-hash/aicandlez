@@ -1,0 +1,146 @@
+Implement final branding, splash screen, logo usage, and AI Coach experience for the app.
+
+----------------------------------------
+1. SPLASH SCREEN (FIX + IMPLEMENT)
+----------------------------------------
+
+Use TWO-STAGE splash experience:
+
+STAGE 1 (Logo Splash):
+- Background color: #0B2E1F (dark green)
+- Center this logo:
+  https://apexdigital.design/wp-content/uploads/2026/04/natura-logo-clean.png
+- Logo size: ~160–200px
+- Duration: ~800ms–1200ms
+
+STAGE 2 (Full Splash Image):
+- Fade into this full splash image:
+  https://apexdigital.design/wp-content/uploads/2026/04/natura-splash-page-2.png
+- Duration: ~1200–1800ms
+- Smooth fade transition (opacity animation)
+
+After splash:
+- Navigate to main app/home screen
+
+IMPORTANT:
+- Ensure splash is properly configured in app.json (Expo)
+- Preload images before rendering
+- No flashing or white screen
+- Transitions must feel smooth and premium
+
+----------------------------------------
+2. LOGO INTEGRATION (GLOBAL BRANDING)
+----------------------------------------
+
+Use this logo:
+https://apexdigital.design/wp-content/uploads/2026/04/natura-logo-clean.png
+
+A. PROFILE SCREEN:
+- Use logo as DEFAULT avatar
+- Size: 90–110px inside avatar container
+- Centered
+- Slightly larger than current
+- Clean (NO glow)
+
+RULE:
+- If user uploads image → replace logo
+- If no image → show logo
+
+B. HEADER / APP BRANDING:
+- Use smaller version where appropriate (top screens)
+- Maintain padding and aspect ratio
+- Never stretch or distort
+
+----------------------------------------
+3. BREATHING EXPERIENCE (ADD SOUND)
+----------------------------------------
+
+Add optional breathing audio:
+
+- Toggle already exists → connect it
+- Use soft synthesized breathing sound:
+  - Inhale → gentle rise sound
+  - Exhale → soft release sound
+- Sync audio with animation timing
+
+RULES:
+- Must be subtle (not loud or annoying)
+- Loop seamlessly
+- Respect toggle ON/OFF state
+
+----------------------------------------
+4. AI COACH (CORE FEATURE)
+----------------------------------------
+
+Build a guided AI Coach experience (NOT a chat UI yet)
+
+TOP SECTION:
+Display:
+"How are you feeling today?"
+
+OPTIONS (buttons):
+- Stressed
+- Low energy
+- Anxious
+- Focused
+- Just exploring
+
+----------------------------------------
+AI RESPONSE LOGIC:
+----------------------------------------
+
+When user selects mood:
+Show recommendation card:
+
+Example:
+"Let’s slow things down. I recommend a short breathing session followed by gentle movement."
+
+----------------------------------------
+GENERATED SESSION:
+----------------------------------------
+
+Display:
+
+"Your session:"
+- 2 min breathing
+- 5 min yoga
+- 1 chakra focus
+
+----------------------------------------
+CTA BUTTON:
+----------------------------------------
+
+"Start My Session"
+
+Flow when clicked:
+- Step 1 → Breathing
+- Step 2 → Yoga
+- Step 3 → Chakra
+- Step 4 → Meditation (optional)
+
+----------------------------------------
+UX RULES:
+----------------------------------------
+
+- Smooth transitions between steps
+- Use existing components (do not overbuild)
+- Keep UI minimal and premium
+- No chat interface yet
+- Focus on guided experience
+
+----------------------------------------
+5. FINAL UX POLISH
+----------------------------------------
+
+- All animations smooth (no lag)
+- Consistent green theme
+- Proper spacing and padding everywhere
+- No visual glitches
+- App should feel like a finished product
+
+----------------------------------------
+GOAL:
+----------------------------------------
+
+Make the app feel like a premium daily wellness product,
+similar in quality to Calm or Headspace.
