@@ -1,0 +1,108 @@
+We are updating the **Natura AI app (NOT Natura Yoga AI app)**.
+
+Make the following UI/UX improvements on the HOME SCREEN only.
+
+-----------------------------------
+1. FIX LOGO + HERO BUTTON
+-----------------------------------
+
+- Replace the current incorrect logo with the official Natura AI logo (green circular leaf + energy dot symbol).
+- Ensure logo is centered and clearly visible.
+
+HERO BUTTON FIX ("Begin Your Journey"):
+
+- REMOVE the small leaf icon on the left side of the button.
+- REMOVE any arrow/icon on the left side.
+- Keep the button clean and minimal.
+- MOVE the arrow icon to the far RIGHT side of the button (only if needed).
+- Ensure text is perfectly centered.
+- Maintain proper horizontal padding.
+
+-----------------------------------
+2. FIX AI COACH CARD BUTTONS
+-----------------------------------
+
+Inside the AI Wellness Coach card:
+
+- REMOVE ALL icons from:
+  - "Get Today’s Plan"
+  - "Ask AI Coach"
+
+- RENAME:
+  "Get Today’s Plan" → "Today’s Plan"
+
+- Keep buttons equal size and aligned.
+- Ensure text does NOT wrap.
+
+-----------------------------------
+3. FIX "START GUIDE" BUTTON (IMPORTANT)
+-----------------------------------
+
+- REMOVE the arrow icon next to "Start Guide"
+- Center the text inside the button
+- Ensure padding is symmetrical left and right
+- Keep button clean and balanced
+
+-----------------------------------
+4. ADD GROCERY LIST (CRITICAL UX FIX)
+-----------------------------------
+
+SECTION: Quick Actions
+
+Add a 4th button:
+
+- Label: "Groceries"
+- Icon: shopping cart
+
+FINAL layout (2x2 grid):
+
+- Ask AI
+- My Plans
+- Recipes
+- Groceries
+
+Ensure:
+- Equal sizing
+- Even spacing
+- Consistent icon style
+
+-----------------------------------
+5. ADD SECONDARY GROCERY ACCESS
+-----------------------------------
+
+Below Quick Actions, add:
+
+Text:
+"Need ingredients for your meals?"
+
+Button:
+"Open Grocery List"
+
+- Subtle design
+- Green theme
+- Rounded corners
+
+-----------------------------------
+6. CLEAN UP SCROLL / SPACING
+-----------------------------------
+
+- Reduce excessive vertical spacing
+- Keep key actions visible without heavy scrolling
+
+-----------------------------------
+7. DESIGN CONSISTENCY
+-----------------------------------
+
+- Maintain Natura AI dark green premium look
+- Soft glow accents
+- Rounded UI elements
+- Clean typography
+- No clutter
+
+-----------------------------------
+
+IMPORTANT:
+ONLY modify the Natura AI app.
+DO NOT touch Natura Yoga AI.
+
+Return updated UI components only.
