@@ -8,9 +8,9 @@ import {
   Animated,
   Easing,
   Dimensions,
-  Platform,
   Image,
 } from "react-native";
+import { Audio } from "expo-av";
 import { useLocalSearchParams, router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -41,121 +41,58 @@ const BREATH_IMAGES: Record<string, { uri: string; caption: string }> = {
 };
 const CIRCLE = width * 0.55;
 
-// ─── Web Audio breathing synthesis ───────────────────────────────────────────
+// ─── expo-av breathing audio ──────────────────────────────────────────────────
 
 function useBreathAudio(enabled: boolean) {
-  const ctxRef  = useRef<any>(null);
-  const oscRef  = useRef<any>(null);
-  const gainRef = useRef<any>(null);
-  const ambRef  = useRef<any>(null);
-  const ambGainRef = useRef<any>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
-  const isWeb = Platform.OS === "web";
-
-  const getCtx = useCallback(async (): Promise<any | null> => {
-    if (!isWeb) return null;
-    try {
-      const AC = (globalThis as any).AudioContext || (globalThis as any).webkitAudioContext;
-      if (!AC) return null;
-      if (!ctxRef.current || ctxRef.current.state === "closed") {
-        ctxRef.current = new AC();
-      }
-      if (ctxRef.current.state === "suspended") {
-        try { await ctxRef.current.resume(); } catch {}
-      }
-      return ctxRef.current;
-    } catch { return null; }
-  }, [isWeb]);
-
-  const startAmbient = useCallback((ctx: any) => {
-    if (ambRef.current) return;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.04, ctx.currentTime + 2);
-    gain.connect(ctx.destination);
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(110, ctx.currentTime);
-    osc.connect(gain);
-    osc.start();
-    ambRef.current = osc;
-    ambGainRef.current = gain;
+  useEffect(() => {
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      staysActiveInBackground: false,
+      playsInSilentModeIOS: true,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+    }).catch(() => {});
+    return () => {
+      soundRef.current?.unloadAsync().catch(() => {});
+      soundRef.current = null;
+    };
   }, []);
 
-  const playPhase = useCallback(async (label: string, duration: number) => {
-    if (!enabled) return;
-    const ctx = await getCtx();
-    if (!ctx) return;
-
-    startAmbient(ctx);
-
-    // Stop previous oscillator
-    try {
-      if (gainRef.current) {
-        gainRef.current.gain.cancelScheduledValues(ctx.currentTime);
-        gainRef.current.gain.setValueAtTime(gainRef.current.gain.value, ctx.currentTime);
-        gainRef.current.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
-      }
-      setTimeout(() => { try { oscRef.current?.stop(); } catch {} }, 350);
-    } catch {}
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.connect(ctx.destination);
-
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.connect(gain);
-
-    const now = ctx.currentTime;
-    const dur = duration;
-
-    if (label === "Inhale") {
-      osc.frequency.setValueAtTime(270, now);
-      osc.frequency.linearRampToValueAtTime(490, now + dur);
-      gain.gain.linearRampToValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.18, now + 0.6);
-      gain.gain.setValueAtTime(0.18, now + dur - 0.3);
-      gain.gain.linearRampToValueAtTime(0.1, now + dur);
-    } else if (label.includes("Hold") || label === "Retention") {
-      osc.frequency.setValueAtTime(210, now);
-      gain.gain.linearRampToValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.07, now + 0.8);
-    } else {
-      // Exhale
-      osc.frequency.setValueAtTime(490, now);
-      osc.frequency.linearRampToValueAtTime(215, now + dur);
-      gain.gain.linearRampToValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.15, now + 0.6);
-      gain.gain.setValueAtTime(0.15, now + dur - 0.6);
-      gain.gain.linearRampToValueAtTime(0, now + dur);
+  // Stop sound when user turns off audio mid-session
+  useEffect(() => {
+    if (!enabled && soundRef.current) {
+      soundRef.current.stopAsync()
+        .then(() => soundRef.current?.unloadAsync())
+        .catch(() => {})
+        .finally(() => { soundRef.current = null; });
     }
+  }, [enabled]);
 
-    osc.start();
-    oscRef.current = osc;
-    gainRef.current = gain;
-  }, [enabled, getCtx, startAmbient]);
-
-  const stopAll = useCallback(() => {
+  const playPhase = useCallback(async (_label: string, _duration: number) => {
+    if (!enabled) return;
+    // Ambient loop already running — no restart needed between phases
+    if (soundRef.current) return;
     try {
-      if (gainRef.current && ctxRef.current) {
-        gainRef.current.gain.linearRampToValueAtTime(0, ctxRef.current.currentTime + 0.4);
-      }
-      if (ambGainRef.current && ctxRef.current) {
-        ambGainRef.current.gain.linearRampToValueAtTime(0, ctxRef.current.currentTime + 1.2);
-      }
-      setTimeout(() => {
-        try { oscRef.current?.stop(); } catch {}
-        try { ambRef.current?.stop(); } catch {}
-        oscRef.current = null; gainRef.current = null;
-        ambRef.current = null; ambGainRef.current = null;
-      }, 1400);
-    } catch {}
-  }, []);
+      const { sound } = await Audio.Sound.createAsync(
+        require("../../assets/sounds/breath-ambient.wav"),
+        { shouldPlay: true, isLooping: true, volume: 0.55 },
+      );
+      soundRef.current = sound;
+    } catch (error) {
+      console.log("Breath audio error:", error);
+    }
+  }, [enabled]);
 
-  useEffect(() => () => {
-    stopAll();
-    setTimeout(() => { try { ctxRef.current?.close(); } catch {} }, 1500);
+  const stopAll = useCallback(async () => {
+    try {
+      if (soundRef.current) {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+    } catch {}
   }, []);
 
   return { playPhase, stopAll };

@@ -9,8 +9,8 @@ import {
   Image,
   Dimensions,
   Animated,
-  Platform,
 } from "react-native";
+import { Audio } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -22,7 +22,19 @@ import { useChecklist } from "../../hooks/useChecklist";
 
 const { width } = Dimensions.get("window");
 
-// ─── Web Audio Engine ─────────────────────────────────────────────────────────
+// ─── Chakra sound files (solfeggio sine tones) ────────────────────────────────
+
+const CHAKRA_SOUNDS: Record<string, any> = {
+  "root":         require("../../assets/sounds/root.wav"),
+  "sacral":       require("../../assets/sounds/sacral.wav"),
+  "solar-plexus": require("../../assets/sounds/solar-plexus.wav"),
+  "heart":        require("../../assets/sounds/heart.wav"),
+  "throat":       require("../../assets/sounds/throat.wav"),
+  "third-eye":    require("../../assets/sounds/third-eye.wav"),
+  "crown":        require("../../assets/sounds/crown.wav"),
+};
+
+// ─── expo-av Audio Engine ─────────────────────────────────────────────────────
 
 interface AudioPlayer {
   isPlaying: boolean;
@@ -32,121 +44,74 @@ interface AudioPlayer {
 
 function useChakraAudio() {
   const [player, setPlayer] = useState<AudioPlayer>({ isPlaying: false, isPaused: false, chakra: null });
-  const ctxRef = useRef<any>(null);
-  const gainRef = useRef<any>(null);
-  const oscRef = useRef<any>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
-  const isWeb = Platform.OS === "web";
-
-  const _getCtx = useCallback(() => {
-    if (!isWeb) return null;
-    try {
-      const AC = (globalThis as any).AudioContext || (globalThis as any).webkitAudioContext;
-      if (!AC) return null;
-      if (!ctxRef.current || ctxRef.current.state === "closed") {
-        ctxRef.current = new AC();
-      }
-      return ctxRef.current;
-    } catch {
-      return null;
-    }
-  }, [isWeb]);
-
-  const _fadeOut = useCallback((ctx: any, gain: any, duration: number, cb?: () => void) => {
-    const now = ctx.currentTime;
-    gain.gain.cancelScheduledValues(now);
-    gain.gain.setValueAtTime(gain.gain.value, now);
-    gain.gain.linearRampToValueAtTime(0.0001, now + duration);
-    setTimeout(() => cb?.(), duration * 1000 + 50);
+  useEffect(() => {
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      staysActiveInBackground: false,
+      playsInSilentModeIOS: true,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+    }).catch(() => {});
+    return () => {
+      soundRef.current?.unloadAsync().catch(() => {});
+      soundRef.current = null;
+    };
   }, []);
 
-  const stop = useCallback(() => {
-    if (!isWeb) { setPlayer({ isPlaying: false, isPaused: false, chakra: null }); return; }
-    const ctx = ctxRef.current;
-    const gain = gainRef.current;
-    if (ctx && gain && oscRef.current) {
-      _fadeOut(ctx, gain, 1.2, () => {
-        try { oscRef.current?.stop(); } catch {}
-        oscRef.current = null;
-        gainRef.current = null;
-      });
-    }
+  const stop = useCallback(async () => {
+    try {
+      if (soundRef.current) {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+    } catch {}
     setPlayer({ isPlaying: false, isPaused: false, chakra: null });
-  }, [isWeb, _fadeOut]);
+  }, []);
 
   const play = useCallback(async (chakra: Chakra) => {
-    if (!isWeb) {
+    try {
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+    } catch {}
+
+    const file = CHAKRA_SOUNDS[chakra.id];
+    if (!file) {
       setPlayer({ isPlaying: true, isPaused: false, chakra });
       return;
     }
-    // Stop previous immediately
+
     try {
-      if (gainRef.current && ctxRef.current) {
-        gainRef.current.gain.cancelScheduledValues(ctxRef.current.currentTime);
-        gainRef.current.gain.setValueAtTime(0, ctxRef.current.currentTime);
-      }
-      oscRef.current?.stop();
-    } catch {}
-    oscRef.current = null;
-    gainRef.current = null;
-
-    const ctx = _getCtx();
-    if (!ctx) return;
-    try { if (ctx.state === "suspended") await ctx.resume(); } catch {}
-
-    const hz = parseFloat(chakra.soundFrequency);
-
-    // Gain node with fade-in
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + 1.4);
-    gain.connect(ctx.destination);
-
-    // Main oscillator
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(hz, ctx.currentTime);
-    osc.connect(gain);
-    osc.start();
-
-    gainRef.current = gain;
-    oscRef.current = osc;
-    setPlayer({ isPlaying: true, isPaused: false, chakra });
-  }, [isWeb, _getCtx]);
-
-  const pause = useCallback(() => {
-    if (!isWeb) { setPlayer(p => ({ ...p, isPlaying: false, isPaused: true })); return; }
-    const ctx = ctxRef.current;
-    if (ctx?.state === "running") {
-      if (gainRef.current) {
-        const now = ctx.currentTime;
-        gainRef.current.gain.cancelScheduledValues(now);
-        gainRef.current.gain.setValueAtTime(gainRef.current.gain.value, now);
-        gainRef.current.gain.linearRampToValueAtTime(0.0001, now + 0.5);
-      }
-      setTimeout(() => {
-        try { ctx.suspend(); } catch {}
-        setPlayer(p => ({ ...p, isPlaying: false, isPaused: true }));
-      }, 550);
-    }
-  }, [isWeb]);
-
-  const resume = useCallback(() => {
-    if (!isWeb) { setPlayer(p => ({ ...p, isPlaying: true, isPaused: false })); return; }
-    const ctx = ctxRef.current;
-    if (ctx?.state === "suspended" && gainRef.current) {
-      ctx.resume().then(() => {
-        const now = ctx.currentTime;
-        gainRef.current.gain.cancelScheduledValues(now);
-        gainRef.current.gain.setValueAtTime(0.0001, now);
-        gainRef.current.gain.linearRampToValueAtTime(0.28, now + 0.8);
-        setPlayer(p => ({ ...p, isPlaying: true, isPaused: false }));
+      const { sound } = await Audio.Sound.createAsync(file, {
+        shouldPlay: true,
+        isLooping: true,
+        volume: 0.85,
       });
+      soundRef.current = sound;
+      setPlayer({ isPlaying: true, isPaused: false, chakra });
+    } catch (error) {
+      console.log("Chakra audio error:", error);
+      setPlayer({ isPlaying: true, isPaused: false, chakra });
     }
-  }, [isWeb]);
+  }, []);
 
-  // Cleanup on unmount
-  useEffect(() => () => { try { ctxRef.current?.close(); } catch {} }, []);
+  const pause = useCallback(async () => {
+    try {
+      if (soundRef.current) await soundRef.current.pauseAsync();
+    } catch {}
+    setPlayer(p => ({ ...p, isPlaying: false, isPaused: true }));
+  }, []);
+
+  const resume = useCallback(async () => {
+    try {
+      if (soundRef.current) await soundRef.current.playAsync();
+    } catch {}
+    setPlayer(p => ({ ...p, isPlaying: true, isPaused: false }));
+  }, []);
 
   return { player, play, pause, resume, stop };
 }
