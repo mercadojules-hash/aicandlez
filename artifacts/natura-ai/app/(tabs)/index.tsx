@@ -23,6 +23,99 @@ const { width } = Dimensions.get("window");
 
 const LOGO_URL = "https://apexdigital.design/wp-content/uploads/2026/04/natura-logo-clean.png";
 
+// ─── Slider images ────────────────────────────────────────────────────────────
+
+const SLIDER_W = width - spacing.md * 2;
+
+const SLIDES = [
+  { id: "1", uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-home-slide-1.webp" },
+  { id: "2", uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-home-slide-2.webp" },
+  { id: "3", uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-home-slide-3.webp" },
+];
+
+function HomeSlider() {
+  const { colors } = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
+  const idxRef    = useRef(0);
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const next = (idxRef.current + 1) % SLIDES.length;
+      idxRef.current = next;
+      setActiveIdx(next);
+      scrollRef.current?.scrollTo({ x: next * SLIDER_W, animated: true });
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <View style={[sliderStyles.wrap, { marginHorizontal: spacing.md, marginBottom: spacing.md }]}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        scrollEnabled={false}
+        showsHorizontalScrollIndicator={false}
+        style={{ width: SLIDER_W, borderRadius: radius.lg, overflow: "hidden" }}
+      >
+        {SLIDES.map((slide) => (
+          <View key={slide.id} style={sliderStyles.slide}>
+            <Image source={{ uri: slide.uri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+            <LinearGradient
+              colors={["transparent", "rgba(4,14,8,0.65)"]}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <Text style={sliderStyles.caption}>Breathe. Move. Transform.</Text>
+          </View>
+        ))}
+      </ScrollView>
+      <View style={sliderStyles.dots}>
+        {SLIDES.map((_, i) => (
+          <View
+            key={i}
+            style={[
+              sliderStyles.dot,
+              { backgroundColor: i === activeIdx ? colors.primary : colors.border, width: i === activeIdx ? 18 : 6 },
+            ]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const sliderStyles = StyleSheet.create({
+  wrap: { overflow: "hidden" },
+  slide: {
+    width: SLIDER_W,
+    height: 200,
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    justifyContent: "flex-end",
+  },
+  caption: {
+    color: "#fff",
+    fontSize: fontSizes.sm,
+    fontFamily: "Inter_600SemiBold",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    letterSpacing: 0.4,
+  },
+  dots: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+  },
+  dot: {
+    height: 6,
+    borderRadius: radius.full,
+    opacity: 0.9,
+  },
+});
+
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
 function AvatarButton() {
@@ -310,7 +403,10 @@ export default function HomeScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
-        <View style={{ height: 40 }} />
+        {/* ── INSPIRE SLIDER ──────────────────────────────────────── */}
+        <HomeSlider />
+
+        <View style={{ height: 24 }} />
       </ScrollView>
     </SafeAreaView>
   );

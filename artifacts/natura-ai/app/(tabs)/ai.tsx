@@ -664,6 +664,22 @@ export default function AIScreen() {
           </Animated.View>
         )}
 
+        {/* ── AI COACH IMAGE CARD ─────────────────────────────── */}
+        <View style={styles.coachImgWrap}>
+          <Image
+            source={{ uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-ai-coach.webp" }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
+          />
+          <LinearGradient
+            colors={["transparent", "rgba(4,14,8,0.72)"]}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View style={styles.coachImgOverlay}>
+            <Text style={styles.coachImgText}>Personalized guidance for your journey</Text>
+          </View>
+        </View>
+
         <View style={{ height: 52 }} />
       </ScrollView>
     </SafeAreaView>
@@ -901,5 +917,28 @@ const styles = StyleSheet.create({
   newCheckInText: {
     fontSize: fontSizes.sm, fontFamily: "Inter_500Medium",
     color: colors.primary,
+  },
+
+  // Coach image card
+  coachImgWrap: {
+    height: 200,
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  coachImgOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: spacing.md,
+  },
+  coachImgText: {
+    color: "#fff",
+    fontSize: fontSizes.sm,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.3,
   },
 });

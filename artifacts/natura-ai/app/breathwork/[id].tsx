@@ -3,11 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
   TouchableOpacity,
   Animated,
   Easing,
   Dimensions,
   Platform,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -20,6 +22,23 @@ import { useChecklist } from "../../hooks/useChecklist";
 import { useSoundPreference } from "../../hooks/useSoundPreference";
 
 const { width } = Dimensions.get("window");
+
+// ─── Per-pattern images ───────────────────────────────────────────────────────
+
+const BREATH_IMAGES: Record<string, { uri: string; caption: string }> = {
+  "box-breathing": {
+    uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-breath-box.webp",
+    caption: "Find calm through rhythm",
+  },
+  "478-breathing": {
+    uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-breath-478.webp",
+    caption: "Relax deeply and restore balance",
+  },
+  "calm-breathing": {
+    uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-breath-calm.webp",
+    caption: "Slow down. Breathe. Reset.",
+  },
+};
 const CIRCLE = width * 0.55;
 
 // ─── Web Audio breathing synthesis ───────────────────────────────────────────
@@ -261,6 +280,8 @@ export default function BreathworkSession() {
   }
 
   if (!started) {
+    const breathImg = BREATH_IMAGES[id ?? ""];
+
     return (
       <SafeAreaView style={styles.safe}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
@@ -278,38 +299,58 @@ export default function BreathworkSession() {
           <Text style={styles.previewSub}>{pattern.subtitle}</Text>
         </LinearGradient>
 
-        <View style={styles.previewBody}>
-          <Text style={styles.previewDesc}>{pattern.description}</Text>
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          <View style={styles.previewBody}>
+            <Text style={styles.previewDesc}>{pattern.description}</Text>
 
-          <Text style={styles.sectionHead}>Pattern</Text>
-          <View style={styles.phaseGrid}>
-            {pattern.phases.map((p, i) => (
-              <View key={i} style={[styles.phaseCard, { borderColor: pattern.color + "40" }]}>
-                <Text style={[styles.phaseCardLabel, { color: pattern.color }]}>{p.label}</Text>
-                <Text style={styles.phaseCardDur}>{p.duration}s</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Sound toggle on start screen */}
-          <TouchableOpacity
-            onPress={() => setSoundEnabled(!soundEnabled)}
-            style={[styles.soundToggleRow, { borderColor: colors.border, backgroundColor: colors.card }]}
-          >
-            <Feather name={soundEnabled ? "volume-2" : "volume-x"} size={16} color={soundEnabled ? pattern.color : colors.textDim} />
-            <Text style={[styles.soundToggleLabel, { color: soundEnabled ? colors.text : colors.textDim }]}>
-              Breathing audio {soundEnabled ? "on" : "off"}
-            </Text>
-            <View style={[styles.toggle, { backgroundColor: soundEnabled ? pattern.color : colors.cardAlt, borderColor: soundEnabled ? pattern.color : colors.border }]}>
-              <View style={[styles.toggleThumb, { transform: [{ translateX: soundEnabled ? 20 : 2 }] }]} />
+            <Text style={styles.sectionHead}>Pattern</Text>
+            <View style={styles.phaseGrid}>
+              {pattern.phases.map((p, i) => (
+                <View key={i} style={[styles.phaseCard, { borderColor: pattern.color + "40" }]}>
+                  <Text style={[styles.phaseCardLabel, { color: pattern.color }]}>{p.label}</Text>
+                  <Text style={styles.phaseCardDur}>{p.duration}s</Text>
+                </View>
+              ))}
             </View>
-          </TouchableOpacity>
 
-          <View style={styles.cyclesInfo}>
-            <Feather name="repeat" size={16} color={colors.accent} />
-            <Text style={styles.cyclesText}>{pattern.totalCycles} cycles total</Text>
+            {/* Sound toggle on start screen */}
+            <TouchableOpacity
+              onPress={() => setSoundEnabled(!soundEnabled)}
+              style={[styles.soundToggleRow, { borderColor: colors.border, backgroundColor: colors.card }]}
+            >
+              <Feather name={soundEnabled ? "volume-2" : "volume-x"} size={16} color={soundEnabled ? pattern.color : colors.textDim} />
+              <Text style={[styles.soundToggleLabel, { color: soundEnabled ? colors.text : colors.textDim }]}>
+                Breathing audio {soundEnabled ? "on" : "off"}
+              </Text>
+              <View style={[styles.toggle, { backgroundColor: soundEnabled ? pattern.color : colors.cardAlt, borderColor: soundEnabled ? pattern.color : colors.border }]}>
+                <View style={[styles.toggleThumb, { transform: [{ translateX: soundEnabled ? 20 : 2 }] }]} />
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.cyclesInfo}>
+              <Feather name="repeat" size={16} color={colors.accent} />
+              <Text style={styles.cyclesText}>{pattern.totalCycles} cycles total</Text>
+            </View>
           </View>
-        </View>
+
+          {/* ── Per-pattern image card ──────────────────────────── */}
+          {breathImg && (
+            <View style={styles.breathImgCard}>
+              <Image
+                source={{ uri: breathImg.uri }}
+                style={StyleSheet.absoluteFillObject}
+                resizeMode="cover"
+              />
+              <LinearGradient
+                colors={["transparent", "rgba(4,14,8,0.65)"]}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <Text style={styles.breathImgCaption}>{breathImg.caption}</Text>
+            </View>
+          )}
+
+          <View style={{ height: 16 }} />
+        </ScrollView>
 
         <View style={styles.startBtnWrapper}>
           <TouchableOpacity onPress={() => setStarted(true)} activeOpacity={0.88}>
@@ -428,7 +469,23 @@ const styles = StyleSheet.create({
   iconCircle: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", marginBottom: 16 },
   previewTitle: { fontSize: fontSizes.xxl, fontFamily: "Inter_700Bold", color: colors.text, marginBottom: 6, textAlign: "center" },
   previewSub: { fontSize: fontSizes.md, fontFamily: "Inter_400Regular", color: colors.textMuted, textAlign: "center" },
-  previewBody: { flex: 1, paddingHorizontal: spacing.md },
+  previewBody: { paddingHorizontal: spacing.md },
+  breathImgCard: {
+    height: 190,
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    justifyContent: "flex-end",
+  },
+  breathImgCaption: {
+    color: "#fff",
+    fontSize: fontSizes.sm,
+    fontFamily: "Inter_600SemiBold",
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    letterSpacing: 0.3,
+  },
   previewDesc: { fontSize: fontSizes.sm, fontFamily: "Inter_400Regular", color: colors.textMuted, lineHeight: 22, marginBottom: spacing.md },
   sectionHead: { fontSize: fontSizes.md, fontFamily: "Inter_600SemiBold", color: colors.text, marginBottom: spacing.sm },
   phaseGrid: { flexDirection: "row", gap: 10, marginBottom: spacing.md },

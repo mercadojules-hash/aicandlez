@@ -1,0 +1,183 @@
+FINAL UI POLISH — Add Image System + Homepage Slider (Natura Yoga AI)
+
+IMPORTANT:
+- Do NOT modify splash screen
+- Do NOT break existing navigation
+- Do NOT change AI Coach logic (already upgraded)
+- Do NOT rename existing screens
+- Only ADD UI enhancements cleanly
+
+----------------------------------
+
+🎯 GOAL:
+Add:
+1. Homepage auto-slider (3 images)
+2. Image section at bottom of:
+   - Home screen
+   - AI Wellness Coach screen
+   - Breathing pages
+3. Keep everything minimal, premium, and fast (Calm/Headspace style)
+
+----------------------------------
+
+🖼️ IMAGE URLS
+
+Homepage Slider:
+- https://apexdigital.design/wp-content/uploads/2026/04/natura-home-slide-1.webp
+- https://apexdigital.design/wp-content/uploads/2026/04/natura-home-slide-2.webp
+- https://apexdigital.design/wp-content/uploads/2026/04/natura-home-slide-3.webp
+
+Breathing Images:
+- Box: https://apexdigital.design/wp-content/uploads/2026/04/natura-breath-box.webp
+- 4-7-8: https://apexdigital.design/wp-content/uploads/2026/04/natura-breath-478.webp
+- Calm: https://apexdigital.design/wp-content/uploads/2026/04/natura-breath-calm.webp
+
+AI Coach Image:
+- https://apexdigital.design/wp-content/uploads/2026/04/natura-ai-coach.webp
+
+----------------------------------
+
+🏠 1. HOMEPAGE — ADD AUTO SLIDER
+
+Place slider at BOTTOM of Home screen (after AI Coach card).
+
+Requirements:
+
+- Full width
+- Rounded corners
+- Height: ~180–220px
+- Auto-slide every 4 seconds
+- Smooth fade or horizontal slide animation
+- Loop infinitely
+- No arrows, no clutter
+
+Use React Native FlatList or ScrollView with paging.
+
+Structure:
+
+slides = [
+  { id: 1, image: 'URL1' },
+  { id: 2, image: 'URL2' },
+  { id: 3, image: 'URL3' }
+]
+
+Each slide:
+- ImageBackground
+- Slight dark gradient overlay (for readability)
+- Optional subtle text overlay:
+   “Breathe. Move. Transform.”
+
+Performance:
+- Lazy load images
+- No lag
+- Must work in Expo
+
+----------------------------------
+
+🧠 2. AI WELLNESS COACH — ADD IMAGE (BOTTOM)
+
+At the very bottom of AI Coach screen (after conversation / buttons):
+
+Add a single image card:
+
+- Use: natura-ai-coach.webp
+- Height: ~200px
+- Rounded corners
+- Soft overlay gradient
+
+Overlay text (small, minimal):
+
+“Personalized guidance for your journey”
+
+Optional small button:
+“Start Session”
+
+DO NOT:
+- Interrupt conversation flow
+- Add multiple images
+- Make it feel like a gallery
+
+----------------------------------
+
+🌬️ 3. BREATHING SCREENS — ADD IMAGE PER TYPE
+
+At bottom of each breathing page:
+
+----------------------------------
+
+BOX BREATHING SCREEN:
+Use:
+natura-breath-box.webp
+
+Overlay text:
+“Find calm through rhythm”
+
+----------------------------------
+
+4-7-8 BREATHING SCREEN:
+Use:
+natura-breath-478.webp
+
+Overlay text:
+“Relax deeply and restore balance”
+
+----------------------------------
+
+CALM BREATHING SCREEN:
+Use:
+natura-breath-calm.webp
+
+Overlay text:
+“Slow down. Breathe. Reset.”
+
+----------------------------------
+
+All breathing images:
+
+- Height: ~180–200px
+- Rounded corners
+- Subtle gradient overlay
+- Margin from bottom navigation
+- Smooth fade-in animation
+
+----------------------------------
+
+🎨 DESIGN RULES (VERY IMPORTANT)
+
+- Keep spacing consistent
+- No clutter
+- No multiple stacked images
+- Maintain dark green Natura theme
+- Use soft shadows or glow (very subtle)
+- All images must feel integrated (not pasted)
+
+----------------------------------
+
+⚡ PERFORMANCE RULES
+
+- Use optimized Image component
+- Avoid re-renders
+- No heavy animations
+- Must not affect scroll performance
+
+----------------------------------
+
+✅ FINAL TEST CHECKLIST
+
+- Home slider auto-rotates smoothly
+- Images load correctly (no broken URLs)
+- AI Coach still works fully
+- Breathing screens still functional
+- No UI overlap with bottom nav
+- No console errors
+- Works in Expo preview
+
+----------------------------------
+
+After completing, summarize:
+- Files updated
+- Where slider was added
+- Where images were added
+- Any improvements made for performance
+
+----------------------------------
