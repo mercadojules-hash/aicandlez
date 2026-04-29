@@ -74,7 +74,7 @@ function useChakraAudio() {
     setPlayer({ isPlaying: false, isPaused: false, chakra: null });
   }, [isWeb, _fadeOut]);
 
-  const play = useCallback((chakra: Chakra) => {
+  const play = useCallback(async (chakra: Chakra) => {
     if (!isWeb) {
       setPlayer({ isPlaying: true, isPaused: false, chakra });
       return;
@@ -92,7 +92,7 @@ function useChakraAudio() {
 
     const ctx = _getCtx();
     if (!ctx) return;
-    if (ctx.state === "suspended") ctx.resume();
+    try { if (ctx.state === "suspended") await ctx.resume(); } catch {}
 
     const hz = parseFloat(chakra.soundFrequency);
 

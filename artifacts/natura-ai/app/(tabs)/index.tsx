@@ -52,7 +52,7 @@ function HomeSlider() {
   }, []);
 
   return (
-    <View style={[sliderStyles.wrap, { marginHorizontal: spacing.md, marginBottom: spacing.md }]}>
+    <View style={[sliderStyles.wrap, { marginHorizontal: spacing.md, marginBottom: 8 }]}>
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -91,7 +91,7 @@ const sliderStyles = StyleSheet.create({
   wrap: { overflow: "hidden" },
   slide: {
     width: SLIDER_W,
-    height: 200,
+    height: 180,
     borderRadius: radius.lg,
     overflow: "hidden",
     justifyContent: "flex-end",
@@ -109,7 +109,7 @@ const sliderStyles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 6,
-    marginTop: 10,
+    marginTop: 6,
   },
   dot: {
     height: 6,

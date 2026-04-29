@@ -52,7 +52,7 @@ function useBreathAudio(enabled: boolean) {
 
   const isWeb = Platform.OS === "web";
 
-  const getCtx = useCallback(() => {
+  const getCtx = useCallback(async (): Promise<any | null> => {
     if (!isWeb) return null;
     try {
       const AC = (globalThis as any).AudioContext || (globalThis as any).webkitAudioContext;
@@ -60,7 +60,9 @@ function useBreathAudio(enabled: boolean) {
       if (!ctxRef.current || ctxRef.current.state === "closed") {
         ctxRef.current = new AC();
       }
-      if (ctxRef.current.state === "suspended") ctxRef.current.resume();
+      if (ctxRef.current.state === "suspended") {
+        try { await ctxRef.current.resume(); } catch {}
+      }
       return ctxRef.current;
     } catch { return null; }
   }, [isWeb]);
@@ -80,9 +82,9 @@ function useBreathAudio(enabled: boolean) {
     ambGainRef.current = gain;
   }, []);
 
-  const playPhase = useCallback((label: string, duration: number) => {
+  const playPhase = useCallback(async (label: string, duration: number) => {
     if (!enabled) return;
-    const ctx = getCtx();
+    const ctx = await getCtx();
     if (!ctx) return;
 
     startAmbient(ctx);

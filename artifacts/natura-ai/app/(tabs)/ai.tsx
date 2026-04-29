@@ -379,15 +379,16 @@ export default function AIScreen() {
             colors={[colors.primary + "28", colors.primary + "08"]}
             style={StyleSheet.absoluteFillObject}
           />
-          <Image source={{ uri: LOGO_URL }} style={styles.headerLogo} resizeMode="contain" />
-          <View style={styles.headerText}>
-            <Text style={styles.greeting}>{greeting}</Text>
+          {/* Logo + title row — sits above greeting */}
+          <View style={styles.headerLogoRow}>
+            <Image source={{ uri: LOGO_URL }} style={styles.headerLogoSmall} resizeMode="contain" />
             <Text style={styles.headerTitle}>AI Wellness Coach</Text>
-            <Text style={styles.headerSub}>Your AI wellness guide</Text>
-            <Text style={styles.headerSub2}>
-              Based on your energy, I'll guide your next session.
-            </Text>
           </View>
+          <Text style={styles.greeting}>{greeting}</Text>
+          <Text style={styles.headerSub}>Your AI wellness guide</Text>
+          <Text style={styles.headerSub2}>
+            Based on your energy, I'll guide your next session.
+          </Text>
         </View>
 
         {/* ── Journey context line ─────────────────────────────────────────── */}
@@ -707,9 +708,7 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 14,
+    flexDirection: "column",
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
@@ -717,15 +716,20 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     overflow: "hidden",
   },
-  headerLogo: { width: 52, height: 52, marginTop: 4 },
-  headerText: { flex: 1 },
+  headerLogoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 10,
+  },
+  headerLogoSmall: { width: 32, height: 32, borderRadius: 8 },
   greeting: {
     fontSize: fontSizes.xs, fontFamily: "Inter_400Regular",
     color: colors.textDim, marginBottom: 4,
   },
   headerTitle: {
-    fontSize: fontSizes.lg, fontFamily: "Inter_700Bold",
-    color: colors.text, marginBottom: 4,
+    fontSize: 22, fontFamily: "Inter_700Bold",
+    color: colors.text,
   },
   headerSub: {
     fontSize: fontSizes.sm, fontFamily: "Inter_500Medium",

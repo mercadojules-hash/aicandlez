@@ -1,0 +1,147 @@
+We need to finalize 3 issues in the Natura Yoga AI app:
+
+-----------------------------------
+1. FIX TOP SLIDER SPACING (IMPORTANT UI POLISH)
+-----------------------------------
+
+The top slider/banner is currently too spaced out and not aligned tightly.
+
+Make these adjustments:
+
+- Reduce vertical padding of the slider container
+- Ensure the image fills width properly
+- Reduce gap between slider and next section
+
+Example fix:
+
+<ScrollView
+  horizontal
+  showsHorizontalScrollIndicator={false}
+  contentContainerStyle={{
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 10,
+  }}
+>
+  {slides.map((item, index) => (
+    <Image
+      key={index}
+      source={item.image}
+      style={{
+        width: 300,
+        height: 180,
+        borderRadius: 20,
+        marginRight: 12,
+      }}
+      resizeMode="cover"
+    />
+  ))}
+</ScrollView>
+
+Also:
+- Remove any extra marginTop or marginBottom around the slider section
+- Keep layout tight and premium (similar to Calm app)
+
+-----------------------------------
+2. FIX AUDIO (CHAKRAS + BREATHING NOT PLAYING)
+-----------------------------------
+
+Install correct audio package:
+
+npx expo install expo-av
+
+Then implement a reusable audio player:
+
+import { Audio } from 'expo-av';
+import { useRef } from 'react';
+
+const soundRef = useRef(null);
+
+const playSound = async (file) => {
+  try {
+    if (soundRef.current) {
+      await soundRef.current.unloadAsync();
+    }
+
+    const { sound } = await Audio.Sound.createAsync(file, {
+      shouldPlay: true,
+      isLooping: true,
+      volume: 1.0,
+    });
+
+    soundRef.current = sound;
+    await sound.playAsync();
+  } catch (error) {
+    console.log('Audio error:', error);
+  }
+};
+
+const stopSound = async () => {
+  if (soundRef.current) {
+    await soundRef.current.stopAsync();
+    await soundRef.current.unloadAsync();
+    soundRef.current = null;
+  }
+};
+
+IMPORTANT:
+- Trigger playSound ONLY on user tap (button press)
+- Do NOT autoplay on screen load (iOS blocks it)
+
+Example usage:
+
+<TouchableOpacity onPress={() => playSound(require('../assets/sounds/root.mp3'))}>
+  <Text>Play Root Chakra</Text>
+</TouchableOpacity>
+
+Also:
+- Ensure sound files exist inside /assets/sounds/
+- Confirm iPhone is NOT on silent mode
+
+-----------------------------------
+3. ADD LOGO TO AI WELLNESS COACH (TOP LEFT)
+-----------------------------------
+
+At the top of the AI Wellness Coach screen, add logo + title row:
+
+<View style={{
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 10
+}}>
+  <Image
+    source={require('../assets/logo.png')}
+    style={{
+      width: 32,
+      height: 32,
+      marginRight: 10
+    }}
+    resizeMode="contain"
+  />
+  
+  <Text style={{
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#FFFFFF'
+  }}>
+    AI Wellness Coach
+  </Text>
+</View>
+
+Make sure:
+- It sits ABOVE the "Good afternoon" text
+- Proper spacing (not cramped)
+- Clean and minimal (premium feel)
+
+-----------------------------------
+FINAL EXPECTED RESULT
+-----------------------------------
+
+After these fixes:
+
+✔ Slider is tight, clean, and properly spaced  
+✔ Chakra + Breathing sounds play correctly  
+✔ AI screen has logo on top left  
+✔ App feels polished and production-ready  
+
+-----------------------------------
