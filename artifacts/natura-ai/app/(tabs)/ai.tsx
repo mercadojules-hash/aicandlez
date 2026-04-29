@@ -17,7 +17,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useJourney } from "../../hooks/useJourney";
 
 const { width } = Dimensions.get("window");
-const LOGO_URL = "https://apexdigital.design/wp-content/uploads/2026/04/natura-logo-clean.png";
+const logo = require("../../assets/images/logo.png");
 
 // ─── AsyncStorage keys ────────────────────────────────────────────────────────
 // AsyncStorage is already installed in this app.
@@ -381,7 +381,7 @@ export default function AIScreen() {
           />
           {/* Logo + title row — sits above greeting */}
           <View style={styles.headerLogoRow}>
-            <Image source={{ uri: LOGO_URL }} style={styles.headerLogoSmall} resizeMode="contain" />
+            <Image source={logo} style={styles.headerLogoSmall} resizeMode="contain" />
             <Text style={styles.headerTitle}>AI Wellness Coach</Text>
           </View>
           <Text style={styles.greeting}>{greeting}</Text>
@@ -455,7 +455,7 @@ export default function AIScreen() {
                 colors={[colors.primary + "18", colors.primary + "06"]}
                 style={StyleSheet.absoluteFillObject}
               />
-              <Image source={{ uri: LOGO_URL }} style={styles.recLogo} resizeMode="contain" />
+              <Image source={logo} style={styles.recLogo} resizeMode="contain" />
               <View style={styles.thinkingContent}>
                 <Text style={styles.thinkingText}>Understanding your energy…</Text>
                 <TypingDots />
@@ -507,7 +507,7 @@ export default function AIScreen() {
                   style={StyleSheet.absoluteFillObject}
                 />
                 <View style={styles.aiCardHeader}>
-                  <Image source={{ uri: LOGO_URL }} style={styles.recLogo} resizeMode="contain" />
+                  <Image source={logo} style={styles.recLogo} resizeMode="contain" />
                   <Text style={styles.aiCardLabel}>Natura AI</Text>
                 </View>
                 <Text style={styles.aiResponseText}>{selectedMood.aiResponse}</Text>
@@ -665,7 +665,7 @@ export default function AIScreen() {
                 style={StyleSheet.absoluteFillObject}
               />
               <View style={styles.followHeader}>
-                <Image source={{ uri: LOGO_URL }} style={styles.recLogo} resizeMode="contain" />
+                <Image source={logo} style={styles.recLogo} resizeMode="contain" />
                 <Text style={styles.aiCardLabel}>Natura AI</Text>
               </View>
               <Text style={styles.followText}>{REFLECTION_RESPONSES[reflectionChoice]}</Text>
