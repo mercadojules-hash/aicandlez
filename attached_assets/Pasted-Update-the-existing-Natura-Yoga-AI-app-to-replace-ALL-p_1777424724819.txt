@@ -1,0 +1,65 @@
+Update the existing Natura Yoga AI app to replace ALL placeholder/Unsplash images with the following real image URLs.
+
+---
+
+GOAL:
+Use these URLs as the official yoga pose image source and organize them into Beginner and Intermediate categories.
+
+---
+
+BEGINNER POSES:
+
+[
+{ name: "Child's Pose", level: "Beginner", image: "https://apexdigital.design/wp-content/uploads/2026/04/childs-pose.webp" },
+{ name: "Bridge Pose", level: "Beginner", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-bridge-pose.webp" },
+{ name: "Cat-Cow", level: "Beginner", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-cat-cow-pose.webp" },
+{ name: "Cobra Pose", level: "Beginner", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-cobra-pose.webp" },
+{ name: "Downward Dog", level: "Beginner", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-downward-dog.webp" },
+{ name: "Legs Up the Wall", level: "Beginner", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-legs-up-the-wall-pose.webp" },
+{ name: "Mountain Pose", level: "Beginner", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-mountain-pose.webp" },
+{ name: "Plank Pose", level: "Beginner", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-plank-pose.webp" },
+{ name: "Seated Forward Fold", level: "Beginner", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-seated-forward-fold-pose.webp" },
+{ name: "Tree Pose", level: "Beginner", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-tree-pose.webp" },
+{ name: "Warrior I", level: "Beginner", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-warrior-i-pose.webp" },
+{ name: "Warrior II", level: "Beginner", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-warrior-ii-pose.webp" }
+]
+
+---
+
+INTERMEDIATE POSES:
+
+[
+{ name: "Chair Pose Twist", level: "Intermediate", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-chair-pose-twist-pose.webp" },
+{ name: "Crow Pose", level: "Intermediate", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-crow-pose.webp" },
+{ name: "Dolphin Pose", level: "Intermediate", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-dolphin-pose.webp" },
+{ name: "Half Moon Pose", level: "Intermediate", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-half-moon-pose.webp" },
+{ name: "Low Lunge Twist", level: "Intermediate", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-low-lunge-twist-pose.webp" },
+{ name: "Pigeon Pose", level: "Intermediate", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-pigeon-pose.webp" },
+{ name: "Plank to Chaturanga Flow", level: "Intermediate", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-plank-chaturanga-flow-poses.webp" },
+{ name: "Revolved Triangle", level: "Intermediate", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-revolved-triangle-pose.webp" },
+{ name: "Side Plank", level: "Intermediate", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-side-plank-pose.webp" },
+{ name: "Standing Forward Fold", level: "Intermediate", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-standing-forward-fold-pose.webp" },
+{ name: "Warrior III", level: "Intermediate", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-warrior-iii-pose.webp" },
+{ name: "Extended Side Angle", level: "Intermediate", image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-extended-side-angle-pose.webp" }
+]
+
+---
+
+REQUIREMENTS:
+
+* Replace ALL existing yoga images with these URLs
+* Ensure images load correctly in:
+
+  * Yoga list screen
+  * Pose detail screen
+* Add filter tabs:
+
+  * All
+  * Beginner
+  * Intermediate
+* Maintain clean UI and performance
+* Do NOT break navigation
+
+---
+
+This must be a complete update, not partial edits.
