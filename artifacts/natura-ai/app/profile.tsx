@@ -180,7 +180,7 @@ export default function ProfileScreen() {
                   },
                 ]}
               >
-                <Animated.View
+                <View
                   style={[
                     styles.toggleThumb,
                     { transform: [{ translateX: soundEnabled ? 20 : 2 }] },
