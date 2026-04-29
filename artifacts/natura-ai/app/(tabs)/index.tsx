@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,79 +7,219 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  Image,
+  Alert,
+  Platform,
 } from "react-native";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colors, spacing, radius, fontSizes } from "../../constants/theme";
+import * as ImagePicker from "expo-image-picker";
+import { spacing, radius, fontSizes } from "../../constants/theme";
 import { useStreak } from "../../hooks/useStreak";
 import { useChecklist } from "../../hooks/useChecklist";
+import { useTheme, ThemeOverride } from "../../contexts/ThemeContext";
+import { useUser } from "../../contexts/UserContext";
+import { NaturaLogo } from "../../components/NaturaLogo";
 
 const { width } = Dimensions.get("window");
 
-function ProgressBar({ value }: { value: number }) {
-  const anim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(anim, { toValue: value, duration: 800, useNativeDriver: false }).start();
-  }, [value]);
-  const w = anim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
-  return (
-    <View style={styles.progressTrack}>
-      <Animated.View style={[styles.progressFill, { width: w }]} />
-    </View>
-  );
-}
+// ─── Avatar ───────────────────────────────────────────────────────────────────
 
-function CheckItem({ label, done, onPress }: { label: string; done: boolean; onPress: () => void }) {
+function AvatarButton() {
+  const { profile, updateProfile } = useUser();
+  const { colors } = useTheme();
+
+  const pickImage = async () => {
+    try {
+      if (Platform.OS !== "web") {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission needed", "Please allow photo library access to set a profile photo.");
+          return;
+        }
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]) {
+        await updateProfile({ image: result.assets[0].uri });
+      }
+    } catch {}
+  };
+
   return (
-    <TouchableOpacity style={styles.checkRow} onPress={onPress} activeOpacity={0.7}>
-      <View style={[styles.checkbox, done && styles.checkboxDone]}>
-        {done && <Feather name="check" size={14} color="#fff" />}
-      </View>
-      <Text style={[styles.checkLabel, done && styles.checkLabelDone]}>{label}</Text>
+    <TouchableOpacity
+      onPress={pickImage}
+      activeOpacity={0.8}
+      style={[styles.avatarWrap, { borderColor: colors.primary + "60" }]}
+    >
+      {profile.image ? (
+        <Image source={{ uri: profile.image }} style={styles.avatarImg} />
+      ) : (
+        <LinearGradient
+          colors={[colors.primary + "60", colors.primary + "28"]}
+          style={styles.avatarPlaceholder}
+        >
+          <Feather name="user" size={17} color={colors.primary} />
+        </LinearGradient>
+      )}
     </TouchableOpacity>
   );
 }
 
-const quickActions = [
-  { label: "Yoga Poses", icon: "activity", route: "/(tabs)/yoga", color: colors.accent },
-  { label: "Breathe", icon: "wind", route: "/(tabs)/breathe", color: colors.primary },
-  { label: "Chakras", icon: "circle", route: "/(tabs)/chakras", color: "#7c6ead" },
-  { label: "AI Coach", icon: "message-circle", route: "/(tabs)/ai", color: "#6ea8ed" },
-];
+// ─── Theme Toggle ─────────────────────────────────────────────────────────────
+
+const THEME_CYCLE: ThemeOverride[] = ["dark", "light", "system"];
+const THEME_ICONS: Record<ThemeOverride, string> = { dark: "moon", light: "sun", system: "monitor" };
+const THEME_LABELS: Record<ThemeOverride, string> = { dark: "Dark", light: "Light", system: "Auto" };
+
+function ThemeToggle() {
+  const { override, setOverride, colors } = useTheme();
+  const next = () => {
+    const i = THEME_CYCLE.indexOf(override);
+    setOverride(THEME_CYCLE[(i + 1) % THEME_CYCLE.length]);
+  };
+  return (
+    <TouchableOpacity
+      onPress={next}
+      activeOpacity={0.75}
+      style={[styles.themeBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+    >
+      <Feather name={THEME_ICONS[override] as any} size={14} color={colors.primary} />
+      <Text style={[styles.themeBtnText, { color: colors.textMuted }]}>{THEME_LABELS[override]}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Progress Bar ─────────────────────────────────────────────────────────────
+
+function ProgressBar({ value, color }: { value: number; color: string }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, { toValue: value, duration: 900, useNativeDriver: false }).start();
+  }, [value]);
+  const w = anim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.progressTrack, { backgroundColor: colors.cardAlt }]}>
+      <Animated.View style={[styles.progressFill, { width: w, backgroundColor: color }]} />
+    </View>
+  );
+}
+
+// ─── Check Item ───────────────────────────────────────────────────────────────
+
+function CheckItem({
+  label,
+  done,
+  onPress,
+}: {
+  label: string;
+  done: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <TouchableOpacity
+      style={[styles.checkRow, { borderBottomColor: colors.border }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View
+        style={[
+          styles.checkbox,
+          { borderColor: done ? colors.primary : colors.borderLight },
+          done && { backgroundColor: colors.primary },
+        ]}
+      >
+        {done && <Feather name="check" size={13} color="#fff" />}
+      </View>
+      <Text style={[styles.checkLabel, { color: done ? colors.textDim : colors.text }, done && styles.checkLabelDone]}>
+        {label}
+      </Text>
+      {!done && <Feather name="chevron-right" size={14} color={colors.textDim} style={{ marginLeft: "auto" }} />}
+    </TouchableOpacity>
+  );
+}
+
+// ─── Quick Action Card ────────────────────────────────────────────────────────
+
+function QuickCard({ label, icon, route, color }: { label: string; icon: string; route: string; color: string }) {
+  const { colors } = useTheme();
+  return (
+    <TouchableOpacity
+      style={[styles.quickCard, { borderColor: colors.border }]}
+      onPress={() => router.push(route as any)}
+      activeOpacity={0.8}
+    >
+      <LinearGradient colors={[color + "33", color + "0C"]} style={styles.quickCardGrad}>
+        <View style={[styles.quickIcon, { backgroundColor: color + "28" }]}>
+          <Feather name={icon as any} size={22} color={color} />
+        </View>
+        <Text style={[styles.quickLabel, { color: colors.text }]}>{label}</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Home Screen ──────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const { streak } = useStreak();
   const { checklist, markComplete, getProgress } = useChecklist();
+  const { colors } = useTheme();
   const progress = getProgress();
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
+  const quickActions = [
+    { label: "Yoga Poses", icon: "activity", route: "/(tabs)/yoga", color: colors.accent },
+    { label: "Breathe", icon: "wind", route: "/(tabs)/breathe", color: colors.primary },
+    { label: "Chakras", icon: "circle", route: "/(tabs)/chakras", color: "#7c6ead" },
+    { label: "AI Coach", icon: "message-circle", route: "/(tabs)/ai", color: "#6ea8ed" },
+  ];
+
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={["top"]}>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Header */}
+
+        {/* ── HEADER ──────────────────────────────────────────────────── */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>{greeting}</Text>
-            <Text style={styles.name}>Welcome back 🌿</Text>
+          <View style={styles.headerLeft}>
+            <AvatarButton />
+            <View>
+              <Text style={[styles.greeting, { color: colors.textMuted }]}>{greeting}</Text>
+              <View style={styles.logoRow}>
+                <NaturaLogo size={22} />
+                <Text style={[styles.name, { color: colors.text }]}>Natura AI</Text>
+              </View>
+            </View>
           </View>
-          <View style={styles.streakBadge}>
-            <Text style={styles.streakFire}>🔥</Text>
-            <Text style={styles.streakNum}>{streak}</Text>
+          <View style={styles.headerRight}>
+            <ThemeToggle />
+            <View style={[styles.streakBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={styles.streakFire}>🔥</Text>
+              <Text style={[styles.streakNum, { color: colors.text }]}>{streak}</Text>
+            </View>
           </View>
         </View>
 
-        {/* Progress */}
-        <View style={styles.section}>
+        {/* ── DAILY PROGRESS ──────────────────────────────────────────── */}
+        <View style={[styles.section, { paddingHorizontal: spacing.md }]}>
           <View style={styles.progressHeader}>
-            <Text style={styles.sectionTitle}>Daily Progress</Text>
-            <Text style={styles.progressPct}>{Math.round(progress * 100)}%</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Daily Progress</Text>
+            <Text style={[styles.progressPct, { color: colors.primary }]}>
+              {Math.round(progress * 100)}%
+            </Text>
           </View>
-          <ProgressBar value={progress} />
-          <Text style={styles.progressHint}>
+          <ProgressBar value={progress} color={colors.primary} />
+          <Text style={[styles.progressHint, { color: colors.textDim }]}>
             {progress === 0
               ? "Start your first practice today"
               : progress < 1
@@ -88,84 +228,90 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {/* Quick Actions */}
-        <Text style={[styles.sectionTitle, { paddingHorizontal: spacing.md, marginBottom: spacing.sm }]}>
+        {/* ── QUICK ACTIONS ───────────────────────────────────────────── */}
+        <Text style={[styles.sectionTitle, { paddingHorizontal: spacing.md, marginBottom: spacing.sm, color: colors.text }]}>
           Start Practicing
         </Text>
         <View style={styles.quickGrid}>
           {quickActions.map((a) => (
-            <TouchableOpacity
-              key={a.label}
-              style={styles.quickCard}
-              onPress={() => router.push(a.route as any)}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={[a.color + "33", a.color + "11"]}
-                style={styles.quickCardGrad}
-              >
-                <View style={[styles.quickIcon, { backgroundColor: a.color + "28" }]}>
-                  <Feather name={a.icon as any} size={22} color={a.color} />
-                </View>
-                <Text style={styles.quickLabel}>{a.label}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            <QuickCard key={a.label} {...a} />
           ))}
         </View>
 
-        {/* Daily Checklist */}
-        <View style={[styles.section, styles.card]}>
-          <Text style={styles.sectionTitle}>Today's Checklist</Text>
+        {/* ── CHECKLIST ───────────────────────────────────────────────── */}
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              marginHorizontal: spacing.md,
+              marginBottom: spacing.md,
+            },
+          ]}
+        >
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Today's Checklist</Text>
           <View style={{ marginTop: spacing.sm }}>
             <CheckItem
               label="Complete a yoga flow"
               done={checklist.yoga}
-              onPress={() => { if (!checklist.yoga) { markComplete("yoga"); router.push("/(tabs)/flows"); } }}
+              onPress={() => {
+                if (!checklist.yoga) markComplete("yoga");
+                router.push("/(tabs)/yoga");
+              }}
             />
             <CheckItem
               label="Do a breathing session"
               done={checklist.breathwork}
-              onPress={() => { if (!checklist.breathwork) { markComplete("breathwork"); router.push("/(tabs)/breathe"); } }}
+              onPress={() => {
+                if (!checklist.breathwork) markComplete("breathwork");
+                router.push("/(tabs)/breathe");
+              }}
             />
             <CheckItem
               label="Review a chakra"
               done={checklist.chakra}
-              onPress={() => { if (!checklist.chakra) { markComplete("chakra"); router.push("/(tabs)/chakras"); } }}
+              onPress={() => {
+                if (!checklist.chakra) markComplete("chakra");
+                router.push("/(tabs)/chakras");
+              }}
             />
           </View>
         </View>
 
-        {/* AI Banner */}
+        {/* ── AI BANNER ───────────────────────────────────────────────── */}
         <TouchableOpacity
-          style={styles.aiBanner}
+          style={[styles.aiBanner, { borderColor: colors.border, marginHorizontal: spacing.md }]}
           onPress={() => router.push("/(tabs)/ai")}
           activeOpacity={0.88}
         >
           <LinearGradient
-            colors={["#1a3a2e", "#0d2a20"]}
+            colors={[colors.cardHover, colors.card]}
             style={styles.aiBannerGrad}
           >
             <View style={styles.aiBannerLeft}>
-              <View style={styles.aiIcon}>
+              <View style={[styles.aiIcon, { backgroundColor: colors.primary + "20" }]}>
                 <Feather name="message-circle" size={22} color={colors.primary} />
               </View>
               <View>
-                <Text style={styles.aiBannerTitle}>AI Wellness Coach</Text>
-                <Text style={styles.aiBannerSub}>Get a personalised recommendation</Text>
+                <Text style={[styles.aiBannerTitle, { color: colors.text }]}>AI Wellness Coach</Text>
+                <Text style={[styles.aiBannerSub, { color: colors.textMuted }]}>
+                  Get a personalised recommendation
+                </Text>
               </View>
             </View>
             <Feather name="chevron-right" size={20} color={colors.textDim} />
           </LinearGradient>
         </TouchableOpacity>
 
-        <View style={{ height: 32 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1 },
   scroll: { flex: 1 },
   header: {
     flexDirection: "row",
@@ -175,176 +321,78 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
   },
-  greeting: {
-    fontSize: fontSizes.sm,
-    fontFamily: "Inter_400Regular",
-    color: colors.textMuted,
-    marginBottom: 4,
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  logoRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  avatarWrap: {
+    width: 40, height: 40, borderRadius: 20,
+    borderWidth: 1.5, overflow: "hidden",
   },
-  name: {
-    fontSize: fontSizes.xxl,
-    fontFamily: "Inter_700Bold",
-    color: colors.text,
+  avatarImg: { width: "100%", height: "100%" },
+  avatarPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
+  greeting: { fontSize: fontSizes.xs, fontFamily: "Inter_400Regular", marginBottom: 2 },
+  name: { fontSize: fontSizes.md, fontFamily: "Inter_700Bold" },
+  themeBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    borderRadius: radius.full, borderWidth: 1,
+    paddingHorizontal: 10, paddingVertical: 5,
   },
+  themeBtnText: { fontSize: 10, fontFamily: "Inter_500Medium" },
   streakBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.card,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    gap: 4,
+    flexDirection: "row", alignItems: "center",
+    borderRadius: radius.full, borderWidth: 1,
+    paddingHorizontal: 12, paddingVertical: 7, gap: 4,
   },
-  streakFire: { fontSize: 18 },
-  streakNum: {
-    fontSize: fontSizes.lg,
-    fontFamily: "Inter_700Bold",
-    color: colors.text,
-  },
-  section: {
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
-  },
+  streakFire: { fontSize: 16 },
+  streakNum: { fontSize: fontSizes.md, fontFamily: "Inter_700Bold" },
+  section: { marginBottom: spacing.md },
   card: {
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    marginHorizontal: spacing.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius.lg, borderWidth: 1,
+    padding: spacing.md, marginBottom: spacing.md,
   },
   sectionTitle: {
-    fontSize: fontSizes.md,
-    fontFamily: "Inter_600SemiBold",
-    color: colors.text,
-    marginBottom: 4,
+    fontSize: fontSizes.md, fontFamily: "Inter_600SemiBold", marginBottom: 4,
   },
   progressHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.sm,
+    flexDirection: "row", justifyContent: "space-between",
+    alignItems: "center", marginBottom: spacing.sm,
   },
-  progressPct: {
-    fontSize: fontSizes.md,
-    fontFamily: "Inter_600SemiBold",
-    color: colors.primary,
-  },
-  progressTrack: {
-    height: 8,
-    backgroundColor: colors.cardAlt,
-    borderRadius: radius.full,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: colors.primary,
-    borderRadius: radius.full,
-  },
+  progressPct: { fontSize: fontSizes.md, fontFamily: "Inter_600SemiBold" },
+  progressTrack: { height: 8, borderRadius: radius.full, overflow: "hidden" },
+  progressFill: { height: "100%", borderRadius: radius.full },
   progressHint: {
-    marginTop: 8,
-    fontSize: fontSizes.xs,
-    fontFamily: "Inter_400Regular",
-    color: colors.textDim,
+    marginTop: 8, fontSize: fontSizes.xs, fontFamily: "Inter_400Regular",
   },
   quickGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: spacing.md,
-    gap: 10,
+    flexDirection: "row", flexWrap: "wrap",
+    paddingHorizontal: spacing.md, gap: 10,
     marginBottom: spacing.md,
   },
   quickCard: {
     width: (width - spacing.md * 2 - 10) / 2,
-    borderRadius: radius.lg,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius.lg, overflow: "hidden", borderWidth: 1,
   },
-  quickCardGrad: {
-    padding: spacing.md,
-    alignItems: "flex-start",
-    gap: 10,
-  },
-  quickIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickLabel: {
-    fontSize: fontSizes.md,
-    fontFamily: "Inter_600SemiBold",
-    color: colors.text,
-  },
+  quickCardGrad: { padding: spacing.md, alignItems: "flex-start", gap: 10 },
+  quickIcon: { width: 42, height: 42, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
+  quickLabel: { fontSize: fontSizes.md, fontFamily: "Inter_600SemiBold" },
   checkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    flexDirection: "row", alignItems: "center",
+    paddingVertical: 11, gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: colors.borderLight,
-    alignItems: "center",
-    justifyContent: "center",
+    width: 24, height: 24, borderRadius: 8, borderWidth: 1.5,
+    alignItems: "center", justifyContent: "center",
   },
-  checkboxDone: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  checkLabel: {
-    fontSize: fontSizes.md,
-    fontFamily: "Inter_400Regular",
-    color: colors.text,
-  },
-  checkLabelDone: {
-    color: colors.textDim,
-    textDecorationLine: "line-through",
-  },
-  aiBanner: {
-    marginHorizontal: spacing.md,
-    borderRadius: radius.lg,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+  checkLabel: { fontSize: fontSizes.md, fontFamily: "Inter_400Regular", flex: 1 },
+  checkLabelDone: { textDecorationLine: "line-through" },
+  aiBanner: { borderRadius: radius.lg, overflow: "hidden", borderWidth: 1 },
   aiBannerGrad: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: spacing.md,
+    flexDirection: "row", alignItems: "center",
+    justifyContent: "space-between", padding: spacing.md,
   },
-  aiBannerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  aiIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.primary + "20",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  aiBannerTitle: {
-    fontSize: fontSizes.md,
-    fontFamily: "Inter_600SemiBold",
-    color: colors.text,
-  },
-  aiBannerSub: {
-    fontSize: fontSizes.sm,
-    fontFamily: "Inter_400Regular",
-    color: colors.textMuted,
-    marginTop: 2,
-  },
+  aiBannerLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  aiIcon: { width: 44, height: 44, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
+  aiBannerTitle: { fontSize: fontSizes.md, fontFamily: "Inter_600SemiBold" },
+  aiBannerSub: { fontSize: fontSizes.sm, fontFamily: "Inter_400Regular", marginTop: 2 },
 });

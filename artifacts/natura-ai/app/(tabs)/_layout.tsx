@@ -1,9 +1,12 @@
 import { Tabs } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { colors, fontSizes } from "../../constants/theme";
+import { fontSizes } from "../../constants/theme";
 import { Platform } from "react-native";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function TabLayout() {
+  const { colors } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
