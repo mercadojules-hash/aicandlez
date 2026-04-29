@@ -1,4 +1,4 @@
-const CACHE_NAME = 'natura-ai-v1';
+const CACHE_NAME = 'natura-ai-v3';
 const STATIC_ASSETS = [
   '/natura-web/',
   '/natura-web/index.html',
