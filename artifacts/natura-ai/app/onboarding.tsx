@@ -128,10 +128,16 @@ export default function OnboardingScreen() {
           Find your balance{"\n"}through movement{"\n"}and breath
         </Text>
 
-        {/* Feature chips */}
+        {/* Feature chips — icon + text only, no emoji (renders as □ on iOS) */}
         <View style={styles.pillsRow}>
-          {["🧘 Yoga", "🌬 Breathwork", "✨ Chakras", "🤖 AI Coach"].map((label) => (
+          {[
+            { icon: "activity" as const, label: "Yoga" },
+            { icon: "wind"     as const, label: "Breathwork" },
+            { icon: "circle"   as const, label: "Chakras" },
+            { icon: "moon"     as const, label: "Meditation" },
+          ].map(({ icon, label }) => (
             <View key={label} style={styles.pill}>
+              <Feather name={icon} size={13} color={colors.primaryLight} />
               <Text style={styles.pillText}>{label}</Text>
             </View>
           ))}
@@ -150,7 +156,6 @@ export default function OnboardingScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
-        <Text style={styles.subNote}>No experience needed · Free forever</Text>
       </Animated.View>
     </View>
   );
@@ -212,12 +217,15 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     backgroundColor: "rgba(78,173,124,0.18)",
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: "rgba(78,173,124,0.35)",
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 8,
   },
   pillText: {
     fontSize: fontSizes.sm,
@@ -240,12 +248,5 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
-  },
-  subNote: {
-    marginTop: 14,
-    fontSize: fontSizes.xs,
-    fontFamily: "Inter_400Regular",
-    color: colors.textDim,
-    textAlign: "center",
   },
 });
