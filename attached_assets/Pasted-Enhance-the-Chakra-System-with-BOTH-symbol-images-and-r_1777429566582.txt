@@ -1,0 +1,185 @@
+Enhance the Chakra System with BOTH symbol images and real sound frequency playback.
+
+Do NOT overwrite existing working features. Only enhance.
+
+---
+
+1. CHAKRA SYMBOL IMAGE INTEGRATION
+
+---
+
+Use these URLs:
+
+const chakraSymbols = {
+root: "https://apexdigital.design/wp-content/uploads/2026/04/root-chakra-symbol.png",
+sacral: "https://apexdigital.design/wp-content/uploads/2026/04/sacral-chakra-symbol.png",
+solar: "https://apexdigital.design/wp-content/uploads/2026/04/solar-plexus-symbol.png",
+heart: "https://apexdigital.design/wp-content/uploads/2026/04/heart-chakra-symbol.png",
+throat: "https://apexdigital.design/wp-content/uploads/2026/04/throat-chakra-symbol.png",
+thirdEye: "https://apexdigital.design/wp-content/uploads/2026/04/third-eye-chakra-symbol.png",
+crown: "https://apexdigital.design/wp-content/uploads/2026/04/crown-chakra-symbol.png"
+};
+
+---
+
+2. SHOW SYMBOLS IN UI
+
+---
+
+A) Chakra List Screen:
+
+* Replace right-side empty circle with symbol image
+* Centered
+* Size: 60–70%
+* resizeMode: contain
+
+B) Chakra Detail Screen:
+
+* Replace top circle content with symbol
+* Larger (~75%)
+* Centered
+
+---
+
+3. ADD SOFT GLOW EFFECT
+
+---
+
+Behind each symbol:
+
+* Use chakra color
+* opacity ~0.25
+* soft blur
+
+---
+
+4. FIX IMAGE LOADING (IMPORTANT)
+
+---
+
+Ensure:
+
+source={{ uri: chakraSymbols[chakra.id] }}
+
+Fallback protection:
+
+source={chakraSymbols[chakra.id] ? { uri: chakraSymbols[chakra.id] } : null}
+
+---
+
+5. AUDIO SYSTEM (REAL SOUND HEALING)
+
+---
+
+Create audio system using Expo Audio (or equivalent):
+
+Each chakra has its own frequency file:
+
+root → 396 Hz
+sacral → 417 Hz
+solar → 528 Hz
+heart → 639 Hz
+throat → 741 Hz
+thirdEye → 852 Hz
+crown → 963 Hz
+
+Audio files stored in:
+/assets/audio/
+
+---
+
+6. AUDIO CONTROL LOGIC
+
+---
+
+Implement global audio manager:
+
+* Only ONE sound plays at a time
+* If user taps another chakra → stop previous
+
+Functions:
+
+playSound(chakraId)
+pauseSound()
+stopSound()
+
+---
+
+7. PLAY BUTTON BEHAVIOR
+
+---
+
+On tap:
+
+* Start audio
+* Loop continuously
+* Fade in over 1–1.5 seconds
+
+Tap again:
+
+* Pause / Resume toggle
+
+---
+
+8. FADE EFFECTS (IMPORTANT)
+
+---
+
+* Smooth fade in (no abrupt sound)
+* Smooth fade out on stop
+
+---
+
+9. UI FEEDBACK
+
+---
+
+When playing:
+
+* Button switches to “Pause”
+* Add subtle pulsing glow animation
+* Reflect chakra color
+
+---
+
+10. MINI PLAYER (LIGHTWEIGHT)
+
+---
+
+Show floating player:
+
+* Chakra name
+* Frequency (e.g. 396 Hz)
+* Pause button
+* Close button
+
+---
+
+11. PERFORMANCE
+
+---
+
+* Preload audio
+* Keep playback smooth
+* Avoid lag when switching
+
+---
+
+12. DO NOT BREAK EXISTING FEATURES
+
+---
+
+Keep:
+
+* Pose section
+* Crystal section
+* Layout
+* Chakra data
+
+---
+
+## END RESULT
+
+* Chakra symbols visible everywhere
+* Sound healing fully functional
+* Clean, premium UI experience
