@@ -1,0 +1,245 @@
+FINAL FEATURE — Add “30-Day Yoga Journey” System (Natura Yoga AI)
+
+IMPORTANT:
+- Do NOT modify splash screen
+- Do NOT break Home layout (only enhance)
+- Do NOT remove AI Coach
+- Do NOT change navigation structure
+- Keep everything clean, minimal, premium
+
+----------------------------------
+
+🎯 GOAL
+
+Add a structured “30-Day Yoga Journey” system:
+
+- 4 Weeks (Week 1–4)
+- 7 Days per week
+- Visual + guided plan
+- Integrated into Home screen (replace “Today’s Checklist”)
+
+----------------------------------
+
+🖼️ WEEK IMAGES (USE THESE EXACT URLS)
+
+Week 1:
+https://apexdigital.design/wp-content/uploads/2026/04/natura-plan-week-1.webp
+
+Week 2:
+https://apexdigital.design/wp-content/uploads/2026/04/natura-plan-week-2.webp
+
+Week 3:
+https://apexdigital.design/wp-content/uploads/2026/04/natura-plan-week-3.webp
+
+Week 4:
+https://apexdigital.design/wp-content/uploads/2026/04/natura-plan-week-4.webp
+
+----------------------------------
+
+🧬 DATA STRUCTURE
+
+Create a simple local plan system:
+
+const journey = {
+  currentDay: 1,
+  currentWeek: 1,
+  completedDays: []
+};
+
+const weeks = [
+  {
+    week: 1,
+    title: "Foundation",
+    image: WEEK1_URL,
+    days: [
+      "Breath Awareness",
+      "Gentle Stretch",
+      "Relax & Reset",
+      "Breath Control",
+      "Light Flow",
+      "Recovery",
+      "Full Reset"
+    ]
+  },
+  {
+    week: 2,
+    title: "Energy",
+    image: WEEK2_URL,
+    days: [
+      "Morning Flow",
+      "Strength Build",
+      "Core Activation",
+      "Energy Boost",
+      "Full Body Flow",
+      "Active Recovery",
+      "Power Reset"
+    ]
+  },
+  {
+    week: 3,
+    title: "Focus",
+    image: WEEK3_URL,
+    days: [
+      "Mindful Breathing",
+      "Focus Flow",
+      "Stillness Practice",
+      "Clarity Reset",
+      "Balance Focus",
+      "Deep Breath",
+      "Mind Reset"
+    ]
+  },
+  {
+    week: 4,
+    title: "Balance",
+    image: WEEK4_URL,
+    days: [
+      "Balance Flow",
+      "Deep Stretch",
+      "Full Integration",
+      "Strength + Calm",
+      "Flow & Breath",
+      "Recovery",
+      "Final Reset"
+    ]
+  }
+];
+
+----------------------------------
+
+🏠 HOME SCREEN — REPLACE “TODAY’S CHECKLIST”
+
+Remove:
+- “Today’s Checklist”
+
+Replace with:
+
+🌿 “30-Day Yoga Journey” section
+
+----------------------------------
+
+📱 UI STRUCTURE
+
+[Header]
+30-Day Yoga Journey
+
+[Horizontal Week Selector]
+Week 1 | Week 2 | Week 3 | Week 4
+
+- Highlight active week
+- Smooth horizontal scroll if needed
+
+----------------------------------
+
+[WEEK HERO CARD]
+
+- Full-width image (use week image)
+- Height: ~160–200px
+- Rounded corners
+- Subtle dark gradient overlay
+
+Overlay text:
+Week X
+Week Title (Foundation / Energy / etc.)
+
+----------------------------------
+
+[DAY LIST]
+
+Show 7 days:
+
+Example:
+
+Day 1 ✓  Breath Awareness  
+Day 2 ✓  Gentle Stretch  
+Day 3 →  Relax & Reset (TODAY)  
+Day 4     Breath Control  
+Day 5     Light Flow  
+Day 6     Recovery  
+Day 7     Full Reset  
+
+----------------------------------
+
+🎯 DAY STATES
+
+- Completed → checkmark + slightly faded
+- Current day → highlight (glow or accent color)
+- Future days → normal
+
+----------------------------------
+
+⚡ INTERACTION
+
+When user taps a day:
+
+- Open existing session (Yoga / Breath / etc.)
+- OR trigger AI Coach with that day’s context
+
+----------------------------------
+
+🧠 AI COACH INTEGRATION (IMPORTANT)
+
+Update AI Coach logic slightly:
+
+If journey exists:
+
+Add line under header:
+
+“Day X of your 30-Day Journey”
+
+And responses like:
+
+- “Let’s continue your journey”
+- “Today is a focus day”
+- “You’re building momentum”
+
+----------------------------------
+
+💾 STATE MANAGEMENT
+
+Store locally (AsyncStorage if available):
+
+- currentDay
+- completedDays
+- startDate
+
+Auto-increment day when user completes session
+
+----------------------------------
+
+🎨 DESIGN RULES
+
+- Keep spacing clean
+- No clutter
+- No heavy UI
+- Match Natura green theme
+- Smooth transitions only
+- No lag
+
+----------------------------------
+
+⚡ PERFORMANCE
+
+- Lazy load images
+- Avoid unnecessary re-renders
+- Keep scroll smooth
+
+----------------------------------
+
+✅ FINAL TEST
+
+- Week switching works
+- Day highlight updates correctly
+- Images load correctly
+- No UI overlap
+- AI Coach still works
+- No console errors
+- Works in Expo preview
+
+----------------------------------
+
+After completing, summarize:
+- Files updated
+- Where 30-day plan was added
+- How state is handled
+- Any performance optimizations

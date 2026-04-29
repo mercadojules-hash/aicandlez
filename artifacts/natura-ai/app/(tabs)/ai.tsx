@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, spacing, radius, fontSizes } from "../../constants/theme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useJourney } from "../../hooks/useJourney";
 
 const { width } = Dimensions.get("window");
 const LOGO_URL = "https://apexdigital.design/wp-content/uploads/2026/04/natura-logo-clean.png";
@@ -218,6 +219,8 @@ function TypingDots() {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function AIScreen() {
+  const { currentDay, currentWeek } = useJourney();
+
   const [stage, setStage] = useState<AppStage>("mood");
   const [selectedMood, setSelectedMood] = useState<MoodData | null>(null);
   const [sessionType, setSessionType] = useState<SessionType | null>(null);
@@ -386,6 +389,16 @@ export default function AIScreen() {
             </Text>
           </View>
         </View>
+
+        {/* ── Journey context line ─────────────────────────────────────────── */}
+        {stage === "mood" && (
+          <View style={[styles.journeyRow, { backgroundColor: colors.primary + "10", borderColor: colors.primary + "30" }]}>
+            <Feather name="map" size={12} color={colors.primary} />
+            <Text style={[styles.journeyRowText, { color: colors.primary }]}>
+              Day {currentDay} of your 30-Day Journey — Week {currentWeek}
+            </Text>
+          </View>
+        )}
 
         {/* ── Memory: personalization line ────────────────────────────────── */}
         {personalizationLine !== null && stage === "mood" && (
@@ -917,6 +930,17 @@ const styles = StyleSheet.create({
   newCheckInText: {
     fontSize: fontSizes.sm, fontFamily: "Inter_500Medium",
     color: colors.primary,
+  },
+
+  // Journey row
+  journeyRow: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    marginHorizontal: spacing.md, marginBottom: spacing.sm,
+    borderRadius: radius.md, borderWidth: 1,
+    paddingHorizontal: spacing.sm, paddingVertical: 8,
+  },
+  journeyRowText: {
+    fontSize: fontSizes.xs, fontFamily: "Inter_600SemiBold", flex: 1,
   },
 
   // Coach image card

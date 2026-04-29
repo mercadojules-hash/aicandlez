@@ -16,8 +16,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { spacing, radius, fontSizes } from "../../constants/theme";
 import { useStreak } from "../../hooks/useStreak";
 import { useChecklist } from "../../hooks/useChecklist";
+import { useJourney } from "../../hooks/useJourney";
 import { useTheme, ThemeOverride } from "../../contexts/ThemeContext";
 import { useUser } from "../../contexts/UserContext";
+import { JOURNEY_WEEKS } from "../../data/journey";
 
 const { width } = Dimensions.get("window");
 
@@ -232,30 +234,191 @@ function QuickCard({ label, icon, route, color }: { label: string; icon: string;
   );
 }
 
+// ─── 30-Day Journey Section ───────────────────────────────────────────────────
+
+function JourneySection({
+  currentDay,
+  completedDays,
+}: {
+  currentDay: number;
+  completedDays: number[];
+}) {
+  const { colors } = useTheme();
+  const activeWeekIdx = Math.max(0, Math.ceil(currentDay / 7) - 1);
+  const [selectedWeek, setSelectedWeek] = useState(activeWeekIdx);
+  const week = JOURNEY_WEEKS[selectedWeek];
+  const weekStartDay = selectedWeek * 7 + 1;
+
+  return (
+    <View style={{ marginHorizontal: spacing.md, marginBottom: spacing.md }}>
+      {/* Header */}
+      <View style={jStyles.sectionHeader}>
+        <Text style={[jStyles.sectionTitle, { color: colors.text }]}>30-Day Yoga Journey</Text>
+        <View style={[jStyles.dayPill, { backgroundColor: colors.primary + "1A", borderColor: colors.primary + "40" }]}>
+          <Feather name="calendar" size={11} color={colors.primary} />
+          <Text style={[jStyles.dayPillText, { color: colors.primary }]}>Day {currentDay} / 28</Text>
+        </View>
+      </View>
+
+      {/* Week Tabs */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 8, paddingBottom: 12 }}
+      >
+        {JOURNEY_WEEKS.map((w, i) => {
+          const isActive   = i === selectedWeek;
+          const isDoneWeek = currentDay > (i + 1) * 7;
+          return (
+            <TouchableOpacity
+              key={w.week}
+              onPress={() => setSelectedWeek(i)}
+              style={[
+                jStyles.weekTab,
+                { borderColor: isActive ? colors.primary : colors.border },
+                isActive && { backgroundColor: colors.primary + "1A" },
+              ]}
+              activeOpacity={0.75}
+            >
+              {isDoneWeek && <Feather name="check" size={11} color={colors.primary} />}
+              <Text style={[jStyles.weekTabText, { color: isActive ? colors.primary : colors.textDim }]}>
+                Week {w.week}
+              </Text>
+              <Text style={[jStyles.weekTabSub, { color: isActive ? colors.primary + "aa" : colors.border }]}>
+                {w.title}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Hero Card */}
+      <View style={jStyles.heroCard}>
+        <Image source={{ uri: week.image }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+        <LinearGradient colors={["transparent", "rgba(4,14,8,0.8)"]} style={StyleSheet.absoluteFillObject} />
+        <View style={jStyles.heroOverlay}>
+          <Text style={jStyles.heroWeekLabel}>WEEK {week.week}</Text>
+          <Text style={jStyles.heroTitle}>{week.title}</Text>
+        </View>
+      </View>
+
+      {/* Day List */}
+      <View style={[jStyles.dayList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {week.days.map((dayName, i) => {
+          const dayNum   = weekStartDay + i;
+          const isDone   = completedDays.includes(dayNum);
+          const isCurrent = dayNum === currentDay;
+          const isFuture  = dayNum > currentDay;
+
+          return (
+            <TouchableOpacity
+              key={i}
+              style={[
+                jStyles.dayRow,
+                { borderBottomColor: i < week.days.length - 1 ? colors.border : "transparent" },
+                isCurrent && { backgroundColor: colors.primary + "0E" },
+              ]}
+              onPress={() => router.push("/(tabs)/ai")}
+              activeOpacity={isFuture ? 0.45 : 0.75}
+            >
+              <View
+                style={[
+                  jStyles.dayCircle,
+                  { borderColor: isDone ? colors.primary : isCurrent ? colors.primary : colors.borderLight },
+                  isDone && { backgroundColor: colors.primary },
+                ]}
+              >
+                {isDone ? (
+                  <Feather name="check" size={11} color="#fff" />
+                ) : (
+                  <Text style={[jStyles.dayCircleNum, { color: isCurrent ? colors.primary : colors.textDim }]}>
+                    {dayNum}
+                  </Text>
+                )}
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[
+                    jStyles.dayName,
+                    { color: isFuture ? colors.textDim : isDone ? colors.textDim : colors.text },
+                    isDone && { textDecorationLine: "line-through" },
+                  ]}
+                >
+                  {dayName}
+                </Text>
+                {isCurrent && (
+                  <Text style={[jStyles.todayLabel, { color: colors.primary }]}>TODAY</Text>
+                )}
+              </View>
+
+              {isCurrent && <Feather name="chevron-right" size={16} color={colors.primary} />}
+              {isFuture && <View style={[jStyles.futureDot, { backgroundColor: colors.borderLight }]} />}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const jStyles = StyleSheet.create({
+  sectionHeader: {
+    flexDirection: "row", alignItems: "center",
+    justifyContent: "space-between", marginBottom: spacing.sm,
+  },
+  sectionTitle: { fontSize: fontSizes.md, fontFamily: "Inter_700Bold" },
+  dayPill: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    borderRadius: radius.full, borderWidth: 1,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  dayPillText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  weekTab: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    borderRadius: radius.full, borderWidth: 1.5,
+    paddingHorizontal: 14, paddingVertical: 8,
+  },
+  weekTabText: { fontSize: fontSizes.xs, fontFamily: "Inter_600SemiBold" },
+  weekTabSub: { fontSize: 10, fontFamily: "Inter_400Regular" },
+  heroCard: {
+    height: 170, borderRadius: radius.lg, overflow: "hidden",
+    marginBottom: spacing.sm, justifyContent: "flex-end",
+  },
+  heroOverlay: { padding: spacing.md },
+  heroWeekLabel: {
+    fontSize: 10, fontFamily: "Inter_600SemiBold",
+    color: "rgba(255,255,255,0.65)", letterSpacing: 1.2, marginBottom: 4,
+  },
+  heroTitle: { fontSize: fontSizes.xxl, fontFamily: "Inter_700Bold", color: "#fff" },
+  dayList: { borderRadius: radius.lg, borderWidth: 1, overflow: "hidden" },
+  dayRow: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: spacing.md, paddingVertical: 13,
+    gap: 12, borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  dayCircle: {
+    width: 28, height: 28, borderRadius: 14, borderWidth: 1.5,
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
+  dayCircleNum: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  dayName: { fontSize: fontSizes.sm, fontFamily: "Inter_500Medium" },
+  todayLabel: { fontSize: 10, fontFamily: "Inter_700Bold", marginTop: 2, letterSpacing: 0.6 },
+  futureDot: { width: 6, height: 6, borderRadius: 3 },
+});
+
 // ─── Home Screen ──────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const { streak } = useStreak();
-  const { checklist, markComplete, getProgress } = useChecklist();
+  const { getProgress } = useChecklist();
+  const { currentDay, completedDays } = useJourney();
   const { colors } = useTheme();
-  const [checklistExpanded, setChecklistExpanded] = useState(false);
-  const checklistAnim = useRef(new Animated.Value(0)).current;
 
   const progress = getProgress();
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-
-  const toggleChecklist = () => {
-    const toValue = checklistExpanded ? 0 : 1;
-    setChecklistExpanded(!checklistExpanded);
-    Animated.timing(checklistAnim, { toValue, duration: 280, useNativeDriver: false }).start();
-  };
-
-  const checklistHeight = checklistAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 168],
-  });
 
   const quickActions = [
     { label: "Yoga Poses", icon: "activity", route: "/(tabs)/yoga",    color: colors.accent },
@@ -316,67 +479,8 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        {/* ── CHECKLIST (collapsible) ──────────────────────────────────── */}
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: colors.card,
-              borderColor: colors.border,
-              marginHorizontal: spacing.md,
-              marginBottom: spacing.md,
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.checklistHeader}
-            onPress={toggleChecklist}
-            activeOpacity={0.75}
-          >
-            <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>
-              Today's Checklist
-            </Text>
-            <View style={styles.checklistMeta}>
-              <Text style={[styles.checklistCount, { color: colors.primary }]}>
-                {Object.values(checklist).filter(Boolean).length}/{Object.values(checklist).length}
-              </Text>
-              <Feather
-                name={checklistExpanded ? "chevron-up" : "chevron-down"}
-                size={16}
-                color={colors.textDim}
-              />
-            </View>
-          </TouchableOpacity>
-
-          <Animated.View style={{ height: checklistHeight, overflow: "hidden" }}>
-            <View style={{ marginTop: spacing.sm }}>
-              <CheckItem
-                label="Complete a yoga flow"
-                done={checklist.yoga}
-                onPress={() => {
-                  if (!checklist.yoga) markComplete("yoga");
-                  router.push("/(tabs)/yoga");
-                }}
-              />
-              <CheckItem
-                label="Do a breathing session"
-                done={checklist.breathwork}
-                onPress={() => {
-                  if (!checklist.breathwork) markComplete("breathwork");
-                  router.push("/(tabs)/breathe");
-                }}
-              />
-              <CheckItem
-                label="Review a chakra"
-                done={checklist.chakra}
-                onPress={() => {
-                  if (!checklist.chakra) markComplete("chakra");
-                  router.push("/(tabs)/chakras");
-                }}
-              />
-            </View>
-          </Animated.View>
-        </View>
+        {/* ── 30-DAY YOGA JOURNEY ─────────────────────────────────────── */}
+        <JourneySection currentDay={currentDay} completedDays={completedDays} />
 
         {/* ── AI BANNER ───────────────────────────────────────────────── */}
         <TouchableOpacity
