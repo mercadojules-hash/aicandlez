@@ -1,0 +1,175 @@
+Update the Chakra System UI and functionality to a premium, image-driven experience.
+
+GOAL:
+Transform the chakra section into a visually rich, structured wellness experience that includes chakra symbols, crystals, yoga poses, and sound healing.
+
+---
+
+1. CHAKRA LIST SCREEN (chakra overview)
+
+---
+
+Update each chakra card:
+
+* Keep current layout (title + description)
+* On the RIGHT side of each card:
+
+  * Add chakra symbol (SVG or PNG)
+  * Symbol should be white or lightly tinted
+  * Place inside a soft rounded container or glow circle
+* Keep chakra color theme per card (red, orange, yellow, etc)
+
+Make sure:
+
+* Alignment is clean and centered vertically
+* Spacing is consistent across all cards
+* No layout breaking on smaller screens
+
+---
+
+2. CHAKRA DETAIL SCREEN (MAJOR UPGRADE)
+
+---
+
+Rebuild chakra detail screen with the following structure:
+
+---
+
+## SECTION 1 — HERO HEADER
+
+* Full-width gradient background using chakra color
+* Center a circular container at top
+* Inside circle:
+
+  * Display chakra symbol (REPLACE text title in circle)
+
+Below circle:
+
+* Chakra name (e.g. "Root Chakra")
+* Sanskrit name (e.g. "Muladhara")
+
+Optional:
+
+* Small tags (Element, Location)
+
+---
+
+## SECTION 2 — CORE INFO
+
+Display:
+
+* Element (Earth, Water, Fire, etc)
+* Location (Base of spine, etc)
+
+Use clean pill-style tags or small cards
+
+---
+
+## SECTION 3 — CRYSTAL (NEW)
+
+Add a new section:
+
+Title: "Crystal"
+
+Include:
+
+* Crystal image (rounded)
+* Crystal name (e.g. Red Jasper)
+* Short benefit (1 sentence max)
+
+Layout:
+
+* Horizontal card or stacked card
+* Keep soft shadow + rounded corners
+
+---
+
+## SECTION 4 — YOGA POSE (CONNECTED FEATURE)
+
+Add a section:
+
+Title: "Recommended Pose"
+
+Include:
+
+* Yoga pose image (from your existing yoga system URLs)
+* Pose name
+* 1–2 line explanation:
+  Example: "Helps ground energy and activate the root chakra"
+
+Optional:
+
+* Tap interaction → navigate to pose detail screen
+
+---
+
+## SECTION 5 — SOUND HEALING (NEW)
+
+Add section:
+
+Title: "Sound Healing"
+
+Include:
+
+* Button: "Play Chakra Frequency"
+* Subtext: "Tap to begin calming sound meditation"
+
+Functionality:
+
+* On tap → play looping sound bowl audio
+* Add pause/stop toggle
+* Do NOT autoplay audio
+
+Keep UI minimal and clean
+
+---
+
+3. DATA STRUCTURE UPDATE
+
+---
+
+Extend chakra data model to include:
+
+* symbol (image URL or local asset)
+* crystalName
+* crystalImage
+* crystalDescription
+* yogaPoseName
+* yogaPoseImage
+* yogaPoseDescription
+* soundFrequency (optional for future use)
+
+---
+
+4. DESIGN RULES (IMPORTANT)
+
+---
+
+* Maintain Natura AI dark + green theme
+* Chakra colors must still stand out
+* Use soft gradients, glow, and shadows
+* Keep spacing consistent with yoga screens
+* Avoid clutter — clean sections only
+
+---
+
+5. INTERACTIONS
+
+---
+
+* Smooth scroll between sections
+* Subtle fade/slide animations (optional)
+* Button press feedback
+* Image loading should be optimized (use WebP)
+
+---
+
+## END RESULT
+
+The chakra system should feel like:
+
+* A premium wellness experience
+* Visually rich but clean
+* Connected to yoga + meditation features
+
+Do not break existing navigation or functionality.

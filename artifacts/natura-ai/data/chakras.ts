@@ -16,6 +16,17 @@ export interface Chakra {
   foods: string[];
   poses: string[];
   image: string;
+  // Enhanced fields
+  symbol: string;
+  crystalName: string;
+  crystalImage: string;
+  crystalBenefit: string;
+  yogaPoseId: string;
+  yogaPoseName: string;
+  yogaPoseImage: string;
+  yogaPoseDescription: string;
+  soundFrequency: string;
+  soundLabel: string;
 }
 
 export const chakras: Chakra[] = [
@@ -32,8 +43,7 @@ export const chakras: Chakra[] = [
     affirmation: "I am safe. I am grounded. I belong here.",
     description:
       "The Root Chakra is your foundation — your sense of safety, security, and belonging in the physical world. It connects you to the earth and to your most basic survival needs. When balanced, you feel stable, secure, and at home in your body.",
-    emotionalAssociation:
-      "Security, stability, trust, grounding, and a sense of home",
+    emotionalAssociation: "Security, stability, trust, grounding, and a sense of home",
     benefits: [
       "Deep sense of safety and security",
       "Physical strength and vitality",
@@ -51,6 +61,16 @@ export const chakras: Chakra[] = [
     foods: ["Beets", "Radishes", "Carrots", "Potatoes", "Protein-rich foods"],
     poses: ["Mountain Pose", "Warrior I", "Child's Pose", "Seated Forward Fold"],
     image: "https://placehold.co/400x400/c0392b/FFFFFF?text=Muladhara",
+    symbol: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Muladhara.svg/240px-Muladhara.svg.png",
+    crystalName: "Red Jasper",
+    crystalImage: "https://placehold.co/300x300/c0392b/FFFFFF?text=Red+Jasper",
+    crystalBenefit: "Grounds and stabilises energy, bringing deep comfort and security to the root.",
+    yogaPoseId: "mountain-pose",
+    yogaPoseName: "Mountain Pose",
+    yogaPoseImage: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-mountain-pose.webp",
+    yogaPoseDescription: "Roots you to the earth, activating the base chakra and building foundational stability.",
+    soundFrequency: "396 Hz",
+    soundLabel: "Liberation from fear",
   },
   {
     id: "sacral",
@@ -65,8 +85,7 @@ export const chakras: Chakra[] = [
     affirmation: "I embrace my creativity. I allow myself to feel fully.",
     description:
       "The Sacral Chakra governs creativity, sensuality, pleasure, and emotional flow. It is the seat of your passion and your ability to experience joy and connection with others. A balanced sacral chakra allows you to move through life with emotional fluidity and creative vitality.",
-    emotionalAssociation:
-      "Creativity, pleasure, desire, intimacy, and emotional fluidity",
+    emotionalAssociation: "Creativity, pleasure, desire, intimacy, and emotional fluidity",
     benefits: [
       "Emotional balance and resilience",
       "Vibrant creativity and inspiration",
@@ -84,6 +103,16 @@ export const chakras: Chakra[] = [
     foods: ["Oranges", "Mangoes", "Pumpkin", "Passion fruit", "Seeds"],
     poses: ["Pigeon Pose", "Bound Angle", "Low Lunge", "Goddess Pose"],
     image: "https://placehold.co/400x400/e67e22/FFFFFF?text=Swadhisthana",
+    symbol: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Swadhisthana.svg/240px-Swadhisthana.svg.png",
+    crystalName: "Carnelian",
+    crystalImage: "https://placehold.co/300x300/e67e22/FFFFFF?text=Carnelian",
+    crystalBenefit: "Ignites passion, boosts creativity, and restores vitality to emotional expression.",
+    yogaPoseId: "pigeon-pose",
+    yogaPoseName: "Pigeon Pose",
+    yogaPoseImage: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-pigeon-pose.webp",
+    yogaPoseDescription: "Deeply releases the hips, unlocking stored emotional tension in the sacral centre.",
+    soundFrequency: "417 Hz",
+    soundLabel: "Facilitating change",
   },
   {
     id: "solar-plexus",
@@ -92,14 +121,13 @@ export const chakras: Chakra[] = [
     subtitle: "I do",
     sanskrit: "Manipura",
     location: "Upper abdomen",
-    color: "#f1c40f",
+    color: "#d4ac0d",
     element: "Fire",
     mantra: "RAM",
     affirmation: "I am powerful. I trust myself and my purpose completely.",
     description:
       "The Solar Plexus is your personal power center — your sense of self, confidence, and will. When balanced, you act from a place of authentic strength and purpose. This chakra fuels your ambition, discipline, and ability to manifest your intentions in the world.",
-    emotionalAssociation:
-      "Confidence, self-esteem, personal power, and healthy boundaries",
+    emotionalAssociation: "Confidence, self-esteem, personal power, and healthy boundaries",
     benefits: [
       "Strong self-esteem and confidence",
       "Clear motivation and sense of purpose",
@@ -117,6 +145,16 @@ export const chakras: Chakra[] = [
     foods: ["Bananas", "Corn", "Pineapple", "Ginger", "Turmeric", "Legumes"],
     poses: ["Boat Pose", "Warrior III", "Plank", "Triangle Pose"],
     image: "https://placehold.co/400x400/d4ac0d/FFFFFF?text=Manipura",
+    symbol: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Manipura.svg/240px-Manipura.svg.png",
+    crystalName: "Citrine",
+    crystalImage: "https://placehold.co/300x300/d4ac0d/FFFFFF?text=Citrine",
+    crystalBenefit: "Amplifies personal power, boosts confidence, and attracts abundance and motivation.",
+    yogaPoseId: "warrior-3",
+    yogaPoseName: "Warrior III",
+    yogaPoseImage: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-warrior-iii-pose.webp",
+    yogaPoseDescription: "Activates core strength and willpower, channelling fire energy through the solar plexus.",
+    soundFrequency: "528 Hz",
+    soundLabel: "Transformation & miracles",
   },
   {
     id: "heart",
@@ -131,8 +169,7 @@ export const chakras: Chakra[] = [
     affirmation: "I am love. I give and receive love freely and openly.",
     description:
       "The Heart Chakra bridges the physical and spiritual realms. It is the home of love — both for others and for yourself. An open heart chakra allows you to give and receive without fear, to forgive with grace, and to live with genuine compassion for all beings.",
-    emotionalAssociation:
-      "Unconditional love, compassion, empathy, forgiveness, and inner peace",
+    emotionalAssociation: "Unconditional love, compassion, empathy, forgiveness, and inner peace",
     benefits: [
       "Deep emotional healing and forgiveness",
       "Genuine empathy and compassion",
@@ -150,6 +187,16 @@ export const chakras: Chakra[] = [
     foods: ["Leafy greens", "Broccoli", "Avocado", "Green tea", "Fresh herbs"],
     poses: ["Camel Pose", "Cobra", "Bridge Pose", "Wild Thing"],
     image: "https://placehold.co/400x400/27ae60/FFFFFF?text=Anahata",
+    symbol: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Anahata.svg/240px-Anahata.svg.png",
+    crystalName: "Rose Quartz",
+    crystalImage: "https://placehold.co/300x300/e8a0b0/FFFFFF?text=Rose+Quartz",
+    crystalBenefit: "Opens the heart to unconditional love, heals emotional wounds, and restores trust.",
+    yogaPoseId: "bridge-pose",
+    yogaPoseName: "Bridge Pose",
+    yogaPoseImage: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-bridge-pose.webp",
+    yogaPoseDescription: "Opens the chest and heart space, allowing prana to flow freely through the heart centre.",
+    soundFrequency: "639 Hz",
+    soundLabel: "Connecting relationships",
   },
   {
     id: "throat",
@@ -164,8 +211,7 @@ export const chakras: Chakra[] = [
     affirmation: "I speak my truth with clarity. My voice matters.",
     description:
       "The Throat Chakra is the center of communication, truth, and authentic expression. When open, you speak your truth with clarity and listen with genuine presence. This chakra governs all forms of expression — verbal, written, artistic — and your ability to live in alignment with your truth.",
-    emotionalAssociation:
-      "Communication, self-expression, honesty, and authentic truth",
+    emotionalAssociation: "Communication, self-expression, honesty, and authentic truth",
     benefits: [
       "Clear and confident self-expression",
       "Ability to speak your truth fearlessly",
@@ -183,6 +229,16 @@ export const chakras: Chakra[] = [
     foods: ["Blueberries", "Blackberries", "Figs", "Herbal teas", "Raw honey"],
     poses: ["Fish Pose", "Shoulder Stand", "Neck Rolls", "Plow Pose"],
     image: "https://placehold.co/400x400/2980b9/FFFFFF?text=Vishuddha",
+    symbol: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Vishuddha.svg/240px-Vishuddha.svg.png",
+    crystalName: "Aquamarine",
+    crystalImage: "https://placehold.co/300x300/5dade2/FFFFFF?text=Aquamarine",
+    crystalBenefit: "Calms the mind, clears the throat, and empowers authentic, courageous communication.",
+    yogaPoseId: "cat-cow",
+    yogaPoseName: "Cat-Cow",
+    yogaPoseImage: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-cat-cow-pose.webp",
+    yogaPoseDescription: "Creates gentle traction in the neck and spine, opening the throat and freeing expression.",
+    soundFrequency: "741 Hz",
+    soundLabel: "Expression & solutions",
   },
   {
     id: "third-eye",
@@ -197,8 +253,7 @@ export const chakras: Chakra[] = [
     affirmation: "I trust my intuition. I see beyond what is visible.",
     description:
       "The Third Eye is the seat of intuition, wisdom, and inner vision. It connects you to a deeper knowing beyond the rational mind — your inner guidance system. When awakened, you perceive life with clarity, access higher wisdom, and trust the intelligence that lives within you.",
-    emotionalAssociation:
-      "Intuition, perception, imagination, clarity, and inner wisdom",
+    emotionalAssociation: "Intuition, perception, imagination, clarity, and inner wisdom",
     benefits: [
       "Sharp intuition and inner knowing",
       "Mental clarity and focused awareness",
@@ -216,6 +271,16 @@ export const chakras: Chakra[] = [
     foods: ["Eggplant", "Purple cabbage", "Grapes", "Dark chocolate", "Omega-3 rich foods"],
     poses: ["Child's Pose", "Dolphin Pose", "Seated Meditation", "Eagle Pose"],
     image: "https://placehold.co/400x400/6c3483/FFFFFF?text=Ajna",
+    symbol: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Ajna.svg/240px-Ajna.svg.png",
+    crystalName: "Amethyst",
+    crystalImage: "https://placehold.co/300x300/7d3c98/FFFFFF?text=Amethyst",
+    crystalBenefit: "Heightens intuition, quiets mental chatter, and opens the gateway to inner wisdom.",
+    yogaPoseId: "childs-pose",
+    yogaPoseName: "Child's Pose",
+    yogaPoseImage: "https://apexdigital.design/wp-content/uploads/2026/04/childs-pose.webp",
+    yogaPoseDescription: "Gently presses the forehead to the earth, stimulating the third eye and encouraging inward focus.",
+    soundFrequency: "852 Hz",
+    soundLabel: "Returning to spiritual order",
   },
   {
     id: "crown",
@@ -230,8 +295,7 @@ export const chakras: Chakra[] = [
     affirmation: "I am connected to all that is. I am light, love, and wisdom.",
     description:
       "The Crown Chakra connects you to universal consciousness, spiritual wisdom, and the divine. It is the gateway to enlightenment and your highest self. When open, you experience a profound sense of unity with all life, deep inner peace, and an understanding that goes beyond words.",
-    emotionalAssociation:
-      "Spiritual connection, unity, bliss, and universal love",
+    emotionalAssociation: "Spiritual connection, unity, bliss, and universal love",
     benefits: [
       "Deep peace and spiritual fulfilment",
       "Sense of oneness with all life",
@@ -249,5 +313,15 @@ export const chakras: Chakra[] = [
     foods: ["Light foods", "Fasting", "Fresh air", "Sunlight", "Meditation"],
     poses: ["Savasana", "Headstand", "Lotus Pose", "Tree Pose"],
     image: "https://placehold.co/400x400/7d3c98/FFFFFF?text=Sahasrara",
+    symbol: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Sahasrara.svg/240px-Sahasrara.svg.png",
+    crystalName: "Clear Quartz",
+    crystalImage: "https://placehold.co/300x300/d5dbdb/555555?text=Clear+Quartz",
+    crystalBenefit: "The master healer — amplifies energy, clarity, and connection to the highest divine consciousness.",
+    yogaPoseId: "legs-up-wall",
+    yogaPoseName: "Legs Up the Wall",
+    yogaPoseImage: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-legs-up-the-wall-pose.webp",
+    yogaPoseDescription: "Inverts the body gently, drawing energy upward toward the crown and inducing deep stillness.",
+    soundFrequency: "963 Hz",
+    soundLabel: "Pure consciousness",
   },
 ];
