@@ -1333,28 +1333,89 @@ a { color: inherit; text-decoration: none; }
 .ingredient-row:last-child { margin-bottom: 0; }
 .ingredient-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); flex-shrink: 0; box-shadow: 0 0 6px rgba(120,255,180,0.5); }
 
-.step-row { display: flex; gap: 14px; margin-bottom: 12px; }
+/* Step progression system */
+.steps-track { display: flex; flex-direction: column; }
+.step-row {
+  display: flex; gap: 14px;
+  padding: 12px 14px 12px 0;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.step-row.active {
+  background: rgba(120,255,180,0.06);
+  border: 1px solid rgba(120,255,180,0.15);
+  padding: 14px 14px 14px 14px;
+  transform: scale(1.01);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+.step-row.done {
+  opacity: 0.55;
+}
+.step-row:active { transform: scale(0.99); }
+
+.step-col {
+  display: flex; flex-direction: column; align-items: center;
+  flex-shrink: 0; padding-top: 1px;
+}
+.step-connector {
+  width: 1.5px; flex: 1; min-height: 16px;
+  background: rgba(255,255,255,0.1);
+  margin: 4px 0;
+  transition: background 0.3s;
+}
+.step-connector.done { background: rgba(120,255,180,0.35); }
+
 .step-num {
   width: 30px; height: 30px; border-radius: 50%;
-  background: rgba(120,255,180,0.15);
-  border: 1px solid rgba(120,255,180,0.4);
+  background: rgba(120,255,180,0.1);
+  border: 1px solid rgba(120,255,180,0.3);
   color: var(--primary); font-size: 13px; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.step-num.active {
+  background: rgba(120,255,180,0.2);
+  border-color: rgba(120,255,180,0.6);
+  box-shadow: 0 0 14px rgba(120,255,180,0.4);
+}
+.step-num.done {
+  background: rgba(120,255,180,0.15);
+  border-color: rgba(120,255,180,0.4);
+  box-shadow: 0 0 8px rgba(120,255,180,0.25);
+}
+
+.step-body { flex: 1; padding-bottom: 8px; }
+.step-instruction { font-size: 14px; color: rgba(255,255,255,0.85); line-height: 1.55; }
+.step-duration { font-size: 12px; color: var(--primary); margin-top: 5px; font-weight: 500; opacity: 0.8; }
+
+/* Benefits */
+.benefit-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 0; font-size: 14px;
+  color: rgba(255,255,255,0.85);
+  line-height: 1.5;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.benefit-row:last-child { border-bottom: none; }
+.benefit-check {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(120,255,180,0.1);
+  border: 1px solid rgba(120,255,180,0.3);
+  display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; margin-top: 1px;
-  box-shadow: 0 0 10px rgba(120,255,180,0.2);
 }
-.step-instruction { font-size: 14px; color: rgba(255,255,255,0.85); line-height: 1.5; }
-.step-duration { font-size: 12px; color: var(--primary); margin-top: 4px; font-weight: 500; opacity: 0.8; }
 
-.benefit-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 14px; color: rgba(255,255,255,0.82); }
-
+/* Safety card */
 .safety-card {
-  background: rgba(245,166,35,0.08);
-  border: 1px solid rgba(245,166,35,0.2);
-  border-radius: 14px; padding: 14px 16px; margin-bottom: 24px;
+  background: rgba(255,200,0,0.06);
+  border: 1px solid rgba(255,200,0,0.2);
+  border-radius: 16px; padding: 16px 18px; margin-bottom: 24px;
 }
-.safety-title { font-size: 13px; font-weight: 700; color: #F5C842; margin-bottom: 6px; }
-.safety-text { font-size: 13px; color: rgba(245,200,66,0.8); line-height: 1.5; }
+.safety-title { font-size: 13px; font-weight: 700; color: #F5C842; margin-bottom: 7px; }
+.safety-text { font-size: 13px; color: rgba(245,200,66,0.8); line-height: 1.55; }
 
 .guided-btn {
   font-size: 13px; color: var(--primary); font-weight: 600;
@@ -1362,6 +1423,7 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid rgba(120,255,180,0.3);
   padding: 6px 14px; border-radius: 999px;
   transition: all 0.15s;
+  display: flex; align-items: center; gap: 4px;
 }
 .guided-btn:active { background: rgba(120,255,180,0.2); }
 
@@ -1487,14 +1549,38 @@ a { color: inherit; text-decoration: none; }
 
 /* Detail CTA */
 .detail-cta-btn {
-  width: 100%; padding: 18px;
-  background: rgba(120,255,180,0.9);
-  color: #0D1F16; font-size: 16px; font-weight: 700;
-  border-radius: 18px; margin-top: 8px; margin-bottom: 16px;
-  box-shadow: 0 8px 20px rgba(120,255,180,0.25), inset 0 1px 1px rgba(255,255,255,0.3);
-  transition: all 0.18s; letter-spacing: -0.1px;
+  width: 100%; padding: 20px;
+  background: linear-gradient(135deg, #5BFFB2 0%, #38D996 100%);
+  color: #0A1F14; font-size: 16px; font-weight: 700;
+  border-radius: 20px; margin-top: 8px; margin-bottom: 16px;
+  box-shadow: 0 10px 28px rgba(80,255,160,0.35), inset 0 1px 1px rgba(255,255,255,0.35);
+  transition: transform 0.18s, box-shadow 0.18s;
+  letter-spacing: -0.1px;
 }
-.detail-cta-btn:active { transform: scale(0.98); opacity: 0.9; }
+.detail-cta-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 6px 16px rgba(80,255,160,0.25), inset 0 1px 1px rgba(255,255,255,0.2);
+}
+
+/* Guided mode — dot indicators */
+.guided-dots {
+  display: flex; gap: 6px; justify-content: center;
+  margin: -6px 0 4px;
+}
+.guided-dot {
+  height: 5px; border-radius: 999px;
+  background: rgba(255,255,255,0.15);
+  transition: all 0.22s;
+  flex: 1; max-width: 28px; cursor: pointer;
+}
+.guided-dot.done {
+  background: rgba(120,255,180,0.45);
+}
+.guided-dot.active {
+  background: rgba(120,255,180,0.9);
+  max-width: 40px;
+  box-shadow: 0 0 8px rgba(120,255,180,0.4);
+}
 
 /* AI Wellness Coach card */
 .ai-coach-card {

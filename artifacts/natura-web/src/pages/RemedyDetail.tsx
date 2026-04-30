@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ChevronLeft, Bookmark, Check, ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronLeft, Bookmark, Check, ChevronRight, Sparkles } from "lucide-react";
 import { useWellness } from "@/contexts/WellnessContext";
 import { REMEDIES, RECIPES } from "@/lib/data";
 import imgGingerTea from "@assets/remedy-ginger-tea_1777546217699.webp";
@@ -24,6 +24,8 @@ export default function RemedyDetail() {
   const [stepMode, setStepMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [heroFailed, setHeroFailed] = useState(false);
+  const [activeStep, setActiveStep] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 
   const item = REMEDIES.find((r) => r.id === id) || RECIPES.find((r) => r.id === id);
   if (!item) return (
@@ -36,6 +38,20 @@ export default function RemedyDetail() {
   const saved = isSaved(item.id);
   const isRecipe = "variations" in item;
   const heroSrc = REMEDY_IMAGES[item.id] ?? item.image;
+
+  const toggleStep = (idx: number) => {
+    setCompletedSteps((prev) => {
+      const next = new Set(prev);
+      next.has(idx) ? next.delete(idx) : next.add(idx);
+      return next;
+    });
+    setActiveStep(idx + 1 < item.steps.length ? idx + 1 : idx);
+  };
+
+  const enterGuidedMode = () => {
+    setCurrentStep(0);
+    setStepMode(true);
+  };
 
   return (
     <div className="detail-screen">
@@ -72,6 +88,7 @@ export default function RemedyDetail() {
 
         {!stepMode ? (
           <>
+            {/* Ingredients */}
             <div className="detail-section">
               <h3 className="detail-section-title">Ingredients</h3>
               {item.ingredients.map((ing, i) => (
@@ -82,34 +99,57 @@ export default function RemedyDetail() {
               ))}
             </div>
 
+            {/* Steps — progression system */}
             <div className="detail-section">
               <div className="detail-section-header">
                 <h3 className="detail-section-title">Steps</h3>
-                <button className="guided-btn" onClick={() => setStepMode(true)}>Guided mode</button>
+                <button className="guided-btn" onClick={enterGuidedMode}>
+                  <Sparkles size={12} style={{ display: "inline", marginRight: 4 }} />
+                  Guided
+                </button>
               </div>
-              {item.steps.map((step) => (
-                <div key={step.stepNumber} className="step-row">
-                  <div className="step-num">{step.stepNumber}</div>
-                  <div>
-                    <p className="step-instruction">{step.instruction}</p>
-                    {step.duration && <p className="step-duration">⏱ {step.duration}</p>}
-                  </div>
-                </div>
-              ))}
+              <div className="steps-track">
+                {item.steps.map((step, idx) => {
+                  const done = completedSteps.has(idx);
+                  const isActive = activeStep === idx && !done;
+                  return (
+                    <div
+                      key={step.stepNumber}
+                      className={`step-row ${isActive ? "active" : ""} ${done ? "done" : ""}`}
+                      onClick={() => toggleStep(idx)}
+                    >
+                      <div className="step-col">
+                        <div className={`step-num ${done ? "done" : isActive ? "active" : ""}`}>
+                          {done ? <Check size={13} color="#7CFFB2" /> : step.stepNumber}
+                        </div>
+                        {idx < item.steps.length - 1 && (
+                          <div className={`step-connector ${done ? "done" : ""}`} />
+                        )}
+                      </div>
+                      <div className="step-body">
+                        <p className="step-instruction">{step.instruction}</p>
+                        {step.duration && <p className="step-duration">⏱ {step.duration}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
+            {/* Benefits */}
             {"benefits" in item && (
               <div className="detail-section">
                 <h3 className="detail-section-title">Benefits</h3>
                 {item.benefits.map((b, i) => (
                   <div key={i} className="benefit-row">
-                    <Check size={14} color="#7CFFB2" />
+                    <span className="benefit-check"><Check size={13} color="#7CFFB2" /></span>
                     <span>{b}</span>
                   </div>
                 ))}
               </div>
             )}
 
+            {/* Variations */}
             {isRecipe && (
               <div className="detail-section">
                 <h3 className="detail-section-title">Variations</h3>
@@ -122,24 +162,40 @@ export default function RemedyDetail() {
               </div>
             )}
 
+            {/* Safety note */}
             <div className="safety-card">
               <p className="safety-title">⚠️ Safety Note</p>
               <p className="safety-text">{"safetyNote" in item ? item.safetyNote : ""}</p>
             </div>
 
-            <button className="detail-cta-btn" onClick={() => setStepMode(true)}>
+            <button className="detail-cta-btn" onClick={enterGuidedMode}>
+              <Sparkles size={16} style={{ display: "inline", marginRight: 8, verticalAlign: "middle" }} />
               Start Guided Mode
             </button>
           </>
         ) : (
+          /* ─── Guided mode ─── */
           <div className="guided-mode">
             <div className="guided-header">
-              <p className="guided-count">Step {currentStep + 1} of {item.steps.length}</p>
-              <button className="guided-exit" onClick={() => setStepMode(false)}>Exit guided mode</button>
+              <p className="guided-count">Step {currentStep + 1} <span style={{ color: "rgba(255,255,255,0.4)" }}>of {item.steps.length}</span></p>
+              <button className="guided-exit" onClick={() => setStepMode(false)}>Exit</button>
             </div>
+
+            {/* Dot indicators */}
+            <div className="guided-dots">
+              {item.steps.map((_, i) => (
+                <button
+                  key={i}
+                  className={`guided-dot ${i === currentStep ? "active" : ""} ${i < currentStep ? "done" : ""}`}
+                  onClick={() => setCurrentStep(i)}
+                />
+              ))}
+            </div>
+
             <div className="guided-progress">
               <div className="guided-progress-fill" style={{ width: `${((currentStep + 1) / item.steps.length) * 100}%` }} />
             </div>
+
             <div className="guided-step-card">
               <div className="guided-step-num">{currentStep + 1}</div>
               <p className="guided-step-instruction">{item.steps[currentStep].instruction}</p>
@@ -147,6 +203,7 @@ export default function RemedyDetail() {
                 <p className="guided-step-duration">⏱ {item.steps[currentStep].duration}</p>
               )}
             </div>
+
             <div className="guided-nav">
               <button
                 className="guided-nav-btn"
@@ -158,13 +215,13 @@ export default function RemedyDetail() {
               </button>
               {currentStep < item.steps.length - 1 ? (
                 <button className="guided-nav-btn primary" onClick={() => setCurrentStep((s) => s + 1)}>
-                  Next
+                  Next Step
                   <ChevronRight size={20} />
                 </button>
               ) : (
                 <button className="guided-nav-btn primary" onClick={() => setStepMode(false)}>
-                  <Check size={20} />
-                  Done
+                  <Check size={18} />
+                  Complete
                 </button>
               )}
             </div>

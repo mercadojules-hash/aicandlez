@@ -1,0 +1,99 @@
+Upgrade the Plan/Remedy detail screen to feel like a premium guided experience (not a static recipe page).
+
+Keep layout, but enhance interaction, hierarchy, and immersion.
+
+1. HERO SECTION (TOP IMAGE AREA)
+
+- Increase visual impact:
+  height: 180px–220px
+- Add layered overlay:
+  background-image:
+    linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.75)),
+    radial-gradient(circle at top right, rgba(120,255,180,0.15), transparent 60%);
+
+- Make title larger and more prominent
+- Make category badge (STRESS, DIGESTION, etc.) glow slightly:
+  box-shadow: 0 0 12px rgba(120,255,180,0.3)
+
+2. INGREDIENTS → CARD STYLE
+
+Instead of plain rows:
+- Wrap each ingredient in soft glass pills:
+  background: rgba(255,255,255,0.04)
+  border-radius: 12px
+  padding: 10px 12px
+  margin-bottom: 8px
+
+- Add subtle dot/icon at left with glow
+
+3. STEPS → PROGRESSION SYSTEM (IMPORTANT)
+
+This is the biggest upgrade.
+
+- Each step should feel like part of a journey:
+  - Keep numbered circles
+  - Add soft glow to active step
+
+- Add vertical progress line:
+  thin line connecting steps (low opacity)
+
+- Add “active step” state:
+  - Slightly brighter background
+  - Scale: 1.01
+
+OPTIONAL (HIGH VALUE):
+- Add checkmark when completed
+- Allow tapping step to mark complete
+
+4. BENEFITS → ELEVATE VISUALLY
+
+- Add icons (checkmarks already good)
+- Increase spacing
+- Slight glow on each line:
+  text-shadow: 0 0 6px rgba(120,255,180,0.2)
+
+5. SAFETY NOTE → MAKE IT FEEL IMPORTANT
+
+- Keep yellow but refine:
+  background: rgba(255,200,0,0.12)
+  border: 1px solid rgba(255,200,0,0.3)
+  border-radius: 14px
+  padding: 14px
+
+6. PRIMARY CTA (MOST IMPORTANT)
+
+“Start Guided Mode” should feel like a feature, not a button.
+
+- Increase height
+- Add gradient:
+  linear-gradient(135deg, #5BFFB2, #38D996)
+
+- Add glow:
+  box-shadow: 0 10px 25px rgba(80,255,160,0.35)
+
+- Add press effect:
+  scale: 0.97
+
+7. ADD MICRO-INTERACTION (CRITICAL)
+
+When user taps “Start Guided Mode”:
+- Transition screen (fade or slide)
+- Enter step-by-step mode:
+  → Show ONE step at a time
+  → “Next Step” button
+  → Progress indicator (1/5)
+
+This transforms the app from content → experience
+
+8. OVERALL FEEL
+
+- Increase vertical spacing slightly
+- Avoid cramped sections
+- Maintain dark + green premium aesthetic
+- Everything should feel breathable and intentional
+
+FINAL RESULT:
+- Feels like a guided wellness session
+- Not a static list
+- Calm, premium, immersive
+- Comparable to Calm / Headspace flows
