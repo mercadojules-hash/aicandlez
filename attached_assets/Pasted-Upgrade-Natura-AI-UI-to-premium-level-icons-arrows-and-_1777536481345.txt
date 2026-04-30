@@ -1,0 +1,159 @@
+Upgrade Natura AI UI to premium-level icons, arrows, and header branding.
+
+GOAL:
+
+* Make icons look modern, minimal, and premium (Apple / Headspace level)
+* Add right-side chevron arrows to all actionable rows
+* Restore and properly position Natura AI logo in header
+* Keep current layout, just upgrade visual quality
+
+DO NOT:
+
+* Change structure or data
+* Break layout
+* Add clutter
+
+---
+
+1. ADD HEADER LOGO (TOP LEFT)
+
+---
+
+At the top of the Home screen:
+
+* Add Natura AI logo (small, clean)
+* Place it ABOVE "Good evening, Jules"
+* Align left with text
+* Size: ~28–32px height
+
+Layout:
+
+[ LOGO ]
+[ Good evening, Jules 👋 ]
+
+Add slight spacing (8–12px) between logo and text.
+
+---
+
+2. UPGRADE ALL ICONS (CRITICAL)
+
+---
+
+Replace current icons with:
+
+STYLE:
+
+* Thin line icons OR minimal filled icons
+* Consistent stroke width
+* Soft green color (#9FE870 or similar)
+* Slight glow (very subtle)
+
+DO NOT use:
+
+* Thick icons
+* Mixed styles
+* Emoji-style icons
+
+Apply to:
+
+* Streak (flame)
+* Time (clock)
+* Sessions (check)
+* Score (star)
+* Plan items (leaf, food, lightning, lotus)
+
+---
+
+3. ADD RIGHT-SIDE CHEVRON ARROWS
+
+---
+
+For EVERY clickable row:
+
+Add:
+
+› (chevron right icon)
+
+Place:
+
+* Far right
+* Vertically centered
+
+Apply to:
+
+* Remedy card
+* Recipe card
+* Action card
+* Wellness card
+* "Need guidance" row
+
+Style:
+
+* Light gray/green
+* Slight opacity (not too bright)
+* Size: small (clean, not bulky)
+
+---
+
+4. IMPROVE ICON CONTAINERS (BIG VISUAL UPGRADE)
+
+---
+
+Each left icon should sit inside a soft circle:
+
+Style:
+
+* background: rgba(255,255,255,0.05)
+* border-radius: 50%
+* subtle glow:
+  box-shadow: 0 0 12px rgba(120,255,180,0.15)
+
+This gives that premium “floating icon” look.
+
+---
+
+5. POLISH ENERGY BUTTON (TOP RIGHT)
+
+---
+
+Make "Energy Good" look premium:
+
+* Add soft gradient:
+  green → lighter green
+* Add subtle glow
+* Rounded pill shape
+* Slight border:
+  1px solid rgba(255,255,255,0.1)
+
+---
+
+6. KEEP BACKGROUND + OVERLAY AS IS
+
+---
+
+Do NOT change:
+
+* Background system
+* Overlay balance (already correct)
+
+---
+
+## FINAL RESULT SHOULD FEEL:
+
+* Clean
+* Modern
+* Premium
+* Calm but alive
+
+Like:
+
+* Apple Fitness
+* Headspace
+* Calm app
+
+NOT:
+
+* Basic UI
+* Template look
+
+Apply changes and reload preview.

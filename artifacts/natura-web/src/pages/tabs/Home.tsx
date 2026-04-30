@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, Clock, Star, Check, ShoppingCart, Leaf, Sun, Moon, Coffee } from "lucide-react";
+import { Zap, Clock, Star, Check, ShoppingCart, Leaf, Sun, Moon, Coffee, ChevronRight } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
@@ -12,28 +12,25 @@ const AFTERNOON = ROUTINE_TASKS.filter((t) => t.category === "afternoon").slice(
 const EVENING   = ROUTINE_TASKS.filter((t) => t.category === "evening").slice(0, 2);
 const ALL_TASKS = [...MORNING, ...AFTERNOON, ...EVENING];
 
-function NaturaLogoSmall() {
+function NaturaMark() {
   return (
-    <div className="home-logo-wrap">
-      <svg width="36" height="36" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <div className="home-brand-row">
+      <svg width="22" height="28" viewBox="0 0 44 56" fill="none">
         <path
-          d="M48 76C48 76 34 58 34 44C34 34.059 40.268 25.6 48 22C55.732 25.6 62 34.059 62 44C62 58 48 76 48 76Z"
-          fill="#7CFFB2"
+          d="M22 52C22 52 10 38 10 26C10 16.6 15.4 8.8 22 6C28.6 8.8 34 16.6 34 26C34 38 22 52 22 52Z"
+          fill="url(#markGrad)"
         />
-        <path
-          d="M48 76C48 76 34 58 34 44C34 34.059 40.268 25.6 48 22C55.732 25.6 62 34.059 62 44C62 58 48 76 48 76Z"
-          fill="url(#logoGrad)"
-        />
-        <line x1="48" y1="52" x2="48" y2="74" stroke="rgba(7,27,19,0.5)" strokeWidth="1.5" strokeDasharray="3 3" />
-        <circle cx="64" cy="34" r="6" fill="#5CEBA0" />
-        <circle cx="64" cy="34" r="3" fill="rgba(255,255,255,0.9)" />
+        <line x1="22" y1="32" x2="22" y2="50" stroke="rgba(7,27,19,0.45)" strokeWidth="1.2" strokeDasharray="2.5 2.5" />
+        <circle cx="33" cy="18" r="4" fill="#5CEBA0" />
+        <circle cx="33" cy="18" r="2" fill="rgba(255,255,255,0.92)" />
         <defs>
-          <linearGradient id="logoGrad" x1="34" y1="22" x2="62" y2="76" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#7CFFB2" />
+          <linearGradient id="markGrad" x1="10" y1="6" x2="34" y2="52" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#9FE870" />
             <stop offset="100%" stopColor="#3DE892" />
           </linearGradient>
         </defs>
       </svg>
+      <span className="home-brand-name">NATURA AI</span>
     </div>
   );
 }
@@ -58,12 +55,12 @@ function ProgressRing({ score }: { score: number }) {
   const offset = circ * (1 - score / 100);
   return (
     <svg width="104" height="104" viewBox="0 0 104 104">
-      <circle cx="52" cy="52" r={r} fill="none" stroke="rgba(124,255,178,0.1)" strokeWidth="9" />
+      <circle cx="52" cy="52" r={r} fill="none" stroke="rgba(124,255,178,0.1)" strokeWidth="8" />
       <circle
         cx="52" cy="52" r={r}
         fill="none"
         stroke="url(#ringGrad)"
-        strokeWidth="9"
+        strokeWidth="8"
         strokeDasharray={circ}
         strokeDashoffset={offset}
         strokeLinecap="round"
@@ -73,7 +70,7 @@ function ProgressRing({ score }: { score: number }) {
       <defs>
         <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#5CEBA0" />
-          <stop offset="100%" stopColor="#7CFFB2" />
+          <stop offset="100%" stopColor="#9FE870" />
         </linearGradient>
       </defs>
     </svg>
@@ -92,18 +89,19 @@ function TrendGraph() {
   const lastY = H - ((pts[pts.length - 1] - min) / (max - min || 1)) * H;
   return (
     <svg width={W} height={H + 4} style={{ overflow: "visible" }}>
-      <polyline points={coords} fill="none" stroke="#7CFFB2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
-      <circle cx={lastX} cy={lastY} r="3.5" fill="#7CFFB2" style={{ filter: "drop-shadow(0 0 4px #7CFFB2)" }} />
+      <polyline points={coords} fill="none" stroke="#9FE870" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
+      <circle cx={lastX} cy={lastY} r="3.5" fill="#9FE870" style={{ filter: "drop-shadow(0 0 4px #9FE870)" }} />
     </svg>
   );
 }
 
 function TaskIcon({ category }: { category: string }) {
   const size = 15;
-  const color = "#7CFFB2";
-  if (category === "morning") return <Sun size={size} color={color} />;
-  if (category === "evening") return <Moon size={size} color={color} />;
-  return <Coffee size={size} color={color} />;
+  const color = "#9FE870";
+  const sw = 1.5;
+  if (category === "morning") return <Sun size={size} color={color} strokeWidth={sw} />;
+  if (category === "evening") return <Moon size={size} color={color} strokeWidth={sw} />;
+  return <Coffee size={size} color={color} strokeWidth={sw} />;
 }
 
 export default function Home() {
@@ -132,17 +130,17 @@ export default function Home() {
           <div className="home-hero-glow-left" />
           <div className="home-hero-top">
             <div className="home-hero-left">
+              <NaturaMark />
               <p className="home-greeting-sub">{greeting}, {firstName}</p>
               <h1 className="home-hero-title">Today's Plan for You</h1>
               <p className="home-hero-subtitle">Personalized steps for your mind, body and energy</p>
             </div>
             <div className="home-hero-right">
-              <NaturaLogoSmall />
               <UserAvatar name={firstName} />
             </div>
           </div>
           <div className="home-energy-badge">
-            <Zap size={12} color="#7CFFB2" fill="#7CFFB2" />
+            <Zap size={12} color="#9FE870" fill="#9FE870" />
             <span>Energy: Good</span>
           </div>
         </div>
@@ -150,10 +148,10 @@ export default function Home() {
         {/* ── 2. STATS BAR ─────────────────────────────────────────── */}
         <div className="home-stats-bar">
           {[
-            { icon: <Zap size={16} color="#7CFFB2" fill="#7CFFB2" />, value: `${displayStreak}`, label: "day streak" },
-            { icon: <Clock size={16} color="#7CFFB2" />,              value: "32",               label: "min today"  },
-            { icon: <Check size={16} color="#7CFFB2" />,              value: `${completedCount}`, label: "sessions"  },
-            { icon: <Star size={16}  color="#7CFFB2" fill="#7CFFB2" />, value: `${wellnessScore}`, label: "score"   },
+            { icon: <Zap size={17} color="#9FE870" strokeWidth={1.5} />,   value: `${displayStreak}`, label: "day streak" },
+            { icon: <Clock size={17} color="#9FE870" strokeWidth={1.5} />,  value: "32",               label: "min today"  },
+            { icon: <Check size={17} color="#9FE870" strokeWidth={1.8} />,  value: `${completedCount}`, label: "sessions"  },
+            { icon: <Star size={17}  color="#9FE870" strokeWidth={1.5} />,  value: `${wellnessScore}`,  label: "score"     },
           ].map(({ icon, value, label }, i) => (
             <div key={i} className="home-stat-item">
               <div className="home-stat-icon">{icon}</div>
@@ -193,8 +191,9 @@ export default function Home() {
                       <p className="home-tl-sub">{task.category}{task.time ? ` · ${task.time}` : ""}</p>
                     </div>
                     <div className={`home-tl-check ${done ? "checked" : ""}`}>
-                      {done && <Check size={11} color="#071B13" />}
+                      {done && <Check size={11} color="#071B13" strokeWidth={2.5} />}
                     </div>
+                    <ChevronRight size={13} color="rgba(159,232,112,0.32)" strokeWidth={1.5} className="home-tl-chevron" />
                   </button>
                 </div>
               );
@@ -216,7 +215,7 @@ export default function Home() {
             <p className="home-progress-headline">You're doing great!</p>
             <p className="home-progress-body">Keep going, small steps create big changes.</p>
             <div className="home-progress-tip">
-              <Leaf size={12} color="#7CFFB2" />
+              <Leaf size={12} color="#9FE870" strokeWidth={1.5} />
               <span>{tip.title}</span>
             </div>
           </div>
@@ -231,7 +230,7 @@ export default function Home() {
             onClick={() => navigate(`${base}/chat`)}
           >
             Ask AI anything
-            <span className="home-cta-arrow">→</span>
+            <ChevronRight size={18} color="#071B13" strokeWidth={2.5} />
           </button>
         </div>
 

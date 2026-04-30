@@ -357,14 +357,14 @@ a { color: inherit; text-decoration: none; }
 .home-hero-right {
   display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0;
 }
-/* Logo wrap — glowing circle behind brand mark */
-.home-logo-wrap {
-  width: 52px; height: 52px;
-  border-radius: 26px;
-  background: rgba(124,255,178,0.12);
-  border: 1.5px solid rgba(124,255,178,0.35);
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 0 24px rgba(124,255,178,0.28), 0 0 48px rgba(124,255,178,0.10);
+/* Brand row — logo mark + wordmark */
+.home-brand-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px;
+}
+.home-brand-name {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+  color: #9FE870; opacity: 0.9; text-transform: uppercase;
 }
 /* Avatar — larger, stronger glow */
 .home-avatar {
@@ -386,14 +386,14 @@ a { color: inherit; text-decoration: none; }
 .home-energy-badge {
   display: inline-flex; align-items: center; gap: 6px;
   margin-top: 18px;
-  padding: 8px 16px;
-  background: linear-gradient(135deg, rgba(124,255,178,0.16) 0%, rgba(92,235,160,0.08) 100%);
-  border: 1px solid rgba(124,255,178,0.38);
+  padding: 8px 18px;
+  background: linear-gradient(135deg, rgba(159,232,112,0.18) 0%, rgba(61,232,146,0.10) 60%, rgba(92,235,160,0.06) 100%);
+  border: 1px solid rgba(159,232,112,0.35);
   border-radius: 24px;
-  font-size: 13px; font-weight: 700; color: var(--primary);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 0 20px rgba(124,255,178,0.18), inset 0 1px 0 rgba(124,255,178,0.25);
-  letter-spacing: 0.01em;
+  font-size: 13px; font-weight: 700; color: #9FE870;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0 18px rgba(159,232,112,0.16), inset 0 1px 0 rgba(255,255,255,0.10);
+  letter-spacing: 0.02em;
 }
 
 /* STATS BAR */
@@ -415,11 +415,12 @@ a { color: inherit; text-decoration: none; }
   border-left: 1px solid rgba(124,255,178,0.12);
 }
 .home-stat-icon {
-  width: 32px; height: 32px;
-  border-radius: 10px;
-  background: rgba(124,255,178,0.10);
-  border: 1px solid rgba(124,255,178,0.15);
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(159,232,112,0.18);
   display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 12px rgba(120,255,180,0.12);
 }
 .home-stat-value {
   font-size: 22px; font-weight: 800;
@@ -502,10 +503,13 @@ a { color: inherit; text-decoration: none; }
   text-decoration: line-through; color: var(--muted-fg);
 }
 .home-tl-icon-wrap {
-  width: 30px; height: 30px; border-radius: 10px;
-  background: rgba(124,255,178,0.1);
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(159,232,112,0.18);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  box-shadow: 0 0 12px rgba(120,255,180,0.15);
 }
+.home-tl-chevron { flex-shrink: 0; margin-left: 2px; }
 .home-tl-info { flex: 1; }
 .home-tl-label { font-size: 13px; font-weight: 600; color: var(--foreground); line-height: 1.2; }
 .home-tl-sub { font-size: 11px; color: var(--muted-fg); margin-top: 2px; text-transform: capitalize; }
