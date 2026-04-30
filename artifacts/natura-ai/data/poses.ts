@@ -1,7 +1,7 @@
 export interface YogaPose {
   id: string;
   name: string;
-  image: string;
+  image: number | { uri: string };
   difficulty: "Beginner" | "Intermediate";
   duration: string;
   category: string;
@@ -19,7 +19,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "childs-pose",
     name: "Child's Pose",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/childs-pose.webp",
+    image: { uri: "https://apexdigital.design/wp-content/uploads/2026/04/childs-pose.webp" },
     difficulty: "Beginner",
     duration: "1–3 min",
     category: "Restorative",
@@ -51,7 +51,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "bridge-pose",
     name: "Bridge Pose",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-bridge-pose.webp",
+    image: { uri: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-bridge-pose.webp" },
     difficulty: "Beginner",
     duration: "30–60 sec",
     category: "Backbend",
@@ -84,7 +84,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "cat-cow",
     name: "Cat-Cow",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-cat-cow-pose.webp",
+    image: { uri: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-cat-cow-pose.webp" },
     difficulty: "Beginner",
     duration: "1–2 min",
     category: "Flow",
@@ -117,7 +117,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "cobra-pose",
     name: "Cobra Pose",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-cobra-pose.webp",
+    image: { uri: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-cobra-pose.webp" },
     difficulty: "Beginner",
     duration: "15–30 sec",
     category: "Backbend",
@@ -150,7 +150,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "downward-dog",
     name: "Downward Dog",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-downward-dog.webp",
+    image: { uri: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-downward-dog.webp" },
     difficulty: "Beginner",
     duration: "30–60 sec",
     category: "Inversion",
@@ -183,7 +183,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "legs-up-wall",
     name: "Legs Up the Wall",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-legs-up-the-wall-pose.webp",
+    image: require("../assets/images/yoga-legs-up-the-wall-pose.webp"),
     difficulty: "Beginner",
     duration: "3–10 min",
     category: "Restorative",
@@ -216,7 +216,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "mountain-pose",
     name: "Mountain Pose",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-mountain-pose.webp",
+    image: require("../assets/images/yoga-mountain-pose.webp"),
     difficulty: "Beginner",
     duration: "30–60 sec",
     category: "Standing",
@@ -249,7 +249,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "plank-pose",
     name: "Plank Pose",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-plank-pose.webp",
+    image: require("../assets/images/yoga-plank-pose.webp"),
     difficulty: "Beginner",
     duration: "20–60 sec",
     category: "Core",
@@ -282,7 +282,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "seated-forward-fold",
     name: "Seated Forward Fold",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-seated-forward-fold-pose.webp",
+    image: require("../assets/images/yoga-seated-forward-fold-pose.webp"),
     difficulty: "Beginner",
     duration: "1–2 min",
     category: "Forward Fold",
@@ -315,7 +315,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "tree-pose",
     name: "Tree Pose",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-tree-pose.webp",
+    image: require("../assets/images/yoga-tree-pose.webp"),
     difficulty: "Beginner",
     duration: "30–45 sec each side",
     category: "Balance",
@@ -348,7 +348,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "warrior-1",
     name: "Warrior I",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-warrior-i-pose.webp",
+    image: require("../assets/images/yoga-warrior-i-pose.webp"),
     difficulty: "Beginner",
     duration: "30–45 sec each side",
     category: "Standing",
@@ -381,7 +381,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "warrior-2",
     name: "Warrior II",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-warrior-ii-pose.webp",
+    image: require("../assets/images/yoga-warrior-ii-pose.webp"),
     difficulty: "Beginner",
     duration: "30–45 sec each side",
     category: "Standing",
@@ -416,7 +416,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "chair-pose-twist",
     name: "Chair Pose Twist",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-chair-pose-twist-pose.webp",
+    image: { uri: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-chair-pose-twist-pose.webp" },
     difficulty: "Intermediate",
     duration: "30–45 sec each side",
     category: "Twist",
@@ -449,7 +449,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "crow-pose",
     name: "Crow Pose",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-crow-pose.webp",
+    image: { uri: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-crow-pose.webp" },
     difficulty: "Intermediate",
     duration: "10–30 sec",
     category: "Arm Balance",
@@ -482,7 +482,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "dolphin-pose",
     name: "Dolphin Pose",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-dolphin-pose.webp",
+    image: { uri: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-dolphin-pose.webp" },
     difficulty: "Intermediate",
     duration: "30–60 sec",
     category: "Inversion",
@@ -515,7 +515,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "half-moon-pose",
     name: "Half Moon Pose",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-half-moon-pose.webp",
+    image: require("../assets/images/yoga-half-moon-pose.webp"),
     difficulty: "Intermediate",
     duration: "20–30 sec each side",
     category: "Balance",
@@ -548,7 +548,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "low-lunge-twist",
     name: "Low Lunge Twist",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-low-lunge-twist-pose.webp",
+    image: require("../assets/images/yoga-low-lunge-twist-pose.webp"),
     difficulty: "Intermediate",
     duration: "30–45 sec each side",
     category: "Twist",
@@ -581,7 +581,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "pigeon-pose",
     name: "Pigeon Pose",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-pigeon-pose.webp",
+    image: require("../assets/images/yoga-pigeon-pose.webp"),
     difficulty: "Intermediate",
     duration: "1–3 min each side",
     category: "Hip Opener",
@@ -614,7 +614,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "plank-to-chaturanga",
     name: "Plank to Chaturanga Flow",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-plank-chaturanga-flow-poses.webp",
+    image: require("../assets/images/yoga-plank-chaturanga-flow-poses.webp"),
     difficulty: "Intermediate",
     duration: "5–10 reps",
     category: "Core",
@@ -647,7 +647,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "revolved-triangle",
     name: "Revolved Triangle",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-revolved-triangle-pose.webp",
+    image: require("../assets/images/yoga-revolved-triangle-pose.webp"),
     difficulty: "Intermediate",
     duration: "20–30 sec each side",
     category: "Twist",
@@ -680,7 +680,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "side-plank",
     name: "Side Plank",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-side-plank-pose.webp",
+    image: require("../assets/images/yoga-side-plank-pose.webp"),
     difficulty: "Intermediate",
     duration: "20–45 sec each side",
     category: "Core",
@@ -713,7 +713,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "standing-forward-fold",
     name: "Standing Forward Fold",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-standing-forward-fold-pose.webp",
+    image: require("../assets/images/yoga-standing-forward-fold-pose.webp"),
     difficulty: "Intermediate",
     duration: "45 sec–2 min",
     category: "Forward Fold",
@@ -746,7 +746,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "warrior-3",
     name: "Warrior III",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-warrior-iii-pose.webp",
+    image: require("../assets/images/yoga-warrior-iii-pose.webp"),
     difficulty: "Intermediate",
     duration: "20–30 sec each side",
     category: "Balance",
@@ -779,7 +779,7 @@ export const yogaPoses: YogaPose[] = [
   {
     id: "extended-side-angle",
     name: "Extended Side Angle",
-    image: "https://apexdigital.design/wp-content/uploads/2026/04/yoga-extended-side-angle-pose.webp",
+    image: require("../assets/images/yoga-extended-side-angle-pose.webp"),
     difficulty: "Intermediate",
     duration: "30–45 sec each side",
     category: "Standing",

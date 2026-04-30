@@ -158,7 +158,7 @@ export default function PoseDetail() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Hero image */}
         <View style={styles.hero}>
-          <Image source={{ uri: pose.image }} style={styles.heroImage} resizeMode="cover" />
+          <Image source={pose.image as any} style={styles.heroImage} resizeMode="cover" />
           <LinearGradient
             colors={["transparent", "rgba(13,31,22,0.6)", colors.background]}
             style={StyleSheet.absoluteFillObject}
@@ -249,7 +249,7 @@ export default function PoseDetail() {
                   style={styles.relatedCard}
                   onPress={() => router.replace(`/pose/${p.id}` as any)}
                 >
-                  <Image source={{ uri: p.image }} style={styles.relatedImg} resizeMode="cover" />
+                  <Image source={p.image as any} style={styles.relatedImg} resizeMode="cover" />
                   <View style={styles.relatedOverlay} />
                   <Text style={styles.relatedName}>{p.name}</Text>
                 </TouchableOpacity>
