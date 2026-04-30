@@ -229,13 +229,16 @@ export default function Learn() {
   if (selected) {
     return (
       <Layout bgStyle={getBackgroundStyle(BG.calm)}>
-        <ArticleDetail article={selected} onClose={() => setSelected(null)} />
+        <div className="learn-screen">
+          <ArticleDetail article={selected} onClose={() => setSelected(null)} />
+        </div>
       </Layout>
     );
   }
 
   return (
     <Layout bgStyle={getBackgroundStyle(BG.calm)}>
+      <div className="learn-screen">
       <div className="scroll-view">
         {/* Header */}
         <div className="learn-header">
@@ -319,6 +322,7 @@ export default function Learn() {
         </div>
 
         <div style={{ height: 28 }} />
+      </div>
       </div>
     </Layout>
   );

@@ -5,6 +5,7 @@ export const BG = {
   main2:     "https://apexdigital.design/wp-content/uploads/2026/04/natura-bg-main-v2.webp",
   meditation:"https://apexdigital.design/wp-content/uploads/2026/04/natura-bg-meditation-v1.webp",
   focus:     "https://apexdigital.design/wp-content/uploads/2026/04/natura-bg-focus-v1.webp",
+  calm:      "https://apexdigital.design/wp-content/uploads/2026/04/natura-bg-forest-v1.webp",
 } as const;
 
 export function getBackgroundStyle(bgUrl: string): CSSProperties {
