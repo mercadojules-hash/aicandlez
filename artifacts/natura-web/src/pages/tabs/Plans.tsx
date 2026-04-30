@@ -5,6 +5,7 @@ import { Layout } from "@/components/Layout";
 import { useWellness } from "@/contexts/WellnessContext";
 import { PLANS, REMEDIES } from "@/lib/data";
 import { CardImage } from "@/components/CardImage";
+import { BG, getBackgroundStyle } from "@/lib/background";
 
 type Tab = "Plans" | "Remedies" | "Saved";
 
@@ -18,8 +19,8 @@ export default function Plans() {
   const savedRemedies = savedItems.filter((s) => s.type === "remedy");
 
   return (
-    <Layout>
-      <div className="scroll-view">
+    <Layout bgStyle={getBackgroundStyle(BG.main2)}>
+      <div className="scroll-view" style={{ background: "transparent" }}>
         <div className="page-header">
           <h1 className="page-title">Wellness Plans</h1>
           <div className="seg-tabs">

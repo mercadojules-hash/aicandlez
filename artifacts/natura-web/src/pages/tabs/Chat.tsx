@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Activity, ArrowUp } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { askAI, type AIResponse } from "@/lib/ai";
+import { BG, getBackgroundStyle } from "@/lib/background";
 
 interface Message {
   id: string;
@@ -78,8 +79,8 @@ export default function Chat() {
   };
 
   return (
-    <Layout>
-      <div className="chat-screen">
+    <Layout bgStyle={getBackgroundStyle(BG.focus)}>
+      <div className="chat-screen" style={{ background: "transparent" }}>
         <div className="chat-header">
           <div className="chat-avatar"><Activity size={20} color="#3D7A45" /></div>
           <div>

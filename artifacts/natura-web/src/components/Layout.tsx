@@ -1,9 +1,15 @@
+import type { CSSProperties } from "react";
 import { BottomNav } from "./BottomNav";
 
-export function Layout({ children }: { children: React.ReactNode }) {
+interface LayoutProps {
+  children: React.ReactNode;
+  bgStyle?: CSSProperties;
+}
+
+export function Layout({ children, bgStyle }: LayoutProps) {
   return (
     <div className="app-shell">
-      <div className="screen-content">{children}</div>
+      <div className="screen-content" style={bgStyle}>{children}</div>
       <BottomNav />
     </div>
   );

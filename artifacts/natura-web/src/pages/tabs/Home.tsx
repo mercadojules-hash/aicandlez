@@ -5,6 +5,7 @@ import { Layout } from "@/components/Layout";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
 import { ROUTINE_TASKS, getTodayTip } from "@/lib/data";
+import { BG, getBackgroundStyle } from "@/lib/background";
 
 const MORNING   = ROUTINE_TASKS.filter((t) => t.category === "morning").slice(0, 3);
 const AFTERNOON = ROUTINE_TASKS.filter((t) => t.category === "afternoon").slice(0, 2);
@@ -122,8 +123,8 @@ export default function Home() {
   const displayStreak = streak > 0 ? streak : 5;
 
   return (
-    <Layout>
-      <div className="scroll-view home-scroll">
+    <Layout bgStyle={getBackgroundStyle(BG.main1)}>
+      <div className="scroll-view home-scroll" style={{ background: "transparent" }}>
 
         {/* ── 1. HERO ──────────────────────────────────────────────── */}
         <div className="home-hero">

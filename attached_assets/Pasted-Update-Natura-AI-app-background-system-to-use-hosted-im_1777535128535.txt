@@ -1,0 +1,111 @@
+Update Natura AI app background system to use hosted images with proper overlays and positioning.
+
+GOAL:
+
+* Match premium Calm/Headspace style
+* Dark readable center
+* Light from top-right
+* Consistent across all screens
+
+DO NOT:
+
+* Duplicate files
+* Change layout structure
+* Break existing components
+
+---
+
+1. CREATE BACKGROUND SYSTEM (GLOBAL STYLE)
+
+---
+
+Add this reusable function/helper:
+
+const getBackgroundStyle = (bgUrl) => ({
+backgroundImage: `     radial-gradient(circle at center, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.9) 70%),
+    linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.85) 100%),
+    url(${bgUrl})
+  `,
+backgroundSize: 'cover',
+backgroundPosition: 'center right',
+backgroundRepeat: 'no-repeat'
+});
+
+---
+
+2. DEFINE YOUR BACKGROUND URLS
+
+---
+
+const BG = {
+main1: "https://apexdigital.design/wp-content/uploads/2026/04/natura-bg-main-v1.webp",
+main2: "https://apexdigital.design/wp-content/uploads/2026/04/natura-bg-main-v2.webp",
+meditation: "https://apexdigital.design/wp-content/uploads/2026/04/natura-bg-meditation-v1.webp",
+focus: "https://apexdigital.design/wp-content/uploads/2026/04/natura-bg-focus-v1.webp"
+};
+
+---
+
+3. APPLY BACKGROUNDS PER SCREEN
+
+---
+
+HOME SCREEN:
+style={getBackgroundStyle(BG.main1)}
+
+PLANS / TODAY’S PLAN SCREEN:
+style={getBackgroundStyle(BG.main2)}
+
+AI COACH / CHAT SCREEN:
+style={getBackgroundStyle(BG.focus)}
+
+MEDITATION / WELLNESS SCREEN:
+style={getBackgroundStyle(BG.meditation)}
+
+---
+
+4. IMPROVE TEXT READABILITY
+
+---
+
+Ensure main container has:
+
+color: '#ffffff'
+
+Add slight text shadow to headings:
+
+textShadow: '0px 2px 8px rgba(0,0,0,0.6)'
+
+---
+
+5. CARD CONSISTENCY (IMPORTANT)
+
+---
+
+All cards should use:
+
+backgroundColor: 'rgba(0,0,0,0.35)'
+backdropFilter: 'blur(10px)'
+borderRadius: 20
+border: '1px solid rgba(255,255,255,0.05)'
+
+---
+
+6. DO NOT TOUCH:
+
+---
+
+* Navigation logic
+* Existing data
+* Component hierarchy
+
+---
+
+## FINAL CHECK:
+
+* Background loads from URL (no local assets)
+* Light appears top-right
+* Center is darker for readability
+* No flickering or layout shift
+
+Save and reload app.
