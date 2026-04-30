@@ -1,0 +1,153 @@
+We are upgrading the HOME screen to match a premium App Store-level experience.
+
+IMPORTANT:
+The current version is functional but lacks visual impact, branding, and emotional engagement.
+
+We are transforming it into a PREMIUM HERO EXPERIENCE.
+
+--------------------------------------------------
+
+🎯 GOAL:
+Make the Home screen feel like a polished product, not just a UI screen.
+
+It must match this structure:
+
+- Strong hero section
+- Clear branding (logo visible)
+- Personalized feel (avatar)
+- Premium glow + depth
+- Emotional + motivational tone
+
+--------------------------------------------------
+
+🧠 1. HERO SECTION (CRITICAL FIX)
+
+REBUILD TOP SECTION COMPLETELY:
+
+Layout:
+
+Top left:
+"Good morning, Jules 👋"
+
+Main title:
+"Today's Plan for You"
+
+Subtext:
+"Personalized steps for your mind, body and energy"
+
+--------------------------------------------------
+
+🔥 ADD STRONG BRANDING (MISSING RIGHT NOW)
+
+Top right MUST include:
+
+- Natura AI logo (larger, visible, glowing slightly)
+- User avatar BELOW the logo (circular)
+
+These MUST feel intentional and premium — not small icons
+
+--------------------------------------------------
+
+⚡ 2. ENERGY STATUS BADGE
+
+Below title:
+
+Add pill:
+
+"⚡ Energy: Good"
+
+Style:
+- Soft glow
+- Green gradient
+- Rounded
+
+--------------------------------------------------
+
+📊 3. STATS BAR (ENHANCE)
+
+Current stats are OK but need polish:
+
+- Add glass effect (slight blur)
+- Increase spacing
+- Improve icon size
+- Add subtle glow
+
+Stats:
+- Day streak
+- Minutes today
+- Sessions
+- Score
+
+--------------------------------------------------
+
+🗓 4. TIMELINE (KEEP BUT POLISH)
+
+Your timeline is GOOD — keep it
+
+Enhance:
+- Slight glow on active items
+- Softer separators
+- Better spacing
+
+--------------------------------------------------
+
+🔥 5. PROGRESS CARD (IMPORTANT)
+
+Upgrade this section:
+
+Left:
+- Large circular progress ring (thicker, glowing)
+
+Right:
+- Text:
+"You're doing great!"
+"Keep going, small steps create big changes."
+
+- Add mini line graph (glowing upward trend)
+
+--------------------------------------------------
+
+🚀 6. CTA CARD (MAKE THIS STRONGER)
+
+Current:
+"Ask AI anything"
+
+Upgrade to:
+
+Card:
+"Need guidance?"
+
+Button:
+"Ask AI anything →"
+
+Style:
+- Full width
+- Strong green glow
+- Looks tappable and premium
+
+--------------------------------------------------
+
+🎨 7. VISUAL UPGRADE (CRITICAL)
+
+Apply globally:
+
+- Add subtle background gradient
+- Add soft glow highlights behind sections
+- Increase spacing between blocks
+- Add depth (shadow + blur)
+
+--------------------------------------------------
+
+⚠️ FINAL RESULT
+
+The Home screen should feel like:
+
+- Calm
+- Premium
+- Personalized
+- Intelligent
+- App Store ready
+
+NOT like a basic dashboard.
+
+--------------------------------------------------

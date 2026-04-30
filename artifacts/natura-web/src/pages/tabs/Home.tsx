@@ -13,17 +13,27 @@ const ALL_TASKS = [...MORNING, ...AFTERNOON, ...EVENING];
 
 function NaturaLogoSmall() {
   return (
-    <svg width="32" height="32" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="48" cy="48" r="48" fill="rgba(124,255,178,0.15)" />
-      <circle cx="48" cy="48" r="38" fill="rgba(124,255,178,0.08)" />
-      <path
-        d="M48 72C48 72 38 58 38 46C38 38.268 42.477 31.6 48 28C53.523 31.6 58 38.268 58 46C58 58 48 72 48 72Z"
-        fill="#7CFFB2"
-      />
-      <line x1="48" y1="50" x2="48" y2="70" stroke="rgba(124,255,178,0.4)" strokeWidth="1.5" strokeDasharray="3 3" />
-      <circle cx="62" cy="36" r="5" fill="#5CEBA0" />
-      <circle cx="62" cy="36" r="2.5" fill="rgba(124,255,178,0.8)" />
-    </svg>
+    <div className="home-logo-wrap">
+      <svg width="36" height="36" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M48 76C48 76 34 58 34 44C34 34.059 40.268 25.6 48 22C55.732 25.6 62 34.059 62 44C62 58 48 76 48 76Z"
+          fill="#7CFFB2"
+        />
+        <path
+          d="M48 76C48 76 34 58 34 44C34 34.059 40.268 25.6 48 22C55.732 25.6 62 34.059 62 44C62 58 48 76 48 76Z"
+          fill="url(#logoGrad)"
+        />
+        <line x1="48" y1="52" x2="48" y2="74" stroke="rgba(7,27,19,0.5)" strokeWidth="1.5" strokeDasharray="3 3" />
+        <circle cx="64" cy="34" r="6" fill="#5CEBA0" />
+        <circle cx="64" cy="34" r="3" fill="rgba(255,255,255,0.9)" />
+        <defs>
+          <linearGradient id="logoGrad" x1="34" y1="22" x2="62" y2="76" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#7CFFB2" />
+            <stop offset="100%" stopColor="#3DE892" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
   );
 }
 
@@ -31,10 +41,10 @@ function UserAvatar({ name }: { name: string }) {
   const initial = name ? name[0].toUpperCase() : "U";
   return (
     <div className="home-avatar">
-      <svg viewBox="0 0 44 44" width="44" height="44">
-        <circle cx="22" cy="22" r="22" fill="#1E3D2B" />
-        <circle cx="22" cy="17" r="8" fill="#7CFFB2" opacity="0.9" />
-        <ellipse cx="22" cy="36" rx="13" ry="9" fill="#7CFFB2" opacity="0.5" />
+      <svg viewBox="0 0 56 56" width="56" height="56">
+        <circle cx="28" cy="28" r="28" fill="#142A1C" />
+        <circle cx="28" cy="21" r="10" fill="#7CFFB2" opacity="0.85" />
+        <ellipse cx="28" cy="44" rx="16" ry="11" fill="#7CFFB2" opacity="0.45" />
       </svg>
       <span className="home-avatar-initial">{initial}</span>
     </div>
@@ -118,6 +128,7 @@ export default function Home() {
         {/* ── 1. HERO ──────────────────────────────────────────────── */}
         <div className="home-hero">
           <div className="home-hero-glow" />
+          <div className="home-hero-glow-left" />
           <div className="home-hero-top">
             <div className="home-hero-left">
               <p className="home-greeting-sub">{greeting}, {firstName}</p>
