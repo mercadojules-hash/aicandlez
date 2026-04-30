@@ -1,7 +1,7 @@
 export interface WeekData {
   week: number;
   title: string;
-  image: number | { uri: string };
+  image: number;
   days: string[];
 }
 
@@ -51,7 +51,7 @@ export const JOURNEY_WEEKS: WeekData[] = [
   {
     week: 4,
     title: "Balance",
-    image: { uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-plan-week-4.webp" },
+    image: require("../assets/images/natura-plan-week-4.webp"),
     days: [
       "Balance Flow",
       "Deep Stretch",
