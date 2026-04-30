@@ -3,18 +3,23 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ChevronLeft, Bookmark, Check, ChevronRight, Sparkles } from "lucide-react";
 import { useWellness } from "@/contexts/WellnessContext";
 import { REMEDIES, RECIPES } from "@/lib/data";
-import imgGingerTea from "@assets/remedy-ginger-tea_1777546217699.webp";
-import imgTurmericMilk from "@assets/remedy-turmeric-golden-milk_1777546217701.webp";
-import imgLavenderTea from "@assets/remedy-lavender-calming-tea_1777546217700.webp";
-import imgChamomileTea from "@assets/remedy-chamomile-sleep-tea_1777546217699.webp";
+import imgGingerTea      from "@assets/remedy-ginger-tea_1777546217699.webp";
+import imgTurmericMilk   from "@assets/remedy-turmeric-golden-milk_1777546217701.webp";
+import imgLavenderTea    from "@assets/remedy-lavender-calming-tea_1777546217700.webp";
+import imgChamomileTea   from "@assets/remedy-chamomile-sleep-tea_1777546217699.webp";
 import imgEnergySmoothie from "@assets/remedy-green-energy-smoothie_1777546217700.webp";
+import imgStressRelief   from "@assets/natura-plan-stress-relief-v1_1777543715688.webp";
 
-const REMEDY_IMAGES: Record<string, string> = {
-  "remedy-ginger-tea":       imgGingerTea,
-  "remedy-lavender-calm":    imgLavenderTea,
-  "remedy-immunity-shot":    imgTurmericMilk,
-  "remedy-ashwagandha-milk": imgChamomileTea,
-  "remedy-energy-smoothie":  imgEnergySmoothie,
+const DETAIL_IMAGES: Record<string, string> = {
+  "remedy-ginger-tea":         imgGingerTea,
+  "remedy-lavender-calm":      imgLavenderTea,
+  "remedy-immunity-shot":      imgTurmericMilk,
+  "remedy-ashwagandha-milk":   imgChamomileTea,
+  "remedy-energy-smoothie":    imgEnergySmoothie,
+  "recipe-golden-milk":        imgTurmericMilk,
+  "recipe-immunity-broth":     imgGingerTea,
+  "recipe-overnight-oats":     imgEnergySmoothie,
+  "recipe-antistress-salad":   imgStressRelief,
 };
 
 export default function RemedyDetail() {
@@ -37,7 +42,8 @@ export default function RemedyDetail() {
 
   const saved = isSaved(item.id);
   const isRecipe = "variations" in item;
-  const heroSrc = REMEDY_IMAGES[item.id] ?? item.image;
+  const heroSrc = DETAIL_IMAGES[item.id] ?? item.image;
+  const bgImg   = DETAIL_IMAGES[item.id] ?? item.image;
 
   const toggleStep = (idx: number) => {
     setCompletedSteps((prev) => {
@@ -54,7 +60,19 @@ export default function RemedyDetail() {
   };
 
   return (
-    <div className="detail-screen">
+    <div
+      className="detail-screen"
+      style={{
+        backgroundImage: bgImg
+          ? `linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.85) 100%),
+             radial-gradient(circle at top right, rgba(120,255,180,0.15), transparent 60%),
+             url(${bgImg})`
+          : undefined,
+        backgroundSize:     "cover",
+        backgroundPosition: "center top",
+        backgroundAttachment: "local",
+      }}
+    >
       <div className="detail-hero">
         {!heroFailed && heroSrc ? (
           <img src={heroSrc} alt={item.title} className="detail-hero-img" onError={() => setHeroFailed(true)} />
