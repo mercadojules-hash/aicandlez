@@ -1,0 +1,204 @@
+We need to COMPLETELY upgrade the Home screen UI to match a premium App Store-level design.
+
+IMPORTANT:
+Do NOT keep the current flat layout.
+We are redesigning the Home screen to match a high-end wellness app with depth, hierarchy, and branding.
+
+--------------------------------------------------
+
+🎯 GOAL:
+Make the Home screen visually match this structure:
+
+1. HERO SECTION (TOP)
+2. STATS BAR (GLASS CARD)
+3. TODAY’S PLAN (TIMELINE STYLE)
+4. PROGRESS SECTION (CIRCLE + GRAPH)
+5. CTA SECTION (ASK AI)
+6. BOTTOM NAV (already exists)
+
+--------------------------------------------------
+
+🧠 1. HERO SECTION (VERY IMPORTANT)
+
+At the VERY TOP add:
+
+LEFT SIDE:
+- Text:
+  "Good morning, Jules 👋"
+- Large title:
+  "Today’s Plan for You"
+- Subtext:
+  "Personalized steps for your mind, body and energy"
+
+RIGHT SIDE:
+- Add TWO elements:
+
+1. USER PROFILE AVATAR (circle)
+   - If user has no image → use placeholder avatar
+   - Must show ALWAYS (this is required)
+
+2. NATURA AI LOGO
+   - Place near top right or integrated near avatar
+   - Use existing logo asset
+   - Size small but visible (brand presence)
+
+---
+
+Also add:
+- Soft green glow background behind header
+- Subtle leaf / nature ambient gradient
+
+--------------------------------------------------
+
+⚡ 2. ENERGY BADGE (TOP RIGHT)
+
+Add pill badge:
+- “⚡ Energy: Good”
+- Glass style (rounded, soft glow)
+- Positioned near avatar/logo
+
+--------------------------------------------------
+
+📊 3. STATS BAR (GLASS CARD)
+
+Below hero, add a horizontal glass card:
+
+Display 4 stats:
+- 🔥 5 day streak
+- ⏱ 32 min today
+- ✅ 3 sessions
+- ⭐ 86 score
+
+STYLE:
+- Rounded container
+- Slight blur / glass effect
+- Neon green icons
+- Even spacing
+
+--------------------------------------------------
+
+📅 4. TODAY’S PLAN (TIMELINE STYLE)
+
+Replace current list with a TIMELINE layout:
+
+LEFT SIDE:
+- Vertical line
+- Time markers:
+  7:00 AM
+  8:00 AM
+  12:30 PM
+  7:30 PM
+
+RIGHT SIDE:
+- Cards for each item:
+
+Example:
+[ REMEDY ]
+Green Energy Matcha
+5 min • Energy Boost
+
+[ RECIPE ]
+Adaptogenic Oats Bowl
+
+[ ACTION ]
+10-min walk after lunch
+
+[ WELLNESS ]
+Evening mindfulness
+
+STYLE:
+- Rounded cards
+- Slight glow on icons
+- Icons inside soft circles
+- Checkmark for completed items
+
+--------------------------------------------------
+
+📈 5. PROGRESS SECTION (HIGH IMPACT)
+
+Add a large card:
+
+LEFT:
+- Circular progress ring (animated)
+- “86 Wellness Score”
+
+RIGHT:
+- Small upward trend graph
+- Text:
+  “You’re doing great!
+   Keep going, small steps create big changes.”
+
+IMPORTANT:
+- Use smooth animation if possible
+- Green neon glow style
+
+--------------------------------------------------
+
+🧠 6. CTA SECTION (ASK AI)
+
+Add a full-width card:
+
+Text:
+“Need guidance?”
+
+Button:
+“Ask AI anything →”
+
+STYLE:
+- Gradient green button
+- Rounded pill
+- Glow effect
+
+--------------------------------------------------
+
+🎨 DESIGN SYSTEM (VERY IMPORTANT)
+
+Apply globally:
+
+- Dark background: deep green/black
+- Accent: neon green (#7CFFB2 style)
+- Glass cards (blur + transparency)
+- Soft shadows (not harsh)
+- Rounded corners everywhere
+- Smooth spacing (premium feel)
+
+--------------------------------------------------
+
+🧩 7. PROFILE IMAGE (REQUIRED FIX)
+
+- Ensure avatar ALWAYS renders
+- If no user image:
+  → show default placeholder avatar
+- This must NOT be empty
+
+--------------------------------------------------
+
+🌿 8. LOGO (REQUIRED FIX)
+
+- Add Natura AI logo to Home screen
+- Top right OR near header
+- Must be visible for branding
+
+--------------------------------------------------
+
+⚠️ FINAL RULES
+
+- Do NOT remove existing functionality
+- Only upgrade UI layer
+- Keep navigation working
+- Keep data intact
+- Focus on layout + visuals + hierarchy
+
+--------------------------------------------------
+
+RESULT:
+
+We should see a PREMIUM Home screen with:
+- Strong first impression
+- Personal feel (avatar)
+- Clear structure
+- Beautiful glow + depth
+- App Store quality UI
+
+This is NOT a minor tweak.
+This is a full Home screen redesign.
