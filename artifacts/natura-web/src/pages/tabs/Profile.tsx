@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Zap, Bookmark, CheckCircle, RefreshCw, Moon, Sun, Smartphone,
-  Bell, Lock, LogOut, ChevronRight, Sparkles, Target,
+  Zap, Bookmark, CheckCircle, Moon, Sun, Smartphone,
+  Bell, Lock, LogOut, ChevronRight, Target,
 } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/contexts/UserContext";
@@ -103,6 +103,20 @@ export default function Profile() {
           </div>
         </div>
 
+        {/* ── Premium upgrade card ── */}
+        {!isPremium && (
+          <div className="profile-upgrade-card">
+            <div className="profile-upgrade-icon">🌿</div>
+            <div className="profile-upgrade-body">
+              <p className="profile-upgrade-title">Natura Premium</p>
+              <p className="profile-upgrade-sub">Unlock full access to recipes, AI guidance, and wellness plans</p>
+            </div>
+            <button className="profile-upgrade-btn" onClick={() => navigate(`${base}/upgrade`)}>
+              Upgrade
+            </button>
+          </div>
+        )}
+
         {/* ── Daily Check-In ── */}
         <div className="profile-section">
           <p className="profile-section-title">Daily Check-In</p>
@@ -121,23 +135,6 @@ export default function Profile() {
                 Submit Check-In
               </button>
             </>
-          )}
-        </div>
-
-        {/* ── Membership ── */}
-        <div className="membership-card">
-          <span className="membership-badge">{isPremium ? "PREMIUM" : "FREE"}</span>
-          <p className="membership-title">{isPremium ? "Natura Premium" : "Unlock Premium"}</p>
-          <p className="membership-sub">
-            {isPremium
-              ? "You have access to all features and guided programs."
-              : "Get unlimited AI guidance, all plans, and offline access."}
-          </p>
-          {!isPremium && (
-            <button className="membership-upgrade-btn" onClick={() => navigate(`${base}/upgrade`)}>
-              <Sparkles size={16} style={{ display: "inline", marginRight: 6 }} />
-              Upgrade to Premium
-            </button>
           )}
         </div>
 

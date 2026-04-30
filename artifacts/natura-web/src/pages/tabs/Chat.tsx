@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { Activity, ArrowUp, Leaf, Moon, Droplets, Zap, ShieldCheck } from "lucide-react";
+import { Activity, ArrowUp, Leaf, Moon, Droplets, Zap, ShieldCheck, Check } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { askAI, type AIResponse } from "@/lib/ai";
 import { BG, getBackgroundStyle } from "@/lib/background";
+import { usePremium } from "@/contexts/PremiumContext";
 
 interface Message {
   id: string;
@@ -52,7 +54,16 @@ function AIMessage({ response }: { response: AIResponse }) {
   );
 }
 
+const AI_FEATURES = [
+  "Ask health & wellness questions",
+  "Get personalized recommendations",
+  "Smart daily guidance",
+];
+
 export default function Chat() {
+  const { isPremium } = usePremium();
+  const navigate = useNavigate();
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -87,6 +98,32 @@ export default function Chat() {
       inputRef.current?.setSelectionRange(len, len);
     }, 60);
   };
+
+  if (!isPremium) {
+    return (
+      <Layout bgStyle={getBackgroundStyle(BG.focus)}>
+        <div className="chat-paywall">
+          <div className="chat-paywall-glow" />
+          <div className="chat-paywall-avatar">
+            <Activity size={28} color="#7CFFB2" />
+          </div>
+          <h2 className="chat-paywall-title">🌿 Natura AI Premium</h2>
+          <p className="chat-paywall-sub">Personalized wellness guidance powered by AI</p>
+          <div className="chat-paywall-features">
+            {AI_FEATURES.map((f, i) => (
+              <div key={i} className="chat-paywall-feature">
+                <div className="chat-paywall-check"><Check size={11} /></div>
+                <span>{f}</span>
+              </div>
+            ))}
+          </div>
+          <button className="chat-paywall-btn" onClick={() => navigate(`${base}/upgrade`)}>
+            Unlock AI
+          </button>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout bgStyle={getBackgroundStyle(BG.focus)}>

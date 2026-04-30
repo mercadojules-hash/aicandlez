@@ -1,0 +1,195 @@
+We are performing FINAL monetization + UX polish before App Store submission.
+
+DO NOT redesign anything. Only apply targeted fixes.
+
+-----------------------------------
+1. PROFILE PAGE FIX (CLEAN + STRUCTURED)
+-----------------------------------
+
+GOAL:
+Make Profile feel premium, organized, and purposeful.
+
+-----------------------------------
+
+A. REMOVE:
+- Floating “FREE” pill (it looks random and low quality)
+
+-----------------------------------
+
+B. ADD CLEAN UPGRADE CARD (TOP SECTION)
+
+Insert directly under user header:
+
+Card:
+
+Title:
+🌿 Natura Premium
+
+Text:
+Unlock full access to recipes, AI guidance, and wellness plans
+
+Button:
+[Upgrade]
+
+STYLE:
+- Glass card
+- Subtle green glow border
+- Same style as existing UI cards
+- No floating elements
+
+-----------------------------------
+
+C. KEEP:
+- Daily Check-In
+- Appearance toggle
+- Settings section
+
+-----------------------------------
+
+D. DISCLAIMER (BOTTOM)
+
+Ensure this exists at bottom:
+
+"Natura AI provides educational wellness information only. It is not medical advice. Always consult a qualified healthcare provider."
+
+Small, muted text.
+
+-----------------------------------
+2. LOCK AI PAGE (CRITICAL)
+-----------------------------------
+
+GOAL:
+AI = PREMIUM FEATURE
+
+-----------------------------------
+
+IF user is NOT premium:
+
+REPLACE entire AI screen with:
+
+-----------------------------------
+
+🌿 Natura AI Premium
+
+"Personalized wellness guidance powered by AI"
+
+Features:
+
+• Ask health & wellness questions
+• Get personalized recommendations
+• Smart daily guidance
+
+[Unlock AI]
+
+-----------------------------------
+
+Button → opens UpgradeScreen
+
+-----------------------------------
+
+IF user IS premium:
+
+Show normal AI interface
+
+-----------------------------------
+3. LOCK "ASK AI" ON HOMEPAGE
+-----------------------------------
+
+On Home screen:
+
+Locate:
+"Ask AI" button
+
+-----------------------------------
+
+IF NOT premium:
+
+- Add lock icon 🔒
+- Reduce opacity slightly (0.6–0.7)
+- On press → open UpgradeScreen
+
+-----------------------------------
+
+IF premium:
+
+Normal behavior
+
+-----------------------------------
+4. LOCK ANY AI ENTRY POINTS (GLOBAL RULE)
+-----------------------------------
+
+Anywhere AI appears:
+
+IF not premium:
+→ redirect to UpgradeScreen
+
+-----------------------------------
+5. KEEP PLANS PAGE AS-IS
+-----------------------------------
+
+Plans page is already PERFECT.
+
+DO NOT modify.
+
+-----------------------------------
+6. REMOVE WEAK UX ELEMENTS
+-----------------------------------
+
+REMOVE:
+- Any floating upgrade/free buttons
+- Any duplicate upgrade prompts
+
+We want:
+✔ Clean
+✔ Intentional
+✔ Premium feel
+
+-----------------------------------
+7. GLOBAL PREMIUM STATE (ENSURE CONSISTENCY)
+-----------------------------------
+
+Use ONE source of truth:
+
+const isPremium = globalState.isPremium
+
+Apply to:
+
+- Recipes (already done)
+- Plans (already done)
+- AI (NEW)
+- Ask AI button (NEW)
+- Profile upgrade card (NEW)
+
+-----------------------------------
+8. FINAL CHECK
+-----------------------------------
+
+Verify:
+
+PROFILE:
+✔ No floating button
+✔ Clean upgrade card
+✔ Disclaimer visible
+
+AI:
+✔ Locked when not premium
+✔ Works when premium
+
+HOME:
+✔ Ask AI locked correctly
+
+NAVIGATION:
+✔ Upgrade screen opens everywhere
+
+-----------------------------------
+END GOAL
+-----------------------------------
+
+This app should now feel like:
+
+🔥 A real subscription product
+🔥 Clean, intentional UX
+🔥 No clutter, no confusion
+🔥 Strong premium positioning
+
+READY FOR TESTFLIGHT

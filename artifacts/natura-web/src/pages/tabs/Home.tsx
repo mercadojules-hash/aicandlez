@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, ShoppingCart } from "lucide-react";
+import { Check, ShoppingCart, Lock } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
+import { usePremium } from "@/contexts/PremiumContext";
 import { ROUTINE_TASKS, getTodayTip } from "@/lib/data";
 import { BG, getBackgroundStyle } from "@/lib/background";
 
@@ -91,6 +92,7 @@ function TrendGraph() {
 export default function Home() {
   const { profile } = useUser();
   const { toggleTask, isTaskDone, streak, groceryList, toggleGroceryItem, clearGroceryChecked } = useWellness();
+  const { isPremium } = usePremium();
   const navigate = useNavigate();
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const [groceryOpen, setGroceryOpen] = useState(false);
@@ -217,9 +219,10 @@ export default function Home() {
           <div className="home-cta-glow" />
           <p className="home-cta-label">Need guidance?</p>
           <button
-            className="home-cta-btn"
-            onClick={() => navigate(`${base}/chat`)}
+            className={`home-cta-btn ${!isPremium ? "home-cta-btn--locked" : ""}`}
+            onClick={() => navigate(isPremium ? `${base}/chat` : `${base}/upgrade`)}
           >
+            {!isPremium && <Lock size={15} style={{ flexShrink: 0 }} />}
             Ask AI anything
             <img src={iconChevron} alt="" style={{ width: 18, height: 18, flexShrink: 0 }} />
           </button>
