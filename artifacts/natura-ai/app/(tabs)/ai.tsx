@@ -681,7 +681,7 @@ export default function AIScreen() {
         {/* ── AI COACH IMAGE CARD ─────────────────────────────── */}
         <View style={styles.coachImgWrap}>
           <Image
-            source={{ uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-ai-coach.webp" }}
+            source={require("../../assets/images/natura-ai-coach.webp")}
             style={StyleSheet.absoluteFillObject}
             resizeMode="cover"
           />

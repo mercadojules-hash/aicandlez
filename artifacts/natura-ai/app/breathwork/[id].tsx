@@ -25,17 +25,17 @@ const { width } = Dimensions.get("window");
 
 // ─── Per-pattern images ───────────────────────────────────────────────────────
 
-const BREATH_IMAGES: Record<string, { uri: string; caption: string }> = {
+const BREATH_IMAGES: Record<string, { source: number; caption: string }> = {
   "box-breathing": {
-    uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-breath-box.webp",
+    source: require("../../assets/images/natura-breath-box.webp"),
     caption: "Find calm through rhythm",
   },
   "478-breathing": {
-    uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-breath-478.webp",
+    source: require("../../assets/images/natura-breath-478.webp"),
     caption: "Relax deeply and restore balance",
   },
   "calm-breathing": {
-    uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-breath-calm.webp",
+    source: require("../../assets/images/natura-breath-calm.webp"),
     caption: "Slow down. Breathe. Reset.",
   },
 };
@@ -276,7 +276,7 @@ export default function BreathworkSession() {
           {breathImg && (
             <View style={styles.breathImgCard}>
               <Image
-                source={{ uri: breathImg.uri }}
+                source={breathImg.source}
                 style={StyleSheet.absoluteFillObject}
                 resizeMode="cover"
               />

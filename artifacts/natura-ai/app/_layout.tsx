@@ -18,10 +18,8 @@ import { UserProvider } from "../contexts/UserContext";
 SplashScreen.preventAutoHideAsync();
 
 const MIN_SPLASH_MS = 2000;
-const LOGO_URL = "https://apexdigital.design/wp-content/uploads/2026/04/natura-logo-clean.png";
+const LOGO = require("../assets/images/natura-logo-clean.png");
 
-// Preload branded logo so it shows instantly with no flicker
-Image.prefetch(LOGO_URL).catch(() => {});
 
 // ─── In-app splash overlay ────────────────────────────────────────────────────
 // Shown after the native OS splash hides — provides a seamless handoff.
@@ -62,7 +60,7 @@ function AppSplash({ visible }: { visible: boolean }) {
       <View style={styles.splashBg} />
       <Animated.View style={{ alignItems: "center", transform: [{ scale }] }}>
         <Image
-          source={{ uri: LOGO_URL }}
+          source={LOGO}
           style={styles.logoImg}
           resizeMode="contain"
         />

@@ -251,7 +251,7 @@ function MiniPlayer({ audio }: { audio: AudioControls }) {
 
         {/* Symbol */}
         <View style={[mini.imgWrap, { borderColor: chakra.color + "50" }]}>
-          <Image source={{ uri: chakra.symbol }} style={mini.img} resizeMode="contain" />
+          <Image source={chakra.symbol as any} style={mini.img} resizeMode="contain" />
         </View>
 
         {/* Info */}
@@ -297,7 +297,7 @@ function CrystalCard({ chakra }: { chakra: Chakra }) {
         {!imgError && chakra.crystalImage ? (
           <>
             <Image
-              source={{ uri: chakra.crystalImage }}
+              source={chakra.crystalImage as any}
               style={detail.crystalImg}
               resizeMode="cover"
               onError={() => setImgError(true)}
@@ -370,7 +370,7 @@ function ChakraDetail({
               <View style={[detail.symbolGlow, { backgroundColor: chakra.color + "35" }]} />
               <View style={[detail.symbolRing, { borderColor: chakra.color + "60" }]}>
                 {chakra.symbol ? (
-                  <Image source={{ uri: chakra.symbol }} style={detail.symbolImg} resizeMode="contain" />
+                  <Image source={chakra.symbol as any} style={detail.symbolImg} resizeMode="contain" />
                 ) : null}
               </View>
             </View>
@@ -417,7 +417,7 @@ function ChakraDetail({
               activeOpacity={0.85}
             >
               <View style={detail.poseImgWrap}>
-                <Image source={{ uri: chakra.yogaPoseImage }} style={detail.poseImg} resizeMode="cover" />
+                <Image source={chakra.yogaPoseImage as any} style={detail.poseImg} resizeMode="cover" />
                 <LinearGradient colors={["transparent", "rgba(10,25,16,0.8)"]} style={detail.poseImgGrad} />
               </View>
               <View style={detail.poseContent}>
@@ -507,7 +507,7 @@ function ChakraCard({ chakra, onPress }: { chakra: Chakra; onPress: () => void }
         <View style={[list.symbolWrap, { borderColor: chakra.color + "45", backgroundColor: chakra.color + "12" }]}>
           <View style={[list.symbolGlow, { backgroundColor: chakra.color + "25" }]} />
           {chakra.symbol ? (
-            <Image source={{ uri: chakra.symbol }} style={list.symbolImg} resizeMode="contain" />
+            <Image source={chakra.symbol as any} style={list.symbolImg} resizeMode="contain" />
           ) : null}
         </View>
 

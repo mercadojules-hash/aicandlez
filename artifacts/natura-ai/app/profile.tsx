@@ -19,7 +19,7 @@ import { spacing, radius, fontSizes } from "../constants/theme";
 import { useTheme, ThemeOverride } from "../contexts/ThemeContext";
 import { useUser } from "../contexts/UserContext";
 import { useSoundPreference } from "../hooks/useSoundPreference";
-const LOGO_URL = "https://apexdigital.design/wp-content/uploads/2026/04/natura-logo-clean.png";
+const LOGO = require("../assets/images/natura-logo-clean.png");
 
 const THEME_OPTIONS: { label: string; icon: string; value: ThemeOverride }[] = [
   { label: "Dark", icon: "moon", value: "dark" },
@@ -84,7 +84,7 @@ export default function ProfileScreen() {
             ) : (
               <View style={[styles.avatarPlaceholder, { backgroundColor: "#0B2E1F" }]}>
                 <Image
-                  source={{ uri: LOGO_URL }}
+                  source={LOGO}
                   style={{ width: 80, height: 80 }}
                   resizeMode="contain"
                 />
@@ -193,7 +193,7 @@ export default function ProfileScreen() {
 
           {/* App info */}
           <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Image source={{ uri: LOGO_URL }} style={{ width: 36, height: 36 }} resizeMode="contain" />
+            <Image source={LOGO} style={{ width: 36, height: 36 }} resizeMode="contain" />
             <View>
               <Text style={[styles.infoTitle, { color: colors.text }]}>Natura Yoga AI</Text>
               <Text style={[styles.infoVersion, { color: colors.textDim }]}>Version 1.0.0</Text>

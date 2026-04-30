@@ -23,16 +23,16 @@ import { JOURNEY_WEEKS } from "../../data/journey";
 
 const { width } = Dimensions.get("window");
 
-const LOGO_URL = "https://apexdigital.design/wp-content/uploads/2026/04/natura-logo-clean.png";
+const LOGO = require("../../assets/images/natura-logo-clean.png");
 
 // ─── Slider images ────────────────────────────────────────────────────────────
 
 const SLIDER_W = width - spacing.md * 2;
 
-const SLIDES: { id: string; source: number | { uri: string } }[] = [
-  { id: "1", source: { uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-home-slide-1.webp" } },
-  { id: "2", source: require("../../assets/images/natura-splash-page-2.png") },
-  { id: "3", source: { uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-home-slide-3.webp" } },
+const SLIDES: { id: string; source: number }[] = [
+  { id: "1", source: require("../../assets/images/natura-home-slide-1.webp") },
+  { id: "2", source: require("../../assets/images/natura-home-slide-2.webp") },
+  { id: "3", source: require("../../assets/images/natura-home-slide-3.webp") },
 ];
 
 function HomeSlider() {
@@ -133,7 +133,7 @@ function AvatarButton() {
       {profile.image ? (
         <Image source={{ uri: profile.image }} style={styles.avatarImg} />
       ) : (
-        <Image source={{ uri: LOGO_URL }} style={styles.avatarImg} resizeMode="contain" />
+        <Image source={LOGO} style={styles.avatarImg} resizeMode="contain" />
       )}
     </TouchableOpacity>
   );
@@ -294,7 +294,7 @@ function JourneySection({
 
       {/* Hero Card */}
       <View style={jStyles.heroCard}>
-        <Image source={{ uri: week.image }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+        <Image source={week.image as any} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
         <LinearGradient colors={["transparent", "rgba(4,14,8,0.8)"]} style={StyleSheet.absoluteFillObject} />
         <View style={jStyles.heroOverlay}>
           <Text style={jStyles.heroWeekLabel}>WEEK {week.week}</Text>

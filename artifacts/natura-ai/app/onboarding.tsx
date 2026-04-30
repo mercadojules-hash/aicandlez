@@ -16,11 +16,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { height } = Dimensions.get("window");
 
-const LOGO_URL   = "https://apexdigital.design/wp-content/uploads/2026/04/natura-logo-clean.png";
-const SPLASH_URL = "https://apexdigital.design/wp-content/uploads/2026/04/natura-splash-page-2.png";
+const LOGO       = require("../assets/images/natura-logo-clean.png");
+const SPLASH_URL = require("../assets/images/natura-splash-page-2.png");
 
-Image.prefetch(LOGO_URL).catch(() => {});
-Image.prefetch(SPLASH_URL).catch(() => {});
 
 export default function OnboardingScreen() {
   const logoOpacity  = useRef(new Animated.Value(0)).current;
@@ -63,7 +61,7 @@ export default function OnboardingScreen() {
 
       {/* Splash background — full cover, no dark overlay */}
       <Image
-        source={{ uri: SPLASH_URL }}
+        source={SPLASH_URL}
         style={[StyleSheet.absoluteFillObject, styles.splashImg]}
         resizeMode="cover"
       />
@@ -78,7 +76,7 @@ export default function OnboardingScreen() {
       {/* Stage 1: logo fades in centered, then exits */}
       <Animated.View style={[styles.logoStage, logoAnimStyle]} pointerEvents="none">
         <View style={styles.logoGlow} />
-        <Image source={{ uri: LOGO_URL }} style={styles.logoStageImg} resizeMode="contain" />
+        <Image source={LOGO} style={styles.logoStageImg} resizeMode="contain" />
       </Animated.View>
 
       {/* Stage 2: main content */}
@@ -88,7 +86,7 @@ export default function OnboardingScreen() {
         {/* Center block — logo + title + subtitle */}
         <View style={styles.centerBlock}>
           <View style={styles.logoGlowLarge} />
-          <Image source={{ uri: LOGO_URL }} style={styles.contentLogo} resizeMode="contain" />
+          <Image source={LOGO} style={styles.contentLogo} resizeMode="contain" />
           <Text style={styles.appName}>Natura Yoga AI</Text>
           <Text style={styles.appSubtitle}>
             Find your balance through movement and breath
