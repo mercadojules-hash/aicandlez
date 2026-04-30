@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Activity, ArrowUp } from "lucide-react";
+import { Activity, ArrowUp, Leaf, Moon, Droplets, Zap, ShieldCheck } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { askAI, type AIResponse } from "@/lib/ai";
 import { BG, getBackgroundStyle } from "@/lib/background";
@@ -13,25 +13,25 @@ interface Message {
 }
 
 const SUGGESTIONS = [
-  "I'm feeling stressed and anxious",
-  "Help me sleep better",
-  "My digestion feels sluggish",
-  "I need more energy",
-  "How can I support my immune system?",
+  { text: "I'm feeling stressed and anxious",     Icon: Leaf,        color: "#9FE870" },
+  { text: "Help me sleep better",                  Icon: Moon,        color: "#A78BFA" },
+  { text: "My digestion feels sluggish",           Icon: Droplets,    color: "#7ECFED" },
+  { text: "I need more energy",                    Icon: Zap,         color: "#F5C842" },
+  { text: "How can I support my immune system?",   Icon: ShieldCheck, color: "#7CFFB2" },
 ];
 
 function AIMessage({ response }: { response: AIResponse }) {
   const sections = [
-    { label: "Herbs", emoji: "🌿", items: response.herbs },
-    { label: "Teas", emoji: "🍵", items: response.teas },
-    { label: "Foods", emoji: "🥗", items: response.foods },
+    { label: "Herbs",       emoji: "🌿", items: response.herbs },
+    { label: "Teas",        emoji: "🍵", items: response.teas },
+    { label: "Foods",       emoji: "🥗", items: response.foods },
     { label: "Supplements", emoji: "💊", items: response.supplements },
   ];
 
   return (
     <div className="ai-message">
       <div className="ai-bubble-header">
-        <div className="ai-avatar-sm"><Activity size={14} color="#3D7A45" /></div>
+        <div className="ai-avatar-sm"><Activity size={14} color="#7CFFB2" /></div>
         <span className="ai-label">Natura AI</span>
       </div>
       <p className="ai-why">{response.whyItHelps}</p>
@@ -57,6 +57,7 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -78,12 +79,25 @@ export default function Chat() {
     }
   };
 
+  const fillSuggestion = (text: string) => {
+    setInput(text);
+    setTimeout(() => {
+      inputRef.current?.focus();
+      const len = text.length;
+      inputRef.current?.setSelectionRange(len, len);
+    }, 60);
+  };
+
   return (
     <Layout bgStyle={getBackgroundStyle(BG.focus)}>
       <div className="chat-screen" style={{ background: "transparent" }}>
         <div className="chat-header">
-          <div className="chat-avatar"><Activity size={20} color="#3D7A45" /></div>
+          <div className="chat-avatar">
+            <Activity size={20} color="#7CFFB2" />
+            <span className="chat-avatar-pulse" />
+          </div>
           <div>
+            <p className="chat-coach-label">AI Wellness Coach</p>
             <p className="chat-title">Natura AI</p>
             <p className="chat-sub">Natural wellness guidance</p>
           </div>
@@ -93,11 +107,27 @@ export default function Chat() {
           {messages.length === 0 && (
             <div className="chat-empty">
               <p className="chat-empty-title">What would you like support with?</p>
-              <p className="chat-empty-sub">Ask about herbs, teas, remedies, or wellness topics. All suggestions are educational only.</p>
+              <p className="chat-empty-sub">Choose a topic below or type your own question.</p>
               <div className="suggestions">
-                {SUGGESTIONS.map((s, i) => (
-                  <button key={i} className="suggestion-chip" onClick={() => send(s)}>{s}</button>
+                {SUGGESTIONS.map(({ text, Icon, color }, i) => (
+                  <button
+                    key={i}
+                    className="suggestion-chip"
+                    onClick={() => fillSuggestion(text)}
+                  >
+                    <span className="suggestion-icon" style={{ color }}>
+                      <Icon size={18} />
+                    </span>
+                    <span className="suggestion-text">{text}</span>
+                    <span className="suggestion-arrow">›</span>
+                  </button>
                 ))}
+              </div>
+
+              <div className="chat-divider">
+                <span className="chat-divider-line" />
+                <span className="chat-divider-label">or ask your own question</span>
+                <span className="chat-divider-line" />
               </div>
             </div>
           )}
@@ -121,8 +151,9 @@ export default function Chat() {
         </div>
 
         <div className="chat-input-bar">
-          <div className="chat-input-wrap">
+          <div className={`chat-input-wrap ${input.trim() ? "has-input" : ""}`}>
             <textarea
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about herbs, sleep, stress..."
@@ -136,7 +167,7 @@ export default function Chat() {
               onClick={() => send(input)}
               disabled={!input.trim() || loading}
             >
-              <ArrowUp size={18} color="#fff" />
+              <ArrowUp size={18} color={input.trim() && !loading ? "#0D1F16" : "#fff"} />
             </button>
           </div>
           <p className="chat-disclaimer">Educational suggestions only — not medical advice</p>
