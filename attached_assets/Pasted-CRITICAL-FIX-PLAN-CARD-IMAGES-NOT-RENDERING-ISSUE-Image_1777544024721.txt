@@ -1,0 +1,116 @@
+CRITICAL FIX — PLAN CARD IMAGES NOT RENDERING
+
+ISSUE:
+Images were uploaded/imported but are NOT showing on the Plans cards.
+Cards still show placeholder gradient instead of real images.
+
+This means:
+❌ Images are NOT mapped correctly in the data layer
+❌ UI is NOT using the correct image property
+
+--------------------------------------------------
+GOAL
+--------------------------------------------------
+
+• Each plan card MUST display its correct image
+• Replace placeholder gradient with real images
+• Keep overlay + glow system intact
+
+--------------------------------------------------
+STEP 1 — DEFINE IMAGE MAPPING (REQUIRED)
+--------------------------------------------------
+
+In Plans.tsx (or wherever plan data is defined):
+
+Create a mapping object:
+
+const PLAN_IMAGES = {
+  "3-Day Stress Relief": "plan-stress-3day.webp",
+  "7-Day Sleep Reset": "plan-sleep-7day.webp",
+  "5-Day Energy Boost": "plan-energy-5day.webp"
+};
+
+If using imports:
+
+import stressImg from "@/assets/plan-stress-3day.webp";
+import sleepImg from "@/assets/plan-sleep-7day.webp";
+import energyImg from "@/assets/plan-energy-5day.webp";
+
+const PLAN_IMAGES = {
+  "3-Day Stress Relief": stressImg,
+  "7-Day Sleep Reset": sleepImg,
+  "5-Day Energy Boost": energyImg
+};
+
+--------------------------------------------------
+STEP 2 — APPLY IMAGE TO CARD (THIS IS MISSING)
+--------------------------------------------------
+
+Inside the card render:
+
+REPLACE any placeholder background with:
+
+style={{
+  backgroundImage: `
+    linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.65)),
+    radial-gradient(circle at top right, rgba(120,255,180,0.18), transparent 60%),
+    url(${PLAN_IMAGES[plan.title]})
+  `,
+  backgroundSize: "cover",
+  backgroundPosition: "center"
+}}
+
+--------------------------------------------------
+STEP 3 — REMOVE HARDCODED COLORS
+--------------------------------------------------
+
+REMOVE any:
+
+background: linear-gradient(...)
+background: #123456
+
+These are blocking the image from showing.
+
+--------------------------------------------------
+STEP 4 — VERIFY IMAGE LOAD
+--------------------------------------------------
+
+Console log:
+
+console.log(PLAN_IMAGES[plan.title]);
+
+If undefined → mapping is wrong.
+
+--------------------------------------------------
+STEP 5 — FALLBACK (IMPORTANT)
+--------------------------------------------------
+
+Add fallback in case image fails:
+
+url(${PLAN_IMAGES[plan.title] || defaultFallbackImage})
+
+--------------------------------------------------
+EXPECTED RESULT
+--------------------------------------------------
+
+Each card should now show:
+
+• Stress → green forest image
+• Sleep → blue night sky
+• Energy → vibrant glow/energy scene
+
+AND still have:
+
+• dark readability overlay
+• green glow effect
+• glass UI depth
+
+--------------------------------------------------
+DO NOT:
+--------------------------------------------------
+
+• Do NOT remove overlay system
+• Do NOT revert to gradients
+• Do NOT hardcode image per card
+
+--------------------------------------------------
