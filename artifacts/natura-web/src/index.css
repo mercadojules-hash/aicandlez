@@ -2178,7 +2178,7 @@ a { color: inherit; text-decoration: none; }
 .pw-nav-label.active { color: #7CFFB2; font-weight: 700; }
 
 /* ── Learn page ─────────────────────────────────────────────────── */
-.learn-header { padding: 52px 20px 10px; }
+.learn-header { padding: 6px 20px 10px; }
 .learn-page-title { font-size: 26px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; margin-bottom: 4px; }
 .learn-page-sub { font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.5; }
 
@@ -2268,7 +2268,12 @@ a { color: inherit; text-decoration: none; }
 .learn-article-summary { font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.4; }
 
 /* Article detail */
-.learn-detail { display: flex; flex-direction: column; min-height: 100%; }
+.learn-detail {
+  display: flex; flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .learn-detail-hero { position: relative; height: 240px; flex-shrink: 0; overflow: hidden; background: #0D1F16; }
 .learn-detail-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .learn-detail-overlay {
