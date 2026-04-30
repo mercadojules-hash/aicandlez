@@ -9,11 +9,24 @@ import { BG, getBackgroundStyle } from "@/lib/background";
 import imgStressRelief from "@assets/natura-plan-stress-relief-v1_1777543715688.webp";
 import imgSleepReset from "@assets/natura-plan-sleep-reset-v1_1777543715688.webp";
 import imgEnergyBoost from "@assets/natura-plan-energy-boost-v1_1777543715687.webp";
+import imgGingerTea from "@assets/remedy-ginger-tea_1777546217699.webp";
+import imgTurmericMilk from "@assets/remedy-turmeric-golden-milk_1777546217701.webp";
+import imgLavenderTea from "@assets/remedy-lavender-calming-tea_1777546217700.webp";
+import imgChamomileTea from "@assets/remedy-chamomile-sleep-tea_1777546217699.webp";
+import imgEnergySmoothie from "@assets/remedy-green-energy-smoothie_1777546217700.webp";
 
 const PLAN_IMAGES: Record<string, string> = {
   "plan-stress-3day": imgStressRelief,
   "plan-sleep-7day":  imgSleepReset,
   "plan-energy-5day": imgEnergyBoost,
+};
+
+const REMEDY_IMAGES: Record<string, string> = {
+  "remedy-ginger-tea":       imgGingerTea,
+  "remedy-lavender-calm":    imgLavenderTea,
+  "remedy-immunity-shot":    imgTurmericMilk,
+  "remedy-ashwagandha-milk": imgChamomileTea,
+  "remedy-energy-smoothie":  imgEnergySmoothie,
 };
 
 type Tab = "Plans" | "Remedies" | "Saved";
@@ -79,7 +92,7 @@ export default function Plans() {
               const saved = isSaved(remedy.id);
               return (
                 <div key={remedy.id} className="plan-card" onClick={() => navigate(`${base}/remedy/${remedy.id}`)}>
-                  <CardImage src={remedy.image} alt={remedy.title} className="plan-card-img" fallbackHint={remedy.category} />
+                  <CardImage src={REMEDY_IMAGES[remedy.id] ?? remedy.image} alt={remedy.title} className="plan-card-img" fallbackHint={remedy.category} />
                   <div className="plan-card-body">
                     <div className="plan-card-row1">
                       <span className="plan-goal-badge">{remedy.category}</span>
@@ -137,7 +150,7 @@ export default function Plans() {
                       if (!remedy) return null;
                       return (
                         <div key={remedy.id} className="plan-card" onClick={() => navigate(`${base}/remedy/${remedy.id}`)}>
-                          <CardImage src={remedy.image} alt={remedy.title} className="plan-card-img" fallbackHint={remedy.category} />
+                          <CardImage src={REMEDY_IMAGES[remedy.id] ?? remedy.image} alt={remedy.title} className="plan-card-img" fallbackHint={remedy.category} />
                           <div className="plan-card-body">
                             <span className="plan-goal-badge">{remedy.category}</span>
                             <p className="plan-card-title">{remedy.title}</p>
