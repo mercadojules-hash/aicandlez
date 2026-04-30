@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bookmark, ShoppingCart, Trash2, Check } from "lucide-react";
+import { Bookmark, ShoppingCart, Trash2, Check, Lock } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { getBackgroundStyle, BG } from "@/lib/background";
 import { useWellness } from "@/contexts/WellnessContext";
+import { usePremium } from "@/contexts/PremiumContext";
 import { RECIPES } from "@/lib/data";
 
 import imgTurmeric        from "@assets/remedy-turmeric-golden-milk_1777546217701.webp";
@@ -77,10 +78,24 @@ const GOAL_COLORS: Record<string, string> = {
 const FILTERS = ["All", "sleep", "stress", "energy", "digestion", "immunity"] as const;
 type Tab = "Recipes" | "Grocery List";
 
+const FREE_RECIPE_IDS = new Set([
+  "recipe-golden-milk",
+  "recipe-immunity-broth",
+  "recipe-overnight-oats",
+  "recipe-energy-citrus",
+  "recipe-antistress-salad",
+  "recipe-stress-chamomile",
+  "recipe-sleep-chamomile",
+  "recipe-sleep-lavender",
+  "recipe-digestion-ginger",
+  "recipe-digestion-peppermint",
+]);
+
 export default function Recipes() {
   const [activeTab, setActiveTab] = useState<Tab>("Recipes");
   const [filter, setFilter]       = useState("All");
   const { saveItem, removeItem, isSaved, addToGrocery, groceryList, toggleGroceryItem, clearGroceryChecked } = useWellness();
+  const { isPremium } = usePremium();
   const navigate = useNavigate();
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -126,12 +141,13 @@ export default function Recipes() {
                   const saved     = isSaved(recipe.id);
                   const img       = RECIPE_IMAGES[recipe.id];
                   const goalColor = GOAL_COLORS[recipe.goal] ?? "#7CFFB2";
+                  const isLocked  = !isPremium && !FREE_RECIPE_IDS.has(recipe.id);
 
                   return (
                     <div
                       key={recipe.id}
                       className="recipe-feature-card"
-                      onClick={() => navigate(`${base}/remedy/${recipe.id}`)}
+                      onClick={() => isLocked ? navigate(`${base}/upgrade`) : navigate(`${base}/remedy/${recipe.id}`)}
                     >
                       <div
                         className="recipe-card-hero"
@@ -145,6 +161,18 @@ export default function Recipes() {
                           backgroundPosition: "center",
                         }}
                       >
+                        {isLocked && (
+                          <div className="recipe-locked-overlay">
+                            <div className="recipe-locked-icon">
+                              <Lock size={16} color="#9FE870" />
+                            </div>
+                            <p className="recipe-locked-label">Premium Recipe</p>
+                            <p className="recipe-locked-sub">Unlock to access</p>
+                            <button className="recipe-locked-btn" onClick={(e) => { e.stopPropagation(); navigate(`${base}/upgrade`); }}>
+                              Upgrade
+                            </button>
+                          </div>
+                        )}
                         {/* top row: badge + actions */}
                         <div className="recipe-hero-top">
                           <span

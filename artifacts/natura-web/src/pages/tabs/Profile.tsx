@@ -7,6 +7,7 @@ import {
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
+import { usePremium } from "@/contexts/PremiumContext";
 import { useTheme, type ThemeMode } from "@/contexts/ThemeContext";
 import { getBackgroundStyle, BG } from "@/lib/background";
 
@@ -36,13 +37,14 @@ const THEME_OPTIONS = [
 export default function Profile() {
   const { profile, resetOnboarding } = useUser();
   const { streak, savedItems, completedTasks, submitCheckIn, lastCheckIn } = useWellness();
+  const { isPremium } = usePremium();
   const { mode, setMode } = useTheme();
   const navigate = useNavigate();
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const [energy, setEnergy] = useState(3);
   const [stress, setStress] = useState(3);
   const [sleep, setSleep] = useState(3);
   const [checkInDone, setCheckInDone] = useState(!!lastCheckIn);
-  const [isPremium] = useState(false);
 
   const handleCheckIn = () => {
     submitCheckIn({ energy, stress, sleep });
@@ -132,7 +134,7 @@ export default function Profile() {
               : "Get unlimited AI guidance, all plans, and offline access."}
           </p>
           {!isPremium && (
-            <button className="membership-upgrade-btn">
+            <button className="membership-upgrade-btn" onClick={() => navigate(`${base}/upgrade`)}>
               <Sparkles size={16} style={{ display: "inline", marginRight: 6 }} />
               Upgrade to Premium
             </button>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bookmark, Clock, Calendar } from "lucide-react";
+import { Bookmark, Clock, Calendar, Crown } from "lucide-react";
+import { usePremium } from "@/contexts/PremiumContext";
 import { Layout } from "@/components/Layout";
 import { useWellness } from "@/contexts/WellnessContext";
 import { PLANS, REMEDIES } from "@/lib/data";
@@ -34,6 +35,7 @@ type Tab = "Plans" | "Remedies" | "Saved";
 export default function Plans() {
   const [activeTab, setActiveTab] = useState<Tab>("Plans");
   const { saveItem, removeItem, isSaved, savedItems } = useWellness();
+  const { isPremium } = usePremium();
   const navigate = useNavigate();
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -56,6 +58,21 @@ export default function Plans() {
 
         {activeTab === "Plans" && (
           <>
+            {!isPremium ? (
+              <div className="plans-paywall">
+                <div className="plans-paywall-icon">
+                  <Crown size={30} color="#9FE870" />
+                </div>
+                <p className="plans-paywall-title">Premium Plans Only</p>
+                <p className="plans-paywall-sub">
+                  Unlock guided wellness programs tailored to your goals — stress relief, sleep resets, energy boosts, and more.
+                </p>
+                <button className="plans-paywall-btn" onClick={() => navigate(`${base}/upgrade`)}>
+                  Unlock Plans
+                </button>
+              </div>
+            ) : (
+            <>
             <p className="section-label">Curated wellness programs to support your goals</p>
             {PLANS.map((plan) => {
               const saved = isSaved(plan.id);
@@ -82,6 +99,8 @@ export default function Plans() {
                 </div>
               );
             })}
+            </>
+            )}
           </>
         )}
 

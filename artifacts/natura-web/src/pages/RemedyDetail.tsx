@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ChevronLeft, Bookmark, Check, ChevronRight, Sparkles } from "lucide-react";
 import { useWellness } from "@/contexts/WellnessContext";
+import { usePremium } from "@/contexts/PremiumContext";
 import { REMEDIES, RECIPES } from "@/lib/data";
 import imgGingerTea      from "@assets/remedy-ginger-tea_1777546217699.webp";
 import imgTurmericMilk   from "@assets/remedy-turmeric-golden-milk_1777546217701.webp";
@@ -73,7 +74,9 @@ const DETAIL_IMAGES: Record<string, string> = {
 export default function RemedyDetail() {
   const { id } = useParams<{ id: string }>();
   const { saveItem, removeItem, isSaved } = useWellness();
+  const { isPremium } = usePremium();
   const navigate = useNavigate();
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const [stepMode, setStepMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [heroFailed, setHeroFailed] = useState(false);
@@ -233,6 +236,18 @@ export default function RemedyDetail() {
               <p className="safety-title">⚠️ Safety Note</p>
               <p className="safety-text">{"safetyNote" in item ? item.safetyNote : ""}</p>
             </div>
+
+            {isRecipe && !isPremium && (
+              <div className="recipe-upsell-card">
+                <p className="recipe-upsell-title">Want more like this?</p>
+                <p className="recipe-upsell-sub">
+                  Unlock the full Natura experience — 50+ premium recipes, guided wellness plans, and daily routines.
+                </p>
+                <button className="recipe-upsell-btn" onClick={() => navigate(`${base}/upgrade`)}>
+                  Unlock Full Library
+                </button>
+              </div>
+            )}
 
             <button className="detail-cta-btn" onClick={enterGuidedMode}>
               <Sparkles size={16} style={{ display: "inline", marginRight: 8, verticalAlign: "middle" }} />

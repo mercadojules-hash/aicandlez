@@ -1,0 +1,220 @@
+We are building a PREMIUM UPGRADE SYSTEM for Natura AI.
+
+GOAL:
+Create a clean, premium, App Store-quality paywall that feels like Calm/Headspace — NOT cheap or aggressive.
+
+-----------------------------------
+1. CREATE NEW SCREEN
+-----------------------------------
+
+Create a new screen:
+
+UpgradeScreen.tsx
+
+This screen should be accessible from:
+- Locked recipes
+- Plans tab
+- Profile page
+- Upgrade buttons
+
+-----------------------------------
+2. DESIGN STYLE (VERY IMPORTANT)
+-----------------------------------
+
+Style MUST match Natura:
+
+- Dark green gradient background
+- Soft glow accents
+- Glassmorphism cards
+- Rounded corners (20–28px)
+- Subtle shadows
+- Clean typography
+- Calm, premium feel
+
+NO loud colors, NO aggressive sales UI
+
+-----------------------------------
+3. SCREEN LAYOUT
+-----------------------------------
+
+Build this exact structure:
+
+-----------------------------------
+
+[TOP HERO]
+
+🌿 Natura Premium
+
+"Unlock your full wellness potential"
+
+Soft glowing circle or subtle animated gradient behind title
+
+-----------------------------------
+
+[FEATURE LIST]
+
+Use icons + short text:
+
+✓ Full recipe library (50+ recipes)
+✓ Guided wellness plans
+✓ Stress, sleep, energy programs
+✓ Daily routines & tracking
+✓ New content added weekly
+
+-----------------------------------
+
+[PLAN OPTIONS]
+
+Create 2 plans:
+
+MONTHLY:
+$9.99 / month
+
+YEARLY (highlight this):
+$59.99 / year
+"Best Value – Save 50%"
+
+UI:
+
+- Two cards side-by-side or stacked
+- Yearly card slightly larger / highlighted
+- Selected plan has glow border
+
+-----------------------------------
+
+[CTA BUTTON]
+
+Large button:
+
+"Start Free Trial"
+
+Subtext below:
+"Cancel anytime"
+
+-----------------------------------
+
+[FOOTER]
+
+Small text:
+
+- Restore Purchase
+- Terms of Service
+- Privacy Policy
+
+-----------------------------------
+4. INTERACTIONS
+-----------------------------------
+
+- Tapping a plan selects it
+- CTA uses selected plan
+- Add subtle scale animation on press
+- Add glow highlight on selected plan
+
+-----------------------------------
+5. SUBSCRIPTION STATE (BASIC)
+-----------------------------------
+
+Create global state:
+
+const [isPremium, setIsPremium] = useState(false);
+
+Simulate upgrade for now:
+
+On "Start Free Trial" press:
+setIsPremium(true)
+
+-----------------------------------
+6. LOCKED CONTENT SYSTEM
+-----------------------------------
+
+Update recipe cards:
+
+IF recipe.isPremium === true AND user is NOT premium:
+
+- Blur image slightly
+- Add dark overlay
+- Show lock icon
+- Show:
+
+"Premium Recipe"
+"Unlock to access"
+
+[Upgrade]
+
+Clicking opens UpgradeScreen
+
+-----------------------------------
+7. PLANS TAB (IMPORTANT)
+-----------------------------------
+
+If user is NOT premium:
+
+Replace Plans screen with:
+
+"Premium Plans Only"
+
+Short message:
+"Unlock guided wellness programs tailored to you"
+
+[Upgrade]
+
+-----------------------------------
+8. FLOATING BUTTON FIX
+-----------------------------------
+
+REMOVE random floating free button.
+
+Replace with:
+
+Contextual upgrade prompts ONLY:
+- Locked recipes
+- Plans tab
+- End of recipe detail
+
+-----------------------------------
+9. RECIPE DETAIL UPSELL
+-----------------------------------
+
+At bottom of FREE recipes:
+
+Add section:
+
+"Want more like this?"
+
+"Unlock full Natura experience"
+
+[Upgrade]
+
+-----------------------------------
+10. PERFORMANCE + CLEANUP
+-----------------------------------
+
+- No inline styles chaos
+- Use reusable components:
+  - PlanCard
+  - FeatureItem
+  - LockedOverlay
+- Keep code clean and scalable
+
+-----------------------------------
+11. FINAL CHECK
+-----------------------------------
+
+Verify:
+
+- Upgrade screen opens from all entry points
+- Locked recipes show correctly
+- Plan selection works
+- UI matches Natura style
+- No layout breaks
+
+-----------------------------------
+END GOAL
+-----------------------------------
+
+This should feel like:
+
+🔥 Premium wellness app
+🔥 Calm / Headspace level UI
+🔥 Clear value before asking for money
+🔥 Smooth upgrade experience

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { WellnessProvider } from "@/contexts/WellnessContext";
+import { PremiumProvider } from "@/contexts/PremiumContext";
 import Welcome from "@/pages/onboarding/Welcome";
 import Goals from "@/pages/onboarding/Goals";
 import Preferences from "@/pages/onboarding/Preferences";
@@ -14,6 +15,7 @@ import Learn from "@/pages/tabs/Learn";
 import RemedyDetail from "@/pages/RemedyDetail";
 import PlanDetail from "@/pages/PlanDetail";
 import PreviewWellnessScreen from "@/pages/PreviewWellnessScreen";
+import UpgradeScreen from "@/pages/UpgradeScreen";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -37,6 +39,7 @@ function AppRoutes() {
       <Route path={`${base}/profile`}  element={<Profile />} />
       <Route path={`${base}/remedy/:id`} element={<RemedyDetail />} />
       <Route path={`${base}/plan/:id`}   element={<PlanDetail />} />
+      <Route path={`${base}/upgrade`}    element={<UpgradeScreen />} />
       <Route path="*" element={<Navigate to={`${base}/home`} replace />} />
     </Routes>
   );
@@ -47,7 +50,9 @@ export default function App() {
     <BrowserRouter>
       <UserProvider>
         <WellnessProvider>
-          <AppRoutes />
+          <PremiumProvider>
+            <AppRoutes />
+          </PremiumProvider>
         </WellnessProvider>
       </UserProvider>
     </BrowserRouter>
