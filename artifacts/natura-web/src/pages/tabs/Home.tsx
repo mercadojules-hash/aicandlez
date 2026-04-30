@@ -1,64 +1,37 @@
-import { ReactNode, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Flame, Clock, Star, Check, CheckCircle2, ShoppingCart,
-  Leaf, ChevronRight, Droplets, Wind, Zap, Coffee,
-  Navigation2, Sunset, Moon,
-} from "lucide-react";
+import { Check, ShoppingCart } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
 import { ROUTINE_TASKS, getTodayTip } from "@/lib/data";
 import { BG, getBackgroundStyle } from "@/lib/background";
-import naturaLogo from "@/assets/natura-logo.svg?url";
+
+import logoIcon     from "@assets/natura-logo-icon_1777541706005.webp";
+import iconFlame    from "@assets/icon-flame_1777541639916.webp";
+import iconClock    from "@assets/icon-clock_1777541639916.webp";
+import iconCheck    from "@assets/icon-check_1777541639915.webp";
+import iconStar     from "@assets/icon-star_1777541639916.webp";
+import iconLeaf     from "@assets/icon-leaf_1777541639916.webp";
+import iconBowl     from "@assets/icon-bowl_1777541639915.webp";
+import iconLightning from "@assets/icon-lightning_1777541639916.webp";
+import iconLotus    from "@assets/icon-lotus_1777541639916.webp";
+import iconChevron  from "@assets/icon-chevron_1777541639915.webp";
 
 const MORNING   = ROUTINE_TASKS.filter((t) => t.category === "morning").slice(0, 3);
 const AFTERNOON = ROUTINE_TASKS.filter((t) => t.category === "afternoon").slice(0, 2);
 const EVENING   = ROUTINE_TASKS.filter((t) => t.category === "evening").slice(0, 2);
 const ALL_TASKS = [...MORNING, ...AFTERNOON, ...EVENING];
 
-const TASK_ICON: Record<string, ReactNode> = {
-  "rt-1": <Droplets    size={17} color="#9FE870" strokeWidth={1.5} />,
-  "rt-2": <Wind        size={17} color="#9FE870" strokeWidth={1.5} />,
-  "rt-3": <Zap         size={17} color="#9FE870" strokeWidth={1.5} />,
-  "rt-4": <Coffee      size={17} color="#9FE870" strokeWidth={1.5} />,
-  "rt-5": <Navigation2 size={17} color="#9FE870" strokeWidth={1.5} />,
-  "rt-6": <Sunset      size={17} color="#9FE870" strokeWidth={1.5} />,
-  "rt-7": <Leaf        size={17} color="#9FE870" strokeWidth={1.5} />,
+const TASK_ICON: Record<string, string> = {
+  "rt-1": iconLeaf,
+  "rt-2": iconLotus,
+  "rt-3": iconLightning,
+  "rt-4": iconBowl,
+  "rt-5": iconLightning,
+  "rt-6": iconLotus,
+  "rt-7": iconLeaf,
 };
-
-function PremiumIcon({ children, size = 44 }: { children: ReactNode; size?: number }) {
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: "rgba(255,255,255,0.05)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        boxShadow: "0 0 18px rgba(120,255,180,0.18)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        flexShrink: 0,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function NaturaMark() {
-  return (
-    <div className="home-brand-row">
-      <img src={naturaLogo} alt="Natura AI" className="home-brand-logo" />
-      <div className="home-brand-text">
-        <span className="home-brand-name">NATURA AI</span>
-        <span className="home-brand-sub">AI Wellness Coach</span>
-      </div>
-    </div>
-  );
-}
 
 function UserAvatar({ name }: { name: string }) {
   const initial = name ? name[0].toUpperCase() : "U";
@@ -122,7 +95,7 @@ function TrendGraph() {
 
 export default function Home() {
   const { profile } = useUser();
-  const { toggleTask, isTaskDone, streak, addToGrocery, groceryList, toggleGroceryItem, clearGroceryChecked } = useWellness();
+  const { toggleTask, isTaskDone, streak, groceryList, toggleGroceryItem, clearGroceryChecked } = useWellness();
   const navigate = useNavigate();
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const [groceryOpen, setGroceryOpen] = useState(false);
@@ -137,10 +110,10 @@ export default function Home() {
   const displayStreak = streak > 0 ? streak : 5;
 
   const STATS = [
-    { icon: <Flame       size={17} color="#9FE870" strokeWidth={1.5} />, value: `${displayStreak}`, label: "day streak" },
-    { icon: <Clock       size={17} color="#9FE870" strokeWidth={1.5} />, value: "32",               label: "min today"  },
-    { icon: <CheckCircle2 size={17} color="#9FE870" strokeWidth={1.5} />, value: `${completedCount}`, label: "sessions" },
-    { icon: <Star        size={17} color="#9FE870" strokeWidth={1.5} />, value: `${wellnessScore}`, label: "score"      },
+    { icon: iconFlame, value: `${displayStreak}`, label: "day streak" },
+    { icon: iconClock, value: "32",                label: "min today"  },
+    { icon: iconCheck, value: `${completedCount}`, label: "sessions"   },
+    { icon: iconStar,  value: `${wellnessScore}`,  label: "score"      },
   ];
 
   return (
@@ -153,7 +126,13 @@ export default function Home() {
           <div className="home-hero-glow-left" />
           <div className="home-hero-top">
             <div className="home-hero-left">
-              <NaturaMark />
+              <div className="home-brand-row">
+                <img src={logoIcon} alt="Natura AI" className="home-brand-logo" />
+                <div className="home-brand-text">
+                  <span className="home-brand-name">NATURA AI</span>
+                  <span className="home-brand-sub">AI Wellness Coach</span>
+                </div>
+              </div>
               <p className="home-greeting-sub">{greeting}, {firstName}</p>
               <h1 className="home-hero-title">Today's Plan for You</h1>
               <p className="home-hero-subtitle">Personalized steps for your mind, body and energy</p>
@@ -163,7 +142,7 @@ export default function Home() {
             </div>
           </div>
           <div className="home-energy-badge">
-            <Flame size={12} color="#9FE870" fill="#9FE870" strokeWidth={1.5} />
+            <img src={iconFlame} alt="" className="home-energy-icon" />
             <span>Energy: Good</span>
           </div>
         </div>
@@ -172,7 +151,7 @@ export default function Home() {
         <div className="home-stats-bar">
           {STATS.map(({ icon, value, label }, i) => (
             <div key={i} className="home-stat-item">
-              <PremiumIcon size={38}>{icon}</PremiumIcon>
+              <img src={icon} alt={label} className="home-stat-img" />
               <span className="home-stat-value">{value}</span>
               <span className="home-stat-label">{label}</span>
             </div>
@@ -201,17 +180,16 @@ export default function Home() {
                     className={`home-tl-card ${done ? "done" : ""}`}
                     onClick={() => toggleTask(task.id)}
                   >
-                    <PremiumIcon size={44}>
-                      {TASK_ICON[task.id] ?? <Leaf size={17} color="#9FE870" strokeWidth={1.5} />}
-                    </PremiumIcon>
+                    <img
+                      src={done ? iconCheck : (TASK_ICON[task.id] ?? iconLeaf)}
+                      alt=""
+                      className="home-tl-img"
+                    />
                     <div className="home-tl-info">
                       <p className="home-tl-label">{task.label}</p>
                       <p className="home-tl-sub">{task.category}{task.time ? ` · ${task.time}` : ""}</p>
                     </div>
-                    <div className={`home-tl-check ${done ? "checked" : ""}`}>
-                      {done && <Check size={11} color="#071B13" strokeWidth={2.5} />}
-                    </div>
-                    <ChevronRight size={14} color="rgba(159,232,112,0.45)" strokeWidth={1.5} className="home-tl-chevron" />
+                    <img src={iconChevron} alt="" className="home-tl-chevron-img" />
                   </button>
                 </div>
               );
@@ -233,7 +211,7 @@ export default function Home() {
             <p className="home-progress-headline">You're doing great!</p>
             <p className="home-progress-body">Keep going, small steps create big changes.</p>
             <div className="home-progress-tip">
-              <Leaf size={12} color="#9FE870" strokeWidth={1.5} />
+              <img src={iconLeaf} alt="" className="home-tip-icon" />
               <span>{tip.title}</span>
             </div>
           </div>
@@ -248,7 +226,7 @@ export default function Home() {
             onClick={() => navigate(`${base}/chat`)}
           >
             Ask AI anything
-            <ChevronRight size={18} color="#071B13" strokeWidth={2.5} />
+            <img src={iconChevron} alt="" style={{ width: 18, height: 18, flexShrink: 0 }} />
           </button>
         </div>
 

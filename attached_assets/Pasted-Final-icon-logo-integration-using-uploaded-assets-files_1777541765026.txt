@@ -1,0 +1,162 @@
+Final icon + logo integration using uploaded assets (files already in project).
+
+IMPORTANT:
+All icons and logo have been uploaded into the project.
+You MUST import and use these exact files.
+
+---
+
+## ASSET LOCATION
+
+/assets/natura/
+natura-logo-icon.webp
+
+/assets/natura/icons/
+icon-leaf.webp
+icon-bowl.webp
+icon-lightning.webp
+icon-lotus.webp
+icon-flame.webp
+icon-clock.webp
+icon-check.webp
+icon-star.webp
+icon-chevron.webp
+
+---
+
+## GOAL
+
+* Replace ALL icons with these files
+* Use the real logo image (not text)
+* Remove all icon libraries and placeholders
+* Ensure consistent premium UI
+
+---
+
+1. IMPORT ASSETS (DO NOT SKIP)
+
+---
+
+Import all images at the top of the file, for example:
+
+import logoIcon from "@/assets/natura/natura-logo-icon.webp";
+import iconLeaf from "@/assets/natura/icons/icon-leaf.webp";
+import iconBowl from "@/assets/natura/icons/icon-bowl.webp";
+import iconLightning from "@/assets/natura/icons/icon-lightning.webp";
+import iconLotus from "@/assets/natura/icons/icon-lotus.webp";
+import iconFlame from "@/assets/natura/icons/icon-flame.webp";
+import iconClock from "@/assets/natura/icons/icon-clock.webp";
+import iconCheck from "@/assets/natura/icons/icon-check.webp";
+import iconStar from "@/assets/natura/icons/icon-star.webp";
+import iconChevron from "@/assets/natura/icons/icon-chevron.webp";
+
+---
+
+2. REMOVE ALL ICON LIBRARIES
+
+---
+
+Delete:
+
+* lucide-react
+* react-icons
+* any emoji icons
+* any previous icon components
+
+ONLY use the imported images.
+
+---
+
+3. HEADER LOGO (TOP LEFT)
+
+---
+
+Replace header with:
+
+<img src={logoIcon} />
+
+Style:
+
+* height: 30px
+* width: 30px
+* border-radius: 50%
+* aligned left of text
+
+---
+
+4. STAT ICONS (TOP ROW)
+
+---
+
+Use:
+
+* iconFlame → streak
+* iconClock → time
+* iconCheck → sessions
+* iconStar → score
+
+---
+
+5. TODAY’S PLAN ICONS
+
+---
+
+Use:
+
+* iconLeaf → Remedy
+* iconBowl → Recipe
+* iconLightning → Action
+* iconLotus → Wellness
+
+---
+
+6. CHEVRON ICON (ALL ROWS)
+
+---
+
+Use:
+
+<img src={iconChevron} />
+
+Position:
+
+* far right
+* vertically centered
+
+---
+
+7. ICON CONTAINER (ALL ICONS)
+
+---
+
+Wrap every icon in the SAME container:
+
+* circular
+* centered
+* subtle glow
+* consistent size
+
+---
+
+8. FINAL VALIDATION (REQUIRED)
+
+---
+
+Before completing:
+
+✔ Logo visible top left
+✔ All 9 icons used correctly
+✔ No old icons remain
+✔ Icons consistent in size/style
+✔ Chevron present on each row
+
+---
+
+## RESULT
+
+* Clean, premium UI
+* Consistent icon system
+* Proper branding
+* No fallback visuals
+
+Apply changes and reload preview.
