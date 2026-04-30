@@ -10,8 +10,9 @@ export const BG = {
 export function getBackgroundStyle(bgUrl: string): CSSProperties {
   return {
     backgroundImage: `
-      radial-gradient(circle at center, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.90) 70%),
-      linear-gradient(to bottom, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.85) 100%),
+      radial-gradient(circle at center, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.55) 70%),
+      linear-gradient(to bottom, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.50) 100%),
+      linear-gradient(to top right, rgba(80,255,150,0.08), transparent),
       url(${bgUrl})
     `,
     backgroundSize: "cover",
