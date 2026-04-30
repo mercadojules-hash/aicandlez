@@ -28,10 +28,12 @@ import imgDigPeppermint   from "@assets/digestion-peppermint-relief-tea-v1_17775
 import imgDigChamomile    from "@assets/natura-digestion-chamomile-bloating-relief-tea-v1_1777562671038.webp";
 import imgDigProbiotic    from "@assets/natura-digestion-green-probiotic-smoothie-v1_1777562671039.webp";
 
-import imgStressChamomile from "@assets/stress-chamomile-lemon-calm-tea-v1_1777562707376.webp";
-import imgStressLavender  from "@assets/stress-lavender-chamomile-relax-tea-v1_1777562707376.webp";
-import imgStressChocolate from "@assets/stress-dark-chocolate-energy-bites-v1_1777562707376.webp";
-import imgStressAdaptogen from "@assets/stress-turmeric-adaptogen-latte-v1_1777562707376.webp";
+import imgStressChamomile    from "@assets/stress-chamomile-lemon-calm-tea-v1_1777562707376.webp";
+import imgStressLavender     from "@assets/stress-lavender-chamomile-relax-tea-v1_1777562707376.webp";
+import imgStressChocolate    from "@assets/stress-dark-chocolate-energy-bites-v1_1777562707376.webp";
+import imgStressAdaptogen    from "@assets/stress-turmeric-adaptogen-latte-v1_1777562707376.webp";
+import imgStressAshwagandha  from "@assets/stress-ashwagandha-calm-latte-v1_1777562707375.webp";
+import imgStressOatBites     from "@assets/stress-oat-lavender-energy-bites-v1_1777562707376.webp";
 
 const DETAIL_IMAGES: Record<string, string> = {
   "remedy-ginger-tea":           imgGingerTea,
@@ -54,6 +56,8 @@ const DETAIL_IMAGES: Record<string, string> = {
   "recipe-stress-lavender":      imgStressLavender,
   "recipe-stress-chocolate":     imgStressChocolate,
   "recipe-stress-adaptogen":     imgStressAdaptogen,
+  "recipe-stress-ashwagandha":   imgStressAshwagandha,
+  "recipe-stress-oat-bites":     imgStressOatBites,
   "recipe-sleep-chamomile":      imgSleepChamomile,
   "recipe-sleep-lavender":       imgSleepLavender,
   "recipe-sleep-golden-rest":    imgSleepGoldenRest,
