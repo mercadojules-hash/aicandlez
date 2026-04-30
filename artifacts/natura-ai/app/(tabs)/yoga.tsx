@@ -76,7 +76,7 @@ export default function YogaScreen() {
               activeOpacity={0.88}
             >
               <Image
-                source={{ uri: pose.image }}
+                source={pose.image as any}
                 style={styles.cardImage}
                 resizeMode="cover"
               />

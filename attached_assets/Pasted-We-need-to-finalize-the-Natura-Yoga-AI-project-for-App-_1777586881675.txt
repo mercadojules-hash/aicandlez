@@ -1,0 +1,138 @@
+We need to finalize the Natura Yoga AI project for App Store submission.
+
+IMPORTANT: Do NOT break anything that is currently working.
+
+GOALS:
+1. Ensure ALL images are bundled locally (no external URLs)
+2. Ensure the app builds cleanly with Expo/EAS
+3. Remove any broken dependency issues (pnpm/catalog errors)
+4. Generate a clean production-ready ZIP
+5. Make the ZIP easily downloadable in the preview
+
+---
+
+STEP 1 — VERIFY LOCAL ASSETS
+
+- Scan the entire project for any image URLs (http/https)
+- Replace ALL external image URLs with local assets inside:
+
+  /assets/images/
+
+- Ensure ALL images are imported correctly in code, for example:
+  require('../assets/images/filename.png')
+
+- Confirm total images:
+  ✅ 61 images bundled locally
+
+---
+
+STEP 2 — FIX DEPENDENCIES (CRITICAL)
+
+- Remove node_modules completely
+- Remove package-lock.json, pnpm-lock.yaml, and any lock files
+
+- Ensure the project uses ONLY npm (NOT pnpm)
+
+- Clean package.json:
+  - Remove any "catalog:" references
+  - Remove any invalid or broken dependencies
+
+- Reinstall clean:
+
+  npm install
+
+- Confirm:
+  ✅ No install errors
+  ✅ No catalog errors
+  ✅ No unsupported protocol errors
+
+---
+
+STEP 3 — VALIDATE APP CONFIG
+
+Open app.json and confirm:
+
+- slug: "natura-yoga-ai"
+- scheme: "natura-yoga-ai"
+- ios.bundleIdentifier: "com.julesmercado.naturayogaai"
+- ios.buildNumber: increment to next version (ex: "4")
+
+Do NOT change anything else unless broken.
+
+---
+
+STEP 4 — TEST BUILD READINESS
+
+Run:
+
+npx expo start --clear
+
+Confirm:
+✅ No errors
+✅ Images load instantly (no delays)
+✅ App renders correctly
+
+---
+
+STEP 5 — CREATE CLEAN ZIP (VERY IMPORTANT)
+
+Create a new ZIP:
+
+natura-yoga-ai-v1.0.0-v3.zip
+
+ZIP must include:
+- app.json
+- package.json
+- all source code
+- /assets/images/ (ALL 61 images)
+
+ZIP must NOT include:
+- node_modules
+- .expo
+- cache files
+
+---
+
+STEP 6 — MOVE ZIP TO PUBLIC DOWNLOAD
+
+Place ZIP here:
+
+/public/natura-yoga-ai-v1.0.0-v3.zip
+
+---
+
+STEP 7 — UPDATE DOWNLOAD PAGE (CRITICAL UX)
+
+On /natura-web/download:
+
+- Place a LARGE green button at the VERY TOP (no scrolling)
+
+Button text:
+⬇ Download Natura Yoga AI (v1.0.0 v3)
+
+- Button must directly download the ZIP
+- Ensure it works in preview
+
+---
+
+STEP 8 — VERIFY EVERYTHING
+
+Confirm:
+
+✅ ZIP size ~30–35MB  
+✅ 61 images inside ZIP  
+✅ Folder structure is clean  
+✅ Download works instantly  
+✅ No missing files  
+
+---
+
+FINAL OUTPUT REQUIRED:
+
+- Provide direct download URL
+- Confirm image count
+- Confirm ZIP integrity
+- Confirm no dependency issues
+
+DO NOT SKIP ANY STEP
+DO NOT BREAK EXISTING FUNCTIONALITY

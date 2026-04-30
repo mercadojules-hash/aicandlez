@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "Natura AI",
-    "slug": "natura-ai",
+    "slug": "natura-yoga-ai",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/natura-app-icon.png",
-    "scheme": "natura-ai",
+    "scheme": "natura-yoga-ai",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -15,8 +15,8 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.naturaai.app",
-      "buildNumber": "1",
+      "bundleIdentifier": "com.julesmercado.naturayogaai",
+      "buildNumber": "4",
       "infoPlist": {
         "UIStatusBarStyle": "UIStatusBarStyleDarkContent",
         "NSPhotoLibraryUsageDescription": "Allow Natura AI to access your photo library to update your profile picture.",
