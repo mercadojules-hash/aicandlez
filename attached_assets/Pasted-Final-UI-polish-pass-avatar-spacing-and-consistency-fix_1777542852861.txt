@@ -1,0 +1,151 @@
+Final UI polish pass — avatar, spacing, and consistency fixes.
+
+IMPORTANT: This is NOT a redesign. Do NOT change layout.
+Only refine, align, and finalize visuals.
+
+--------------------------------------------------
+1. HEADER AVATAR (CRITICAL FIX)
+--------------------------------------------------
+
+We are providing a new default avatar asset.
+
+Use this asset:
+avatar-default.webp
+
+REQUIREMENTS:
+
+• Replace current profile placeholder with avatar-default.webp
+• Avatar must be perfectly circular
+• Size: 40px x 40px
+• Position: top-right corner
+• Add spacing from edge:
+  - margin-right: 12px
+  - margin-top: 8px
+
+STYLE (match premium UI):
+
+• Subtle glow:
+  box-shadow: 0 0 12px rgba(120,255,180,0.25)
+
+• Soft glass background behind avatar:
+  background: rgba(255,255,255,0.04)
+  backdrop-filter: blur(6px)
+  border-radius: 50%
+
+• Avatar should feel integrated, NOT floating awkwardly
+
+--------------------------------------------------
+2. HEADER BRAND ALIGNMENT (LEFT SIDE)
+--------------------------------------------------
+
+Ensure left header is clean and aligned:
+
+• Logo icon (natura-logo-icon.webp)
+• Text stack:
+    NATURA AI (white)
+    AI Wellness Coach (green)
+
+FIX:
+
+• Vertically center logo + text with avatar
+• Add spacing between logo and text: 8px
+• Ensure consistent padding top/bottom
+
+This row must feel balanced left ↔ right
+
+--------------------------------------------------
+3. ICON CONSISTENCY (FINAL PASS)
+--------------------------------------------------
+
+DO NOT change icons — they are correct now.
+
+But ensure consistency:
+
+• All icons use SAME glow intensity
+• All icons centered inside their containers
+• No icon appears larger/smaller than others
+
+Timeline icons:
+• Must be vertically centered inside circle
+• Equal padding on all sides
+
+--------------------------------------------------
+4. CARD / GLASS CONSISTENCY
+--------------------------------------------------
+
+Apply SAME glass effect everywhere:
+
+Cards must ALL use:
+
+background: rgba(0,0,0,0.25)
+backdrop-filter: blur(18px)
+border: 1px solid rgba(255,255,255,0.08)
+
+INNER BEVEL:
+inset 0 1px 2px rgba(255,255,255,0.15)
+
+OUTER DEPTH:
+0 12px 30px rgba(0,0,0,0.35)
+
+This must be consistent across:
+• Stats bar
+• Timeline cards
+• CTA card
+• Score card
+
+--------------------------------------------------
+5. CHEVRON ALIGNMENT (FINAL DETAIL)
+--------------------------------------------------
+
+Chevron icons (right side of each row):
+
+• Vertically centered EXACTLY
+• Size: 18px
+• Opacity: 0.7
+• Glow:
+  drop-shadow(0 0 6px rgba(120,255,180,0.25))
+
+Spacing:
+• margin-right: 12px
+
+--------------------------------------------------
+6. SPACING + RHYTHM FIX
+--------------------------------------------------
+
+Ensure consistent spacing:
+
+• Space between timeline cards: 10–12px
+• Padding inside cards: 14px
+• Section spacing (header → stats → plan): consistent
+
+Nothing should feel cramped or uneven
+
+--------------------------------------------------
+7. FINAL CHECK (VERY IMPORTANT)
+--------------------------------------------------
+
+DO NOT:
+• Change layout
+• Replace icons
+• Alter colors drastically
+
+ONLY:
+• Align
+• polish
+• refine
+
+--------------------------------------------------
+GOAL
+--------------------------------------------------
+
+The UI should feel:
+
+• Premium
+• Calm
+• Consistent
+• Balanced
+• App Store ready
+
+Everything should now match the same design system.
+
+--------------------------------------------------

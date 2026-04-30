@@ -8,6 +8,7 @@ import { ROUTINE_TASKS, getTodayTip } from "@/lib/data";
 import { BG, getBackgroundStyle } from "@/lib/background";
 
 import logoIcon     from "@assets/natura-logo-icon_1777541706005.webp";
+import avatarDefault from "@assets/avatar-default_1777542738312.webp";
 import iconFlame    from "@assets/icon-flame_1777541639916.webp";
 import iconClock    from "@assets/icon-clock_1777541639916.webp";
 import iconCheck    from "@assets/icon-check_1777541639915.webp";
@@ -33,16 +34,10 @@ const TASK_ICON: Record<string, string> = {
   "rt-7": iconLeaf,
 };
 
-function UserAvatar({ name }: { name: string }) {
-  const initial = name ? name[0].toUpperCase() : "U";
+function UserAvatar() {
   return (
-    <div className="home-avatar">
-      <svg viewBox="0 0 56 56" width="56" height="56">
-        <circle cx="28" cy="28" r="28" fill="#142A1C" />
-        <circle cx="28" cy="21" r="10" fill="#7CFFB2" opacity="0.85" />
-        <ellipse cx="28" cy="44" rx="16" ry="11" fill="#7CFFB2" opacity="0.45" />
-      </svg>
-      <span className="home-avatar-initial">{initial}</span>
+    <div className="home-avatar-wrap">
+      <img src={avatarDefault} alt="Profile" className="home-avatar-img" />
     </div>
   );
 }
@@ -138,7 +133,7 @@ export default function Home() {
               <p className="home-hero-subtitle">Personalized steps for your mind, body and energy</p>
             </div>
             <div className="home-hero-right">
-              <UserAvatar name={firstName} />
+              <UserAvatar />
             </div>
           </div>
           <div className="home-energy-badge">
