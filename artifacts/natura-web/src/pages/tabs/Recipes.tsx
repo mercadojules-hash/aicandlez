@@ -6,26 +6,71 @@ import { getBackgroundStyle, BG } from "@/lib/background";
 import { useWellness } from "@/contexts/WellnessContext";
 import { RECIPES } from "@/lib/data";
 
-import imgTurmeric  from "@assets/remedy-turmeric-golden-milk_1777546217701.webp";
-import imgGinger    from "@assets/remedy-ginger-tea_1777546217699.webp";
-import imgSmoothie  from "@assets/remedy-green-energy-smoothie_1777546217700.webp";
-import imgStress    from "@assets/natura-plan-stress-relief-v1_1777543715688.webp";
+import imgTurmeric        from "@assets/remedy-turmeric-golden-milk_1777546217701.webp";
+import imgGinger          from "@assets/remedy-ginger-tea_1777546217699.webp";
+import imgSmoothie        from "@assets/remedy-green-energy-smoothie_1777546217700.webp";
+import imgStress          from "@assets/natura-plan-stress-relief-v1_1777543715688.webp";
+
+import imgSleepBanana     from "@assets/recipe-sleep-banana-magnesium-smoothie_1777562671039.webp";
+import imgSleepChamomile  from "@assets/recipe-sleep-chamomile-honey-night-tea_1777562671040.webp";
+import imgSleepGoldenRest from "@assets/recipe-sleep-golden-milk-rest_1777562671040.webp";
+import imgSleepLavender   from "@assets/recipe-sleep-lavender-chamomile-tea_1777562671040.webp";
+import imgSleepMoonMilk   from "@assets/sleep-cinnamon-moon-milk-v1_1777562671040.webp";
+
+import imgEnergyChocolate from "@assets/energy-chocolate-coffee-protein-smoothie-v1_1777562671037.webp";
+import imgEnergyCitrus    from "@assets/energy-citrus-green-juice-v1._1777562671037.webp";
+import imgEnergyMatcha    from "@assets/energy-green-matcha-detox-smoothie-v1_1777562671038.webp";
+import imgEnergyTurmeric  from "@assets/energy-turmeric-ginger-lemon-elixir-v1_1777562671038.webp";
+import imgEnergyBowl      from "@assets/energy-superfood-green-smoothie-bowl-v1_1777562671038.webp";
+
+import imgDigFennel       from "@assets/natura-digestion-fennel-bloating-relief-tea-v1_1777562671039.webp";
+import imgDigGinger       from "@assets/digestion-soothing-ginger-tea-v1_1777562671037.webp";
+import imgDigPeppermint   from "@assets/digestion-peppermint-relief-tea-v1_1777562671037.webp";
+import imgDigChamomile    from "@assets/natura-digestion-chamomile-bloating-relief-tea-v1_1777562671038.webp";
+import imgDigProbiotic    from "@assets/natura-digestion-green-probiotic-smoothie-v1_1777562671039.webp";
+
+import imgStressChamomile from "@assets/stress-chamomile-lemon-calm-tea-v1_1777562707376.webp";
+import imgStressLavender  from "@assets/stress-lavender-chamomile-relax-tea-v1_1777562707376.webp";
+import imgStressChocolate from "@assets/stress-dark-chocolate-energy-bites-v1_1777562707376.webp";
+import imgStressAdaptogen from "@assets/stress-turmeric-adaptogen-latte-v1_1777562707376.webp";
 
 const RECIPE_IMAGES: Record<string, string> = {
-  "recipe-golden-milk":    imgTurmeric,
-  "recipe-immunity-broth": imgGinger,
-  "recipe-overnight-oats": imgSmoothie,
-  "recipe-antistress-salad": imgStress,
+  "recipe-golden-milk":         imgTurmeric,
+  "recipe-immunity-broth":      imgGinger,
+  "recipe-immunity-elderberry":  imgGinger,
+  "recipe-immunity-citrus-shot": imgTurmeric,
+  "recipe-immunity-green-bowl":  imgEnergyBowl,
+  "recipe-overnight-oats":      imgSmoothie,
+  "recipe-energy-citrus":        imgEnergyCitrus,
+  "recipe-energy-matcha":        imgEnergyMatcha,
+  "recipe-energy-turmeric":      imgEnergyTurmeric,
+  "recipe-energy-chocolate":     imgEnergyChocolate,
+  "recipe-antistress-salad":    imgStress,
+  "recipe-stress-chamomile":    imgStressChamomile,
+  "recipe-stress-lavender":     imgStressLavender,
+  "recipe-stress-chocolate":    imgStressChocolate,
+  "recipe-stress-adaptogen":    imgStressAdaptogen,
+  "recipe-sleep-chamomile":     imgSleepChamomile,
+  "recipe-sleep-lavender":      imgSleepLavender,
+  "recipe-sleep-golden-rest":   imgSleepGoldenRest,
+  "recipe-sleep-banana":        imgSleepBanana,
+  "recipe-sleep-moon-milk":     imgSleepMoonMilk,
+  "recipe-digestion-fennel":    imgDigFennel,
+  "recipe-digestion-ginger":    imgDigGinger,
+  "recipe-digestion-peppermint": imgDigPeppermint,
+  "recipe-digestion-chamomile":  imgDigChamomile,
+  "recipe-digestion-probiotic":  imgDigProbiotic,
 };
 
 const GOAL_COLORS: Record<string, string> = {
-  immunity: "#4CAF7D",
-  energy:   "#9FE870",
-  stress:   "#F5A623",
-  sleep:    "#8B7FD4",
+  immunity:  "#4CAF7D",
+  energy:    "#9FE870",
+  stress:    "#F5A623",
+  sleep:     "#8B7FD4",
+  digestion: "#45B7AA",
 };
 
-const FILTERS = ["All", "stress", "sleep", "energy", "immunity"] as const;
+const FILTERS = ["All", "sleep", "stress", "energy", "digestion", "immunity"] as const;
 type Tab = "Recipes" | "Grocery List";
 
 export default function Recipes() {

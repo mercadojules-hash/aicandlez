@@ -1,0 +1,171 @@
+We are now integrating real recipe images into the Recipes system.
+
+GOAL:
+Map 25 local .webp images to recipe cards and detail pages using a clean, scalable structure.
+
+-----------------------------------
+1. IMAGE SOURCE (IMPORTANT)
+-----------------------------------
+
+All images are stored locally inside:
+
+/assets/recipes/
+
+Each image follows this naming pattern:
+
+natura-[category]-[recipe-name]-v1.webp
+
+Examples:
+- natura-sleep-chamomile-honey-night-tea-v1.webp
+- natura-stress-magnesium-cacao-relax-drink-v1.webp
+- natura-energy-citrus-green-juice-v1.webp
+- natura-digestion-fennel-bloating-relief-tea-v1.webp
+- natura-immunity-turmeric-ginger-shot-v1.webp
+
+-----------------------------------
+2. UPDATE RECIPE DATA STRUCTURE
+-----------------------------------
+
+Update the recipe data model to include:
+
+{
+  id: string,
+  title: string,
+  category: 'sleep' | 'stress' | 'energy' | 'digestion' | 'immunity',
+  duration: string,
+  description: string,
+  image: require('...') OR local URI
+}
+
+IMPORTANT:
+Use LOCAL images only (no remote URLs)
+
+-----------------------------------
+3. CREATE CATEGORY DISTRIBUTION
+-----------------------------------
+
+Ensure EACH category has at least 3–6 recipes:
+
+Sleep:
+- Chamomile Honey Night Tea
+- Lavender Evening Tea
+- Warm Almond Nutmeg Milk
+- (add remaining sleep images)
+
+Stress:
+- Magnesium Cacao Drink
+- Ashwagandha Calm Tonic
+- Lemon Balm Relax Tea
+- (add remaining)
+
+Energy:
+- Citrus Green Juice
+- Adaptogenic Overnight Oats
+- Matcha Focus Latte
+- (add remaining)
+
+Digestion:
+- Fennel Bloating Relief Tea
+- Ginger Digestive Tea
+- Detox Cilantro Cleanse Tea
+- (add remaining)
+
+Immunity:
+- Turmeric Golden Latte
+- Herbal Immunity Broth
+- Ginger Lemon Shot
+- (add remaining)
+
+-----------------------------------
+4. MAP IMAGES TO RECIPES
+-----------------------------------
+
+Each recipe MUST map to its correct image:
+
+Example:
+
+image: require('../../assets/recipes/natura-sleep-chamomile-honey-night-tea-v1.webp')
+
+OR if using Expo:
+
+image: require('@/assets/recipes/...')
+
+-----------------------------------
+5. UPDATE RECIPE CARDS (CRITICAL)
+-----------------------------------
+
+Each recipe card MUST:
+
+- Use image as FULL background
+- Use:
+  background-size: cover
+  background-position: center
+
+- Add bottom gradient overlay:
+  linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.2))
+
+- Text sits ON TOP of image (not below)
+
+Card layout:
+
+[IMAGE BACKGROUND]
+  [Category badge]
+  [Duration]
+  [Title]
+  [Short description]
+
+-----------------------------------
+6. UPDATE RECIPE DETAIL SCREEN
+-----------------------------------
+
+Each recipe detail page MUST:
+
+- Use SAME image as hero background
+- Apply:
+  full-bleed image (top 260–300px)
+  glass overlay content panel
+
+- Ensure:
+  title is fully visible (no clipping)
+  scroll works correctly
+  contrast is readable
+
+-----------------------------------
+7. FALLBACK SAFETY (IMPORTANT)
+-----------------------------------
+
+If image fails to load:
+
+- Show soft gradient fallback
+- DO NOT break layout
+
+-----------------------------------
+8. PERFORMANCE
+-----------------------------------
+
+- Use optimized .webp only
+- No large uncompressed images
+- Lazy load if needed
+
+-----------------------------------
+9. FINAL CHECK
+-----------------------------------
+
+Verify:
+
+- All 25 images appear correctly
+- No empty categories
+- No missing images
+- Text readable on all cards
+- Scroll works on detail pages
+
+-----------------------------------
+END GOAL
+-----------------------------------
+
+Recipes page should feel like:
+
+🔥 Premium wellness app
+🔥 Image-driven experience
+🔥 Consistent with Natura brand
+🔥 App Store ready
