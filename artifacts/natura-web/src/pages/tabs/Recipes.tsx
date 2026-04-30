@@ -84,12 +84,11 @@ export default function Recipes() {
                       className="recipe-feature-card"
                       onClick={() => navigate(`${base}/remedy/${recipe.id}`)}
                     >
-                      {/* Image hero */}
                       <div
                         className="recipe-card-hero"
                         style={{
                           backgroundImage: img
-                            ? `linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.55)),
+                            ? `linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.88) 100%),
                                radial-gradient(circle at top right, rgba(120,255,180,0.12), transparent 60%),
                                url(${img})`
                             : `linear-gradient(135deg, rgba(20,80,50,0.9), rgba(10,40,25,0.95))`,
@@ -97,43 +96,46 @@ export default function Recipes() {
                           backgroundPosition: "center",
                         }}
                       >
-                        <span
-                          className="recipe-hero-badge"
-                          style={{ color: goalColor, background: goalColor + "22", borderColor: goalColor + "55" }}
-                        >
-                          {recipe.category.toUpperCase()}
-                        </span>
-                        <div className="recipe-hero-actions" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            className="recipe-hero-btn"
-                            title="Add to grocery list"
-                            onClick={(e) => { e.stopPropagation(); addToGrocery(recipe.groceryList); }}
-                          >
-                            <ShoppingCart size={15} color="rgba(255,255,255,0.85)" />
-                          </button>
-                          <button
-                            className={`recipe-hero-btn ${saved ? "saved" : ""}`}
-                            title={saved ? "Saved" : "Save recipe"}
-                            onClick={(e) => { e.stopPropagation(); saved ? removeItem(recipe.id) : saveItem({ id: recipe.id, type: "recipe", title: recipe.title, savedAt: new Date().toISOString() }); }}
-                          >
-                            <Bookmark size={15} fill={saved ? "#7CFFB2" : "none"} color={saved ? "#7CFFB2" : "rgba(255,255,255,0.85)"} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Card body */}
-                      <div className="recipe-card-body">
-                        <div className="recipe-card-meta">
-                          <span className="recipe-time-badge">⏱ {recipe.prepTime}</span>
+                        {/* top row: badge + actions */}
+                        <div className="recipe-hero-top">
                           <span
-                            className="recipe-goal-pill"
-                            style={{ color: goalColor, background: goalColor + "18", borderColor: goalColor + "44" }}
+                            className="recipe-hero-badge"
+                            style={{ color: goalColor, background: goalColor + "22", borderColor: goalColor + "55" }}
                           >
-                            {recipe.goal}
+                            {recipe.category.toUpperCase()}
                           </span>
+                          <div className="recipe-hero-actions" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              className="recipe-hero-btn"
+                              title="Add to grocery list"
+                              onClick={(e) => { e.stopPropagation(); addToGrocery(recipe.groceryList); }}
+                            >
+                              <ShoppingCart size={15} color="rgba(255,255,255,0.85)" />
+                            </button>
+                            <button
+                              className={`recipe-hero-btn ${saved ? "saved" : ""}`}
+                              title={saved ? "Saved" : "Save recipe"}
+                              onClick={(e) => { e.stopPropagation(); saved ? removeItem(recipe.id) : saveItem({ id: recipe.id, type: "recipe", title: recipe.title, savedAt: new Date().toISOString() }); }}
+                            >
+                              <Bookmark size={15} fill={saved ? "#7CFFB2" : "none"} color={saved ? "#7CFFB2" : "rgba(255,255,255,0.85)"} />
+                            </button>
+                          </div>
                         </div>
-                        <p className="recipe-card-title">{recipe.title}</p>
-                        <p className="recipe-card-desc">{recipe.description}</p>
+
+                        {/* bottom row: meta + title + desc ON the image */}
+                        <div className="recipe-hero-bottom">
+                          <div className="recipe-card-meta">
+                            <span className="recipe-time-badge">⏱ {recipe.prepTime}</span>
+                            <span
+                              className="recipe-goal-pill"
+                              style={{ color: goalColor, background: goalColor + "18", borderColor: goalColor + "44" }}
+                            >
+                              {recipe.goal}
+                            </span>
+                          </div>
+                          <p className="recipe-card-title">{recipe.title}</p>
+                          <p className="recipe-card-desc">{recipe.description}</p>
+                        </div>
                       </div>
                     </div>
                   );

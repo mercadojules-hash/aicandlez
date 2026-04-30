@@ -850,6 +850,7 @@ a { color: inherit; text-decoration: none; }
 
 /* Plan cards */
 .plan-card {
+  position: relative;
   background: rgba(0,0,0,0.25);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 20px;
@@ -863,30 +864,46 @@ a { color: inherit; text-decoration: none; }
 .plan-card:active { transform: scale(0.98); }
 .plan-card { box-shadow: inset 0 1px 2px rgba(255,255,255,0.15), 0 12px 30px rgba(0,0,0,0.35); }
 .plan-card-img {
-  height: 140px; overflow: hidden; flex-shrink: 0;
+  height: 200px; overflow: hidden; flex-shrink: 0;
   position: relative;
 }
 .plan-card-img::after {
   content: "";
   position: absolute; inset: 0;
   background:
-    radial-gradient(circle at top left, rgba(255,255,255,0.08), transparent 60%),
-    linear-gradient(to bottom, rgba(0,0,0,0.05), rgba(0,0,0,0.45)),
-    radial-gradient(circle at top right, rgba(120,255,180,0.10), transparent 60%);
+    linear-gradient(to bottom,
+      rgba(0,0,0,0.12) 0%,
+      rgba(0,0,0,0.35) 50%,
+      rgba(0,0,0,0.82) 100%),
+    radial-gradient(circle at top right, rgba(120,255,180,0.1), transparent 55%);
   pointer-events: none;
 }
-.plan-card-body { padding: 16px; }
-.plan-card-row1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.plan-goal-badge {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.06em; color: var(--primary);
-  background: rgba(120,255,180,0.15);
-  border: 1px solid rgba(120,255,180,0.4);
-  padding: 4px 10px; border-radius: 999px;
+.plan-card-body {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 16px 18px 18px;
+  z-index: 2;
 }
-.plan-card-title { font-size: 17px; font-weight: 600; color: #ffffff; margin-bottom: 6px; }
-.plan-card-sub { font-size: 13px; color: var(--muted-fg); line-height: 1.4; margin-bottom: 10px; opacity: 0.75; }
-.plan-card-meta { display: flex; gap: 16px; font-size: 12px; color: var(--muted-fg); opacity: 0.7; }
+.plan-card-row1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.plan-goal-badge {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--primary);
+  background: rgba(120,255,180,0.18);
+  border: 1px solid rgba(120,255,180,0.45);
+  padding: 3px 10px; border-radius: 999px;
+}
+.plan-card-title {
+  font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 5px;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+  line-height: 1.25;
+}
+.plan-card-sub {
+  font-size: 13px; color: rgba(255,255,255,0.72); line-height: 1.4; margin-bottom: 8px;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+.plan-card-meta {
+  display: flex; gap: 14px; font-size: 11px;
+  color: rgba(255,255,255,0.55);
+}
 
 .saved-group-label { font-size: 16px; font-weight: 600; color: #ffffff; padding: 8px 20px 12px; opacity: 0.85; }
 
@@ -925,6 +942,7 @@ a { color: inherit; text-decoration: none; }
 .recipe-list::-webkit-scrollbar { display: none; }
 
 .recipe-feature-card {
+  flex-shrink: 0;
   border-radius: 20px; overflow: hidden; cursor: pointer;
   background: rgba(0,0,0,0.35);
   border: 1px solid rgba(255,255,255,0.07);
@@ -934,9 +952,12 @@ a { color: inherit; text-decoration: none; }
 .recipe-feature-card:active { transform: scale(0.98); box-shadow: 0 6px 18px rgba(0,0,0,0.3); }
 
 .recipe-card-hero {
-  position: relative; height: 180px;
+  position: relative; height: 220px;
+}
+.recipe-hero-top {
+  position: absolute; top: 14px; left: 14px; right: 14px;
   display: flex; align-items: flex-start; justify-content: space-between;
-  padding: 14px 14px;
+  z-index: 2;
 }
 .recipe-hero-badge {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
@@ -956,15 +977,31 @@ a { color: inherit; text-decoration: none; }
 .recipe-hero-btn:active { opacity: 0.7; transform: scale(0.93); }
 .recipe-hero-btn.saved { background: rgba(120,255,180,0.15); border-color: rgba(120,255,180,0.3); }
 
-.recipe-card-body { padding: 14px 16px 16px; }
-.recipe-card-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.recipe-time-badge { font-size: 11px; color: rgba(255,255,255,0.5); font-weight: 500; }
+/* text panel pinned to bottom of image */
+.recipe-hero-bottom {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  z-index: 2;
+  display: flex; flex-direction: column; gap: 4px;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.2) 70%, transparent 100%);
+  padding: 24px 14px 14px;
+}
+.recipe-card-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.recipe-time-badge { font-size: 11px; color: rgba(255,255,255,0.6); font-weight: 500; }
 .recipe-goal-pill {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
   padding: 3px 9px; border-radius: 999px; border: 1px solid;
 }
-.recipe-card-title { font-size: 16px; font-weight: 700; color: #ffffff; line-height: 1.35; margin-bottom: 5px; }
-.recipe-card-desc { font-size: 13px; color: rgba(255,255,255,0.55); line-height: 1.5; }
+.recipe-card-title {
+  font-size: 17px; font-weight: 700; color: #ffffff;
+  line-height: 1.3; margin: 0;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.65);
+}
+.recipe-card-desc {
+  font-size: 12px; color: rgba(255,255,255,0.65); line-height: 1.45; margin: 0;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
 
 /* Recipe empty state */
 .recipe-empty-state {
