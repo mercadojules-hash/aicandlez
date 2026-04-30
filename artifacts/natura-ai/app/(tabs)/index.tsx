@@ -29,10 +29,10 @@ const LOGO_URL = "https://apexdigital.design/wp-content/uploads/2026/04/natura-l
 
 const SLIDER_W = width - spacing.md * 2;
 
-const SLIDES = [
-  { id: "1", uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-home-slide-1.webp" },
-  { id: "2", uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-home-slide-2.webp" },
-  { id: "3", uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-home-slide-3.webp" },
+const SLIDES: { id: string; source: number | { uri: string } }[] = [
+  { id: "1", source: { uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-home-slide-1.webp" } },
+  { id: "2", source: require("../../assets/images/natura-splash-page-2.png") },
+  { id: "3", source: { uri: "https://apexdigital.design/wp-content/uploads/2026/04/natura-home-slide-3.webp" } },
 ];
 
 function HomeSlider() {
@@ -63,7 +63,7 @@ function HomeSlider() {
       >
         {SLIDES.map((slide) => (
           <View key={slide.id} style={sliderStyles.slide}>
-            <Image source={{ uri: slide.uri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+            <Image source={slide.source as any} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
             <LinearGradient
               colors={["transparent", "rgba(4,14,8,0.65)"]}
               style={StyleSheet.absoluteFillObject}
