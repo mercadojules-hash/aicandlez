@@ -1,0 +1,194 @@
+Fix incomplete UI upgrade. Current implementation did NOT apply premium icon styling, bevel/glass effect, or header branding correctly.
+
+GOAL:
+
+* Match premium UI exactly (glass, glow, bevel feel)
+* Replace ALL icons in Today's Plan section
+* Add Natura AI logo correctly in header
+* Fix stat icons (5 day streak, time, sessions, score)
+* Ensure visual consistency across all elements
+
+DO NOT:
+
+* Leave any old icons
+* Mix icon styles
+* Skip any section
+
+---
+
+1. ADD LOGO + HEADER TEXT (CRITICAL)
+
+---
+
+TOP LEFT HEADER MUST BE:
+
+[ Natura AI LOGO ]  Natura AI
+AI Wellness Coach
+
+REQUIREMENTS:
+
+* USE actual Natura AI logo image (not placeholder, not icon)
+* Logo size: ~28px height
+* Place LEFT of text (horizontal layout)
+
+TEXT STYLING:
+
+"NATURA AI"
+
+* Color: WHITE (#FFFFFF)
+* Font weight: semi-bold
+
+"AI WELLNESS COACH"
+
+* Color: green (#9FE870 or similar)
+* Font size: smaller subtitle
+* Slight letter spacing
+
+Spacing:
+
+* Logo and text: 8–10px
+* Subtitle sits directly under "NATURA AI"
+
+---
+
+2. REPLACE ALL STAT ICONS (TOP ROW)
+
+---
+
+Current icons are not premium. Replace ALL:
+
+* 5 day streak → use clean flame icon (NOT emoji)
+* Time → clean clock icon
+* Sessions → check circle icon
+* Score → star icon
+
+STYLE:
+
+* Thin stroke OR minimal fill
+* Color: soft green (#9FE870)
+* NO emoji icons
+
+---
+
+3. APPLY CIRCULAR ICON CONTAINERS (VERY IMPORTANT)
+
+---
+
+ALL stat icons must be inside circles:
+
+Style:
+
+* background: rgba(255,255,255,0.05)
+* border-radius: 50%
+* subtle glow:
+  box-shadow: 0 0 12px rgba(120,255,180,0.15)
+
+This is REQUIRED for:
+
+* stat icons
+* timeline icons
+
+---
+
+4. FIX TODAY’S PLAN ICONS (CURRENTLY WRONG)
+
+---
+
+The icons inside each row (leaf, food, lightning, lotus) are still basic.
+
+UPGRADE THEM:
+
+* Replace with cleaner, modern icons
+* Same stroke width across all
+* Same green color system
+
+Each icon must be inside a glowing circular container (same style as above)
+
+---
+
+5. ADD RIGHT CHEVRON ARROWS (MUST MATCH DESIGN)
+
+---
+
+Every row must have:
+
+ChevronRight icon (›)
+
+Apply to:
+
+* Green Energy Matcha
+* Oats Bowl
+* Walk after lunch
+* Evening mindfulness
+
+STYLE:
+
+* Small
+* Light green / gray
+* Vertically centered
+* Positioned far right
+
+---
+
+6. ADD GLASS / BEVEL EFFECT TO CARDS (CRITICAL VISUAL FIX)
+
+---
+
+Right now cards are flat. Upgrade them.
+
+ALL cards must have:
+
+* background: rgba(0,0,0,0.25)
+* backdrop-filter: blur(12px)
+* border-radius: 20px
+
+ADD subtle inner highlight:
+
+* border: 1px solid rgba(255,255,255,0.08)
+
+ADD glow:
+
+* box-shadow: 0 10px 30px rgba(0,0,0,0.3)
+
+This creates the "premium glass / bevel" look.
+
+---
+
+7. FIX ENERGY PILL (TOP RIGHT)
+
+---
+
+Make "Energy Good" look premium:
+
+* Gradient background (green → lighter green)
+* Soft glow
+* Rounded pill
+* Thin border
+
+---
+
+8. ENSURE CONSISTENCY
+
+---
+
+ALL icons must:
+
+* Match in thickness
+* Match in color
+* Match in glow
+
+NO mismatched icons allowed.
+
+---
+
+## FINAL RESULT MUST:
+
+* Look like premium Apple/Headspace UI
+* Have visible glow + depth
+* Have clean icons (no emojis)
+* Show logo clearly in header
+* Have consistent icon containers
+
+If any section still uses old icons or flat styling, fix it before completing.
+
+Apply changes and reload preview.

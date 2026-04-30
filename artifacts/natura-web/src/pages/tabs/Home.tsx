@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, Clock, Star, Check, ShoppingCart, Leaf, Sun, Moon, Coffee, ChevronRight } from "lucide-react";
+import { Flame, Clock, Star, Check, CheckCircle2, ShoppingCart, Leaf, Sun, Moon, Coffee, ChevronRight } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
@@ -15,7 +15,7 @@ const ALL_TASKS = [...MORNING, ...AFTERNOON, ...EVENING];
 function NaturaMark() {
   return (
     <div className="home-brand-row">
-      <svg width="22" height="28" viewBox="0 0 44 56" fill="none">
+      <svg width="24" height="30" viewBox="0 0 44 56" fill="none">
         <path
           d="M22 52C22 52 10 38 10 26C10 16.6 15.4 8.8 22 6C28.6 8.8 34 16.6 34 26C34 38 22 52 22 52Z"
           fill="url(#markGrad)"
@@ -30,7 +30,10 @@ function NaturaMark() {
           </linearGradient>
         </defs>
       </svg>
-      <span className="home-brand-name">NATURA AI</span>
+      <div className="home-brand-text">
+        <span className="home-brand-name">NATURA AI</span>
+        <span className="home-brand-sub">AI Wellness Coach</span>
+      </div>
     </div>
   );
 }
@@ -140,7 +143,7 @@ export default function Home() {
             </div>
           </div>
           <div className="home-energy-badge">
-            <Zap size={12} color="#9FE870" fill="#9FE870" />
+            <Flame size={12} color="#9FE870" fill="#9FE870" strokeWidth={1.5} />
             <span>Energy: Good</span>
           </div>
         </div>
@@ -148,10 +151,10 @@ export default function Home() {
         {/* ── 2. STATS BAR ─────────────────────────────────────────── */}
         <div className="home-stats-bar">
           {[
-            { icon: <Zap size={17} color="#9FE870" strokeWidth={1.5} />,   value: `${displayStreak}`, label: "day streak" },
-            { icon: <Clock size={17} color="#9FE870" strokeWidth={1.5} />,  value: "32",               label: "min today"  },
-            { icon: <Check size={17} color="#9FE870" strokeWidth={1.8} />,  value: `${completedCount}`, label: "sessions"  },
-            { icon: <Star size={17}  color="#9FE870" strokeWidth={1.5} />,  value: `${wellnessScore}`,  label: "score"     },
+            { icon: <Flame       size={17} color="#9FE870" strokeWidth={1.5} />, value: `${displayStreak}`,  label: "day streak" },
+            { icon: <Clock       size={17} color="#9FE870" strokeWidth={1.5} />, value: "32",                label: "min today"  },
+            { icon: <CheckCircle2 size={17} color="#9FE870" strokeWidth={1.5} />, value: `${completedCount}`, label: "sessions"   },
+            { icon: <Star        size={17} color="#9FE870" strokeWidth={1.5} />, value: `${wellnessScore}`,  label: "score"      },
           ].map(({ icon, value, label }, i) => (
             <div key={i} className="home-stat-item">
               <div className="home-stat-icon">{icon}</div>
