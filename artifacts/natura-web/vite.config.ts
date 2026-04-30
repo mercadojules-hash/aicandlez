@@ -33,13 +33,20 @@ export default defineConfig({
     {
       name: "serve-zip-download",
       configureServer(server) {
-        const zipPath = path.resolve(import.meta.dirname, "public/natura-ai.zip");
+        const zips: Record<string, string> = {
+          "/natura-ai.zip": path.resolve(import.meta.dirname, "public/natura-ai.zip"),
+          "/natura-yoga-ai-v1.0.0.zip": path.resolve(import.meta.dirname, "public/natura-yoga-ai-v1.0.0.zip"),
+        };
         server.middlewares.use((req, res, next) => {
-          if (req.url?.endsWith("/natura-ai.zip")) {
+          const urlPath = req.url?.split("?")[0] ?? "";
+          const matched = Object.keys(zips).find((k) => urlPath.endsWith(k));
+          if (matched) {
+            const filePath = zips[matched];
+            const filename = path.basename(filePath);
             res.setHeader("Content-Type", "application/zip");
-            res.setHeader("Content-Disposition", 'attachment; filename="natura-ai.zip"');
-            res.setHeader("Content-Length", String(fs.statSync(zipPath).size));
-            fs.createReadStream(zipPath).pipe(res);
+            res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+            res.setHeader("Content-Length", String(fs.statSync(filePath).size));
+            fs.createReadStream(filePath).pipe(res);
             return;
           }
           next();

@@ -16,6 +16,7 @@ import RemedyDetail from "@/pages/RemedyDetail";
 import PlanDetail from "@/pages/PlanDetail";
 import PreviewWellnessScreen from "@/pages/PreviewWellnessScreen";
 import UpgradeScreen from "@/pages/UpgradeScreen";
+import Download from "@/pages/Download";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -40,6 +41,7 @@ function AppRoutes() {
       <Route path={`${base}/remedy/:id`} element={<RemedyDetail />} />
       <Route path={`${base}/plan/:id`}   element={<PlanDetail />} />
       <Route path={`${base}/upgrade`}    element={<UpgradeScreen />} />
+      <Route path={`${base}/download`}   element={<Download />} />
       <Route path="*" element={<Navigate to={`${base}/home`} replace />} />
     </Routes>
   );
