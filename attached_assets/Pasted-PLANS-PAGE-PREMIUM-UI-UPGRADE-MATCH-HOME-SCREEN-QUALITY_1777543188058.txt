@@ -1,0 +1,154 @@
+PLANS PAGE — PREMIUM UI UPGRADE (MATCH HOME SCREEN QUALITY)
+
+This is a visual upgrade ONLY.
+Do NOT change layout or content structure.
+
+--------------------------------------------------
+1. HEADER AREA (TOP)
+--------------------------------------------------
+
+Current header "Wellness Plans" feels flat.
+
+UPDATE:
+
+• Add soft top lighting effect:
+    radial-gradient(circle at top right, rgba(120,255,180,0.18), transparent 60%)
+
+• Title styling:
+    color: #ffffff
+    font-weight: 600
+    letter-spacing: -0.3px
+
+• Subtitle (if present):
+    opacity: 0.7
+
+GOAL:
+Header should feel alive, not static
+
+--------------------------------------------------
+2. TAB BAR (Plans / Remedies / Saved)
+--------------------------------------------------
+
+Upgrade tabs to glass segmented control:
+
+• Background:
+    rgba(255,255,255,0.05)
+
+• Active tab:
+    background: rgba(120,255,180,0.15)
+    border: 1px solid rgba(120,255,180,0.4)
+    box-shadow: 0 0 12px rgba(120,255,180,0.25)
+
+• Inactive tabs:
+    opacity: 0.6
+
+• Border radius: 999px (pill style)
+
+--------------------------------------------------
+3. PLAN CARDS (CRITICAL)
+--------------------------------------------------
+
+All cards MUST match Home screen glass style:
+
+Apply:
+
+background: rgba(0,0,0,0.25)
+backdrop-filter: blur(18px)
+border: 1px solid rgba(255,255,255,0.08)
+
+INNER BEVEL:
+inset 0 1px 2px rgba(255,255,255,0.15)
+
+OUTER SHADOW:
+0 12px 30px rgba(0,0,0,0.35)
+
+--------------------------------------------------
+4. CARD TOP IMAGE AREA
+--------------------------------------------------
+
+Currently looks like a flat color block.
+
+FIX:
+
+• Add subtle glow overlay:
+    linear-gradient(to bottom, rgba(120,255,180,0.12), transparent)
+
+• Add soft vignette:
+    darken edges slightly
+
+• Keep icon centered but add glow:
+    drop-shadow(0 0 10px rgba(120,255,180,0.4))
+
+GOAL:
+Feels like a premium featured card, not a placeholder
+
+--------------------------------------------------
+5. CARD CONTENT (TEXT + META)
+--------------------------------------------------
+
+Title:
+• White
+• Slightly larger
+• font-weight: 600
+
+Category tags (STRESS, SLEEP):
+• Pill style
+• background: rgba(120,255,180,0.15)
+• border: 1px solid rgba(120,255,180,0.4)
+
+Meta info (days, duration):
+• opacity: 0.7
+• consistent spacing
+
+--------------------------------------------------
+6. BOOKMARK ICON (TOP RIGHT OF CARD)
+--------------------------------------------------
+
+Fix alignment + style:
+
+• Place inside circular container
+• Size: 28px container
+• Center icon perfectly
+
+Style:
+background: rgba(255,255,255,0.05)
+border-radius: 50%
+
+Active state:
+• Glow green
+• Slight scale-up (1.1)
+
+--------------------------------------------------
+7. CARD SPACING (VERY IMPORTANT)
+--------------------------------------------------
+
+• Space between cards: 14px
+• Padding inside cards: 16px
+
+Everything should breathe more
+
+--------------------------------------------------
+8. SCROLL FEEL
+--------------------------------------------------
+
+Ensure smooth scrolling:
+
+• No clipping of shadows
+• Cards should feel like floating layers
+
+--------------------------------------------------
+GOAL
+--------------------------------------------------
+
+Plans page must now match Home screen quality:
+
+• Same glass system
+• Same glow language
+• Same depth
+• Same premium feel
+
+It should feel like:
+👉 one unified design system
+👉 not a separate screen
+
+--------------------------------------------------
