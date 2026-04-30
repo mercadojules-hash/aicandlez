@@ -4,6 +4,7 @@ import { Bookmark, ShoppingCart, Trash2, Check } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { useWellness } from "@/contexts/WellnessContext";
 import { RECIPES } from "@/lib/data";
+import { CardImage } from "@/components/CardImage";
 
 const FILTERS = ["All", "stress", "sleep", "energy", "immunity"] as const;
 type Tab = "Recipes" | "Grocery List";
@@ -51,9 +52,7 @@ export default function Recipes() {
                   const saved = isSaved(recipe.id);
                   return (
                     <div key={recipe.id} className="recipe-card" onClick={() => navigate(`${base}/remedy/${recipe.id}`)}>
-                      <div className={`recipe-card-img img-${recipe.imageKey}`}>
-                        <span className="plan-card-emoji">{recipe.imageKey === "tea" ? "🍵" : recipe.imageKey === "herbs" ? "🌿" : "🥣"}</span>
-                      </div>
+                      <CardImage src={recipe.image} alt={recipe.title} className="recipe-card-img" fallbackHint={recipe.category} />
                       <div className="recipe-card-body">
                         <div className="plan-card-row1">
                           <span className="recipe-goal-badge">{recipe.category} · {recipe.prepTime}</span>

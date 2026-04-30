@@ -9,6 +9,7 @@ export default function PlanDetail() {
   const { saveItem, removeItem, isSaved, addToGrocery } = useWellness();
   const navigate = useNavigate();
   const [activeDay, setActiveDay] = useState(0);
+  const [heroFailed, setHeroFailed] = useState(false);
 
   const plan = PLANS.find((p) => p.id === id);
   if (!plan) return (
@@ -23,7 +24,17 @@ export default function PlanDetail() {
 
   return (
     <div className="detail-screen">
-      <div className={`detail-hero img-${plan.imageKey}`}>
+      <div className="detail-hero">
+        {!heroFailed && plan.image ? (
+          <img
+            src={plan.image}
+            alt={plan.title}
+            className="detail-hero-img"
+            onError={() => setHeroFailed(true)}
+          />
+        ) : (
+          <div className="detail-hero-fallback" />
+        )}
         <div className="detail-hero-overlay">
           <button className="detail-back-btn" onClick={() => navigate(-1)}>
             <ChevronLeft size={24} color="#fff" />
@@ -39,9 +50,6 @@ export default function PlanDetail() {
               <Bookmark size={20} fill={saved ? "#fff" : "none"} color="#fff" />
             </button>
           </div>
-        </div>
-        <div className="detail-hero-content">
-          <span className="detail-hero-emoji">{plan.imageKey === "tea" ? "🍵" : plan.imageKey === "herbs" ? "🌿" : "🥣"}</span>
         </div>
       </div>
 
@@ -87,12 +95,12 @@ export default function PlanDetail() {
 
         <div className="plan-grid">
           <div className="plan-grid-card">
-            <h4 className="plan-grid-title">🥗 Foods</h4>
-            {day.foods.map((f, i) => <p key={i} className="plan-grid-item">• {f}</p>)}
+            <h4 className="plan-grid-title">Foods</h4>
+            {day.foods.map((f, i) => <p key={i} className="plan-grid-item">&#x2022; {f}</p>)}
           </div>
           <div className="plan-grid-card">
-            <h4 className="plan-grid-title">🍵 Teas</h4>
-            {day.teas.map((t, i) => <p key={i} className="plan-grid-item">• {t}</p>)}
+            <h4 className="plan-grid-title">Teas</h4>
+            {day.teas.map((t, i) => <p key={i} className="plan-grid-item">&#x2022; {t}</p>)}
           </div>
         </div>
 

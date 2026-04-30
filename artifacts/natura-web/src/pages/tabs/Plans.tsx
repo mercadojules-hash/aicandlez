@@ -4,6 +4,7 @@ import { Bookmark, Clock, Calendar } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { useWellness } from "@/contexts/WellnessContext";
 import { PLANS, REMEDIES } from "@/lib/data";
+import { CardImage } from "@/components/CardImage";
 
 type Tab = "Plans" | "Remedies" | "Saved";
 
@@ -37,9 +38,7 @@ export default function Plans() {
               const saved = isSaved(plan.id);
               return (
                 <div key={plan.id} className="plan-card" onClick={() => navigate(`${base}/plan/${plan.id}`)}>
-                  <div className={`plan-card-img img-${plan.imageKey}`}>
-                    <span className="plan-card-emoji">{plan.imageKey === "tea" ? "🍵" : plan.imageKey === "herbs" ? "🌿" : "🥣"}</span>
-                  </div>
+                  <CardImage src={plan.image} alt={plan.title} className="plan-card-img" fallbackHint={plan.goal} />
                   <div className="plan-card-body">
                     <div className="plan-card-row1">
                       <span className="plan-goal-badge">{plan.goal}</span>
@@ -70,9 +69,7 @@ export default function Plans() {
               const saved = isSaved(remedy.id);
               return (
                 <div key={remedy.id} className="plan-card" onClick={() => navigate(`${base}/remedy/${remedy.id}`)}>
-                  <div className={`plan-card-img img-${remedy.imageKey}`}>
-                    <span className="plan-card-emoji">{remedy.imageKey === "tea" ? "🍵" : remedy.imageKey === "herbs" ? "🌿" : "🥣"}</span>
-                  </div>
+                  <CardImage src={remedy.image} alt={remedy.title} className="plan-card-img" fallbackHint={remedy.category} />
                   <div className="plan-card-body">
                     <div className="plan-card-row1">
                       <span className="plan-goal-badge">{remedy.category}</span>
@@ -111,9 +108,7 @@ export default function Plans() {
                       if (!plan) return null;
                       return (
                         <div key={plan.id} className="plan-card" onClick={() => navigate(`${base}/plan/${plan.id}`)}>
-                          <div className={`plan-card-img img-${plan.imageKey}`}>
-                            <span className="plan-card-emoji">{plan.imageKey === "tea" ? "🍵" : plan.imageKey === "herbs" ? "🌿" : "🥣"}</span>
-                          </div>
+                          <CardImage src={plan.image} alt={plan.title} className="plan-card-img" fallbackHint={plan.goal} />
                           <div className="plan-card-body">
                             <span className="plan-goal-badge">{plan.goal}</span>
                             <p className="plan-card-title">{plan.title}</p>
@@ -132,9 +127,7 @@ export default function Plans() {
                       if (!remedy) return null;
                       return (
                         <div key={remedy.id} className="plan-card" onClick={() => navigate(`${base}/remedy/${remedy.id}`)}>
-                          <div className={`plan-card-img img-${remedy.imageKey}`}>
-                            <span className="plan-card-emoji">{remedy.imageKey === "tea" ? "🍵" : remedy.imageKey === "herbs" ? "🌿" : "🥣"}</span>
-                          </div>
+                          <CardImage src={remedy.image} alt={remedy.title} className="plan-card-img" fallbackHint={remedy.category} />
                           <div className="plan-card-body">
                             <span className="plan-goal-badge">{remedy.category}</span>
                             <p className="plan-card-title">{remedy.title}</p>

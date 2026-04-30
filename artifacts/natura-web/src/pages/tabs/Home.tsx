@@ -5,6 +5,7 @@ import { Layout } from "@/components/Layout";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
 import { REMEDIES, ROUTINE_TASKS, getTodayTip, getQuickWin } from "@/lib/data";
+import { CardImage } from "@/components/CardImage";
 
 const MORNING = ROUTINE_TASKS.filter((t) => t.category === "morning").slice(0, 3);
 const AFTERNOON = ROUTINE_TASKS.filter((t) => t.category === "afternoon").slice(0, 2);
@@ -142,11 +143,7 @@ export default function Home() {
               const saved = isSaved(remedy.id);
               return (
                 <div key={remedy.id} className="remedy-card" onClick={() => navigate(`${base}/remedy/${remedy.id}`)}>
-                  <div className={`remedy-card-img img-${remedy.imageKey}`}>
-                    <span className="remedy-card-emoji">
-                      {remedy.imageKey === "tea" ? "🍵" : remedy.imageKey === "herbs" ? "🌿" : "🥣"}
-                    </span>
-                  </div>
+                  <CardImage src={remedy.image} alt={remedy.title} className="remedy-card-img" fallbackHint={remedy.category} />
                   <div className="remedy-card-body">
                     <span className="remedy-card-category">{remedy.category}</span>
                     <p className="remedy-card-title">{remedy.title}</p>

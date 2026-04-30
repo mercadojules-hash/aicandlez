@@ -10,6 +10,7 @@ export default function RemedyDetail() {
   const navigate = useNavigate();
   const [stepMode, setStepMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [heroFailed, setHeroFailed] = useState(false);
 
   const item = REMEDIES.find((r) => r.id === id) || RECIPES.find((r) => r.id === id);
   if (!item) return (
@@ -24,7 +25,17 @@ export default function RemedyDetail() {
 
   return (
     <div className="detail-screen">
-      <div className={`detail-hero img-${item.imageKey}`}>
+      <div className="detail-hero">
+        {!heroFailed && item.image ? (
+          <img
+            src={item.image}
+            alt={item.title}
+            className="detail-hero-img"
+            onError={() => setHeroFailed(true)}
+          />
+        ) : (
+          <div className="detail-hero-fallback" />
+        )}
         <div className="detail-hero-overlay">
           <button className="detail-back-btn" onClick={() => navigate(-1)}>
             <ChevronLeft size={24} color="#fff" />
@@ -36,15 +47,12 @@ export default function RemedyDetail() {
             <Bookmark size={20} fill={saved ? "#fff" : "none"} color="#fff" />
           </button>
         </div>
-        <div className="detail-hero-content">
-          <span className="detail-hero-emoji">{item.imageKey === "tea" ? "🍵" : item.imageKey === "herbs" ? "🌿" : "🥣"}</span>
-        </div>
       </div>
 
       <div className="detail-content">
         <div className="detail-meta">
           <span className="detail-category">{item.category}</span>
-          <span className="detail-prep">⏱ {item.prepTime}</span>
+          <span className="detail-prep">&#x23F1; {item.prepTime}</span>
         </div>
         <h1 className="detail-title">{item.title}</h1>
         <p className="detail-description">{item.description}</p>
@@ -71,7 +79,7 @@ export default function RemedyDetail() {
                   <div className="step-num">{step.stepNumber}</div>
                   <div>
                     <p className="step-instruction">{step.instruction}</p>
-                    {step.duration && <p className="step-duration">⏱ {step.duration}</p>}
+                    {step.duration && <p className="step-duration">&#x23F1; {step.duration}</p>}
                   </div>
                 </div>
               ))}
@@ -119,7 +127,7 @@ export default function RemedyDetail() {
               <div className="guided-step-num">{currentStep + 1}</div>
               <p className="guided-step-instruction">{item.steps[currentStep].instruction}</p>
               {item.steps[currentStep].duration && (
-                <p className="guided-step-duration">⏱ {item.steps[currentStep].duration}</p>
+                <p className="guided-step-duration">&#x23F1; {item.steps[currentStep].duration}</p>
               )}
             </div>
             <div className="guided-nav">

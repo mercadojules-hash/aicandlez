@@ -1,8 +1,8 @@
 export interface RemedyStep { stepNumber: number; instruction: string; duration?: string; }
-export interface Remedy { id: string; title: string; description: string; category: string; prepTime: string; ingredients: string[]; steps: RemedyStep[]; benefits: string[]; safetyNote: string; imageKey: "herbs" | "tea" | "bowl"; }
+export interface Remedy { id: string; title: string; description: string; category: string; prepTime: string; ingredients: string[]; steps: RemedyStep[]; benefits: string[]; safetyNote: string; image: string; }
 export interface PlanActivity { id: string; time: string; title: string; description: string; category: "morning" | "afternoon" | "evening"; duration?: string; }
-export interface WellnessPlan { id: string; title: string; subtitle: string; goal: string; duration: string; days: { day: number; label: string; activities: PlanActivity[]; foods: string[]; teas: string[]; supplements: string[]; }[]; groceryList: string[]; imageKey: "herbs" | "tea" | "bowl"; }
-export interface Recipe { id: string; title: string; description: string; category: string; prepTime: string; goal: string; ingredients: string[]; steps: RemedyStep[]; variations: string[]; groceryList: string[]; imageKey: "herbs" | "tea" | "bowl"; }
+export interface WellnessPlan { id: string; title: string; subtitle: string; goal: string; duration: string; days: { day: number; label: string; activities: PlanActivity[]; foods: string[]; teas: string[]; supplements: string[]; }[]; groceryList: string[]; image: string; }
+export interface Recipe { id: string; title: string; description: string; category: string; prepTime: string; goal: string; ingredients: string[]; steps: RemedyStep[]; variations: string[]; groceryList: string[]; image: string; }
 export interface DailyTip { id: string; title: string; body: string; category: string; }
 export interface RoutineTask { id: string; label: string; time?: string; category: "morning" | "afternoon" | "evening"; }
 
@@ -49,7 +49,7 @@ export const REMEDIES: Remedy[] = [
     description: "A warming, traditional remedy used to ease bloating, nausea, and sluggish digestion.",
     category: "Digestion",
     prepTime: "10 min",
-    imageKey: "tea",
+    image: "https://apexdigital.design/wp-content/uploads/natura-ai/remedies/ginger-digestive-tea.jpg",
     ingredients: ["1 inch fresh ginger root", "1 cup filtered water", "1 tsp raw honey", "Squeeze of lemon juice", "Pinch of black pepper"],
     steps: [
       { stepNumber: 1, instruction: "Slice the fresh ginger into thin rounds. No need to peel." },
@@ -67,7 +67,7 @@ export const REMEDIES: Remedy[] = [
     description: "A simple evening practice using lavender to signal rest and ease a busy mind.",
     category: "Stress & Sleep",
     prepTime: "15 min",
-    imageKey: "herbs",
+    image: "https://apexdigital.design/wp-content/uploads/natura-ai/remedies/lavender-calming-ritual.jpg",
     ingredients: ["Dried lavender buds or lavender tea", "1 cup hot water", "1 tsp honey", "Optional: lavender essential oil for diffusing"],
     steps: [
       { stepNumber: 1, instruction: "Brew lavender tea or steep 1 tsp dried lavender buds in hot water.", duration: "5 minutes" },
@@ -85,7 +85,7 @@ export const REMEDIES: Remedy[] = [
     description: "A potent wellness shot combining ginger, turmeric, and citrus to support immune resilience.",
     category: "Immunity",
     prepTime: "5 min",
-    imageKey: "bowl",
+    image: "https://apexdigital.design/wp-content/uploads/natura-ai/remedies/immunity-wellness-shot.jpg",
     ingredients: ["1 inch fresh ginger", "1 tsp turmeric powder", "Juice of 1 lemon", "Pinch of black pepper", "1 tsp raw honey", "2 tbsp water"],
     steps: [
       { stepNumber: 1, instruction: "Juice the fresh ginger (or grate and squeeze through a cloth)." },
@@ -103,7 +103,7 @@ export const REMEDIES: Remedy[] = [
     description: "A nourishing bedtime milk with ashwagandha and warming spices to support deep rest.",
     category: "Sleep & Stress",
     prepTime: "8 min",
-    imageKey: "tea",
+    image: "https://apexdigital.design/wp-content/uploads/natura-ai/remedies/adaptogenic-moon-milk.jpg",
     ingredients: ["1 cup oat or almond milk", "1 tsp ashwagandha powder", "1/2 tsp cinnamon", "1/4 tsp cardamom", "1 tsp honey", "Pinch of nutmeg"],
     steps: [
       { stepNumber: 1, instruction: "Heat oat milk in a small saucepan over medium-low heat. Do not boil." },
@@ -121,7 +121,7 @@ export const REMEDIES: Remedy[] = [
     description: "A nutrient-dense smoothie to support sustained morning energy without the crash.",
     category: "Energy",
     prepTime: "5 min",
-    imageKey: "bowl",
+    image: "https://apexdigital.design/wp-content/uploads/natura-ai/remedies/green-energy-smoothie.jpg",
     ingredients: ["1 cup spinach or kale", "1 banana (frozen)", "1 tsp maca powder", "1 tbsp almond butter", "1 cup coconut water", "1/2 tsp spirulina (optional)"],
     steps: [
       { stepNumber: 1, instruction: "Add coconut water to your blender first as the base." },
@@ -142,7 +142,7 @@ export const PLANS: WellnessPlan[] = [
     subtitle: "Reset your nervous system with gentle, natural support.",
     goal: "stress",
     duration: "3 days",
-    imageKey: "herbs",
+    image: "https://apexdigital.design/wp-content/uploads/natura-ai/plans/stress-relief-plan.jpg",
     groceryList: ["Chamomile tea", "Lavender tea", "Ashwagandha powder", "Dark chocolate (70%+)", "Blueberries", "Oat milk", "Honey", "Magnesium supplement"],
     days: [
       {
@@ -189,7 +189,7 @@ export const PLANS: WellnessPlan[] = [
     subtitle: "Rebuild healthy sleep habits with natural plant support.",
     goal: "sleep",
     duration: "7 days",
-    imageKey: "tea",
+    image: "https://apexdigital.design/wp-content/uploads/natura-ai/plans/sleep-reset-plan.jpg",
     groceryList: ["Chamomile tea", "Valerian root tea", "Lemon balm tea", "Tart cherry juice", "Passionflower", "Magnesium supplement", "Oat milk", "Honey", "Lavender oil"],
     days: [
       {
@@ -210,7 +210,7 @@ export const PLANS: WellnessPlan[] = [
     subtitle: "Naturally boost vitality with adaptogens and nutrient-dense foods.",
     goal: "energy",
     duration: "5 days",
-    imageKey: "bowl",
+    image: "https://apexdigital.design/wp-content/uploads/natura-ai/plans/energy-revival-plan.jpg",
     groceryList: ["Maca powder", "Green tea", "Spinach", "Kale", "Frozen bananas", "Almond butter", "Coconut water", "Walnuts", "Ginseng tea", "B-complex supplement"],
     days: [
       {
@@ -236,7 +236,7 @@ export const RECIPES: Recipe[] = [
     category: "Drinks",
     prepTime: "5 min",
     goal: "immunity",
-    imageKey: "tea",
+    image: "https://apexdigital.design/wp-content/uploads/natura-ai/recipes/golden-turmeric-latte.jpg",
     ingredients: ["1 cup oat milk", "1 tsp turmeric powder", "1/2 tsp cinnamon", "1/4 tsp ginger powder", "Pinch of black pepper", "1 tsp honey or maple syrup"],
     steps: [
       { stepNumber: 1, instruction: "Heat oat milk in a saucepan over medium heat. Do not boil." },
@@ -255,7 +255,7 @@ export const RECIPES: Recipe[] = [
     category: "Soups",
     prepTime: "45 min",
     goal: "immunity",
-    imageKey: "herbs",
+    image: "https://apexdigital.design/wp-content/uploads/natura-ai/recipes/herbal-immunity-broth.jpg",
     ingredients: ["4 cups vegetable broth", "3 garlic cloves, minced", "1 inch fresh ginger", "1 tsp turmeric", "1 cup shiitake mushrooms", "1 lemon (juice)", "Fresh thyme or rosemary", "Sea salt to taste"],
     steps: [
       { stepNumber: 1, instruction: "Bring vegetable broth to a simmer in a large pot." },
@@ -274,7 +274,7 @@ export const RECIPES: Recipe[] = [
     category: "Breakfast",
     prepTime: "5 min (+ overnight)",
     goal: "energy",
-    imageKey: "bowl",
+    image: "https://apexdigital.design/wp-content/uploads/natura-ai/recipes/adaptogenic-overnight-oats.jpg",
     ingredients: ["1/2 cup rolled oats", "1 cup oat milk", "1 tsp maca powder", "1 tbsp chia seeds", "1 tbsp almond butter", "1 tsp honey", "Toppings: berries, nuts, granola"],
     steps: [
       { stepNumber: 1, instruction: "Combine oats, oat milk, maca, and chia seeds in a jar." },
@@ -293,7 +293,7 @@ export const RECIPES: Recipe[] = [
     category: "Meals",
     prepTime: "10 min",
     goal: "stress",
-    imageKey: "bowl",
+    image: "https://apexdigital.design/wp-content/uploads/natura-ai/recipes/stress-less-salad.jpg",
     ingredients: ["2 cups baby spinach", "1/2 avocado", "1/4 cup walnuts", "1/4 cup blueberries", "2 tbsp pumpkin seeds", "Dressing: olive oil, lemon, salt, pepper"],
     steps: [
       { stepNumber: 1, instruction: "Wash and dry the spinach. Place in a large bowl." },
