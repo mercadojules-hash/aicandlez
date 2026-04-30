@@ -1,0 +1,110 @@
+We are ready for FINAL PRODUCTION EXPORT for App Store submission.
+
+GOAL:
+Generate a clean production-ready build and provide a downloadable ZIP file placed in Preview.
+
+-----------------------------------
+1. BUILD PRODUCTION VERSION
+-----------------------------------
+
+- Run full production build (no dev mode)
+- Remove any debug logs / console logs
+- Ensure no placeholder/demo data remains
+- Optimize bundle size
+
+-----------------------------------
+2. VERIFY REQUIRED APP STORE FILES
+-----------------------------------
+
+Ensure the project includes:
+
+✔ App icon (1024x1024)
+✔ Splash screen assets
+✔ All image assets (recipes, backgrounds)
+✔ Fonts (if custom)
+✔ Navigation + routing fully working
+
+-----------------------------------
+3. CONFIG CHECK (CRITICAL)
+-----------------------------------
+
+Verify:
+
+✔ App name: Natura AI
+✔ Bundle identifier is consistent
+✔ Version number set (e.g. 1.0.0)
+✔ Build number set (e.g. 1)
+
+✔ No broken routes
+✔ No missing imports
+✔ No console errors
+
+-----------------------------------
+4. FEATURE VERIFICATION
+-----------------------------------
+
+Ensure all core features are included:
+
+✔ Recipes (with premium locks)
+✔ Plans (premium gated)
+✔ AI page (locked for non-premium)
+✔ Ask AI button (locked correctly)
+✔ Upgrade screen (monthly + yearly)
+✔ Profile page (fixed header + disclaimer)
+
+-----------------------------------
+5. CLEAN PROJECT STRUCTURE
+-----------------------------------
+
+Before zipping:
+
+- Remove unused files
+- Remove duplicate assets
+- Remove temp/test files
+- Keep only production-relevant code
+
+-----------------------------------
+6. CREATE ZIP PACKAGE
+-----------------------------------
+
+Create a ZIP file named:
+
+natura-ai-v1-production.zip
+
+Include:
+
+- Full project source
+- All assets
+- Config files
+- Package.json / dependencies
+
+-----------------------------------
+7. PLACE ZIP IN PREVIEW
+-----------------------------------
+
+- Upload the ZIP file to the Preview panel
+- Provide a direct download link
+- Ensure file is accessible and not corrupted
+
+-----------------------------------
+8. FINAL VALIDATION
+-----------------------------------
+
+Confirm:
+
+✔ App builds successfully
+✔ No runtime errors
+✔ All screens render properly
+✔ Premium system works
+
+-----------------------------------
+END RESULT
+-----------------------------------
+
+We should have:
+
+→ A clean downloadable ZIP
+→ Production-ready app
+→ Ready for TestFlight / App Store submission
+
+NO extra explanations — just build, zip, and provide download.
