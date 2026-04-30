@@ -22,20 +22,20 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* PREVIEW — renders immediately without onboarding */}
-      <Route path={`${base}/`} element={<PreviewWellnessScreen />} />
-      <Route path={`${base}/preview`} element={<PreviewWellnessScreen />} />
+      {/* PREVIEW — all routes open without onboarding */}
+      <Route path={`${base}/`}           element={<PreviewWellnessScreen />} />
+      <Route path={`${base}/preview`}    element={<PreviewWellnessScreen />} />
       <Route path={`${base}/onboarding`} element={<Welcome />} />
-      <Route path={`${base}/onboarding/goals`} element={<Goals />} />
-      <Route path={`${base}/onboarding/preferences`} element={<Preferences />} />
-      <Route path={`${base}/onboarding/disclaimer`} element={<Disclaimer />} />
-      <Route path={`${base}/home`} element={isOnboarded ? <Home /> : <Navigate to={`${base}/onboarding`} replace />} />
-      <Route path={`${base}/chat`} element={isOnboarded ? <Chat /> : <Navigate to={`${base}/onboarding`} replace />} />
-      <Route path={`${base}/plans`} element={isOnboarded ? <Plans /> : <Navigate to={`${base}/onboarding`} replace />} />
-      <Route path={`${base}/recipes`} element={isOnboarded ? <Recipes /> : <Navigate to={`${base}/onboarding`} replace />} />
-      <Route path={`${base}/profile`} element={isOnboarded ? <Profile /> : <Navigate to={`${base}/onboarding`} replace />} />
-      <Route path={`${base}/remedy/:id`} element={isOnboarded ? <RemedyDetail /> : <Navigate to={`${base}/onboarding`} replace />} />
-      <Route path={`${base}/plan/:id`} element={isOnboarded ? <PlanDetail /> : <Navigate to={`${base}/onboarding`} replace />} />
+      <Route path={`${base}/onboarding/goals`}        element={<Goals />} />
+      <Route path={`${base}/onboarding/preferences`}  element={<Preferences />} />
+      <Route path={`${base}/onboarding/disclaimer`}   element={<Disclaimer />} />
+      <Route path={`${base}/home`}     element={<Home />} />
+      <Route path={`${base}/chat`}     element={<Chat />} />
+      <Route path={`${base}/plans`}    element={<Plans />} />
+      <Route path={`${base}/recipes`}  element={<Recipes />} />
+      <Route path={`${base}/profile`}  element={<Profile />} />
+      <Route path={`${base}/remedy/:id`} element={<RemedyDetail />} />
+      <Route path={`${base}/plan/:id`}   element={<PlanDetail />} />
       <Route path="*" element={<Navigate to={`${base}/`} replace />} />
     </Routes>
   );

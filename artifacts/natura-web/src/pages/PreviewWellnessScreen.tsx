@@ -67,11 +67,11 @@ const TIMELINE = [
 
 /* ─── bottom tabs ────────────────────────────────────────────────── */
 const TABS = [
-  { icon: Home,          label: "Home" },
-  { icon: MessageCircle, label: "Ask AI" },
-  { icon: List,          label: "Plans",   active: true },
-  { icon: BookOpen,      label: "Recipes" },
-  { icon: User,          label: "Profile" },
+  { icon: Home,          label: "Home",    path: "/home" },
+  { icon: MessageCircle, label: "Ask AI",  path: "/chat" },
+  { icon: List,          label: "Plans",   path: null, active: true },
+  { icon: BookOpen,      label: "Recipes", path: "/recipes" },
+  { icon: User,          label: "Profile", path: "/profile" },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -212,8 +212,12 @@ export default function PreviewWellnessScreen() {
 
       {/* ── BOTTOM NAV ──────────────────────────────────────────── */}
       <nav className="pw-nav">
-        {TABS.map(({ icon: Icon, label, active }) => (
-          <button key={label} className={`pw-nav-tab ${active ? "active" : ""}`}>
+        {TABS.map(({ icon: Icon, label, path, active }) => (
+          <button
+            key={label}
+            className={`pw-nav-tab ${active ? "active" : ""}`}
+            onClick={() => path && navigate(`${base}${path}`)}
+          >
             <div className={`pw-nav-icon ${active ? "active" : ""}`}>
               <Icon size={20} color={active ? "#7CFFB2" : "rgba(255,255,255,0.35)"} />
             </div>
