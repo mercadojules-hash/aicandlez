@@ -1,0 +1,194 @@
+We are upgrading the Natura AI app UI to match a premium holistic wellness + AI experience.
+
+IMPORTANT:
+We want to SEE these changes immediately in the preview environment.
+Do NOT just refactor code — actively render the new UI so it is visible when the app reloads.
+
+----------------------------------
+
+🎯 GOAL
+
+Match the look and structure of a high-end wellness app:
+- Dark green aesthetic
+- Glowing accents
+- Calm, premium, minimal
+- Holistic + AI-driven feel
+
+Think:
+Calm + Headspace + futuristic AI wellness
+
+----------------------------------
+
+🟢 STEP 1 — CREATE A PREVIEW SCREEN (CRITICAL)
+
+Create a new screen/component called:
+
+PreviewWellnessScreen
+
+Set this screen as the DEFAULT route temporarily so it loads immediately in preview.
+
+This screen should visually match the upgraded design.
+
+----------------------------------
+
+🧠 STEP 2 — IMPLEMENT THIS EXACT LAYOUT
+
+Build the screen in this order:
+
+----------------------------------
+
+1. HEADER
+
+- Text:
+  "Good evening, Jules 👋"
+- Large title:
+  "Today's Plan for You"
+- Subtitle:
+  "Personalized steps for your mind, body, and energy"
+
+- Top right:
+  circular Natura logo
+
+----------------------------------
+
+2. ENERGY BADGE
+
+- Pill style button:
+  ⚡ Energy — Good
+- Glowing green border
+- Slight blur / glass effect
+
+----------------------------------
+
+3. STATS ROW
+
+4 cards in a single row:
+
+- 🔥 5 day streak
+- ⏱ 32 min today
+- ✅ 3 sessions
+- ⭐ 86 score
+
+Style:
+- Glassmorphism
+- Rounded corners
+- Soft glow
+- Even spacing
+
+----------------------------------
+
+4. TIMELINE (KEY FEATURE)
+
+LEFT SIDE:
+- Vertical glowing line
+- Circular nodes for each time
+
+RIGHT SIDE:
+Cards for each item:
+
+7:00 AM
+→ Green Energy Matcha (Remedy)
+
+8:00 AM
+→ Adaptogenic Oats Bowl (Recipe)
+
+12:30 PM
+→ 10-min walk (Action)
+
+7:30 PM
+→ Evening mindfulness
+
+Each card:
+- Icon circle
+- Title
+- Subtitle
+- Chevron arrow
+- Glow highlight
+
+----------------------------------
+
+5. PROGRESS SECTION
+
+- Circular progress:
+  "86 Wellness Score"
+
+- Right side:
+  small line chart (fake data OK)
+
+- Text:
+  "You're doing great! Keep going, small steps create big changes."
+
+----------------------------------
+
+6. CTA SECTION
+
+- Card:
+  "Need guidance?"
+
+- Button:
+  "Ask AI anything"
+
+----------------------------------
+
+7. BOTTOM NAVIGATION
+
+Tabs:
+- Home
+- Ask AI
+- Plans (ACTIVE)
+- Recipes
+- Learn
+- Profile
+
+Active tab:
+- glowing green highlight
+
+----------------------------------
+
+🎨 STEP 3 — VISUAL STYLE
+
+Apply globally:
+
+- Background:
+  dark green gradient (#071B13 → #0D2E1F)
+
+- Cards:
+  rgba(255,255,255,0.05)
+  border: rgba(255,255,255,0.08)
+  backdrop blur
+
+- Accent:
+  neon green glow (#7CFFB2)
+
+- Typography:
+  bold headings
+  soft gray subtext
+
+----------------------------------
+
+✨ STEP 4 — ANIMATIONS (LIGHT)
+
+- Fade in cards
+- Slight scale on press
+- Smooth transitions
+
+----------------------------------
+
+🚨 STEP 5 — PREVIEW REQUIREMENT
+
+- Ensure this new screen renders immediately in preview
+- Replace current home temporarily if needed
+- Do NOT leave this hidden behind navigation
+
+----------------------------------
+
+FINAL RESULT:
+
+When preview loads, we should see:
+A polished, premium Natura AI holistic wellness dashboard
+matching the design direction we just created.
+
+----------------------------------
+
+Do not break existing functionality.
+This is a visual + layout upgrade for preview testing.

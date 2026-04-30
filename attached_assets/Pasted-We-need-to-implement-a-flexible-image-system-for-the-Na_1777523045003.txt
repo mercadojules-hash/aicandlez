@@ -1,0 +1,93 @@
+We need to implement a flexible image system for the Natura AI app so we can easily swap images later without changing code.
+
+IMPORTANT:
+Use Unsplash images for now (for preview), but structure it so we can replace them with our own hosted URLs anytime.
+
+----------------------------------
+
+🎯 GOAL
+
+- Use high-quality Unsplash images temporarily
+- Store ALL image URLs in one central config file
+- Allow easy replacement with custom URLs later (no code changes needed)
+
+----------------------------------
+
+🟢 STEP 1 — CREATE IMAGE CONFIG FILE
+
+Create a file:
+
+/config/imageAssets.js   (or .ts depending on project)
+
+Inside, define:
+
+export const IMAGE_ASSETS = {
+  heroBackground: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
+  wellnessBackground: "https://images.unsplash.com/photo-1490645935967-10de6ba17061",
+  recipePlaceholder: "https://images.unsplash.com/photo-1498837167922-ddd27525d352",
+  matcha: "https://images.unsplash.com/photo-1515823064-d6e0c04616a7",
+  oats: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd",
+  meditation: "https://images.unsplash.com/photo-1506126613408-eca07ce68773",
+  progressBackground: "https://images.unsplash.com/photo-1465101046530-73398c7f28ca"
+};
+
+----------------------------------
+
+🟢 STEP 2 — USE THESE IMAGES IN UI
+
+Replace any hardcoded images in components with:
+
+import { IMAGE_ASSETS } from "../config/imageAssets";
+
+Example:
+
+<Image source={{ uri: IMAGE_ASSETS.matcha }} />
+
+----------------------------------
+
+🟢 STEP 3 — ADD FALLBACK HANDLING
+
+If an image fails to load:
+- Show a soft gradient placeholder
+- OR a default local asset
+
+----------------------------------
+
+🟢 STEP 4 — OPTIMIZE DISPLAY
+
+- Use proper aspect ratios
+- Add slight overlay (dark gradient) for readability
+- Add rounded corners to match UI
+
+----------------------------------
+
+🟢 STEP 5 — PREP FOR FUTURE (IMPORTANT)
+
+Structure this so later we can replace URLs like:
+
+IMAGE_ASSETS.matcha = "https://yourdomain.com/images/matcha.png"
+
+WITHOUT changing any UI code.
+
+----------------------------------
+
+🟢 STEP 6 — OPTIONAL (IF EASY)
+
+Allow environment-based switching:
+
+DEV → Unsplash images  
+PROD → Custom hosted images  
+
+----------------------------------
+
+FINAL RESULT:
+
+- All images come from ONE central config
+- Easy to update anytime
+- Works instantly in preview
+- Matches premium UI design
+
+----------------------------------
+
+Do not break existing UI.
+Only refactor image handling system.

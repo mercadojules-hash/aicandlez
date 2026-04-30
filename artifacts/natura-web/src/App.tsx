@@ -12,6 +12,7 @@ import Recipes from "@/pages/tabs/Recipes";
 import Profile from "@/pages/tabs/Profile";
 import RemedyDetail from "@/pages/RemedyDetail";
 import PlanDetail from "@/pages/PlanDetail";
+import PreviewWellnessScreen from "@/pages/PreviewWellnessScreen";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -21,7 +22,9 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path={`${base}/`} element={<Navigate to={isOnboarded ? `${base}/home` : `${base}/onboarding`} replace />} />
+      {/* PREVIEW — renders immediately without onboarding */}
+      <Route path={`${base}/`} element={<PreviewWellnessScreen />} />
+      <Route path={`${base}/preview`} element={<PreviewWellnessScreen />} />
       <Route path={`${base}/onboarding`} element={<Welcome />} />
       <Route path={`${base}/onboarding/goals`} element={<Goals />} />
       <Route path={`${base}/onboarding/preferences`} element={<Preferences />} />
