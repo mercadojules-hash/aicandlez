@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Zap, Bookmark, CheckCircle, RefreshCw, Download } from "lucide-react";
+import { Zap, Bookmark, CheckCircle, RefreshCw, Download, Moon, Sun, Smartphone } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
+import { useTheme, type ThemeMode } from "@/contexts/ThemeContext";
 
 const SCALE_LABELS = ["Very low", "Low", "Moderate", "Good", "Excellent"];
 
@@ -19,9 +20,16 @@ function ScaleSelector({ label, value, onChange }: { label: string; value: numbe
   );
 }
 
+const THEME_OPTIONS = [
+  { mode: "dark"  as ThemeMode, label: "Dark",  Icon: Moon },
+  { mode: "light" as ThemeMode, label: "Light", Icon: Sun },
+  { mode: "auto"  as ThemeMode, label: "Auto",  Icon: Smartphone },
+];
+
 export default function Profile() {
   const { profile, resetOnboarding } = useUser();
   const { streak, savedItems, completedTasks, submitCheckIn, lastCheckIn } = useWellness();
+  const { mode, setMode } = useTheme();
   const [energy, setEnergy] = useState(3);
   const [stress, setStress] = useState(3);
   const [sleep, setSleep] = useState(3);
@@ -108,6 +116,18 @@ export default function Profile() {
             </div>
           </div>
         )}
+
+        <div className="profile-section">
+          <p className="profile-section-title">Appearance</p>
+          <div className="theme-toggle-row">
+            {THEME_OPTIONS.map(({ mode: m, label, Icon }) => (
+              <button key={m} className={`theme-btn ${mode === m ? "active" : ""}`} onClick={() => setMode(m)}>
+                <Icon size={16} />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="profile-section muted-section">
           <p className="profile-section-title">Medical Disclaimer</p>

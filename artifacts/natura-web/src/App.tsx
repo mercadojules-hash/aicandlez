@@ -10,6 +10,7 @@ import Chat from "@/pages/tabs/Chat";
 import Plans from "@/pages/tabs/Plans";
 import Recipes from "@/pages/tabs/Recipes";
 import Profile from "@/pages/tabs/Profile";
+import Learn from "@/pages/tabs/Learn";
 import RemedyDetail from "@/pages/RemedyDetail";
 import PlanDetail from "@/pages/PlanDetail";
 import PreviewWellnessScreen from "@/pages/PreviewWellnessScreen";
@@ -22,8 +23,7 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* PREVIEW — all routes open without onboarding */}
-      <Route path={`${base}/`}           element={<PreviewWellnessScreen />} />
+      <Route path={`${base}/`}           element={<Navigate to={`${base}/home`} replace />} />
       <Route path={`${base}/preview`}    element={<PreviewWellnessScreen />} />
       <Route path={`${base}/onboarding`} element={<Welcome />} />
       <Route path={`${base}/onboarding/goals`}        element={<Goals />} />
@@ -33,10 +33,11 @@ function AppRoutes() {
       <Route path={`${base}/chat`}     element={<Chat />} />
       <Route path={`${base}/plans`}    element={<Plans />} />
       <Route path={`${base}/recipes`}  element={<Recipes />} />
+      <Route path={`${base}/learn`}    element={<Learn />} />
       <Route path={`${base}/profile`}  element={<Profile />} />
       <Route path={`${base}/remedy/:id`} element={<RemedyDetail />} />
       <Route path={`${base}/plan/:id`}   element={<PlanDetail />} />
-      <Route path="*" element={<Navigate to={`${base}/`} replace />} />
+      <Route path="*" element={<Navigate to={`${base}/home`} replace />} />
     </Routes>
   );
 }

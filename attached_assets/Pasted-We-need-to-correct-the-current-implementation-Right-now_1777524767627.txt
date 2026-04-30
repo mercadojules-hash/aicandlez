@@ -1,0 +1,153 @@
+We need to correct the current implementation.
+
+Right now the app is NOT a real working app in preview.
+
+ISSUES WE SEE:
+
+- Only the Plans screen has been upgraded
+- Other screens (Home, Ask AI, Recipes, Profile, Learn) are still basic / inconsistent
+- The preview is showing multiple canvas panels instead of a single app experience
+- Navigation is not behaving like a real mobile app
+- Tabs appear visually but are not fully wired across all screens
+- This feels like a design board, NOT a functional app
+
+----------------------------------
+
+🎯 GOAL
+
+Convert this into a REAL, fully working app inside preview.
+
+We want ONE app container where:
+- Tabs work properly
+- Screens switch correctly
+- UI is consistent across ALL pages
+- We can click and test everything like a real app
+
+----------------------------------
+
+🟢 STEP 1 — FIX PREVIEW STRUCTURE (CRITICAL)
+
+STOP showing multiple canvas panels.
+
+Instead:
+
+- Render ONE mobile app container in preview
+- Use proper navigation (tab navigator or routing)
+- Only ONE screen visible at a time
+- Bottom tab bar must control navigation
+
+We should NOT see all pages side-by-side anymore.
+
+----------------------------------
+
+🟢 STEP 2 — FULL NAVIGATION WIRING
+
+Ensure bottom tabs ACTUALLY navigate:
+
+Tabs:
+- Home
+- Ask AI
+- Plans
+- Recipes
+- Learn
+- Profile
+
+Each tab must:
+- Load its own screen
+- Replace the current view
+- Maintain state if possible
+
+----------------------------------
+
+🟢 STEP 3 — APPLY DESIGN SYSTEM TO ALL SCREENS
+
+Right now ONLY Plans is upgraded.
+
+We need ALL screens upgraded to match that quality:
+
+Upgrade:
+
+🏠 Home  
+- Match premium UI (cards, glow, stats, timeline)
+
+💬 Ask AI  
+- Styled chat UI (not default/plain)
+
+📋 Plans  
+- Keep existing upgraded version (this is correct direction)
+
+🍵 Recipes  
+- Upgrade to image cards + wellness UI
+
+📚 Learn  
+- Clean card-based layout
+
+👤 Profile  
+- Add wellness score + theme toggle
+
+Everything must feel like ONE cohesive app.
+
+----------------------------------
+
+🟢 STEP 4 — DARK / LIGHT / AUTO MODE
+
+Implement full theme system:
+
+- Dark (default)
+- Light
+- Auto
+
+Apply theme across ALL screens (not just Plans)
+
+Add toggle in Profile.
+
+----------------------------------
+
+🟢 STEP 5 — LOGO + BRAND CONSISTENCY
+
+Ensure Natura AI logo appears:
+
+- Header (top right or top area)
+- Consistently across all screens
+
+----------------------------------
+
+🟢 STEP 6 — INTERACTION (MAKE IT TESTABLE)
+
+We must be able to:
+
+- Tap tabs → navigate
+- Tap cards → respond (even mock)
+- Toggle checklist items
+- Type in Ask AI
+- Scroll naturally
+
+No dead UI.
+
+----------------------------------
+
+🟢 STEP 7 — USE EXISTING PREVIEW (DO NOT BREAK)
+
+Do NOT rebuild from scratch.
+
+Instead:
+- Convert current canvas setup into a real navigation-based app
+- Reuse existing screens
+- Upgrade remaining screens to match Plans quality
+
+----------------------------------
+
+🟢 FINAL RESULT (VERY IMPORTANT)
+
+When preview loads:
+
+We should see:
+👉 ONE app screen (not multiple panels)
+👉 Working tab navigation
+👉 Fully styled UI across ALL tabs
+👉 Smooth interactions
+👉 Dark mode active by default
+
+It should feel like a real mobile app we can test.
+
+----------------------------------
