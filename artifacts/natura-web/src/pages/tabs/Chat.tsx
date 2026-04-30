@@ -92,6 +92,17 @@ export default function Chat() {
     <Layout bgStyle={getBackgroundStyle(BG.focus)}>
       <div className="chat-screen" style={{ background: "transparent" }}>
         <div className="chat-header">
+          {/* Floating particles */}
+          <span className="chat-particle" style={{ left: "12%",  top: "55%", animationDelay: "0s",    animationDuration: "4.5s" }} />
+          <span className="chat-particle" style={{ left: "28%",  top: "35%", animationDelay: "1.2s",  animationDuration: "5.8s" }} />
+          <span className="chat-particle" style={{ left: "60%",  top: "65%", animationDelay: "0.6s",  animationDuration: "4.1s" }} />
+          <span className="chat-particle" style={{ left: "78%",  top: "28%", animationDelay: "2.1s",  animationDuration: "6.2s" }} />
+          <span className="chat-particle" style={{ left: "90%",  top: "55%", animationDelay: "0.9s",  animationDuration: "5.0s" }} />
+          {/* Shimmer sweep */}
+          <span className="chat-header-shimmer" />
+          {/* Avatar glow halo */}
+          <span className="chat-avatar-halo" />
+
           <div className="chat-avatar">
             <Activity size={20} color="#7CFFB2" />
             <span className="chat-avatar-pulse" />

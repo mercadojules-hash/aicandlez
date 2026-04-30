@@ -941,13 +941,71 @@ a { color: inherit; text-decoration: none; }
   flex-shrink: 0;
   overflow: hidden;
 }
+/* Ambient radial glow — top-right */
 .chat-header::before {
   content: "";
-  position: absolute; top: -30px; right: -30px;
-  width: 220px; height: 160px;
-  background: radial-gradient(circle at top right, rgba(120,255,180,0.12), transparent 60%);
+  position: absolute; top: -40px; right: -40px;
+  width: 260px; height: 190px;
+  background: radial-gradient(circle at top right, rgba(120,255,180,0.14), transparent 60%);
+  animation: pulse-glow 4s ease-in-out infinite;
   pointer-events: none;
 }
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(1.15); }
+}
+
+/* Shimmer sweep */
+.chat-header-shimmer {
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(120,255,180,0.04) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-sweep 6s ease-in-out infinite;
+  pointer-events: none; z-index: 0;
+}
+@keyframes shimmer-sweep {
+  0%   { background-position: 200% 0; }
+  50%  { background-position: -50% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Floating particles */
+.chat-particle {
+  position: absolute;
+  width: 3px; height: 3px; border-radius: 50%;
+  background: rgba(120,255,180,0.35);
+  box-shadow: 0 0 5px rgba(120,255,180,0.4);
+  pointer-events: none; z-index: 0;
+  animation: float-particle linear infinite;
+}
+@keyframes float-particle {
+  0%   { transform: translateY(0) scale(1);   opacity: 0; }
+  15%  { opacity: 0.6; }
+  80%  { opacity: 0.3; }
+  100% { transform: translateY(-80px) scale(0.4); opacity: 0; }
+}
+
+/* Outer halo ring behind avatar */
+.chat-avatar-halo {
+  position: absolute;
+  left: 20px; top: 52px;
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(120,255,180,0.18) 0%, transparent 70%);
+  animation: halo-breathe 3s ease-in-out infinite;
+  pointer-events: none; z-index: 0;
+  transform-origin: center center;
+}
+@keyframes halo-breathe {
+  0%, 100% { transform: scale(1);    opacity: 1; }
+  50%       { transform: scale(2.2); opacity: 0; }
+}
+
 .chat-avatar {
   width: 46px; height: 46px; border-radius: 50%;
   background: rgba(120,255,180,0.12);
@@ -957,15 +1015,23 @@ a { color: inherit; text-decoration: none; }
   flex-shrink: 0; position: relative; z-index: 1;
 }
 .chat-avatar-pulse {
-  position: absolute; inset: -4px;
+  position: absolute; inset: -5px;
   border-radius: 50%;
-  border: 1px solid rgba(120,255,180,0.25);
+  border: 1px solid rgba(120,255,180,0.22);
   animation: avatar-pulse 2.8s ease-in-out infinite;
   pointer-events: none;
 }
+.chat-avatar-pulse::after {
+  content: "";
+  position: absolute; inset: -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(120,255,180,0.1);
+  animation: avatar-pulse 2.8s ease-in-out infinite 0.6s;
+  pointer-events: none;
+}
 @keyframes avatar-pulse {
-  0%, 100% { opacity: 0.6; transform: scale(1); }
-  50%       { opacity: 0;   transform: scale(1.3); }
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%       { opacity: 0;   transform: scale(1.4); }
 }
 .chat-coach-label {
   font-size: 10px; font-weight: 700; text-transform: uppercase;
