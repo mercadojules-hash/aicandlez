@@ -1,35 +1,57 @@
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Flame, Clock, Star, Check, CheckCircle2, ShoppingCart, Leaf, Sun, Moon, Coffee, ChevronRight } from "lucide-react";
+import {
+  Flame, Clock, Star, Check, CheckCircle2, ShoppingCart,
+  Leaf, ChevronRight, Droplets, Wind, Zap, Coffee,
+  Navigation2, Sunset, Moon,
+} from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { useUser } from "@/contexts/UserContext";
 import { useWellness } from "@/contexts/WellnessContext";
 import { ROUTINE_TASKS, getTodayTip } from "@/lib/data";
 import { BG, getBackgroundStyle } from "@/lib/background";
+import naturaLogo from "@/assets/natura-logo.svg?url";
 
 const MORNING   = ROUTINE_TASKS.filter((t) => t.category === "morning").slice(0, 3);
 const AFTERNOON = ROUTINE_TASKS.filter((t) => t.category === "afternoon").slice(0, 2);
 const EVENING   = ROUTINE_TASKS.filter((t) => t.category === "evening").slice(0, 2);
 const ALL_TASKS = [...MORNING, ...AFTERNOON, ...EVENING];
 
+const TASK_ICON: Record<string, ReactNode> = {
+  "rt-1": <Droplets    size={17} color="#9FE870" strokeWidth={1.5} />,
+  "rt-2": <Wind        size={17} color="#9FE870" strokeWidth={1.5} />,
+  "rt-3": <Zap         size={17} color="#9FE870" strokeWidth={1.5} />,
+  "rt-4": <Coffee      size={17} color="#9FE870" strokeWidth={1.5} />,
+  "rt-5": <Navigation2 size={17} color="#9FE870" strokeWidth={1.5} />,
+  "rt-6": <Sunset      size={17} color="#9FE870" strokeWidth={1.5} />,
+  "rt-7": <Leaf        size={17} color="#9FE870" strokeWidth={1.5} />,
+};
+
+function PremiumIcon({ children, size = 44 }: { children: ReactNode; size?: number }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: "rgba(255,255,255,0.05)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxShadow: "0 0 18px rgba(120,255,180,0.18)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 function NaturaMark() {
   return (
     <div className="home-brand-row">
-      <svg width="24" height="30" viewBox="0 0 44 56" fill="none">
-        <path
-          d="M22 52C22 52 10 38 10 26C10 16.6 15.4 8.8 22 6C28.6 8.8 34 16.6 34 26C34 38 22 52 22 52Z"
-          fill="url(#markGrad)"
-        />
-        <line x1="22" y1="32" x2="22" y2="50" stroke="rgba(7,27,19,0.45)" strokeWidth="1.2" strokeDasharray="2.5 2.5" />
-        <circle cx="33" cy="18" r="4" fill="#5CEBA0" />
-        <circle cx="33" cy="18" r="2" fill="rgba(255,255,255,0.92)" />
-        <defs>
-          <linearGradient id="markGrad" x1="10" y1="6" x2="34" y2="52" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#9FE870" />
-            <stop offset="100%" stopColor="#3DE892" />
-          </linearGradient>
-        </defs>
-      </svg>
+      <img src={naturaLogo} alt="Natura AI" className="home-brand-logo" />
       <div className="home-brand-text">
         <span className="home-brand-name">NATURA AI</span>
         <span className="home-brand-sub">AI Wellness Coach</span>
@@ -98,15 +120,6 @@ function TrendGraph() {
   );
 }
 
-function TaskIcon({ category }: { category: string }) {
-  const size = 15;
-  const color = "#9FE870";
-  const sw = 1.5;
-  if (category === "morning") return <Sun size={size} color={color} strokeWidth={sw} />;
-  if (category === "evening") return <Moon size={size} color={color} strokeWidth={sw} />;
-  return <Coffee size={size} color={color} strokeWidth={sw} />;
-}
-
 export default function Home() {
   const { profile } = useUser();
   const { toggleTask, isTaskDone, streak, addToGrocery, groceryList, toggleGroceryItem, clearGroceryChecked } = useWellness();
@@ -122,6 +135,13 @@ export default function Home() {
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const wellnessScore = Math.min(95, 60 + Math.round(progressPct * 20) + Math.min((streak || 0) * 2, 15));
   const displayStreak = streak > 0 ? streak : 5;
+
+  const STATS = [
+    { icon: <Flame       size={17} color="#9FE870" strokeWidth={1.5} />, value: `${displayStreak}`, label: "day streak" },
+    { icon: <Clock       size={17} color="#9FE870" strokeWidth={1.5} />, value: "32",               label: "min today"  },
+    { icon: <CheckCircle2 size={17} color="#9FE870" strokeWidth={1.5} />, value: `${completedCount}`, label: "sessions" },
+    { icon: <Star        size={17} color="#9FE870" strokeWidth={1.5} />, value: `${wellnessScore}`, label: "score"      },
+  ];
 
   return (
     <Layout bgStyle={getBackgroundStyle(BG.main1)}>
@@ -150,14 +170,9 @@ export default function Home() {
 
         {/* ── 2. STATS BAR ─────────────────────────────────────────── */}
         <div className="home-stats-bar">
-          {[
-            { icon: <Flame       size={17} color="#9FE870" strokeWidth={1.5} />, value: `${displayStreak}`,  label: "day streak" },
-            { icon: <Clock       size={17} color="#9FE870" strokeWidth={1.5} />, value: "32",                label: "min today"  },
-            { icon: <CheckCircle2 size={17} color="#9FE870" strokeWidth={1.5} />, value: `${completedCount}`, label: "sessions"   },
-            { icon: <Star        size={17} color="#9FE870" strokeWidth={1.5} />, value: `${wellnessScore}`,  label: "score"      },
-          ].map(({ icon, value, label }, i) => (
+          {STATS.map(({ icon, value, label }, i) => (
             <div key={i} className="home-stat-item">
-              <div className="home-stat-icon">{icon}</div>
+              <PremiumIcon size={38}>{icon}</PremiumIcon>
               <span className="home-stat-value">{value}</span>
               <span className="home-stat-label">{label}</span>
             </div>
@@ -186,9 +201,9 @@ export default function Home() {
                     className={`home-tl-card ${done ? "done" : ""}`}
                     onClick={() => toggleTask(task.id)}
                   >
-                    <div className="home-tl-icon-wrap">
-                      <TaskIcon category={task.category} />
-                    </div>
+                    <PremiumIcon size={44}>
+                      {TASK_ICON[task.id] ?? <Leaf size={17} color="#9FE870" strokeWidth={1.5} />}
+                    </PremiumIcon>
                     <div className="home-tl-info">
                       <p className="home-tl-label">{task.label}</p>
                       <p className="home-tl-sub">{task.category}{task.time ? ` · ${task.time}` : ""}</p>
@@ -196,7 +211,7 @@ export default function Home() {
                     <div className={`home-tl-check ${done ? "checked" : ""}`}>
                       {done && <Check size={11} color="#071B13" strokeWidth={2.5} />}
                     </div>
-                    <ChevronRight size={13} color="rgba(159,232,112,0.32)" strokeWidth={1.5} className="home-tl-chevron" />
+                    <ChevronRight size={14} color="rgba(159,232,112,0.45)" strokeWidth={1.5} className="home-tl-chevron" />
                   </button>
                 </div>
               );

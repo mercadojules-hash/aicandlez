@@ -1,0 +1,29 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="leafGrad" x1="60" y1="20" x2="140" y2="170" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#9FE870"/>
+      <stop offset="100%" stop-color="#3DE892"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- Main leaf body -->
+  <path
+    d="M100 168 C100 168 48 130 48 92 C48 56 72 24 100 16 C128 24 152 56 152 92 C152 130 100 168 100 168Z"
+    fill="url(#leafGrad)"
+    filter="url(#glow)"
+  />
+  <!-- Central vein -->
+  <line x1="100" y1="108" x2="100" y2="162" stroke="rgba(7,27,19,0.35)" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round"/>
+  <!-- Left veins -->
+  <path d="M100 90 Q78 78 68 62" stroke="rgba(7,27,19,0.25)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M100 112 Q76 100 68 86" stroke="rgba(7,27,19,0.2)" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+  <!-- Right veins -->
+  <path d="M100 90 Q122 78 132 62" stroke="rgba(7,27,19,0.25)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M100 112 Q124 100 132 86" stroke="rgba(7,27,19,0.2)" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+  <!-- Top accent dot -->
+  <circle cx="138" cy="54" r="10" fill="#5CEBA0"/>
+  <circle cx="138" cy="54" r="5" fill="rgba(255,255,255,0.9)"/>
+</svg>
