@@ -1,0 +1,134 @@
+PLANS PAGE — APPLY HOSTED CARD IMAGES (FINAL INTEGRATION)
+
+We have added 3 custom background images for the Plans cards.
+
+GOAL:
+• Use each image as the top banner for its corresponding plan
+• Keep text readable
+• Maintain premium glass + glow style
+• DO NOT break layout
+
+--------------------------------------------------
+1. ASSIGN IMAGES TO EACH CARD
+--------------------------------------------------
+
+Map images EXACTLY like this:
+
+• 3-Day Stress Relief
+  → natura-plan-stress-relief-v1.webp
+
+• 7-Day Sleep Reset
+  → natura-plan-sleep-reset-v1.webp
+
+• Energy / Focus plan (or 3rd card)
+  → natura-plan-energy-boost-v1.webp
+
+--------------------------------------------------
+2. CARD IMAGE AREA (TOP SECTION)
+--------------------------------------------------
+
+Each card has a top visual section — update it:
+
+• Use background-image (NOT img tag)
+• Cover full width of card
+• Height: 120–140px
+• border-top-left-radius: inherit
+• border-top-right-radius: inherit
+
+CSS:
+
+background-size: cover;
+background-position: center;
+background-repeat: no-repeat;
+
+--------------------------------------------------
+3. ADD PREMIUM OVERLAY (CRITICAL FOR READABILITY)
+--------------------------------------------------
+
+Without this, text will break.
+
+Add overlay ON TOP of image:
+
+Layer 1 (dark fade):
+linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.55))
+
+Layer 2 (brand glow):
+radial-gradient(circle at top right, rgba(120,255,180,0.15), transparent 60%)
+
+These must be layered WITH the image.
+
+--------------------------------------------------
+4. ICON IN IMAGE AREA (CENTER)
+--------------------------------------------------
+
+Keep icon centered but upgrade it:
+
+• Wrap icon in circular glass container
+• Size: 48px
+• Center both vertically + horizontally
+
+Style:
+
+background: rgba(255,255,255,0.06);
+backdrop-filter: blur(8px);
+border-radius: 50%;
+
+Glow:
+box-shadow: 0 0 14px rgba(120,255,180,0.35);
+
+--------------------------------------------------
+5. TEXT READABILITY FIX
+--------------------------------------------------
+
+Inside card content:
+
+• Title: #ffffff
+• Description: opacity 0.7–0.8
+• Ensure contrast over image
+
+If needed:
+Add slight text-shadow:
+text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+
+--------------------------------------------------
+6. KEEP GLASS CARD BASE (DO NOT REMOVE)
+--------------------------------------------------
+
+The LOWER part of the card must still use:
+
+background: rgba(0,0,0,0.25);
+backdrop-filter: blur(18px);
+border: 1px solid rgba(255,255,255,0.08);
+
+Do NOT replace with solid colors.
+
+--------------------------------------------------
+7. FINAL VISUAL GOAL
+--------------------------------------------------
+
+Each card should now feel like:
+
+• A featured premium module
+• Image + glow + glass layered together
+• Consistent with Home screen design
+
+NOT:
+• Flat color blocks ❌
+• Plain images ❌
+• Washed out text ❌
+
+--------------------------------------------------
+IMPORTANT
+--------------------------------------------------
+
+Do NOT:
+• Change layout
+• Resize cards drastically
+• Remove blur/glass system
+
+ONLY:
+• Apply images
+• Add overlays
+• Enhance visual depth
+
+--------------------------------------------------

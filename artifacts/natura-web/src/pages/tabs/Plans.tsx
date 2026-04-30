@@ -6,6 +6,15 @@ import { useWellness } from "@/contexts/WellnessContext";
 import { PLANS, REMEDIES } from "@/lib/data";
 import { CardImage } from "@/components/CardImage";
 import { BG, getBackgroundStyle } from "@/lib/background";
+import imgStressRelief from "@assets/natura-plan-stress-relief-v1_1777543715688.webp";
+import imgSleepReset from "@assets/natura-plan-sleep-reset-v1_1777543715688.webp";
+import imgEnergyBoost from "@assets/natura-plan-energy-boost-v1_1777543715687.webp";
+
+const PLAN_IMAGES: Record<string, string> = {
+  "plan-stress-3day": imgStressRelief,
+  "plan-sleep-7day":  imgSleepReset,
+  "plan-energy-5day": imgEnergyBoost,
+};
 
 type Tab = "Plans" | "Remedies" | "Saved";
 
@@ -39,7 +48,7 @@ export default function Plans() {
               const saved = isSaved(plan.id);
               return (
                 <div key={plan.id} className="plan-card" onClick={() => navigate(`${base}/plan/${plan.id}`)}>
-                  <CardImage src={plan.image} alt={plan.title} className="plan-card-img" fallbackHint={plan.goal} />
+                  <CardImage src={PLAN_IMAGES[plan.id] ?? plan.image} alt={plan.title} className="plan-card-img" fallbackHint={plan.goal} />
                   <div className="plan-card-body">
                     <div className="plan-card-row1">
                       <span className="plan-goal-badge">{plan.goal}</span>
@@ -109,7 +118,7 @@ export default function Plans() {
                       if (!plan) return null;
                       return (
                         <div key={plan.id} className="plan-card" onClick={() => navigate(`${base}/plan/${plan.id}`)}>
-                          <CardImage src={plan.image} alt={plan.title} className="plan-card-img" fallbackHint={plan.goal} />
+                          <CardImage src={PLAN_IMAGES[plan.id] ?? plan.image} alt={plan.title} className="plan-card-img" fallbackHint={plan.goal} />
                           <div className="plan-card-body">
                             <span className="plan-goal-badge">{plan.goal}</span>
                             <p className="plan-card-title">{plan.title}</p>
