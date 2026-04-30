@@ -36,6 +36,7 @@ export default defineConfig({
         const zips: Record<string, string> = {
           "/natura-ai.zip": path.resolve(import.meta.dirname, "public/natura-ai.zip"),
           "/natura-yoga-ai-v1.0.0.zip": path.resolve(import.meta.dirname, "public/natura-yoga-ai-v1.0.0.zip"),
+          "/natura-yoga-ai-v1.0.0-v2.zip": path.resolve(import.meta.dirname, "public/natura-yoga-ai-v1.0.0-v2.zip"),
         };
         server.middlewares.use((req, res, next) => {
           const urlPath = req.url?.split("?")[0] ?? "";
