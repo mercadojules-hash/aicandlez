@@ -1,0 +1,84 @@
+VISUAL FIX — PLAN IMAGES ARE TOO DARK / NOT PROMINENT
+
+Current issue:
+Images ARE loading correctly, but are visually too dark and not standing out.
+The overlay is too aggressive and is hiding the image detail.
+
+This makes the cards feel like dark blocks instead of premium image cards.
+
+--------------------------------------------------
+GOAL
+--------------------------------------------------
+
+• Make images clearly visible (like Home screen background)
+• Keep text readable
+• Keep premium glow style
+• Reduce darkness WITHOUT removing overlay system
+
+--------------------------------------------------
+FIX OVERLAY (CRITICAL)
+--------------------------------------------------
+
+Current overlay is too strong.
+
+REPLACE:
+
+linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.65))
+
+WITH:
+
+linear-gradient(to bottom, rgba(0,0,0,0.05), rgba(0,0,0,0.45))
+
+--------------------------------------------------
+ADJUST RADIAL GLOW (LESS HEAVY)
+--------------------------------------------------
+
+REPLACE:
+
+rgba(120,255,180,0.18)
+
+WITH:
+
+rgba(120,255,180,0.10)
+
+--------------------------------------------------
+ADD TOP LIGHT (IMPORTANT)
+--------------------------------------------------
+
+Add this subtle highlight to bring image to life:
+
+radial-gradient(circle at top left, rgba(255,255,255,0.08), transparent 60%)
+
+--------------------------------------------------
+FINAL BACKGROUND STACK
+--------------------------------------------------
+
+background-image:
+  radial-gradient(circle at top left, rgba(255,255,255,0.08), transparent 60%),
+  linear-gradient(to bottom, rgba(0,0,0,0.05), rgba(0,0,0,0.45)),
+  radial-gradient(circle at top right, rgba(120,255,180,0.10), transparent 60%),
+  url(IMAGE_URL);
+
+--------------------------------------------------
+RESULT REQUIRED
+--------------------------------------------------
+
+• You must clearly see:
+  - leaves / jungle details on Stress card
+  - sky + moon glow on Sleep card
+  - energy lighting on Energy card
+
+• Cards should feel:
+  - alive
+  - atmospheric
+  - NOT flat or overly dark
+
+--------------------------------------------------
+DO NOT:
+--------------------------------------------------
+
+• Do NOT remove overlay entirely
+• Do NOT make text unreadable
+• Do NOT revert to solid backgrounds
+
+--------------------------------------------------
