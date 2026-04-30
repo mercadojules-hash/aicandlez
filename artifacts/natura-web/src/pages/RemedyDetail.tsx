@@ -3,6 +3,19 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ChevronLeft, Bookmark, Check, ChevronRight, ChevronDown } from "lucide-react";
 import { useWellness } from "@/contexts/WellnessContext";
 import { REMEDIES, RECIPES } from "@/lib/data";
+import imgGingerTea from "@assets/remedy-ginger-tea_1777546217699.webp";
+import imgTurmericMilk from "@assets/remedy-turmeric-golden-milk_1777546217701.webp";
+import imgLavenderTea from "@assets/remedy-lavender-calming-tea_1777546217700.webp";
+import imgChamomileTea from "@assets/remedy-chamomile-sleep-tea_1777546217699.webp";
+import imgEnergySmoothie from "@assets/remedy-green-energy-smoothie_1777546217700.webp";
+
+const REMEDY_IMAGES: Record<string, string> = {
+  "remedy-ginger-tea":       imgGingerTea,
+  "remedy-lavender-calm":    imgLavenderTea,
+  "remedy-immunity-shot":    imgTurmericMilk,
+  "remedy-ashwagandha-milk": imgChamomileTea,
+  "remedy-energy-smoothie":  imgEnergySmoothie,
+};
 
 export default function RemedyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -22,39 +35,39 @@ export default function RemedyDetail() {
 
   const saved = isSaved(item.id);
   const isRecipe = "variations" in item;
+  const heroSrc = REMEDY_IMAGES[item.id] ?? item.image;
 
   return (
     <div className="detail-screen">
       <div className="detail-hero">
-        {!heroFailed && item.image ? (
-          <img
-            src={item.image}
-            alt={item.title}
-            className="detail-hero-img"
-            onError={() => setHeroFailed(true)}
-          />
+        {!heroFailed && heroSrc ? (
+          <img src={heroSrc} alt={item.title} className="detail-hero-img" onError={() => setHeroFailed(true)} />
         ) : (
           <div className="detail-hero-fallback" />
         )}
         <div className="detail-hero-overlay">
-          <button className="detail-back-btn" onClick={() => navigate(-1)}>
-            <ChevronLeft size={24} color="#fff" />
-          </button>
-          <button
-            className="detail-save-btn"
-            onClick={() => saved ? removeItem(item.id) : saveItem({ id: item.id, type: isRecipe ? "recipe" : "remedy", title: item.title, savedAt: new Date().toISOString() })}
-          >
-            <Bookmark size={20} fill={saved ? "#fff" : "none"} color="#fff" />
-          </button>
+          <div className="detail-hero-top">
+            <button className="detail-back-btn" onClick={() => navigate(-1)}>
+              <ChevronLeft size={22} color="#fff" />
+            </button>
+            <button
+              className={`detail-save-btn ${saved ? "saved" : ""}`}
+              onClick={() => saved ? removeItem(item.id) : saveItem({ id: item.id, type: isRecipe ? "recipe" : "remedy", title: item.title, savedAt: new Date().toISOString() })}
+            >
+              <Bookmark size={18} fill={saved ? "#fff" : "none"} color="#fff" />
+            </button>
+          </div>
+          <div className="detail-hero-bottom">
+            <span className="detail-hero-category">{item.category}</span>
+            <h1 className="detail-hero-title">{item.title}</h1>
+          </div>
         </div>
       </div>
 
       <div className="detail-content">
         <div className="detail-meta">
-          <span className="detail-category">{item.category}</span>
-          <span className="detail-prep">&#x23F1; {item.prepTime}</span>
+          <span className="detail-prep">⏱ {item.prepTime}</span>
         </div>
-        <h1 className="detail-title">{item.title}</h1>
         <p className="detail-description">{item.description}</p>
 
         {!stepMode ? (
@@ -79,7 +92,7 @@ export default function RemedyDetail() {
                   <div className="step-num">{step.stepNumber}</div>
                   <div>
                     <p className="step-instruction">{step.instruction}</p>
-                    {step.duration && <p className="step-duration">&#x23F1; {step.duration}</p>}
+                    {step.duration && <p className="step-duration">⏱ {step.duration}</p>}
                   </div>
                 </div>
               ))}
@@ -90,7 +103,7 @@ export default function RemedyDetail() {
                 <h3 className="detail-section-title">Benefits</h3>
                 {item.benefits.map((b, i) => (
                   <div key={i} className="benefit-row">
-                    <Check size={14} color="#3D7A45" />
+                    <Check size={14} color="#7CFFB2" />
                     <span>{b}</span>
                   </div>
                 ))}
@@ -102,7 +115,7 @@ export default function RemedyDetail() {
                 <h3 className="detail-section-title">Variations</h3>
                 {(item as any).variations.map((v: string, i: number) => (
                   <div key={i} className="ingredient-row">
-                    <div className="ingredient-dot" style={{ background: "#6BAA4A" }} />
+                    <div className="ingredient-dot" style={{ background: "#9FE870" }} />
                     <span>{v}</span>
                   </div>
                 ))}
@@ -110,9 +123,13 @@ export default function RemedyDetail() {
             )}
 
             <div className="safety-card">
-              <p className="safety-title">Safety Note</p>
+              <p className="safety-title">⚠️ Safety Note</p>
               <p className="safety-text">{"safetyNote" in item ? item.safetyNote : ""}</p>
             </div>
+
+            <button className="detail-cta-btn" onClick={() => setStepMode(true)}>
+              Start Guided Mode
+            </button>
           </>
         ) : (
           <div className="guided-mode">
@@ -127,7 +144,7 @@ export default function RemedyDetail() {
               <div className="guided-step-num">{currentStep + 1}</div>
               <p className="guided-step-instruction">{item.steps[currentStep].instruction}</p>
               {item.steps[currentStep].duration && (
-                <p className="guided-step-duration">&#x23F1; {item.steps[currentStep].duration}</p>
+                <p className="guided-step-duration">⏱ {item.steps[currentStep].duration}</p>
               )}
             </div>
             <div className="guided-nav">
