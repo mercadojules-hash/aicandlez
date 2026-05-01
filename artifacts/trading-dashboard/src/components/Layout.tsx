@@ -23,7 +23,7 @@ import {
 
 export const MODULE_LIST = [
   { id: 1,  path: "/",           icon: LayoutDashboard, label: "Dashboard",          sublabel: "System shell & status",          status: "active"   },
-  { id: 2,  path: "/market",     icon: Radio,           label: "Market Data",        sublabel: "Live feed engine",               status: "pending"  },
+  { id: 2,  path: "/market",     icon: Radio,           label: "Market Data",        sublabel: "Live feed engine",               status: "active"   },
   { id: 3,  path: "/indicators", icon: BarChart3,       label: "Indicators",         sublabel: "Candle & indicator engine",      status: "pending"  },
   { id: 4,  path: "/ai",         icon: Brain,           label: "AI Reasoning",       sublabel: "Signal & decision engine",       status: "pending"  },
   { id: 5,  path: "/risk",       icon: Shield,          label: "Risk Management",    sublabel: "Position sizing & limits",       status: "pending"  },
@@ -57,7 +57,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 font-bold text-sm tracking-widest select-none">
             <Cpu className="w-4 h-4 text-primary" />
             <span className="text-foreground">APEX</span><span className="text-primary">TRADER</span>
-            <span className="ml-1 text-[10px] font-mono font-normal text-muted-foreground/60 tracking-normal">v1.0 · MODULE 1</span>
+            <span className="ml-1 text-[10px] font-mono font-normal text-muted-foreground/60 tracking-normal">
+              v1.0 · MODULE {String(Math.max(...MODULE_LIST.filter(m => m.status === "active").map(m => m.id))).padStart(2, "0")}
+            </span>
           </div>
         </div>
 

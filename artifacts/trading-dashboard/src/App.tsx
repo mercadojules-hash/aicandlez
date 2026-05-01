@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout, MODULE_LIST } from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
+import MarketData from "@/pages/MarketData";
 import ComingSoon from "@/pages/ComingSoon";
 
 const queryClient = new QueryClient({
@@ -19,6 +20,9 @@ function Router() {
     <Switch>
       <Route path="/">
         <Layout><Dashboard /></Layout>
+      </Route>
+      <Route path="/market">
+        <Layout><MarketData /></Layout>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>

@@ -86,8 +86,8 @@ export default function Dashboard() {
       {/* ── System health cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <HealthCard icon={<Server className="w-4 h-4" />} label="API Server"   ok={apiHealth.ok}   value={apiHealth.ok ? `${apiHealth.latencyMs}ms` : "offline"} />
-        <HealthCard icon={<Radio    className="w-4 h-4" />} label="WebSocket"  ok={false}           value="Module 2"    dim />
-        <HealthCard icon={<Database className="w-4 h-4" />} label="Data Feed"  ok={false}           value="Module 2"    dim />
+        <HealthCard icon={<Radio    className="w-4 h-4" />} label="WebSocket"  ok={false}           value="Module 3"    dim />
+        <HealthCard icon={<Database className="w-4 h-4" />} label="Data Feed"  ok={true}            value="Kraken · Live" />
         <HealthCard icon={<Brain    className="w-4 h-4" />} label="AI Engine"  ok={false}           value="Module 4"    dim />
       </div>
 
@@ -95,8 +95,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Modules Active"  value={`${activeModules}/14`}   icon={<CheckCircle2 className="w-4 h-4 text-green-400" />} color="green"  />
         <StatCard label="Modules Pending" value={`${pendingModules}/14`}  icon={<Clock        className="w-4 h-4 text-yellow-400" />} color="yellow" />
-        <StatCard label="Build Phase"     value="1 · Foundation"          icon={<Layers       className="w-4 h-4 text-primary"    />} color="blue"   />
-        <StatCard label="System Status"   value="Initializing"            icon={<Activity     className="w-4 h-4 text-primary"    />} color="blue"   />
+        <StatCard label="Build Phase"     value="2 · Data Engine"         icon={<Layers       className="w-4 h-4 text-primary"    />} color="blue"   />
+        <StatCard label="System Status"   value="Data Feed Online"        icon={<Activity     className="w-4 h-4 text-primary"    />} color="blue"   />
       </div>
 
       {/* ── Body grid ── */}
@@ -185,8 +185,8 @@ export default function Dashboard() {
             <div className="p-4 flex flex-col gap-1.5 text-[11px] font-mono text-muted-foreground">
               <ArchRow icon={<TrendingUp className="w-3 h-3" />} label="Frontend"  value="React + Vite + Tailwind"  ok />
               <ArchRow icon={<Server     className="w-3 h-3" />} label="Backend"   value="Express · Node.js"         ok />
-              <ArchRow icon={<Radio      className="w-3 h-3" />} label="Realtime"  value="WebSocket (Module 2)"      />
-              <ArchRow icon={<Database   className="w-3 h-3" />} label="Data"      value="Binance API (Module 2)"    />
+              <ArchRow icon={<Radio      className="w-3 h-3" />} label="Realtime"  value="WebSocket (Module 3)"      />
+              <ArchRow icon={<Database   className="w-3 h-3" />} label="Data"      value="Kraken API · Live"          ok />
               <ArchRow icon={<Brain      className="w-3 h-3" />} label="AI"        value="LLM Engine (Module 4)"     />
               <ArchRow icon={<Shield     className="w-3 h-3" />} label="Risk"      value="Risk Engine (Module 5)"    />
               <ArchRow icon={<Zap        className="w-3 h-3" />} label="Execution" value="Live Broker (Module 13)"   />
@@ -197,10 +197,10 @@ export default function Dashboard() {
           <div className="border border-primary/20 rounded-xl bg-primary/5 overflow-hidden">
             <div className="px-4 py-3 border-b border-primary/20 flex items-center gap-2 text-sm font-semibold text-primary">
               <Zap className="w-4 h-4" />
-              Next: Module 2
+              Next: Module 3 · Indicators
             </div>
             <div className="p-4 flex flex-col gap-1.5 text-[11px] text-muted-foreground">
-              {["Live market data (Binance WebSocket)", "Real-time OHLCV candle streaming", "Symbol + timeframe switching", "Data normalization layer", "Live candlestick chart"].map((item) => (
+              {["RSI, MACD, Bollinger Bands", "EMA 20 / EMA 50 crossover detection", "Volume-weighted indicators", "Real-time indicator overlay on candles", "Signal strength scoring"].map((item) => (
                 <div key={item} className="flex items-start gap-1.5">
                   <Circle className="w-2.5 h-2.5 mt-0.5 shrink-0 text-primary/50" />
                   {item}
