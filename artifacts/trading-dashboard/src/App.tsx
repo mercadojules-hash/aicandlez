@@ -20,6 +20,7 @@ import Sentiment from "@/pages/Sentiment";
 import Exchange from "@/pages/Exchange";
 import ComingSoon from "@/pages/ComingSoon";
 import SystemVerification from "@/pages/SystemVerification";
+import SignalDebug from "@/pages/SignalDebug";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -79,6 +80,9 @@ function Router() {
       </Route>
       <Route path="/syscheck">
         <Layout><SystemVerification /></Layout>
+      </Route>
+      <Route path="/debug">
+        <Layout><SignalDebug /></Layout>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>
