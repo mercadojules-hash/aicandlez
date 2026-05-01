@@ -1,0 +1,107 @@
+The ZIP you sent is still completely wrong.
+
+You are packaging the wrong app/source again. The correct app is **Natura AI**, and it is currently visible in the Preview at:
+
+`.replit.dev/natura-web/home`
+
+I am attaching 6 screenshots showing the 6 main tabs of the correct Natura AI app:
+
+1. Home — “Today’s Plan for You”
+2. Ask AI — “Natura AI Premium / Unlock AI”
+3. Plans — “Wellness Plans”
+4. Recipes — “Golden Turmeric Latte / Herbal Immunity Broth”
+5. Learn — “Learn & Improve”
+6. Profile — “Jules / Daily Check-In / Appearance”
+
+This is NOT Natura Yoga AI.
+
+There are:
+
+* NO yoga pose images
+* NO yoga.tsx
+* NO chakra yoga pose image library
+* NO Natura Yoga files
+* NO meditation/yoga pose folders
+
+The correct app is a holistic wellness app with:
+
+* Today’s Plan
+* Ask AI
+* Plans
+* Recipes
+* Learn
+* Profile
+* Premium unlock screens
+* Green wellness UI
+
+Please locate and package the exact source used by the preview route:
+
+`.replit.dev/natura-web/home`
+
+Do NOT package anything from Natura Yoga AI.
+
+Create a new clean ZIP named:
+
+`natura-ai.zip`
+
+ZIP requirements:
+
+The ZIP root must contain the actual app source directly, not nested inside artifacts or workspace folders.
+
+Required root files/folders:
+
+* app/
+* assets/
+* components/
+* hooks/
+* lib/
+* app.json
+* package.json
+* tsconfig.json
+* babel.config.js
+* metro.config.js
+* eas.json
+
+Do NOT include:
+
+* artifacts/
+* natura-yoga-ai/
+* yoga.tsx
+* yoga pose images
+* chakra yoga pose images
+* pnpm-workspace.yaml
+* pnpm-lock.yaml
+* catalog: dependencies
+* workspace:* dependencies
+* @workspace/* dependencies
+
+app.json must be:
+
+name: Natura AI
+slug: natura-ai
+scheme: natura-ai
+ios.bundleIdentifier: com.naturaai.app
+ios.buildNumber: 3
+
+package.json must work with:
+
+`npm install`
+
+No `catalog:` dependencies.
+No `workspace:*` dependencies.
+No internal workspace packages.
+
+Before sending the ZIP, verify and report:
+
+1. Root files/folders inside ZIP
+2. Total image count
+3. Confirm zero yoga files
+4. Confirm zero yoga pose images
+5. Confirm zero chakra yoga pose images
+6. Confirm no `catalog:` references
+7. Confirm no `workspace:*` references
+8. Confirm no pnpm files
+9. Confirm `npm install` works
+10. Confirm `npx expo start` works
+
+If you cannot locate the exact source for `.replit.dev/natura-web/home`, stop and tell me. Do not send another ZIP from the wrong app.
