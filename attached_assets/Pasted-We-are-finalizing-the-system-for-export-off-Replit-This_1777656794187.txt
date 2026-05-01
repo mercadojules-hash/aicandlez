@@ -1,0 +1,106 @@
+We are finalizing the system for export off Replit. This must be the final stable version. Do NOT rebuild anything — only extend and organize existing features.
+
+GOAL:
+Create a complete, unified, device-friendly trading dashboard that can run on desktop, tablet, and mobile without further changes.
+
+---
+
+1. UNIFIED TRADING DASHBOARD VIEW
+
+Create a main dashboard page that combines:
+
+* Multi-asset charts (BTC, ETH, SOL default)
+* Signal summary (BUY / SELL / HOLD counts)
+* AI market summary panel
+* Active trades / status
+* Risk status (daily trades remaining, risk level)
+
+Requirements:
+
+* Clean layout
+* Responsive design (must work on desktop, tablet, mobile)
+* No need to switch between multiple modules
+
+Goal:
+User can monitor everything from ONE screen.
+
+---
+
+2. ALERTS / NOTIFICATIONS SYSTEM
+
+Add real-time alerts for:
+
+* BUY / SELL signals
+* MTF confirmation
+* Trade execution (auto + manual)
+
+Requirements:
+
+* On-screen popup alerts
+* Optional sound toggle
+* Show asset, timeframe, confidence
+* Avoid duplicate spam alerts
+
+Goal:
+User does not need to constantly watch the screen.
+
+---
+
+3. SETTINGS / CONTROL PANEL
+
+Add a simple UI panel to control:
+
+* Max trades per day (3 / 5 / 10 / custom)
+* Position size (USD)
+* Risk level
+* Toggle auto-trading ON/OFF
+
+Requirements:
+
+* Changes apply instantly
+* Persist settings locally (browser storage)
+* No code changes required
+
+Goal:
+User has full control without rebuilding system.
+
+---
+
+4. ENSURE MOBILE + TABLET COMPATIBILITY
+
+Optimize layout so:
+
+* Charts stack properly on smaller screens
+* Controls remain accessible
+* Buttons are touch-friendly
+* No overflow or broken UI on mobile
+
+Goal:
+System runs cleanly on phone and tablet browsers.
+
+---
+
+5. FINAL SYSTEM VALIDATION
+
+Before completion:
+
+* Confirm charts load correctly
+* Confirm signals update
+* Confirm alerts trigger
+* Confirm settings persist after refresh
+* Confirm simulation mode works
+* Confirm no broken modules
+
+---
+
+IMPORTANT:
+
+* Do NOT change trading logic
+* Do NOT remove any existing features
+* Do NOT add unnecessary complexity
+
+---
+
+FINAL GOAL:
+
+Deliver a stable, complete version of Apex Trader that can be exported and run independently on desktop and mobile without needing further development.

@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout, MODULE_LIST } from "@/components/Layout";
+import { AlertsProvider } from "@/components/AlertsProvider";
+import { SettingsDrawer } from "@/components/SettingsDrawer";
 import Dashboard from "@/pages/Dashboard";
 import MarketData from "@/pages/MarketData";
 import Indicators from "@/pages/Indicators";
@@ -22,6 +24,7 @@ import ComingSoon from "@/pages/ComingSoon";
 import SystemVerification from "@/pages/SystemVerification";
 import SignalDebug from "@/pages/SignalDebug";
 import MultiChart from "@/pages/MultiChart";
+import CommandCenter from "@/pages/CommandCenter";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -88,6 +91,9 @@ function Router() {
       <Route path="/charts">
         <Layout><MultiChart /></Layout>
       </Route>
+      <Route path="/command">
+        <Layout><CommandCenter /></Layout>
+      </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>
           <Layout><ComingSoon path={path} /></Layout>
@@ -101,10 +107,13 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
+        <AlertsProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <SettingsDrawer />
+          <Toaster />
+        </AlertsProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
