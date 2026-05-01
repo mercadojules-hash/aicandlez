@@ -10,6 +10,7 @@ import backtestRouter from "./backtest.js";
 import candlesRouter from "./candles.js";
 import marketDataRouter from "./marketData.js";
 import analysisRouter from "./analysis.js";
+import aiDecisionRouter from "./aiDecision.js";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(backtestRouter);
 router.use(candlesRouter);
 router.use(marketDataRouter);
 router.use(analysisRouter);
+router.use(aiDecisionRouter);
 
 export default router;

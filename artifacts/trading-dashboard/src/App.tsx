@@ -6,6 +6,7 @@ import { Layout, MODULE_LIST } from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
 import MarketData from "@/pages/MarketData";
 import Indicators from "@/pages/Indicators";
+import AIReasoning from "@/pages/AIReasoning";
 import ComingSoon from "@/pages/ComingSoon";
 
 const queryClient = new QueryClient({
@@ -27,6 +28,9 @@ function Router() {
       </Route>
       <Route path="/indicators">
         <Layout><Indicators /></Layout>
+      </Route>
+      <Route path="/ai">
+        <Layout><AIReasoning /></Layout>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>
