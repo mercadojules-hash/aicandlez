@@ -38,9 +38,24 @@ Hybrid AI crypto trading dashboard — 19 modules, all active. Kraken exchange, 
 14. Sentiment AI — news scoring –100 to +100, Fear & Greed index, AI confidence ±5–20%
 15. Exchange — Kraken integration, SIMULATION (default) / LIVE mode, kill switch, pause, risk-gated order execution, no withdrawals
 16. System Verification — full engine health check panel, 10 subsystems, auto-refresh at `/syscheck`
-17. Signal Debug — MTF funnel tracker, per-symbol indicator breakdown, test mode toggle, last-10 signal log at `/debug`
+17. Signal Debug — MTF funnel tracker, per-symbol indicator breakdown, test mode toggle, last-10 signal log, **signal quality filter toggles** (volume + 1H trend), **mini 5m sparkline charts** with VOL/MARKET/1H badges at `/debug`
 18. Multi-Asset Chart — BTC/ETH/SOL charts side-by-side, EMA9/21 trend lines, volume overlay, flexible asset config + custom symbol add at `/charts`
 19. Command Center — unified one-screen view: 3 mini charts + signal summary + AI brief + active trades + risk status. Fully responsive (desktop/tablet/mobile) at `/command`
+
+**Asset Scanner** (`/scanner`): Now includes **15m mini sparkline charts** (60 candles, colored by trend) on each asset card.
+
+**Signal quality filters** (v1.0.0 final):
+- **Volume confirmation** — current 5m volume must be ≥ 85% of 20-bar rolling average (default: ON)
+- **Sideways filter** — blocks trades when EMA9/EMA21 spread < 0.15% on both TFs (always active)
+- **1H trend alignment** — optional: requires 1H EMA9 to align with signal direction (default: OFF, toggleable in Signal Debug)
+- Default `minConfidence` changed from 70 to **60**
+- New API: `POST /api/engine/filters` — `{ volumeFilter: boolean, require1HTrend: boolean }`
+- New engine status fields: `volumeFilter`, `require1HTrend`, `symbolBreakdowns[*].volumeConfirmed`, `.marketCondition`, `.trend1H`
+
+**Export ZIP** (`/apex-trader-final-export-v1.zip`):
+- Served from `trading-dashboard/public/`
+- Contains: `README.md` (full feature guide, API reference, arch diagram), `.env.example`, `SETUP.md` (quick-start checklist)
+- Download link in sidebar footer (desktop + mobile)
 
 **Global components (App-level):**
 - `AlertsProvider.tsx` — polls engine every 8s, shows toast alerts for BUY/SELL signals + trade executions. Sound toggle (Web Audio API). Deduplication via signal ID set.

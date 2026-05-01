@@ -24,6 +24,7 @@ import {
   Zap,
   ClipboardCheck,
   Bug,
+  Download,
   X,
 } from "lucide-react";
 
@@ -179,6 +180,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
               />
             ))}
           </nav>
+          {/* Download export link */}
+          {!collapsed && (
+            <div className="p-2 border-t border-border/30 shrink-0">
+              <a
+                href="/apex-trader-final-export-v1.zip"
+                download
+                className="flex items-center gap-2 px-2 py-1.5 rounded text-[11px] text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/20 transition-colors"
+              >
+                <Download className="w-3 h-3 shrink-0" />
+                <span>Download Export</span>
+              </a>
+            </div>
+          )}
         </aside>
 
         {/* Mobile sidebar — overlay drawer */}
@@ -206,6 +220,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
               />
             ))}
           </nav>
+          {/* Download export link (mobile) */}
+          <div className="p-3 border-t border-border/30 shrink-0">
+            <a
+              href="/apex-trader-final-export-v1.zip"
+              download
+              className="flex items-center gap-2 px-3 py-2 rounded text-xs text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/20 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5 shrink-0" />
+              <span>Download Export ZIP</span>
+            </a>
+          </div>
         </aside>
 
         {/* Main content */}

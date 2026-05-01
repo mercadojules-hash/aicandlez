@@ -30,14 +30,18 @@ export interface TimeframeSnapshot {
 }
 
 export interface SymbolBreakdown {
-  symbol:        string;
-  fast:          TimeframeSnapshot;   // 5m
-  slow:          TimeframeSnapshot;   // 15m
-  mtfConfirmed:  boolean;
-  agreedAction:  string;
-  avgConfidence: number;
-  blockReason:   string;
-  lastUpdated:   number;
+  symbol:          string;
+  fast:            TimeframeSnapshot;   // 5m
+  slow:            TimeframeSnapshot;   // 15m
+  mtfConfirmed:    boolean;
+  agreedAction:    string;
+  avgConfidence:   number;
+  blockReason:     string;
+  lastUpdated:     number;
+  // Quality filters
+  volumeConfirmed: boolean;
+  marketCondition: "trending" | "sideways" | "neutral";
+  trend1H:         "bullish" | "bearish" | "unknown";
 }
 
 // ── Signal log entry (last-10 circular buffer) ────────────────────────────────
@@ -70,6 +74,8 @@ interface EngineStats {
   trailingStopHits:   number;
   correlationBlocks:  number;
   testMode:           boolean;
+  require1HTrend:     boolean;   // optional: 1H EMA must align with signal direction
+  volumeFilter:       boolean;   // optional: volume must be above-average
   // Signal distribution
   signalCounts:       { BUY: number; SELL: number; HOLD: number };
   // Execution funnel
@@ -100,6 +106,8 @@ export const engineStats: EngineStats = {
   trailingStopHits:   0,
   correlationBlocks:  0,
   testMode:           false,
+  require1HTrend:     false,
+  volumeFilter:       true,
   signalCounts:       { BUY: 0, SELL: 0, HOLD: 0 },
   funnelTotal:        0,
   funnelPassedMTF:    0,
@@ -115,6 +123,16 @@ export const engineStats: EngineStats = {
 export function setTestMode(enabled: boolean) {
   engineStats.testMode = enabled;
   logger.info({ testMode: enabled }, "Trading loop: test mode changed");
+}
+
+export function setRequire1HTrend(enabled: boolean) {
+  engineStats.require1HTrend = enabled;
+  logger.info({ require1HTrend: enabled }, "Trading loop: 1H trend alignment filter changed");
+}
+
+export function setVolumeFilter(enabled: boolean) {
+  engineStats.volumeFilter = enabled;
+  logger.info({ volumeFilter: enabled }, "Trading loop: volume confirmation filter changed");
 }
 
 // ── Position metadata store (for journal at close) ─────────────────────────────
@@ -145,7 +163,7 @@ interface LoopSettings {
 async function fetchSettings(): Promise<LoopSettings> {
   const rows = await db.select().from(settingsTable).where(eq(settingsTable.id, "default")).limit(1);
   if (rows.length === 0) {
-    return { autoMode: false, killSwitch: false, minConfidence: 70, allocation: 1000, stopLossPercent: 2, takeProfitPercent: 4, maxTradesPerDay: 5 };
+    return { autoMode: false, killSwitch: false, minConfidence: 60, allocation: 1000, stopLossPercent: 2, takeProfitPercent: 4, maxTradesPerDay: 5 };
   }
   const s = rows[0]!;
   return {
@@ -254,15 +272,18 @@ async function persistSignal(
 // ── Multi-timeframe decision (per symbol) ──────────────────────────────────────
 
 interface MTFResult {
-  symbol:        string;
-  fast:          AIDecisionResult;
-  slow:          AIDecisionResult;
-  fastSnap:      TimeframeSnapshot;
-  slowSnap:      TimeframeSnapshot;
-  mtfConfirmed:  boolean;
-  agreedAction:  "BUY" | "SELL" | "HOLD";
-  avgConfidence: number;
-  blockReason:   string;
+  symbol:          string;
+  fast:            AIDecisionResult;
+  slow:            AIDecisionResult;
+  fastSnap:        TimeframeSnapshot;
+  slowSnap:        TimeframeSnapshot;
+  mtfConfirmed:    boolean;
+  agreedAction:    "BUY" | "SELL" | "HOLD";
+  avgConfidence:   number;
+  blockReason:     string;
+  volumeConfirmed: boolean;
+  marketCondition: "trending" | "sideways" | "neutral";
+  trend1H:         "bullish" | "bearish" | "unknown";
 }
 
 async function computeMTFDecision(symbol: string): Promise<MTFResult> {
@@ -285,6 +306,43 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
   const agreedAction: "BUY" | "SELL" | "HOLD" = bothBuy ? "BUY" : bothSell ? "SELL" : "HOLD";
   const avgConfidence = parseFloat(((fast.confidence + slow.confidence) / 2).toFixed(1));
 
+  // ── Volume confirmation filter ─────────────────────────────────────────────
+  // Compare latest candle volume vs rolling average of last 20 candles
+  let volumeConfirmed = true;
+  if (candles5m.length >= 5) {
+    const recentVols  = candles5m.slice(-21, -1).map((c) => c.volume);
+    const avgVol      = recentVols.reduce((a, b) => a + b, 0) / recentVols.length;
+    const currentVol  = candles5m[candles5m.length - 1]?.volume ?? 0;
+    volumeConfirmed   = currentVol >= avgVol * 0.85;   // current must be ≥ 85% of average
+  }
+
+  // ── Market condition: sideways / trending ──────────────────────────────────
+  // EMA spread as % of price on both TFs must be meaningful for "trending"
+  const price5m     = candles5m[candles5m.length - 1]?.close ?? 1;
+  const emaSpread5m = Math.abs(fastSnap.ema9 - fastSnap.ema21) / price5m;
+  const emaSpread15m= Math.abs(slowSnap.ema9 - slowSnap.ema21) / price5m;
+  const marketCondition: "trending" | "sideways" | "neutral" =
+    emaSpread5m < 0.0015 && emaSpread15m < 0.0015 ? "sideways" :
+    (emaSpread5m >= 0.003 || emaSpread15m >= 0.003) ? "trending" : "neutral";
+
+  // ── 1H trend alignment (optional flag) ───────────────────────────────────
+  let trend1H: "bullish" | "bearish" | "unknown" = "unknown";
+  if (engineStats.require1HTrend) {
+    try {
+      const candles1h = await getCandles(symbol, "1h", 30);
+      if (candles1h.length >= 21) {
+        const closes = candles1h.map((c) => c.close);
+        const k9     = 2 / (9  + 1);
+        const k21    = 2 / (21 + 1);
+        let ema9Val  = closes.slice(0, 9).reduce((a, b) => a + b) / 9;
+        let ema21Val = closes.slice(0, 21).reduce((a, b) => a + b) / 21;
+        for (let i = 9;  i < closes.length; i++) ema9Val  = closes[i]! * k9  + ema9Val  * (1 - k9);
+        for (let i = 21; i < closes.length; i++) ema21Val = closes[i]! * k21 + ema21Val * (1 - k21);
+        trend1H = ema9Val > ema21Val ? "bullish" : "bearish";
+      }
+    } catch { trend1H = "unknown"; }
+  }
+
   // Determine block reason
   let blockReason = "None";
   if (fast.decision === "HOLD" && slow.decision === "HOLD") {
@@ -294,8 +352,13 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
   } else if (mtfConfirmed && agreedAction !== "HOLD") {
     blockReason = "None";
   }
+  if (marketCondition === "sideways") blockReason = blockReason === "None" ? "Sideways market" : blockReason;
 
-  return { symbol, fast, slow, fastSnap, slowSnap, mtfConfirmed, agreedAction, avgConfidence, blockReason };
+  return {
+    symbol, fast, slow, fastSnap, slowSnap,
+    mtfConfirmed, agreedAction, avgConfidence, blockReason,
+    volumeConfirmed, marketCondition, trend1H,
+  };
 }
 
 // ── Correlation filter ─────────────────────────────────────────────────────────
@@ -504,13 +567,16 @@ async function tick() {
       // Update per-symbol breakdown
       engineStats.symbolBreakdowns[symbol] = {
         symbol,
-        fast:          mtf.fastSnap,
-        slow:          mtf.slowSnap,
-        mtfConfirmed:  mtf.mtfConfirmed,
-        agreedAction:  mtf.agreedAction,
-        avgConfidence: mtf.avgConfidence,
-        blockReason:   mtf.blockReason,
-        lastUpdated:   Date.now(),
+        fast:            mtf.fastSnap,
+        slow:            mtf.slowSnap,
+        mtfConfirmed:    mtf.mtfConfirmed,
+        agreedAction:    mtf.agreedAction,
+        avgConfidence:   mtf.avgConfidence,
+        blockReason:     mtf.blockReason,
+        lastUpdated:     Date.now(),
+        volumeConfirmed: mtf.volumeConfirmed,
+        marketCondition: mtf.marketCondition,
+        trend1H:         mtf.trend1H,
       };
 
       logger.info({
@@ -539,12 +605,23 @@ async function tick() {
               : mtf.slow.decision as "BUY" | "SELL")
           : mtf.agreedAction;
 
+      // Quality gates — skip in test mode for fast iteration
+      const volumeGatePass  = !engineStats.volumeFilter || testMode || mtf.volumeConfirmed;
+      const sidewaysGatePass= testMode || mtf.marketCondition !== "sideways";
+      const trend1HGatePass = testMode || !engineStats.require1HTrend ||
+        mtf.trend1H === "unknown" ||
+        (testAction === "BUY"  && mtf.trend1H === "bullish") ||
+        (testAction === "SELL" && mtf.trend1H === "bearish");
+
       const shouldTrade =
         settings.autoMode &&
         !settings.killSwitch &&
         (mtf.mtfConfirmed || testSingleTF) &&
         testAction !== "HOLD" &&
-        mtf.avgConfidence >= confThresh;
+        mtf.avgConfidence >= confThresh &&
+        volumeGatePass &&
+        sidewaysGatePass &&
+        trend1HGatePass;
 
       // Determine block reason for the signal log
       let signalBlockReason: string | null = null;
@@ -554,6 +631,12 @@ async function tick() {
         signalBlockReason = mtf.blockReason;
       } else if (mtf.avgConfidence < confThresh) {
         signalBlockReason = `Low confidence (${mtf.avgConfidence.toFixed(1)}% < ${confThresh}%)`;
+      } else if (!sidewaysGatePass) {
+        signalBlockReason = "Sideways/range-bound market";
+      } else if (!volumeGatePass) {
+        signalBlockReason = "Volume below average (low-volume filter)";
+      } else if (!trend1HGatePass) {
+        signalBlockReason = `1H trend conflict (trend=${mtf.trend1H}, signal=${testAction})`;
       }
 
       // Append to signal log

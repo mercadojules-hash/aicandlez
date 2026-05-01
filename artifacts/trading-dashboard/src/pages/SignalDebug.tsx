@@ -5,6 +5,7 @@ import {
   AlertTriangle, CheckCircle2, XCircle, FlaskConical, ChevronRight,
   Zap, BarChart2, Clock, Filter, ArrowRight,
 } from "lucide-react";
+import { ResponsiveContainer, AreaChart, Area, Tooltip } from "recharts";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,9 @@ interface SymbolBreakdown {
   symbol: string; fast: TimeframeSnap; slow: TimeframeSnap;
   mtfConfirmed: boolean; agreedAction: string; avgConfidence: number;
   blockReason: string; lastUpdated: number;
+  volumeConfirmed?: boolean;
+  marketCondition?: "trending" | "sideways" | "neutral";
+  trend1H?: "bullish" | "bearish" | "unknown";
 }
 
 interface SignalLogEntry {
@@ -28,6 +32,7 @@ interface SignalLogEntry {
 
 interface EngineStatus {
   running: boolean; testMode: boolean;
+  require1HTrend?: boolean; volumeFilter?: boolean;
   signalCounts: { BUY: number; SELL: number; HOLD: number };
   signalsGenerated: number; tradesExecuted: number;
   mtfConfirmedCount: number; mtfBlockCount: number;
@@ -158,6 +163,78 @@ const SYMBOL_META: Record<string, { label: string; color: string }> = {
   SOLUSD: { label: "SOL", color: "#9945FF" },
 };
 
+interface CandlePoint { time: number; close: number; volume: number }
+
+function DebugMiniChart({ symbol }: { symbol: string }) {
+  const meta   = SYMBOL_META[symbol];
+  const stroke = meta?.color ?? "#64748b";
+
+  const { data: candles, isLoading } = useQuery<CandlePoint[]>({
+    queryKey: ["debugMiniChart", symbol],
+    queryFn: async () => {
+      const r = await fetch(`/api/candles?symbol=${symbol}&timeframe=5m&limit=48`);
+      if (!r.ok) throw new Error("candle fetch failed");
+      return r.json();
+    },
+    staleTime:       20_000,
+    refetchInterval: 60_000,
+  });
+
+  if (isLoading || !candles || candles.length < 2) {
+    return <div className="h-12 flex items-center justify-center"><div className="w-3 h-3 border border-border border-t-foreground/40 rounded-full animate-spin" /></div>;
+  }
+
+  const first = candles[0]!.close;
+  const last  = candles[candles.length - 1]!.close;
+  const bullish  = last >= first;
+  const fillBase = bullish ? "#10b981" : "#ef4444";
+  const pctChg   = ((last - first) / first) * 100;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[9px] text-muted-foreground/40">5m · 48 bars</span>
+        <span className={`text-[9px] font-mono font-semibold ${bullish ? "text-emerald-400" : "text-red-400"}`}>
+          {bullish ? "+" : ""}{pctChg.toFixed(2)}%
+        </span>
+      </div>
+      <div className="h-12 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={candles} margin={{ top: 1, right: 0, left: 0, bottom: 1 }}>
+            <defs>
+              <linearGradient id={`dbg-${symbol}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%"  stopColor={fillBase} stopOpacity={0.25} />
+                <stop offset="95%" stopColor={fillBase} stopOpacity={0}    />
+              </linearGradient>
+            </defs>
+            <Tooltip
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const c = payload[0]?.payload as CandlePoint;
+                return (
+                  <div className="bg-card border border-border rounded px-2 py-0.5 text-[9px] text-foreground/80">
+                    ${c.close.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </div>
+                );
+              }}
+            />
+            <Area
+              type="monotone"
+              dataKey="close"
+              stroke={stroke}
+              strokeWidth={1.5}
+              fill={`url(#dbg-${symbol})`}
+              dot={false}
+              activeDot={{ r: 2, fill: stroke }}
+              isAnimationActive={false}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
 function SymbolCard({ bd }: { bd: SymbolBreakdown }) {
   const meta = SYMBOL_META[bd.symbol] ?? { label: bd.symbol, color: "#888" };
   const hasBlock = bd.blockReason && bd.blockReason !== "None";
@@ -189,6 +266,42 @@ function SymbolCard({ bd }: { bd: SymbolBreakdown }) {
           <span className="text-[11px] text-amber-300">{bd.blockReason}</span>
         </div>
       )}
+
+      {/* Mini price chart */}
+      <DebugMiniChart symbol={bd.symbol} />
+
+      {/* Quality filter badges */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {bd.volumeConfirmed !== undefined && (
+          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold border
+            ${bd.volumeConfirmed
+              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/25"
+              : "bg-red-500/10 text-red-400 border-red-500/25"}`}>
+            {bd.volumeConfirmed ? <CheckCircle2 className="w-2.5 h-2.5" /> : <XCircle className="w-2.5 h-2.5" />}
+            VOL {bd.volumeConfirmed ? "OK" : "LOW"}
+          </span>
+        )}
+        {bd.marketCondition && (
+          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold border
+            ${bd.marketCondition === "trending"
+              ? "bg-sky-500/10 text-sky-400 border-sky-500/25"
+              : bd.marketCondition === "sideways"
+                ? "bg-amber-500/10 text-amber-400 border-amber-500/25"
+                : "bg-slate-700/40 text-slate-400 border-slate-600/30"}`}>
+            <Activity className="w-2.5 h-2.5" />
+            {bd.marketCondition.toUpperCase()}
+          </span>
+        )}
+        {bd.trend1H && bd.trend1H !== "unknown" && (
+          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold border
+            ${bd.trend1H === "bullish"
+              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/25"
+              : "bg-red-500/10 text-red-400 border-red-500/25"}`}>
+            {bd.trend1H === "bullish" ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+            1H {bd.trend1H.toUpperCase()}
+          </span>
+        )}
+      </div>
 
       {/* 5m + 15m columns */}
       <div className="flex gap-2">
@@ -241,6 +354,16 @@ export default function SignalDebug() {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ enabled }),
+      }).then((r) => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["engine-debug"] }),
+  });
+
+  const filterMutation = useMutation({
+    mutationFn: (patch: { volumeFilter?: boolean; require1HTrend?: boolean }) =>
+      fetch("/api/engine/filters", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(patch),
       }).then((r) => r.json()),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["engine-debug"] }),
   });
@@ -382,7 +505,54 @@ export default function SignalDebug() {
             </div>
           </div>
 
-          {/* ── 4. Signal breakdown per symbol ── */}
+          {/* ── 4. Quality filter toggles ── */}
+          <div className="bg-card border border-border/40 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Filter className="w-4 h-4 text-muted-foreground/60" />
+              <span className="text-sm font-semibold">Signal Quality Filters</span>
+              <span className="text-[10px] text-muted-foreground/40 ml-1">(bypassed in test mode)</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Volume filter */}
+              <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/10 border border-border/30">
+                <div>
+                  <div className="text-xs font-semibold text-foreground/80">Volume Confirmation</div>
+                  <div className="text-[10px] text-muted-foreground/50 mt-0.5">Block low-volume signals (current &lt; 85% of avg)</div>
+                </div>
+                <button
+                  onClick={() => filterMutation.mutate({ volumeFilter: !(d?.volumeFilter ?? true) })}
+                  disabled={filterMutation.isPending}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold border transition-colors ${
+                    (d?.volumeFilter ?? true)
+                      ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                      : "bg-muted/20 text-muted-foreground border-border/40"
+                  }`}
+                >
+                  {(d?.volumeFilter ?? true) ? "ON" : "OFF"}
+                </button>
+              </div>
+              {/* 1H trend filter */}
+              <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/10 border border-border/30">
+                <div>
+                  <div className="text-xs font-semibold text-foreground/80">1H Trend Alignment</div>
+                  <div className="text-[10px] text-muted-foreground/50 mt-0.5">Require 1H EMA9 &gt; EMA21 to match signal</div>
+                </div>
+                <button
+                  onClick={() => filterMutation.mutate({ require1HTrend: !(d?.require1HTrend ?? false) })}
+                  disabled={filterMutation.isPending}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold border transition-colors ${
+                    (d?.require1HTrend ?? false)
+                      ? "bg-sky-500/20 text-sky-400 border-sky-500/40"
+                      : "bg-muted/20 text-muted-foreground border-border/40"
+                  }`}
+                >
+                  {(d?.require1HTrend ?? false) ? "ON" : "OFF"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── 5. Signal breakdown per symbol ── */}
           <div>
             <h2 className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-widest mb-3 flex items-center gap-2">
               <GitMerge className="w-3.5 h-3.5" /> Signal Breakdown · 5m vs 15m per symbol

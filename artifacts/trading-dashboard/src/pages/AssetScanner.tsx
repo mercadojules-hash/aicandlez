@@ -17,6 +17,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  Tooltip,
+} from "recharts";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -135,6 +141,101 @@ function useCountdown(active: boolean, resetAt: number) {
     return () => clearInterval(id);
   }, [active]);
   return secs;
+}
+
+// ── Symbol mapping (displayName → API symbol) ──────────────────────────────────
+
+const SYMBOL_TO_API: Record<string, string> = {
+  BTC: "BTCUSD",
+  ETH: "ETHUSD",
+  SOL: "SOLUSD",
+};
+
+// ── Mini sparkline chart for each asset card ───────────────────────────────────
+
+interface CandlePoint { time: number; close: number; volume: number }
+
+const CHART_STROKE: Record<string, string> = {
+  BTC: "#f59e0b",   // amber-400
+  ETH: "#60a5fa",   // blue-400
+  SOL: "#a78bfa",   // purple-400
+};
+
+const CHART_FILL_UP  = "#10b981";   // emerald (bullish)
+const CHART_FILL_DN  = "#ef4444";   // red (bearish)
+
+function AssetMiniChart({ displayName }: { displayName: string }) {
+  const apiSymbol = SYMBOL_TO_API[displayName] ?? "BTCUSD";
+  const stroke    = CHART_STROKE[displayName] ?? "#64748b";
+
+  const { data: candles, isLoading } = useQuery<CandlePoint[]>({
+    queryKey: ["miniChart", apiSymbol],
+    queryFn: async () => {
+      const r = await fetch(`/api/candles?symbol=${apiSymbol}&timeframe=15m&limit=60`);
+      if (!r.ok) throw new Error("candle fetch failed");
+      return r.json();
+    },
+    staleTime:       30_000,
+    refetchInterval: 60_000,
+  });
+
+  if (isLoading || !candles || candles.length < 2) {
+    return (
+      <div className="h-16 flex items-center justify-center">
+        <div className="w-4 h-4 border border-slate-600 border-t-slate-400 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const first = candles[0]!.close;
+  const last  = candles[candles.length - 1]!.close;
+  const bullish = last >= first;
+  const fillColor = bullish ? CHART_FILL_UP : CHART_FILL_DN;
+  const pctChg = ((last - first) / first) * 100;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between px-0.5">
+        <span className="text-[10px] text-slate-500">15m chart (60 candles)</span>
+        <span className={`text-[10px] font-mono font-semibold ${bullish ? "text-emerald-400" : "text-red-400"}`}>
+          {bullish ? "+" : ""}{pctChg.toFixed(2)}%
+        </span>
+      </div>
+      <div className="h-16 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={candles} margin={{ top: 2, right: 0, left: 0, bottom: 2 }}>
+            <defs>
+              <linearGradient id={`grad-${displayName}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%"  stopColor={fillColor} stopOpacity={0.35} />
+                <stop offset="95%" stopColor={fillColor} stopOpacity={0}    />
+              </linearGradient>
+            </defs>
+            <Tooltip
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const c = payload[0]?.payload as CandlePoint;
+                return (
+                  <div className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[10px] text-slate-300">
+                    ${c.close.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </div>
+                );
+              }}
+            />
+            <Area
+              type="monotone"
+              dataKey="close"
+              stroke={stroke}
+              strokeWidth={1.5}
+              fill={`url(#grad-${displayName})`}
+              dot={false}
+              activeDot={{ r: 2, fill: stroke }}
+              isAnimationActive={false}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -283,6 +384,9 @@ export default function AssetScanner() {
                 </CardHeader>
 
                 <CardContent className="space-y-4">
+                  {/* Mini sparkline chart */}
+                  <AssetMiniChart displayName={asset.displayName} />
+
                   {/* Confidence gauge */}
                   <div>
                     <div className="flex justify-between items-center mb-1.5">

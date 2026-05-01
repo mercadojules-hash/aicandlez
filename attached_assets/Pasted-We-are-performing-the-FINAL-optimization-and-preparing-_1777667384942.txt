@@ -1,0 +1,104 @@
+We are performing the FINAL optimization and preparing the system for export. Do NOT rebuild the system. Only extend and enhance existing functionality.
+
+---
+
+1. SIGNAL QUALITY OPTIMIZATION (Improve win rate safely)
+
+Enhance trade filtering logic WITHOUT changing core architecture:
+
+* Set default minimum confidence to 60%
+* Add rule: do NOT generate trades when market condition = Neutral / Sideways
+* Add optional toggle: require 1H trend alignment with 5m/15m signals
+* Add volume confirmation filter (only allow trades when volume is increasing or above average)
+
+Goal:
+Improve trade quality and move toward ~60–65% win rate without overfitting.
+
+---
+
+2. ADD MINI CHARTS TO ASSET SCANNER
+
+Enhance each asset card (BTC, ETH, SOL):
+
+* Add compact mini chart (sparkline or small candlestick)
+* Include EMA 9 and EMA 21 overlays
+* Show recent price movement visually (last ~20–50 candles)
+* Color-code trend direction
+
+Layout:
+
+* Chart should sit above or behind the current metrics
+* Must remain clean and not overcrowded
+
+Goal:
+User can visually confirm trend instead of relying only on numbers.
+
+---
+
+3. ADD MINI CHARTS TO SIGNAL DEBUG
+
+Enhance each symbol block:
+
+* Add a small chart showing price + EMA trend
+* Highlight signal point (where BUY/SELL would trigger)
+* Show recent trend context
+
+Goal:
+User can understand WHY signals are being blocked or triggered.
+
+---
+
+4. FINAL EXPORT PACKAGE
+
+Create a downloadable ZIP file of the COMPLETE project.
+
+Requirements:
+
+* Include full frontend and backend
+* Include all package.json files
+* Include README with exact setup instructions
+* Include .env.example with required variables (NO real API keys)
+* Ensure project runs locally without Replit
+
+File name EXACTLY:
+
+apex-trader-final-export-v1.zip
+
+---
+
+5. SETUP INSTRUCTIONS (MUST INCLUDE)
+
+Provide:
+
+* npm or pnpm install command
+* command to run backend server
+* command to run frontend
+* local URL to access dashboard
+* instructions to access from phone/tablet on same Wi-Fi network
+
+---
+
+6. FINAL VALIDATION
+
+Before completion:
+
+* Confirm charts load correctly
+* Confirm scanner + debug charts render
+* Confirm signals still function
+* Confirm alerts still work
+* Confirm settings persist
+* Confirm simulation mode works
+
+---
+
+IMPORTANT:
+
+* Do NOT change trading logic structure
+* Do NOT break existing modules
+* Do NOT remove features
+
+---
+
+FINAL GOAL:
+
+Deliver a visually complete, optimized, export-ready Apex Trader system that can run locally on desktop and be accessed from tablet and phone without further development.

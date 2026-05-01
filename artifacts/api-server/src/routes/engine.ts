@@ -5,6 +5,8 @@ import {
   stopTradingLoop,
   getLoopIntervalMs,
   setTestMode,
+  setRequire1HTrend,
+  setVolumeFilter,
 } from "../lib/tradingLoop.js";
 
 const router = Router();
@@ -24,6 +26,8 @@ router.get("/engine/status", (_req, res) => {
     trailingStopHits:   engineStats.trailingStopHits,
     correlationBlocks:  engineStats.correlationBlocks,
     testMode:           engineStats.testMode,
+    require1HTrend:     engineStats.require1HTrend,
+    volumeFilter:       engineStats.volumeFilter,
     loopIntervalMs:     getLoopIntervalMs(),
     // Signal distribution
     signalCounts:       engineStats.signalCounts,
@@ -66,6 +70,29 @@ router.post("/engine/testmode", (req, res) => {
     message:  enabled
       ? "Test mode ON — trades execute at confidence >= 35% or single-TF strong signal. Mode tagged 'test'."
       : "Test mode OFF — strict MTF confirmation required.",
+  });
+});
+
+router.post("/engine/filters", (req, res) => {
+  const body = req.body ?? {};
+  let changed = false;
+
+  if (typeof body.volumeFilter === "boolean") {
+    setVolumeFilter(body.volumeFilter);
+    changed = true;
+  }
+  if (typeof body.require1HTrend === "boolean") {
+    setRequire1HTrend(body.require1HTrend);
+    changed = true;
+  }
+  if (!changed) {
+    res.status(400).json({ error: "body must include at least one of: { volumeFilter: boolean, require1HTrend: boolean }" });
+    return;
+  }
+  res.json({
+    volumeFilter:   engineStats.volumeFilter,
+    require1HTrend: engineStats.require1HTrend,
+    message: "Quality filters updated.",
   });
 });
 
