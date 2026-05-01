@@ -38,6 +38,7 @@ export default defineConfig({
           "/natura-yoga-ai-v1.0.0.zip": path.resolve(import.meta.dirname, "public/natura-yoga-ai-v1.0.0.zip"),
           "/natura-yoga-ai-v1.0.0-v2.zip": path.resolve(import.meta.dirname, "public/natura-yoga-ai-v1.0.0-v2.zip"),
           "/natura-yoga-ai-v1.0.0-v3.zip": path.resolve(import.meta.dirname, "public/natura-yoga-ai-v1.0.0-v3.zip"),
+          "/natura-ai-v1.0.0-production.zip": path.resolve(import.meta.dirname, "public/natura-ai-v1.0.0-production.zip"),
         };
         server.middlewares.use((req, res, next) => {
           const urlPath = req.url?.split("?")[0] ?? "";
