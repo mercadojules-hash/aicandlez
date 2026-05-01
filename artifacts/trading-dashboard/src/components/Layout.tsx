@@ -33,7 +33,7 @@ export const MODULE_LIST = [
   { id: 7,  path: "/backtest",   icon: BarChart2,       label: "Backtesting",        sublabel: "Strategy optimizer",            status: "active"   },
   { id: 8,  path: "/optimizer",  icon: SlidersHorizontal, label: "Strategy Optimizer", sublabel: "Parameter grid search",         status: "active"   },
   { id: 9,  path: "/scanner",    icon: Scan,            label: "Asset Scanner",      sublabel: "Multi-asset opportunity rank",   status: "active"   },
-  { id: 10, path: "/journal",    icon: BookOpen,        label: "Journal",            sublabel: "Trade logging & learning",      status: "pending"  },
+  { id: 10, path: "/portfolio",  icon: Layers,          label: "Portfolio",          sublabel: "Allocation & exposure tracking", status: "active"   },
   { id: 11, path: "/validation", icon: LineChart,       label: "Validation",         sublabel: "Walk-forward & out-of-sample",  status: "pending"  },
   { id: 12, path: "/sentiment",  icon: MessageSquare,   label: "Sentiment AI",       sublabel: "News & social signals",         status: "pending"  },
   { id: 13, path: "/live",       icon: Zap,             label: "Live Trading",       sublabel: "Exchange integration",          status: "pending"  },
