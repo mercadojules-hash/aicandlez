@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Activity,
+  ArrowLeftRight,
   BarChart2,
   BarChart3,
   BookOpen,
@@ -39,6 +40,7 @@ export const MODULE_LIST = [
   { id: 12, path: "/journal",    icon: BookOpen,        label: "Trade Journal",      sublabel: "Learning & trade scoring",      status: "active"   },
   { id: 13, path: "/validation", icon: ShieldCheck,     label: "Validation",         sublabel: "Walk-forward & OOS testing",    status: "active"   },
   { id: 14, path: "/sentiment",  icon: MessageSquare,   label: "Sentiment AI",       sublabel: "News & confidence scoring",     status: "active"   },
+  { id: 15, path: "/exchange",   icon: ArrowLeftRight,  label: "Exchange",           sublabel: "Kraken live & sim trading",     status: "active"   },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

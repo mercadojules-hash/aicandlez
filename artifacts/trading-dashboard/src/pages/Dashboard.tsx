@@ -94,9 +94,9 @@ export default function Dashboard() {
 
       {/* ── Progress overview ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Modules Active"  value={`${activeModules}/14`}   icon={<CheckCircle2 className="w-4 h-4 text-green-400" />} color="green"  />
-        <StatCard label="Modules Pending" value={`${pendingModules}/14`}  icon={<Clock        className="w-4 h-4 text-yellow-400" />} color="yellow" />
-        <StatCard label="Build Phase"     value="14 · Sentiment AI"       icon={<Layers       className="w-4 h-4 text-primary"    />} color="blue"   />
+        <StatCard label="Modules Active"  value={`${activeModules}/15`}   icon={<CheckCircle2 className="w-4 h-4 text-green-400" />} color="green"  />
+        <StatCard label="Modules Pending" value={`${pendingModules}/15`}  icon={<Clock        className="w-4 h-4 text-yellow-400" />} color="yellow" />
+        <StatCard label="Build Phase"     value="15 · Exchange"           icon={<Layers       className="w-4 h-4 text-primary"    />} color="blue"   />
         <StatCard label="System Status"   value="All Systems Online"      icon={<Activity     className="w-4 h-4 text-green-400"  />} color="green"  />
       </div>
 
@@ -108,7 +108,7 @@ export default function Dashboard() {
           <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <Layers className="w-4 h-4 text-primary" />
-              Build Roadmap — 14 Modules
+              Build Roadmap — 15 Modules
             </div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400/80 inline-block" />Active</span>

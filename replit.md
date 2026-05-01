@@ -19,46 +19,57 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 ## Artifacts
 
 ### trading-dashboard (React + Vite @ /)
-AI-assisted crypto trading dashboard with TradingView-style dark UI.
+Hybrid AI crypto trading dashboard — 15 modules, all active. Kraken exchange, BTCUSD/ETHUSD/SOLUSD, 1m–1h timeframes.
 
-**Features:**
-- Live candlestick chart (lightweight-charts v5) with symbol/timeframe selector
-- AI signal panel (BUY/SELL/HOLD, confidence %, trend, reasoning, indicators)
-- Mode 2 auto-execution engine with strict rules (confidence, trend, allocation, daily limit)
-- Risk controls (allocation, stop loss, take profit, max trades/day, min confidence)
-- Kill switch (halts all trading instantly)
-- Portfolio panel (balance, PnL, win rate, open positions)
-- Trade history with close buttons
-- Backtest mode (historical simulation, win rate, profit %)
-- Activity log (signal + trade events, color-coded by level)
-- Binance integration ready (disabled by default)
+**Modules:**
+1. Dashboard — system shell, roadmap, health cards
+2. Market Data — live Kraken candle feed
+3. Indicators — EMA, RSI, candlestick rendering
+4. AI Reasoning — EMA+RSI signal engine, BUY/SELL/HOLD with confidence
+5. Risk Management — position sizing, kill switch, daily loss limit, trade cap
+6. Simulation — paper trading with risk gate enforcement, auto-journal logging
+7. Backtesting — historical walk-forward simulation
+8. Strategy Optimizer — grid search over EMA/RSI parameters
+9. Asset Scanner — multi-symbol opportunity ranking
+10. Portfolio — allocation & exposure tracking
+11. Correlation — BTC/ETH/SOL correlation matrix, trailing stops
+12. Trade Journal — scored trade feedback (0–100), win rate, insights
+13. Validation — walk-forward 4-window OOS 70/30, overfitting grade A–F, live lock gate
+14. Sentiment AI — news scoring –100 to +100, Fear & Greed index, AI confidence ±5–20%
+15. Exchange — Kraken integration, SIMULATION (default) / LIVE mode, kill switch, pause, risk-gated order execution, no withdrawals
 
-**Routes:** `/` (dashboard), `/backtest`, `/logs`
+**Key files:**
+- `src/pages/` — one file per module
+- `src/components/Layout.tsx` — MODULE_LIST sidebar
+- `src/App.tsx` — all routes
 
 ### api-server (Express @ /api)
-Shared backend for trading operations.
+Shared backend for all trading operations.
 
-**Routes:** `/api/signals/*`, `/api/trades/*`, `/api/portfolio`, `/api/dashboard/summary`, `/api/settings`, `/api/settings/kill-switch`, `/api/logs`, `/api/backtest/run`, `/api/candles`
+**Key routes:**
+- `/api/exchange/*` — exchange engine (status, orders, preview, execute, kill, pause, mode, balances)
+- `/api/sentiment/*` — sentiment scoring, news feed
+- `/api/validation/*` — walk-forward validation engine
+- `/api/journal/*` — trade journal & scoring
+- `/api/simulation/*` — paper trading engine
+- `/api/signals/*`, `/api/candles/*`, `/api/backtest/*`
 
-## DB Schema
+**Key lib files:**
+- `src/lib/exchangeEngine.ts` — Kraken REST + HMAC-SHA512 signing, order execution, simulation balances
+- `src/lib/sentimentEngine.ts` — deterministic 5-min bucketed headline scoring
+- `src/lib/validationEngine.ts` — walk-forward OOS, overfitting detection
+- `src/lib/riskEngine.ts` — position limits, kill switch, daily PnL tracking
+- `src/lib/backtestEngine.ts` — EMA+RSI strategy, simulateOnCandles
 
-- `signals` - AI signal history (symbol, timeframe, action, confidence, trend, indicators)
-- `trades` - Trade history (symbol, side, amount, price, exit_price, pnl, status, mode)
-- `settings` - Risk control settings (allocation, SL/TP %, max trades, auto mode, kill switch)
-- `logs` - Activity log (type, level, message, details)
+**Exchange secrets (for LIVE mode):**
+- `KRAKEN_API_KEY` — Kraken private API key
+- `KRAKEN_API_SECRET` — Kraken private API secret (base64)
+- `EXCHANGE_LIVE_ENABLED=true` — must be explicitly set to unlock LIVE mode
 
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
-
-## Binance Integration (Ready but Disabled)
-- `binanceApiKey` and `binanceApiSecret` stored in settings table
-- `liveTrading` defaults to `false` — all trades simulated
-- To enable: implement `executeTrade(symbol, side, amount)` in `artifacts/api-server/src/lib/trading.ts` using `binance-api-node`
 
 ### natura-ai (Expo/React Native @ /natura-ai)
 Mobile-first AI-powered holistic wellness app.
