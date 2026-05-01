@@ -11,6 +11,7 @@ import RiskManagement from "@/pages/RiskManagement";
 import Simulation from "@/pages/Simulation";
 import Backtest from "@/pages/Backtest";
 import StrategyOptimizer from "@/pages/StrategyOptimizer";
+import AssetScanner from "@/pages/AssetScanner";
 import ComingSoon from "@/pages/ComingSoon";
 
 const queryClient = new QueryClient({
@@ -47,6 +48,9 @@ function Router() {
       </Route>
       <Route path="/optimizer">
         <Layout><StrategyOptimizer /></Layout>
+      </Route>
+      <Route path="/scanner">
+        <Layout><AssetScanner /></Layout>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>

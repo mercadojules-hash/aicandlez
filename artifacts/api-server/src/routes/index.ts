@@ -14,6 +14,7 @@ import aiDecisionRouter from "./aiDecision.js";
 import riskManagementRouter from "./riskManagement.js";
 import simulationRouter from "./simulation.js";
 import optimizerRouter from "./optimizer.js";
+import scannerRouter from "./scanner.js";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(aiDecisionRouter);
 router.use(riskManagementRouter);
 router.use(simulationRouter);
 router.use(optimizerRouter);
+router.use(scannerRouter);
 
 export default router;
