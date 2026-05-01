@@ -10,6 +10,7 @@ import AIReasoning from "@/pages/AIReasoning";
 import RiskManagement from "@/pages/RiskManagement";
 import Simulation from "@/pages/Simulation";
 import Backtest from "@/pages/Backtest";
+import StrategyOptimizer from "@/pages/StrategyOptimizer";
 import ComingSoon from "@/pages/ComingSoon";
 
 const queryClient = new QueryClient({
@@ -43,6 +44,9 @@ function Router() {
       </Route>
       <Route path="/backtest">
         <Layout><Backtest /></Layout>
+      </Route>
+      <Route path="/optimizer">
+        <Layout><StrategyOptimizer /></Layout>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>

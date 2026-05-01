@@ -17,6 +17,7 @@ import {
   Radio,
   Settings,
   Shield,
+  SlidersHorizontal,
   TrendingUp,
   Zap,
 } from "lucide-react";
@@ -29,7 +30,7 @@ export const MODULE_LIST = [
   { id: 5,  path: "/risk",       icon: Shield,          label: "Risk Management",    sublabel: "Position sizing & limits",       status: "active"   },
   { id: 6,  path: "/simulation", icon: FlaskConical,    label: "Simulation",         sublabel: "Paper trading engine",           status: "active"   },
   { id: 7,  path: "/backtest",   icon: BarChart2,       label: "Backtesting",        sublabel: "Strategy optimizer",            status: "active"   },
-  { id: 8,  path: "/portfolio",  icon: Layers,          label: "Portfolio",          sublabel: "Multi-asset system",            status: "pending"  },
+  { id: 8,  path: "/optimizer",  icon: SlidersHorizontal, label: "Strategy Optimizer", sublabel: "Parameter grid search",         status: "active"   },
   { id: 9,  path: "/correlation",icon: TrendingUp,      label: "Correlation",        sublabel: "Trailing stops & correlation",  status: "pending"  },
   { id: 10, path: "/journal",    icon: BookOpen,        label: "Journal",            sublabel: "Trade logging & learning",      status: "pending"  },
   { id: 11, path: "/validation", icon: LineChart,       label: "Validation",         sublabel: "Walk-forward & out-of-sample",  status: "pending"  },
