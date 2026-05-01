@@ -21,6 +21,7 @@ import Exchange from "@/pages/Exchange";
 import ComingSoon from "@/pages/ComingSoon";
 import SystemVerification from "@/pages/SystemVerification";
 import SignalDebug from "@/pages/SignalDebug";
+import MultiChart from "@/pages/MultiChart";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -83,6 +84,9 @@ function Router() {
       </Route>
       <Route path="/debug">
         <Layout><SignalDebug /></Layout>
+      </Route>
+      <Route path="/charts">
+        <Layout><MultiChart /></Layout>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>

@@ -19,7 +19,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 ## Artifacts
 
 ### trading-dashboard (React + Vite @ /)
-Hybrid AI crypto trading dashboard — 15 modules, all active. Kraken exchange, BTCUSD/ETHUSD/SOLUSD, 1m–1h timeframes.
+Hybrid AI crypto trading dashboard — 18 modules, all active. Kraken exchange, BTCUSD/ETHUSD/SOLUSD, 1m–1h timeframes.
 
 **Modules:**
 1. Dashboard — system shell, roadmap, health cards
@@ -37,6 +37,9 @@ Hybrid AI crypto trading dashboard — 15 modules, all active. Kraken exchange, 
 13. Validation — walk-forward 4-window OOS 70/30, overfitting grade A–F, live lock gate
 14. Sentiment AI — news scoring –100 to +100, Fear & Greed index, AI confidence ±5–20%
 15. Exchange — Kraken integration, SIMULATION (default) / LIVE mode, kill switch, pause, risk-gated order execution, no withdrawals
+16. System Verification — full engine health check panel, 10 subsystems, auto-refresh at `/syscheck`
+17. Signal Debug — MTF funnel tracker, per-symbol indicator breakdown, test mode toggle, last-10 signal log at `/debug`
+18. Multi-Asset Chart — BTC/ETH/SOL charts side-by-side, EMA9/21 trend lines, volume overlay, flexible asset config + custom symbol add at `/charts`
 
 **Key files:**
 - `src/pages/` — one file per module

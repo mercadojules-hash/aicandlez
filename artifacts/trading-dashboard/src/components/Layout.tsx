@@ -45,6 +45,7 @@ export const MODULE_LIST = [
   { id: 15, path: "/exchange",   icon: ArrowLeftRight,  label: "Exchange",           sublabel: "Kraken live & sim trading",     status: "active"   },
   { id: 16, path: "/syscheck",  icon: ClipboardCheck,  label: "System Verification", sublabel: "Full engine health & proof",    status: "active"   },
   { id: 17, path: "/debug",     icon: Bug,             label: "Signal Debug",        sublabel: "Why no trades? Full breakdown", status: "active"   },
+  { id: 18, path: "/charts",    icon: BarChart2,       label: "Multi-Asset Chart",   sublabel: "BTC, ETH, SOL + custom assets", status: "active"   },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
