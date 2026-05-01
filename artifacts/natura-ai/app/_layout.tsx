@@ -17,7 +17,7 @@ import { UserProvider } from "../contexts/UserContext";
 // ─── Keep native splash visible until we're ready ────────────────────────────
 SplashScreen.preventAutoHideAsync();
 
-const MIN_SPLASH_MS = 2000;
+const MIN_SPLASH_MS = 0;
 const LOGO = require("../assets/images/natura-logo-clean.png");
 
 

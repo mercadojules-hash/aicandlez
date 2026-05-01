@@ -60,7 +60,7 @@ export default function TabLayout() {
         name="learn"
         options={{
           title: "Learn",
-          tabBarIcon: ({ color, size }) => <Feather name="graduation-cap" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Feather name="book" size={size} color={color} />,
         }}
       />
       <Tabs.Screen

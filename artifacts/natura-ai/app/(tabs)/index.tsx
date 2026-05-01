@@ -1,208 +1,219 @@
-import React, { useState } from "react";
+import React from "react";
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, Image,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  ImageBackground,
+  Platform,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useTheme } from "../../contexts/ThemeContext";
-import { useUser } from "../../contexts/UserContext";
-import { useWellness } from "../../contexts/WellnessContext";
-import { useSubscription } from "../../contexts/SubscriptionContext";
-import { ROUTINE_TASKS, getTodayTip } from "../../data/wellness";
-import { fontSizes, radii, spacing } from "../../constants/theme";
+// ─── Assets ───────────────────────────────────────────────────────────────────
+const BG          = require("../../assets/images/natura-bg-main-v1.webp");
+const LOGO        = require("../../assets/images/natura-logo-icon.png");
+const AVATAR      = require("../../assets/images/avatar-default.webp");
+const IC_FLAME    = require("../../assets/images/icon-flame.webp");
+const IC_CLOCK    = require("../../assets/images/icon-clock.webp");
+const IC_CHECK    = require("../../assets/images/icon-check.webp");
+const IC_STAR     = require("../../assets/images/icon-star.webp");
+const IC_LEAF     = require("../../assets/images/icon-leaf.webp");
+const IC_LOTUS    = require("../../assets/images/icon-lotus.webp");
+const IC_LIGHTNING= require("../../assets/images/icon-lightning.webp");
+const IC_BOWL     = require("../../assets/images/icon-bowl.webp");
+const IC_CHEVRON  = require("../../assets/images/icon-chevron.webp");
 
-const MORNING   = ROUTINE_TASKS.filter((t) => t.category === "morning").slice(0, 3);
-const AFTERNOON = ROUTINE_TASKS.filter((t) => t.category === "afternoon").slice(0, 2);
-const EVENING   = ROUTINE_TASKS.filter((t) => t.category === "evening").slice(0, 2);
-const ALL_TASKS = [...MORNING, ...AFTERNOON, ...EVENING];
+// ─── Constants ────────────────────────────────────────────────────────────────
+const W = Dimensions.get("window").width;
 
-const TASK_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
-  "rt-1": "droplet",
-  "rt-2": "wind",
-  "rt-3": "activity",
-  "rt-4": "coffee",
-  "rt-5": "map-pin",
-  "rt-6": "sunset",
-  "rt-7": "moon",
-};
+const NEON   = "#a8e063";
+const WHITE  = "#ffffff";
+const DIM    = "rgba(255,255,255,0.5)";
+const CARD   = "rgba(8,22,13,0.82)";
+const BORDER = "rgba(100,200,80,0.22)";
 
-export default function HomeScreen() {
-  const { colors } = useTheme();
-  const { profile } = useUser();
-  const { toggleTask, isTaskDone, streak } = useWellness();
-  const { isPremium } = useSubscription();
-  const router = useRouter();
+// ─── Task data ────────────────────────────────────────────────────────────────
+const TASKS = [
+  { id: "t1", time: "7:00 AM",  label: "Warm lemon water",    subtitle: "Morning · 7:00 AM",   icon: IC_LEAF      },
+  { id: "t2", time: "7:15 AM",  label: "5-minute breathing",  subtitle: "Morning · 7:15 AM",   icon: IC_LOTUS     },
+  { id: "t3", time: "7:30 AM",  label: "Morning stretch",     subtitle: "Morning · 7:30 AM",   icon: IC_LIGHTNING },
+  { id: "t4", time: "3:00 PM",  label: "Herbal tea break",    subtitle: "Afternoon · 3:00 PM", icon: IC_BOWL      },
+  { id: "t5", time: "4:00 PM",  label: "Mindful walk",        subtitle: "Afternoon · 4:00 PM", icon: IC_LIGHTNING },
+  { id: "t6", time: "9:00 PM",  label: "Digital sunset",      subtitle: "Evening · 9:00 PM",   icon: IC_LOTUS     },
+  { id: "t7", time: "9:30 PM",  label: "Evening wind-down tea", subtitle: "Evening · 9:30 PM", icon: IC_LEAF      },
+];
 
-  const tip = getTodayTip();
-  const completedCount = ALL_TASKS.filter((t) => isTaskDone(t.id)).length;
-  const progressPct = ALL_TASKS.length > 0 ? completedCount / ALL_TASKS.length : 0;
-  const firstName = profile.name ? profile.name.split(" ")[0] : "Jules";
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const displayStreak = streak > 0 ? streak : 5;
-  const wellnessScore = Math.min(95, 60 + Math.round(progressPct * 20) + Math.min(displayStreak * 2, 15));
-
-  const STATS = [
-    { icon: "zap" as const,       value: `${displayStreak}`, label: "day streak" },
-    { icon: "clock" as const,     value: "32",                label: "min today"  },
-    { icon: "check-circle" as const, value: `${completedCount}`, label: "sessions" },
-    { icon: "star" as const,      value: `${wellnessScore}`,  label: "score"      },
-  ];
-
+// ─── Sub-components ───────────────────────────────────────────────────────────
+interface StatItemProps { icon: ReturnType<typeof require>; value: string; label: string; }
+function StatItem({ icon, value, label }: StatItemProps) {
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={["top"]}>
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-
-        {/* ── HEADER ── */}
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.brandName, { color: colors.primary }]}>NATURA AI</Text>
-            <Text style={[styles.brandSub, { color: colors.textMuted }]}>AI Wellness Coach</Text>
-          </View>
-          <View style={[styles.avatarCircle, { backgroundColor: colors.primary + "22", borderColor: colors.primary + "55" }]}>
-            <Text style={[styles.avatarLetter, { color: colors.primary }]}>{firstName[0].toUpperCase()}</Text>
-          </View>
-        </View>
-
-        {/* ── HERO ── */}
-        <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.heroBadge, { backgroundColor: colors.primary + "22" }]}>
-            <Feather name="zap" size={12} color={colors.primary} />
-            <Text style={[styles.heroBadgeText, { color: colors.primary }]}>Energy: Good</Text>
-          </View>
-          <Text style={[styles.heroGreeting, { color: colors.textMuted }]}>{greeting}, {firstName}</Text>
-          <Text style={[styles.heroTitle, { color: colors.text }]}>Today's Plan for You</Text>
-          <Text style={[styles.heroSub, { color: colors.textDim }]}>Personalized steps for your mind, body and energy</Text>
-        </View>
-
-        {/* ── STATS BAR ── */}
-        <View style={[styles.statsBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {STATS.map(({ icon, value, label }, i) => (
-            <View key={i} style={styles.statItem}>
-              <Feather name={icon} size={16} color={colors.primary} />
-              <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* ── TODAY'S PLAN ── */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Today's Plan</Text>
-            <Text style={[styles.sectionMeta, { color: colors.textMuted }]}>{completedCount}/{ALL_TASKS.length} done</Text>
-          </View>
-          <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-            <View style={[styles.progressFill, { width: `${progressPct * 100}%` as any, backgroundColor: colors.primary }]} />
-          </View>
-          {ALL_TASKS.map((task) => {
-            const done = isTaskDone(task.id);
-            return (
-              <View key={task.id} style={styles.tlItem}>
-                <View style={styles.tlLeft}>
-                  {task.time && <Text style={[styles.tlTime, { color: colors.textMuted }]}>{task.time}</Text>}
-                  <View style={[styles.tlDot, { backgroundColor: done ? colors.primary : colors.border }]} />
-                </View>
-                <TouchableOpacity
-                  style={[styles.tlCard, { backgroundColor: done ? colors.primary + "18" : colors.card, borderColor: done ? colors.primary + "44" : colors.border }]}
-                  onPress={() => toggleTask(task.id)}
-                  activeOpacity={0.75}
-                >
-                  <View style={[styles.tlIcon, { backgroundColor: done ? colors.primary + "33" : colors.border + "80" }]}>
-                    <Feather name={done ? "check" : (TASK_ICONS[task.id] ?? "circle")} size={14} color={done ? colors.primary : colors.textDim} />
-                  </View>
-                  <View style={styles.tlInfo}>
-                    <Text style={[styles.tlLabel, { color: done ? colors.primary : colors.text }]}>{task.label}</Text>
-                    <Text style={[styles.tlSub, { color: colors.textMuted }]}>{task.category}{task.time ? ` · ${task.time}` : ""}</Text>
-                  </View>
-                  <Feather name="chevron-right" size={14} color={colors.textDim} />
-                </TouchableOpacity>
-              </View>
-            );
-          })}
-        </View>
-
-        {/* ── WELLNESS SCORE ── */}
-        <View style={[styles.scoreCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.scoreBadge, { backgroundColor: colors.primary + "22" }]}>
-            <Text style={[styles.scoreNum, { color: colors.primary }]}>{wellnessScore}</Text>
-            <Text style={[styles.scoreLabel, { color: colors.textMuted }]}>Wellness Score</Text>
-          </View>
-          <View style={styles.scoreInfo}>
-            <Text style={[styles.scoreHeadline, { color: colors.text }]}>You're doing great!</Text>
-            <Text style={[styles.scoreSub, { color: colors.textDim }]}>Keep going — small steps create big changes.</Text>
-            <View style={[styles.tipRow, { backgroundColor: colors.primary + "11" }]}>
-              <Feather name="sun" size={12} color={colors.primary} />
-              <Text style={[styles.tipText, { color: colors.textDim }]}>{tip.title}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* ── CTA ── */}
-        <TouchableOpacity
-          style={[styles.ctaCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => router.push(isPremium ? "/(tabs)/ask-ai" : "/(tabs)/ask-ai")}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.ctaLabel, { color: colors.textMuted }]}>Need guidance?</Text>
-          <View style={[styles.ctaBtn, { backgroundColor: colors.primary + "22", borderColor: colors.primary + "44" }]}>
-            <Feather name="message-circle" size={14} color={colors.primary} />
-            <Text style={[styles.ctaBtnText, { color: colors.primary }]}>Ask AI anything</Text>
-            <Feather name="chevron-right" size={14} color={colors.primary} />
-          </View>
-        </TouchableOpacity>
-
-        <View style={{ height: 32 }} />
-      </ScrollView>
-    </SafeAreaView>
+    <View style={s.statItem}>
+      <Image source={icon} style={s.statIcon} />
+      <Text style={s.statValue}>{value}</Text>
+      <Text style={s.statLabel}>{label}</Text>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+interface TaskRowProps {
+  time: string;
+  label: string;
+  subtitle: string;
+  icon: ReturnType<typeof require>;
+  isLast: boolean;
+}
+function TaskRow({ time, label, subtitle, icon, isLast }: TaskRowProps) {
+  return (
+    <View style={s.tlRow}>
+      {/* Left: time + dot + line */}
+      <View style={s.tlLeft}>
+        <Text style={s.tlTime}>{time}</Text>
+        <View style={s.tlDot} />
+        {!isLast && <View style={s.tlLine} />}
+      </View>
+
+      {/* Right: card */}
+      <TouchableOpacity style={s.tlCard} activeOpacity={0.75}>
+        <Image source={icon} style={s.tlIcon} />
+        <View style={s.tlInfo}>
+          <Text style={s.tlLabel}>{label}</Text>
+          <Text style={s.tlSub}>{subtitle}</Text>
+        </View>
+        <Image source={IC_CHEVRON} style={s.tlChevron} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+export default function HomeScreen() {
+  const hour     = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const total    = TASKS.length;
+
+  return (
+    <ImageBackground source={BG} style={s.bg} resizeMode="cover">
+      {/* Overlay to darken the top for legibility */}
+      <View style={s.overlay} pointerEvents="none" />
+
+      <SafeAreaView style={s.safe} edges={["top"]}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.scroll}
+        >
+
+          {/* ── HEADER ── */}
+          <View style={s.header}>
+            <View style={s.headerLeft}>
+              <Image source={LOGO} style={s.logo} />
+              <View>
+                <Text style={s.brandName}>NATURA AI</Text>
+                <Text style={s.brandSub}>AI Wellness Coach</Text>
+              </View>
+            </View>
+            <Image source={AVATAR} style={s.avatar} />
+          </View>
+
+          {/* ── HERO ── */}
+          <View style={s.hero}>
+            <Text style={s.greeting}>{greeting}, Jules</Text>
+            <Text style={s.heroTitle}>Today's Plan for You</Text>
+            <Text style={s.heroSub}>Personalized steps for your{"\n"}mind, body and energy</Text>
+            <View style={s.energyBadge}>
+              <Image source={IC_LEAF} style={s.energyIcon} />
+              <Text style={s.energyText}>Energy: Good</Text>
+            </View>
+          </View>
+
+          {/* ── STATS CARD ── */}
+          <View style={s.statsCard}>
+            <StatItem icon={IC_FLAME} value="5" label="day streak"  />
+            <StatItem icon={IC_CLOCK} value="32"                 label="min today"   />
+            <StatItem icon={IC_CHECK} value="0"                  label="sessions"    />
+            <StatItem icon={IC_STAR}  value="60"                 label="score"       />
+          </View>
+
+          {/* ── TODAY'S PLAN ── */}
+          <View style={s.planSection}>
+            <View style={s.planHeader}>
+              <Text style={s.planTitle}>Today's Plan</Text>
+              <Text style={s.planMeta}>0/{total} done</Text>
+            </View>
+            {/* Divider */}
+            <View style={s.divider} />
+
+            {/* Timeline */}
+            {TASKS.map((task, idx) => (
+              <TaskRow
+                key={task.id}
+                time={task.time}
+                label={task.label}
+                subtitle={task.subtitle}
+                icon={task.icon}
+                isLast={idx === TASKS.length - 1}
+              />
+            ))}
+          </View>
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </SafeAreaView>
+    </ImageBackground>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  // Root
+  bg:           { flex: 1, backgroundColor: "#04100a" },
+  overlay:      { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(2,8,4,0.38)" },
   safe:         { flex: 1 },
-  scroll:       { flex: 1 },
-  header:       { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm },
-  brandName:    { fontSize: fontSizes.xs, fontFamily: "Inter_700Bold", letterSpacing: 2 },
-  brandSub:     { fontSize: fontSizes.xs, fontFamily: "Inter_400Regular" },
-  avatarCircle: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  avatarLetter: { fontSize: fontSizes.md, fontFamily: "Inter_700Bold" },
-  hero:         { marginHorizontal: spacing.md, borderRadius: radii.lg, padding: spacing.md, borderWidth: 1, marginBottom: spacing.md },
-  heroBadge:    { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, marginBottom: spacing.sm },
-  heroBadgeText:{ fontSize: fontSizes.xs, fontFamily: "Inter_600SemiBold" },
-  heroGreeting: { fontSize: fontSizes.sm, fontFamily: "Inter_400Regular", marginBottom: 2 },
-  heroTitle:    { fontSize: fontSizes.xl, fontFamily: "Inter_700Bold", marginBottom: 4 },
-  heroSub:      { fontSize: fontSizes.sm, fontFamily: "Inter_400Regular" },
-  statsBar:     { marginHorizontal: spacing.md, borderRadius: radii.md, padding: spacing.md, borderWidth: 1, flexDirection: "row", justifyContent: "space-around", marginBottom: spacing.md },
-  statItem:     { alignItems: "center", gap: 3 },
-  statValue:    { fontSize: fontSizes.lg, fontFamily: "Inter_700Bold" },
-  statLabel:    { fontSize: fontSizes.xs, fontFamily: "Inter_400Regular" },
-  section:      { paddingHorizontal: spacing.md, marginBottom: spacing.md },
-  sectionHeader:{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.sm },
-  sectionTitle: { fontSize: fontSizes.md, fontFamily: "Inter_600SemiBold" },
-  sectionMeta:  { fontSize: fontSizes.xs, fontFamily: "Inter_400Regular" },
-  progressBar:  { height: 4, borderRadius: 2, marginBottom: spacing.md, overflow: "hidden" },
-  progressFill: { height: 4, borderRadius: 2 },
-  tlItem:       { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, marginBottom: spacing.sm },
-  tlLeft:       { alignItems: "center", width: 52, paddingTop: 14 },
-  tlTime:       { fontSize: 10, fontFamily: "Inter_400Regular", marginBottom: 4 },
-  tlDot:        { width: 8, height: 8, borderRadius: 4 },
-  tlCard:       { flex: 1, flexDirection: "row", alignItems: "center", borderRadius: radii.md, borderWidth: 1, padding: spacing.sm, gap: spacing.sm },
-  tlIcon:       { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  scroll:       { paddingHorizontal: 20, paddingTop: 8 },
+
+  // Header
+  header:       { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
+  headerLeft:   { flexDirection: "row", alignItems: "center", gap: 10 },
+  logo:         { width: 36, height: 36, borderRadius: 18 },
+  brandName:    { color: WHITE, fontSize: 13, fontWeight: "700", letterSpacing: 1.5 },
+  brandSub:     { color: DIM,   fontSize: 11, fontWeight: "400" },
+  avatar:       { width: 48, height: 48, borderRadius: 24 },
+
+  // Hero
+  hero:         { marginBottom: 22 },
+  greeting:     { color: NEON,  fontSize: 15, fontWeight: "600", marginBottom: 4 },
+  heroTitle:    { color: WHITE, fontSize: 30, fontWeight: "800", lineHeight: 36, marginBottom: 6 },
+  heroSub:      { color: DIM,   fontSize: 14, fontWeight: "400", lineHeight: 20, marginBottom: 16 },
+  energyBadge:  { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", borderWidth: 1.5, borderColor: NEON, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  energyIcon:   { width: 16, height: 16 },
+  energyText:   { color: NEON, fontSize: 13, fontWeight: "600" },
+
+  // Stats card
+  statsCard:    { flexDirection: "row", justifyContent: "space-around", alignItems: "center", backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: BORDER, paddingVertical: 18, paddingHorizontal: 10, marginBottom: 28, ...Platform.select({ ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10 }, android: { elevation: 8 } }) },
+  statItem:     { alignItems: "center", gap: 5 },
+  statIcon:     { width: 44, height: 44 },
+  statValue:    { color: WHITE, fontSize: 22, fontWeight: "800" },
+  statLabel:    { color: DIM,   fontSize: 11, fontWeight: "400" },
+
+  // Plan section
+  planSection:  { },
+  planHeader:   { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  planTitle:    { color: WHITE, fontSize: 20, fontWeight: "700" },
+  planMeta:     { color: NEON,  fontSize: 13, fontWeight: "600" },
+  divider:      { height: 1.5, backgroundColor: NEON, opacity: 0.45, marginBottom: 16 },
+
+  // Timeline
+  tlRow:        { flexDirection: "row", alignItems: "flex-start", marginBottom: 0 },
+  tlLeft:       { width: 62, alignItems: "center", paddingTop: 17 },
+  tlTime:       { color: DIM, fontSize: 10, fontWeight: "500", marginBottom: 5, textAlign: "center", width: 54 },
+  tlDot:        { width: 9, height: 9, borderRadius: 5, backgroundColor: NEON, shadowColor: NEON, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 5, elevation: 4 },
+  tlLine:       { width: 1.5, flex: 1, minHeight: 56, backgroundColor: "rgba(130,200,80,0.3)", marginTop: 3 },
+
+  tlCard:       { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, paddingVertical: 10, paddingHorizontal: 12, gap: 10, marginBottom: 8, marginLeft: 6 },
+  tlIcon:       { width: 40, height: 40, borderRadius: 20 },
   tlInfo:       { flex: 1 },
-  tlLabel:      { fontSize: fontSizes.sm, fontFamily: "Inter_600SemiBold" },
-  tlSub:        { fontSize: fontSizes.xs, fontFamily: "Inter_400Regular", marginTop: 1, textTransform: "capitalize" },
-  scoreCard:    { marginHorizontal: spacing.md, borderRadius: radii.lg, padding: spacing.md, borderWidth: 1, flexDirection: "row", gap: spacing.md, marginBottom: spacing.md },
-  scoreBadge:   { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  scoreNum:     { fontSize: fontSizes.xxl, fontFamily: "Inter_700Bold" },
-  scoreLabel:   { fontSize: 10, fontFamily: "Inter_400Regular", textAlign: "center" },
-  scoreInfo:    { flex: 1, justifyContent: "center" },
-  scoreHeadline:{ fontSize: fontSizes.md, fontFamily: "Inter_600SemiBold", marginBottom: 3 },
-  scoreSub:     { fontSize: fontSizes.xs, fontFamily: "Inter_400Regular", marginBottom: spacing.sm },
-  tipRow:       { flexDirection: "row", alignItems: "center", gap: 5, padding: 6, borderRadius: 8 },
-  tipText:      { fontSize: fontSizes.xs, fontFamily: "Inter_400Regular", flex: 1 },
-  ctaCard:      { marginHorizontal: spacing.md, borderRadius: radii.lg, padding: spacing.md, borderWidth: 1, marginBottom: spacing.md },
-  ctaLabel:     { fontSize: fontSizes.xs, fontFamily: "Inter_400Regular", marginBottom: spacing.sm },
-  ctaBtn:       { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radii.md, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  ctaBtnText:   { flex: 1, fontSize: fontSizes.sm, fontFamily: "Inter_600SemiBold" },
+  tlLabel:      { color: WHITE, fontSize: 14, fontWeight: "600", marginBottom: 2 },
+  tlSub:        { color: DIM,   fontSize: 11, fontWeight: "400" },
+  tlChevron:    { width: 18, height: 18, opacity: 0.75 },
 });
