@@ -1,8 +1,9 @@
-const LATEST = { file: "natura-ai-CLEAN-6TAB-v1.zip", label: "Natura AI — Clean 6-Tab Build (v1)" };
+const LATEST     = { file: "nature-ai-STANDALONE-v1.zip", label: "Nature AI — Standalone Build (v1)" };
+const STANDALONE = { file: "nature-ai-STANDALONE-v1.zip", label: "Standalone (no monorepo)" };
 
 const PREV = [
+  { file: "natura-ai-CLEAN-6TAB-v1.zip",     label: "Natura AI — Clean 6-Tab (monorepo ZIP)" },
   { file: "natura-ai-v1.0.0-production.zip", label: "production (includes yoga/chakra)" },
-  { file: "natura-yoga-ai-v1.0.0-v3.zip",    label: "natura-yoga-ai v3" },
 ];
 
 export default function Download() {
@@ -33,7 +34,7 @@ export default function Download() {
 
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <span style={{ color: "#4a7a5a", fontSize: 12, fontFamily: "monospace" }}>
-            {LATEST.file} · 15.3 MB · 82 files · 19 images · zero yoga/chakra · integrity verified
+            {LATEST.file} · 27 KB · 22 files · zero yoga/chakra · integrity verified
           </span>
         </div>
 
@@ -94,8 +95,8 @@ export default function Download() {
             fontFamily: "monospace", fontSize: 12, color: "#b8d4c2", lineHeight: 1.7,
           }}>
             <div style={{ color: "#86bb9a", fontFamily: "sans-serif", fontSize: 10, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>app.json</div>
-            {[["name","Natura AI"],["slug","natura-ai"],["scheme","natura-ai"],
-              ["ios.bundleIdentifier","com.naturaai.app"],["ios.buildNumber","3"]].map(([k,v]) => (
+            {[["name","Nature AI"],["slug","nature-ai"],["scheme","nature-ai"],
+              ["ios.bundleIdentifier","com.natureai.app"],["ios.buildNumber","1"]].map(([k,v]) => (
               <div key={k}><span style={{ color: "#6b9b7e" }}>{k}: </span><span>"{v}"</span></div>
             ))}
           </div>
