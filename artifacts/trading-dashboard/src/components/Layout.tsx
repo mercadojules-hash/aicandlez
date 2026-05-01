@@ -13,10 +13,10 @@ import {
   Layers,
   LayoutDashboard,
   LineChart,
-  MessageSquare,
   Radio,
   Settings,
   Shield,
+  ShieldCheck,
   Scan,
   SlidersHorizontal,
   TrendingUp,
@@ -36,7 +36,7 @@ export const MODULE_LIST = [
   { id: 10, path: "/portfolio",  icon: Layers,          label: "Portfolio",          sublabel: "Allocation & exposure tracking", status: "active"   },
   { id: 11, path: "/correlation", icon: TrendingUp,      label: "Correlation",        sublabel: "Correlation matrix & trailing stops", status: "active" },
   { id: 12, path: "/journal",    icon: BookOpen,        label: "Trade Journal",      sublabel: "Learning & trade scoring",      status: "active"   },
-  { id: 13, path: "/live",       icon: Zap,             label: "Live Trading",       sublabel: "Exchange integration",          status: "pending"  },
+  { id: 13, path: "/validation", icon: ShieldCheck,     label: "Validation",         sublabel: "Walk-forward & OOS testing",    status: "active"   },
   { id: 14, path: "/settings",   icon: Settings,        label: "Settings",           sublabel: "System configuration",          status: "pending"  },
 ];
 
