@@ -1,0 +1,342 @@
+Build a full-stack HYBRID AI autonomous trading system with layered intelligence, strict risk controls, and simulation-first execution.
+
+---
+
+## PRIMARY OBJECTIVE
+
+Create a trading platform where AI can:
+
+* Analyze market data
+* Detect patterns (candles + indicators)
+* Generate reasoning-based decisions
+* Adapt over time (safe reinforcement learning)
+* Execute trades ONLY under strict constraints
+
+The system must prioritize:
+SAFETY > CONSISTENCY > PROFIT
+
+---
+
+## CRITICAL SAFETY RULE (NON-NEGOTIABLE)
+
+Default mode = SIMULATION
+
+LIVE mode must:
+
+* Be OFF by default
+* Require manual enable
+* Require explicit confirmation
+
+---
+
+## TECH STACK
+
+Frontend:
+
+* React (dark SaaS UI, neon + glassmorphism)
+
+Backend:
+
+* Node.js + Express
+
+Database:
+
+* SQLite
+
+Exchange:
+
+* Binance API (spot only)
+
+---
+
+## CORE SYSTEM ARCHITECTURE
+
+1. MARKET DATA ENGINE
+
+---
+
+* Pull OHLCV candle data
+* Multiple timeframes (1m, 5m, 15m, 1h)
+* Support BTC/USDT initially
+
+---
+
+2. INDICATOR ENGINE
+
+---
+
+Implement:
+
+* RSI
+* EMA (short + long)
+* Trend direction
+* Momentum strength
+
+---
+
+3. CANDLE PATTERN ENGINE
+
+---
+
+Detect:
+
+* Bullish engulfing
+* Bearish engulfing
+* Hammer
+* Shooting star
+* Doji
+
+Each pattern must:
+
+* Output signal (bullish/bearish/neutral)
+* Affect confidence score
+
+---
+
+4. AI REASONING ENGINE (EXPLAINABLE AI)
+
+---
+
+Combine:
+
+* indicators
+* candle patterns
+* trend
+* momentum
+* recent price behavior
+
+Output:
+
+* Decision: BUY / SELL / HOLD
+* Confidence score (0–100)
+* Human-readable reasoning
+
+Example:
+“Uptrend confirmed, RSI recovering, bullish engulfing detected → strong continuation probability”
+
+---
+
+5. ANOMALY DETECTION ENGINE
+
+---
+
+Detect abnormal market behavior:
+
+* Sudden volatility spikes
+* Volume surges
+* Price deviation from normal range
+
+Use:
+
+* statistical deviation (z-score)
+* volatility thresholds
+
+Actions:
+
+* reduce confidence
+* block trades
+* trigger safety pause
+
+---
+
+6. REINFORCEMENT LEARNING (SAFE MODE)
+
+---
+
+DO NOT allow full autonomous strategy creation.
+
+Instead:
+
+Implement WEIGHT ADJUSTMENT SYSTEM:
+
+* Adjust importance of:
+  RSI
+  trend
+  candles
+  momentum
+
+Based on:
+
+* past trade outcomes
+* win/loss performance
+
+Example:
+
+* If RSI signals fail → reduce weight
+* If trend signals succeed → increase weight
+
+---
+
+7. EXECUTION ENGINE
+
+---
+
+Trade ONLY if:
+
+* confidence >= threshold
+* trend alignment confirmed
+* anomaly check passed
+* risk rules pass
+
+---
+
+8. STRICT RISK SYSTEM (MANDATORY)
+
+---
+
+* Fixed AI allocation (hard cap)
+* Max position size
+* Max trades per day
+* Daily loss limit
+* Global stop loss %
+* Take profit locking
+
+---
+
+9. CONTROL SYSTEM
+
+---
+
+Implement:
+
+* Mode toggle:
+  SIMULATION / LIVE
+
+* Pause button:
+  stops new trades
+
+* Kill switch:
+  instantly stops system
+
+---
+
+10. AUTO SAFETY SHUTDOWN
+
+---
+
+Auto-stop if:
+
+* drawdown exceeds threshold
+* daily loss limit reached
+* consecutive losses exceed limit
+* anomaly spike detected
+
+---
+
+11. BACKTESTING ENGINE
+
+---
+
+* Run strategy on historical data
+* Metrics:
+  total return
+  win rate
+  max drawdown
+  trade count
+
+UI:
+
+* Backtest panel
+* Configurable parameters
+
+---
+
+12. STRATEGY OPTIMIZER
+
+---
+
+* Grid search optimization
+* Tune:
+  RSI thresholds
+  EMA lengths
+  confidence threshold
+
+Output:
+
+* best configuration
+* comparison table
+
+---
+
+13. PERFORMANCE ANALYTICS
+
+---
+
+Dashboard must include:
+
+* Equity curve
+* Win rate
+* Avg trade profit
+* Drawdown %
+* Trade history
+
+---
+
+14. LOGGING SYSTEM
+
+---
+
+Log everything:
+
+* signal generated
+* reasoning output
+* anomaly detection
+* trade execution
+* stop events
+
+---
+
+15. UI DASHBOARD (IMPORTANT)
+
+---
+
+Dark SaaS interface with:
+
+Panels:
+
+* Live chart
+* AI status (RUNNING / PAUSED)
+* Allocation usage
+* Risk status
+* Trade history
+* AI reasoning panel
+
+Controls:
+
+* Mode toggle
+* Kill switch
+* Allocation slider
+
+---
+
+16. LIVE TRADING SECURITY
+
+---
+
+* Binance API keys stored backend only
+* ENV variables
+* NO withdrawal permissions
+
+---
+
+## FINAL REQUIREMENTS
+
+The system must:
+
+* Work fully in simulation first
+* Provide explainable AI reasoning
+* Adapt safely over time
+* Detect abnormal market behavior
+* Include backtesting and optimization
+* Allow controlled live trading
+
+---
+
+## GOAL
+
+A hybrid AI trading system that is:
+
+* intelligent (multi-layer analysis)
+* adaptive (safe learning)
+* aware (anomaly detection)
+* controlled (strict risk system)

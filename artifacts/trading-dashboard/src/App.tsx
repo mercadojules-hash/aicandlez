@@ -2,45 +2,34 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Layout } from "@/components/Layout";
+import { Layout, MODULE_LIST } from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
-import Backtest from "@/pages/Backtest";
-import Logs from "@/pages/Logs";
-import NotFound from "@/pages/not-found";
+import ComingSoon from "@/pages/ComingSoon";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: false,
-    },
+    queries: { refetchOnWindowFocus: false, retry: false },
   },
 });
+
+const PENDING_PATHS = MODULE_LIST.filter((m) => m.status === "pending").map((m) => m.path);
 
 function Router() {
   return (
     <Switch>
       <Route path="/">
-        <Layout>
-          <Dashboard />
-        </Layout>
+        <Layout><Dashboard /></Layout>
       </Route>
-      <Route path="/backtest">
-        <Layout>
-          <Backtest />
-        </Layout>
-      </Route>
-      <Route path="/logs">
-        <Layout>
-          <Logs />
-        </Layout>
-      </Route>
-      <Route component={NotFound} />
+      {PENDING_PATHS.map((path) => (
+        <Route key={path} path={path}>
+          <Layout><ComingSoon path={path} /></Layout>
+        </Route>
+      ))}
     </Switch>
   );
 }
 
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -52,5 +41,3 @@ function App() {
     </QueryClientProvider>
   );
 }
-
-export default App;

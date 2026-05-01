@@ -1,90 +1,149 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, BarChart2, LayoutDashboard, Settings, TerminalSquare } from "lucide-react";
-import { useGetDashboardSummary, useToggleKillSwitch } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { getGetDashboardSummaryQueryKey, getGetSettingsQueryKey } from "@workspace/api-client-react";
+import {
+  Activity,
+  BarChart2,
+  BarChart3,
+  BookOpen,
+  Brain,
+  ChevronLeft,
+  ChevronRight,
+  Cpu,
+  FlaskConical,
+  Layers,
+  LayoutDashboard,
+  LineChart,
+  MessageSquare,
+  Radio,
+  Settings,
+  Shield,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
+
+export const MODULE_LIST = [
+  { id: 1,  path: "/",           icon: LayoutDashboard, label: "Dashboard",          sublabel: "System shell & status",          status: "active"   },
+  { id: 2,  path: "/market",     icon: Radio,           label: "Market Data",        sublabel: "Live feed engine",               status: "pending"  },
+  { id: 3,  path: "/indicators", icon: BarChart3,       label: "Indicators",         sublabel: "Candle & indicator engine",      status: "pending"  },
+  { id: 4,  path: "/ai",         icon: Brain,           label: "AI Reasoning",       sublabel: "Signal & decision engine",       status: "pending"  },
+  { id: 5,  path: "/risk",       icon: Shield,          label: "Risk Management",    sublabel: "Position sizing & limits",       status: "pending"  },
+  { id: 6,  path: "/simulation", icon: FlaskConical,    label: "Simulation",         sublabel: "Paper trading engine",           status: "pending"  },
+  { id: 7,  path: "/backtest",   icon: BarChart2,       label: "Backtesting",        sublabel: "Strategy optimizer",            status: "pending"  },
+  { id: 8,  path: "/portfolio",  icon: Layers,          label: "Portfolio",          sublabel: "Multi-asset system",            status: "pending"  },
+  { id: 9,  path: "/correlation",icon: TrendingUp,      label: "Correlation",        sublabel: "Trailing stops & correlation",  status: "pending"  },
+  { id: 10, path: "/journal",    icon: BookOpen,        label: "Journal",            sublabel: "Trade logging & learning",      status: "pending"  },
+  { id: 11, path: "/validation", icon: LineChart,       label: "Validation",         sublabel: "Walk-forward & out-of-sample",  status: "pending"  },
+  { id: 12, path: "/sentiment",  icon: MessageSquare,   label: "Sentiment AI",       sublabel: "News & social signals",         status: "pending"  },
+  { id: 13, path: "/live",       icon: Zap,             label: "Live Trading",       sublabel: "Exchange integration",          status: "pending"  },
+  { id: 14, path: "/settings",   icon: Settings,        label: "Settings",           sublabel: "System configuration",          status: "pending"  },
+];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const queryClient = useQueryClient();
-
-  const { data: summary } = useGetDashboardSummary({
-    query: {
-      queryKey: getGetDashboardSummaryQueryKey(),
-      refetchInterval: 10000,
-    }
-  });
-
-  const toggleKillSwitch = useToggleKillSwitch();
-
-  const handleKillSwitch = () => {
-    const newActive = !summary?.killSwitchActive;
-    toggleKillSwitch.mutate(
-      { data: { active: newActive } },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
-        }
-      }
-    );
-  };
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background text-foreground dark selection:bg-primary/30">
-      <header className="h-14 border-b border-border/40 bg-card/50 backdrop-blur flex items-center px-4 justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 font-bold text-lg tracking-tight">
-            <Activity className="w-5 h-5 text-primary" />
-            <span>APEX<span className="text-primary">TRADER</span></span>
+    <div className="min-h-[100dvh] flex flex-col bg-background text-foreground dark">
+
+      {/* ── Top bar ── */}
+      <header className="h-12 shrink-0 border-b border-border/40 bg-card/60 backdrop-blur flex items-center px-4 justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setCollapsed((c) => !c)}
+            className="p-1.5 rounded hover:bg-card text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+          <div className="flex items-center gap-2 font-bold text-sm tracking-widest select-none">
+            <Cpu className="w-4 h-4 text-primary" />
+            <span className="text-foreground">APEX</span><span className="text-primary">TRADER</span>
+            <span className="ml-1 text-[10px] font-mono font-normal text-muted-foreground/60 tracking-normal">v1.0 · MODULE 1</span>
           </div>
-          
-          <nav className="hidden md:flex items-center gap-1 ml-4">
-            <NavItem href="/" icon={<LayoutDashboard className="w-4 h-4" />} label="Dashboard" active={location === "/"} />
-            <NavItem href="/backtest" icon={<BarChart2 className="w-4 h-4" />} label="Backtest" active={location === "/backtest"} />
-            <NavItem href="/logs" icon={<TerminalSquare className="w-4 h-4" />} label="Logs" active={location === "/logs"} />
-          </nav>
         </div>
 
-        <div className="flex items-center gap-4">
-          {summary && (
-            <>
-              <div className="flex items-center gap-3 text-xs font-mono">
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-card border border-border">
-                  <span className="text-muted-foreground">AUTO:</span>
-                  <span className={summary.autoModeActive ? "text-success" : "text-muted-foreground"}>
-                    {summary.autoModeActive ? "ON" : "OFF"}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={handleKillSwitch}
-                className={`px-3 py-1.5 text-xs font-bold rounded flex items-center gap-2 transition-all ${
-                  summary.killSwitchActive 
-                    ? "bg-destructive/20 text-destructive border border-destructive/50 shadow-[0_0_10px_rgba(239,68,68,0.5)]" 
-                    : "bg-card border border-border text-muted-foreground hover:bg-card/80"
-                }`}
-              >
-                <div className={`w-2 h-2 rounded-full ${summary.killSwitchActive ? "bg-destructive animate-pulse" : "bg-muted-foreground"}`} />
-                KILL SWITCH
-              </button>
-            </>
-          )}
-        </div>
+        <SystemStatusBar />
       </header>
 
-      <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
-        {children}
-      </main>
+      {/* ── Body: sidebar + content ── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+
+        {/* Sidebar */}
+        <aside className={`${collapsed ? "w-14" : "w-56"} shrink-0 border-r border-border/40 bg-card/30 flex flex-col transition-all duration-200 overflow-y-auto`}>
+          <nav className="flex flex-col gap-0.5 p-2">
+            {MODULE_LIST.map((mod) => {
+              const Icon = mod.icon;
+              const active = location === mod.path || (mod.path !== "/" && location.startsWith(mod.path));
+              const isPending = mod.status === "pending";
+              return (
+                <Link key={mod.id} href={isPending ? "#" : mod.path}
+                  className={`flex items-center gap-2.5 px-2 py-2 rounded-md transition-colors group relative
+                    ${active ? "bg-primary/10 text-primary" : isPending ? "text-muted-foreground/40 cursor-not-allowed" : "text-muted-foreground hover:text-foreground hover:bg-card"}`}
+                  title={collapsed ? mod.label : undefined}
+                  onClick={(e: React.MouseEvent) => { if (isPending) e.preventDefault(); }}
+                >
+                    {/* Module number */}
+                    <span className={`w-4 h-4 text-[9px] font-bold font-mono flex items-center justify-center rounded shrink-0 
+                      ${active ? "text-primary" : "text-muted-foreground/50"}`}>
+                      {String(mod.id).padStart(2, "0")}
+                    </span>
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    {!collapsed && (
+                      <span className="text-[11px] font-medium leading-none truncate">{mod.label}</span>
+                    )}
+                    {!collapsed && isPending && (
+                      <span className="ml-auto text-[9px] font-mono text-muted-foreground/30">—</span>
+                    )}
+                    {!collapsed && active && (
+                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                    )}
+                </Link>
+              );
+            })}
+          </nav>
+        </aside>
+
+        {/* Main */}
+        <main className="flex-1 overflow-auto p-4">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
 
-function NavItem({ href, icon, label, active }: { href: string; icon: React.ReactNode; label: string; active: boolean }) {
+// ── System Status Bar (top right) ─────────────────────────────────────────────
+function SystemStatusBar() {
+  const [ws] = useState<"connected" | "disconnected">("disconnected");
+  const apiOk = true; // will use real query in Module 2
+
   return (
-    <Link href={href} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-card'}`}>
-      {icon}
-      <span>{label}</span>
-    </Link>
+    <div className="flex items-center gap-3 font-mono text-[10px]">
+      <StatusPill label="API" ok={apiOk} />
+      <StatusPill label="WS" ok={ws === "connected"} />
+      <StatusPill label="ENGINE" ok={false} />
+      <KillSwitchButton />
+    </div>
+  );
+}
+
+function StatusPill({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div className="flex items-center gap-1 px-2 py-1 rounded bg-card border border-border/50">
+      <span className="text-muted-foreground">{label}:</span>
+      <span className={ok ? "text-green-400" : "text-muted-foreground/40"}>{ok ? "OK" : "—"}</span>
+    </div>
+  );
+}
+
+function KillSwitchButton() {
+  return (
+    <button
+      disabled
+      title="Available in Module 5 (Risk Management)"
+      className="px-2 py-1 rounded bg-card border border-border/30 text-muted-foreground/30 flex items-center gap-1.5 cursor-not-allowed"
+    >
+      <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/20" />
+      KILL SWITCH
+    </button>
   );
 }
