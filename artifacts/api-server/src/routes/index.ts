@@ -9,6 +9,7 @@ import logsRouter from "./logs.js";
 import backtestRouter from "./backtest.js";
 import candlesRouter from "./candles.js";
 import marketDataRouter from "./marketData.js";
+import analysisRouter from "./analysis.js";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(logsRouter);
 router.use(backtestRouter);
 router.use(candlesRouter);
 router.use(marketDataRouter);
+router.use(analysisRouter);
 
 export default router;

@@ -24,7 +24,7 @@ import {
 export const MODULE_LIST = [
   { id: 1,  path: "/",           icon: LayoutDashboard, label: "Dashboard",          sublabel: "System shell & status",          status: "active"   },
   { id: 2,  path: "/market",     icon: Radio,           label: "Market Data",        sublabel: "Live feed engine",               status: "active"   },
-  { id: 3,  path: "/indicators", icon: BarChart3,       label: "Indicators",         sublabel: "Candle & indicator engine",      status: "pending"  },
+  { id: 3,  path: "/indicators", icon: BarChart3,       label: "Indicators",         sublabel: "Candle & indicator engine",      status: "active"   },
   { id: 4,  path: "/ai",         icon: Brain,           label: "AI Reasoning",       sublabel: "Signal & decision engine",       status: "pending"  },
   { id: 5,  path: "/risk",       icon: Shield,          label: "Risk Management",    sublabel: "Position sizing & limits",       status: "pending"  },
   { id: 6,  path: "/simulation", icon: FlaskConical,    label: "Simulation",         sublabel: "Paper trading engine",           status: "pending"  },
