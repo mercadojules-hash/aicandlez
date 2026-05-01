@@ -58,6 +58,7 @@ export interface BacktestConfig {
   timeframe:      string;
   initialCapital: number;
   strategy:       "ema_crossover";
+  candleLimit?:   number;
 }
 
 export interface BacktestTradeRecord {
@@ -256,14 +257,17 @@ export async function runBacktest(
   params: StrategyParams = DEFAULT_PARAMS,
 ): Promise<BacktestResult> {
   const { symbol, timeframe, initialCapital } = config;
-  const candles = await getCandles(symbol, timeframe, 500);
+  const limit   = config.candleLimit ?? 500;
+  const candles = await getCandles(symbol, timeframe, limit);
 
   if (candles.length < WARMUP + 5) {
     throw new Error(`Not enough candles: got ${candles.length}, need at least ${WARMUP + 5}`);
   }
 
   const closes = candles.map(c => c.close);
-  const msPerCandle: Record<string, number> = { "1m": 60e3, "5m": 300e3, "15m": 900e3, "1h": 3600e3 };
+  const msPerCandle: Record<string, number> = {
+    "1m": 60e3, "5m": 300e3, "15m": 900e3, "1h": 3600e3, "4h": 14400e3, "1d": 86400e3,
+  };
   const spanDays    = Math.round(candles.length * (msPerCandle[timeframe] ?? 3600e3) / 86400e3);
   const periodLabel = `${candles.length} ${timeframe} candles (~${spanDays} days)`;
 

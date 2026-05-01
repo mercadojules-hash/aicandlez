@@ -24,18 +24,19 @@ export interface SignalFactor {
 }
 
 export interface AIDecisionResult {
-  symbol:     string;
-  timeframe:  string;
-  price:      number;
-  decision:   Decision;
-  confidence: number;
-  reasoning:  string;
-  momentum:   MomentumResult;
-  signals:    SignalFactor[];
-  totalScore: number;
-  maxScore:   number;
-  analyzedAt: number;
-  candles:    number;
+  symbol:       string;
+  timeframe:    string;
+  price:        number;
+  decision:     Decision;
+  confidence:   number;
+  reasoning:    string;
+  shortSummary: string;
+  momentum:     MomentumResult;
+  signals:      SignalFactor[];
+  totalScore:   number;
+  maxScore:     number;
+  analyzedAt:   number;
+  candles:      number;
 }
 
 // ── Momentum ──────────────────────────────────────────────────────────────────
@@ -213,6 +214,52 @@ function buildSignals(
   ];
 }
 
+// ── Short Summary ─────────────────────────────────────────────────────────────
+
+function buildShortSummary(
+  decision:  Decision,
+  analysis:  ReturnType<typeof runAnalysis>,
+  momentum:  MomentumResult,
+): string {
+  const { rsi, ema, trend } = analysis.indicators;
+  const detected = analysis.patterns.filter((p) => p.detected);
+  const parts: string[] = [];
+
+  // RSI condition
+  if (rsi.value < 30)      parts.push("RSI oversold");
+  else if (rsi.value < 40) parts.push("RSI near oversold");
+  else if (rsi.value > 70) parts.push("RSI overbought");
+  else if (rsi.value > 60) parts.push("RSI near overbought");
+
+  // EMA crossover
+  if (ema.crossover === "golden")      parts.push("golden cross");
+  else if (ema.crossover === "death")  parts.push("death cross");
+  else if (ema.signal === "bullish")   parts.push("bullish EMA alignment");
+  else if (ema.signal === "bearish")   parts.push("bearish EMA alignment");
+
+  // Momentum
+  if (momentum.direction === "bullish" && momentum.strength !== "weak") parts.push(`${momentum.strength} upward momentum`);
+  if (momentum.direction === "bearish" && momentum.strength !== "weak") parts.push(`${momentum.strength} downward momentum`);
+
+  // Patterns
+  for (const p of detected) {
+    parts.push(p.name.toLowerCase() + " detected");
+  }
+
+  // Trend context
+  if (trend.direction !== "neutral") {
+    parts.push(`${trend.strength} ${trend.direction} trend`);
+  }
+
+  if (parts.length === 0) {
+    return decision === "HOLD" ? "Mixed signals — no clear edge" : `${decision} signal — multiple factors converge`;
+  }
+
+  const joined = parts.join(", ");
+  const arrow  = decision === "BUY" ? " → BUY" : decision === "SELL" ? " → SELL" : " → HOLD";
+  return joined.charAt(0).toUpperCase() + joined.slice(1) + arrow;
+}
+
 // ── Main Entry ────────────────────────────────────────────────────────────────
 
 export function runAIDecision(
@@ -239,16 +286,18 @@ export function runAIDecision(
   const raw        = Math.abs(totalScore) / maxScore;
   const confidence = parseFloat(Math.min(98, Math.max(10, raw * 150)).toFixed(1));
 
-  const reasoning = buildReasoning(decision, confidence, analysis, momentum);
-  const signals   = buildSignals(analysis, momentum);
+  const reasoning    = buildReasoning(decision, confidence, analysis, momentum);
+  const shortSummary = buildShortSummary(decision, analysis, momentum);
+  const signals      = buildSignals(analysis, momentum);
 
   return {
     symbol,
     timeframe,
-    price:      candles[candles.length - 1].close,
+    price:        candles[candles.length - 1].close,
     decision,
     confidence,
     reasoning,
+    shortSummary,
     momentum,
     signals,
     totalScore,

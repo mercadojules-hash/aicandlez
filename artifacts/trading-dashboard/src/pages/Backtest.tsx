@@ -54,7 +54,9 @@ const SYMBOLS = [
   { id: "SOLUSD", label: "SOL", name: "Solana",   color: "#9945FF" },
 ];
 const TIMEFRAMES = [
-  { id: "1h",  label: "1 Hour",  detail: "~21 day window"   },
+  { id: "1h",  label: "1 Hour",  detail: "~30 day window"   },
+  { id: "4h",  label: "4 Hour",  detail: "~120 day window"  },
+  { id: "1d",  label: "1 Day",   detail: "~365 day window"  },
   { id: "15m", label: "15 Min",  detail: "~5 day window"    },
   { id: "5m",  label: "5 Min",   detail: "~1.7 day window"  },
 ];
@@ -331,7 +333,7 @@ export default function Backtest() {
               <RefreshCw className="w-8 h-8 text-primary animate-spin" />
               <p className="text-sm font-medium">Fetching &amp; simulating…</p>
               <p className="text-xs text-muted-foreground/50">
-                Pulling up to 500 {timeframe} candles for {sym?.label} from Kraken, then running EMA Crossover
+                Pulling up to {timeframe === "1d" ? "365" : "720"} {timeframe} candles for {sym?.label} from Kraken, then running EMA Crossover
               </p>
             </div>
           )}

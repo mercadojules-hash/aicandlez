@@ -34,12 +34,15 @@ export const KRAKEN_PAIRS: Record<string, string> = {
 
 export const SUPPORTED_SYMBOLS = Object.keys(KRAKEN_PAIRS);
 export const SUPPORTED_TIMEFRAMES = ["1m", "5m", "15m", "1h"];
+export const BACKTEST_TIMEFRAMES  = ["1m", "5m", "15m", "1h", "4h", "1d"];
 
 const KRAKEN_INTERVALS: Record<string, number> = {
   "1m": 1,
   "5m": 5,
   "15m": 15,
   "1h": 60,
+  "4h": 240,
+  "1d": 1440,
 };
 
 const CANDLE_TTL: Record<string, number> = {
@@ -47,6 +50,8 @@ const CANDLE_TTL: Record<string, number> = {
   "5m": 60_000,
   "15m": 90_000,
   "1h": 120_000,
+  "4h": 300_000,
+  "1d": 600_000,
 };
 
 const TICKER_TTL = 15_000;
