@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   getAccountSummary, getTradeHistory, placeOrder, closePosition, resetSimulation,
 } from "../lib/simulationEngine.js";
+import { addJournalEntry } from "../lib/tradeJournalEngine.js";
 
 const router = Router();
 
@@ -41,10 +42,30 @@ router.post("/simulation/order", async (req, res) => {
   }
 });
 
-// POST /simulation/close/:positionId — close a position at current market price
+// POST /simulation/close/:positionId — close a position and auto-log to journal
 router.post("/simulation/close/:positionId", async (req, res) => {
   try {
     const result = await closePosition(req.params.positionId!);
+    if (result.success && result.trade) {
+      const t = result.trade;
+      addJournalEntry({
+        symbol:         t.symbol,
+        displayName:    t.symbol.replace("USD", ""),
+        side:           t.side,
+        entryPrice:     t.entryPrice,
+        exitPrice:      t.exitPrice,
+        entryTime:      t.entryTime,
+        exitTime:       t.exitTime,
+        sizeUSD:        t.sizeUSD,
+        realizedPnL:    t.realizedPnL,
+        realizedPnLPct: t.realizedPnLPct,
+        durationMs:     t.durationMs,
+        closeReason:    (req.body?.closeReason as "MANUAL" | "TRAILING_STOP" | "RISK_KILL" | "AUTO") ?? "MANUAL",
+        reasoning:      req.body?.reasoning,
+        notes:          req.body?.notes,
+        tags:           req.body?.tags,
+      }).catch(() => { /* non-fatal */ });
+    }
     res.status(result.success ? 200 : 404).json(result);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });

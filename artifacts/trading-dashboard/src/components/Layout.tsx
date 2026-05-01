@@ -35,7 +35,7 @@ export const MODULE_LIST = [
   { id: 9,  path: "/scanner",    icon: Scan,            label: "Asset Scanner",      sublabel: "Multi-asset opportunity rank",   status: "active"   },
   { id: 10, path: "/portfolio",  icon: Layers,          label: "Portfolio",          sublabel: "Allocation & exposure tracking", status: "active"   },
   { id: 11, path: "/correlation", icon: TrendingUp,      label: "Correlation",        sublabel: "Correlation matrix & trailing stops", status: "active" },
-  { id: 12, path: "/sentiment",  icon: MessageSquare,   label: "Sentiment AI",       sublabel: "News & social signals",         status: "pending"  },
+  { id: 12, path: "/journal",    icon: BookOpen,        label: "Trade Journal",      sublabel: "Learning & trade scoring",      status: "active"   },
   { id: 13, path: "/live",       icon: Zap,             label: "Live Trading",       sublabel: "Exchange integration",          status: "pending"  },
   { id: 14, path: "/settings",   icon: Settings,        label: "Settings",           sublabel: "System configuration",          status: "pending"  },
 ];

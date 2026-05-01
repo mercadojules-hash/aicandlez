@@ -14,6 +14,7 @@ import StrategyOptimizer from "@/pages/StrategyOptimizer";
 import AssetScanner from "@/pages/AssetScanner";
 import Portfolio from "@/pages/Portfolio";
 import Correlation from "@/pages/Correlation";
+import Journal from "@/pages/Journal";
 import ComingSoon from "@/pages/ComingSoon";
 
 const queryClient = new QueryClient({
@@ -59,6 +60,9 @@ function Router() {
       </Route>
       <Route path="/correlation">
         <Layout><Correlation /></Layout>
+      </Route>
+      <Route path="/journal">
+        <Layout><Journal /></Layout>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>

@@ -16,6 +16,7 @@ import simulationRouter from "./simulation.js";
 import optimizerRouter from "./optimizer.js";
 import scannerRouter from "./scanner.js";
 import correlationRouter from "./correlation.js";
+import journalRouter from "./journal.js";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(simulationRouter);
 router.use(optimizerRouter);
 router.use(scannerRouter);
 router.use(correlationRouter);
+router.use(journalRouter);
 
 export default router;
