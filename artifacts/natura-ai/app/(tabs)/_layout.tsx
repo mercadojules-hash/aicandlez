@@ -36,31 +36,38 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="yoga"
+        name="ask-ai"
         options={{
-          title: "Yoga",
-          tabBarIcon: ({ color, size }) => <Feather name="activity" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="breathe"
-        options={{
-          title: "Breathe",
-          tabBarIcon: ({ color, size }) => <Feather name="wind" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="chakras"
-        options={{
-          title: "Chakras",
-          tabBarIcon: ({ color, size }) => <Feather name="circle" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="ai"
-        options={{
-          title: "AI",
+          title: "Ask AI",
           tabBarIcon: ({ color, size }) => <Feather name="message-circle" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="plans"
+        options={{
+          title: "Plans",
+          tabBarIcon: ({ color, size }) => <Feather name="list" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="recipes"
+        options={{
+          title: "Recipes",
+          tabBarIcon: ({ color, size }) => <Feather name="book-open" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="learn"
+        options={{
+          title: "Learn",
+          tabBarIcon: ({ color, size }) => <Feather name="graduation-cap" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color, size }) => <Feather name="user" size={size} color={color} />,
         }}
       />
     </Tabs>

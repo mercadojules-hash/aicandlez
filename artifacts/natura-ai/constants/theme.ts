@@ -46,6 +46,8 @@ export const radius = {
   full: 999,
 };
 
+export const radii = radius;
+
 export const fontSizes = {
   xs: 11,
   sm: 13,

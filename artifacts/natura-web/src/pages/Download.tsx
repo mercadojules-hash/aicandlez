@@ -1,4 +1,4 @@
-const LATEST = { file: "natura-ai.zip", label: "Natura AI — Clean Wellness Build" };
+const LATEST = { file: "natura-ai.zip", label: "Natura AI v2 — 6-Tab Wellness Build" };
 
 const PREV = [
   { file: "natura-ai-v1.0.0-production.zip", label: "production (includes yoga/chakra)" },
@@ -33,7 +33,7 @@ export default function Download() {
 
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <span style={{ color: "#4a7a5a", fontSize: 12, fontFamily: "monospace" }}>
-            {LATEST.file} · 15.6 MB · 22 images · 83 files · integrity verified
+            {LATEST.file} · 15.6 MB · 91 files · 6-tab wellness build · integrity verified
           </span>
         </div>
 
@@ -67,7 +67,7 @@ export default function Download() {
             <div style={{ fontSize: 10, fontWeight: 600, color: "#2ecc71", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
               App screens included
             </div>
-            {["Home — Dashboard & Today's Plan","Breathe — Breathwork sessions","AI — AI Wellness Coach"].map(s => (
+            {["Home — Dashboard & Today's Plan","Ask AI — AI Wellness Coach","Plans — Guided Programs & Remedies","Recipes — Wellness Recipes & Grocery List","Learn — Articles & Wellness Tips","Profile — Check-In, Streak & Settings"].map(s => (
               <div key={s} style={{ display: "flex", gap: 8, marginBottom: 5 }}>
                 <span style={{ color: "#2ecc71", fontSize: 13, flexShrink: 0 }}>✓</span>
                 <span style={{ fontSize: 13, color: "#b8d4c2" }}>{s}</span>
