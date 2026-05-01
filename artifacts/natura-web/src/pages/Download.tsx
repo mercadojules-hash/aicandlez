@@ -1,4 +1,4 @@
-const LATEST = { file: "natura-ai.zip", label: "Natura AI v2 — 6-Tab Wellness Build" };
+const LATEST = { file: "natura-ai-CLEAN-6TAB-v1.zip", label: "Natura AI — Clean 6-Tab Build (v1)" };
 
 const PREV = [
   { file: "natura-ai-v1.0.0-production.zip", label: "production (includes yoga/chakra)" },
@@ -33,7 +33,7 @@ export default function Download() {
 
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <span style={{ color: "#4a7a5a", fontSize: 12, fontFamily: "monospace" }}>
-            {LATEST.file} · 15.6 MB · 91 files · 6-tab wellness build · integrity verified
+            {LATEST.file} · 15.3 MB · 82 files · 19 images · zero yoga/chakra · integrity verified
           </span>
         </div>
 
