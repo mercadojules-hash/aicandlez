@@ -13,6 +13,7 @@ import {
   Layers,
   LayoutDashboard,
   LineChart,
+  MessageSquare,
   Radio,
   Settings,
   Shield,
@@ -37,7 +38,7 @@ export const MODULE_LIST = [
   { id: 11, path: "/correlation", icon: TrendingUp,      label: "Correlation",        sublabel: "Correlation matrix & trailing stops", status: "active" },
   { id: 12, path: "/journal",    icon: BookOpen,        label: "Trade Journal",      sublabel: "Learning & trade scoring",      status: "active"   },
   { id: 13, path: "/validation", icon: ShieldCheck,     label: "Validation",         sublabel: "Walk-forward & OOS testing",    status: "active"   },
-  { id: 14, path: "/settings",   icon: Settings,        label: "Settings",           sublabel: "System configuration",          status: "pending"  },
+  { id: 14, path: "/sentiment",  icon: MessageSquare,   label: "Sentiment AI",       sublabel: "News & confidence scoring",     status: "active"   },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

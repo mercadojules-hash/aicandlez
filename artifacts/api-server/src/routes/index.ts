@@ -18,6 +18,7 @@ import scannerRouter from "./scanner.js";
 import correlationRouter from "./correlation.js";
 import journalRouter from "./journal.js";
 import validationRouter from "./validation.js";
+import sentimentRouter from "./sentiment.js";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use(scannerRouter);
 router.use(correlationRouter);
 router.use(journalRouter);
 router.use(validationRouter);
+router.use(sentimentRouter);
 
 export default router;

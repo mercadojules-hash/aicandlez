@@ -16,6 +16,7 @@ import Portfolio from "@/pages/Portfolio";
 import Correlation from "@/pages/Correlation";
 import Journal from "@/pages/Journal";
 import Validation from "@/pages/Validation";
+import Sentiment from "@/pages/Sentiment";
 import ComingSoon from "@/pages/ComingSoon";
 
 const queryClient = new QueryClient({
@@ -67,6 +68,9 @@ function Router() {
       </Route>
       <Route path="/validation">
         <Layout><Validation /></Layout>
+      </Route>
+      <Route path="/sentiment">
+        <Layout><Sentiment /></Layout>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>
