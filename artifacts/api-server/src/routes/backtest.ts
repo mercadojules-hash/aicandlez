@@ -1,45 +1,37 @@
 import { Router } from "express";
-import { runBacktestSimulation } from "../lib/trading.js";
+import { runBacktest, type BacktestConfig } from "../lib/backtestEngine.js";
+import { SUPPORTED_SYMBOLS, SUPPORTED_TIMEFRAMES } from "../lib/marketData.js";
 
 const router = Router();
 
+// POST /backtest/run — run strategy on historical candles
 router.post("/backtest/run", async (req, res) => {
   const {
-    symbol = "BTCUSDT",
-    days = 30,
-    allocation = 20,
-    stopLossPercent = 2,
-    takeProfitPercent = 4,
-    minConfidence = 80,
-  } = req.body;
+    symbol         = "BTCUSD",
+    timeframe      = "1h",
+    initialCapital = 10000,
+  } = req.body ?? {};
 
-  const result = runBacktestSimulation(
-    symbol,
-    days,
-    allocation,
-    stopLossPercent,
-    takeProfitPercent,
-    minConfidence
-  );
+  if (!SUPPORTED_SYMBOLS.includes(symbol)) {
+    res.status(400).json({ error: `Unsupported symbol. Supported: ${SUPPORTED_SYMBOLS.join(", ")}` });
+    return;
+  }
+  if (!SUPPORTED_TIMEFRAMES.includes(timeframe)) {
+    res.status(400).json({ error: `Unsupported timeframe. Supported: ${SUPPORTED_TIMEFRAMES.join(", ")}` });
+    return;
+  }
+  if (typeof initialCapital !== "number" || initialCapital < 100) {
+    res.status(400).json({ error: "initialCapital must be a number >= 100" });
+    return;
+  }
 
-  res.json({
-    symbol,
-    days,
-    totalTrades: result.trades.length,
-    wins: result.wins,
-    losses: result.losses,
-    winRate: result.winRate,
-    totalProfit: result.totalProfit,
-    totalProfitPercent: result.totalProfitPercent,
-    maxDrawdown: result.maxDrawdown,
-    trades: result.trades.map((t) => ({
-      ...t,
-      signalId: null,
-      stopLoss: null,
-      takeProfit: null,
-      pnlPercent: t.pnlPercent,
-    })),
-  });
+  try {
+    const config: BacktestConfig = { symbol, timeframe, initialCapital, strategy: "ema_crossover" };
+    const result = await runBacktest(config);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 export default router;

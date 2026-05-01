@@ -28,7 +28,7 @@ export const MODULE_LIST = [
   { id: 4,  path: "/ai",         icon: Brain,           label: "AI Reasoning",       sublabel: "Signal & decision engine",       status: "active"   },
   { id: 5,  path: "/risk",       icon: Shield,          label: "Risk Management",    sublabel: "Position sizing & limits",       status: "active"   },
   { id: 6,  path: "/simulation", icon: FlaskConical,    label: "Simulation",         sublabel: "Paper trading engine",           status: "active"   },
-  { id: 7,  path: "/backtest",   icon: BarChart2,       label: "Backtesting",        sublabel: "Strategy optimizer",            status: "pending"  },
+  { id: 7,  path: "/backtest",   icon: BarChart2,       label: "Backtesting",        sublabel: "Strategy optimizer",            status: "active"   },
   { id: 8,  path: "/portfolio",  icon: Layers,          label: "Portfolio",          sublabel: "Multi-asset system",            status: "pending"  },
   { id: 9,  path: "/correlation",icon: TrendingUp,      label: "Correlation",        sublabel: "Trailing stops & correlation",  status: "pending"  },
   { id: 10, path: "/journal",    icon: BookOpen,        label: "Journal",            sublabel: "Trade logging & learning",      status: "pending"  },

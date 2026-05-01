@@ -1,248 +1,487 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { Search, Play, ArrowDownUp, AlertCircle, Percent, DollarSign, Activity } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { useRunBacktest } from "@workspace/api-client-react";
+import {
+  BarChart2, Play, RefreshCw, AlertTriangle, TrendingUp, TrendingDown,
+  CheckCircle2, Trophy, Target, Zap, Clock, ChevronDown, ChevronUp,
+} from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+// ── Types ──────────────────────────────────────────────────────────────────────
 
-const formSchema = z.object({
-  symbol: z.string().min(1),
-  days: z.coerce.number().min(1).max(365),
-  allocation: z.coerce.number().min(10),
-  stopLossPercent: z.coerce.number().min(0.1).max(50),
-  takeProfitPercent: z.coerce.number().min(0.1).max(100),
-  minConfidence: z.coerce.number().min(1).max(100),
-});
+interface BacktestTrade {
+  n: number;
+  entryTime: number;
+  entryPrice: number;
+  exitTime: number;
+  exitPrice: number;
+  returnPct: number;
+  returnUSD: number;
+  won: boolean;
+}
 
-export default function Backtest() {
-  const runBacktest = useRunBacktest();
+interface BacktestResult {
+  config: {
+    symbol: string;
+    timeframe: string;
+    initialCapital: number;
+    candleCount: number;
+    periodLabel: string;
+    strategy: string;
+  };
+  metrics: {
+    totalReturn: number;
+    totalReturnUSD: number;
+    winRate: number;
+    maxDrawdown: number;
+    totalTrades: number;
+    winningTrades: number;
+    losingTrades: number;
+    profitFactor: number;
+    avgWinPct: number;
+    avgLossPct: number;
+    benchmarkReturn: number;
+    finalEquity: number;
+    sharpeRatio: number;
+  };
+  trades: BacktestTrade[];
+  equityCurve: Array<{ time: number; equity: number; pct: number }>;
+  runAt: number;
+}
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      symbol: "BTCUSDT",
-      days: 30,
-      allocation: 1000,
-      stopLossPercent: 2,
-      takeProfitPercent: 5,
-      minConfidence: 75,
-    },
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+const SYMBOLS = [
+  { id: "BTCUSD", label: "BTC", name: "Bitcoin",  color: "#F7931A" },
+  { id: "ETHUSD", label: "ETH", name: "Ethereum", color: "#627EEA" },
+  { id: "SOLUSD", label: "SOL", name: "Solana",   color: "#9945FF" },
+];
+const TIMEFRAMES = [
+  { id: "1h",  label: "1 Hour",  detail: "~21 day window"   },
+  { id: "15m", label: "15 Min",  detail: "~5 day window"    },
+  { id: "5m",  label: "5 Min",   detail: "~1.7 day window"  },
+];
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function usd(n: number, dec = 2) {
+  const sign = n < 0 ? "−$" : "$";
+  return sign + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function pct(n: number, d = 2, showSign = true) {
+  const sign = showSign ? (n >= 0 ? "+" : "") : "";
+  return sign + n.toFixed(d) + "%";
+}
+function tsLabel(ts: number) {
+  return new Date(ts * 1000).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
+}
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    runBacktest.mutate({ data: values });
+// ── Equity Curve SVG ──────────────────────────────────────────────────────────
+
+function EquityCurve({ curve, initialCapital, benchmarkReturn }: {
+  curve: BacktestResult["equityCurve"];
+  initialCapital: number;
+  benchmarkReturn: number;
+}) {
+  if (curve.length < 2) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground/30 text-sm">
+        No equity data
+      </div>
+    );
   }
 
-  const result = runBacktest.data;
-  const isLoading = runBacktest.isPending;
+  const W = 800;
+  const H = 200;
+  const PAD = { top: 16, right: 16, bottom: 24, left: 60 };
+  const iW = W - PAD.left - PAD.right;
+  const iH = H - PAD.top - PAD.bottom;
+
+  const equities = curve.map(p => p.equity);
+  const benchFinal = initialCapital * (1 + benchmarkReturn / 100);
+  const benchArr = curve.map((_, i) =>
+    initialCapital + (benchFinal - initialCapital) * (i / (curve.length - 1))
+  );
+
+  const allVals = [...equities, ...benchArr, initialCapital];
+  const minV = Math.min(...allVals);
+  const maxV = Math.max(...allVals);
+  const rangeV = maxV === minV ? 1 : maxV - minV;
+
+  const px = (i: number) => PAD.left + (i / (curve.length - 1)) * iW;
+  const py = (v: number) => PAD.top + iH - ((v - minV) / rangeV) * iH;
+
+  const stratPath = equities.map((v, i) => `${i === 0 ? "M" : "L"}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(" ");
+  const benchPath = benchArr.map((v, i) => `${i === 0 ? "M" : "L"}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(" ");
+  const areaClose = ` L${px(curve.length - 1).toFixed(1)},${py(minV).toFixed(1)} L${PAD.left},${py(minV).toFixed(1)} Z`;
+
+  const isProfit  = equities[equities.length - 1]! >= initialCapital;
+  const lineColor = isProfit ? "#34d399" : "#f87171";
+  const yTicks    = [minV, (minV + maxV) / 2, maxV];
 
   return (
-    <div className="flex-1 overflow-auto">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex flex-col md:flex-row gap-6 items-start">
-          <Card className="w-full md:w-80 shrink-0">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Play className="w-4 h-4 text-primary" />
-                Run Simulation
-              </CardTitle>
-              <CardDescription>Test strategy against historical data</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Symbol</Label>
-                  <Select 
-                    value={form.watch("symbol")} 
-                    onValueChange={(val) => form.setValue("symbol", val)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select symbol" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="BTCUSDT">BTC/USDT</SelectItem>
-                      <SelectItem value="ETHUSDT">ETH/USDT</SelectItem>
-                      <SelectItem value="SOLUSDT">SOL/USDT</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={lineColor} stopOpacity="0.22" />
+          <stop offset="100%" stopColor={lineColor} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
 
-                <div className="space-y-2">
-                  <Label>Duration (Days)</Label>
-                  <Select 
-                    value={form.watch("days").toString()} 
-                    onValueChange={(val) => form.setValue("days", Number(val))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select duration" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="7">7 Days</SelectItem>
-                      <SelectItem value="14">14 Days</SelectItem>
-                      <SelectItem value="30">30 Days</SelectItem>
-                      <SelectItem value="90">90 Days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+      {yTicks.map((v, i) => (
+        <g key={i}>
+          <line x1={PAD.left} y1={py(v)} x2={W - PAD.right} y2={py(v)}
+            stroke="currentColor" strokeOpacity="0.07" strokeWidth="1" />
+          <text x={PAD.left - 6} y={py(v) + 4} textAnchor="end" fontSize="9"
+            fill="currentColor" fillOpacity="0.35">
+            {Math.abs(v) >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v.toFixed(0)}`}
+          </text>
+        </g>
+      ))}
 
-                <div className="space-y-2">
-                  <Label>Initial Allocation ($)</Label>
-                  <Input type="number" {...form.register("allocation")} />
-                </div>
+      <line x1={PAD.left} y1={py(initialCapital)} x2={W - PAD.right} y2={py(initialCapital)}
+        stroke="currentColor" strokeOpacity="0.15" strokeWidth="1" strokeDasharray="4 4" />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Stop Loss (%)</Label>
-                    <Input type="number" step="0.1" {...form.register("stopLossPercent")} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Take Profit (%)</Label>
-                    <Input type="number" step="0.1" {...form.register("takeProfitPercent")} />
-                  </div>
-                </div>
+      <path d={stratPath + areaClose} fill="url(#eqGrad)" />
+      <path d={benchPath} fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeOpacity="0.45" strokeDasharray="6 3" />
+      <path d={stratPath} fill="none" stroke={lineColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
 
-                <div className="space-y-2">
-                  <Label>Min Confidence (%)</Label>
-                  <Input type="number" {...form.register("minConfidence")} />
-                </div>
+      <g>
+        <line x1={W - 110} y1={PAD.top + 9} x2={W - 96} y2={PAD.top + 9}
+          stroke={lineColor} strokeWidth="2.5" />
+        <text x={W - 92} y={PAD.top + 13} fontSize="9" fill={lineColor} fillOpacity="0.9">Strategy</text>
+        <line x1={W - 110} y1={PAD.top + 23} x2={W - 96} y2={PAD.top + 23}
+          stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="5 3" strokeOpacity="0.7" />
+        <text x={W - 92} y={PAD.top + 27} fontSize="9" fill="#94a3b8" fillOpacity="0.7">Buy &amp; Hold</text>
+      </g>
+    </svg>
+  );
+}
 
-                <Button type="submit" className="w-full font-bold mt-2" disabled={isLoading}>
-                  {isLoading ? "Running..." : "RUN BACKTEST"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+// ── Metric Card ───────────────────────────────────────────────────────────────
 
-          <div className="flex-1 space-y-6 w-full">
-            {result ? (
-              <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <StatCard 
-                    title="Win Rate" 
-                    value={`${result.winRate.toFixed(1)}%`} 
-                    subtext={`${result.wins}W / ${result.losses}L`} 
-                    trend={result.winRate > 50 ? "up" : "down"}
-                  />
-                  <StatCard 
-                    title="Total Profit" 
-                    value={`$${result.totalProfit.toFixed(2)}`} 
-                    subtext={`${result.totalProfitPercent > 0 ? '+' : ''}${result.totalProfitPercent.toFixed(2)}%`}
-                    trend={result.totalProfit > 0 ? "up" : "down"}
-                  />
-                  <StatCard 
-                    title="Max Drawdown" 
-                    value={`${result.maxDrawdown.toFixed(2)}%`} 
-                    trend="down"
-                    alert={result.maxDrawdown > 20}
-                  />
-                  <StatCard 
-                    title="Total Trades" 
-                    value={result.totalTrades.toString()} 
-                  />
-                </div>
-
-                <Card>
-                  <CardHeader className="py-4">
-                    <CardTitle className="text-sm font-medium">Trade History ({result.symbol})</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="max-h-[500px] overflow-auto">
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-card z-10">
-                          <TableRow>
-                            <TableHead>Time</TableHead>
-                            <TableHead>Side</TableHead>
-                            <TableHead className="text-right">Entry</TableHead>
-                            <TableHead className="text-right">Exit</TableHead>
-                            <TableHead className="text-right">PnL</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {result.trades.map((trade) => (
-                            <TableRow key={trade.id}>
-                              <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                                {format(new Date(trade.timestamp), "MM/dd HH:mm")}
-                              </TableCell>
-                              <TableCell>
-                                <span className={`font-bold text-xs ${trade.side === "BUY" ? "text-success" : "text-destructive"}`}>
-                                  {trade.side}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-xs">${trade.price.toFixed(2)}</TableCell>
-                              <TableCell className="text-right font-mono text-xs">
-                                {trade.exitPrice ? `$${trade.exitPrice.toFixed(2)}` : "-"}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-xs">
-                                {trade.pnl != null ? (
-                                  <span className={trade.pnl >= 0 ? "text-success" : "text-destructive"}>
-                                    {trade.pnl > 0 ? "+" : ""}{trade.pnl.toFixed(2)}
-                                  </span>
-                                ) : "-"}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className={`text-[10px] ${
-                                  trade.status === 'open' ? 'border-primary text-primary' : 
-                                  trade.pnl && trade.pnl > 0 ? 'border-success/50 text-success' : 'border-destructive/50 text-destructive'
-                                }`}>
-                                  {trade.status.toUpperCase()}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          {result.trades.length === 0 && (
-                            <TableRow>
-                              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                No trades generated in this period. Try adjusting parameters.
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
-            ) : (
-              <div className="h-full min-h-[400px] flex flex-col items-center justify-center border border-border/50 border-dashed rounded-xl bg-card/20 text-muted-foreground">
-                <Activity className="w-12 h-12 mb-4 opacity-20" />
-                <p>Run a backtest to see historical performance</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+function MetricCard({ label, value, sub, color, icon }: {
+  label: string; value: string; sub?: string; color: string; icon: React.ReactNode;
+}) {
+  return (
+    <div className="bg-background border border-border/30 rounded-xl p-4">
+      <div className="flex items-center gap-1.5 text-muted-foreground/60 mb-2 text-xs">{icon}{label}</div>
+      <div className={`text-lg font-bold font-mono ${color}`}>{value}</div>
+      {sub && <div className="text-[10px] text-muted-foreground/40 mt-0.5">{sub}</div>}
     </div>
   );
 }
 
-function StatCard({ title, value, subtext, trend, alert }: { title: string, value: string, subtext?: string, trend?: "up"|"down", alert?: boolean }) {
+// ── Main page ─────────────────────────────────────────────────────────────────
+
+export default function Backtest() {
+  const [symbol,         setSymbol]    = useState("BTCUSD");
+  const [timeframe,      setTimeframe] = useState("1h");
+  const [initialCapital, setCapital]   = useState(10000);
+  const [running,        setRunning]   = useState(false);
+  const [result,         setResult]    = useState<BacktestResult | null>(null);
+  const [error,          setError]     = useState<string | null>(null);
+  const [showAllTrades,  setShowAll]   = useState(false);
+
+  async function runBacktest() {
+    setRunning(true);
+    setError(null);
+    setResult(null);
+    setShowAll(false);
+    try {
+      const res = await fetch("/api/backtest/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol, timeframe, initialCapital }),
+      });
+      const data: BacktestResult & { error?: string } = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setResult(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const m = result?.metrics;
+  const sym = SYMBOLS.find(s => s.id === symbol);
+  const visibleTrades = showAllTrades ? result?.trades : result?.trades.slice(0, 8);
+
   return (
-    <Card className={`overflow-hidden relative ${alert ? 'border-destructive/50' : ''}`}>
-      {alert && <div className="absolute top-0 right-0 w-full h-1 bg-destructive" />}
-      <CardContent className="p-4 flex flex-col gap-1">
-        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{title}</span>
-        <div className="flex items-end gap-2 mt-1">
-          <span className={`text-2xl font-bold font-mono tracking-tight ${
-            trend === 'up' ? 'text-success' : trend === 'down' ? 'text-destructive' : ''
-          }`}>
-            {value}
-          </span>
+    <div className="flex flex-col gap-5 max-w-[1100px]">
+
+      {/* Header */}
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <BarChart2 className="w-4 h-4 text-primary" />
+          <span className="text-xs font-mono text-primary tracking-widest uppercase">Module 07 · Backtesting</span>
         </div>
-        {subtext && (
-          <span className="text-xs text-muted-foreground font-mono mt-1">{subtext}</span>
-        )}
-      </CardContent>
-    </Card>
+        <h1 className="text-xl font-bold">Backtesting Engine</h1>
+        <p className="text-sm text-muted-foreground">
+          EMA Crossover strategy on historical Kraken data · Equity curve · Win rate · Max drawdown
+        </p>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 border border-red-900/40 bg-red-950/20 rounded-lg px-4 py-3 text-sm text-red-400">
+          <AlertTriangle className="w-4 h-4 shrink-0" />{error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-5">
+
+        {/* ── Config panel ─────────────────────────────────────────────────────── */}
+        <div className="bg-card border border-border/40 rounded-xl overflow-hidden flex flex-col">
+          <div className="px-5 py-3 border-b border-border/30 flex items-center gap-2">
+            <Target className="w-3.5 h-3.5 text-muted-foreground/50" />
+            <span className="text-sm font-semibold">Configuration</span>
+          </div>
+
+          <div className="p-5 flex flex-col gap-5 flex-1">
+            {/* Symbol */}
+            <div>
+              <label className="text-xs text-muted-foreground/70 mb-2 block">Asset</label>
+              <div className="flex flex-col gap-1.5">
+                {SYMBOLS.map((s) => (
+                  <button key={s.id} onClick={() => setSymbol(s.id)}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-sm transition-all text-left ${
+                      symbol === s.id
+                        ? "border-primary/40 bg-primary/10 text-primary"
+                        : "border-border/30 text-muted-foreground/60 hover:text-foreground hover:border-border/50"
+                    }`}>
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
+                    <span className="font-bold">{s.label}</span>
+                    <span className="text-xs opacity-60 ml-1">{s.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Timeframe */}
+            <div>
+              <label className="text-xs text-muted-foreground/70 mb-2 block">Candle Timeframe</label>
+              <div className="flex flex-col gap-1.5">
+                {TIMEFRAMES.map((tf) => (
+                  <button key={tf.id} onClick={() => setTimeframe(tf.id)}
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-all ${
+                      timeframe === tf.id
+                        ? "border-primary/40 bg-primary/10 text-primary"
+                        : "border-border/30 text-muted-foreground/60 hover:text-foreground"
+                    }`}>
+                    <span className="font-bold">{tf.label}</span>
+                    <span className="text-[10px] opacity-60">{tf.detail}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Capital */}
+            <div>
+              <label className="text-xs text-muted-foreground/70 mb-2 block">Starting Capital</label>
+              <input
+                type="number" min={100} step={1000} value={initialCapital}
+                onChange={(e) => setCapital(Math.max(100, Number(e.target.value)))}
+                className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary/50"
+              />
+              <div className="flex gap-1.5 mt-2">
+                {[1000, 5000, 10000, 25000].map((v) => (
+                  <button key={v} onClick={() => setCapital(v)}
+                    className={`flex-1 text-[10px] font-mono py-1 rounded border transition-colors ${
+                      initialCapital === v ? "border-primary/40 text-primary bg-primary/10" : "border-border/30 text-muted-foreground/50 hover:text-foreground"
+                    }`}>
+                    {v >= 1000 ? `$${v / 1000}K` : `$${v}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Strategy (fixed label) */}
+            <div className="bg-background border border-border/30 rounded-lg p-3">
+              <div className="text-[10px] text-muted-foreground/40 mb-1">Strategy (fixed)</div>
+              <div className="text-sm font-bold mb-1.5">EMA Crossover + RSI Filter</div>
+              <div className="text-[10px] text-muted-foreground/50 leading-relaxed">
+                <span className="text-emerald-400">▲ BUY</span> when EMA-9 crosses above EMA-21 &amp; RSI &lt; 70<br />
+                <span className="text-red-400">▼ SELL</span> when EMA-9 crosses below EMA-21 or RSI &gt; 78
+              </div>
+            </div>
+          </div>
+
+          <div className="p-5 pt-0">
+            <button
+              onClick={runBacktest} disabled={running}
+              className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${
+                running
+                  ? "bg-primary/20 text-primary/40 cursor-not-allowed"
+                  : "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]"
+              }`}>
+              {running
+                ? <><RefreshCw className="w-4 h-4 animate-spin" />Simulating…</>
+                : <><Play className="w-4 h-4" />Run Backtest</>
+              }
+            </button>
+          </div>
+        </div>
+
+        {/* ── Results column ────────────────────────────────────────────────────── */}
+        <div className="flex flex-col gap-4">
+
+          {/* Loading */}
+          {running && (
+            <div className="bg-card border border-border/40 rounded-xl p-10 flex flex-col items-center gap-3 text-center">
+              <RefreshCw className="w-8 h-8 text-primary animate-spin" />
+              <p className="text-sm font-medium">Fetching &amp; simulating…</p>
+              <p className="text-xs text-muted-foreground/50">
+                Pulling up to 500 {timeframe} candles for {sym?.label} from Kraken, then running EMA Crossover
+              </p>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!running && !result && !error && (
+            <div className="bg-card border border-border/40 rounded-xl p-14 flex flex-col items-center gap-3 text-center">
+              <BarChart2 className="w-10 h-10 text-border/40" />
+              <p className="text-sm font-medium text-muted-foreground/60">Configure and run a backtest</p>
+              <p className="text-xs text-muted-foreground/40">
+                Historical {sym?.label ?? "BTC"} {timeframe} candles from Kraken · EMA Crossover strategy
+              </p>
+            </div>
+          )}
+
+          {/* Results */}
+          {result && !running && (
+            <>
+              {/* Summary strip */}
+              <div className="bg-card border border-border/40 rounded-xl px-5 py-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground/60">
+                <span className="font-mono font-bold text-foreground">
+                  {result.config.symbol.replace("USD", "")} · {result.config.timeframe}
+                </span>
+                <span>{result.config.periodLabel}</span>
+                <span>Capital: {usd(result.config.initialCapital, 0)}</span>
+                <span className="ml-auto">Run at {new Date(result.runAt).toLocaleTimeString()}</span>
+              </div>
+
+              {/* 6 metric cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <MetricCard
+                  label="Total Return"
+                  value={pct(m!.totalReturn)}
+                  sub={`${m!.totalReturnUSD >= 0 ? "+" : ""}${usd(m!.totalReturnUSD)} · Final: ${usd(m!.finalEquity, 0)}`}
+                  color={m!.totalReturn >= 0 ? "text-emerald-400" : "text-red-400"}
+                  icon={<TrendingUp className="w-3.5 h-3.5" />}
+                />
+                <MetricCard
+                  label="Win Rate"
+                  value={pct(m!.winRate, 1, false)}
+                  sub={`${m!.winningTrades}W · ${m!.losingTrades}L · ${m!.totalTrades} trades`}
+                  color={m!.winRate >= 55 ? "text-emerald-400" : m!.winRate >= 40 ? "text-yellow-400" : "text-red-400"}
+                  icon={<Trophy className="w-3.5 h-3.5" />}
+                />
+                <MetricCard
+                  label="Max Drawdown"
+                  value={`−${m!.maxDrawdown.toFixed(2)}%`}
+                  sub="Worst peak-to-trough decline"
+                  color={m!.maxDrawdown < 5 ? "text-emerald-400" : m!.maxDrawdown < 15 ? "text-yellow-400" : "text-red-400"}
+                  icon={<TrendingDown className="w-3.5 h-3.5" />}
+                />
+                <MetricCard
+                  label="Profit Factor"
+                  value={m!.profitFactor >= 99 ? "∞" : m!.profitFactor.toFixed(2)}
+                  sub={`Avg win ${pct(m!.avgWinPct, 2, false)} · Avg loss −${pct(m!.avgLossPct, 2, false)}`}
+                  color={m!.profitFactor > 1.5 ? "text-emerald-400" : m!.profitFactor >= 1 ? "text-yellow-400" : "text-red-400"}
+                  icon={<Zap className="w-3.5 h-3.5" />}
+                />
+                <MetricCard
+                  label="Sharpe Ratio"
+                  value={m!.sharpeRatio.toFixed(2)}
+                  sub="Annualized risk-adjusted return"
+                  color={m!.sharpeRatio > 1 ? "text-emerald-400" : m!.sharpeRatio > 0 ? "text-yellow-400" : "text-red-400"}
+                  icon={<Target className="w-3.5 h-3.5" />}
+                />
+                <MetricCard
+                  label="vs Buy & Hold"
+                  value={pct(m!.totalReturn - m!.benchmarkReturn)}
+                  sub={`Benchmark: ${pct(m!.benchmarkReturn)}`}
+                  color={(m!.totalReturn - m!.benchmarkReturn) >= 0 ? "text-emerald-400" : "text-red-400"}
+                  icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                />
+              </div>
+
+              {/* Equity Curve */}
+              <div className="bg-card border border-border/40 rounded-xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-border/30 flex items-center gap-2">
+                  <TrendingUp className="w-3.5 h-3.5 text-muted-foreground/50" />
+                  <span className="text-sm font-semibold">Equity Curve</span>
+                  <span className="text-xs text-muted-foreground/40 ml-auto">{result.equityCurve.length} candle snapshots</span>
+                </div>
+                <div className="p-4 h-[220px]">
+                  <EquityCurve
+                    curve={result.equityCurve}
+                    initialCapital={result.config.initialCapital}
+                    benchmarkReturn={m!.benchmarkReturn}
+                  />
+                </div>
+              </div>
+
+              {/* Trade table */}
+              {result.trades.length > 0 ? (
+                <div className="bg-card border border-border/40 rounded-xl overflow-hidden">
+                  <div className="px-5 py-3 border-b border-border/30 flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground/50" />
+                    <span className="text-sm font-semibold">Simulated Trades</span>
+                    <span className="text-xs text-muted-foreground/40 ml-auto">{result.trades.length} total</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border/20 text-muted-foreground/40">
+                          {["#", "Entry Date", "Entry $", "Exit Date", "Exit $", "Return", "P&L"].map((h, i) => (
+                            <th key={h} className={`px-4 py-2.5 font-medium ${i === 0 ? "text-left" : i < 4 ? "text-left" : "text-right"}`}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleTrades!.map((t) => (
+                          <tr key={t.n} className={`border-b border-border/10 last:border-0 hover:bg-card/60 transition-colors ${
+                            t.won ? "bg-emerald-400/[0.02]" : "bg-red-400/[0.02]"
+                          }`}>
+                            <td className="px-4 py-2.5 font-mono text-muted-foreground/40">{t.n}</td>
+                            <td className="px-4 py-2.5 text-muted-foreground/60 whitespace-nowrap">{tsLabel(t.entryTime)}</td>
+                            <td className="px-4 py-2.5 text-right font-mono">{usd(t.entryPrice)}</td>
+                            <td className="px-4 py-2.5 text-muted-foreground/60 whitespace-nowrap">{tsLabel(t.exitTime)}</td>
+                            <td className="px-4 py-2.5 text-right font-mono">{usd(t.exitPrice)}</td>
+                            <td className={`px-4 py-2.5 text-right font-mono font-bold ${t.won ? "text-emerald-400" : "text-red-400"}`}>
+                              {pct(t.returnPct)}
+                            </td>
+                            <td className={`px-4 py-2.5 text-right font-mono ${t.won ? "text-emerald-400" : "text-red-400"}`}>
+                              {t.returnUSD >= 0 ? "+" : ""}{usd(t.returnUSD)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {result.trades.length > 8 && (
+                    <div className="border-t border-border/20">
+                      <button onClick={() => setShowAll(!showAllTrades)}
+                        className="w-full py-2.5 text-xs text-muted-foreground/50 hover:text-foreground flex items-center justify-center gap-1.5 transition-colors">
+                        {showAllTrades
+                          ? <><ChevronUp className="w-3.5 h-3.5" /> Show less</>
+                          : <><ChevronDown className="w-3.5 h-3.5" /> Show all {result.trades.length} trades</>
+                        }
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-card border border-border/40 rounded-xl p-8 text-center">
+                  <p className="text-sm text-muted-foreground/40">No EMA crossover signals generated in this period</p>
+                  <p className="text-xs text-muted-foreground/30 mt-1">Try a different timeframe or symbol</p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

@@ -9,6 +9,7 @@ import Indicators from "@/pages/Indicators";
 import AIReasoning from "@/pages/AIReasoning";
 import RiskManagement from "@/pages/RiskManagement";
 import Simulation from "@/pages/Simulation";
+import Backtest from "@/pages/Backtest";
 import ComingSoon from "@/pages/ComingSoon";
 
 const queryClient = new QueryClient({
@@ -39,6 +40,9 @@ function Router() {
       </Route>
       <Route path="/simulation">
         <Layout><Simulation /></Layout>
+      </Route>
+      <Route path="/backtest">
+        <Layout><Backtest /></Layout>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>
