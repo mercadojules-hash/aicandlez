@@ -12,6 +12,7 @@ import marketDataRouter from "./marketData.js";
 import analysisRouter from "./analysis.js";
 import aiDecisionRouter from "./aiDecision.js";
 import riskManagementRouter from "./riskManagement.js";
+import simulationRouter from "./simulation.js";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(marketDataRouter);
 router.use(analysisRouter);
 router.use(aiDecisionRouter);
 router.use(riskManagementRouter);
+router.use(simulationRouter);
 
 export default router;

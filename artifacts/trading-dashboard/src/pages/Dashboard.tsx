@@ -96,8 +96,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Modules Active"  value={`${activeModules}/14`}   icon={<CheckCircle2 className="w-4 h-4 text-green-400" />} color="green"  />
         <StatCard label="Modules Pending" value={`${pendingModules}/14`}  icon={<Clock        className="w-4 h-4 text-yellow-400" />} color="yellow" />
-        <StatCard label="Build Phase"     value="5 · Risk Management"     icon={<Layers       className="w-4 h-4 text-primary"    />} color="blue"   />
-        <StatCard label="System Status"   value="Risk Engine Online"      icon={<Activity     className="w-4 h-4 text-primary"    />} color="blue"   />
+        <StatCard label="Build Phase"     value="6 · Simulation"          icon={<Layers       className="w-4 h-4 text-primary"    />} color="blue"   />
+        <StatCard label="System Status"   value="Sim Engine Online"       icon={<Activity     className="w-4 h-4 text-primary"    />} color="blue"   />
       </div>
 
       {/* ── Body grid ── */}
@@ -198,10 +198,10 @@ export default function Dashboard() {
           <div className="border border-primary/20 rounded-xl bg-primary/5 overflow-hidden">
             <div className="px-4 py-3 border-b border-primary/20 flex items-center gap-2 text-sm font-semibold text-primary">
               <Zap className="w-4 h-4" />
-              Next: Module 6 · Simulation
+              Next: Module 7 · Backtesting
             </div>
             <div className="p-4 flex flex-col gap-1.5 text-[11px] text-muted-foreground">
-              {["Paper trading engine (no real money)", "Order simulation: market, limit, stop", "Simulated P&L + equity curve", "Fill price slippage model", "Reset / replay simulation anytime"].map((item) => (
+              {["Run AI strategy on historical candle data", "Win rate, Sharpe ratio, max drawdown", "Equity curve chart over time", "Compare strategy vs. buy-and-hold", "Export backtest results"].map((item) => (
                 <div key={item} className="flex items-start gap-1.5">
                   <Circle className="w-2.5 h-2.5 mt-0.5 shrink-0 text-primary/50" />
                   {item}
