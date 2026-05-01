@@ -4,6 +4,15 @@ import type { Candle } from "./marketData.js";
 
 export type Signal = "bullish" | "bearish" | "neutral";
 
+export interface MACDResult {
+  macdLine:   number;
+  signalLine: number;
+  histogram:  number;
+  signal:     Signal;
+  score:      number;
+  crossover:  "bullish" | "bearish" | "none";
+}
+
 export interface RSIResult {
   value: number;
   signal: Signal;
@@ -138,6 +147,55 @@ export function computeEMA(candles: Candle[], shortPeriod = 9, longPeriod = 21):
   }
 
   return { short, shortPeriod, long, longPeriod, spread, spreadPct, signal, score, crossover };
+}
+
+// ── MACD ──────────────────────────────────────────────────────────────────────
+
+export function computeMACD(candles: Candle[], fast = 12, slow = 26, signalPeriod = 9): MACDResult {
+  const closes = candles.map((c) => c.close);
+
+  if (closes.length < slow + signalPeriod) {
+    return { macdLine: 0, signalLine: 0, histogram: 0, signal: "neutral", score: 0, crossover: "none" };
+  }
+
+  // Build a full series of MACD line values to compute the signal EMA
+  const macdSeries: number[] = [];
+  for (let i = slow - 1; i < closes.length; i++) {
+    const slice = closes.slice(0, i + 1);
+    macdSeries.push(calcEMA(slice, fast) - calcEMA(slice, slow));
+  }
+
+  const macdLine   = macdSeries[macdSeries.length - 1]!;
+  const signalLine = calcEMA(macdSeries, signalPeriod);
+  const histogram  = parseFloat((macdLine - signalLine).toFixed(4));
+
+  // Detect crossover by comparing last two MACD and signal values
+  let crossover: MACDResult["crossover"] = "none";
+  if (macdSeries.length >= signalPeriod + 2) {
+    const prevMacdSeries = macdSeries.slice(0, -1);
+    const prevMacd   = prevMacdSeries[prevMacdSeries.length - 1]!;
+    const prevSignal = calcEMA(prevMacdSeries, signalPeriod);
+    if (prevMacd < prevSignal && macdLine > signalLine) crossover = "bullish";
+    if (prevMacd > prevSignal && macdLine < signalLine) crossover = "bearish";
+  }
+
+  let signal: Signal;
+  let score: number;
+
+  if (crossover === "bullish")        { signal = "bullish"; score =  1.0; }
+  else if (crossover === "bearish")   { signal = "bearish"; score = -1.0; }
+  else if (macdLine > signalLine)     { signal = "bullish"; score =  0.5; }
+  else if (macdLine < signalLine)     { signal = "bearish"; score = -0.5; }
+  else                                { signal = "neutral"; score =  0;   }
+
+  return {
+    macdLine:   parseFloat(macdLine.toFixed(4)),
+    signalLine: parseFloat(signalLine.toFixed(4)),
+    histogram,
+    signal,
+    score,
+    crossover,
+  };
 }
 
 // ── Trend ─────────────────────────────────────────────────────────────────────

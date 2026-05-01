@@ -1,16 +1,44 @@
 import { Router } from "express";
-import { generateCandles } from "../lib/trading.js";
+import { getCandles, SUPPORTED_SYMBOLS, SUPPORTED_TIMEFRAMES } from "../lib/marketData.js";
 
 const router = Router();
 
-router.get("/candles", (req, res) => {
-  const symbol = (req.query.symbol as string) ?? "BTCUSDT";
-  const timeframe = (req.query.timeframe as string) ?? "1H";
-  const limit = parseInt((req.query.limit as string) ?? "200", 10);
+const SYMBOL_MAP: Record<string, string> = {
+  BTCUSDT: "BTCUSD", BTCUSD: "BTCUSD", BTC: "BTCUSD",
+  ETHUSDT: "ETHUSD", ETHUSD: "ETHUSD", ETH: "ETHUSD",
+  SOLUSDT: "SOLUSD", SOLUSD: "SOLUSD", SOL: "SOLUSD",
+};
 
-  const candles = generateCandles(symbol, timeframe, Math.min(limit, 500));
+const TIMEFRAME_MAP: Record<string, string> = { "1H": "1h", "4H": "1h", "1D": "1h" };
 
-  res.json(candles);
+router.get("/candles", async (req, res) => {
+  const rawSymbol = ((req.query.symbol as string) ?? "BTCUSD").toUpperCase();
+  const symbol    = SYMBOL_MAP[rawSymbol] ?? rawSymbol;
+  const rawTf     = (req.query.timeframe as string) ?? "1h";
+  const timeframe = (TIMEFRAME_MAP[rawTf] ?? rawTf).toLowerCase();
+  const limit     = Math.min(parseInt((req.query.limit as string) ?? "200", 10), 500);
+
+  if (!SUPPORTED_SYMBOLS.includes(symbol)) {
+    res.status(400).json({
+      error: `Symbol "${symbol}" not supported. Use: ${SUPPORTED_SYMBOLS.join(", ")}`,
+    });
+    return;
+  }
+
+  if (!SUPPORTED_TIMEFRAMES.includes(timeframe)) {
+    res.status(400).json({
+      error: `Timeframe "${timeframe}" not supported. Use: ${SUPPORTED_TIMEFRAMES.join(", ")}`,
+    });
+    return;
+  }
+
+  try {
+    const candles = await getCandles(symbol, timeframe, limit);
+    res.json(candles);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
 });
 
 export default router;

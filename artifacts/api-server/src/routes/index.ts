@@ -20,6 +20,7 @@ import journalRouter from "./journal.js";
 import validationRouter from "./validation.js";
 import sentimentRouter from "./sentiment.js";
 import exchangeRouter from "./exchange.js";
+import engineRouter from "./engine.js";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(journalRouter);
 router.use(validationRouter);
 router.use(sentimentRouter);
 router.use(exchangeRouter);
+router.use(engineRouter);
 
 export default router;
