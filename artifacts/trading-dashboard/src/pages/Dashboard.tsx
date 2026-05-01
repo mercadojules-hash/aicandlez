@@ -84,19 +84,20 @@ export default function Dashboard() {
       </div>
 
       {/* ── System health cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <HealthCard icon={<Server className="w-4 h-4" />} label="API Server"   ok={apiHealth.ok}   value={apiHealth.ok ? `${apiHealth.latencyMs}ms` : "offline"} />
         <HealthCard icon={<Radio    className="w-4 h-4" />} label="WebSocket"  ok={false}           value="Module 3"    dim />
         <HealthCard icon={<Database className="w-4 h-4" />} label="Data Feed"  ok={true}            value="Kraken · Live" />
         <HealthCard icon={<Brain    className="w-4 h-4" />} label="AI Engine"  ok={true}            value="Reasoning" />
+        <HealthCard icon={<Shield   className="w-4 h-4" />} label="Risk Engine" ok={true}           value="Active" />
       </div>
 
       {/* ── Progress overview ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Modules Active"  value={`${activeModules}/14`}   icon={<CheckCircle2 className="w-4 h-4 text-green-400" />} color="green"  />
         <StatCard label="Modules Pending" value={`${pendingModules}/14`}  icon={<Clock        className="w-4 h-4 text-yellow-400" />} color="yellow" />
-        <StatCard label="Build Phase"     value="4 · AI Reasoning"        icon={<Layers       className="w-4 h-4 text-primary"    />} color="blue"   />
-        <StatCard label="System Status"   value="AI Engine Online"        icon={<Activity     className="w-4 h-4 text-primary"    />} color="blue"   />
+        <StatCard label="Build Phase"     value="5 · Risk Management"     icon={<Layers       className="w-4 h-4 text-primary"    />} color="blue"   />
+        <StatCard label="System Status"   value="Risk Engine Online"      icon={<Activity     className="w-4 h-4 text-primary"    />} color="blue"   />
       </div>
 
       {/* ── Body grid ── */}
@@ -188,7 +189,7 @@ export default function Dashboard() {
               <ArchRow icon={<Radio      className="w-3 h-3" />} label="Realtime"  value="WebSocket (Module 3)"      />
               <ArchRow icon={<Database   className="w-3 h-3" />} label="Data"      value="Kraken API · Live"          ok />
               <ArchRow icon={<Brain      className="w-3 h-3" />} label="AI"        value="Reasoning Engine · Live"   ok />
-              <ArchRow icon={<Shield     className="w-3 h-3" />} label="Risk"      value="Risk Engine (Module 5)"    />
+              <ArchRow icon={<Shield     className="w-3 h-3" />} label="Risk"      value="Risk Engine · Active"       ok />
               <ArchRow icon={<Zap        className="w-3 h-3" />} label="Execution" value="Live Broker (Module 13)"   />
             </div>
           </div>
@@ -197,10 +198,10 @@ export default function Dashboard() {
           <div className="border border-primary/20 rounded-xl bg-primary/5 overflow-hidden">
             <div className="px-4 py-3 border-b border-primary/20 flex items-center gap-2 text-sm font-semibold text-primary">
               <Zap className="w-4 h-4" />
-              Next: Module 5 · Risk Management
+              Next: Module 6 · Simulation
             </div>
             <div className="p-4 flex flex-col gap-1.5 text-[11px] text-muted-foreground">
-              {["Position sizing by risk % per trade", "Stop-loss + take-profit calculator", "Max drawdown guard rails", "Portfolio exposure limits", "Per-trade risk/reward ratio display"].map((item) => (
+              {["Paper trading engine (no real money)", "Order simulation: market, limit, stop", "Simulated P&L + equity curve", "Fill price slippage model", "Reset / replay simulation anytime"].map((item) => (
                 <div key={item} className="flex items-start gap-1.5">
                   <Circle className="w-2.5 h-2.5 mt-0.5 shrink-0 text-primary/50" />
                   {item}

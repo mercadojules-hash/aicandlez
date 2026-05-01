@@ -11,6 +11,7 @@ import candlesRouter from "./candles.js";
 import marketDataRouter from "./marketData.js";
 import analysisRouter from "./analysis.js";
 import aiDecisionRouter from "./aiDecision.js";
+import riskManagementRouter from "./riskManagement.js";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(candlesRouter);
 router.use(marketDataRouter);
 router.use(analysisRouter);
 router.use(aiDecisionRouter);
+router.use(riskManagementRouter);
 
 export default router;
