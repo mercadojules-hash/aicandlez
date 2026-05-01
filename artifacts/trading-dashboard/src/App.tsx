@@ -13,6 +13,7 @@ import Backtest from "@/pages/Backtest";
 import StrategyOptimizer from "@/pages/StrategyOptimizer";
 import AssetScanner from "@/pages/AssetScanner";
 import Portfolio from "@/pages/Portfolio";
+import Correlation from "@/pages/Correlation";
 import ComingSoon from "@/pages/ComingSoon";
 
 const queryClient = new QueryClient({
@@ -55,6 +56,9 @@ function Router() {
       </Route>
       <Route path="/portfolio">
         <Layout><Portfolio /></Layout>
+      </Route>
+      <Route path="/correlation">
+        <Layout><Correlation /></Layout>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>

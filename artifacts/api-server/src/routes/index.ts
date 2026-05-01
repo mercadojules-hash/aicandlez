@@ -15,6 +15,7 @@ import riskManagementRouter from "./riskManagement.js";
 import simulationRouter from "./simulation.js";
 import optimizerRouter from "./optimizer.js";
 import scannerRouter from "./scanner.js";
+import correlationRouter from "./correlation.js";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(riskManagementRouter);
 router.use(simulationRouter);
 router.use(optimizerRouter);
 router.use(scannerRouter);
+router.use(correlationRouter);
 
 export default router;
