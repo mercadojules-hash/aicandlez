@@ -19,6 +19,7 @@ import Validation from "@/pages/Validation";
 import Sentiment from "@/pages/Sentiment";
 import Exchange from "@/pages/Exchange";
 import ComingSoon from "@/pages/ComingSoon";
+import SystemVerification from "@/pages/SystemVerification";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,6 +76,9 @@ function Router() {
       </Route>
       <Route path="/exchange">
         <Layout><Exchange /></Layout>
+      </Route>
+      <Route path="/syscheck">
+        <Layout><SystemVerification /></Layout>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>

@@ -21,6 +21,7 @@ import validationRouter from "./validation.js";
 import sentimentRouter from "./sentiment.js";
 import exchangeRouter from "./exchange.js";
 import engineRouter from "./engine.js";
+import systemRouter from "./system.js";
 
 const router: IRouter = Router();
 
@@ -46,5 +47,6 @@ router.use(validationRouter);
 router.use(sentimentRouter);
 router.use(exchangeRouter);
 router.use(engineRouter);
+router.use(systemRouter);
 
 export default router;

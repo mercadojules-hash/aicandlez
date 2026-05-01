@@ -5,18 +5,21 @@ const router = Router();
 
 router.get("/engine/status", (_req, res) => {
   res.json({
-    running:          engineStats.running,
-    startedAt:        engineStats.startedAt,
-    lastTickAt:       engineStats.lastTickAt,
-    lastSignalAt:     engineStats.lastSignalAt,
-    lastTradeAt:      engineStats.lastTradeAt,
-    signalsGenerated: engineStats.signalsGenerated,
-    tradesExecuted:   engineStats.tradesExecuted,
-    tradesBlocked:    engineStats.tradesBlocked,
-    loopIntervalMs:   getLoopIntervalMs(),
-    lastSignal:       engineStats.lastSignal,
-    lastTrade:        engineStats.lastTrade,
-    recentErrors:     engineStats.errors.slice(-5),
+    running:           engineStats.running,
+    startedAt:         engineStats.startedAt,
+    lastTickAt:        engineStats.lastTickAt,
+    lastSignalAt:      engineStats.lastSignalAt,
+    lastTradeAt:       engineStats.lastTradeAt,
+    signalsGenerated:  engineStats.signalsGenerated,
+    tradesExecuted:    engineStats.tradesExecuted,
+    tradesBlocked:     engineStats.tradesBlocked,
+    mtfConfirmedCount: engineStats.mtfConfirmedCount,
+    trailingStopHits:  engineStats.trailingStopHits,
+    correlationBlocks: engineStats.correlationBlocks,
+    loopIntervalMs:    getLoopIntervalMs(),
+    lastSignal:        engineStats.lastSignal,
+    lastTrade:         engineStats.lastTrade,
+    recentErrors:      engineStats.errors.slice(-5),
   });
 });
 
