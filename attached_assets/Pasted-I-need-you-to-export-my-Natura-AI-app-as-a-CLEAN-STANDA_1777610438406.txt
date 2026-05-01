@@ -1,0 +1,100 @@
+I need you to export my Natura AI app as a CLEAN, STANDALONE Expo project ZIP.
+
+THIS MUST BE PRODUCTION-READY AND REQUIRE ZERO FIXES AFTER DOWNLOAD.
+
+----------------------------------
+1. PROJECT STRUCTURE (STRICT)
+----------------------------------
+The ZIP root must contain ONLY:
+
+- app.json
+- package.json
+- assets/
+- app/
+- tsconfig.json
+
+NO nested folders like:
+- artifacts/
+- natura-ai/
+- packages/
+- monorepo roots
+
+----------------------------------
+2. REMOVE MONOREPO / PNPM COMPLETELY
+----------------------------------
+DO NOT include:
+- pnpm-workspace.yaml
+- pnpm-lock.yaml
+- artifacts/
+- workspace:* dependencies
+- catalog: dependencies
+
+----------------------------------
+3. PACKAGE.JSON (CRITICAL)
+----------------------------------
+- Must work with: npm install
+- Replace ALL:
+  - catalog:
+  - workspace:*
+- Remove ALL @workspace/* packages
+- Use real npm versions only
+- No unresolved or internal dependencies
+
+----------------------------------
+4. VERIFY BUILD READINESS
+----------------------------------
+You MUST confirm ALL of the following:
+
+✔ npm install runs with NO ERRORS  
+✔ npx expo start runs successfully  
+✔ No missing modules  
+✔ No dependency conflicts  
+
+----------------------------------
+5. IOS CONFIG (REQUIRED)
+----------------------------------
+app.json must include EXACTLY:
+
+{
+  "expo": {
+    "name": "Natura AI",
+    "slug": "natura-ai",
+    "scheme": "natura-ai",
+    "ios": {
+      "bundleIdentifier": "com.naturaai.app",
+      "buildNumber": "3"
+    }
+  }
+}
+
+----------------------------------
+6. ZIP OUTPUT
+----------------------------------
+File name MUST be:
+
+natura-ai.zip
+
+----------------------------------
+7. VALIDATION REPORT (REQUIRED)
+----------------------------------
+Before sending the ZIP, provide:
+
+- Total files
+- Total images
+- ZIP size
+- Confirmation:
+  ✔ No monorepo files
+  ✔ No pnpm files
+  ✔ No catalog/workspace deps
+  ✔ npm install works
+  ✔ expo start works
+
+----------------------------------
+8. FINAL REQUIREMENT
+----------------------------------
+This ZIP must work immediately with:
+
+npm install
+npx eas build -p ios
+
+WITHOUT ANY MANUAL FIXES.
