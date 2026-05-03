@@ -2,28 +2,46 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+
+// ── Environment defaults (safe for local dev outside Replit) ───────────────────
+const IS_REPLIT = process.env.REPL_ID !== undefined;
 
 const rawPort = process.env.PORT;
+const port = (() => {
+  if (!rawPort) return 5173;
+  const n = Number(rawPort);
+  return Number.isNaN(n) || n <= 0 ? 5173 : n;
+})();
 
 if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
+  console.warn("[vite] PORT not set — defaulting to 5173");
 }
 
-const port = Number(rawPort);
+const basePath = process.env.BASE_PATH ?? "/";
 
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
+if (!process.env.BASE_PATH) {
+  console.warn('[vite] BASE_PATH not set — defaulting to "/"');
 }
 
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
-  );
+// ── Replit-specific plugins (skipped outside Replit automatically) ─────────────
+const replitPlugins: import("vite").Plugin[] = [];
+if (IS_REPLIT && process.env.NODE_ENV !== "production") {
+  try {
+    const [overlay, cartographer, banner] = await Promise.all([
+      import("@replit/vite-plugin-runtime-error-modal"),
+      import("@replit/vite-plugin-cartographer"),
+      import("@replit/vite-plugin-dev-banner"),
+    ]);
+    replitPlugins.push(
+      overlay.default(),
+      cartographer.cartographer({
+        root: path.resolve(import.meta.dirname, ".."),
+      }),
+      banner.devBanner(),
+    );
+  } catch {
+    // Replit plugins unavailable — continuing without them
+  }
 }
 
 export default defineConfig({
@@ -31,20 +49,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    runtimeErrorOverlay(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer({
-              root: path.resolve(import.meta.dirname, ".."),
-            }),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
+    ...replitPlugins,
   ],
   resolve: {
     alias: {
@@ -60,11 +65,11 @@ export default defineConfig({
   },
   server: {
     port,
-    strictPort: true,
+    strictPort: IS_REPLIT,   // strict only on Replit; locally fall back to next free port
     host: "0.0.0.0",
     allowedHosts: true,
     fs: {
-      strict: true,
+      strict: IS_REPLIT,     // only restrict fs on Replit; locally allow any path
     },
   },
   preview: {

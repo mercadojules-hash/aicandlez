@@ -2,26 +2,24 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startTradingLoop } from "./lib/tradingLoop.js";
 
+// ── Port resolution — defaults to 8080 if PORT is not set ─────────────────────
 const rawPort = process.env["PORT"];
+const port = rawPort ? Number(rawPort) : 8080;
 
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
+if (rawPort && (Number.isNaN(port) || port <= 0)) {
+  console.warn(
+    `[api-server] Invalid PORT value "${rawPort}" — falling back to 8080.`,
   );
 }
 
-const port = Number(rawPort);
+const finalPort = !Number.isNaN(port) && port > 0 ? port : 8080;
 
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
-
-app.listen(port, (err) => {
+app.listen(finalPort, (err) => {
   if (err) {
-    logger.error({ err }, "Error listening on port");
+    logger.error({ err }, "Error listening on port — exiting");
     process.exit(1);
   }
 
-  logger.info({ port }, "Server listening");
+  logger.info({ port: finalPort }, "API server listening");
   startTradingLoop();
 });
