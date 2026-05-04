@@ -11,8 +11,9 @@
 //   4. kill-switch route also patches this store.
 //
 // maxActivePositions is in-memory only (not in DB schema).
-//   Set to 0 to disable the open-position cap.
-// maxTradesPerDay = 0 means unlimited daily trades.
+//   0 = no cap on concurrent open positions.
+// maxTradesPerDay = 0 means unlimited daily trades — Gate 2 in autoExecute()
+//   skips the daily count check entirely.
 
 export interface PersistedSettings {
   autoMode:            boolean;
@@ -28,14 +29,15 @@ export interface PersistedSettings {
 // ── Defaults ─────────────────────────────────────────────────────────────────
 // autoMode is TRUE so paper trading starts immediately on first run —
 // no database or additional configuration required.
+// maxTradesPerDay = 0 means unlimited (no daily cap enforced by the engine loop).
 const DEFAULTS: PersistedSettings = {
   autoMode:            true,
   killSwitch:          false,
-  minConfidence:       25,   // low enough for test-mode signals to trade without DB config
+  minConfidence:       25,
   allocation:          1000,
   stopLossPercent:     2,
   takeProfitPercent:   4,
-  maxTradesPerDay:     10,   // 0 = unlimited
+  maxTradesPerDay:     0,    // 0 = unlimited daily trades
   maxActivePositions:  3,    // max concurrent open positions (0 = unlimited)
 };
 

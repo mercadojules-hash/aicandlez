@@ -12,14 +12,15 @@ interface RiskConfig {
   allocationPct: number;
   maxTradeSizeUSD: number;
   dailyLossLimitPct: number;
-  maxTradesPerDay: number;
+  maxTradesPerDay: number;   // 0 = unlimited
   killSwitchActive: boolean;
 }
 
 interface RiskStatus {
   maxPositionSizeUSD: number;
   tradesUsedToday: number;
-  tradesRemainingToday: number;
+  tradesRemainingToday: number;  // -1 = unlimited
+  unlimitedDailyTrades: boolean;
   dailyPnL: number;
   dailyPnLPct: number;
   dailyLossLimitUSD: number;
@@ -65,10 +66,10 @@ const RISK_LEVEL_BG: Record<string, string> = {
 
 // ── Usage Bar ─────────────────────────────────────────────────────────────────
 
-function UsageBar({ usedPct, label, used, total, color }: {
-  usedPct: number; label: string; used: string; total: string; color: string;
+function UsageBar({ usedPct, label, used, total, color, unlimited = false }: {
+  usedPct: number; label: string; used: string; total: string; color: string; unlimited?: boolean;
 }) {
-  const filled = Math.min(100, Math.max(0, usedPct));
+  const filled = Math.min(100, Math.max(0, unlimited ? 0 : usedPct));
   const segments = 20;
   const filledCount = Math.round((filled / 100) * segments);
 
@@ -76,18 +77,24 @@ function UsageBar({ usedPct, label, used, total, color }: {
     <div>
       <div className="flex items-center justify-between mb-2 text-xs">
         <span className="text-muted-foreground/70 font-medium">{label}</span>
-        <span className="font-mono text-muted-foreground/50">{used} / {total}</span>
+        <span className="font-mono text-muted-foreground/50">
+          {unlimited ? `${used} / ∞` : `${used} / ${total}`}
+        </span>
       </div>
       <div className="flex gap-0.5 mb-1.5">
         {Array.from({ length: segments }).map((_, i) => (
           <div key={i} className={`flex-1 h-2 rounded-sm transition-all ${
-            i < filledCount ? color : "bg-border/20"
+            unlimited
+              ? "bg-primary/20"
+              : i < filledCount ? color : "bg-border/20"
           }`} />
         ))}
       </div>
       <div className="flex justify-between text-[10px] font-mono text-muted-foreground/40">
-        <span>{pct(filled, 1)} used</span>
-        <span>{pct(100 - filled, 1)} remaining</span>
+        {unlimited
+          ? <><span>Unlimited</span><span>No daily cap</span></>
+          : <><span>{pct(filled, 1)} used</span><span>{pct(100 - filled, 1)} remaining</span></>
+        }
       </div>
     </div>
   );
@@ -140,10 +147,8 @@ export default function RiskManagement() {
   const [saved,   setSaved]   = useState(false);
   const [dirty,   setDirty]   = useState(false);
 
-  // Local editable copy
   const [draft, setDraft] = useState<RiskConfig | null>(null);
 
-  // Validator state
   const [validateSize, setValidateSize] = useState(2500);
   const [validateResult, setValidateResult] = useState<ValidateResult | null>(null);
   const [validating, setValidating]        = useState(false);
@@ -227,9 +232,25 @@ export default function RiskManagement() {
     }
   }
 
-  const riskLevelColor = status ? RISK_LEVEL_COLORS[status.riskLevel] ?? "text-foreground" : "text-muted-foreground";
-  const riskLevelBg    = status ? RISK_LEVEL_BG[status.riskLevel]    ?? "bg-card border-border/40" : "bg-card border-border/40";
-  const killActive     = config?.killSwitchActive ?? false;
+  const unlimited       = status?.unlimitedDailyTrades ?? (config?.maxTradesPerDay === 0);
+  const riskLevelColor  = status ? RISK_LEVEL_COLORS[status.riskLevel] ?? "text-foreground" : "text-muted-foreground";
+  const riskLevelBg     = status ? RISK_LEVEL_BG[status.riskLevel]    ?? "bg-card border-border/40" : "bg-card border-border/40";
+  const killActive      = config?.killSwitchActive ?? false;
+
+  // Trades today display helpers
+  const tradesTodayValue = status
+    ? unlimited
+      ? `${status.tradesUsedToday} / ∞`
+      : `${status.tradesUsedToday} / ${config?.maxTradesPerDay}`
+    : "—";
+  const tradesTodaySub = status
+    ? unlimited
+      ? "Unlimited daily trades"
+      : `${status.tradesRemainingToday} remaining`
+    : "loading…";
+  const tradesTodayColor = status && !unlimited && status.tradesRemainingToday === 0
+    ? "text-red-400"
+    : "text-yellow-400";
 
   return (
     <div className="flex flex-col gap-5 max-w-[1100px]">
@@ -257,7 +278,7 @@ export default function RiskManagement() {
         </div>
       )}
 
-      {/* Kill switch — always prominent */}
+      {/* Kill switch */}
       <div className={`rounded-xl border p-4 flex items-center justify-between ${killActive ? "border-red-400/40 bg-red-400/10" : "border-border/40 bg-card/30"}`}>
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${killActive ? "bg-red-400/20" : "bg-card"}`}>
@@ -295,9 +316,9 @@ export default function RiskManagement() {
           {
             icon: <BarChart3 className="w-4 h-4" />,
             label: "Trades Today",
-            value: status ? `${status.tradesUsedToday} / ${config?.maxTradesPerDay}` : "—",
-            sub: status ? `${status.tradesRemainingToday} remaining` : "loading…",
-            color: status && status.tradesRemainingToday === 0 ? "text-red-400" : "text-yellow-400",
+            value: tradesTodayValue,
+            sub: tradesTodaySub,
+            color: tradesTodayColor,
           },
           {
             icon: <TrendingDown className="w-4 h-4" />,
@@ -394,17 +415,27 @@ export default function RiskManagement() {
                   description={`Trading halts if daily losses exceed ${pct(draft.dailyLossLimitPct)} = ${usd((draft.dailyLossLimitPct / 100) * draft.totalCapitalUSD)}`}
                 />
 
+                {/* Max Trades / Day — 0 = unlimited */}
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="text-sm font-medium">Max Trades / Day</label>
-                    <input
-                      type="number" min={1} max={100} step={1}
-                      value={draft.maxTradesPerDay}
-                      onChange={(e) => patchDraft({ maxTradesPerDay: Number(e.target.value) })}
-                      className="w-32 bg-background border border-border/50 rounded-lg px-3 py-1.5 text-sm font-mono text-right focus:outline-none focus:border-primary/50"
-                    />
+                    <div className="flex items-center gap-2">
+                      {draft.maxTradesPerDay === 0 && (
+                        <span className="text-[10px] font-mono text-primary border border-primary/20 bg-primary/5 px-2 py-0.5 rounded">
+                          UNLIMITED
+                        </span>
+                      )}
+                      <input
+                        type="number" min={0} max={1000} step={1}
+                        value={draft.maxTradesPerDay}
+                        onChange={(e) => patchDraft({ maxTradesPerDay: Number(e.target.value) })}
+                        className="w-32 bg-background border border-border/50 rounded-lg px-3 py-1.5 text-sm font-mono text-right focus:outline-none focus:border-primary/50"
+                      />
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground/50">Maximum number of trades allowed per calendar day</p>
+                  <p className="text-xs text-muted-foreground/50">
+                    Maximum trades allowed per calendar day · <span className="text-primary font-mono">0 = unlimited</span>
+                  </p>
                 </div>
               </>
             )}
@@ -448,10 +479,11 @@ export default function RiskManagement() {
                 <>
                   <UsageBar
                     label="Trade Count"
-                    usedPct={(status.tradesUsedToday / config.maxTradesPerDay) * 100}
+                    usedPct={unlimited ? 0 : (status.tradesUsedToday / config.maxTradesPerDay) * 100}
                     used={String(status.tradesUsedToday)}
                     total={String(config.maxTradesPerDay)}
                     color="bg-cyan-400"
+                    unlimited={unlimited}
                   />
                   <UsageBar
                     label="Daily Loss Budget"
@@ -496,7 +528,6 @@ export default function RiskManagement() {
                     {validating ? "…" : "Validate"}
                   </button>
                 </div>
-                {/* Quick size buttons */}
                 <div className="flex gap-1.5 mt-2">
                   {[500, 1000, 2500, 5000, 10000].map((v) => (
                     <button key={v} onClick={() => { setValidateSize(v); setValidateResult(null); }}

@@ -5,7 +5,7 @@ export interface RiskConfig {
   allocationPct:     number;   // % of capital per trade
   maxTradeSizeUSD:   number;   // hard cap per trade
   dailyLossLimitPct: number;   // % of capital = daily stop
-  maxTradesPerDay:   number;
+  maxTradesPerDay:   number;   // 0 = unlimited
   killSwitchActive:  boolean;
 }
 
@@ -28,7 +28,7 @@ let config: RiskConfig = {
   allocationPct:     10,
   maxTradeSizeUSD:   5_000,
   dailyLossLimitPct: 5,
-  maxTradesPerDay:   10,
+  maxTradesPerDay:   0,   // 0 = unlimited by default
   killSwitchActive:  false,
 };
 
@@ -50,12 +50,13 @@ function ensureToday() {
 export interface RiskStatus {
   maxPositionSizeUSD:      number;
   tradesUsedToday:         number;
-  tradesRemainingToday:    number;
+  tradesRemainingToday:    number;   // -1 = unlimited
+  unlimitedDailyTrades:    boolean;
   dailyPnL:                number;
   dailyPnLPct:             number;
   dailyLossLimitUSD:       number;
   dailyLossUsedUSD:        number;
-  dailyLossUsedPct:        number;   // % of limit consumed
+  dailyLossUsedPct:        number;
   dailyLossRemainingUSD:   number;
   riskLevel:               "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   haltReason:              string | null;
@@ -67,33 +68,42 @@ function computeStatus(): RiskStatus {
 
   const { totalCapitalUSD, allocationPct, maxTradeSizeUSD, dailyLossLimitPct, maxTradesPerDay, killSwitchActive } = config;
 
+  const unlimited             = maxTradesPerDay === 0;
   const maxPositionSizeUSD    = Math.min((allocationPct / 100) * totalCapitalUSD, maxTradeSizeUSD);
   const dailyLossLimitUSD     = (dailyLossLimitPct / 100) * totalCapitalUSD;
   const dailyLossUsedUSD      = Math.max(0, -daily.dailyPnL);
   const dailyLossUsedPct      = dailyLossLimitUSD > 0 ? (dailyLossUsedUSD / dailyLossLimitUSD) * 100 : 0;
   const dailyLossRemainingUSD = Math.max(0, dailyLossLimitUSD - dailyLossUsedUSD);
-  const tradesRemainingToday  = Math.max(0, maxTradesPerDay - daily.tradesCount);
+
+  // -1 signals unlimited to consumers; use a large sentinel for %-based math below
+  const tradesRemainingToday = unlimited
+    ? -1
+    : Math.max(0, maxTradesPerDay - daily.tradesCount);
+  const tradeCountExhausted  = !unlimited && tradesRemainingToday === 0;
+  const tradeCountNearLimit  = !unlimited && daily.tradesCount >= maxTradesPerDay * 0.8;
+  const tradeCountHalfway    = !unlimited && daily.tradesCount >= maxTradesPerDay * 0.5;
 
   let riskLevel: RiskStatus["riskLevel"];
-  if (killSwitchActive || dailyLossUsedPct >= 100 || tradesRemainingToday === 0) {
+  if (killSwitchActive || dailyLossUsedPct >= 100 || tradeCountExhausted) {
     riskLevel = "CRITICAL";
-  } else if (dailyLossUsedPct >= 70 || daily.tradesCount >= maxTradesPerDay * 0.8) {
+  } else if (dailyLossUsedPct >= 70 || tradeCountNearLimit) {
     riskLevel = "HIGH";
-  } else if (dailyLossUsedPct >= 40 || daily.tradesCount >= maxTradesPerDay * 0.5) {
+  } else if (dailyLossUsedPct >= 40 || tradeCountHalfway) {
     riskLevel = "MEDIUM";
   } else {
     riskLevel = "LOW";
   }
 
   let haltReason: string | null = null;
-  if (killSwitchActive)               haltReason = "Kill switch manually activated";
-  else if (dailyLossUsedPct >= 100)   haltReason = "Daily loss limit reached";
-  else if (tradesRemainingToday === 0) haltReason = "Daily trade count limit reached";
+  if (killSwitchActive)       haltReason = "Kill switch manually activated";
+  else if (dailyLossUsedPct >= 100) haltReason = "Daily loss limit reached";
+  else if (tradeCountExhausted)     haltReason = "Daily trade count limit reached";
 
   return {
     maxPositionSizeUSD,
     tradesUsedToday:      daily.tradesCount,
     tradesRemainingToday,
+    unlimitedDailyTrades: unlimited,
     dailyPnL:             daily.dailyPnL,
     dailyPnLPct:          totalCapitalUSD > 0 ? (daily.dailyPnL / totalCapitalUSD) * 100 : 0,
     dailyLossLimitUSD,
@@ -128,7 +138,8 @@ export interface ValidateResult {
 export function validateTrade(sizeUSD: number): ValidateResult {
   ensureToday();
   const status  = computeStatus();
-  const { killSwitchActive } = config;
+  const { killSwitchActive, maxTradesPerDay } = config;
+  const unlimited = maxTradesPerDay === 0;
 
   const killSwitchCheck: ValidationCheck = killSwitchActive
     ? { pass: false, reason: "Kill switch is active — all trading halted" }
@@ -138,9 +149,11 @@ export function validateTrade(sizeUSD: number): ValidateResult {
     ? { pass: true,  reason: `$${sizeUSD.toLocaleString()} within max $${status.maxPositionSizeUSD.toLocaleString()}` }
     : { pass: false, reason: `$${sizeUSD.toLocaleString()} exceeds max allowed $${status.maxPositionSizeUSD.toLocaleString()}` };
 
-  const dailyTradesCheck: ValidationCheck = status.tradesRemainingToday > 0
-    ? { pass: true,  reason: `${status.tradesRemainingToday} trades remaining today` }
-    : { pass: false, reason: `Daily trade limit of ${config.maxTradesPerDay} reached` };
+  const dailyTradesCheck: ValidationCheck = unlimited
+    ? { pass: true, reason: "Unlimited daily trades — no count limit" }
+    : status.tradesRemainingToday > 0
+      ? { pass: true,  reason: `${status.tradesRemainingToday} trades remaining today` }
+      : { pass: false, reason: `Daily trade limit of ${config.maxTradesPerDay} reached` };
 
   const dailyLossCheck: ValidationCheck = status.dailyLossUsedPct < 100
     ? { pass: true,  reason: `$${status.dailyLossRemainingUSD.toLocaleString("en-US", { maximumFractionDigits: 0 })} loss budget remaining` }
@@ -174,11 +187,12 @@ export function updateConfig(patch: Partial<RiskConfig>): RiskConfig {
   config = {
     ...config,
     ...patch,
-    // Clamp values to valid ranges
+    // Clamp values to valid ranges.
+    // maxTradesPerDay: 0 is valid and means unlimited — minimum is 0, not 1.
     allocationPct:     Math.min(100, Math.max(1,    patch.allocationPct     ?? config.allocationPct)),
     maxTradeSizeUSD:   Math.max(100,               patch.maxTradeSizeUSD   ?? config.maxTradeSizeUSD),
     dailyLossLimitPct: Math.min(50,  Math.max(1,    patch.dailyLossLimitPct ?? config.dailyLossLimitPct)),
-    maxTradesPerDay:   Math.min(100, Math.max(1,    patch.maxTradesPerDay   ?? config.maxTradesPerDay)),
+    maxTradesPerDay:   Math.min(1000, Math.max(0,   patch.maxTradesPerDay   ?? config.maxTradesPerDay)),
     totalCapitalUSD:   Math.max(1000,              patch.totalCapitalUSD   ?? config.totalCapitalUSD),
   };
   return { ...config };
