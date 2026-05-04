@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { db } from "@workspace/db";
 import { signalsTable, logsTable, settingsTable, tradesTable } from "@workspace/db";
 import { eq, and, gte } from "drizzle-orm";
+import { settingsStore } from "./settingsStore.js";
 import { getCandles, SUPPORTED_SYMBOLS, type Candle } from "./marketData.js";
 import { runAIDecision, type AIDecisionResult } from "./aiReasoning.js";
 import { computeRSI, computeEMA, computeMACD } from "./indicators.js";
@@ -160,21 +161,35 @@ interface LoopSettings {
   maxTradesPerDay:   number;
 }
 
+// ── Lazy DB sync: load once on first tick, then serve from in-memory store ────
+// Default: autoMode=true — paper trading works out of the box without a DB.
+let _settingsLoaded = false;
+
 async function fetchSettings(): Promise<LoopSettings> {
-  const rows = await db.select().from(settingsTable).where(eq(settingsTable.id, "default")).limit(1);
-  if (rows.length === 0) {
-    return { autoMode: false, killSwitch: false, minConfidence: 60, allocation: 1000, stopLossPercent: 2, takeProfitPercent: 4, maxTradesPerDay: 5 };
+  if (!_settingsLoaded) {
+    try {
+      const rows = await db.select().from(settingsTable).where(eq(settingsTable.id, "default")).limit(1);
+      if (rows.length > 0) {
+        const s = rows[0]!;
+        settingsStore.patch({
+          autoMode:          s.autoMode,
+          killSwitch:        s.killSwitch,
+          minConfidence:     s.minConfidence,
+          allocation:        s.allocation,
+          stopLossPercent:   s.stopLossPercent,
+          takeProfitPercent: s.takeProfitPercent,
+          maxTradesPerDay:   s.maxTradesPerDay,
+        });
+        logger.info("Trading loop: settings synced from DB");
+      } else {
+        logger.info("Trading loop: no DB settings row — using defaults (autoMode=true, paper trading ON)");
+      }
+    } catch {
+      logger.warn("Trading loop: DB unavailable — using in-memory defaults (autoMode=true)");
+    }
+    _settingsLoaded = true;
   }
-  const s = rows[0]!;
-  return {
-    autoMode:          s.autoMode,
-    killSwitch:        s.killSwitch,
-    minConfidence:     s.minConfidence,
-    allocation:        s.allocation,
-    stopLossPercent:   s.stopLossPercent,
-    takeProfitPercent: s.takeProfitPercent,
-    maxTradesPerDay:   s.maxTradesPerDay,
-  };
+  return settingsStore.get();
 }
 
 async function countTodayLoopTrades(): Promise<number> {
@@ -590,17 +605,20 @@ async function tick() {
       }, "MTF analysis");
 
       const testMode   = engineStats.testMode;
-      const confThresh = testMode ? 35 : settings.minConfidence;
+      // In test mode: lower bar so signals execute in typical low-vol markets.
+      // confThresh=20 means any signal with avg confidence > 20% can trade.
+      // testSingleTF threshold=25 lets a single BUY/SELL at modest confidence fire.
+      const confThresh = testMode ? 20 : settings.minConfidence;
 
-      // Test mode also allows single-TF strong signal
+      // Test mode also allows single-TF signal at reduced confidence
       const testSingleTF =
         testMode && (
-          (mtf.fast.decision !== "HOLD" && mtf.fast.confidence >= 60) ||
-          (mtf.slow.decision !== "HOLD" && mtf.slow.confidence >= 60)
+          (mtf.fast.decision !== "HOLD" && mtf.fast.confidence >= 25) ||
+          (mtf.slow.decision !== "HOLD" && mtf.slow.confidence >= 25)
         );
       const testAction: "BUY" | "SELL" | "HOLD" =
         testSingleTF
-          ? (mtf.fast.confidence >= 60 && mtf.fast.decision !== "HOLD"
+          ? (mtf.fast.confidence >= 25 && mtf.fast.decision !== "HOLD"
               ? mtf.fast.decision as "BUY" | "SELL"
               : mtf.slow.decision as "BUY" | "SELL")
           : mtf.agreedAction;

@@ -1,0 +1,135 @@
+I’m attaching our current working project ZIP (Apex Trader).
+
+We do NOT want a rebuild.
+
+We want you to FIX the execution issue directly within this project so that paper trading works immediately after unzip and run.
+
+---
+
+## 🔴 CURRENT PROBLEM
+
+* Signals are generating correctly ✅
+* Engine loop is running ✅
+* Paper trading toggle works (/api/paper/start) ✅
+* No crashes ✅
+
+BUT:
+
+* Trades are NOT executing ❌
+* Active Trades = 0 ❌
+* Trade Journal is NOT updating ❌
+* Execution funnel shows signals but 0 executed trades ❌
+
+System Verification:
+
+* Currently 7/10 checks passed
+* Missing:
+
+  * Signal Generation
+  * Trailing Stop Engine
+  * Walk-forward Validation
+
+---
+
+## 🎯 WHAT WE NEED
+
+1. Identify EXACTLY why trades are not executing
+2. Fix ONLY the execution pipeline (do NOT rebuild or restructure the app)
+3. Ensure paper trading executes trades automatically
+
+---
+
+## ⚠️ IMPORTANT REQUIREMENTS
+
+* Do NOT rebuild the app
+* Do NOT change architecture
+* Do NOT remove existing logic
+* Do NOT require us to reconfigure localhost
+* Do NOT introduce new setup steps
+
+We want a **surgical fix**, not a rewrite.
+
+---
+
+## 🧪 TEST MODE (REQUIRED)
+
+Please include a safe way to verify execution works:
+
+* Either temporarily bypass filters
+  OR
+* Ensure trades execute under current conditions
+
+We need to confirm:
+signal → execution → trade → journal → UI
+
+---
+
+## 👀 EXPECTED RESULT AFTER FIX
+
+When we run locally:
+
+* Active Trades > 0
+* Trade Journal updates automatically
+* Execution funnel shows executed trades
+* System Verification improves (ideally 10/10)
+
+---
+
+## 📊 VISIBILITY (VERY IMPORTANT)
+
+Make sure we can clearly SEE trades happening:
+
+* Active Trades panel updates
+* Trade Journal logs new trades
+* Optional (preferred):
+
+  * “Last Trade Executed” timestamp
+  * Execution counter
+  * Terminal logs:
+
+    * "Attempting trade"
+    * "Trade executed"
+
+---
+
+## ⚠️ ADDITIONAL MODULE CHECKS
+
+We also need clarification/fix for:
+
+### Signal Generation
+
+* Shows NOT active in System Verification
+* But signals ARE appearing in UI
+
+👉 Confirm if this is:
+
+* a UI status issue
+  OR
+* a real module issue
+
+---
+
+### Trailing Stop Engine
+
+* Shows NOT active
+
+👉 Confirm:
+
+* Should it only activate when trades exist?
+* Or is it not wired correctly?
+
+---
+
+## 📦 DELIVERY
+
+Return:
+
+* Updated ZIP
+  OR
+* Exact files to replace (full blocks, not fragments)
+
+---
+
+Goal: We unzip, run locally, and immediately see paper trading working without any additional setup.
+
+This is a stabilization + execution fix — not a redesign.

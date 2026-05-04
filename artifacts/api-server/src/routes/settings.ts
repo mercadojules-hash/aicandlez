@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { settingsTable, logsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { generateId } from "../lib/trading.js";
+import { settingsStore } from "../lib/settingsStore.js";
 
 const router = Router();
 
@@ -52,6 +53,18 @@ router.put("/settings", async (req, res) => {
 
   await db.update(settingsTable).set(update).where(eq(settingsTable.id, "default"));
 
+  // Keep in-memory settings store in sync so trading loop picks up changes
+  // immediately, even when DATABASE_URL is not set (mock DB).
+  settingsStore.patch({
+    ...(update.autoMode          !== undefined && { autoMode:          update.autoMode }),
+    ...(update.killSwitch        !== undefined && { killSwitch:        update.killSwitch }),
+    ...(update.minConfidence     !== undefined && { minConfidence:     update.minConfidence }),
+    ...(update.allocation        !== undefined && { allocation:        update.allocation }),
+    ...(update.stopLossPercent   !== undefined && { stopLossPercent:   update.stopLossPercent }),
+    ...(update.takeProfitPercent !== undefined && { takeProfitPercent: update.takeProfitPercent }),
+    ...(update.maxTradesPerDay   !== undefined && { maxTradesPerDay:   update.maxTradesPerDay }),
+  });
+
   await db.insert(logsTable).values({
     id: generateId(),
     type: "system",
@@ -71,6 +84,7 @@ router.post("/settings/kill-switch", async (req, res) => {
   await ensureSettings();
 
   await db.update(settingsTable).set({ killSwitch: active }).where(eq(settingsTable.id, "default"));
+  settingsStore.patch({ killSwitch: active }); // keep in-memory store in sync
 
   await db.insert(logsTable).values({
     id: generateId(),

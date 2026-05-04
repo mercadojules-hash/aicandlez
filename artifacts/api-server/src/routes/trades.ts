@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { tradesTable, logsTable, settingsTable } from "@workspace/db";
 import { desc, eq, gte, and } from "drizzle-orm";
 import { generateId, getBasePrice, generateSimulatedPrice, calculatePnL } from "../lib/trading.js";
+import { getAccountSummary, getTradeHistory } from "../lib/simulationEngine.js";
 
 const router = Router();
 
@@ -13,7 +14,22 @@ router.get("/trades", async (req, res) => {
     .orderBy(desc(tradesTable.timestamp))
     .limit(100);
 
-  res.json(trades.map(formatTrade));
+  if (trades.length > 0) {
+    res.json(trades.map(formatTrade));
+    return;
+  }
+
+  // Fallback: DB empty (no DATABASE_URL or no trades yet) — serve from
+  // simulation engine in-memory state so the UI is never blank after trades fire.
+  try {
+    const account     = await getAccountSummary();
+    const history     = getTradeHistory();
+    const openTrades  = account.positions.map((p) => simPositionToTrade(p, "open"));
+    const closedTrades= history.map((t) => simTradeToTrade(t));
+    res.json([...openTrades, ...closedTrades]);
+  } catch {
+    res.json([]);
+  }
 });
 
 router.post("/trades", async (req, res) => {
@@ -62,7 +78,19 @@ router.get("/trades/open", async (req, res) => {
     .where(eq(tradesTable.status, "open"))
     .orderBy(desc(tradesTable.timestamp));
 
-  res.json(trades.map(formatTrade));
+  if (trades.length > 0) {
+    res.json(trades.map(formatTrade));
+    return;
+  }
+
+  // Fallback: serve simulation engine open positions so "Active Trades" panel
+  // is populated even when DATABASE_URL is absent (mock DB).
+  try {
+    const account = await getAccountSummary();
+    res.json(account.positions.map((p) => simPositionToTrade(p, "open")));
+  } catch {
+    res.json([]);
+  }
 });
 
 router.post("/trades/:id/close", async (req, res) => {
@@ -110,6 +138,55 @@ async function getSettings() {
     return newRows[0];
   }
   return rows[0];
+}
+
+// ── Simulation engine → trade format converters ───────────────────────────────
+
+function simPositionToTrade(
+  p: { id: string; symbol: string; side: "BUY" | "SELL"; sizeUSD: number; entryPrice: number; entryTime: number; currentPrice?: number; unrealizedPnL?: number; unrealizedPnLPct?: number },
+  status: string,
+) {
+  return {
+    id:          p.id,
+    symbol:      p.symbol,
+    side:        p.side,
+    amount:      p.sizeUSD,
+    price:       p.entryPrice,
+    exitPrice:   null,
+    pnl:         p.unrealizedPnL    ?? null,
+    pnlPercent:  p.unrealizedPnLPct ?? null,
+    status,
+    mode:        "auto",
+    signalId:    null,
+    stopLoss:    null,
+    takeProfit:  null,
+    reason:      "Paper trade (simulation engine)",
+    timestamp:   new Date(p.entryTime).toISOString(),
+    closedAt:    null,
+    currentPrice: p.currentPrice ?? null,
+  };
+}
+
+function simTradeToTrade(t: { id: string; symbol: string; side: "BUY" | "SELL"; sizeUSD: number; entryPrice: number; exitPrice: number; entryTime: number; exitTime: number; realizedPnL: number; realizedPnLPct: number }) {
+  return {
+    id:         t.id,
+    symbol:     t.symbol,
+    side:       t.side,
+    amount:     t.sizeUSD,
+    price:      t.entryPrice,
+    exitPrice:  t.exitPrice,
+    pnl:        t.realizedPnL,
+    pnlPercent: t.realizedPnLPct,
+    status:     "closed",
+    mode:       "auto",
+    signalId:   null,
+    stopLoss:   null,
+    takeProfit: null,
+    reason:     "Paper trade (simulation engine)",
+    timestamp:  new Date(t.entryTime).toISOString(),
+    closedAt:   new Date(t.exitTime).toISOString(),
+    currentPrice: null,
+  };
 }
 
 function formatTrade(t: typeof tradesTable.$inferSelect) {

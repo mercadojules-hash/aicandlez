@@ -55,6 +55,24 @@ router.get("/system/verification", async (_req, res) => {
     }
   } catch { /* ignore */ }
 
+  // Fallback: DB returned nothing (mock DB / no signals persisted yet) but
+  // the engine has generated signals — use in-memory stats so System
+  // Verification correctly shows Signal Generation as ACTIVE.
+  if (lastSignalRow === null && engineStats.lastSignal) {
+    const sig = engineStats.lastSignal;
+    lastSignalRow = {
+      id:         "in-memory",
+      symbol:     sig.symbol,
+      timeframe:  sig.timeframe,
+      action:     sig.action,
+      confidence: sig.confidence,
+      trend:      sig.action === "BUY" ? "bullish" : sig.action === "SELL" ? "bearish" : "neutral",
+      reasoning:  sig.shortSummary,
+      price:      sig.price,
+      timestamp:  new Date(engineStats.lastSignalAt ?? now).toISOString(),
+    };
+  }
+
   // ── 3. MTF gate status ─────────────────────────────────────────────────────
   const mtfStatus = {
     confirmed:         engineStats.lastSignal?.mtfConfirmed ?? false,

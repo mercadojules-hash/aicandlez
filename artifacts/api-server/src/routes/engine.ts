@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { Router } from "express";
 import {
   engineStats,
@@ -8,6 +9,9 @@ import {
   setRequire1HTrend,
   setVolumeFilter,
 } from "../lib/tradingLoop.js";
+import { placeOrder } from "../lib/simulationEngine.js";
+import { db } from "@workspace/db";
+import { tradesTable, logsTable } from "@workspace/db";
 
 const router = Router();
 
@@ -93,6 +97,82 @@ router.post("/engine/filters", (req, res) => {
     volumeFilter:   engineStats.volumeFilter,
     require1HTrend: engineStats.require1HTrend,
     message: "Quality filters updated.",
+  });
+});
+
+// ── POST /engine/force-test-trades ───────────────────────────────────────────
+// Bypass all signal filters and place one BUY for each supported symbol.
+// Use this to verify the full execution pipeline works:
+//   signal → placeOrder → tradesTable → UI (Active Trades + Logs)
+// Trades are tagged mode="test" and sizeUSD=$500 each.
+// Safe: simulation engine only — no real orders placed.
+router.post("/engine/force-test-trades", async (_req, res) => {
+  const targets: Array<{ symbol: string; side: "BUY" | "SELL" }> = [
+    { symbol: "BTCUSD", side: "BUY" },
+    { symbol: "ETHUSD", side: "BUY" },
+    { symbol: "SOLUSD", side: "BUY" },
+  ];
+
+  const results: Array<{
+    symbol: string; success: boolean;
+    side?: string; price?: number; sizeUSD?: number; error?: string;
+  }> = [];
+
+  for (const { symbol, side } of targets) {
+    try {
+      const result = await placeOrder({ symbol, side, sizeUSD: 500 });
+
+      if (result.success && result.position) {
+        const pos      = result.position;
+        const tradeId  = crypto.randomUUID();
+        const signalId = crypto.randomUUID();
+        const stopLoss   = parseFloat((pos.entryPrice * 0.98).toFixed(2));
+        const takeProfit = parseFloat((pos.entryPrice * 1.04).toFixed(2));
+
+        await db.insert(tradesTable).values({
+          id:         tradeId,
+          symbol,
+          side,
+          amount:     500,
+          price:      pos.entryPrice,
+          status:     "open",
+          mode:       "test",
+          signalId,
+          stopLoss,
+          takeProfit,
+          reason:     "[FORCE TEST] Execution pipeline verification",
+        });
+
+        await db.insert(logsTable).values({
+          id:      crypto.randomUUID(),
+          type:    "trade",
+          level:   "success",
+          message: `[FORCE TEST] ${side} ${symbol} @ $${pos.entryPrice.toFixed(2)} — $500 — Execution pipeline verified`,
+          details: { symbol, side, entryPrice: pos.entryPrice, sizeUSD: 500, mode: "test", tradeId },
+        });
+
+        engineStats.tradesExecuted++;
+        engineStats.funnelExecuted++;
+        engineStats.lastTradeAt = Date.now();
+        engineStats.lastTrade   = { symbol, side, sizeUSD: 500, price: pos.entryPrice, reason: "Force test", mode: "test" };
+
+        results.push({ symbol, success: true, side, price: pos.entryPrice, sizeUSD: 500 });
+      } else {
+        results.push({ symbol, success: false, error: result.error ?? "Unknown error" });
+      }
+    } catch (err) {
+      results.push({ symbol, success: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  const ok = results.filter((r) => r.success).length;
+  res.json({
+    message: ok > 0
+      ? `Force-test: ${ok}/3 trades placed. Check Active Trades panel and Logs.`
+      : "Force-test failed — check simulation engine balance or symbol config.",
+    results,
+    totalExecuted: ok,
+    note: "Test trades ($500 each) placed directly into the simulation engine, bypassing signal filters. Appear in Active Trades, Trade History, and Logs immediately.",
   });
 });
 
