@@ -6,6 +6,29 @@ import { addJournalEntry } from "../lib/tradeJournalEngine.js";
 
 const router = Router();
 
+// GET /account — canonical account endpoint used by Command Center + portfolio panels.
+// Returns the same data as /simulation/account in the flat shape frontends expect:
+//   { balance, equity, positions, totalPnL, totalPnLPct, ... }
+router.get("/account", async (_req, res) => {
+  try {
+    const data = await getAccountSummary();
+    res.json({
+      balance:       parseFloat(data.account.cashBalance.toFixed(2)),
+      startBalance:  data.account.startingBalance,
+      equity:        data.equity,
+      positions:     data.positions,
+      totalPnL:      data.totalPnL,
+      totalPnLPct:   data.totalPnLPct,
+      unrealizedPnL: data.unrealizedPnL,
+      positionCount: data.positionCount,
+      totalTrades:   data.account.totalTrades,
+      totalRealized: parseFloat(data.account.totalRealized.toFixed(2)),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // GET /simulation/account — live balance, open positions, equity
 router.get("/simulation/account", async (_req, res) => {
   try {

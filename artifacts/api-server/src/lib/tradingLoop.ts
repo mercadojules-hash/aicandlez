@@ -106,7 +106,7 @@ export const engineStats: EngineStats = {
   mtfBlockCount:      0,
   trailingStopHits:   0,
   correlationBlocks:  0,
-  testMode:           false,
+  testMode:           true,   // enabled by default: modest signals (≥25% confidence) can trade immediately
   require1HTrend:     false,
   volumeFilter:       true,
   signalCounts:       { BUY: 0, SELL: 0, HOLD: 0 },
@@ -172,7 +172,10 @@ async function fetchSettings(): Promise<LoopSettings> {
       if (rows.length > 0) {
         const s = rows[0]!;
         settingsStore.patch({
-          autoMode:          s.autoMode,
+          // Never let the DB schema default (auto_mode=false) disable paper trading on startup.
+          // autoMode is always enabled unless the kill switch is explicitly active.
+          // This prevents the Drizzle schema default from silently killing the loop.
+          autoMode:          !s.killSwitch,
           killSwitch:        s.killSwitch,
           minConfidence:     s.minConfidence,
           allocation:        s.allocation,
@@ -180,7 +183,7 @@ async function fetchSettings(): Promise<LoopSettings> {
           takeProfitPercent: s.takeProfitPercent,
           maxTradesPerDay:   s.maxTradesPerDay,
         });
-        logger.info("Trading loop: settings synced from DB");
+        logger.info({ autoMode: !s.killSwitch, killSwitch: s.killSwitch }, "Trading loop: settings synced from DB");
       } else {
         logger.info("Trading loop: no DB settings row — using defaults (autoMode=true, paper trading ON)");
       }

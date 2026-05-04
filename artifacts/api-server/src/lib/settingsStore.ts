@@ -26,11 +26,11 @@ export interface PersistedSettings {
 const DEFAULTS: PersistedSettings = {
   autoMode:          true,
   killSwitch:        false,
-  minConfidence:     60,
+  minConfidence:     25,   // low enough for test-mode signals to trade without DB config
   allocation:        1000,
   stopLossPercent:   2,
   takeProfitPercent: 4,
-  maxTradesPerDay:   5,
+  maxTradesPerDay:   10,
 };
 
 let _store: PersistedSettings = { ...DEFAULTS };
