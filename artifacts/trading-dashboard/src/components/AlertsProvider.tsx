@@ -118,6 +118,80 @@ function AlertToast({ alert, onDismiss }: { alert: Alert; onDismiss: () => void 
   );
 }
 
+// ── Trade execution flash banner ───────────────────────────────────────────────
+// Fires only on real trade execution (type === "trade"). Full-viewport, center-
+// screen, impossible to miss. Auto-dismisses after 3.5 s.
+
+interface TradeFlash {
+  id: string;
+  symbol: string;
+  body: string;
+}
+
+function TradeFlashBanner({ flash, onDone }: { flash: TradeFlash; onDone: () => void }) {
+  const [phase, setPhase] = useState<"in" | "hold" | "out">("in");
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase("hold"), 120);
+    const t2 = setTimeout(() => setPhase("out"),  3000);
+    const t3 = setTimeout(() => onDone(),         3500);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, []);
+
+  const sym   = flash.symbol ? flash.symbol.replace("USD", "") : "";
+  const color = SYMBOL_COLOR[flash.symbol] ?? "#f59e0b";
+
+  return (
+    <div
+      className={`fixed inset-0 z-[99999] flex items-center justify-center pointer-events-none
+        transition-all duration-300
+        ${phase === "out" ? "opacity-0 scale-105" : phase === "in" ? "opacity-0 scale-95" : "opacity-100 scale-100"}`}
+    >
+      {/* backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+
+      {/* card */}
+      <div
+        className="relative flex flex-col items-center gap-3 px-10 py-8 rounded-2xl shadow-[0_0_80px_rgba(0,0,0,0.8)] border-2"
+        style={{
+          background: `radial-gradient(ellipse at center, ${color}18 0%, #0a0a0f 70%)`,
+          borderColor: color,
+          boxShadow: `0 0 60px ${color}50, 0 0 120px ${color}20`,
+        }}
+      >
+        {/* pulsing ring */}
+        <div
+          className="absolute inset-0 rounded-2xl animate-ping opacity-20 pointer-events-none"
+          style={{ border: `2px solid ${color}` }}
+        />
+
+        <div className="flex items-center gap-3">
+          <Zap className="w-8 h-8" style={{ color }} />
+          <span className="text-3xl sm:text-4xl font-black tracking-widest uppercase" style={{ color }}>
+            TRADE EXECUTED
+          </span>
+          <Zap className="w-8 h-8" style={{ color }} />
+        </div>
+
+        {sym && (
+          <div className="flex items-center gap-2">
+            <div
+              className="px-3 py-1 rounded-lg text-lg font-black tracking-wide"
+              style={{ backgroundColor: color + "25", color }}
+            >
+              {sym}
+            </div>
+          </div>
+        )}
+
+        <div className="text-sm text-white/70 font-mono text-center leading-relaxed">
+          {flash.body}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 const STORAGE_SOUND = "apex_sound_v1";
@@ -137,6 +211,7 @@ interface EngineStatus {
 
 export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const [alerts,       setAlerts]       = useState<Alert[]>([]);
+  const [tradeFlash,   setTradeFlash]   = useState<TradeFlash | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
     try { return localStorage.getItem(STORAGE_SOUND) !== "false"; } catch { return false; }
   });
@@ -168,6 +243,15 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       playBeep(alert.type);
     }
 
+    // For trade execution: show the high-visibility flash banner
+    if (alert.type === "trade") {
+      setTradeFlash({
+        id:     alert.id,
+        symbol: alert.symbol,
+        body:   alert.body,
+      });
+    }
+
     setAlerts((prev) => {
       const next = [alert, ...prev].slice(0, MAX_VISIBLE);
       return next;
@@ -194,11 +278,12 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
         if (!res.ok) return;
         const data: EngineStatus = await res.json();
 
-        // Check recentSignalLog for new BUY/SELL signals
+        // Check recentSignalLog for new BUY/SELL signals (signal alerts only — NOT for executed trades)
         for (const entry of (data.recentSignalLog ?? [])) {
           if (entry.decision === "HOLD") continue;
           if (seenIds.current.has(entry.id)) continue;
 
+          // Signal alert — shows for every non-HOLD signal (with or without execution)
           const isBuy  = entry.decision === "BUY";
           const symLbl = entry.symbol.replace("USD", "");
           push({
@@ -211,7 +296,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
             timestamp:  entry.timestamp,
           });
 
-          // If it was executed, add a separate trade alert
+          // Execution alert — only fires when the signal was actually executed as a trade
           if (entry.executedAs) {
             const tradeAlertId = `trade-${entry.id}`;
             push({
@@ -226,7 +311,8 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // Check for new trade count increase since last poll
+        // Fallback: watch raw tradesExecuted counter for increment
+        // (catches trades placed via force-test or manual orders that may not appear in recentSignalLog)
         const tc = data.tradesExecuted ?? 0;
         if (prevTradeCount.current !== null && tc > prevTradeCount.current) {
           const tradeId = `trade-count-${tc}`;
@@ -235,7 +321,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
             type:      "trade",
             symbol:    "",
             title:     "Trade Executed",
-            body:      `${tc} total trades completed in this session`,
+            body:      `${tc} total trades executed this session`,
             timestamp: Date.now(),
           });
         }
@@ -251,6 +337,15 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={{ alerts, soundEnabled, toggleSound, dismiss }}>
       {children}
+
+      {/* High-visibility trade execution flash — center screen, impossible to miss */}
+      {tradeFlash && (
+        <TradeFlashBanner
+          key={tradeFlash.id}
+          flash={tradeFlash}
+          onDone={() => setTradeFlash(null)}
+        />
+      )}
 
       {/* Toast stack — fixed top-right */}
       <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none w-[320px] max-w-[calc(100vw-2rem)]">

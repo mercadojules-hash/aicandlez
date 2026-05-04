@@ -10,6 +10,7 @@ import {
   setVolumeFilter,
 } from "../lib/tradingLoop.js";
 import { placeOrder } from "../lib/simulationEngine.js";
+import { sendTradeExecutedSMS } from "../lib/notifications.js";
 import { db } from "@workspace/db";
 import { tradesTable, logsTable } from "@workspace/db";
 
@@ -155,6 +156,9 @@ router.post("/engine/force-test-trades", async (_req, res) => {
         engineStats.funnelExecuted++;
         engineStats.lastTradeAt = Date.now();
         engineStats.lastTrade   = { symbol, side, sizeUSD: 500, price: pos.entryPrice, reason: "Force test", mode: "test" };
+
+        // SMS fires ONLY after a confirmed trade — never for signals, HOLDs, or blocked trades
+        void sendTradeExecutedSMS(symbol, side, pos.entryPrice);
 
         results.push({ symbol, success: true, side, price: pos.entryPrice, sizeUSD: 500 });
       } else {

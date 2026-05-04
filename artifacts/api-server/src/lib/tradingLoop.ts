@@ -11,6 +11,7 @@ import { validateTrade } from "./riskEngine.js";
 import { checkTrailingStops } from "./trailingStopEngine.js";
 import { computeCorrelationMatrix } from "./correlationEngine.js";
 import { addJournalEntry } from "./tradeJournalEngine.js";
+import { sendTradeExecutedSMS } from "./notifications.js";
 import { logger } from "./logger.js";
 
 function genId() { return crypto.randomUUID(); }
@@ -493,6 +494,9 @@ async function autoExecute(
     message: `${tag} ${side} ${symbol} @ $${pos.entryPrice.toFixed(2)} — $${sizeUSD.toFixed(0)} — SL $${stopLoss.toFixed(2)} / TP $${takeProfit.toFixed(2)} — ${shortSummary}`,
     details: { symbol, side, entryPrice: pos.entryPrice, sizeUSD, stopLoss, takeProfit, signalId, shortSummary, tradeMode },
   });
+
+  // SMS fires ONLY after a real trade is confirmed — never for signals, HOLDs, or blocked trades
+  void sendTradeExecutedSMS(symbol, side, pos.entryPrice);
 
   return { executed: true, blockReason: null };
 }
