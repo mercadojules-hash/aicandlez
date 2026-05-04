@@ -76,8 +76,8 @@ interface EngineStats {
   trailingStopHits:   number;
   correlationBlocks:  number;
   testMode:           boolean;
-  require1HTrend:     boolean;   // optional: 1H EMA must align with signal direction
-  volumeFilter:       boolean;   // optional: volume must be above-average
+  require1HTrend:     boolean;
+  volumeFilter:       boolean;
   // Signal distribution
   signalCounts:       { BUY: number; SELL: number; HOLD: number };
   // Execution funnel
@@ -153,13 +153,14 @@ const positionMeta = new Map<string, PositionMeta>();
 // ── Settings ───────────────────────────────────────────────────────────────────
 
 interface LoopSettings {
-  autoMode:          boolean;
-  killSwitch:        boolean;
-  minConfidence:     number;
-  allocation:        number;
-  stopLossPercent:   number;
-  takeProfitPercent: number;
-  maxTradesPerDay:   number;
+  autoMode:            boolean;
+  killSwitch:          boolean;
+  minConfidence:       number;
+  allocation:          number;
+  stopLossPercent:     number;
+  takeProfitPercent:   number;
+  maxTradesPerDay:     number;  // 0 = unlimited
+  maxActivePositions:  number;  // 0 = unlimited; default 3
 }
 
 // ── Lazy DB sync: load once on first tick, then serve from in-memory store ────
@@ -175,7 +176,6 @@ async function fetchSettings(): Promise<LoopSettings> {
         settingsStore.patch({
           // Never let the DB schema default (auto_mode=false) disable paper trading on startup.
           // autoMode is always enabled unless the kill switch is explicitly active.
-          // This prevents the Drizzle schema default from silently killing the loop.
           autoMode:          !s.killSwitch,
           killSwitch:        s.killSwitch,
           minConfidence:     s.minConfidence,
@@ -183,6 +183,8 @@ async function fetchSettings(): Promise<LoopSettings> {
           stopLossPercent:   s.stopLossPercent,
           takeProfitPercent: s.takeProfitPercent,
           maxTradesPerDay:   s.maxTradesPerDay,
+          // maxActivePositions is in-memory only — not in DB schema.
+          // Keep the default (3) from settingsStore; do not override from DB row.
         });
         logger.info({ autoMode: !s.killSwitch, killSwitch: s.killSwitch }, "Trading loop: settings synced from DB");
       } else {
@@ -195,6 +197,10 @@ async function fetchSettings(): Promise<LoopSettings> {
   }
   return settingsStore.get();
 }
+
+// ── Daily trade count (loop-initiated trades only) ────────────────────────────
+// Returns the number of auto/test trades placed today via the engine loop.
+// Force-test trades are excluded from this count (mode check covers it).
 
 async function countTodayLoopTrades(): Promise<number> {
   const midnight = new Date();
@@ -220,7 +226,7 @@ function buildTimeframeSnapshot(
   candles:  Candle[],
 ): TimeframeSnapshot {
   const rsi  = computeRSI(candles);
-  const ema  = computeEMA(candles);   // EMA9 / EMA21 by default
+  const ema  = computeEMA(candles);
   const macd = computeMACD(candles);
 
   const macdState =
@@ -269,7 +275,6 @@ async function persistSignal(
     ema50:      snap.ema21,
   });
 
-  // Update signal counters
   const key = decision.decision as "BUY" | "SELL" | "HOLD";
   if (key in engineStats.signalCounts) engineStats.signalCounts[key]++;
   engineStats.signalsGenerated++;
@@ -326,17 +331,15 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
   const avgConfidence = parseFloat(((fast.confidence + slow.confidence) / 2).toFixed(1));
 
   // ── Volume confirmation filter ─────────────────────────────────────────────
-  // Compare latest candle volume vs rolling average of last 20 candles
   let volumeConfirmed = true;
   if (candles5m.length >= 5) {
     const recentVols  = candles5m.slice(-21, -1).map((c) => c.volume);
     const avgVol      = recentVols.reduce((a, b) => a + b, 0) / recentVols.length;
     const currentVol  = candles5m[candles5m.length - 1]?.volume ?? 0;
-    volumeConfirmed   = currentVol >= avgVol * 0.85;   // current must be ≥ 85% of average
+    volumeConfirmed   = currentVol >= avgVol * 0.85;
   }
 
   // ── Market condition: sideways / trending ──────────────────────────────────
-  // EMA spread as % of price on both TFs must be meaningful for "trending"
   const price5m     = candles5m[candles5m.length - 1]?.close ?? 1;
   const emaSpread5m = Math.abs(fastSnap.ema9 - fastSnap.ema21) / price5m;
   const emaSpread15m= Math.abs(slowSnap.ema9 - slowSnap.ema21) / price5m;
@@ -362,7 +365,6 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
     } catch { trend1H = "unknown"; }
   }
 
-  // Determine block reason
   let blockReason = "None";
   if (fast.decision === "HOLD" && slow.decision === "HOLD") {
     blockReason = "HOLD bias";
@@ -406,6 +408,18 @@ async function isCorrelationBlocked(symbol: string): Promise<boolean> {
 }
 
 // ── Auto trade execution ───────────────────────────────────────────────────────
+//
+// Gate order:
+//   1. Max active positions check  (in-memory; default 3; 0 = unlimited)
+//   2. Daily trade count check     (DB query;  0 = unlimited)
+//   3. Correlation filter          (in-memory)
+//   4. Risk engine validation      (in-memory)
+//   5. placeOrder()                (simulation engine)
+//   6. DB persist, stats update
+//   7. SMS notification            (only on confirmed execution)
+//
+// The force-test-trades endpoint bypasses ALL gates and calls placeOrder()
+// directly, intentionally skipping limits for pipeline verification.
 
 async function autoExecute(
   signalId:     string,
@@ -417,15 +431,37 @@ async function autoExecute(
   settings:     LoopSettings,
   isTest:       boolean,
 ): Promise<{ executed: boolean; blockReason: string | null }> {
-  const todayCount = await countTodayLoopTrades();
-  if (todayCount >= settings.maxTradesPerDay) {
-    engineStats.tradesBlocked++;
-    const msg = `Auto-trade blocked for ${symbol}: daily limit (${settings.maxTradesPerDay}) reached`;
-    logger.info({ symbol, side, todayCount }, msg);
-    await db.insert(logsTable).values({ id: genId(), type: "trade", level: "warn", message: msg, details: { symbol, side } });
-    return { executed: false, blockReason: "Daily limit" };
+
+  // ── Gate 1: max concurrent open positions ──────────────────────────────────
+  if (settings.maxActivePositions > 0) {
+    const account = await getAccountSummary();
+    const openCount = account.positions.length;
+    if (openCount >= settings.maxActivePositions) {
+      engineStats.tradesBlocked++;
+      const msg = `Auto-trade blocked for ${symbol} ${side}: max active positions (${settings.maxActivePositions}) reached — currently ${openCount} open`;
+      logger.info({ symbol, side, openCount, maxActivePositions: settings.maxActivePositions }, msg);
+      await db.insert(logsTable).values({
+        id: genId(), type: "trade", level: "warn",
+        message: msg,
+        details: { symbol, side, openCount, maxActivePositions: settings.maxActivePositions },
+      });
+      return { executed: false, blockReason: `Max active positions (${settings.maxActivePositions})` };
+    }
   }
 
+  // ── Gate 2: daily trade count (0 = unlimited) ──────────────────────────────
+  if (settings.maxTradesPerDay > 0) {
+    const todayCount = await countTodayLoopTrades();
+    if (todayCount >= settings.maxTradesPerDay) {
+      engineStats.tradesBlocked++;
+      const msg = `Auto-trade blocked for ${symbol}: daily limit (${settings.maxTradesPerDay}) reached`;
+      logger.info({ symbol, side, todayCount }, msg);
+      await db.insert(logsTable).values({ id: genId(), type: "trade", level: "warn", message: msg, details: { symbol, side } });
+      return { executed: false, blockReason: "Daily limit" };
+    }
+  }
+
+  // ── Gate 3: correlation filter ─────────────────────────────────────────────
   const corrBlocked = await isCorrelationBlocked(symbol);
   if (corrBlocked) {
     engineStats.tradesBlocked++;
@@ -435,6 +471,7 @@ async function autoExecute(
     return { executed: false, blockReason: "Correlation filter" };
   }
 
+  // ── Gate 4: risk engine ────────────────────────────────────────────────────
   const sizeUSD   = settings.allocation;
   const riskCheck = validateTrade(sizeUSD);
   if (!riskCheck.allowed) {
@@ -448,6 +485,7 @@ async function autoExecute(
     return { executed: false, blockReason: `Risk engine: ${riskCheck.violations.join("; ")}` };
   }
 
+  // ── Gate 5: place order ────────────────────────────────────────────────────
   const result = await placeOrder({ symbol, side, sizeUSD });
   if (!result.success) {
     engineStats.tradesBlocked++;
@@ -460,6 +498,7 @@ async function autoExecute(
     return { executed: false, blockReason: `Sim engine: ${result.error}` };
   }
 
+  // ── Execution confirmed ────────────────────────────────────────────────────
   const pos        = result.position!;
   const stopLoss   = side === "BUY" ? price * (1 - settings.stopLossPercent / 100) : price * (1 + settings.stopLossPercent / 100);
   const takeProfit = side === "BUY" ? price * (1 + settings.takeProfitPercent / 100) : price * (1 - settings.takeProfitPercent / 100);
@@ -612,12 +651,9 @@ async function tick() {
       }, "MTF analysis");
 
       const testMode   = engineStats.testMode;
-      // In test mode: lower bar so signals execute in typical low-vol markets.
-      // confThresh=20 means any signal with avg confidence > 20% can trade.
-      // testSingleTF threshold=25 lets a single BUY/SELL at modest confidence fire.
       const confThresh = testMode ? 20 : settings.minConfidence;
 
-      // Test mode also allows single-TF signal at reduced confidence
+      // Test mode: allow single-TF signal at modest confidence
       const testSingleTF =
         testMode && (
           (mtf.fast.decision !== "HOLD" && mtf.fast.confidence >= 25) ||
@@ -630,10 +666,10 @@ async function tick() {
               : mtf.slow.decision as "BUY" | "SELL")
           : mtf.agreedAction;
 
-      // Quality gates — skip in test mode for fast iteration
-      const volumeGatePass  = !engineStats.volumeFilter || testMode || mtf.volumeConfirmed;
-      const sidewaysGatePass= testMode || mtf.marketCondition !== "sideways";
-      const trend1HGatePass = testMode || !engineStats.require1HTrend ||
+      // Quality gates — bypassed in test mode for fast iteration
+      const volumeGatePass   = !engineStats.volumeFilter || testMode || mtf.volumeConfirmed;
+      const sidewaysGatePass = testMode || mtf.marketCondition !== "sideways";
+      const trend1HGatePass  = testMode || !engineStats.require1HTrend ||
         mtf.trend1H === "unknown" ||
         (testAction === "BUY"  && mtf.trend1H === "bullish") ||
         (testAction === "SELL" && mtf.trend1H === "bearish");
@@ -648,7 +684,7 @@ async function tick() {
         sidewaysGatePass &&
         trend1HGatePass;
 
-      // Determine block reason for the signal log
+      // Determine block reason for signal log
       let signalBlockReason: string | null = null;
       if (!settings.autoMode) {
         signalBlockReason = "Auto-mode off";
@@ -664,7 +700,6 @@ async function tick() {
         signalBlockReason = `1H trend conflict (trend=${mtf.trend1H}, signal=${testAction})`;
       }
 
-      // Append to signal log
       appendSignalLog({
         id:           id5m,
         symbol,
