@@ -1,0 +1,155 @@
+You are updating an Express + TypeScript backend for a trading system.
+
+⚠️ Current issue:
+The route `/api/engine/force-test-trades` ONLY increments counters and does NOT create real trades.
+
+As a result:
+
+* `/api/trades` does NOT change
+* The frontend dashboard does NOT update
+* Paper trading account stays static
+
+---
+
+# 🎯 GOAL
+
+Fix the system so that:
+
+👉 Calling:
+POST `/api/engine/force-test-trades`
+
+👉 Actually CREATES REAL TRADES using the SAME logic as:
+POST `/api/trades`
+
+---
+
+# 🔥 REQUIREMENTS
+
+## 1. DO NOT fake stats
+
+Remove or ignore:
+
+```ts
+engineStats.tradesExecuted += X;
+```
+
+---
+
+## 2. CREATE REAL TRADES
+
+Inside `/force-test-trades`, you must:
+
+👉 Generate 2–5 trades per request
+
+Each trade must:
+
+* Insert into `tradesTable` (same as `/api/trades`)
+* Insert into `logsTable`
+* Use existing helper functions:
+
+  * generateId()
+  * getBasePrice()
+  * generateSimulatedPrice()
+
+---
+
+## 3. Trade structure
+
+Each trade should randomly include:
+
+```ts
+symbol: "BTCUSD" | "ETHUSD" | "SOLUSD"
+side: "BUY" | "SELL"
+amount: number (0.1 – 2)
+mode: "test"
+status: randomly "open" OR "closed"
+```
+
+---
+
+## 4. If CLOSED trade
+
+You MUST calculate:
+
+```ts
+exitPrice
+pnl
+pnlPercent
+closedAt
+reason: "test_close"
+```
+
+Use existing `calculatePnL()` helper.
+
+---
+
+## 5. If OPEN trade
+
+Leave:
+
+```ts
+status: "open"
+exitPrice: null
+pnl: null
+```
+
+---
+
+## 6. INSERT INTO DATABASE
+
+Use SAME pattern already used in `/api/trades`:
+
+```ts
+await db.insert(tradesTable).values({...})
+await db.insert(logsTable).values({...})
+```
+
+---
+
+## 7. RETURN RESPONSE
+
+Return:
+
+```ts
+{
+  success: true,
+  tradesCreated: number
+}
+```
+
+---
+
+## 8. KEEP EVERYTHING ELSE UNCHANGED
+
+DO NOT:
+
+* change existing `/api/trades`
+* change database schema
+* break existing endpoints
+
+---
+
+# 🎯 FINAL RESULT
+
+After this change:
+
+1. Calling:
+
+```bash
+curl -X POST http://localhost:8080/api/engine/force-test-trades
+```
+
+2. Will:
+
+* Add new trades to DB
+* Update `/api/trades`
+* Update Journal UI
+* Update portfolio (PnL, equity, etc.)
+
+---
+
+# ✅ OUTPUT
+
+Return the FULL updated engine route file with working `/force-test-trades`.
+
+No explanation. Code only.

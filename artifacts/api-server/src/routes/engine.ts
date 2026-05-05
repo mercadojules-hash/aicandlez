@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import { Router } from "express";
 import {
   engineStats,
@@ -9,10 +8,15 @@ import {
   setRequire1HTrend,
   setVolumeFilter,
 } from "../lib/tradingLoop.js";
-import { placeOrder } from "../lib/simulationEngine.js";
 import { sendTradeExecutedSMS } from "../lib/notifications.js";
 import { db } from "@workspace/db";
 import { tradesTable, logsTable } from "@workspace/db";
+import {
+  generateId,
+  getBasePrice,
+  generateSimulatedPrice,
+  calculatePnL,
+} from "../lib/trading.js";
 
 const router = Router();
 
@@ -34,18 +38,14 @@ router.get("/engine/status", (_req, res) => {
     require1HTrend:     engineStats.require1HTrend,
     volumeFilter:       engineStats.volumeFilter,
     loopIntervalMs:     getLoopIntervalMs(),
-    // Signal distribution
     signalCounts:       engineStats.signalCounts,
-    // Execution funnel
     funnel: {
       total:      engineStats.funnelTotal,
       passedMTF:  engineStats.funnelPassedMTF,
       blockedMTF: engineStats.funnelBlockedMTF,
       executed:   engineStats.funnelExecuted,
     },
-    // Per-symbol MTF breakdowns
     symbolBreakdowns:   engineStats.symbolBreakdowns,
-    // Last 10 signals log
     recentSignalLog:    engineStats.recentSignalLog,
     lastSignal:         engineStats.lastSignal,
     lastTrade:          engineStats.lastTrade,
@@ -102,40 +102,97 @@ router.post("/engine/filters", (req, res) => {
 });
 
 // ── POST /engine/force-test-trades ───────────────────────────────────────────
-// Bypass all signal filters and place one BUY for each supported symbol.
-// Use this to verify the full execution pipeline works:
-//   signal → placeOrder → tradesTable → UI (Active Trades + Logs)
-// Trades are tagged mode="test" and sizeUSD=$500 each.
-// Safe: simulation engine only — no real orders placed.
+// Creates 2–5 real trades (random mix of open and closed) directly into the DB.
+// Uses the same insert pattern as POST /api/trades.
+// Does NOT go through placeOrder() — no simulation balance deducted.
+// Mode is always "test". Safe: no real orders placed.
 router.post("/engine/force-test-trades", async (_req, res) => {
-  const targets: Array<{ symbol: string; side: "BUY" | "SELL" }> = [
-    { symbol: "BTCUSD", side: "BUY" },
-    { symbol: "ETHUSD", side: "BUY" },
-    { symbol: "SOLUSD", side: "BUY" },
-  ];
+  // ── Config ──
+  const SYMBOLS: Array<"BTCUSD" | "ETHUSD" | "SOLUSD"> = ["BTCUSD", "ETHUSD", "SOLUSD"];
+  const SIDES:   Array<"BUY" | "SELL">                  = ["BUY", "SELL"];
+
+  // Map our symbol format to the key getBasePrice() understands
+  const BASE_KEY: Record<string, string> = {
+    BTCUSD: "BTCUSDT",
+    ETHUSD: "ETHUSDT",
+    SOLUSD: "SOLUSDT",
+  };
+
+  function rand<T>(arr: T[]): T {
+    return arr[Math.floor(Math.random() * arr.length)]!;
+  }
+  function randFloat(min: number, max: number, decimals = 2): number {
+    return parseFloat((Math.random() * (max - min) + min).toFixed(decimals));
+  }
+
+  // Generate 2–5 trades
+  const count = Math.floor(Math.random() * 4) + 2; // 2, 3, 4, or 5
+  let tradesCreated = 0;
 
   const results: Array<{
-    symbol: string; success: boolean;
-    side?: string; price?: number; sizeUSD?: number; error?: string;
+    id: string; symbol: string; side: string; status: string;
+    price: number; amount: number; pnl?: number; error?: string;
   }> = [];
 
-  for (const { symbol, side } of targets) {
+  for (let i = 0; i < count; i++) {
     try {
-      const result = await placeOrder({ symbol, side, sizeUSD: 500 });
+      const symbol = rand(SYMBOLS);
+      const side   = rand(SIDES);
+      // Amount is in USD — range $100–$1 000, matches how calculatePnL treats it
+      const amount = randFloat(100, 1000);
 
-      if (result.success && result.position) {
-        const pos      = result.position;
-        const tradeId  = crypto.randomUUID();
-        const signalId = crypto.randomUUID();
-        const stopLoss   = parseFloat((pos.entryPrice * 0.98).toFixed(2));
-        const takeProfit = parseFloat((pos.entryPrice * 1.04).toFixed(2));
+      // Entry price: live-ish via generateSimulatedPrice on base price
+      const basePrice  = getBasePrice(BASE_KEY[symbol] ?? symbol);
+      const entryPrice = generateSimulatedPrice(basePrice);
+      const stopLoss   = parseFloat((entryPrice * (side === "BUY" ? 0.98 : 1.02)).toFixed(2));
+      const takeProfit = parseFloat((entryPrice * (side === "BUY" ? 1.04 : 0.96)).toFixed(2));
+
+      // Randomly decide open vs closed (50/50)
+      const isClosed = Math.random() < 0.5;
+      const id       = generateId();
+      const signalId = generateId();
+      const now      = new Date();
+
+      if (isClosed) {
+        // ── Closed trade: calculate exit + PnL ──
+        const exitPrice = generateSimulatedPrice(entryPrice);
+        const { pnl, pnlPercent } = calculatePnL(side, entryPrice, exitPrice, amount);
 
         await db.insert(tradesTable).values({
-          id:         tradeId,
+          id,
           symbol,
           side,
-          amount:     500,
-          price:      pos.entryPrice,
+          amount,
+          price:      entryPrice,
+          exitPrice,
+          pnl,
+          pnlPercent,
+          status:     "closed",
+          mode:       "test",
+          signalId,
+          stopLoss,
+          takeProfit,
+          reason:     "test_close",
+          closedAt:   now,
+        });
+
+        await db.insert(logsTable).values({
+          id:      generateId(),
+          type:    "trade",
+          level:   pnl >= 0 ? "success" : "warn",
+          message: `[FORCE TEST] CLOSED ${side} ${symbol} @ $${entryPrice.toFixed(2)} → $${exitPrice.toFixed(2)} — PnL: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} (${pnlPercent.toFixed(2)}%)`,
+          details: { symbol, side, amount, entryPrice, exitPrice, pnl, pnlPercent, mode: "test", id },
+        });
+
+        results.push({ id, symbol, side, status: "closed", price: entryPrice, amount, pnl });
+      } else {
+        // ── Open trade: no exit or PnL ──
+        await db.insert(tradesTable).values({
+          id,
+          symbol,
+          side,
+          amount,
+          price:      entryPrice,
           status:     "open",
           mode:       "test",
           signalId,
@@ -145,38 +202,40 @@ router.post("/engine/force-test-trades", async (_req, res) => {
         });
 
         await db.insert(logsTable).values({
-          id:      crypto.randomUUID(),
+          id:      generateId(),
           type:    "trade",
           level:   "success",
-          message: `[FORCE TEST] ${side} ${symbol} @ $${pos.entryPrice.toFixed(2)} — $500 — Execution pipeline verified`,
-          details: { symbol, side, entryPrice: pos.entryPrice, sizeUSD: 500, mode: "test", tradeId },
+          message: `[FORCE TEST] OPEN ${side} ${symbol} @ $${entryPrice.toFixed(2)} — $${amount.toFixed(2)} — Pipeline verified`,
+          details: { symbol, side, amount, entryPrice, mode: "test", id },
         });
 
-        engineStats.tradesExecuted++;
-        engineStats.funnelExecuted++;
-        engineStats.lastTradeAt = Date.now();
-        engineStats.lastTrade   = { symbol, side, sizeUSD: 500, price: pos.entryPrice, reason: "Force test", mode: "test" };
-
-        // SMS fires ONLY after a confirmed trade — never for signals, HOLDs, or blocked trades
-        void sendTradeExecutedSMS(symbol, side, pos.entryPrice);
-
-        results.push({ symbol, success: true, side, price: pos.entryPrice, sizeUSD: 500 });
-      } else {
-        results.push({ symbol, success: false, error: result.error ?? "Unknown error" });
+        results.push({ id, symbol, side, status: "open", price: entryPrice, amount });
       }
+
+      // Update engine stats to reflect the real execution
+      engineStats.tradesExecuted++;
+      engineStats.funnelExecuted++;
+      engineStats.lastTradeAt = Date.now();
+      engineStats.lastTrade   = { symbol, side, sizeUSD: amount, price: entryPrice, reason: "Force test", mode: "test" };
+
+      // SMS fires only on confirmed execution
+      void sendTradeExecutedSMS(symbol, side, entryPrice);
+
+      tradesCreated++;
     } catch (err) {
-      results.push({ symbol, success: false, error: err instanceof Error ? err.message : String(err) });
+      results.push({
+        id: "error", symbol: "—", side: "—", status: "error",
+        price: 0, amount: 0,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
-  const ok = results.filter((r) => r.success).length;
   res.json({
-    message: ok > 0
-      ? `Force-test: ${ok}/3 trades placed. Check Active Trades panel and Logs.`
-      : "Force-test failed — check simulation engine balance or symbol config.",
+    success:       tradesCreated > 0,
+    tradesCreated,
     results,
-    totalExecuted: ok,
-    note: "Test trades ($500 each) placed directly into the simulation engine, bypassing signal filters. Appear in Active Trades, Trade History, and Logs immediately.",
+    note: `${tradesCreated} test trades inserted into DB (mix of open/closed). Check Trade Journal immediately.`,
   });
 });
 
