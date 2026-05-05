@@ -1,0 +1,210 @@
+You are updating an existing React + TypeScript file: **Journal.tsx** inside a trading dashboard.
+
+The UI already works and is styled. DO NOT redesign the page. Keep the existing layout, components, and visual style.
+
+Your job is to UPGRADE the page by adding a **FULL PAPER TRADING ACCOUNT LAYER** on top of the existing trade journal.
+
+---
+
+## 🔥 GOAL
+
+Enhance the Journal page so it behaves like a real trading dashboard with:
+
+* Starting balance (paper money)
+* Live account value
+* Unrealized PnL (open trades)
+* Total PnL (closed + open)
+* Portfolio summary panel at the top
+
+---
+
+## 📡 DATA SOURCE (IMPORTANT)
+
+The page already fetches from:
+
+GET `/api/trades`
+
+Each trade has fields like:
+
+* id
+* symbol
+* side
+* price
+* amount
+* status ("open" | "closed")
+* pnl
+* pnlPercent
+* exitPrice
+* timestamp
+* closedAt
+
+⚠️ Do NOT change backend APIs
+⚠️ Do NOT create new endpoints
+⚠️ Everything must be calculated client-side from `/api/trades`
+
+---
+
+## 💰 ACCOUNT LOGIC (IMPLEMENT EXACTLY)
+
+### 1. Starting Balance
+
+Hardcode:
+
+```ts
+const START_BALANCE = 10000;
+```
+
+---
+
+### 2. Separate trades
+
+```ts
+const openTrades = trades.filter(t => t.status === "open");
+const closedTrades = trades.filter(t => t.status === "closed");
+```
+
+---
+
+### 3. Closed PnL
+
+```ts
+const closedPnL = closedTrades.reduce((sum, t) => sum + (t.pnl ?? 0), 0);
+```
+
+---
+
+### 4. Unrealized PnL (OPEN trades)
+
+Use current price from:
+
+```ts
+t.price (entry)
+```
+
+Simulate current price safely (no API change):
+
+```ts
+const getLivePrice = (t) => t.price; // placeholder for now
+```
+
+Then:
+
+```ts
+const unrealizedPnL = openTrades.reduce((sum, t) => {
+  const current = getLivePrice(t);
+  const entry = t.price;
+
+  const pnl =
+    t.side === "BUY"
+      ? (current - entry) * t.amount
+      : (entry - current) * t.amount;
+
+  return sum + pnl;
+}, 0);
+```
+
+---
+
+### 5. Total PnL
+
+```ts
+const totalPnL = closedPnL + unrealizedPnL;
+```
+
+---
+
+### 6. Account Equity
+
+```ts
+const equity = START_BALANCE + totalPnL;
+```
+
+---
+
+## 🧱 UI REQUIREMENTS (TOP PORTFOLIO PANEL)
+
+Add a new section ABOVE the existing summary cards.
+
+Create a **Portfolio Panel** with 4 cards:
+
+### Card 1 — Balance
+
+* Label: "Starting Balance"
+* Value: $10,000
+
+### Card 2 — Equity (LIVE)
+
+* Label: "Account Value"
+* Value: equity
+* Color:
+
+  * Green if profit
+  * Red if loss
+
+### Card 3 — Unrealized PnL
+
+* Label: "Open PnL"
+* Value: unrealizedPnL
+
+### Card 4 — Total PnL
+
+* Label: "Total PnL"
+* Value: totalPnL
+
+---
+
+## 🎨 UI RULES
+
+* Use existing components (Card, Badge, etc.)
+* Match current design system (Tailwind classes already used)
+* DO NOT introduce new UI libraries
+* DO NOT break existing layout
+
+---
+
+## 🔄 REAL-TIME BEHAVIOR
+
+* Must update when trades update
+* Must work with existing:
+
+  * auto-refresh (15s)
+  * manual refresh button
+
+---
+
+## 🛡️ SAFETY REQUIREMENTS
+
+* Use safe checks for all numbers:
+
+  * null
+  * undefined
+* Prevent NaN
+* Never crash if trades array is empty
+
+---
+
+## ✅ FINAL RESULT
+
+After update, the page must show:
+
+1. Portfolio (money view)
+2. Active trades (open positions)
+3. Trade history (closed)
+4. Performance metrics
+
+---
+
+## 🚫 DO NOT
+
+* Do not modify backend
+* Do not remove existing features
+* Do not break refresh button
+* Do not change routing
+
+---
+
+## ✅ OUTPUT
+
+Return the FULL updated Journal.tsx file, complete and ready to paste.
+
+No explanations. Code only.

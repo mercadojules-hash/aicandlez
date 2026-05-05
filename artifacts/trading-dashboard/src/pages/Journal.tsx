@@ -4,7 +4,7 @@ import {
   BookOpen, RefreshCw, TrendingUp, TrendingDown, Trophy,
   Clock, DollarSign, Target, ChevronDown, ChevronUp,
   CheckCircle2, XCircle, ArrowRight, Activity, Zap,
-  AlertTriangle,
+  AlertTriangle, Wallet, BarChart2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -116,6 +116,37 @@ function calcSummary(trades: Trade[]): Summary {
     totalPnL,
     avgPnLPct,
   };
+}
+
+// ── Paper trading account ──────────────────────────────────────────────────────
+
+const START_BALANCE = 10_000;
+
+function getLivePrice(t: Trade): number {
+  return safeNum(t.price);
+}
+
+function calcAccount(trades: Trade[]) {
+  const openTrades   = trades.filter(t => t?.status === "open");
+  const closedTrades = trades.filter(t => t?.status === "closed");
+
+  const closedPnL = closedTrades.reduce((sum, t) => sum + safeNum(t.pnl), 0);
+
+  const unrealizedPnL = openTrades.reduce((sum, t) => {
+    const current = getLivePrice(t);
+    const entry   = safeNum(t.price);
+    const amt     = safeNum(t.amount);
+    if (entry === 0 || amt === 0) return sum;
+    const pnl = t.side === "BUY"
+      ? (current - entry) * amt
+      : (entry - current) * amt;
+    return sum + (isFinite(pnl) ? pnl : 0);
+  }, 0);
+
+  const totalPnL = closedPnL + unrealizedPnL;
+  const equity   = START_BALANCE + totalPnL;
+
+  return { closedPnL, unrealizedPnL, totalPnL, equity };
 }
 
 // ── Stat card ──────────────────────────────────────────────────────────────────
@@ -328,8 +359,14 @@ export default function Journal() {
   const open       = safeTrades.filter(t => t?.status === "open");
   const closed     = safeTrades.filter(t => t?.status === "closed");
   const summary    = calcSummary(safeTrades);
+  const account    = calcAccount(safeTrades);
 
-  const pnlPositive = summary.totalPnL >= 0;
+  const pnlPositive      = summary.totalPnL >= 0;
+  const equityPositive   = account.equity >= START_BALANCE;
+  const totalPnLPositive = account.totalPnL >= 0;
+  const unrealPositive   = account.unrealizedPnL >= 0;
+
+  const equityChangePct = ((account.equity - START_BALANCE) / START_BALANCE) * 100;
 
   return (
     <div className="space-y-5 max-w-[1400px] mx-auto">
@@ -365,6 +402,73 @@ export default function Journal() {
           Failed to load trades. Check that the API server is running.
         </div>
       )}
+
+      {/* ── Portfolio Panel ── */}
+      <div className="rounded-xl border border-border/50 bg-card/40 p-4 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Wallet className="w-3.5 h-3.5 text-primary" />
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Paper Trading Account</span>
+          <span className="ml-auto text-[10px] font-mono text-muted-foreground/60">all values calculated client-side</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Card 1 — Starting Balance */}
+          <div className="rounded-xl border border-border/40 p-4 bg-slate-800/30">
+            <div className="flex items-start justify-between mb-2">
+              <div className="text-[10px] text-muted-foreground font-medium">Starting Balance</div>
+              <DollarSign className="w-4 h-4 text-muted-foreground/40" />
+            </div>
+            <div className="text-xl font-bold font-mono">
+              ${START_BALANCE.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">Paper money · fixed</div>
+          </div>
+
+          {/* Card 2 — Account Value (equity) */}
+          <div className={`rounded-xl border p-4 ${equityPositive ? "border-green-500/30 bg-green-500/5" : "border-red-500/30 bg-red-500/5"}`}>
+            <div className="flex items-start justify-between mb-2">
+              <div className="text-[10px] text-muted-foreground font-medium">Account Value</div>
+              <BarChart2 className={`w-4 h-4 ${equityPositive ? "text-green-400" : "text-red-400"}`} />
+            </div>
+            <div className={`text-xl font-bold font-mono ${equityPositive ? "text-green-400" : "text-red-400"}`}>
+              ${account.equity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className={`text-[10px] font-mono mt-0.5 ${equityPositive ? "text-green-400/70" : "text-red-400/70"}`}>
+              {equityPositive ? "+" : ""}{equityChangePct.toFixed(2)}% from start
+            </div>
+          </div>
+
+          {/* Card 3 — Unrealized PnL */}
+          <div className={`rounded-xl border p-4 ${unrealPositive ? "border-primary/30 bg-primary/5" : "border-orange-500/30 bg-orange-500/5"}`}>
+            <div className="flex items-start justify-between mb-2">
+              <div className="text-[10px] text-muted-foreground font-medium">Open PnL</div>
+              <Activity className={`w-4 h-4 ${unrealPositive ? "text-primary" : "text-orange-400"}`} />
+            </div>
+            <div className={`text-xl font-bold font-mono ${unrealPositive ? "text-primary" : "text-orange-400"}`}>
+              {unrealPositive ? "+" : ""}${account.unrealizedPnL.toFixed(2)}
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">
+              {open.length} open position{open.length !== 1 ? "s" : ""} · unrealized
+            </div>
+          </div>
+
+          {/* Card 4 — Total PnL */}
+          <div className={`rounded-xl border p-4 ${totalPnLPositive ? "border-green-500/30 bg-green-500/5" : "border-red-500/30 bg-red-500/5"}`}>
+            <div className="flex items-start justify-between mb-2">
+              <div className="text-[10px] text-muted-foreground font-medium">Total PnL</div>
+              {totalPnLPositive
+                ? <TrendingUp className="w-4 h-4 text-green-400" />
+                : <TrendingDown className="w-4 h-4 text-red-400" />
+              }
+            </div>
+            <div className={`text-xl font-bold font-mono ${totalPnLPositive ? "text-green-400" : "text-red-400"}`}>
+              {totalPnLPositive ? "+" : ""}${account.totalPnL.toFixed(2)}
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">
+              Closed ${account.closedPnL.toFixed(2)} · Open ${account.unrealizedPnL.toFixed(2)}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ── Summary stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
