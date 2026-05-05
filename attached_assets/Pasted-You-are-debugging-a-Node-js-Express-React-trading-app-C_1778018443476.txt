@@ -1,0 +1,107 @@
+You are debugging a Node.js + Express + React trading app.
+
+CRITICAL ISSUE:
+
+* The API endpoint `GET /api/trades` is ONLY returning 4 trades
+* The frontend journal dashboard also shows exactly 4 trades
+* The returned trades contain fields like `confidence` and `mode: "test"`
+* They DO NOT match the database schema (missing pnl, status, etc.)
+
+GOAL:
+Find the EXACT source of where these 4 trades are being created or limited.
+
+DO NOT GUESS — TRACE IT.
+
+---
+
+STEP 1 — FIND ALL ROUTES
+Search the entire project for:
+
+* `"/api/trades"`
+* `router.get("/trades"`
+* `app.get("/api/trades"`
+
+List EVERY file that defines this route.
+
+---
+
+STEP 2 — IDENTIFY ACTIVE ROUTE
+Determine which route is actually being registered in the server entry file:
+
+* index.ts
+* server.ts
+* app.ts
+
+Show the EXACT `app.use(...)` chain and which trades route is active.
+
+---
+
+STEP 3 — TRACE DATA SOURCE
+For the ACTIVE `/api/trades` route:
+
+1. Identify where the data comes from:
+
+   * DB query?
+   * in-memory array?
+   * mock/test data?
+   * injected trades?
+
+2. Look for ANY of the following:
+
+   * `.slice(0, 4)`
+   * `.limit(4)`
+   * hardcoded array of 4 items
+   * test/mock data with `confidence` field
+
+---
+
+STEP 4 — FIND OVERRIDES
+Check if multiple routes exist that override each other:
+Example:
+
+* `app.use("/api/trades", testRoute)`
+* `app.use("/api", realRoute)`
+
+Confirm execution order.
+
+---
+
+STEP 5 — ROOT CAUSE
+Return EXACTLY:
+
+* File path causing the 4-trade limit
+* Line number
+* Code snippet responsible
+
+---
+
+STEP 6 — FIX (MANDATORY)
+Provide a COMPLETE corrected version of the route file that:
+
+* Removes ALL limits (no slice, no limit 4)
+* Returns:
+
+  * DB trades
+  * injected trades (if used)
+* Ensures full dataset is returned
+
+---
+
+STEP 7 — VERIFICATION
+Explain how to confirm the fix:
+
+* Expected API output
+* Expected frontend behavior
+
+---
+
+IMPORTANT:
+
+* Do NOT explain theory
+* Do NOT summarize
+* Output ONLY actionable findings + fixed code
+* Assume this is a production debugging task
+
+---
+
+This is a routing/data-source conflict. Find the exact line causing it.
