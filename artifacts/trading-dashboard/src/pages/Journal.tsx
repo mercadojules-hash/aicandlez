@@ -339,10 +339,9 @@ export default function Journal() {
   } = useQuery<Trade[]>({
     queryKey: ["/trades"],
     queryFn: async () => {
-      const res = await fetch("/api/trades");
+      const res = await fetch("/api/trades", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      // Defensive: handle both array and wrapped responses
       return Array.isArray(data) ? data : (data?.trades ?? []);
     },
     refetchInterval:            15_000,   // auto-refresh every 15s
