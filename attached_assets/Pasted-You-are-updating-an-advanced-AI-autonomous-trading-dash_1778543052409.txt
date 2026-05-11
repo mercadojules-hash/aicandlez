@@ -1,0 +1,433 @@
+You are updating an advanced AI autonomous trading dashboard called APEX TRADER.
+
+IMPORTANT:
+You must return the FULL updated working project files.
+DO NOT return partial snippets.
+DO NOT return isolated code blocks.
+DO NOT explain fixes without implementing them.
+The project must run immediately after unzip with all updates already integrated.
+
+The current project already works.
+This is now a VISUAL + ARCHITECTURAL + UX UPGRADE pass.
+
+────────────────────────────────────
+PRIMARY GOAL
+────────────────────────────────────
+
+Transform the dashboard into a HIGH-END futuristic autonomous AI trading terminal.
+
+The design should feel:
+
+* alive
+* dynamic
+* cinematic
+* neon
+* intelligent
+* premium
+* fast
+* immersive
+
+Reference aesthetic:
+Bloomberg Terminal + Tron + AI command center + high-end crypto execution platform.
+
+The current dashboard is TOO FLAT and TOO STATIC.
+
+We need:
+
+* brighter neon energy
+* stronger contrast
+* larger typography
+* more motion
+* more telemetry feeling
+* more visual hierarchy
+* better spacing
+* more “AI operating system” feeling
+
+The dashboard should feel so alive that users want to stare at it.
+
+────────────────────────────────────
+GLOBAL DESIGN REQUIREMENTS
+────────────────────────────────────
+
+GLOBAL THEME:
+
+* deep black background (#000000)
+* neon cyan
+* neon blue
+* neon green
+* neon amber
+* neon red
+* glowing borders
+* subtle animated gradients
+* live terminal aesthetic
+
+Typography:
+
+* increase font sizes globally
+* current font sizes are too small
+* ticker text especially needs larger text
+* all telemetry labels should be more readable
+
+Glow:
+
+* stronger glow effects on active panels
+* subtle animated pulse effects
+* terminal scanline feeling
+* live telemetry atmosphere
+
+Spacing:
+
+* more breathing room
+* cleaner hierarchy
+* reduce compressed panel feeling
+
+Motion:
+
+* subtle animated highlights
+* animated strike/confidence lines
+* ticker movement
+* glowing live indicators
+* smooth chart updates
+
+────────────────────────────────────
+TOP LIVE AI TICKER
+────────────────────────────────────
+
+The top ticker is VERY IMPORTANT.
+
+Keep it.
+
+Upgrade it:
+
+* brighter
+* larger font
+* stronger neon glow
+* easier readability
+* more visible market movement
+* more alive
+
+Ticker should include:
+
+* crypto
+* equities
+* AI decisions
+* HOLD/BUY/SELL
+* confidence %
+* volatility warnings
+* AI accumulation notices
+* breakout watch alerts
+* momentum shift alerts
+
+Ticker should feel like:
+“global AI trading telemetry”
+
+────────────────────────────────────
+COMMAND CENTER LAYOUT REBUILD
+────────────────────────────────────
+
+FINAL REQUIRED LAYOUT:
+
+TOP:
+
+1. live AI ticker stream
+
+SECOND ROW:
+2. 18 telemetry stat containers/cards
+
+These telemetry cards are EXTREMELY IMPORTANT:
+
+* Active Users
+* Fees Collected
+* Live AI Trades
+* Live Executions
+* Execution Success
+* AI Win Rate
+* Broker
+* Portfolio Equity
+* Exposure
+* Connected Exchanges
+* Threat Level
+* Validation Grade
+
+These should remain visible and prominent.
+
+────────────────────────────────────
+MAIN CENTER AREA
+────────────────────────────────────
+
+3. 8 LIVE CRYPTO CHARTS
+
+THIS IS CRITICAL.
+
+Charts should:
+
+* span horizontally
+* 2 rows x 4 columns
+* larger
+* more dynamic
+* live feeling
+* glowing EMA overlays
+* stronger color identity
+* subtle animated confidence bars
+* stronger motion
+
+Assets:
+
+* BTC
+* ETH
+* SOL
+* XRP
+* DOGE
+* AVAX
+* LINK
+* ADA
+
+If chart data unavailable:
+show graceful “NO DATA” state.
+
+DO NOT crash.
+
+Charts must feel ACTIVE and REALTIME.
+
+────────────────────────────────────
+RIGHT SIDE PANEL
+────────────────────────────────────
+
+Move these LOWER so they align vertically beside:
+
+* charts
+* live terminal feed
+
+Place:
+
+* AI Opportunity Scanner
+* AI Market Regime
+* Signal Summary
+
+These should NOT be stuck high at the top anymore.
+
+They should visually balance against:
+
+* 8 chart grid
+* live terminal feed
+
+────────────────────────────────────
+LIVE TERMINAL FEED
+────────────────────────────────────
+
+Place BELOW the 8 charts.
+
+This is VERY IMPORTANT visually.
+
+The live terminal feed should feel:
+
+* alive
+* tactical
+* execution-focused
+* high-frequency AI telemetry
+
+Add:
+
+* confidence strike lines
+* execution pulse bars
+* stronger row separators
+* signal intensity indicators
+* animated execution states
+
+Statuses:
+
+* BLOCKED
+* MONITORING
+* EXECUTING
+* FILLED
+* ROUTING
+* VALIDATING
+* SCANNING
+
+Add subtle animations.
+
+Reduce empty space.
+
+Make feed visually dense and exciting.
+
+────────────────────────────────────
+LOWER SECTION
+────────────────────────────────────
+
+Below charts/live feed:
+place remaining cards:
+
+* Portfolio Snapshot
+* Risk Status
+* Active Trades
+* Broker/Exchange
+* AI Brief
+* Fees
+* Execution Telemetry
+* Autonomous Feed
+  etc
+
+These fill remaining lower layout space.
+
+────────────────────────────────────
+IMPORTANT VISUAL DIFFERENCE
+────────────────────────────────────
+
+The current build still looks:
+
+* too clean
+* too static
+* too SaaS-like
+
+We need:
+
+* cyberpunk terminal energy
+* AI control center atmosphere
+* more glow
+* more movement
+* more contrast
+* larger readable telemetry
+
+DO NOT make it look like:
+“generic admin dashboard”
+
+Make it feel:
+“AI autonomous trading system”
+
+────────────────────────────────────
+EXCHANGE SYSTEM
+────────────────────────────────────
+
+Keep dynamic exchange switching.
+
+Current issue:
+hardcoded Kraken labels previously appeared.
+
+Ensure:
+ALL broker labels are dynamic.
+
+Examples:
+
+* BINANCE LIVE
+* COINBASE LIVE
+* ROBINHOOD LIVE
+* KRAKEN LIVE
+
+NEVER hardcode broker names.
+
+Broker telemetry must dynamically read:
+
+* selected exchange
+* balances
+* positions
+* status
+
+────────────────────────────────────
+ARCHITECTURE CLEANUP
+────────────────────────────────────
+
+VERY IMPORTANT.
+
+CommandCenter.tsx is becoming too large.
+
+Refactor into modular components.
+
+Create separate component files.
+
+Examples:
+
+* BrokerStatusCard.tsx
+* OpportunityScanner.tsx
+* MarketRegimePanel.tsx
+* LiveTerminalFeed.tsx
+* CryptoChartGrid.tsx
+* SignalSummary.tsx
+* PortfolioSnapshot.tsx
+* RiskStatus.tsx
+* ExecutionTelemetry.tsx
+
+Goal:
+
+* easier reordering
+* easier maintenance
+* cleaner imports
+* reusable widgets
+* smaller files
+* future mobile app compatibility
+
+────────────────────────────────────
+REACT QUERY CLEANUP
+────────────────────────────────────
+
+Ensure React Query uses:
+
+* cache: "no-store"
+* staleTime: 0
+* refetchOnMount: "always"
+* refetchOnReconnect: true
+* refetchOnWindowFocus: true
+
+Avoid stale telemetry.
+
+────────────────────────────────────
+PLATFORM DIRECTION
+────────────────────────────────────
+
+IMPORTANT:
+This platform is becoming:
+
+“fully autonomous AI trading infrastructure”
+
+The AI will eventually:
+
+* choose exchange automatically
+* choose asset automatically
+* choose whether to trade
+* choose position sizing
+* route execution intelligently
+
+The dashboard should visually reflect:
+“AI thinking autonomously.”
+
+────────────────────────────────────
+DO NOT CHANGE
+────────────────────────────────────
+
+DO NOT:
+
+* remove neon aesthetic
+* simplify visuals
+* flatten the design
+* replace terminal aesthetic
+* reduce telemetry density
+
+KEEP:
+
+* advanced feel
+* aggressive visual identity
+* AI command center atmosphere
+
+────────────────────────────────────
+FINAL DELIVERY REQUIREMENTS
+────────────────────────────────────
+
+Return:
+
+* FULL updated working files
+* FULL updated components
+* COMPLETE integrated project
+* NO partial snippets
+* NO “replace this section manually”
+* NO pseudo code
+
+Project must:
+
+* unzip
+* run immediately
+* show updates immediately
+
+ZERO placeholder responses.
+ZERO incomplete implementations.
+ZERO broken imports.
+ZERO missing components.
+ZERO TypeScript errors.

@@ -53,50 +53,50 @@
 }
 
 :root {
-  /* ── Cyberpunk AI Terminal Theme ───────────────────────────────────────── */
-  --background: 210 100% 2%;        /* #000508 — pure deep black */
-  --foreground: 185 60% 88%;        /* #c8f4fa — icy blue-white */
+  /* ── PURE BLACK CYBERPUNK AI TERMINAL ──────────────────────────────────── */
+  --background: 0 0% 0%;               /* #000000 — pure black */
+  --foreground: 185 70% 90%;           /* #d0f8ff — bright icy cyan-white */
 
-  --card: 210 80% 4%;               /* #010C18 — terminal card */
-  --card-foreground: 185 60% 88%;
-  --card-border: 200 50% 10%;       /* #0A1E2E */
+  --card: 210 100% 3%;                 /* #000812 */
+  --card-foreground: 185 70% 90%;
+  --card-border: 200 60% 10%;          /* #062030 */
 
-  --popover: 210 80% 4%;
-  --popover-foreground: 185 60% 88%;
-  --popover-border: 200 50% 10%;
+  --popover: 210 100% 3%;
+  --popover-foreground: 185 70% 90%;
+  --popover-border: 200 60% 10%;
 
-  --primary: 185 100% 52%;          /* #00EEFF — vivid neon cyan */
-  --primary-foreground: 210 100% 2%;
+  --primary: 185 100% 56%;             /* #00F0FF — vivid neon cyan */
+  --primary-foreground: 0 0% 0%;
 
   --secondary: 271 91% 65%;
-  --secondary-foreground: 210 40% 98%;
+  --secondary-foreground: 185 70% 90%;
 
   --muted: 210 60% 7%;
-  --muted-foreground: 195 30% 45%;
+  --muted-foreground: 195 35% 50%;
 
   --accent: 210 60% 7%;
-  --accent-foreground: 185 60% 88%;
+  --accent-foreground: 185 70% 90%;
 
-  --destructive: 350 100% 55%;      /* #FF1744 */
-  --destructive-foreground: 210 40% 98%;
+  --destructive: 350 100% 55%;         /* #FF1744 */
+  --destructive-foreground: 0 0% 100%;
 
-  --success: 152 100% 50%;          /* #00FF88 */
-  --success-foreground: 210 100% 2%;
+  --success: 152 100% 52%;             /* #00FF8A */
+  --success-foreground: 0 0% 0%;
 
   --border: 210 50% 8%;
   --input: 210 50% 8%;
-  --ring: 185 100% 52%;
+  --ring: 185 100% 56%;
 
   --radius: 0.375rem;
 
-  --sidebar: 210 100% 2%;
-  --sidebar-foreground: 185 60% 88%;
+  --sidebar: 0 0% 1%;
+  --sidebar-foreground: 185 70% 90%;
   --sidebar-border: 210 50% 6%;
-  --sidebar-primary: 185 100% 52%;
-  --sidebar-primary-foreground: 210 100% 2%;
+  --sidebar-primary: 185 100% 56%;
+  --sidebar-primary-foreground: 0 0% 0%;
   --sidebar-accent: 210 60% 5%;
-  --sidebar-accent-foreground: 185 60% 88%;
-  --sidebar-ring: 185 100% 52%;
+  --sidebar-accent-foreground: 185 70% 90%;
+  --sidebar-ring: 185 100% 56%;
 
   --app-font-sans: 'JetBrains Mono', 'Fira Code', Menlo, monospace;
   --app-font-serif: Georgia, serif;
@@ -107,38 +107,45 @@
 
 @layer base {
   * { @apply border-border; }
-  body { @apply font-mono antialiased bg-background text-foreground; }
 
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track { background: #010810; }
-  ::-webkit-scrollbar-thumb { background: #00eeff25; border-radius: 2px; }
-  ::-webkit-scrollbar-thumb:hover { background: #00eeff50; }
+  body {
+    @apply font-mono antialiased bg-black text-foreground;
+    background-color: #000000;
+  }
+
+  ::-webkit-scrollbar { width: 3px; height: 3px; }
+  ::-webkit-scrollbar-track { background: #000000; }
+  ::-webkit-scrollbar-thumb { background: #00f0ff20; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #00f0ff50; }
 }
 
-/* ── Keyframe Animations ─────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   KEYFRAME ANIMATIONS
+════════════════════════════════════════════════════════════════════════════ */
 
 @keyframes ticker {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
 
-@keyframes ticker-fast {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
 @keyframes neon-pulse {
   0%, 100% { opacity: 1; }
-  50%       { opacity: 0.45; }
+  50%       { opacity: 0.4; }
 }
 
-@keyframes glow-breathe {
-  0%, 100% { box-shadow: 0 0 6px currentColor; opacity: 1; }
-  50%       { box-shadow: 0 0 18px currentColor, 0 0 36px currentColor; opacity: 0.8; }
+@keyframes neon-pulse-slow {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+@keyframes glow-border-anim {
+  0%   { box-shadow: 0 0 4px #00f0ff30, inset 0 0 20px #00f0ff04; }
+  50%  { box-shadow: 0 0 12px #00f0ff60, inset 0 0 40px #00f0ff08; }
+  100% { box-shadow: 0 0 4px #00f0ff30, inset 0 0 20px #00f0ff04; }
 }
 
 @keyframes slide-in-left {
-  from { opacity: 0; transform: translateX(-8px); }
+  from { opacity: 0; transform: translateX(-12px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 
@@ -146,36 +153,67 @@
   from { width: 0; }
 }
 
-@keyframes flicker {
+@keyframes blink-caret {
   0%, 100% { opacity: 1; }
-  93%  { opacity: 0.4; }
-  94%  { opacity: 1; }
-  98%  { opacity: 0.6; }
-  99%  { opacity: 1; }
+  50%       { opacity: 0; }
 }
 
-/* ── Neon Color Utilities ────────────────────────────────────────────────── */
+@keyframes data-flow {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
-.neon-cyan  { color: #00eeff; }
-.neon-green { color: #00ff88; }
+@keyframes scanline-sweep {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  5%   { opacity: 0.4; }
+  95%  { opacity: 0.4; }
+  100% { transform: translateY(400%); opacity: 0; }
+}
+
+@keyframes exec-pulse {
+  0%   { box-shadow: 0 0 0 0 #ffb80060; }
+  70%  { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@keyframes row-flash {
+  0%   { background-color: #00f0ff06; }
+  100% { background-color: transparent; }
+}
+
+@keyframes border-march {
+  0%   { border-color: #00f0ff30; }
+  50%  { border-color: #00f0ff80; }
+  100% { border-color: #00f0ff30; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   NEON COLOR UTILITIES
+════════════════════════════════════════════════════════════════════════════ */
+
+.neon-cyan  { color: #00f0ff; }
+.neon-green { color: #00ff8a; }
 .neon-amber { color: #ffb800; }
-.neon-red   { color: #ff3366; }
+.neon-red   { color: #ff2255; }
+.neon-purple{ color: #c855f7; }
 
-.glow-text-cyan  { color: #00eeff; text-shadow: 0 0 10px #00eeff90, 0 0 24px #00eeff50; }
-.glow-text-green { color: #00ff88; text-shadow: 0 0 10px #00ff8890, 0 0 24px #00ff8850; }
-.glow-text-amber { color: #ffb800; text-shadow: 0 0 10px #ffb80090, 0 0 24px #ffb80050; }
-.glow-text-red   { color: #ff3366; text-shadow: 0 0 10px #ff336690, 0 0 24px #ff336650; }
+.glow-text-cyan  { color: #00f0ff; text-shadow: 0 0 12px #00f0ffb0, 0 0 28px #00f0ff60, 0 0 48px #00f0ff30; }
+.glow-text-green { color: #00ff8a; text-shadow: 0 0 12px #00ff8ab0, 0 0 28px #00ff8a60, 0 0 48px #00ff8a30; }
+.glow-text-amber { color: #ffb800; text-shadow: 0 0 12px #ffb800b0, 0 0 28px #ffb80060, 0 0 48px #ffb80030; }
+.glow-text-red   { color: #ff2255; text-shadow: 0 0 12px #ff2255b0, 0 0 28px #ff225560, 0 0 48px #ff225530; }
 
-.glow-border-cyan  { box-shadow: 0 0 0 1px #00eeff25, inset 0 0 24px #00eeff06; border-color: #00eeff20 !important; }
-.glow-border-green { box-shadow: 0 0 0 1px #00ff8825, inset 0 0 24px #00ff8806; border-color: #00ff8820 !important; }
-.glow-border-amber { box-shadow: 0 0 0 1px #ffb80025, inset 0 0 24px #ffb80006; border-color: #ffb80020 !important; }
-.glow-border-red   { box-shadow: 0 0 0 1px #ff336625, inset 0 0 24px #ff336606; border-color: #ff336620 !important; }
+.glow-border-cyan  { box-shadow: 0 0 0 1px #00f0ff30, inset 0 0 30px #00f0ff06; border-color: #00f0ff25 !important; }
+.glow-border-green { box-shadow: 0 0 0 1px #00ff8a30, inset 0 0 30px #00ff8a06; border-color: #00ff8a25 !important; }
+.glow-border-amber { box-shadow: 0 0 0 1px #ffb80030, inset 0 0 30px #ffb80006; border-color: #ffb80025 !important; }
+.glow-border-red   { box-shadow: 0 0 0 1px #ff225530, inset 0 0 30px #ff225506; border-color: #ff225525 !important; }
 
-/* ── Terminal Card ───────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   TERMINAL CARD
+════════════════════════════════════════════════════════════════════════════ */
 
 .terminal-card {
-  background: linear-gradient(145deg, #010D1C 0%, #000B15 100%);
-  border: 1px solid #0E2235;
+  background: linear-gradient(145deg, #030F1E 0%, #010912 100%);
+  border: 1px solid #0D2235;
   position: relative;
   overflow: hidden;
 }
@@ -184,73 +222,140 @@
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, #00eeff30 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, #00f0ff40 40%, #00f0ff80 50%, #00f0ff40 60%, transparent 100%);
   pointer-events: none;
 }
+.terminal-card:hover {
+  border-color: #0F2A3F;
+}
 
-/* ── Live Status Dots ────────────────────────────────────────────────────── */
+/* scanline overlay — applies to terminal cards */
+.terminal-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 240, 255, 0.012) 2px,
+    rgba(0, 240, 255, 0.012) 4px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+.terminal-card > * { position: relative; z-index: 1; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   LIVE STATUS DOTS
+════════════════════════════════════════════════════════════════════════════ */
 
 .live-dot {
   display: inline-block;
-  width: 6px; height: 6px;
+  width: 7px; height: 7px;
   border-radius: 50%;
-  background: #00ff88;
-  box-shadow: 0 0 8px #00ff88, 0 0 16px #00ff8850;
-  animation: neon-pulse 1.5s ease-in-out infinite;
+  background: #00ff8a;
+  box-shadow: 0 0 8px #00ff8a, 0 0 20px #00ff8a60;
+  animation: neon-pulse 1.4s ease-in-out infinite;
+  flex-shrink: 0;
 }
-.live-dot-cyan  { background: #00eeff; box-shadow: 0 0 8px #00eeff, 0 0 16px #00eeff50; }
-.live-dot-amber { background: #ffb800; box-shadow: 0 0 8px #ffb800, 0 0 16px #ffb80050; }
-.live-dot-red   { background: #ff3366; box-shadow: 0 0 8px #ff3366, 0 0 16px #ff336650; }
+.live-dot-cyan   { background: #00f0ff; box-shadow: 0 0 8px #00f0ff, 0 0 20px #00f0ff60; }
+.live-dot-amber  { background: #ffb800; box-shadow: 0 0 8px #ffb800, 0 0 20px #ffb80060; }
+.live-dot-red    { background: #ff2255; box-shadow: 0 0 8px #ff2255, 0 0 20px #ff225560; }
+.live-dot-purple { background: #c855f7; box-shadow: 0 0 8px #c855f7, 0 0 20px #c855f760; }
 
-/* ── Scrolling Ticker ────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   SCROLLING TICKER
+════════════════════════════════════════════════════════════════════════════ */
 
 .ticker-wrap { overflow: hidden; white-space: nowrap; }
-.ticker-content {
-  display: inline-block;
-  animation: ticker 50s linear infinite;
-}
-.ticker-content-fast { animation: ticker-fast 25s linear infinite; }
-.ticker-content-slow { animation: ticker 80s linear infinite; }
+.ticker-content        { display: inline-block; animation: ticker 50s linear infinite; }
+.ticker-content-fast   { display: inline-block; animation: ticker 24s linear infinite; }
+.ticker-content-slow   { display: inline-block; animation: ticker 80s linear infinite; }
+.ticker-content-xslow  { display: inline-block; animation: ticker 120s linear infinite; }
 
-/* ── Confidence Bar ──────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   CONFIDENCE BAR
+════════════════════════════════════════════════════════════════════════════ */
 
 .conf-bar-track {
-  height: 3px;
-  background: #ffffff08;
-  border-radius: 2px;
+  height: 4px;
+  background: #ffffff06;
+  border-radius: 3px;
   overflow: hidden;
 }
 .conf-bar-fill {
   height: 100%;
-  border-radius: 2px;
-  box-shadow: 0 0 8px currentColor;
-  animation: conf-fill 0.8s ease-out;
+  border-radius: 3px;
+  box-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+  animation: conf-fill 0.9s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── Neon Badges ─────────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   NEON BADGES
+════════════════════════════════════════════════════════════════════════════ */
 
-.badge-buy  { background: #00ff8814; color: #00ff88; border: 1px solid #00ff8835; }
-.badge-sell { background: #ff336614; color: #ff3366; border: 1px solid #ff336635; }
-.badge-hold { background: #ffffff08; color: #4a7a8a;  border: 1px solid #ffffff12; }
-.badge-exec { background: #ffb80014; color: #ffb800; border: 1px solid #ffb80035; }
+.badge-buy    { background: #00ff8a14; color: #00ff8a; border: 1px solid #00ff8a40; }
+.badge-sell   { background: #ff225514; color: #ff2255; border: 1px solid #ff225540; }
+.badge-hold   { background: #ffffff08; color: #3a6a80; border: 1px solid #ffffff12; }
+.badge-exec   { background: #ffb80014; color: #ffb800; border: 1px solid #ffb80040; }
+.badge-scan   { background: #c855f714; color: #c855f7; border: 1px solid #c855f740; }
 
-/* ── Neon Divider ────────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   NEON DIVIDER
+════════════════════════════════════════════════════════════════════════════ */
 
 .neon-divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent, #00eeff18, transparent);
+  background: linear-gradient(90deg, transparent, #00f0ff22, transparent);
 }
 
-/* ── Telemetry Cell ──────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   TELEMETRY CELL
+════════════════════════════════════════════════════════════════════════════ */
 
 .tele-cell {
-  background: linear-gradient(145deg, #010C18 0%, #010912 100%);
-  border: 1px solid #0D1F30;
+  background: linear-gradient(145deg, #010D1C 0%, #000B14 100%);
+  border: 1px solid #0C1F31;
+  padding: 10px 12px;
+  min-width: 100px;
   position: relative;
-  padding: 8px 10px;
-  min-width: 90px;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.tele-cell::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #00f0ff18, transparent);
+  pointer-events: none;
 }
 .tele-cell:hover {
-  border-color: #00eeff20;
-  box-shadow: 0 0 12px #00eeff08;
+  border-color: #00f0ff25;
+  box-shadow: 0 0 16px #00f0ff08;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   BLINK CURSOR
+════════════════════════════════════════════════════════════════════════════ */
+
+.cursor-blink {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  background: #00f0ff;
+  animation: blink-caret 1s step-end infinite;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  box-shadow: 0 0 8px #00f0ff;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   EXECUTING ANIMATION
+════════════════════════════════════════════════════════════════════════════ */
+
+.exec-badge {
+  animation: exec-pulse 2s ease-in-out infinite;
 }
