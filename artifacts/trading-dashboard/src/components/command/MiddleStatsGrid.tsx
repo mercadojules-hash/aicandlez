@@ -1,29 +1,30 @@
-import { TrendingUp, TrendingDown, BarChart2, AlertTriangle, CheckCircle2, Wallet } from "lucide-react";
 import type { Trade, EngineStatus } from "./types";
 
-interface Props {
-  trades:  Trade[]       | undefined;
-  engine:  EngineStatus  | undefined;
-}
+interface Props { trades: Trade[] | undefined; engine: EngineStatus | undefined }
 
-function StatBox({ label, value, sub, color = "" }: { label: string; value: string; sub?: string; color?: string }) {
+function StatBox({ label, value, sub, color = "#4a8fa8" }: { label: string; value: string; sub?: string; color?: string }) {
   return (
-    <div className="bg-muted/10 rounded-lg p-3 text-center">
-      <div className={`text-sm font-bold font-mono ${color}`}>{value}</div>
-      {sub && <div className="text-[9px] text-muted-foreground/40">{sub}</div>}
-      <div className="text-[9px] text-muted-foreground/50 mt-0.5">{label}</div>
+    <div className="bg-[#050e1a] rounded p-2.5 text-center border border-[#0A1820] hover:border-[#0D2235] transition-colors">
+      <div
+        className="text-[13px] font-bold font-mono leading-none"
+        style={{ color, textShadow: `0 0 10px ${color}50` }}
+      >
+        {value}
+      </div>
+      {sub && <div className="text-[7px] text-[#0E2235] font-mono mt-0.5">{sub}</div>}
+      <div className="text-[7px] text-[#0A1828] uppercase tracking-[0.15em] mt-0.5 font-mono">{label}</div>
     </div>
   );
 }
 
 export function MiddleStatsGrid({ trades, engine }: Props) {
-  const all     = trades ?? [];
-  const open    = all.filter((t) => t.status === "open");
-  const closed  = all.filter((t) => t.status === "closed");
-  const wins    = closed.filter((t) => (t.pnl ?? 0) > 0);
+  const all    = trades ?? [];
+  const open   = all.filter((t) => t.status === "open");
+  const closed = all.filter((t) => t.status === "closed");
+  const wins   = closed.filter((t) => (t.pnl ?? 0) > 0);
   const winRate = closed.length ? (wins.length / closed.length) * 100 : 0;
   const totalPnl = closed.reduce((s, t) => s + (t.pnl ?? 0), 0);
-  const exposure  = open.reduce((s, t) => s + (t.amount ?? 0), 0);
+  const exposure = open.reduce((s, t) => s + (t.amount ?? 0), 0);
 
   const execCount = engine?.tradesExecuted ?? 0;
   const riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" =
@@ -33,52 +34,54 @@ export function MiddleStatsGrid({ trades, engine }: Props) {
     execCount > 3    ? "MEDIUM"   : "LOW";
 
   const riskColor =
-    riskLevel === "CRITICAL" ? "text-red-400" :
-    riskLevel === "HIGH"     ? "text-orange-400" :
-    riskLevel === "MEDIUM"   ? "text-amber-400" :
-    "text-emerald-400";
+    riskLevel === "CRITICAL" ? "#ff3366" :
+    riskLevel === "HIGH"     ? "#ff8800" :
+    riskLevel === "MEDIUM"   ? "#ffb800" : "#00ff88";
 
   return (
-    <div className="bg-card border border-border/40 rounded-xl p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <BarChart2 className="w-4 h-4 text-primary" />
-        <h3 className="text-sm font-semibold">Portfolio Snapshot</h3>
+    <div className="terminal-card rounded-lg overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-[#0E2235]">
+        <div className="live-dot live-dot-cyan" style={{ width: 5, height: 5 }} />
+        <span className="text-[9px] font-bold tracking-[0.18em] text-[#00eeff]">PORTFOLIO SNAPSHOT</span>
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        <StatBox
-          label="Win rate"
-          value={`${winRate.toFixed(0)}%`}
-          sub={`${wins.length}W / ${closed.length - wins.length}L`}
-          color={winRate >= 50 ? "text-emerald-400" : "text-red-400"}
-        />
-        <StatBox
-          label="Total P&L"
-          value={`${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(2)}`}
-          sub={`${closed.length} closed`}
-          color={totalPnl >= 0 ? "text-emerald-400" : "text-red-400"}
-        />
-        <StatBox
-          label="Open exposure"
-          value={`$${exposure.toFixed(0)}`}
-          sub={`${open.length} positions`}
-        />
-        <StatBox
-          label="Active"
-          value={`${open.length}`}
-          sub="open trades"
-          color={open.length > 0 ? "text-sky-400" : ""}
-        />
-        <StatBox
-          label="Executed"
-          value={`${engine?.tradesExecuted ?? 0}`}
-          sub="this session"
-          color={engine?.tradesExecuted ? "text-amber-400" : ""}
-        />
-        <StatBox
-          label="Threat level"
-          value={riskLevel}
-          color={riskColor}
-        />
+      <div className="p-2">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+          <StatBox
+            label="WIN RATE"
+            value={`${winRate.toFixed(0)}%`}
+            sub={`${wins.length}W/${closed.length - wins.length}L`}
+            color={winRate >= 50 ? "#00ff88" : "#ff3366"}
+          />
+          <StatBox
+            label="TOTAL P&L"
+            value={`${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(0)}`}
+            sub={`${closed.length} closed`}
+            color={totalPnl >= 0 ? "#00ff88" : "#ff3366"}
+          />
+          <StatBox
+            label="EXPOSURE"
+            value={`$${exposure.toFixed(0)}`}
+            sub={`${open.length} pos`}
+            color={exposure > 0 ? "#ffb800" : "#0E2235"}
+          />
+          <StatBox
+            label="ACTIVE"
+            value={`${open.length}`}
+            sub="open trades"
+            color={open.length > 0 ? "#00eeff" : "#0E2235"}
+          />
+          <StatBox
+            label="EXECUTED"
+            value={`${execCount}`}
+            sub="this session"
+            color={execCount > 0 ? "#ffb800" : "#0E2235"}
+          />
+          <StatBox
+            label="THREAT LEVEL"
+            value={riskLevel}
+            color={riskColor}
+          />
+        </div>
       </div>
     </div>
   );

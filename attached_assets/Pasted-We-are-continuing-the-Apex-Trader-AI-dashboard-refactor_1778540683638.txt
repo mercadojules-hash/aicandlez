@@ -1,0 +1,282 @@
+We are continuing the Apex Trader AI dashboard refactor and visual redesign.
+
+IMPORTANT:
+I am uploading the FULL zipped project folder.
+
+I do NOT want partial code snippets or isolated scripts returned.
+I want the ENTIRE updated working project returned fully updated and ready to unzip/run immediately.
+
+When complete:
+
+* return the FULL updated project
+* all files included
+* fully wired
+* fully tested
+* fully working
+* no placeholder panels
+* no partial implementations
+
+CRITICAL:
+The current modular architecture cleanup is GOOD.
+KEEP the modular architecture and reusable component system.
+
+HOWEVER:
+The dashboard visually lost its dynamic AI trading terminal feel.
+
+The original dashboard aesthetic MUST be restored and improved.
+
+==================================================
+CORE VISUAL DIRECTION
+=====================
+
+The dashboard should feel like:
+
+* autonomous AI trading operating system
+* hedge fund AI command center
+* cybernetic trading terminal
+* institutional AI execution engine
+* live telemetry system
+
+NOT:
+
+* generic SaaS admin panel
+* minimal analytics template
+* plain corporate dashboard
+
+==================================================
+GLOBAL THEME REQUIREMENTS
+=========================
+
+APPLY THIS TO THE ENTIRE DASHBOARD:
+NOT JUST COMMAND CENTER.
+
+Every page should share the same visual language:
+
+* Dashboard
+* Market Data
+* AI Reasoning
+* Risk
+* Portfolio
+* Validation
+* Signal Debug
+* Multi Asset Chart
+* etc.
+
+Global style requirements:
+
+* black background
+* cyan neon telemetry
+* emerald success glow
+* amber warning glow
+* red danger glow
+* terminal-style typography
+* live telemetry atmosphere
+* animated pulse indicators
+* subtle glow shadows
+* holographic/cyber-terminal feel
+* subtle movement everywhere
+* highly dynamic visual system
+
+==================================================
+KEEP + RESTORE THESE FEATURES
+=============================
+
+These MUST remain:
+
+* top live telemetry tickers
+* macro ticker
+* crypto ticker
+* equities ticker
+* AI telemetry ticker
+* glowing stat containers
+* neon telemetry colors
+* execution feed
+* live terminal feed
+* multi-chart grid
+* AI opportunity scanner
+* AI market regime
+* dynamic confidence values
+* animated indicators
+* pulsing live status dots
+
+==================================================
+NEW LAYOUT ORDER (IMPORTANT)
+============================
+
+TOP:
+
+* Live AI ticker system
+* Macro ticker
+* Crypto ticker
+* Equities ticker
+* AI telemetry ticker
+
+ROW 1:
+18 telemetry stat containers
+
+These are CRITICAL and must remain:
+
+* Portfolio Equity
+* Unrealized PnL
+* Validation Grade
+* AI Engine
+* Exposure
+* Broker
+* Fees Collected
+* AI Win Rate
+* Live AI Trades
+* Live Executions
+* Execution Success
+* Connected Exchanges
+* Threat Level
+* Users
+* etc.
+
+MAIN CENTERPIECE:
+8-chart crypto grid
+
+Charts should dominate visually.
+
+8 charts:
+
+* BTCUSD
+* ETHUSD
+* SOLUSD
+* XRPUSD
+* DOGEUSD
+* AVAXUSD
+* LINKUSD
+* ADAUSD
+
+Charts should include:
+
+* EMA overlays
+* volume overlays
+* glowing lines
+* confidence indicators
+* graceful no-data fallback
+* subtle animation
+
+TOP RIGHT SIDE:
+
+* AI Opportunity Scanner
+* AI Market Regime
+
+These should sit beside the charts as AI intelligence modules.
+
+UNDER THE CHARTS:
+
+* Live Terminal Feed
+
+The terminal feed should feel ALIVE.
+
+Add:
+
+* confidence strike lines
+* execution readiness indicators
+* AI routing states
+* RSI status
+* EMA alignment
+* volatility state
+* execution status
+
+Example visual structure:
+
+BTCUSD
+BUY • 78%
+
+████████████████░░
+
+EMA ALIGNMENT: CONFIRMED
+RSI: OVERSOLD
+ROUTING: BINANCE
+EXECUTION: READY
+
+Add subtle animated confidence bars/strikelines.
+
+LOWER AREA:
+Everything else fills below:
+
+* Active Trades
+* Risk
+* Broker
+* Fees
+* AI Brief
+* Portfolio Snapshot
+* Signal Summary
+* etc.
+
+BOTTOM:
+
+* Autonomous Execution Feed
+
+This is lowest informational priority.
+
+==================================================
+CRITICAL VISUAL REQUIREMENTS
+============================
+
+DO NOT flatten the visual density.
+
+The dashboard SHOULD feel:
+
+* active
+* information rich
+* high-frequency
+* slightly overwhelming
+* AI-driven
+* immersive
+* cybernetic
+* constantly moving
+
+This visual identity is VERY IMPORTANT.
+
+==================================================
+EXCHANGE SYSTEM
+===============
+
+Keep:
+
+* modular exchange adapters
+* dynamic exchange switching
+* exchange abstraction system
+
+Fix remaining stale telemetry issues:
+
+* broker labels
+* balances
+* live status
+* connected positions
+
+NO hardcoded Kraken labels anywhere.
+
+==================================================
+ARCHITECTURE
+============
+
+KEEP:
+
+* modular component system
+* reusable panels
+* scalable architecture
+* exchange abstraction layer
+* separated components
+* clean data flow
+
+==================================================
+IMPORTANT
+=========
+
+I am including screenshots of:
+
+1. the original dynamic dashboard
+2. the current modular dashboard
+
+The final version should COMBINE:
+
+* the architecture quality of the modular version
+  WITH
+* the immersive dynamic neon AI-terminal aesthetic of the original version
+
+The final dashboard should feel:
+alive, intelligent, autonomous, immersive, and premium.

@@ -3,7 +3,6 @@ import {
   ComposedChart, Line, Bar, YAxis, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from "recharts";
-import { RefreshCw } from "lucide-react";
 import type { Candle, ChartPt, SymBreakdown } from "./types";
 import { buildChartData, fmtPrice, Q_OPTS } from "./helpers";
 
@@ -12,9 +11,9 @@ function MiniTooltip({ active, payload, label }: any) {
   const d = payload[0]?.payload as ChartPt;
   if (!d) return null;
   return (
-    <div className="bg-card border border-border/50 rounded-lg p-2 text-[10px] shadow-xl">
-      <div className="text-muted-foreground/60 mb-1">{label}</div>
-      <div className="font-mono font-bold">${fmtPrice(d.close)}</div>
+    <div className="terminal-card rounded px-2 py-1.5 text-[9px] shadow-xl border-[#00eeff20]">
+      <div className="text-[#1e5070] mb-0.5">{label}</div>
+      <div className="font-mono font-bold text-[#00eeff]">${fmtPrice(d.close)}</div>
     </div>
   );
 }
@@ -50,72 +49,121 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
   const pMax   = prices.length ? Math.max(...prices) : 1;
   const pad    = (pMax - pMin) * 0.06;
 
+  const decisionBg =
+    decision === "BUY"  ? { bg: "#00ff8812", text: "#00ff88", border: "#00ff8830" } :
+    decision === "SELL" ? { bg: "#ff336612", text: "#ff3366", border: "#ff336630" } :
+    { bg: "#ffffff06", text: "#2e5c75", border: "#ffffff10" };
+
   return (
-    <div className="bg-card border border-border/40 rounded-xl overflow-hidden">
-      <div className="flex items-center gap-2 px-3 pt-3 pb-1">
+    <div className="terminal-card rounded-lg overflow-hidden hover:border-[#00eeff20] transition-colors group">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-2.5 pt-2.5 pb-1">
         <div
-          className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0"
-          style={{ backgroundColor: color + "25", color }}
+          className="w-6 h-6 rounded flex items-center justify-center text-[9px] font-bold shrink-0"
+          style={{ backgroundColor: color + "18", color, boxShadow: `0 0 8px ${color}40` }}
         >
-          {label.slice(0, 3)}
+          {label.slice(0, 4)}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-bold leading-none">{symbol.replace("USD", "/USD")}</div>
+          <div className="text-[10px] font-bold leading-none text-foreground/90">
+            {symbol.replace("USD", "/USD")}
+          </div>
           {last && (
-            <div className="text-[10px] font-mono text-muted-foreground/60 mt-0.5">
+            <div className="text-[9px] font-mono mt-0.5" style={{ color }}>
               ${fmtPrice(last.close)}
             </div>
           )}
         </div>
         <div className="flex flex-col items-end gap-0.5">
           {pctChg !== null && (
-            <span className={`text-[10px] font-bold ${isUp ? "text-emerald-400" : "text-red-400"}`}>
+            <span
+              className="text-[9px] font-bold font-mono"
+              style={{
+                color: isUp ? "#00ff88" : "#ff3366",
+                textShadow: isUp ? "0 0 8px #00ff8860" : "0 0 8px #ff336660",
+              }}
+            >
               {isUp ? "+" : ""}{pctChg.toFixed(2)}%
             </span>
           )}
           {decision !== "—" && (
-            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-              decision === "BUY"  ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" :
-              decision === "SELL" ? "bg-red-500/15 text-red-400 border-red-500/30" :
-              "bg-muted/20 text-muted-foreground/60 border-border/30"
-            }`}>{decision}</span>
+            <span
+              className="text-[8px] font-bold px-1.5 py-0.5 rounded tracking-wide"
+              style={{ background: decisionBg.bg, color: decisionBg.text, border: `1px solid ${decisionBg.border}` }}
+            >
+              {decision}
+            </span>
           )}
         </div>
       </div>
 
+      {/* Chart */}
       {isLoading ? (
-        <div className="flex items-center justify-center h-28 text-muted-foreground/30">
-          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+        <div className="flex items-center justify-center h-24 text-[#0E2235]">
+          <div className="w-3 h-3 rounded-full border border-[#00eeff30] animate-spin border-t-[#00eeff]" />
         </div>
       ) : chartData.length === 0 ? (
-        <div className="flex items-center justify-center h-28 text-muted-foreground/20 text-[9px]">
-          No data
+        <div className="flex items-center justify-center h-24 text-[8px] text-[#0E2235] font-mono">
+          NO DATA
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={110}>
-          <ComposedChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+        <ResponsiveContainer width="100%" height={90}>
+          <ComposedChart data={chartData} margin={{ top: 4, right: 2, bottom: 0, left: 0 }}>
             <YAxis yAxisId="p" domain={[pMin - pad, pMax + pad]} hide />
             <YAxis yAxisId="v" domain={[0, maxVol * 4.5]} hide />
             <Tooltip content={<MiniTooltip />} />
-            <Bar yAxisId="v" dataKey="volume" fill={color} fillOpacity={0.18} radius={[1,1,0,0]} isAnimationActive={false} />
-            <Line yAxisId="p" dataKey="close" stroke={color} strokeWidth={1.5} dot={false} isAnimationActive={false} />
-            <Line yAxisId="p" dataKey="ema9"  stroke="#fbbf24" strokeWidth={1} dot={false} isAnimationActive={false} strokeDasharray="3 2" connectNulls />
-            <Line yAxisId="p" dataKey="ema21" stroke="#60a5fa" strokeWidth={1} dot={false} isAnimationActive={false} strokeDasharray="5 3" connectNulls />
+            <Bar
+              yAxisId="v" dataKey="volume"
+              fill={color} fillOpacity={0.12}
+              radius={[1, 1, 0, 0]} isAnimationActive={false}
+            />
+            <Line
+              yAxisId="p" dataKey="close"
+              stroke={color} strokeWidth={1.5}
+              dot={false} isAnimationActive={false}
+              style={{ filter: `drop-shadow(0 0 3px ${color}80)` }}
+            />
+            <Line
+              yAxisId="p" dataKey="ema9"
+              stroke="#ffb800" strokeWidth={0.8}
+              dot={false} isAnimationActive={false}
+              strokeDasharray="3 2" connectNulls
+              strokeOpacity={0.7}
+            />
+            <Line
+              yAxisId="p" dataKey="ema21"
+              stroke="#00eeff" strokeWidth={0.8}
+              dot={false} isAnimationActive={false}
+              strokeDasharray="5 3" connectNulls
+              strokeOpacity={0.5}
+            />
             {last?.close && (
-              <ReferenceLine yAxisId="p" y={last.close} stroke={color} strokeDasharray="2 4" strokeOpacity={0.4} />
+              <ReferenceLine
+                yAxisId="p" y={last.close}
+                stroke={color} strokeDasharray="2 4"
+                strokeOpacity={0.3}
+              />
             )}
           </ComposedChart>
         </ResponsiveContainer>
       )}
 
+      {/* Confidence bar */}
       {conf > 0 && (
-        <div className="px-3 pb-2.5 pt-1">
-          <div className="flex items-center justify-between text-[9px] text-muted-foreground/40 mb-1">
-            <span>AI conf</span>
-            <span className="font-mono">{conf.toFixed(0)}%</span>
+        <div className="px-2.5 pb-2 pt-1">
+          <div className="flex items-center justify-between text-[8px] text-[#1a4060] mb-1 font-mono">
+            <span>AI CONF</span>
+            <span style={{ color }}>{conf.toFixed(0)}%</span>
           </div>
-          <div className="h-1 bg-muted/20 rounded overflow-hidden">
-            <div className="h-full rounded transition-all" style={{ width: `${Math.min(100, conf)}%`, backgroundColor: color }} />
+          <div className="conf-bar-track">
+            <div
+              className="conf-bar-fill"
+              style={{
+                width: `${Math.min(100, conf)}%`,
+                background: color,
+                color,
+              }}
+            />
           </div>
         </div>
       )}

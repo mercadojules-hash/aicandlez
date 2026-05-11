@@ -1,21 +1,22 @@
 import { ASSETS } from "./types";
 import type { SymBreakdown } from "./types";
 import { MiniChart } from "./MiniChart";
-import { LayoutGrid } from "lucide-react";
 
-interface Props {
-  breakdowns: SymBreakdown[];
-}
+interface Props { breakdowns: SymBreakdown[] }
 
 export function CryptoChartGrid({ breakdowns }: Props) {
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
-        <LayoutGrid className="w-4 h-4 text-primary" />
-        <h3 className="text-sm font-semibold">Crypto Chart Grid</h3>
-        <span className="text-[10px] text-muted-foreground/40 ml-1">15m · EMA9/21 · volume overlay</span>
+      <div className="flex items-center gap-2 mb-2.5">
+        <div className="live-dot live-dot-cyan" style={{ width: 5, height: 5 }} />
+        <span className="text-[9px] font-bold tracking-[0.2em] text-[#00eeff80] uppercase">
+          Crypto Chart Grid
+        </span>
+        <span className="text-[8px] text-[#0E2235] ml-1 font-mono">
+          15m · EMA9/21 · volume
+        </span>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {ASSETS.map((a) => {
           const bd = breakdowns.find((b) => b.symbol === a.symbol);
           return (
