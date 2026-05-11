@@ -27,9 +27,14 @@ interface CacheEntry<T> {
 }
 
 export const KRAKEN_PAIRS: Record<string, string> = {
-  BTCUSD: "XBTUSD",
-  ETHUSD: "ETHUSD",
-  SOLUSD: "SOLUSD",
+  BTCUSD:  "XBTUSD",
+  ETHUSD:  "ETHUSD",
+  SOLUSD:  "SOLUSD",
+  XRPUSD:  "XRPUSD",
+  DOGEUSD: "XDGUSD",
+  AVAXUSD: "AVAXUSD",
+  LINKUSD: "LINKUSD",
+  ADAUSD:  "ADAUSD",
 };
 
 export const SUPPORTED_SYMBOLS = Object.keys(KRAKEN_PAIRS);

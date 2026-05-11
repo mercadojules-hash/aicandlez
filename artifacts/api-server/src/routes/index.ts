@@ -22,6 +22,7 @@ import sentimentRouter from "./sentiment.js";
 import exchangeRouter from "./exchange.js";
 import engineRouter from "./engine.js";
 import systemRouter from "./system.js";
+import feesRouter from "./fees.js";
 
 const router: IRouter = Router();
 
@@ -48,5 +49,6 @@ router.use(sentimentRouter);
 router.use(exchangeRouter);
 router.use(engineRouter);
 router.use(systemRouter);
+router.use(feesRouter);
 
 export default router;

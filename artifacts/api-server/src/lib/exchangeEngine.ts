@@ -58,6 +58,7 @@ export interface ExchangeStatus {
   ordersToday:       number;
   lastOrderAt:       number | null;
   simBalances:       Balances;
+  exchangeName:      string;        // selected exchange display name
 }
 
 export interface Balances {
@@ -78,10 +79,11 @@ const TAKER_FEE = 0.0026; // 0.26% Kraken taker fee
 
 // ── Singleton state ──────────────────────────────────────────────────────────
 
-let _mode:        ExchangeMode = "simulation";
-let _killSwitch:  boolean      = false;
-let _paused:      boolean      = false;
-const _orders:    ExchangeOrder[] = [];
+let _mode:             ExchangeMode = "simulation";
+let _killSwitch:       boolean      = false;
+let _paused:           boolean      = false;
+let _selectedExchange: string       = "Kraken";
+const _orders:         ExchangeOrder[] = [];
 
 let _simBalances: Balances = {
   USD: 100_000,
@@ -376,15 +378,16 @@ export function getExchangeStatus(): ExchangeStatus {
   const lastOrder   = _orders.find((o) => o.status === "filled");
 
   return {
-    mode:         _mode,
-    killSwitch:   _killSwitch,
-    paused:       _paused,
-    liveCapable:  isLiveCapable(),
+    mode:          _mode,
+    killSwitch:    _killSwitch,
+    paused:        _paused,
+    liveCapable:   isLiveCapable(),
     apiConfigured: isApiConfigured(),
-    liveEnabled:  isLiveEnabled(),
+    liveEnabled:   isLiveEnabled(),
     ordersToday,
-    lastOrderAt:  lastOrder?.timestamp ?? null,
-    simBalances:  { ..._simBalances },
+    lastOrderAt:   lastOrder?.timestamp ?? null,
+    simBalances:   { ..._simBalances },
+    exchangeName:  _selectedExchange,
   };
 }
 
@@ -415,4 +418,8 @@ export function togglePause(): boolean {
 export function resetSimBalances(): Balances {
   _simBalances = { USD: 100_000, BTC: 0, ETH: 0, SOL: 0 };
   return { ..._simBalances };
+}
+
+export function setSelectedExchange(name: string): void {
+  _selectedExchange = name;
 }

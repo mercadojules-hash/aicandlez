@@ -9,6 +9,7 @@ import {
   executeOrder,
   fetchLiveBalances,
   resetSimBalances,
+  setSelectedExchange,
   type OrderSide,
   type OrderType,
   type ExchangeMode,
@@ -114,6 +115,17 @@ router.post("/exchange/order/execute", async (req, res) => {
     const msg = err instanceof Error ? err.message : "Execution failed";
     res.status(502).json({ error: msg });
   }
+});
+
+// ── Select exchange (UI label) ─────────────────────────────────────────────────
+router.post("/exchange/select", (req, res) => {
+  const { name } = req.body as { name: string };
+  if (!name || typeof name !== "string") {
+    res.status(400).json({ error: "name is required" });
+    return;
+  }
+  setSelectedExchange(name.trim());
+  res.json({ exchangeName: name.trim(), status: getExchangeStatus() });
 });
 
 export default router;

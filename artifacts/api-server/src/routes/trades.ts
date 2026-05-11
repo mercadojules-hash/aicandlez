@@ -4,6 +4,7 @@ import { tradesTable, logsTable, settingsTable } from "@workspace/db";
 import { desc, eq, gte, and } from "drizzle-orm";
 import { generateId, getBasePrice, generateSimulatedPrice, calculatePnL } from "../lib/trading.js";
 import { getAccountSummary, getTradeHistory } from "../lib/simulationEngine.js";
+import { recordFee } from "../lib/feeLedger.js";
 
 const router = Router();
 
@@ -57,6 +58,8 @@ router.post("/trades", async (req, res) => {
     stopLoss: stopLoss ?? null,
     takeProfit: takeProfit ?? null,
   });
+
+  recordFee({ tradeId: id, symbol: symbol ?? "BTCUSDT", side, amountUSD: amount });
 
   await db.insert(logsTable).values({
     id: generateId(),

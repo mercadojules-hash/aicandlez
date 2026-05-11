@@ -1,0 +1,185 @@
+I am uploading the full zipped Apex Trader project. I need you to update the complete project and return the full updated project as a ZIP file, not partial snippets.
+
+IMPORTANT:
+
+* Do not send partial scripts.
+* Do not send only changed files.
+* Return the entire working project folder zipped.
+* I want to unzip it, run it, and immediately see the updates.
+* Preserve the current dashboard style/design. Do not redesign the look. Improve structure and ordering only.
+
+MAIN GOAL:
+Refactor the dashboard architecture so CommandCenter.tsx is no longer a huge messy file. Create reusable component files and short clean component tags so panels can be reordered easily.
+
+CURRENT ISSUES TO FIX:
+
+1. CommandCenter.tsx is too large and hard to maintain.
+2. Broker cards still show stale Kraken labels even when another exchange is selected.
+3. Dashboard panels need to be organized in a better order.
+4. I want 4 to 8 crypto charts showing, not only 3.
+5. AI Opportunity Scanner and AI Market Regime are very important and should appear higher.
+6. Autonomous Execution Feed is least important and should be moved lower.
+7. Exchange switching must stay persistent and update all UI labels correctly.
+8. The app should support future AI-decided routing where the AI chooses both the exchange and the asset.
+
+REFACTOR REQUIREMENTS:
+Create:
+src/components/command/
+
+Break CommandCenter.tsx into clean reusable components. At minimum create:
+
+* BrokerStatusCard.tsx
+* PortfolioCard.tsx
+* PnLCard.tsx
+* ValidationCard.tsx
+* AIEngineCard.tsx
+* ExposureCard.tsx
+* BalanceCard.tsx
+* WinRateCard.tsx
+* ThreatLevelCard.tsx
+* ExecutionCard.tsx
+* MarketBiasCard.tsx
+* MarketRegimeCard.tsx
+* OpportunityScanner.tsx
+* AutonomousExecutionFeed.tsx
+* LiveTerminalFeed.tsx
+* CryptoChartGrid.tsx
+* MarketTicker.tsx
+* StatChip.tsx if needed as shared component
+
+CommandCenter.tsx should become a clean layout file using short component tags like: <BrokerStatusCard /> <CryptoChartGrid /> <OpportunityScanner /> <MarketRegimeCard /> <AutonomousExecutionFeed />
+
+Do not leave thousands of lines of JSX inside CommandCenter.tsx.
+
+DASHBOARD LAYOUT ORDER:
+Keep the same general visual style, but reorder panels like this:
+
+Top area:
+
+1. Live AI System ticker
+2. Main telemetry stat cards
+3. AI Opportunity Scanner
+4. AI Market Regime / Market Bias
+5. Crypto Chart Grid with 4 to 8 top crypto charts
+
+Middle:
+6. Portfolio equity
+7. PnL
+8. Validation
+9. AI Engine
+10. Exposure
+11. Broker / exchange status
+12. Account mode
+13. Fees collected
+14. Win rate
+15. Threat level
+
+Lower:
+16. Live Terminal Feed
+17. Autonomous Execution Feed
+
+CHART REQUIREMENTS:
+Update the chart section to support 4 to 8 top crypto charts. Use the top crypto symbols already supported or create clean support for:
+
+* BTCUSD
+* ETHUSD
+* SOLUSD
+* XRPUSD
+* DOGEUSD
+* AVAXUSD
+* LINKUSD
+* ADAUSD if available
+
+If some assets do not have candle data yet, build the chart grid so it gracefully handles missing data without crashing.
+
+EXCHANGE / BROKER REQUIREMENTS:
+Remove all hardcoded Kraken labels from the UI unless Kraken is actually selected.
+
+Every broker label must be dynamic:
+
+* BINANCE LIVE
+* COINBASE LIVE
+* KRAKEN LIVE
+* ROBINHOOD LIVE
+* OKX LIVE
+  etc.
+
+Same for balance:
+
+* BINANCE BALANCE
+* COINBASE BALANCE
+* KRAKEN BALANCE
+
+The active exchange should come from the selected exchange mode, not stale Kraken telemetry.
+
+Fix React Query caching:
+
+* account telemetry must refetch after exchange changes
+* use cache: "no-store"
+* staleTime: 0
+* gcTime: 0
+* refetchOnMount: "always"
+* refetchOnReconnect: true
+* refetchOnWindowFocus: true
+* invalidate relevant queries after exchange switching
+
+AI ROUTING GOAL:
+Add foundation for AI-decided routing. The long-term goal is that users connect one or more exchanges and the AI decides:
+
+* what asset to trade
+* which exchange to trade on
+* when to enter
+* when to exit
+* position size
+* risk level
+
+Do not fully activate real autonomous live trading yet unless already safely gated. Create the clean architecture for it:
+
+* routing engine
+* exchange health monitor
+* broker selection logic
+* liquidity/fee/slippage placeholders
+* safety checks
+* kill switch
+
+FEE REQUIREMENT:
+Add a safe platform fee ledger for a 3% fee on every buy/sell trade.
+
+IMPORTANT:
+Do NOT activate real wallet transfers yet.
+Do NOT send crypto automatically yet.
+Do NOT move real money yet.
+
+For now:
+
+* calculate 3% platform fee on each executed buy/sell
+* log it
+* display it in dashboard as platform fees collected
+* store it in trade metadata or fee ledger
+* add placeholder config for future owner wallet payout
+
+Later we will connect the real crypto wallet after legal/compliance/payment review.
+
+SAFETY REQUIREMENTS:
+Before any real live trading:
+
+* live trading must remain gated
+* kill switch must work
+* max daily loss must be enforceable
+* max trades per day must be enforceable
+* exchange health must be checked
+* API key errors must not crash the app
+* missing exchange balances must show $0 or disconnected, not Kraken
+
+FINAL DELIVERY:
+Return the entire updated project as a ZIP file.
+
+Also include:
+
+1. short summary of what changed
+2. exact run commands
+3. confirmation that no hardcoded Kraken UI labels remain
+4. confirmation that CommandCenter.tsx was modularized
+5. confirmation that dashboard opens without crashes
+6. confirmation that selecting Binance/Coinbase/Kraken updates the UI labels
+7. confirmation that fee ledger is safe/simulated only
