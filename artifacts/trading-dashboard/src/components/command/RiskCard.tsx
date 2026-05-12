@@ -17,14 +17,16 @@ export function RiskCard({ engine, settings }: Props) {
 
   return (
     <div className="terminal-card rounded-lg overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[#0E2235]">
-        <Shield className="w-3.5 h-3.5 text-[#00eeff]" />
-        <span className="text-[9px] font-bold tracking-[0.18em] text-[#00eeff]">RISK STATUS</span>
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b" style={{ borderBottomColor: "#141414" }}>
+        <Shield className="w-3.5 h-3.5" style={{ color: "#00eeff" }} />
+        <span className="text-[10px] font-bold tracking-[0.18em] font-mono" style={{ color: "#00eeff" }}>
+          RISK STATUS
+        </span>
         <span
-          className="ml-auto text-[8px] font-bold px-1.5 py-0.5 rounded font-mono"
+          className="ml-auto text-[9px] font-bold px-2 py-0.5 rounded font-mono"
           style={autoMode
-            ? { background: "#00ff8810", color: "#00ff88", border: "1px solid #00ff8830" }
-            : { background: "#ffffff06", color: "#1e4060", border: "1px solid #ffffff10" }
+            ? { background: "#00ff8810", color: "#00ff88", border: "1px solid #00ff8828" }
+            : { background: "#ffffff05", color: "#1e4060", border: "1px solid #ffffff08" }
           }
         >
           {autoMode ? "AUTO ON" : "MANUAL"}
@@ -32,29 +34,33 @@ export function RiskCard({ engine, settings }: Props) {
       </div>
 
       <div className="p-3">
-        <div className="mb-3">
-          <div className="flex justify-between text-[8px] font-mono mb-1">
-            <span className="text-[#1e4060]">TRADES REMAINING TODAY</span>
-            <span style={{ color: barColor }}>{remaining} / {maxTrades}</span>
+        <div className="mb-4">
+          <div className="flex justify-between text-[9px] font-mono mb-1.5">
+            <span style={{ color: "#1e4060" }}>TRADES REMAINING TODAY</span>
+            <span className="font-bold tabular-nums" style={{ color: barColor }}>
+              {remaining} / {maxTrades}
+            </span>
           </div>
-          <div className="h-1.5 bg-[#050e1a] rounded overflow-hidden">
+          <div className="rounded overflow-hidden" style={{ height: 6, background: "#0a0a0a" }}>
             <div
               className="h-full rounded transition-all"
-              style={{ width: `${riskPct * 100}%`, background: barColor, boxShadow: `0 0 8px ${barColor}60` }}
+              style={{ width: `${riskPct * 100}%`, background: barColor, boxShadow: `0 0 6px ${barColor}50` }}
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5 text-[8px] font-mono">
+        <div className="grid grid-cols-2 gap-2 text-[9px] font-mono">
           {[
-            { v: `${settings?.allocation ?? 20}%`,       l: "POSITION SIZE",    c: "#4a8fa8" },
-            { v: `${minConf}%`,                          l: "MIN CONFIDENCE",   c: "#00eeff" },
-            { v: `${settings?.stopLossPercent ?? 2}%`,   l: "STOP LOSS",        c: "#ff3366" },
-            { v: `${engine?.tradesExecuted ?? 0}`,        l: "TOTAL EXECUTED",   c: "#00ff88" },
+            { v: `${settings?.allocation ?? 20}%`,      l: "POSITION SIZE",   c: "#4a8fa8" },
+            { v: `${minConf}%`,                         l: "MIN CONFIDENCE",  c: "#00eeff" },
+            { v: `${settings?.stopLossPercent ?? 2}%`,  l: "STOP LOSS",       c: "#ff3366" },
+            { v: `${engine?.tradesExecuted ?? 0}`,       l: "TOTAL EXECUTED",  c: "#00ff88" },
           ].map(({ v, l, c }) => (
-            <div key={l} className="bg-[#050e1a] rounded p-2 text-center border border-[#0A1E30]">
-              <div className="text-[12px] font-bold mb-0.5" style={{ color: c, textShadow: `0 0 8px ${c}50` }}>{v}</div>
-              <div className="text-[7px] text-[#0E2235] uppercase tracking-widest">{l}</div>
+            <div key={l} className="rounded p-2.5 text-center" style={{ background: "#050505", border: "1px solid #181818" }}>
+              <div className="text-[16px] font-bold mb-0.5 tabular-nums" style={{ color: c, textShadow: `0 0 8px ${c}40` }}>
+                {v}
+              </div>
+              <div className="text-[7px] uppercase tracking-widest" style={{ color: "#1a2a35" }}>{l}</div>
             </div>
           ))}
         </div>

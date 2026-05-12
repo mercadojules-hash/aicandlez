@@ -212,8 +212,8 @@
 ════════════════════════════════════════════════════════════════════════════ */
 
 .terminal-card {
-  background: linear-gradient(145deg, #030F1E 0%, #010912 100%);
-  border: 1px solid #0D2235;
+  background: #000000;
+  border: 1px solid #1c1c1c;
   position: relative;
   overflow: hidden;
 }
@@ -222,11 +222,11 @@
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, #00f0ff40 40%, #00f0ff80 50%, #00f0ff40 60%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, #00f0ff20 40%, #00f0ff45 50%, #00f0ff20 60%, transparent 100%);
   pointer-events: none;
 }
 .terminal-card:hover {
-  border-color: #0F2A3F;
+  border-color: #282828;
 }
 
 /* scanline overlay — applies to terminal cards */

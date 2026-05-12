@@ -22,13 +22,13 @@ function Cell({
     >
       <div
         className="absolute top-0 left-0 right-0 h-[2px] rounded-t"
-        style={{ background: dim ? "transparent" : `linear-gradient(90deg, transparent, ${color}50, transparent)` }}
+        style={{ background: dim ? "transparent" : `linear-gradient(90deg, transparent, ${color}40, transparent)` }}
       />
       <div
         className="text-[22px] font-bold font-mono leading-none mb-1 tracking-tight tabular-nums"
         style={{
           color: dim ? "#1a3850" : color,
-          textShadow: dim ? "none" : `0 0 16px ${color}70, 0 0 32px ${color}30`,
+          textShadow: dim ? "none" : `0 0 14px ${color}60, 0 0 28px ${color}25`,
         }}
       >
         {value}
@@ -69,9 +69,56 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
   const volFilter = engine?.volumeFilter ?? false;
   const mtfBlocked = engine?.mtfBlockCount ?? 0;
 
+  // Priority-ordered: exchange context first, then activity, then detail
   const cells: Array<{
     label: string; value: string | number; sub?: string; color?: string; dim?: boolean; pulse?: boolean;
   }> = [
+    // ── 1. Exchange context ──────────────────────────────────────────
+    {
+      label: "BROKER",
+      value: exName.toUpperCase().slice(0, 6),
+      sub:   `${mode} MODE`,
+      color: mode === "LIVE" ? "#ff3355" : "#00f0ff",
+      pulse: mode === "LIVE",
+    },
+    {
+      label: "AI ENGINE",
+      value: engine?.running ? "ONLINE" : "OFFLINE",
+      color: engine?.running ? "#00ff8a" : "#ff2255",
+      pulse: engine?.running,
+    },
+    {
+      label: "KILL SWITCH",
+      value: exchangeStatus?.killSwitch ? "ACTIVE" : "SAFE",
+      color: exchangeStatus?.killSwitch ? "#ff2255" : "#00ff8a",
+      pulse: !!exchangeStatus?.killSwitch,
+    },
+    // ── 2. Activity / live state ────────────────────────────────────
+    {
+      label: "LIVE TRADES",
+      value: open.length,
+      color: open.length > 0 ? "#00f0ff" : "#1a3850",
+      dim:   open.length === 0,
+      pulse: open.length > 0,
+    },
+    {
+      label: "EXECUTIONS",
+      value: execToday,
+      color: execToday > 0 ? "#ffb800" : "#1a3850",
+      dim:   execToday === 0,
+    },
+    {
+      label: "FEES",
+      value: `$${(feeSummary?.totalFeesCollected ?? 0).toFixed(2)}`,
+      color: "#00ff8a",
+    },
+    {
+      label: "BLOCKED",
+      value: blocked,
+      color: blocked > 50 ? "#ff2255" : blocked > 20 ? "#ffb800" : "#1a3850",
+      dim:   blocked === 0,
+    },
+    // ── 3. Account state ────────────────────────────────────────────
     {
       label: "PORTFOLIO EQ",
       value: `$${simUSD >= 1000 ? (simUSD / 1000).toFixed(0) + "K" : simUSD.toFixed(0)}`,
@@ -90,29 +137,17 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       dim:   exposure === 0,
     },
     {
+      label: "ACCT MODE",
+      value: settings?.autoMode ? "AUTO" : "MANUAL",
+      color: settings?.autoMode ? "#00ff8a" : "#ffb800",
+      pulse: settings?.autoMode,
+    },
+    // ── 4. Signal quality ───────────────────────────────────────────
+    {
       label: "AI WIN RATE",
       value: `${winRate.toFixed(1)}%`,
       color: winRate >= 55 ? "#00ff8a" : winRate >= 40 ? "#ffb800" : "#ff2255",
       pulse: closed.length > 0,
-    },
-    {
-      label: "LIVE TRADES",
-      value: open.length,
-      color: open.length > 0 ? "#00f0ff" : "#1a3850",
-      dim:   open.length === 0,
-      pulse: open.length > 0,
-    },
-    {
-      label: "EXECUTIONS",
-      value: execToday,
-      color: execToday > 0 ? "#ffb800" : "#1a3850",
-      dim:   execToday === 0,
-    },
-    {
-      label: "BLOCKED",
-      value: blocked,
-      color: blocked > 50 ? "#ff2255" : blocked > 20 ? "#ffb800" : "#1a3850",
-      dim:   blocked === 0,
     },
     {
       label: "BUY SIGNALS",
@@ -144,67 +179,31 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       color: execRate > 60 ? "#00ff8a" : execRate > 20 ? "#ffb800" : "#ff2255",
     },
     {
+      label: "VOL FILTER",
+      value: volFilter ? "ON" : "OFF",
+      color: volFilter ? "#00ff8a" : "#ffb800",
+    },
+    {
       label: "LAST SIGNAL",
       value: lastSig,
       color: "#00f0ff",
       dim:   !engine?.lastSignalAt,
     },
     {
-      label: "VOL FILTER",
-      value: volFilter ? "ON" : "OFF",
-      color: volFilter ? "#00ff8a" : "#ffb800",
-    },
-    {
-      label: "BROKER",
-      value: exName.toUpperCase().slice(0, 6),
-      sub:   `${mode} MODE`,
-      color: "#00f0ff",
-    },
-    {
-      label: "AI ENGINE",
-      value: engine?.running ? "ONLINE" : "OFFLINE",
-      color: engine?.running ? "#00ff8a" : "#ff2255",
-      pulse: engine?.running,
-    },
-    {
-      label: "KILL SWITCH",
-      value: exchangeStatus?.killSwitch ? "ACTIVE" : "SAFE",
-      color: exchangeStatus?.killSwitch ? "#ff2255" : "#00ff8a",
-    },
-    {
       label: "MIN CONF",
       value: `${settings?.minConfidence ?? 60}%`,
       color: "#00f0ff",
-    },
-    {
-      label: "ACCT MODE",
-      value: settings?.autoMode ? "AUTO" : "MANUAL",
-      color: settings?.autoMode ? "#00ff8a" : "#ffb800",
-      pulse: settings?.autoMode,
-    },
-    {
-      label: "FEES",
-      value: `$${(feeSummary?.totalFeesCollected ?? 0).toFixed(2)}`,
-      color: "#00ff8a",
     },
   ];
 
   return (
     <div
-      className="border-b border-[#0C1E2C] px-2 py-2"
-      style={{ background: "linear-gradient(180deg, #000810 0%, #000000 100%)" }}
+      className="border-b px-2 py-2"
+      style={{ background: "#000000", borderBottomColor: "#141414" }}
     >
       <div className="flex gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
         {cells.map((c) => (
-          <Cell
-            key={c.label}
-            label={c.label}
-            value={c.value}
-            sub={c.sub}
-            color={c.color}
-            dim={c.dim}
-            pulse={c.pulse}
-          />
+          <Cell key={c.label} {...c} />
         ))}
       </div>
     </div>

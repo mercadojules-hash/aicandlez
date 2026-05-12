@@ -1,0 +1,202 @@
+The dashboard is improving, but several critical issues were still missed.
+
+Please carefully follow ALL corrections below.
+
+CRITICAL COLOR FIX
+The interiors of the containers are STILL charcoal gray.
+
+I explicitly need:
+
+* PURE BLACK interiors
+* matte black
+* deep black
+* near #000000
+
+This applies to:
+
+* charts
+* Live Terminal Feed
+* AI Opportunity Scanner
+* AI Market Regime
+* AI Threat Monitor
+* all telemetry containers
+
+The neon colors ONLY stand out properly against TRUE black.
+
+Do NOT use:
+
+* charcoal gray
+* navy gray
+* smoky blue
+* washed black
+
+The containers need:
+background: #000000 or extremely close.
+
+CHART MOVEMENT FIX
+You misunderstood the chart movement request.
+
+Right now:
+
+* only the END of the strike line moves
+* the chart feels anchored/static
+
+I need:
+
+* the ENTIRE strike line to subtly move
+* live interpolation across the WHOLE line
+* the line should breathe and flow
+* TradingView/Bloomberg feel
+* continuous market motion
+
+The charts should:
+
+* drift naturally
+* fluctuate continuously
+* have slight live oscillation
+* feel like active streaming telemetry
+
+Not:
+
+* frozen chart with moving endpoint
+
+The FULL chart needs motion.
+
+BOTTOM CONTAINER ISSUE
+You completely missed the bottom containers.
+
+Problems:
+
+* unreadable typography
+* too compressed
+* weak hierarchy
+* low usability
+* too much dead space
+* information density is poor
+
+The lower dashboard needs:
+
+* larger typography
+* better spacing
+* stronger hierarchy
+* clearer telemetry grouping
+* readable at a glance
+
+LIVE TERMINAL FEED FIXES
+Major improvements still needed.
+
+I want:
+
+* vertical scrolling
+* overflow-y auto
+* cinematic scrolling feed
+* denser telemetry
+* no wasted empty space underneath
+
+REMOVE the large empty dead area under the feed.
+
+The terminal should:
+
+* continuously stream
+* feel alive
+* resemble institutional execution telemetry
+
+Also:
+
+* increase readability
+* larger text
+* stronger confidence visuals
+* more compact vertical spacing
+
+EXCHANGE DROPDOWN / ACCOUNT SWITCHING
+Very important feature missing.
+
+I added 11 exchanges.
+
+When switching exchanges:
+
+* Coinbase should show Coinbase balances
+* Kraken should show Kraken balances
+* Binance should show Binance balances
+
+Right now:
+
+* it still shows Kraken values globally
+* exchange switching is mostly visual only
+
+I need REAL exchange-context switching in the UI state.
+
+Example:
+IF exchange === Coinbase:
+
+* show Coinbase balance
+* show Coinbase positions
+* show Coinbase broker status
+* show Coinbase telemetry
+
+IF exchange === Kraken:
+
+* show Kraken values
+
+The dashboard must react dynamically per selected exchange.
+
+TOP TELEMETRY BAR FIX
+The top metrics row (18 telemetry containers) needs reordering.
+
+PRIORITIZE:
+
+* user activity
+* active users
+* fees collected
+* live executions
+* exchange status
+* broker balances
+
+Those are more important than some of the current low-priority metrics.
+
+Also:
+
+* improve spacing
+* improve readability
+* reduce cramped feeling
+
+SIMULATION / PAUSE / KILL SWITCH
+The controls exist visually but are not obvious enough.
+
+Need:
+
+* clearer interaction states
+* stronger visibility
+* easier click targeting
+* obvious active selection styling
+
+The exchange dropdown also needs:
+
+* stronger contrast
+* clearer active state
+* smoother dropdown styling
+* institutional trading terminal feel
+
+VERY IMPORTANT
+Please tell me EXACTLY which files/components control:
+
+1. Chart animation/interpolation
+2. Exchange switching state
+3. Broker balances
+4. Live terminal feed rendering
+5. Bottom telemetry containers
+6. AI Opportunity Scanner
+7. AI Market Regime
+8. AI Threat Monitor
+9. Top telemetry metric ordering
+
+If needed, I can manually fine-tune those components after your structural update.
+
+The architecture is close now.
+The remaining work is:
+
+* realism
+* motion
+* readability
+* institutional polish
+* true live telemetry feeling
