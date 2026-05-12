@@ -1,0 +1,213 @@
+This is moving in the right direction, but the dashboard still does NOT match the institutional composition and hierarchy of the reference image.
+
+The issue is no longer individual widgets.
+
+The issue is:
+LAYOUT COMPOSITION
+SPACING
+VISUAL HIERARCHY
+INFORMATION DENSITY
+PROPORTIONAL BALANCE
+
+Right now it still feels like:
+“components added onto a dashboard.”
+
+The reference feels like:
+“a unified institutional trading operating system.”
+
+IMPORTANT:
+Do NOT focus on adding more widgets now.
+
+Focus on:
+
+* proportional layout redesign
+* visual density
+* enterprise spacing
+* panel hierarchy
+* unified composition
+
+The dashboard currently feels:
+
+* too stretched vertically
+* too much dead space
+* inconsistent panel density
+* charts isolated
+* lower panels disconnected
+* insufficient horizontal telemetry grouping
+
+The reference image feels:
+
+* compressed
+* intentional
+* information-rich
+* operator-grade
+* balanced
+* unified
+
+──────────────────────────────
+MAJOR LAYOUT CHANGES REQUIRED
+──────────────────────────────
+
+1. PLATFORM OVERVIEW PANEL
+   Current:
+   Too small and isolated.
+
+Need:
+
+* larger footprint
+* integrated into chart ecosystem
+* stronger visual weight
+* thicker donut
+* animated center telemetry
+* live user pulse indicators
+
+Should feel like:
+institutional operations telemetry.
+
+──────────────────────────────
+2. ACTIVE TRADES PANEL
+Current:
+Still too thin and spreadsheet-like.
+
+Need:
+
+* much taller rows
+* larger typography
+* animated PnL glow
+* stronger risk indicators
+* better spacing between trades
+* more visual hierarchy
+* confidence bars MUCH more prominent
+* exposure metrics larger
+* “RECENTLY CLOSED” visually separated
+
+Need:
+more Bloomberg / Hyperliquid / prop desk feel.
+
+This is one of the most important panels.
+
+──────────────────────────────
+3. LIVE TERMINAL FEED
+Current:
+Still visually weak.
+
+Need:
+
+* stronger category color system
+* more glow accents
+* stage progression visuals
+* better timestamp hierarchy
+* clearer routing/execution states
+* more visual activity density
+
+Need to FEEL alive.
+
+Current feed still feels static.
+
+──────────────────────────────
+4. ENTIRE DASHBOARD NEEDS COMPRESSION
+Current:
+Too much vertical spacing.
+
+Need:
+
+* tighter layout
+* denser telemetry
+* reduced empty padding
+* better use of horizontal width
+* stronger multi-panel cohesion
+
+Reference image feels:
+high-information-density.
+
+Current version still feels:
+too spacious.
+
+──────────────────────────────
+5. BOTTOM ANALYTICS ROW
+Current:
+Feels disconnected from dashboard.
+
+Need:
+
+* integrated visual framing
+* stronger alignment
+* shared telemetry styling
+* more premium metrics layout
+* stronger AI telemetry visuals
+
+Should feel like:
+institutional AI control center.
+
+──────────────────────────────
+6. SIDEBAR
+Current:
+Still too generic.
+
+Need:
+
+* stronger grouping
+* more premium hover states
+* active section glow
+* telemetry badges
+* status indicators
+* tighter typography hierarchy
+
+Should feel:
+operational, not admin-template.
+
+──────────────────────────────
+7. CRYPTO CHART GRID
+Current:
+Good progress.
+
+Need:
+
+* slightly taller charts
+* stronger glow hierarchy
+* better line weight
+* smoother overlays
+* more premium market-terminal feel
+
+Reference charts feel:
+alive and premium.
+
+──────────────────────────────
+8. OVERALL TARGET
+──────────────────────────────
+
+The target is NOT:
+“crypto dashboard.”
+
+The target is:
+institutional AI trading operating system.
+
+Think:
+
+* Bloomberg Terminal
+* Hyperliquid Pro
+* Quant Tower
+* prop trading desk
+* hedge fund telemetry
+* AI operations center
+
+NOT:
+generic SaaS dashboard.
+
+──────────────────────────────
+MOST IMPORTANT
+──────────────────────────────
+
+Focus now on:
+
+* composition
+* balance
+* density
+* hierarchy
+* premium motion
+* operational feel
+
+NOT:
+adding additional widgets.
+
+We are now polishing the EXPERIENCE layer.

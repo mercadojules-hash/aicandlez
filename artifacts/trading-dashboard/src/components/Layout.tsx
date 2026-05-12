@@ -33,38 +33,36 @@ import {
   Zap,
 } from "lucide-react";
 
-/* ── Primary trading modules ─────────────────────────────────────────────── */
 export const MODULE_LIST = [
-  { id:  1, path: "/",           icon: LayoutDashboard,   label: "Dashboard",           status: "active" },
-  { id:  2, path: "/market",     icon: Radio,             label: "Market Data",         status: "active" },
-  { id:  3, path: "/indicators", icon: BarChart3,         label: "Indicators",          status: "active" },
-  { id:  4, path: "/ai",         icon: Brain,             label: "AI Reasoning",        status: "active" },
-  { id:  5, path: "/risk",       icon: Shield,            label: "Risk Management",     status: "active" },
-  { id:  6, path: "/simulation", icon: FlaskConical,      label: "Simulation",          status: "active" },
-  { id:  7, path: "/backtest",   icon: BarChart2,         label: "Backtesting",         status: "active" },
-  { id:  8, path: "/optimizer",  icon: SlidersHorizontal, label: "Strategy Optimizer",  status: "active" },
-  { id:  9, path: "/scanner",    icon: Scan,              label: "Asset Scanner",       status: "active" },
-  { id: 10, path: "/portfolio",  icon: Layers,            label: "Portfolio",           status: "active" },
-  { id: 11, path: "/correlation",icon: TrendingUp,        label: "Correlation",         status: "active" },
-  { id: 12, path: "/journal",    icon: BookOpen,          label: "Trade Journal",       status: "active" },
-  { id: 13, path: "/validation", icon: ShieldCheck,       label: "Validation",          status: "active" },
-  { id: 14, path: "/sentiment",  icon: MessageSquare,     label: "Sentiment AI",        status: "active" },
-  { id: 15, path: "/exchange",   icon: ArrowLeftRight,    label: "Exchange",            status: "active" },
-  { id: 16, path: "/syscheck",   icon: ClipboardCheck,    label: "System Verification", status: "active" },
-  { id: 17, path: "/debug",      icon: Bug,               label: "Signal Debug",        status: "active" },
-  { id: 18, path: "/charts",     icon: BarChart2,         label: "Multi-Asset Chart",   status: "active" },
-  { id: 19, path: "/command",    icon: Cpu,               label: "Command Center",      status: "active" },
+  { id:  1, path: "/",           icon: LayoutDashboard,   label: "Dashboard",           group: "CORE" },
+  { id:  2, path: "/market",     icon: Radio,             label: "Market Data",         group: "CORE" },
+  { id:  3, path: "/indicators", icon: BarChart3,         label: "Indicators",          group: "CORE" },
+  { id:  4, path: "/ai",         icon: Brain,             label: "AI Reasoning",        group: "AI"   },
+  { id:  5, path: "/risk",       icon: Shield,            label: "Risk Management",     group: "RISK" },
+  { id:  6, path: "/simulation", icon: FlaskConical,      label: "Simulation",          group: "TRADE"},
+  { id:  7, path: "/backtest",   icon: BarChart2,         label: "Backtesting",         group: "TRADE"},
+  { id:  8, path: "/optimizer",  icon: SlidersHorizontal, label: "Strategy Optimizer",  group: "AI"   },
+  { id:  9, path: "/scanner",    icon: Scan,              label: "Asset Scanner",       group: "TRADE"},
+  { id: 10, path: "/portfolio",  icon: Layers,            label: "Portfolio",           group: "TRADE"},
+  { id: 11, path: "/correlation",icon: TrendingUp,        label: "Correlation",         group: "TRADE"},
+  { id: 12, path: "/journal",    icon: BookOpen,          label: "Trade Journal",       group: "TRADE"},
+  { id: 13, path: "/validation", icon: ShieldCheck,       label: "Validation",          group: "RISK" },
+  { id: 14, path: "/sentiment",  icon: MessageSquare,     label: "Sentiment AI",        group: "AI"   },
+  { id: 15, path: "/exchange",   icon: ArrowLeftRight,    label: "Exchange",            group: "CORE" },
+  { id: 16, path: "/syscheck",   icon: ClipboardCheck,    label: "System Verification", group: "SYS"  },
+  { id: 17, path: "/debug",      icon: Bug,               label: "Signal Debug",        group: "SYS"  },
+  { id: 18, path: "/charts",     icon: BarChart2,         label: "Multi-Asset Chart",   group: "TRADE"},
+  { id: 19, path: "/command",    icon: Cpu,               label: "Command Center",      group: "SYS"  },
 ];
 
-/* ── Platform admin modules (future pages, shown as coming soon) ─────────── */
-const PLATFORM_ITEMS = [
-  { icon: Users,         label: "Users",         badge: "1,248" },
-  { icon: Zap,           label: "AI Models",     badge: "3"     },
-  { icon: Trophy,        label: "Leaderboard",   badge: null    },
-  { icon: Bell,          label: "Alerts",        badge: "2"     },
-  { icon: BarChart2,     label: "Analytics",     badge: null    },
-  { icon: Wallet,        label: "Revenue",       badge: null    },
-  { icon: AlertTriangle, label: "Risk Monitor",  badge: null    },
+const PLATFORM_ITEMS: { icon: React.ElementType; label: string; badge?: string; badgeColor?: string }[] = [
+  { icon: Users,         label: "Users",       badge: "1,248", badgeColor: "#00aaff" },
+  { icon: Zap,           label: "AI Models",   badge: "3",     badgeColor: "#cc55ff" },
+  { icon: Trophy,        label: "Leaderboard"                                         },
+  { icon: Bell,          label: "Alerts",      badge: "2",     badgeColor: "#ff6600" },
+  { icon: BarChart2,     label: "Analytics"                                           },
+  { icon: Wallet,        label: "Revenue"                                             },
+  { icon: AlertTriangle, label: "Risk Monitor"                                        },
 ];
 
 function NavItem({
@@ -79,49 +77,63 @@ function NavItem({
   return (
     <Link
       href={mod.path}
-      className={`flex items-center gap-2 px-1.5 py-1.5 rounded transition-all group min-h-[34px] touch-manipulation border
-        ${active
-          ? "border-[#00eeff18] bg-[#00eeff08]"
-          : "border-transparent text-[#1a3a50] hover:text-[#4a8fa8] hover:bg-[#010C18]"
-        }`}
-      style={active ? { boxShadow: "0 0 12px #00eeff06, inset 0 0 12px #00eeff04" } : {}}
+      className={`flex items-center gap-2 px-1.5 py-[5px] rounded transition-all group min-h-[30px] touch-manipulation border`}
+      style={active
+        ? {
+            background: "#00eeff08",
+            borderColor: "#00eeff22",
+            boxShadow: "inset 2px 0 0 #00eeff50, 0 0 16px #00eeff06",
+          }
+        : {
+            borderColor: "transparent",
+            color: "#1a3a50",
+          }
+      }
       title={collapsed ? mod.label : undefined}
       onClick={onNavigate}
     >
-      <span className={`w-5 text-[8px] font-bold font-mono text-center shrink-0 ${
-        active ? "text-[#00eeff70]" : "text-[#0E2235]"
-      }`}>
+      <span className="w-5 text-[7px] font-bold font-mono text-center shrink-0"
+        style={{ color: active ? "#00eeff50" : "#0D1E2C" }}>
         {String(mod.id).padStart(2, "0")}
       </span>
-      <Icon className="w-3.5 h-3.5 shrink-0"
-        style={active ? { color: "#00eeff", filter: "drop-shadow(0 0 4px #00eeff80)" } : {}} />
+
+      <Icon className="w-3 h-3 shrink-0"
+        style={active
+          ? { color: "#00eeff", filter: "drop-shadow(0 0 5px #00eeff)" }
+          : { color: "#1a3a50" }
+        }
+      />
+
       {!collapsed && (
-        <span className={`text-[10px] font-mono leading-none truncate flex-1 ${active ? "text-[#00eeff]" : ""}`}>
+        <span className="text-[9px] font-mono leading-none truncate flex-1"
+          style={{ color: active ? "#00eeff" : "#1a3a50" }}>
           {mod.label}
         </span>
       )}
+
       {!collapsed && active && (
-        <span className="live-dot live-dot-cyan shrink-0" style={{ width: 4, height: 4 }} />
+        <span className="live-dot live-dot-cyan shrink-0" style={{ width: 3, height: 3 }} />
       )}
     </Link>
   );
 }
 
 function PlatformNavItem({
-  icon: Icon, label, badge, collapsed,
-}: { icon: React.ElementType; label: string; badge: string | null; collapsed: boolean }) {
+  icon: Icon, label, badge, badgeColor = "#00aaff", collapsed,
+}: { icon: React.ElementType; label: string; badge?: string; badgeColor?: string; collapsed: boolean }) {
   return (
     <div
-      className="flex items-center gap-2 px-1.5 py-1.5 rounded border border-transparent cursor-default opacity-60 hover:opacity-80 transition-opacity min-h-[30px]"
+      className="flex items-center gap-2 px-1.5 py-[5px] rounded cursor-default min-h-[28px] transition-colors group border border-transparent"
+      style={{ opacity: 0.55 }}
       title={collapsed ? label : undefined}
     >
       <Icon className="w-3 h-3 shrink-0" style={{ color: "#1e4060" }} />
       {!collapsed && (
         <>
-          <span className="text-[10px] font-mono truncate flex-1" style={{ color: "#1e4060" }}>{label}</span>
+          <span className="text-[9px] font-mono truncate flex-1" style={{ color: "#1e4060" }}>{label}</span>
           {badge && (
-            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded font-mono shrink-0"
-              style={{ background: "#00aaff08", color: "#00aaff40", border: "1px solid #00aaff14" }}>
+            <span className="text-[7px] font-bold px-1.5 py-0.5 rounded font-mono shrink-0"
+              style={{ background: `${badgeColor}10`, color: badgeColor, border: `1px solid ${badgeColor}20` }}>
               {badge}
             </span>
           )}
@@ -131,22 +143,37 @@ function PlatformNavItem({
   );
 }
 
-/* ── Admin profile block ─────────────────────────────────────────────────── */
+function SectionDivider({ label, collapsed }: { label: string; collapsed: boolean }) {
+  if (collapsed) return <div className="my-1.5 h-px mx-1.5" style={{ background: "#0A1E2E" }} />;
+  return (
+    <div className="flex items-center gap-2 px-1.5 pt-2.5 pb-1">
+      <div className="h-px flex-1" style={{ background: "#0A1E2E" }} />
+      <span className="text-[6px] font-bold font-mono tracking-[0.25em]" style={{ color: "#0D1E2C" }}>{label}</span>
+      <div className="h-px flex-1" style={{ background: "#0A1E2E" }} />
+    </div>
+  );
+}
+
 function AdminBlock({ collapsed }: { collapsed: boolean }) {
   if (collapsed) return null;
   return (
-    <div className="px-2 py-2.5 border-t" style={{ borderTopColor: "#0A1E2E" }}>
+    <div className="px-1.5 pb-2 pt-1 border-t" style={{ borderTopColor: "#0A1E2E" }}>
       <div className="flex items-center gap-2 px-2 py-2 rounded"
-        style={{ background: "#010C18", border: "1px solid #0A1E2E" }}>
-        <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[9px] font-bold font-mono"
-          style={{ background: "#00aaff18", color: "#00aaff", border: "1px solid #00aaff22" }}>
+        style={{ background: "#010C18", border: "1px solid #0d1e2c" }}>
+        <div className="w-6 h-6 rounded flex items-center justify-center shrink-0 text-[9px] font-bold font-mono"
+          style={{
+            background: "linear-gradient(135deg, #00aaff20, #7b68ee20)",
+            color: "#00aaff",
+            border: "1px solid #00aaff28",
+            boxShadow: "0 0 8px #00aaff18",
+          }}>
           A
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[9px] font-bold font-mono truncate" style={{ color: "#4a8fa8" }}>Admin</div>
-          <div className="text-[7px] font-mono truncate" style={{ color: "#1e3040" }}>Super Admin</div>
+          <div className="text-[7px] font-mono truncate" style={{ color: "#1e3040" }}>Super Admin · LIVE</div>
         </div>
-        <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#00ff8a", boxShadow: "0 0 4px #00ff8a80" }} />
+        <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#00ff8a", boxShadow: "0 0 5px #00ff8a" }} />
       </div>
     </div>
   );
@@ -167,44 +194,32 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const activeModuleId = MODULE_LIST.find(
     (m) => location === m.path || (m.path !== "/" && location.startsWith(m.path))
   )?.id ?? 1;
-
   const isActive = (m: typeof MODULE_LIST[number]) =>
     location === m.path || (m.path !== "/" && location.startsWith(m.path));
 
-  const sidebarStyle = { background: "#000508", borderRightColor: "#0A1E2E" };
-
   const SidebarContent = ({ onNavigate, collap }: { onNavigate?: () => void; collap: boolean }) => (
     <>
-      {/* Trading modules */}
-      <nav className="flex flex-col gap-0.5 p-1.5 flex-1">
+      <nav className="flex flex-col gap-0.5 px-1.5 py-2 flex-1 overflow-y-auto">
         {MODULE_LIST.map((mod) => (
           <NavItem key={mod.id} mod={mod} active={isActive(mod)} collapsed={collap} onNavigate={onNavigate} />
         ))}
 
-        {/* Platform section divider */}
-        {!collap && (
-          <div className="flex items-center gap-2 px-1.5 pt-3 pb-1">
-            <div className="flex-1 h-px" style={{ background: "#0A1E2E" }} />
-            <span className="text-[7px] font-bold font-mono tracking-[0.2em]" style={{ color: "#0E2235" }}>
-              PLATFORM
-            </span>
-            <div className="flex-1 h-px" style={{ background: "#0A1E2E" }} />
-          </div>
-        )}
-        {collap && <div className="my-1 h-px mx-1.5" style={{ background: "#0A1E2E" }} />}
+        <SectionDivider label="PLATFORM" collapsed={collap} />
 
         {PLATFORM_ITEMS.map((item) => (
           <PlatformNavItem key={item.label} {...item} collapsed={collap} />
         ))}
       </nav>
 
-      {/* Export + Admin */}
       {!collap && (
-        <div className="p-2 border-t shrink-0" style={{ borderTopColor: "#0A1E2E" }}>
+        <div className="px-1.5 py-1.5 border-t shrink-0" style={{ borderTopColor: "#0A1E2E" }}>
           <a
             href="/apex-trader-v7-full.tar.gz"
             download
-            className="flex items-center gap-2 px-2 py-1.5 rounded text-[9px] font-mono border border-transparent text-[#0E2235] hover:text-[#1e4060] hover:border-[#0E2235] transition-colors"
+            className="flex items-center gap-2 px-2 py-1.5 rounded text-[8px] font-mono border border-transparent"
+            style={{ color: "#0D1E2C" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "#1e4060")}
+            onMouseLeave={e => (e.currentTarget.style.color = "#0D1E2C")}
           >
             <Download className="w-3 h-3 shrink-0" />
             <span>Export v7</span>
@@ -221,68 +236,68 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Top bar */}
       <header
-        className="h-11 shrink-0 border-b flex items-center px-3 sm:px-4 justify-between sticky top-0 z-50"
+        className="h-10 shrink-0 border-b flex items-center px-3 justify-between sticky top-0 z-50"
         style={{
-          background: "linear-gradient(180deg, #010D1C 0%, #000810 100%)",
+          background: "linear-gradient(180deg, #020e1c 0%, #000a14 100%)",
           borderBottomColor: "#0D2035",
-          boxShadow: "0 1px 0 #00eeff06, 0 2px 8px #00000060",
+          boxShadow: "0 1px 0 #00eeff06, 0 2px 10px #00000070",
         }}
       >
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setMobileOpen((o) => !o)}
-            className="md:hidden p-1.5 rounded border border-[#0E2235] text-[#1e4060] hover:text-[#00eeff] hover:border-[#00eeff25] transition-colors touch-manipulation min-w-[32px] min-h-[32px] flex items-center justify-center"
-          >
-            {mobileOpen ? <X className="w-3.5 h-3.5" /> : <Menu className="w-3.5 h-3.5" />}
+          <button onClick={() => setMobileOpen(o => !o)}
+            className="md:hidden p-1.5 rounded border border-[#0E2235] touch-manipulation min-w-[28px] min-h-[28px] flex items-center justify-center"
+            style={{ color: "#1e4060" }}>
+            {mobileOpen ? <X className="w-3 h-3" /> : <Menu className="w-3 h-3" />}
           </button>
-          <button
-            onClick={() => setCollapsed((c) => !c)}
-            className="hidden md:flex p-1.5 rounded border border-[#0E2235] text-[#1e4060] hover:text-[#00eeff] hover:border-[#00eeff25] transition-colors"
-          >
-            {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+          <button onClick={() => setCollapsed(c => !c)}
+            className="hidden md:flex p-1 rounded border border-[#0E2235] transition-colors"
+            style={{ color: "#1e4060" }}>
+            {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
           </button>
+
           <div className="flex items-center gap-2 select-none">
-            <Cpu className="w-4 h-4 shrink-0" style={{ color: "#00eeff", filter: "drop-shadow(0 0 6px #00eeff90)" }} />
-            <div className="flex items-center font-mono text-[13px] font-bold tracking-[0.2em]">
-              <span className="text-foreground/70">APEX</span>
-              <span style={{ color: "#00eeff", textShadow: "0 0 14px #00eeff70" }}> TRADER</span>
+            <Cpu className="w-3.5 h-3.5 shrink-0" style={{ color: "#00eeff", filter: "drop-shadow(0 0 6px #00eeff)" }} />
+            <div className="font-mono text-[12px] font-bold tracking-[0.22em]">
+              <span style={{ color: "#4a7a9080" }}>APEX</span>
+              <span style={{ color: "#00eeff", textShadow: "0 0 16px #00eeff70" }}> TRADER</span>
             </div>
-            <span className="hidden sm:inline text-[8px] font-mono text-[#0E2235] tracking-widest ml-1">
+            <span className="hidden sm:inline text-[7px] font-mono tracking-widest"
+              style={{ color: "#0D1E2C" }}>
               v1.0 · MOD {String(activeModuleId).padStart(2, "0")}
             </span>
           </div>
         </div>
+
         <SystemStatusBar />
       </header>
 
       {/* Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
-
         {mobileOpen && (
-          <div className="md:hidden fixed inset-0 z-30 bg-black/75 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <div className="md:hidden fixed inset-0 z-30 bg-black/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
         )}
 
         {/* Desktop sidebar */}
         <aside
-          className={`hidden md:flex ${collapsed ? "w-12" : "w-52"} shrink-0 border-r flex-col transition-all duration-200 overflow-y-auto`}
-          style={sidebarStyle}
+          className={`hidden md:flex ${collapsed ? "w-11" : "w-48"} shrink-0 border-r flex-col transition-all duration-200 overflow-hidden`}
+          style={{ background: "#000508", borderRightColor: "#0a1820" }}
         >
           <SidebarContent collap={collapsed} />
         </aside>
 
         {/* Mobile sidebar */}
         <aside
-          className={`md:hidden fixed inset-y-0 left-0 z-40 w-60 flex-col transition-transform duration-200 ease-out overflow-y-auto flex
+          className={`md:hidden fixed inset-y-0 left-0 z-40 w-56 flex-col transition-transform duration-200 ease-out overflow-y-auto flex
             ${mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}`}
           style={{ background: "#000810", borderRight: "1px solid #0A1E2E" }}
         >
-          <div className="h-11 flex items-center gap-2 px-3 border-b shrink-0" style={{ borderBottomColor: "#0A1E2E" }}>
-            <Cpu className="w-4 h-4" style={{ color: "#00eeff" }} />
-            <span className="font-mono text-sm font-bold tracking-[0.15em]">
+          <div className="h-10 flex items-center gap-2 px-3 border-b shrink-0" style={{ borderBottomColor: "#0A1E2E" }}>
+            <Cpu className="w-3.5 h-3.5" style={{ color: "#00eeff" }} />
+            <span className="font-mono text-[11px] font-bold tracking-[0.18em]">
               APEX<span style={{ color: "#00eeff" }}>TRADER</span>
             </span>
-            <button onClick={() => setMobileOpen(false)} className="ml-auto p-1 rounded text-[#0E2235] hover:text-[#00eeff]">
-              <X className="w-4 h-4" />
+            <button onClick={() => setMobileOpen(false)} className="ml-auto p-1 rounded" style={{ color: "#1e4060" }}>
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
           <SidebarContent collap={false} onNavigate={handleNavigate} />
@@ -294,7 +309,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ── System Status Bar ───────────────────────────────────────────────────── */
+/* ── System Status Bar ─────────────────────────────────────────────────────── */
 function SystemStatusBar() {
   const [apiOk, setApiOk] = useState(false);
   useEffect(() => {
@@ -306,34 +321,27 @@ function SystemStatusBar() {
     const t = setInterval(ping, 15_000);
     return () => clearInterval(t);
   }, []);
-
   return (
-    <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-[9px]">
-      <StatusPill label="API"    ok={apiOk}  />
-      <span className="hidden sm:inline"><StatusPill label="WS"     ok={false} /></span>
-      <span className="hidden sm:inline"><StatusPill label="ENGINE" ok={false} /></span>
-      <KillSwitchButton />
+    <div className="flex items-center gap-1.5 font-mono text-[8px]">
+      <Pill label="API"    ok={apiOk}  />
+      <span className="hidden sm:inline"><Pill label="WS"     ok={false} /></span>
+      <span className="hidden sm:inline"><Pill label="ENGINE" ok={false} /></span>
+      <button disabled
+        className="hidden sm:flex px-1.5 py-0.5 rounded border items-center gap-1 cursor-not-allowed"
+        style={{ background: "#010C18", borderColor: "#0E2235", color: "#0D1E2C" }}>
+        <Activity className="w-2.5 h-2.5" />
+        KILL
+      </button>
     </div>
   );
 }
 
-function StatusPill({ label, ok }: { label: string; ok: boolean }) {
+function Pill({ label, ok }: { label: string; ok: boolean }) {
   return (
     <div className="flex items-center gap-1 px-1.5 py-0.5 rounded border"
       style={{ background: "#010C18", borderColor: "#0E2235" }}>
       <span style={{ color: "#1e4060" }}>{label}:</span>
       <span style={{ color: ok ? "#00ff88" : "#0E2235" }}>{ok ? "OK" : "—"}</span>
     </div>
-  );
-}
-
-function KillSwitchButton() {
-  return (
-    <button disabled
-      className="hidden sm:flex px-2 py-0.5 rounded border items-center gap-1.5 cursor-not-allowed"
-      style={{ background: "#010C18", borderColor: "#0E2235", color: "#0E2235" }}>
-      <Activity className="w-3 h-3" />
-      KILL
-    </button>
   );
 }

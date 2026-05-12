@@ -26,61 +26,44 @@ export default function CommandCenter() {
   const qc = useQueryClient();
 
   const { data: engine } = useQuery<EngineStatus>({
-    queryKey:        ["engine-status-cmd"],
-    queryFn:         () => fetch("/api/engine/status", { cache: "no-store" }).then((r) => r.json()),
-    refetchInterval: 8_000,
-    ...Q_OPTS,
+    queryKey: ["engine-status-cmd"],
+    queryFn:  () => fetch("/api/engine/status", { cache: "no-store" }).then(r => r.json()),
+    refetchInterval: 8_000, ...Q_OPTS,
   });
-
   const { data: settings } = useQuery<AppSettings>({
-    queryKey:        ["settings-cmd"],
-    queryFn:         () => fetch("/api/settings", { cache: "no-store" }).then((r) => r.json()),
-    refetchInterval: 60_000,
-    ...Q_OPTS,
+    queryKey: ["settings-cmd"],
+    queryFn:  () => fetch("/api/settings", { cache: "no-store" }).then(r => r.json()),
+    refetchInterval: 60_000, ...Q_OPTS,
   });
-
   const { data: trades } = useQuery<Trade[]>({
-    queryKey:        ["trades-cmd"],
-    queryFn:         () =>
-      fetch("/api/trades", { cache: "no-store" })
-        .then((r) => r.json())
-        .then((d) => Array.isArray(d) ? d : []),
-    refetchInterval: 12_000,
-    ...Q_OPTS,
+    queryKey: ["trades-cmd"],
+    queryFn:  () => fetch("/api/trades", { cache: "no-store" }).then(r => r.json()).then(d => Array.isArray(d) ? d : []),
+    refetchInterval: 12_000, ...Q_OPTS,
   });
-
   const { data: exchangeStatus, refetch: refetchExchange } = useQuery<ExchangeStatus>({
-    queryKey:        ["exchange-status-cmd"],
-    queryFn:         () => fetch("/api/exchange/status", { cache: "no-store" }).then((r) => r.json()),
-    refetchInterval: 15_000,
-    ...Q_OPTS,
+    queryKey: ["exchange-status-cmd"],
+    queryFn:  () => fetch("/api/exchange/status", { cache: "no-store" }).then(r => r.json()),
+    refetchInterval: 15_000, ...Q_OPTS,
   });
-
   const { data: feeSummary } = useQuery<FeeSummary>({
-    queryKey:        ["fees-cmd"],
-    queryFn:         () => fetch("/api/fees", { cache: "no-store" }).then((r) => r.json()),
-    refetchInterval: 30_000,
-    ...Q_OPTS,
+    queryKey: ["fees-cmd"],
+    queryFn:  () => fetch("/api/fees", { cache: "no-store" }).then(r => r.json()),
+    refetchInterval: 30_000, ...Q_OPTS,
   });
 
   const breakdowns = engine ? Object.values(engine.symbolBreakdowns) : [];
+  const isKill     = exchangeStatus?.killSwitch ?? false;
+  const isPaused   = exchangeStatus?.paused     ?? false;
+  const isLive     = exchangeStatus?.mode === "live";
+  const exName     = exchangeStatus?.exchangeName ?? "KRAKEN";
 
-  const isKill   = exchangeStatus?.killSwitch ?? false;
-  const isPaused = exchangeStatus?.paused     ?? false;
-  const isLive   = exchangeStatus?.mode === "live";
-  const exName   = exchangeStatus?.exchangeName ?? "KRAKEN";
-
-  const invalidateExchange = () => {
-    qc.invalidateQueries({ queryKey: ["exchange-status-cmd"] });
-    refetchExchange();
-  };
+  const invalidateExchange = () => { qc.invalidateQueries({ queryKey: ["exchange-status-cmd"] }); refetchExchange(); };
   const toggleKill  = () => fetch("/api/exchange/kill",  { method: "POST", cache: "no-store" }).then(invalidateExchange);
   const togglePause = () => fetch("/api/exchange/pause", { method: "POST", cache: "no-store" }).then(invalidateExchange);
-  const toggleMode  = () =>
-    fetch("/api/exchange/mode", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body:   JSON.stringify({ mode: isLive ? "simulation" : "live" }), cache: "no-store",
-    }).then(invalidateExchange);
+  const toggleMode  = () => fetch("/api/exchange/mode",  {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: isLive ? "simulation" : "live" }), cache: "no-store",
+  }).then(invalidateExchange);
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: "#060810" }}>
@@ -88,109 +71,90 @@ export default function CommandCenter() {
       {/* 1. Market ticker strip */}
       <TickerStrips engine={engine} />
 
-      {/* 2. Platform telemetry bar (institutional 5-section bar) */}
+      {/* 2. Platform telemetry bar */}
       <PlatformTelemetryBar
         engine={engine} settings={settings}
         trades={trades} exchangeStatus={exchangeStatus} feeSummary={feeSummary}
       />
 
-      <div className="flex-1 p-3 sm:p-4 space-y-3 max-w-screen-2xl mx-auto w-full">
+      {/* 3. Quick controls */}
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b flex-wrap"
+        style={{ borderBottomColor: "#0d0d0d", background: "#000000" }}>
+        <Cpu className="w-3.5 h-3.5 shrink-0" style={{ color: "#00aaff" }} />
+        <span className="text-[11px] font-bold tracking-[0.2em] font-mono" style={{ color: "#00aaff" }}>COMMAND CENTER</span>
+        <span className="text-[7px] font-bold px-1.5 py-0.5 rounded font-mono tracking-widest"
+          style={{ background: "#00aaff08", color: "#00aaff30", border: "1px solid #00aaff10" }}>MOD 19</span>
+        {engine?.running && (
+          <span className="flex items-center gap-1 text-[8px] font-mono" style={{ color: "#00ff8a" }}>
+            <span className="live-dot" style={{ width: 4, height: 4 }} /> LIVE
+          </span>
+        )}
 
-        {/* 3. Quick Controls Bar */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2.5 mr-2">
-            <Cpu className="w-4 h-4" style={{ color: "#00aaff" }} />
-            <h1 className="text-[13px] font-bold tracking-[0.18em] uppercase font-mono" style={{ color: "#00aaff" }}>
-              Command Center
-            </h1>
-            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded font-mono tracking-widest"
-              style={{ background: "#00aaff08", color: "#00aaff40", border: "1px solid #00aaff12" }}>
-              MOD 19
-            </span>
-            {engine?.running && (
-              <span className="flex items-center gap-1.5 text-[9px] font-mono" style={{ color: "#00ff8a" }}>
-                <span className="live-dot" style={{ width: 5, height: 5 }} />
-                LIVE
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap flex-1">
-            <span className="text-[9px] font-bold px-2.5 py-1.5 rounded font-mono tracking-widest"
-              style={{ background: "#00aaff0a", color: "#00aaff", border: "1px solid #00aaff22" }}>
-              {exName.toUpperCase().slice(0, 8)}
-            </span>
-            <button onClick={toggleMode}
-              className="text-[9px] font-bold px-2.5 py-1.5 rounded font-mono tracking-widest transition-all"
-              style={isLive
-                ? { background: "#ff33550e", color: "#ff3355", border: "1px solid #ff335530" }
-                : { background: "#ffaa000e", color: "#ffaa00", border: "1px solid #ffaa0030" }}>
-              {isLive ? "⚡ LIVE" : "◉ SIMULATION"}
-            </button>
-            <button onClick={togglePause}
-              className="flex items-center gap-1.5 text-[9px] font-bold px-2.5 py-1.5 rounded font-mono transition-all"
-              style={isPaused
-                ? { background: "#ffaa0014", color: "#ffaa00", border: "1px solid #ffaa0035" }
-                : { background: "#00000000", color: "#2a4a60",  border: "1px solid #1c1c1c"  }}>
-              {isPaused ? <><Play  className="w-3 h-3" /> RESUME</> : <><Pause className="w-3 h-3" /> PAUSE</>}
-            </button>
-            <button onClick={toggleKill}
-              className="flex items-center gap-1.5 text-[9px] font-bold px-2.5 py-1.5 rounded font-mono transition-all"
-              style={isKill
-                ? { background: "#ff225518", color: "#ff2255", border: "1px solid #ff225540", animation: "border-march 2s ease-in-out infinite" }
-                : { background: "#00000000", color: "#2a4a60",  border: "1px solid #1c1c1c"  }}>
-              <ShieldOff className="w-3 h-3" />
-              {isKill ? "⚡ KILL ACTIVE" : "KILL SWITCH"}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-[8px] font-mono" style={{ color: "#1e3040" }}>
-            <Clock className="w-3 h-3" />
-            {ago(engine?.lastTickAt ?? null)}
-          </div>
+        <div className="flex items-center gap-1.5 flex-wrap ml-2">
+          <span className="text-[8px] font-bold px-2 py-1 rounded font-mono tracking-widest"
+            style={{ background: "#00aaff0a", color: "#00aaff", border: "1px solid #00aaff1e" }}>
+            {exName.toUpperCase().slice(0, 8)}
+          </span>
+          <button onClick={toggleMode}
+            className="text-[8px] font-bold px-2 py-1 rounded font-mono tracking-widest transition-all"
+            style={isLive
+              ? { background: "#ff33550e", color: "#ff3355", border: "1px solid #ff335528" }
+              : { background: "#ffaa000e", color: "#ffaa00", border: "1px solid #ffaa0028" }}>
+            {isLive ? "⚡ LIVE" : "◉ SIM"}
+          </button>
+          <button onClick={togglePause}
+            className="flex items-center gap-1 text-[8px] font-bold px-2 py-1 rounded font-mono transition-all"
+            style={isPaused
+              ? { background: "#ffaa0010", color: "#ffaa00", border: "1px solid #ffaa0028" }
+              : { background: "transparent", color: "#2a4a60", border: "1px solid #1c1c1c" }}>
+            {isPaused ? <><Play className="w-2.5 h-2.5" /> RESUME</> : <><Pause className="w-2.5 h-2.5" /> PAUSE</>}
+          </button>
+          <button onClick={toggleKill}
+            className="flex items-center gap-1 text-[8px] font-bold px-2 py-1 rounded font-mono transition-all"
+            style={isKill
+              ? { background: "#ff225514", color: "#ff2255", border: "1px solid #ff225538", animation: "border-march 2s ease-in-out infinite" }
+              : { background: "transparent", color: "#2a4a60", border: "1px solid #1c1c1c" }}>
+            <ShieldOff className="w-2.5 h-2.5" />
+            {isKill ? "KILL ACTIVE" : "KILL"}
+          </button>
         </div>
 
-        {/* 4. Full-width chart wall */}
+        <div className="ml-auto flex items-center gap-1 text-[8px] font-mono" style={{ color: "#1a2a35" }}>
+          <Clock className="w-3 h-3" />
+          {ago(engine?.lastTickAt ?? null)}
+        </div>
+      </div>
+
+      {/* MAIN CONTENT — tighter spacing */}
+      <div className="flex-1 p-2 sm:p-3 space-y-2 max-w-screen-2xl mx-auto w-full">
+
+        {/* 4. Chart wall */}
         <CryptoChartGrid breakdowns={breakdowns} />
 
-        {/* 5. Three-column: Platform Overview | Terminal Feed | Right stack */}
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-3">
-
-          {/* Col 1 — Platform Overview */}
-          <div className="xl:col-span-1">
-            <PlatformOverviewPanel />
-          </div>
-
-          {/* Col 2–3 — Terminal Feed */}
-          <div className="xl:col-span-2">
-            <RichTerminalFeed engine={engine} />
-          </div>
-
-          {/* Col 4 — AI Opportunity Scanner */}
-          <div className="xl:col-span-1">
-            <OpportunityScanner breakdowns={breakdowns} />
-          </div>
+        {/* 5. Three columns: Platform Overview | Terminal Feed | Scanner */}
+        <div className="grid gap-2" style={{ gridTemplateColumns: "260px 1fr 260px" }}>
+          <PlatformOverviewPanel />
+          <RichTerminalFeed engine={engine} />
+          <OpportunityScanner breakdowns={breakdowns} />
         </div>
 
-        {/* 6. Active Trades — full width institutional blotter */}
+        {/* 6. Active trades blotter — full width */}
         <ActiveTradesPanel trades={trades} />
 
-        {/* 7. Portfolio snapshot + right panels */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
-          <div className="xl:col-span-2">
-            <MiddleStatsGrid trades={trades} engine={engine} />
-          </div>
-          <div className="space-y-3">
+        {/* 7. Mid row: Portfolio + Regime + Threat */}
+        <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 280px" }}>
+          <MiddleStatsGrid trades={trades} engine={engine} />
+          <div className="space-y-2">
             <MarketRegimeCard breakdowns={breakdowns} lastTickAt={engine?.lastTickAt ?? null} />
             <AIThreatMonitor  engine={engine} breakdowns={breakdowns} />
           </div>
         </div>
 
-        {/* 8. Bottom analytics row: AI Performance | Market Regime | AI Model Health */}
+        {/* 8. Bottom analytics: AI Perf | Regime | Model Health */}
         <BottomAnalyticsRow engine={engine} trades={trades} />
 
-        {/* 9. Bottom utility row: Risk · AI Brief · Broker · Fees */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+        {/* 9. Utility row: Risk · AI Brief · Broker · Fees */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
           <RiskCard         engine={engine} settings={settings} />
           <AIBriefCard      engine={engine} />
           <BrokerStatusCard exchangeStatus={exchangeStatus} />
