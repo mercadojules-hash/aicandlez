@@ -74,12 +74,18 @@ export function PlatformOverviewPanel() {
     { label: "Inactive",      value: 26  + (tick % 2), pct:  3, color: "#2a3a50" },
   ];
 
+  /* TOP 10 assets by volume */
   const topAssets: VolumeRow[] = [
-    { rank: 1, symbol: "BTC/USDT",  volume: "$1.02M", color: "#F7931A", pct: 100 },
-    { rank: 2, symbol: "ETH/USDT",  volume: "$620K",  color: "#627EEA", pct: 61  },
-    { rank: 3, symbol: "SOL/USDT",  volume: "$310K",  color: "#9945FF", pct: 30  },
-    { rank: 4, symbol: "XRP/USDT",  volume: "$210K",  color: "#00AAE4", pct: 21  },
-    { rank: 5, symbol: "DOGE/USDT", volume: "$128K",  color: "#C2A633", pct: 13  },
+    { rank:  1, symbol: "BTC/USDT",  volume: "$1.02M", color: "#F7931A", pct: 100 },
+    { rank:  2, symbol: "ETH/USDT",  volume: "$620K",  color: "#627EEA", pct: 61  },
+    { rank:  3, symbol: "SOL/USDT",  volume: "$310K",  color: "#9945FF", pct: 30  },
+    { rank:  4, symbol: "XRP/USDT",  volume: "$210K",  color: "#00AAE4", pct: 21  },
+    { rank:  5, symbol: "DOGE/USDT", volume: "$128K",  color: "#C2A633", pct: 13  },
+    { rank:  6, symbol: "AVAX/USDT", volume: "$97K",   color: "#E84142", pct: 10  },
+    { rank:  7, symbol: "LINK/USDT", volume: "$74K",   color: "#2A5ADA", pct:  7  },
+    { rank:  8, symbol: "ADA/USDT",  volume: "$61K",   color: "#0033AD", pct:  6  },
+    { rank:  9, symbol: "BNB/USDT",  volume: "$48K",   color: "#F0B90B", pct:  5  },
+    { rank: 10, symbol: "MATIC/USDT",volume: "$32K",   color: "#8247E5", pct:  3  },
   ];
 
   return (
@@ -94,52 +100,52 @@ export function PlatformOverviewPanel() {
         </span>
       </div>
 
-      <div className="flex flex-col flex-1">
+      <div className="flex flex-col flex-1 min-h-0">
         {/* Donut */}
-        <div className="flex justify-center pt-2 pb-1">
+        <div className="flex justify-center pt-2 pb-1 flex-shrink-0">
           <DonutChart segments={segments} total={total} />
         </div>
 
-        {/* Legend */}
-        <div className="px-3 space-y-1 pb-2">
+        {/* Legend — tighter spacing */}
+        <div className="px-3 space-y-0.5 pb-2 flex-shrink-0">
           {segments.map((seg) => (
             <div key={seg.label}
-              className="flex items-center gap-2 px-2 py-1 rounded"
-              style={{ background: `${seg.color}0a`, border: `1px solid ${seg.color}18` }}>
-              <div className="w-1 h-4 rounded-full flex-shrink-0"
+              className="flex items-center gap-2 px-2 py-0.5 rounded"
+              style={{ background: `${seg.color}0a`, border: `1px solid ${seg.color}14` }}>
+              <div className="w-1 h-3.5 rounded-full flex-shrink-0"
                 style={{ background: seg.color, boxShadow: `0 0 3px ${seg.color}60` }} />
-              <span className="text-[10px] font-mono flex-1 font-medium" style={{ color: "#C7D4E2" }}>
+              <span className="text-[9px] font-mono flex-1 font-medium" style={{ color: "#C7D4E2" }}>
                 {seg.label}
               </span>
-              <span className="text-[13px] font-bold font-mono tabular-nums" style={{ color: seg.color }}>
+              <span className="text-[12px] font-bold font-mono tabular-nums" style={{ color: seg.color }}>
                 {seg.value.toLocaleString()}
               </span>
-              <span className="text-[9px] font-mono w-8 text-right font-medium" style={{ color: "#9FB3C8" }}>
+              <span className="text-[8px] font-mono w-7 text-right font-medium" style={{ color: "#9FB3C8" }}>
                 {seg.pct}%
               </span>
             </div>
           ))}
         </div>
 
-        <div className="neon-divider mx-3 mb-2" />
+        <div className="neon-divider mx-3 mb-2 flex-shrink-0" />
 
-        {/* Top assets */}
-        <div className="px-3 pb-3">
-          <div className="text-[8px] font-mono tracking-[0.18em] mb-2 font-semibold uppercase"
+        {/* TOP 10 assets — fills remaining space */}
+        <div className="px-3 pb-2 flex-1 overflow-y-auto feed-scroll min-h-0">
+          <div className="text-[8px] font-mono tracking-[0.18em] mb-1.5 font-semibold uppercase"
             style={{ color: "#9FB3C8" }}>
             Top Assets by Volume (24H)
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             {topAssets.map((a) => (
               <div key={a.symbol} className="flex items-center gap-2">
-                <span className="text-[9px] font-mono w-3 text-right flex-shrink-0 font-medium"
-                  style={{ color: "#9FB3C8" }}>{a.rank}</span>
-                <div className="flex-1">
+                <span className="text-[8px] font-mono w-4 text-right flex-shrink-0 font-medium"
+                  style={{ color: "#4a6a80" }}>{a.rank}</span>
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[10px] font-bold font-mono" style={{ color: a.color }}>
+                    <span className="text-[9px] font-bold font-mono" style={{ color: a.color }}>
                       {a.symbol}
                     </span>
-                    <span className="text-[10px] font-bold font-mono tabular-nums"
+                    <span className="text-[9px] font-bold font-mono tabular-nums"
                       style={{ color: "#EAF2FF" }}>{a.volume}</span>
                   </div>
                   <div className="rounded-sm overflow-hidden" style={{ height: 2, background: "#0d0d0d" }}>

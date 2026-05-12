@@ -1,0 +1,164 @@
+We are now in the FINAL dashboard polish phase. The architecture/layout is correct. Do NOT redesign anything. This pass is ONLY about filling unused space, increasing visibility, and improving usability.
+
+READ THIS CAREFULLY — preserve the existing structure and styling.
+
+====================================================
+
+FILL UNUSED SPACE UNDER:
+Platform Overview
+Live Terminal Feed
+AI Opportunity Scanner
+====================================================
+
+There is visible dead space at the bottom of these three containers.
+
+I want the containers visually filled properly.
+
+LIVE TERMINAL FEED
+
+Increase from ~10 rows to ~15 rows visible by default inside the same container.
+
+Requirements:
+
+maintain scrolling
+same row styling
+same row density
+same typography
+no giant spacing between rows
+use the unused vertical space fully
+
+This should feel like a real institutional blotter.
+
+====================================================
+2. PLATFORM OVERVIEW
+
+Currently shows:
+TOP 5 ASSETS BY VOLUME
+
+Increase to:
+TOP 10 ASSETS BY VOLUME
+
+Requirements:
+
+tighter row spacing
+keep same typography hierarchy
+use remaining vertical space efficiently
+do NOT enlarge the container
+just fill the empty area properly
+====================================================
+3. AI OPPORTUNITY SCANNER
+
+Currently only shows ~8 ranked opportunities.
+
+Increase to:
+TOP 10 OPPORTUNITIES
+
+Requirements:
+
+preserve existing layout
+maintain scrolling if needed
+use the empty bottom area
+keep featured opportunity section unchanged
+====================================================
+4. EXCHANGE SWITCHER (IMPORTANT)
+
+The exchange switcher is visually correct but partially broken functionally.
+
+Current issue:
+Only Kraken / Coinbase / Binance labels are partially visible.
+Other exchanges are clipped or inaccessible.
+Switcher does not feel clickable enough.
+
+FIX:
+
+REQUIREMENTS
+make the entire exchange switcher horizontally scrollable OR properly responsive
+ALL exchanges must be visible:
+Kraken
+Coinbase
+Binance
+Simulation
+Bybit
+Bitget
+KuCoin
+OKX
+Gate.io
+each exchange MUST clearly look clickable
+improve hover states
+cursor:pointer
+stronger active glow
+proper spacing/padding
+preserve dark institutional styling
+
+DO NOT remove the current segmented-switch design.
+
+====================================================
+5. 8 CRYPTO CHARTS — VISIBILITY POLISH
+
+The charts themselves are excellent.
+
+Remaining issue:
+Some chart telemetry is too faint.
+
+Increase visibility of:
+
+BOTTOM RIGHT CORNER METRICS
+
+The small percentages/telemetry at bottom-right of each chart are too faint.
+
+Increase:
+
+opacity
+brightness
+font weight slightly
+readability
+BACKGROUND MICRO-CHARTS / STRIKE-LINE VISUALS
+
+The mini telemetry visuals behind the strike lines are almost invisible.
+
+Increase visibility slightly:
+
+opacity +15–20%
+slightly brighter line glow
+preserve subtlety
+DO NOT overpower the main chart line
+
+Goal:
+institutional + readable
+NOT neon/glowy.
+
+====================================================
+6. DO NOT CHANGE
+
+DO NOT redesign:
+
+chart layout
+active trades
+recently closed
+bottom analytics section
+exchange switcher structure
+telemetry bar
+overall spacing system
+
+This is now a refinement pass ONLY.
+
+Goal:
+remove dead space,
+improve readability,
+increase data density,
+preserve institutional aesthetic.
+
+====================================================
+FINAL GOAL
+
+The dashboard should now feel:
+
+dense
+premium
+fully utilized
+highly readable
+zero wasted space
+Bloomberg / Quant terminal inspired
+scalable to enterprise multi-user AI trading platform
+
+Do all updates in a single coordinated pass.

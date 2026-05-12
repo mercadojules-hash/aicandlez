@@ -87,7 +87,7 @@ export function RichTerminalFeed({ engine }: Props) {
     <div className="terminal-card flex flex-col" style={{ height: "100%" }}>
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-3 py-2.5 border-b flex-shrink-0"
+      <div className="flex items-center gap-3 px-3 py-2 border-b flex-shrink-0"
         style={{ borderBottomColor: "#111111" }}>
         <div className="w-1.5 h-1.5 rounded-sm flex-shrink-0"
           style={{ background: "#00aaff", boxShadow: "0 0 5px #00aaff" }} />
@@ -114,12 +114,12 @@ export function RichTerminalFeed({ engine }: Props) {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 px-3 py-1.5 border-b flex-shrink-0"
+      <div className="flex items-center gap-1 px-3 py-1 border-b flex-shrink-0"
         style={{ borderBottomColor: "#0d0d0d", background: "#020202" }}>
         {TABS.map(tab => (
           <button key={tab.key}
             onClick={() => setFilter(tab.key)}
-            className="text-[9px] font-bold font-mono px-2.5 py-0.5 rounded tracking-wide transition-all"
+            className="text-[8px] font-bold font-mono px-2 py-0.5 rounded tracking-wide transition-all"
             style={filter === tab.key
               ? { background: `${CAT_COLOR[tab.key]}14`, color: CAT_COLOR[tab.key], border: `1px solid ${CAT_COLOR[tab.key]}30` }
               : { background: "transparent", color: "#9FB3C8", border: "1px solid transparent" }
@@ -127,16 +127,16 @@ export function RichTerminalFeed({ engine }: Props) {
             {tab.label}
           </button>
         ))}
-        <span className="ml-auto text-[9px] font-mono font-semibold tabular-nums" style={{ color: "#C7D4E2" }}>
-          {visible.length} rows
+        <span className="ml-auto text-[8px] font-mono font-semibold tabular-nums" style={{ color: "#C7D4E2" }}>
+          {visible.length}
         </span>
       </div>
 
-      {/* Feed — fills all remaining height */}
+      {/* Feed — fills all remaining height, tighter rows for ~15 visible */}
       <div ref={scrollRef} className="feed-scroll"
         style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         {visible.length === 0 ? (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex items-center justify-center py-10">
             <span className="text-[11px] font-mono animate-pulse font-medium" style={{ color: "#9FB3C8" }}>
               AWAITING SIGNAL STREAM…
             </span>
@@ -163,71 +163,56 @@ export function RichTerminalFeed({ engine }: Props) {
                 <div key={s.id}
                   style={{
                     borderBottom: "1px solid #0d0d0d",
-                    borderLeft: `2px solid ${stageCfg.color}${isFilled ? "90" : "35"}`,
-                    background: isBlocked ? "#ff33550c"
-                      : isFilled  ? "#00ff8a08"
-                      : i === 0   ? "#050505"
-                      : "transparent",
-                    animation: i === 0 ? "feed-row-in 0.25s ease-out" : undefined,
+                    borderLeft:   `2px solid ${stageCfg.color}${isFilled ? "90" : "35"}`,
+                    background:   isBlocked ? "#ff33550c" : isFilled ? "#00ff8a08" : i === 0 ? "#050505" : "transparent",
+                    animation:    i === 0 ? "feed-row-in 0.25s ease-out" : undefined,
                   }}>
 
-                  {/* Main row — larger padding, larger text */}
-                  <div className="flex items-center gap-2.5 px-3 py-2.5">
-                    {/* Stage badge */}
-                    <span className="text-[8px] font-bold font-mono px-2 py-0.5 rounded flex-shrink-0"
+                  {/* Row — tighter py-1.5 to show ~15 rows in container */}
+                  <div className="flex items-center gap-2 px-2.5 py-1.5">
+                    <span className="text-[7px] font-bold font-mono px-1.5 py-0.5 rounded flex-shrink-0"
                       style={{
-                        color: stageCfg.color, background: `${stageCfg.color}14`,
-                        border: `1px solid ${stageCfg.color}28`,
-                        minWidth: 42, textAlign: "center",
+                        color:      stageCfg.color,
+                        background: `${stageCfg.color}14`,
+                        border:     `1px solid ${stageCfg.color}28`,
+                        minWidth:   40, textAlign: "center",
                       }}>
                       {stageCfg.label}
                     </span>
-
-                    {/* Timestamp — larger, more readable */}
-                    <span className="text-[10px] font-mono tabular-nums flex-shrink-0 font-semibold"
+                    <span className="text-[9px] font-mono tabular-nums flex-shrink-0 font-semibold"
                       style={{ color: "#C7D4E2" }}>
                       {ts}
                     </span>
-
-                    {/* Decision — clear and prominent */}
-                    <span className="text-[12px] font-bold font-mono flex-shrink-0"
+                    <span className="text-[11px] font-bold font-mono flex-shrink-0"
                       style={{
                         color: decColor,
                         textShadow: s.decision !== "HOLD" ? `0 0 8px ${decColor}50` : undefined,
                       }}>
                       {s.decision}
                     </span>
-
-                    {/* Symbol */}
-                    <span className="text-[12px] font-bold font-mono flex-shrink-0" style={{ color: symColor }}>
+                    <span className="text-[11px] font-bold font-mono flex-shrink-0" style={{ color: symColor }}>
                       {sym}
                     </span>
-
-                    {/* Confidence — dominant number */}
-                    <span className="text-[11px] font-bold font-mono tabular-nums flex-shrink-0"
+                    <span className="text-[10px] font-bold font-mono tabular-nums flex-shrink-0"
                       style={{ color: confColor }}>
                       {s._conf.toFixed(0)}%
                     </span>
-
-                    {/* Reason text */}
-                    <span className="text-[10px] font-mono truncate flex-1"
+                    <span className="text-[9px] font-mono truncate flex-1"
                       style={{ color: isBlocked ? "#ff335580" : "#9FB3C8" }}>
                       {isBlocked ? `⚠ ${s.blockReason}` : (s.shortSummary ?? "")}
                     </span>
-
-                    {/* Exchange chip */}
-                    <span className="text-[8px] font-mono px-1.5 py-0.5 rounded flex-shrink-0 font-medium"
+                    <span className="text-[7px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
                       style={{ color: "#C7D4E2", background: "#0d0d0d", border: "1px solid #1a1a1a" }}>
                       KRK
                     </span>
                   </div>
 
-                  {/* Conf bar — slightly taller for visibility */}
-                  <div style={{ paddingLeft: 68, paddingRight: 12, paddingBottom: 6 }}>
-                    <div style={{ height: 2.5, background: "#0a0a0a", borderRadius: 2 }}>
+                  {/* Conf bar — slim */}
+                  <div style={{ paddingLeft: 64, paddingRight: 10, paddingBottom: 4 }}>
+                    <div style={{ height: 2, background: "#0a0a0a", borderRadius: 2 }}>
                       <div style={{
                         height: "100%",
-                        width: `${Math.min(100, s._conf)}%`,
+                        width:  `${Math.min(100, s._conf)}%`,
                         background: confColor,
                         borderRadius: 2,
                         opacity: 0.6,
@@ -240,9 +225,9 @@ export function RichTerminalFeed({ engine }: Props) {
             })}
 
             {/* Terminal cursor */}
-            <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderLeft: "2px solid #0d0d0d" }}>
-              <span className="text-[10px] font-mono font-semibold" style={{ color: "#C7D4E2" }}>$</span>
-              <span className="text-[10px] font-mono font-medium" style={{ color: "#9FB3C8" }}>
+            <div className="flex items-center gap-2 px-4 py-2" style={{ borderLeft: "2px solid #0d0d0d" }}>
+              <span className="text-[9px] font-mono font-semibold" style={{ color: "#C7D4E2" }}>$</span>
+              <span className="text-[9px] font-mono" style={{ color: "#9FB3C8" }}>
                 {engine?.running
                   ? `ENGINE RUNNING · NEXT TICK ${nextTick}s · SIGNALS: ${engine.signalsGenerated ?? 0}`
                   : "ENGINE IDLE — AWAITING FIRST TICK"}

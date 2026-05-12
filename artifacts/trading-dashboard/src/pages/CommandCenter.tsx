@@ -21,7 +21,6 @@ import { ago, Q_OPTS } from "@/components/command/helpers";
 type ExchangeOption = {
   id:       string;
   label:    string;
-  short:    string;
   color:    string;
   disabled?: boolean;
   soon?:    boolean;
@@ -29,25 +28,39 @@ type ExchangeOption = {
 };
 
 const EXCHANGES: ExchangeOption[] = [
-  { id: "kraken",   label: "Kraken",   short: "KRK", color: "#5741d9" },
-  { id: "coinbase", label: "Coinbase", short: "CB",  color: "#2775ca", disabled: true, soon: true },
-  { id: "binance",  label: "Binance",  short: "BNB", color: "#f0b90b", disabled: true, soon: true },
-  { id: "sim",      label: "Simulation", short: "SIM", color: "#ffaa00", isSim: true },
+  { id: "kraken",   label: "Kraken",   color: "#5741d9"              },
+  { id: "sim",      label: "SIM",      color: "#ffaa00", isSim: true  },
+  { id: "coinbase", label: "Coinbase", color: "#2775ca", disabled: true, soon: true },
+  { id: "binance",  label: "Binance",  color: "#f0b90b", disabled: true, soon: true },
+  { id: "bybit",    label: "Bybit",    color: "#f7a600", disabled: true, soon: true },
+  { id: "bitget",   label: "Bitget",   color: "#00cfa0", disabled: true, soon: true },
+  { id: "kucoin",   label: "KuCoin",   color: "#24ae8f", disabled: true, soon: true },
+  { id: "okx",      label: "OKX",      color: "#c0c0c0", disabled: true, soon: true },
+  { id: "gateio",   label: "Gate.io",  color: "#2354e6", disabled: true, soon: true },
 ];
 
 function ExchangeSwitcher({
   isLive, exName, onSelectSim, onSelectLive,
 }: {
-  isLive: boolean;
-  exName: string;
-  onSelectSim: () => void;
+  isLive:       boolean;
+  exName:       string;
+  onSelectSim:  () => void;
   onSelectLive: (exchange: string) => void;
 }) {
   const activeId = !isLive ? "sim" : (exName.toLowerCase() || "kraken");
 
   return (
-    <div className="flex items-center gap-0.5 p-0.5 rounded-lg"
-      style={{ background: "#040d16", border: "1px solid #0d1e2e" }}>
+    /* Horizontally scrollable so all 9 exchanges are always reachable */
+    <div
+      className="flex items-center gap-0.5 p-0.5 rounded-lg overflow-x-auto"
+      style={{
+        background:   "#040d16",
+        border:       "1px solid #0d1e2e",
+        scrollbarWidth: "none",
+        maxWidth:     560,
+        flexShrink:   0,
+      }}
+    >
       {EXCHANGES.map(ex => {
         const isActive   = activeId === ex.id;
         const isDisabled = ex.disabled === true;
@@ -61,50 +74,52 @@ function ExchangeSwitcher({
               if (ex.isSim)   onSelectSim();
               else            onSelectLive(ex.id);
             }}
-            title={isDisabled ? `${ex.label} — coming soon` : ex.label}
-            className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-md font-mono font-bold transition-all"
-            style={isActive ? {
-              background:  `${ex.color}18`,
-              color:        ex.color,
-              border:      `1px solid ${ex.color}45`,
-              boxShadow:   `0 0 12px ${ex.color}25, inset 0 0 8px ${ex.color}08`,
-              fontSize:    "10px",
-              letterSpacing: "0.1em",
-            } : isDisabled ? {
-              background:  "transparent",
-              color:       "#1e3040",
-              border:      "1px solid transparent",
-              fontSize:    "10px",
-              letterSpacing: "0.1em",
-              cursor:      "not-allowed",
-            } : {
-              background:  "transparent",
-              color:       "#4a7a95",
-              border:      "1px solid transparent",
-              fontSize:    "10px",
-              letterSpacing: "0.1em",
+            title={isDisabled ? `${ex.label} — coming soon` : `Switch to ${ex.label}`}
+            className="flex items-center gap-1 rounded-md font-mono font-bold transition-all flex-shrink-0"
+            style={{
+              padding:       "5px 10px",
+              fontSize:      "9px",
+              letterSpacing: "0.08em",
+              cursor:        isDisabled ? "not-allowed" : "pointer",
+              whiteSpace:    "nowrap",
+              ...(isActive ? {
+                background:  `${ex.color}20`,
+                color:        ex.color,
+                border:      `1px solid ${ex.color}50`,
+                boxShadow:   `0 0 14px ${ex.color}30, inset 0 0 8px ${ex.color}10`,
+              } : isDisabled ? {
+                background:  "transparent",
+                color:       "#1e3040",
+                border:      "1px solid transparent",
+              } : {
+                background:  "transparent",
+                color:       "#5a8aaa",
+                border:      "1px solid transparent",
+              }),
             }}
             onMouseEnter={e => {
-              if (!isActive && !isDisabled)
-                e.currentTarget.style.color = "#9FB3C8";
+              if (!isActive && !isDisabled) {
+                e.currentTarget.style.color       = "#C7D4E2";
+                e.currentTarget.style.background  = "#0d1e2e";
+                e.currentTarget.style.borderColor = "#1a3050";
+              }
             }}
             onMouseLeave={e => {
-              if (!isActive && !isDisabled)
-                e.currentTarget.style.color = "#4a7a95";
+              if (!isActive && !isDisabled) {
+                e.currentTarget.style.color       = "#5a8aaa";
+                e.currentTarget.style.background  = "transparent";
+                e.currentTarget.style.borderColor = "transparent";
+              }
             }}
           >
-            {/* Active glow dot */}
             {isActive && (
               <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                 style={{ background: ex.color, boxShadow: `0 0 6px ${ex.color}` }} />
             )}
-
             <span>{ex.label}</span>
-
-            {/* Coming soon badge */}
             {ex.soon && (
-              <span className="text-[7px] font-bold px-1 py-px rounded font-mono"
-                style={{ background: "#ffaa0012", color: "#ffaa0070", border: "1px solid #ffaa0020" }}>
+              <span className="text-[6px] font-bold px-1 py-px rounded font-mono"
+                style={{ background: "#ffaa0010", color: "#ffaa0055", border: "1px solid #ffaa0018" }}>
                 SOON
               </span>
             )}
@@ -202,12 +217,12 @@ export default function CommandCenter() {
           </span>
         )}
 
-        {/* Center: action controls — PAUSE + KILL only */}
+        {/* Action controls */}
         <div className="flex items-center gap-1.5 ml-4">
           <button onClick={togglePause}
             className="flex items-center gap-1.5 text-[9px] font-bold px-3 py-1.5 rounded font-mono transition-all border"
             style={isPaused
-              ? { background: "#ffaa0012", color: "#ffaa00", border: "1px solid #ffaa0038", boxShadow: "0 0 8px #ffaa0020" }
+              ? { background: "#ffaa0012", color: "#ffaa00", borderColor: "#ffaa0038", boxShadow: "0 0 8px #ffaa0020" }
               : { background: "transparent", color: "#9FB3C8", borderColor: "#1c2a36" }}>
             {isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
             {isPaused ? "RESUME" : "PAUSE"}
@@ -222,17 +237,16 @@ export default function CommandCenter() {
           </button>
         </div>
 
-        {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Right: last tick */}
+        {/* Last tick */}
         <div className="flex items-center gap-1.5 text-[8px] font-mono font-medium mr-3"
           style={{ color: "#3a5a70" }}>
           <Clock className="w-3 h-3" />
           {ago(engine?.lastTickAt ?? null)}
         </div>
 
-        {/* Right: Exchange Switcher */}
+        {/* Exchange Switcher — horizontally scrollable */}
         <ExchangeSwitcher
           isLive={isLive}
           exName={exName}
@@ -241,7 +255,7 @@ export default function CommandCenter() {
         />
       </div>
 
-      {/* ④–⑧ Main content */}
+      {/* Main content */}
       <div className="flex-1 p-2 sm:p-3 space-y-2 max-w-screen-2xl mx-auto w-full">
 
         {/* ④ Chart wall */}
@@ -257,13 +271,13 @@ export default function CommandCenter() {
         {/* ⑥ Active Trades LEFT | Recently Closed RIGHT */}
         <ActiveTradesPanel trades={trades} />
 
-        {/* ⑦ 8-container unified grid (4+4 two-row) */}
+        {/* ⑦ 8-container unified grid */}
         <MiddleStatsGrid
           trades={trades} engine={engine}
           exchangeStatus={exchangeStatus} feeSummary={feeSummary}
         />
 
-        {/* ⑧ Bottom analytics: AI Perf | Market Regime | Model Health */}
+        {/* ⑧ Bottom analytics */}
         <BottomAnalyticsRow engine={engine} trades={trades} />
 
       </div>

@@ -123,7 +123,6 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
       {/* Header */}
       <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
         <div className="flex-1 min-w-0">
-          {/* Symbol label — now properly readable */}
           <div className="text-[9px] font-mono tracking-wider font-semibold" style={{ color: "#9FB3C8" }}>
             {symbol.replace("USD", "/USD")}
           </div>
@@ -172,53 +171,56 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
               <YAxis yAxisId="p" domain={[pMin - pad, pMax + pad]} hide />
               <YAxis yAxisId="v" domain={[0, maxVol * 5]} hide />
               <Tooltip content={<MiniTooltip />} />
-              {/* Volume bars — brighter fill for visibility */}
-              <Bar yAxisId="v" dataKey="volume" fill={color} fillOpacity={0.18}
+              {/* Volume bars — visible fill */}
+              <Bar yAxisId="v" dataKey="volume" fill={color} fillOpacity={0.20}
                 radius={[1, 1, 0, 0]} isAnimationActive={false} />
-              {/* EMA21 — brighter, more visible */}
-              <Line yAxisId="p" dataKey="ema21" stroke="#00d4ff" strokeWidth={1.2}
+              {/* EMA21 — clearly visible dashed line */}
+              <Line yAxisId="p" dataKey="ema21" stroke="#00d4ff" strokeWidth={1.3}
                 dot={false} isAnimationActive={false} strokeDasharray="5 4"
-                connectNulls strokeOpacity={0.60} />
-              {/* EMA9 — brighter, more visible */}
-              <Line yAxisId="p" dataKey="ema9" stroke="#ffaa00" strokeWidth={1.2}
+                connectNulls strokeOpacity={0.65} />
+              {/* EMA9 — clearly visible dashed line */}
+              <Line yAxisId="p" dataKey="ema9" stroke="#ffaa00" strokeWidth={1.3}
                 dot={false} isAnimationActive={false} strokeDasharray="3 3"
-                connectNulls strokeOpacity={0.70} />
-              {/* Price line — main chart line */}
+                connectNulls strokeOpacity={0.75} />
+              {/* Price line */}
               <Line yAxisId="p" dataKey="close" stroke={color} strokeWidth={1.8}
                 dot={false} isAnimationActive={false}
-                style={{ filter: `drop-shadow(0 0 3px ${color}60)` }} />
-              {/* Reference strike line — brighter */}
+                style={{ filter: `drop-shadow(0 0 3px ${color}65)` }} />
+              {/* Reference/strike line — visible */}
               {lastPt?.close && (
                 <ReferenceLine yAxisId="p" y={lastPt.close}
-                  stroke={color} strokeDasharray="2 6" strokeOpacity={0.35} />
+                  stroke={color} strokeDasharray="2 6" strokeOpacity={0.40} />
               )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
       )}
 
-      {/* Footer */}
+      {/* Footer — brighter bottom-right telemetry */}
       <div className="px-3 pb-2.5 pt-1.5">
         {conf > 0 ? (
           <>
             <div className="flex items-center justify-between mb-1">
-              {/* RSI label — now readable */}
-              <span className="text-[9px] font-mono tracking-[0.08em] font-medium" style={{ color: "#9FB3C8" }}>
+              {/* RSI label — readable */}
+              <span className="text-[9px] font-mono font-semibold" style={{ color: "#9FB3C8" }}>
                 {rsi !== undefined ? `RSI ${rsi.toFixed(0)}` : "AI CONF"}
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-[8px] font-mono font-semibold"
-                  style={{ color: volOk ? "#00ff8a70" : "#ff225550" }}>
+                {/* VOL indicator — clearly visible */}
+                <span className="text-[8px] font-mono font-bold"
+                  style={{ color: volOk ? "#00ff8a85" : "#ff225560" }}>
                   {volOk ? "✓VOL" : "✗VOL"}
                 </span>
-                <span className="text-[12px] font-bold font-mono tabular-nums" style={{ color }}>
+                {/* Confidence — dominant bottom-right metric */}
+                <span className="text-[13px] font-bold font-mono tabular-nums"
+                  style={{ color, textShadow: `0 0 8px ${color}40` }}>
                   {conf.toFixed(0)}%
                 </span>
               </div>
             </div>
             <div className="rounded-sm overflow-hidden" style={{ height: 3, background: "#0a0a0a" }}>
               <div className="h-full rounded-sm"
-                style={{ width: `${Math.min(100, conf)}%`, background: color, opacity: 0.65 }} />
+                style={{ width: `${Math.min(100, conf)}%`, background: color, opacity: 0.70 }} />
             </div>
           </>
         ) : (
