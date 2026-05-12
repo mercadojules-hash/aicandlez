@@ -1,49 +1,49 @@
-import { useEffect, useState } from "react";
 import { Terminal, Zap } from "lucide-react";
-import type { EngineStatus } from "./types";
+import type { EngineStatus, SignalLogEntry } from "./types";
 import { SYMBOL_COLOR } from "./types";
+import { ago } from "./helpers";
 
 interface Props { engine: EngineStatus | undefined }
 
 const STAGE_CFG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  FILLED:     { label: "✓ FILLED",    color: "#00ff8a", bg: "#00ff8a10", border: "#00ff8a35" },
-  EXECUTING:  { label: "⚡ EXECUTING", color: "#ffb800", bg: "#ffb80010", border: "#ffb80040" },
-  ROUTING:    { label: "→ ROUTING",   color: "#00f0ff", bg: "#00f0ff08", border: "#00f0ff30" },
-  MONITORING: { label: "● MONITOR",   color: "#00f0ff", bg: "#00f0ff08", border: "#00f0ff28" },
-  BLOCKED:    { label: "✗ BLOCKED",   color: "#ff2255", bg: "#ff225510", border: "#ff225535" },
-  SCANNING:   { label: "◌ SCANNING",  color: "#c855f7", bg: "#c855f708", border: "#c855f728" },
-  VALIDATING: { label: "⟳ VALIDATING",color: "#ffb800", bg: "#ffb80008", border: "#ffb80028" },
+  FILLED:     { label: "✓ FILLED",     color: "#00ff8a", bg: "#00ff8a10", border: "#00ff8a35" },
+  EXECUTING:  { label: "⚡ EXECUTING",  color: "#ffb800", bg: "#ffb80010", border: "#ffb80040" },
+  ROUTING:    { label: "→ ROUTING",    color: "#00f0ff", bg: "#00f0ff08", border: "#00f0ff30" },
+  MONITORING: { label: "● MONITOR",    color: "#00f0ff", bg: "#00f0ff08", border: "#00f0ff28" },
+  BLOCKED:    { label: "✗ BLOCKED",    color: "#ff2255", bg: "#ff225510", border: "#ff225535" },
+  SCANNING:   { label: "◌ SCANNING",   color: "#c855f7", bg: "#c855f708", border: "#c855f728" },
+  VALIDATING: { label: "⟳ VALIDATING", color: "#ffb800", bg: "#ffb80008", border: "#ffb80028" },
 };
 
-function getStage(sig: EngineStatus["recentSignalLog"][0]): string {
-  if (sig.executedAs)                                  return "FILLED";
-  if (sig.blockReason && sig.blockReason !== "None")   return "BLOCKED";
-  if (sig.confidence >= 78)                            return "EXECUTING";
-  if (sig.confidence >= 65)                            return "ROUTING";
-  if (sig.confidence >= 55)                            return "MONITORING";
-  if (sig.confidence >= 40)                            return "VALIDATING";
+function getStage(sig: SignalLogEntry): string {
+  if (sig.executedAs)                                return "FILLED";
+  if (sig.blockReason && sig.blockReason !== "None") return "BLOCKED";
+  if (sig.confidence >= 78)                          return "EXECUTING";
+  if (sig.confidence >= 65)                          return "ROUTING";
+  if (sig.confidence >= 55)                          return "MONITORING";
+  if (sig.confidence >= 40)                          return "VALIDATING";
   return "SCANNING";
 }
 
-function emaLabel(conf: number): { text: string; color: string } {
-  if (conf >= 68) return { text: "CONFIRMED",  color: "#00ff8a90" };
-  if (conf >= 52) return { text: "DIVERGING",  color: "#ffb80090" };
+function emaLabel(sig: SignalLogEntry): { text: string; color: string } {
+  const c = sig.confidence;
+  if (c >= 68) return { text: "CONFIRMED",  color: "#00ff8a90" };
+  if (c >= 52) return { text: "DIVERGING",  color: "#ffb80090" };
   return              { text: "INVERTED",   color: "#ff225590" };
 }
 
-function rsiLabel(conf: number): { text: string; color: string } {
-  if (conf > 80) return { text: "OVERBOUGHT", color: "#ff225590" };
-  if (conf > 65) return { text: "BULLISH",    color: "#00ff8a90" };
-  if (conf > 45) return { text: "NEUTRAL",    color: "#4a8fa890" };
-  return              { text: "OVERSOLD",   color: "#00f0ff90" };
+function rsiLabel(sig: SignalLogEntry): { text: string; color: string } {
+  const c = sig.confidence;
+  if (c > 80) return { text: "OVERBOUGHT", color: "#ff225590" };
+  if (c > 65) return { text: "BULLISH",    color: "#00ff8a90" };
+  if (c > 45) return { text: "NEUTRAL",    color: "#4a8fa890" };
+  return             { text: "OVERSOLD",   color: "#00f0ff90" };
 }
 
-/* ── Blinking cursor ──────────────────────────────────────────────────────── */
 function Cursor() {
   return <span className="cursor-blink" />;
 }
 
-/* ── Confidence strike bar ────────────────────────────────────────────────── */
 function ConfidenceStrike({ pct, color }: { pct: number; color: string }) {
   return (
     <div className="relative" style={{ height: 6 }}>
@@ -57,32 +57,21 @@ function ConfidenceStrike({ pct, color }: { pct: number; color: string }) {
           animation: "conf-fill 1s cubic-bezier(0.16, 1, 0.3, 1)",
         }}
       />
-      {/* Strike marker */}
       <div
         className="absolute top-0 bottom-0 w-[2px]"
-        style={{
-          left: `${Math.min(99, pct)}%`,
-          background: color,
-          boxShadow: `0 0 8px ${color}`,
-        }}
+        style={{ left: `${Math.min(99, pct)}%`, background: color, boxShadow: `0 0 8px ${color}` }}
       />
     </div>
   );
 }
 
 export function RichTerminalFeed({ engine }: Props) {
-  const log     = [...(engine?.recentSignalLog ?? [])].reverse().slice(0, 12);
-  const [tick, setTick] = useState(0);
-
-  /* subtle refresh pulse every 8s */
-  useEffect(() => {
-    const t = setInterval(() => setTick((n) => n + 1), 8000);
-    return () => clearInterval(t);
-  }, []);
+  const log        = [...(engine?.recentSignalLog ?? [])].reverse().slice(0, 12);
+  const exchangeNm = "KRAKEN";
 
   return (
     <div className="terminal-card rounded-lg overflow-hidden">
-      {/* ── Header ───────────────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       <div
         className="flex items-center gap-3 px-4 py-3 border-b"
         style={{ borderBottomColor: "#0D2235", background: "linear-gradient(90deg, #040F1C, #020A14)" }}
@@ -96,6 +85,11 @@ export function RichTerminalFeed({ engine }: Props) {
         </span>
 
         <div className="ml-auto flex items-center gap-3">
+          {engine?.lastSignalAt && (
+            <span className="text-[9px] font-mono text-[#1a3850]">
+              last sig {ago(engine.lastSignalAt)}
+            </span>
+          )}
           {engine?.running ? (
             <>
               <span className="live-dot" style={{ width: 6, height: 6 }} />
@@ -109,14 +103,13 @@ export function RichTerminalFeed({ engine }: Props) {
         </div>
       </div>
 
-      {/* ── Feed ─────────────────────────────────────────────────────── */}
+      {/* ── Feed ───────────────────────────────────────────────────────── */}
       <div className="p-3 space-y-2 font-mono" style={{ minHeight: 320 }}>
         {log.length === 0 ? (
           <div className="flex items-center justify-center" style={{ minHeight: 200 }}>
             <div className="text-center">
               <div className="text-[13px] text-[#1a3850] font-mono mb-2">
-                $ AWAITING SIGNAL STREAM
-                <Cursor />
+                $ AWAITING SIGNAL STREAM <Cursor />
               </div>
               <div className="text-[10px] text-[#0E2235] font-mono animate-pulse">
                 ENGINE INITIALIZING…
@@ -132,15 +125,15 @@ export function RichTerminalFeed({ engine }: Props) {
             const ts       = new Date(s.timestamp).toLocaleTimeString("en-US", {
               hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
             });
-            const ema    = emaLabel(s.confidence);
-            const rsi    = rsiLabel(s.confidence);
+            const ema    = emaLabel(s);
+            const rsi    = rsiLabel(s);
             const confPc = Math.min(100, s.confidence);
             const barClr = s.decision === "BUY" ? "#00ff8a" : s.decision === "SELL" ? "#ff2255" : "#4a8fa8";
             const isExec = stage === "FILLED" || stage === "EXECUTING";
 
             return (
               <div
-                key={s.id + i + tick}
+                key={s.id}
                 className="rounded-md border overflow-hidden"
                 style={{
                   background: isExec
@@ -151,7 +144,7 @@ export function RichTerminalFeed({ engine }: Props) {
                   animation: `slide-in-left 0.25s ease ${i * 0.03}s both`,
                 }}
               >
-                {/* Row 1: stage + symbol + decision + time */}
+                {/* Row 1: stage + symbol + timeframe + decision + time */}
                 <div className="flex items-center gap-2.5 px-3 py-2.5">
                   <span
                     className={`text-[9px] font-bold tracking-[0.12em] px-2 py-1 rounded shrink-0 ${isExec ? "exec-badge" : ""}`}
@@ -175,6 +168,14 @@ export function RichTerminalFeed({ engine }: Props) {
                       {sym}
                     </span>
                     <span className="text-[10px] text-[#1a3850]">/USD</span>
+                    {s.timeframe && (
+                      <span
+                        className="text-[8px] font-bold px-1.5 py-0.5 rounded font-mono"
+                        style={{ background: "#00f0ff08", color: "#00f0ff60", border: "1px solid #00f0ff20" }}
+                      >
+                        {s.timeframe}
+                      </span>
+                    )}
                     <span
                       className="text-[13px] font-bold ml-1"
                       style={{
@@ -205,35 +206,30 @@ export function RichTerminalFeed({ engine }: Props) {
                 </div>
 
                 {/* Row 3: metrics grid */}
-                <div
-                  className="grid grid-cols-4 gap-px border-t"
-                  style={{ borderTopColor: "#0A1E30" }}
-                >
+                <div className="grid grid-cols-4 gap-px border-t" style={{ borderTopColor: "#0A1E30" }}>
                   {[
                     { label: "EMA ALIGN",   value: ema.text,  color: ema.color },
                     { label: "RSI STATE",   value: rsi.text,  color: rsi.color },
-                    { label: "ROUTING",     value: s.executedAs ? "BINANCE" : "PENDING", color: "#00f0ff60" },
+                    { label: "EXCHANGE",    value: exchangeNm, color: "#00f0ff60" },
                     {
                       label: "EXEC STATUS",
-                      value: s.executedAs  ? `${s.executedAs} FILLED` :
-                             (s.blockReason && s.blockReason !== "None") ? "BLOCKED" : "PENDING",
-                      color: s.executedAs ? "#00ff8a90" :
-                             (s.blockReason && s.blockReason !== "None") ? "#ff225590" : "#4a8fa890",
+                      value: s.executedAs
+                        ? `${s.executedAs} FILLED`
+                        : (s.blockReason && s.blockReason !== "None") ? "BLOCKED" : "PENDING",
+                      color: s.executedAs
+                        ? "#00ff8a90"
+                        : (s.blockReason && s.blockReason !== "None") ? "#ff225590" : "#4a8fa890",
                     },
                   ].map(({ label, value, color: c }) => (
-                    <div
-                      key={label}
-                      className="px-3 py-2"
-                      style={{ background: "#010812" }}
-                    >
+                    <div key={label} className="px-3 py-2" style={{ background: "#010812" }}>
                       <div className="text-[8px] text-[#1a3850] uppercase tracking-[0.12em] mb-0.5">{label}</div>
                       <div className="text-[10px] font-bold" style={{ color: c }}>{value}</div>
                     </div>
                   ))}
                 </div>
 
-                {/* Block reason */}
-                {s.blockReason && s.blockReason !== "None" && (
+                {/* Block reason / short summary */}
+                {(s.blockReason && s.blockReason !== "None") ? (
                   <div
                     className="flex items-center gap-2 px-3 py-1.5 border-t text-[9px]"
                     style={{ borderTopColor: "#0A1E30", color: "#ff225560", background: "#ff225504" }}
@@ -241,7 +237,14 @@ export function RichTerminalFeed({ engine }: Props) {
                     <span>⚠</span>
                     <span className="truncate">{s.blockReason}</span>
                   </div>
-                )}
+                ) : s.shortSummary ? (
+                  <div
+                    className="flex items-center gap-2 px-3 py-1.5 border-t text-[9px]"
+                    style={{ borderTopColor: "#0A1E30", color: "#1a3850", background: "#010812" }}
+                  >
+                    <span className="truncate font-mono">{s.shortSummary}</span>
+                  </div>
+                ) : null}
               </div>
             );
           })
@@ -251,7 +254,7 @@ export function RichTerminalFeed({ engine }: Props) {
         {engine?.running && (
           <div className="flex items-center gap-2 px-2 py-1">
             <span className="text-[10px] font-mono" style={{ color: "#00f0ff40" }}>
-              $ AI_ENGINE LOOP ACTIVE · NEXT TICK IN ~10s
+              $ AI_ENGINE LOOP ACTIVE · NEXT TICK IN ~{Math.round((engine.loopIntervalMs ?? 60000) / 1000)}s
             </span>
             <Cursor />
           </div>

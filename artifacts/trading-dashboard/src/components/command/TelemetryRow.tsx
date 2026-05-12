@@ -1,4 +1,5 @@
 import type { EngineStatus, AppSettings, Trade, ExchangeStatus, FeeSummary } from "./types";
+import { ago } from "./helpers";
 
 interface Props {
   engine:         EngineStatus   | undefined;
@@ -19,13 +20,10 @@ function Cell({
       className="tele-cell rounded shrink-0"
       style={pulse && !dim ? { animation: "border-march 3s ease-in-out infinite" } : {}}
     >
-      {/* Top accent line with color */}
       <div
         className="absolute top-0 left-0 right-0 h-[2px] rounded-t"
         style={{ background: dim ? "transparent" : `linear-gradient(90deg, transparent, ${color}50, transparent)` }}
       />
-
-      {/* Main value */}
       <div
         className="text-[22px] font-bold font-mono leading-none mb-1 tracking-tight tabular-nums"
         style={{
@@ -35,15 +33,11 @@ function Cell({
       >
         {value}
       </div>
-
-      {/* Sub label */}
       {sub && (
         <div className="text-[9px] text-[#1e4860] font-mono uppercase tracking-[0.15em] leading-none mb-1">
           {sub}
         </div>
       )}
-
-      {/* Label */}
       <div className="text-[8px] text-[#1a3850] font-mono uppercase tracking-[0.15em] leading-none">
         {label}
       </div>
@@ -60,16 +54,20 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
   const totalPnl = closed.reduce((s, t) => s + (t.pnl ?? 0), 0);
   const exposure = open.reduce((s, t) => s + (t.amount ?? 0), 0);
 
-  const exName     = exchangeStatus?.exchangeName ?? "KRAKEN";
-  const mode       = exchangeStatus?.mode === "live" ? "LIVE" : "SIM";
-  const execToday  = engine?.tradesExecuted ?? 0;
-  const buySig     = engine?.signalCounts.BUY ?? 0;
-  const sellSig    = engine?.signalCounts.SELL ?? 0;
-  const passedMTF  = engine?.funnel?.passedMTF ?? 0;
-  const totalSig   = engine?.signalsGenerated ?? 0;
-  const execCount  = engine?.funnel?.executed ?? 0;
-  const execRate   = totalSig > 0 ? (execCount / totalSig * 100) : 0;
-  const simUSD     = exchangeStatus?.simBalances?.USD ?? 100_000;
+  const exName    = exchangeStatus?.exchangeName ?? "KRAKEN";
+  const mode      = exchangeStatus?.mode === "live" ? "LIVE" : "SIM";
+  const execToday = engine?.tradesExecuted  ?? 0;
+  const blocked   = engine?.tradesBlocked   ?? 0;
+  const buySig    = engine?.signalCounts.BUY  ?? 0;
+  const sellSig   = engine?.signalCounts.SELL ?? 0;
+  const passedMTF = engine?.funnel?.passedMTF ?? 0;
+  const totalSig  = engine?.signalsGenerated  ?? 0;
+  const execCount = engine?.funnel?.executed  ?? 0;
+  const execRate  = totalSig > 0 ? (execCount / totalSig * 100) : 0;
+  const simUSD    = exchangeStatus?.simBalances?.USD ?? 100_000;
+  const lastSig   = ago(engine?.lastSignalAt ?? null);
+  const volFilter = engine?.volumeFilter ?? false;
+  const mtfBlocked = engine?.mtfBlockCount ?? 0;
 
   const cells: Array<{
     label: string; value: string | number; sub?: string; color?: string; dim?: boolean; pulse?: boolean;
@@ -111,6 +109,12 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       dim:   execToday === 0,
     },
     {
+      label: "BLOCKED",
+      value: blocked,
+      color: blocked > 50 ? "#ff2255" : blocked > 20 ? "#ffb800" : "#1a3850",
+      dim:   blocked === 0,
+    },
+    {
       label: "BUY SIGNALS",
       value: buySig,
       color: buySig > 0 ? "#00ff8a" : "#1a3850",
@@ -129,36 +133,32 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       dim:   passedMTF === 0,
     },
     {
+      label: "MTF BLOCKED",
+      value: mtfBlocked,
+      color: mtfBlocked > 100 ? "#ff2255" : "#1a3850",
+      dim:   mtfBlocked === 0,
+    },
+    {
       label: "EXEC RATE",
       value: `${execRate.toFixed(1)}%`,
       color: execRate > 60 ? "#00ff8a" : execRate > 20 ? "#ffb800" : "#ff2255",
+    },
+    {
+      label: "LAST SIGNAL",
+      value: lastSig,
+      color: "#00f0ff",
+      dim:   !engine?.lastSignalAt,
+    },
+    {
+      label: "VOL FILTER",
+      value: volFilter ? "ON" : "OFF",
+      color: volFilter ? "#00ff8a" : "#ffb800",
     },
     {
       label: "BROKER",
       value: exName.toUpperCase().slice(0, 6),
       sub:   `${mode} MODE`,
       color: "#00f0ff",
-    },
-    {
-      label: "FEES COLLECTED",
-      value: `$${(feeSummary?.totalFeesCollected ?? 0).toFixed(2)}`,
-      color: "#00ff8a",
-    },
-    {
-      label: "ACCT MODE",
-      value: settings?.autoMode ? "AUTO" : "MANUAL",
-      color: settings?.autoMode ? "#00ff8a" : "#ffb800",
-      pulse: settings?.autoMode,
-    },
-    {
-      label: "MIN CONF",
-      value: `${settings?.minConfidence ?? 60}%`,
-      color: "#00f0ff",
-    },
-    {
-      label: "MAX TRADES",
-      value: settings?.maxTradesPerDay ?? 5,
-      color: "#4a8fa8",
     },
     {
       label: "AI ENGINE",
@@ -172,9 +172,20 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       color: exchangeStatus?.killSwitch ? "#ff2255" : "#00ff8a",
     },
     {
-      label: "SIGNALS GEN",
-      value: engine?.signalsGenerated ?? 0,
-      color: "#4a8fa8",
+      label: "MIN CONF",
+      value: `${settings?.minConfidence ?? 60}%`,
+      color: "#00f0ff",
+    },
+    {
+      label: "ACCT MODE",
+      value: settings?.autoMode ? "AUTO" : "MANUAL",
+      color: settings?.autoMode ? "#00ff8a" : "#ffb800",
+      pulse: settings?.autoMode,
+    },
+    {
+      label: "FEES",
+      value: `$${(feeSummary?.totalFeesCollected ?? 0).toFixed(2)}`,
+      color: "#00ff8a",
     },
   ];
 

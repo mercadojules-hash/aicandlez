@@ -12,6 +12,14 @@ export function AIBriefCard({ engine }: Props) {
       <div className="flex items-center gap-2 px-3 py-2 border-b border-[#0E2235]">
         <Brain className="w-3.5 h-3.5 text-[#00eeff]" />
         <span className="text-[9px] font-bold tracking-[0.18em] text-[#00eeff]">AI MARKET BRIEF</span>
+        {engine?.recentErrors && engine.recentErrors.length > 0 && (
+          <span
+            className="ml-auto text-[7px] font-bold px-1.5 py-0.5 rounded font-mono"
+            style={{ background: "#ff225510", color: "#ff2255", border: "1px solid #ff225530" }}
+          >
+            {engine.recentErrors.length} ERR
+          </span>
+        )}
       </div>
 
       <div className="p-2">
@@ -22,12 +30,15 @@ export function AIBriefCard({ engine }: Props) {
         ) : (
           <div className="space-y-1.5">
             {breakdowns.map((bd) => {
-              const color = SYMBOL_COLOR[bd.symbol] ?? "#4a8fa8";
-              const lbl   = bd.symbol.replace("USD", "");
-              const rsi   = bd.fast.rsi;
-              const emaOk = bd.fast.ema9 > bd.fast.ema21;
-              const isBuy = bd.agreedAction === "BUY";
+              const color  = SYMBOL_COLOR[bd.symbol] ?? "#4a8fa8";
+              const lbl    = bd.symbol.replace("USD", "");
+              const rsi    = bd.fast.rsi;
+              const isBuy  = bd.agreedAction === "BUY";
               const isSell = bd.agreedAction === "SELL";
+
+              const emaSig  = bd.fast.emaSignal ?? (bd.fast.ema9 > bd.fast.ema21 ? "bullish" : "bearish");
+              const emaUp   = emaSig === "bullish";
+
               return (
                 <div
                   key={bd.symbol}
@@ -52,6 +63,11 @@ export function AIBriefCard({ engine }: Props) {
                       >
                         {bd.agreedAction}
                       </span>
+                      {bd.volumeConfirmed ? (
+                        <span className="text-[7px] font-mono" style={{ color: "#00ff8860" }}>✓VOL</span>
+                      ) : (
+                        <span className="text-[7px] font-mono" style={{ color: "#ff225550" }}>✗VOL</span>
+                      )}
                       <span
                         className={`text-[7px] font-mono ml-auto ${
                           rsi > 70 ? "text-[#ff336670]" : rsi < 35 ? "text-[#00ff8870]" : "text-[#1e4060]"
@@ -61,11 +77,25 @@ export function AIBriefCard({ engine }: Props) {
                       </span>
                     </div>
                     <div className="text-[7px] text-[#1a4060] leading-snug truncate font-mono">
-                      {emaOk ? "EMA BULLISH (9>21)" : "EMA BEARISH (9<21)"} · MACD {bd.fast.macdState}
+                      {emaUp ? "EMA BULLISH" : "EMA BEARISH"} ({emaSig}) · MACD {bd.fast.macdState}
                     </div>
                     {bd.blockReason && bd.blockReason !== "None" && (
                       <div className="text-[7px] text-[#ffb80060] mt-0.5 truncate">⚠ {bd.blockReason}</div>
                     )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span
+                      className="text-[7px] font-mono"
+                      style={{
+                        color: bd.marketCondition === "trending" ? "#ffb80070" :
+                               bd.marketCondition === "volatile" ? "#ff225570" : "#1a3850",
+                      }}
+                    >
+                      {bd.marketCondition?.toUpperCase() ?? ""}
+                    </span>
+                    <span className="text-[8px] font-bold font-mono" style={{ color }}>
+                      {bd.avgConfidence.toFixed(0)}%
+                    </span>
                   </div>
                 </div>
               );

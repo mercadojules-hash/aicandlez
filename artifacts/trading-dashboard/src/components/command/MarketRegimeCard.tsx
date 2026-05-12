@@ -1,5 +1,6 @@
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { SymBreakdown } from "./types";
+import { SYMBOL_COLOR } from "./types";
 import { ago } from "./helpers";
 
 interface Props { breakdowns: SymBreakdown[]; lastTickAt: number | null }
@@ -8,40 +9,40 @@ export function MarketRegimeCard({ breakdowns, lastTickAt }: Props) {
   const buys  = breakdowns.filter((b) => b.agreedAction === "BUY").length;
   const sells = breakdowns.filter((b) => b.agreedAction === "SELL").length;
   const total = breakdowns.length || 1;
+
   const bullPct = (buys  / total) * 100;
   const bearPct = (sells / total) * 100;
 
   const regime =
-    bullPct >= 60 ? "BULL"           :
-    bearPct >= 60 ? "BEAR"           :
-    buys > sells  ? "MIXED BULLISH"  :
-    sells > buys  ? "MIXED BEARISH"  : "NEUTRAL";
+    bullPct >= 60 ? "BULL"          :
+    bearPct >= 60 ? "BEAR"          :
+    buys > sells  ? "MIXED BULLISH" :
+    sells > buys  ? "MIXED BEARISH" : "NEUTRAL";
 
   const regimeColor =
     regime.includes("BULL") ? "#00ff88" :
-    regime.includes("BEAR") ? "#ff3366" :
-    "#ffb800";
+    regime.includes("BEAR") ? "#ff3366" : "#ffb800";
 
   const RegimeIcon =
-    regime.includes("BULL") ? TrendingUp :
-    regime.includes("BEAR") ? TrendingDown :
-    Minus;
+    regime.includes("BULL") ? TrendingUp  :
+    regime.includes("BEAR") ? TrendingDown : Minus;
 
   const avgConf = breakdowns.length
     ? breakdowns.reduce((s, b) => s + b.avgConfidence, 0) / breakdowns.length
     : 0;
 
-  const directionalBias = buys >= sells ? "BULLISH" : "BEARISH";
-  const biasColor = buys >= sells ? "#00ff88" : "#ff3366";
+  const directionalBias  = buys >= sells ? "BULLISH" : "BEARISH";
+  const biasColor        = buys >= sells ? "#00ff88" : "#ff3366";
+
+  const volConfirmed     = breakdowns.filter((b) => b.volumeConfirmed).length;
+  const trending         = breakdowns.filter((b) => b.marketCondition === "trending").length;
 
   return (
     <div className="terminal-card rounded-lg overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-[#0E2235]">
         <RegimeIcon className="w-3.5 h-3.5" style={{ color: regimeColor }} />
-        <span className="text-[9px] font-bold tracking-[0.18em] text-[#00eeff]">
-          AI MARKET REGIME
-        </span>
+        <span className="text-[9px] font-bold tracking-[0.18em] text-[#00eeff]">AI MARKET REGIME</span>
         <span className="ml-auto text-[8px] text-[#1e4060] font-mono">{ago(lastTickAt)}</span>
       </div>
 
@@ -60,9 +61,9 @@ export function MarketRegimeCard({ breakdowns, lastTickAt }: Props) {
         {/* Bars */}
         <div className="space-y-1.5 mb-3">
           {[
-            { label: "Bullish",  count: buys,               color: "#00ff88" },
-            { label: "Bearish",  count: sells,              color: "#ff3366" },
-            { label: "Neutral",  count: total - buys - sells, color: "#2e5c75" },
+            { label: "Bullish", count: buys,               color: "#00ff88" },
+            { label: "Bearish", count: sells,              color: "#ff3366" },
+            { label: "Neutral", count: total - buys - sells, color: "#2e5c75" },
           ].map(({ label, count, color }) => (
             <div key={label} className="flex items-center gap-2">
               <span className="w-14 text-[8px] text-[#1e4060] font-mono">{label}</span>
@@ -84,7 +85,7 @@ export function MarketRegimeCard({ breakdowns, lastTickAt }: Props) {
 
         {/* Stats row */}
         <div className="neon-divider mb-2" />
-        <div className="grid grid-cols-2 gap-2 text-[8px] font-mono">
+        <div className="grid grid-cols-2 gap-2 text-[8px] font-mono mb-3">
           <div>
             <div className="text-[#0E2235] uppercase tracking-widest">DIRECTIONAL BIAS</div>
             <div className="font-bold mt-0.5" style={{ color: biasColor }}>{directionalBias}</div>
@@ -94,6 +95,69 @@ export function MarketRegimeCard({ breakdowns, lastTickAt }: Props) {
             <div className="font-bold mt-0.5 text-[#00eeff]">{avgConf.toFixed(1)}%</div>
           </div>
         </div>
+
+        {/* Volume + condition summary */}
+        {breakdowns.length > 0 && (
+          <>
+            <div className="neon-divider mb-2" />
+            <div className="grid grid-cols-2 gap-2 text-[8px] font-mono mb-3">
+              <div>
+                <div className="text-[#0E2235] uppercase tracking-widest">VOL CONFIRMED</div>
+                <div
+                  className="font-bold mt-0.5"
+                  style={{ color: volConfirmed > 0 ? "#00ff88" : "#ff3366" }}
+                >
+                  {volConfirmed}/{total}
+                </div>
+              </div>
+              <div>
+                <div className="text-[#0E2235] uppercase tracking-widest">TRENDING</div>
+                <div
+                  className="font-bold mt-0.5"
+                  style={{ color: trending > 0 ? "#ffb800" : "#1e4060" }}
+                >
+                  {trending}/{total}
+                </div>
+              </div>
+            </div>
+
+            {/* Per-symbol condition strip */}
+            <div className="space-y-1">
+              {breakdowns.map((b) => {
+                const color = SYMBOL_COLOR[b.symbol] ?? "#4a8fa8";
+                const lbl   = b.symbol.replace("USD", "");
+                const trend1H = b.trend1H && b.trend1H !== "unknown" ? b.trend1H : null;
+                return (
+                  <div key={b.symbol} className="flex items-center gap-1.5">
+                    <div
+                      className="w-6 text-[7px] font-bold text-right shrink-0"
+                      style={{ color }}
+                    >
+                      {lbl.slice(0, 3)}
+                    </div>
+                    <div className="flex-1 h-1 bg-[#050e1a] rounded overflow-hidden">
+                      <div
+                        className="h-full rounded"
+                        style={{
+                          width: `${Math.min(100, b.avgConfidence)}%`,
+                          background: color,
+                          opacity: 0.5,
+                        }}
+                      />
+                    </div>
+                    {b.volumeConfirmed
+                      ? <span className="text-[7px] font-mono shrink-0" style={{ color: "#00ff8850" }}>✓</span>
+                      : <span className="text-[7px] font-mono shrink-0" style={{ color: "#ff225540" }}>✗</span>
+                    }
+                    <span className="text-[7px] font-mono shrink-0 w-14 text-[#1a3850]">
+                      {trend1H ? trend1H.toUpperCase() : b.marketCondition?.toUpperCase() ?? ""}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

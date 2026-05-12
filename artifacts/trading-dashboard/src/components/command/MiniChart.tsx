@@ -19,9 +19,9 @@ function MiniTooltip({ active, payload }: any) {
 }
 
 interface Props {
-  symbol:    string;
-  label:     string;
-  color:     string;
+  symbol:     string;
+  label:      string;
+  color:      string;
   breakdown?: SymBreakdown;
 }
 
@@ -42,6 +42,9 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
   const isUp      = (pctChg ?? 0) >= 0;
   const decision  = breakdown?.agreedAction ?? "—";
   const conf      = breakdown?.avgConfidence ?? 0;
+  const rsi       = breakdown?.fast.rsi;
+  const volOk     = breakdown?.volumeConfirmed ?? false;
+  const condition = breakdown?.marketCondition ?? "";
 
   const maxVol = chartData.length ? Math.max(...chartData.map((d) => d.volume)) || 1 : 1;
   const prices = chartData.flatMap((d) => [d.close, d.ema9, d.ema21].filter(Boolean) as number[]);
@@ -59,12 +62,11 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
       className="terminal-card rounded-lg overflow-hidden group transition-all duration-300"
       style={{
         background: "linear-gradient(145deg, #040F1C 0%, #020A14 100%)",
-        border: `1px solid #0D2235`,
+        border: "1px solid #0D2235",
       }}
     >
       {/* Header */}
       <div className="flex items-center gap-2.5 px-3 pt-3 pb-1.5">
-        {/* Symbol badge */}
         <div
           className="w-8 h-8 rounded flex items-center justify-center text-[10px] font-bold shrink-0"
           style={{
@@ -122,20 +124,14 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
 
       {/* Chart area */}
       {isLoading ? (
-        <div
-          className="flex items-center justify-center"
-          style={{ height: 120 }}
-        >
+        <div className="flex items-center justify-center" style={{ height: 120 }}>
           <div
             className="w-5 h-5 rounded-full border-2 animate-spin"
             style={{ borderColor: `${color}30`, borderTopColor: color }}
           />
         </div>
       ) : chartData.length === 0 ? (
-        <div
-          className="flex flex-col items-center justify-center gap-1"
-          style={{ height: 120 }}
-        >
+        <div className="flex flex-col items-center justify-center gap-1" style={{ height: 120 }}>
           <div className="text-[10px] text-[#0E2235] font-mono">NO DATA</div>
           <div className="text-[8px] text-[#081820] font-mono">API UNAVAILABLE</div>
         </div>
@@ -152,44 +148,52 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
             />
             <Line
               yAxisId="p" dataKey="close"
-              stroke={color} strokeWidth={2}
-              dot={false} isAnimationActive={false}
+              stroke={color} strokeWidth={2} dot={false} isAnimationActive={false}
               style={{ filter: `drop-shadow(0 0 5px ${color}) drop-shadow(0 0 10px ${color}60)` }}
             />
             <Line
               yAxisId="p" dataKey="ema9"
-              stroke="#ffb800" strokeWidth={1.2}
-              dot={false} isAnimationActive={false}
-              strokeDasharray="4 3" connectNulls
-              strokeOpacity={0.75}
+              stroke="#ffb800" strokeWidth={1.2} dot={false} isAnimationActive={false}
+              strokeDasharray="4 3" connectNulls strokeOpacity={0.75}
               style={{ filter: "drop-shadow(0 0 3px #ffb80080)" }}
             />
             <Line
               yAxisId="p" dataKey="ema21"
-              stroke="#00f0ff" strokeWidth={1}
-              dot={false} isAnimationActive={false}
-              strokeDasharray="6 4" connectNulls
-              strokeOpacity={0.55}
+              stroke="#00f0ff" strokeWidth={1} dot={false} isAnimationActive={false}
+              strokeDasharray="6 4" connectNulls strokeOpacity={0.55}
               style={{ filter: "drop-shadow(0 0 3px #00f0ff60)" }}
             />
             {last?.close && (
               <ReferenceLine
                 yAxisId="p" y={last.close}
-                stroke={color} strokeDasharray="3 6"
-                strokeOpacity={0.35}
+                stroke={color} strokeDasharray="3 6" strokeOpacity={0.35}
               />
             )}
           </ComposedChart>
         </ResponsiveContainer>
       )}
 
-      {/* Confidence bar + label */}
+      {/* Footer: confidence + RSI + volume */}
       <div className="px-3 pb-3 pt-1">
         {conf > 0 ? (
           <>
             <div className="flex items-center justify-between mb-1">
               <span className="text-[9px] text-[#1a3850] font-mono tracking-[0.1em]">AI CONF</span>
-              <span className="text-[10px] font-bold font-mono" style={{ color }}>{conf.toFixed(0)}%</span>
+              <div className="flex items-center gap-2">
+                {rsi !== undefined && (
+                  <span
+                    className="text-[9px] font-mono"
+                    style={{
+                      color: rsi > 70 ? "#ff2255" : rsi < 35 ? "#00f0ff" : "#1e4060",
+                    }}
+                  >
+                    RSI {rsi.toFixed(0)}
+                  </span>
+                )}
+                <span className="text-[10px] font-bold font-mono" style={{ color }}>
+                  {conf.toFixed(0)}%
+                </span>
+              </div>
             </div>
             <div className="conf-bar-track" style={{ height: 5 }}>
               <div
@@ -201,6 +205,27 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
                 }}
               />
             </div>
+            {breakdown && (
+              <div className="flex items-center gap-1.5 mt-1">
+                <span
+                  className="text-[7px] font-mono"
+                  style={{ color: volOk ? "#00ff8a70" : "#ff225560" }}
+                >
+                  {volOk ? "✓ VOL" : "✗ VOL"}
+                </span>
+                {condition && (
+                  <span
+                    className="text-[7px] font-mono ml-auto"
+                    style={{
+                      color: condition === "trending" ? "#ffb80060" :
+                             condition === "volatile" ? "#ff225560" : "#1a3850",
+                    }}
+                  >
+                    {condition.toUpperCase()}
+                  </span>
+                )}
+              </div>
+            )}
           </>
         ) : (
           <div className="text-[8px] text-[#0E2235] font-mono text-center tracking-[0.15em]">
