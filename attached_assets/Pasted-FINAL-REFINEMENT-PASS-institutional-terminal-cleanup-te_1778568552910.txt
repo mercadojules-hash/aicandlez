@@ -1,0 +1,241 @@
+FINAL REFINEMENT PASS — institutional terminal cleanup + telemetry optimization.
+
+The dashboard is VERY close now. This final pass is about hierarchy, spacing, readability, and institutional polish.
+
+KEEP:
+
+* the current 8-chart horizontal layout
+* the current chart sizing
+* the current right-side stack
+* the current black styling direction
+* the current ticker bars
+* the current telemetry aesthetic
+
+DO NOT:
+
+* redesign the dashboard
+* move the charts again
+* revert any recent work
+* add gradients
+* add glow haze
+* use charcoal/navy interiors
+
+==================================================
+
+1. TRUE PURE BLACK INTERIORS
+   ==================================================
+
+Several panels are STILL charcoal/navy internally instead of true black.
+
+I need ALL inner container backgrounds changed to:
+
+background: #000000;
+
+NOT:
+
+* #07111a
+* #050e1a
+* #08131d
+* gradients
+* navy overlays
+
+Affected panels STILL needing cleanup:
+
+* AI Opportunity Scanner
+* AI Market Regime
+* AI Threat Monitor
+* top telemetry rows
+* ticker telemetry cells
+* right-side inner cards
+* active trades rows
+* lower telemetry cells
+
+The neon colors need maximum contrast against PURE OLED black.
+
+Also:
+
+* reduce glow strength another 20–30%
+* sharper borders
+* cleaner institutional look
+* less cyberpunk haze
+* more Bloomberg/hedge-fund precision
+
+==================================================
+2. TOP TELEMETRY AREA — FILL EMPTY CELLS
+========================================
+
+The empty spaces in the top-right telemetry rows should become meaningful institutional metrics.
+
+Populate remaining empty telemetry cells with:
+
+* ACTIVE USERS
+* API LATENCY
+* AI CONFIDENCE
+* OPEN POSITIONS
+* CONNECTED EXCHANGES
+* DAILY VOLUME
+* REALIZED PNL
+* ACCOUNT HEALTH
+
+These should inherit the SAME visual style as existing telemetry cells:
+
+* pure black interiors
+* neon numeric values
+* compact labels
+* crisp borders
+
+==================================================
+3. ACTIVE TRADES PANEL
+======================
+
+The area under Active Trades is wasted space.
+
+DO THIS:
+
+* increase Active Trades height significantly
+* allow the Active Trades panel to fill more vertical space
+* add vertical scrolling
+* more visible rows
+* denser institutional trade-terminal feel
+
+Keep:
+
+* OPEN badges
+* symbol coloring
+* BUY/SELL color coding
+* timestamp alignment
+
+Goal:
+institutional live blotter / hedge-fund execution feed.
+
+==================================================
+4. LOWER TELEMETRY ROWS
+=======================
+
+The lower section should become cleaner horizontal telemetry rows.
+
+Current structure feels fragmented.
+
+Make:
+
+* Active Trades
+* Risk Status
+* AI Market Brief
+* Broker / Exchange
+* Platform Fees
+
+all feel like ONE coordinated telemetry zone.
+
+Requirements:
+
+* equal visual hierarchy
+* aligned heights
+* consistent padding
+* pure black interiors
+* brighter typography
+* stronger neon contrast
+* tighter spacing
+* more readable values
+
+==================================================
+5. RIGHT PANEL CLEANUP
+======================
+
+AI Opportunity Scanner:
+
+* increase readability
+* slightly larger confidence %
+* stronger hierarchy
+* black internals
+
+AI Market Regime:
+
+* larger BULLISH/BEARISH label
+* stronger AI conviction bar
+* cleaner spacing
+* black internals
+
+AI Threat Monitor:
+
+* stronger warning hierarchy
+* cleaner row spacing
+* more readable warning text
+* black internals
+
+==================================================
+6. LIVE TERMINAL FEED
+=====================
+
+KEEP current structure.
+
+JUST:
+
+* slightly larger
+* denser rows
+* stronger scrolling behavior
+* more visible confidence movement
+* more alive
+* more active
+
+The terminal should feel:
+
+* HFT
+* autonomous AI execution
+* institutional signal stream
+
+==================================================
+7. CHARTS
+=========
+
+KEEP the current chart layout.
+
+JUST improve:
+
+* whole-line wave motion
+* smoother interpolation
+* subtle live movement across ENTIRE line
+* less endpoint-only behavior
+* TradingView/Bloomberg style drift
+
+The charts should feel:
+
+* alive
+* breathing
+* continuously updating
+* realtime
+
+==================================================
+8. VERY IMPORTANT
+=================
+
+DO NOT shrink fonts again.
+
+The larger typography direction is CORRECT.
+
+Prioritize:
+
+* readability
+* density
+* hierarchy
+* institutional clarity
+
+NOT:
+
+* tiny futuristic text
+* excessive glow
+* empty space
+* weak contrast
+
+==================================================
+9. FINAL DELIVERABLE
+====================
+
+Once complete:
+
+* send updated Replit preview link
+* send updated downloadable build link
+* confirm all telemetry backgrounds are TRUE black
+* confirm Active Trades scroll works
+* confirm top telemetry cells populated
+* confirm right-side containers cleaned up
+* confirm chart interpolation improved

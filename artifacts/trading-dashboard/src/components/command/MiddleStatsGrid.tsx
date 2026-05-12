@@ -7,21 +7,21 @@ function StatBox({
 }: { label: string; value: string; sub?: string; color?: string }) {
   return (
     <div
-      className="rounded p-3 text-center"
-      style={{ background: "#050505", border: "1px solid #181818" }}
+      className="rounded text-center"
+      style={{ background: "#050505", border: "1px solid #181818", padding: "14px 12px" }}
     >
       <div
-        className="text-[18px] font-bold font-mono leading-none mb-1 tabular-nums"
-        style={{ color, textShadow: `0 0 12px ${color}45` }}
+        className="font-bold font-mono leading-none mb-1.5 tabular-nums"
+        style={{ fontSize: 20, color, textShadow: `0 0 10px ${color}35` }}
       >
         {value}
       </div>
       {sub && (
-        <div className="text-[8px] font-mono mt-0.5 tracking-[0.08em]" style={{ color: "#1a2a35" }}>{sub}</div>
+        <div className="text-[9px] font-mono mt-1 tracking-[0.1em]" style={{ color: "#1a2a35" }}>{sub}</div>
       )}
       <div
-        className="text-[8px] uppercase tracking-[0.15em] mt-1 font-mono"
-        style={{ color: "#1a2a35" }}
+        className="font-mono uppercase mt-1"
+        style={{ fontSize: 9, letterSpacing: "0.15em", color: "#1a2a35" }}
       >
         {label}
       </div>
@@ -30,10 +30,10 @@ function StatBox({
 }
 
 export function MiddleStatsGrid({ trades, engine }: Props) {
-  const all    = trades ?? [];
-  const open   = all.filter((t) => t.status === "open");
-  const closed = all.filter((t) => t.status === "closed");
-  const wins   = closed.filter((t) => (t.pnl ?? 0) > 0);
+  const all     = trades ?? [];
+  const open    = all.filter((t) => t.status === "open");
+  const closed  = all.filter((t) => t.status === "closed");
+  const wins    = closed.filter((t) => (t.pnl ?? 0) > 0);
   const winRate = closed.length ? (wins.length / closed.length) * 100 : 0;
   const totalPnl = closed.reduce((s, t) => s + (t.pnl ?? 0), 0);
   const exposure = open.reduce((s, t) => s + (t.amount ?? 0), 0);
@@ -46,31 +46,37 @@ export function MiddleStatsGrid({ trades, engine }: Props) {
     execCount > 3    ? "MEDIUM"   : "LOW";
 
   const riskColor =
-    riskLevel === "CRITICAL" ? "#ff3366" :
+    riskLevel === "CRITICAL" ? "#ff3355" :
     riskLevel === "HIGH"     ? "#ff8800" :
-    riskLevel === "MEDIUM"   ? "#ffb800" : "#00ff88";
+    riskLevel === "MEDIUM"   ? "#ffb800" : "#00ff8a";
 
   return (
-    <div className="terminal-card rounded-lg overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b" style={{ borderBottomColor: "#141414" }}>
+    <div
+      className="rounded-lg overflow-hidden"
+      style={{ background: "#000000", border: "1px solid #1c1c1c" }}
+    >
+      <div
+        className="flex items-center gap-2 px-4 py-3 border-b"
+        style={{ borderBottomColor: "#141414", background: "#000000" }}
+      >
         <div className="live-dot live-dot-cyan" style={{ width: 5, height: 5 }} />
-        <span className="text-[10px] font-bold tracking-[0.18em] font-mono" style={{ color: "#00eeff" }}>
+        <span className="text-[10px] font-bold tracking-[0.22em] font-mono" style={{ color: "#00eeff" }}>
           PORTFOLIO SNAPSHOT
         </span>
       </div>
-      <div className="p-2.5">
+      <div className="p-3">
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           <StatBox
             label="WIN RATE"
             value={`${winRate.toFixed(0)}%`}
             sub={`${wins.length}W / ${closed.length - wins.length}L`}
-            color={winRate >= 50 ? "#00ff88" : "#ff3366"}
+            color={winRate >= 50 ? "#00ff8a" : "#ff3355"}
           />
           <StatBox
             label="TOTAL P&L"
             value={`${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(0)}`}
             sub={`${closed.length} closed`}
-            color={totalPnl >= 0 ? "#00ff88" : "#ff3366"}
+            color={totalPnl >= 0 ? "#00ff8a" : "#ff3355"}
           />
           <StatBox
             label="EXPOSURE"

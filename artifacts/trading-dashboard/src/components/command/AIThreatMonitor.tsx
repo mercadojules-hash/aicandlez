@@ -28,7 +28,7 @@ function assess(engine: EngineStatus | undefined, bds: any[]) {
   if (volatile >= 3) {
     score += 25; warnings.push({ msg: `${volatile} assets in volatile regime`, level: "high" });
   } else if (volatile >= 1) {
-    score += 10; warnings.push({ msg: `${volatile} asset(s) showing volatility`, level: "med" });
+    score += 10; warnings.push({ msg: `${volatile} asset(s) showing elevated volatility`, level: "med" });
   }
   if (volOk < bds.length * 0.4) {
     score += 20; warnings.push({ msg: "Volume confirmation below threshold", level: "med" });
@@ -53,7 +53,7 @@ function assess(engine: EngineStatus | undefined, bds: any[]) {
 }
 
 const warnColor = (l: Warning["level"]) =>
-  l === "high" ? "#ff3355" : l === "med" ? "#ffaa00" : "#00ff8a70";
+  l === "high" ? "#ff3355" : l === "med" ? "#ffaa00" : "#00ff8a";
 
 export function AIThreatMonitor({ engine, breakdowns = [] }: Props) {
   const t = assess(engine, breakdowns);
@@ -67,40 +67,40 @@ export function AIThreatMonitor({ engine, breakdowns = [] }: Props) {
   }, [t.risk]);
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ background: "#080808", border: "1px solid #181818" }}>
+    <div className="rounded-lg overflow-hidden" style={{ background: "#000000", border: "1px solid #1c1c1c" }}>
 
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b" style={{ borderBottomColor: "#181818", background: "#050505" }}>
+      <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderBottomColor: "#141414", background: "#000000" }}>
         <div className="flex-1">
-          <div className="text-[10px] font-bold tracking-[0.2em] font-mono" style={{ color: "#00aaff" }}>
+          <div className="text-[10px] font-bold tracking-[0.22em] font-mono" style={{ color: "#00aaff" }}>
             AI THREAT MONITOR
           </div>
-          <div className="text-[8px] font-mono text-[#2a4050] tracking-[0.1em] mt-0.5">
+          <div className="text-[8px] font-mono tracking-[0.12em] mt-0.5" style={{ color: "#1a2a35" }}>
             AUTONOMOUS RISK ENVIRONMENT ANALYSIS
           </div>
         </div>
         <span
-          className="text-[9px] font-bold px-2 py-0.5 rounded font-mono tracking-[0.1em]"
-          style={{ background: `${t.color}12`, color: t.color, border: `1px solid ${t.color}30` }}
+          className="text-[9px] font-bold px-2 py-0.5 rounded font-mono tracking-[0.12em]"
+          style={{ background: `${t.color}0e`, color: t.color, border: `1px solid ${t.color}28` }}
         >
           {t.level}
         </span>
       </div>
 
-      <div className="p-3">
+      <div className="p-4">
         {/* Risk bar */}
-        <div className="mb-3">
-          <div className="flex items-center justify-between text-[9px] font-mono mb-1.5">
-            <span className="text-[#2a4050] tracking-[0.1em]">ENVIRONMENTAL RISK</span>
-            <span style={{ color: t.color }} className="font-bold">{t.level}</span>
+        <div className="mb-4">
+          <div className="flex items-center justify-between text-[9px] font-mono mb-2">
+            <span className="tracking-[0.12em]" style={{ color: "#1a2a35" }}>ENVIRONMENTAL RISK</span>
+            <span className="font-bold text-[13px]" style={{ color: t.color }}>{t.level}</span>
           </div>
-          <div className="rounded-sm overflow-hidden" style={{ height: 7, background: "#111111" }}>
+          <div className="rounded-sm overflow-hidden" style={{ height: 7, background: "#0a0a0a" }}>
             <div
               className="h-full rounded-sm"
               style={{
                 width: `${Math.min(100, animRisk)}%`,
-                background: `linear-gradient(90deg, ${t.color}50, ${t.color})`,
-                boxShadow: `0 0 6px ${t.color}50`,
+                background: `linear-gradient(90deg, ${t.color}40, ${t.color}cc)`,
+                boxShadow: `0 0 4px ${t.color}40`,
                 transition: "width 0.3s",
               }}
             />
@@ -108,17 +108,20 @@ export function AIThreatMonitor({ engine, breakdowns = [] }: Props) {
         </div>
 
         {/* Warnings */}
-        <div className="space-y-1.5 mb-3">
+        <div className="space-y-2 mb-4">
           {t.warnings.map((w, i) => (
             <div
               key={i}
-              className="flex items-start gap-2 px-2.5 py-2 rounded border"
-              style={{ background: `${warnColor(w.level)}07`, borderColor: `${warnColor(w.level)}20` }}
+              className="flex items-start gap-3 px-3 py-2.5 rounded"
+              style={{ background: `${warnColor(w.level)}08`, border: `1px solid ${warnColor(w.level)}1a` }}
             >
-              <span style={{ color: warnColor(w.level), fontSize: 10, flexShrink: 0, lineHeight: 1.4 }}>
+              <span style={{ color: warnColor(w.level), fontSize: 12, flexShrink: 0, lineHeight: 1.5 }}>
                 {w.level === "high" ? "⚠" : w.level === "med" ? "●" : "✓"}
               </span>
-              <span className="text-[10px] font-mono leading-snug" style={{ color: warnColor(w.level) + "cc" }}>
+              <span
+                className="text-[10px] font-mono leading-snug font-bold"
+                style={{ color: `${warnColor(w.level)}cc` }}
+              >
                 {w.msg}
               </span>
             </div>
@@ -127,17 +130,25 @@ export function AIThreatMonitor({ engine, breakdowns = [] }: Props) {
 
         {/* Stats */}
         <div
-          className="grid grid-cols-3 gap-2 pt-2.5 border-t"
-          style={{ borderTopColor: "#111111" }}
+          className="grid grid-cols-3 gap-2 pt-3"
+          style={{ borderTop: "1px solid #0a0a0a" }}
         >
           {[
-            { label: "BLOCKED",  value: engine?.tradesBlocked ?? 0, color: "#ff3355" },
-            { label: "SYMBOLS",  value: breakdowns.length,           color: "#00aaff" },
-            { label: "MTF OK",   value: breakdowns.filter((b: any) => b.mtfConfirmed).length, color: "#00ff8a" },
+            { label: "BLOCKED", value: engine?.tradesBlocked ?? 0, color: "#ff3355" },
+            { label: "SYMBOLS", value: breakdowns.length,          color: "#00aaff" },
+            { label: "MTF OK",  value: breakdowns.filter((b: any) => b.mtfConfirmed).length, color: "#00ff8a" },
           ].map(({ label, value, color }) => (
-            <div key={label} className="text-center">
-              <div className="text-[8px] font-mono text-[#2a4050] tracking-[0.08em] mb-0.5">{label}</div>
-              <div className="text-[16px] font-bold font-mono tabular-nums" style={{ color }}>{value}</div>
+            <div
+              key={label}
+              className="text-center rounded p-2"
+              style={{ background: "#050505", border: "1px solid #181818" }}
+            >
+              <div className="text-[8px] font-mono tracking-[0.1em] mb-1" style={{ color: "#1a2a35" }}>
+                {label}
+              </div>
+              <div className="text-[18px] font-bold font-mono tabular-nums" style={{ color }}>
+                {value}
+              </div>
             </div>
           ))}
         </div>
