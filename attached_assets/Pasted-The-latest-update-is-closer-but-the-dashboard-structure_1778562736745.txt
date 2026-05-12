@@ -1,0 +1,141 @@
+The latest update is closer, but the dashboard structure and styling still do NOT match the reference CommandCenter.
+
+Please carefully follow these corrections.
+
+LAYOUT REQUIREMENTS
+
+* Keep the 8-chart wall as the primary top section
+* The charts must go FULL WIDTH horizontally across the dashboard
+* The charts should NOT be compressed into a smaller left area
+
+Under the chart wall:
+LEFT SIDE:
+
+* LIVE TERMINAL FEED
+
+RIGHT SIDE STACK:
+
+* AI OPPORTUNITY SCANNER
+* AI MARKET REGIME
+* AI THREAT MONITOR
+
+The right-side containers should sit vertically stacked to the RIGHT of the Live Terminal Feed, exactly like the reference dashboard structure.
+
+Do NOT place the right-side containers beside the charts.
+They belong BELOW the chart wall.
+
+VISUAL REQUIREMENTS
+The interiors of ALL containers must be:
+
+* matte black
+* deep black
+* not blue haze
+* not gray
+* black so neon colors stand out strongly
+
+This includes:
+
+* chart plotting areas
+* terminal feed background
+* AI Opportunity Scanner interior
+* AI Market Regime interior
+* AI Threat Monitor interior
+
+Reduce overall glow intensity:
+
+* current glow is still too strong
+* use subtle institutional glow
+* Bloomberg / TradingView / Palantir style
+* premium institutional trading UI
+* not cyberpunk arcade
+
+CHART REQUIREMENTS
+The charts are visually better now, but they still feel stale/static.
+
+I need the charts to feel ALIVE like:
+
+* Bloomberg Terminal
+* TradingView
+* institutional live market dashboards
+
+Required behavior:
+
+* smooth continuous movement
+* micro interpolation/drift between candle updates
+* subtle live motion even when backend candles are slow
+* streaming feel
+* realtime animation feel
+* not frozen snapshots
+
+The charts should visually feel:
+
+* active
+* streaming
+* alive
+* realtime
+
+LIVE TERMINAL FEED REQUIREMENTS
+The Live Terminal Feed still has no life.
+
+Problems:
+
+* text too small
+* weak visual hierarchy
+* rows feel dead/static
+* not enough realtime telemetry feeling
+* too much empty space
+* not enough execution-system feel
+
+I need:
+
+* larger readable telemetry text
+* stronger row hierarchy
+* active streaming behavior
+* confidence visibly changing/updating
+* live execution console feel
+* denser information layout
+* realtime autonomous system feeling
+
+The terminal should resemble:
+
+* institutional AI execution telemetry
+* HFT execution console
+* autonomous trading engine
+* Bloomberg/Palantir style telemetry stream
+
+AI OPPORTUNITY SCANNER / MARKET REGIME / THREAT MONITOR
+These containers still do not resemble the reference.
+
+Issues:
+
+* text too small
+* weak hierarchy
+* interiors not black enough
+* weak contrast
+* not enough density
+* too much empty space
+* weak readability
+
+Need:
+
+* larger typography
+* stronger hierarchy
+* black interiors
+* stronger neon contrast
+* more live telemetry feeling
+* more institutional dashboard styling
+* more premium trading terminal feel
+
+IMPORTANT
+Do NOT redesign the whole dashboard.
+Keep the current overall architecture.
+
+Only fix:
+
+* chart wall width/layout
+* chart live movement
+* terminal feed behavior/style
+* right-side container positioning
+* black interiors
+* typography/readability
+* institutional terminal aesthetics
