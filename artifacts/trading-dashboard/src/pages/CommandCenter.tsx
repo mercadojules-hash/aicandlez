@@ -134,7 +134,7 @@ export default function CommandCenter() {
         <CryptoChartGrid breakdowns={breakdowns} />
 
         {/* ⑤ Three-column: Platform Overview | Terminal Feed (fills height) | Scanner */}
-        <div className="grid gap-2" style={{ gridTemplateColumns: "260px 1fr 260px", height: 640 }}>
+        <div className="grid gap-2" style={{ gridTemplateColumns: "260px 1fr 260px", height: 780 }}>
           <PlatformOverviewPanel />
           <RichTerminalFeed engine={engine} />
           <OpportunityScanner breakdowns={breakdowns} />

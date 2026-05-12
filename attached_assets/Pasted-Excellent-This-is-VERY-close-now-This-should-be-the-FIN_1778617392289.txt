@@ -1,0 +1,171 @@
+Excellent. This is VERY close now.
+
+This should be the FINAL visual polish pass before we move into AI Trader infrastructure + exchange expansion.
+
+DO NOT redesign the layout anymore.
+The structure is correct.
+This pass is ONLY:
+
+* readability
+* scale balancing
+* visibility
+* hierarchy
+* container utilization
+
+==================================================
+
+1. LIVE TERMINAL FEED — FINAL FIX
+   ==================================================
+
+This is still underutilizing the container.
+
+Current issue:
+
+* rows are too compressed
+* typography is too tiny
+* content does not visually fill the container
+* too much dead vertical space remains
+* feels disconnected from the Active Trades density
+
+What I want:
+
+* make the ENTIRE terminal section larger visually
+* increase row height slightly
+* increase terminal typography slightly
+* increase spacing between rows
+* make the feed visually denser and more alive
+
+MOST IMPORTANT:
+I want the terminal to show approximately:
+20 visible feed rows
+WITH smooth internal scrolling.
+
+The feed should continuously scroll like:
+
+* Bloomberg terminal
+* exchange execution feed
+* institutional order routing console
+
+The container should feel ACTIVE and FULL.
+
+Keep:
+
+* compact institutional style
+* small typography overall
+
+But:
+
+* scale it UP enough to properly use the space.
+
+==================================================
+2. 8 CRYPTO CHARTS — READABILITY FIX
+====================================
+
+The charts themselves are PERFECT.
+
+The issue is readability.
+
+Current issues:
+
+* labels are too dim
+* values are too faint
+* mini background sparkline/secondary graph is nearly invisible
+* EMA labels are hard to see
+
+Fix:
+
+* brighten all chart labels
+* brighten price values
+* brighten percentages
+* brighten EMA labels
+* increase chart contrast slightly
+
+MOST IMPORTANT:
+The mini chart/sparkline behind the strike line needs to become visible.
+
+Right now:
+
+* it visually disappears into the background
+
+I want:
+
+* slightly brighter stroke
+* slightly higher opacity
+* still subtle
+* still premium
+* but clearly visible
+
+Do NOT:
+
+* change chart layout
+* change chart spacing
+* enlarge cards
+* change the strike lines
+
+Only improve visibility/readability.
+
+==================================================
+3. COMMAND CENTER LEFT SIDEBAR
+==============================
+
+Current issue:
+
+* the category list on the left side does NOT visually match the dashboard quality
+* text is way too tiny
+* labels are hard to read
+* spacing feels cramped
+
+This area should feel:
+
+* premium
+* readable
+* institutional
+* aligned with the dashboard typography system
+
+Fix:
+
+* increase sidebar text size noticeably
+* improve contrast heavily
+* improve spacing/padding
+* make active states brighter
+* improve section hierarchy
+* match the typography quality of the dashboard
+
+DO NOT:
+
+* make it oversized
+* turn it into a consumer UI
+
+Goal:
+institutional but readable.
+
+==================================================
+4. FINAL QUALITY PASS
+=====================
+
+This is now the FINAL visual refinement stage.
+
+Focus ONLY on:
+
+* readability
+* hierarchy
+* contrast
+* spacing balance
+* proper container utilization
+
+Do NOT:
+
+* redesign layouts
+* move sections around
+* create new widgets
+* change dashboard structure
+
+After this pass:
+we move into:
+
+* Binance integration
+* AI Trader infrastructure
+* execution engine upgrades
+* scaling architecture
+* production user systems
+* live AI automation stack

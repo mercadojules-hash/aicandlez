@@ -1,0 +1,133 @@
+One important functionality disappeared during the polish passes:
+
+EXCHANGE SWITCHING.
+
+We need to restore this immediately because it is core functionality.
+
+==================================================
+
+1. EXCHANGE SWITCHER — RESTORE
+   ==================================================
+
+Current issue:
+
+* there is no visible exchange selector anymore
+* users cannot clearly switch between exchanges
+* the existing tiny buttons in the top-right are:
+
+  * too faint
+  * visually useless
+  * not readable
+  * not obviously clickable
+  * not functioning as proper controls
+
+Also:
+We ALREADY have:
+
+* Pause
+* Kill Switch
+  above the charts.
+
+So the tiny duplicate controls in the top-right are unnecessary.
+
+==================================================
+2. WHAT I WANT
+==============
+
+Create a REAL exchange switcher component.
+
+Location:
+Top-right area of the dashboard header.
+
+It should include:
+
+* Kraken
+* Coinbase
+* Binance (prepare placeholder now)
+* Simulation mode
+
+The exchange selector should feel:
+
+* premium
+* institutional
+* clearly interactive
+* obvious functionality
+
+==================================================
+3. VISUAL STYLE
+===============
+
+DO NOT:
+
+* use tiny dim pills
+* use near-invisible buttons
+* duplicate kill switch controls
+
+DO:
+
+* use clear segmented controls or tabs
+* brighter active state
+* readable typography
+* hover states
+* visible borders
+* active glow/subtle highlight
+
+Think:
+institutional exchange terminal.
+
+==================================================
+4. FUNCTIONAL REQUIREMENTS
+==========================
+
+The switcher must:
+
+* clearly show current active exchange
+* support future scaling to more exchanges
+* visually support:
+
+  * Kraken
+  * Coinbase
+  * Binance
+  * Simulation
+
+Binance can remain:
+
+* placeholder
+* disabled
+* “coming soon”
+
+But the UI must already support it cleanly.
+
+==================================================
+5. CLEANUP
+==========
+
+Remove the current faint useless top-right controls entirely.
+
+Keep ONLY:
+
+* proper exchange switcher
+* existing command center controls above charts
+  (SIM / PAUSE / KILL etc.)
+
+No duplicated controls.
+
+==================================================
+6. IMPORTANT
+============
+
+This is functionality restoration — not redesign.
+
+Do NOT:
+
+* move layout sections
+* redesign dashboard
+* resize charts
+* touch active trades
+* touch analytics rows
+
+ONLY:
+
+* restore exchange switching properly
+* remove useless duplicate controls
+* improve usability + visibility

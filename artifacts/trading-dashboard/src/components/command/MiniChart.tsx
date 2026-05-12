@@ -33,12 +33,11 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
     queryKey:        ["candles-cmd", symbol, "15m", 60],
     queryFn:         () =>
       fetch(`/api/candles?symbol=${symbol}&timeframe=15m&limit=60`, { cache: "no-store" })
-        .then((r) => r.ok ? r.json() : []),
+        .then(r => r.ok ? r.json() : []),
     refetchInterval: 20_000,
     ...Q_OPTS,
   });
 
-  // baseData is the immutable anchor — never modified
   const [baseData, setBaseData] = useState<ChartPt[]>([]);
   useEffect(() => {
     if (candles && candles.length) setBaseData(buildChartData(candles));
@@ -59,7 +58,6 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
     setHeaderPrice(baseClose);
     setChartData(baseData);
 
-    // 320ms: header price micro-tick
     const headerTick = setInterval(() => {
       phase.current += 0.18 + Math.random() * 0.09;
       const sinStep  = Math.sin(phase.current) * baseClose * 0.00042;
@@ -72,14 +70,12 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
       setHeaderPrice(baseClose + globalDrift.current);
     }, 320);
 
-    // 800ms: full-line wave — phase-shifted sine across ALL points
     const chartTick = setInterval(() => {
       const drift     = globalDrift.current;
-      const waveAmp   = baseClose * 0.0028; // 0.28% amplitude — slightly stronger
+      const waveAmp   = baseClose * 0.0028;
       const snapPhase = phase.current;
       setChartData(
         baseData.map((pt, i) => {
-          // Ripple wave: each point at different phase + envelope for natural feel
           const wave = Math.sin(snapPhase + i * 0.20) * waveAmp
                      * (0.4 + 0.6 * Math.sin(i * 0.10 + snapPhase * 0.3));
           return { ...pt, close: pt.close + drift + wave };
@@ -100,16 +96,16 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
   const rsi       = breakdown?.fast.rsi;
   const volOk     = breakdown?.volumeConfirmed ?? false;
 
-  const maxVol = chartData.length ? Math.max(...chartData.map((d) => d.volume)) || 1 : 1;
-  const prices = chartData.flatMap((d) => [d.close, d.ema9, d.ema21].filter(Boolean) as number[]);
+  const maxVol = chartData.length ? Math.max(...chartData.map(d => d.volume)) || 1 : 1;
+  const prices = chartData.flatMap(d => [d.close, d.ema9, d.ema21].filter(Boolean) as number[]);
   const pMin   = prices.length ? Math.min(...prices) : 0;
   const pMax   = prices.length ? Math.max(...prices) : 1;
   const pad    = (pMax - pMin) * 0.14;
 
   const dCfg =
-    decision === "BUY"  ? { bg: "#00ff8a07", text: "#00ff8a", border: "#00ff8a20" } :
-    decision === "SELL" ? { bg: "#ff225507", text: "#ff2255", border: "#ff225520" } :
-    { bg: "#ffffff04", text: "#1e2d3a", border: "#ffffff06" };
+    decision === "BUY"  ? { bg: "#00ff8a0c", text: "#00ff8a", border: "#00ff8a28" } :
+    decision === "SELL" ? { bg: "#ff22550c", text: "#ff2255", border: "#ff225528" } :
+    { bg: "#ffffff05", text: "#4a6a80", border: "#ffffff0a" };
 
   const [priceFlash, setFlash] = useState(false);
   const prevPriceRef           = useRef<number | null>(null);
@@ -127,29 +123,30 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
       {/* Header */}
       <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
         <div className="flex-1 min-w-0">
-          <div className="text-[9px] font-mono tracking-wider" style={{ color: "#1e2d3a" }}>
+          {/* Symbol label — now properly readable */}
+          <div className="text-[9px] font-mono tracking-wider font-semibold" style={{ color: "#9FB3C8" }}>
             {symbol.replace("USD", "/USD")}
           </div>
           {livePrice !== null ? (
             <div
-              className="text-[15px] font-mono font-bold leading-none mt-0.5 tabular-nums"
-              style={{ color: priceFlash ? (isUp ? "#00ff8a" : "#ff3355") : color, transition: "color 0.12s" }}
+              className="text-[17px] font-mono font-bold leading-none mt-0.5 tabular-nums"
+              style={{ color: priceFlash ? (isUp ? "#00ff8a" : "#ff3355") : "#EAF2FF", transition: "color 0.12s" }}
             >
               ${fmtPrice(livePrice)}
             </div>
           ) : (
-            <div className="text-[10px] mt-0.5 font-mono" style={{ color: "#0a1520" }}>—</div>
+            <div className="text-[10px] mt-0.5 font-mono" style={{ color: "#1a2a35" }}>—</div>
           )}
         </div>
         <div className="flex flex-col items-end gap-0.5 shrink-0">
           {pctChg !== null && (
-            <span className="text-[12px] font-bold font-mono tabular-nums"
+            <span className="text-[13px] font-bold font-mono tabular-nums"
               style={{ color: isUp ? "#00ff8a" : "#ff3355" }}>
               {isUp ? "+" : ""}{pctChg.toFixed(2)}%
             </span>
           )}
           {decision !== "—" && (
-            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded tracking-[0.08em]"
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-[0.08em] font-mono"
               style={{ background: dCfg.bg, color: dCfg.text, border: `1px solid ${dCfg.border}` }}>
               {decision}
             </span>
@@ -157,7 +154,7 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
         </div>
       </div>
 
-      {/* Chart — pure black */}
+      {/* Chart */}
       {isLoading ? (
         <div className="flex items-center justify-center" style={{ height: 92, background: "#000000" }}>
           <div className="w-4 h-4 rounded-full border-2 animate-spin"
@@ -165,7 +162,7 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
         </div>
       ) : chartData.length === 0 ? (
         <div className="flex items-center justify-center text-[8px] font-mono"
-          style={{ height: 92, background: "#000000", color: "#0a1520" }}>
+          style={{ height: 92, background: "#000000", color: "#1a2a35" }}>
           NO DATA
         </div>
       ) : (
@@ -175,20 +172,25 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
               <YAxis yAxisId="p" domain={[pMin - pad, pMax + pad]} hide />
               <YAxis yAxisId="v" domain={[0, maxVol * 5]} hide />
               <Tooltip content={<MiniTooltip />} />
-              <Bar yAxisId="v" dataKey="volume" fill={color} fillOpacity={0.08}
+              {/* Volume bars — brighter fill for visibility */}
+              <Bar yAxisId="v" dataKey="volume" fill={color} fillOpacity={0.18}
                 radius={[1, 1, 0, 0]} isAnimationActive={false} />
-              <Line yAxisId="p" dataKey="ema21" stroke="#00d4ff" strokeWidth={0.8}
+              {/* EMA21 — brighter, more visible */}
+              <Line yAxisId="p" dataKey="ema21" stroke="#00d4ff" strokeWidth={1.2}
                 dot={false} isAnimationActive={false} strokeDasharray="5 4"
-                connectNulls strokeOpacity={0.28} />
-              <Line yAxisId="p" dataKey="ema9" stroke="#ffaa00" strokeWidth={0.8}
+                connectNulls strokeOpacity={0.60} />
+              {/* EMA9 — brighter, more visible */}
+              <Line yAxisId="p" dataKey="ema9" stroke="#ffaa00" strokeWidth={1.2}
                 dot={false} isAnimationActive={false} strokeDasharray="3 3"
-                connectNulls strokeOpacity={0.38} />
-              <Line yAxisId="p" dataKey="close" stroke={color} strokeWidth={1.6}
+                connectNulls strokeOpacity={0.70} />
+              {/* Price line — main chart line */}
+              <Line yAxisId="p" dataKey="close" stroke={color} strokeWidth={1.8}
                 dot={false} isAnimationActive={false}
-                style={{ filter: `drop-shadow(0 0 2px ${color}50)` }} />
+                style={{ filter: `drop-shadow(0 0 3px ${color}60)` }} />
+              {/* Reference strike line — brighter */}
               {lastPt?.close && (
                 <ReferenceLine yAxisId="p" y={lastPt.close}
-                  stroke={color} strokeDasharray="2 6" strokeOpacity={0.16} />
+                  stroke={color} strokeDasharray="2 6" strokeOpacity={0.35} />
               )}
             </ComposedChart>
           </ResponsiveContainer>
@@ -200,24 +202,28 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
         {conf > 0 ? (
           <>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[8px] font-mono tracking-[0.08em]" style={{ color: "#0d1a22" }}>
+              {/* RSI label — now readable */}
+              <span className="text-[9px] font-mono tracking-[0.08em] font-medium" style={{ color: "#9FB3C8" }}>
                 {rsi !== undefined ? `RSI ${rsi.toFixed(0)}` : "AI CONF"}
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-[7px] font-mono"
-                  style={{ color: volOk ? "#00ff8a38" : "#ff225530" }}>
+                <span className="text-[8px] font-mono font-semibold"
+                  style={{ color: volOk ? "#00ff8a70" : "#ff225550" }}>
                   {volOk ? "✓VOL" : "✗VOL"}
                 </span>
-                <span className="text-[11px] font-bold font-mono" style={{ color }}>{conf.toFixed(0)}%</span>
+                <span className="text-[12px] font-bold font-mono tabular-nums" style={{ color }}>
+                  {conf.toFixed(0)}%
+                </span>
               </div>
             </div>
             <div className="rounded-sm overflow-hidden" style={{ height: 3, background: "#0a0a0a" }}>
               <div className="h-full rounded-sm"
-                style={{ width: `${Math.min(100, conf)}%`, background: color, opacity: 0.58 }} />
+                style={{ width: `${Math.min(100, conf)}%`, background: color, opacity: 0.65 }} />
             </div>
           </>
         ) : (
-          <div className="text-[8px] font-mono text-center tracking-[0.1em]" style={{ color: "#0a1520" }}>
+          <div className="text-[9px] font-mono text-center tracking-[0.1em] font-medium"
+            style={{ color: "#4a6a80" }}>
             AWAITING SIGNAL
           </div>
         )}

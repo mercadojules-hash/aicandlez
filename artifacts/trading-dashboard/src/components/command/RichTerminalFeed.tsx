@@ -6,14 +6,14 @@ interface Props { engine: EngineStatus | undefined }
 
 type Category = "ALL" | "SIGNAL" | "TRADE" | "ALERT" | "AI";
 
-const STAGE_CFG: Record<string, { label: string; color: string; icon: string }> = {
-  FILLED:     { label: "TRADE",   color: "#00ff8a", icon: "✓" },
-  EXECUTION:  { label: "EXEC",    color: "#00cc6a", icon: "→" },
-  ROUTING:    { label: "ROUTE",   color: "#00ccff", icon: "⟳" },
-  BLOCKED:    { label: "BLOCK",   color: "#ff3355", icon: "✗" },
-  MONITORING: { label: "AI",      color: "#0099ff", icon: "◆" },
-  VALIDATING: { label: "VALID",   color: "#ffaa00", icon: "⟳" },
-  SCANNING:   { label: "SCAN",    color: "#7b68ee", icon: "◈" },
+const STAGE_CFG: Record<string, { label: string; color: string }> = {
+  FILLED:     { label: "TRADE",   color: "#00ff8a" },
+  EXECUTION:  { label: "EXEC",    color: "#00cc6a" },
+  ROUTING:    { label: "ROUTE",   color: "#00ccff" },
+  BLOCKED:    { label: "BLOCK",   color: "#ff3355" },
+  MONITORING: { label: "AI",      color: "#0099ff" },
+  VALIDATING: { label: "VALID",   color: "#ffaa00" },
+  SCANNING:   { label: "SCAN",    color: "#7b68ee" },
 };
 
 const CAT_COLOR: Record<string, string> = {
@@ -49,13 +49,16 @@ const TABS: { key: Category; label: string }[] = [
 
 export function RichTerminalFeed({ engine }: Props) {
   const raw = [...(engine?.recentSignalLog ?? [])].reverse().slice(0, 80);
-  const [rows,   setRows]  = useState<LiveRow[]>([]);
-  const [filter, setFilter]= useState<Category>("ALL");
-  const [tick,   setTick]  = useState(0);
-  const scrollRef          = useRef<HTMLDivElement>(null);
-  const prevLen            = useRef(0);
+  const [rows,   setRows]   = useState<LiveRow[]>([]);
+  const [filter, setFilter] = useState<Category>("ALL");
+  const [tick,   setTick]   = useState(0);
+  const scrollRef           = useRef<HTMLDivElement>(null);
+  const prevLen             = useRef(0);
 
-  useEffect(() => { const id = setInterval(() => setTick(t => t + 1), 1000); return () => clearInterval(id); }, []);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const next: LiveRow[] = raw.map(s => ({ ...s, _conf: s.confidence, _stage: getStage(s) }));
@@ -78,17 +81,21 @@ export function RichTerminalFeed({ engine }: Props) {
 
   const loopSec  = Math.round((engine?.loopIntervalMs ?? 60000) / 1000);
   const nextTick = loopSec - (tick % loopSec);
-
-  const visible = filter === "ALL" ? rows : rows.filter(r => stageToCategory(r._stage) === filter);
+  const visible  = filter === "ALL" ? rows : rows.filter(r => stageToCategory(r._stage) === filter);
 
   return (
     <div className="terminal-card flex flex-col" style={{ height: "100%" }}>
+
       {/* Header */}
-      <div className="flex items-center gap-3 px-3 py-2 border-b flex-shrink-0"
+      <div className="flex items-center gap-3 px-3 py-2.5 border-b flex-shrink-0"
         style={{ borderBottomColor: "#111111" }}>
-        <span className="panel-header-title" style={{ color: "#00aaff" }}>LIVE TERMINAL FEED</span>
+        <div className="w-1.5 h-1.5 rounded-sm flex-shrink-0"
+          style={{ background: "#00aaff", boxShadow: "0 0 5px #00aaff" }} />
+        <span className="text-[11px] font-bold font-mono tracking-[0.18em]" style={{ color: "#00aaff" }}>
+          LIVE TERMINAL FEED
+        </span>
         <span className="text-[9px] font-mono font-medium" style={{ color: "#9FB3C8" }}>
-          SIGNAL STREAM
+          · SIGNAL STREAM
         </span>
         <div className="ml-auto flex items-center gap-3">
           <span className="text-[9px] font-mono tabular-nums font-medium"
@@ -97,40 +104,40 @@ export function RichTerminalFeed({ engine }: Props) {
           </span>
           {engine?.running ? (
             <span className="flex items-center gap-1.5">
-              <span className="live-dot" style={{ width: 4, height: 4 }} />
-              <span className="text-[8px] font-mono font-bold" style={{ color: "#00ff8a" }}>LIVE</span>
+              <span className="live-dot" style={{ width: 5, height: 5 }} />
+              <span className="text-[9px] font-mono font-bold" style={{ color: "#00ff8a" }}>LIVE</span>
             </span>
           ) : (
-            <span className="text-[8px] font-mono font-medium" style={{ color: "#9FB3C8" }}>IDLE</span>
+            <span className="text-[9px] font-mono font-medium" style={{ color: "#9FB3C8" }}>IDLE</span>
           )}
         </div>
       </div>
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-0.5 px-2 py-1 border-b flex-shrink-0"
+      <div className="flex items-center gap-1 px-3 py-1.5 border-b flex-shrink-0"
         style={{ borderBottomColor: "#0d0d0d", background: "#020202" }}>
         {TABS.map(tab => (
           <button key={tab.key}
             onClick={() => setFilter(tab.key)}
-            className="text-[8px] font-bold font-mono px-2 py-0.5 rounded tracking-wide transition-all"
+            className="text-[9px] font-bold font-mono px-2.5 py-0.5 rounded tracking-wide transition-all"
             style={filter === tab.key
-              ? { background: `${CAT_COLOR[tab.key]}14`, color: CAT_COLOR[tab.key], border: `1px solid ${CAT_COLOR[tab.key]}28` }
+              ? { background: `${CAT_COLOR[tab.key]}14`, color: CAT_COLOR[tab.key], border: `1px solid ${CAT_COLOR[tab.key]}30` }
               : { background: "transparent", color: "#9FB3C8", border: "1px solid transparent" }
             }>
             {tab.label}
           </button>
         ))}
-        <span className="ml-auto text-[8px] font-mono font-medium" style={{ color: "#9FB3C8" }}>
-          {visible.length}
+        <span className="ml-auto text-[9px] font-mono font-semibold tabular-nums" style={{ color: "#C7D4E2" }}>
+          {visible.length} rows
         </span>
       </div>
 
-      {/* Feed — fills remaining space, smooth scroll */}
+      {/* Feed — fills all remaining height */}
       <div ref={scrollRef} className="feed-scroll"
         style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         {visible.length === 0 ? (
-          <div className="flex items-center justify-center py-10">
-            <span className="text-[10px] font-mono animate-pulse font-medium" style={{ color: "#9FB3C8" }}>
+          <div className="flex items-center justify-center py-12">
+            <span className="text-[11px] font-mono animate-pulse font-medium" style={{ color: "#9FB3C8" }}>
               AWAITING SIGNAL STREAM…
             </span>
           </div>
@@ -147,69 +154,83 @@ export function RichTerminalFeed({ engine }: Props) {
               const isBlocked = stage === "BLOCKED";
               const isFilled  = stage === "FILLED";
               const confColor = s._conf >= 70 ? "#00ff8a" : s._conf >= 50 ? "#ffaa00" : "#ff4466";
-              const ts        = new Date(s.timestamp).toLocaleTimeString("en-US", {
+
+              const ts = new Date(s.timestamp).toLocaleTimeString("en-US", {
                 hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
               });
 
               return (
                 <div key={s.id}
                   style={{
-                    borderBottom: "1px solid #0a0a0a",
-                    borderLeft: `2px solid ${stageCfg.color}${isFilled ? "80" : "28"}`,
-                    background: isBlocked ? "#ff33550a" : isFilled ? "#00ff8a06" : i === 0 ? "#030303" : "transparent",
+                    borderBottom: "1px solid #0d0d0d",
+                    borderLeft: `2px solid ${stageCfg.color}${isFilled ? "90" : "35"}`,
+                    background: isBlocked ? "#ff33550c"
+                      : isFilled  ? "#00ff8a08"
+                      : i === 0   ? "#050505"
+                      : "transparent",
                     animation: i === 0 ? "feed-row-in 0.25s ease-out" : undefined,
                   }}>
-                  <div className="flex items-center gap-2 px-2.5 py-2">
+
+                  {/* Main row — larger padding, larger text */}
+                  <div className="flex items-center gap-2.5 px-3 py-2.5">
                     {/* Stage badge */}
-                    <span className="text-[7px] font-bold font-mono px-1.5 py-0.5 rounded flex-shrink-0"
+                    <span className="text-[8px] font-bold font-mono px-2 py-0.5 rounded flex-shrink-0"
                       style={{
-                        color: stageCfg.color, background: `${stageCfg.color}12`,
-                        border: `1px solid ${stageCfg.color}22`,
-                        minWidth: 38, textAlign: "center",
+                        color: stageCfg.color, background: `${stageCfg.color}14`,
+                        border: `1px solid ${stageCfg.color}28`,
+                        minWidth: 42, textAlign: "center",
                       }}>
                       {stageCfg.label}
                     </span>
 
-                    {/* Timestamp */}
-                    <span className="text-[9px] font-mono tabular-nums flex-shrink-0 font-semibold"
-                      style={{ color: "#C7D4E2" }}>{ts}</span>
+                    {/* Timestamp — larger, more readable */}
+                    <span className="text-[10px] font-mono tabular-nums flex-shrink-0 font-semibold"
+                      style={{ color: "#C7D4E2" }}>
+                      {ts}
+                    </span>
 
-                    {/* Decision */}
-                    <span className="text-[11px] font-bold font-mono flex-shrink-0"
-                      style={{ color: decColor }}>
+                    {/* Decision — clear and prominent */}
+                    <span className="text-[12px] font-bold font-mono flex-shrink-0"
+                      style={{
+                        color: decColor,
+                        textShadow: s.decision !== "HOLD" ? `0 0 8px ${decColor}50` : undefined,
+                      }}>
                       {s.decision}
                     </span>
 
                     {/* Symbol */}
-                    <span className="text-[11px] font-bold font-mono flex-shrink-0" style={{ color: symColor }}>
+                    <span className="text-[12px] font-bold font-mono flex-shrink-0" style={{ color: symColor }}>
                       {sym}
                     </span>
 
-                    {/* Confidence */}
-                    <span className="text-[10px] font-bold font-mono tabular-nums flex-shrink-0"
+                    {/* Confidence — dominant number */}
+                    <span className="text-[11px] font-bold font-mono tabular-nums flex-shrink-0"
                       style={{ color: confColor }}>
                       {s._conf.toFixed(0)}%
                     </span>
 
-                    {/* Reason */}
-                    <span className="text-[9px] font-mono truncate flex-1 font-medium"
-                      style={{ color: isBlocked ? "#ff335565" : "#9FB3C8" }}>
+                    {/* Reason text */}
+                    <span className="text-[10px] font-mono truncate flex-1"
+                      style={{ color: isBlocked ? "#ff335580" : "#9FB3C8" }}>
                       {isBlocked ? `⚠ ${s.blockReason}` : (s.shortSummary ?? "")}
                     </span>
 
                     {/* Exchange chip */}
-                    <span className="text-[7px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
-                      style={{ color: "#C7D4E2", background: "#0d0d0d", border: "1px solid #181818" }}>
+                    <span className="text-[8px] font-mono px-1.5 py-0.5 rounded flex-shrink-0 font-medium"
+                      style={{ color: "#C7D4E2", background: "#0d0d0d", border: "1px solid #1a1a1a" }}>
                       KRK
                     </span>
                   </div>
 
-                  {/* Mini conf bar */}
-                  <div style={{ paddingLeft: 62, paddingRight: 10, paddingBottom: 5 }}>
-                    <div style={{ height: 2, background: "#0a0a0a", borderRadius: 2 }}>
+                  {/* Conf bar — slightly taller for visibility */}
+                  <div style={{ paddingLeft: 68, paddingRight: 12, paddingBottom: 6 }}>
+                    <div style={{ height: 2.5, background: "#0a0a0a", borderRadius: 2 }}>
                       <div style={{
-                        height: "100%", width: `${Math.min(100, s._conf)}%`,
-                        background: confColor, borderRadius: 2, opacity: 0.55,
+                        height: "100%",
+                        width: `${Math.min(100, s._conf)}%`,
+                        background: confColor,
+                        borderRadius: 2,
+                        opacity: 0.6,
                         transition: "width 0.8s ease",
                       }} />
                     </div>
@@ -218,13 +239,13 @@ export function RichTerminalFeed({ engine }: Props) {
               );
             })}
 
-            {/* Terminal cursor line */}
-            <div className="flex items-center gap-2 px-3 py-2" style={{ borderLeft: "2px solid #0d0d0d" }}>
-              <span className="text-[8px] font-mono font-medium" style={{ color: "#9FB3C8" }}>$</span>
-              <span className="text-[8px] font-mono font-medium" style={{ color: "#9FB3C8" }}>
+            {/* Terminal cursor */}
+            <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderLeft: "2px solid #0d0d0d" }}>
+              <span className="text-[10px] font-mono font-semibold" style={{ color: "#C7D4E2" }}>$</span>
+              <span className="text-[10px] font-mono font-medium" style={{ color: "#9FB3C8" }}>
                 {engine?.running
-                  ? `RUNNING · NEXT ${nextTick}s · SIG: ${engine.signalsGenerated ?? 0}`
-                  : "IDLE"}
+                  ? `ENGINE RUNNING · NEXT TICK ${nextTick}s · SIGNALS: ${engine.signalsGenerated ?? 0}`
+                  : "ENGINE IDLE — AWAITING FIRST TICK"}
               </span>
               <span className="cursor-blink" />
             </div>
