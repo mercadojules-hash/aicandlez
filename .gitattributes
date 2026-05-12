@@ -1,3 +1,4 @@
 natura-ai-v1-production.zip filter=lfs diff=lfs merge=lfs -text
 attached_assets/apex-trader-final-export-v1_2_1777869732742.zip filter=lfs diff=lfs merge=lfs -text
 attached_assets/apex-trader-final-working_1778537627526.zip filter=lfs diff=lfs merge=lfs -text
+artifacts/trading-dashboard/public/apex-trader-final-working-v2.zip filter=lfs diff=lfs merge=lfs -text
