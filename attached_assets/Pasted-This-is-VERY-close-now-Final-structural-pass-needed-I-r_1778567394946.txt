@@ -1,0 +1,173 @@
+This is VERY close now. Final structural pass needed.
+
+I reviewed the newest screenshots carefully.
+
+FINAL REQUIRED CHANGES
+
+1. REMOVE “AUTONOMOUS EXECUTION FEED”
+   Delete this entire container completely.
+
+It is:
+
+* wasting space
+* visually weak
+* redundant now
+* hurting layout density
+
+REMOVE IT entirely.
+
+2. EXPAND LIVE TERMINAL FEED
+   The Live Terminal Feed should become the dominant lower-left container.
+
+Increase:
+
+* width
+* height
+* visible rows
+* scrolling depth
+
+I want:
+
+* more telemetry visible at once
+* stronger HFT/institutional feel
+* denser streaming activity
+* larger readable rows
+
+The feed should feel:
+
+* alive
+* continuous
+* streaming
+* operational
+
+3. MOVE “ACTIVE TRADES” DIRECTLY UNDER LIVE FEED
+   Place Active Trades immediately below the Live Terminal Feed.
+
+This creates:
+
+* proper operational grouping
+* execution flow hierarchy
+* better spatial balance
+
+Desired left-side structure:
+
+LIVE TERMINAL FEED
+↓
+ACTIVE TRADES
+
+NOT separated across the dashboard.
+
+4. FILL THE EMPTY DEAD SPACE
+   There is still too much unused vertical space under the feed area.
+
+Compress layout vertically and maximize information density.
+
+NO giant empty black gaps.
+
+5. ALL INNER CONTAINERS MUST BE TRUE BLACK
+   Still seeing charcoal/navy-gray in:
+
+* user info rows
+* exchange info rows
+* some telemetry cells
+* market brief sections
+* risk cells
+* lower telemetry boxes
+
+I want:
+backgrounds:
+
+* #000000
+* #020202
+* #050505 maximum
+
+NO:
+
+* slate
+* navy gray
+* smoky black
+* blue charcoal
+
+Every internal panel should feel:
+
+* matte black
+* OLED black
+* ultra high contrast
+
+6. USER / EXCHANGE INFO ROWS
+   The rows under the ticker strip still need refinement.
+
+I want:
+
+* TWO cleaner rows
+* black interior cells
+* better spacing
+* stronger readability
+* more institutional styling
+
+These rows should look:
+
+* cleaner
+* tighter
+* more premium
+* more like Bloomberg telemetry strips
+
+7. LIVE FEED STILL NEEDS MORE ENERGY
+   Add:
+
+* subtle confidence pulsing
+* tiny telemetry drift
+* smoother scrolling updates
+* slight activity animations
+* more active refresh cadence
+
+It still feels slightly static.
+
+8. CHARTS
+   The charts are MUCH better now.
+
+Only remaining tweak:
+
+* slightly stronger whole-line motion
+* smoother interpolation
+* less endpoint emphasis
+
+Do NOT overdo it.
+Keep it premium and subtle.
+
+9. TOP CONTROL AREA
+   Ensure these are ALWAYS visible:
+
+* Simulation
+* Pause
+* Kill Switch
+* Exchange dropdown
+
+The controls should:
+
+* never disappear
+* never blend into background
+* always remain obvious
+
+10. VERY IMPORTANT
+    After this pass:
+    Please send me:
+
+* the NEW download/export URL
+* the exact component/file map again
+* where exchange switching is controlled
+* where the feed animations are controlled
+* where chart interpolation is controlled
+
+I may fine-tune the realism manually afterward.
+
+This is the final major polish pass.
+The architecture is now close.
+Remaining work is mostly:
+
+* density
+* realism
+* operational flow
+* institutional polish
+* OLED black styling
+* live telemetry feel

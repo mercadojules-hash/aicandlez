@@ -106,8 +106,8 @@ function Row({
     >
       {/* Row label */}
       <div
-        className="shrink-0 flex items-center gap-2 border-r border-[#0C1E2C] px-3 h-full"
-        style={{ minWidth: 80, background: rowBg ? rowBg : "#020810" }}
+        className="shrink-0 flex items-center gap-2 border-r border-[#141414] px-3 h-full"
+        style={{ minWidth: 80, background: "#000000" }}
       >
         {live && (
           <span className="live-dot live-dot-cyan" style={{ width: 6, height: 6 }} />

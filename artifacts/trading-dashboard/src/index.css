@@ -315,8 +315,8 @@
 ════════════════════════════════════════════════════════════════════════════ */
 
 .tele-cell {
-  background: linear-gradient(145deg, #010D1C 0%, #000B14 100%);
-  border: 1px solid #0C1F31;
+  background: #000000;
+  border: 1px solid #181818;
   padding: 10px 12px;
   min-width: 100px;
   position: relative;
@@ -329,12 +329,12 @@
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, #00f0ff18, transparent);
+  background: linear-gradient(90deg, transparent, #00f0ff14, transparent);
   pointer-events: none;
 }
 .tele-cell:hover {
-  border-color: #00f0ff25;
-  box-shadow: 0 0 16px #00f0ff08;
+  border-color: #282828;
+  box-shadow: 0 0 12px #00f0ff06;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════

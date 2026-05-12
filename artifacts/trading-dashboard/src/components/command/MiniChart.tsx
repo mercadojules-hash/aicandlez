@@ -13,7 +13,7 @@ function MiniTooltip({ active, payload }: any) {
   if (!d) return null;
   return (
     <div className="rounded px-2 py-1.5 text-[10px] border"
-      style={{ background: "#000000", borderColor: "#222222" }}>
+      style={{ background: "#000000", borderColor: "#1c1c1c" }}>
       <div className="font-mono font-bold text-[12px]" style={{ color: "#00f0ff" }}>
         ${fmtPrice(d.close)}
       </div>
@@ -38,7 +38,7 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
     ...Q_OPTS,
   });
 
-  // baseData is the immutable anchor from the API — never modified
+  // baseData is the immutable anchor — never modified
   const [baseData, setBaseData] = useState<ChartPt[]>([]);
   useEffect(() => {
     if (candles && candles.length) setBaseData(buildChartData(candles));
@@ -46,9 +46,7 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
 
   const baseClose = baseData[baseData.length - 1]?.close ?? null;
 
-  // Live header price (fast tick)
   const [headerPrice, setHeaderPrice] = useState<number | null>(null);
-  // Full animated chart data (all points wave)
   const [chartData,   setChartData]   = useState<ChartPt[]>([]);
 
   const globalDrift = useRef(0);
@@ -64,8 +62,8 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
     // 320ms: header price micro-tick
     const headerTick = setInterval(() => {
       phase.current += 0.18 + Math.random() * 0.09;
-      const sinStep  = Math.sin(phase.current) * baseClose * 0.00040;
-      const randStep = (Math.random() - 0.48 + bias.current * 0.015) * baseClose * 0.00018;
+      const sinStep  = Math.sin(phase.current) * baseClose * 0.00042;
+      const randStep = (Math.random() - 0.48 + bias.current * 0.015) * baseClose * 0.00020;
       globalDrift.current = Math.max(
         -baseClose * 0.005,
         Math.min(baseClose * 0.005, globalDrift.current + sinStep + randStep),
@@ -74,19 +72,20 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
       setHeaderPrice(baseClose + globalDrift.current);
     }, 320);
 
-    // 850ms: full-line wave — applies phase-varying sine to EVERY point
+    // 800ms: full-line wave — phase-shifted sine across ALL points
     const chartTick = setInterval(() => {
-      const drift    = globalDrift.current;
-      const waveAmp  = baseClose * 0.0022; // 0.22% peak wave amplitude
+      const drift     = globalDrift.current;
+      const waveAmp   = baseClose * 0.0028; // 0.28% amplitude — slightly stronger
       const snapPhase = phase.current;
       setChartData(
         baseData.map((pt, i) => {
-          // Each point gets a different phase offset → creates flowing wave
-          const wave = Math.sin(snapPhase + i * 0.20) * waveAmp * (0.5 + 0.5 * Math.sin(i * 0.11));
+          // Ripple wave: each point at different phase + envelope for natural feel
+          const wave = Math.sin(snapPhase + i * 0.20) * waveAmp
+                     * (0.4 + 0.6 * Math.sin(i * 0.10 + snapPhase * 0.3));
           return { ...pt, close: pt.close + drift + wave };
         })
       );
-    }, 850);
+    }, 800);
 
     return () => { clearInterval(headerTick); clearInterval(chartTick); };
   }, [baseClose, baseData.length]);
@@ -108,16 +107,16 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
   const pad    = (pMax - pMin) * 0.14;
 
   const dCfg =
-    decision === "BUY"  ? { bg: "#00ff8a08", text: "#00ff8a", border: "#00ff8a22" } :
-    decision === "SELL" ? { bg: "#ff225508", text: "#ff2255", border: "#ff225522" } :
-    { bg: "#ffffff04", text: "#2a3a48", border: "#ffffff06" };
+    decision === "BUY"  ? { bg: "#00ff8a07", text: "#00ff8a", border: "#00ff8a20" } :
+    decision === "SELL" ? { bg: "#ff225507", text: "#ff2255", border: "#ff225520" } :
+    { bg: "#ffffff04", text: "#1e2d3a", border: "#ffffff06" };
 
   const [priceFlash, setFlash] = useState(false);
   const prevPriceRef           = useRef<number | null>(null);
   useEffect(() => {
     if (livePrice !== null && prevPriceRef.current !== null && livePrice !== prevPriceRef.current) {
       setFlash(true);
-      setTimeout(() => setFlash(false), 200);
+      setTimeout(() => setFlash(false), 180);
     }
     prevPriceRef.current = livePrice;
   }, [livePrice]);
@@ -128,18 +127,18 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
       {/* Header */}
       <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
         <div className="flex-1 min-w-0">
-          <div className="text-[9px] font-mono tracking-wider" style={{ color: "#2a4050" }}>
+          <div className="text-[9px] font-mono tracking-wider" style={{ color: "#1e2d3a" }}>
             {symbol.replace("USD", "/USD")}
           </div>
           {livePrice !== null ? (
             <div
               className="text-[15px] font-mono font-bold leading-none mt-0.5 tabular-nums"
-              style={{ color: priceFlash ? (isUp ? "#00ff8a" : "#ff3355") : color, transition: "color 0.15s" }}
+              style={{ color: priceFlash ? (isUp ? "#00ff8a" : "#ff3355") : color, transition: "color 0.12s" }}
             >
               ${fmtPrice(livePrice)}
             </div>
           ) : (
-            <div className="text-[10px] mt-0.5 font-mono" style={{ color: "#111111" }}>—</div>
+            <div className="text-[10px] mt-0.5 font-mono" style={{ color: "#0a1520" }}>—</div>
           )}
         </div>
         <div className="flex flex-col items-end gap-0.5 shrink-0">
@@ -162,11 +161,11 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
       {isLoading ? (
         <div className="flex items-center justify-center" style={{ height: 92, background: "#000000" }}>
           <div className="w-4 h-4 rounded-full border-2 animate-spin"
-            style={{ borderColor: `${color}15`, borderTopColor: color + "70" }} />
+            style={{ borderColor: `${color}12`, borderTopColor: color + "65" }} />
         </div>
       ) : chartData.length === 0 ? (
         <div className="flex items-center justify-center text-[8px] font-mono"
-          style={{ height: 92, background: "#000000", color: "#111111" }}>
+          style={{ height: 92, background: "#000000", color: "#0a1520" }}>
           NO DATA
         </div>
       ) : (
@@ -176,20 +175,20 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
               <YAxis yAxisId="p" domain={[pMin - pad, pMax + pad]} hide />
               <YAxis yAxisId="v" domain={[0, maxVol * 5]} hide />
               <Tooltip content={<MiniTooltip />} />
-              <Bar yAxisId="v" dataKey="volume" fill={color} fillOpacity={0.09}
+              <Bar yAxisId="v" dataKey="volume" fill={color} fillOpacity={0.08}
                 radius={[1, 1, 0, 0]} isAnimationActive={false} />
               <Line yAxisId="p" dataKey="ema21" stroke="#00d4ff" strokeWidth={0.8}
                 dot={false} isAnimationActive={false} strokeDasharray="5 4"
-                connectNulls strokeOpacity={0.30} />
+                connectNulls strokeOpacity={0.28} />
               <Line yAxisId="p" dataKey="ema9" stroke="#ffaa00" strokeWidth={0.8}
                 dot={false} isAnimationActive={false} strokeDasharray="3 3"
-                connectNulls strokeOpacity={0.40} />
+                connectNulls strokeOpacity={0.38} />
               <Line yAxisId="p" dataKey="close" stroke={color} strokeWidth={1.6}
                 dot={false} isAnimationActive={false}
-                style={{ filter: `drop-shadow(0 0 2px ${color}55)` }} />
+                style={{ filter: `drop-shadow(0 0 2px ${color}50)` }} />
               {lastPt?.close && (
                 <ReferenceLine yAxisId="p" y={lastPt.close}
-                  stroke={color} strokeDasharray="2 6" strokeOpacity={0.18} />
+                  stroke={color} strokeDasharray="2 6" strokeOpacity={0.16} />
               )}
             </ComposedChart>
           </ResponsiveContainer>
@@ -201,24 +200,24 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
         {conf > 0 ? (
           <>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[8px] font-mono tracking-[0.08em]" style={{ color: "#1e3040" }}>
+              <span className="text-[8px] font-mono tracking-[0.08em]" style={{ color: "#0d1a22" }}>
                 {rsi !== undefined ? `RSI ${rsi.toFixed(0)}` : "AI CONF"}
               </span>
               <div className="flex items-center gap-2">
                 <span className="text-[7px] font-mono"
-                  style={{ color: volOk ? "#00ff8a40" : "#ff225535" }}>
+                  style={{ color: volOk ? "#00ff8a38" : "#ff225530" }}>
                   {volOk ? "✓VOL" : "✗VOL"}
                 </span>
                 <span className="text-[11px] font-bold font-mono" style={{ color }}>{conf.toFixed(0)}%</span>
               </div>
             </div>
-            <div className="rounded-sm overflow-hidden" style={{ height: 3, background: "#111111" }}>
+            <div className="rounded-sm overflow-hidden" style={{ height: 3, background: "#0a0a0a" }}>
               <div className="h-full rounded-sm"
-                style={{ width: `${Math.min(100, conf)}%`, background: color, opacity: 0.60 }} />
+                style={{ width: `${Math.min(100, conf)}%`, background: color, opacity: 0.58 }} />
             </div>
           </>
         ) : (
-          <div className="text-[8px] font-mono text-center tracking-[0.1em]" style={{ color: "#111111" }}>
+          <div className="text-[8px] font-mono text-center tracking-[0.1em]" style={{ color: "#0a1520" }}>
             AWAITING SIGNAL
           </div>
         )}
