@@ -98,6 +98,7 @@ const EXCHANGE_BALANCES: Record<string, Balances> = {
   Huobi:    { USD:  8_400,  BTC: 0,    ETH: 0.05, SOL: 0    },
   MEXC:     { USD:  5_100,  BTC: 0,    ETH: 0.02, SOL: 0    },
   Phemex:   { USD:  3_200,  BTC: 0,    ETH: 0,    SOL: 0    },
+  Uphold:   { USD: 18_750,  BTC: 0.03, ETH: 0.22, SOL: 1.4  },
 };
 
 let _simBalances: Balances = { ...EXCHANGE_BALANCES["Kraken"]! };

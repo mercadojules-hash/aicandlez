@@ -1,0 +1,122 @@
+FINAL MICRO-FIX PASS — almost complete.
+
+The dashboard is now very close. Only a few issues remain.
+
+==================================================
+
+1. ACTIVE TRADES PANEL
+   ==================================================
+
+This panel STILL has charcoal/navy internals.
+
+I need:
+
+* TRUE pure black interiors (#000000)
+* no navy gray anywhere
+* no charcoal cells
+* no gradients
+
+ALSO:
+the Active Trades panel STILL does not extend downward enough.
+
+Right now there is still wasted empty vertical space beneath it.
+
+Please:
+
+* increase Active Trades container height substantially
+* let it expand downward to occupy the unused empty area
+* make it visually dominant as the primary live execution blotter
+
+Goal:
+institutional execution terminal feel.
+
+==================================================
+2. ACTIVE TRADES SCROLLING
+==========================
+
+Scrolling is either:
+
+* not working
+  OR
+* not visually obvious
+
+Need:
+
+* proper overflow-y scroll
+* visible thin scrollbar
+* smooth scrolling
+* max-height large enough to matter
+* at least 30–40 visible trades available
+
+The panel should behave like a real execution feed.
+
+==================================================
+3. LIVE TERMINAL FEED
+=====================
+
+The LIVE TERMINAL FEED still is not truly scrolling properly either.
+
+Need:
+
+* visible scroll behavior
+* overflow-y:auto
+* smooth scrolling
+* more rows available
+* obvious terminal-feed movement
+
+It should feel:
+
+* active
+* autonomous
+* realtime
+* alive
+
+==================================================
+4. ADD UPHOLD
+=============
+
+Please add:
+
+* Uphold
+
+to the Broker / Exchange list and exchange switching system.
+
+Current exchange architecture is good — just include Uphold in:
+
+* dropdown
+* broker card
+* exchange map
+* simulated balances
+
+==================================================
+5. DO NOT CHANGE
+================
+
+DO NOT:
+
+* redesign layout
+* resize charts
+* move telemetry
+* alter right-side structure
+
+The dashboard architecture is now correct.
+
+This is ONLY:
+
+* black-level cleanup
+* scroll behavior
+* execution feed polish
+* final exchange addition
+
+==================================================
+6. FINAL DELIVERY
+=================
+
+After this pass:
+
+* send updated preview link
+* send updated downloadable build/export link
+* confirm Active Trades now fully fills lower space
+* confirm both feeds visibly scroll
+* confirm all interiors are TRUE black
+* confirm Uphold added successfully

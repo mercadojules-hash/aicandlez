@@ -120,10 +120,8 @@ export function RichTerminalFeed({ engine }: Props) {
       {/* Scrollable feed */}
       <div
         ref={scrollRef}
-        style={{
-          overflowY: "auto", maxHeight: 620,
-          scrollbarWidth: "thin", scrollbarColor: "#1a1a1a #000000",
-        }}
+        className="feed-scroll"
+        style={{ maxHeight: 620 }}
       >
         {rows.length === 0 ? (
           <div className="flex items-center justify-center py-14">

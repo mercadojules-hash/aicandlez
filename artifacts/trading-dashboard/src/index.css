@@ -119,6 +119,47 @@
   ::-webkit-scrollbar-thumb:hover { background: #00f0ff50; }
 }
 
+/* ── Blotter / Feed scrollable containers ─────────────────────────────────── */
+.blotter-scroll {
+  overflow-y: scroll;
+  scrollbar-width: thin;
+  scrollbar-color: #2a3a4a #000000;
+}
+.blotter-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.blotter-scroll::-webkit-scrollbar-track {
+  background: #050505;
+  border-left: 1px solid #111111;
+}
+.blotter-scroll::-webkit-scrollbar-thumb {
+  background: #1e3a50;
+  border-radius: 2px;
+}
+.blotter-scroll::-webkit-scrollbar-thumb:hover {
+  background: #00f0ff40;
+}
+
+.feed-scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #1e3a50 #000000;
+}
+.feed-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.feed-scroll::-webkit-scrollbar-track {
+  background: #050505;
+  border-left: 1px solid #111111;
+}
+.feed-scroll::-webkit-scrollbar-thumb {
+  background: #1e3a50;
+  border-radius: 2px;
+}
+.feed-scroll::-webkit-scrollbar-thumb:hover {
+  background: #00f0ff40;
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
    KEYFRAME ANIMATIONS
 ════════════════════════════════════════════════════════════════════════════ */

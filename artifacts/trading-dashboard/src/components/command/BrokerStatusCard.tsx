@@ -6,7 +6,7 @@ interface Props { exchangeStatus: ExchangeStatus | undefined }
 
 const ALL_EXCHANGES = [
   "Kraken", "Binance", "Coinbase", "OKX", "Bybit",
-  "Bitfinex", "Gate.io", "KuCoin", "Huobi", "MEXC", "Phemex",
+  "Bitfinex", "Gate.io", "KuCoin", "Huobi", "MEXC", "Phemex", "Uphold",
 ];
 
 export function BrokerStatusCard({ exchangeStatus }: Props) {
