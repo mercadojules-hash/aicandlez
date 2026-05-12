@@ -1,0 +1,212 @@
+We are now transitioning OUT of dashboard/UI work.
+
+Dashboard foundation is approved.
+
+From this point forward:
+focus ONLY on platform infrastructure, exchange systems, scalability, AI execution architecture, and app-readiness.
+
+The next major phase after this will be:
+MOBILE APP DEVELOPMENT.
+
+====================================================
+PHASE 1 — EXCHANGE ENGINE ARCHITECTURE
+
+Current:
+
+Kraken functional
+Simulation functional
+
+Next:
+Scaffold exchange adapter architecture for:
+
+Binance
+Coinbase
+Bybit
+OKX
+KuCoin
+
+Build:
+services/exchanges/
+
+Structure:
+services/exchanges/
+kraken/
+binance/
+coinbase/
+bybit/
+okx/
+kucoin/
+
+Need:
+
+unified exchange interface
+shared execution abstraction
+shared websocket architecture
+reconnect handling
+retry handling
+rate limit handling
+standardized order object
+standardized position object
+standardized account object
+
+Create:
+BaseExchangeAdapter.ts
+
+All exchanges should inherit from the same adapter pattern.
+
+====================================================
+PHASE 2 — MULTI-USER PLATFORM ARCHITECTURE
+
+Prepare system for:
+100,000+ users.
+
+Need:
+
+multi-tenant architecture
+isolated AI sessions
+isolated paper trading accounts
+user-scoped telemetry
+scalable websocket architecture
+queue-based execution
+worker architecture
+
+Integrate:
+
+Redis
+BullMQ
+PostgreSQL
+websocket gateway
+event bus
+execution workers
+
+Need:
+
+per-user engine state
+per-user AI memory
+isolated trade journals
+isolated analytics
+isolated AI profiles
+====================================================
+PHASE 3 — AI EXECUTION ENGINE
+
+Build advanced AI execution framework.
+
+Need:
+
+confidence scoring engine
+regime classification
+volatility adaptation
+dynamic trade sizing
+adaptive signal filtering
+AI personality profiles
+
+Profiles:
+
+Conservative
+Balanced
+Aggressive
+
+Need:
+
+AI performance memory
+signal quality tracking
+strategy scoring
+drawdown adaptation
+self-evaluation metrics
+trade memory system
+====================================================
+PHASE 4 — RISK ENGINE
+
+Build enterprise-grade risk systems.
+
+Need:
+
+max daily drawdown
+max portfolio exposure
+circuit breaker system
+emergency kill engine
+volatility protection
+slippage detection
+abnormal execution detection
+disconnected exchange protection
+websocket health monitoring
+====================================================
+PHASE 5 — USER PLATFORM SYSTEMS
+
+Build:
+
+authentication
+onboarding
+exchange connection wizard
+encrypted API vault
+user profiles
+subscription architecture
+analytics
+AI settings
+
+Need:
+
+encrypted credential storage
+secure exchange key handling
+permission isolation
+paper/live isolation
+====================================================
+PHASE 6 — TELEMETRY & OBSERVABILITY
+
+Build:
+
+centralized logging
+execution telemetry
+AI signal audit trails
+websocket monitoring
+latency monitoring
+trade replay system
+engine diagnostics
+exchange diagnostics
+====================================================
+PHASE 7 — BACKTESTING & AI LAB
+
+Build:
+
+strategy sandbox
+AI model comparison
+historical replay engine
+backtesting framework
+performance analytics
+parameter optimization
+AI training telemetry
+====================================================
+PHASE 8 — MOBILE APP PREPARATION
+
+Prepare backend APIs for:
+iOS + Android app.
+
+Need:
+
+mobile-ready REST API
+websocket mobile streams
+auth tokens
+push notification architecture
+lightweight telemetry endpoints
+portfolio snapshot endpoints
+mobile execution endpoints
+====================================================
+IMPORTANT
+
+Dashboard UI is now considered:
+FOUNDATION LOCKED.
+
+Do NOT redesign dashboard architecture anymore unless explicitly requested.
+
+Primary focus is now:
+
+infrastructure
+AI execution
+scalability
+exchange systems
+mobile app readiness
+backend architecture
+enterprise stability
+
+Goal:
+evolve from a prototype dashboard into a real AI trading platform.

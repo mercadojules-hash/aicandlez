@@ -23,6 +23,8 @@ import exchangeRouter from "./exchange.js";
 import engineRouter from "./engine.js";
 import systemRouter from "./system.js";
 import feesRouter from "./fees.js";
+import mobileRouter from "./mobile.js";
+import adaptersRouter from "./adapters.js";
 
 const router: IRouter = Router();
 
@@ -50,5 +52,7 @@ router.use(exchangeRouter);
 router.use(engineRouter);
 router.use(systemRouter);
 router.use(feesRouter);
+router.use(mobileRouter);
+router.use(adaptersRouter);
 
 export default router;

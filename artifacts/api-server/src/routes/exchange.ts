@@ -48,11 +48,13 @@ router.get("/exchange/balances", async (_req, res) => {
 router.post("/exchange/mode", (req, res) => {
   const { mode } = req.body as { mode: ExchangeMode };
   if (mode !== "simulation" && mode !== "live") {
-    return res.status(400).json({ error: "mode must be 'simulation' or 'live'" });
+    res.status(400).json({ error: "mode must be 'simulation' or 'live'" });
+    return;
   }
   const result = setMode(mode);
   if (!result.ok) {
-    return res.status(400).json({ error: result.reason });
+    res.status(400).json({ error: result.reason });
+    return;
   }
   res.json({ mode, status: getExchangeStatus() });
 });
@@ -85,7 +87,8 @@ router.post("/exchange/order/preview", async (req, res) => {
     limitPrice?: number;
   };
   if (!symbol || !side || !orderType || !amountUSD) {
-    return res.status(400).json({ error: "symbol, side, orderType, amountUSD are required" });
+    res.status(400).json({ error: "symbol, side, orderType, amountUSD are required" });
+    return;
   }
   try {
     const preview = await previewOrder(symbol, side, orderType, amountUSD, limitPrice);
@@ -106,7 +109,8 @@ router.post("/exchange/order/execute", async (req, res) => {
     limitPrice?: number;
   };
   if (!symbol || !side || !orderType || !amountUSD) {
-    return res.status(400).json({ error: "symbol, side, orderType, amountUSD are required" });
+    res.status(400).json({ error: "symbol, side, orderType, amountUSD are required" });
+    return;
   }
   try {
     const order = await executeOrder(symbol, side, orderType, amountUSD, limitPrice);
