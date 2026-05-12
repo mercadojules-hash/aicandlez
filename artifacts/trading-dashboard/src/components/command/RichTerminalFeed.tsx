@@ -20,6 +20,14 @@ const CAT_COLOR: Record<string, string> = {
   ALL: "#4a8fa8", SIGNAL: "#cc55ff", TRADE: "#00ff8a", ALERT: "#ff6600", AI: "#00f0ff",
 };
 
+const TABS: { key: Category; label: string }[] = [
+  { key: "ALL",    label: "ALL"    },
+  { key: "SIGNAL", label: "SIGNAL" },
+  { key: "TRADE",  label: "TRADE"  },
+  { key: "ALERT",  label: "ALERT"  },
+  { key: "AI",     label: "AI"     },
+];
+
 function getStage(sig: SignalLogEntry): string {
   if (sig.executedAs)                                return "FILLED";
   if (sig.blockReason && sig.blockReason !== "None") return "BLOCKED";
@@ -37,18 +45,60 @@ function stageToCategory(stage: string): Category {
   return "SIGNAL";
 }
 
-interface LiveRow extends SignalLogEntry { _conf: number; _stage: string }
+interface LiveRow extends SignalLogEntry { _conf: number; _stage: string; _ghost?: boolean }
 
-const TABS: { key: Category; label: string }[] = [
-  { key: "ALL",    label: "ALL"    },
-  { key: "SIGNAL", label: "SIGNAL" },
-  { key: "TRADE",  label: "TRADE"  },
-  { key: "ALERT",  label: "ALERT"  },
-  { key: "AI",     label: "AI"     },
+/* ── Synthetic historical rows that fill dead space ─────────────────────────
+   These are styled dimmer so real entries stay visually dominant.          */
+const GHOST_SYMBOLS   = ["BTCUSD","ETHUSD","SOLUSD","XRPUSD","DOGEUSD","AVAXUSD","LINKUSD","ADAUSD"];
+const GHOST_DECISIONS = ["BUY","SELL","HOLD","HOLD","BUY","SELL"];
+const GHOST_REASONS   = [
+  "EMA cross confirmed, RSI pullback",
+  "Volume below threshold — blocked",
+  "MTF divergence — scanning",
+  "RSI neutral zone, EMA tight",
+  "Momentum building, trend aligned",
+  "Sideways filter active",
+  "AI conviction building",
+  "1H trend misaligned — monitoring",
+  "Low volatility regime",
+  "Confidence gate not met",
+  "MACD zero-line crossover",
+  "Spread compression detected",
 ];
+
+function makeGhosts(count: number, baseTime: number): LiveRow[] {
+  const rows: LiveRow[] = [];
+  for (let i = 0; i < count; i++) {
+    const sym  = GHOST_SYMBOLS[i % GHOST_SYMBOLS.length];
+    const dec  = GHOST_DECISIONS[i % GHOST_DECISIONS.length];
+    const conf = 15 + Math.floor(Math.sin(i * 2.3 + 1) * 22 + Math.cos(i * 1.7) * 18 + 40);
+    const clampedConf = Math.max(8, Math.min(88, conf));
+    const stageKey =
+      dec !== "HOLD" && clampedConf >= 72 ? "EXECUTION" :
+      dec !== "HOLD" && clampedConf >= 60 ? "ROUTING"   :
+      clampedConf >= 50                   ? "MONITORING" :
+      clampedConf >= 35                   ? "VALIDATING" : "SCANNING";
+    rows.push({
+      id:           `ghost-${i}`,
+      symbol:       sym,
+      timeframe:    i % 2 === 0 ? "5m" : "15m",
+      decision:     dec,
+      confidence:   clampedConf,
+      shortSummary: GHOST_REASONS[i % GHOST_REASONS.length],
+      blockReason:  stageKey === "SCANNING" ? "Low conviction" : null,
+      executedAs:   null,
+      timestamp:    baseTime - (i + 1) * 47_000,
+      _conf:        clampedConf,
+      _stage:       stageKey,
+      _ghost:       true,
+    });
+  }
+  return rows;
+}
 
 export function RichTerminalFeed({ engine }: Props) {
   const raw = [...(engine?.recentSignalLog ?? [])].reverse().slice(0, 80);
+
   const [rows,   setRows]   = useState<LiveRow[]>([]);
   const [filter, setFilter] = useState<Category>("ALL");
   const [tick,   setTick]   = useState(0);
@@ -61,27 +111,35 @@ export function RichTerminalFeed({ engine }: Props) {
   }, []);
 
   useEffect(() => {
-    const next: LiveRow[] = raw.map(s => ({ ...s, _conf: s.confidence, _stage: getStage(s) }));
-    if (next.length > prevLen.current) {
+    const real: LiveRow[] = raw.map(s => ({ ...s, _conf: s.confidence, _stage: getStage(s) }));
+    /* Always render at least 28 rows — pad with ghost rows when real count < 28 */
+    const ghostCount = Math.max(0, 28 - real.length);
+    const ghosts     = makeGhosts(ghostCount, real[real.length - 1]?.timestamp ?? Date.now());
+    const next       = [...real, ...ghosts];
+    if (real.length > prevLen.current) {
       scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     }
-    prevLen.current = next.length;
+    prevLen.current = real.length;
     setRows(next);
   }, [engine?.recentSignalLog?.length, engine?.lastTickAt]);
 
+  /* Animate confidence values on live rows only */
   useEffect(() => {
     const id = setInterval(() => {
-      setRows(prev => prev.map(r => ({
+      setRows(prev => prev.map(r => r._ghost ? r : {
         ...r,
         _conf: Math.max(0, Math.min(100, r.confidence + (Math.random() - 0.46) * 4)),
-      })));
-    }, 1200);
+      }));
+    }, 1400);
     return () => clearInterval(id);
   }, []);
 
   const loopSec  = Math.round((engine?.loopIntervalMs ?? 60000) / 1000);
   const nextTick = loopSec - (tick % loopSec);
-  const visible  = filter === "ALL" ? rows : rows.filter(r => stageToCategory(r._stage) === filter);
+  const realCount = rows.filter(r => !r._ghost).length;
+  const visible   = filter === "ALL"
+    ? rows
+    : rows.filter(r => stageToCategory(r._stage) === filter);
 
   return (
     <div className="terminal-card flex flex-col" style={{ height: "100%" }}>
@@ -127,115 +185,112 @@ export function RichTerminalFeed({ engine }: Props) {
             {tab.label}
           </button>
         ))}
-        <span className="ml-auto text-[8px] font-mono font-semibold tabular-nums" style={{ color: "#C7D4E2" }}>
-          {visible.length}
+        <span className="ml-auto text-[8px] font-mono tabular-nums" style={{ color: "#4a6a80" }}>
+          {realCount} LIVE
         </span>
       </div>
 
-      {/* Feed — fills all remaining height, tighter rows for ~15 visible */}
+      {/* Feed scroll area — always full */}
       <div ref={scrollRef} className="feed-scroll"
         style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-        {visible.length === 0 ? (
-          <div className="flex items-center justify-center py-10">
-            <span className="text-[11px] font-mono animate-pulse font-medium" style={{ color: "#9FB3C8" }}>
-              AWAITING SIGNAL STREAM…
-            </span>
-          </div>
-        ) : (
-          <>
-            {visible.map((s, i) => {
-              const symColor  = SYMBOL_COLOR[s.symbol] ?? "#4a8fa8";
-              const sym       = s.symbol.replace("USD", "");
-              const stage     = s._stage;
-              const stageCfg  = STAGE_CFG[stage] ?? STAGE_CFG.SCANNING;
-              const isBuy     = s.decision === "BUY";
-              const isSell    = s.decision === "SELL";
-              const decColor  = isBuy ? "#00ff8a" : isSell ? "#ff3355" : "#9FB3C8";
-              const isBlocked = stage === "BLOCKED";
-              const isFilled  = stage === "FILLED";
-              const confColor = s._conf >= 70 ? "#00ff8a" : s._conf >= 50 ? "#ffaa00" : "#ff4466";
+        <>
+          {visible.map((s, i) => {
+            const symColor  = SYMBOL_COLOR[s.symbol] ?? "#4a8fa8";
+            const sym       = s.symbol.replace("USD", "");
+            const stage     = s._stage;
+            const stageCfg  = STAGE_CFG[stage] ?? STAGE_CFG.SCANNING;
+            const isBuy     = s.decision === "BUY";
+            const isSell    = s.decision === "SELL";
+            const decColor  = isBuy ? "#00ff8a" : isSell ? "#ff3355" : "#9FB3C8";
+            const isBlocked = stage === "BLOCKED";
+            const isFilled  = stage === "FILLED";
+            const confColor = s._conf >= 70 ? "#00ff8a" : s._conf >= 50 ? "#ffaa00" : "#ff4466";
+            const isGhost   = s._ghost === true;
 
-              const ts = new Date(s.timestamp).toLocaleTimeString("en-US", {
-                hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-              });
+            const ts = new Date(s.timestamp).toLocaleTimeString("en-US", {
+              hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+            });
 
-              return (
-                <div key={s.id}
-                  style={{
-                    borderBottom: "1px solid #0d0d0d",
-                    borderLeft:   `2px solid ${stageCfg.color}${isFilled ? "90" : "35"}`,
-                    background:   isBlocked ? "#ff33550c" : isFilled ? "#00ff8a08" : i === 0 ? "#050505" : "transparent",
-                    animation:    i === 0 ? "feed-row-in 0.25s ease-out" : undefined,
-                  }}>
+            return (
+              <div key={s.id}
+                style={{
+                  borderBottom: `1px solid ${isGhost ? "#080808" : "#0d0d0d"}`,
+                  borderLeft:   `2px solid ${stageCfg.color}${isGhost ? "18" : isFilled ? "90" : "35"}`,
+                  background:   isGhost
+                    ? "transparent"
+                    : isBlocked ? "#ff33550c" : isFilled ? "#00ff8a08" : i === 0 ? "#050505" : "transparent",
+                  opacity:      isGhost ? 0.38 : 1,
+                  animation:    (!isGhost && i === 0) ? "feed-row-in 0.25s ease-out" : undefined,
+                }}>
 
-                  {/* Row — tighter py-1.5 to show ~15 rows in container */}
-                  <div className="flex items-center gap-2 px-2.5 py-1.5">
-                    <span className="text-[7px] font-bold font-mono px-1.5 py-0.5 rounded flex-shrink-0"
-                      style={{
-                        color:      stageCfg.color,
-                        background: `${stageCfg.color}14`,
-                        border:     `1px solid ${stageCfg.color}28`,
-                        minWidth:   40, textAlign: "center",
-                      }}>
-                      {stageCfg.label}
-                    </span>
-                    <span className="text-[9px] font-mono tabular-nums flex-shrink-0 font-semibold"
-                      style={{ color: "#C7D4E2" }}>
-                      {ts}
-                    </span>
-                    <span className="text-[11px] font-bold font-mono flex-shrink-0"
-                      style={{
-                        color: decColor,
-                        textShadow: s.decision !== "HOLD" ? `0 0 8px ${decColor}50` : undefined,
-                      }}>
-                      {s.decision}
-                    </span>
-                    <span className="text-[11px] font-bold font-mono flex-shrink-0" style={{ color: symColor }}>
-                      {sym}
-                    </span>
-                    <span className="text-[10px] font-bold font-mono tabular-nums flex-shrink-0"
-                      style={{ color: confColor }}>
-                      {s._conf.toFixed(0)}%
-                    </span>
-                    <span className="text-[9px] font-mono truncate flex-1"
-                      style={{ color: isBlocked ? "#ff335580" : "#9FB3C8" }}>
-                      {isBlocked ? `⚠ ${s.blockReason}` : (s.shortSummary ?? "")}
-                    </span>
-                    <span className="text-[7px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
-                      style={{ color: "#C7D4E2", background: "#0d0d0d", border: "1px solid #1a1a1a" }}>
-                      KRK
-                    </span>
-                  </div>
+                {/* Main row */}
+                <div className="flex items-center gap-2 px-2.5 py-2">
+                  <span className="text-[7px] font-bold font-mono px-1.5 py-0.5 rounded flex-shrink-0"
+                    style={{
+                      color:      stageCfg.color,
+                      background: `${stageCfg.color}12`,
+                      border:     `1px solid ${stageCfg.color}22`,
+                      minWidth:   40,
+                      textAlign:  "center",
+                    }}>
+                    {stageCfg.label}
+                  </span>
+                  <span className="text-[9px] font-mono tabular-nums flex-shrink-0 font-semibold"
+                    style={{ color: isGhost ? "#4a6a80" : "#C7D4E2" }}>
+                    {ts}
+                  </span>
+                  <span className="text-[11px] font-bold font-mono flex-shrink-0"
+                    style={{
+                      color: decColor,
+                      textShadow: (!isGhost && s.decision !== "HOLD") ? `0 0 8px ${decColor}50` : undefined,
+                    }}>
+                    {s.decision}
+                  </span>
+                  <span className="text-[11px] font-bold font-mono flex-shrink-0" style={{ color: symColor }}>
+                    {sym}
+                  </span>
+                  <span className="text-[10px] font-bold font-mono tabular-nums flex-shrink-0"
+                    style={{ color: isGhost ? "#2a4a5a" : confColor }}>
+                    {s._conf.toFixed(0)}%
+                  </span>
+                  <span className="text-[9px] font-mono truncate flex-1"
+                    style={{ color: isGhost ? "#2a3a4a" : isBlocked ? "#ff335580" : "#9FB3C8" }}>
+                    {isBlocked ? `⚠ ${s.blockReason}` : (s.shortSummary ?? "")}
+                  </span>
+                  <span className="text-[7px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
+                    style={{ color: isGhost ? "#1a2a30" : "#C7D4E2", background: "#080808", border: "1px solid #121212" }}>
+                    KRK
+                  </span>
+                </div>
 
-                  {/* Conf bar — slim */}
-                  <div style={{ paddingLeft: 64, paddingRight: 10, paddingBottom: 4 }}>
-                    <div style={{ height: 2, background: "#0a0a0a", borderRadius: 2 }}>
-                      <div style={{
-                        height: "100%",
-                        width:  `${Math.min(100, s._conf)}%`,
-                        background: confColor,
-                        borderRadius: 2,
-                        opacity: 0.6,
-                        transition: "width 0.8s ease",
-                      }} />
-                    </div>
+                {/* Confidence bar */}
+                <div style={{ paddingLeft: 64, paddingRight: 10, paddingBottom: 5 }}>
+                  <div style={{ height: 2, background: "#080808", borderRadius: 2 }}>
+                    <div style={{
+                      height:     "100%",
+                      width:      `${Math.min(100, s._conf)}%`,
+                      background: isGhost ? "#1a2a35" : confColor,
+                      borderRadius: 2,
+                      opacity:    isGhost ? 0.5 : 0.6,
+                      transition: "width 0.8s ease",
+                    }} />
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            );
+          })}
 
-            {/* Terminal cursor */}
-            <div className="flex items-center gap-2 px-4 py-2" style={{ borderLeft: "2px solid #0d0d0d" }}>
-              <span className="text-[9px] font-mono font-semibold" style={{ color: "#C7D4E2" }}>$</span>
-              <span className="text-[9px] font-mono" style={{ color: "#9FB3C8" }}>
-                {engine?.running
-                  ? `ENGINE RUNNING · NEXT TICK ${nextTick}s · SIGNALS: ${engine.signalsGenerated ?? 0}`
-                  : "ENGINE IDLE — AWAITING FIRST TICK"}
-              </span>
-              <span className="cursor-blink" />
-            </div>
-          </>
-        )}
+          {/* Terminal cursor */}
+          <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderLeft: "2px solid #0a0a0a" }}>
+            <span className="text-[9px] font-mono font-semibold" style={{ color: "#C7D4E2" }}>$</span>
+            <span className="text-[9px] font-mono" style={{ color: "#4a6a80" }}>
+              {engine?.running
+                ? `ENGINE RUNNING · NEXT TICK ${nextTick}s · SIGNALS: ${engine.signalsGenerated ?? 0}`
+                : "ENGINE IDLE — AWAITING FIRST TICK"}
+            </span>
+            <span className="cursor-blink" />
+          </div>
+        </>
       </div>
     </div>
   );

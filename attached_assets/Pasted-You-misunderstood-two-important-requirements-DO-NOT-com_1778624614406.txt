@@ -1,0 +1,141 @@
+You misunderstood two important requirements.
+
+DO NOT compress the UI further.
+
+The issue is NOT row height anymore.
+The issue is EMPTY UNUSED SPACE.
+
+We are now correcting that specifically.
+
+====================================================
+
+LIVE TERMINAL FEED — FILL THE CONTAINER
+====================================================
+
+Current problem:
+You reduced row height, which made the feed even harder to read.
+
+That is NOT what I asked for.
+
+I want:
+
+MORE feed entries rendered
+same readability
+same typography
+same row scale
+container visually FULL
+
+Right now there is still a huge empty dead zone at the bottom.
+
+====================================================
+CORRECT FIX
+
+REVERT the over-compression.
+
+Then:
+
+render ~15–20 feed entries simultaneously
+maintain scroll
+preserve readability
+preserve institutional density
+use the full container height
+
+Requirements:
+
+row height should return closer to previous readable size
+timestamps readable
+category badges readable
+signal text readable
+confidence bars readable
+no ultra-thin compressed rows
+
+The container itself is large enough already.
+We simply need MORE rows rendered into the visible area.
+
+This should feel like:
+Bloomberg / Quant / institutional live blotter.
+
+====================================================
+2. EXCHANGE SWITCHER — NOT VISIBLE
+
+You implemented the exchange switcher logic correctly,
+BUT the user cannot actually SEE or USE it properly.
+
+Current problem:
+The switcher is hidden/collapsed near the top-right area.
+
+The exchanges are NOT clearly visible or accessible.
+
+====================================================
+CORRECT FIX
+
+Move the full exchange switcher into a CLEAR VISIBLE POSITION.
+
+Place it:
+RIGHT SIDE of the COMMAND CENTER HEADER BAR
+
+Same horizontal row as:
+
+LIVE
+Kraken/SIM status
+PAUSE
+KILL SWITCH
+
+The exchange switcher should be clearly visible and immediately usable.
+
+====================================================
+EXCHANGE SWITCHER REQUIREMENTS
+
+Visible exchanges:
+
+Kraken
+Simulation
+Coinbase
+Binance
+Bybit
+Bitget
+KuCoin
+OKX
+Gate.io
+
+Behavior:
+
+Kraken + Simulation fully clickable
+Others show SOON state
+
+Visual requirements:
+
+readable labels
+proper spacing
+clear hover states
+obvious clickable affordance
+active exchange glow
+no clipping
+no hidden overflow
+no tiny pills
+
+This is a PRIMARY CONTROL SURFACE.
+It should feel important and immediately discoverable.
+
+====================================================
+3. DO NOT CHANGE
+
+DO NOT:
+
+redesign the layout
+resize chart grid
+change active trades
+change recently closed
+change bottom analytics
+compress typography further
+
+We are now in FINAL USABILITY POLISH.
+
+Goal:
+
+eliminate dead space
+improve visibility
+improve usability
+preserve premium institutional aesthetic
+
+This is a refinement pass ONLY.

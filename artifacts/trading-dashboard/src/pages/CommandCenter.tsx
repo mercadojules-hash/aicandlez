@@ -28,15 +28,15 @@ type ExchangeOption = {
 };
 
 const EXCHANGES: ExchangeOption[] = [
-  { id: "kraken",   label: "Kraken",   color: "#5741d9"              },
-  { id: "sim",      label: "SIM",      color: "#ffaa00", isSim: true  },
-  { id: "coinbase", label: "Coinbase", color: "#2775ca", disabled: true, soon: true },
-  { id: "binance",  label: "Binance",  color: "#f0b90b", disabled: true, soon: true },
-  { id: "bybit",    label: "Bybit",    color: "#f7a600", disabled: true, soon: true },
-  { id: "bitget",   label: "Bitget",   color: "#00cfa0", disabled: true, soon: true },
-  { id: "kucoin",   label: "KuCoin",   color: "#24ae8f", disabled: true, soon: true },
-  { id: "okx",      label: "OKX",      color: "#c0c0c0", disabled: true, soon: true },
-  { id: "gateio",   label: "Gate.io",  color: "#2354e6", disabled: true, soon: true },
+  { id: "kraken",   label: "Kraken",   color: "#5741d9"                              },
+  { id: "sim",      label: "SIM",      color: "#ffaa00", isSim: true                 },
+  { id: "coinbase", label: "Coinbase", color: "#2775ca", disabled: true, soon: true  },
+  { id: "binance",  label: "Binance",  color: "#f0b90b", disabled: true, soon: true  },
+  { id: "bybit",    label: "Bybit",    color: "#f7a600", disabled: true, soon: true  },
+  { id: "bitget",   label: "Bitget",   color: "#00cfa0", disabled: true, soon: true  },
+  { id: "kucoin",   label: "KuCoin",   color: "#24ae8f", disabled: true, soon: true  },
+  { id: "okx",      label: "OKX",      color: "#b0b0b0", disabled: true, soon: true  },
+  { id: "gateio",   label: "Gate.io",  color: "#2354e6", disabled: true, soon: true  },
 ];
 
 function ExchangeSwitcher({
@@ -50,20 +50,15 @@ function ExchangeSwitcher({
   const activeId = !isLive ? "sim" : (exName.toLowerCase() || "kraken");
 
   return (
-    /* Horizontally scrollable so all 9 exchanges are always reachable */
-    <div
-      className="flex items-center gap-0.5 p-0.5 rounded-lg overflow-x-auto"
+    <div className="flex items-center gap-px p-0.5 rounded-lg flex-shrink-0"
       style={{
-        background:   "#040d16",
-        border:       "1px solid #0d1e2e",
-        scrollbarWidth: "none",
-        maxWidth:     560,
-        flexShrink:   0,
-      }}
-    >
+        background:      "#020a12",
+        border:          "1px solid #0d1e2e",
+        overflow:        "hidden",
+      }}>
       {EXCHANGES.map(ex => {
         const isActive   = activeId === ex.id;
-        const isDisabled = ex.disabled === true;
+        const isDisabled = !!ex.disabled;
 
         return (
           <button
@@ -75,51 +70,51 @@ function ExchangeSwitcher({
               else            onSelectLive(ex.id);
             }}
             title={isDisabled ? `${ex.label} — coming soon` : `Switch to ${ex.label}`}
-            className="flex items-center gap-1 rounded-md font-mono font-bold transition-all flex-shrink-0"
+            className="flex items-center gap-1 rounded font-mono font-bold transition-all flex-shrink-0"
             style={{
-              padding:       "5px 10px",
+              padding:       "5px 9px",
               fontSize:      "9px",
-              letterSpacing: "0.08em",
-              cursor:        isDisabled ? "not-allowed" : "pointer",
+              letterSpacing: "0.07em",
               whiteSpace:    "nowrap",
+              cursor:        isDisabled ? "not-allowed" : "pointer",
               ...(isActive ? {
-                background:  `${ex.color}20`,
-                color:        ex.color,
-                border:      `1px solid ${ex.color}50`,
-                boxShadow:   `0 0 14px ${ex.color}30, inset 0 0 8px ${ex.color}10`,
+                background: `${ex.color}1e`,
+                color:       ex.color,
+                border:     `1px solid ${ex.color}48`,
+                boxShadow:  `0 0 12px ${ex.color}28, inset 0 0 8px ${ex.color}0c`,
               } : isDisabled ? {
-                background:  "transparent",
-                color:       "#1e3040",
-                border:      "1px solid transparent",
+                background: "transparent",
+                color:      "#1a2e3a",
+                border:     "1px solid transparent",
               } : {
-                background:  "transparent",
-                color:       "#5a8aaa",
-                border:      "1px solid transparent",
+                background: "transparent",
+                color:      "#4a7a94",
+                border:     "1px solid transparent",
               }),
             }}
             onMouseEnter={e => {
               if (!isActive && !isDisabled) {
-                e.currentTarget.style.color       = "#C7D4E2";
-                e.currentTarget.style.background  = "#0d1e2e";
-                e.currentTarget.style.borderColor = "#1a3050";
+                e.currentTarget.style.color      = "#C7D4E2";
+                e.currentTarget.style.background = "#0d1e2e";
+                e.currentTarget.style.border     = "1px solid #1a3050";
               }
             }}
             onMouseLeave={e => {
               if (!isActive && !isDisabled) {
-                e.currentTarget.style.color       = "#5a8aaa";
-                e.currentTarget.style.background  = "transparent";
-                e.currentTarget.style.borderColor = "transparent";
+                e.currentTarget.style.color      = "#4a7a94";
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.border     = "1px solid transparent";
               }
             }}
           >
             {isActive && (
               <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ background: ex.color, boxShadow: `0 0 6px ${ex.color}` }} />
+                style={{ background: ex.color, boxShadow: `0 0 5px ${ex.color}` }} />
             )}
             <span>{ex.label}</span>
             {ex.soon && (
-              <span className="text-[6px] font-bold px-1 py-px rounded font-mono"
-                style={{ background: "#ffaa0010", color: "#ffaa0055", border: "1px solid #ffaa0018" }}>
+              <span className="text-[6px] font-bold px-1 py-px rounded-sm font-mono leading-none"
+                style={{ background: "#ffffff06", color: "#2a4050", border: "1px solid #1a2a35" }}>
                 SOON
               </span>
             )}
@@ -198,27 +193,28 @@ export default function CommandCenter() {
         trades={trades} exchangeStatus={exchangeStatus} feeSummary={feeSummary}
       />
 
-      {/* ③ Command strip */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b flex-shrink-0"
-        style={{ borderBottomColor: "#0d1520", background: "#000000" }}>
+      {/* ③ Command strip — two rows: top = identity + actions, bottom = exchange switcher */}
+      <div className="flex-shrink-0 border-b" style={{ borderBottomColor: "#0d1520", background: "#000000" }}>
 
-        {/* Left: identity */}
-        <Cpu className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#00aaff" }} />
-        <span className="text-[10px] font-bold tracking-[0.2em] font-mono" style={{ color: "#EAF2FF" }}>
-          COMMAND CENTER
-        </span>
-        <span className="text-[7px] font-bold px-1.5 py-0.5 rounded font-mono tracking-widest"
-          style={{ background: "#00aaff08", color: "#9FB3C8", border: "1px solid #00aaff14" }}>
-          MOD 19
-        </span>
-        {engine?.running && (
-          <span className="flex items-center gap-1 text-[8px] font-mono font-semibold" style={{ color: "#00ff8a" }}>
-            <span className="live-dot" style={{ width: 4, height: 4 }} /> LIVE
+        {/* Row A: identity + action controls + clock */}
+        <div className="flex items-center gap-2 px-3 py-2">
+          <Cpu className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#00aaff" }} />
+          <span className="text-[10px] font-bold tracking-[0.2em] font-mono" style={{ color: "#EAF2FF" }}>
+            COMMAND CENTER
           </span>
-        )}
+          <span className="text-[7px] font-bold px-1.5 py-0.5 rounded font-mono tracking-widest"
+            style={{ background: "#00aaff08", color: "#9FB3C8", border: "1px solid #00aaff14" }}>
+            MOD 19
+          </span>
+          {engine?.running && (
+            <span className="flex items-center gap-1 text-[8px] font-mono font-semibold" style={{ color: "#00ff8a" }}>
+              <span className="live-dot" style={{ width: 4, height: 4 }} /> LIVE
+            </span>
+          )}
 
-        {/* Action controls */}
-        <div className="flex items-center gap-1.5 ml-4">
+          <div className="w-px h-4 mx-2 flex-shrink-0" style={{ background: "#1a2a36" }} />
+
+          {/* PAUSE */}
           <button onClick={togglePause}
             className="flex items-center gap-1.5 text-[9px] font-bold px-3 py-1.5 rounded font-mono transition-all border"
             style={isPaused
@@ -227,6 +223,8 @@ export default function CommandCenter() {
             {isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
             {isPaused ? "RESUME" : "PAUSE"}
           </button>
+
+          {/* KILL SWITCH */}
           <button onClick={toggleKill}
             className="flex items-center gap-1.5 text-[9px] font-bold px-3 py-1.5 rounded font-mono transition-all border"
             style={isKill
@@ -235,24 +233,34 @@ export default function CommandCenter() {
             <ShieldOff className="w-3 h-3" />
             {isKill ? "KILL ACTIVE" : "KILL SWITCH"}
           </button>
+
+          <div className="flex-1" />
+
+          {/* Last tick clock */}
+          <div className="flex items-center gap-1.5 text-[8px] font-mono font-medium"
+            style={{ color: "#2a4050" }}>
+            <Clock className="w-3 h-3" />
+            {ago(engine?.lastTickAt ?? null)}
+          </div>
         </div>
 
-        <div className="flex-1" />
-
-        {/* Last tick */}
-        <div className="flex items-center gap-1.5 text-[8px] font-mono font-medium mr-3"
-          style={{ color: "#3a5a70" }}>
-          <Clock className="w-3 h-3" />
-          {ago(engine?.lastTickAt ?? null)}
+        {/* Row B: Exchange switcher — full-width, clearly visible */}
+        <div className="flex items-center px-3 pb-2 gap-3">
+          <span className="text-[8px] font-mono font-bold tracking-[0.15em] flex-shrink-0"
+            style={{ color: "#4a6a80" }}>
+            EXCHANGE
+          </span>
+          <ExchangeSwitcher
+            isLive={isLive}
+            exName={exName}
+            onSelectSim={selectSim}
+            onSelectLive={selectLive}
+          />
+          <span className="text-[8px] font-mono font-medium ml-2 flex-shrink-0"
+            style={{ color: "#2a3a4a" }}>
+            {isLive ? `LIVE · ${exName.toUpperCase()}` : "SIMULATION MODE"}
+          </span>
         </div>
-
-        {/* Exchange Switcher — horizontally scrollable */}
-        <ExchangeSwitcher
-          isLive={isLive}
-          exName={exName}
-          onSelectSim={selectSim}
-          onSelectLive={selectLive}
-        />
       </div>
 
       {/* Main content */}
