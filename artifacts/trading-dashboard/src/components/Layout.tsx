@@ -1,32 +1,39 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
+  Activity,
+  AlertTriangle,
   ArrowLeftRight,
   BarChart2,
   BarChart3,
+  Bell,
   BookOpen,
   Brain,
+  Bug,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Cpu,
+  Download,
   FlaskConical,
   Layers,
   LayoutDashboard,
   Menu,
   MessageSquare,
   Radio,
+  Scan,
   Shield,
   ShieldCheck,
-  Scan,
   SlidersHorizontal,
   TrendingUp,
-  ClipboardCheck,
-  Bug,
-  Download,
+  Trophy,
+  Users,
+  Wallet,
   X,
-  Activity,
+  Zap,
 } from "lucide-react";
 
+/* ── Primary trading modules ─────────────────────────────────────────────── */
 export const MODULE_LIST = [
   { id:  1, path: "/",           icon: LayoutDashboard,   label: "Dashboard",           status: "active" },
   { id:  2, path: "/market",     icon: Radio,             label: "Market Data",         status: "active" },
@@ -49,6 +56,17 @@ export const MODULE_LIST = [
   { id: 19, path: "/command",    icon: Cpu,               label: "Command Center",      status: "active" },
 ];
 
+/* ── Platform admin modules (future pages, shown as coming soon) ─────────── */
+const PLATFORM_ITEMS = [
+  { icon: Users,         label: "Users",         badge: "1,248" },
+  { icon: Zap,           label: "AI Models",     badge: "3"     },
+  { icon: Trophy,        label: "Leaderboard",   badge: null    },
+  { icon: Bell,          label: "Alerts",        badge: "2"     },
+  { icon: BarChart2,     label: "Analytics",     badge: null    },
+  { icon: Wallet,        label: "Revenue",       badge: null    },
+  { icon: AlertTriangle, label: "Risk Monitor",  badge: null    },
+];
+
 function NavItem({
   mod, active, collapsed, onNavigate,
 }: {
@@ -61,7 +79,7 @@ function NavItem({
   return (
     <Link
       href={mod.path}
-      className={`flex items-center gap-2 px-1.5 py-1.5 rounded transition-all group min-h-[36px] touch-manipulation border
+      className={`flex items-center gap-2 px-1.5 py-1.5 rounded transition-all group min-h-[34px] touch-manipulation border
         ${active
           ? "border-[#00eeff18] bg-[#00eeff08]"
           : "border-transparent text-[#1a3a50] hover:text-[#4a8fa8] hover:bg-[#010C18]"
@@ -75,26 +93,62 @@ function NavItem({
       }`}>
         {String(mod.id).padStart(2, "0")}
       </span>
-
-      <Icon
-        className="w-3.5 h-3.5 shrink-0"
-        style={active
-          ? { color: "#00eeff", filter: "drop-shadow(0 0 4px #00eeff80)" }
-          : {}}
-      />
-
+      <Icon className="w-3.5 h-3.5 shrink-0"
+        style={active ? { color: "#00eeff", filter: "drop-shadow(0 0 4px #00eeff80)" } : {}} />
       {!collapsed && (
-        <span className={`text-[10px] font-mono leading-none truncate flex-1 ${
-          active ? "text-[#00eeff]" : ""
-        }`}>
+        <span className={`text-[10px] font-mono leading-none truncate flex-1 ${active ? "text-[#00eeff]" : ""}`}>
           {mod.label}
         </span>
       )}
-
       {!collapsed && active && (
         <span className="live-dot live-dot-cyan shrink-0" style={{ width: 4, height: 4 }} />
       )}
     </Link>
+  );
+}
+
+function PlatformNavItem({
+  icon: Icon, label, badge, collapsed,
+}: { icon: React.ElementType; label: string; badge: string | null; collapsed: boolean }) {
+  return (
+    <div
+      className="flex items-center gap-2 px-1.5 py-1.5 rounded border border-transparent cursor-default opacity-60 hover:opacity-80 transition-opacity min-h-[30px]"
+      title={collapsed ? label : undefined}
+    >
+      <Icon className="w-3 h-3 shrink-0" style={{ color: "#1e4060" }} />
+      {!collapsed && (
+        <>
+          <span className="text-[10px] font-mono truncate flex-1" style={{ color: "#1e4060" }}>{label}</span>
+          {badge && (
+            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded font-mono shrink-0"
+              style={{ background: "#00aaff08", color: "#00aaff40", border: "1px solid #00aaff14" }}>
+              {badge}
+            </span>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ── Admin profile block ─────────────────────────────────────────────────── */
+function AdminBlock({ collapsed }: { collapsed: boolean }) {
+  if (collapsed) return null;
+  return (
+    <div className="px-2 py-2.5 border-t" style={{ borderTopColor: "#0A1E2E" }}>
+      <div className="flex items-center gap-2 px-2 py-2 rounded"
+        style={{ background: "#010C18", border: "1px solid #0A1E2E" }}>
+        <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[9px] font-bold font-mono"
+          style={{ background: "#00aaff18", color: "#00aaff", border: "1px solid #00aaff22" }}>
+          A
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[9px] font-bold font-mono truncate" style={{ color: "#4a8fa8" }}>Admin</div>
+          <div className="text-[7px] font-mono truncate" style={{ color: "#1e3040" }}>Super Admin</div>
+        </div>
+        <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#00ff8a", boxShadow: "0 0 4px #00ff8a80" }} />
+      </div>
+    </div>
   );
 }
 
@@ -114,13 +168,58 @@ export function Layout({ children }: { children: React.ReactNode }) {
     (m) => location === m.path || (m.path !== "/" && location.startsWith(m.path))
   )?.id ?? 1;
 
-  const sidebarClass = `flex flex-col overflow-y-auto`;
+  const isActive = (m: typeof MODULE_LIST[number]) =>
+    location === m.path || (m.path !== "/" && location.startsWith(m.path));
+
   const sidebarStyle = { background: "#000508", borderRightColor: "#0A1E2E" };
+
+  const SidebarContent = ({ onNavigate, collap }: { onNavigate?: () => void; collap: boolean }) => (
+    <>
+      {/* Trading modules */}
+      <nav className="flex flex-col gap-0.5 p-1.5 flex-1">
+        {MODULE_LIST.map((mod) => (
+          <NavItem key={mod.id} mod={mod} active={isActive(mod)} collapsed={collap} onNavigate={onNavigate} />
+        ))}
+
+        {/* Platform section divider */}
+        {!collap && (
+          <div className="flex items-center gap-2 px-1.5 pt-3 pb-1">
+            <div className="flex-1 h-px" style={{ background: "#0A1E2E" }} />
+            <span className="text-[7px] font-bold font-mono tracking-[0.2em]" style={{ color: "#0E2235" }}>
+              PLATFORM
+            </span>
+            <div className="flex-1 h-px" style={{ background: "#0A1E2E" }} />
+          </div>
+        )}
+        {collap && <div className="my-1 h-px mx-1.5" style={{ background: "#0A1E2E" }} />}
+
+        {PLATFORM_ITEMS.map((item) => (
+          <PlatformNavItem key={item.label} {...item} collapsed={collap} />
+        ))}
+      </nav>
+
+      {/* Export + Admin */}
+      {!collap && (
+        <div className="p-2 border-t shrink-0" style={{ borderTopColor: "#0A1E2E" }}>
+          <a
+            href="/apex-trader-v7-full.tar.gz"
+            download
+            className="flex items-center gap-2 px-2 py-1.5 rounded text-[9px] font-mono border border-transparent text-[#0E2235] hover:text-[#1e4060] hover:border-[#0E2235] transition-colors"
+          >
+            <Download className="w-3 h-3 shrink-0" />
+            <span>Export v7</span>
+          </a>
+        </div>
+      )}
+
+      <AdminBlock collapsed={collap} />
+    </>
+  );
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-[#000508] text-foreground dark">
 
-      {/* ── Top bar ─────────────────────────────────────────────────────── */}
+      {/* Top bar */}
       <header
         className="h-11 shrink-0 border-b flex items-center px-3 sm:px-4 justify-between sticky top-0 z-50"
         style={{
@@ -130,31 +229,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
         }}
       >
         <div className="flex items-center gap-2">
-          {/* Mobile toggle */}
           <button
             onClick={() => setMobileOpen((o) => !o)}
             className="md:hidden p-1.5 rounded border border-[#0E2235] text-[#1e4060] hover:text-[#00eeff] hover:border-[#00eeff25] transition-colors touch-manipulation min-w-[32px] min-h-[32px] flex items-center justify-center"
-            aria-label="Menu"
           >
             {mobileOpen ? <X className="w-3.5 h-3.5" /> : <Menu className="w-3.5 h-3.5" />}
           </button>
-
-          {/* Desktop collapse toggle */}
           <button
             onClick={() => setCollapsed((c) => !c)}
             className="hidden md:flex p-1.5 rounded border border-[#0E2235] text-[#1e4060] hover:text-[#00eeff] hover:border-[#00eeff25] transition-colors"
           >
-            {collapsed
-              ? <ChevronRight className="w-3.5 h-3.5" />
-              : <ChevronLeft  className="w-3.5 h-3.5" />}
+            {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
           </button>
-
-          {/* Logo */}
           <div className="flex items-center gap-2 select-none">
-            <Cpu
-              className="w-4 h-4 shrink-0"
-              style={{ color: "#00eeff", filter: "drop-shadow(0 0 6px #00eeff90)" }}
-            />
+            <Cpu className="w-4 h-4 shrink-0" style={{ color: "#00eeff", filter: "drop-shadow(0 0 6px #00eeff90)" }} />
             <div className="flex items-center font-mono text-[13px] font-bold tracking-[0.2em]">
               <span className="text-foreground/70">APEX</span>
               <span style={{ color: "#00eeff", textShadow: "0 0 14px #00eeff70" }}> TRADER</span>
@@ -164,19 +252,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </span>
           </div>
         </div>
-
         <SystemStatusBar />
       </header>
 
-      {/* ── Body ────────────────────────────────────────────────────────── */}
+      {/* Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
 
-        {/* Mobile backdrop */}
         {mobileOpen && (
-          <div
-            className="md:hidden fixed inset-0 z-30 bg-black/75 backdrop-blur-sm"
-            onClick={() => setMobileOpen(false)}
-          />
+          <div className="md:hidden fixed inset-0 z-30 bg-black/75 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
         )}
 
         {/* Desktop sidebar */}
@@ -184,97 +267,40 @@ export function Layout({ children }: { children: React.ReactNode }) {
           className={`hidden md:flex ${collapsed ? "w-12" : "w-52"} shrink-0 border-r flex-col transition-all duration-200 overflow-y-auto`}
           style={sidebarStyle}
         >
-          <nav className={`${sidebarClass} gap-0.5 p-1.5 flex-1`}>
-            {MODULE_LIST.map((mod) => (
-              <NavItem
-                key={mod.id}
-                mod={mod}
-                active={location === mod.path || (mod.path !== "/" && location.startsWith(mod.path))}
-                collapsed={collapsed}
-              />
-            ))}
-          </nav>
-
-          {!collapsed && (
-            <div className="p-2 border-t shrink-0" style={{ borderTopColor: "#0A1E2E" }}>
-              <a
-                href="/apex-trader-final-export-v1.zip"
-                download
-                className="flex items-center gap-2 px-2 py-1.5 rounded text-[9px] font-mono border border-transparent text-[#0E2235] hover:text-[#1e4060] hover:border-[#0E2235] transition-colors"
-              >
-                <Download className="w-3 h-3 shrink-0" />
-                <span>Export ZIP</span>
-              </a>
-            </div>
-          )}
+          <SidebarContent collap={collapsed} />
         </aside>
 
-        {/* Mobile sidebar drawer */}
+        {/* Mobile sidebar */}
         <aside
           className={`md:hidden fixed inset-y-0 left-0 z-40 w-60 flex-col transition-transform duration-200 ease-out overflow-y-auto flex
             ${mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}`}
           style={{ background: "#000810", borderRight: "1px solid #0A1E2E" }}
         >
-          <div
-            className="h-11 flex items-center gap-2 px-3 border-b shrink-0"
-            style={{ borderBottomColor: "#0A1E2E" }}
-          >
+          <div className="h-11 flex items-center gap-2 px-3 border-b shrink-0" style={{ borderBottomColor: "#0A1E2E" }}>
             <Cpu className="w-4 h-4" style={{ color: "#00eeff" }} />
             <span className="font-mono text-sm font-bold tracking-[0.15em]">
               APEX<span style={{ color: "#00eeff" }}>TRADER</span>
             </span>
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="ml-auto p-1 rounded text-[#0E2235] hover:text-[#00eeff] transition-colors"
-            >
+            <button onClick={() => setMobileOpen(false)} className="ml-auto p-1 rounded text-[#0E2235] hover:text-[#00eeff]">
               <X className="w-4 h-4" />
             </button>
           </div>
-
-          <nav className="flex flex-col gap-0.5 p-1.5 flex-1 overflow-y-auto">
-            {MODULE_LIST.map((mod) => (
-              <NavItem
-                key={mod.id}
-                mod={mod}
-                active={location === mod.path || (mod.path !== "/" && location.startsWith(mod.path))}
-                collapsed={false}
-                onNavigate={handleNavigate}
-              />
-            ))}
-          </nav>
-
-          <div className="p-2 border-t shrink-0" style={{ borderTopColor: "#0A1E2E" }}>
-            <a
-              href="/apex-trader-final-export-v1.zip"
-              download
-              className="flex items-center gap-2 px-2 py-2 rounded text-[9px] font-mono text-[#0E2235] hover:text-[#1e4060] transition-colors"
-            >
-              <Download className="w-3.5 h-3.5 shrink-0" />
-              <span>Download Export ZIP</span>
-            </a>
-          </div>
+          <SidebarContent collap={false} onNavigate={handleNavigate} />
         </aside>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-auto min-w-0">
-          {children}
-        </main>
+        <main className="flex-1 overflow-auto min-w-0">{children}</main>
       </div>
     </div>
   );
 }
 
 /* ── System Status Bar ───────────────────────────────────────────────────── */
-
 function SystemStatusBar() {
   const [apiOk, setApiOk] = useState(false);
-
   useEffect(() => {
     const ping = async () => {
-      try {
-        const r = await fetch("/api/healthz", { signal: AbortSignal.timeout(3000) });
-        setApiOk(r.ok);
-      } catch { setApiOk(false); }
+      try { const r = await fetch("/api/healthz", { signal: AbortSignal.timeout(3000) }); setApiOk(r.ok); }
+      catch { setApiOk(false); }
     };
     ping();
     const t = setInterval(ping, 15_000);
@@ -283,7 +309,7 @@ function SystemStatusBar() {
 
   return (
     <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-[9px]">
-      <StatusPill label="API"    ok={apiOk} />
+      <StatusPill label="API"    ok={apiOk}  />
       <span className="hidden sm:inline"><StatusPill label="WS"     ok={false} /></span>
       <span className="hidden sm:inline"><StatusPill label="ENGINE" ok={false} /></span>
       <KillSwitchButton />
@@ -293,11 +319,9 @@ function SystemStatusBar() {
 
 function StatusPill({ label, ok }: { label: string; ok: boolean }) {
   return (
-    <div
-      className="flex items-center gap-1 px-1.5 py-0.5 rounded border"
-      style={{ background: "#010C18", borderColor: "#0E2235" }}
-    >
-      <span className="text-[#1e4060]">{label}:</span>
+    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded border"
+      style={{ background: "#010C18", borderColor: "#0E2235" }}>
+      <span style={{ color: "#1e4060" }}>{label}:</span>
       <span style={{ color: ok ? "#00ff88" : "#0E2235" }}>{ok ? "OK" : "—"}</span>
     </div>
   );
@@ -305,12 +329,9 @@ function StatusPill({ label, ok }: { label: string; ok: boolean }) {
 
 function KillSwitchButton() {
   return (
-    <button
-      disabled
-      title="Available in Module 5 (Risk Management)"
+    <button disabled
       className="hidden sm:flex px-2 py-0.5 rounded border items-center gap-1.5 cursor-not-allowed"
-      style={{ background: "#010C18", borderColor: "#0E2235", color: "#0E2235" }}
-    >
+      style={{ background: "#010C18", borderColor: "#0E2235", color: "#0E2235" }}>
       <Activity className="w-3 h-3" />
       KILL
     </button>

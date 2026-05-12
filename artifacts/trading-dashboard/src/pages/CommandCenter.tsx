@@ -1,19 +1,21 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Cpu, Clock, Zap, ShieldOff, Pause, Play } from "lucide-react";
+import { Cpu, Clock, ShieldOff, Pause, Play } from "lucide-react";
 
-import { TickerStrips }       from "@/components/command/TickerStrips";
-import { TelemetryRow }       from "@/components/command/TelemetryRow";
-import { CryptoChartGrid }    from "@/components/command/CryptoChartGrid";
-import { RichTerminalFeed }   from "@/components/command/RichTerminalFeed";
-import { OpportunityScanner } from "@/components/command/OpportunityScanner";
-import { MarketRegimeCard }   from "@/components/command/MarketRegimeCard";
-import { AIThreatMonitor }    from "@/components/command/AIThreatMonitor";
-import { MiddleStatsGrid }    from "@/components/command/MiddleStatsGrid";
-import { ActiveTradesPanel }  from "@/components/command/ActiveTradesPanel";
-import { RiskCard }           from "@/components/command/RiskCard";
-import { AIBriefCard }        from "@/components/command/AIBriefCard";
-import { BrokerStatusCard }   from "@/components/command/BrokerStatusCard";
-import { PlatformFeeCard }    from "@/components/command/PlatformFeeCard";
+import { TickerStrips }          from "@/components/command/TickerStrips";
+import { PlatformTelemetryBar }  from "@/components/command/PlatformTelemetryBar";
+import { CryptoChartGrid }       from "@/components/command/CryptoChartGrid";
+import { PlatformOverviewPanel } from "@/components/command/PlatformOverviewPanel";
+import { RichTerminalFeed }      from "@/components/command/RichTerminalFeed";
+import { OpportunityScanner }    from "@/components/command/OpportunityScanner";
+import { MarketRegimeCard }      from "@/components/command/MarketRegimeCard";
+import { AIThreatMonitor }       from "@/components/command/AIThreatMonitor";
+import { MiddleStatsGrid }       from "@/components/command/MiddleStatsGrid";
+import { ActiveTradesPanel }     from "@/components/command/ActiveTradesPanel";
+import { RiskCard }              from "@/components/command/RiskCard";
+import { AIBriefCard }           from "@/components/command/AIBriefCard";
+import { BrokerStatusCard }      from "@/components/command/BrokerStatusCard";
+import { PlatformFeeCard }       from "@/components/command/PlatformFeeCard";
+import { BottomAnalyticsRow }    from "@/components/command/BottomAnalyticsRow";
 
 import type {
   EngineStatus, AppSettings, Trade, ExchangeStatus, FeeSummary,
@@ -72,13 +74,10 @@ export default function CommandCenter() {
     qc.invalidateQueries({ queryKey: ["exchange-status-cmd"] });
     refetchExchange();
   };
-
-  const toggleKill  = () =>
-    fetch("/api/exchange/kill",  { method: "POST", cache: "no-store" }).then(invalidateExchange);
-  const togglePause = () =>
-    fetch("/api/exchange/pause", { method: "POST", cache: "no-store" }).then(invalidateExchange);
+  const toggleKill  = () => fetch("/api/exchange/kill",  { method: "POST", cache: "no-store" }).then(invalidateExchange);
+  const togglePause = () => fetch("/api/exchange/pause", { method: "POST", cache: "no-store" }).then(invalidateExchange);
   const toggleMode  = () =>
-    fetch("/api/exchange/mode",  {
+    fetch("/api/exchange/mode", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body:   JSON.stringify({ mode: isLive ? "simulation" : "live" }), cache: "no-store",
     }).then(invalidateExchange);
@@ -86,24 +85,22 @@ export default function CommandCenter() {
   return (
     <div className="flex flex-col min-h-screen" style={{ background: "#060810" }}>
 
-      {/* 1. Ticker strips */}
+      {/* 1. Market ticker strip */}
       <TickerStrips engine={engine} />
 
-      {/* 2. Telemetry row */}
-      <TelemetryRow
+      {/* 2. Platform telemetry bar (institutional 5-section bar) */}
+      <PlatformTelemetryBar
         engine={engine} settings={settings}
         trades={trades} exchangeStatus={exchangeStatus} feeSummary={feeSummary}
       />
 
       <div className="flex-1 p-3 sm:p-4 space-y-3 max-w-screen-2xl mx-auto w-full">
 
-        {/* 3. Page header + Quick Controls Bar */}
+        {/* 3. Quick Controls Bar */}
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Title */}
           <div className="flex items-center gap-2.5 mr-2">
             <Cpu className="w-4 h-4" style={{ color: "#00aaff" }} />
-            <h1 className="text-[13px] font-bold tracking-[0.18em] uppercase font-mono"
-              style={{ color: "#00aaff" }}>
+            <h1 className="text-[13px] font-bold tracking-[0.18em] uppercase font-mono" style={{ color: "#00aaff" }}>
               Command Center
             </h1>
             <span className="text-[8px] font-bold px-1.5 py-0.5 rounded font-mono tracking-widest"
@@ -118,53 +115,30 @@ export default function CommandCenter() {
             )}
           </div>
 
-          {/* ── Quick Controls ── always visible */}
           <div className="flex items-center gap-2 flex-wrap flex-1">
-            {/* Exchange badge */}
-            <span
-              className="text-[9px] font-bold px-2.5 py-1.5 rounded font-mono tracking-widest"
-              style={{ background: "#00aaff0a", color: "#00aaff", border: "1px solid #00aaff22" }}
-            >
+            <span className="text-[9px] font-bold px-2.5 py-1.5 rounded font-mono tracking-widest"
+              style={{ background: "#00aaff0a", color: "#00aaff", border: "1px solid #00aaff22" }}>
               {exName.toUpperCase().slice(0, 8)}
             </span>
-
-            {/* Simulation / Live */}
-            <button
-              onClick={toggleMode}
+            <button onClick={toggleMode}
               className="text-[9px] font-bold px-2.5 py-1.5 rounded font-mono tracking-widest transition-all"
               style={isLive
                 ? { background: "#ff33550e", color: "#ff3355", border: "1px solid #ff335530" }
-                : { background: "#ffaa000e", color: "#ffaa00", border: "1px solid #ffaa0030" }
-              }
-            >
+                : { background: "#ffaa000e", color: "#ffaa00", border: "1px solid #ffaa0030" }}>
               {isLive ? "⚡ LIVE" : "◉ SIMULATION"}
             </button>
-
-            {/* Pause */}
-            <button
-              onClick={togglePause}
+            <button onClick={togglePause}
               className="flex items-center gap-1.5 text-[9px] font-bold px-2.5 py-1.5 rounded font-mono transition-all"
               style={isPaused
                 ? { background: "#ffaa0014", color: "#ffaa00", border: "1px solid #ffaa0035" }
-                : { background: "#00000000", color: "#2a4a60",  border: "1px solid #1c1c1c"  }
-              }
-            >
-              {isPaused
-                ? <><Play  className="w-3 h-3" /> RESUME</>
-                : <><Pause className="w-3 h-3" /> PAUSE</>
-              }
+                : { background: "#00000000", color: "#2a4a60",  border: "1px solid #1c1c1c"  }}>
+              {isPaused ? <><Play  className="w-3 h-3" /> RESUME</> : <><Pause className="w-3 h-3" /> PAUSE</>}
             </button>
-
-            {/* Kill Switch */}
-            <button
-              onClick={toggleKill}
+            <button onClick={toggleKill}
               className="flex items-center gap-1.5 text-[9px] font-bold px-2.5 py-1.5 rounded font-mono transition-all"
               style={isKill
-                ? { background: "#ff225518", color: "#ff2255", border: "1px solid #ff225540",
-                    animation: "border-march 2s ease-in-out infinite" }
-                : { background: "#00000000", color: "#2a4a60",  border: "1px solid #1c1c1c"  }
-              }
-            >
+                ? { background: "#ff225518", color: "#ff2255", border: "1px solid #ff225540", animation: "border-march 2s ease-in-out infinite" }
+                : { background: "#00000000", color: "#2a4a60",  border: "1px solid #1c1c1c"  }}>
               <ShieldOff className="w-3 h-3" />
               {isKill ? "⚡ KILL ACTIVE" : "KILL SWITCH"}
             </button>
@@ -179,32 +153,48 @@ export default function CommandCenter() {
         {/* 4. Full-width chart wall */}
         <CryptoChartGrid breakdowns={breakdowns} />
 
-        {/* 5. Below charts: Terminal Feed (2/3) + right stack (1/3) */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+        {/* 5. Three-column: Platform Overview | Terminal Feed | Right stack */}
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-3">
 
-          {/* Left 2/3 — Terminal Feed + Active Trades stacked */}
-          <div className="xl:col-span-2 space-y-3">
-            <RichTerminalFeed engine={engine} />
-            <ActiveTradesPanel trades={trades} />
+          {/* Col 1 — Platform Overview */}
+          <div className="xl:col-span-1">
+            <PlatformOverviewPanel />
           </div>
 
-          {/* Right 1/3 — Scanner → Regime → Threat */}
-          <div className="space-y-3">
+          {/* Col 2–3 — Terminal Feed */}
+          <div className="xl:col-span-2">
+            <RichTerminalFeed engine={engine} />
+          </div>
+
+          {/* Col 4 — AI Opportunity Scanner */}
+          <div className="xl:col-span-1">
             <OpportunityScanner breakdowns={breakdowns} />
-            <MarketRegimeCard   breakdowns={breakdowns} lastTickAt={engine?.lastTickAt ?? null} />
-            <AIThreatMonitor    engine={engine} breakdowns={breakdowns} />
           </div>
         </div>
 
-        {/* 6. Portfolio snapshot */}
-        <MiddleStatsGrid trades={trades} engine={engine} />
+        {/* 6. Active Trades — full width institutional blotter */}
+        <ActiveTradesPanel trades={trades} />
 
-        {/* 7. Bottom row: Risk · AI Brief · Broker · Fees */}
+        {/* 7. Portfolio snapshot + right panels */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+          <div className="xl:col-span-2">
+            <MiddleStatsGrid trades={trades} engine={engine} />
+          </div>
+          <div className="space-y-3">
+            <MarketRegimeCard breakdowns={breakdowns} lastTickAt={engine?.lastTickAt ?? null} />
+            <AIThreatMonitor  engine={engine} breakdowns={breakdowns} />
+          </div>
+        </div>
+
+        {/* 8. Bottom analytics row: AI Performance | Market Regime | AI Model Health */}
+        <BottomAnalyticsRow engine={engine} trades={trades} />
+
+        {/* 9. Bottom utility row: Risk · AI Brief · Broker · Fees */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-          <RiskCard           engine={engine} settings={settings} />
-          <AIBriefCard        engine={engine} />
-          <BrokerStatusCard   exchangeStatus={exchangeStatus} />
-          <PlatformFeeCard    feeSummary={feeSummary} />
+          <RiskCard         engine={engine} settings={settings} />
+          <AIBriefCard      engine={engine} />
+          <BrokerStatusCard exchangeStatus={exchangeStatus} />
+          <PlatformFeeCard  feeSummary={feeSummary} />
         </div>
 
       </div>

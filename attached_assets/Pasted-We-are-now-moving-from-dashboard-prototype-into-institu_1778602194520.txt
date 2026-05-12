@@ -1,0 +1,322 @@
+We are now moving from “dashboard prototype” into “institutional trading platform.”
+
+I’m attaching the reference layout image. Use it as the visual direction for the next major dashboard evolution.
+
+IMPORTANT:
+Do ALL upgrades in one coordinated UI pass so spacing, hierarchy, telemetry, and responsiveness remain consistent.
+
+PRIORITY GOAL:
+Create a true enterprise-grade AI trading command center that can scale visually for:
+
+* thousands of active users
+* live exchange execution
+* websocket streaming
+* copy trading
+* institutional telemetry
+* AI execution monitoring
+
+────────────────────────────
+
+1. ROW 1 — MARKET TICKER STRIP
+   ────────────────────────────
+
+Keep:
+
+* global market ticker strip
+* live crypto prices
+* mini chart movement
+
+Improve:
+
+* smoother ticker spacing
+* stronger hierarchy
+* animated pulse when price updates
+* better glow consistency
+* websocket-ready architecture
+
+Add:
+
+* subtle volume indication
+* spread indication
+* exchange source indicator
+* tiny live status pulse
+
+────────────────────────────
+2. ROW 2 — PLATFORM TELEMETRY BAR
+(REPLACES CURRENT SECOND TICKER ROW)
+────────────────────────────
+
+Build a dedicated telemetry row exactly like the attached concept.
+
+Include:
+
+USER ACTIVITY
+
+* total users
+* active users
+* live bots running
+* new users (24h)
+* copy traders connected
+* active subscriptions
+
+TRADING ACTIVITY
+
+* open positions
+* daily trade volume
+* executions/min
+* signals/min
+* win rate
+* avg pnl %
+
+FINANCIALS
+
+* fees collected (24h)
+* total fees lifetime
+* avg revenue/user
+* payouts processed
+* top trader earnings
+
+SYSTEM HEALTH
+
+* websocket connections
+* API latency
+* exchange health
+* queue depth
+* execution success rate
+* backend CPU/memory
+
+AI INTELLIGENCE
+
+* avg AI confidence
+* market regime
+* risk level
+* trend strength
+* model accuracy
+* prediction edge
+
+Use:
+
+* compact institutional telemetry cards
+* subtle neon accents
+* animated live indicators
+* color-coded risk states
+
+────────────────────────────
+3. PLATFORM OVERVIEW PANEL
+(VERY IMPORTANT)
+────────────────────────────
+
+Add a NEW panel exactly like the attached concept.
+
+This should visually display:
+
+* TOTAL USERS
+* LIVE TRADERS
+* PAPER TRADERS
+* AI BOTS ONLY
+* INACTIVE USERS
+
+Use:
+
+* donut/pie visualization
+* live percentages
+* glowing segmentation
+* realtime counters
+
+This is critical because the platform is intended to scale to thousands of users.
+
+This panel should feel like:
+
+* mission control
+* SaaS analytics
+* prop firm admin terminal
+
+────────────────────────────
+4. ACTIVE TRADES PANEL
+────────────────────────────
+
+Upgrade current blotter into institutional trade desk UI.
+
+Add:
+
+* AI confidence bars
+* exposure telemetry
+* avg pnl %
+* live pnl glow
+* animated OPEN pulse
+* better row hierarchy
+* trade duration
+* risk scoring
+* copy-trader count
+* recently closed section
+
+Support:
+
+* future websocket streaming
+* live pnl updates
+* execution animations
+
+────────────────────────────
+5. LIVE TERMINAL FEED
+────────────────────────────
+
+Improve:
+
+* timestamps
+* hierarchy
+* color coding
+* icons
+* signal categories
+* execution categories
+* alerts
+* system notices
+
+Support:
+
+* streaming websocket architecture later
+
+Add categories:
+
+* SIGNAL
+* EXECUTION
+* ALERT
+* SYSTEM
+* USER
+* AI
+
+────────────────────────────
+6. AI OPPORTUNITY SCANNER
+────────────────────────────
+
+Upgrade to:
+
+* confidence bars
+* LONG/SHORT tabs
+* opportunity ranking
+* execution readiness
+* AI conviction scoring
+
+Add:
+
+* “View All Opportunities”
+* sortable assets
+* confidence filtering
+
+────────────────────────────
+7. BOTTOM ANALYTICS ROW
+────────────────────────────
+
+Add:
+AI PERFORMANCE PANEL
+
+* win rate
+* avg pnl
+* profit factor
+* total signals
+* avg hold duration
+* execution quality
+
+MARKET REGIME DETECTION
+
+* bullish/bearish/sideways
+* confidence %
+* volatility state
+
+AI MODEL HEALTH
+
+* model drift
+* prediction edge
+* retraining status
+* confidence stability
+
+────────────────────────────
+8. SIDEBAR IMPROVEMENTS
+────────────────────────────
+
+Add:
+
+* user management
+* analytics
+* alerts
+* exchanges
+* AI models
+* subscriptions
+* revenue
+* leaderboard
+
+Include:
+
+* compact admin profile block
+* system status
+* connected exchanges
+
+────────────────────────────
+9. MOTION / ANIMATION LAYER
+────────────────────────────
+
+VERY IMPORTANT.
+
+The dashboard now needs:
+
+* live feeling
+* movement
+* execution pulses
+* glowing updates
+* blinking indicators
+* animated confidence bars
+* subtle transitions
+
+Avoid:
+
+* excessive motion
+* lag
+* heavy CPU usage
+
+Target:
+institutional terminal feel.
+
+────────────────────────────
+10. ARCHITECTURE PREPARATION
+────────────────────────────
+
+Please structure the frontend for future:
+
+* websocket streaming
+* realtime pnl
+* live user telemetry
+* exchange scaling
+* multi-user sessions
+* copy trading
+* leaderboard systems
+* live notifications
+
+Avoid:
+
+* excessive polling
+* duplicate renders
+* unnecessary rerenders
+
+────────────────────────────
+11. DESIGN LANGUAGE
+────────────────────────────
+
+Maintain:
+
+* Apex neon aesthetic
+* black institutional background
+* Bloomberg/crypto-terminal feel
+* clean spacing
+* prop desk UI quality
+
+Target inspiration:
+
+* Binance institutional
+* Hyperliquid
+* TensorCharts
+* TradingView Pro
+* Bloomberg Terminal
+* Prop firm dashboards
+* Quant execution UIs
+
+The attached image is the target direction.
+Use it as the blueprint for layout hierarchy and telemetry structure.
