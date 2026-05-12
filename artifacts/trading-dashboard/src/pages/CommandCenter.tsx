@@ -7,14 +7,8 @@ import { CryptoChartGrid }       from "@/components/command/CryptoChartGrid";
 import { PlatformOverviewPanel } from "@/components/command/PlatformOverviewPanel";
 import { RichTerminalFeed }      from "@/components/command/RichTerminalFeed";
 import { OpportunityScanner }    from "@/components/command/OpportunityScanner";
-import { MarketRegimeCard }      from "@/components/command/MarketRegimeCard";
-import { AIThreatMonitor }       from "@/components/command/AIThreatMonitor";
 import { MiddleStatsGrid }       from "@/components/command/MiddleStatsGrid";
 import { ActiveTradesPanel }     from "@/components/command/ActiveTradesPanel";
-import { RiskCard }              from "@/components/command/RiskCard";
-import { AIBriefCard }           from "@/components/command/AIBriefCard";
-import { BrokerStatusCard }      from "@/components/command/BrokerStatusCard";
-import { PlatformFeeCard }       from "@/components/command/PlatformFeeCard";
 import { BottomAnalyticsRow }    from "@/components/command/BottomAnalyticsRow";
 
 import type {
@@ -58,7 +52,10 @@ export default function CommandCenter() {
   const isLive     = exchangeStatus?.mode === "live";
   const exName     = exchangeStatus?.exchangeName ?? "KRAKEN";
 
-  const invalidate = () => { qc.invalidateQueries({ queryKey: ["exchange-status-cmd"] }); refetchExchange(); };
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["exchange-status-cmd"] });
+    refetchExchange();
+  };
   const toggleKill  = () => fetch("/api/exchange/kill",  { method: "POST", cache: "no-store" }).then(invalidate);
   const togglePause = () => fetch("/api/exchange/pause", { method: "POST", cache: "no-store" }).then(invalidate);
   const toggleMode  = () => fetch("/api/exchange/mode",  {
@@ -78,25 +75,24 @@ export default function CommandCenter() {
         trades={trades} exchangeStatus={exchangeStatus} feeSummary={feeSummary}
       />
 
-      {/* ③ Quick controls strip */}
+      {/* ③ Command strip */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b flex-wrap flex-shrink-0"
         style={{ borderBottomColor: "#111111", background: "#000000" }}>
         <Cpu className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#00aaff" }} />
-        <span className="text-[10px] font-bold tracking-[0.2em] font-mono font-semibold"
+        <span className="text-[10px] font-bold tracking-[0.2em] font-mono"
           style={{ color: "#EAF2FF" }}>COMMAND CENTER</span>
         <span className="text-[7px] font-bold px-1.5 py-0.5 rounded font-mono tracking-widest"
           style={{ background: "#00aaff08", color: "#9FB3C8", border: "1px solid #00aaff14" }}>
           MOD 19
         </span>
         {engine?.running && (
-          <span className="flex items-center gap-1 text-[8px] font-mono font-semibold"
-            style={{ color: "#00ff8a" }}>
+          <span className="flex items-center gap-1 text-[8px] font-mono font-semibold" style={{ color: "#00ff8a" }}>
             <span className="live-dot" style={{ width: 4, height: 4 }} /> LIVE
           </span>
         )}
 
         <div className="flex items-center gap-1.5 flex-wrap ml-2">
-          <span className="text-[8px] font-bold px-2 py-0.5 rounded font-mono font-semibold"
+          <span className="text-[8px] font-bold px-2 py-0.5 rounded font-mono"
             style={{ background: "#00aaff0a", color: "#C7D4E2", border: "1px solid #00aaff1c" }}>
             {exName.toUpperCase().slice(0, 8)}
           </span>
@@ -131,14 +127,14 @@ export default function CommandCenter() {
         </div>
       </div>
 
-      {/* ④–⑨ Main content */}
+      {/* ④–⑧ Main content */}
       <div className="flex-1 p-2 sm:p-3 space-y-2 max-w-screen-2xl mx-auto w-full">
 
         {/* ④ Chart wall */}
         <CryptoChartGrid breakdowns={breakdowns} />
 
-        {/* ⑤ Three-column: Platform Overview | Terminal Feed | Scanner */}
-        <div className="grid gap-2" style={{ gridTemplateColumns: "260px 1fr 260px" }}>
+        {/* ⑤ Three-column: Platform Overview | Terminal Feed (fills height) | Scanner */}
+        <div className="grid gap-2" style={{ gridTemplateColumns: "260px 1fr 260px", height: 640 }}>
           <PlatformOverviewPanel />
           <RichTerminalFeed engine={engine} />
           <OpportunityScanner breakdowns={breakdowns} />
@@ -147,25 +143,14 @@ export default function CommandCenter() {
         {/* ⑥ Active Trades LEFT | Recently Closed RIGHT */}
         <ActiveTradesPanel trades={trades} />
 
-        {/* ⑦ Five-column portfolio/metrics strip */}
-        <MiddleStatsGrid trades={trades} engine={engine} />
+        {/* ⑦ 8-container unified grid (4+4 two-row) */}
+        <MiddleStatsGrid
+          trades={trades} engine={engine}
+          exchangeStatus={exchangeStatus} feeSummary={feeSummary}
+        />
 
-        {/* ⑧ Regime + Threat row */}
-        <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 340px" }}>
-          <BottomAnalyticsRow engine={engine} trades={trades} />
-          <div className="space-y-2">
-            <MarketRegimeCard breakdowns={breakdowns} lastTickAt={engine?.lastTickAt ?? null} />
-            <AIThreatMonitor  engine={engine} breakdowns={breakdowns} />
-          </div>
-        </div>
-
-        {/* ⑨ Utility row: Risk · AI Brief · Broker · Fees */}
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
-          <RiskCard         engine={engine} settings={settings} />
-          <AIBriefCard      engine={engine} />
-          <BrokerStatusCard exchangeStatus={exchangeStatus} />
-          <PlatformFeeCard  feeSummary={feeSummary} />
-        </div>
+        {/* ⑧ Bottom analytics: AI Perf | Market Regime | Model Health */}
+        <BottomAnalyticsRow engine={engine} trades={trades} />
 
       </div>
     </div>

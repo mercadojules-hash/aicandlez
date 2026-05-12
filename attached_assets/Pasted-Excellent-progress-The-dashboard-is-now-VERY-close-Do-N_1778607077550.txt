@@ -1,0 +1,154 @@
+Excellent progress. The dashboard is now VERY close.
+
+Do NOT redesign the layout anymore.
+This is now a refinement + space utilization pass only.
+
+The charts are perfect.
+Active Trades + Recently Closed are perfect.
+The middle analytics containers are perfect.
+
+Now we need to fix the remaining layout balance + hierarchy issues.
+
+========================================
+
+1. LIVE TERMINAL FEED
+   ========================================
+
+This is the biggest remaining issue.
+
+Current problem:
+
+* the feed became EVEN SMALLER
+* there is too much empty dead space underneath
+* the container is not being utilized
+* rows are too compressed vertically
+
+What I want:
+
+* make the Live Terminal Feed container TALLER
+* fill the FULL container height with rows
+* show approximately 20 visible rows
+* use smooth scrolling inside the container
+* remove dead empty space underneath the rows
+
+IMPORTANT:
+Do NOT make the typography larger overall.
+Keep institutional density.
+
+Instead:
+
+* slightly increase row height
+* better spacing
+* better vertical rhythm
+* more visible rows
+* stronger utilization of the container
+
+Goal:
+The terminal should feel:
+
+* alive
+* active
+* flowing constantly
+* like a professional execution stream
+
+The feed should visually dominate the middle area vertically.
+
+========================================
+2. AI OPPORTUNITY SCANNER
+=========================
+
+The structure is correct.
+But hierarchy is wrong.
+
+Current issue:
+
+* the crypto symbol title is too large/heavy
+* percentages are too dim
+* confidence values are not visually dominant enough
+
+Fix:
+
+* make the crypto pair title SMALLER
+* keep the confidence percentage LARGE
+* brighten the percentages heavily
+* brighten conviction values
+* improve contrast
+
+Desired hierarchy:
+
+1. BIG confidence %
+2. conviction bars
+3. smaller crypto title
+4. supporting metrics
+
+Make the right panel feel more premium/intelligent.
+
+========================================
+3. BOTTOM CONTAINER ROW
+=======================
+
+This section is now very good overall.
+
+Current issue:
+There are still 4 orphan containers floating underneath instead of being integrated cleanly.
+
+I want:
+
+* a FULL 8-CONTAINER GRID
+* evenly spaced
+* perfectly aligned
+* consistent widths/heights
+
+Current top row is good:
+
+1. Performance
+2. Exposure & Risk
+3. Velocity
+4. AI Metrics
+
+Now COMPLETE the layout cleanly by integrating the remaining modules into the same system.
+
+Final target:
+8 balanced bottom containers total.
+
+Move/integrate:
+
+* AI Market Brief
+* Broker / Exchange
+* Platform Fees
+* AI Threat Monitor
+
+Into the unified 8-container grid system.
+
+========================================
+4. GENERAL POLISH
+=================
+
+Maintain:
+
+* compact typography
+* institutional density
+* Bloomberg/Quant feel
+
+DO NOT:
+
+* increase overall text size globally
+* add oversized spacing
+* add giant cards
+
+DO:
+
+* improve hierarchy
+* improve contrast
+* improve container utilization
+* remove dead space
+* improve balance/alignment
+
+The dashboard is now around 90% complete.
+This pass is mainly:
+
+* vertical rhythm
+* balance
+* hierarchy
+* proper space utilization
+* stronger visual intelligence
