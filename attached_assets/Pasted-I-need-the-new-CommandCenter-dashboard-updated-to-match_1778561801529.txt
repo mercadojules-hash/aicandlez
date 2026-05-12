@@ -1,0 +1,57 @@
+I need the new CommandCenter dashboard updated to match the reference dashboard behavior and style.
+
+IMPORTANT:
+Keep the current new layout structure:
+
+* 8 charts going across as the main chart wall
+* AI Opportunity Scanner, AI Market Regime, and AI Threat Monitor positioned under/right side as currently planned
+* Live Terminal Feed stays under the chart wall on the left
+
+Do NOT revert the layout.
+
+What needs fixing:
+
+1. Charts must feel live
+
+* Charts should move continuously like the reference CommandCenter
+* Use the same live/streaming chart behavior from the old CommandCenter if possible
+* Prices should not feel frozen or stale
+* Add smooth live interpolation/drift if the backend candle data does not update fast enough
+* Keep chart interiors black so neon lines stand out
+
+2. Live Terminal Feed must match the reference
+
+* The terminal feed should actually feel live
+* Confidence values should update/fluctuate visibly
+* Rows should stream/update like the old CommandCenter
+* Use the same Live Feed behavior/style from the reference CommandCenter if possible
+* It should feel like an autonomous AI execution console, not static cards
+
+3. Use the same style/components from the reference where possible
+   Please replicate the reference dashboard versions of:
+
+* Live Terminal Feed
+* AI Opportunity Scanner
+* AI Market Regime
+* AI Threat Monitor
+
+4. Visual style requirements
+
+* Matte black backgrounds inside every container
+* Neon colors should stand out against black
+* Reduce/lower the glow intensity
+* Avoid excessive cyberpunk glow
+* More Bloomberg / TradingView / institutional AI terminal style
+* Dense, readable, professional, premium
+* Keep subtle glow only for important signals
+
+5. Do not break the working structure
+
+* Preserve the current CommandCenter architecture
+* Preserve the 8-chart wall layout
+* Preserve the right-side/lower container placement
+* Only replace or upgrade the individual components needed
+* Avoid partial broken edits; replace full component files if needed
+
+Goal:
+Make the new dashboard visually and behaviorally feel like the old/reference CommandCenter, but with the improved new layout: live moving charts, live terminal feed, live opportunity scanner, market regime, threat monitor, black interiors, reduced glow, and institutional trading terminal aesthetics.

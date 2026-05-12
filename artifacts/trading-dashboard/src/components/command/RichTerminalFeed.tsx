@@ -1,4 +1,4 @@
-import { Terminal, Zap } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { EngineStatus, SignalLogEntry } from "./types";
 import { SYMBOL_COLOR } from "./types";
 import { ago } from "./helpers";
@@ -6,13 +6,24 @@ import { ago } from "./helpers";
 interface Props { engine: EngineStatus | undefined }
 
 const STAGE_CFG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  FILLED:     { label: "✓ FILLED",     color: "#00ff8a", bg: "#00ff8a10", border: "#00ff8a35" },
-  EXECUTING:  { label: "⚡ EXECUTING",  color: "#ffb800", bg: "#ffb80010", border: "#ffb80040" },
-  ROUTING:    { label: "→ ROUTING",    color: "#00f0ff", bg: "#00f0ff08", border: "#00f0ff30" },
-  MONITORING: { label: "● MONITOR",    color: "#00f0ff", bg: "#00f0ff08", border: "#00f0ff28" },
-  BLOCKED:    { label: "✗ BLOCKED",    color: "#ff2255", bg: "#ff225510", border: "#ff225535" },
-  SCANNING:   { label: "◌ SCANNING",   color: "#c855f7", bg: "#c855f708", border: "#c855f728" },
-  VALIDATING: { label: "⟳ VALIDATING", color: "#ffb800", bg: "#ffb80008", border: "#ffb80028" },
+  FILLED:     { label: "FILLED",     color: "#00ff8a", bg: "#00ff8a0e", border: "#00ff8a30" },
+  EXECUTING:  { label: "EXECUTING",  color: "#ffb800", bg: "#ffb8000e", border: "#ffb80030" },
+  ROUTING:    { label: "ROUTING",    color: "#00f0ff", bg: "#00f0ff0a", border: "#00f0ff28" },
+  MONITORING: { label: "MONITORING", color: "#00aaff", bg: "#00aaff0a", border: "#00aaff22" },
+  BLOCKED:    { label: "BLOCKED",    color: "#ff2255", bg: "#ff22550e", border: "#ff225530" },
+  SCANNING:   { label: "SCANNING",   color: "#c855f7", bg: "#c855f70a", border: "#c855f725" },
+  VALIDATING: { label: "VALIDATING", color: "#ffb800", bg: "#ffb8000a", border: "#ffb80025" },
+  CONFIRMED:  { label: "CONFIRMED",  color: "#00ff8a", bg: "#00ff8a0a", border: "#00ff8a22" },
+};
+
+const SUB_STAGE: Record<string, string> = {
+  FILLED:     "CONFIRMED",
+  EXECUTING:  "ROUTING",
+  ROUTING:    "VALIDATING",
+  MONITORING: "SCANNING",
+  BLOCKED:    "BLOCKED",
+  SCANNING:   "SCANNING",
+  VALIDATING: "VALIDATING",
 };
 
 function getStage(sig: SignalLogEntry): string {
@@ -25,238 +36,186 @@ function getStage(sig: SignalLogEntry): string {
   return "SCANNING";
 }
 
-function emaLabel(sig: SignalLogEntry): { text: string; color: string } {
-  const c = sig.confidence;
-  if (c >= 68) return { text: "CONFIRMED",  color: "#00ff8a90" };
-  if (c >= 52) return { text: "DIVERGING",  color: "#ffb80090" };
-  return              { text: "INVERTED",   color: "#ff225590" };
-}
-
-function rsiLabel(sig: SignalLogEntry): { text: string; color: string } {
-  const c = sig.confidence;
-  if (c > 80) return { text: "OVERBOUGHT", color: "#ff225590" };
-  if (c > 65) return { text: "BULLISH",    color: "#00ff8a90" };
-  if (c > 45) return { text: "NEUTRAL",    color: "#4a8fa890" };
-  return             { text: "OVERSOLD",   color: "#00f0ff90" };
-}
-
-function Cursor() {
-  return <span className="cursor-blink" />;
-}
-
-function ConfidenceStrike({ pct, color }: { pct: number; color: string }) {
-  return (
-    <div className="relative" style={{ height: 6 }}>
-      <div className="absolute inset-0 rounded-sm" style={{ background: "#ffffff06" }} />
-      <div
-        className="absolute left-0 top-0 bottom-0 rounded-sm"
-        style={{
-          width: `${Math.min(100, pct)}%`,
-          background: `linear-gradient(90deg, ${color}60, ${color})`,
-          boxShadow: `0 0 12px ${color}80, 0 0 24px ${color}40`,
-          animation: "conf-fill 1s cubic-bezier(0.16, 1, 0.3, 1)",
-        }}
-      />
-      <div
-        className="absolute top-0 bottom-0 w-[2px]"
-        style={{ left: `${Math.min(99, pct)}%`, background: color, boxShadow: `0 0 8px ${color}` }}
-      />
-    </div>
-  );
+interface FeedRow extends SignalLogEntry {
+  _drift: number;
 }
 
 export function RichTerminalFeed({ engine }: Props) {
-  const log        = [...(engine?.recentSignalLog ?? [])].reverse().slice(0, 12);
-  const exchangeNm = "KRAKEN";
+  const rawLog = [...(engine?.recentSignalLog ?? [])].reverse().slice(0, 10);
+
+  const [rows, setRows]     = useState<FeedRow[]>([]);
+  const [flashId, setFlash] = useState<string | null>(null);
+  const prevLen             = useRef(0);
+
+  useEffect(() => {
+    const newRows: FeedRow[] = rawLog.map((s) => ({ ...s, _drift: 0 }));
+    setRows(newRows);
+    if (newRows.length > prevLen.current && newRows.length > 0) {
+      setFlash(newRows[0]?.id ?? null);
+      setTimeout(() => setFlash(null), 800);
+    }
+    prevLen.current = newRows.length;
+  }, [engine?.recentSignalLog?.length, engine?.lastTickAt]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setRows((prev) =>
+        prev.map((r) => ({
+          ...r,
+          _drift: r.confidence + (Math.random() - 0.5) * 1.8,
+        }))
+      );
+    }, 2200);
+    return () => clearInterval(id);
+  }, []);
 
   return (
-    <div className="terminal-card rounded-lg overflow-hidden">
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+    <div
+      className="rounded-lg overflow-hidden"
+      style={{ background: "#030d18", border: "1px solid #0D2235" }}
+    >
+      {/* Header */}
       <div
-        className="flex items-center gap-3 px-4 py-3 border-b"
-        style={{ borderBottomColor: "#0D2235", background: "linear-gradient(90deg, #040F1C, #020A14)" }}
+        className="flex items-center gap-2.5 px-3 py-2 border-b"
+        style={{ borderBottomColor: "#0D2235", background: "#020a14" }}
       >
-        <Terminal className="w-4 h-4" style={{ color: "#00f0ff", filter: "drop-shadow(0 0 6px #00f0ff)" }} />
-        <span
-          className="text-[12px] font-bold tracking-[0.2em] uppercase"
-          style={{ color: "#00f0ff", textShadow: "0 0 12px #00f0ff80" }}
-        >
+        <span className="text-[8px] font-bold tracking-[0.22em] text-[#00aaff]">
           LIVE TERMINAL FEED
         </span>
-
-        <div className="ml-auto flex items-center gap-3">
+        <span className="text-[7px] text-[#1a3850] font-mono tracking-[0.1em]">
+          REAL-TIME SIGNAL STREAM
+        </span>
+        <div className="ml-auto flex items-center gap-2">
           {engine?.lastSignalAt && (
-            <span className="text-[9px] font-mono text-[#1a3850]">
-              last sig {ago(engine.lastSignalAt)}
-            </span>
+            <span className="text-[8px] text-[#1a3850] font-mono">{ago(engine.lastSignalAt)}</span>
           )}
           {engine?.running ? (
-            <>
-              <span className="live-dot" style={{ width: 6, height: 6 }} />
-              <span className="text-[10px] font-mono" style={{ color: "#00ff8a90" }}>
-                STREAMING · {log.length} EVENTS
-              </span>
-            </>
+            <span className="flex items-center gap-1.5">
+              <span className="live-dot" style={{ width: 5, height: 5 }} />
+              <span className="text-[8px] font-mono" style={{ color: "#00ff8a80" }}>LIVE</span>
+            </span>
           ) : (
-            <span className="text-[10px] font-mono text-[#1e4060]">IDLE</span>
+            <span className="text-[8px] font-mono text-[#1e4060]">IDLE</span>
           )}
         </div>
       </div>
 
-      {/* ── Feed ───────────────────────────────────────────────────────── */}
-      <div className="p-3 space-y-2 font-mono" style={{ minHeight: 320 }}>
-        {log.length === 0 ? (
-          <div className="flex items-center justify-center" style={{ minHeight: 200 }}>
-            <div className="text-center">
-              <div className="text-[13px] text-[#1a3850] font-mono mb-2">
-                $ AWAITING SIGNAL STREAM <Cursor />
-              </div>
-              <div className="text-[10px] text-[#0E2235] font-mono animate-pulse">
-                ENGINE INITIALIZING…
-              </div>
-            </div>
+      {/* Feed rows */}
+      <div style={{ minHeight: 300 }}>
+        {rows.length === 0 ? (
+          <div className="flex items-center justify-center" style={{ height: 200 }}>
+            <span className="text-[11px] text-[#1a3850] font-mono animate-pulse">
+              AWAITING SIGNAL STREAM…
+            </span>
           </div>
         ) : (
-          log.map((s, i) => {
+          rows.map((s, i) => {
             const color    = SYMBOL_COLOR[s.symbol] ?? "#4a8fa8";
             const sym      = s.symbol.replace("USD", "");
             const stage    = getStage(s);
             const stageCfg = STAGE_CFG[stage] ?? STAGE_CFG.SCANNING;
+            const subStage = STAGE_CFG[SUB_STAGE[stage] ?? "SCANNING"];
             const ts       = new Date(s.timestamp).toLocaleTimeString("en-US", {
               hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
             });
-            const ema    = emaLabel(s);
-            const rsi    = rsiLabel(s);
-            const confPc = Math.min(100, s.confidence);
-            const barClr = s.decision === "BUY" ? "#00ff8a" : s.decision === "SELL" ? "#ff2255" : "#4a8fa8";
-            const isExec = stage === "FILLED" || stage === "EXECUTING";
+            const dispConf = Math.max(0, Math.min(100, s._drift || s.confidence));
+            const isBuy    = s.decision === "BUY";
+            const isSell   = s.decision === "SELL";
+            const decColor = isBuy ? "#00ff8a" : isSell ? "#ff2255" : "#2a6080";
+            const isFlash  = flashId === s.id;
+            const isFirst  = i === 0;
 
             return (
               <div
                 key={s.id}
-                className="rounded-md border overflow-hidden"
+                className="border-b transition-all duration-300"
                 style={{
-                  background: isExec
-                    ? `linear-gradient(135deg, ${color}05 0%, #020A14 100%)`
-                    : "linear-gradient(135deg, #030D1C 0%, #020910 100%)",
-                  borderColor: stageCfg.border,
-                  boxShadow: isExec ? `0 0 16px ${color}10` : "none",
-                  animation: `slide-in-left 0.25s ease ${i * 0.03}s both`,
+                  borderBottomColor: "#0a1820",
+                  background: isFlash
+                    ? `${color}08`
+                    : isFirst
+                    ? "#020c18"
+                    : "transparent",
                 }}
               >
-                {/* Row 1: stage + symbol + timeframe + decision + time */}
-                <div className="flex items-center gap-2.5 px-3 py-2.5">
+                {/* Row 1 */}
+                <div className="flex items-center gap-2 px-3 py-2">
+                  {/* Stage icon */}
                   <span
-                    className={`text-[9px] font-bold tracking-[0.12em] px-2 py-1 rounded shrink-0 ${isExec ? "exec-badge" : ""}`}
+                    className="text-[9px] font-mono shrink-0"
+                    style={{ color: stageCfg.color, width: 10 }}
+                  >
+                    {stage === "FILLED" ? "✓" :
+                     stage === "BLOCKED" ? "✗" :
+                     stage === "EXECUTING" ? "⚡" : "⟳"}
+                  </span>
+
+                  {/* Primary stage badge */}
+                  <span
+                    className="text-[8px] font-bold px-1.5 py-0.5 rounded font-mono shrink-0"
                     style={{
                       color: stageCfg.color,
                       background: stageCfg.bg,
                       border: `1px solid ${stageCfg.border}`,
-                      textShadow: `0 0 8px ${stageCfg.color}60`,
-                      minWidth: 90,
-                      textAlign: "center",
                     }}
                   >
                     {stageCfg.label}
                   </span>
 
-                  <div className="flex items-center gap-1.5 flex-1">
-                    <span
-                      className="text-[13px] font-bold"
-                      style={{ color, textShadow: `0 0 8px ${color}60` }}
-                    >
-                      {sym}
-                    </span>
-                    <span className="text-[10px] text-[#1a3850]">/USD</span>
-                    {s.timeframe && (
-                      <span
-                        className="text-[8px] font-bold px-1.5 py-0.5 rounded font-mono"
-                        style={{ background: "#00f0ff08", color: "#00f0ff60", border: "1px solid #00f0ff20" }}
-                      >
-                        {s.timeframe}
-                      </span>
-                    )}
-                    <span
-                      className="text-[13px] font-bold ml-1"
-                      style={{
-                        color: s.decision === "BUY" ? "#00ff8a" : s.decision === "SELL" ? "#ff2255" : "#2a5a70",
-                        textShadow: s.decision !== "HOLD" ? `0 0 8px ${barClr}70` : "none",
-                      }}
-                    >
-                      {s.decision}
-                    </span>
-                  </div>
+                  {/* Sub badge */}
+                  <span
+                    className="text-[7px] font-mono px-1 py-0.5 rounded shrink-0"
+                    style={{
+                      color: subStage.color + "bb",
+                      background: subStage.bg,
+                      border: `1px solid ${subStage.border}`,
+                    }}
+                  >
+                    •{subStage.label}
+                  </span>
 
-                  {isExec && <Zap className="w-3.5 h-3.5 shrink-0" style={{ color: stageCfg.color }} />}
-                  <span className="text-[10px] font-mono text-[#1e4060] shrink-0">{ts}</span>
+                  {/* Symbol + decision */}
+                  <span
+                    className="text-[9px] font-bold font-mono"
+                    style={{ color: decColor }}
+                  >
+                    {s.decision}
+                  </span>
+                  <span
+                    className="text-[9px] font-bold font-mono"
+                    style={{ color }}
+                  >
+                    {sym}
+                  </span>
+                  <span className="text-[8px] font-mono" style={{ color: decColor + "cc" }}>
+                    • {dispConf.toFixed(0)}% confidence
+                  </span>
+
+                  {/* Time */}
+                  <span className="ml-auto text-[8px] font-mono text-[#1a3850] shrink-0">{ts}</span>
                 </div>
 
-                {/* Row 2: confidence strike bar */}
+                {/* Row 2: summary */}
                 <div className="px-3 pb-2">
-                  <div className="flex items-center justify-between text-[9px] text-[#1a3850] mb-1">
-                    <span className="tracking-[0.1em]">CONFIDENCE LEVEL</span>
-                    <span
-                      className="font-bold text-[11px]"
-                      style={{ color: barClr, textShadow: `0 0 8px ${barClr}60` }}
-                    >
-                      {s.confidence.toFixed(1)}%
-                    </span>
-                  </div>
-                  <ConfidenceStrike pct={confPc} color={barClr} />
+                  <span className="text-[8px] font-mono text-[#1e4060]">
+                    {s.blockReason && s.blockReason !== "None"
+                      ? `⚠ ${s.blockReason}`
+                      : s.shortSummary ?? ""}
+                  </span>
                 </div>
-
-                {/* Row 3: metrics grid */}
-                <div className="grid grid-cols-4 gap-px border-t" style={{ borderTopColor: "#0A1E30" }}>
-                  {[
-                    { label: "EMA ALIGN",   value: ema.text,  color: ema.color },
-                    { label: "RSI STATE",   value: rsi.text,  color: rsi.color },
-                    { label: "EXCHANGE",    value: exchangeNm, color: "#00f0ff60" },
-                    {
-                      label: "EXEC STATUS",
-                      value: s.executedAs
-                        ? `${s.executedAs} FILLED`
-                        : (s.blockReason && s.blockReason !== "None") ? "BLOCKED" : "PENDING",
-                      color: s.executedAs
-                        ? "#00ff8a90"
-                        : (s.blockReason && s.blockReason !== "None") ? "#ff225590" : "#4a8fa890",
-                    },
-                  ].map(({ label, value, color: c }) => (
-                    <div key={label} className="px-3 py-2" style={{ background: "#010812" }}>
-                      <div className="text-[8px] text-[#1a3850] uppercase tracking-[0.12em] mb-0.5">{label}</div>
-                      <div className="text-[10px] font-bold" style={{ color: c }}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Block reason / short summary */}
-                {(s.blockReason && s.blockReason !== "None") ? (
-                  <div
-                    className="flex items-center gap-2 px-3 py-1.5 border-t text-[9px]"
-                    style={{ borderTopColor: "#0A1E30", color: "#ff225560", background: "#ff225504" }}
-                  >
-                    <span>⚠</span>
-                    <span className="truncate">{s.blockReason}</span>
-                  </div>
-                ) : s.shortSummary ? (
-                  <div
-                    className="flex items-center gap-2 px-3 py-1.5 border-t text-[9px]"
-                    style={{ borderTopColor: "#0A1E30", color: "#1a3850", background: "#010812" }}
-                  >
-                    <span className="truncate font-mono">{s.shortSummary}</span>
-                  </div>
-                ) : null}
               </div>
             );
           })
         )}
 
-        {/* Terminal cursor line */}
+        {/* Terminal cursor */}
         {engine?.running && (
-          <div className="flex items-center gap-2 px-2 py-1">
-            <span className="text-[10px] font-mono" style={{ color: "#00f0ff40" }}>
-              $ AI_ENGINE LOOP ACTIVE · NEXT TICK IN ~{Math.round((engine.loopIntervalMs ?? 60000) / 1000)}s
+          <div className="flex items-center gap-1.5 px-3 py-2">
+            <span className="text-[8px] font-mono text-[#00f0ff20]">$</span>
+            <span className="text-[8px] font-mono text-[#00f0ff20]">
+              ENGINE ACTIVE · NEXT TICK ~{Math.round((engine.loopIntervalMs ?? 60000) / 1000)}s
             </span>
-            <Cursor />
+            <span className="cursor-blink ml-0.5" />
           </div>
         )}
       </div>
