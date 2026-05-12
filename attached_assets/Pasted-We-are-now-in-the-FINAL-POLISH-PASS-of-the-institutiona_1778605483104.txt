@@ -1,0 +1,245 @@
+We are now in the FINAL POLISH PASS of the institutional dashboard redesign.
+
+The architecture/layout is now correct.
+DO NOT redesign the structure again.
+This pass is ONLY focused on:
+
+* readability
+* density
+* spacing
+* hierarchy
+* filling dead space
+* improving usability
+
+Use the attached reference screenshots as the exact visual target.
+
+MOST IMPORTANT ISSUE:
+The dashboard descriptions/subtext are TOO SMALL and TOO FAINT almost everywhere.
+
+GLOBAL TEXT FIXES (VERY IMPORTANT)
+Apply these globally across the dashboard:
+
+* Increase all micro labels from:
+
+  * 7px → 11px minimum
+  * 8px → 12px minimum
+  * 9px → 13px minimum
+
+* Increase important values from:
+
+  * 12px → 16px
+  * 14px → 18px
+
+* ALL description text should use HIGH CONTRAST.
+  Current issue:
+  text is dim/faint and hard to read.
+
+Use brighter colors:
+
+* labels: #9FB3C8 minimum
+
+* secondary text: #C7D4E2
+
+* important text: #EAF2FF
+
+* values: #FFFFFF
+
+* Increase font-weight:
+
+  * many labels should become semi-bold
+  * metrics should become bold
+
+* Improve readability hierarchy:
+  headers > values > labels > metadata
+
+* Add stronger spacing between labels and values.
+
+DO NOT use ultra-thin low-opacity text anymore.
+
+========================================
+
+1. PLATFORM TELEMETRY BAR (TOP METRICS ROW)
+   ========================================
+
+Current structure is GOOD.
+Keep the layout.
+
+Fix:
+
+* descriptions under numbers are tiny/faint
+* metrics need stronger hierarchy
+* improve scanability
+
+Required:
+
+* Larger labels
+* Brighter descriptions
+* Slightly larger spacing between metric groups
+* Add subtle separators between sections
+* Make all metric cards visually balanced
+
+The top section is otherwise COMPLETE.
+
+========================================
+2. PLATFORM OVERVIEW PANEL
+==========================
+
+The donut chart is PERFECT.
+
+Problems:
+
+* side labels are too tiny
+* bottom volume list is too tiny
+* percentages hard to read
+
+Fix:
+
+* increase ALL text sizes
+* brighter labels
+* slightly larger legend spacing
+* make percentages easier to scan
+
+Keep current layout.
+
+========================================
+3. LIVE TERMINAL FEED
+=====================
+
+Current feed looks GREAT.
+
+But:
+
+* there is too much EMPTY SPACE underneath
+* feed is not dense enough
+
+Required updates:
+
+* increase visible rows:
+  10 rows → 20 rows
+* make container scrollable
+* preserve smooth scrolling
+* slightly reduce row height
+* make timestamps slightly brighter
+* keep category color coding
+
+Remove the huge dead space below the feed.
+
+Feed should feel ACTIVE and ALIVE.
+
+========================================
+4. ACTIVE TRADES PANEL (MAJOR FIX)
+==================================
+
+Current issue:
+There is MASSIVE empty space on the right side.
+
+We need TWO SEPARATE CONTAINERS on this row:
+
+LEFT:
+ACTIVE TRADES
+
+RIGHT:
+RECENTLY CLOSED
+
+Each container:
+
+* independently scrollable
+* show 10 visible rows
+* fixed height
+* tighter row density
+
+IMPORTANT:
+Current AI confidence glow is TOO STRONG.
+
+Fix:
+
+* reduce glow intensity significantly
+* use cleaner solid bars
+* subtle gradients only
+* no giant neon bloom
+
+Improve readability:
+
+* larger headers
+* brighter columns
+* stronger separators
+
+Both containers together should FILL THE ENTIRE ROW.
+No dead space.
+
+========================================
+5. PORTFOLIO SNAPSHOT ROW (BIGGEST LAYOUT ISSUE)
+================================================
+
+Currently:
+WAY too much empty space.
+
+We need this entire row rebuilt into:
+5 equal containers across the row.
+
+Each card should fully utilize the height.
+
+MOVE these components into the row:
+
+1. PERFORMANCE OVERVIEW
+2. EXPOSURE & RISK
+3. TRADING VELOCITY
+4. AI MODEL METRICS
+5. AI MARKET BRIEF
+
+All 5 should sit horizontally across the row.
+
+Requirements:
+
+* fully fill available width
+* fully fill height
+* larger text
+* brighter labels
+* add icons in headers
+* stronger information hierarchy
+* cleaner stat alignment
+
+The current AI Market Brief panel should be integrated INTO this row.
+
+========================================
+6. GENERAL VISUAL POLISH
+========================
+
+Apply globally:
+
+* reduce unnecessary empty padding
+* increase section separation
+* stronger borders
+* more readable typography
+* cleaner spacing rhythm
+* slightly brighter panel edges
+* more enterprise-grade finish
+
+Dashboard should feel:
+
+* dense
+* premium
+* institutional
+* readable at a glance
+
+========================================
+7. IMPORTANT
+============
+
+DO NOT:
+
+* redesign the architecture
+* move the major layout sections
+* remove existing components
+* rebuild charts
+* touch chart structure
+
+The charts are PERFECT already.
+
+This pass is ONLY:
+READABILITY + DENSITY + INFORMATION HIERARCHY + SPACE UTILIZATION.
+
+Use the attached screenshots as the direct visual target.
+
+Goal:
+This should feel like a Bloomberg / Quant / Institutional trading terminal.

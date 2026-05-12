@@ -1,0 +1,262 @@
+We are now in the FINAL POLISH PASS of the institutional dashboard redesign.
+
+The architecture/layout is now mostly correct.
+DO NOT redesign the dashboard again from scratch.
+This pass is ONLY focused on:
+
+* readability
+* density
+* spacing
+* hierarchy
+* compact institutional styling
+* filling dead space
+* improving scanability
+
+Use the attached screenshots as the direct visual target.
+
+VERY IMPORTANT:
+I do NOT want oversized typography or bulky SaaS cards.
+
+The dashboard should remain:
+
+* compact
+* dense
+* Bloomberg-style
+* institutional
+* high information density
+
+The issue is NOT that text is too small overall.
+The issue is:
+
+* text is too faint
+* too low contrast
+* hierarchy is weak
+* descriptions are hard to read
+
+========================================
+GLOBAL TEXT + READABILITY FIXES
+===============================
+
+Apply these globally:
+
+Typography sizing:
+
+* micro labels: 9px–10px
+* secondary labels: 10px–11px
+* primary values: 13px–15px
+* important headers: 15px–18px
+
+DO NOT oversize the UI.
+
+Main fixes needed:
+
+* brighter text
+* stronger contrast
+* better hierarchy
+* better spacing between labels/values
+
+Color requirements:
+
+* labels: #9FB3C8 minimum
+* secondary text: #C7D4E2
+* important text: #EAF2FF
+* values: #FFFFFF
+
+Increase font-weight slightly:
+
+* labels → medium/semi-bold
+* values → bold
+
+Reduce ultra-faint opacity usage throughout the dashboard.
+
+========================================
+TOP TELEMETRY BAR
+=================
+
+The structure is GOOD already.
+Keep the layout.
+
+Fix:
+
+* descriptions under metrics are too tiny/faint
+* improve spacing between metric groups
+* slightly brighter labels
+* stronger hierarchy
+* improve scanability
+
+Do NOT enlarge the cards.
+Keep institutional compact density.
+
+========================================
+CRYPTO CHART GRID
+=================
+
+The charts are PERFECT.
+Do NOT redesign the charts.
+
+No structural changes needed.
+
+========================================
+PLATFORM OVERVIEW + TERMINAL + SCANNER ROW
+==========================================
+
+Keep this layout structure:
+
+LEFT:
+Platform Overview
+
+CENTER:
+Live Terminal Feed
+
+RIGHT:
+AI Opportunity Scanner
+
+This row layout is correct.
+
+========================================
+PLATFORM OVERVIEW PANEL
+=======================
+
+The donut chart is PERFECT.
+
+Fix:
+
+* side labels are too tiny/faint
+* percentages difficult to scan
+* improve contrast
+* increase readability slightly
+* improve legend spacing
+
+Do NOT enlarge the panel.
+
+========================================
+LIVE TERMINAL FEED
+==================
+
+Current feed structure is excellent.
+
+But:
+
+* too much empty dead space underneath
+* not enough rows visible
+
+Required:
+
+* increase visible rows:
+  10 → 20 visible rows
+* make container scrollable
+* smooth scrolling
+* slightly tighter row density
+* brighter timestamps
+* preserve category colors
+
+Goal:
+make the feed feel constantly active/alive.
+
+========================================
+ACTIVE TRADES + RECENTLY CLOSED
+===============================
+
+IMPORTANT LAYOUT REQUIREMENT:
+
+Do NOT place ACTIVE TRADES and RECENTLY CLOSED side-by-side across the full width of the dashboard.
+
+Correct structure:
+
+ROW ABOVE:
+Platform Overview | Live Terminal Feed | AI Opportunity Scanner
+
+ROW BELOW:
+LEFT = ACTIVE TRADES
+RIGHT = RECENTLY CLOSED
+
+This hierarchy feels much better visually.
+
+Requirements:
+
+* both panels independently scrollable
+* 10 visible rows each
+* compact row density
+* stronger readability
+* reduce excessive glow intensity
+
+Current issue:
+confidence bars glow TOO MUCH.
+
+Fix:
+
+* subtle gradients only
+* cleaner solid bars
+* reduce neon bloom heavily
+* more professional institutional feel
+
+Improve:
+
+* column readability
+* spacing consistency
+* brighter labels
+* stronger separators
+
+========================================
+PORTFOLIO SNAPSHOT ROW
+======================
+
+Current issue:
+too much dead space and empty padding.
+
+Rebuild this row into:
+5 horizontal containers across the full width.
+
+Include:
+
+1. Performance Overview
+2. Exposure & Risk
+3. Trading Velocity
+4. AI Model Metrics
+5. AI Market Brief
+
+Requirements:
+
+* fully utilize row height
+* remove empty space
+* tighter spacing
+* brighter labels
+* stronger hierarchy
+* compact institutional density
+* add icons in headers
+* improve stat readability
+
+DO NOT make the cards oversized.
+
+========================================
+GENERAL VISUAL POLISH
+=====================
+
+Apply globally:
+
+* reduce unnecessary empty padding
+* stronger section separation
+* cleaner spacing rhythm
+* slightly brighter panel edges
+* cleaner borders
+* consistent typography hierarchy
+* better visual scanability
+
+The dashboard should feel:
+
+* elite
+* dense
+* professional
+* institutional
+* fast to scan
+* built for serious trading
+
+DO NOT:
+
+* redesign the architecture
+* change the chart structure
+* add oversized SaaS spacing
+* turn this into a casual consumer dashboard
+
+Goal:
+Bloomberg / Quant terminal energy with modern neon styling.
