@@ -4,14 +4,29 @@ import fs from "fs";
 
 const router: IRouter = Router();
 
-const ZIP_PATH = path.resolve(import.meta.dirname, "natura-ai.zip");
+const DIST_DIR    = import.meta.dirname;
+const NATURA_ZIP  = path.resolve(DIST_DIR, "natura-ai.zip");
+const PROD_ZIP    = path.resolve(DIST_DIR, "apex-trader-production.zip");
 
 router.get("/download-zip", (_req, res) => {
-  if (!fs.existsSync(ZIP_PATH)) {
-    res.status(503).json({ error: "ZIP not yet built", path: ZIP_PATH });
+  if (!fs.existsSync(NATURA_ZIP)) {
+    res.status(503).json({ error: "ZIP not yet built" });
     return;
   }
-  res.download(ZIP_PATH, "natura-ai.zip", (err) => {
+  res.download(NATURA_ZIP, "natura-ai.zip", (err) => {
+    if (err && !res.headersSent) {
+      res.status(500).json({ error: "Download failed", detail: String(err) });
+    }
+  });
+});
+
+// ── Final master production bundle ────────────────────────────────────────────
+router.get("/download-production", (_req, res) => {
+  if (!fs.existsSync(PROD_ZIP)) {
+    res.status(503).json({ error: "Production ZIP not yet built — run a fresh build" });
+    return;
+  }
+  res.download(PROD_ZIP, "apex-trader-production.zip", (err) => {
     if (err && !res.headersSent) {
       res.status(500).json({ error: "Download failed", detail: String(err) });
     }

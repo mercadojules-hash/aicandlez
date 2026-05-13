@@ -13,28 +13,79 @@ import { WebhookHandlers } from "./webhookHandlers.js";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 
+// ── Production-safe CORS ───────────────────────────────────────────────────────
+// In production: only allow known origins (custom domains + Replit previews).
+// In development: allow all origins for ease of local use.
+
+function buildAllowedOrigins(): string[] {
+  const origins: string[] = [
+    // Production custom domains
+    "https://app.apexdigital.design",
+    "https://api.apexdigital.design",
+    "https://apexdigital.design",
+  ];
+
+  // Replit preview domains (dev + staging — REPLIT_DOMAINS is comma-separated)
+  const replitDomains = process.env["REPLIT_DOMAINS"];
+  if (replitDomains) {
+    replitDomains.split(",").forEach((d) => origins.push(`https://${d.trim()}`));
+  }
+
+  // Local development origins
+  if (process.env["NODE_ENV"] !== "production") {
+    origins.push(
+      "http://localhost:80",
+      "http://localhost:3000",
+      "http://localhost:5173",
+      "http://localhost:8080",
+    );
+  }
+
+  return origins;
+}
+
+const allowedOrigins = buildAllowedOrigins();
+
+const corsOptions: cors.CorsOptions = {
+  credentials: true,
+  origin: (origin, callback) => {
+    // Allow requests with no Origin header (mobile apps, health probes, curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    // In development, be permissive so local tooling works
+    if (process.env["NODE_ENV"] !== "production") return callback(null, true);
+    logger.warn({ origin }, "CORS: blocked disallowed origin");
+    callback(new Error(`CORS: origin ${origin} not allowed`), false);
+  },
+};
+
 // ── Rate limiters ─────────────────────────────────────────────────────────────
 
 // General API: 300 requests per minute per IP
 const apiLimiter = rateLimit({
-  windowMs:         60 * 1000,
-  max:              300,
-  standardHeaders:  true,
-  legacyHeaders:    false,
-  handler:          (_req, res) => res.status(429).json({ error: "Too many requests. Please slow down." }),
-  skip:             (req) => req.path.startsWith("/api/stripe/webhook"),
+  windowMs:        60 * 1000,
+  max:             300,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  handler:         (_req, res) => res.status(429).json({ error: "Too many requests. Please slow down." }),
+  skip:            (req) => req.path.startsWith("/api/stripe/webhook"),
 });
 
-// Sensitive routes: 20 requests per minute per IP (auth, billing checkout)
+// Sensitive routes: 20 requests per minute per IP (auth, billing)
 const strictLimiter = rateLimit({
-  windowMs:         60 * 1000,
-  max:              20,
-  standardHeaders:  true,
-  legacyHeaders:    false,
-  handler:          (_req, res) => res.status(429).json({ error: "Rate limit exceeded on sensitive endpoint." }),
+  windowMs:        60 * 1000,
+  max:             20,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  handler:         (_req, res) => res.status(429).json({ error: "Rate limit exceeded on sensitive endpoint." }),
 });
+
+// ── App ───────────────────────────────────────────────────────────────────────
 
 const app: Express = express();
+
+// Trust proxy headers from Railway/Render/Replit reverse proxies
+app.set("trust proxy", 1);
 
 app.use(
   pinoHttp({
@@ -42,15 +93,13 @@ app.use(
     serializers: {
       req(req) {
         return {
-          id: req.id,
+          id:     req.id,
           method: req.method,
-          url: req.url?.split("?")[0],
+          url:    req.url?.split("?")[0],
         };
       },
       res(res) {
-        return {
-          statusCode: res.statusCode,
-        };
+        return { statusCode: res.statusCode };
       },
     },
   }),
@@ -59,11 +108,10 @@ app.use(
 // Clerk proxy MUST be before body parsers (streams raw bytes)
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
-app.use(cors({ credentials: true, origin: true }));
+app.use(cors(corsOptions));
 
 // ── Stripe webhook — MUST be before express.json() ───────────────────────────
 // Stripe requires the raw Buffer body for signature verification.
-// express.json() would parse it into an object first, breaking verification.
 
 app.post(
   "/api/stripe/webhook",
@@ -97,7 +145,7 @@ app.post(
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Clerk session middleware — resolves publishable key per-host for multi-domain support
+// Clerk session middleware — resolves publishable key per-host for multi-domain
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(
@@ -108,7 +156,7 @@ app.use(
 );
 
 // Rate limiting — applied after middleware, before routes
-app.use("/api", apiLimiter);
+app.use("/api",                  apiLimiter);
 app.use("/api/billing/checkout", strictLimiter);
 app.use("/api/billing/portal",   strictLimiter);
 app.use("/api/auth",             strictLimiter);

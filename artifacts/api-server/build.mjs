@@ -121,15 +121,14 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     },
   });
 
-  // Generate natura-ai.zip and place it next to the server bundle.
-  // This runs at every build so it's always present in production,
-  // regardless of whether the zip was committed to git.
   const workspaceRoot = path.resolve(artifactDir, "../..");
+
+  // ── natura-ai.zip ──────────────────────────────────────────────────────────
   const naturaAiDir = path.resolve(workspaceRoot, "artifacts/natura-ai");
-  const zipDest = path.resolve(distDir, "natura-ai.zip");
-  await rm(zipDest, { force: true });
+  const naturaZipDest = path.resolve(distDir, "natura-ai.zip");
+  await rm(naturaZipDest, { force: true });
   await new Promise((resolve, reject) => {
-    const output = createWriteStream(zipDest);
+    const output = createWriteStream(naturaZipDest);
     const archive = archiver("zip", { zlib: { level: 6 } });
     output.on("close", () => {
       console.log(`✅ natura-ai.zip generated (${archive.pointer()} bytes)`);
@@ -143,13 +142,68 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     archive.glob("**/*", {
       cwd: naturaAiDir,
       dot: true,
-      ignore: [
-        "node_modules/**",
-        ".expo/**",
-        "dist/**",
-        ".git/**",
-      ],
+      ignore: ["node_modules/**", ".expo/**", "dist/**", ".git/**"],
     });
+    archive.finalize();
+  });
+
+  // ── apex-trader-production.zip — full platform deployment bundle ───────────
+  // Includes: all source, libs, configs, deployment docs, migrations, .env.example
+  const prodZipDest = path.resolve(distDir, "apex-trader-production.zip");
+  await rm(prodZipDest, { force: true });
+  await new Promise((resolve, reject) => {
+    const output = createWriteStream(prodZipDest);
+    const archive = archiver("zip", { zlib: { level: 6 } });
+    output.on("close", () => {
+      console.log(`✅ apex-trader-production.zip generated (${archive.pointer()} bytes)`);
+      resolve();
+    });
+    archive.on("error", (err) => {
+      console.error("❌ Failed to generate apex-trader-production.zip:", err.message);
+      reject(err);
+    });
+    archive.pipe(output);
+
+    const ignore = [
+      "node_modules/**",
+      ".expo/**",
+      "dist/**",
+      ".git/**",
+      ".local/**",
+      "**/.DS_Store",
+      "**/*.log",
+      "**/*.map",
+      ".env",
+      "attached_assets/**",
+    ];
+
+    // Monorepo root config files
+    archive.glob("*.json",       { cwd: workspaceRoot, dot: true, ignore });
+    archive.glob("*.toml",       { cwd: workspaceRoot, dot: true, ignore });
+    archive.glob("*.yaml",       { cwd: workspaceRoot, dot: true, ignore });
+    archive.glob("*.yml",        { cwd: workspaceRoot, dot: true, ignore });
+    archive.glob("*.md",         { cwd: workspaceRoot, dot: true, ignore });
+    archive.glob("tsconfig*",    { cwd: workspaceRoot, dot: true, ignore });
+    archive.glob(".env.example", { cwd: workspaceRoot, dot: true });
+
+    // API server (source + build config)
+    archive.glob("artifacts/api-server/**/*", {
+      cwd: workspaceRoot, dot: true,
+      ignore: [...ignore, "artifacts/api-server/dist/**"],
+    });
+
+    // Dashboard (source + build config, not dist)
+    archive.glob("artifacts/trading-dashboard/**/*", {
+      cwd: workspaceRoot, dot: true,
+      ignore: [...ignore, "artifacts/trading-dashboard/dist/**", "artifacts/trading-dashboard/public/*.zip"],
+    });
+
+    // Shared libraries
+    archive.glob("lib/**/*", { cwd: workspaceRoot, dot: true, ignore });
+
+    // Scripts (seeder, helpers)
+    archive.glob("scripts/**/*", { cwd: workspaceRoot, dot: true, ignore });
+
     archive.finalize();
   });
 }

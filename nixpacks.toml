@@ -1,0 +1,18 @@
+# Nixpacks build config for Railway deployment
+# Builds the API server from this pnpm monorepo
+
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+cmds = ["npm install -g pnpm@10"]
+
+[phases.install]
+cmds = ["pnpm install --frozen-lockfile"]
+
+[phases.build]
+cmds = [
+  "pnpm run typecheck:libs",
+  "pnpm --filter @workspace/api-server run build"
+]
+
+[start]
+cmd = "pnpm --filter @workspace/api-server run migrate && pnpm --filter @workspace/api-server run start"

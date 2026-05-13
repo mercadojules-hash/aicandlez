@@ -1,0 +1,173 @@
+We are now transitioning into the FINAL PRE-PRODUCTION DEPLOYMENT phase before mobile app development.
+
+The next major objective is:
+deploying the full platform to cloud infrastructure so the dashboard/backend become permanently online and independent from localhost.
+
+====================================================
+GOAL
+====
+
+Prepare the platform for:
+
+* real cloud deployment
+* persistent backend uptime
+* production APIs
+* mobile app connectivity
+* production websocket infrastructure
+* live authentication
+* production database operation
+
+The mobile app will later connect to:
+
+* production APIs
+* production websocket server
+* production auth system
+
+NOT localhost.
+
+====================================================
+DEPLOYMENT ARCHITECTURE
+=======================
+
+Target structure:
+
+apexdigital.design
+→ marketing / WordPress / landing pages
+
+app.apexdigital.design
+→ dashboard frontend
+
+api.apexdigital.design
+→ AI backend / APIs / websocket layer
+
+====================================================
+PRIMARY OBJECTIVE
+=================
+
+Prepare the platform for deployment to:
+
+* Railway
+  OR
+* Render
+
+(whichever is best suited for the current architecture)
+
+====================================================
+PHASE 5A — PRODUCTION DEPLOYMENT PREP
+=====================================
+
+Need:
+
+* production build pipeline
+* production env handling
+* deployment scripts
+* production startup scripts
+* websocket production configuration
+* production-safe CORS
+* environment validation
+* production logging
+* graceful shutdown handling
+
+====================================================
+PHASE 5B — CLOUD INFRASTRUCTURE PREP
+====================================
+
+Prepare:
+
+* PostgreSQL production configuration
+* SSL-ready deployment
+* secure environment variable loading
+* health check endpoints
+* websocket reconnect strategy
+* production adapter bootstrapping
+* production auth callbacks
+* production Stripe callback URLs
+
+====================================================
+PHASE 5C — DOMAIN / SUBDOMAIN READINESS
+=======================================
+
+Prepare deployment docs for:
+
+* app.apexdigital.design
+* api.apexdigital.design
+
+Need:
+
+* expected DNS setup
+* reverse proxy guidance
+* environment variable mapping
+* deployment checklist
+* Railway/Render configuration instructions
+
+====================================================
+PHASE 5D — FINAL PRODUCTION HARDENING
+=====================================
+
+Verify:
+
+* no localhost assumptions
+* websocket stability
+* reconnect safety
+* auth persistence
+* exchange isolation
+* disclaimer persistence
+* billing integrity
+* fee telemetry integrity
+
+====================================================
+PHASE 5E — FINAL MASTER EXPORT
+==============================
+
+After deployment prep:
+generate the FINAL MASTER BUILD ZIP.
+
+Need:
+
+* backend
+* frontend
+* adapters
+* auth
+* Stripe
+* disclaimers
+* exchange onboarding
+* production configs
+* migrations
+* deployment docs
+* env examples
+
+Provide:
+
+* final ZIP URL
+* file count
+* ZIP size
+* deployment instructions
+* Railway/Render setup instructions
+* production startup instructions
+
+====================================================
+IMPORTANT
+=========
+
+This is now about:
+
+* deployment
+* production readiness
+* cloud infrastructure
+* stability
+* mobile app preparation
+
+NOT:
+
+* dashboard redesign
+* new exchange features
+* cosmetic UI work
+
+After this phase:
+we begin:
+
+* cloud deployment
+* production testing
+* mobile app development
+* TestFlight
+* App Store preparation

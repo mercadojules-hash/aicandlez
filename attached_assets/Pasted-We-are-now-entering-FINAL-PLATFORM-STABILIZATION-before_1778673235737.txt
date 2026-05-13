@@ -1,0 +1,149 @@
+We are now entering FINAL PLATFORM STABILIZATION before the mobile app phase.
+
+No more major dashboard redesigns or feature expansion.
+
+Focus ONLY on:
+
+* legal/disclaimer infrastructure
+* production cleanup
+* final stabilization
+* final export packaging
+
+====================================================
+FINAL TASK 1 — LEGAL / DISCLAIMER SYSTEM
+========================================
+
+Build the complete disclaimer acceptance flow required before enabling AI Trader.
+
+This is REQUIRED before:
+
+* live trading
+* AI activation
+* exchange activation
+
+Need:
+
+1. AI Trading Risk Disclaimer
+2. Fee Disclosure
+3. No Guaranteed Profit Disclaimer
+4. Terms Acceptance
+5. Live Trading Confirmation
+
+Core fee disclosure:
+
+* Apex AI Trader charges a 3% fee per executed AI trade
+* No subscription fee
+* Users retain custody of exchange funds
+* Withdrawals are never requested
+* AI trading involves risk and losses may occur
+
+====================================================
+DISCLAIMER REQUIREMENTS
+=======================
+
+Build:
+
+* first-launch disclaimer modal
+* blocking acceptance screen
+* versioned disclaimer acceptance
+* database audit log
+* acceptance timestamp
+* user acceptance persistence
+* re-acceptance when disclaimer version changes
+
+Need:
+
+* cannot activate AI until accepted
+* cannot enable live mode until accepted
+* cannot connect exchange until accepted
+
+====================================================
+FINAL TASK 2 — FEE TELEMETRY
+============================
+
+Finalize fee visibility.
+
+Dashboard/app must show:
+
+* total fees collected
+* fee history
+* fee per trade
+* net PnL after fees
+* gross vs net performance
+
+No subscriptions.
+No recurring billing UI.
+Execution-fee model only.
+
+====================================================
+FINAL TASK 3 — PRODUCTION CLEANUP
+=================================
+
+Run:
+
+* full typecheck
+* dead code cleanup
+* unused import cleanup
+* runtime warning cleanup
+* build verification
+* migration verification
+* websocket reconnect verification
+* auth persistence verification
+
+Verify:
+
+* no blocking TS/runtime errors
+* no broken routes
+* no stale placeholder UI
+* no orphaned test data
+
+====================================================
+FINAL TASK 4 — PRODUCTION HARDENING
+===================================
+
+Add:
+
+* startup validation
+* graceful shutdown handling
+* websocket reconnect safeguards
+* retry protections
+* adapter timeout protections
+* health checks
+* environment validation
+
+====================================================
+FINAL TASK 5 — FINAL MASTER EXPORT
+==================================
+
+After stabilization:
+generate the FINAL MASTER ZIP.
+
+Requirements:
+
+* complete project
+* backend
+* frontend
+* exchange adapters
+* auth system
+* billing system
+* disclaimer system
+* settings system
+* telemetry
+* docs
+* migrations
+* env examples
+
+Provide:
+
+* final ZIP URL
+* file count
+* ZIP size
+* startup instructions
+* production readiness summary
+
+This will become the locked master build before:
+
+* mobile app development
+* TestFlight
+* production deployment
+* beta onboarding
