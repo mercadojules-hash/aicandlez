@@ -30,6 +30,7 @@ import SignalDebug from "@/pages/SignalDebug";
 import MultiChart from "@/pages/MultiChart";
 import CommandCenter from "@/pages/CommandCenter";
 import Settings from "@/pages/Settings";
+import Billing from "@/pages/Billing";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
 
@@ -240,6 +241,9 @@ function Router() {
       </Route>
       <Route path="/settings">
         <Protected><Settings /></Protected>
+      </Route>
+      <Route path="/billing">
+        <Protected><Billing /></Protected>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>

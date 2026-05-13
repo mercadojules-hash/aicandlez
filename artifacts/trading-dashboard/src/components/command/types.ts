@@ -48,6 +48,7 @@ export interface SignalLogEntry {
 export interface EngineStatus {
   running:           boolean;
   testMode:          boolean;
+  killSwitch?:       boolean;
   startedAt:         number;
   lastTickAt:        number | null;
   lastSignalAt:      number | null;

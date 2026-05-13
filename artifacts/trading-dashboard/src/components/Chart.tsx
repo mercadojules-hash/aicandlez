@@ -131,7 +131,7 @@ export function Chart({ symbol, timeframe, onSymbolChange, onTimeframeChange }: 
         </div>
       </div>
 
-      {isLoading && (!candles || candles.length === 0) && (
+      {isLoading && (!((candles as unknown) as unknown[])?.length) && (
         <div className="absolute inset-0 flex items-center justify-center z-20 bg-background/20 backdrop-blur-sm">
           <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
         </div>

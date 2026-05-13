@@ -37,25 +37,25 @@ import {
 } from "lucide-react";
 
 export const MODULE_LIST = [
-  { id:  1, path: "/dashboard",   icon: LayoutDashboard,   label: "Dashboard",           group: "CORE" },
-  { id:  2, path: "/market",      icon: Radio,             label: "Market Data",         group: "CORE" },
-  { id:  3, path: "/indicators",  icon: BarChart3,         label: "Indicators",          group: "CORE" },
-  { id:  4, path: "/ai",          icon: Brain,             label: "AI Reasoning",        group: "AI"   },
-  { id:  5, path: "/risk",        icon: Shield,            label: "Risk Management",     group: "RISK" },
-  { id:  6, path: "/simulation",  icon: FlaskConical,      label: "Simulation",          group: "TRADE"},
-  { id:  7, path: "/backtest",    icon: BarChart2,         label: "Backtesting",         group: "TRADE"},
-  { id:  8, path: "/optimizer",   icon: SlidersHorizontal, label: "Strategy Optimizer",  group: "AI"   },
-  { id:  9, path: "/scanner",     icon: Scan,              label: "Asset Scanner",       group: "TRADE"},
-  { id: 10, path: "/portfolio",   icon: Layers,            label: "Portfolio",           group: "TRADE"},
-  { id: 11, path: "/correlation", icon: TrendingUp,        label: "Correlation",         group: "TRADE"},
-  { id: 12, path: "/journal",     icon: BookOpen,          label: "Trade Journal",       group: "TRADE"},
-  { id: 13, path: "/validation",  icon: ShieldCheck,       label: "Validation",          group: "RISK" },
-  { id: 14, path: "/sentiment",   icon: MessageSquare,     label: "Sentiment AI",        group: "AI"   },
-  { id: 15, path: "/exchange",    icon: ArrowLeftRight,    label: "Exchange",            group: "CORE" },
-  { id: 16, path: "/syscheck",    icon: ClipboardCheck,    label: "System Verification", group: "SYS"  },
-  { id: 17, path: "/debug",       icon: Bug,               label: "Signal Debug",        group: "SYS"  },
-  { id: 18, path: "/charts",      icon: BarChart2,         label: "Multi-Asset Chart",   group: "TRADE"},
-  { id: 19, path: "/command",     icon: Cpu,               label: "Command Center",      group: "SYS"  },
+  { id:  1, path: "/dashboard",   icon: LayoutDashboard,   label: "Dashboard",           group: "CORE",  status: "active",  sublabel: "System shell & roadmap"             },
+  { id:  2, path: "/market",      icon: Radio,             label: "Market Data",         group: "CORE",  status: "active",  sublabel: "Live Kraken candle feed"            },
+  { id:  3, path: "/indicators",  icon: BarChart3,         label: "Indicators",          group: "CORE",  status: "active",  sublabel: "EMA, RSI, candlestick rendering"    },
+  { id:  4, path: "/ai",          icon: Brain,             label: "AI Reasoning",        group: "AI",    status: "active",  sublabel: "EMA+RSI signal engine, BUY/SELL"   },
+  { id:  5, path: "/risk",        icon: Shield,            label: "Risk Management",     group: "RISK",  status: "active",  sublabel: "Kill switch, daily loss limit"      },
+  { id:  6, path: "/simulation",  icon: FlaskConical,      label: "Simulation",          group: "TRADE", status: "active",  sublabel: "Paper trading, risk-gate enforced"  },
+  { id:  7, path: "/backtest",    icon: BarChart2,         label: "Backtesting",         group: "TRADE", status: "active",  sublabel: "Historical walk-forward simulation" },
+  { id:  8, path: "/optimizer",   icon: SlidersHorizontal, label: "Strategy Optimizer",  group: "AI",    status: "active",  sublabel: "Grid search EMA/RSI parameters"    },
+  { id:  9, path: "/scanner",     icon: Scan,              label: "Asset Scanner",       group: "TRADE", status: "active",  sublabel: "Multi-symbol opportunity ranking"   },
+  { id: 10, path: "/portfolio",   icon: Layers,            label: "Portfolio",           group: "TRADE", status: "active",  sublabel: "Allocation & exposure tracking"     },
+  { id: 11, path: "/correlation", icon: TrendingUp,        label: "Correlation",         group: "TRADE", status: "active",  sublabel: "BTC/ETH/SOL correlation matrix"     },
+  { id: 12, path: "/journal",     icon: BookOpen,          label: "Trade Journal",       group: "TRADE", status: "active",  sublabel: "Scored trade feedback, win rate"    },
+  { id: 13, path: "/validation",  icon: ShieldCheck,       label: "Validation",          group: "RISK",  status: "active",  sublabel: "Walk-forward OOS, overfitting grade"},
+  { id: 14, path: "/sentiment",   icon: MessageSquare,     label: "Sentiment AI",        group: "AI",    status: "active",  sublabel: "News scoring, Fear & Greed index"  },
+  { id: 15, path: "/exchange",    icon: ArrowLeftRight,    label: "Exchange",            group: "CORE",  status: "active",  sublabel: "Kraken, sim/live, kill switch"      },
+  { id: 16, path: "/syscheck",    icon: ClipboardCheck,    label: "System Verification", group: "SYS",   status: "active",  sublabel: "Full engine health check, 10 systems"},
+  { id: 17, path: "/debug",       icon: Bug,               label: "Signal Debug",        group: "SYS",   status: "active",  sublabel: "MTF funnel, signal quality filters" },
+  { id: 18, path: "/charts",      icon: BarChart2,         label: "Multi-Asset Chart",   group: "TRADE", status: "active",  sublabel: "BTC/ETH/SOL side-by-side, EMA9/21"  },
+  { id: 19, path: "/command",     icon: Cpu,               label: "Command Center",      group: "SYS",   status: "active",  sublabel: "Unified one-screen trading view"    },
 ];
 
 const PLATFORM_ITEMS: { icon: React.ElementType; label: string; badge?: string; badgeColor?: string }[] = [
@@ -223,6 +223,16 @@ function UserBlock({ collapsed }: { collapsed: boolean }) {
           <div className="text-[10px] font-bold font-mono truncate" style={{ color: "#7ab8cc" }}>{displayName}</div>
           <div className="text-[8px] font-mono truncate" style={{ color: "#3a5a70" }}>{email}</div>
         </div>
+        <Link
+          href="/billing"
+          title="Billing & subscription"
+          className="p-1 rounded transition-colors"
+          style={{ color: "#3a5a70" }}
+          onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#00aaff"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#3a5a70"; }}
+        >
+          <Wallet className="w-3 h-3" />
+        </Link>
         <Link
           href="/settings"
           title="Account settings"

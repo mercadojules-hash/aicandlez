@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { Terminal, Filter, RefreshCcw, AlertTriangle, CheckCircle2, Info, ArrowRight } from "lucide-react";
-import { useGetLogs } from "@workspace/api-client-react";
+import { useGetLogs, getGetLogsQueryKey } from "@workspace/api-client-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -18,6 +18,7 @@ export default function Logs() {
     { limit },
     {
       query: {
+        queryKey:       getGetLogsQueryKey({ limit }),
         refetchInterval: 5000,
       }
     }

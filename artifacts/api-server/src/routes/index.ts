@@ -29,6 +29,7 @@ import authRouter from "./auth.js";
 import userSettingsRouter from "./userSettings.js";
 import userNotificationsRouter from "./userNotifications.js";
 import userExchangesRouter from "./userExchanges.js";
+import billingRouter from "./billing.js";
 
 const router: IRouter = Router();
 
@@ -38,6 +39,7 @@ router.use(authRouter);
 router.use(userSettingsRouter);
 router.use(userNotificationsRouter);
 router.use(userExchangesRouter);
+router.use(billingRouter);
 router.use(signalsRouter);
 router.use(tradesRouter);
 router.use(portfolioRouter);
