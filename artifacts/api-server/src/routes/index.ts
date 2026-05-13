@@ -28,6 +28,7 @@ import adaptersRouter from "./adapters.js";
 import authRouter from "./auth.js";
 import userSettingsRouter from "./userSettings.js";
 import userNotificationsRouter from "./userNotifications.js";
+import userExchangesRouter from "./userExchanges.js";
 
 const router: IRouter = Router();
 
@@ -36,6 +37,7 @@ router.use(downloadRouter);
 router.use(authRouter);
 router.use(userSettingsRouter);
 router.use(userNotificationsRouter);
+router.use(userExchangesRouter);
 router.use(signalsRouter);
 router.use(tradesRouter);
 router.use(portfolioRouter);

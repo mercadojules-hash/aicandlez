@@ -17,6 +17,61 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Build**: esbuild (CJS bundle)
 - **Auth**: Replit-managed Clerk (httpOnly cookie on web, Bearer for mobile)
 
+## Phase 3 — Exchange Connection Management (COMPLETE)
+
+Each user can connect their own exchange accounts with encrypted API key storage.
+
+**New DB Table:** `user_exchange_connections`
+- `id`, `userId` (FK → users), `exchange`, `label`
+- `encrypted_blob` — AES-256-GCM encrypted JSON `{ iv, authTag, ciphertext }` — raw keys never stored in plaintext
+- `status` (active/error/revoked), `is_default`, `trading_mode` (paper/live default)
+- `permissions` JSONB `{ read, trade, withdraw: false }` — withdraw is always false
+- `last_verified_at`, `last_error`, `created_at`, `updated_at`
+
+**Credential Vault (upgraded):**
+- Added `encryptBlob(userId, creds)` → produces JSON string for DB storage
+- Added `decryptBlob(userId, blob)` → decrypts stored blob back to credentials (in-memory only)
+- Per-user PBKDF2 key derivation (100k iterations, SHA-256) — each user's data is keyed differently
+- Credentials never logged, never returned in API responses
+
+**New API Routes (all requireAuth — userId from Clerk session):**
+- `GET /api/user/exchanges` — list all 6 supported exchanges + per-exchange connection status/metadata (safe: no keys)
+- `POST /api/user/exchanges/connect` — validate, test connection, encrypt, persist. Rejects bad credentials before storage.
+- `POST /api/user/exchanges/:exchange/test` — re-test a stored connection, update health + permissions
+- `POST /api/user/exchanges/:exchange/default` — set as user's default exchange
+- `POST /api/user/exchanges/:exchange/mode` — switch paper/live; live requires `acknowledged: true`
+- `DELETE /api/user/exchanges/:exchange` — permanently delete encrypted credentials
+
+**Connection test flow:**
+1. Validate input (required fields, format, passphrase for OKX/KuCoin)
+2. Instantiate ephemeral adapter with user's credentials (not global registry)
+3. `getTicker("BTCUSD")` — public network check
+4. `getAccount()` — private auth check → if succeeds, permissions `{ read: true, trade: true, withdraw: false }`
+5. Store ONLY on success — invalid credentials are rejected before any DB write
+
+**Safety enforcement:**
+- Live mode default: OFF (paper only by default)
+- Live mode switch requires `acknowledged: true` in request body
+- Withdrawal permissions: never tested, never requested, always set to `false`
+- Confirmation dialog required in UI before enabling live mode or disconnecting
+
+**Supported exchanges:** Kraken, Binance, Coinbase, Bybit, OKX, KuCoin
+- Each has `requiredPerms` and `warnings` metadata shown in connect wizard
+- OKX + KuCoin require passphrase (enforced at validation)
+
+**Frontend (Settings.tsx):**
+- New "EXCHANGE CONNECTIONS" section at top of `/settings` page
+- 6 exchange cards — each shows: status badge, READ/TRADE permissions, last verified timestamp, paper/live toggle
+- Connect button → `ConnectModal` with: label, API key (masked), API secret (masked), passphrase (if needed), safety warnings, withdrawal acknowledgement checkbox
+- Test / Set Default / Disconnect buttons per connected exchange
+- Global safety banner: "WITHDRAWAL PERMISSIONS ARE NEVER REQUESTED"
+
+**Key files:**
+- `lib/db/src/schema/userExchangeConnections.ts` — DB schema
+- `artifacts/api-server/src/services/vault/CredentialVault.ts` — added `encryptBlob`, `decryptBlob`
+- `artifacts/api-server/src/routes/userExchanges.ts` — all 5 auth-gated routes
+- `artifacts/trading-dashboard/src/pages/Settings.tsx` — exchange connections section
+
 ## Phase 2 — User-Scoped Trading Platform (COMPLETE)
 
 Each authenticated user has a fully isolated trading environment. No data bleeds between accounts.

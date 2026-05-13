@@ -1,0 +1,499 @@
+import { Router } from "express";
+import { db } from "@workspace/db";
+import { userExchangeConnectionsTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
+import { requireAuth } from "../middlewares/requireAuth.js";
+import { vault } from "../services/vault/CredentialVault.js";
+import { auditLogger } from "../services/telemetry/AuditLogger.js";
+import { KrakenAdapter }   from "../services/exchanges/adapters/KrakenAdapter.js";
+import { BinanceAdapter }  from "../services/exchanges/adapters/BinanceAdapter.js";
+import { CoinbaseAdapter } from "../services/exchanges/adapters/CoinbaseAdapter.js";
+import { BybitAdapter }    from "../services/exchanges/adapters/BybitAdapter.js";
+import { OKXAdapter }      from "../services/exchanges/adapters/OKXAdapter.js";
+import { KuCoinAdapter }   from "../services/exchanges/adapters/KuCoinAdapter.js";
+import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
+import type { ExchangeCredentials } from "../services/vault/CredentialVault.js";
+import type { Request } from "express";
+
+// ── User exchange connection routes ───────────────────────────────────────────
+//
+// All routes are auth-gated. userId is extracted from Clerk session — never
+// from the request body. Raw credentials are never logged, never returned.
+//
+// Base path: /api/user/exchanges
+
+const router = Router();
+type AuthReq = Request & { clerkUserId: string };
+
+// ── Supported exchanges ───────────────────────────────────────────────────────
+
+const SUPPORTED_EXCHANGES = new Set(["Kraken", "Binance", "Coinbase", "Bybit", "OKX", "KuCoin"]);
+
+// Exchange metadata for UI — no keys or secrets here
+const EXCHANGE_META: Record<string, {
+  name: string;
+  url:  string;
+  logo: string;
+  requiresPassphrase: boolean;
+  requiredPerms: string;
+  warnings: string[];
+}> = {
+  Kraken:   {
+    name: "Kraken", url: "https://www.kraken.com", logo: "kraken",
+    requiresPassphrase: false,
+    requiredPerms: "Query Funds, Query Open Orders & Trades, Create & Modify Orders",
+    warnings: ["Do NOT enable withdrawal permissions.", "Use a restricted key scoped to trading only."],
+  },
+  Binance:  {
+    name: "Binance", url: "https://www.binance.com", logo: "binance",
+    requiresPassphrase: false,
+    requiredPerms: "Enable Reading, Enable Spot & Margin Trading",
+    warnings: ["Do NOT enable withdrawals.", "Do NOT enable futures/margin unless intended."],
+  },
+  Coinbase: {
+    name: "Coinbase", url: "https://www.coinbase.com", logo: "coinbase",
+    requiresPassphrase: false,
+    requiredPerms: "View, Trade",
+    warnings: ["Do NOT enable Transfer permissions.", "Use Advanced Trade API keys only."],
+  },
+  Bybit:    {
+    name: "Bybit", url: "https://www.bybit.com", logo: "bybit",
+    requiresPassphrase: false,
+    requiredPerms: "Read, Trade",
+    warnings: ["Do NOT enable withdraw permissions.", "Restrict key to Unified Trading Account only."],
+  },
+  OKX:      {
+    name: "OKX", url: "https://www.okx.com", logo: "okx",
+    requiresPassphrase: true,
+    requiredPerms: "Read, Trade",
+    warnings: ["Do NOT enable withdraw permissions.", "Passphrase is required for OKX API keys."],
+  },
+  KuCoin:   {
+    name: "KuCoin", url: "https://www.kucoin.com", logo: "kucoin",
+    requiresPassphrase: true,
+    requiredPerms: "General, Trade",
+    warnings: ["Do NOT enable withdrawal permission.", "Passphrase must match what you set when creating the key."],
+  },
+};
+
+// ── Adapter factory ───────────────────────────────────────────────────────────
+// Creates a temp adapter instance with user-supplied credentials injected via
+// AdapterConfig. No global registry modification — instance is ephemeral.
+
+function makeAdapter(exchange: string, creds: ExchangeCredentials): BaseExchangeAdapter {
+  const cfg = { apiKey: creds.apiKey, apiSecret: creds.apiSecret, passphrase: creds.passphrase };
+  switch (exchange) {
+    case "Kraken":   return new KrakenAdapter(cfg);
+    case "Binance":  return new BinanceAdapter(cfg);
+    case "Coinbase": return new CoinbaseAdapter(cfg);
+    case "Bybit":    return new BybitAdapter(cfg);
+    case "OKX":      return new OKXAdapter(cfg);
+    case "KuCoin":   return new KuCoinAdapter(cfg);
+    default: throw new Error(`No adapter for exchange: ${exchange}`);
+  }
+}
+
+// ── Connection test helper ────────────────────────────────────────────────────
+// 1. Test public endpoint (confirms network / exchange reachable)
+// 2. Test private endpoint (getAccount) → confirms credentials work
+// Never tests or requests withdrawal permissions.
+
+async function runConnectionTest(exchange: string, creds: ExchangeCredentials) {
+  const adapter = makeAdapter(exchange, creds);
+
+  // Step 1 — public ticker (network check)
+  await adapter.getTicker("BTCUSD");
+
+  // Step 2 — private account endpoint (auth check)
+  let read  = false;
+  let trade = false;
+  let errorMsg: string | undefined;
+  try {
+    await adapter.getAccount();
+    read  = true;
+    trade = true;   // read access on exchange account implies trading key scope
+  } catch (err) {
+    errorMsg = (err as Error).message;
+  }
+
+  return {
+    ok:          read,
+    permissions: { read, trade, withdraw: false as const },
+    error:       errorMsg,
+  };
+}
+
+// ── Safe row serialiser — never includes encryptedBlob ───────────────────────
+
+function safeRow(row: typeof userExchangeConnectionsTable.$inferSelect) {
+  return {
+    id:              row.id,
+    exchange:        row.exchange,
+    label:           row.label,
+    status:          row.status,
+    isDefault:       row.isDefault,
+    tradingMode:     row.tradingMode,
+    permissions:     row.permissions,
+    lastVerifiedAt:  row.lastVerifiedAt,
+    lastError:       row.lastError,
+    createdAt:       row.createdAt,
+    updatedAt:       row.updatedAt,
+    meta:            EXCHANGE_META[row.exchange] ?? null,
+  };
+}
+
+// ── GET /api/user/exchanges ───────────────────────────────────────────────────
+// Returns all of the authenticated user's exchange connections.
+// Includes connection metadata + exchange info. Never returns raw keys.
+
+router.get("/user/exchanges", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
+  try {
+    const rows = await db
+      .select()
+      .from(userExchangeConnectionsTable)
+      .where(eq(userExchangeConnectionsTable.userId, userId));
+
+    // Build response: safe rows + a full list of supported exchanges (with connection status)
+    const connectedSet = new Set(rows.map(r => r.exchange));
+    const allExchanges = [...SUPPORTED_EXCHANGES].map(exch => ({
+      exchange:    exch,
+      connected:   connectedSet.has(exch),
+      connection:  rows.find(r => r.exchange === exch) ? safeRow(rows.find(r => r.exchange === exch)!) : null,
+      meta:        EXCHANGE_META[exch] ?? null,
+    }));
+
+    res.json({ exchanges: allExchanges });
+  } catch (err) {
+    req.log.error({ err }, "GET /user/exchanges failed");
+    res.status(500).json({ error: "Failed to load exchange connections" });
+  }
+});
+
+// ── POST /api/user/exchanges/connect ─────────────────────────────────────────
+// Validate credentials, test connection, store encrypted to DB.
+// Body: { exchange, apiKey, apiSecret, passphrase?, label? }
+
+router.post("/user/exchanges/connect", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
+  const { exchange, apiKey, apiSecret, passphrase, label } = req.body as {
+    exchange:    string;
+    apiKey:      string;
+    apiSecret:   string;
+    passphrase?: string;
+    label?:      string;
+  };
+
+  // ── Validate input ────────────────────────────────────────────────────────
+
+  if (!exchange || !apiKey || !apiSecret) {
+    res.status(400).json({ error: "exchange, apiKey, and apiSecret are required" });
+    return;
+  }
+  if (!SUPPORTED_EXCHANGES.has(exchange)) {
+    res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
+    return;
+  }
+
+  const meta = EXCHANGE_META[exchange]!;
+  if (meta.requiresPassphrase && !passphrase) {
+    res.status(400).json({ error: `${exchange} requires a passphrase` });
+    return;
+  }
+
+  // Basic format checks — prevent obviously invalid keys from hitting the exchange
+  if (apiKey.trim().length < 8 || apiSecret.trim().length < 8) {
+    res.status(400).json({ error: "API key and secret must be at least 8 characters" });
+    return;
+  }
+
+  const creds: ExchangeCredentials = { apiKey: apiKey.trim(), apiSecret: apiSecret.trim(), passphrase: passphrase?.trim(), label };
+
+  // ── Test connection ───────────────────────────────────────────────────────
+  let testResult: { ok: boolean; permissions: { read: boolean; trade: boolean; withdraw: false }; error?: string };
+  try {
+    req.log.info({ userId, exchange }, "userExchanges: testing connection");
+    testResult = await runConnectionTest(exchange, creds);
+  } catch (err) {
+    req.log.warn({ userId, exchange, err: (err as Error).message }, "userExchanges: connection test failed");
+    res.status(422).json({
+      ok:    false,
+      error: `Connection test failed: ${(err as Error).message}`,
+    });
+    return;
+  }
+
+  if (!testResult.ok) {
+    req.log.warn({ userId, exchange }, "userExchanges: credentials rejected (no read access)");
+    res.status(422).json({
+      ok:    false,
+      error: testResult.error ?? "Credentials could not authenticate with the exchange. Check your API key and secret.",
+    });
+    return;
+  }
+
+  // ── Encrypt + persist ─────────────────────────────────────────────────────
+  const encryptedBlob = vault.encryptBlob(userId, creds);
+
+  try {
+    const now = new Date();
+    await db
+      .insert(userExchangeConnectionsTable)
+      .values({
+        userId,
+        exchange,
+        label:          label ?? "Default",
+        encryptedBlob,
+        status:         "active",
+        isDefault:      false,
+        tradingMode:    "paper",
+        permissions:    testResult.permissions,
+        lastVerifiedAt: now,
+        lastError:      null,
+      })
+      .onConflictDoUpdate({
+        target: [userExchangeConnectionsTable.userId, userExchangeConnectionsTable.exchange],
+        set: {
+          label:          label ?? "Default",
+          encryptedBlob,
+          status:         "active",
+          permissions:    testResult.permissions,
+          lastVerifiedAt: now,
+          lastError:      null,
+          updatedAt:      now,
+        },
+      });
+
+    auditLogger.append(userId, "CREDENTIAL_STORED", { exchange }, { exchange });
+    req.log.info({ userId, exchange }, "userExchanges: credentials stored successfully");
+
+    // Return the updated row (safe, no raw creds)
+    const [row] = await db
+      .select()
+      .from(userExchangeConnectionsTable)
+      .where(
+        and(
+          eq(userExchangeConnectionsTable.userId, userId),
+          eq(userExchangeConnectionsTable.exchange, exchange),
+        )
+      )
+      .limit(1);
+
+    res.json({ ok: true, connection: row ? safeRow(row) : null, permissions: testResult.permissions });
+  } catch (err) {
+    req.log.error({ err }, "userExchanges: failed to persist connection");
+    res.status(500).json({ error: "Failed to save connection" });
+  }
+});
+
+// ── POST /api/user/exchanges/:exchange/test ───────────────────────────────────
+// Re-test a stored connection. Updates permissions + health timestamp.
+
+router.post("/user/exchanges/:exchange/test", requireAuth, async (req, res): Promise<void> => {
+  const userId   = (req as AuthReq).clerkUserId;
+  const exchange = String(req.params["exchange"]);
+
+  if (!SUPPORTED_EXCHANGES.has(exchange)) {
+    res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
+    return;
+  }
+
+  const [row] = await db
+    .select()
+    .from(userExchangeConnectionsTable)
+    .where(
+      and(
+        eq(userExchangeConnectionsTable.userId, userId),
+        eq(userExchangeConnectionsTable.exchange, exchange),
+      )
+    )
+    .limit(1);
+
+  if (!row) {
+    res.status(404).json({ ok: false, error: `No connection found for ${exchange}` });
+    return;
+  }
+
+  const creds = vault.decryptBlob(userId, row.encryptedBlob);
+  if (!creds) {
+    res.status(500).json({ ok: false, error: "Failed to decrypt stored credentials" });
+    return;
+  }
+
+  let testResult: { ok: boolean; permissions: { read: boolean; trade: boolean; withdraw: false }; error?: string };
+  try {
+    testResult = await runConnectionTest(exchange, creds);
+  } catch (err) {
+    const errorMsg = (err as Error).message;
+    await db
+      .update(userExchangeConnectionsTable)
+      .set({ status: "error", lastError: errorMsg, updatedAt: new Date() })
+      .where(
+        and(
+          eq(userExchangeConnectionsTable.userId, userId),
+          eq(userExchangeConnectionsTable.exchange, exchange),
+        )
+      );
+    res.json({ ok: false, error: errorMsg });
+    return;
+  }
+
+  const now = new Date();
+  await db
+    .update(userExchangeConnectionsTable)
+    .set({
+      status:         testResult.ok ? "active" : "error",
+      permissions:    testResult.permissions,
+      lastVerifiedAt: now,
+      lastError:      testResult.error ?? null,
+      updatedAt:      now,
+    })
+    .where(
+      and(
+        eq(userExchangeConnectionsTable.userId, userId),
+        eq(userExchangeConnectionsTable.exchange, exchange),
+      )
+    );
+
+  req.log.info({ userId, exchange, ok: testResult.ok }, "userExchanges: connection re-tested");
+  res.json({ ok: testResult.ok, permissions: testResult.permissions, error: testResult.error });
+});
+
+// ── POST /api/user/exchanges/:exchange/default ────────────────────────────────
+// Set one exchange as the user's default; clears default on all others.
+
+router.post("/user/exchanges/:exchange/default", requireAuth, async (req, res): Promise<void> => {
+  const userId   = (req as AuthReq).clerkUserId;
+  const exchange = String(req.params["exchange"]);
+
+  if (!SUPPORTED_EXCHANGES.has(exchange)) {
+    res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
+    return;
+  }
+
+  // Verify the connection exists and belongs to this user
+  const [row] = await db
+    .select()
+    .from(userExchangeConnectionsTable)
+    .where(
+      and(
+        eq(userExchangeConnectionsTable.userId, userId),
+        eq(userExchangeConnectionsTable.exchange, exchange),
+      )
+    )
+    .limit(1);
+
+  if (!row) {
+    res.status(404).json({ error: `No connection found for ${exchange}` });
+    return;
+  }
+
+  // Clear all user's defaults, then set this one
+  await db
+    .update(userExchangeConnectionsTable)
+    .set({ isDefault: false, updatedAt: new Date() })
+    .where(eq(userExchangeConnectionsTable.userId, userId));
+
+  await db
+    .update(userExchangeConnectionsTable)
+    .set({ isDefault: true, updatedAt: new Date() })
+    .where(
+      and(
+        eq(userExchangeConnectionsTable.userId, userId),
+        eq(userExchangeConnectionsTable.exchange, exchange),
+      )
+    );
+
+  req.log.info({ userId, exchange }, "userExchanges: default exchange set");
+  res.json({ ok: true, default: exchange });
+});
+
+// ── POST /api/user/exchanges/:exchange/mode ───────────────────────────────────
+// Set paper/live trading mode for a connection.
+// Live mode requires explicit opt-in — cannot be set without user acknowledgement.
+
+router.post("/user/exchanges/:exchange/mode", requireAuth, async (req, res): Promise<void> => {
+  const userId   = (req as AuthReq).clerkUserId;
+  const exchange = String(req.params["exchange"]);
+  const { mode, acknowledged } = req.body as { mode: string; acknowledged?: boolean };
+
+  if (!SUPPORTED_EXCHANGES.has(exchange)) {
+    res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
+    return;
+  }
+  if (mode !== "paper" && mode !== "live") {
+    res.status(400).json({ error: "mode must be 'paper' or 'live'" });
+    return;
+  }
+  if (mode === "live" && !acknowledged) {
+    res.status(400).json({ error: "Live trading requires explicit acknowledgement (acknowledged: true)" });
+    return;
+  }
+
+  const [row] = await db
+    .select()
+    .from(userExchangeConnectionsTable)
+    .where(
+      and(
+        eq(userExchangeConnectionsTable.userId, userId),
+        eq(userExchangeConnectionsTable.exchange, exchange),
+      )
+    )
+    .limit(1);
+
+  if (!row) {
+    res.status(404).json({ error: `No connection found for ${exchange}` });
+    return;
+  }
+
+  await db
+    .update(userExchangeConnectionsTable)
+    .set({ tradingMode: mode, updatedAt: new Date() })
+    .where(
+      and(
+        eq(userExchangeConnectionsTable.userId, userId),
+        eq(userExchangeConnectionsTable.exchange, exchange),
+      )
+    );
+
+  if (mode === "live") {
+    auditLogger.append(userId, "MODE_CHANGED", { exchange, mode: "live" }, { exchange });
+  }
+
+  req.log.info({ userId, exchange, mode }, "userExchanges: trading mode updated");
+  res.json({ ok: true, exchange, tradingMode: mode });
+});
+
+// ── DELETE /api/user/exchanges/:exchange ──────────────────────────────────────
+// Permanently remove a user's exchange connection and encrypted credentials.
+
+router.delete("/user/exchanges/:exchange", requireAuth, async (req, res): Promise<void> => {
+  const userId   = (req as AuthReq).clerkUserId;
+  const exchange = String(req.params["exchange"]);
+
+  if (!SUPPORTED_EXCHANGES.has(exchange)) {
+    res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
+    return;
+  }
+
+  const result = await db
+    .delete(userExchangeConnectionsTable)
+    .where(
+      and(
+        eq(userExchangeConnectionsTable.userId, userId),
+        eq(userExchangeConnectionsTable.exchange, exchange),
+      )
+    )
+    .returning({ id: userExchangeConnectionsTable.id });
+
+  if (result.length === 0) {
+    res.status(404).json({ error: `No connection found for ${exchange}` });
+    return;
+  }
+
+  auditLogger.append(userId, "CREDENTIAL_DELETED", { exchange }, { exchange });
+  req.log.info({ userId, exchange }, "userExchanges: connection deleted");
+  res.json({ ok: true, exchange });
+});
+
+export default router;

@@ -8,3 +8,4 @@ export * from "./simAccounts";
 export * from "./simPositions";
 export * from "./simTrades";
 export * from "./userNotifications";
+export * from "./userExchangeConnections";

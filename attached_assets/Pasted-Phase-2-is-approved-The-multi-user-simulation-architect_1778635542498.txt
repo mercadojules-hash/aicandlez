@@ -1,0 +1,179 @@
+Phase 2 is approved.
+
+The multi-user simulation architecture is now complete.
+
+Next phase:
+
+PHASE 3 — EXCHANGE CONNECTION MANAGEMENT + ENCRYPTED API KEY ONBOARDING
+
+Goal:
+Allow each authenticated user to connect their own exchange account safely.
+
+This is required before the mobile app can support live trading.
+
+====================================================
+PHASE 3A — USER EXCHANGE CONNECTIONS
+====================================
+
+Build a full exchange connection system.
+
+Each user should be able to connect:
+
+* Kraken
+* Binance
+* Coinbase
+* Bybit
+* OKX
+* KuCoin
+
+Requirements:
+
+* exchange connections must be user-scoped
+* one user cannot access another user’s exchange connection
+* connections should persist in the database
+* support active/inactive states
+* support default exchange selection
+* support paper/live mode per user
+
+====================================================
+PHASE 3B — CREDENTIAL VAULT INTEGRATION
+=======================================
+
+Use the existing CredentialVault system.
+
+Need:
+
+* encrypted API key storage
+* encrypted secret storage
+* encrypted passphrase storage when needed
+* never return raw keys to frontend
+* never log raw credentials
+* support revoke/delete credentials
+
+Security requirement:
+API response should only show:
+
+* exchange name
+* connected true/false
+* permissions detected
+* last checked timestamp
+* health status
+
+====================================================
+PHASE 3C — CONNECTION WIZARD UI
+===============================
+
+Build frontend exchange connection wizard.
+
+Add route:
+/settings/exchanges
+
+or section inside Settings.
+
+UI should include:
+
+* exchange cards
+* connect button
+* disconnect button
+* test connection button
+* active/default exchange selector
+* connection health badge
+* permissions warning
+
+For each exchange card show:
+
+* connected status
+* paper/live mode
+* last health check
+* required API permissions
+* safety warning
+
+====================================================
+PHASE 3D — API KEY VALIDATION
+=============================
+
+When user submits API keys:
+
+* validate format
+* run test connection
+* fetch account/balance if allowed
+* detect permissions
+* detect read-only vs trading-enabled
+* reject invalid credentials
+* store only after successful validation
+
+Need endpoints:
+POST /api/user/exchanges/connect
+GET /api/user/exchanges
+POST /api/user/exchanges/test
+POST /api/user/exchanges/default
+DELETE /api/user/exchanges/:exchange
+
+====================================================
+PHASE 3E — SAFETY RULES
+=======================
+
+Important:
+
+* Withdrawals must never be supported.
+* Do not request withdrawal permissions.
+* Warn users to create API keys with trading only, no withdrawals.
+* Default live execution should remain disabled until user explicitly enables it.
+* User must acknowledge risk before live mode.
+
+====================================================
+PHASE 3F — DASHBOARD INTEGRATION
+================================
+
+The exchange switcher should now reflect the logged-in user’s connected exchanges.
+
+If exchange is not connected:
+
+* show SOON or CONNECT
+* clicking opens connection wizard
+
+If connected:
+
+* allow selecting it as active exchange
+
+If disconnected:
+
+* dim it
+
+====================================================
+PHASE 3G — BACKEND INTEGRATION
+==============================
+
+Wire user exchange credentials into:
+
+* ExchangeRegistry
+* BaseExchangeAdapter
+* BinanceAdapter
+* KrakenAdapter
+* CoinbaseAdapter
+* BybitAdapter
+* OKXAdapter
+* KuCoinAdapter
+
+Important:
+Adapters must use the authenticated user’s encrypted credentials, not global credentials.
+
+====================================================
+PHASE 3H — VERIFICATION
+=======================
+
+Before reporting complete, verify:
+
+* unauthenticated requests return 401
+* user A cannot see user B exchange connections
+* keys are encrypted in database
+* raw keys never appear in logs or API responses
+* invalid credentials are rejected
+* valid credentials save correctly
+* connected exchange appears in dashboard switcher
+
+Primary focus:
+secure user-scoped exchange onboarding.
+
+Do not redesign dashboard.
+Only add the exchange connection flow and backend integration.

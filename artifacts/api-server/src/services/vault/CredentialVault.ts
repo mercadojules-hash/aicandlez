@@ -106,6 +106,43 @@ class CredentialVault {
     return deleted;
   }
 
+  // ── Encrypt / decrypt for DB persistence ─────────────────────────────────
+  // These allow callers to produce an encrypted blob for DB storage and
+  // restore credentials from it later — without exposing the key material.
+
+  encryptBlob(userId: string, creds: ExchangeCredentials): string {
+    const key      = this.deriveKey(userId);
+    const iv       = crypto.randomBytes(12);
+    const cipher   = crypto.createCipheriv("aes-256-gcm", key, iv);
+    const plain    = JSON.stringify({ apiKey: creds.apiKey, apiSecret: creds.apiSecret, passphrase: creds.passphrase });
+    const encrypted = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
+    const authTag  = cipher.getAuthTag();
+    return JSON.stringify({
+      iv:         iv.toString("hex"),
+      authTag:    authTag.toString("hex"),
+      ciphertext: encrypted.toString("hex"),
+    });
+  }
+
+  decryptBlob(userId: string, blob: string): ExchangeCredentials | null {
+    try {
+      const { iv: ivHex, authTag: tagHex, ciphertext: ctHex } = JSON.parse(blob) as {
+        iv: string; authTag: string; ciphertext: string;
+      };
+      const key      = this.deriveKey(userId);
+      const iv       = Buffer.from(ivHex,  "hex");
+      const authTag  = Buffer.from(tagHex, "hex");
+      const ct       = Buffer.from(ctHex,  "hex");
+      const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+      decipher.setAuthTag(authTag);
+      const plain = decipher.update(ct).toString("utf8") + decipher.final("utf8");
+      return JSON.parse(plain) as ExchangeCredentials;
+    } catch {
+      logger.error({ userId }, "CredentialVault: decryptBlob failed — possible tampering");
+      return null;
+    }
+  }
+
   // ── List connected exchanges (no credential data exposed) ─────────────────
 
   listConnected(userId: string): Array<{ exchange: string; label?: string; updatedAt: number }> {
