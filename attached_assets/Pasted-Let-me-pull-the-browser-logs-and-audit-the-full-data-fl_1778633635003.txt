@@ -1,0 +1,101 @@
+Let me pull the browser logs and audit the full data flow simultaneously:
+
+
+2 actions
+No browser errors — the data is arriving but not rendering. Let me trace the exact data flow through every relevant file simultaneously:
+
+
+4 actions
+Good — rich live data confirmed. Now let me read all the relevant frontend files in parallel to trace the exact rendering pipeline:
+
+
+4 actions
+Now let me read all the command component files in parallel to find exactly where data stops flowing:
+
+
+4 actions
+Reading all the rendering components simultaneously to pinpoint the exact breakpoints:
+
+
+5 actions
+Now reading the critical rendering components — MiniChart (charts) and the other panels:
+
+
+5 actions
+I can see the issues. Let me check the exact API response field names — there's likely a mismatch between what the backend emits and what the frontend types expect:
+
+
+4 actions
+Good — avgConfidence field name is correct and data is rich. The issue is more subtle. Let me check App.tsx routing and the active trades fetch path:
+
+
+4 actions
+I have the full picture now. Let me read the AlertsProvider and then trace the exact bug — the issue is likely in shared query keys and initial fetch latency:
+
+
+4 actions
+Now I have the full picture. Here are the exact bugs:
+
+"AWAITING SIGNAL" — shows when breakdown?.avgConfidence === 0. On initial render before the 8s engine poll returns, breakdown is undefined → conf = 0 → every card shows fallback. Fix: smarter fallback states + faster poll.
+Active Trades blank — CommandCenter fetches /api/trades (86 orphaned test trades all status="open") but the 3 real engine simulation positions live at /api/simulation/account. These are never fetched.
+Platform Overview — 100% hardcoded fake users/data, never connected to real simulation account.
+Slow hydration — engine query at 8s refetch; gcTime:0 means every page navigation clears cache and restarts from scratch.
+Fixing all five points in parallel now:
+
+
+3 actions
+Now let me read the remaining four files I need to edit in parallel:
+
+
+5 actions
+Now I have everything I need. Writing all four edits in parallel:
+
+
+4 actions
+Let me check the current state of PlatformOverviewPanel.tsx to finish it, and simultaneously fix CommandCenter.tsx:
+
+
+2 actions
+I need to fix the PlatformOverviewPanel.tsx where the old total variable and DonutChart call still have old props, and then complete the CommandCenter.tsx changes:
+
+
+3 actions
+Now I need to update the render section of CommandCenter.tsx to pass the new props, and check for any compile errors in parallel:
+
+
+3 actions
+The runtime error from total reference is from the previous HMR. I can see the updates are loading. I need to fix two remaining things: pass the new props in CommandCenter's render, and remove the unused openPnL variable:
+
+
+5 actions
+Clean logs — no runtime errors. Let me take a screenshot to verify the Command Center is rendering correctly, and run the typecheck in parallel:
+
+
+3 actions
+The chart cards are all rendering with live data — no more "AWAITING SIGNAL", RSI values and confidence bars visible (31%, 16%, 17%, 10%). The TypeScript errors are all pre-existing issues in other files, not from my changes. Let me scroll down to verify the Active Trades and Platform Overview sections:
+
+
+2 actions
+Every section is now live with real data. Here's what's confirmed working in the screenshot:
+
+Crypto Chart Grid — All 8 cards render with live price charts, EMA9/21 lines, volume overlay, RSI readings (62, 57, 48, 54, 65, 75, 66, 51), and confidence bars (30%, 12%, 31%, 13%, 19%, 30%, 36%, 18%). No more "AWAITING SIGNAL".
+
+Platform Overview — Donut now shows $100.0K SIM EQUITY from the real simulation account, with segments: Cash Balance $99,940 (100%), Open Positions 3 pos, Realized P&L +$0.00.
+
+Live Terminal Feed — Real signal stream rendering: timestamped HOLD/BUY/SELL events from recentSignalLog with confidence values and block reasons.
+
+AI Opportunity Scanner — Real opportunity ranking: LINK/USDT 36%, SOL/USDT 31%, BTC/USDT 30%, etc.
+
+Active Trades (LIVE BLOTTER) — Now shows the 3 real engine simulation positions:
+
+AVAX/USD LONG · 2.024 AVAX · entry $9.88
+AVAX/USD LONG · 2.024 AVAX · entry $9.88
+ETH/USD SHORT · 0.009 ETH · entry $2,281.86
+Recently Closed — 8 real closed trades with actual P&L: ETH +$2.892, BTC −$2.611, BTC +$0.795, ETH +$2.255, SOL +$1.377.
+
+The four root-cause fixes applied:
+
+Engine refetch interval dropped from 8s → 3s — charts hydrate on first paint
+MiniChart fallback now shows SCANNING… (pulsing, dark) while engine loads, then RSI / confidence bar once data arrives — "AWAITING SIGNAL" is gone
+/api/simulation/account added to CommandCenter — the 3 real engine positions now flow through as active trades instead of the 86 orphaned DB test records
+Platform Overview wired to real simulation equity/cash/positions — donut and legend reflect the actual account state
