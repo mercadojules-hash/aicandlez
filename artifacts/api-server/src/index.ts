@@ -22,13 +22,11 @@ async function initStripe(): Promise<void> {
     return;
   }
   try {
-    const { runMigrations }  = await import("stripe-replit-sync");
-    const { getStripeSync }  = await import("./stripeClient.js");
+    // Note: runMigrations is called as a pre-start script (src/migrate.ts)
+    // because it uses __dirname internally and can't run inside the esbuild bundle.
+    const { getStripeSync } = await import("./stripeClient.js");
 
-    await runMigrations({ databaseUrl });
-    logger.info("Stripe schema ready");
-
-    const stripeSync     = await getStripeSync();
+    const stripeSync = await getStripeSync();
     const domainEnv      = process.env["REPLIT_DOMAINS"];
     const webhookBaseUrl = domainEnv
       ? `https://${domainEnv.split(",")[0]}`
