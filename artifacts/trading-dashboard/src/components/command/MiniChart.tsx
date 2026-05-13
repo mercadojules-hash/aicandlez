@@ -198,20 +198,22 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
 
       {/* Footer — brighter bottom-right telemetry */}
       <div className="px-3 pb-2.5 pt-1.5">
-        {conf > 0 ? (
+        {breakdown === undefined ? (
+          <div className="text-[9px] font-mono text-center tracking-[0.1em] font-medium animate-pulse"
+            style={{ color: "#1e3040" }}>
+            SCANNING…
+          </div>
+        ) : conf > 0 ? (
           <>
             <div className="flex items-center justify-between mb-1">
-              {/* RSI label — readable */}
               <span className="text-[9px] font-mono font-semibold" style={{ color: "#9FB3C8" }}>
                 {rsi !== undefined ? `RSI ${rsi.toFixed(0)}` : "AI CONF"}
               </span>
               <div className="flex items-center gap-2">
-                {/* VOL indicator — clearly visible */}
                 <span className="text-[8px] font-mono font-bold"
                   style={{ color: volOk ? "#00ff8a85" : "#ff225560" }}>
                   {volOk ? "✓VOL" : "✗VOL"}
                 </span>
-                {/* Confidence — dominant bottom-right metric */}
                 <span className="text-[13px] font-bold font-mono tabular-nums"
                   style={{ color, textShadow: `0 0 8px ${color}40` }}>
                   {conf.toFixed(0)}%
@@ -224,9 +226,13 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
             </div>
           </>
         ) : (
-          <div className="text-[9px] font-mono text-center tracking-[0.1em] font-medium"
-            style={{ color: "#4a6a80" }}>
-            AWAITING SIGNAL
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] font-mono font-semibold" style={{ color: "#4a6a80" }}>
+              {breakdown.agreedAction || "HOLD"}
+            </span>
+            <span className="text-[8px] font-mono font-medium" style={{ color: "#1e3040" }}>
+              LOW CONF
+            </span>
           </div>
         )}
       </div>

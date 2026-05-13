@@ -135,3 +135,32 @@ export const ASSETS = [
   { symbol: "LINKUSD", label: "LINK", color: SYMBOL_COLOR.LINKUSD },
   { symbol: "ADAUSD",  label: "ADA",  color: SYMBOL_COLOR.ADAUSD  },
 ];
+
+export interface SimPosition {
+  id:               string;
+  symbol:           string;
+  side:             string;
+  quantity:         number;
+  entryPrice:       number;
+  entryTime:        number;
+  sizeUSD:          number;
+  currentPrice:     number;
+  unrealizedPnL:    number;
+  unrealizedPnLPct: number;
+  marketValue:      number;
+}
+
+export interface SimAccount {
+  account: {
+    startingBalance: number;
+    cashBalance:     number;
+    totalRealized:   number;
+    totalTrades:     number;
+  };
+  equity:        number;
+  totalPnL:      number;
+  totalPnLPct:   number;
+  unrealizedPnL: number;
+  positionCount: number;
+  positions:     SimPosition[];
+}

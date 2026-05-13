@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
+import type { SimAccount } from "./types";
 
-interface UserSegment { label: string; value: number; color: string; pct: number }
+interface Segment { label: string; value: string; color: string; pct: number }
 
-function DonutChart({ segments, total }: { segments: UserSegment[]; total: number }) {
+function DonutChart({ segments, centerValue, centerLabel }: {
+  segments: Segment[];
+  centerValue: string;
+  centerLabel: string;
+}) {
   const r  = 76;
   const cx = 96;
   const cy = 96;
@@ -43,13 +48,13 @@ function DonutChart({ segments, total }: { segments: UserSegment[]; total: numbe
         <circle cx={cx} cy={cy} r={r - sw / 2 - 2} fill="none" stroke="#0d0d0d" strokeWidth={1} />
       </svg>
       <div className="absolute flex flex-col items-center justify-center"
-        style={{ inset: 0, marginLeft: 36, marginRight: 36, marginTop: 36, marginBottom: 36 }}>
-        <div className="text-[28px] font-bold font-mono tabular-nums leading-none"
+        style={{ inset: 0, marginLeft: 28, marginRight: 28, marginTop: 36, marginBottom: 36 }}>
+        <div className="text-[20px] font-bold font-mono tabular-nums leading-none"
           style={{ color: "#00f0ff", textShadow: "0 0 16px #00f0ff60" }}>
-          {total.toLocaleString()}
+          {centerValue}
         </div>
-        <div className="text-[7px] font-mono tracking-[0.2em] mt-1 font-medium" style={{ color: "#9FB3C8" }}>
-          TOTAL USERS
+        <div className="text-[7px] font-mono tracking-[0.18em] mt-1 font-medium" style={{ color: "#9FB3C8" }}>
+          {centerLabel}
         </div>
         <div className="flex items-center gap-1 mt-1.5">
           <span className="live-dot" style={{ width: 4, height: 4 }} />
@@ -62,17 +67,39 @@ function DonutChart({ segments, total }: { segments: UserSegment[]; total: numbe
 
 interface VolumeRow { rank: number; symbol: string; volume: string; color: string; pct: number }
 
-export function PlatformOverviewPanel() {
+interface Props { simAccount?: SimAccount }
+
+export function PlatformOverviewPanel({ simAccount }: Props) {
   const [tick, setTick] = useState(0);
   useEffect(() => { const t = setInterval(() => setTick(n => n + 1), 2000); return () => clearInterval(t); }, []);
 
-  const total = 1248 + Math.floor(tick / 4);
-  const segments: UserSegment[] = [
-    { label: "Live Traders",  value: 386 + (tick % 5), pct: 31, color: "#00ff8a" },
-    { label: "Paper Traders", value: 680 + (tick % 3), pct: 54, color: "#00aaff" },
-    { label: "AI Bots",       value: 156 + (tick % 7), pct: 12, color: "#7b68ee" },
-    { label: "Inactive",      value: 26  + (tick % 2), pct:  3, color: "#2a3a50" },
+  const equity   = simAccount?.equity ?? 0;
+  const cash     = simAccount?.account?.cashBalance ?? 0;
+  const realized = simAccount?.account?.totalRealized ?? 0;
+  const posCount = simAccount?.positionCount ?? 0;
+
+  const cashPct     = equity > 0 ? Math.round((cash / equity) * 100)    : 85;
+  const posPct      = equity > 0 ? Math.round(((equity - cash) / equity) * 100) : 12;
+  const realPct     = Math.max(0, Math.min(10, Math.abs(realized / (equity || 1)) * 100));
+  const restPct     = Math.max(0, 100 - cashPct - posPct - realPct);
+
+  const centerValue = equity > 0
+    ? `$${(equity / 1000).toFixed(equity >= 100_000 ? 0 : 1)}K`
+    : "SIM";
+  const centerLabel = equity > 0 ? "SIM EQUITY" : "SIMULATION";
+
+  const segments: Segment[] = simAccount ? [
+    { label: "Cash Balance",   value: `$${cash.toFixed(2)}`,        pct: cashPct,  color: "#00aaff" },
+    { label: "Open Positions", value: `${posCount} pos`,            pct: posPct,   color: "#00ff8a" },
+    { label: "Realized P&L",   value: `${realized >= 0 ? "+" : ""}$${realized.toFixed(2)}`, pct: Math.max(realPct, 3), color: realized >= 0 ? "#7b68ee" : "#ff3355" },
+    { label: "Reserve",        value: `${restPct}%`,                pct: Math.max(restPct, 0), color: "#2a3a50" },
+  ] : [
+    { label: "Cash Balance",   value: "—", pct: 85, color: "#00aaff" },
+    { label: "Open Positions", value: "—", pct: 12, color: "#00ff8a" },
+    { label: "Realized P&L",   value: "—", pct:  3, color: "#7b68ee" },
   ];
+
+  void tick;
 
   /* TOP 10 assets by volume */
   const topAssets: VolumeRow[] = [
@@ -103,7 +130,7 @@ export function PlatformOverviewPanel() {
       <div className="flex flex-col flex-1 min-h-0">
         {/* Donut */}
         <div className="flex justify-center pt-2 pb-1 flex-shrink-0">
-          <DonutChart segments={segments} total={total} />
+          <DonutChart segments={segments} centerValue={centerValue} centerLabel={centerLabel} />
         </div>
 
         {/* Legend — tighter spacing */}
@@ -117,8 +144,8 @@ export function PlatformOverviewPanel() {
               <span className="text-[9px] font-mono flex-1 font-medium" style={{ color: "#C7D4E2" }}>
                 {seg.label}
               </span>
-              <span className="text-[12px] font-bold font-mono tabular-nums" style={{ color: seg.color }}>
-                {seg.value.toLocaleString()}
+              <span className="text-[11px] font-bold font-mono tabular-nums" style={{ color: seg.color }}>
+                {seg.value}
               </span>
               <span className="text-[8px] font-mono w-7 text-right font-medium" style={{ color: "#9FB3C8" }}>
                 {seg.pct}%

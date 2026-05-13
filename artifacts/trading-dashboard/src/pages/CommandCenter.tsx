@@ -12,7 +12,7 @@ import { ActiveTradesPanel }     from "@/components/command/ActiveTradesPanel";
 import { BottomAnalyticsRow }    from "@/components/command/BottomAnalyticsRow";
 
 import type {
-  EngineStatus, AppSettings, Trade, ExchangeStatus, FeeSummary,
+  EngineStatus, AppSettings, Trade, ExchangeStatus, FeeSummary, SimAccount,
 } from "@/components/command/types";
 import { ago, Q_OPTS } from "@/components/command/helpers";
 
@@ -133,7 +133,7 @@ export default function CommandCenter() {
   const { data: engine } = useQuery<EngineStatus>({
     queryKey: ["engine-status-cmd"],
     queryFn:  () => fetch("/api/engine/status", { cache: "no-store" }).then(r => r.json()),
-    refetchInterval: 8_000, ...Q_OPTS,
+    refetchInterval: 3_000, ...Q_OPTS,
   });
   const { data: settings } = useQuery<AppSettings>({
     queryKey: ["settings-cmd"],
@@ -145,6 +145,11 @@ export default function CommandCenter() {
     queryFn:  () => fetch("/api/trades", { cache: "no-store" })
       .then(r => r.json()).then(d => Array.isArray(d) ? d : []),
     refetchInterval: 12_000, ...Q_OPTS,
+  });
+  const { data: simAccount } = useQuery<SimAccount>({
+    queryKey: ["sim-account-cmd"],
+    queryFn:  () => fetch("/api/simulation/account", { cache: "no-store" }).then(r => r.json()),
+    refetchInterval: 5_000, ...Q_OPTS,
   });
   const { data: exchangeStatus, refetch: refetchExchange } = useQuery<ExchangeStatus>({
     queryKey: ["exchange-status-cmd"],
@@ -158,6 +163,25 @@ export default function CommandCenter() {
   });
 
   const breakdowns = engine ? Object.values(engine.symbolBreakdowns) : [];
+
+  const simTrades: Trade[] = (simAccount?.positions ?? []).map(p => ({
+    id:         p.id,
+    symbol:     p.symbol,
+    side:       p.side.toUpperCase(),
+    amount:     p.quantity,
+    price:      p.entryPrice,
+    pnl:        p.unrealizedPnL,
+    pnlPercent: p.unrealizedPnLPct,
+    status:     "open",
+    mode:       "simulation",
+    timestamp:  new Date(p.entryTime).toISOString(),
+    closedAt:   null,
+  }));
+
+  const displayTrades: Trade[] = [
+    ...simTrades,
+    ...(trades ?? []).filter(t => t.status === "closed"),
+  ];
   const isKill     = exchangeStatus?.killSwitch ?? false;
   const isPaused   = exchangeStatus?.paused     ?? false;
   const isLive     = exchangeStatus?.mode === "live";
@@ -271,13 +295,13 @@ export default function CommandCenter() {
 
         {/* ⑤ Three-column: Platform Overview | Terminal Feed | Scanner */}
         <div className="grid gap-2" style={{ gridTemplateColumns: "260px 1fr 260px", height: 780 }}>
-          <PlatformOverviewPanel />
+          <PlatformOverviewPanel simAccount={simAccount} />
           <RichTerminalFeed engine={engine} />
           <OpportunityScanner breakdowns={breakdowns} />
         </div>
 
         {/* ⑥ Active Trades LEFT | Recently Closed RIGHT */}
-        <ActiveTradesPanel trades={trades} />
+        <ActiveTradesPanel trades={displayTrades} />
 
         {/* ⑦ 8-container unified grid */}
         <MiddleStatsGrid
