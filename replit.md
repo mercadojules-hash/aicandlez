@@ -17,6 +17,51 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Build**: esbuild (CJS bundle)
 - **Auth**: Replit-managed Clerk (httpOnly cookie on web, Bearer for mobile)
 
+## Phase 2 — User-Scoped Trading Platform (COMPLETE)
+
+Each authenticated user has a fully isolated trading environment. No data bleeds between accounts.
+
+**DB Tables (5 new):**
+- `user_settings` — per-user AI personality, risk profile, filters, notification prefs, preferences
+- `sim_accounts` — per-user simulation balance (starts at $100,000)
+- `sim_positions` — per-user open positions (indexed by userId)
+- `sim_trades` — per-user closed trade history (indexed by userId)
+- `user_notifications` — per-user alert inbox (indexed by userId + read status)
+
+**Engine Architecture:**
+- Global trading loop stays shared (market signals are identical for all users)
+- `lib/userSimRegistry.ts` — `Map<userId, UserSimState>` with lazy DB-load on first request and immediate DB persistence on every mutation
+- All simulation API routes are now `requireAuth`-gated and use `userSimRegistry` instead of the global `simulationEngine`
+- Existing `simulationEngine.ts` remains for trading loop test mode (pipeline verification only)
+
+**New API Routes (all require auth):**
+- `GET /api/user/settings` — get or create user settings (JIT provisioning)
+- `PUT /api/user/settings` — update any subset of user settings
+- `GET /api/user/notifications` — list notifications (newest first, limit 50) + unread count
+- `POST /api/user/notifications/read-all` — mark all as read
+- `POST /api/user/notifications/:id/read` — mark single notification as read
+- `GET /api/account`, `GET /api/simulation/account` — user-scoped sim account
+- `GET /api/simulation/trades` — user-scoped trade history
+- `POST /api/simulation/order` — place order in user's account
+- `POST /api/simulation/close/:positionId` — close user's position
+- `POST /api/simulation/reset` — reset user's $100k account
+
+**New Frontend:**
+- `src/pages/Settings.tsx` — full account settings page at `/settings` (auth-protected)
+  - AI Configuration: personality selector (Conservative/Balanced/Aggressive), confidence threshold
+  - Risk Management: position size, max trades/day, max active positions, stop loss, take profit, auto mode
+  - Signal Filters: volume confirmation, 1H trend alignment, preferred exchange
+  - Notifications: trade exec, signal alerts, risk alerts (all per-user toggles)
+  - Preferences: timezone, display currency
+- Settings gear icon added to UserBlock in sidebar (next to sign-out button)
+- `/settings` route added and protected
+
+**Key files:**
+- `lib/db/src/schema/userSettings.ts`, `simAccounts.ts`, `simPositions.ts`, `simTrades.ts`, `userNotifications.ts`
+- `artifacts/api-server/src/lib/userSimRegistry.ts`
+- `artifacts/api-server/src/routes/userSettings.ts`, `userNotifications.ts`
+- `artifacts/trading-dashboard/src/pages/Settings.tsx`
+
 ## Authentication (Phase 1 — COMPLETE)
 
 Clerk is fully integrated. Provisioned app: `app_3DeE2sfuhHWTY73M9jlbRCKabFx`.

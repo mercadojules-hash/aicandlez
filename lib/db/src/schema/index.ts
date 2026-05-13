@@ -3,3 +3,8 @@ export * from "./trades";
 export * from "./settings";
 export * from "./logs";
 export * from "./users";
+export * from "./userSettings";
+export * from "./simAccounts";
+export * from "./simPositions";
+export * from "./simTrades";
+export * from "./userNotifications";

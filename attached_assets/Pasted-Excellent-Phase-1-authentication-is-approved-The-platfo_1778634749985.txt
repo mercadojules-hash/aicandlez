@@ -1,0 +1,210 @@
+Excellent. Phase 1 authentication is approved.
+
+The platform now officially has:
+
+* real auth
+* protected routes
+* persistent users
+* session architecture
+* scalable onboarding foundation
+
+We now move into:
+PHASE 2 — USER-SCOPED TRADING PLATFORM
+
+This is the transition from:
+global simulation engine
+→
+isolated per-user AI trading system.
+
+====================================================
+PHASE 2 — USER-SCOPED ENGINE STATE
+==================================
+
+Current issue:
+The simulation engine is still globally shared.
+
+Need:
+Every authenticated user must have:
+
+* isolated simulation account
+* isolated AI engine state
+* isolated positions
+* isolated active trades
+* isolated recent signals
+* isolated risk profile
+* isolated telemetry
+* isolated AI memory
+
+No user should ever see another user’s:
+
+* trades
+* balances
+* signals
+* settings
+* positions
+* notifications
+
+====================================================
+PHASE 2A — USER ACCOUNT DATA MODEL
+==================================
+
+Create:
+
+* accounts table
+* portfolios table
+* positions table
+* user_settings table
+* user_exchange_connections table
+* user_notifications table
+
+Need:
+
+* proper foreign keys
+* indexed user lookups
+* scalable schema
+* migration files
+
+====================================================
+PHASE 2B — ENGINE ISOLATION
+===========================
+
+Refactor engine architecture so:
+each authenticated user gets:
+
+* isolated engine session
+* isolated AI memory
+* isolated simulation account
+* isolated telemetry state
+
+Use existing:
+UserEngineRegistry
+
+But fully wire it into:
+
+* auth sessions
+* dashboard requests
+* websocket streams
+* API routes
+
+====================================================
+PHASE 2C — USER-SCOPED API ROUTES
+=================================
+
+Every major API route must become:
+authenticated + user-scoped.
+
+Examples:
+
+Current:
+GET /api/simulation/account
+
+Need:
+Authenticated request returns ONLY that user’s account.
+
+Same for:
+
+* positions
+* trades
+* signals
+* telemetry
+* risk
+* AI memory
+* notifications
+
+====================================================
+PHASE 2D — USER-SCOPED DASHBOARD
+================================
+
+Dashboard must become:
+fully personalized.
+
+Each logged-in user should see:
+
+* their own portfolio
+* their own trades
+* their own AI signals
+* their own active positions
+* their own AI settings
+* their own exchange connections
+
+No more shared/global state.
+
+====================================================
+PHASE 2E — USER SETTINGS PANEL
+==============================
+
+Build:
+Settings / Account panel.
+
+Need:
+
+* AI personality selection
+* risk level
+* paper/live toggle
+* exchange preferences
+* notification preferences
+* timezone/currency settings
+
+Persist everything per-user.
+
+====================================================
+PHASE 2F — EXCHANGE CONNECTION MANAGEMENT
+=========================================
+
+Build user exchange onboarding.
+
+Need:
+
+* connect Kraken
+* connect Binance
+* connect Coinbase
+* validate API keys
+* encrypted vault storage
+* connection health checks
+* reconnect flow
+* disconnect flow
+
+Every exchange connection must belong to a specific user.
+
+====================================================
+PHASE 2G — NOTIFICATIONS
+========================
+
+Build:
+per-user notification infrastructure.
+
+Need:
+
+* trade alerts
+* AI alerts
+* risk alerts
+* drawdown alerts
+* exchange disconnect alerts
+* kill switch alerts
+
+Persist notifications in DB.
+
+====================================================
+IMPORTANT
+=========
+
+Primary focus now:
+
+* user isolation
+* multi-user architecture
+* account persistence
+* engine separation
+* exchange ownership
+* authenticated APIs
+
+NOT dashboard redesign.
+
+After this phase:
+we move into:
+
+* Stripe billing
+* mobile app
+* TestFlight
+* exchange onboarding UX
+* push notifications
+* production deployment

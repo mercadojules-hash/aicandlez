@@ -1,51 +1,58 @@
 import { Router } from "express";
+import { requireAuth } from "../middlewares/requireAuth.js";
 import {
-  getAccountSummary, getTradeHistory, placeOrder, closePosition, resetSimulation,
-} from "../lib/simulationEngine.js";
+  getUserAccountSummary,
+  getUserTradeHistory,
+  placeUserOrder,
+  closeUserPosition,
+  resetUserSimulation,
+} from "../lib/userSimRegistry.js";
 import { addJournalEntry } from "../lib/tradeJournalEngine.js";
+import type { Request } from "express";
+
+type AuthReq = Request & { clerkUserId: string };
 
 const router = Router();
 
-// GET /account — canonical account endpoint used by Command Center + portfolio panels.
-// Returns the same data as /simulation/account in the flat shape frontends expect:
-//   { balance, equity, positions, totalPnL, totalPnLPct, ... }
-router.get("/account", async (_req, res) => {
+// GET /account — canonical account endpoint used by Command Center + portfolio panels
+router.get("/account", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
   try {
-    const data = await getAccountSummary();
-    res.json({
-      balance:       parseFloat(data.account.cashBalance.toFixed(2)),
-      startBalance:  data.account.startingBalance,
-      equity:        data.equity,
-      positions:     data.positions,
-      totalPnL:      data.totalPnL,
-      totalPnLPct:   data.totalPnLPct,
-      unrealizedPnL: data.unrealizedPnL,
-      positionCount: data.positionCount,
-      totalTrades:   data.account.totalTrades,
-      totalRealized: parseFloat(data.account.totalRealized.toFixed(2)),
-    });
+    const data = await getUserAccountSummary(userId);
+    res.json(data);
   } catch (err) {
+    req.log.error({ err, userId }, "GET /account failed");
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
-// GET /simulation/account — live balance, open positions, equity
-router.get("/simulation/account", async (_req, res) => {
+// GET /simulation/account
+router.get("/simulation/account", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
   try {
-    const data = await getAccountSummary();
+    const data = await getUserAccountSummary(userId);
     res.json(data);
   } catch (err) {
+    req.log.error({ err, userId }, "GET /simulation/account failed");
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
 // GET /simulation/trades — closed trade history
-router.get("/simulation/trades", (_req, res) => {
-  res.json({ trades: getTradeHistory() });
+router.get("/simulation/trades", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
+  try {
+    const trades = await getUserTradeHistory(userId);
+    res.json({ trades });
+  } catch (err) {
+    req.log.error({ err, userId }, "GET /simulation/trades failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 // POST /simulation/order — place a simulated order
-router.post("/simulation/order", async (req, res) => {
+router.post("/simulation/order", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
   const { symbol, side, sizeUSD } = req.body ?? {};
 
   if (!symbol || !side || typeof sizeUSD !== "number") {
@@ -58,17 +65,22 @@ router.post("/simulation/order", async (req, res) => {
   }
 
   try {
-    const result = await placeOrder({ symbol, side, sizeUSD });
+    const result = await placeUserOrder(userId, { symbol, side, sizeUSD });
     res.status(result.success ? 201 : 400).json(result);
   } catch (err) {
+    req.log.error({ err, userId }, "POST /simulation/order failed");
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
 // POST /simulation/close/:positionId — close a position and auto-log to journal
-router.post("/simulation/close/:positionId", async (req, res) => {
+router.post("/simulation/close/:positionId", requireAuth, async (req, res): Promise<void> => {
+  const userId     = (req as AuthReq).clerkUserId;
+  const positionId = String(req.params.positionId);
+  const closeReason = (req.body?.closeReason as string | undefined) ?? "MANUAL";
+
   try {
-    const result = await closePosition(req.params.positionId!);
+    const result = await closeUserPosition(userId, positionId, closeReason);
     if (result.success && result.trade) {
       const t = result.trade;
       addJournalEntry({
@@ -83,7 +95,7 @@ router.post("/simulation/close/:positionId", async (req, res) => {
         realizedPnL:    t.realizedPnL,
         realizedPnLPct: t.realizedPnLPct,
         durationMs:     t.durationMs,
-        closeReason:    (req.body?.closeReason as "MANUAL" | "TRAILING_STOP" | "RISK_KILL" | "AUTO") ?? "MANUAL",
+        closeReason:    closeReason as "MANUAL" | "TRAILING_STOP" | "RISK_KILL" | "AUTO",
         reasoning:      req.body?.reasoning,
         notes:          req.body?.notes,
         tags:           req.body?.tags,
@@ -91,14 +103,21 @@ router.post("/simulation/close/:positionId", async (req, res) => {
     }
     res.status(result.success ? 200 : 404).json(result);
   } catch (err) {
+    req.log.error({ err, userId }, "POST /simulation/close failed");
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
-// POST /simulation/reset — wipe all positions and reset balance
-router.post("/simulation/reset", (_req, res) => {
-  resetSimulation();
-  res.json({ ok: true, message: "Simulation reset to $100,000 starting balance" });
+// POST /simulation/reset — wipe all positions and reset balance for this user
+router.post("/simulation/reset", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
+  try {
+    await resetUserSimulation(userId);
+    res.json({ ok: true, message: "Simulation reset to $100,000 starting balance" });
+  } catch (err) {
+    req.log.error({ err, userId }, "POST /simulation/reset failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 export default router;

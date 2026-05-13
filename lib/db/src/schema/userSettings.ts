@@ -1,0 +1,41 @@
+import { pgTable, varchar, real, integer, boolean, timestamp, uuid } from "drizzle-orm/pg-core";
+import { usersTable } from "./users";
+
+export const userSettingsTable = pgTable("user_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: varchar("user_id", { length: 255 })
+    .notNull()
+    .unique()
+    .references(() => usersTable.clerkUserId, { onDelete: "cascade" }),
+
+  aiPersonality:      varchar("ai_personality", { length: 50 }).notNull().default("balanced"),
+  minConfidence:      real("min_confidence").notNull().default(60),
+
+  riskLevel:          varchar("risk_level", { length: 50 }).notNull().default("moderate"),
+  positionSizeUSD:    real("position_size_usd").notNull().default(20),
+  maxTradesPerDay:    integer("max_trades_per_day").notNull().default(5),
+  maxActivePositions: integer("max_active_positions").notNull().default(3),
+  stopLossPercent:    real("stop_loss_percent").notNull().default(2),
+  takeProfitPercent:  real("take_profit_percent").notNull().default(4),
+
+  autoMode:           boolean("auto_mode").notNull().default(false),
+  tradingMode:        varchar("trading_mode", { length: 50 }).notNull().default("simulation"),
+
+  volumeFilter:       boolean("volume_filter").notNull().default(true),
+  require1HTrend:     boolean("require_1h_trend").notNull().default(false),
+
+  preferredExchange:  varchar("preferred_exchange", { length: 50 }).notNull().default("Kraken"),
+
+  notificationsTradeExec:  boolean("notifications_trade_exec").notNull().default(true),
+  notificationsSignals:    boolean("notifications_signals").notNull().default(false),
+  notificationsRiskAlerts: boolean("notifications_risk_alerts").notNull().default(true),
+
+  timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
+  currency: varchar("currency", { length: 10 }).notNull().default("USD"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type UserSettings = typeof userSettingsTable.$inferSelect;
+export type InsertUserSettings = typeof userSettingsTable.$inferInsert;

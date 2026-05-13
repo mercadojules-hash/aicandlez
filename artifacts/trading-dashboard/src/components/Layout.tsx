@@ -24,6 +24,7 @@ import {
   MessageSquare,
   Radio,
   Scan,
+  Settings,
   Shield,
   ShieldCheck,
   SlidersHorizontal,
@@ -222,6 +223,16 @@ function UserBlock({ collapsed }: { collapsed: boolean }) {
           <div className="text-[10px] font-bold font-mono truncate" style={{ color: "#7ab8cc" }}>{displayName}</div>
           <div className="text-[8px] font-mono truncate" style={{ color: "#3a5a70" }}>{email}</div>
         </div>
+        <Link
+          href="/settings"
+          title="Account settings"
+          className="p-1 rounded transition-colors"
+          style={{ color: "#3a5a70" }}
+          onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#00aaff"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#3a5a70"; }}
+        >
+          <Settings className="w-3 h-3" />
+        </Link>
         <button
           onClick={() => signOut({ redirectUrl: basePath || "/" })}
           title="Sign out"

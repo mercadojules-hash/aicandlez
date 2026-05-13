@@ -26,12 +26,16 @@ import feesRouter from "./fees.js";
 import mobileRouter from "./mobile.js";
 import adaptersRouter from "./adapters.js";
 import authRouter from "./auth.js";
+import userSettingsRouter from "./userSettings.js";
+import userNotificationsRouter from "./userNotifications.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(downloadRouter);
 router.use(authRouter);
+router.use(userSettingsRouter);
+router.use(userNotificationsRouter);
 router.use(signalsRouter);
 router.use(tradesRouter);
 router.use(portfolioRouter);
