@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Cpu, Clock, ShieldOff, Pause, Play } from "lucide-react";
 
 import { TickerStrips }          from "@/components/command/TickerStrips";
@@ -40,14 +41,12 @@ const EXCHANGES: ExchangeOption[] = [
 ];
 
 function ExchangeSwitcher({
-  isLive, exName, onSelectSim, onSelectLive,
+  activeId, onSelectSim, onSelectLive,
 }: {
-  isLive:       boolean;
-  exName:       string;
+  activeId:     string;
   onSelectSim:  () => void;
   onSelectLive: (exchange: string) => void;
 }) {
-  const activeId = !isLive ? "sim" : (exName.toLowerCase() || "kraken");
 
   return (
     <div className="flex items-center gap-px p-0.5 rounded-lg flex-shrink-0"
@@ -130,6 +129,10 @@ function ExchangeSwitcher({
 export default function CommandCenter() {
   const qc = useQueryClient();
 
+  // Optimistic mode — reflects button click immediately before the server round-trip completes.
+  // null = use server state; "sim" | "kraken" | "coinbase" | … = pending click
+  const [pendingMode, setPendingMode] = useState<string | null>(null);
+
   const { data: engine } = useQuery<EngineStatus>({
     queryKey: ["engine-status-cmd"],
     queryFn:  () => fetch("/api/engine/status", { cache: "no-store" }).then(r => r.json()),
@@ -146,20 +149,35 @@ export default function CommandCenter() {
       .then(r => r.json()).then(d => Array.isArray(d) ? d : []),
     refetchInterval: 12_000, ...Q_OPTS,
   });
-  const { data: simAccount } = useQuery<SimAccount>({
-    queryKey: ["sim-account-cmd"],
-    queryFn:  () => fetch("/api/simulation/account", { cache: "no-store" }).then(r => r.json()),
-    refetchInterval: 5_000, ...Q_OPTS,
-  });
   const { data: exchangeStatus, refetch: refetchExchange } = useQuery<ExchangeStatus>({
     queryKey: ["exchange-status-cmd"],
     queryFn:  () => fetch("/api/exchange/status", { cache: "no-store" }).then(r => r.json()),
-    refetchInterval: 15_000, ...Q_OPTS,
+    refetchInterval: 8_000, ...Q_OPTS,
   });
   const { data: feeSummary } = useQuery<FeeSummary>({
     queryKey: ["fees-cmd"],
     queryFn:  () => fetch("/api/fees", { cache: "no-store" }).then(r => r.json()),
     refetchInterval: 30_000, ...Q_OPTS,
+  });
+
+  const isKill   = exchangeStatus?.killSwitch ?? false;
+  const isPaused = exchangeStatus?.paused     ?? false;
+  const isLive   = exchangeStatus?.mode === "live";
+  const exName   = exchangeStatus?.exchangeName ?? "kraken";
+
+  // Resolved active mode: pending click wins until server confirms
+  const confirmedId = !isLive ? "sim" : exName.toLowerCase();
+  const activeId    = pendingMode ?? confirmedId;
+  const liveActive  = activeId !== "sim";
+
+  // /api/simulation/account: only poll when in simulation mode (confirmed + not switching to live)
+  const simEnabled = !liveActive;
+  const { data: simAccount } = useQuery<SimAccount>({
+    queryKey: ["sim-account-cmd"],
+    queryFn:  () => fetch("/api/simulation/account", { cache: "no-store" }).then(r => r.json()),
+    refetchInterval: simEnabled ? 5_000 : false,
+    enabled:         simEnabled,
+    ...Q_OPTS,
   });
 
   const breakdowns = engine ? Object.values(engine.symbolBreakdowns) : [];
@@ -182,28 +200,38 @@ export default function CommandCenter() {
     ...simTrades,
     ...(trades ?? []).filter(t => t.status === "closed"),
   ];
-  const isKill     = exchangeStatus?.killSwitch ?? false;
-  const isPaused   = exchangeStatus?.paused     ?? false;
-  const isLive     = exchangeStatus?.mode === "live";
-  const exName     = exchangeStatus?.exchangeName ?? "kraken";
 
-  const invalidate = () => {
+  const invalidateExchange = () => {
     qc.invalidateQueries({ queryKey: ["exchange-status-cmd"] });
-    refetchExchange();
+    void refetchExchange().then(() => setPendingMode(null));
   };
 
-  const toggleKill  = () => fetch("/api/exchange/kill",  { method: "POST", cache: "no-store" }).then(invalidate);
-  const togglePause = () => fetch("/api/exchange/pause", { method: "POST", cache: "no-store" }).then(invalidate);
+  const toggleKill  = () => fetch("/api/exchange/kill",  { method: "POST", cache: "no-store" })
+    .then(() => { qc.invalidateQueries({ queryKey: ["exchange-status-cmd"] }); void refetchExchange(); });
+  const togglePause = () => fetch("/api/exchange/pause", { method: "POST", cache: "no-store" })
+    .then(() => { qc.invalidateQueries({ queryKey: ["exchange-status-cmd"] }); void refetchExchange(); });
 
-  const selectSim  = () => fetch("/api/exchange/mode", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: "simulation" }), cache: "no-store",
-  }).then(invalidate);
+  // pendingId: the button ID that should highlight immediately ("sim" | "kraken" | …)
+  // apiMode:   what to send to the backend ("simulation" | "kraken" | …)
+  const switchExchangeMode = (pendingId: string, apiMode: string) => {
+    setPendingMode(pendingId);
+    // Clear stale sim data when switching away from simulation
+    if (pendingId !== "sim") {
+      qc.removeQueries({ queryKey: ["sim-account-cmd"] });
+    }
+    fetch("/api/engine/exchange-mode", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ mode: apiMode }),
+      cache:   "no-store",
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r))
+      .then(() => invalidateExchange())
+      .catch(() => setPendingMode(null)); // revert on error
+  };
 
-  const selectLive = (_exchange: string) => fetch("/api/exchange/mode", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: "live" }), cache: "no-store",
-  }).then(invalidate);
+  const selectSim  = ()           => switchExchangeMode("sim", "simulation");
+  const selectLive = (ex: string) => switchExchangeMode(ex.toLowerCase(), ex.toLowerCase());
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: "#060810" }}>
@@ -275,14 +303,13 @@ export default function CommandCenter() {
             EXCHANGE
           </span>
           <ExchangeSwitcher
-            isLive={isLive}
-            exName={exName}
+            activeId={activeId}
             onSelectSim={selectSim}
             onSelectLive={selectLive}
           />
           <span className="text-[8px] font-mono font-medium ml-2 flex-shrink-0"
             style={{ color: "#2a3a4a" }}>
-            {isLive ? `LIVE · ${exName.toUpperCase()}` : "SIMULATION MODE"}
+            {liveActive ? `LIVE · ${activeId.toUpperCase()}` : "SIMULATION MODE"}
           </span>
         </div>
       </div>

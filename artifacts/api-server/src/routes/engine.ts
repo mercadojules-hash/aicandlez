@@ -9,6 +9,11 @@ import {
   setVolumeFilter,
 } from "../lib/tradingLoop.js";
 import { sendTradeExecutedSMS } from "../lib/notifications.js";
+import {
+  setMode,
+  setSelectedExchange,
+  getExchangeStatus,
+} from "../lib/exchangeEngine.js";
 import { db } from "@workspace/db";
 import { tradesTable, logsTable } from "@workspace/db";
 import {
@@ -99,6 +104,35 @@ router.post("/engine/filters", (req, res) => {
     require1HTrend: engineStats.require1HTrend,
     message: "Quality filters updated.",
   });
+});
+
+// ── POST /engine/exchange-mode ────────────────────────────────────────────────
+// Unified exchange switcher. body: { mode: "simulation" | "kraken" | "coinbase" | ... }
+// "simulation" → paper trading.  Any exchange name → live mode on that exchange.
+router.post("/engine/exchange-mode", (req, res) => {
+  const { mode } = (req.body ?? {}) as { mode?: string };
+  if (!mode || typeof mode !== "string") {
+    res.status(400).json({ error: 'body must include { mode: "simulation" | "<exchange>" }' });
+    return;
+  }
+
+  if (mode === "simulation") {
+    const result = setMode("simulation");
+    if (!result.ok) {
+      res.status(400).json({ error: result.reason });
+      return;
+    }
+  } else {
+    // Live mode on named exchange (kraken, coinbase, binance, …)
+    const result = setMode("live");
+    if (!result.ok) {
+      res.status(400).json({ error: result.reason });
+      return;
+    }
+    setSelectedExchange(mode);
+  }
+
+  res.json({ mode, status: getExchangeStatus() });
 });
 
 // ── POST /engine/force-test-trades ───────────────────────────────────────────
