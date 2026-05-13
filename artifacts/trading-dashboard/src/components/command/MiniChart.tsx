@@ -93,6 +93,24 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
   // the chart is NEVER blank while candles are available.
   const chartData = animData.length > 0 ? animData : baseData;
 
+  // ── Diagnostic: log once when chart data first populates ──────────────────
+  const didLog = useRef(false);
+  if (!didLog.current && chartData.length > 0) {
+    didLog.current = true;
+    console.log(
+      `[MiniChart:${symbol}] ✅ chartData POPULATED`,
+      `len=${chartData.length}`,
+      `baseData=${baseData.length}`,
+      `animData=${animData.length}`,
+      `first=`, chartData[0],
+      `last=`, chartData[chartData.length - 1],
+      `domain=[${(Math.min(...chartData.map(d => d.close))).toFixed(4)}, ${(Math.max(...chartData.map(d => d.close))).toFixed(4)}]`,
+    );
+  }
+  if (!isLoading && chartData.length === 0) {
+    console.warn(`[MiniChart:${symbol}] ⚠️ NO DATA — candles=${candles?.length ?? "undefined"}`);
+  }
+
   const livePrice = headerPrice ?? baseClose;
   const first     = chartData[0];
   const lastPt    = chartData[chartData.length - 1];
