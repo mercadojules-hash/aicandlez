@@ -1,11 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ComposedChart, Line, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import type { Candle, ChartPt, SymBreakdown } from "./types";
-import { buildChartData, fmtPrice, Q_OPTS } from "./helpers";
+import { buildChartData, fmtPrice } from "./helpers";
 
 function MiniTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
@@ -28,18 +27,59 @@ interface Props {
   breakdown?: SymBreakdown;
 }
 
-export function MiniChart({ symbol, label, color, breakdown }: Props) {
-  const { data: candles, isLoading } = useQuery<Candle[]>({
-    queryKey:        ["candles-cmd", symbol, "15m", 60],
-    queryFn:         () =>
-      fetch(`/api/candles?symbol=${symbol}&timeframe=15m&limit=60`, { cache: "no-store" })
-        .then(r => r.ok ? r.json() : []),
-    refetchInterval: 20_000,
-    ...Q_OPTS,
-  });
+type FetchState = "loading" | "ok" | "empty" | "error";
 
-  // Compute base chart data synchronously — no state/effect chain needed.
-  // This guarantees chartData is populated the instant candles arrive.
+export function MiniChart({ symbol, label, color, breakdown }: Props) {
+  // TOP-LEVEL UNCONDITIONAL MOUNT LOG — fires on every render, before all hooks
+  console.log("[MiniChart RENDER]", symbol);
+
+  // ── Direct fetch — no React Query ────────────────────────────────────────
+  const [candles,     setCandles]     = useState<Candle[] | null>(null);
+  const [fetchState,  setFetchState]  = useState<FetchState>("loading");
+  const [fetchError,  setFetchError]  = useState<string | null>(null);
+
+  useEffect(() => {
+    console.log("[MiniChart useEffect]", symbol, "— starting fetch");
+    let cancelled = false;
+
+    const doFetch = () => {
+      const url = `/api/candles?symbol=${symbol}&timeframe=15m&limit=60`;
+      console.log("[MiniChart fetch]", symbol, url);
+
+      fetch(url, { cache: "no-store" })
+        .then(r => {
+          console.log("[MiniChart fetch response]", symbol, "status:", r.status, "ok:", r.ok);
+          if (!r.ok) {
+            setFetchState("error");
+            setFetchError(`HTTP ${r.status}`);
+            return;
+          }
+          return r.json().then((data: Candle[]) => {
+            if (cancelled) return;
+            console.log("[MiniChart fetch data]", symbol, "candles:", data?.length);
+            if (!data || !data.length) {
+              setFetchState("empty");
+              setCandles([]);
+            } else {
+              setCandles(data);
+              setFetchState("ok");
+            }
+          });
+        })
+        .catch(err => {
+          if (cancelled) return;
+          console.error("[MiniChart fetch ERROR]", symbol, err);
+          setFetchState("error");
+          setFetchError(String(err));
+        });
+    };
+
+    doFetch();
+    const interval = setInterval(doFetch, 20_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [symbol]);
+
+  // ── Chart data — synchronous from candles ────────────────────────────────
   const baseData = useMemo<ChartPt[]>(
     () => (candles && candles.length ? buildChartData(candles) : []),
     [candles],
@@ -48,8 +88,7 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
   const baseClose = baseData.length > 0 ? baseData[baseData.length - 1].close : null;
 
   const [headerPrice, setHeaderPrice] = useState<number | null>(null);
-  // animData: the live-animated overlay; falls back to baseData when empty
-  const [animData, setAnimData] = useState<ChartPt[]>([]);
+  const [animData,    setAnimData]    = useState<ChartPt[]>([]);
 
   const globalDrift = useRef(0);
   const phase       = useRef(Math.random() * Math.PI * 2);
@@ -89,28 +128,9 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
     return () => { clearInterval(headerTick); clearInterval(chartTick); };
   }, [baseClose, baseData.length]);
 
-  // Use animated data when ready, otherwise fall back to raw candle data so
-  // the chart is NEVER blank while candles are available.
   const chartData = animData.length > 0 ? animData : baseData;
 
-  // ── Diagnostic: log once when chart data first populates ──────────────────
-  const didLog = useRef(false);
-  if (!didLog.current && chartData.length > 0) {
-    didLog.current = true;
-    console.log(
-      `[MiniChart:${symbol}] ✅ chartData POPULATED`,
-      `len=${chartData.length}`,
-      `baseData=${baseData.length}`,
-      `animData=${animData.length}`,
-      `first=`, chartData[0],
-      `last=`, chartData[chartData.length - 1],
-      `domain=[${(Math.min(...chartData.map(d => d.close))).toFixed(4)}, ${(Math.max(...chartData.map(d => d.close))).toFixed(4)}]`,
-    );
-  }
-  if (!isLoading && chartData.length === 0) {
-    console.warn(`[MiniChart:${symbol}] ⚠️ NO DATA — candles=${candles?.length ?? "undefined"}`);
-  }
-
+  // ── Derived display values ────────────────────────────────────────────────
   const livePrice = headerPrice ?? baseClose;
   const first     = chartData[0];
   const lastPt    = chartData[chartData.length - 1];
@@ -142,6 +162,7 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
     prevPriceRef.current = livePrice;
   }, [livePrice]);
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="rounded-lg overflow-hidden" style={{ background: "#000000", border: "1px solid #1c1c1c" }}>
 
@@ -159,7 +180,9 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
               ${fmtPrice(livePrice)}
             </div>
           ) : (
-            <div className="text-[10px] mt-0.5 font-mono" style={{ color: "#1a2a35" }}>—</div>
+            <div className="text-[10px] mt-0.5 font-mono" style={{ color: "#3a5a70" }}>
+              {fetchState === "loading" ? "LOADING…" : "—"}
+            </div>
           )}
         </div>
         <div className="flex flex-col items-end gap-0.5 shrink-0">
@@ -179,15 +202,25 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
       </div>
 
       {/* Chart */}
-      {isLoading ? (
-        <div className="flex items-center justify-center" style={{ height: 92, background: "#000000" }}>
+      {fetchState === "loading" ? (
+        <div className="flex flex-col items-center justify-center gap-1.5" style={{ height: 92, background: "#000000" }}>
           <div className="w-4 h-4 rounded-full border-2 animate-spin"
-            style={{ borderColor: `${color}12`, borderTopColor: color + "65" }} />
+            style={{ borderColor: `${color}22`, borderTopColor: color + "99" }} />
+          <div className="text-[7px] font-mono font-semibold" style={{ color: "#2a4050" }}>
+            FETCHING {symbol}
+          </div>
+        </div>
+      ) : fetchState === "error" ? (
+        <div className="flex flex-col items-center justify-center gap-1 text-[9px] font-mono font-bold"
+          style={{ height: 92, background: "#110000", color: "#ff4040" }}>
+          <span>⚠ FETCH ERROR</span>
+          <span style={{ color: "#ff4040aa", fontSize: 7 }}>{fetchError}</span>
         </div>
       ) : chartData.length === 0 ? (
-        <div className="flex items-center justify-center text-[8px] font-mono"
-          style={{ height: 92, background: "#000000", color: "#1a2a35" }}>
-          NO DATA
+        <div className="flex flex-col items-center justify-center gap-1 text-[9px] font-mono font-bold"
+          style={{ height: 92, background: "#0a0800", color: "#ffaa40" }}>
+          <span>⚠ EMPTY RESPONSE</span>
+          <span style={{ color: "#ffaa4088", fontSize: 7 }}>0 candles from API</span>
         </div>
       ) : (
         <div style={{ background: "#000000" }}>
@@ -197,22 +230,17 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
               <YAxis yAxisId="p" domain={[pMin - pad, pMax + pad]} hide />
               <YAxis yAxisId="v" domain={[0, maxVol * 5]} hide />
               <Tooltip content={<MiniTooltip />} />
-              {/* Volume bars — visible fill */}
               <Bar yAxisId="v" dataKey="volume" fill={color} fillOpacity={0.20}
                 radius={[1, 1, 0, 0]} isAnimationActive={false} />
-              {/* EMA21 — clearly visible dashed line */}
               <Line yAxisId="p" dataKey="ema21" stroke="#00d4ff" strokeWidth={1.3}
                 dot={false} isAnimationActive={false} strokeDasharray="5 4"
                 connectNulls strokeOpacity={0.65} />
-              {/* EMA9 — clearly visible dashed line */}
               <Line yAxisId="p" dataKey="ema9" stroke="#ffaa00" strokeWidth={1.3}
                 dot={false} isAnimationActive={false} strokeDasharray="3 3"
                 connectNulls strokeOpacity={0.75} />
-              {/* Price line */}
               <Line yAxisId="p" dataKey="close" stroke={color} strokeWidth={1.8}
                 dot={false} isAnimationActive={false}
                 style={{ filter: `drop-shadow(0 0 3px ${color}65)` }} />
-              {/* Reference/strike line — visible */}
               {lastPt?.close && (
                 <ReferenceLine yAxisId="p" y={lastPt.close}
                   stroke={color} strokeDasharray="2 6" strokeOpacity={0.40} />
@@ -222,7 +250,7 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
         </div>
       )}
 
-      {/* Footer — brighter bottom-right telemetry */}
+      {/* Footer */}
       <div className="px-3 pb-2.5 pt-1.5">
         {breakdown === undefined ? (
           <div className="text-[9px] font-mono text-center tracking-[0.1em] font-medium animate-pulse"
