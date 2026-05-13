@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ComposedChart, Line, Bar, YAxis, Tooltip,
+  ComposedChart, Line, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import type { Candle, ChartPt, SymBreakdown } from "./types";
@@ -38,25 +38,28 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
     ...Q_OPTS,
   });
 
-  const [baseData, setBaseData] = useState<ChartPt[]>([]);
-  useEffect(() => {
-    if (candles && candles.length) setBaseData(buildChartData(candles));
-  }, [candles]);
+  // Compute base chart data synchronously — no state/effect chain needed.
+  // This guarantees chartData is populated the instant candles arrive.
+  const baseData = useMemo<ChartPt[]>(
+    () => (candles && candles.length ? buildChartData(candles) : []),
+    [candles],
+  );
 
-  const baseClose = baseData[baseData.length - 1]?.close ?? null;
+  const baseClose = baseData.length > 0 ? baseData[baseData.length - 1].close : null;
 
   const [headerPrice, setHeaderPrice] = useState<number | null>(null);
-  const [chartData,   setChartData]   = useState<ChartPt[]>([]);
+  // animData: the live-animated overlay; falls back to baseData when empty
+  const [animData, setAnimData] = useState<ChartPt[]>([]);
 
   const globalDrift = useRef(0);
   const phase       = useRef(Math.random() * Math.PI * 2);
   const bias        = useRef(Math.random() > 0.5 ? 1 : -1);
 
   useEffect(() => {
-    if (!baseClose || !baseData.length) return;
+    if (!baseClose || !baseData.length) { setAnimData([]); return; }
     globalDrift.current = 0;
     setHeaderPrice(baseClose);
-    setChartData(baseData);
+    setAnimData(baseData);
 
     const headerTick = setInterval(() => {
       phase.current += 0.18 + Math.random() * 0.09;
@@ -74,7 +77,7 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
       const drift     = globalDrift.current;
       const waveAmp   = baseClose * 0.0028;
       const snapPhase = phase.current;
-      setChartData(
+      setAnimData(
         baseData.map((pt, i) => {
           const wave = Math.sin(snapPhase + i * 0.20) * waveAmp
                      * (0.4 + 0.6 * Math.sin(i * 0.10 + snapPhase * 0.3));
@@ -85,6 +88,10 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
 
     return () => { clearInterval(headerTick); clearInterval(chartTick); };
   }, [baseClose, baseData.length]);
+
+  // Use animated data when ready, otherwise fall back to raw candle data so
+  // the chart is NEVER blank while candles are available.
+  const chartData = animData.length > 0 ? animData : baseData;
 
   const livePrice = headerPrice ?? baseClose;
   const first     = chartData[0];
@@ -168,6 +175,7 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
         <div style={{ background: "#000000" }}>
           <ResponsiveContainer width="100%" height={92}>
             <ComposedChart data={chartData} margin={{ top: 4, right: 2, bottom: 0, left: 0 }}>
+              <XAxis dataKey="label" hide />
               <YAxis yAxisId="p" domain={[pMin - pad, pMax + pad]} hide />
               <YAxis yAxisId="v" domain={[0, maxVol * 5]} hide />
               <Tooltip content={<MiniTooltip />} />

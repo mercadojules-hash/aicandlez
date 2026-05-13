@@ -45,10 +45,9 @@ export function ago(ts: number | null): string {
 }
 
 export const Q_OPTS = {
-  cache:                 "no-store" as RequestCache,
-  staleTime:             0,
-  gcTime:                0,
-  refetchOnMount:        "always" as const,
+  staleTime:             15_000,
+  gcTime:                60_000,
+  refetchOnMount:        true,
   refetchOnReconnect:    true,
-  refetchOnWindowFocus:  true,
+  refetchOnWindowFocus:  false,
 } as const;
