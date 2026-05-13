@@ -5,12 +5,25 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { vault } from "../services/vault/CredentialVault.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
-import { KrakenAdapter }   from "../services/exchanges/adapters/KrakenAdapter.js";
-import { BinanceAdapter }  from "../services/exchanges/adapters/BinanceAdapter.js";
-import { CoinbaseAdapter } from "../services/exchanges/adapters/CoinbaseAdapter.js";
-import { BybitAdapter }    from "../services/exchanges/adapters/BybitAdapter.js";
-import { OKXAdapter }      from "../services/exchanges/adapters/OKXAdapter.js";
-import { KuCoinAdapter }   from "../services/exchanges/adapters/KuCoinAdapter.js";
+import { EXCHANGE_CATALOG, CATALOG_BY_ID, CONNECTABLE_EXCHANGE_IDS } from "../services/exchanges/catalog.js";
+// Live adapters
+import { KrakenAdapter }         from "../services/exchanges/adapters/KrakenAdapter.js";
+import { BinanceAdapter }        from "../services/exchanges/adapters/BinanceAdapter.js";
+import { CoinbaseAdapter }       from "../services/exchanges/adapters/CoinbaseAdapter.js";
+import { BybitAdapter }          from "../services/exchanges/adapters/BybitAdapter.js";
+import { OKXAdapter }            from "../services/exchanges/adapters/OKXAdapter.js";
+import { KuCoinAdapter }         from "../services/exchanges/adapters/KuCoinAdapter.js";
+// Beta adapters
+import { GateIOAdapter }         from "../services/exchanges/adapters/GateIOAdapter.js";
+import { BitgetAdapter }         from "../services/exchanges/adapters/BitgetAdapter.js";
+import { MEXCAdapter }           from "../services/exchanges/adapters/MEXCAdapter.js";
+import { CryptoDotComAdapter }   from "../services/exchanges/adapters/CryptoDotComAdapter.js";
+import { HTXAdapter }            from "../services/exchanges/adapters/HTXAdapter.js";
+import { GeminiAdapter }         from "../services/exchanges/adapters/GeminiAdapter.js";
+import { BitstampAdapter }       from "../services/exchanges/adapters/BitstampAdapter.js";
+import { PhemexAdapter }         from "../services/exchanges/adapters/PhemexAdapter.js";
+import { BloFinAdapter }         from "../services/exchanges/adapters/BloFinAdapter.js";
+import { BingXAdapter }          from "../services/exchanges/adapters/BingXAdapter.js";
 import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
 import type { ExchangeCredentials } from "../services/vault/CredentialVault.js";
 import type { Request } from "express";
@@ -25,56 +38,10 @@ import type { Request } from "express";
 const router = Router();
 type AuthReq = Request & { clerkUserId: string };
 
-// ── Supported exchanges ───────────────────────────────────────────────────────
-
-const SUPPORTED_EXCHANGES = new Set(["Kraken", "Binance", "Coinbase", "Bybit", "OKX", "KuCoin"]);
-
-// Exchange metadata for UI — no keys or secrets here
-const EXCHANGE_META: Record<string, {
-  name: string;
-  url:  string;
-  logo: string;
-  requiresPassphrase: boolean;
-  requiredPerms: string;
-  warnings: string[];
-}> = {
-  Kraken:   {
-    name: "Kraken", url: "https://www.kraken.com", logo: "kraken",
-    requiresPassphrase: false,
-    requiredPerms: "Query Funds, Query Open Orders & Trades, Create & Modify Orders",
-    warnings: ["Do NOT enable withdrawal permissions.", "Use a restricted key scoped to trading only."],
-  },
-  Binance:  {
-    name: "Binance", url: "https://www.binance.com", logo: "binance",
-    requiresPassphrase: false,
-    requiredPerms: "Enable Reading, Enable Spot & Margin Trading",
-    warnings: ["Do NOT enable withdrawals.", "Do NOT enable futures/margin unless intended."],
-  },
-  Coinbase: {
-    name: "Coinbase", url: "https://www.coinbase.com", logo: "coinbase",
-    requiresPassphrase: false,
-    requiredPerms: "View, Trade",
-    warnings: ["Do NOT enable Transfer permissions.", "Use Advanced Trade API keys only."],
-  },
-  Bybit:    {
-    name: "Bybit", url: "https://www.bybit.com", logo: "bybit",
-    requiresPassphrase: false,
-    requiredPerms: "Read, Trade",
-    warnings: ["Do NOT enable withdraw permissions.", "Restrict key to Unified Trading Account only."],
-  },
-  OKX:      {
-    name: "OKX", url: "https://www.okx.com", logo: "okx",
-    requiresPassphrase: true,
-    requiredPerms: "Read, Trade",
-    warnings: ["Do NOT enable withdraw permissions.", "Passphrase is required for OKX API keys."],
-  },
-  KuCoin:   {
-    name: "KuCoin", url: "https://www.kucoin.com", logo: "kucoin",
-    requiresPassphrase: true,
-    requiredPerms: "General, Trade",
-    warnings: ["Do NOT enable withdrawal permission.", "Passphrase must match what you set when creating the key."],
-  },
-};
+// ── Supported exchanges — driven entirely from EXCHANGE_CATALOG ───────────────
+// CONNECTABLE_EXCHANGE_IDS: all exchanges where status !== "coming_soon"
+// CATALOG_BY_ID:            fast ID → entry lookup
+// EXCHANGE_CATALOG:         ordered list (preserves tier order for UI)
 
 // ── Adapter factory ───────────────────────────────────────────────────────────
 // Creates a temp adapter instance with user-supplied credentials injected via
@@ -83,12 +50,24 @@ const EXCHANGE_META: Record<string, {
 function makeAdapter(exchange: string, creds: ExchangeCredentials): BaseExchangeAdapter {
   const cfg = { apiKey: creds.apiKey, apiSecret: creds.apiSecret, passphrase: creds.passphrase };
   switch (exchange) {
-    case "Kraken":   return new KrakenAdapter(cfg);
-    case "Binance":  return new BinanceAdapter(cfg);
-    case "Coinbase": return new CoinbaseAdapter(cfg);
-    case "Bybit":    return new BybitAdapter(cfg);
-    case "OKX":      return new OKXAdapter(cfg);
-    case "KuCoin":   return new KuCoinAdapter(cfg);
+    // Live
+    case "Kraken":       return new KrakenAdapter(cfg);
+    case "Binance":      return new BinanceAdapter(cfg);
+    case "Coinbase":     return new CoinbaseAdapter(cfg);
+    case "Bybit":        return new BybitAdapter(cfg);
+    case "OKX":          return new OKXAdapter(cfg);
+    case "KuCoin":       return new KuCoinAdapter(cfg);
+    // Beta
+    case "GateIO":       return new GateIOAdapter(cfg);
+    case "Bitget":       return new BitgetAdapter(cfg);
+    case "MEXC":         return new MEXCAdapter(cfg);
+    case "CryptoDotCom": return new CryptoDotComAdapter(cfg);
+    case "HTX":          return new HTXAdapter(cfg);
+    case "Gemini":       return new GeminiAdapter(cfg);
+    case "Bitstamp":     return new BitstampAdapter(cfg);
+    case "Phemex":       return new PhemexAdapter(cfg);
+    case "BloFin":       return new BloFinAdapter(cfg);
+    case "BingX":        return new BingXAdapter(cfg);
     default: throw new Error(`No adapter for exchange: ${exchange}`);
   }
 }
@@ -138,7 +117,7 @@ function safeRow(row: typeof userExchangeConnectionsTable.$inferSelect) {
     lastError:       row.lastError,
     createdAt:       row.createdAt,
     updatedAt:       row.updatedAt,
-    meta:            EXCHANGE_META[row.exchange] ?? null,
+    meta:            CATALOG_BY_ID[row.exchange] ?? null,
   };
 }
 
@@ -154,13 +133,13 @@ router.get("/user/exchanges", requireAuth, async (req, res): Promise<void> => {
       .from(userExchangeConnectionsTable)
       .where(eq(userExchangeConnectionsTable.userId, userId));
 
-    // Build response: safe rows + a full list of supported exchanges (with connection status)
+    // Build response: all exchanges from catalog (with per-user connection status)
     const connectedSet = new Set(rows.map(r => r.exchange));
-    const allExchanges = [...SUPPORTED_EXCHANGES].map(exch => ({
-      exchange:    exch,
-      connected:   connectedSet.has(exch),
-      connection:  rows.find(r => r.exchange === exch) ? safeRow(rows.find(r => r.exchange === exch)!) : null,
-      meta:        EXCHANGE_META[exch] ?? null,
+    const allExchanges = EXCHANGE_CATALOG.map(entry => ({
+      exchange:    entry.id,
+      connected:   connectedSet.has(entry.id),
+      connection:  rows.find(r => r.exchange === entry.id) ? safeRow(rows.find(r => r.exchange === entry.id)!) : null,
+      meta:        entry,
     }));
 
     res.json({ exchanges: allExchanges });
@@ -190,12 +169,12 @@ router.post("/user/exchanges/connect", requireAuth, async (req, res): Promise<vo
     res.status(400).json({ error: "exchange, apiKey, and apiSecret are required" });
     return;
   }
-  if (!SUPPORTED_EXCHANGES.has(exchange)) {
+  if (!CONNECTABLE_EXCHANGE_IDS.has(exchange)) {
     res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
     return;
   }
 
-  const meta = EXCHANGE_META[exchange]!;
+  const meta = CATALOG_BY_ID[exchange]!;
   if (meta.requiresPassphrase && !passphrase) {
     res.status(400).json({ error: `${exchange} requires a passphrase` });
     return;
@@ -293,7 +272,7 @@ router.post("/user/exchanges/:exchange/test", requireAuth, async (req, res): Pro
   const userId   = (req as AuthReq).clerkUserId;
   const exchange = String(req.params["exchange"]);
 
-  if (!SUPPORTED_EXCHANGES.has(exchange)) {
+  if (!CONNECTABLE_EXCHANGE_IDS.has(exchange)) {
     res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
     return;
   }
@@ -366,7 +345,7 @@ router.post("/user/exchanges/:exchange/default", requireAuth, async (req, res): 
   const userId   = (req as AuthReq).clerkUserId;
   const exchange = String(req.params["exchange"]);
 
-  if (!SUPPORTED_EXCHANGES.has(exchange)) {
+  if (!CONNECTABLE_EXCHANGE_IDS.has(exchange)) {
     res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
     return;
   }
@@ -417,7 +396,7 @@ router.post("/user/exchanges/:exchange/mode", requireAuth, async (req, res): Pro
   const exchange = String(req.params["exchange"]);
   const { mode, acknowledged } = req.body as { mode: string; acknowledged?: boolean };
 
-  if (!SUPPORTED_EXCHANGES.has(exchange)) {
+  if (!CONNECTABLE_EXCHANGE_IDS.has(exchange)) {
     res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
     return;
   }
@@ -471,7 +450,7 @@ router.delete("/user/exchanges/:exchange", requireAuth, async (req, res): Promis
   const userId   = (req as AuthReq).clerkUserId;
   const exchange = String(req.params["exchange"]);
 
-  if (!SUPPORTED_EXCHANGES.has(exchange)) {
+  if (!CONNECTABLE_EXCHANGE_IDS.has(exchange)) {
     res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
     return;
   }

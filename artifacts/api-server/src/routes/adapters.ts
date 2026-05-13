@@ -1,14 +1,26 @@
 import { Router } from "express";
 import { registry } from "../services/exchanges/ExchangeRegistry.js";
-import { KrakenAdapter, KRAKEN_CONFIG }   from "../services/exchanges/adapters/KrakenAdapter.js";
-import { BinanceAdapter, BINANCE_CONFIG }  from "../services/exchanges/adapters/BinanceAdapter.js";
-import { CoinbaseAdapter, COINBASE_CONFIG } from "../services/exchanges/adapters/CoinbaseAdapter.js";
-import { BybitAdapter, BYBIT_CONFIG }      from "../services/exchanges/adapters/BybitAdapter.js";
-import { OKXAdapter, OKX_CONFIG }          from "../services/exchanges/adapters/OKXAdapter.js";
-import { KuCoinAdapter, KUCOIN_CONFIG }    from "../services/exchanges/adapters/KuCoinAdapter.js";
-import { breakers }                        from "../services/risk/CircuitBreaker.js";
-import { vault }                           from "../services/vault/CredentialVault.js";
-import { auditLogger }                     from "../services/telemetry/AuditLogger.js";
+// Live adapters
+import { KrakenAdapter, KRAKEN_CONFIG }       from "../services/exchanges/adapters/KrakenAdapter.js";
+import { BinanceAdapter, BINANCE_CONFIG }      from "../services/exchanges/adapters/BinanceAdapter.js";
+import { CoinbaseAdapter, COINBASE_CONFIG }    from "../services/exchanges/adapters/CoinbaseAdapter.js";
+import { BybitAdapter, BYBIT_CONFIG }          from "../services/exchanges/adapters/BybitAdapter.js";
+import { OKXAdapter, OKX_CONFIG }              from "../services/exchanges/adapters/OKXAdapter.js";
+import { KuCoinAdapter, KUCOIN_CONFIG }        from "../services/exchanges/adapters/KuCoinAdapter.js";
+// Beta adapters
+import { GateIOAdapter, GATEIO_CONFIG }        from "../services/exchanges/adapters/GateIOAdapter.js";
+import { BitgetAdapter, BITGET_CONFIG }        from "../services/exchanges/adapters/BitgetAdapter.js";
+import { MEXCAdapter, MEXC_CONFIG }            from "../services/exchanges/adapters/MEXCAdapter.js";
+import { CryptoDotComAdapter, CRYPTOCOM_CONFIG } from "../services/exchanges/adapters/CryptoDotComAdapter.js";
+import { HTXAdapter, HTX_CONFIG }              from "../services/exchanges/adapters/HTXAdapter.js";
+import { GeminiAdapter, GEMINI_CONFIG }        from "../services/exchanges/adapters/GeminiAdapter.js";
+import { BitstampAdapter, BITSTAMP_CONFIG }    from "../services/exchanges/adapters/BitstampAdapter.js";
+import { PhemexAdapter, PHEMEX_CONFIG }        from "../services/exchanges/adapters/PhemexAdapter.js";
+import { BloFinAdapter, BLOFIN_CONFIG }        from "../services/exchanges/adapters/BloFinAdapter.js";
+import { BingXAdapter, BINGX_CONFIG }          from "../services/exchanges/adapters/BingXAdapter.js";
+import { breakers }                            from "../services/risk/CircuitBreaker.js";
+import { vault }                               from "../services/vault/CredentialVault.js";
+import { auditLogger }                         from "../services/telemetry/AuditLogger.js";
 
 // ── Adapter management routes ─────────────────────────────────────────────────
 //
@@ -32,12 +44,24 @@ const router = Router();
 
 function bootstrapAdapters(): void {
   const adapters = [
+    // Live
     new KrakenAdapter(KRAKEN_CONFIG),
     new BinanceAdapter(BINANCE_CONFIG),
     new CoinbaseAdapter(COINBASE_CONFIG),
     new BybitAdapter(BYBIT_CONFIG),
     new OKXAdapter(OKX_CONFIG),
     new KuCoinAdapter(KUCOIN_CONFIG),
+    // Beta — registered for health monitoring and switchability
+    new GateIOAdapter(GATEIO_CONFIG),
+    new BitgetAdapter(BITGET_CONFIG),
+    new MEXCAdapter(MEXC_CONFIG),
+    new CryptoDotComAdapter(CRYPTOCOM_CONFIG),
+    new HTXAdapter(HTX_CONFIG),
+    new GeminiAdapter(GEMINI_CONFIG),
+    new BitstampAdapter(BITSTAMP_CONFIG),
+    new PhemexAdapter(PHEMEX_CONFIG),
+    new BloFinAdapter(BLOFIN_CONFIG),
+    new BingXAdapter(BINGX_CONFIG),
   ];
 
   for (const adapter of adapters) {

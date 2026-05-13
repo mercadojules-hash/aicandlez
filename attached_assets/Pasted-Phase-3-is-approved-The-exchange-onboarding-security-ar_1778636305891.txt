@@ -1,0 +1,217 @@
+Phase 3 is approved.
+
+The exchange onboarding/security architecture is now strong enough for real production scaling.
+
+Next phase:
+
+PHASE 4 — BILLING + PRODUCTION READINESS
+
+Goal:
+Prepare the platform for:
+
+* real users
+* subscriptions
+* scaling
+* production deployment
+* mobile app launch
+
+====================================================
+PHASE 4A — STRIPE BILLING SYSTEM
+================================
+
+Build full Stripe integration.
+
+Plans:
+
+* Free
+* Pro
+* Enterprise
+
+Need:
+
+* Stripe Checkout
+* subscription creation
+* billing portal
+* webhooks
+* upgrade/downgrade
+* cancel/reactivate
+* trial periods
+* subscription status sync
+
+Persist:
+
+* stripeCustomerId
+* stripeSubscriptionId
+* plan
+* billing status
+* trial status
+
+====================================================
+PHASE 4B — PLAN ENFORCEMENT
+===========================
+
+Enforce feature access by plan.
+
+Examples:
+
+FREE:
+
+* paper trading only
+* limited signals/day
+* limited exchanges
+* limited AI personalities
+* delayed telemetry
+
+PRO:
+
+* live trading
+* all exchanges
+* faster signals
+* push alerts
+* advanced telemetry
+
+ENTERPRISE:
+
+* higher limits
+* multi-account support
+* priority execution
+* advanced analytics
+* admin tools
+
+Need:
+
+* middleware enforcement
+* API enforcement
+* frontend gating
+* usage tracking
+
+====================================================
+PHASE 4C — PRODUCTION ENVIRONMENT SYSTEM
+========================================
+
+Prepare:
+
+* staging
+* production
+* environment separation
+
+Need:
+
+* production env config
+* secrets management
+* deployment config
+* health checks
+* startup validation
+* production logging
+
+====================================================
+PHASE 4D — OBSERVABILITY & MONITORING
+=====================================
+
+Build:
+
+* centralized logs
+* error tracking
+* latency tracking
+* websocket monitoring
+* adapter monitoring
+* failed execution alerts
+* API health dashboard
+
+Suggested:
+
+* Sentry
+* PostHog
+* structured logging
+* metrics aggregation
+
+====================================================
+PHASE 4E — PUSH NOTIFICATIONS
+=============================
+
+Build infrastructure for:
+
+* mobile push
+* browser push
+* in-app alerts
+
+Alert types:
+
+* trade opened
+* trade closed
+* high confidence setup
+* drawdown warning
+* exchange disconnected
+* AI paused
+* kill switch triggered
+
+====================================================
+PHASE 4F — ADMIN PANEL
+======================
+
+Build internal admin tools.
+
+Need:
+
+* user management
+* subscription management
+* exchange monitoring
+* platform health
+* AI telemetry
+* adapter status
+* risk monitoring
+* revenue analytics
+
+====================================================
+PHASE 4G — SECURITY HARDENING
+=============================
+
+Add:
+
+* rate limiting
+* brute-force protection
+* session monitoring
+* suspicious login detection
+* API abuse protection
+* audit expansion
+* IP/device tracking
+
+====================================================
+PHASE 4H — FINAL PRODUCTION PREP
+================================
+
+Before mobile app phase:
+
+* eliminate remaining TS/runtime errors
+* verify clean production build
+* verify all migrations
+* verify websocket reconnect stability
+* verify auth persistence
+* verify exchange onboarding
+* verify billing flows
+* verify isolated user state
+
+====================================================
+IMPORTANT
+=========
+
+Primary focus now:
+
+* monetization
+* operational readiness
+* production infrastructure
+* observability
+* admin tooling
+* stability
+
+NOT dashboard redesign.
+
+After this phase:
+we begin:
+
+* iOS app
+* Expo/React Native
+* TestFlight
+* App Store deployment
+* push notification UX
+* onboarding flow

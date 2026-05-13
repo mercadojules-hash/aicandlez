@@ -49,12 +49,17 @@ interface UserSettings {
 }
 
 interface ExchangeMeta {
+  id: string;
   name: string;
   url: string;
   logo: string;
+  status: "live" | "beta" | "coming_soon";
   requiresPassphrase: boolean;
   requiredPerms: string;
   warnings: string[];
+  features?: string[];
+  takerFeePct?: number;
+  makerFeePct?: number;
 }
 
 interface ExchangeConnection {
@@ -519,7 +524,7 @@ function ExchangeCard({
     >
       {/* Top row */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div
             className="w-2 h-2 rounded-full shrink-0"
             style={{ background: statusColor, boxShadow: isConnected ? `0 0 6px ${statusColor}` : "none" }}
@@ -527,6 +532,22 @@ function ExchangeCard({
           <span className="font-mono text-[11px] font-bold" style={{ color: isConnected ? "#EAF2FF" : "#7ab8cc" }}>
             {entry.exchange}
           </span>
+          {entry.meta?.status === "coming_soon" && (
+            <span
+              className="font-mono text-[7px] px-1.5 py-0.5 rounded tracking-widest"
+              style={{ background: "#1a1a2e", color: "#6a6a9a", border: "1px solid #2a2a4e" }}
+            >
+              COMING SOON
+            </span>
+          )}
+          {entry.meta?.status === "beta" && !entry.connected && (
+            <span
+              className="font-mono text-[7px] px-1.5 py-0.5 rounded tracking-widest"
+              style={{ background: "#0d1a0d", color: "#4a8a4a", border: "1px solid #1a3a1a" }}
+            >
+              BETA
+            </span>
+          )}
           {conn?.isDefault && (
             <span
               className="font-mono text-[8px] px-1.5 py-0.5 rounded"
@@ -614,13 +635,22 @@ function ExchangeCard({
       {/* Action buttons */}
       <div className="flex gap-1.5">
         {!entry.connected ? (
-          <button
-            onClick={onConnect}
-            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded font-mono text-[9px] font-bold transition-all"
-            style={{ background: "#00aaff14", border: "1px solid #00aaff40", color: "#00aaff" }}
-          >
-            <Link2 className="w-3 h-3" /> Connect
-          </button>
+          entry.meta?.status === "coming_soon" ? (
+            <div
+              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded font-mono text-[9px]"
+              style={{ background: "#0d0d1a", border: "1px solid #2a2a4e", color: "#4a4a7a" }}
+            >
+              Wallet integration in development
+            </div>
+          ) : (
+            <button
+              onClick={onConnect}
+              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded font-mono text-[9px] font-bold transition-all"
+              style={{ background: "#00aaff14", border: "1px solid #00aaff40", color: "#00aaff" }}
+            >
+              <Link2 className="w-3 h-3" /> Connect
+            </button>
+          )
         ) : (
           <>
             <button
