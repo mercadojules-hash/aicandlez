@@ -48,7 +48,9 @@ export default defineConfig({
   base: basePath,
   plugins: [
     react(),
-    tailwindcss(),
+    // optimize: false prevents @clerk/themes CSS layer imports from being
+    // reordered in prod builds (Tailwind v4 + lightningcss interaction)
+    tailwindcss({ optimize: false }),
     ...replitPlugins,
   ],
   resolve: {

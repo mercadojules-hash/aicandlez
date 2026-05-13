@@ -1,0 +1,210 @@
+The Command Center/dashboard phase is now considered COMPLETE and APPROVED.
+
+Do NOT redesign or restructure the dashboard anymore unless specifically requested.
+
+We are now transitioning from:
+prototype dashboard
+→
+real multi-user AI trading platform.
+
+====================================================
+NEXT MAJOR PHASE
+AUTHENTICATION + USER PLATFORM
+==============================
+
+This is now the highest priority before mobile app development.
+
+Build a complete authentication and user account system integrated into the existing multi-tenant architecture already created.
+
+====================================================
+PHASE 1 — AUTHENTICATION SYSTEM
+===============================
+
+Build:
+
+* signup
+* login
+* logout
+* JWT/session auth
+* protected routes
+* refresh token flow
+* password hashing
+* forgot password flow
+* reset password flow
+* email verification scaffold
+* session persistence
+
+Need:
+
+* secure middleware
+* auth guards
+* user-scoped API access
+* role support:
+
+  * user
+  * admin
+  * super-admin
+
+Suggested stack:
+
+* JWT
+* bcrypt
+* secure httpOnly cookies
+* PostgreSQL user tables
+
+====================================================
+PHASE 2 — USER PROFILE SYSTEM
+=============================
+
+Build:
+
+* user profile model
+* profile settings
+* AI personality selection
+
+  * Conservative
+  * Balanced
+  * Aggressive
+* risk tolerance settings
+* exchange preferences
+* notification preferences
+* timezone/currency settings
+
+Need:
+
+* isolated user configs
+* per-user engine settings
+* persistence layer
+
+====================================================
+PHASE 3 — EXCHANGE CONNECTION WIZARD
+====================================
+
+Build complete exchange onboarding flow.
+
+Need:
+
+* connect Kraken
+* connect Binance
+* connect Coinbase
+* validate API keys
+* permission checks
+* encrypted vault storage
+* connection health tests
+* reconnect flow
+* revoke credentials flow
+
+Requirements:
+
+* use existing CredentialVault
+* never expose raw keys
+* support paper/live per user
+* exchange isolation per user
+
+====================================================
+PHASE 4 — SUBSCRIPTION / BILLING SYSTEM
+=======================================
+
+Build:
+
+* Stripe integration
+* subscription tiers
+* free trial system
+* usage enforcement
+* upgrade/downgrade flow
+* billing portal
+* webhook handling
+
+Initial plans:
+
+* Free
+* Pro
+* Enterprise
+
+Need:
+
+* per-tier engine limits
+* trade frequency limits
+* AI personality restrictions
+* telemetry restrictions
+* exchange restrictions
+
+====================================================
+PHASE 5 — USER DASHBOARD STATE
+==============================
+
+Convert dashboard from:
+global simulation dashboard
+→
+fully user-scoped dashboard.
+
+Need:
+
+* isolated portfolios
+* isolated trades
+* isolated AI telemetry
+* isolated account balances
+* isolated active trades
+* isolated notifications
+
+Everything must become:
+per-user.
+
+====================================================
+PHASE 6 — NOTIFICATION INFRASTRUCTURE
+=====================================
+
+Build:
+
+* push notification architecture
+* in-app notifications
+* websocket alert stream
+* alert center
+* notification preferences
+
+Notification types:
+
+* trade opened
+* trade closed
+* high confidence setup
+* kill switch triggered
+* drawdown alert
+* exchange disconnected
+* volatility alert
+
+====================================================
+PHASE 7 — MOBILE APP PREPARATION
+================================
+
+Prepare APIs specifically for:
+iOS + Android app integration.
+
+Need:
+
+* auth endpoints
+* session endpoints
+* lightweight mobile payloads
+* mobile portfolio endpoints
+* mobile trade endpoints
+* mobile notification endpoints
+
+====================================================
+IMPORTANT
+=========
+
+The backend architecture is now strong enough to support real scaling.
+
+Primary focus is now:
+
+* user systems
+* authentication
+* onboarding
+* billing
+* account isolation
+* exchange onboarding
+* mobile readiness
+
+NOT dashboard redesign.
+
+After this phase:
+we begin the iOS mobile app build.

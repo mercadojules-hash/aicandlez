@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { useUser, useClerk } from "@clerk/react";
 import {
   Activity,
   AlertTriangle,
@@ -18,6 +19,7 @@ import {
   FlaskConical,
   Layers,
   LayoutDashboard,
+  LogOut,
   Menu,
   MessageSquare,
   Radio,
@@ -34,25 +36,25 @@ import {
 } from "lucide-react";
 
 export const MODULE_LIST = [
-  { id:  1, path: "/",           icon: LayoutDashboard,   label: "Dashboard",           group: "CORE" },
-  { id:  2, path: "/market",     icon: Radio,             label: "Market Data",         group: "CORE" },
-  { id:  3, path: "/indicators", icon: BarChart3,         label: "Indicators",          group: "CORE" },
-  { id:  4, path: "/ai",         icon: Brain,             label: "AI Reasoning",        group: "AI"   },
-  { id:  5, path: "/risk",       icon: Shield,            label: "Risk Management",     group: "RISK" },
-  { id:  6, path: "/simulation", icon: FlaskConical,      label: "Simulation",          group: "TRADE"},
-  { id:  7, path: "/backtest",   icon: BarChart2,         label: "Backtesting",         group: "TRADE"},
-  { id:  8, path: "/optimizer",  icon: SlidersHorizontal, label: "Strategy Optimizer",  group: "AI"   },
-  { id:  9, path: "/scanner",    icon: Scan,              label: "Asset Scanner",       group: "TRADE"},
-  { id: 10, path: "/portfolio",  icon: Layers,            label: "Portfolio",           group: "TRADE"},
-  { id: 11, path: "/correlation",icon: TrendingUp,        label: "Correlation",         group: "TRADE"},
-  { id: 12, path: "/journal",    icon: BookOpen,          label: "Trade Journal",       group: "TRADE"},
-  { id: 13, path: "/validation", icon: ShieldCheck,       label: "Validation",          group: "RISK" },
-  { id: 14, path: "/sentiment",  icon: MessageSquare,     label: "Sentiment AI",        group: "AI"   },
-  { id: 15, path: "/exchange",   icon: ArrowLeftRight,    label: "Exchange",            group: "CORE" },
-  { id: 16, path: "/syscheck",   icon: ClipboardCheck,    label: "System Verification", group: "SYS"  },
-  { id: 17, path: "/debug",      icon: Bug,               label: "Signal Debug",        group: "SYS"  },
-  { id: 18, path: "/charts",     icon: BarChart2,         label: "Multi-Asset Chart",   group: "TRADE"},
-  { id: 19, path: "/command",    icon: Cpu,               label: "Command Center",      group: "SYS"  },
+  { id:  1, path: "/dashboard",   icon: LayoutDashboard,   label: "Dashboard",           group: "CORE" },
+  { id:  2, path: "/market",      icon: Radio,             label: "Market Data",         group: "CORE" },
+  { id:  3, path: "/indicators",  icon: BarChart3,         label: "Indicators",          group: "CORE" },
+  { id:  4, path: "/ai",          icon: Brain,             label: "AI Reasoning",        group: "AI"   },
+  { id:  5, path: "/risk",        icon: Shield,            label: "Risk Management",     group: "RISK" },
+  { id:  6, path: "/simulation",  icon: FlaskConical,      label: "Simulation",          group: "TRADE"},
+  { id:  7, path: "/backtest",    icon: BarChart2,         label: "Backtesting",         group: "TRADE"},
+  { id:  8, path: "/optimizer",   icon: SlidersHorizontal, label: "Strategy Optimizer",  group: "AI"   },
+  { id:  9, path: "/scanner",     icon: Scan,              label: "Asset Scanner",       group: "TRADE"},
+  { id: 10, path: "/portfolio",   icon: Layers,            label: "Portfolio",           group: "TRADE"},
+  { id: 11, path: "/correlation", icon: TrendingUp,        label: "Correlation",         group: "TRADE"},
+  { id: 12, path: "/journal",     icon: BookOpen,          label: "Trade Journal",       group: "TRADE"},
+  { id: 13, path: "/validation",  icon: ShieldCheck,       label: "Validation",          group: "RISK" },
+  { id: 14, path: "/sentiment",   icon: MessageSquare,     label: "Sentiment AI",        group: "AI"   },
+  { id: 15, path: "/exchange",    icon: ArrowLeftRight,    label: "Exchange",            group: "CORE" },
+  { id: 16, path: "/syscheck",    icon: ClipboardCheck,    label: "System Verification", group: "SYS"  },
+  { id: 17, path: "/debug",       icon: Bug,               label: "Signal Debug",        group: "SYS"  },
+  { id: 18, path: "/charts",      icon: BarChart2,         label: "Multi-Asset Chart",   group: "TRADE"},
+  { id: 19, path: "/command",     icon: Cpu,               label: "Command Center",      group: "SYS"  },
 ];
 
 const PLATFORM_ITEMS: { icon: React.ElementType; label: string; badge?: string; badgeColor?: string }[] = [
@@ -170,8 +172,39 @@ function SectionDivider({ label, collapsed }: { label: string; collapsed: boolea
   );
 }
 
-function AdminBlock({ collapsed }: { collapsed: boolean }) {
-  if (collapsed) return null;
+function UserBlock({ collapsed }: { collapsed: boolean }) {
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
+
+  if (!isLoaded || !user) return null;
+
+  const initials = (user.firstName?.[0] ?? user.emailAddresses[0]?.emailAddress?.[0] ?? "U").toUpperCase();
+  const displayName = user.firstName
+    ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}`
+    : user.emailAddresses[0]?.emailAddress ?? "User";
+  const email = user.emailAddresses[0]?.emailAddress ?? "";
+
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+  if (collapsed) {
+    return (
+      <div className="px-2 pb-2 pt-1 border-t flex justify-center" style={{ borderTopColor: "#0E2030" }}>
+        <button
+          onClick={() => signOut({ redirectUrl: basePath || "/" })}
+          className="w-7 h-7 rounded flex items-center justify-center text-[10px] font-bold font-mono"
+          title={`Sign out (${email})`}
+          style={{
+            background: "linear-gradient(135deg, #00aaff20, #7b68ee20)",
+            color: "#00aaff",
+            border: "1px solid #00aaff30",
+          }}
+        >
+          {initials}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="px-2 pb-2 pt-1 border-t" style={{ borderTopColor: "#0E2030" }}>
       <div className="flex items-center gap-2 px-2 py-2 rounded"
@@ -183,13 +216,22 @@ function AdminBlock({ collapsed }: { collapsed: boolean }) {
             border: "1px solid #00aaff30",
             boxShadow: "0 0 8px #00aaff18",
           }}>
-          A
+          {initials}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] font-bold font-mono truncate" style={{ color: "#7ab8cc" }}>Admin</div>
-          <div className="text-[8px] font-mono truncate" style={{ color: "#3a5a70" }}>Super Admin · LIVE</div>
+          <div className="text-[10px] font-bold font-mono truncate" style={{ color: "#7ab8cc" }}>{displayName}</div>
+          <div className="text-[8px] font-mono truncate" style={{ color: "#3a5a70" }}>{email}</div>
         </div>
-        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: "#00ff8a", boxShadow: "0 0 5px #00ff8a" }} />
+        <button
+          onClick={() => signOut({ redirectUrl: basePath || "/" })}
+          title="Sign out"
+          className="p-1 rounded transition-colors"
+          style={{ color: "#3a5a70" }}
+          onMouseEnter={e => { e.currentTarget.style.color = "#ff4455"; }}
+          onMouseLeave={e => { e.currentTarget.style.color = "#3a5a70"; }}
+        >
+          <LogOut className="w-3 h-3" />
+        </button>
       </div>
     </div>
   );
@@ -208,10 +250,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const activeModuleId = MODULE_LIST.find(
-    m => location === m.path || (m.path !== "/" && location.startsWith(m.path))
+    m => location === m.path || (m.path !== "/dashboard" && location.startsWith(m.path))
   )?.id ?? 1;
   const isActive = (m: typeof MODULE_LIST[number]) =>
-    location === m.path || (m.path !== "/" && location.startsWith(m.path));
+    location === m.path || (m.path !== "/dashboard" && location.startsWith(m.path));
 
   const SidebarContent = ({ onNavigate, collap }: { onNavigate?: () => void; collap: boolean }) => (
     <>
@@ -243,7 +285,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <AdminBlock collapsed={collap} />
+      <UserBlock collapsed={collap} />
     </>
   );
 

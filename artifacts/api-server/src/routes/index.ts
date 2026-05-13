@@ -25,11 +25,13 @@ import systemRouter from "./system.js";
 import feesRouter from "./fees.js";
 import mobileRouter from "./mobile.js";
 import adaptersRouter from "./adapters.js";
+import authRouter from "./auth.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(downloadRouter);
+router.use(authRouter);
 router.use(signalsRouter);
 router.use(tradesRouter);
 router.use(portfolioRouter);

@@ -15,6 +15,36 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **Auth**: Replit-managed Clerk (httpOnly cookie on web, Bearer for mobile)
+
+## Authentication (Phase 1 — COMPLETE)
+
+Clerk is fully integrated. Provisioned app: `app_3DeE2sfuhHWTY73M9jlbRCKabFx`.
+
+**Routing:**
+- `/` — Public landing page (unauthenticated) → redirects signed-in users to `/command`
+- `/sign-in/*?` — Clerk sign-in (email + Google OAuth)
+- `/sign-up/*?` — Clerk sign-up
+- All dashboard routes (`/command`, `/market`, `/ai`, etc.) — protected; redirect to `/sign-in` when unauthenticated
+
+**Server:**
+- `artifacts/api-server/src/middlewares/clerkProxyMiddleware.ts` — Clerk FAPI proxy (production only)
+- `artifacts/api-server/src/middlewares/requireAuth.ts` — `requireAuth` + `requireRole` middleware
+- `artifacts/api-server/src/routes/auth.ts` — `GET /api/auth/me` (JIT user provisioning), `PUT /api/auth/profile`
+- `app.ts` mounts: `clerkProxyMiddleware` (before body parsers) → `clerkMiddleware` (after)
+
+**DB schema:** `lib/db/src/schema/users.ts` — `users` table (clerkUserId, email, role: user/admin/super-admin)
+
+**Frontend:**
+- `src/App.tsx` — `ClerkProvider` wrapping all routes, `ClerkQueryClientCacheInvalidator`
+- `src/components/Layout.tsx` — `UserBlock` shows real user name/email, sign-out button via `useUser` + `useClerk`
+- `src/pages/Landing.tsx` — branded public landing page
+- Clerk appearance: dark terminal theme (#050D1A card, #00aaff primary, monospace font, Apex Trader logo)
+- `public/logo.svg` — branded SVG logo shown in Clerk UI
+- CSS: `@layer theme, base, clerk, components, utilities` (Tailwind v4 + Clerk layer)
+- `vite.config.ts`: `tailwindcss({ optimize: false })` (prevents prod CSS layer reordering)
+
+**Env vars (auto-provisioned):** `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`
 
 ## Artifacts
 
@@ -61,10 +91,14 @@ Hybrid AI crypto trading dashboard — 19 modules, all active. Kraken exchange, 
 - `AlertsProvider.tsx` — polls engine every 8s, shows toast alerts for BUY/SELL signals + trade executions. Sound toggle (Web Audio API). Deduplication via signal ID set.
 - `SettingsDrawer.tsx` — floating gear icon (fixed bottom-right), slide-up drawer on mobile / popover on desktop. Controls: maxTradesPerDay, position size, min confidence, stop loss, take profit, auto-mode toggle. Persists to localStorage + syncs with `PUT /api/settings`.
 
+**Auth note:** Dashboard path moved from `/` to `/dashboard` in MODULE_LIST (home route `/` is now the public landing page). All 19 module routes remain unchanged.
+
 **Key files:**
 - `src/pages/` — one file per module
-- `src/components/Layout.tsx` — MODULE_LIST sidebar
-- `src/App.tsx` — all routes
+- `src/pages/Landing.tsx` — public landing page (unauthenticated home)
+- `src/pages/auth/SignInPage.tsx`, `SignUpPage.tsx` — Clerk auth pages
+- `src/components/Layout.tsx` — MODULE_LIST sidebar + UserBlock (real user)
+- `src/App.tsx` — ClerkProvider + all routes
 
 ### api-server (Express @ /api)
 Shared backend for all trading operations.
