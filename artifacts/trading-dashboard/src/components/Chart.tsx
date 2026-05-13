@@ -80,7 +80,7 @@ export function Chart({ symbol, timeframe, onSymbolChange, onTimeframeChange }: 
   }, []);
 
   useEffect(() => {
-    if (candles && candleSeriesRef.current && volumeSeriesRef.current) {
+    if (candles && Array.isArray(candles) && candleSeriesRef.current && volumeSeriesRef.current) {
       const formattedData = candles.map(c => ({
         time: c.time as any,
         open: c.open,

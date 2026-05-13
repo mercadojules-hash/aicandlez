@@ -23,6 +23,39 @@ if (!process.env.BASE_PATH) {
   console.warn('[vite] BASE_PATH not set — defaulting to "/"');
 }
 
+// ── API guard plugin ───────────────────────────────────────────────────────────
+// The Replit shared proxy routes /api/* to the API server (port 8080) and
+// /  to this Vite dev server (port 24210).  When the API server is starting
+// up or restarting, the shared proxy may fall through to Vite, which would
+// normally serve index.html (200, text/html) as its SPA fallback — a silent
+// data corruption that poisons the React Query cache for JSON endpoints.
+//
+// This plugin intercepts any /api/* request that reaches Vite and returns a
+// proper 503 JSON error, so React Query enters the error state instead of
+// caching an HTML string as if it were valid API data.
+const apiGuardPlugin: import("vite").Plugin = {
+  name: "api-fallback-guard",
+  configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      const url = req.url ?? "";
+      // Strip query string for path matching
+      const pathname = url.split("?")[0];
+      if (pathname.startsWith("/api/") || pathname === "/api") {
+        res.statusCode = 503;
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("X-Api-Guard", "vite-fallback");
+        res.end(
+          JSON.stringify({
+            error: "API server temporarily unavailable — please retry in a moment",
+          }),
+        );
+        return;
+      }
+      next();
+    });
+  },
+};
+
 // ── Replit-specific plugins (skipped outside Replit automatically) ─────────────
 const replitPlugins: import("vite").Plugin[] = [];
 if (IS_REPLIT && process.env.NODE_ENV !== "production") {
@@ -47,6 +80,7 @@ if (IS_REPLIT && process.env.NODE_ENV !== "production") {
 export default defineConfig({
   base: basePath,
   plugins: [
+    apiGuardPlugin,
     react(),
     // optimize: false prevents @clerk/themes CSS layer imports from being
     // reordered in prod builds (Tailwind v4 + lightningcss interaction)

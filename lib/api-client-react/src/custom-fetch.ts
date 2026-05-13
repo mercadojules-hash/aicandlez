@@ -299,6 +299,25 @@ async function parseSuccessBody(
     return null;
   }
 
+  const mediaType = getMediaType(response.headers);
+
+  // Reject text/html on a 2xx response to a JSON API endpoint.
+  // This catches the Replit-proxy "fallthrough" scenario where the API
+  // server is temporarily unreachable and the Vite SPA server serves
+  // index.html (200, text/html) instead — silently poisoning the React
+  // Query cache with an HTML string if left unchecked.
+  if (
+    responseType !== "text" &&
+    responseType !== "blob" &&
+    mediaType === "text/html"
+  ) {
+    throw new ApiError(
+      response,
+      "Received text/html from a JSON endpoint — API server may be temporarily unavailable",
+      requestInfo,
+    );
+  }
+
   const effectiveType =
     responseType === "auto" ? inferResponseType(response) : responseType;
 
