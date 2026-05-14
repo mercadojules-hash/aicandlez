@@ -243,39 +243,43 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
   }
 
   /**
-   * CDP API keys use an `organizations/…` key name format.
-   * Legacy Coinbase Pro keys are short hex/alphanumeric strings.
+   * Key format detection:
+   *   "organizations/…" prefix  → CDP org key  → ES256 JWT (ECDSA P-256)
+   *   UUID (36 chars), 64-byte decoded secret  → new CDP key → EdDSA JWT (Ed25519)
+   *   anything else             → legacy HMAC-SHA256
    */
-  private get isCdpKey(): boolean {
-    return !!(this.config.apiKey?.startsWith("organizations/") || this.config.apiSecret?.includes("-----BEGIN"));
+  private get keyType(): "cdp-org" | "cdp-uuid" | "hmac" {
+    const k = this.config.apiKey  ?? "";
+    const s = this.config.apiSecret ?? "";
+    if (k.startsWith("organizations/") || s.includes("-----BEGIN")) return "cdp-org";
+    if (/^[0-9a-f-]{36}$/.test(k) && Buffer.from(s, "base64").length === 64) return "cdp-uuid";
+    return "hmac";
   }
 
   /**
    * Reconstruct a valid PEM EC private key from however the secret is stored.
-   * CDP keys are often stored in env vars as bare base64 DER (no header/footer)
-   * with literal `\n` escape sequences instead of real newlines.
-   * Handles all three forms:
-   *   1. Full PEM (has "-----BEGIN") — just normalise escaped newlines
+   * Handles:
+   *   1. Full PEM (has "-----BEGIN") — normalise escaped newlines
    *   2. Bare base64 DER — wrap with SEC1 EC PRIVATE KEY header/footer
    */
   private normalisePem(raw: string): string {
-    // Turn literal \n sequences into real newlines, then strip surrounding whitespace
     const s = raw.replace(/\\n/g, "\n").trim();
-    // Already a valid PEM — return as-is
     if (s.startsWith("-----")) return s;
-    // Bare base64 body — wrap with SEC1 header/footer in 64-char lines
     const b64 = s.replace(/\s+/g, "");
     const lines: string[] = [];
     for (let i = 0; i < b64.length; i += 64) lines.push(b64.slice(i, i + 64));
     return `-----BEGIN EC PRIVATE KEY-----\n${lines.join("\n")}\n-----END EC PRIVATE KEY-----\n`;
   }
 
+  /** Strip query string from path for use in JWT uri claim */
+  private jwtPath(path: string): string {
+    return path.split("?")[0]!;
+  }
+
   /**
-   * Build a signed JWT for the Coinbase CDP API (Advanced Trade v3).
-   * Header: { alg: "ES256", kid: keyName, nonce: randomHex }
-   * Payload: { sub: keyName, iss: "coinbase-cloud", nbf, exp, uri: "METHOD host/path" }
+   * ES256 JWT for CDP org keys (organizations/… key name + ECDSA P-256 private key).
    */
-  private buildJwt(method: string, path: string): string {
+  private buildEs256Jwt(method: string, path: string): string {
     const keyName = this.config.apiKey!;
     const pem     = this.normalisePem(this.config.apiSecret!);
     const nonce   = crypto.randomBytes(16).toString("hex");
@@ -283,11 +287,9 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
 
     const header  = Buffer.from(JSON.stringify({ alg: "ES256", kid: keyName, nonce })).toString("base64url");
     const payload = Buffer.from(JSON.stringify({
-      sub: keyName,
-      iss: "coinbase-cloud",
-      nbf: now,
-      exp: now + 120,
-      uri: `${method} ${this.BASE}${path}`,
+      sub: keyName, iss: "coinbase-cloud",
+      nbf: now, exp: now + 120,
+      uri: `${method} ${this.BASE}${this.jwtPath(path)}`,
     })).toString("base64url");
 
     const sigInput = `${header}.${payload}`;
@@ -300,10 +302,33 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
   }
 
   /**
-   * Legacy HMAC-SHA256 signing (Coinbase Pro / Advanced Trade legacy keys).
-   * Secret is base64-encoded — must be decoded to raw bytes before use.
-   * Signature is base64-encoded (not hex).
-   * Method must be uppercase.
+   * EdDSA JWT for new CDP UUID keys.
+   * Secret is base64-encoded 64 bytes: [0..31] = Ed25519 private seed, [32..63] = public key.
+   */
+  private buildEdDsaJwt(method: string, path: string): string {
+    const keyName  = this.config.apiKey!;
+    const rawBytes = Buffer.from(this.config.apiSecret!, "base64"); // 64 bytes
+    const privKey  = crypto.createPrivateKey({
+      key:    { kty: "OKP", crv: "Ed25519", d: rawBytes.slice(0, 32).toString("base64url"), x: rawBytes.slice(32).toString("base64url") },
+      format: "jwk",
+    });
+    const nonce   = crypto.randomBytes(16).toString("hex");
+    const now     = Math.floor(Date.now() / 1000);
+
+    const header  = Buffer.from(JSON.stringify({ alg: "EdDSA", kid: keyName, nonce })).toString("base64url");
+    const payload = Buffer.from(JSON.stringify({
+      sub: keyName, iss: "coinbase-cloud",
+      nbf: now, exp: now + 120,
+      uri: `${method} ${this.BASE}${this.jwtPath(path)}`,
+    })).toString("base64url");
+
+    const sigInput = `${header}.${payload}`;
+    const sig      = crypto.sign(null, Buffer.from(sigInput), privKey).toString("base64url");
+    return `${sigInput}.${sig}`;
+  }
+
+  /**
+   * Legacy HMAC-SHA256 signing (Coinbase Pro / older Advanced Trade keys).
    */
   private hmacSign(timestamp: string, method: string, path: string, body = ""): string {
     const secretBytes = Buffer.from(this.config.apiSecret!, "base64");
@@ -314,8 +339,12 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
   }
 
   private authHeaders(method: string, path: string, body = ""): Record<string, string> {
-    if (this.isCdpKey) {
-      return { Authorization: `Bearer ${this.buildJwt(method, path)}`, "Content-Type": "application/json" };
+    const type = this.keyType;
+    if (type === "cdp-org") {
+      return { Authorization: `Bearer ${this.buildEs256Jwt(method, path)}`, "Content-Type": "application/json" };
+    }
+    if (type === "cdp-uuid") {
+      return { Authorization: `Bearer ${this.buildEdDsaJwt(method, path)}`, "Content-Type": "application/json" };
     }
     const ts = Math.floor(Date.now() / 1000).toString();
     return {
