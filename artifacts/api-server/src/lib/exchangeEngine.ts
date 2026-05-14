@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import https from "node:https";
 import { validateTrade, getStatus as getRiskStatus } from "./riskEngine.js";
 import { CoinbaseAdapter } from "../services/exchanges/adapters/CoinbaseAdapter.js";
+import { AlpacaAdapter }  from "../services/exchanges/adapters/AlpacaAdapter.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -100,6 +101,7 @@ const EXCHANGE_BALANCES: Record<string, Balances> = {
   MEXC:     { USD:  5_100,  BTC: 0,    ETH: 0.02, SOL: 0    },
   Phemex:   { USD:  3_200,  BTC: 0,    ETH: 0,    SOL: 0    },
   Uphold:   { USD: 18_750,  BTC: 0.03, ETH: 0.22, SOL: 1.4  },
+  Alpaca:   { USD: 100_000, BTC: 0,    ETH: 0,    SOL: 0    },
 };
 
 let _simBalances: Balances = { ...EXCHANGE_BALANCES["Kraken"]! };
@@ -115,12 +117,13 @@ function isExchangeConfigured(exchange: string): boolean {
   if (ex === "cryptocom" || ex === "cryptocomdotcom" || ex === "cryptodotcom") {
     return !!(process.env["CRYPTOCOM_API_KEY"] && process.env["CRYPTOCOM_API_SECRET"]);
   }
+  if (ex === "alpaca") return !!(process.env["ALPACA_API_KEY"] && process.env["ALPACA_SECRET_KEY"]);
   return false;
 }
 
 /** Returns list of exchange IDs that have API credentials configured */
 export function getConfiguredExchanges(): string[] {
-  return (["Kraken", "Binance", "Coinbase", "CryptoDotCom"] as const)
+  return (["Kraken", "Binance", "Coinbase", "CryptoDotCom", "Alpaca"] as const)
     .filter(e => isExchangeConfigured(e));
 }
 
@@ -195,6 +198,18 @@ export async function fetchLiveBalances(): Promise<Balances> {
   if (_selectedExchange === "Coinbase") {
     if (!isExchangeConfigured("Coinbase")) throw new Error("Coinbase API keys not configured");
     const adapter = new CoinbaseAdapter();
+    const account = await adapter.getAccount();
+    return {
+      USD: account.balances["USD"]?.free ?? 0,
+      BTC: account.balances["BTC"]?.free ?? 0,
+      ETH: account.balances["ETH"]?.free ?? 0,
+      SOL: account.balances["SOL"]?.free ?? 0,
+    };
+  }
+
+  if (_selectedExchange === "Alpaca") {
+    if (!isExchangeConfigured("Alpaca")) throw new Error("Alpaca API keys not configured");
+    const adapter = new AlpacaAdapter();
     const account = await adapter.getAccount();
     return {
       USD: account.balances["USD"]?.free ?? 0,
