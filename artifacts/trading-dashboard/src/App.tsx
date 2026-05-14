@@ -39,6 +39,8 @@ import MultiChart from "@/pages/MultiChart";
 import CommandCenter from "@/pages/CommandCenter";
 import Settings from "@/pages/Settings";
 import Billing from "@/pages/Billing";
+import Admin from "@/pages/Admin";
+import Account from "@/pages/Account";
 
 // ── Env ───────────────────────────────────────────────────────────────────────
 
@@ -311,6 +313,12 @@ function Router() {
       </Route>
       <Route path="/billing">
         <Protected><Billing /></Protected>
+      </Route>
+      <Route path="/admin">
+        <Protected><Admin /></Protected>
+      </Route>
+      <Route path="/account">
+        <Protected><Account /></Protected>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>

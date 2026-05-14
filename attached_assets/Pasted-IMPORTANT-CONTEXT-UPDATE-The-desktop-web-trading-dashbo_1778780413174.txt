@@ -1,0 +1,165 @@
+IMPORTANT CONTEXT UPDATE:
+
+The desktop/web trading dashboard is already completed and operational.
+
+DO NOT redesign or rebuild the dashboard.
+
+We are now building the MOBILE APP VERSION of Apex AI Trader using the EXISTING platform architecture, branding, telemetry systems, exchange systems, and UI language already established in the desktop dashboard.
+
+The current desktop dashboard should serve as the design language and feature foundation for the mobile app.
+
+PRIMARY OBJECTIVE:
+Create a premium mobile trading app experience that feels like a mobile extension of the existing Apex AI Trader platform.
+
+The mobile app should include:
+
+* mobile onboarding
+* authentication
+* profile/account system
+* mobile AI trading controls
+* portfolio tracking
+* live positions
+* live PnL
+* exchange switching
+* AI telemetry
+* live terminal feed
+* fee tracking
+* account analytics
+* push notification system
+* AI trade alerts
+* mobile execution controls
+
+The app must maintain the SAME:
+
+* neon institutional aesthetic
+* black luxury trading UI
+* futuristic fintech appearance
+* premium hedge-fund feel
+* cinematic crypto visual language
+
+DO NOT make this look like a generic Coinbase clone.
+
+The app should feel like:
+“Bloomberg Terminal meets elite AI crypto trading app.”
+
+━━━━━━━━━━━━━━━━━━
+MOBILE APP STRUCTURE
+━━━━━━━━━━━━━━━━━━
+
+Build:
+
+* Splash Screen
+* Login / Signup
+* AI Dashboard Home
+* Live Trading Screen
+* Portfolio Screen
+* Active Trades Screen
+* AI Opportunity Scanner
+* Terminal Feed Screen
+* User Profile Screen
+* Wallet / Balance Screen
+* Fee Analytics Screen
+* Settings Screen
+* Notifications Screen
+
+━━━━━━━━━━━━━━━━━━
+HOME SCREEN
+━━━━━━━━━━━━━━━━━━
+
+The mobile home dashboard should show:
+
+* total balance
+* live PnL
+* AI engine status
+* exchange connected
+* active positions
+* recent AI trades
+* AI confidence
+* quick action buttons
+* mini live charts
+* fee telemetry
+* live market ticker
+
+━━━━━━━━━━━━━━━━━━
+PROFILE SYSTEM
+━━━━━━━━━━━━━━━━━━
+
+Add:
+
+* circular profile image/avatar
+* username
+* tier badge
+* exchange status
+* AI trader level
+* user metrics
+* total fees paid
+* lifetime PnL
+* win rate
+* connected exchanges
+
+━━━━━━━━━━━━━━━━━━
+ADMIN / OPERATOR VIEW
+━━━━━━━━━━━━━━━━━━
+
+The platform owner/admin must have access to a hidden operator analytics section inside the app.
+
+This operator dashboard should show:
+
+* total active users
+* live users
+* total fees collected
+* fees per user
+* top revenue users
+* live platform exposure
+* platform trade count
+* total platform volume
+* live connected exchanges
+* global AI telemetry
+
+This is critical.
+
+The operator dashboard is ONLY visible to the admin account.
+
+━━━━━━━━━━━━━━━━━━
+LIVE TRADING EXPERIENCE
+━━━━━━━━━━━━━━━━━━
+
+The mobile app should display:
+
+* live trade execution
+* AI buy/sell signals
+* live position cards
+* animated PnL movement
+* stop loss / take profit
+* confidence indicators
+* AI reasoning
+* live charts
+
+━━━━━━━━━━━━━━━━━━
+VISUAL STYLE
+━━━━━━━━━━━━━━━━━━
+
+Maintain:
+
+* black backgrounds
+* neon accents
+* glowing telemetry
+* premium typography
+* cinematic UI
+* futuristic institutional trading aesthetic
+
+Add:
+
+* smooth mobile animations
+* swipe gestures
+* glowing transitions
+* premium onboarding
+* tactile UI interactions
+
+━━━━━━━━━━━━━━━━━━
+FINAL GOAL
+━━━━━━━━━━━━━━━━━━
+
+The mobile app should feel like a premium AI-powered crypto hedge fund platform in the palm of the user’s hand.
+
+It should feel App Store production-ready, highly scalable, and visually elite.

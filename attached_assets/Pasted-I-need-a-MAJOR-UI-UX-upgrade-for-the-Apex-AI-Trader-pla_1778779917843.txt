@@ -1,0 +1,287 @@
+I need a MAJOR UI/UX upgrade for the Apex AI Trader platform while preserving the current premium Bloomberg/TradingView institutional aesthetic already implemented.
+
+DO NOT redesign from scratch.
+DO NOT remove the existing neon cinematic style.
+Build ON TOP of the current architecture and styling.
+
+PRIMARY OBJECTIVE:
+Transform Apex AI Trader into a production-grade AI trading SaaS platform with:
+
+* live user identity/profile system
+* operator analytics dashboard
+* user fee tracking
+* modern account/profile UI
+* scalable multi-user infrastructure visuals
+* premium fintech feel
+
+━━━━━━━━━━━━━━━━━━
+GLOBAL DESIGN RULES
+━━━━━━━━━━━━━━━━━━
+
+Maintain:
+
+* black container interiors
+* neon glow accents
+* premium dark institutional aesthetic
+* cinematic crypto dashboard feel
+* current typography hierarchy
+* current chart system
+* current telemetry bars
+* current exchange switcher
+* current terminal feed style
+
+Improve:
+
+* spacing
+* alignment
+* profile/account visibility
+* user identity system
+* monetization visibility
+* operator oversight
+* responsiveness
+* visual polish
+
+NO generic SaaS look.
+NO flat boring UI.
+NO white cards.
+NO bright backgrounds.
+
+Everything should feel like:
+“Bloomberg Terminal meets futuristic AI hedge fund.”
+
+━━━━━━━━━━━━━━━━━━
+NEW FEATURE #1 — USER PROFILE SYSTEM
+━━━━━━━━━━━━━━━━━━
+
+Create a fully designed user profile/account system.
+
+TOP RIGHT HEADER:
+Add:
+
+* circular user profile image/avatar
+* username
+* account tier badge
+* online indicator
+* dropdown menu
+
+Dropdown should include:
+
+* Profile
+* Wallet
+* Billing
+* API Connections
+* Trading History
+* Settings
+* Logout
+
+Profile avatar:
+
+* neon ring glow
+* animated online pulse
+* hover effects
+* premium fintech styling
+
+━━━━━━━━━━━━━━━━━━
+NEW FEATURE #2 — OPERATOR / ADMIN DASHBOARD
+━━━━━━━━━━━━━━━━━━
+
+IMPORTANT:
+This section is ONLY visible to the platform owner/admin.
+
+Create an internal admin analytics dashboard that tracks:
+
+PLATFORM METRICS:
+
+* total active users
+* live connected users
+* total bots running
+* total live accounts
+* total daily volume
+* total fees collected
+* average revenue per user
+* most profitable users
+* most active users
+* exchange distribution
+* total trades today
+* signals per minute
+* open positions across platform
+* platform win rate
+* total platform exposure
+
+USER ANALYTICS TABLE:
+Create a glowing institutional-style data table showing:
+
+* username
+* profile picture
+* exchange connected
+* live/sim status
+* open positions
+* total trades
+* fees generated
+* PnL
+* status
+* last activity
+
+Add:
+
+* sortable columns
+* scrolling table
+* search
+* filters
+* pagination
+* glowing hover states
+
+━━━━━━━━━━━━━━━━━━
+NEW FEATURE #3 — FEE TRACKING SYSTEM
+━━━━━━━━━━━━━━━━━━
+
+The platform uses a transaction-fee model instead of subscriptions.
+
+Add visual fee telemetry throughout dashboard.
+
+Need:
+
+* fee collection cards
+* fee revenue widgets
+* rolling 24h fees
+* per-user fee totals
+* lifetime fees
+* live fee ticker
+
+In Platform Overview:
+Add:
+
+* TOTAL FEES COLLECTED
+* TODAY’S FEES
+* TOP PAYING USER
+* FEES/MINUTE
+* PROJECTED MONTHLY REVENUE
+
+These should animate live.
+
+━━━━━━━━━━━━━━━━━━
+NEW FEATURE #4 — USER ACCOUNT PANEL
+━━━━━━━━━━━━━━━━━━
+
+Create a premium account center page.
+
+Include:
+
+* profile picture upload
+* username
+* connected exchanges
+* wallet balances
+* AI performance metrics
+* subscription/tier status
+* total fees paid
+* lifetime PnL
+* win rate
+* open positions
+* recent trades
+* AI risk profile
+
+Style:
+
+* neon glow containers
+* animated charts
+* futuristic account cards
+* premium fintech look
+
+━━━━━━━━━━━━━━━━━━
+NEW FEATURE #5 — LIVE EXECUTION VISUALIZATION
+━━━━━━━━━━━━━━━━━━
+
+Improve the large black live execution section above the ticker strip.
+
+When AI trades:
+Show:
+
+* active live trade card
+* animated entry effects
+* glowing BUY/SELL pulses
+* real-time PnL movement
+* confidence meter
+* AI reasoning stream
+* stop loss/take profit visuals
+* execution timeline
+* trade duration timer
+
+When idle:
+Display:
+
+* AI scanning animation
+* “Awaiting High Probability Setup”
+* live scanning telemetry
+* market regime analysis
+
+━━━━━━━━━━━━━━━━━━
+NEW FEATURE #6 — MULTI-USER ARCHITECTURE UI
+━━━━━━━━━━━━━━━━━━
+
+This platform is expected to scale to:
+
+* 10,000+ users initially
+* eventually 100,000+
+
+The UI should visually reflect that scale.
+
+Need:
+
+* platform activity indicators
+* global trading telemetry
+* live user counts
+* copy trading metrics
+* platform-wide AI analytics
+* real-time infrastructure feel
+
+━━━━━━━━━━━━━━━━━━
+ANIMATION REQUIREMENTS
+━━━━━━━━━━━━━━━━━━
+
+Use:
+
+* subtle motion
+* glowing transitions
+* pulse effects
+* animated telemetry
+* smooth hover animations
+* futuristic UI responsiveness
+
+Avoid:
+
+* cheesy effects
+* excessive blur
+* laggy animations
+* overdone neon
+
+━━━━━━━━━━━━━━━━━━
+TECH REQUIREMENTS
+━━━━━━━━━━━━━━━━━━
+
+Maintain existing stack:
+
+* React
+* TypeScript
+* Tailwind
+* existing chart architecture
+* existing API structure
+
+Do NOT break:
+
+* live exchange mode
+* Kraken integration
+* simulation engine
+* telemetry polling
+* existing command center
+
+Keep all current functionality operational.
+
+━━━━━━━━━━━━━━━━━━
+FINAL GOAL
+━━━━━━━━━━━━━━━━━━
+
+The result should feel like:
+
+“A premium AI hedge fund platform where users can autonomously trade crypto while the platform owner monitors global platform analytics and earns transaction-based revenue.”
+
+This should look production-ready, investor-ready, and App Store quality.
