@@ -58,3 +58,8 @@ externalPort = 5000
 [[ports]]
 localPort = 24210
 externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+EXCHANGE_LIVE_ENABLED = "true"

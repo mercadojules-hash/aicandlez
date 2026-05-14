@@ -1,0 +1,89 @@
+Need a full Exchange Command Center stabilization + UX upgrade for Apex Trader.
+
+Current exchanges integrated/prepared:
+
+* Kraken
+* Coinbase
+* Binance.US
+* Crypto.com
+
+I will provide an updated `.env` copy with the newest exchange credentials/configs.
+
+Primary issue:
+The exchange buttons/state synchronization in the Command Center is unstable and confusing. Backend switching is working, but frontend state/rendering is inconsistent.
+
+Please complete ALL of the following:
+
+1. Exchange Button / State Fixes
+
+* Fix exchange button synchronization
+* Ensure selected exchange persists visually
+* Fix SIM vs LIVE state rendering
+* Prevent stale exchange states
+* Ensure frontend reflects backend exchange state instantly
+* Fix optimistic update handling
+* Prevent button flashing/desync
+* Ensure active exchange survives refresh/reload
+
+2. Command Center UI Improvements
+
+* Make exchange buttons larger and more visible
+* Add stronger active-state styling/glow
+* Clearly separate:
+
+  * SIMULATION MODE
+  * LIVE MODE
+* Add exchange-specific badge/icon rendering
+* Improve spacing/alignment
+* Improve responsiveness
+
+3. Unified Exchange Rendering
+
+* Standardize exchange state management for:
+
+  * Kraken
+  * Coinbase
+  * Binance.US
+  * Crypto.com
+* Create one centralized exchange state system
+* Remove duplicate/stale polling logic
+* Normalize balance/account rendering across exchanges
+
+4. Telemetry + Account Sync
+
+* Ensure live balances/accounts display correctly
+* Stop simulation polling when LIVE exchange is active
+* Prevent stale SIM balances from rendering in LIVE mode
+* Normalize telemetry response structure
+
+5. Backend / API Cleanup
+
+* Standardize exchange route architecture
+* Ensure:
+  POST /api/engine/exchange-mode
+  is the single authoritative switching route
+* Normalize exchange IDs:
+
+  * sim
+  * kraken
+  * coinbase
+  * binanceus
+  * cryptocom
+* Ensure exchange selection persists globally
+
+6. Environment / Config Cleanup
+
+* Update `.env` handling for all exchanges
+* Normalize naming conventions
+* Add validation/error handling for missing credentials
+* Prevent silent failures
+
+7. Future-Proofing
+   Please structure this as a scalable exchange abstraction layer because future plans include:
+
+* Robinhood research/prototyping
+* equities support later
+* additional broker adapters
+
+Goal:
+A clean professional Command Center where exchange switching feels instant, obvious, stable, and production-grade.

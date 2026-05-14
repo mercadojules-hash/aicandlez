@@ -105,8 +105,26 @@ let _simBalances: Balances = { ...EXCHANGE_BALANCES["Kraken"]! };
 
 // ── Env helpers ──────────────────────────────────────────────────────────────
 
+/** Per-exchange credential check — normalises common ID variants */
+function isExchangeConfigured(exchange: string): boolean {
+  const ex = exchange.toLowerCase().replace(/[\s._-]/g, "");
+  if (ex === "kraken")                         return !!(process.env["KRAKEN_API_KEY"]    && process.env["KRAKEN_API_SECRET"]);
+  if (ex === "binance" || ex === "binanceus")  return !!(process.env["BINANCE_API_KEY"]   && process.env["BINANCE_API_SECRET"]);
+  if (ex === "coinbase")                       return !!(process.env["COINBASE_API_KEY"]  && process.env["COINBASE_API_SECRET"]);
+  if (ex === "cryptocom" || ex === "cryptocomdotcom" || ex === "cryptodotcom") {
+    return !!(process.env["CRYPTOCOM_API_KEY"] && process.env["CRYPTOCOM_API_SECRET"]);
+  }
+  return false;
+}
+
+/** Returns list of exchange IDs that have API credentials configured */
+export function getConfiguredExchanges(): string[] {
+  return (["Kraken", "Binance", "Coinbase", "CryptoDotCom"] as const)
+    .filter(e => isExchangeConfigured(e));
+}
+
 function isApiConfigured(): boolean {
-  return !!(process.env["KRAKEN_API_KEY"] && process.env["KRAKEN_API_SECRET"]);
+  return isExchangeConfigured(_selectedExchange);
 }
 function isLiveEnabled(): boolean {
   return process.env["EXCHANGE_LIVE_ENABLED"] === "true";
@@ -382,23 +400,24 @@ export async function executeOrder(
 
 // ── Public getters / setters ─────────────────────────────────────────────────
 
-export function getExchangeStatus(): ExchangeStatus {
+export function getExchangeStatus(): ExchangeStatus & { configuredExchanges: string[] } {
   const today    = new Date().toISOString().slice(0, 10);
   const startOfDay = new Date(today).getTime();
   const ordersToday = _orders.filter((o) => o.timestamp >= startOfDay && o.status === "filled").length;
   const lastOrder   = _orders.find((o) => o.status === "filled");
 
   return {
-    mode:          _mode,
-    killSwitch:    _killSwitch,
-    paused:        _paused,
-    liveCapable:   isLiveCapable(),
-    apiConfigured: isApiConfigured(),
-    liveEnabled:   isLiveEnabled(),
+    mode:                 _mode,
+    killSwitch:           _killSwitch,
+    paused:               _paused,
+    liveCapable:          isLiveCapable(),
+    apiConfigured:        isApiConfigured(),
+    liveEnabled:          isLiveEnabled(),
     ordersToday,
-    lastOrderAt:   lastOrder?.timestamp ?? null,
-    simBalances:   { ..._simBalances },
-    exchangeName:  _selectedExchange,
+    lastOrderAt:          lastOrder?.timestamp ?? null,
+    simBalances:          { ..._simBalances },
+    exchangeName:         _selectedExchange,
+    configuredExchanges:  getConfiguredExchanges(),
   };
 }
 
@@ -406,11 +425,12 @@ export function getOrders(limit = 50): ExchangeOrder[] {
   return _orders.slice(0, limit);
 }
 
-export function setMode(mode: ExchangeMode): { ok: boolean; reason?: string } {
+export function setMode(mode: ExchangeMode, exchange?: string): { ok: boolean; reason?: string } {
   if (mode === "live") {
-    if (!isLiveEnabled())    return { ok: false, reason: "EXCHANGE_LIVE_ENABLED is not set to 'true'" };
-    if (!isApiConfigured())  return { ok: false, reason: "KRAKEN_API_KEY or KRAKEN_API_SECRET not configured" };
-    if (_killSwitch)         return { ok: false, reason: "Exchange kill switch is active — disable it first" };
+    if (!isLiveEnabled()) return { ok: false, reason: "EXCHANGE_LIVE_ENABLED is not set to 'true'" };
+    const ex = exchange ?? _selectedExchange;
+    if (!isExchangeConfigured(ex)) return { ok: false, reason: `${ex} API credentials are not configured` };
+    if (_killSwitch) return { ok: false, reason: "Exchange kill switch is active — disable it first" };
   }
   _mode = mode;
   return { ok: true };
