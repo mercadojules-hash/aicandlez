@@ -280,7 +280,7 @@ const ds = StyleSheet.create({
 // ── Home Screen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const { engine, account, positions, trades, isLoading, refresh } = useTrading();
+  const { engine, account, positions, trades, isLoading, refresh, alpacaAccount } = useTrading();
   const insets  = useSafeAreaInsets();
   const breathe = useRef(new Animated.Value(0)).current;
   const isWeb   = Platform.OS === "web";
@@ -360,8 +360,10 @@ export default function HomeScreen() {
               </Text>
             </View>
             <View style={s.balItem}>
-              <Text style={s.balItemLabel}>FEES PAID</Text>
-              <Text style={[s.balItemValue, { color: C.orange }]}>{fmt$(account.totalFeesPaid)}</Text>
+              <Text style={s.balItemLabel}>BUY POWER</Text>
+              <Text style={[s.balItemValue, { color: C.cyan }]}>
+                {alpacaAccount ? fmt$(alpacaAccount.buyingPower, 0) : "—"}
+              </Text>
             </View>
           </View>
         </View>
@@ -396,7 +398,7 @@ export default function HomeScreen() {
             <AIInsight />
           </View>
           <View style={{ alignItems: "flex-end", gap: 5 }}>
-            <Text style={s.engineExch}>{engine?.exchange ?? "KRAKEN"}</Text>
+            <Text style={s.engineExch}>{engine?.exchange ?? "ALPACA"}</Text>
             {engine?.volumeFilter && <Text style={s.filterTag}>VOL FILTER</Text>}
           </View>
         </View>

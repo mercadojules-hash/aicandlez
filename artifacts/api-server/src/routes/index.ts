@@ -28,6 +28,7 @@ import adaptersRouter from "./adapters.js";
 import authRouter from "./auth.js";
 import userSettingsRouter from "./userSettings.js";
 import userNotificationsRouter from "./userNotifications.js";
+import alpacaPaperRouter from "./alpacaPaper.js";
 import userExchangesRouter from "./userExchanges.js";
 import billingRouter from "./billing.js";
 
@@ -64,5 +65,6 @@ router.use(systemRouter);
 router.use(feesRouter);
 router.use(mobileRouter);
 router.use(adaptersRouter);
+router.use(alpacaPaperRouter);
 
 export default router;
