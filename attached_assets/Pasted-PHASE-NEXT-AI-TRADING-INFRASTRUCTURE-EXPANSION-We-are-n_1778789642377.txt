@@ -1,0 +1,245 @@
+PHASE NEXT — AI TRADING INFRASTRUCTURE EXPANSION
+
+We are now transitioning the platform from a “crypto trading app” into a premium AI-powered multi-market trading ecosystem.
+
+This phase focuses on:
+
+1. Paper Trading architecture
+2. Alpaca integration
+3. Exchange ecosystem expansion
+4. AI trading mode selection
+5. More institutional onboarding psychology
+
+CRITICAL:
+Do NOT redesign the app.
+Preserve the current premium black/cyan/purple institutional aesthetic.
+Preserve spacing, typography hierarchy, glow restraint, and cinematic UI language.
+
+==================================================
+
+1. PAPER TRADING MUST BECOME FIRST-CLASS
+   ==================================================
+
+Paper Trading should NO LONGER feel hidden or secondary.
+
+The app should now support:
+• Paper Trading
+• Live AI Trading
+
+These should exist throughout the ecosystem as a core platform mode.
+
+Add a GLOBAL trading mode selector:
+• PAPER AI
+• LIVE AI
+
+The selector should appear:
+• Home screen top-right
+• Trade screen
+• Exchange onboarding flow
+• Profile trading configuration
+
+Style:
+• segmented institutional toggle
+• smooth animated transition
+• cyan active glow
+• subtle background blur
+• not overly bright
+
+IMPORTANT:
+Paper Trading should feel:
+“AI training mode”
+NOT:
+“fake mode”
+
+==================================================
+2. ADD ALPACA AS A PRIMARY INTEGRATION
+======================================
+
+Add Alpaca as a fully supported exchange/broker connection.
+
+Supported ecosystem should now include:
+
+CRYPTO:
+• Kraken
+• Crypto.com
+• Binance
+• Coinbase
+• Bybit
+• OKX
+• KuCoin
+
+TRADITIONAL + HYBRID:
+• Alpaca
+
+Alpaca should visually feel:
+• institutional
+• equities-capable
+• professional
+• trusted
+
+Use:
+• subtle green/cyan institutional accents
+• premium icon styling
+• AI-ready broker language
+
+==================================================
+3. REDESIGN THE “CONNECT EXCHANGE” EXPERIENCE
+=============================================
+
+Current exchange CTA is good.
+Now elevate it into a true infrastructure gateway.
+
+Replace:
+“Connect Your Exchange”
+
+With:
+“Connect Trading Infrastructure”
+
+Sub-copy:
+“Securely connect exchanges and brokers for AI-powered execution.”
+
+Add:
+• horizontal scrolling exchange ecosystem
+• animated logo pills
+• connection categories:
+
+* Crypto
+* Stocks
+* Futures
+* AI Ready
+
+Add badges:
+• PAPER READY
+• AI VERIFIED
+• LOW LATENCY
+• RECOMMENDED
+
+==================================================
+4. MULTI-MARKET AI EXPANSION
+============================
+
+The app should now visually imply:
+• crypto
+• equities
+• ETFs
+• AI sector baskets
+• volatility products
+• forex later
+
+Without cluttering the interface.
+
+Add subtle references to:
+• equities
+• ETFs
+• hybrid AI portfolios
+
+Examples:
+AAPL
+NVDA
+TSLA
+SPY
+QQQ
+
+These should appear:
+• AI scanner
+• live signals
+• portfolio allocation hints
+• performance analytics
+
+==================================================
+5. NEW “AI DEPLOYMENT STATUS”
+=============================
+
+Add a new premium card section:
+“AI Deployment Status”
+
+Examples:
+• Paper AI Active
+• Live AI Disabled
+• 3 Markets Monitored
+• 1,240 Assets Scanned
+• 4 Exchanges Connected
+
+Style:
+• command-center minimal
+• glowing status dots
+• subtle pulsing telemetry
+
+==================================================
+6. IMPROVE USER PSYCHOLOGY
+==========================
+
+The app should emotionally communicate:
+
+• safety
+• sophistication
+• intelligence
+• automation
+• opportunity
+• control
+
+NOT:
+• gambling
+• meme coin casino
+• noisy crypto chaos
+
+The experience should feel closer to:
+“personal AI hedge fund”
+
+than:
+“retail crypto app.”
+
+==================================================
+7. EXCHANGE/BROKER ONBOARDING MODAL
+===================================
+
+Upgrade onboarding flow into:
+multi-step institutional onboarding.
+
+Step 1:
+Select infrastructure provider
+(Crypto exchanges + Alpaca)
+
+Step 2:
+Choose trading mode
+• Paper AI
+• Live AI
+
+Step 3:
+Permissions + API validation
+
+Step 4:
+AI readiness check
+• latency
+• permissions
+• trade access
+• paper support
+• market compatibility
+
+Step 5:
+Success screen:
+“AI Trading Infrastructure Connected”
+
+==================================================
+8. KEEP EVERYTHING PREMIUM
+==========================
+
+Do NOT:
+• add bright gradients
+• add gaming visuals
+• add meme coin aesthetics
+• add excessive glow
+• add visual clutter
+
+Maintain:
+• cinematic black UI
+• restrained neon accents
+• institutional spacing
+• Bloomberg-inspired minimalism
+• ultra-premium typography
+• luxury fintech interaction language
+
+Goal:
+Users should open the app and immediately think:
+
+“This feels like institutional AI trading software I should not normally have access to.”

@@ -16,7 +16,7 @@ const TAB_BAR_H = 84;
 // ── Asset Database ─────────────────────────────────────────────────────────────
 
 type Signal = "BUY" | "SELL" | "HOLD";
-type Cat    = "ALL"|"TRENDING"|"AI"|"MEME"|"DEFI"|"L1"|"GAMING"|"RWA"|"GAINERS"|"VOLATILE";
+type Cat    = "ALL"|"TRENDING"|"AI"|"MEME"|"DEFI"|"L1"|"GAMING"|"RWA"|"GAINERS"|"VOLATILE"|"STOCKS"|"ETF";
 
 interface Asset {
   symbol: string; name: string; cats: Cat[];
@@ -49,7 +49,13 @@ const ALL_ASSETS: Asset[] = [
   { symbol:"AXSUSD",  name:"Axie Infinity",  cats:["ALL","GAMING"],                        signal:"HOLD", conf:42, price:7.2,     change:-1.44,  vol:false, mcap:"1.1B"  },
   { symbol:"GALUSD",  name:"Gala",           cats:["ALL","GAMING","VOLATILE"],             signal:"BUY",  conf:57, price:0.044,   change: 6.22,  vol:true,  mcap:"1.6B"  },
   { symbol:"ONDOUSD", name:"Ondo",           cats:["ALL","RWA","GAINERS","TRENDING"],      signal:"BUY",  conf:68, price:1.04,    change: 5.22,  vol:true,  mcap:"1.4B"  },
-  { symbol:"PAXGUSD", name:"PAX Gold",       cats:["ALL","RWA"],                           signal:"HOLD", conf:45, price:2_340,   change: 0.32,  vol:false, mcap:"0.5B"  },
+  { symbol:"PAXGUSD", name:"PAX Gold",        cats:["ALL","RWA"],                              signal:"HOLD", conf:45, price:2_340,  change: 0.32,  vol:false, mcap:"0.5B"  },
+  // Equities & ETFs
+  { symbol:"AAPL",    name:"Apple Inc.",      cats:["ALL","STOCKS","AI","GAINERS"],            signal:"BUY",  conf:71, price:189.4,  change: 1.22,  vol:true,  mcap:"2.94T" },
+  { symbol:"NVDA",    name:"NVIDIA Corp.",    cats:["ALL","STOCKS","AI","GAINERS","TRENDING"], signal:"BUY",  conf:82, price:875.4,  change: 3.84,  vol:true,  mcap:"2.16T" },
+  { symbol:"TSLA",    name:"Tesla Inc.",      cats:["ALL","STOCKS","VOLATILE"],                signal:"HOLD", conf:51, price:182.2,  change:-1.12,  vol:false, mcap:"580B"  },
+  { symbol:"SPY",     name:"S&P 500 ETF",     cats:["ALL","STOCKS","ETF"],                     signal:"BUY",  conf:64, price:524.8,  change: 0.88,  vol:true,  mcap:"—"     },
+  { symbol:"QQQ",     name:"Nasdaq 100 ETF",  cats:["ALL","STOCKS","ETF","GAINERS"],           signal:"BUY",  conf:68, price:448.2,  change: 1.44,  vol:true,  mcap:"—"     },
 ];
 
 // ── Categories ─────────────────────────────────────────────────────────────────
@@ -67,16 +73,19 @@ const CATEGORIES: CatDef[] = [
   { key:"RWA",      label:"RWA",          icon:"dollar-sign",   accent: C.green  },
   { key:"GAINERS",  label:"TOP GAINERS",  icon:"arrow-up-right",accent: C.green  },
   { key:"VOLATILE", label:"HIGH VOL",     icon:"activity",      accent: C.red    },
+  { key:"STOCKS",   label:"STOCKS",       icon:"briefcase",     accent: C.teal   },
+  { key:"ETF",      label:"ETFs",         icon:"bar-chart-2",   accent: C.green  },
 ];
 
 // ── AI Scanning Pulse ──────────────────────────────────────────────────────────
 
 const SCAN_MSGS = [
-  "Scanning 1,240 assets across 6 exchanges…",
-  "Detecting momentum signals on AI tokens…",
+  "Scanning 1,240+ assets across crypto and equities…",
+  "Detecting momentum signals on AI tokens and tech stocks…",
   "Analyzing cross-exchange volume anomalies…",
-  "Running EMA breakout detection on L1s…",
-  "Evaluating meme coin volatility patterns…",
+  "Running EMA breakout detection across L1s and ETFs…",
+  "Evaluating NVDA, AAPL technical formations…",
+  "Cross-correlating crypto and equities volatility…",
 ];
 
 function ScanIndicator() {

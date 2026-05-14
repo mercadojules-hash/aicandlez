@@ -10,6 +10,7 @@ import { useTrading, fmt$, fmtPct, fmtAge } from "@/contexts/TradingContext";
 import { PositionCard } from "@/components/PositionCard";
 import { LiveDot } from "@/components/LiveDot";
 import { MicroAnalytics } from "@/components/MicroAnalytics";
+import { TradingModeToggle } from "@/components/TradingModeToggle";
 import { C, FONTS, RADIUS } from "@/constants/theme";
 
 const TAB_BAR_H = 84;
@@ -149,6 +150,7 @@ export default function TradeScreen() {
   const isWeb  = Platform.OS === "web";
   const topPad = isWeb ? 67 : insets.top + 10;
 
+  const [tradingMode, setTradingMode] = useState<"paper" | "live">("paper");
   const [autoMode,   setAutoMode]   = useState(true);
   const [killActive, setKillActive] = useState(false);
   const [paused,     setPaused]     = useState(false);
@@ -186,17 +188,7 @@ export default function TradeScreen() {
             </Text>
           </View>
         </View>
-        <View style={[
-          s.modeBadge,
-          {
-            borderColor: engine?.mode === "LIVE" ? `${C.red}50` : `${C.cyan}35`,
-            backgroundColor: engine?.mode === "LIVE" ? `${C.red}12` : C.cyanDim,
-          },
-        ]}>
-          <Text style={[s.modeText, { color: engine?.mode === "LIVE" ? C.red : C.cyan }]}>
-            {engine?.mode ?? "SIMULATION"}
-          </Text>
-        </View>
+        <TradingModeToggle mode={tradingMode} onChange={setTradingMode} />
       </View>
 
       {/* ── Controls ── */}

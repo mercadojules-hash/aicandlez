@@ -9,6 +9,7 @@ import { useTrading, fmt$, fmtPct, fmtAge } from "@/contexts/TradingContext";
 import { SignalBadge, ConfidenceBar } from "@/components/SignalBadge";
 import { LiveDot } from "@/components/LiveDot";
 import { PortfolioChart } from "@/components/PortfolioChart";
+import { TradingModeToggle } from "@/components/TradingModeToggle";
 import { C, FONTS, RADIUS } from "@/constants/theme";
 
 const TAB_BAR_H = 84;
@@ -223,6 +224,59 @@ function Section({ label, accent = C.cyan, right }: { label: string; accent?: st
   );
 }
 
+// ── AI Deployment Status ───────────────────────────────────────────────────────
+
+function AIDeploymentStatus({ mode, engine }: { mode: "paper" | "live"; engine: any }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: 1200, useNativeDriver: true }),
+    ])).start();
+  }, []);
+
+  const dotOp = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] });
+
+  const stats = [
+    { label: "PAPER AI",   value: mode === "paper" && engine?.running ? "ACTIVE" : "STANDBY", color: mode === "paper" && engine?.running ? C.green : C.textDim },
+    { label: "LIVE AI",    value: mode === "live" ? "ACTIVE" : "DISABLED",                    color: mode === "live" ? C.orange : C.textDim },
+    { label: "MARKETS",    value: "3 Monitored",                                               color: C.cyan    },
+    { label: "ASSETS",     value: "1,240+ Scanned",                                            color: C.textPrimary },
+    { label: "EXCHANGES",  value: "4 Connected",                                               color: C.purple  },
+    { label: "CONFIDENCE", value: `${engine?.confidence ?? 62}%`,                             color: C.cyan    },
+  ];
+
+  return (
+    <View style={ds.card}>
+      <View style={ds.topLine} />
+      <View style={ds.header}>
+        <Animated.View style={[ds.dot, { opacity: dotOp }]} />
+        <Text style={ds.title}>AI DEPLOYMENT STATUS</Text>
+      </View>
+      <View style={ds.grid}>
+        {stats.map(item => (
+          <View key={item.label} style={ds.item}>
+            <Text style={ds.itemLabel}>{item.label}</Text>
+            <Text style={[ds.itemValue, { color: item.color }]}>{item.value}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+const ds = StyleSheet.create({
+  card:      { backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: `${C.cyan}18`, marginBottom: 18, overflow: "hidden", shadowColor: C.cyan, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
+  topLine:   { height: 1.5, backgroundColor: C.cyan, opacity: 0.22 },
+  header:    { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: C.border },
+  dot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: C.cyan },
+  title:     { fontSize: 9, fontFamily: FONTS.monoBold, color: `${C.cyan}80`, letterSpacing: 2 },
+  grid:      { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 12, paddingVertical: 10 },
+  item:      { width: "33.33%", paddingHorizontal: 4, paddingVertical: 7 },
+  itemLabel: { fontSize: 7, fontFamily: FONTS.mono, color: C.textDim, letterSpacing: 1, marginBottom: 3 },
+  itemValue: { fontSize: 11, fontFamily: FONTS.monoBold },
+});
+
 // ── Home Screen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
@@ -231,6 +285,8 @@ export default function HomeScreen() {
   const breathe = useRef(new Animated.Value(0)).current;
   const isWeb   = Platform.OS === "web";
   const topPad  = isWeb ? 67 : insets.top + 10;
+
+  const [tradingMode, setTradingMode] = useState<"paper" | "live">("paper");
 
   const pnlColor = account.unrealizedPnL >= 0 ? C.green : C.red;
 
@@ -272,10 +328,8 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
-          <View style={{ alignItems: "flex-end", gap: 6 }}>
-            <View style={s.modeBadge}>
-              <Text style={s.modeText}>{engine?.mode ?? "SIMULATION"}</Text>
-            </View>
+          <View style={{ alignItems: "flex-end", gap: 8 }}>
+            <TradingModeToggle mode={tradingMode} onChange={setTradingMode} />
             <Text style={s.notifHint}>
               <Feather name="activity" size={9} color={C.textDim} /> {trades.length} trades
             </Text>
@@ -321,6 +375,9 @@ export default function HomeScreen() {
           <StatTile label="POSITIONS"    value={String(positions.length)}           color={positions.length > 0 ? C.cyan : C.textMuted} />
           <StatTile label="TOTAL TRADES" value={String(account.totalTrades)}        color={C.textPrimary} />
         </View>
+
+        {/* ── AI Deployment Status ── */}
+        <AIDeploymentStatus mode={tradingMode} engine={engine} />
 
         {/* ── AI Engine Status ── */}
         <Section label="AI ENGINE STATUS" accent={C.purple} />
