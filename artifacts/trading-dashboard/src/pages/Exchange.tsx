@@ -28,15 +28,17 @@ import {
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface ExchangeStatus {
-  mode:          "simulation" | "live";
-  killSwitch:    boolean;
-  paused:        boolean;
-  liveCapable:   boolean;
-  apiConfigured: boolean;
-  liveEnabled:   boolean;
-  ordersToday:   number;
-  lastOrderAt:   number | null;
-  simBalances:   Balances;
+  mode:                "simulation" | "live";
+  killSwitch:          boolean;
+  paused:              boolean;
+  liveCapable:         boolean;
+  apiConfigured:       boolean;
+  liveEnabled:         boolean;
+  ordersToday:         number;
+  lastOrderAt:         number | null;
+  simBalances:         Balances;
+  exchangeName:        string;
+  configuredExchanges: string[];
 }
 interface Balances { USD: number; BTC: number; ETH: number; SOL: number }
 interface RiskGate  { name: string; passed: boolean; detail: string }
@@ -222,6 +224,12 @@ export default function Exchange() {
     onSuccess:  invalidate,
   });
 
+  const selectExchangeMutation = useMutation({
+    mutationFn: (name: string) =>
+      apiFetch("/api/exchange/select", { method: "POST", body: JSON.stringify({ name }) }),
+    onSuccess: invalidate,
+  });
+
   const handleExecute = async () => {
     const amt = parseFloat(amountUSD);
     if (!amt || !preview) return;
@@ -267,7 +275,7 @@ export default function Exchange() {
           </div>
           <div>
             <h1 className="text-lg font-bold leading-tight">Exchange Integration</h1>
-            <p className="text-xs text-muted-foreground">Kraken · Simulation & live order execution · Risk-gated</p>
+            <p className="text-xs text-muted-foreground">{status?.exchangeName ?? "Exchange"} · Simulation &amp; live order execution · Risk-gated</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -366,7 +374,7 @@ export default function Exchange() {
           <div className="border border-border/40 rounded-xl bg-card/30 p-4 flex flex-col gap-3">
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Connection</div>
             {[
-              { label: "Exchange",     value: "Kraken",                                ok: true },
+              { label: "Exchange",     value: status?.exchangeName ?? "—",                         ok: true },
               { label: "API Keys",     value: status?.apiConfigured ? "Configured" : "Not set",  ok: status?.apiConfigured ?? false },
               { label: "Live Enable",  value: status?.liveEnabled ? "Enabled" : "Disabled",      ok: status?.liveEnabled ?? false },
               { label: "Live Ready",   value: status?.liveCapable  ? "Yes" : "No",               ok: status?.liveCapable  ?? false },
@@ -379,10 +387,30 @@ export default function Exchange() {
                 </span>
               </div>
             ))}
+            {/* Exchange selector — shown when multiple exchanges are configured */}
+            {status?.configuredExchanges && status.configuredExchanges.length > 0 && (
+              <div className="mt-1 flex flex-col gap-1.5 border-t border-border/30 pt-2">
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Switch Exchange</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {status.configuredExchanges.map(ex => (
+                    <button
+                      key={ex}
+                      onClick={() => selectExchangeMutation.mutate(ex)}
+                      className={`text-xs px-2.5 py-1 rounded-md border font-semibold transition-colors ${
+                        status.exchangeName === ex
+                          ? "border-primary/60 bg-primary/15 text-primary"
+                          : "border-border/40 bg-card/40 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                      }`}
+                    >
+                      {ex}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {!status?.apiConfigured && (
               <div className="mt-1 text-[10px] text-muted-foreground bg-card/60 rounded-lg p-2 leading-relaxed">
-                Set <code className="text-primary">KRAKEN_API_KEY</code> and{" "}
-                <code className="text-primary">KRAKEN_API_SECRET</code> in Secrets,
+                Configure API keys in Secrets (e.g. <code className="text-primary">KRAKEN_API_KEY</code> / <code className="text-primary">COINBASE_API_KEY</code>),
                 then set <code className="text-primary">EXCHANGE_LIVE_ENABLED=true</code> to unlock LIVE mode.
               </div>
             )}
@@ -593,7 +621,7 @@ export default function Exchange() {
               {isLive && preview.allowed && (
                 <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-2.5 text-xs text-yellow-300 flex items-start gap-2">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span><strong>LIVE MODE:</strong> This order will place a real order on Kraken using real funds.</span>
+                  <span><strong>LIVE MODE:</strong> This order will place a real order on {status?.exchangeName ?? "the exchange"} using real funds.</span>
                 </div>
               )}
 
@@ -700,13 +728,13 @@ export default function Exchange() {
               </div>
               <div>
                 <h2 className="text-base font-bold text-foreground">Enable LIVE Trading</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Real orders on Kraken · Real funds at risk</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Real orders on {status?.exchangeName ?? "exchange"} · Real funds at risk</p>
               </div>
             </div>
 
             <div className="flex flex-col gap-2 text-xs">
               {[
-                { icon: status?.apiConfigured,    label: "Kraken API keys configured" },
+                { icon: status?.apiConfigured,    label: `${status?.exchangeName ?? "Exchange"} API keys configured` },
                 { icon: status?.liveEnabled,      label: "EXCHANGE_LIVE_ENABLED=true" },
                 { icon: !isKillActive,            label: "Kill switch is off" },
                 { icon: true,                     label: "No withdrawals — spot orders only" },
@@ -719,7 +747,7 @@ export default function Exchange() {
             </div>
 
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-xs text-yellow-300">
-              <strong>Warning:</strong> In LIVE mode, all executed orders will be real Kraken spot orders. Ensure your risk parameters are set correctly. The system will still enforce position limits, kill switches, and daily loss limits.
+              <strong>Warning:</strong> In LIVE mode, all executed orders will be real {status?.exchangeName ?? "exchange"} spot orders. Ensure your risk parameters are set correctly. The system will still enforce position limits, kill switches, and daily loss limits.
             </div>
 
             <div className="flex flex-col gap-2">

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import https from "node:https";
 import { validateTrade, getStatus as getRiskStatus } from "./riskEngine.js";
+import { CoinbaseAdapter } from "../services/exchanges/adapters/CoinbaseAdapter.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -191,8 +192,20 @@ async function krakenPrivate<T>(endpoint: string, params: Record<string, string>
 // ── Live balances ────────────────────────────────────────────────────────────
 
 export async function fetchLiveBalances(): Promise<Balances> {
-  if (!isApiConfigured()) throw new Error("Kraken API keys not configured");
+  if (_selectedExchange === "Coinbase") {
+    if (!isExchangeConfigured("Coinbase")) throw new Error("Coinbase API keys not configured");
+    const adapter = new CoinbaseAdapter();
+    const account = await adapter.getAccount();
+    return {
+      USD: account.balances["USD"]?.free ?? 0,
+      BTC: account.balances["BTC"]?.free ?? 0,
+      ETH: account.balances["ETH"]?.free ?? 0,
+      SOL: account.balances["SOL"]?.free ?? 0,
+    };
+  }
 
+  // Default: Kraken
+  if (!isApiConfigured()) throw new Error("Kraken API keys not configured");
   const raw = await krakenPrivate<Record<string, string>>("Balance");
   return {
     USD: parseFloat(raw["ZUSD"] ?? raw["USD"] ?? "0"),
