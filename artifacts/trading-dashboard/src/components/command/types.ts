@@ -82,17 +82,22 @@ export interface AppSettings {
 }
 
 export interface Trade {
-  id:         string;
-  symbol:     string;
-  side:       string;
-  amount:     number;
-  price:      number;
-  pnl:        number | null;
-  pnlPercent: number | null;
-  status:     string;
-  mode:       string;
-  timestamp:  string;
-  closedAt:   string | null;
+  id:          string;
+  symbol:      string;
+  side:        string;
+  amount:      number;
+  price:       number;
+  exitPrice:   number | null;
+  pnl:         number | null;
+  pnlPercent:  number | null;
+  status:      string;
+  mode:        string;
+  signalId:    string | null;
+  stopLoss:    number | null;
+  takeProfit:  number | null;
+  reason:      string | null;
+  timestamp:   string;
+  closedAt:    string | null;
 }
 
 export interface ExchangeStatus {

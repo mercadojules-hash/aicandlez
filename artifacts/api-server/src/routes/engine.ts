@@ -14,6 +14,7 @@ import {
   setSelectedExchange,
   getExchangeStatus,
 } from "../lib/exchangeEngine.js";
+import { registry } from "../services/exchanges/ExchangeRegistry.js";
 import { db } from "@workspace/db";
 import { tradesTable, logsTable } from "@workspace/db";
 import {
@@ -106,6 +107,20 @@ router.post("/engine/filters", (req, res) => {
   });
 });
 
+// ── Exchange ID → adapter canonical name ──────────────────────────────────────
+// Normalises frontend IDs ("kraken", "coinbase", "binance", "cryptocom") to the
+// exact name used by ExchangeRegistry and the credential-check helpers.
+const EXCHANGE_ID_TO_ADAPTER: Record<string, string> = {
+  kraken:     "Kraken",
+  coinbase:   "Coinbase",
+  binance:    "Binance",
+  binanceus:  "Binance",
+  cryptocom:  "CryptoDotCom",
+  bybit:      "Bybit",
+  okx:        "OKX",
+  kucoin:     "KuCoin",
+};
+
 // ── POST /engine/exchange-mode ────────────────────────────────────────────────
 // Unified exchange switcher. body: { mode: "simulation" | "kraken" | "coinbase" | ... }
 // "simulation" → paper trading.  Any exchange name → live mode on that exchange.
@@ -123,13 +138,23 @@ router.post("/engine/exchange-mode", (req, res) => {
       return;
     }
   } else {
-    // Live mode on named exchange (kraken, coinbase, binance, …)
-    const result = setMode("live");
+    // Resolve the canonical adapter name
+    const adapterName = EXCHANGE_ID_TO_ADAPTER[mode.toLowerCase()] ?? mode;
+
+    // Credential check — pass exchange name so setMode validates the right keys
+    const result = setMode("live", adapterName);
     if (!result.ok) {
       res.status(400).json({ error: result.reason });
       return;
     }
-    setSelectedExchange(mode);
+
+    // Sync selected exchange display name
+    setSelectedExchange(adapterName);
+
+    // Sync the adapter registry (best-effort — adapter may not be registered yet)
+    if (registry.has(adapterName)) {
+      registry.setActive(adapterName);
+    }
   }
 
   res.json({ mode, status: getExchangeStatus() });

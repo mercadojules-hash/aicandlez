@@ -4,6 +4,7 @@ import { Cpu, Clock, ShieldOff, Pause, Play } from "lucide-react";
 
 import { TickerStrips }          from "@/components/command/TickerStrips";
 import { PlatformTelemetryBar }  from "@/components/command/PlatformTelemetryBar";
+import { LiveTradingConsole }    from "@/components/command/LiveTradingConsole";
 import { CryptoChartGrid }       from "@/components/command/CryptoChartGrid";
 import { PlatformOverviewPanel } from "@/components/command/PlatformOverviewPanel";
 import { RichTerminalFeed }      from "@/components/command/RichTerminalFeed";
@@ -138,10 +139,10 @@ export default function CommandCenter() {
     queryFn:  () => fetch("/api/engine/status", { cache: "no-store" }).then(r => r.json()),
     refetchInterval: 3_000, ...Q_OPTS,
   });
-  const { data: settings } = useQuery<AppSettings>({
+  const { data: settings, refetch: refetchSettings } = useQuery<AppSettings>({
     queryKey: ["settings-cmd"],
     queryFn:  () => fetch("/api/settings", { cache: "no-store" }).then(r => r.json()),
-    refetchInterval: 60_000, ...Q_OPTS,
+    refetchInterval: 10_000, ...Q_OPTS,
   });
   const { data: trades } = useQuery<Trade[]>({
     queryKey: ["trades-cmd"],
@@ -183,17 +184,22 @@ export default function CommandCenter() {
   const breakdowns = engine ? Object.values(engine.symbolBreakdowns) : [];
 
   const simTrades: Trade[] = (simAccount?.positions ?? []).map(p => ({
-    id:         p.id,
-    symbol:     p.symbol,
-    side:       p.side.toUpperCase(),
-    amount:     p.quantity,
-    price:      p.entryPrice,
-    pnl:        p.unrealizedPnL,
-    pnlPercent: p.unrealizedPnLPct,
-    status:     "open",
-    mode:       "simulation",
-    timestamp:  new Date(p.entryTime).toISOString(),
-    closedAt:   null,
+    id:          p.id,
+    symbol:      p.symbol,
+    side:        p.side.toUpperCase(),
+    amount:      p.quantity,
+    price:       p.entryPrice,
+    exitPrice:   null,
+    pnl:         p.unrealizedPnL,
+    pnlPercent:  p.unrealizedPnLPct,
+    status:      "open",
+    mode:        "simulation",
+    signalId:    null,
+    stopLoss:    null,
+    takeProfit:  null,
+    reason:      null,
+    timestamp:   new Date(p.entryTime).toISOString(),
+    closedAt:    null,
   }));
 
   const displayTrades: Trade[] = [
@@ -210,6 +216,19 @@ export default function CommandCenter() {
     .then(() => { qc.invalidateQueries({ queryKey: ["exchange-status-cmd"] }); void refetchExchange(); });
   const togglePause = () => fetch("/api/exchange/pause", { method: "POST", cache: "no-store" })
     .then(() => { qc.invalidateQueries({ queryKey: ["exchange-status-cmd"] }); void refetchExchange(); });
+
+  const startEngine = () => fetch("/api/engine/start", { method: "POST", cache: "no-store" })
+    .then(() => qc.invalidateQueries({ queryKey: ["engine-status-cmd"] }));
+  const stopEngine  = () => fetch("/api/engine/stop",  { method: "POST", cache: "no-store" })
+    .then(() => qc.invalidateQueries({ queryKey: ["engine-status-cmd"] }));
+
+  const settingsPatch = (patch: Record<string, number | boolean>) =>
+    fetch("/api/settings", {
+      method:  "PUT",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(patch),
+      cache:   "no-store",
+    }).then(() => { void refetchSettings(); });
 
   // pendingId: the button ID that should highlight immediately ("sim" | "kraken" | …)
   // apiMode:   what to send to the backend ("simulation" | "kraken" | …)
@@ -236,7 +255,25 @@ export default function CommandCenter() {
   return (
     <div className="flex flex-col min-h-screen" style={{ background: "#060810" }}>
 
-      {/* ① Ticker strips */}
+      {/* ① Live Trading Console — always visible at the top */}
+      <LiveTradingConsole
+        engine={engine}
+        settings={settings}
+        exchangeStatus={exchangeStatus}
+        trades={trades}
+        simAccount={simAccount}
+        activeId={activeId}
+        liveActive={liveActive}
+        onToggleKill={toggleKill}
+        onTogglePause={togglePause}
+        onStartEngine={startEngine}
+        onStopEngine={stopEngine}
+        onSettingsPatch={settingsPatch}
+        onSelectSim={selectSim}
+        onSelectLive={selectLive}
+      />
+
+      {/* ② Ticker strips */}
       <TickerStrips engine={engine} />
 
       {/* ② Telemetry bar */}
