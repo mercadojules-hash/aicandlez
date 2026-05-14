@@ -299,9 +299,18 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
     return `${sigInput}.${sigBuf.toString("base64url")}`;
   }
 
-  /** Legacy HMAC-SHA256 signing (Coinbase Pro / older Advanced Trade keys) */
+  /**
+   * Legacy HMAC-SHA256 signing (Coinbase Pro / Advanced Trade legacy keys).
+   * Secret is base64-encoded — must be decoded to raw bytes before use.
+   * Signature is base64-encoded (not hex).
+   * Method must be uppercase.
+   */
   private hmacSign(timestamp: string, method: string, path: string, body = ""): string {
-    return crypto.createHmac("sha256", this.config.apiSecret!).update(`${timestamp}${method}${path}${body}`).digest("hex");
+    const secretBytes = Buffer.from(this.config.apiSecret!, "base64");
+    return crypto
+      .createHmac("sha256", secretBytes)
+      .update(`${timestamp}${method.toUpperCase()}${path}${body}`)
+      .digest("base64");
   }
 
   private authHeaders(method: string, path: string, body = ""): Record<string, string> {
