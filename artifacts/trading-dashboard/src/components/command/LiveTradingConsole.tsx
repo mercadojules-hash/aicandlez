@@ -478,9 +478,9 @@ export function LiveTradingConsole({
             />
             <StatCard
               label="TRADES TODAY"
-              value={`${todayTrades.length} / ${settings?.maxTradesPerDay ?? 5}`}
-              sub={tradesLeft > 0 ? `${tradesLeft} remaining` : "LIMIT REACHED"}
-              valueColor={tradesLeft > 0 ? "#9FB3C8" : "#ffaa00"}
+              value={String(todayTrades.length)}
+              sub={`of ${settings?.maxTradesPerDay ?? 5} limit · ${tradesLeft > 0 ? `${tradesLeft} left` : "maxed"}`}
+              valueColor={tradesLeft === 0 ? "#ffaa00" : "#9FB3C8"}
             />
             <StatCard
               label="SESSION P&L"

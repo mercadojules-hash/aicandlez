@@ -121,6 +121,7 @@ const EXCHANGE_ID_TO_ADAPTER: Record<string, string> = {
   bybit:      "Bybit",
   okx:        "OKX",
   kucoin:     "KuCoin",
+  alpaca:     "Alpaca",
 };
 
 // ── POST /engine/exchange-mode ────────────────────────────────────────────────

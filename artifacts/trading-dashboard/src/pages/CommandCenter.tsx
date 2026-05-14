@@ -12,6 +12,7 @@ import { OpportunityScanner }    from "@/components/command/OpportunityScanner";
 import { MiddleStatsGrid }       from "@/components/command/MiddleStatsGrid";
 import { ActiveTradesPanel }     from "@/components/command/ActiveTradesPanel";
 import { BottomAnalyticsRow }    from "@/components/command/BottomAnalyticsRow";
+import { PlatformActivityHub }   from "@/components/command/PlatformActivityHub";
 
 import type {
   EngineStatus, AppSettings, Trade, ExchangeStatus, FeeSummary, SimAccount, LiveBalance,
@@ -27,19 +28,20 @@ type ExchangeOption = {
   disabled?: boolean;
   soon?:    boolean;
   isSim?:   boolean;
+  isPaper?: boolean;
 };
 
 const EXCHANGES: ExchangeOption[] = [
-  { id: "kraken",   label: "Kraken",     color: "#5741d9"                              },
-  { id: "sim",      label: "SIM",        color: "#ffaa00", isSim: true                 },
-  { id: "coinbase", label: "Coinbase",   color: "#2775ca"                              },
-  { id: "binance",  label: "Binance",    color: "#f0b90b"                              },
-  { id: "cryptocom",label: "Crypto.com", color: "#1199fa"                              },
-  { id: "bybit",    label: "Bybit",      color: "#f7a600", disabled: true, soon: true  },
-  { id: "bitget",   label: "Bitget",     color: "#00cfa0", disabled: true, soon: true  },
-  { id: "kucoin",   label: "KuCoin",     color: "#24ae8f", disabled: true, soon: true  },
-  { id: "okx",      label: "OKX",        color: "#b0b0b0", disabled: true, soon: true  },
-  { id: "gateio",   label: "Gate.io",    color: "#2354e6", disabled: true, soon: true  },
+  { id: "sim",      label: "PAPER AI",   color: "#ffaa00", isSim: true                  },
+  { id: "alpaca",   label: "ALPACA",     color: "#30c78d", isPaper: true                },
+  { id: "kraken",   label: "Kraken",     color: "#5741d9"                               },
+  { id: "coinbase", label: "Coinbase",   color: "#2775ca"                               },
+  { id: "binance",  label: "Binance",    color: "#f0b90b"                               },
+  { id: "cryptocom",label: "Crypto.com", color: "#1199fa"                               },
+  { id: "bybit",    label: "Bybit",      color: "#f7a600", disabled: true, soon: true   },
+  { id: "kucoin",   label: "KuCoin",     color: "#24ae8f", disabled: true, soon: true   },
+  { id: "okx",      label: "OKX",        color: "#b0b0b0", disabled: true, soon: true   },
+  { id: "gateio",   label: "Gate.io",    color: "#2354e6", disabled: true, soon: true   },
 ];
 
 function ExchangeSwitcher({
@@ -51,11 +53,13 @@ function ExchangeSwitcher({
 }) {
 
   return (
-    <div className="flex items-center gap-px p-0.5 rounded-lg flex-shrink-0"
+    <div className="flex items-center gap-px flex-shrink-0"
       style={{
-        background:      "#020a12",
-        border:          "1px solid #0d1e2e",
-        overflow:        "hidden",
+        background: "#010810",
+        border:     "1px solid #0d1e2e",
+        borderRadius: 8,
+        padding:    "3px",
+        overflow:   "hidden",
       }}>
       {EXCHANGES.map(ex => {
         const isActive   = activeId === ex.id;
@@ -71,25 +75,25 @@ function ExchangeSwitcher({
               else            onSelectLive(ex.id);
             }}
             title={isDisabled ? `${ex.label} — coming soon` : `Switch to ${ex.label}`}
-            className="flex items-center gap-1 rounded font-mono font-bold transition-all flex-shrink-0"
+            className="flex items-center gap-1.5 rounded-md font-mono font-bold transition-all flex-shrink-0"
             style={{
-              padding:       "5px 9px",
+              padding:       "6px 11px",
               fontSize:      "9px",
-              letterSpacing: "0.07em",
+              letterSpacing: "0.09em",
               whiteSpace:    "nowrap",
               cursor:        isDisabled ? "not-allowed" : "pointer",
               ...(isActive ? {
-                background: `${ex.color}1e`,
+                background: `${ex.color}20`,
                 color:       ex.color,
-                border:     `1px solid ${ex.color}48`,
-                boxShadow:  `0 0 12px ${ex.color}28, inset 0 0 8px ${ex.color}0c`,
+                border:     `1px solid ${ex.color}55`,
+                boxShadow:  `0 0 14px ${ex.color}30, inset 0 0 10px ${ex.color}10`,
               } : isDisabled ? {
                 background: "transparent",
                 color:      "#1a2e3a",
                 border:     "1px solid transparent",
               } : {
                 background: "transparent",
-                color:      "#4a7a94",
+                color:      "#3a6070",
                 border:     "1px solid transparent",
               }),
             }}
@@ -97,22 +101,42 @@ function ExchangeSwitcher({
               if (!isActive && !isDisabled) {
                 e.currentTarget.style.color      = "#C7D4E2";
                 e.currentTarget.style.background = "#0d1e2e";
-                e.currentTarget.style.border     = "1px solid #1a3050";
+                e.currentTarget.style.border     = `1px solid ${ex.color}30`;
               }
             }}
             onMouseLeave={e => {
               if (!isActive && !isDisabled) {
-                e.currentTarget.style.color      = "#4a7a94";
+                e.currentTarget.style.color      = "#3a6070";
                 e.currentTarget.style.background = "transparent";
                 e.currentTarget.style.border     = "1px solid transparent";
               }
             }}
           >
+            {/* Active health indicator */}
             {isActive && (
-              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ background: ex.color, boxShadow: `0 0 5px ${ex.color}` }} />
+              <span
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0 live-dot"
+                style={{ background: ex.color, boxShadow: `0 0 6px ${ex.color}` }}
+              />
             )}
+
             <span>{ex.label}</span>
+
+            {/* PAPER badge on Alpaca */}
+            {ex.isPaper && !isDisabled && (
+              <span
+                className="text-[6.5px] font-bold px-1 py-px rounded-sm font-mono leading-none"
+                style={{
+                  background: `${ex.color}18`,
+                  color:      isActive ? ex.color : `${ex.color}80`,
+                  border:     `1px solid ${ex.color}30`,
+                }}
+              >
+                PAPER
+              </span>
+            )}
+
+            {/* SOON badge */}
             {ex.soon && (
               <span className="text-[6px] font-bold px-1 py-px rounded-sm font-mono leading-none"
                 style={{ background: "#ffffff06", color: "#2a4050", border: "1px solid #1a2a35" }}>
@@ -385,10 +409,17 @@ export default function CommandCenter() {
         </div>
       </div>
 
+      {/* ④ Platform Activity Hub — operator layer before chart wall */}
+      <PlatformActivityHub
+        engine={engine}
+        exchangeStatus={exchangeStatus}
+        feeSummary={feeSummary}
+      />
+
       {/* Main content */}
       <div className="flex-1 p-2 sm:p-3 space-y-2 max-w-screen-2xl mx-auto w-full">
 
-        {/* ④ Chart wall */}
+        {/* ⑤ Chart wall */}
         <CryptoChartGrid breakdowns={breakdowns} />
 
         {/* ⑤ Three-column: Platform Overview | Terminal Feed | Scanner */}

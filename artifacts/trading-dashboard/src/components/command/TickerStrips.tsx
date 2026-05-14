@@ -153,8 +153,8 @@ export function TickerStrips({ engine }: Props) {
         const sym  = s.symbol.replace("USD", "");
         const exec = s.executedAs;
         const blk  = s.blockReason && s.blockReason !== "None";
-        const tag  = exec ? "✓ EXECUTED" : blk ? "BLOCKED" : "SIGNAL";
-        const c    = exec ? "#00ff8a" : blk ? "#ff3366" : "#00f0ff";
+        const tag  = exec ? "✓ EXECUTED" : blk ? "FILTERED" : "SIGNAL";
+        const c    = exec ? "#00ff8a" : blk ? "#ffb800" : "#00f0ff";
         const dCol = s.decision === "BUY" ? "#00ff8a" : s.decision === "SELL" ? "#ff3366" : "#3a6a80";
         return (
           <span key={i} className="inline-flex items-center gap-2 mx-5 shrink-0">

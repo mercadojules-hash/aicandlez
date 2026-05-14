@@ -1,0 +1,172 @@
+TOP DASHBOARD OPERATOR LAYER REFINEMENT
+
+We are now refining the top operational layer of the dashboard.
+
+This dashboard is evolving from a simple trading UI into a LIVE AI TRADING PLATFORM OPERATIONS CENTER focused on:
+
+* user activity
+* AI activity
+* platform telemetry
+* execution monitoring
+* fee generation
+* operational intelligence
+
+CRITICAL TOP SECTION CHANGES:
+
+1. LARGE EMPTY BLACK CONTAINER
+   The large empty black container under the top telemetry row is wasting premium space.
+
+Replace it with a large LIVE PLATFORM ACTIVITY CHART.
+
+This should become:
+AI + USER ACTIVITY COMMAND CENTER.
+
+Required metrics:
+
+* live AI trades
+* trades/minute
+* active users
+* users currently trading
+* live platform volume
+* AI executions
+* fees generated
+* platform PnL
+* new users joining
+* websocket activity
+* order flow density
+* live session activity
+
+Suggested visualization:
+
+* large animated realtime chart
+* multiple overlays
+* glowing institutional aesthetic
+* live activity pulses
+* execution markers
+* user activity markers
+
+This area should feel:
+
+* alive
+* premium
+* intelligent
+* operational
+* realtime
+
+2. “12 / 5 TRADES TODAY”
+   This is confusing UX.
+
+Clarify immediately.
+
+Replace with:
+
+* “Trades Today”
+* “Daily Trade Limit”
+* progress visualization
+
+Do NOT show ambiguous fractions.
+
+3. ACTIVE ASSET SECTION (DOGE AREA)
+   The active asset area currently wastes space.
+
+Add a LIVE DYNAMIC MINI-CHART directly beside:
+
+* stop loss
+* take profit
+* active asset telemetry
+
+Requirements:
+
+* chart updates dynamically when asset changes
+* live price movement
+* entry markers
+* stop loss line
+* take profit line
+* AI direction overlay
+* live execution visualization
+
+4. EXCHANGE / SIMULATION SECTION
+   Add:
+
+* ALPACA
+* PAPER TRADING
+
+Exchange buttons need redesign:
+
+* glowing premium tabs
+* active state
+* exchange health indicators
+* hover states
+* cleaner spacing
+
+Current buttons feel placeholder-level.
+
+5. REMOVE ALL MOCK TELEMETRY
+   Any remaining fake/mock top telemetry must be removed.
+
+ONLY real:
+
+* market data
+* account data
+* AI execution data
+* platform telemetry
+  should remain.
+
+6. BLOCKED SIGNAL ISSUE
+   Top ticker line continuously shows:
+   [BLOCKED]
+
+This is psychologically damaging.
+
+Investigate:
+
+* confidence threshold
+* risk engine
+* execution filters
+* overblocking logic
+
+The platform should generate:
+
+* steady believable trading activity
+* controlled execution frequency
+* visible AI opportunities
+
+NOT constant blocking.
+
+7. USER OPERATIONS LAYER
+   Add operator-level metrics:
+
+* active users
+* users trading live
+* users in simulation
+* new users today
+* AI executions
+* fees generated
+* total platform volume
+* active websocket sessions
+* average user confidence
+* average platform win rate
+
+8. LIVE USER ACTIVITY STREAM
+   Add live operational event feed:
+   Examples:
+
+* new user connected
+* paper trading activated
+* AI trade executed
+* live mode enabled
+* new position opened
+* subscription upgraded
+
+This dashboard is now becoming:
+an institutional-grade AI trading platform operations center.
+
+Preserve:
+
+* neon institutional aesthetic
+* Bloomberg/TradingView feel
+* black interior containers
+* high contrast telemetry
+
+DO NOT simplify the dashboard.
+REFINE and OPERATIONALIZE it.
