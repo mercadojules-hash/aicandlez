@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Cpu, Clock, ShieldOff, Pause, Play } from "lucide-react";
 
 import { TickerStrips }          from "@/components/command/TickerStrips";
-import { PlatformTelemetryBar }  from "@/components/command/PlatformTelemetryBar";
+import { TelemetryRow }          from "@/components/command/TelemetryRow";
 import { LiveTradingConsole }    from "@/components/command/LiveTradingConsole";
 import { CryptoChartGrid }       from "@/components/command/CryptoChartGrid";
 import { PlatformOverviewPanel } from "@/components/command/PlatformOverviewPanel";
@@ -310,8 +310,8 @@ export default function CommandCenter() {
       {/* ② Ticker strips */}
       <TickerStrips engine={engine} />
 
-      {/* ② Telemetry bar */}
-      <PlatformTelemetryBar
+      {/* ② Telemetry panels — two rows */}
+      <TelemetryRow
         engine={engine} settings={settings}
         trades={trades} exchangeStatus={exchangeStatus} feeSummary={feeSummary}
       />

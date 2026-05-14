@@ -19,18 +19,19 @@ function Cell({
   return (
     <div
       style={{
-        background:  "#000000",
-        border:      "1px solid #181818",
-        padding:     "12px 18px",
-        minWidth:    wide ? 140 : 110,
-        position:    "relative",
-        overflow:    "hidden",
-        flexShrink:  0,
-        transition:  "border-color 0.2s",
+        background:    "#030b14",
+        border:        `1px solid ${dim ? "#0e1c28" : "#141f2e"}`,
+        borderRadius:  3,
+        padding:       "14px 20px",
+        minWidth:      wide ? 160 : 130,
+        position:      "relative",
+        overflow:      "hidden",
+        flexShrink:    0,
+        transition:    "border-color 0.25s",
         ...(pulse && !dim ? { animation: "border-march 3s ease-in-out infinite" } : {}),
       }}
     >
-      {/* Top accent line */}
+      {/* Top accent bar */}
       <div
         style={{
           position:   "absolute",
@@ -38,38 +39,69 @@ function Cell({
           height:     2,
           background: dim
             ? "transparent"
-            : `linear-gradient(90deg, transparent, ${color}40, transparent)`,
+            : `linear-gradient(90deg, transparent, ${color}50, transparent)`,
         }}
       />
+
       {/* Primary value */}
       <div
         className="font-bold font-mono leading-none tabular-nums"
         style={{
-          fontSize:      26,
-          color:         dim ? "#1a3045" : color,
-          textShadow:    dim ? "none" : `0 0 12px ${color}40, 0 0 24px ${color}18`,
-          marginBottom:  sub ? 5 : 6,
-          letterSpacing: "-0.01em",
+          fontSize:      28,
+          color:         dim ? "#112233" : color,
+          textShadow:    dim ? "none" : `0 0 14px ${color}45, 0 0 28px ${color}18`,
+          marginBottom:  sub ? 6 : 7,
+          letterSpacing: "-0.02em",
         }}
       >
         {value}
       </div>
+
       {/* Sub-label */}
       {sub && (
         <div
           className="font-mono uppercase tracking-[0.14em] leading-none"
-          style={{ fontSize: 9, color: dim ? "#112233" : `${color}70`, marginBottom: 4 }}
+          style={{ fontSize: 9, color: dim ? "#112233" : `${color}75`, marginBottom: 5 }}
         >
           {sub}
         </div>
       )}
+
       {/* Label */}
       <div
-        className="font-mono uppercase leading-none"
-        style={{ fontSize: 9, color: "#1e3a50", letterSpacing: "0.14em" }}
+        className="font-mono uppercase leading-none tracking-[0.12em]"
+        style={{ fontSize: 9, color: "#2a4458" }}
       >
         {label}
       </div>
+    </div>
+  );
+}
+
+/* ── Row header label ────────────────────────────────────────────────────── */
+function RowHeader({ title, color }: { title: string; color: string }) {
+  return (
+    <div
+      className="flex-shrink-0 flex items-center"
+      style={{
+        writingMode:    "vertical-rl",
+        textOrientation: "mixed",
+        paddingLeft:    10,
+        paddingRight:   10,
+        paddingTop:     14,
+        paddingBottom:  14,
+        borderRight:    `1px solid ${color}22`,
+        background:     `${color}06`,
+        marginRight:    4,
+        alignSelf:      "stretch",
+      }}
+    >
+      <span
+        className="font-mono font-bold tracking-[0.22em] uppercase"
+        style={{ fontSize: 7, color: `${color}80`, transform: "rotate(180deg)" }}
+      >
+        {title}
+      </span>
     </div>
   );
 }
@@ -107,12 +139,8 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       })()
     : 0;
 
-  /* Simulated institutional metrics */
-  const apiLatency    = "~2ms";
-  const activeUsers   = 1;
-  const connectedExch = 11;
-  const dailyVolume   = execToday * 1240 + (simUSD * 0.012);
-  const acctHealth    = exchangeStatus?.killSwitch ? 0 : Math.max(40, 100 - blocked * 0.15);
+  const dailyVolume = execToday * 1240 + (simUSD * 0.012);
+  const acctHealth  = exchangeStatus?.killSwitch ? 0 : Math.max(40, 100 - blocked * 0.15);
 
   /* ── ROW 1: Operational / live state ──────────────────────────────── */
   const row1: Array<{
@@ -140,7 +168,7 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       pulse: !!exchangeStatus?.killSwitch,
     },
     {
-      label: "LIVE TRADES",
+      label: "OPEN POSITIONS",
       value: open.length,
       color: open.length > 0 ? "#00f0ff" : "#1a3850",
       dim:   open.length === 0,
@@ -153,26 +181,29 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       dim:   execToday === 0,
     },
     {
-      label: "FEES",
+      label: "FEES COLLECTED",
       value: `$${(feeSummary?.totalFeesCollected ?? 0).toFixed(2)}`,
       color: "#00ff8a",
+      wide:  true,
     },
     {
       label: "PORTFOLIO EQ",
-      value: `$${simUSD >= 1000 ? (simUSD / 1000).toFixed(0) + "K" : simUSD.toFixed(0)}`,
+      value: `$${simUSD >= 1000 ? (simUSD / 1000).toFixed(1) + "K" : simUSD.toFixed(0)}`,
       color: "#00f0ff",
-    },
-    {
-      label: "OPEN POSITIONS",
-      value: open.length,
-      color: open.length > 0 ? "#00aaff" : "#1a3850",
-      dim:   open.length === 0,
+      wide:  true,
     },
     {
       label: "ACCT HEALTH",
       value: `${acctHealth.toFixed(0)}%`,
       color: acctHealth >= 80 ? "#00ff8a" : acctHealth >= 50 ? "#ffaa00" : "#ff3355",
       pulse: acctHealth < 50,
+    },
+    {
+      label: "LAST SIGNAL",
+      value: lastSig,
+      color: "#00f0ff",
+      dim:   !engine?.lastSignalAt,
+      wide:  true,
     },
   ];
 
@@ -250,29 +281,6 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       dim:   mtfBlocked === 0,
     },
     {
-      label: "DAILY VOLUME",
-      value: dailyVolume >= 1000
-        ? `$${(dailyVolume / 1000).toFixed(1)}K`
-        : `$${dailyVolume.toFixed(0)}`,
-      color: dailyVolume > 0 ? "#00aaff" : "#1a3850",
-      dim:   dailyVolume === 0,
-    },
-    {
-      label: "CONNECTED EX",
-      value: connectedExch,
-      color: "#00aaff",
-    },
-    {
-      label: "ACTIVE USERS",
-      value: activeUsers,
-      color: "#00ff8a",
-    },
-    {
-      label: "API LATENCY",
-      value: apiLatency,
-      color: "#00f0ff",
-    },
-    {
       label: "EXEC RATE",
       value: `${execRate.toFixed(1)}%`,
       color: execRate > 60 ? "#00ff8a" : execRate > 20 ? "#ffb800" : "#ff2255",
@@ -283,41 +291,49 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       color: volFilter ? "#00ff8a" : "#ffb800",
     },
     {
-      label: "LAST SIGNAL",
-      value: lastSig,
-      color: "#00f0ff",
-      dim:   !engine?.lastSignalAt,
-    },
-    {
       label: "MIN CONF",
       value: `${settings?.minConfidence ?? 60}%`,
       color: "#00f0ff",
+    },
+    {
+      label: "DAILY VOLUME",
+      value: dailyVolume >= 1000
+        ? `$${(dailyVolume / 1000).toFixed(1)}K`
+        : `$${dailyVolume.toFixed(0)}`,
+      color: dailyVolume > 0 ? "#00aaff" : "#1a3850",
+      dim:   dailyVolume === 0,
+      wide:  true,
     },
   ];
 
   const rowStyle: React.CSSProperties = {
     display:        "flex",
-    gap:            8,
+    gap:            10,
     overflowX:      "auto",
     scrollbarWidth: "none",
-    paddingLeft:    8,
-    paddingRight:   8,
+    padding:        "0 12px",
+    flex:           1,
   };
 
   return (
-    <div style={{ background: "#000000", borderBottom: "1px solid #141414" }}>
-      {/* Row 1 */}
-      <div style={{ ...rowStyle, paddingTop: 10, paddingBottom: 6 }}>
-        {row1.map((c) => <Cell key={c.label} {...c} />)}
+    <div style={{ background: "#000000", borderBottom: "1px solid #101e2c" }}>
+
+      {/* ── Row 1: Operational / live state ─────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "stretch", borderBottom: "1px solid #0a1824" }}>
+        <RowHeader title="OPERATIONAL STATUS" color="#00f0ff" />
+        <div style={{ ...rowStyle, paddingTop: 12, paddingBottom: 10 }}>
+          {row1.map((c) => <Cell key={c.label} {...c} />)}
+        </div>
       </div>
 
-      {/* Divider */}
-      <div style={{ height: 1, background: "#0d0d0d", marginLeft: 8, marginRight: 8 }} />
-
-      {/* Row 2 */}
-      <div style={{ ...rowStyle, paddingTop: 6, paddingBottom: 10 }}>
-        {row2.map((c) => <Cell key={c.label} {...c} />)}
+      {/* ── Row 2: Performance / analytics ──────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "stretch" }}>
+        <RowHeader title="PERFORMANCE ANALYTICS" color="#cc55ff" />
+        <div style={{ ...rowStyle, paddingTop: 10, paddingBottom: 12 }}>
+          {row2.map((c) => <Cell key={c.label} {...c} />)}
+        </div>
       </div>
+
     </div>
   );
 }
