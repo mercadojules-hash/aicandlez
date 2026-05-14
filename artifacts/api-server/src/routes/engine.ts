@@ -14,9 +14,11 @@ import {
   setSelectedExchange,
   getExchangeStatus,
 } from "../lib/exchangeEngine.js";
+import { clearAllPositions } from "../lib/simulationEngine.js";
 import { registry } from "../services/exchanges/ExchangeRegistry.js";
 import { db } from "@workspace/db";
 import { tradesTable, logsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import {
   generateId,
   getBasePrice,
@@ -158,6 +160,43 @@ router.post("/engine/exchange-mode", (req, res) => {
   }
 
   res.json({ mode, status: getExchangeStatus() });
+});
+
+// ── POST /engine/close-all-positions ─────────────────────────────────────────
+// Bulk-closes every open trade in tradesTable (simulated exit price + PnL) and
+// clears the in-memory simulationEngine positions so the funnel unblocks.
+router.post("/engine/close-all-positions", async (_req, res) => {
+  // Fetch all open trades
+  const openTrades = await db
+    .select()
+    .from(tradesTable)
+    .where(eq(tradesTable.status, "open"));
+
+  let closed = 0;
+  for (const t of openTrades) {
+    try {
+      const exitPrice = generateSimulatedPrice(t.price);
+      const { pnl, pnlPercent } = calculatePnL(t.side, t.price, exitPrice, t.amount);
+      await db
+        .update(tradesTable)
+        .set({ status: "closed", exitPrice, pnl, pnlPercent, closedAt: new Date(), reason: "force_close_all" })
+        .where(eq(tradesTable.id, t.id));
+      closed++;
+    } catch { /* skip failed rows */ }
+  }
+
+  // Clear in-memory simulation engine positions so maxActivePositions resets
+  const cleared = clearAllPositions();
+
+  await db.insert(logsTable).values({
+    id:      generateId(),
+    type:    "system",
+    level:   "warn",
+    message: `[FORCE CLOSE] All open positions closed (${closed} DB rows, ${cleared} in-memory). Funnel unblocked.`,
+    details: { closed, cleared },
+  });
+
+  res.json({ ok: true, dbClosed: closed, simCleared: cleared });
 });
 
 // ── POST /engine/force-test-trades ───────────────────────────────────────────

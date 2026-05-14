@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Play, Pause, ShieldOff, Shield, Square,
-  TrendingUp, TrendingDown, Clock, Zap, AlertTriangle, Activity,
+  TrendingUp, TrendingDown, Clock, Zap, AlertTriangle, Activity, X, Trash2,
 } from "lucide-react";
 import type { EngineStatus, AppSettings, Trade, ExchangeStatus, SimAccount } from "./types";
 
@@ -17,20 +17,24 @@ const LIVE_EXCHANGES = [
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  engine:          EngineStatus   | undefined;
-  settings:        AppSettings    | undefined;
-  exchangeStatus:  ExchangeStatus | undefined;
-  trades:          Trade[]        | undefined;
-  simAccount:      SimAccount     | undefined;
-  activeId:        string;
-  liveActive:      boolean;
-  onToggleKill:    () => void;
-  onTogglePause:   () => void;
-  onStartEngine:   () => void;
-  onStopEngine:    () => void;
-  onSettingsPatch: (patch: Record<string, number | boolean>) => void;
-  onSelectSim:     () => void;
-  onSelectLive:    (ex: string) => void;
+  engine:                EngineStatus   | undefined;
+  settings:              AppSettings    | undefined;
+  exchangeStatus:        ExchangeStatus | undefined;
+  trades:                Trade[]        | undefined;
+  simAccount:            SimAccount     | undefined;
+  activeId:              string;
+  liveActive:            boolean;
+  onToggleKill:          () => void;
+  onTogglePause:         () => void;
+  onStartEngine:         () => void;
+  onStopEngine:          () => void;
+  onSettingsPatch:       (patch: Record<string, number | boolean>) => void;
+  onSelectSim:           () => void;
+  onSelectLive:          (ex: string) => void;
+  switchError?:          string | null;
+  onClearSwitchError?:   () => void;
+  onCloseAllPositions?:  () => void;
+  closingAll?:           boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -243,6 +247,7 @@ export function LiveTradingConsole({
   activeId, liveActive,
   onToggleKill, onTogglePause, onStartEngine, onStopEngine,
   onSettingsPatch, onSelectSim, onSelectLive,
+  switchError, onClearSwitchError, onCloseAllPositions, closingAll,
 }: Props) {
   const isRunning  = engine?.running ?? false;
   const isKill     = exchangeStatus?.killSwitch ?? false;
@@ -316,6 +321,25 @@ export function LiveTradingConsole({
 
   return (
     <div className="flex-shrink-0" style={{ background: "#000000", borderBottom: `2px solid ${bannerBorder}` }}>
+
+      {/* ── Exchange switch error banner ────────────────────────────────────── */}
+      {switchError && (
+        <div className="flex items-center gap-3 px-4 py-2"
+          style={{ background: "#1a0008", borderBottom: "1px solid #ff225540" }}>
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#ff2255" }} />
+          <span className="text-[10px] font-mono font-bold flex-1" style={{ color: "#ff6688" }}>
+            EXCHANGE SWITCH FAILED — {switchError.toUpperCase()}
+          </span>
+          <span className="text-[9px] font-mono" style={{ color: "#ff225560" }}>
+            ADD API KEYS IN SETTINGS → EXCHANGE CONNECTIONS
+          </span>
+          <button onClick={onClearSwitchError}
+            className="flex-shrink-0 rounded p-0.5 transition-all"
+            style={{ color: "#ff225580", background: "transparent", border: "none" }}>
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* ── Status Banner ──────────────────────────────────────────────────── */}
       <div className="flex items-center gap-4 px-4 py-2.5"
@@ -405,6 +429,18 @@ export function LiveTradingConsole({
             color={isKill ? "#ff2255" : "#9FB3C8"}
             bgColor={isKill ? "#ff225514" : "transparent"}
             borderColor={isKill ? "#ff225560" : "#1c2a36"}
+          />
+
+          {/* Close All Positions — unblocks the max-positions gate */}
+          <LargeButton
+            onClick={onCloseAllPositions ?? (() => {})}
+            label={closingAll ? "CLOSING…" : "CLOSE ALL POSITIONS"}
+            sub="Force-close all open trades & reset sim"
+            icon={Trash2}
+            color="#ff6600"
+            bgColor="#ff660010"
+            borderColor="#ff660035"
+            disabled={closingAll}
           />
         </div>
 

@@ -113,7 +113,7 @@ export function RichTerminalFeed({ engine }: Props) {
   useEffect(() => {
     const real: LiveRow[] = raw.map(s => ({ ...s, _conf: s.confidence, _stage: getStage(s) }));
     /* Always render at least 28 rows — pad with ghost rows when real count < 28 */
-    const ghostCount = Math.max(0, 28 - real.length);
+    const ghostCount = Math.max(0, 35 - real.length);
     const ghosts     = makeGhosts(ghostCount, real[real.length - 1]?.timestamp ?? Date.now());
     const next       = [...real, ...ghosts];
     if (real.length > prevLen.current) {

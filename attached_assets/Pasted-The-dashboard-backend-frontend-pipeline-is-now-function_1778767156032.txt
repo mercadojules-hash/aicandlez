@@ -1,0 +1,162 @@
+The dashboard backend/frontend pipeline is now functioning again after fixing the incorrect dotenv path in `artifacts/api-server/src/index.ts`.
+
+We now need to fix LIVE exchange mode switching and verify real Kraken execution flow.
+
+CURRENT ISSUE:
+
+* Clicking the “Kraken” exchange tab/button in the dashboard does NOT switch the platform from SIMULATION mode to LIVE/KRAKEN mode.
+* UI remains stuck on:
+
+  * “Simulation”
+  * “SIM Exchange”
+  * “Paper Trade”
+* No live account balance is loading from Kraken.
+* Active Trades and Recently Closed remain empty despite engine running.
+
+IMPORTANT:
+The issue is NOT frontend rendering anymore.
+Charts, telemetry, feeds, AI engine, and API routes are now functioning.
+
+Need a FULL investigation into the exchange mode switch pipeline.
+
+CHECK ALL OF THE FOLLOWING:
+
+1. FRONTEND EXCHANGE SWITCHER
+
+* Inspect the clickable exchange selector buttons:
+
+  * Kraken
+  * Coinbase
+  * Binance
+  * Crypto
+* Verify click handlers are wired correctly.
+* Verify state updates actually occur.
+* Verify selected exchange state propagates through React context/store.
+
+2. LIVE MODE TOGGLE PIPELINE
+   Check whether clicking Kraken:
+
+* triggers a frontend action
+* calls backend endpoint
+* updates engine state
+* updates exchange adapter
+* persists mode in store/db
+
+Need to verify if something like:
+POST /api/exchange/mode
+or
+POST /api/engine/live-trading
+is firing.
+
+3. NETWORK INSPECTION
+   Verify:
+
+* request is actually sent
+* request payload is correct
+* backend responds 200
+* frontend updates after response
+
+4. BACKEND ROUTES
+   Inspect all exchange/live-trading routes:
+
+* /api/exchange/*
+* /api/engine/*
+* exchange adapter manager
+* liveTradingEnabled flag
+* simulationEnabled flag
+* broker mode state
+
+5. EXCHANGE ADAPTER INITIALIZATION
+   Verify Kraken adapter:
+
+* initializes correctly
+* loads balances
+* loads open positions
+* authenticates successfully
+* receives API credentials
+* returns account telemetry
+
+6. TELEMETRY BAR
+   When Kraken is active:
+
+* balance should populate
+* exchange should show KRAKEN instead of SIM
+* live mode indicator should change
+* telemetry should reflect real account
+
+7. ACTIVE TRADES / RECENTLY CLOSED
+   Investigate why panels remain empty:
+
+* Is simulation mode preventing execution?
+* Is AI generating only HOLD signals?
+* Are trades blocked by confidence threshold?
+* Is execution funnel rejecting trades?
+* Is trade persistence failing?
+* Is journal/trade DB writing correctly?
+
+Need logs added for:
+
+* trade signal generation
+* trade rejection reasons
+* execution approvals
+* actual simulated/live executions
+
+8. LIVE TERMINAL FEED ROW COUNT
+   Currently only showing ~10 visible rows.
+   Need:
+
+* increase visible rows to ~20–25
+* larger scrollable terminal feed
+* auto-scroll newest entries
+* brighter text contrast
+* denser institutional/Bloomberg-style feed
+
+9. UI/UX IMPROVEMENTS
+
+* “Simulation” badge should dynamically change to:
+
+  * LIVE KRAKEN
+  * LIVE COINBASE
+  * SIMULATION
+* Exchange tabs should visibly highlight active mode.
+* Add LIVE trading danger confirmation modal before enabling real funds.
+* Add visible:
+
+  * LIVE
+  * PAUSED
+  * SIM
+    status indicators.
+
+10. CRITICAL SAFETY
+    Before enabling real trading:
+
+* verify position sizing logic
+* verify max risk %
+* verify kill switch functionality
+* verify stop-loss placement
+* verify exchange order execution path
+* verify no duplicate orders
+* verify dry-run/live separation
+
+IMPORTANT CONTEXT:
+The user ultimately wants:
+
+* real Kraken trading with live funds
+* ability to monitor AI trades from dashboard
+* operator/admin visibility into user trade activity
+* scalable architecture for future app users
+
+Also investigate:
+Once mobile apps/users are connected:
+
+* how operator dashboard can aggregate:
+
+  * user trade activity
+  * live positions
+  * exchange usage
+  * fee tracking
+  * AI performance
+  * account telemetry
+    without exposing private credentials between users.
+
+Need a full diagnostic + implementation update across frontend + backend.

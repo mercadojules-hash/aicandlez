@@ -91,6 +91,13 @@ async function enrichPositions(): Promise<SimPosition[]> {
 
 // ── Account summary ───────────────────────────────────────────────────────────
 
+export function clearAllPositions(): number {
+  const count = positions.length;
+  positions = [];
+  account.cashBalance = account.startingBalance;
+  return count;
+}
+
 export async function getAccountSummary() {
   const enriched = await enrichPositions();
   const unrealizedTotal = enriched.reduce((sum, p) => sum + (p.unrealizedPnL ?? 0), 0);

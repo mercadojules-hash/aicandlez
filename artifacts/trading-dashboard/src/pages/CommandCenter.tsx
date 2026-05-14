@@ -132,7 +132,9 @@ export default function CommandCenter() {
 
   // Optimistic mode — reflects button click immediately before the server round-trip completes.
   // null = use server state; "sim" | "kraken" | "coinbase" | … = pending click
-  const [pendingMode, setPendingMode] = useState<string | null>(null);
+  const [pendingMode,  setPendingMode]  = useState<string | null>(null);
+  const [switchError,  setSwitchError]  = useState<string | null>(null);
+  const [closingAll,   setClosingAll]   = useState(false);
 
   const { data: engine } = useQuery<EngineStatus>({
     queryKey: ["engine-status-cmd"],
@@ -204,12 +206,22 @@ export default function CommandCenter() {
 
   const displayTrades: Trade[] = [
     ...simTrades,
-    ...(trades ?? []).filter(t => t.status === "closed"),
+    ...(trades ?? []),
   ];
 
   const invalidateExchange = () => {
     qc.invalidateQueries({ queryKey: ["exchange-status-cmd"] });
     void refetchExchange().then(() => setPendingMode(null));
+  };
+
+  const closeAllPositions = () => {
+    setClosingAll(true);
+    fetch("/api/engine/close-all-positions", { method: "POST", cache: "no-store" })
+      .then(() => {
+        qc.invalidateQueries({ queryKey: ["trades-cmd"] });
+        qc.invalidateQueries({ queryKey: ["sim-account-cmd"] });
+      })
+      .finally(() => setClosingAll(false));
   };
 
   const toggleKill  = () => fetch("/api/exchange/kill",  { method: "POST", cache: "no-store" })
@@ -234,6 +246,7 @@ export default function CommandCenter() {
   // apiMode:   what to send to the backend ("simulation" | "kraken" | …)
   const switchExchangeMode = (pendingId: string, apiMode: string) => {
     setPendingMode(pendingId);
+    setSwitchError(null);
     // Clear stale sim data when switching away from simulation
     if (pendingId !== "sim") {
       qc.removeQueries({ queryKey: ["sim-account-cmd"] });
@@ -244,9 +257,15 @@ export default function CommandCenter() {
       body:    JSON.stringify({ mode: apiMode }),
       cache:   "no-store",
     })
-      .then(r => r.ok ? r.json() : Promise.reject(r))
-      .then(() => invalidateExchange())
-      .catch(() => setPendingMode(null)); // revert on error
+      .then(r => {
+        if (!r.ok) return r.json().then((j: { error?: string }) => Promise.reject(j.error ?? "Exchange switch failed"));
+        return r.json();
+      })
+      .then(() => { setSwitchError(null); invalidateExchange(); })
+      .catch((err: unknown) => {
+        setPendingMode(null);
+        setSwitchError(typeof err === "string" ? err : "Exchange switch failed — check API key configuration in Settings");
+      });
   };
 
   const selectSim  = ()           => switchExchangeMode("sim", "simulation");
@@ -271,6 +290,10 @@ export default function CommandCenter() {
         onSettingsPatch={settingsPatch}
         onSelectSim={selectSim}
         onSelectLive={selectLive}
+        switchError={switchError}
+        onClearSwitchError={() => setSwitchError(null)}
+        onCloseAllPositions={closeAllPositions}
+        closingAll={closingAll}
       />
 
       {/* ② Ticker strips */}
