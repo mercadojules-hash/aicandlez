@@ -8,6 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { useTrading, fmt$, fmtPct, fmtAge } from "@/contexts/TradingContext";
 import { SignalBadge, ConfidenceBar } from "@/components/SignalBadge";
 import { LiveDot } from "@/components/LiveDot";
+import { PortfolioChart } from "@/components/PortfolioChart";
 import { C, FONTS, RADIUS } from "@/constants/theme";
 
 const TAB_BAR_H = 84;
@@ -185,6 +186,9 @@ export default function HomeScreen() {
           </View>
         </View>
       </View>
+
+      {/* ── Portfolio Chart ── */}
+      <PortfolioChart equity={account.equity} />
 
       {/* ── Quick Stats ── */}
       <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>

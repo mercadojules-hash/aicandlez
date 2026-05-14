@@ -9,6 +9,7 @@ import * as Haptics from "expo-haptics";
 import { useTrading, fmt$, fmtPct, fmtAge } from "@/contexts/TradingContext";
 import { PositionCard } from "@/components/PositionCard";
 import { LiveDot } from "@/components/LiveDot";
+import { MicroAnalytics } from "@/components/MicroAnalytics";
 import { C, FONTS, RADIUS } from "@/constants/theme";
 
 const TAB_BAR_H = 84;
@@ -147,6 +148,29 @@ export default function TradeScreen() {
         <CtrlBtn label="PAUSE"  icon="pause"      color={C.orange} onPress={handlePause} active={paused} />
         <CtrlBtn label="AUTO"   icon="cpu"        color={C.cyan}   onPress={handleAuto}  active={autoMode} />
       </View>
+
+      {/* ── Micro Analytics ── */}
+      {(() => {
+        const closed = trades.filter(t => t.pnl != null);
+        const wins   = closed.filter(t => t.pnl > 0).length;
+        let streak   = 0;
+        for (let i = closed.length - 1; i >= 0; i--) {
+          if (closed[i].pnl > 0) { if (streak >= 0) streak++; else break; }
+          else                   { if (streak <= 0) streak--; else break; }
+        }
+        const exposure = Math.min(positions.length * 28, 100);
+        return (
+          <MicroAnalytics
+            wins={wins}
+            total={closed.length}
+            confidence={engine?.confidence ?? 62}
+            streak={streak}
+            exposure={exposure}
+            avgHoldMins={47}
+            aiRunning={!killActive && !paused && (engine?.running ?? false)}
+          />
+        );
+      })()}
 
       {/* ── Unrealized PnL banner ── */}
       {positions.length > 0 && (

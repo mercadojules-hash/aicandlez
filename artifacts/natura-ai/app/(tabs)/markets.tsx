@@ -8,6 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { useTrading } from "@/contexts/TradingContext";
 import { SignalBadge, ConfidenceBar } from "@/components/SignalBadge";
 import { LiveDot } from "@/components/LiveDot";
+import { MiniSparkline, genSparkData } from "@/components/MiniSparkline";
 import { C, FONTS, RADIUS } from "@/constants/theme";
 
 const TAB_BAR_H = 84;
@@ -27,33 +28,53 @@ const MOCK_ASSETS = [
 
 function AssetCard({ asset }: { asset: typeof MOCK_ASSETS[number] }) {
   const priceStr = asset.price >= 1000
-    ? `$${(asset.price/1000).toFixed(1)}K`
+    ? `$${(asset.price / 1000).toFixed(1)}K`
     : asset.price >= 1
     ? `$${asset.price.toFixed(2)}`
     : `$${asset.price.toFixed(4)}`;
 
-  const accent = asset.signal === "BUY" ? C.green : asset.signal === "SELL" ? C.red : C.cyan;
+  const accent      = asset.signal === "BUY" ? C.green : asset.signal === "SELL" ? C.red : C.cyan;
   const changeColor = asset.change >= 0 ? C.green : C.red;
+  const sparkDir    = asset.signal === "BUY" ? "up" : asset.signal === "SELL" ? "down" : "flat";
+  const sparkData   = genSparkData(asset.symbol, sparkDir as "up" | "down" | "flat");
 
   return (
     <View style={[ac.card, { borderColor: `${accent}25` }]}>
       <View style={[ac.accent, { backgroundColor: accent }]} />
       <View style={ac.top}>
+        {/* Left — symbol */}
         <View style={ac.left}>
           <Text style={ac.symbol}>{asset.symbol.replace("USD", "")}</Text>
           <Text style={ac.mcap}>{asset.mktCap}</Text>
         </View>
+
+        {/* Center — price + sparkline */}
         <View style={ac.center}>
           <Text style={ac.price}>{priceStr}</Text>
           <Text style={[ac.change, { color: changeColor }]}>
             {asset.change >= 0 ? "+" : ""}{asset.change.toFixed(2)}%
           </Text>
         </View>
+
+        {/* Sparkline */}
+        <View style={ac.sparkWrap}>
+          <MiniSparkline
+            data={sparkData}
+            color={accent}
+            width={72}
+            height={34}
+            showFill
+            strokeWidth={1.5}
+          />
+        </View>
+
+        {/* Right — signal */}
         <View style={ac.right}>
           <SignalBadge signal={asset.signal} />
           <Text style={ac.conf}>{asset.confidence}%</Text>
         </View>
       </View>
+
       <View style={ac.bottom}>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
@@ -72,6 +93,7 @@ function AssetCard({ asset }: { asset: typeof MOCK_ASSETS[number] }) {
 const ac = StyleSheet.create({
   card:     { backgroundColor: C.surface, borderRadius: RADIUS.lg, borderWidth: 1, marginBottom: 10, overflow: "hidden" },
   accent:   { height: 2 },
+  sparkWrap:{ justifyContent: "center", marginHorizontal: 4 },
   top:      { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
   left:     { width: 56 },
   symbol:   { fontSize: 14, fontFamily: FONTS.monoBold, color: C.textPrimary },

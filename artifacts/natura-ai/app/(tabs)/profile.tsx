@@ -9,6 +9,7 @@ import * as Haptics from "expo-haptics";
 import { useTrading, fmt$, fmtPct } from "@/contexts/TradingContext";
 import { NeonCard } from "@/components/NeonCard";
 import { LiveDot } from "@/components/LiveDot";
+import { PerformancePanel } from "@/components/PerformancePanel";
 import { C, FONTS, RADIUS } from "@/constants/theme";
 
 const TAB_BAR_H = 88;
@@ -555,6 +556,15 @@ export default function ProfileScreen() {
           />
           <StatCard label="FEES PAID" value={fmt$(account.totalFeesPaid)} color={C.orange} />
         </View>
+
+        {/* ── Performance Intelligence ── */}
+        <SectionHeader label="PERFORMANCE INTELLIGENCE" accent={C.purple} />
+        <PerformancePanel
+          totalPnL={totalPnL}
+          winRate={winRate}
+          totalTrades={account.totalTrades}
+          feesPaid={account.totalFeesPaid}
+        />
 
         {/* ── Exchange Connections ── */}
         <SectionHeader label="EXCHANGE CONNECTIONS" accent={C.cyan} />

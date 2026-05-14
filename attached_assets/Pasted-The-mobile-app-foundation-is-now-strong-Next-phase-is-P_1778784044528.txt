@@ -1,0 +1,258 @@
+The mobile app foundation is now strong.
+Next phase is PREMIUM PERFORMANCE VISUALIZATION and USER EMOTIONAL UX.
+
+We are NOT redesigning the app.
+
+We are upgrading the app from:
+“functional AI trading app”
+to:
+“premium institutional AI investing experience.”
+
+IMPORTANT:
+Do NOT clutter the UI.
+Do NOT create a noisy crypto exchange look.
+Do NOT add excessive telemetry.
+
+The mobile app should feel:
+clean
+cinematic
+minimal
+intelligent
+premium
+high-trust
+
+Use the existing Apex AI Trader dark institutional design language.
+
+---
+
+## PHASE 2 — PERFORMANCE & ANALYTICS UX
+
+GOAL:
+Users should FEEL:
+
+* growth
+* progress
+* confidence
+* momentum
+* intelligence
+* AI-assisted performance
+
+through elegant charts and visual analytics.
+
+---
+
+1. HOME SCREEN — HERO PORTFOLIO CHART
+
+---
+
+Add a premium animated portfolio performance chart directly under the Portfolio Equity section.
+
+Features:
+
+* smooth neon equity curve
+* subtle glow
+* dark background dominance
+* animated transitions
+* minimal labels
+* institutional fintech styling
+
+Timeframe toggles:
+
+* 1D
+* 1W
+* 1M
+* 3M
+* ALL
+
+Chart should support:
+
+* realized PnL
+* unrealized PnL
+* account growth
+* AI-managed growth curve
+
+VISUAL STYLE:
+Think:
+Bloomberg x TradingView x Apple Wallet x Tesla UI.
+
+NOT:
+cheap Binance clone.
+
+---
+
+2. TRADE SCREEN — MICRO ANALYTICS
+
+---
+
+Add small premium analytics modules:
+
+* win/loss donut
+* AI confidence trend
+* exposure gauge
+* profit streak counter
+* execution quality meter
+* average hold duration
+* trade efficiency score
+
+Keep them:
+small
+clean
+minimal
+high signal
+
+No clutter.
+
+---
+
+3. MARKETS SCREEN — MINI LIVE CHARTS
+
+---
+
+Each asset card should include:
+
+* mini sparkline chart
+* momentum visualization
+* trend direction
+* subtle animated movement
+
+Add:
+
+* bullish/bearish visual indicators
+* AI strength score
+* signal acceleration feel
+
+The Markets screen should feel:
+alive
+smart
+reactive
+AI-driven
+
+without becoming visually overwhelming.
+
+---
+
+4. PROFILE SCREEN — ACCOUNT INTELLIGENCE
+
+---
+
+Add premium account analytics:
+
+* portfolio growth chart
+* monthly AI performance
+* AI strategy effectiveness
+* cumulative returns
+* fees generated/saved
+* AI consistency score
+
+Add a “Performance Intelligence” section.
+
+This should feel:
+premium
+institutional
+data-intelligent
+
+NOT:
+gamified crypto nonsense.
+
+---
+
+5. ANIMATION SYSTEM
+
+---
+
+Introduce subtle motion system throughout app:
+
+* smooth card hover transitions
+* animated chart drawing
+* glowing data updates
+* soft pulse on live AI systems
+* elegant fade/slide transitions
+
+Motion should feel:
+Tesla
+Apple
+Bloomberg Terminal modernized
+
+NOT:
+arcade
+cyberpunk overload
+casino crypto app
+
+---
+
+6. LIVE AI FEEL
+
+---
+
+The app should now feel like:
+an intelligent autonomous AI trading system.
+
+Add subtle indicators:
+
+* AI learning pulse
+* market regime shifts
+* confidence movement
+* AI adaptation feel
+
+Very subtle.
+Very premium.
+
+---
+
+7. PRESERVE CURRENT VISUAL LANGUAGE
+
+---
+
+DO NOT redesign the app.
+
+KEEP:
+
+* dark institutional palette
+* restrained neon glow
+* elegant typography
+* glass/neon cards
+* black background dominance
+* premium spacing
+* current navigation structure
+* current exchange architecture
+
+---
+
+8. PERFORMANCE PRIORITY
+
+---
+
+Charts and animations MUST remain:
+
+* smooth
+* lightweight
+* optimized for Expo/mobile
+* battery-conscious
+* production-ready
+
+No laggy heavy chart libraries.
+
+---
+
+9. FINAL PRODUCT DIRECTION
+
+---
+
+The app should now feel like:
+
+“The Black Card version of AI investing.”
+
+Users should emotionally feel:
+
+* trust
+* intelligence
+* sophistication
+* momentum
+* premium automation
+
+This is NOT a crypto gambling app.
+
+It is:
+an institutional-grade AI investment platform for modern consumers.
+
+Refine the emotional UX accordingly.
