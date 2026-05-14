@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { SimAccount } from "./types";
+import type { SimAccount, LiveBalance } from "./types";
 
 interface Segment { label: string; value: string; color: string; pct: number }
 
@@ -67,28 +67,47 @@ function DonutChart({ segments, centerValue, centerLabel }: {
 
 interface VolumeRow { rank: number; symbol: string; volume: string; color: string; pct: number }
 
-interface Props { simAccount?: SimAccount }
+interface Props { simAccount?: SimAccount; liveBalance?: LiveBalance }
 
-export function PlatformOverviewPanel({ simAccount }: Props) {
+export function PlatformOverviewPanel({ simAccount, liveBalance }: Props) {
   const [tick, setTick] = useState(0);
   useEffect(() => { const t = setInterval(() => setTick(n => n + 1), 2000); return () => clearInterval(t); }, []);
 
-  const equity   = simAccount?.equity ?? 0;
-  const cash     = simAccount?.account?.cashBalance ?? 0;
-  const realized = simAccount?.account?.totalRealized ?? 0;
-  const posCount = simAccount?.positionCount ?? 0;
+  const isLive = liveBalance?.source === "live";
 
-  const cashPct     = equity > 0 ? Math.round((cash / equity) * 100)    : 85;
-  const posPct      = equity > 0 ? Math.round(((equity - cash) / equity) * 100) : 12;
-  const realPct     = Math.max(0, Math.min(10, Math.abs(realized / (equity || 1)) * 100));
-  const restPct     = Math.max(0, 100 - cashPct - posPct - realPct);
+  // ── Live Kraken balance path ─────────────────────────────────────────────
+  const liveUSD = isLive ? (liveBalance!.balances.USD) : 0;
+  const liveBTC = isLive ? (liveBalance!.balances.BTC) : 0;
+  const liveETH = isLive ? (liveBalance!.balances.ETH) : 0;
+  const liveSOL = isLive ? (liveBalance!.balances.SOL) : 0;
 
-  const centerValue = equity > 0
-    ? `$${(equity / 1000).toFixed(equity >= 100_000 ? 0 : 1)}K`
-    : "SIM";
-  const centerLabel = equity > 0 ? "SIM EQUITY" : "SIMULATION";
+  // ── Sim balance path ─────────────────────────────────────────────────────
+  const equity   = isLive ? liveUSD : (simAccount?.equity ?? 0);
+  const cash     = isLive ? liveUSD : (simAccount?.account?.cashBalance ?? 0);
+  const realized = isLive ? 0       : (simAccount?.account?.totalRealized ?? 0);
+  const posCount = isLive ? 0       : (simAccount?.positionCount ?? 0);
 
-  const segments: Segment[] = simAccount ? [
+  const cashPct  = (!isLive && equity > 0) ? Math.round((cash / equity) * 100)             : 85;
+  const posPct   = (!isLive && equity > 0) ? Math.round(((equity - cash) / equity) * 100)  : 12;
+  const realPct  = (!isLive) ? Math.max(0, Math.min(10, Math.abs(realized / (equity || 1)) * 100)) : 0;
+  const restPct  = (!isLive) ? Math.max(0, 100 - cashPct - posPct - realPct) : 0;
+
+  const fmtUSD = (n: number) =>
+    n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M`
+    : n >= 1_000   ? `$${(n / 1_000).toFixed(1)}K`
+    : `$${n.toFixed(2)}`;
+
+  const centerValue = isLive
+    ? fmtUSD(liveUSD)
+    : equity > 0 ? `$${(equity / 1000).toFixed(equity >= 100_000 ? 0 : 1)}K` : "SIM";
+  const centerLabel = isLive ? "LIVE USD" : equity > 0 ? "SIM EQUITY" : "SIMULATION";
+
+  const segments: Segment[] = isLive ? [
+    { label: "USD Cash",      value: fmtUSD(liveUSD),                                             pct: 85, color: "#00aaff" },
+    { label: "BTC Holdings",  value: liveBTC > 0 ? `₿ ${liveBTC.toFixed(6)}`  : "0 BTC",         pct: liveBTC > 0 ? 8 : 2,  color: "#F7931A" },
+    { label: "ETH Holdings",  value: liveETH > 0 ? `Ξ ${liveETH.toFixed(6)}`  : "0 ETH",         pct: liveETH > 0 ? 8 : 2,  color: "#627EEA" },
+    { label: "SOL Holdings",  value: liveSOL > 0 ? `◎ ${liveSOL.toFixed(4)}`  : "0 SOL",         pct: liveSOL > 0 ? 5 : 2,  color: "#9945FF" },
+  ] : simAccount ? [
     { label: "Cash Balance",   value: `$${cash.toFixed(2)}`,        pct: cashPct,  color: "#00aaff" },
     { label: "Open Positions", value: `${posCount} pos`,            pct: posPct,   color: "#00ff8a" },
     { label: "Realized P&L",   value: `${realized >= 0 ? "+" : ""}$${realized.toFixed(2)}`, pct: Math.max(realPct, 3), color: realized >= 0 ? "#7b68ee" : "#ff3355" },

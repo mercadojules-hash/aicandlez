@@ -1,0 +1,73 @@
+We successfully migrated the project into a clean new workspace (`apex-trader-live`) and got LIVE Kraken mode functioning again without reverting to simulation.
+
+Current status:
+
+* Backend builds successfully
+* Frontend loads successfully
+* Exchange switching works
+* Kraken LIVE mode persists correctly
+* Red banner issue resolved (`EXCHANGE_LIVE_ENABLED=true`)
+* LIVE banner now shows:
+  `LIVE TRADING — KRAKEN — SPOT ONLY`
+* No more simulation fallback
+
+However, we discovered a remaining issue:
+
+The dashboard is NOT displaying the real Kraken account balance or real account telemetry.
+
+Expected:
+
+* Kraken account has approximately $100 USD balance
+* We should see real account equity/balance/positions reflected in UI
+
+Actual:
+
+* Dashboard still shows simulated/fake telemetry:
+
+  * fake PnL
+  * fake equity
+  * fake active users
+  * fake platform stats
+  * simulated account values
+
+Additional debugging performed:
+
+* Network tab confirms backend is alive and streaming data
+* `status` endpoint returns AI telemetry correctly
+* `settings` endpoint only exposes:
+  `"binanceApiKey": null`
+  `"binanceApiSecret": null`
+* We do NOT currently see Kraken balances/account payloads exposed in frontend telemetry
+
+Important:
+We do NOT want a new ZIP rebuild yet.
+
+We want to patch/update the CURRENT local workspace manually.
+
+Please identify EXACTLY:
+
+1. Which backend route/file is responsible for returning live exchange balances/account telemetry
+2. Which frontend component/file maps/render portfolio/account equity
+3. Whether the backend is still returning simulation portfolio state while LIVE exchange mode is active
+4. What exact code/script changes are needed to:
+
+   * pull REAL Kraken balances
+   * expose them to frontend telemetry
+   * render live account equity correctly
+5. Whether the Kraken adapter itself is already successfully authenticated and retrieving balances internally
+6. Whether the issue is:
+
+   * backend adapter
+   * API permissions
+   * telemetry mapping
+   * frontend rendering
+   * simulation state override
+   * cached mock portfolio state
+
+Please provide:
+
+* exact file paths
+* exact code snippets to replace
+* exact terminal commands if needed
+
+We want to fix this directly in the current workspace without reinstalling another ZIP.

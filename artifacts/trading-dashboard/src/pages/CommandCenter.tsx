@@ -14,7 +14,7 @@ import { ActiveTradesPanel }     from "@/components/command/ActiveTradesPanel";
 import { BottomAnalyticsRow }    from "@/components/command/BottomAnalyticsRow";
 
 import type {
-  EngineStatus, AppSettings, Trade, ExchangeStatus, FeeSummary, SimAccount,
+  EngineStatus, AppSettings, Trade, ExchangeStatus, FeeSummary, SimAccount, LiveBalance,
 } from "@/components/command/types";
 import { ago, Q_OPTS } from "@/components/command/helpers";
 
@@ -184,6 +184,15 @@ export default function CommandCenter() {
     ...Q_OPTS,
   });
 
+  // /api/exchange/balances: poll real exchange balances in LIVE mode only
+  const { data: liveBalance } = useQuery<LiveBalance>({
+    queryKey: ["live-balance-cmd"],
+    queryFn:  () => fetch("/api/exchange/balances", { cache: "no-store" }).then(r => r.json()),
+    refetchInterval: liveActive ? 15_000 : false,
+    enabled:         liveActive,
+    ...Q_OPTS,
+  });
+
   const breakdowns = engine ? Object.values(engine.symbolBreakdowns) : [];
 
   const simTrades: Trade[] = (simAccount?.positions ?? []).map(p => ({
@@ -282,6 +291,7 @@ export default function CommandCenter() {
         exchangeStatus={exchangeStatus}
         trades={trades}
         simAccount={simAccount}
+        liveBalance={liveBalance}
         activeId={activeId}
         liveActive={liveActive}
         onToggleKill={toggleKill}
@@ -383,7 +393,7 @@ export default function CommandCenter() {
 
         {/* ⑤ Three-column: Platform Overview | Terminal Feed | Scanner */}
         <div className="grid gap-2" style={{ gridTemplateColumns: "260px 1fr 260px", height: 780 }}>
-          <PlatformOverviewPanel simAccount={simAccount} />
+          <PlatformOverviewPanel simAccount={simAccount} liveBalance={liveBalance} />
           <RichTerminalFeed engine={engine} />
           <OpportunityScanner breakdowns={breakdowns} />
         </div>

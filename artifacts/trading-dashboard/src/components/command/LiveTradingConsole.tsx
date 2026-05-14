@@ -3,7 +3,7 @@ import {
   Play, Pause, ShieldOff, Shield, Square,
   TrendingUp, TrendingDown, Clock, Zap, AlertTriangle, Activity, X, Trash2,
 } from "lucide-react";
-import type { EngineStatus, AppSettings, Trade, ExchangeStatus, SimAccount } from "./types";
+import type { EngineStatus, AppSettings, Trade, ExchangeStatus, SimAccount, LiveBalance } from "./types";
 
 // ── Exchange options ──────────────────────────────────────────────────────────
 
@@ -22,6 +22,7 @@ interface Props {
   exchangeStatus:        ExchangeStatus | undefined;
   trades:                Trade[]        | undefined;
   simAccount:            SimAccount     | undefined;
+  liveBalance?:          LiveBalance    | undefined;
   activeId:              string;
   liveActive:            boolean;
   onToggleKill:          () => void;
@@ -243,7 +244,7 @@ function ActiveTradeCard({ openTrade, simPos }: {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function LiveTradingConsole({
-  engine, settings, exchangeStatus, trades, simAccount,
+  engine, settings, exchangeStatus, trades, simAccount, liveBalance,
   activeId, liveActive,
   onToggleKill, onTogglePause, onStartEngine, onStopEngine,
   onSettingsPatch, onSelectSim, onSelectLive,
@@ -287,7 +288,11 @@ export function LiveTradingConsole({
 
   const simPos     = simAccount?.positions?.[0];
   const openTrade  = openTrades[0];
-  const balance    = simAccount?.equity ?? simAccount?.account?.cashBalance;
+
+  // In LIVE mode: show real exchange USD balance. In SIM mode: show simulation equity.
+  const krakenUSD  = liveActive && liveBalance?.source === "live" ? liveBalance.balances.USD : null;
+  const balance    = krakenUSD ?? simAccount?.equity ?? simAccount?.account?.cashBalance;
+  const balanceLabel = liveActive && krakenUSD != null ? "LIVE BALANCE (USD)" : "ACCOUNT EQUITY";
   const unrealPnL  = simAccount?.unrealizedPnL ?? 0;
 
   // ── Status banner color ───────────────────────────────────────────────────
@@ -450,10 +455,10 @@ export function LiveTradingConsole({
           {/* Stats row */}
           <div className="flex border-b" style={{ borderBottomColor: "#0d1e2e" }}>
             <StatCard
-              label="ACCOUNT EQUITY"
+              label={balanceLabel}
               value={balance != null ? fmt$(balance, 0) : "—"}
               big
-              valueColor="#EAF2FF"
+              valueColor={krakenUSD != null ? "#00ff8a" : "#EAF2FF"}
             />
             <StatCard
               label="TOTAL REALIZED P&L"

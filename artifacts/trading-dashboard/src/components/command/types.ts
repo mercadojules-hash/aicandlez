@@ -113,6 +113,16 @@ export interface ExchangeStatus {
   exchangeName: string;
 }
 
+export interface LiveBalance {
+  source:   "live" | "simulation";
+  balances: {
+    USD: number;
+    BTC: number;
+    ETH: number;
+    SOL: number;
+  };
+}
+
 export interface FeeSummary {
   totalFeesCollected: number;
   tradeCount:         number;
