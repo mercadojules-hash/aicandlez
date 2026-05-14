@@ -242,53 +242,119 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
     return !!(this.config.apiKey && this.config.apiSecret);
   }
 
-  private sign(timestamp: string, method: string, path: string, body = ""): string {
-    const msg = `${timestamp}${method}${path}${body}`;
-    return crypto.createHmac("sha256", this.config.apiSecret!).update(msg).digest("hex");
+  /**
+   * CDP API keys use an `organizations/…` key name format.
+   * Legacy Coinbase Pro keys are short hex/alphanumeric strings.
+   */
+  private get isCdpKey(): boolean {
+    return !!(this.config.apiKey?.startsWith("organizations/") || this.config.apiSecret?.includes("-----BEGIN"));
+  }
+
+  /**
+   * Reconstruct a valid PEM EC private key from however the secret is stored.
+   * CDP keys are often stored in env vars as bare base64 DER (no header/footer)
+   * with literal `\n` escape sequences instead of real newlines.
+   * Handles all three forms:
+   *   1. Full PEM (has "-----BEGIN") — just normalise escaped newlines
+   *   2. Bare base64 DER — wrap with SEC1 EC PRIVATE KEY header/footer
+   */
+  private normalisePem(raw: string): string {
+    // Turn literal \n sequences into real newlines, then strip surrounding whitespace
+    const s = raw.replace(/\\n/g, "\n").trim();
+    // Already a valid PEM — return as-is
+    if (s.startsWith("-----")) return s;
+    // Bare base64 body — wrap with SEC1 header/footer in 64-char lines
+    const b64 = s.replace(/\s+/g, "");
+    const lines: string[] = [];
+    for (let i = 0; i < b64.length; i += 64) lines.push(b64.slice(i, i + 64));
+    return `-----BEGIN EC PRIVATE KEY-----\n${lines.join("\n")}\n-----END EC PRIVATE KEY-----\n`;
+  }
+
+  /**
+   * Build a signed JWT for the Coinbase CDP API (Advanced Trade v3).
+   * Header: { alg: "ES256", kid: keyName, nonce: randomHex }
+   * Payload: { sub: keyName, iss: "coinbase-cloud", nbf, exp, uri: "METHOD host/path" }
+   */
+  private buildJwt(method: string, path: string): string {
+    const keyName = this.config.apiKey!;
+    const pem     = this.normalisePem(this.config.apiSecret!);
+    const nonce   = crypto.randomBytes(16).toString("hex");
+    const now     = Math.floor(Date.now() / 1000);
+
+    const header  = Buffer.from(JSON.stringify({ alg: "ES256", kid: keyName, nonce })).toString("base64url");
+    const payload = Buffer.from(JSON.stringify({
+      sub: keyName,
+      iss: "coinbase-cloud",
+      nbf: now,
+      exp: now + 120,
+      uri: `${method} ${this.BASE}${path}`,
+    })).toString("base64url");
+
+    const sigInput = `${header}.${payload}`;
+    const signer   = crypto.createSign("SHA256");
+    signer.update(sigInput);
+    const sigBuf   = signer.sign(
+      { key: pem, dsaEncoding: "ieee-p1363" } as Parameters<typeof signer.sign>[0],
+    );
+    return `${sigInput}.${sigBuf.toString("base64url")}`;
+  }
+
+  /** Legacy HMAC-SHA256 signing (Coinbase Pro / older Advanced Trade keys) */
+  private hmacSign(timestamp: string, method: string, path: string, body = ""): string {
+    return crypto.createHmac("sha256", this.config.apiSecret!).update(`${timestamp}${method}${path}${body}`).digest("hex");
+  }
+
+  private authHeaders(method: string, path: string, body = ""): Record<string, string> {
+    if (this.isCdpKey) {
+      return { Authorization: `Bearer ${this.buildJwt(method, path)}`, "Content-Type": "application/json" };
+    }
+    const ts = Math.floor(Date.now() / 1000).toString();
+    return {
+      "CB-ACCESS-KEY":       this.config.apiKey!,
+      "CB-ACCESS-SIGN":      this.hmacSign(ts, method, path, body),
+      "CB-ACCESS-TIMESTAMP": ts,
+      "Content-Type":        "application/json",
+    };
+  }
+
+  private parseOrThrow<T>(data: string, op: string): T {
+    let parsed: unknown;
+    try { parsed = JSON.parse(data); } catch { throw new Error(`${op}: non-JSON response — ${data.slice(0, 200)}`); }
+    const p = parsed as Record<string, unknown>;
+    if (p["error"] || p["message"]) {
+      throw new Error(`${op}: ${p["error"] ?? p["message"]}`);
+    }
+    return parsed as T;
   }
 
   private get<T>(path: string): Promise<T> {
     return new Promise((resolve, reject) => {
-      https.get({ hostname: this.BASE, path }, res => {
+      https.get({ hostname: this.BASE, path, headers: this.authHeaders("GET", path) }, res => {
         let data = "";
         res.on("data", c => { data += c; });
-        res.on("end", () => { try { resolve(JSON.parse(data) as T); } catch { reject(new Error("parse failed")); } });
+        res.on("end", () => { try { resolve(this.parseOrThrow<T>(data, "GET " + path)); } catch (e) { reject(e); } });
       }).on("error", reject);
     });
   }
 
   private signedGet<T>(path: string): Promise<T> {
-    const ts  = Math.floor(Date.now() / 1000).toString();
-    const sig = this.sign(ts, "GET", path);
     return new Promise((resolve, reject) => {
-      https.get({
-        hostname: this.BASE, path,
-        headers: { "CB-ACCESS-KEY": this.config.apiKey!, "CB-ACCESS-SIGN": sig,
-                   "CB-ACCESS-TIMESTAMP": ts, "Content-Type": "application/json" },
-      }, res => {
+      https.get({ hostname: this.BASE, path, headers: this.authHeaders("GET", path) }, res => {
         let data = "";
         res.on("data", c => { data += c; });
-        res.on("end", () => { try { resolve(JSON.parse(data) as T); } catch { reject(new Error("parse failed")); } });
+        res.on("end", () => { try { resolve(this.parseOrThrow<T>(data, "GET " + path)); } catch (e) { reject(e); } });
       }).on("error", reject);
     });
   }
 
   private signedPost<T>(path: string, body: unknown): Promise<T> {
-    const ts      = Math.floor(Date.now() / 1000).toString();
     const bodyStr = JSON.stringify(body);
-    const sig     = this.sign(ts, "POST", path, bodyStr);
+    const headers = { ...this.authHeaders("POST", path, bodyStr), "Content-Length": String(Buffer.byteLength(bodyStr)) };
     return new Promise((resolve, reject) => {
-      const req = https.request({
-        hostname: this.BASE, path, method: "POST",
-        headers: {
-          "CB-ACCESS-KEY": this.config.apiKey!, "CB-ACCESS-SIGN": sig,
-          "CB-ACCESS-TIMESTAMP": ts, "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(bodyStr),
-        },
-      }, res => {
+      const req = https.request({ hostname: this.BASE, path, method: "POST", headers }, res => {
         let data = "";
         res.on("data", c => { data += c; });
-        res.on("end", () => { try { resolve(JSON.parse(data) as T); } catch { reject(new Error("parse failed")); } });
+        res.on("end", () => { try { resolve(this.parseOrThrow<T>(data, "POST " + path)); } catch (e) { reject(e); } });
       });
       req.on("error", reject);
       req.write(bodyStr);
