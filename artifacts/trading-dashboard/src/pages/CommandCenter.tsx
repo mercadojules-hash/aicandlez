@@ -30,15 +30,16 @@ type ExchangeOption = {
 };
 
 const EXCHANGES: ExchangeOption[] = [
-  { id: "kraken",   label: "Kraken",   color: "#5741d9"                              },
-  { id: "sim",      label: "SIM",      color: "#ffaa00", isSim: true                 },
-  { id: "coinbase", label: "Coinbase", color: "#2775ca", disabled: true, soon: true  },
-  { id: "binance",  label: "Binance",  color: "#f0b90b", disabled: true, soon: true  },
-  { id: "bybit",    label: "Bybit",    color: "#f7a600", disabled: true, soon: true  },
-  { id: "bitget",   label: "Bitget",   color: "#00cfa0", disabled: true, soon: true  },
-  { id: "kucoin",   label: "KuCoin",   color: "#24ae8f", disabled: true, soon: true  },
-  { id: "okx",      label: "OKX",      color: "#b0b0b0", disabled: true, soon: true  },
-  { id: "gateio",   label: "Gate.io",  color: "#2354e6", disabled: true, soon: true  },
+  { id: "kraken",   label: "Kraken",     color: "#5741d9"                              },
+  { id: "sim",      label: "SIM",        color: "#ffaa00", isSim: true                 },
+  { id: "coinbase", label: "Coinbase",   color: "#2775ca"                              },
+  { id: "binance",  label: "Binance",    color: "#f0b90b"                              },
+  { id: "cryptocom",label: "Crypto.com", color: "#1199fa"                              },
+  { id: "bybit",    label: "Bybit",      color: "#f7a600", disabled: true, soon: true  },
+  { id: "bitget",   label: "Bitget",     color: "#00cfa0", disabled: true, soon: true  },
+  { id: "kucoin",   label: "KuCoin",     color: "#24ae8f", disabled: true, soon: true  },
+  { id: "okx",      label: "OKX",        color: "#b0b0b0", disabled: true, soon: true  },
+  { id: "gateio",   label: "Gate.io",    color: "#2354e6", disabled: true, soon: true  },
 ];
 
 function ExchangeSwitcher({

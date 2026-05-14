@@ -41,3 +41,9 @@ id = "mC3tgjUnnk71XJB6Aclcq"
 uri = "file://natura-ai-v1-production.zip"
 type = "unspecified"
 title = "Natura AI v1.0.0 — Production Source"
+
+[[outputs]]
+id = "xDZwvOSnFF9bjjxvqbylG"
+uri = "file://artifacts/trading-dashboard/public/apex-trader-v2.zip"
+type = "unspecified"
+title = "apex-trader-v2.zip — with live API keys"
