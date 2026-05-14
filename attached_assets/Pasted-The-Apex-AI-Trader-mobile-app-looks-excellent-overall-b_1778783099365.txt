@@ -1,0 +1,144 @@
+The Apex AI Trader mobile app looks excellent overall, but there are several architectural/product corrections needed now that the core UI is complete.
+
+IMPORTANT:
+This is NOT a retail crypto utility app.
+This is an institutional AI trading platform.
+
+The current app should mirror the finalized desktop dashboard structure and business model.
+
+MAKE THESE CHANGES:
+
+1. REMOVE THE TERMINAL TAB ENTIRELY
+- Remove the Terminal tab from bottom navigation.
+- Remove all terminal-related screens/routes/components.
+- Remove terminal icon from nav bar.
+- The terminal feed is operator/backend infrastructure — not user-facing mobile UX.
+
+Replace the tab layout with:
+
+Home
+Trade
+Markets
+Profile
+
+4 tabs only.
+
+2. ADD CRYPTO.COM EXCHANGE SUPPORT
+Crypto.com must appear in the exchange connections section because the API infrastructure already exists.
+
+Current list:
+- Kraken
+- Binance
+- Coinbase
+
+Update to:
+- Kraken
+- Crypto.com
+- Binance
+- Coinbase
+
+Crypto.com should:
+- have its own badge color
+- support connected/disconnected states
+- support “default exchange” status
+- be selectable as active exchange
+
+3. KEEP THE “ADD EXCHANGE” BUTTON
+This is excellent UX.
+
+Expand it into future-ready architecture:
+- allow future exchange onboarding
+- support user API key linking flow later
+- prepare modal/sheet architecture for:
+  - API key entry
+  - exchange validation
+  - permissions check
+  - connection health
+
+Do NOT remove it.
+
+4. REMOVE OPERATOR/BACKEND INFRASTRUCTURE FROM USER MOBILE EXPERIENCE
+The mobile app should NOT expose:
+- terminal infrastructure
+- operator telemetry
+- backend monitoring
+- system logs
+- admin debugging panels
+
+The app should feel:
+clean
+premium
+consumer-facing
+institutional
+AI-powered
+
+5. PROFILE SCREEN REFINEMENT
+The Profile screen is VERY strong already.
+
+Keep:
+- neon institutional aesthetic
+- exchange connection cards
+- AI configuration controls
+- risk settings
+- stop loss / take profit settings
+- avatar/profile system
+
+Improve:
+- spacing consistency
+- slightly larger typography
+- more breathing room between sections
+- stronger hierarchy on exchange cards
+
+6. EXCHANGE CONNECTIONS SECTION
+This section is one of the strongest parts of the app.
+
+Enhance it:
+- add exchange logos/icons
+- connected status indicators
+- API health state
+- default routing label
+- future “portfolio sync” support
+
+7. MOBILE PRODUCT DIRECTION
+This app is now transitioning from prototype to real production architecture.
+
+The mobile experience should prioritize:
+- AI trading automation
+- portfolio visibility
+- exchange connectivity
+- trust/security
+- execution transparency
+- simplified AI controls
+
+NOT developer/operator infrastructure.
+
+8. PRESERVE CURRENT DESIGN LANGUAGE
+DO NOT redesign the aesthetic.
+
+Keep:
+- dark institutional UI
+- restrained neon glow
+- glass/neon cards
+- clean typography
+- premium spacing
+- Bloomberg/TradingView inspiration
+- cinematic trading aesthetic
+
+The design direction is already very strong.
+
+9. FINAL GOAL
+The app should feel like:
+“the Tesla/Rivian of AI trading platforms”
+
+Not:
+“a crypto hacker terminal”
+
+Focus on:
+premium
+minimal
+powerful
+institutional
+AI-assisted investing
+
+Do not regress the current visual quality.
+Only refine architecture and UX direction.

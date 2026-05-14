@@ -9,7 +9,7 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const isIOS  = Platform.OS === "ios";
   const isWeb  = Platform.OS === "web";
-  const tabH   = 50;
+  const tabH   = 54;
 
   return (
     <Tabs
@@ -27,7 +27,7 @@ export default function TabLayout() {
           elevation: 0,
         },
         tabBarLabelStyle: {
-          fontSize: 9, fontFamily: "Inter_500Medium", letterSpacing: 0.5,
+          fontSize: 9, fontFamily: "Inter_500Medium", letterSpacing: 0.6,
         },
         tabBarBackground: () =>
           isIOS ? (
@@ -37,11 +37,13 @@ export default function TabLayout() {
           ) : null,
       }}
     >
-      <Tabs.Screen name="index"    options={{ title: "Home",     tabBarIcon: ({ color, size }) => <Feather name="activity"    size={size-2} color={color} /> }} />
-      <Tabs.Screen name="trade"    options={{ title: "Trade",    tabBarIcon: ({ color, size }) => <Feather name="trending-up" size={size-2} color={color} /> }} />
-      <Tabs.Screen name="markets"  options={{ title: "Markets",  tabBarIcon: ({ color, size }) => <Feather name="bar-chart-2" size={size-2} color={color} /> }} />
-      <Tabs.Screen name="terminal" options={{ title: "Terminal", tabBarIcon: ({ color, size }) => <Feather name="terminal"    size={size-2} color={color} /> }} />
-      <Tabs.Screen name="profile"  options={{ title: "Profile",  tabBarIcon: ({ color, size }) => <Feather name="user"        size={size-2} color={color} /> }} />
+      <Tabs.Screen name="index"   options={{ title: "Home",    tabBarIcon: ({ color, size }) => <Feather name="activity"    size={size - 2} color={color} /> }} />
+      <Tabs.Screen name="trade"   options={{ title: "Trade",   tabBarIcon: ({ color, size }) => <Feather name="trending-up" size={size - 2} color={color} /> }} />
+      <Tabs.Screen name="markets" options={{ title: "Markets", tabBarIcon: ({ color, size }) => <Feather name="bar-chart-2" size={size - 2} color={color} /> }} />
+      <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ({ color, size }) => <Feather name="user"        size={size - 2} color={color} /> }} />
+
+      {/* Hide terminal from nav — file stays for deep-link access only */}
+      <Tabs.Screen name="terminal" options={{ href: null }} />
     </Tabs>
   );
 }
