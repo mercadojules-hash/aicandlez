@@ -2,159 +2,126 @@ import { useEffect, useRef, useState } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-  useFonts,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
+  useFonts, Inter_400Regular, Inter_500Medium,
+  Inter_600SemiBold, Inter_700Bold,
 } from "@expo-google-fonts/inter";
 import * as SplashScreen from "expo-splash-screen";
-import { Animated, View, StyleSheet, Image } from "react-native";
+import { Animated, View, Text, StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { ThemeProvider, useTheme } from "../contexts/ThemeContext";
-import { UserProvider } from "../contexts/UserContext";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { TradingProvider } from "@/contexts/TradingContext";
+import { C } from "@/constants/theme";
 
-// ─── Keep native splash visible until we're ready ────────────────────────────
 SplashScreen.preventAutoHideAsync();
 
-const MIN_SPLASH_MS = 0;
-const LOGO = require("../assets/images/natura-logo-clean.png");
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 10_000, retry: 1, refetchOnWindowFocus: false } },
+});
 
+// ── Apex Splash ───────────────────────────────────────────────────────────────
 
-// ─── In-app splash overlay ────────────────────────────────────────────────────
-// Shown after the native OS splash hides — provides a seamless handoff.
-// Fades out once fonts + min delay are done.
-
-function AppSplash({ visible }: { visible: boolean }) {
-  const opacity = useRef(new Animated.Value(1)).current;
-  const scale   = useRef(new Animated.Value(0.90)).current;
+function ApexSplash({ visible }: { visible: boolean }) {
+  const opacity   = useRef(new Animated.Value(1)).current;
+  const logoScale = useRef(new Animated.Value(0.85)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(true);
 
-  // Subtle entrance spring
   useEffect(() => {
-    Animated.spring(scale, {
-      toValue: 1,
-      damping: 18,
-      stiffness: 140,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+    Animated.parallel([
+      Animated.spring(logoScale,   { toValue: 1, damping: 16, stiffness: 120, useNativeDriver: true }),
+      Animated.timing(logoOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+    ]).start();
+  }, [logoScale, logoOpacity]);
 
-  // Smooth fade-out once ready
   useEffect(() => {
     if (!visible) {
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 600,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished) setMounted(false);
-      });
+      Animated.timing(opacity, { toValue: 0, duration: 600, delay: 200, useNativeDriver: true })
+        .start(({ finished }) => { if (finished) setMounted(false); });
     }
-  }, [visible]);
+  }, [visible, opacity]);
 
   if (!mounted) return null;
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, styles.splash, { opacity }]}>
-      <View style={styles.splashBg} />
-      <Animated.View style={{ alignItems: "center", transform: [{ scale }] }}>
-        <Image
-          source={LOGO}
-          style={styles.logoImg}
-          resizeMode="contain"
-        />
+    <Animated.View style={[StyleSheet.absoluteFill, styles.splash, { opacity, pointerEvents: "none" }]}>
+      <View style={StyleSheet.absoluteFill} />
+      {/* Glow rings */}
+      <View style={styles.glowOuter} />
+      <View style={styles.glowInner} />
+      <Animated.View style={{ alignItems: "center", transform: [{ scale: logoScale }], opacity: logoOpacity }}>
+        <Text style={styles.splashLogo}>APEX</Text>
+        <Text style={styles.splashSub}>AI TRADER</Text>
+        <View style={styles.splashDivider} />
+        <Text style={styles.splashTag}>INSTITUTIONAL CRYPTO INTELLIGENCE</Text>
       </Animated.View>
     </Animated.View>
   );
 }
 
-// ─── Navigation stack ─────────────────────────────────────────────────────────
-
-function RootStack() {
-  const { colors, isDark } = useTheme();
-
-  return (
-    <>
-      <StatusBar style={isDark ? "light" : "dark"} />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.background },
-          animation: "slide_from_right",
-        }}
-      >
-        <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
-        <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
-        <Stack.Screen name="flow/[id]" options={{ animation: "slide_from_bottom", presentation: "modal" }} />
-        <Stack.Screen name="pose/[id]" options={{ animation: "slide_from_right" }} />
-        <Stack.Screen name="breathwork/[id]" options={{ animation: "slide_from_bottom", presentation: "modal" }} />
-        <Stack.Screen name="meditation/[id]" options={{ animation: "slide_from_bottom", presentation: "modal" }} />
-        <Stack.Screen name="profile" options={{ animation: "slide_from_right" }} />
-      </Stack>
-    </>
-  );
-}
-
-// ─── Root layout ──────────────────────────────────────────────────────────────
+// ── Root Layout ───────────────────────────────────────────────────────────────
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
   });
-
-  const [minDelayDone, setMinDelayDone] = useState(false);
   const [nativeSplashHidden, setNativeSplashHidden] = useState(false);
 
-  // Minimum time the splash must stay visible (premium feel)
   useEffect(() => {
-    const t = setTimeout(() => setMinDelayDone(true), MIN_SPLASH_MS);
-    return () => clearTimeout(t);
-  }, []);
-
-  // Only hide native splash when BOTH fonts AND min delay are ready.
-  // This prevents a flash where the app appears before it's styled.
-  useEffect(() => {
-    if (fontsLoaded && minDelayDone && !nativeSplashHidden) {
+    if ((fontsLoaded || fontError) && !nativeSplashHidden) {
       SplashScreen.hideAsync()
         .then(() => setNativeSplashHidden(true))
         .catch(() => setNativeSplashHidden(true));
     }
-  }, [fontsLoaded, minDelayDone, nativeSplashHidden]);
+  }, [fontsLoaded, fontError, nativeSplashHidden]);
 
-  // In-app splash stays visible until native splash has been hidden
-  const showInAppSplash = !nativeSplashHidden;
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <UserProvider>
-          {/* Render the app early so it's ready when splash hides */}
-          {fontsLoaded ? <RootStack /> : null}
-          {/* Seamless branded overlay — fades out after native splash hides */}
-          <AppSplash visible={showInAppSplash} />
-        </UserProvider>
-      </ThemeProvider>
+      <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+          <TradingProvider>
+            <StatusBar style="light" />
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg }, animation: "fade" }}>
+              <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
+            </Stack>
+            <ApexSplash visible={!nativeSplashHidden} />
+          </TradingProvider>
+        </QueryClientProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
   splash: {
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 999,
-    pointerEvents: "none",
+    backgroundColor: "#000000",
+    alignItems: "center", justifyContent: "center",
+    zIndex: 9999,
   },
-  splashBg: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#0B2E1F",
+  glowOuter: {
+    position: "absolute", width: 300, height: 300,
+    borderRadius: 150, backgroundColor: "#00aaff08",
   },
-  logoImg: {
-    width: 180,
-    height: 180,
+  glowInner: {
+    position: "absolute", width: 180, height: 180,
+    borderRadius: 90, backgroundColor: "#00aaff10",
+  },
+  splashLogo: {
+    fontSize: 52, fontFamily: "Inter_700Bold",
+    color: "#00aaff", letterSpacing: 18,
+    textShadow: "0 0 24px #00aaff",
+  },
+  splashSub: {
+    fontSize: 14, fontFamily: "Inter_600SemiBold",
+    color: "#EAF2FF", letterSpacing: 12, marginTop: 4,
+  },
+  splashDivider: {
+    width: 80, height: 1, backgroundColor: "#00aaff40", marginVertical: 16,
+  },
+  splashTag: {
+    fontSize: 8, fontFamily: "Inter_500Medium",
+    color: "#4a6a80", letterSpacing: 2.5,
   },
 });

@@ -1,75 +1,47 @@
 import { Tabs } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { fontSizes } from "../../constants/theme";
-import { Platform } from "react-native";
-import { useTheme } from "../../contexts/ThemeContext";
+import { Platform, View, StyleSheet } from "react-native";
+import { BlurView } from "expo-blur";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { C } from "@/constants/theme";
 
 export default function TabLayout() {
-  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const isIOS  = Platform.OS === "ios";
+  const isWeb  = Platform.OS === "web";
+  const tabH   = 50;
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarActiveTintColor:   C.cyan,
+        tabBarInactiveTintColor: "#2a4050",
         tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          paddingBottom: Platform.OS === "ios" ? 20 : 8,
-          paddingTop: 8,
-          height: Platform.OS === "ios" ? 80 : 64,
+          position:        "absolute",
+          backgroundColor: isIOS ? "transparent" : C.surface,
+          borderTopWidth:  1,
+          borderTopColor:  C.border,
+          height:          tabH + (isWeb ? 34 : insets.bottom),
+          paddingBottom:   isWeb ? 34 : insets.bottom,
+          elevation: 0,
         },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textDim,
         tabBarLabelStyle: {
-          fontSize: fontSizes.xs,
-          fontFamily: "Inter_500Medium",
-          marginTop: 2,
+          fontSize: 9, fontFamily: "Inter_500Medium", letterSpacing: 0.5,
         },
+        tabBarBackground: () =>
+          isIOS ? (
+            <BlurView intensity={95} tint="dark" style={StyleSheet.absoluteFill} />
+          ) : isWeb ? (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: C.surface }]} />
+          ) : null,
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Home",
-          tabBarIcon: ({ color, size }) => <Feather name="home" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="ask-ai"
-        options={{
-          title: "Ask AI",
-          tabBarIcon: ({ color, size }) => <Feather name="message-circle" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="plans"
-        options={{
-          title: "Plans",
-          tabBarIcon: ({ color, size }) => <Feather name="list" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="recipes"
-        options={{
-          title: "Recipes",
-          tabBarIcon: ({ color, size }) => <Feather name="book-open" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="learn"
-        options={{
-          title: "Learn",
-          tabBarIcon: ({ color, size }) => <Feather name="book" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color, size }) => <Feather name="user" size={size} color={color} />,
-        }}
-      />
+      <Tabs.Screen name="index"    options={{ title: "Home",     tabBarIcon: ({ color, size }) => <Feather name="activity"    size={size-2} color={color} /> }} />
+      <Tabs.Screen name="trade"    options={{ title: "Trade",    tabBarIcon: ({ color, size }) => <Feather name="trending-up" size={size-2} color={color} /> }} />
+      <Tabs.Screen name="markets"  options={{ title: "Markets",  tabBarIcon: ({ color, size }) => <Feather name="bar-chart-2" size={size-2} color={color} /> }} />
+      <Tabs.Screen name="terminal" options={{ title: "Terminal", tabBarIcon: ({ color, size }) => <Feather name="terminal"    size={size-2} color={color} /> }} />
+      <Tabs.Screen name="profile"  options={{ title: "Profile",  tabBarIcon: ({ color, size }) => <Feather name="user"        size={size-2} color={color} /> }} />
     </Tabs>
   );
 }

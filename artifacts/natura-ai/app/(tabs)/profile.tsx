@@ -1,253 +1,280 @@
 import React, { useState } from "react";
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
+  View, Text, ScrollView, TouchableOpacity,
+  StyleSheet, Alert, Platform,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { useTheme, type ThemeOverride } from "../../contexts/ThemeContext";
-import { useUser } from "../../contexts/UserContext";
-import { useWellness } from "../../contexts/WellnessContext";
-import { useSubscription } from "../../contexts/SubscriptionContext";
-import { fontSizes, radii, spacing } from "../../constants/theme";
+import * as Haptics from "expo-haptics";
+import { useTrading, fmt$, fmtPct } from "@/contexts/TradingContext";
+import { NeonCard } from "@/components/NeonCard";
+import { LiveDot } from "@/components/LiveDot";
+import { C, FONTS, RADIUS } from "@/constants/theme";
 
-const SCALE_LABELS = ["Very low", "Low", "Moderate", "Good", "Excellent"];
+const TAB_BAR_H = 84;
 
-const THEME_OPTIONS: { mode: ThemeOverride; label: string; icon: keyof typeof Feather.glyphMap }[] = [
-  { mode: "dark",   label: "Dark",  icon: "moon" },
-  { mode: "light",  label: "Light", icon: "sun" },
-  { mode: "system", label: "Auto",  icon: "smartphone" },
-];
+// ── Avatar ────────────────────────────────────────────────────────────────────
 
-function ScaleSelector({ label, value, onChange, colors }: { label: string; value: number; onChange: (v: number) => void; colors: any }) {
-  const labelStr = SCALE_LABELS[value - 1];
+function Avatar({ initials, size = 64 }: { initials: string; size?: number }) {
   return (
-    <View style={styles.scaleWrap}>
-      <View style={styles.scaleLabelRow}>
-        <Text style={[styles.scaleLabel, { color: colors.text }]}>{label}:</Text>
-        <Text style={[styles.scaleLabelVal, { color: colors.primary }]}>{labelStr}</Text>
+    <View style={[av.ring, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2 }]}>
+      <View style={[av.inner, { width: size, height: size, borderRadius: size / 2 }]}>
+        <Text style={[av.text, { fontSize: size * 0.36 }]}>{initials}</Text>
       </View>
-      <View style={styles.scaleDots}>
-        {[1, 2, 3, 4, 5].map((v) => (
-          <TouchableOpacity
-            key={v}
-            style={[styles.scaleDot, {
-              backgroundColor: value >= v ? colors.primary : "transparent",
-              borderColor: value >= v ? colors.primary : colors.border,
-              flex: 1,
-            }]}
-            onPress={() => onChange(v)}
-          />
-        ))}
+      <View style={av.dot}>
+        <LiveDot color={C.green} size={8} />
       </View>
     </View>
   );
 }
+const av = StyleSheet.create({
+  ring:  { alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: `${C.cyan}50`, shadowColor: C.cyan, shadowOpacity: 0.3, shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
+  inner: { alignItems: "center", justifyContent: "center", backgroundColor: `${C.cyan}18` },
+  text:  { fontFamily: FONTS.monoBold, color: C.cyan },
+  dot:   { position: "absolute", bottom: 0, right: 0 },
+});
+
+// ── Stat Card ─────────────────────────────────────────────────────────────────
+
+function StatCard({ label, value, sub, color = C.textPrimary }: { label: string; value: string; sub?: string; color?: string }) {
+  return (
+    <View style={sc.card}>
+      <Text style={[sc.value, { color }]}>{value}</Text>
+      {sub && <Text style={[sc.sub, { color }]}>{sub}</Text>}
+      <Text style={sc.label}>{label}</Text>
+    </View>
+  );
+}
+const sc = StyleSheet.create({
+  card:  { flex: 1, alignItems: "center", paddingVertical: 14, backgroundColor: C.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: C.border },
+  value: { fontSize: 18, fontFamily: FONTS.monoBold, letterSpacing: 0.5 },
+  sub:   { fontSize: 8,  fontFamily: FONTS.mono, marginTop: 1 },
+  label: { fontSize: 7,  fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 0.8, marginTop: 3 },
+});
+
+// ── Setting Row ───────────────────────────────────────────────────────────────
+
+function SettingRow({ icon, label, value, onPress, danger = false, right }: {
+  icon: string; label: string; value?: string; onPress?: () => void; danger?: boolean; right?: React.ReactNode;
+}) {
+  return (
+    <TouchableOpacity onPress={onPress} style={sr.row} activeOpacity={0.7}>
+      <View style={[sr.icon, { backgroundColor: `${danger ? C.red : C.cyan}12` }]}>
+        <Feather name={icon as any} size={14} color={danger ? C.red : C.cyan} />
+      </View>
+      <Text style={[sr.label, { color: danger ? C.red : C.textPrimary }]}>{label}</Text>
+      {right ? right : (
+        <>
+          {value && <Text style={sr.value}>{value}</Text>}
+          <Feather name="chevron-right" size={14} color={C.textDim} />
+        </>
+      )}
+    </TouchableOpacity>
+  );
+}
+const sr = StyleSheet.create({
+  row:   { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border, gap: 12 },
+  icon:  { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  label: { flex: 1, fontSize: 13, fontFamily: FONTS.monoMedium },
+  value: { fontSize: 11, fontFamily: FONTS.mono, color: C.textMuted, marginRight: 6 },
+});
+
+// ── Exchange Badge ────────────────────────────────────────────────────────────
+
+const EX_COLORS: Record<string, string> = {
+  kraken: "#5741d9", binance: "#f0b90b", coinbase: "#2775ca",
+  bybit:  "#f7a600", okx:     "#b0b0b0", kucoin:   "#24ae8f",
+};
+function ExchangeBadge({ name, isDefault = false }: { name: string; isDefault?: boolean }) {
+  const color = EX_COLORS[name.toLowerCase()] ?? C.cyan;
+  return (
+    <View style={[eb.badge, { borderColor: `${color}35`, backgroundColor: `${color}10` }]}>
+      <View style={[eb.dot, { backgroundColor: color }]} />
+      <Text style={[eb.name, { color }]}>{name.toUpperCase()}</Text>
+      {isDefault && <Text style={eb.def}>DEFAULT</Text>}
+    </View>
+  );
+}
+const eb = StyleSheet.create({
+  badge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.md, borderWidth: 1, marginRight: 8, marginBottom: 8 },
+  dot:   { width: 6, height: 6, borderRadius: 3 },
+  name:  { fontSize: 9, fontFamily: FONTS.monoBold, letterSpacing: 0.8 },
+  def:   { fontSize: 7, fontFamily: FONTS.monoBold, color: C.green, marginLeft: 4, borderWidth: 1, borderColor: `${C.green}30`, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 },
+});
+
+// ── Operator Admin Panel ──────────────────────────────────────────────────────
+
+function AdminPanel() {
+  const [expanded, setExpanded] = useState(false);
+  const metrics = [
+    { label: "ACTIVE USERS",  value: "1,248",  color: C.cyan   },
+    { label: "LIVE USERS",    value: "312",    color: C.green  },
+    { label: "FEES 24H",      value: "$4,820", color: C.orange },
+    { label: "TOTAL VOLUME",  value: "$2.4M",  color: C.purple },
+    { label: "PLATFORM TRADES",value:"18,294", color: C.textPrimary },
+    { label: "AVG WIN RATE",  value: "61.4%",  color: C.green  },
+    { label: "CONNECTED EXS", value: "3,821",  color: C.cyan   },
+    { label: "AI UPTIME",     value: "99.97%", color: C.green  },
+  ];
+  return (
+    <View style={ad.card}>
+      <TouchableOpacity style={ad.header} onPress={() => setExpanded(e => !e)} activeOpacity={0.8}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Feather name="shield" size={14} color={C.purple} />
+          <Text style={ad.title}>OPERATOR CONSOLE</Text>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={ad.badge}><Text style={ad.badgeText}>ADMIN</Text></View>
+          <Feather name={expanded ? "chevron-up" : "chevron-down"} size={14} color={C.textMuted} />
+        </View>
+      </TouchableOpacity>
+      {expanded && (
+        <View style={ad.grid}>
+          {metrics.map(m => (
+            <View key={m.label} style={ad.item}>
+              <Text style={[ad.val, { color: m.color }]}>{m.value}</Text>
+              <Text style={ad.lbl}>{m.label}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+const ad = StyleSheet.create({
+  card:  { backgroundColor: C.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: `${C.purple}30`, marginBottom: 14, overflow: "hidden" },
+  header:{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14 },
+  title: { fontSize: 9, fontFamily: FONTS.monoBold, color: C.purple, letterSpacing: 1.5 },
+  badge: { backgroundColor: `${C.purple}15`, borderRadius: 4, borderWidth: 1, borderColor: `${C.purple}35`, paddingHorizontal: 7, paddingVertical: 2 },
+  badgeText: { fontSize: 7, fontFamily: FONTS.monoBold, color: C.purple, letterSpacing: 0.8 },
+  grid:  { flexDirection: "row", flexWrap: "wrap", borderTopWidth: 1, borderTopColor: C.border, padding: 8 },
+  item:  { width: "50%", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border },
+  val:   { fontSize: 16, fontFamily: FONTS.monoBold },
+  lbl:   { fontSize: 7, fontFamily: FONTS.mono, color: C.textDim, letterSpacing: 0.8, marginTop: 2 },
+});
+
+// ── Profile Screen ────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
-  const { colors, override: mode, setOverride: setMode } = useTheme();
-  const { profile, resetOnboarding } = useUser();
-  const { streak, savedItems, completedTasks, submitCheckIn, lastCheckIn } = useWellness();
-  const { isPremium, openPaywall } = useSubscription();
+  const { account, trades, engine } = useTrading();
+  const insets = useSafeAreaInsets();
+  const isWeb  = Platform.OS === "web";
+  const topPad = isWeb ? 67 : insets.top + 10;
 
-  const [energy, setEnergy]       = useState(3);
-  const [stress, setStress]       = useState(3);
-  const [sleep, setSleep]         = useState(3);
-  const [checkInDone, setCheckInDone] = useState(!!lastCheckIn);
+  const closed     = trades.filter(t => t.pnl != null);
+  const wins       = closed.filter(t => t.pnl > 0);
+  const winRate    = closed.length ? (wins.length / closed.length) * 100 : account.winRate;
+  const totalPnL   = closed.reduce((s, t) => s + t.pnl, 0);
 
-  const firstName   = profile.name ? profile.name.split(" ")[0] : "Jules";
-  const initial     = (profile.name?.charAt(0) || "J").toUpperCase();
-  const focusArea   = profile.goals[0] ?? "General";
-  const savedCount  = savedItems.length;
-  const sessionCount = completedTasks.length;
-
-  const handleCheckIn = async () => {
-    await submitCheckIn({ energy, stress, sleep });
-    setCheckInDone(true);
+  const handleSignOut = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert("Sign Out", "You'll need to sign in again to access your account.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign Out", style: "destructive", onPress: () => {} },
+    ]);
   };
-
-  const handleReset = () => {
-    Alert.alert(
-      "Reset & Sign Out",
-      "This will clear all your data and restart the onboarding. Are you sure?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Reset", style: "destructive", onPress: () => resetOnboarding() },
-      ]
-    );
-  };
-
-  const STATS = [
-    { icon: "zap" as const,          value: `${streak}`,       label: "Day Streak",  color: "#F5C842" },
-    { icon: "check-circle" as const,  value: `${sessionCount}`, label: "Sessions",    color: colors.primary },
-    { icon: "target" as const,        value: focusArea,          label: "Focus",       color: "#A78BFA" },
-  ];
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={["top"]}>
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-
-        {/* ── Avatar Hero ── */}
-        <View style={styles.hero}>
-          <View style={[styles.avatarRing, { borderColor: colors.primary + "44" }]}>
-            <View style={[styles.avatar, { backgroundColor: colors.primary + "22" }]}>
-              <Text style={[styles.avatarInitial, { color: colors.primary }]}>{initial}</Text>
-            </View>
+    <ScrollView
+      style={s.root}
+      contentContainerStyle={[s.scroll, { paddingTop: topPad, paddingBottom: TAB_BAR_H + 16 }]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ── Profile Header ── */}
+      <View style={s.profileHeader}>
+        <Avatar initials="AT" size={64} />
+        <View style={s.profileInfo}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text style={s.name}>Apex Trader</Text>
+            <View style={s.proBadge}><Text style={s.proText}>PRO</Text></View>
           </View>
-          <Text style={[styles.heroName, { color: colors.text }]}>{firstName}</Text>
-          <Text style={[styles.heroSub, { color: colors.textMuted }]}>Your wellness journey</Text>
-        </View>
-
-        {/* ── Stats ── */}
-        <View style={[styles.statsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {STATS.map(({ icon, value, label, color }) => (
-            <View key={label} style={styles.statItem}>
-              <View style={[styles.statIcon, { backgroundColor: color + "22" }]}>
-                <Feather name={icon} size={16} color={color} />
-              </View>
-              <Text style={[styles.statValue, { color: colors.text }]} numberOfLines={1}>{value}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* ── Premium Banner (free users) ── */}
-        {!isPremium && (
-          <TouchableOpacity
-            style={[styles.premiumBanner, { backgroundColor: colors.primary + "11", borderColor: colors.primary + "33" }]}
-            onPress={openPaywall}
-            activeOpacity={0.85}
-          >
-            <Feather name="star" size={20} color={colors.primary} />
-            <View style={styles.premiumInfo}>
-              <Text style={[styles.premiumTitle, { color: colors.primary }]}>Natura Premium</Text>
-              <Text style={[styles.premiumSub, { color: colors.textDim }]}>Unlock full access to recipes, AI guidance, and wellness plans</Text>
-            </View>
-            <TouchableOpacity style={[styles.upgradeBtn, { backgroundColor: colors.primary }]} onPress={openPaywall}>
-              <Text style={styles.upgradeBtnText}>Upgrade</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        )}
-
-        {/* ── Daily Check-In ── */}
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Daily Check-In</Text>
-          <Text style={[styles.sectionSub, { color: colors.textDim }]}>How are you feeling today?</Text>
-          {checkInDone ? (
-            <View style={[styles.checkInDone, { backgroundColor: colors.primary + "11" }]}>
-              <Feather name="check-circle" size={20} color={colors.primary} />
-              <Text style={[styles.checkInDoneText, { color: colors.primary }]}>Check-in complete for today</Text>
-            </View>
-          ) : (
-            <>
-              <ScaleSelector label="Energy"        value={energy} onChange={setEnergy} colors={colors} />
-              <ScaleSelector label="Stress"         value={stress} onChange={setStress} colors={colors} />
-              <ScaleSelector label="Sleep quality"  value={sleep}  onChange={setSleep}  colors={colors} />
-              <TouchableOpacity
-                style={[styles.checkInBtn, { backgroundColor: colors.card, borderColor: colors.primary + "55" }]}
-                onPress={handleCheckIn}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.checkInBtnText, { color: colors.primary }]}>Submit Check-In</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-
-        {/* ── Appearance ── */}
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Appearance</Text>
-          <View style={styles.themeRow}>
-            {THEME_OPTIONS.map(({ mode: m, label, icon }) => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.themeBtn, {
-                  backgroundColor: mode === m ? colors.primary + "22" : "transparent",
-                  borderColor: mode === m ? colors.primary + "88" : colors.border,
-                }]}
-                onPress={() => setMode(m)}
-              >
-                <Feather name={icon} size={16} color={mode === m ? colors.primary : colors.textMuted} />
-                <Text style={[styles.themeBtnText, { color: mode === m ? colors.primary : colors.textMuted }]}>{label}</Text>
-              </TouchableOpacity>
-            ))}
+          <Text style={s.email}>trader@apexai.com</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 }}>
+            <Text style={s.since}>Member since Jan 2025</Text>
           </View>
         </View>
+      </View>
 
-        {/* ── Settings ── */}
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Settings</Text>
-          {[
-            { icon: "bell" as const,  label: "Notifications",  sub: "Daily reminders & tips", action: () => {} },
-            { icon: "lock" as const,  label: "Privacy",         sub: "Data & permissions",     action: () => {} },
-          ].map(({ icon, label, sub, action }) => (
-            <TouchableOpacity key={label} style={[styles.settingRow, { borderBottomColor: colors.border }]} onPress={action} activeOpacity={0.7}>
-              <View style={[styles.settingIcon, { backgroundColor: colors.border + "80" }]}>
-                <Feather name={icon} size={16} color={colors.textDim} />
-              </View>
-              <View style={styles.settingInfo}>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>{label}</Text>
-                <Text style={[styles.settingSub, { color: colors.textMuted }]}>{sub}</Text>
-              </View>
-              <Feather name="chevron-right" size={16} color={colors.textDim} />
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity style={[styles.settingRow, { borderBottomColor: "transparent" }]} onPress={handleReset} activeOpacity={0.7}>
-            <View style={[styles.settingIcon, { backgroundColor: "#E53E3E22" }]}>
-              <Feather name="log-out" size={16} color="#E53E3E" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, { color: "#E53E3E" }]}>Reset & Sign Out</Text>
-              <Text style={[styles.settingSub, { color: colors.textMuted }]}>Clear all data and restart</Text>
-            </View>
-            <Feather name="chevron-right" size={16} color="#E53E3E44" />
-          </TouchableOpacity>
+      {/* ── Stats ── */}
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+        <StatCard label="EQUITY"   value={fmt$(account.equity, 0)}                                     color={C.textPrimary} />
+        <StatCard label="REALIZED" value={totalPnL >= 0 ? `+${fmt$(totalPnL)}` : fmt$(totalPnL)}      color={totalPnL >= 0 ? C.green : C.red} />
+      </View>
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
+        <StatCard label="WIN RATE" value={`${winRate.toFixed(1)}%`} sub={`${wins.length}W / ${closed.length - wins.length}L`} color={winRate >= 55 ? C.green : C.orange} />
+        <StatCard label="FEES PAID" value={fmt$(account.totalFeesPaid)}                               color={C.orange} />
+      </View>
+
+      {/* ── AI Configuration ── */}
+      <View style={s.sectionLabel}>
+        <View style={{ width: 2, height: 12, backgroundColor: C.purple, borderRadius: 1, marginRight: 8 }} />
+        <Text style={s.sectionText}>AI CONFIGURATION</Text>
+      </View>
+      <NeonCard accent={C.purple} style={{ marginBottom: 14 }}>
+        <SettingRow icon="cpu"         label="AI Personality"   value="Balanced" />
+        <SettingRow icon="shield"      label="Risk Profile"      value="Moderate" />
+        <SettingRow icon="sliders"     label="Min Confidence"    value="60%" />
+        <SettingRow icon="toggle-right" label="Auto Mode"        value={engine?.running ? "ON" : "OFF"} />
+        <SettingRow icon="percent"     label="Position Size"     value="0.01%" />
+        <SettingRow icon="trending-down" label="Stop Loss"       value="2%" />
+        <SettingRow icon="trending-up" label="Take Profit"       value="4%" />
+      </NeonCard>
+
+      {/* ── Exchange Connections ── */}
+      <View style={s.sectionLabel}>
+        <View style={{ width: 2, height: 12, backgroundColor: C.cyan, borderRadius: 1, marginRight: 8 }} />
+        <Text style={s.sectionText}>EXCHANGE CONNECTIONS</Text>
+      </View>
+      <View style={[s.card, { marginBottom: 14 }]}>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", paddingVertical: 6 }}>
+          <ExchangeBadge name="Kraken"   isDefault />
+          <ExchangeBadge name="Binance" />
+          <ExchangeBadge name="Coinbase" />
         </View>
+        <TouchableOpacity style={s.connectBtn} activeOpacity={0.8}>
+          <Feather name="plus" size={12} color={C.cyan} />
+          <Text style={s.connectText}>Add Exchange</Text>
+        </TouchableOpacity>
+      </View>
 
-        <View style={{ height: 32 }} />
-      </ScrollView>
-    </SafeAreaView>
+      {/* ── Operator Console ── */}
+      <View style={s.sectionLabel}>
+        <View style={{ width: 2, height: 12, backgroundColor: C.purple, borderRadius: 1, marginRight: 8 }} />
+        <Text style={s.sectionText}>PLATFORM ADMINISTRATION</Text>
+      </View>
+      <AdminPanel />
+
+      {/* ── Account Settings ── */}
+      <View style={s.sectionLabel}>
+        <View style={{ width: 2, height: 12, backgroundColor: C.orange, borderRadius: 1, marginRight: 8 }} />
+        <Text style={s.sectionText}>ACCOUNT</Text>
+      </View>
+      <NeonCard accent={C.orange} style={{ marginBottom: 14 }}>
+        <SettingRow icon="bell"       label="Notifications"     value="All" />
+        <SettingRow icon="clock"      label="Timezone"          value="UTC-5" />
+        <SettingRow icon="dollar-sign" label="Display Currency" value="USD" />
+        <SettingRow icon="lock"       label="Security"          value="2FA On" />
+        <SettingRow icon="download"   label="Export Data" />
+        <SettingRow icon="log-out"    label="Sign Out"          onPress={handleSignOut} danger />
+      </NeonCard>
+
+    </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe:             { flex: 1 },
-  scroll:           { flex: 1 },
-  hero:             { alignItems: "center", paddingVertical: spacing.xl },
-  avatarRing:       { width: 88, height: 88, borderRadius: 44, borderWidth: 2, padding: 4, marginBottom: spacing.sm },
-  avatar:           { width: "100%", height: "100%", borderRadius: 40, alignItems: "center", justifyContent: "center" },
-  avatarInitial:    { fontSize: 32, fontFamily: "Inter_700Bold" },
-  heroName:         { fontSize: fontSizes.xl, fontFamily: "Inter_700Bold", marginBottom: 4 },
-  heroSub:          { fontSize: fontSizes.sm, fontFamily: "Inter_400Regular" },
-  statsRow:         { flexDirection: "row", marginHorizontal: spacing.md, borderRadius: radii.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.md },
-  statItem:         { flex: 1, alignItems: "center", gap: 4 },
-  statIcon:         { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  statValue:        { fontSize: fontSizes.sm, fontFamily: "Inter_700Bold" },
-  statLabel:        { fontSize: 10, fontFamily: "Inter_400Regular" },
-  premiumBanner:    { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginHorizontal: spacing.md, borderRadius: radii.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.md },
-  premiumInfo:      { flex: 1 },
-  premiumTitle:     { fontSize: fontSizes.sm, fontFamily: "Inter_700Bold" },
-  premiumSub:       { fontSize: fontSizes.xs, fontFamily: "Inter_400Regular", lineHeight: 16 },
-  upgradeBtn:       { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radii.full },
-  upgradeBtnText:   { color: "#0D1F16", fontSize: fontSizes.xs, fontFamily: "Inter_700Bold" },
-  section:          { marginHorizontal: spacing.md, borderRadius: radii.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.md },
-  sectionTitle:     { fontSize: fontSizes.md, fontFamily: "Inter_600SemiBold", marginBottom: 2 },
-  sectionSub:       { fontSize: fontSizes.xs, fontFamily: "Inter_400Regular", marginBottom: spacing.md },
-  scaleWrap:        { marginBottom: spacing.md },
-  scaleLabelRow:    { flexDirection: "row", gap: 4, marginBottom: 6 },
-  scaleLabel:       { fontSize: fontSizes.sm, fontFamily: "Inter_400Regular" },
-  scaleLabelVal:    { fontSize: fontSizes.sm, fontFamily: "Inter_600SemiBold" },
-  scaleDots:        { flexDirection: "row", gap: 6 },
-  scaleDot:         { height: 10, borderRadius: 5, borderWidth: 1.5 },
-  checkInDone:      { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, borderRadius: radii.md },
-  checkInDoneText:  { fontSize: fontSizes.sm, fontFamily: "Inter_500Medium" },
-  checkInBtn:       { borderWidth: 1, borderRadius: radii.md, padding: spacing.md, alignItems: "center", marginTop: spacing.sm },
-  checkInBtnText:   { fontSize: fontSizes.sm, fontFamily: "Inter_600SemiBold" },
-  themeRow:         { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
-  themeBtn:         { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, padding: spacing.sm, borderRadius: radii.md, borderWidth: 1 },
-  themeBtnText:     { fontSize: fontSizes.xs, fontFamily: "Inter_500Medium" },
-  settingRow:       { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1 },
-  settingIcon:      { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  settingInfo:      { flex: 1 },
-  settingLabel:     { fontSize: fontSizes.sm, fontFamily: "Inter_500Medium" },
-  settingSub:       { fontSize: fontSizes.xs, fontFamily: "Inter_400Regular" },
+const s = StyleSheet.create({
+  root:   { flex: 1, backgroundColor: C.bg },
+  scroll: { paddingHorizontal: 16 },
+  profileHeader: { flexDirection: "row", alignItems: "center", gap: 16, marginBottom: 20, padding: 16, backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: `${C.cyan}20` },
+  profileInfo: { flex: 1 },
+  name:   { fontSize: 18, fontFamily: FONTS.monoBold, color: C.textPrimary },
+  email:  { fontSize: 10, fontFamily: FONTS.mono, color: C.textMuted, marginTop: 2 },
+  since:  { fontSize: 8,  fontFamily: FONTS.mono, color: C.textDim },
+  proBadge: { backgroundColor: `${C.cyan}15`, borderRadius: 4, borderWidth: 1, borderColor: `${C.cyan}35`, paddingHorizontal: 7, paddingVertical: 2 },
+  proText:  { fontSize: 7, fontFamily: FONTS.monoBold, color: C.cyan, letterSpacing: 1 },
+  sectionLabel: { flexDirection: "row", alignItems: "center", marginBottom: 10, marginTop: 4 },
+  sectionText:  { fontSize: 9, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 1.8 },
+  card: { backgroundColor: C.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14 },
+  connectBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.border },
+  connectText: { fontSize: 11, fontFamily: FONTS.monoMedium, color: C.cyan },
 });

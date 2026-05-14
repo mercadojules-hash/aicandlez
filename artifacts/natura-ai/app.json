@@ -1,43 +1,43 @@
 {
   "expo": {
-    "name": "Natura AI",
+    "name": "Apex AI Trader",
     "slug": "natura-ai",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/natura-app-icon.png",
-    "scheme": "natura-ai",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/images/icon.png",
+    "scheme": "apex-trader",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F6F8F3"
+      "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.naturaai.app",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
-        "UIStatusBarStyle": "UIStatusBarStyleDarkContent",
-        "NSPhotoLibraryUsageDescription": "Allow Natura AI to access your photo library to update your profile picture.",
-        "NSCameraUsageDescription": "Allow Natura AI to access your camera to take a profile photo."
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent",
+        "NSPhotoLibraryUsageDescription": "Allow Apex Trader to access your photo library for your profile picture.",
+        "NSCameraUsageDescription": "Allow Apex Trader to access your camera to take a profile photo."
       }
     },
     "android": {
-      "backgroundColor": "#F6F8F3",
+      "backgroundColor": "#000000",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#F6F8F3"
+        "backgroundColor": "#000000"
       }
     },
     "web": {
       "favicon": "./public/favicon.png",
       "bundler": "metro",
-      "name": "Natura AI",
-      "shortName": "Natura",
-      "description": "Natural wellness, guided by AI",
-      "themeColor": "#5C7F5F",
-      "backgroundColor": "#F6F8F3",
+      "name": "Apex AI Trader",
+      "shortName": "Apex",
+      "description": "Institutional AI-powered crypto trading platform",
+      "themeColor": "#00aaff",
+      "backgroundColor": "#000000",
       "preferRelatedApplications": false,
       "display": "standalone",
       "startUrl": "/",

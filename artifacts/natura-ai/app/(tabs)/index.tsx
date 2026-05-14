@@ -1,219 +1,294 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Image,
-  ImageBackground,
-  Platform,
-  Dimensions,
+  View, Text, ScrollView, TouchableOpacity,
+  StyleSheet, RefreshControl, Animated, Platform,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-// ─── Assets ───────────────────────────────────────────────────────────────────
-const BG          = require("../../assets/images/natura-bg-main-v1.webp");
-const LOGO        = require("../../assets/images/natura-logo-icon.png");
-const AVATAR      = require("../../assets/images/avatar-default.webp");
-const IC_FLAME    = require("../../assets/images/icon-flame.webp");
-const IC_CLOCK    = require("../../assets/images/icon-clock.webp");
-const IC_CHECK    = require("../../assets/images/icon-check.webp");
-const IC_STAR     = require("../../assets/images/icon-star.webp");
-const IC_LEAF     = require("../../assets/images/icon-leaf.webp");
-const IC_LOTUS    = require("../../assets/images/icon-lotus.webp");
-const IC_LIGHTNING= require("../../assets/images/icon-lightning.webp");
-const IC_BOWL     = require("../../assets/images/icon-bowl.webp");
-const IC_CHEVRON  = require("../../assets/images/icon-chevron.webp");
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
+import { useTrading, fmt$, fmtPct, fmtAge } from "@/contexts/TradingContext";
+import { SignalBadge, ConfidenceBar } from "@/components/SignalBadge";
+import { LiveDot } from "@/components/LiveDot";
+import { C, FONTS, RADIUS } from "@/constants/theme";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const W = Dimensions.get("window").width;
+const TAB_BAR_H = 84;
 
-const NEON   = "#a8e063";
-const WHITE  = "#ffffff";
-const DIM    = "rgba(255,255,255,0.5)";
-const CARD   = "rgba(8,22,13,0.82)";
-const BORDER = "rgba(100,200,80,0.22)";
+// ── Ticker ────────────────────────────────────────────────────────────────────
 
-// ─── Task data ────────────────────────────────────────────────────────────────
-const TASKS = [
-  { id: "t1", time: "7:00 AM",  label: "Warm lemon water",    subtitle: "Morning · 7:00 AM",   icon: IC_LEAF      },
-  { id: "t2", time: "7:15 AM",  label: "5-minute breathing",  subtitle: "Morning · 7:15 AM",   icon: IC_LOTUS     },
-  { id: "t3", time: "7:30 AM",  label: "Morning stretch",     subtitle: "Morning · 7:30 AM",   icon: IC_LIGHTNING },
-  { id: "t4", time: "3:00 PM",  label: "Herbal tea break",    subtitle: "Afternoon · 3:00 PM", icon: IC_BOWL      },
-  { id: "t5", time: "4:00 PM",  label: "Mindful walk",        subtitle: "Afternoon · 4:00 PM", icon: IC_LIGHTNING },
-  { id: "t6", time: "9:00 PM",  label: "Digital sunset",      subtitle: "Evening · 9:00 PM",   icon: IC_LOTUS     },
-  { id: "t7", time: "9:30 PM",  label: "Evening wind-down tea", subtitle: "Evening · 9:30 PM", icon: IC_LEAF      },
-];
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-interface StatItemProps { icon: ReturnType<typeof require>; value: string; label: string; }
-function StatItem({ icon, value, label }: StatItemProps) {
+function MarketTicker({ breakdowns }: { breakdowns?: { symbol: string; price?: number; signal: string; confidence: number }[] }) {
+  const items = breakdowns?.length ? breakdowns : [
+    { symbol: "BTCUSD", price: 68_120, signal: "BUY",  confidence: 74 },
+    { symbol: "ETHUSD", price: 3_512,  signal: "BUY",  confidence: 68 },
+    { symbol: "SOLUSD", price: 188.4,  signal: "HOLD", confidence: 52 },
+  ];
   return (
-    <View style={s.statItem}>
-      <Image source={icon} style={s.statIcon} />
-      <Text style={s.statValue}>{value}</Text>
-      <Text style={s.statLabel}>{label}</Text>
+    <View style={tk.row}>
+      {items.map((b, i) => (
+        <View key={b.symbol} style={[tk.item, i < items.length - 1 && tk.sep]}>
+          <Text style={tk.sym}>{b.symbol.replace("USD", "")}</Text>
+          <Text style={tk.price}>{b.price ? `$${b.price.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"}</Text>
+          <Text style={[tk.sig, { color: b.signal === "BUY" ? C.green : b.signal === "SELL" ? C.red : C.cyan }]}>
+            {b.signal}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+const tk = StyleSheet.create({
+  row:   { flexDirection: "row", backgroundColor: C.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: C.border, marginBottom: 12 },
+  item:  { flex: 1, alignItems: "center", paddingVertical: 10 },
+  sep:   { borderRightWidth: 1, borderRightColor: C.border },
+  sym:   { fontSize: 9,  fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 0.8 },
+  price: { fontSize: 13, fontFamily: FONTS.monoBold, color: C.textPrimary, marginTop: 2 },
+  sig:   { fontSize: 8,  fontFamily: FONTS.monoBold, letterSpacing: 0.5, marginTop: 2 },
+});
+
+// ── Stat Tile ─────────────────────────────────────────────────────────────────
+
+function StatTile({ label, value, color = C.textPrimary, sub }: { label: string; value: string; color?: string; sub?: string }) {
+  return (
+    <View style={st.tile}>
+      <Text style={[st.value, { color }]}>{value}</Text>
+      {sub && <Text style={[st.sub, { color }]}>{sub}</Text>}
+      <Text style={st.label}>{label}</Text>
+    </View>
+  );
+}
+const st = StyleSheet.create({
+  tile:  { flex: 1, alignItems: "center", paddingVertical: 12, backgroundColor: C.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: C.border },
+  value: { fontSize: 20, fontFamily: FONTS.monoBold, letterSpacing: 0.5 },
+  sub:   { fontSize: 9,  fontFamily: FONTS.mono, marginTop: 1 },
+  label: { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 0.8, marginTop: 3 },
+});
+
+// ── Signal Row ────────────────────────────────────────────────────────────────
+
+function SignalRow({ sig }: { sig: { id: string; symbol: string; action: "BUY"|"SELL"|"HOLD"; confidence: number; timestamp: string; reason?: string } }) {
+  return (
+    <View style={sr.row}>
+      <View style={sr.left}>
+        <Text style={sr.sym}>{sig.symbol}</Text>
+        <Text style={sr.time}>{fmtAge(sig.timestamp)}</Text>
+      </View>
+      <View style={sr.mid}>
+        <Text style={sr.reason} numberOfLines={1}>{sig.reason ?? "EMA+RSI confluence"}</Text>
+        <ConfidenceBar value={sig.confidence} color={sig.action === "BUY" ? C.green : sig.action === "SELL" ? C.red : C.cyan} />
+      </View>
+      <View style={sr.right}>
+        <SignalBadge signal={sig.action} small />
+        <Text style={sr.conf}>{sig.confidence}%</Text>
+      </View>
+    </View>
+  );
+}
+const sr = StyleSheet.create({
+  row:   { flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, gap: 10 },
+  left:  { width: 72 },
+  sym:   { fontSize: 11, fontFamily: FONTS.monoBold, color: C.textPrimary },
+  time:  { fontSize: 8,  fontFamily: FONTS.mono, color: C.textDim, marginTop: 2 },
+  mid:   { flex: 1 },
+  reason:{ fontSize: 9,  fontFamily: FONTS.mono, color: C.textSecondary },
+  right: { alignItems: "flex-end", gap: 3 },
+  conf:  { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted },
+});
+
+// ── Section Header ────────────────────────────────────────────────────────────
+
+function Section({ label, accent = C.cyan, right }: { label: string; accent?: string; right?: React.ReactNode }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10, marginTop: 4 }}>
+      <View style={{ width: 2, height: 12, backgroundColor: accent, borderRadius: 1, marginRight: 8 }} />
+      <Text style={{ fontSize: 9, fontFamily: FONTS.monoBold, color: `${accent}90`, letterSpacing: 1.8 }}>{label}</Text>
+      {right && <View style={{ flex: 1, alignItems: "flex-end" }}>{right}</View>}
     </View>
   );
 }
 
-interface TaskRowProps {
-  time: string;
-  label: string;
-  subtitle: string;
-  icon: ReturnType<typeof require>;
-  isLast: boolean;
-}
-function TaskRow({ time, label, subtitle, icon, isLast }: TaskRowProps) {
+// ── Home Screen ───────────────────────────────────────────────────────────────
+
+export default function HomeScreen() {
+  const { engine, account, positions, trades, isLoading, refresh } = useTrading();
+  const insets  = useSafeAreaInsets();
+  const pnlAnim = useRef(new Animated.Value(0)).current;
+  const isWeb   = Platform.OS === "web";
+
+  const pnlColor = account.unrealizedPnL >= 0 ? C.green : C.red;
+  const topPad   = isWeb ? 67 : insets.top + 10;
+
+  // Subtle PnL pulse on change
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(pnlAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.timing(pnlAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+    ]).start();
+  }, [account.unrealizedPnL]);
+
+  const recentSignals = engine?.recentSignalLog?.slice(0, 5) ?? [
+    { id:"s1", symbol:"BTCUSD", action:"BUY"  as const, confidence:74, timestamp: new Date(Date.now()-180000).toISOString(), reason:"EMA cross + volume surge" },
+    { id:"s2", symbol:"ETHUSD", action:"HOLD" as const, confidence:52, timestamp: new Date(Date.now()-720000).toISOString(), reason:"Sideways market — spread <0.15%" },
+    { id:"s3", symbol:"SOLUSD", action:"SELL" as const, confidence:61, timestamp: new Date(Date.now()-1800000).toISOString(), reason:"RSI overbought + EMA bear cross" },
+  ];
+
   return (
-    <View style={s.tlRow}>
-      {/* Left: time + dot + line */}
-      <View style={s.tlLeft}>
-        <Text style={s.tlTime}>{time}</Text>
-        <View style={s.tlDot} />
-        {!isLast && <View style={s.tlLine} />}
+    <ScrollView
+      style={s.root}
+      contentContainerStyle={[s.scroll, { paddingTop: topPad, paddingBottom: TAB_BAR_H + 16 }]}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={C.cyan} />}
+    >
+
+      {/* ── Header ── */}
+      <View style={s.header}>
+        <View>
+          <Text style={s.logoText}>APEX <Text style={{ color: C.cyan }}>TRADER</Text></Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 }}>
+            <LiveDot color={engine?.running ? C.green : C.textDim} size={6} />
+            <Text style={s.headerSub}>
+              {engine?.running ? `AI ENGINE ACTIVE · ${engine.exchange ?? "SIM"}` : "AI ENGINE IDLE"}
+            </Text>
+          </View>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <View style={s.modeBadge}>
+            <Text style={s.modeText}>{engine?.mode ?? "SIMULATION"}</Text>
+          </View>
+          <Text style={s.notifHint}>
+            <Feather name="bell" size={10} color={C.textDim} /> {trades.length} trades
+          </Text>
+        </View>
       </View>
 
-      {/* Right: card */}
-      <TouchableOpacity style={s.tlCard} activeOpacity={0.75}>
-        <Image source={icon} style={s.tlIcon} />
-        <View style={s.tlInfo}>
-          <Text style={s.tlLabel}>{label}</Text>
-          <Text style={s.tlSub}>{subtitle}</Text>
+      {/* ── Balance Card ── */}
+      <View style={s.balanceCard}>
+        <View style={s.balanceGlow} />
+        <Text style={s.balLabel}>PORTFOLIO EQUITY</Text>
+        <Text style={s.balAmount}>{fmt$(account.equity, 2)}</Text>
+        <Animated.View style={{ opacity: pnlAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.6] }) }}>
+          <Text style={[s.balPnl, { color: pnlColor }]}>
+            {account.unrealizedPnL >= 0 ? "+" : ""}{fmt$(account.unrealizedPnL)} unrealized  ·  {fmtPct(account.unrealizedPnL / account.equity * 100)}
+          </Text>
+        </Animated.View>
+        <View style={s.balRow}>
+          <View style={s.balItem}>
+            <Text style={s.balItemLabel}>CASH</Text>
+            <Text style={s.balItemValue}>{fmt$(account.cashBalance, 0)}</Text>
+          </View>
+          <View style={[s.balItem, { borderLeftWidth: 1, borderLeftColor: C.border, borderRightWidth: 1, borderRightColor: C.border }]}>
+            <Text style={s.balItemLabel}>REALIZED</Text>
+            <Text style={[s.balItemValue, { color: account.realizedPnL >= 0 ? C.green : C.red }]}>
+              {account.realizedPnL >= 0 ? "+" : ""}{fmt$(account.realizedPnL)}
+            </Text>
+          </View>
+          <View style={s.balItem}>
+            <Text style={s.balItemLabel}>FEES PAID</Text>
+            <Text style={[s.balItemValue, { color: C.orange }]}>{fmt$(account.totalFeesPaid)}</Text>
+          </View>
         </View>
-        <Image source={IC_CHEVRON} style={s.tlChevron} />
-      </TouchableOpacity>
-    </View>
+      </View>
+
+      {/* ── Quick Stats ── */}
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+        <StatTile label="WIN RATE"    value={`${account.winRate.toFixed(0)}%`}    color={account.winRate >= 55 ? C.green : C.orange} />
+        <StatTile label="POSITIONS"   value={String(positions.length)}            color={positions.length > 0 ? C.cyan : C.textMuted} />
+        <StatTile label="TOTAL TRADES" value={String(account.totalTrades)}        color={C.textPrimary} />
+      </View>
+
+      {/* ── Engine Status ── */}
+      <Section label="AI ENGINE STATUS" accent={C.purple} />
+      <View style={s.engineCard}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <LiveDot color={engine?.running ? C.green : "#2a4050"} size={7} />
+            <Text style={[s.engineStatus, { color: engine?.running ? C.green : C.textDim }]}>
+              {engine?.running ? "RUNNING" : "STOPPED"}
+            </Text>
+          </View>
+          <Text style={s.engineDetail}>
+            {engine?.activeSymbol ?? "BTCUSD"} · conf {engine?.confidence ?? 0}%
+          </Text>
+          <Text style={s.engineDetail}>
+            {engine?.signalCount ?? 0} signals generated
+          </Text>
+        </View>
+        <View style={{ alignItems: "flex-end", gap: 4 }}>
+          <Text style={s.engineExch}>{engine?.exchange ?? "KRAKEN"}</Text>
+          {engine?.volumeFilter && (
+            <Text style={s.filterTag}>VOL FILTER</Text>
+          )}
+        </View>
+      </View>
+
+      {/* ── Market Ticker ── */}
+      <Section label="LIVE MARKETS" accent={C.teal} />
+      <MarketTicker breakdowns={engine?.symbolBreakdowns} />
+
+      {/* ── Recent Signals ── */}
+      <Section
+        label="RECENT AI SIGNALS"
+        accent={C.cyan}
+        right={<Text style={{ fontSize: 8, fontFamily: FONTS.mono, color: C.textDim }}>{recentSignals.length} recent</Text>}
+      />
+      <View style={s.card}>
+        {recentSignals.map(sig => <SignalRow key={sig.id} sig={sig} />)}
+        {recentSignals.length === 0 && (
+          <Text style={{ textAlign: "center", color: C.textDim, fontSize: 10, fontFamily: FONTS.mono, paddingVertical: 16 }}>
+            No signals yet — engine warming up
+          </Text>
+        )}
+      </View>
+
+    </ScrollView>
   );
 }
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
-export default function HomeScreen() {
-  const hour     = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const total    = TASKS.length;
-
-  return (
-    <ImageBackground source={BG} style={s.bg} resizeMode="cover">
-      {/* Overlay to darken the top for legibility */}
-      <View style={s.overlay} pointerEvents="none" />
-
-      <SafeAreaView style={s.safe} edges={["top"]}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={s.scroll}
-        >
-
-          {/* ── HEADER ── */}
-          <View style={s.header}>
-            <View style={s.headerLeft}>
-              <Image source={LOGO} style={s.logo} />
-              <View>
-                <Text style={s.brandName}>NATURA AI</Text>
-                <Text style={s.brandSub}>AI Wellness Coach</Text>
-              </View>
-            </View>
-            <Image source={AVATAR} style={s.avatar} />
-          </View>
-
-          {/* ── HERO ── */}
-          <View style={s.hero}>
-            <Text style={s.greeting}>{greeting}, Jules</Text>
-            <Text style={s.heroTitle}>Today's Plan for You</Text>
-            <Text style={s.heroSub}>Personalized steps for your{"\n"}mind, body and energy</Text>
-            <View style={s.energyBadge}>
-              <Image source={IC_LEAF} style={s.energyIcon} />
-              <Text style={s.energyText}>Energy: Good</Text>
-            </View>
-          </View>
-
-          {/* ── STATS CARD ── */}
-          <View style={s.statsCard}>
-            <StatItem icon={IC_FLAME} value="5" label="day streak"  />
-            <StatItem icon={IC_CLOCK} value="32"                 label="min today"   />
-            <StatItem icon={IC_CHECK} value="0"                  label="sessions"    />
-            <StatItem icon={IC_STAR}  value="60"                 label="score"       />
-          </View>
-
-          {/* ── TODAY'S PLAN ── */}
-          <View style={s.planSection}>
-            <View style={s.planHeader}>
-              <Text style={s.planTitle}>Today's Plan</Text>
-              <Text style={s.planMeta}>0/{total} done</Text>
-            </View>
-            {/* Divider */}
-            <View style={s.divider} />
-
-            {/* Timeline */}
-            {TASKS.map((task, idx) => (
-              <TaskRow
-                key={task.id}
-                time={task.time}
-                label={task.label}
-                subtitle={task.subtitle}
-                icon={task.icon}
-                isLast={idx === TASKS.length - 1}
-              />
-            ))}
-          </View>
-
-          <View style={{ height: 40 }} />
-        </ScrollView>
-      </SafeAreaView>
-    </ImageBackground>
-  );
-}
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  // Root
-  bg:           { flex: 1, backgroundColor: "#04100a" },
-  overlay:      { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(2,8,4,0.38)" },
-  safe:         { flex: 1 },
-  scroll:       { paddingHorizontal: 20, paddingTop: 8 },
+  root:   { flex: 1, backgroundColor: C.bg },
+  scroll: { paddingHorizontal: 16 },
 
   // Header
-  header:       { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
-  headerLeft:   { flexDirection: "row", alignItems: "center", gap: 10 },
-  logo:         { width: 36, height: 36, borderRadius: 18 },
-  brandName:    { color: WHITE, fontSize: 13, fontWeight: "700", letterSpacing: 1.5 },
-  brandSub:     { color: DIM,   fontSize: 11, fontWeight: "400" },
-  avatar:       { width: 48, height: 48, borderRadius: 24 },
+  header:    { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 },
+  logoText:  { fontSize: 22, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: 2 },
+  headerSub: { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 1 },
+  modeBadge: { backgroundColor: C.cyanDim, borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: `${C.cyan}35` },
+  modeText:  { fontSize: 8,  fontFamily: FONTS.monoBold, color: C.cyan, letterSpacing: 0.8 },
+  notifHint: { fontSize: 8,  fontFamily: FONTS.mono, color: C.textDim, marginTop: 4 },
 
-  // Hero
-  hero:         { marginBottom: 22 },
-  greeting:     { color: NEON,  fontSize: 15, fontWeight: "600", marginBottom: 4 },
-  heroTitle:    { color: WHITE, fontSize: 30, fontWeight: "800", lineHeight: 36, marginBottom: 6 },
-  heroSub:      { color: DIM,   fontSize: 14, fontWeight: "400", lineHeight: 20, marginBottom: 16 },
-  energyBadge:  { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", borderWidth: 1.5, borderColor: NEON, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
-  energyIcon:   { width: 16, height: 16 },
-  energyText:   { color: NEON, fontSize: 13, fontWeight: "600" },
+  // Balance card
+  balanceCard: {
+    backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1,
+    borderColor: `${C.cyan}30`, padding: 18, marginBottom: 14, overflow: "hidden",
+    shadowColor: C.cyan, shadowOpacity: 0.15, shadowRadius: 20, shadowOffset: { width: 0, height: 0 }, elevation: 8,
+  },
+  balanceGlow: {
+    position: "absolute", top: -40, right: -40, width: 160, height: 160,
+    borderRadius: 80, backgroundColor: `${C.cyan}06`,
+  },
+  balLabel:  { fontSize: 8, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 1.5, marginBottom: 4 },
+  balAmount: { fontSize: 36, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: 0.5, marginBottom: 4 },
+  balPnl:    { fontSize: 12, fontFamily: FONTS.monoMedium, marginBottom: 14 },
+  balRow:    { flexDirection: "row", borderTopWidth: 1, borderTopColor: C.border, paddingTop: 12, marginTop: 2 },
+  balItem:   { flex: 1, alignItems: "center" },
+  balItemLabel: { fontSize: 7, fontFamily: FONTS.mono, color: C.textDim, letterSpacing: 1, marginBottom: 2 },
+  balItemValue: { fontSize: 12, fontFamily: FONTS.monoBold, color: C.textPrimary },
 
-  // Stats card
-  statsCard:    { flexDirection: "row", justifyContent: "space-around", alignItems: "center", backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: BORDER, paddingVertical: 18, paddingHorizontal: 10, marginBottom: 28, ...Platform.select({ ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10 }, android: { elevation: 8 } }) },
-  statItem:     { alignItems: "center", gap: 5 },
-  statIcon:     { width: 44, height: 44 },
-  statValue:    { color: WHITE, fontSize: 22, fontWeight: "800" },
-  statLabel:    { color: DIM,   fontSize: 11, fontWeight: "400" },
+  // Engine
+  engineCard: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    backgroundColor: C.surface, borderRadius: RADIUS.lg, borderWidth: 1,
+    borderColor: `${C.purple}25`, padding: 14, marginBottom: 16,
+  },
+  engineStatus: { fontSize: 13, fontFamily: FONTS.monoBold, letterSpacing: 1 },
+  engineDetail: { fontSize: 9,  fontFamily: FONTS.mono, color: C.textMuted, marginTop: 2 },
+  engineExch:   { fontSize: 10, fontFamily: FONTS.monoBold, color: C.cyan, letterSpacing: 1 },
+  filterTag: {
+    fontSize: 7, fontFamily: FONTS.monoBold, color: C.orange,
+    borderWidth: 1, borderColor: `${C.orange}30`, borderRadius: 3,
+    paddingHorizontal: 5, paddingVertical: 2,
+  },
 
-  // Plan section
-  planSection:  { },
-  planHeader:   { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  planTitle:    { color: WHITE, fontSize: 20, fontWeight: "700" },
-  planMeta:     { color: NEON,  fontSize: 13, fontWeight: "600" },
-  divider:      { height: 1.5, backgroundColor: NEON, opacity: 0.45, marginBottom: 16 },
-
-  // Timeline
-  tlRow:        { flexDirection: "row", alignItems: "flex-start", marginBottom: 0 },
-  tlLeft:       { width: 62, alignItems: "center", paddingTop: 17 },
-  tlTime:       { color: DIM, fontSize: 10, fontWeight: "500", marginBottom: 5, textAlign: "center", width: 54 },
-  tlDot:        { width: 9, height: 9, borderRadius: 5, backgroundColor: NEON, shadowColor: NEON, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 5, elevation: 4 },
-  tlLine:       { width: 1.5, flex: 1, minHeight: 56, backgroundColor: "rgba(130,200,80,0.3)", marginTop: 3 },
-
-  tlCard:       { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, paddingVertical: 10, paddingHorizontal: 12, gap: 10, marginBottom: 8, marginLeft: 6 },
-  tlIcon:       { width: 40, height: 40, borderRadius: 20 },
-  tlInfo:       { flex: 1 },
-  tlLabel:      { color: WHITE, fontSize: 14, fontWeight: "600", marginBottom: 2 },
-  tlSub:        { color: DIM,   fontSize: 11, fontWeight: "400" },
-  tlChevron:    { width: 18, height: 18, opacity: 0.75 },
+  // Generic card
+  card: {
+    backgroundColor: C.surface, borderRadius: RADIUS.lg, borderWidth: 1,
+    borderColor: C.border, paddingHorizontal: 14, paddingTop: 4, paddingBottom: 6, marginBottom: 16,
+  },
 });
