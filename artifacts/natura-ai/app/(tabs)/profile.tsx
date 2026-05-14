@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, Modal,
-  StyleSheet, Alert, Platform, TextInput, KeyboardAvoidingView,
+  StyleSheet, Alert, Platform, TextInput, KeyboardAvoidingView, Animated, RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -19,26 +19,41 @@ const TAB_BAR_H = 88;
 // ─────────────────────────────────────────────────────────────────────────────
 
 function Avatar({ initials, size = 68 }: { initials: string; size?: number }) {
+  const glow = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glow, { toValue: 1, duration: 3000, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0, duration: 3000, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  const shadowOp = glow.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.55] });
+
   return (
-    <View style={[av.ring, { width: size + 10, height: size + 10, borderRadius: (size + 10) / 2 }]}>
+    <Animated.View style={[av.ring, {
+      width: size + 12, height: size + 12, borderRadius: (size + 12) / 2,
+      shadowOpacity: shadowOp,
+    }]}>
       <View style={[av.inner, { width: size, height: size, borderRadius: size / 2 }]}>
         <Text style={[av.text, { fontSize: size * 0.36 }]}>{initials}</Text>
       </View>
       <View style={av.dot}>
         <LiveDot color={C.green} size={9} />
       </View>
-    </View>
+    </Animated.View>
   );
 }
 const av = StyleSheet.create({
-  ring:  {
+  ring: {
     alignItems: "center", justifyContent: "center",
     borderWidth: 1.5, borderColor: `${C.cyan}55`,
-    shadowColor: C.cyan, shadowOpacity: 0.25, shadowRadius: 20,
-    shadowOffset: { width: 0, height: 0 }, elevation: 10,
+    shadowColor: C.cyan, shadowRadius: 28, shadowOffset: { width: 0, height: 0 },
+    elevation: 12,
   },
-  inner: { alignItems: "center", justifyContent: "center", backgroundColor: `${C.cyan}15` },
-  text:  { fontFamily: FONTS.monoBold, color: C.cyan },
+  inner: { alignItems: "center", justifyContent: "center", backgroundColor: `${C.cyan}12` },
+  text:  { fontFamily: FONTS.monoBold, color: C.cyan, letterSpacing: 1 },
   dot:   { position: "absolute", bottom: 2, right: 2 },
 });
 
@@ -50,7 +65,10 @@ function StatCard({ label, value, sub, color = C.textPrimary }: {
   label: string; value: string; sub?: string; color?: string;
 }) {
   return (
-    <View style={sc.card}>
+    <View style={[sc.card, {
+      shadowColor: color, shadowOpacity: 0.1,
+      shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3,
+    }]}>
       <Text style={[sc.value, { color }]}>{value}</Text>
       {sub && <Text style={[sc.sub, { color: `${color}90` }]}>{sub}</Text>}
       <Text style={sc.label}>{label}</Text>
@@ -58,14 +76,14 @@ function StatCard({ label, value, sub, color = C.textPrimary }: {
   );
 }
 const sc = StyleSheet.create({
-  card:  {
+  card: {
     flex: 1, alignItems: "center", paddingVertical: 16,
-    backgroundColor: C.surface, borderRadius: RADIUS.lg,
+    backgroundColor: C.surface, borderRadius: RADIUS.xl,
     borderWidth: 1, borderColor: C.border,
   },
-  value: { fontSize: 20, fontFamily: FONTS.monoBold, letterSpacing: 0.5 },
+  value: { fontSize: 22, fontFamily: FONTS.monoBold, letterSpacing: 0.3 },
   sub:   { fontSize: 9,  fontFamily: FONTS.mono, marginTop: 2 },
-  label: { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 0.8, marginTop: 4 },
+  label: { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 1, marginTop: 5 },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,11 +107,8 @@ function SettingRow({ icon, label, value, onPress, danger = false, accent = C.cy
   );
 }
 const sr = StyleSheet.create({
-  row:   {
-    flexDirection: "row", alignItems: "center",
-    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border, gap: 14,
-  },
-  icon:  { width: 34, height: 34, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  row:   { flexDirection: "row", alignItems: "center", paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: C.border, gap: 14 },
+  icon:  { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   label: { flex: 1, fontSize: 14, fontFamily: FONTS.monoMedium },
   value: { fontSize: 11, fontFamily: FONTS.mono, color: C.textMuted, marginRight: 4 },
 });
@@ -108,10 +123,10 @@ interface ExchangeDef {
   id:        string;
   name:      string;
   color:     string;
-  icon:      string;       // Feather icon name fallback
+  icon:      string;
   status:    ExchangeStatus;
   isDefault: boolean;
-  health:    number;       // 0–100
+  health:    number;
   permissions: { read: boolean; trade: boolean };
   lastSeen?: string;
 }
@@ -144,9 +159,9 @@ const EXCHANGES: ExchangeDef[] = [
 ];
 
 const STATUS_CONFIG: Record<ExchangeStatus, { color: string; label: string }> = {
-  connected:    { color: C.green,  label: "CONNECTED"    },
-  warning:      { color: C.orange, label: "DEGRADED"     },
-  disconnected: { color: C.textDim, label: "OFFLINE"     },
+  connected:    { color: C.green,   label: "CONNECTED" },
+  warning:      { color: C.orange,  label: "DEGRADED"  },
+  disconnected: { color: C.textDim, label: "OFFLINE"   },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -154,17 +169,21 @@ const STATUS_CONFIG: Record<ExchangeStatus, { color: string; label: string }> = 
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ExchangeCard({ ex, onConnect }: { ex: ExchangeDef; onConnect: (ex: ExchangeDef) => void }) {
-  const sc   = STATUS_CONFIG[ex.status];
+  const cfg  = STATUS_CONFIG[ex.status];
   const isOn = ex.status !== "disconnected";
 
   return (
-    <View style={[exc.card, { borderColor: isOn ? `${ex.color}30` : C.border }]}>
-      {/* Top accent line */}
+    <View style={[exc.card, {
+      borderColor: isOn ? `${ex.color}35` : C.border,
+      shadowColor: isOn ? ex.color : "#000",
+      shadowOpacity: isOn ? 0.12 : 0.04,
+      shadowRadius: isOn ? 14 : 6,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: isOn ? 5 : 2,
+    }]}>
       <View style={[exc.topBar, { backgroundColor: isOn ? ex.color : "#1a2535" }]} />
-
       <View style={exc.body}>
-        {/* Left — logo placeholder + name */}
-        <View style={[exc.logoWrap, { backgroundColor: `${ex.color}12`, borderColor: `${ex.color}25` }]}>
+        <View style={[exc.logoWrap, { backgroundColor: `${ex.color}12`, borderColor: `${ex.color}28` }]}>
           <Feather name={ex.icon as any} size={18} color={isOn ? ex.color : C.textDim} />
         </View>
 
@@ -178,16 +197,13 @@ function ExchangeCard({ ex, onConnect }: { ex: ExchangeDef; onConnect: (ex: Exch
             )}
           </View>
 
-          {/* Status + health */}
           <View style={exc.statusRow}>
-            <View style={[exc.statusDot, { backgroundColor: sc.color }]} />
-            <Text style={[exc.statusText, { color: sc.color }]}>{sc.label}</Text>
+            <View style={[exc.statusDot, { backgroundColor: cfg.color }]} />
+            <Text style={[exc.statusText, { color: cfg.color }]}>{cfg.label}</Text>
             {isOn && (
               <>
                 <Text style={exc.sep}>·</Text>
-                <Text style={exc.healthText}>
-                  Health {ex.health}%
-                </Text>
+                <Text style={exc.healthText}>Health {ex.health}%</Text>
               </>
             )}
             {ex.lastSeen && (
@@ -198,13 +214,12 @@ function ExchangeCard({ ex, onConnect }: { ex: ExchangeDef; onConnect: (ex: Exch
             )}
           </View>
 
-          {/* Permissions */}
           {isOn && (
             <View style={exc.permsRow}>
-              <View style={[exc.permTag, { borderColor: ex.permissions.read  ? `${C.green}40` : `${C.textDim}25`, backgroundColor: ex.permissions.read  ? `${C.green}08`   : "transparent" }]}>
+              <View style={[exc.permTag, { borderColor: ex.permissions.read  ? `${C.green}40` : `${C.textDim}25`, backgroundColor: ex.permissions.read  ? `${C.green}08` : "transparent" }]}>
                 <Text style={[exc.permText, { color: ex.permissions.read  ? C.green  : C.textDim }]}>READ</Text>
               </View>
-              <View style={[exc.permTag, { borderColor: ex.permissions.trade ? `${C.cyan}40`  : `${C.textDim}25`, backgroundColor: ex.permissions.trade ? `${C.cyan}08`    : "transparent" }]}>
+              <View style={[exc.permTag, { borderColor: ex.permissions.trade ? `${C.cyan}40`  : `${C.textDim}25`, backgroundColor: ex.permissions.trade ? `${C.cyan}08`  : "transparent" }]}>
                 <Text style={[exc.permText, { color: ex.permissions.trade ? C.cyan   : C.textDim }]}>TRADE</Text>
               </View>
               <View style={[exc.permTag, { borderColor: `${C.red}25`, backgroundColor: "transparent" }]}>
@@ -214,13 +229,8 @@ function ExchangeCard({ ex, onConnect }: { ex: ExchangeDef; onConnect: (ex: Exch
           )}
         </View>
 
-        {/* Right — action */}
         {!isOn ? (
-          <TouchableOpacity
-            onPress={() => onConnect(ex)}
-            style={exc.connectBtn}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity onPress={() => onConnect(ex)} style={exc.connectBtn} activeOpacity={0.8}>
             <Feather name="link" size={12} color={ex.color} />
             <Text style={[exc.connectText, { color: ex.color }]}>Connect</Text>
           </TouchableOpacity>
@@ -238,22 +248,22 @@ const exc = StyleSheet.create({
   card:     { backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, marginBottom: 10, overflow: "hidden" },
   topBar:   { height: 2 },
   body:     { flexDirection: "row", alignItems: "flex-start", padding: 14, gap: 12 },
-  logoWrap: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", marginTop: 2 },
+  logoWrap: { width: 46, height: 46, borderRadius: 13, borderWidth: 1, alignItems: "center", justifyContent: "center", marginTop: 2 },
   info:     { flex: 1, gap: 5 },
   nameRow:  { flexDirection: "row", alignItems: "center", gap: 8 },
   name:     { fontSize: 15, fontFamily: FONTS.monoBold, letterSpacing: 0.3 },
   defaultBadge: { backgroundColor: `${C.green}12`, borderRadius: 4, borderWidth: 1, borderColor: `${C.green}35`, paddingHorizontal: 6, paddingVertical: 2 },
-  defaultText:  { fontSize: 7, fontFamily: FONTS.monoBold, color: C.green, letterSpacing: 0.8 },
+  defaultText:  { fontSize: 7, fontFamily: FONTS.monoBold, color: C.green, letterSpacing: 1 },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   statusDot: { width: 5, height: 5, borderRadius: 3 },
-  statusText:{ fontSize: 9, fontFamily: FONTS.monoBold, letterSpacing: 0.5 },
+  statusText:{ fontSize: 9, fontFamily: FONTS.monoBold, letterSpacing: 0.6 },
   sep:       { fontSize: 8, color: C.textDim },
   healthText:{ fontSize: 9, fontFamily: FONTS.mono, color: C.textMuted },
   lastSeen:  { fontSize: 9, fontFamily: FONTS.mono, color: C.textDim },
   permsRow:  { flexDirection: "row", gap: 5, flexWrap: "wrap" },
   permTag:   { borderRadius: 4, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
-  permText:  { fontSize: 7, fontFamily: FONTS.monoBold, letterSpacing: 0.5 },
-  connectBtn:{ alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.md, borderWidth: 1, borderColor: "#1a2535" },
+  permText:  { fontSize: 7, fontFamily: FONTS.monoBold, letterSpacing: 0.6 },
+  connectBtn:{ alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: "#1a2535" },
   connectText:{ fontSize: 9, fontFamily: FONTS.monoBold, letterSpacing: 0.5 },
   menuBtn:   { padding: 4 },
 });
@@ -285,11 +295,6 @@ function AddExchangeModal({ visible, onClose, prefill }: {
     onClose();
   };
 
-  const handlePick = (ex: typeof AVAILABLE_EXCHANGES[0]) => {
-    setSelected(ex);
-    setStep("keys");
-  };
-
   const handleConnect = () => {
     if (!agreed) return Alert.alert("Acknowledgement required", "Please confirm you understand this platform never requests withdrawal permissions.");
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -300,17 +305,10 @@ function AddExchangeModal({ visible, onClose, prefill }: {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={reset}>
-      <KeyboardAvoidingView
-        style={mo.overlay}
-        behavior={isWeb ? "padding" : "height"}
-      >
+      <KeyboardAvoidingView style={mo.overlay} behavior={isWeb ? "padding" : "height"}>
         <TouchableOpacity style={mo.backdrop} activeOpacity={1} onPress={reset} />
-
         <View style={mo.sheet}>
-          {/* Handle */}
           <View style={mo.handle} />
-
-          {/* Header */}
           <View style={mo.header}>
             {step === "keys" && (
               <TouchableOpacity onPress={() => setStep("pick")} style={{ marginRight: 12 }}>
@@ -318,14 +316,8 @@ function AddExchangeModal({ visible, onClose, prefill }: {
               </TouchableOpacity>
             )}
             <View style={{ flex: 1 }}>
-              <Text style={mo.title}>
-                {step === "pick" ? "Add Exchange" : `Connect ${selected?.name}`}
-              </Text>
-              <Text style={mo.sub}>
-                {step === "pick"
-                  ? "Select an exchange to connect your API keys"
-                  : "Read-only or trading permissions — no withdrawals"}
-              </Text>
+              <Text style={mo.title}>{step === "pick" ? "Add Exchange" : `Connect ${selected?.name}`}</Text>
+              <Text style={mo.sub}>{step === "pick" ? "Select an exchange to connect your API keys" : "Read-only or trading permissions — no withdrawals"}</Text>
             </View>
             <TouchableOpacity onPress={reset}>
               <Feather name="x" size={20} color={C.textMuted} />
@@ -333,106 +325,49 @@ function AddExchangeModal({ visible, onClose, prefill }: {
           </View>
 
           {step === "pick" ? (
-            /* ── Exchange Picker ── */
             <View style={mo.pickerList}>
               {AVAILABLE_EXCHANGES.map(ex => (
-                <TouchableOpacity
-                  key={ex.id}
-                  style={mo.pickerRow}
-                  onPress={() => handlePick(ex)}
-                  activeOpacity={0.8}
-                >
+                <TouchableOpacity key={ex.id} style={mo.pickerRow} onPress={() => { setSelected(ex); setStep("keys"); }} activeOpacity={0.8}>
                   <View style={[mo.pickerIcon, { backgroundColor: `${ex.color}12`, borderColor: `${ex.color}25` }]}>
                     <Text style={[mo.pickerLetter, { color: ex.color }]}>{ex.name[0]}</Text>
                   </View>
                   <Text style={mo.pickerName}>{ex.name}</Text>
-                  {ex.needsPassphrase && (
-                    <Text style={mo.pickerTag}>Passphrase</Text>
-                  )}
+                  {ex.needsPassphrase && <Text style={mo.pickerTag}>Passphrase</Text>}
                   <Feather name="chevron-right" size={16} color={C.textDim} />
                 </TouchableOpacity>
               ))}
             </View>
           ) : (
-            /* ── API Key Form ── */
             <View style={mo.form}>
               <View style={mo.field}>
                 <Text style={mo.fieldLabel}>Label (optional)</Text>
-                <TextInput
-                  style={mo.input}
-                  value={label}
-                  onChangeText={setLabel}
-                  placeholder="e.g. Main account"
-                  placeholderTextColor={C.textDim}
-                  autoCapitalize="none"
-                />
+                <TextInput style={mo.input} value={label} onChangeText={setLabel} placeholder="e.g. Main account" placeholderTextColor={C.textDim} autoCapitalize="none" />
               </View>
               <View style={mo.field}>
                 <Text style={mo.fieldLabel}>API Key</Text>
-                <TextInput
-                  style={mo.input}
-                  value={apiKey}
-                  onChangeText={setApiKey}
-                  placeholder="Paste your API key"
-                  placeholderTextColor={C.textDim}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+                <TextInput style={mo.input} value={apiKey} onChangeText={setApiKey} placeholder="Paste your API key" placeholderTextColor={C.textDim} autoCapitalize="none" autoCorrect={false} />
               </View>
               <View style={mo.field}>
                 <Text style={mo.fieldLabel}>API Secret</Text>
-                <TextInput
-                  style={mo.input}
-                  value={apiSecret}
-                  onChangeText={setApiSecret}
-                  placeholder="Paste your API secret"
-                  placeholderTextColor={C.textDim}
-                  autoCapitalize="none"
-                  secureTextEntry
-                />
+                <TextInput style={mo.input} value={apiSecret} onChangeText={setApiSecret} placeholder="Paste your API secret" placeholderTextColor={C.textDim} autoCapitalize="none" secureTextEntry />
               </View>
               {selected?.needsPassphrase && (
                 <View style={mo.field}>
                   <Text style={mo.fieldLabel}>Passphrase</Text>
-                  <TextInput
-                    style={mo.input}
-                    value={passphrase}
-                    onChangeText={setPassphrase}
-                    placeholder="Required for this exchange"
-                    placeholderTextColor={C.textDim}
-                    secureTextEntry
-                  />
+                  <TextInput style={mo.input} value={passphrase} onChangeText={setPassphrase} placeholder="Required for this exchange" placeholderTextColor={C.textDim} secureTextEntry />
                 </View>
               )}
-
-              {/* Safety notice */}
               <View style={mo.notice}>
                 <Feather name="shield" size={13} color={C.green} />
-                <Text style={mo.noticeText}>
-                  Withdrawal permissions are never requested. API keys are encrypted with AES-256 and stored only on your account.
-                </Text>
+                <Text style={mo.noticeText}>Withdrawal permissions are never requested. API keys are encrypted with AES-256 and stored only on your account.</Text>
               </View>
-
-              {/* Acknowledgement */}
-              <TouchableOpacity
-                style={mo.checkRow}
-                onPress={() => setAgreed(a => !a)}
-                activeOpacity={0.8}
-              >
+              <TouchableOpacity style={mo.checkRow} onPress={() => setAgreed(a => !a)} activeOpacity={0.8}>
                 <View style={[mo.checkbox, agreed && { backgroundColor: C.cyan, borderColor: C.cyan }]}>
                   {agreed && <Feather name="check" size={10} color="#000" />}
                 </View>
-                <Text style={mo.checkLabel}>
-                  I understand no withdrawal permissions will be requested or granted.
-                </Text>
+                <Text style={mo.checkLabel}>I understand no withdrawal permissions will be requested or granted.</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[mo.connectBtn, { opacity: apiKey && apiSecret && agreed ? 1 : 0.4 }]}
-                onPress={handleConnect}
-                disabled={!apiKey || !apiSecret || !agreed}
-                activeOpacity={0.8}
-              >
+              <TouchableOpacity style={[mo.connectBtn, { opacity: apiKey && apiSecret && agreed ? 1 : 0.4 }]} onPress={handleConnect} disabled={!apiKey || !apiSecret || !agreed} activeOpacity={0.8}>
                 <Feather name="link-2" size={14} color="#000" />
                 <Text style={mo.connectBtnText}>Validate & Connect</Text>
               </TouchableOpacity>
@@ -446,33 +381,28 @@ function AddExchangeModal({ visible, onClose, prefill }: {
 
 const mo = StyleSheet.create({
   overlay:  { flex: 1, justifyContent: "flex-end" },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.7)" },
-  sheet:    { backgroundColor: "#070f1a", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: C.border, paddingBottom: 40 },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.75)" },
+  sheet:    { backgroundColor: "#060d18", borderTopLeftRadius: 26, borderTopRightRadius: 26, borderWidth: 1, borderColor: C.border, paddingBottom: 40 },
   handle:   { width: 36, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: "center", marginTop: 12, marginBottom: 4 },
   header:   { flexDirection: "row", alignItems: "flex-start", padding: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.border },
   title:    { fontSize: 17, fontFamily: FONTS.monoBold, color: C.textPrimary },
   sub:      { fontSize: 10, fontFamily: FONTS.mono, color: C.textMuted, marginTop: 3 },
-
   pickerList: { paddingHorizontal: 20, paddingTop: 8 },
   pickerRow:  { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.border },
-  pickerIcon: { width: 38, height: 38, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  pickerLetter: { fontSize: 16, fontFamily: FONTS.monoBold },
+  pickerIcon: { width: 40, height: 40, borderRadius: 11, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  pickerLetter: { fontSize: 17, fontFamily: FONTS.monoBold },
   pickerName: { flex: 1, fontSize: 15, fontFamily: FONTS.monoMedium, color: C.textPrimary },
   pickerTag:  { fontSize: 8, fontFamily: FONTS.mono, color: C.orange, borderWidth: 1, borderColor: `${C.orange}35`, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-
   form:       { paddingHorizontal: 20, paddingTop: 16, gap: 14 },
   field:      { gap: 6 },
-  fieldLabel: { fontSize: 9, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 1 },
-  input:      { backgroundColor: C.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 13, fontFamily: FONTS.mono, color: C.textPrimary },
-
+  fieldLabel: { fontSize: 9, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 1.2 },
+  input:      { backgroundColor: C.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 13, fontSize: 13, fontFamily: FONTS.mono, color: C.textPrimary },
   notice:     { flexDirection: "row", gap: 10, backgroundColor: `${C.green}08`, borderRadius: RADIUS.md, borderWidth: 1, borderColor: `${C.green}20`, padding: 12, alignItems: "flex-start" },
   noticeText: { flex: 1, fontSize: 10, fontFamily: FONTS.mono, color: C.textMuted, lineHeight: 15 },
-
   checkRow:   { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   checkbox:   { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: C.border, alignItems: "center", justifyContent: "center", marginTop: 1 },
   checkLabel: { flex: 1, fontSize: 11, fontFamily: FONTS.mono, color: C.textMuted, lineHeight: 16 },
-
-  connectBtn:     { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.cyan, borderRadius: RADIUS.lg, paddingVertical: 14, marginTop: 4 },
+  connectBtn:     { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.cyan, borderRadius: RADIUS.lg, paddingVertical: 15, marginTop: 4 },
   connectBtnText: { fontSize: 13, fontFamily: FONTS.monoBold, color: "#000", letterSpacing: 0.5 },
 });
 
@@ -482,9 +412,9 @@ const mo = StyleSheet.create({
 
 function SectionHeader({ label, accent = C.cyan }: { label: string; accent?: string }) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12, marginTop: 8 }}>
-      <View style={{ width: 3, height: 13, backgroundColor: accent, borderRadius: 2, marginRight: 10 }} />
-      <Text style={{ fontSize: 10, fontFamily: FONTS.monoBold, color: `${accent}90`, letterSpacing: 1.8 }}>{label}</Text>
+    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12, marginTop: 10 }}>
+      <View style={{ width: 3, height: 14, backgroundColor: accent, borderRadius: 2, marginRight: 10, opacity: 0.85 }} />
+      <Text style={{ fontSize: 9, fontFamily: FONTS.monoBold, color: `${accent}88`, letterSpacing: 2 }}>{label}</Text>
     </View>
   );
 }
@@ -494,66 +424,58 @@ function SectionHeader({ label, accent = C.cyan }: { label: string; accent?: str
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
-  const { account, trades, engine } = useTrading();
-  const insets  = useSafeAreaInsets();
-  const isWeb   = Platform.OS === "web";
-  const topPad  = isWeb ? 67 : insets.top + 10;
-
+  const { account, trades, isLoading, refresh } = useTrading();
+  const insets = useSafeAreaInsets();
+  const isWeb  = Platform.OS === "web";
+  const topPad = isWeb ? 67 : insets.top + 10;
   const [modalVisible, setModalVisible] = useState(false);
   const [prefillEx,    setPrefillEx]    = useState<ExchangeDef | null>(null);
 
-  const closed   = trades.filter(t => t.pnl != null);
-  const wins     = closed.filter(t => t.pnl > 0);
-  const winRate  = closed.length ? (wins.length / closed.length) * 100 : account.winRate;
-  const totalPnL = closed.reduce((s, t) => s + t.pnl, 0);
-
-  const openConnect = (ex?: ExchangeDef) => {
-    setPrefillEx(ex ?? null);
+  const openConnect = (ex: ExchangeDef) => {
+    setPrefillEx(ex);
     setModalVisible(true);
-    Haptics.selectionAsync();
   };
 
-  const handleSignOut = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert("Sign Out", "You'll need to sign back in to access your account.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: () => {} },
-    ]);
-  };
+  const totalPnL  = account.realizedPnL;
+  const winRate   = account.winRate;
 
   return (
     <>
       <ScrollView
-        style={s.root}
-        contentContainerStyle={[s.scroll, { paddingTop: topPad, paddingBottom: TAB_BAR_H + 16 }]}
+        style={p.root}
+        contentContainerStyle={[p.scroll, { paddingTop: topPad, paddingBottom: TAB_BAR_H + 16 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={C.cyan} />}
       >
 
-        {/* ── Profile Header ── */}
-        <View style={s.profileCard}>
-          <Avatar initials="AT" size={68} />
-          <View style={s.profileInfo}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-              <Text style={s.name}>Apex Trader</Text>
-              <View style={s.proBadge}><Text style={s.proText}>PRO</Text></View>
+        {/* ── Identity Card ── */}
+        <View style={p.identityCard}>
+          {/* Ambient glow */}
+          <View style={p.identityGlow} />
+          <View style={p.identityGlow2} />
+
+          <View style={p.identityRow}>
+            <Avatar initials="AT" size={68} />
+            <View style={p.identityInfo}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={p.userName}>Apex Trader</Text>
+                <View style={p.proBadge}>
+                  <Text style={p.proBadgeText}>PRO</Text>
+                </View>
+              </View>
+              <Text style={p.userEmail}>trader@apexai.com</Text>
+              <Text style={p.userMeta}>Member since Jan 2025</Text>
             </View>
-            <Text style={s.email}>trader@apexai.com</Text>
-            <Text style={s.since}>Member since Jan 2025</Text>
           </View>
         </View>
 
-        {/* ── Performance Stats ── */}
-        <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
-          <StatCard label="EQUITY"   value={fmt$(account.equity, 0)}   color={C.textPrimary} />
-          <StatCard label="REALIZED" value={totalPnL >= 0 ? `+${fmt$(totalPnL)}` : fmt$(totalPnL)} color={totalPnL >= 0 ? C.green : C.red} />
+        {/* ── Stats Grid ── */}
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+          <StatCard label="EQUITY"   value={fmt$(account.equity, 0)}  color={C.cyan}  />
+          <StatCard label="REALIZED" value={`${totalPnL >= 0 ? "+" : ""}${fmt$(totalPnL, 0)}`} color={totalPnL >= 0 ? C.green : C.red} />
         </View>
-        <View style={{ flexDirection: "row", gap: 8, marginBottom: 24 }}>
-          <StatCard
-            label="WIN RATE"
-            value={`${winRate.toFixed(1)}%`}
-            sub={`${wins.length}W · ${closed.length - wins.length}L`}
-            color={winRate >= 55 ? C.green : C.orange}
-          />
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 20 }}>
+          <StatCard label="WIN RATE" value={`${winRate.toFixed(1)}%`} sub={`${trades.filter(t => t.pnl >= 0).length}W · ${trades.filter(t => t.pnl < 0).length}L`} color={winRate >= 55 ? C.green : C.orange} />
           <StatCard label="FEES PAID" value={fmt$(account.totalFeesPaid)} color={C.orange} />
         </View>
 
@@ -568,85 +490,84 @@ export default function ProfileScreen() {
 
         {/* ── Exchange Connections ── */}
         <SectionHeader label="EXCHANGE CONNECTIONS" accent={C.cyan} />
-
         {EXCHANGES.map(ex => (
           <ExchangeCard key={ex.id} ex={ex} onConnect={openConnect} />
         ))}
 
-        {/* Add Exchange button */}
-        <TouchableOpacity style={s.addExBtn} onPress={() => openConnect()} activeOpacity={0.8}>
-          <View style={s.addExIcon}>
-            <Feather name="plus" size={16} color={C.cyan} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.addExLabel}>Add Exchange</Text>
-            <Text style={s.addExSub}>Connect Bybit, OKX, KuCoin and more</Text>
-          </View>
-          <Feather name="chevron-right" size={16} color={C.textDim} />
-        </TouchableOpacity>
+        {/* ── Account Settings ── */}
+        <SectionHeader label="ACCOUNT SETTINGS" accent={C.teal} />
+        <View style={p.settingsCard}>
+          <SettingRow icon="bell"       label="Notifications"      value="All alerts"   accent={C.cyan} />
+          <SettingRow icon="shield"     label="Security"           value="2FA enabled"  accent={C.green} />
+          <SettingRow icon="sliders"    label="Risk Parameters"    value="Moderate"     accent={C.purple} />
+          <SettingRow icon="globe"      label="Timezone"           value="UTC−5"        accent={C.teal} />
+          <SettingRow icon="download"   label="Export Trade Data"                       accent={C.cyan} />
+          <SettingRow icon="log-out"    label="Sign Out"           danger />
+        </View>
 
-        {/* ── AI Configuration ── */}
-        <SectionHeader label="AI CONFIGURATION" accent={C.purple} />
-        <NeonCard accent={C.purple} style={{ marginBottom: 24 }}>
-          <SettingRow icon="cpu"          label="AI Personality"  value="Balanced"                        accent={C.purple} />
-          <SettingRow icon="shield"       label="Risk Profile"    value="Moderate"                        accent={C.purple} />
-          <SettingRow icon="sliders"      label="Min Confidence"  value="60%"                             accent={C.purple} />
-          <SettingRow icon="toggle-right" label="Auto Mode"       value={engine?.running ? "ON" : "OFF"} accent={C.purple} />
-          <SettingRow icon="percent"      label="Position Size"   value="0.01%"                           accent={C.purple} />
-          <SettingRow icon="trending-down" label="Stop Loss"      value="2%"                              accent={C.purple} />
-          <SettingRow icon="trending-up"  label="Take Profit"     value="4%"                              accent={C.purple} />
-        </NeonCard>
-
-        {/* ── Account ── */}
-        <SectionHeader label="ACCOUNT" accent={C.orange} />
-        <NeonCard accent={C.orange} style={{ marginBottom: 16 }}>
-          <SettingRow icon="bell"        label="Notifications"    value="All"     accent={C.orange} />
-          <SettingRow icon="clock"       label="Timezone"         value="UTC-5"   accent={C.orange} />
-          <SettingRow icon="dollar-sign" label="Display Currency" value="USD"     accent={C.orange} />
-          <SettingRow icon="lock"        label="Security"         value="2FA On"  accent={C.orange} />
-          <SettingRow icon="download"    label="Export Trade Data"                accent={C.orange} />
-          <SettingRow icon="log-out"     label="Sign Out"         onPress={handleSignOut} danger />
-        </NeonCard>
+        {/* ── System Status ── */}
+        <SectionHeader label="SYSTEM STATUS" accent={C.green} />
+        <View style={p.statusCard}>
+          {[
+            { label: "AI Trading Engine", status: "Operational", color: C.green },
+            { label: "Market Data Feed",  status: "Live",        color: C.green },
+            { label: "Risk Management",   status: "Active",      color: C.green },
+            { label: "Order Execution",   status: "Ready",       color: C.cyan  },
+          ].map(item => (
+            <View key={item.label} style={p.statusRow}>
+              <View style={[p.statusDot, { backgroundColor: item.color, shadowColor: item.color, shadowOpacity: 0.8, shadowRadius: 4, shadowOffset: { width: 0, height: 0 } }]} />
+              <Text style={p.statusLabel}>{item.label}</Text>
+              <Text style={[p.statusVal, { color: item.color }]}>{item.status}</Text>
+            </View>
+          ))}
+        </View>
 
       </ScrollView>
 
       <AddExchangeModal
         visible={modalVisible}
-        onClose={() => setModalVisible(false)}
+        onClose={() => { setModalVisible(false); setPrefillEx(null); }}
         prefill={prefillEx}
       />
     </>
   );
 }
 
-const s = StyleSheet.create({
+const p = StyleSheet.create({
   root:   { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 16 },
 
-  profileCard: {
-    flexDirection: "row", alignItems: "center", gap: 18,
-    marginBottom: 22, padding: 18,
-    backgroundColor: C.surface, borderRadius: RADIUS.xl,
-    borderWidth: 1, borderColor: `${C.cyan}20`,
+  identityCard: {
+    backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1,
+    borderColor: `${C.cyan}28`, padding: 18, marginBottom: 16, overflow: "hidden",
+    shadowColor: C.cyan, shadowOpacity: 0.16, shadowRadius: 24,
+    shadowOffset: { width: 0, height: 5 }, elevation: 10,
   },
-  profileInfo: { flex: 1 },
-  name:   { fontSize: 20, fontFamily: FONTS.monoBold, color: C.textPrimary },
-  email:  { fontSize: 11, fontFamily: FONTS.mono, color: C.textMuted, marginTop: 3 },
-  since:  { fontSize: 9,  fontFamily: FONTS.mono, color: C.textDim, marginTop: 3 },
-  proBadge:{ backgroundColor: `${C.cyan}15`, borderRadius: 5, borderWidth: 1, borderColor: `${C.cyan}35`, paddingHorizontal: 8, paddingVertical: 3 },
-  proText: { fontSize: 8, fontFamily: FONTS.monoBold, color: C.cyan, letterSpacing: 1 },
+  identityGlow:  { position: "absolute", top: -50, right: -50, width: 180, height: 180, borderRadius: 90, backgroundColor: `${C.cyan}05` },
+  identityGlow2: { position: "absolute", bottom: -30, left: -30, width: 120, height: 120, borderRadius: 60, backgroundColor: `${C.purple}04` },
+  identityRow:   { flexDirection: "row", alignItems: "center", gap: 18 },
+  identityInfo:  { flex: 1, gap: 3 },
+  userName:      { fontSize: 20, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: 0.3 },
+  proBadge:      { backgroundColor: `${C.cyan}15`, borderRadius: 5, borderWidth: 1, borderColor: `${C.cyan}40`, paddingHorizontal: 7, paddingVertical: 2 },
+  proBadgeText:  { fontSize: 8, fontFamily: FONTS.monoBold, color: C.cyan, letterSpacing: 1 },
+  userEmail:     { fontSize: 11, fontFamily: FONTS.mono, color: C.textSecondary },
+  userMeta:      { fontSize: 9,  fontFamily: FONTS.mono, color: C.textDim },
 
-  addExBtn: {
-    flexDirection: "row", alignItems: "center", gap: 14,
-    backgroundColor: C.surface, borderRadius: RADIUS.xl,
-    borderWidth: 1, borderColor: `${C.cyan}20`,
-    borderStyle: "dashed", padding: 16, marginBottom: 24,
+  settingsCard: {
+    backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1,
+    borderColor: C.border, paddingHorizontal: 16, marginBottom: 24,
+    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 }, elevation: 3,
   },
-  addExIcon: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: `${C.cyan}10`, borderWidth: 1, borderColor: `${C.cyan}25`,
-    alignItems: "center", justifyContent: "center",
+
+  statusCard: {
+    backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1,
+    borderColor: `${C.green}18`, padding: 16, marginBottom: 24,
+    shadowColor: C.green, shadowOpacity: 0.08, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  addExLabel: { fontSize: 14, fontFamily: FONTS.monoBold, color: C.cyan },
-  addExSub:   { fontSize: 10, fontFamily: FONTS.mono, color: C.textMuted, marginTop: 2 },
+  statusRow:   { flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, gap: 10 },
+  statusDot:   { width: 7, height: 7, borderRadius: 4, elevation: 4 },
+  statusLabel: { flex: 1, fontSize: 13, fontFamily: FONTS.monoMedium, color: C.textMuted },
+  statusVal:   { fontSize: 11, fontFamily: FONTS.monoBold, letterSpacing: 0.4 },
 });

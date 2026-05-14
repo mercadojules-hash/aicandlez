@@ -1,0 +1,309 @@
+The mobile app is now visually strong.
+
+We are entering the FINAL POLISH PHASE.
+
+DO NOT redesign the app.
+DO NOT clutter the UI.
+DO NOT add random widgets.
+
+This phase is about:
+DEPTH
+PREMIUM FEEL
+SPATIAL HIERARCHY
+AI PRESENCE
+MICRO-DETAILS
+EMOTIONAL TRUST
+
+The app should now feel:
+ultra premium
+institutional
+expensive
+high-intelligence
+minimal
+confident
+
+Think:
+Apple Card
+Bloomberg
+TradingView Premium
+Tesla
+BlackRock internal tooling
+
+NOT:
+retail crypto app
+gaming UI
+cyberpunk casino
+
+---
+
+1. ADD SPATIAL DEPTH
+
+---
+
+Right now many cards still feel visually flat.
+
+Improve:
+
+* layered shadows
+* subtle glass depth
+* card elevation hierarchy
+* ambient glow diffusion
+* soft neon reflections
+* dark gradient separation
+
+The user should FEEL:
+depth
+stacking
+dimensionality
+
+without obvious effects.
+
+---
+
+2. IMPROVE TYPOGRAPHY HIERARCHY
+
+---
+
+Typography is close but not fully premium yet.
+
+Refine:
+
+* larger metric dominance
+* improved spacing rhythm
+* better vertical breathing
+* more elegant secondary text
+* stronger visual hierarchy between:
+  labels
+  values
+  AI indicators
+  status metrics
+
+Important:
+Reduce tiny unreadable text.
+Avoid cramped fintech density.
+
+Everything should feel:
+effortless to scan.
+
+---
+
+3. AI PRESENCE SYSTEM
+
+---
+
+The AI still feels like “features.”
+
+It now needs to feel like:
+a living intelligent system.
+
+Add subtle AI-presence behaviors:
+
+* soft neural pulse animations
+* market regime transitions
+* adaptive confidence movement
+* AI engine breathing glow
+* signal synchronization effects
+* intelligent live-state indicators
+
+VERY subtle.
+VERY premium.
+
+The user should subconsciously feel:
+“The AI is actively thinking.”
+
+---
+
+4. LIVE DATA REALISM
+
+---
+
+Current values feel somewhat static.
+
+Improve realism:
+
+* slight micro fluctuations
+* smooth rolling updates
+* delayed momentum transitions
+* asynchronous metric refreshes
+* subtle market motion
+
+NO flashing.
+NO casino movement.
+
+Everything should feel:
+institutional and calm.
+
+---
+
+5. HOME SCREEN REFINEMENT
+
+---
+
+Improve the Home screen specifically:
+
+Portfolio chart:
+
+* smoother curve interpolation
+* softer gradient blending
+* slightly thicker premium line
+* ambient chart glow
+* dynamic hover/press interaction
+
+Metrics row:
+
+* stronger spacing
+* more breathing room
+* improved number alignment
+
+Recent AI signals:
+
+* cleaner confidence visualization
+* stronger row separation
+* improved scan readability
+
+---
+
+6. TRADE SCREEN REFINEMENT
+
+---
+
+Current trade screen is strong.
+Now make it feel elite.
+
+Improve:
+
+* analytics ring polish
+* exposure meter animation
+* open positions spacing
+* trade card hierarchy
+* PnL emphasis
+* execution-state feedback
+
+Add subtle:
+
+* execution pulse
+* AI monitoring indicator
+* “system active” ambient animation
+
+Trade screen should feel:
+high stakes
+high intelligence
+high control
+
+---
+
+7. MARKETS SCREEN REFINEMENT
+
+---
+
+Markets screen is close.
+
+Improve:
+
+* sparkline rendering quality
+* trend smoothness
+* confidence bar elegance
+* asset spacing consistency
+* momentum readability
+
+The market scanner should feel:
+predictive
+AI-assisted
+institutional
+
+not:
+simple watchlist cards.
+
+---
+
+8. PROFILE SCREEN REFINEMENT
+
+---
+
+This should now feel:
+wealth management platform quality.
+
+Improve:
+
+* performance intelligence layout
+* chart readability
+* exchange card polish
+* account settings spacing
+* account prestige feel
+
+Add subtle:
+
+* account trust indicators
+* AI stability indicators
+* system uptime elegance
+
+The Profile screen should emotionally feel:
+secure
+intelligent
+premium
+high-trust
+
+---
+
+9. PREMIUM MOTION SYSTEM
+
+---
+
+Global motion refinement:
+
+Introduce:
+
+* smoother transitions
+* inertial scrolling feel
+* subtle card response
+* elegant fade timing
+* chart draw animation
+* live metric easing
+
+Motion language should feel:
+Apple-level refinement.
+
+NOT:
+over-animated.
+
+---
+
+10. IMPORTANT CONSTRAINTS
+
+---
+
+DO NOT:
+
+* overcrowd screens
+* add random dashboards
+* make tiny unreadable telemetry
+* turn it into Bloomberg chaos
+* use excessive glow
+* create cyberpunk overload
+
+Maintain:
+minimalism
+institutional restraint
+high trust
+clean hierarchy
+
+---
+
+11. FINAL EMOTIONAL TARGET
+
+---
+
+The app should now emotionally communicate:
+
+“This AI platform quietly outperforms.”
+
+The user should feel:
+safe
+smart
+powerful
+ahead of the market
+supported by intelligence
+
+without the UI screaming for attention.
+
+Refine the product accordingly.

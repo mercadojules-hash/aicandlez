@@ -18,51 +18,58 @@ const MONTHS = [
   { m: "MAY", pnl:   393 },
 ];
 
-function MonthlyBars({ width = 280 }: { width?: number }) {
-  const chartH  = 80;
-  const pad     = 4;
-  const barGap  = 5;
+function MonthlyBars({ width = 288 }: { width?: number }) {
+  const chartH  = 90;
+  const pad     = 6;
+  const barGap  = 6;
   const barW    = (width - pad * 2 - barGap * (MONTHS.length - 1)) / MONTHS.length;
   const maxAbs  = Math.max(...MONTHS.map(m => Math.abs(m.pnl)));
   const zeroY   = chartH * 0.52;
 
   return (
-    <Svg width={width} height={chartH + 18}>
+    <Svg width={width} height={chartH + 20}>
       <Defs>
         <LinearGradient id="posBar" x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0%"   stopColor={C.green} stopOpacity={1}    />
-          <Stop offset="100%" stopColor={C.green} stopOpacity={0.40} />
+          <Stop offset="100%" stopColor={C.green} stopOpacity={0.35} />
         </LinearGradient>
         <LinearGradient id="negBar" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%"   stopColor={C.red} stopOpacity={0.40} />
+          <Stop offset="0%"   stopColor={C.red} stopOpacity={0.35} />
           <Stop offset="100%" stopColor={C.red} stopOpacity={1}    />
         </LinearGradient>
       </Defs>
 
-      {/* Zero line */}
-      <Path d={`M ${pad} ${zeroY} L ${width - pad} ${zeroY}`} stroke={C.border} strokeWidth={0.5} />
+      {/* Zero baseline */}
+      <Path d={`M ${pad} ${zeroY} L ${width - pad} ${zeroY}`}
+        stroke={C.border2} strokeWidth={0.8} />
 
       {MONTHS.map((m, i) => {
-        const x    = pad + i * (barW + barGap);
-        const pos  = m.pnl >= 0;
-        const barH = Math.max((Math.abs(m.pnl) / maxAbs) * (chartH * 0.46), 3);
-        const y    = pos ? zeroY - barH : zeroY;
-        const rx   = Math.min(3, barW / 3);
+        const x        = pad + i * (barW + barGap);
+        const pos      = m.pnl >= 0;
+        const barH     = Math.max((Math.abs(m.pnl) / maxAbs) * (chartH * 0.46), 4);
+        const y        = pos ? zeroY - barH : zeroY;
+        const rx       = Math.min(3.5, barW / 3);
         const isLatest = i === MONTHS.length - 1;
 
         return (
           <React.Fragment key={m.m}>
+            {/* Glow behind bar */}
+            <Rect
+              x={x - 1} y={y - 1} width={barW + 2} height={barH + 2}
+              rx={rx + 1} ry={rx + 1}
+              fill={pos ? C.green : C.red} fillOpacity={0.07}
+            />
             <Rect
               x={x} y={y} width={barW} height={barH}
               rx={rx} ry={rx}
               fill={pos ? "url(#posBar)" : "url(#negBar)"}
-              fillOpacity={isLatest ? 0.6 : 1}
+              fillOpacity={isLatest ? 0.55 : 1}
             />
             <SvgText
-              x={x + barW / 2} y={chartH + 14}
+              x={x + barW / 2} y={chartH + 16}
               textAnchor="middle"
-              fontSize={7} fontFamily={FONTS.mono}
-              fill={isLatest ? C.textMuted : C.textDim}
+              fontSize={7.5} fontFamily={FONTS.mono}
+              fill={isLatest ? C.textSecondary : C.textDim}
             >
               {m.m}
             </SvgText>
@@ -76,8 +83,8 @@ function MonthlyBars({ width = 280 }: { width?: number }) {
 // ── Score Ring ────────────────────────────────────────────────────────────────
 
 function ScoreRing({ score, label, color }: { score: number; label: string; color: string }) {
-  const size = 60;
-  const sw   = 5;
+  const size = 70;
+  const sw   = 6;
   const r    = (size - sw) / 2;
   const cx   = size / 2;
   const cy   = size / 2;
@@ -87,7 +94,21 @@ function ScoreRing({ score, label, color }: { score: number; label: string; colo
   return (
     <View style={rg.wrap}>
       <Svg width={size} height={size}>
+        {/* Glow track */}
+        <Circle cx={cx} cy={cy} r={r} stroke={`${color}10`} strokeWidth={sw + 4} fill="none" />
+        {/* Track */}
         <Circle cx={cx} cy={cy} r={r} stroke={`${color}18`} strokeWidth={sw} fill="none" />
+        {/* Arc glow */}
+        {score > 0 && (
+          <Circle
+            cx={cx} cy={cy} r={r} stroke={`${color}30`}
+            strokeWidth={sw + 4} fill="none"
+            strokeDasharray={`${dash.toFixed(1)} ${circ.toFixed(1)}`}
+            strokeLinecap="round"
+            transform={`rotate(-90, ${cx}, ${cy})`}
+          />
+        )}
+        {/* Arc */}
         {score > 0 && (
           <Circle
             cx={cx} cy={cy} r={r} stroke={color}
@@ -106,10 +127,10 @@ function ScoreRing({ score, label, color }: { score: number; label: string; colo
   );
 }
 const rg = StyleSheet.create({
-  wrap:   { alignItems: "center", gap: 4 },
+  wrap:   { alignItems: "center", gap: 5 },
   center: { position: "absolute", top: 0, left: 0, alignItems: "center", justifyContent: "center" },
-  score:  { fontSize: 13, fontFamily: FONTS.monoBold },
-  label:  { fontSize: 7, fontFamily: FONTS.mono, color: C.textDim, letterSpacing: 0.7, textAlign: "center" },
+  score:  { fontSize: 15, fontFamily: FONTS.monoBold },
+  label:  { fontSize: 7.5, fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 0.8, textAlign: "center" },
 });
 
 // ── Stat Row ──────────────────────────────────────────────────────────────────
@@ -125,9 +146,9 @@ function StatRow({ label, value, color = C.textPrimary }: {
   );
 }
 const sr = StyleSheet.create({
-  row:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: C.border },
+  row:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border },
   label: { fontSize: 13, fontFamily: FONTS.monoMedium, color: C.textMuted },
-  value: { fontSize: 13, fontFamily: FONTS.monoBold },
+  value: { fontSize: 14, fontFamily: FONTS.monoBold, letterSpacing: 0.2 },
 });
 
 // ── Performance Panel ─────────────────────────────────────────────────────────
@@ -141,7 +162,7 @@ interface Props {
 
 export function PerformancePanel({ totalPnL, winRate, totalTrades, feesPaid }: Props) {
   const fmt = (v: number) =>
-    `${v >= 0 ? "+" : ""}$${Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+    `${v >= 0 ? "+" : "−"}$${Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
   const aiScore     = Math.min(Math.round(winRate * 1.12), 98);
   const consistency = Math.min(Math.round(winRate * 0.93), 95);
@@ -149,6 +170,9 @@ export function PerformancePanel({ totalPnL, winRate, totalTrades, feesPaid }: P
 
   return (
     <View style={s.card}>
+      {/* Top bar */}
+      <View style={s.topBar} />
+
       {/* Monthly bar chart */}
       <View style={s.barSection}>
         <Text style={s.sectionTitle}>MONTHLY AI PERFORMANCE</Text>
@@ -169,7 +193,7 @@ export function PerformancePanel({ totalPnL, winRate, totalTrades, feesPaid }: P
         <StatRow label="Cumulative Return"  value={fmt(totalPnL)}               color={totalPnL >= 0 ? C.green : C.red} />
         <StatRow label="Total Trades"       value={String(totalTrades)}         color={C.textPrimary} />
         <StatRow label="Win Rate"           value={`${winRate.toFixed(1)}%`}    color={winRate >= 55 ? C.green : C.orange} />
-        <StatRow label="Fees Incurred"      value={`$${feesPaid.toFixed(2)}`}  color={C.orange} />
+        <StatRow label="Fees Incurred"      value={`$${feesPaid.toFixed(2)}`}   color={C.orange} />
         <StatRow label="AI Engine Uptime"   value="99.97%"                      color={C.green} />
       </View>
     </View>
@@ -179,14 +203,19 @@ export function PerformancePanel({ totalPnL, winRate, totalTrades, feesPaid }: P
 const s = StyleSheet.create({
   card: {
     backgroundColor: C.surface, borderRadius: RADIUS.xl,
-    borderWidth: 1, borderColor: C.border, marginBottom: 24, overflow: "hidden",
+    borderWidth: 1, borderColor: `${C.purple}25`,
+    marginBottom: 24, overflow: "hidden",
+    shadowColor: C.purple, shadowOpacity: 0.15,
+    shadowRadius: 20, shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
-  barSection:   { borderBottomWidth: 1, borderBottomColor: C.border, padding: 16 },
-  sectionTitle: { fontSize: 9, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 1.5 },
-  barWrap:      { alignItems: "center", marginTop: 10 },
+  topBar:       { height: 1.5, backgroundColor: C.purple, opacity: 0.45 },
+  barSection:   { borderBottomWidth: 1, borderBottomColor: C.border, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 14 },
+  sectionTitle: { fontSize: 9, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 2, marginBottom: 12 },
+  barWrap:      { alignItems: "center" },
   scoreRow:     {
     flexDirection: "row", justifyContent: "space-around",
-    paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: C.border,
+    paddingVertical: 22, borderBottomWidth: 1, borderBottomColor: C.border,
   },
-  statsSection: { paddingHorizontal: 16, paddingBottom: 4 },
+  statsSection: { paddingHorizontal: 18, paddingBottom: 6, paddingTop: 4 },
 });

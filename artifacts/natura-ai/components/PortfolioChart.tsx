@@ -4,7 +4,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import Svg, {
-  Path, Defs, LinearGradient, Stop, Circle,
+  Path, Defs, LinearGradient, Stop, Circle, Line,
 } from "react-native-svg";
 import { C, FONTS, RADIUS } from "@/constants/theme";
 
@@ -38,12 +38,12 @@ function genCurve(cfg: TFConfig): number[] {
 }
 
 function makePaths(
-  data: number[], w: number, h: number, pad = 6,
+  data: number[], w: number, h: number, pad = 8,
 ): { line: string; fill: string; lastX: number; lastY: number } {
-  const min = Math.min(...data);
-  const max = Math.max(...data);
+  const min   = Math.min(...data);
+  const max   = Math.max(...data);
   const range = max - min || 1;
-  const pts = data.map((v, i) => ({
+  const pts   = data.map((v, i) => ({
     x: pad + (i / (data.length - 1)) * (w - pad * 2),
     y: pad + (1 - (v - min) / range) * (h - pad * 2),
   }));
@@ -61,76 +61,112 @@ function makePaths(
 // ── Pulsing cursor ─────────────────────────────────────────────────────────────
 
 function PulseCursor({ x, y, color }: { x: number; y: number; color: string }) {
-  const pulse = useRef(new Animated.Value(0)).current;
+  const pulse1 = useRef(new Animated.Value(0)).current;
+  const pulse2 = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 800,  useNativeDriver: true }),
+        Animated.timing(pulse1, { toValue: 1, duration: 1400, useNativeDriver: true }),
+        Animated.timing(pulse1, { toValue: 0, duration: 600,  useNativeDriver: true }),
       ])
     ).start();
+    setTimeout(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulse2, { toValue: 1, duration: 1400, useNativeDriver: true }),
+          Animated.timing(pulse2, { toValue: 0, duration: 600,  useNativeDriver: true }),
+        ])
+      ).start();
+    }, 700);
   }, []);
 
-  const scale   = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 2.2] });
-  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] });
+  const scale1   = pulse1.interpolate({ inputRange: [0, 1], outputRange: [1, 2.8] });
+  const opacity1 = pulse1.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0.7, 0.3, 0] });
+  const scale2   = pulse2.interpolate({ inputRange: [0, 1], outputRange: [1, 1.9] });
+  const opacity2 = pulse2.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0.5, 0.2, 0] });
 
   return (
-    <View style={[cur.wrap, { left: x - 10, top: y - 10 }]}>
-      <Animated.View style={[cur.ring, { transform: [{ scale }], opacity, borderColor: color }]} />
-      <View style={[cur.dot, { backgroundColor: color }]} />
+    <View style={[cur.wrap, { left: x - 12, top: y - 12 }]}>
+      <Animated.View style={[cur.ring, { transform: [{ scale: scale1 }], opacity: opacity1, borderColor: color }]} />
+      <Animated.View style={[cur.ring, { transform: [{ scale: scale2 }], opacity: opacity2, borderColor: color }]} />
+      <View style={[cur.dot, { backgroundColor: color, shadowColor: color, shadowOpacity: 0.8, shadowRadius: 4 }]} />
     </View>
   );
 }
 const cur = StyleSheet.create({
-  wrap: { position: "absolute", width: 20, height: 20, alignItems: "center", justifyContent: "center" },
-  ring: { position: "absolute", width: 14, height: 14, borderRadius: 7, borderWidth: 1.5 },
-  dot:  { width: 6, height: 6, borderRadius: 3 },
+  wrap: { position: "absolute", width: 24, height: 24, alignItems: "center", justifyContent: "center" },
+  ring: { position: "absolute", width: 16, height: 16, borderRadius: 8, borderWidth: 1.5 },
+  dot:  { width: 7, height: 7, borderRadius: 3.5, shadowOffset: { width: 0, height: 0 } },
 });
+
+// ── Grid lines ─────────────────────────────────────────────────────────────────
+
+function GridLines({ w, h, pad = 8, color }: { w: number; h: number; pad: number; color: string }) {
+  const steps = [0.25, 0.5, 0.75];
+  return (
+    <>
+      {steps.map((t, i) => {
+        const y = pad + t * (h - pad * 2);
+        return (
+          <Line
+            key={i}
+            x1={pad} y1={y} x2={w - pad} y2={y}
+            stroke={color} strokeWidth={0.5} strokeOpacity={0.18}
+            strokeDasharray="3 6"
+          />
+        );
+      })}
+    </>
+  );
+}
 
 // ── Portfolio Chart ────────────────────────────────────────────────────────────
 
 export function PortfolioChart({ equity = 103_820 }: { equity?: number }) {
   const { width: screenW } = useWindowDimensions();
   const chartW = Math.max(screenW - 32, 200);
-  const chartH = 164;
+  const chartH = 184;
+  const PAD    = 8;
 
-  const [tf, setTf]           = useState<TF>("1W");
-  const fadeAnim              = useRef(new Animated.Value(1)).current;
-  const translateAnim         = useRef(new Animated.Value(0)).current;
+  const [tf, setTf]   = useState<TF>("1W");
+  const fadeAnim      = useRef(new Animated.Value(1)).current;
+  const slideAnim     = useRef(new Animated.Value(0)).current;
 
   const cfg  = TIMEFRAMES.find(t => t.key === tf)!;
   const data = genCurve(cfg);
-  const { line, fill, lastX, lastY } = makePaths(data, chartW, chartH);
+  const { line, fill, lastX, lastY } = makePaths(data, chartW, chartH, PAD);
 
   const change    = data[data.length - 1] - data[0];
   const changePct = (change / data[0]) * 100;
   const isPos     = change >= 0;
   const lineColor = isPos ? C.green : C.red;
-  const gradId    = `grad_${tf}`;
-  const fillGradId = `fillGrad_${tf}`;
 
   const handleTf = (next: TF) => {
     if (next === tf) return;
     Animated.parallel([
-      Animated.timing(fadeAnim,      { toValue: 0, duration: 120, useNativeDriver: true }),
-      Animated.timing(translateAnim, { toValue: 6, duration: 120, useNativeDriver: true }),
+      Animated.timing(fadeAnim,  { toValue: 0, duration: 100, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 8, duration: 100, useNativeDriver: true }),
     ]).start(() => {
       setTf(next);
       Animated.parallel([
-        Animated.timing(fadeAnim,      { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.spring(translateAnim, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 200 }),
+        Animated.timing(fadeAnim,  { toValue: 1, duration: 280, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 220 }),
       ]).start();
     });
   };
 
   return (
     <View style={s.card}>
-      {/* Period change */}
+      {/* Ambient top glow */}
+      <View style={[s.ambientGlow, { backgroundColor: lineColor }]} />
+
+      {/* Period change row */}
       <View style={s.changeRow}>
         <Text style={[s.changeAmt, { color: lineColor }]}>
-          {isPos ? "+" : ""}${Math.abs(change).toLocaleString("en-US", { maximumFractionDigits: 0 })}
+          {isPos ? "+" : "−"}${Math.abs(change).toLocaleString("en-US", { maximumFractionDigits: 0 })}
         </Text>
-        <View style={[s.pctBadge, { backgroundColor: `${lineColor}12`, borderColor: `${lineColor}30` }]}>
+        <View style={[s.pctBadge, { backgroundColor: `${lineColor}14`, borderColor: `${lineColor}35` }]}>
           <Text style={[s.pctText, { color: lineColor }]}>
             {isPos ? "▲" : "▼"} {Math.abs(changePct).toFixed(2)}%
           </Text>
@@ -140,26 +176,43 @@ export function PortfolioChart({ equity = 103_820 }: { equity?: number }) {
 
       {/* SVG Chart */}
       <Animated.View
-        style={[s.chartWrap, { opacity: fadeAnim, transform: [{ translateY: translateAnim }] }]}
+        style={[s.chartWrap, {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+          shadowColor: lineColor,
+        }]}
       >
         <Svg width={chartW} height={chartH}>
           <Defs>
-            <LinearGradient id={fillGradId} x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%"   stopColor={lineColor} stopOpacity={0.22} />
-              <Stop offset="60%"  stopColor={lineColor} stopOpacity={0.06} />
+            <LinearGradient id={`fill_${tf}`} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%"   stopColor={lineColor} stopOpacity={0.28} />
+              <Stop offset="55%"  stopColor={lineColor} stopOpacity={0.08} />
               <Stop offset="100%" stopColor={lineColor} stopOpacity={0}    />
             </LinearGradient>
-            <LinearGradient id={gradId} x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0%"   stopColor={lineColor} stopOpacity={0.3} />
-              <Stop offset="100%" stopColor={lineColor} stopOpacity={1}   />
+            <LinearGradient id={`stroke_${tf}`} x1="0" y1="0" x2="1" y2="0">
+              <Stop offset="0%"   stopColor={lineColor} stopOpacity={0.2}  />
+              <Stop offset="60%"  stopColor={lineColor} stopOpacity={0.85} />
+              <Stop offset="100%" stopColor={lineColor} stopOpacity={1}    />
             </LinearGradient>
           </Defs>
+
+          {/* Grid lines */}
+          <GridLines w={chartW} h={chartH} pad={PAD} color={C.cyan} />
+
           {/* Area fill */}
-          <Path d={fill} fill={`url(#${fillGradId})`} />
-          {/* Glow layer */}
-          <Path d={line} stroke={lineColor} strokeWidth={8} fill="none" strokeOpacity={0.07} strokeLinecap="round" strokeLinejoin="round" />
-          {/* Main line */}
-          <Path d={line} stroke={`url(#${gradId})`} strokeWidth={2.2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <Path d={fill} fill={`url(#fill_${tf})`} />
+
+          {/* Outer glow — very soft ambient */}
+          <Path d={line} stroke={lineColor} strokeWidth={20} fill="none"
+            strokeOpacity={0.035} strokeLinecap="round" strokeLinejoin="round" />
+
+          {/* Mid glow */}
+          <Path d={line} stroke={lineColor} strokeWidth={8} fill="none"
+            strokeOpacity={0.12} strokeLinecap="round" strokeLinejoin="round" />
+
+          {/* Main premium line */}
+          <Path d={line} stroke={`url(#stroke_${tf})`} strokeWidth={2.8} fill="none"
+            strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
         <PulseCursor x={lastX} y={lastY} color={lineColor} />
       </Animated.View>
@@ -172,10 +225,15 @@ export function PortfolioChart({ equity = 103_820 }: { equity?: number }) {
             <TouchableOpacity
               key={t.key}
               onPress={() => handleTf(t.key)}
-              style={[s.tfBtn, active && { backgroundColor: `${lineColor}15`, borderColor: `${lineColor}40` }]}
-              activeOpacity={0.75}
+              style={[
+                s.tfBtn,
+                active && { backgroundColor: `${lineColor}12`, borderColor: `${lineColor}40` },
+              ]}
+              activeOpacity={0.7}
             >
-              <Text style={[s.tfText, { color: active ? lineColor : C.textDim }]}>{t.label}</Text>
+              <Text style={[s.tfText, { color: active ? lineColor : C.textDim }]}>
+                {t.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -185,14 +243,36 @@ export function PortfolioChart({ equity = 103_820 }: { equity?: number }) {
 }
 
 const s = StyleSheet.create({
-  card:      { marginBottom: 14 },
-  changeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10, paddingHorizontal: 2 },
-  changeAmt: { fontSize: 15, fontFamily: FONTS.monoBold, letterSpacing: 0.3 },
-  pctBadge:  { flexDirection: "row", alignItems: "center", borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
-  pctText:   { fontSize: 10, fontFamily: FONTS.monoBold, letterSpacing: 0.4 },
-  periodLabel: { flex: 1, textAlign: "right", fontSize: 9, fontFamily: FONTS.mono, color: C.textDim },
-  chartWrap: { borderRadius: RADIUS.lg, overflow: "hidden" },
-  tfRow:     { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 10 },
-  tfBtn:     { paddingHorizontal: 14, paddingVertical: 6, borderRadius: RADIUS.full, borderWidth: 1, borderColor: "transparent" },
-  tfText:    { fontSize: 10, fontFamily: FONTS.monoBold, letterSpacing: 0.4 },
+  card: { marginBottom: 16, overflow: "hidden" },
+
+  ambientGlow: {
+    position: "absolute", top: 0, left: 0, right: 0, height: 1, opacity: 0.12,
+  },
+
+  changeRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    marginBottom: 12, paddingHorizontal: 2,
+  },
+  changeAmt: {
+    fontSize: 19, fontFamily: FONTS.monoBold, letterSpacing: 0.3,
+  },
+  pctBadge: {
+    flexDirection: "row", alignItems: "center",
+    borderRadius: RADIUS.md, borderWidth: 1,
+    paddingHorizontal: 8, paddingVertical: 3,
+  },
+  pctText:    { fontSize: 11, fontFamily: FONTS.monoBold, letterSpacing: 0.4 },
+  periodLabel:{ flex: 1, textAlign: "right", fontSize: 9, fontFamily: FONTS.mono, color: C.textDim },
+
+  chartWrap: {
+    borderRadius: RADIUS.lg, overflow: "hidden",
+    shadowOpacity: 0.14, shadowRadius: 18, shadowOffset: { width: 0, height: 4 },
+  },
+
+  tfRow: { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 12 },
+  tfBtn: {
+    paddingHorizontal: 16, paddingVertical: 7,
+    borderRadius: RADIUS.full, borderWidth: 1, borderColor: "transparent",
+  },
+  tfText: { fontSize: 11, fontFamily: FONTS.monoBold, letterSpacing: 0.5 },
 });

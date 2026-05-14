@@ -39,16 +39,23 @@ function AssetCard({ asset }: { asset: typeof MOCK_ASSETS[number] }) {
   const sparkData   = genSparkData(asset.symbol, sparkDir as "up" | "down" | "flat");
 
   return (
-    <View style={[ac.card, { borderColor: `${accent}25` }]}>
+    <View style={[ac.card, {
+      borderColor: `${accent}28`,
+      shadowColor: accent, shadowOpacity: 0.10,
+      shadowRadius: 14, shadowOffset: { width: 0, height: 3 },
+      elevation: 4,
+    }]}>
+      {/* Accent top bar */}
       <View style={[ac.accent, { backgroundColor: accent }]} />
+
       <View style={ac.top}>
-        {/* Left — symbol */}
+        {/* Symbol */}
         <View style={ac.left}>
           <Text style={ac.symbol}>{asset.symbol.replace("USD", "")}</Text>
           <Text style={ac.mcap}>{asset.mktCap}</Text>
         </View>
 
-        {/* Center — price + sparkline */}
+        {/* Price */}
         <View style={ac.center}>
           <Text style={ac.price}>{priceStr}</Text>
           <Text style={[ac.change, { color: changeColor }]}>
@@ -61,27 +68,30 @@ function AssetCard({ asset }: { asset: typeof MOCK_ASSETS[number] }) {
           <MiniSparkline
             data={sparkData}
             color={accent}
-            width={72}
-            height={34}
+            width={74}
+            height={36}
             showFill
-            strokeWidth={1.5}
+            strokeWidth={1.8}
           />
         </View>
 
-        {/* Right — signal */}
+        {/* Signal */}
         <View style={ac.right}>
           <SignalBadge signal={asset.signal} />
           <Text style={ac.conf}>{asset.confidence}%</Text>
         </View>
       </View>
 
+      {/* Confidence bar */}
       <View style={ac.bottom}>
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
             <Text style={ac.confLabel}>AI CONFIDENCE</Text>
-            <Text style={[ac.confLabel, { color: asset.volume ? C.green : C.textDim }]}>
-              {asset.volume ? "VOL ✓" : "VOL —"}
-            </Text>
+            <View style={[ac.volChip, { borderColor: asset.volume ? `${C.green}35` : `${C.textDim}20` }]}>
+              <Text style={[ac.volText, { color: asset.volume ? C.green : C.textDim }]}>
+                {asset.volume ? "VOL ✓" : "VOL —"}
+              </Text>
+            </View>
           </View>
           <ConfidenceBar value={asset.confidence} color={accent} />
         </View>
@@ -91,20 +101,22 @@ function AssetCard({ asset }: { asset: typeof MOCK_ASSETS[number] }) {
 }
 
 const ac = StyleSheet.create({
-  card:     { backgroundColor: C.surface, borderRadius: RADIUS.lg, borderWidth: 1, marginBottom: 10, overflow: "hidden" },
-  accent:   { height: 2 },
+  card:     { backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, marginBottom: 10, overflow: "hidden" },
+  accent:   { height: 1.5 },
   sparkWrap:{ justifyContent: "center", marginHorizontal: 4 },
-  top:      { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
-  left:     { width: 56 },
-  symbol:   { fontSize: 14, fontFamily: FONTS.monoBold, color: C.textPrimary },
-  mcap:     { fontSize: 8,  fontFamily: FONTS.mono, color: C.textDim, marginTop: 2 },
+  top:      { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 14, gap: 10 },
+  left:     { width: 52 },
+  symbol:   { fontSize: 14, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: 0.3 },
+  mcap:     { fontSize: 8,  fontFamily: FONTS.mono, color: C.textDim, marginTop: 3 },
   center:   { flex: 1 },
   price:    { fontSize: 16, fontFamily: FONTS.monoBold, color: C.textPrimary },
-  change:   { fontSize: 10, fontFamily: FONTS.monoMedium, marginTop: 2 },
-  right:    { alignItems: "flex-end", gap: 4 },
+  change:   { fontSize: 10, fontFamily: FONTS.monoMedium, marginTop: 3 },
+  right:    { alignItems: "flex-end", gap: 5 },
   conf:     { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted },
-  bottom:   { paddingHorizontal: 14, paddingBottom: 12 },
-  confLabel:{ fontSize: 7,  fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 0.8 },
+  bottom:   { paddingHorizontal: 14, paddingBottom: 14 },
+  confLabel:{ fontSize: 8, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 1 },
+  volChip:  { borderRadius: 4, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
+  volText:  { fontSize: 7, fontFamily: FONTS.monoBold, letterSpacing: 0.6 },
 });
 
 // ── Markets Screen ────────────────────────────────────────────────────────────
@@ -117,15 +129,15 @@ export default function MarketsScreen() {
   const [filter, setFilter] = useState<Filter>("ALL");
 
   const breakdown = engine?.symbolBreakdowns;
-  const assets    = (breakdown?.length ? breakdown.map(b => ({
+  const assets    = breakdown?.length ? breakdown.map(b => ({
     symbol:     b.symbol,
-    signal:     b.signal,
+    signal:     b.signal as "BUY" | "SELL" | "HOLD",
     confidence: b.confidence,
     price:      b.price ?? 0,
     change:     0,
     volume:     b.volumeConfirmed ?? true,
     mktCap:     "—",
-  })) : MOCK_ASSETS);
+  })) : MOCK_ASSETS;
 
   const filtered = assets.filter(a => {
     if (filter === "BUY")  return a.signal === "BUY";
@@ -157,12 +169,17 @@ export default function MarketsScreen() {
       <View style={s.header}>
         <View>
           <Text style={s.title}>AI SCANNER</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <LiveDot color={C.cyan} size={6} />
             <Text style={s.sub}>LIVE SIGNAL ANALYSIS</Text>
           </View>
         </View>
-        <View style={[s.regimeBadge, { borderColor: `${regimeColor}35`, backgroundColor: `${regimeColor}10` }]}>
+        <View style={[s.regimeBadge, {
+          borderColor: `${regimeColor}40`,
+          backgroundColor: `${regimeColor}10`,
+          shadowColor: regimeColor, shadowOpacity: 0.15, shadowRadius: 8,
+          shadowOffset: { width: 0, height: 0 }, elevation: 4,
+        }]}>
           <Text style={[s.regimeText, { color: regimeColor }]}>{bullish}</Text>
         </View>
       </View>
@@ -186,15 +203,25 @@ export default function MarketsScreen() {
       {/* ── Filters ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
         <View style={{ flexDirection: "row", gap: 8 }}>
-          {FILTERS.map(f => (
-            <TouchableOpacity
-              key={f.key}
-              onPress={() => setFilter(f.key)}
-              style={[s.filterBtn, filter === f.key && s.filterActive]}
-            >
-              <Text style={[s.filterText, filter === f.key && s.filterTextActive]}>{f.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {FILTERS.map(f => {
+            const active = filter === f.key;
+            return (
+              <TouchableOpacity
+                key={f.key}
+                onPress={() => setFilter(f.key)}
+                style={[
+                  s.filterBtn,
+                  active && {
+                    borderColor: `${C.cyan}55`, backgroundColor: C.cyanDim,
+                    shadowColor: C.cyan, shadowOpacity: 0.12, shadowRadius: 6, elevation: 3,
+                  },
+                ]}
+                activeOpacity={0.75}
+              >
+                <Text style={[s.filterText, active && { color: C.cyan }]}>{f.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </ScrollView>
 
@@ -215,19 +242,29 @@ export default function MarketsScreen() {
 const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 16 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 },
-  title:  { fontSize: 20, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: 1.5 },
-  sub:    { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 0.8 },
-  regimeBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.md, borderWidth: 1 },
-  regimeText:  { fontSize: 9, fontFamily: FONTS.monoBold, letterSpacing: 1 },
-  regimeBar: { flexDirection: "row", backgroundColor: C.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: C.border, marginBottom: 14 },
-  regimeSeg: { flex: 1, alignItems: "center", paddingVertical: 10 },
-  regimeNum: { fontSize: 18, fontFamily: FONTS.monoBold },
-  regimeLabel: { fontSize: 8, fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 1, marginTop: 2 },
-  filterBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.full, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface },
-  filterActive: { borderColor: `${C.cyan}50`, backgroundColor: C.cyanDim },
-  filterText: { fontSize: 9, fontFamily: FONTS.monoMedium, color: C.textMuted, letterSpacing: 0.5 },
-  filterTextActive: { color: C.cyan },
-  empty: { alignItems: "center", paddingVertical: 40, gap: 8 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
+  title:  { fontSize: 22, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: 1.5 },
+  sub:    { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 1 },
+
+  regimeBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.md, borderWidth: 1 },
+  regimeText:  { fontSize: 10, fontFamily: FONTS.monoBold, letterSpacing: 1.2 },
+
+  regimeBar: {
+    flexDirection: "row", backgroundColor: C.surface, borderRadius: RADIUS.xl,
+    borderWidth: 1, borderColor: C.border, marginBottom: 14,
+    shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 }, elevation: 3,
+  },
+  regimeSeg:   { flex: 1, alignItems: "center", paddingVertical: 12 },
+  regimeNum:   { fontSize: 20, fontFamily: FONTS.monoBold },
+  regimeLabel: { fontSize: 8, fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 1.2, marginTop: 2 },
+
+  filterBtn: {
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: RADIUS.full,
+    borderWidth: 1, borderColor: C.border, backgroundColor: C.surface,
+  },
+  filterText: { fontSize: 9, fontFamily: FONTS.monoMedium, color: C.textMuted, letterSpacing: 0.6 },
+
+  empty: { alignItems: "center", paddingVertical: 44, gap: 10 },
   emptyText: { fontSize: 12, fontFamily: FONTS.monoMedium, color: C.textMuted },
 });
