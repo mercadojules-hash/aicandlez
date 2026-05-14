@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, RefreshControl, Alert, Platform,
+  StyleSheet, RefreshControl, Alert, Platform, Animated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -13,6 +13,55 @@ import { MicroAnalytics } from "@/components/MicroAnalytics";
 import { C, FONTS, RADIUS } from "@/constants/theme";
 
 const TAB_BAR_H = 84;
+
+// ── Animated PnL Value ────────────────────────────────────────────────────────
+
+function AnimatedPnL({ value, style }: { value: number; style?: any }) {
+  const displayed = useRef(new Animated.Value(value)).current;
+  const [rendered, setRendered] = useState(value);
+
+  useEffect(() => {
+    Animated.spring(displayed, {
+      toValue: value, useNativeDriver: false,
+      damping: 24, stiffness: 180,
+    }).start();
+    const id = displayed.addListener(({ value: v }) => setRendered(v));
+    return () => displayed.removeListener(id);
+  }, [value]);
+
+  const color = rendered >= 0 ? C.green : C.red;
+  const str   = `${rendered >= 0 ? "+" : ""}$${Math.abs(rendered).toFixed(2)}`;
+
+  return <Text style={[style, { color }]}>{str}</Text>;
+}
+
+// ── Pulse Position Wrapper ─────────────────────────────────────────────────────
+
+function PulseWrapper({ isProfit, children }: { isProfit: boolean; children: React.ReactNode }) {
+  const anim  = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 2800, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: 2800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  const borderOp = anim.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.45] });
+  const accent   = isProfit ? C.green : C.red;
+
+  return (
+    <View>
+      {children}
+      <Animated.View style={[pw.glow, { borderColor: accent, opacity: borderOp, borderRadius: RADIUS.xl }]} />
+    </View>
+  );
+}
+const pw = StyleSheet.create({
+  glow: { position: "absolute", inset: 0, borderWidth: 1, pointerEvents: "none" } as any,
+});
 
 // ── Control Button ────────────────────────────────────────────────────────────
 
@@ -46,9 +95,7 @@ function SectionHeader({ label, accent = C.cyan, count }: { label: string; accen
     <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12, marginTop: 8 }}>
       <View style={{ width: 3, height: 14, backgroundColor: accent, borderRadius: 2, marginRight: 10, opacity: 0.85 }} />
       <Text style={{ fontSize: 9, fontFamily: FONTS.monoBold, color: `${accent}88`, letterSpacing: 2, flex: 1 }}>{label}</Text>
-      {count != null && (
-        <Text style={{ fontSize: 9, fontFamily: FONTS.monoBold, color: C.textDim }}>{count}</Text>
-      )}
+      {count != null && <Text style={{ fontSize: 9, fontFamily: FONTS.monoBold, color: C.textDim }}>{count}</Text>}
     </View>
   );
 }
@@ -115,26 +162,9 @@ export default function TradeScreen() {
       "This will immediately close all open positions and halt AI trading. Continue?",
       [
         { text: "Cancel", style: "cancel" },
-        {
-          text: "ACTIVATE KILL SWITCH",
-          style: "destructive",
-          onPress: () => {
-            setKillActive(true);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          },
-        },
+        { text: "ACTIVATE KILL SWITCH", style: "destructive", onPress: () => { setKillActive(true); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error); } },
       ]
     );
-  };
-
-  const handlePause = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setPaused(p => !p);
-  };
-
-  const handleAuto = () => {
-    Haptics.selectionAsync();
-    setAutoMode(a => !a);
   };
 
   return (
@@ -171,9 +201,9 @@ export default function TradeScreen() {
 
       {/* ── Controls ── */}
       <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-        <CtrlBtn label="KILL"  icon="zap-off" color={C.red}    onPress={handleKill}  active={killActive} />
-        <CtrlBtn label="PAUSE" icon="pause"   color={C.orange} onPress={handlePause} active={paused} />
-        <CtrlBtn label="AUTO"  icon="cpu"     color={C.cyan}   onPress={handleAuto}  active={autoMode} />
+        <CtrlBtn label="KILL"  icon="zap-off" color={C.red}    onPress={handleKill}                             active={killActive} />
+        <CtrlBtn label="PAUSE" icon="pause"   color={C.orange} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setPaused(p => !p); }} active={paused} />
+        <CtrlBtn label="AUTO"  icon="cpu"     color={C.cyan}   onPress={() => { Haptics.selectionAsync(); setAutoMode(a => !a); }} active={autoMode} />
       </View>
 
       {/* ── Micro Analytics ── */}
@@ -185,36 +215,30 @@ export default function TradeScreen() {
           if (closed[i].pnl > 0) { if (streak >= 0) streak++; else break; }
           else                   { if (streak <= 0) streak--; else break; }
         }
-        const exposure = Math.min(positions.length * 28, 100);
         return (
           <MicroAnalytics
-            wins={wins}
-            total={closed.length}
+            wins={wins} total={closed.length}
             confidence={engine?.confidence ?? 62}
-            streak={streak}
-            exposure={exposure}
+            streak={streak} exposure={Math.min(positions.length * 28, 100)}
             avgHoldMins={47}
             aiRunning={!killActive && !paused && (engine?.running ?? false)}
           />
         );
       })()}
 
-      {/* ── Unrealized PnL banner ── */}
+      {/* ── Animated Unrealized PnL Banner ── */}
       {positions.length > 0 && (
         <View style={[s.pnlBanner, {
           borderColor: totalUnreal >= 0 ? `${C.green}35` : `${C.red}35`,
           backgroundColor: totalUnreal >= 0 ? `${C.green}08` : `${C.red}08`,
           shadowColor: totalUnreal >= 0 ? C.green : C.red,
-          shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 3 },
-          elevation: 4,
+          shadowOpacity: 0.15, shadowRadius: 14, shadowOffset: { width: 0, height: 3 }, elevation: 5,
         }]}>
           <View>
             <Text style={s.pnlBannerLabel}>TOTAL UNREALIZED P&L</Text>
             <Text style={s.pnlBannerSub}>{positions.length} open position{positions.length !== 1 ? "s" : ""}</Text>
           </View>
-          <Text style={[s.pnlBannerValue, { color: totalUnreal >= 0 ? C.green : C.red }]}>
-            {totalUnreal >= 0 ? "+" : ""}{fmt$(totalUnreal)}
-          </Text>
+          <AnimatedPnL value={totalUnreal} style={s.pnlBannerValue} />
         </View>
       )}
 
@@ -228,7 +252,11 @@ export default function TradeScreen() {
           <Text style={s.emptyHint}>{autoMode ? "AI is scanning for opportunities" : "Enable auto mode to start trading"}</Text>
         </View>
       ) : (
-        positions.map(pos => <PositionCard key={pos.id} pos={pos} />)
+        positions.map(pos => (
+          <PulseWrapper key={pos.id} isProfit={pos.pnl >= 0}>
+            <PositionCard pos={pos} />
+          </PulseWrapper>
+        ))
       )}
 
       {/* ── Trade History ── */}
@@ -252,28 +280,18 @@ const s = StyleSheet.create({
   scroll: { paddingHorizontal: 16 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
   title:  { fontSize: 22, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: 1.5 },
-  sub:    { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 1 },
+  sub:    { fontSize: 8, fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 1 },
   modeBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.md, borderWidth: 1 },
   modeText:  { fontSize: 9, fontFamily: FONTS.monoBold, letterSpacing: 1 },
 
-  pnlBanner: {
-    borderRadius: RADIUS.xl, borderWidth: 1, padding: 16,
-    marginBottom: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-  },
+  pnlBanner: { borderRadius: RADIUS.xl, borderWidth: 1, padding: 16, marginBottom: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   pnlBannerLabel: { fontSize: 9, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 1.2 },
   pnlBannerSub:   { fontSize: 8, fontFamily: FONTS.mono, color: C.textDim, marginTop: 2 },
-  pnlBannerValue: { fontSize: 26, fontFamily: FONTS.monoBold, letterSpacing: -0.3 },
+  pnlBannerValue: { fontSize: 28, fontFamily: FONTS.monoBold, letterSpacing: -0.3 },
 
-  empty: {
-    alignItems: "center", paddingVertical: 36, gap: 8,
-    backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1,
-    borderColor: C.border, marginBottom: 18,
-  },
+  empty: { alignItems: "center", paddingVertical: 36, gap: 8, backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: C.border, marginBottom: 18 },
   emptyText: { fontSize: 13, fontFamily: FONTS.monoMedium, color: C.textMuted },
-  emptyHint: { fontSize: 9,  fontFamily: FONTS.mono, color: C.textDim },
+  emptyHint: { fontSize: 9, fontFamily: FONTS.mono, color: C.textDim },
 
-  card: {
-    backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1,
-    borderColor: C.border, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8,
-  },
+  card: { backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: C.border, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
 });

@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, RefreshControl, Platform,
+  StyleSheet, RefreshControl, Platform, Animated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -13,25 +13,116 @@ import { C, FONTS, RADIUS } from "@/constants/theme";
 
 const TAB_BAR_H = 84;
 
-type Filter = "ALL" | "BUY" | "SELL" | "HIGH";
+// ── Asset Database ─────────────────────────────────────────────────────────────
 
-const MOCK_ASSETS = [
-  { symbol: "BTCUSD",  signal: "BUY"  as const, confidence: 74, price: 68_120,  change: 2.34,  volume: true,  mktCap: "1.32T" },
-  { symbol: "ETHUSD",  signal: "BUY"  as const, confidence: 68, price:  3_512,  change: 1.87,  volume: true,  mktCap: "421B"  },
-  { symbol: "SOLUSD",  signal: "HOLD" as const, confidence: 52, price:    188,  change:-0.42,  volume: false, mktCap: "84B"   },
-  { symbol: "BNBUSD",  signal: "SELL" as const, confidence: 63, price:    594,  change:-1.23,  volume: true,  mktCap: "86B"   },
-  { symbol: "XRPUSD",  signal: "BUY"  as const, confidence: 71, price:   0.624, change: 3.12,  volume: true,  mktCap: "35B"   },
-  { symbol: "DOGEUSD", signal: "HOLD" as const, confidence: 44, price:  0.162,  change: 0.88,  volume: false, mktCap: "23B"   },
+type Signal = "BUY" | "SELL" | "HOLD";
+type Cat    = "ALL"|"TRENDING"|"AI"|"MEME"|"DEFI"|"L1"|"GAMING"|"RWA"|"GAINERS"|"VOLATILE";
+
+interface Asset {
+  symbol: string; name: string; cats: Cat[];
+  signal: Signal; conf: number; price: number;
+  change: number; vol: boolean; mcap: string;
+}
+
+const ALL_ASSETS: Asset[] = [
+  { symbol:"BTCUSD",  name:"Bitcoin",        cats:["ALL","TRENDING","L1","GAINERS"],       signal:"BUY",  conf:74, price:68_120,  change: 2.34,  vol:true,  mcap:"1.32T" },
+  { symbol:"ETHUSD",  name:"Ethereum",       cats:["ALL","TRENDING","L1","GAINERS"],       signal:"BUY",  conf:68, price:3_512,   change: 1.87,  vol:true,  mcap:"421B"  },
+  { symbol:"SOLUSD",  name:"Solana",         cats:["ALL","L1","TRENDING"],                 signal:"HOLD", conf:52, price:188,     change:-0.42,  vol:false, mcap:"84B"   },
+  { symbol:"BNBUSD",  name:"BNB",            cats:["ALL","L1"],                            signal:"SELL", conf:63, price:594,     change:-1.23,  vol:true,  mcap:"86B"   },
+  { symbol:"XRPUSD",  name:"Ripple",         cats:["ALL","L1","GAINERS"],                  signal:"BUY",  conf:71, price:0.624,   change: 3.12,  vol:true,  mcap:"35B"   },
+  { symbol:"AVAXUSD", name:"Avalanche",      cats:["ALL","L1","TRENDING","GAINERS"],       signal:"BUY",  conf:67, price:42.8,    change: 4.21,  vol:true,  mcap:"18B"   },
+  { symbol:"ADAUSD",  name:"Cardano",        cats:["ALL","L1"],                            signal:"HOLD", conf:44, price:0.508,   change:-0.88,  vol:false, mcap:"18B"   },
+  { symbol:"NEARUSD", name:"NEAR Protocol",  cats:["ALL","L1","GAINERS"],                  signal:"BUY",  conf:61, price:8.42,    change: 5.11,  vol:true,  mcap:"9.2B"  },
+  { symbol:"FETUSD",  name:"Fetch.ai",       cats:["ALL","AI","GAINERS","VOLATILE"],       signal:"BUY",  conf:79, price:2.18,    change: 8.44,  vol:true,  mcap:"1.8B"  },
+  { symbol:"AGIXUSD", name:"SingularityNET", cats:["ALL","AI","VOLATILE"],                 signal:"BUY",  conf:72, price:1.04,    change: 6.21,  vol:true,  mcap:"1.3B"  },
+  { symbol:"TAOUSD",  name:"Bittensor",      cats:["ALL","AI","GAINERS"],                  signal:"BUY",  conf:65, price:418,     change: 5.77,  vol:false, mcap:"3.1B"  },
+  { symbol:"RNDRUSD", name:"Render",         cats:["ALL","AI","TRENDING","VOLATILE"],      signal:"HOLD", conf:58, price:10.4,    change:-1.32,  vol:true,  mcap:"4.1B"  },
+  { symbol:"NMRUSD",  name:"Numeraire",      cats:["ALL","AI"],                            signal:"HOLD", conf:49, price:22.8,    change: 0.44,  vol:false, mcap:"0.4B"  },
+  { symbol:"DOGEUSD", name:"Dogecoin",       cats:["ALL","MEME","VOLATILE"],               signal:"HOLD", conf:44, price:0.162,   change: 0.88,  vol:false, mcap:"23B"   },
+  { symbol:"PEPEUSD", name:"Pepe",           cats:["ALL","MEME","VOLATILE","GAINERS"],     signal:"BUY",  conf:55, price:0.0000142,change:12.3,  vol:true,  mcap:"6.1B"  },
+  { symbol:"WIFUSD",  name:"dogwifhat",      cats:["ALL","MEME","VOLATILE"],               signal:"SELL", conf:62, price:2.84,    change:-3.21,  vol:false, mcap:"2.8B"  },
+  { symbol:"BONKUSD", name:"Bonk",           cats:["ALL","MEME","VOLATILE"],               signal:"HOLD", conf:38, price:0.0000308,change: 1.44, vol:false, mcap:"2.1B"  },
+  { symbol:"AAVEUSD", name:"Aave",           cats:["ALL","DEFI","GAINERS"],                signal:"BUY",  conf:66, price:192,     change: 2.11,  vol:true,  mcap:"2.9B"  },
+  { symbol:"UNIUSD",  name:"Uniswap",        cats:["ALL","DEFI","GAINERS"],                signal:"BUY",  conf:64, price:11.2,    change: 3.44,  vol:true,  mcap:"6.7B"  },
+  { symbol:"MKRUSD",  name:"Maker",          cats:["ALL","DEFI","RWA"],                    signal:"HOLD", conf:49, price:2_840,   change:-0.88,  vol:false, mcap:"2.6B"  },
+  { symbol:"IMXUSD",  name:"Immutable X",    cats:["ALL","GAMING","TRENDING","GAINERS"],   signal:"BUY",  conf:61, price:2.41,    change: 4.88,  vol:true,  mcap:"3.4B"  },
+  { symbol:"AXSUSD",  name:"Axie Infinity",  cats:["ALL","GAMING"],                        signal:"HOLD", conf:42, price:7.2,     change:-1.44,  vol:false, mcap:"1.1B"  },
+  { symbol:"GALUSD",  name:"Gala",           cats:["ALL","GAMING","VOLATILE"],             signal:"BUY",  conf:57, price:0.044,   change: 6.22,  vol:true,  mcap:"1.6B"  },
+  { symbol:"ONDOUSD", name:"Ondo",           cats:["ALL","RWA","GAINERS","TRENDING"],      signal:"BUY",  conf:68, price:1.04,    change: 5.22,  vol:true,  mcap:"1.4B"  },
+  { symbol:"PAXGUSD", name:"PAX Gold",       cats:["ALL","RWA"],                           signal:"HOLD", conf:45, price:2_340,   change: 0.32,  vol:false, mcap:"0.5B"  },
 ];
+
+// ── Categories ─────────────────────────────────────────────────────────────────
+
+interface CatDef { key: Cat; label: string; icon: string; accent: string }
+
+const CATEGORIES: CatDef[] = [
+  { key:"ALL",      label:"ALL",          icon:"grid",          accent: C.cyan   },
+  { key:"TRENDING", label:"TRENDING",     icon:"trending-up",   accent: C.green  },
+  { key:"AI",       label:"AI TOKENS",    icon:"cpu",           accent: C.purple },
+  { key:"MEME",     label:"MEME",         icon:"smile",         accent: C.orange },
+  { key:"DEFI",     label:"DEFI",         icon:"layers",        accent: C.teal   },
+  { key:"L1",       label:"LAYER 1",      icon:"box",           accent: C.cyan   },
+  { key:"GAMING",   label:"GAMING",       icon:"triangle",      accent: C.purple },
+  { key:"RWA",      label:"RWA",          icon:"dollar-sign",   accent: C.green  },
+  { key:"GAINERS",  label:"TOP GAINERS",  icon:"arrow-up-right",accent: C.green  },
+  { key:"VOLATILE", label:"HIGH VOL",     icon:"activity",      accent: C.red    },
+];
+
+// ── AI Scanning Pulse ──────────────────────────────────────────────────────────
+
+const SCAN_MSGS = [
+  "Scanning 1,240 assets across 6 exchanges…",
+  "Detecting momentum signals on AI tokens…",
+  "Analyzing cross-exchange volume anomalies…",
+  "Running EMA breakout detection on L1s…",
+  "Evaluating meme coin volatility patterns…",
+];
+
+function ScanIndicator() {
+  const [idx, setIdx] = useState(0);
+  const fade          = useRef(new Animated.Value(1)).current;
+  const dot           = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      Animated.timing(fade, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => {
+        setIdx(i => (i + 1) % SCAN_MSGS.length);
+        Animated.timing(fade, { toValue: 1, duration: 380, useNativeDriver: true }).start();
+      });
+    }, 4000);
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(dot, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(dot, { toValue: 0, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+    return () => clearInterval(t);
+  }, []);
+
+  const dotOp = dot.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] });
+
+  return (
+    <View style={scan.row}>
+      <Animated.View style={[scan.dot, { opacity: dotOp }]} />
+      <Animated.Text style={[scan.text, { opacity: fade }]}>{SCAN_MSGS[idx]}</Animated.Text>
+    </View>
+  );
+}
+const scan = StyleSheet.create({
+  row:  { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 12 },
+  dot:  { width: 5, height: 5, borderRadius: 3, backgroundColor: C.cyan },
+  text: { fontSize: 9, fontFamily: FONTS.mono, color: C.textSecondary, flex: 1 },
+});
 
 // ── Asset Card ────────────────────────────────────────────────────────────────
 
-function AssetCard({ asset }: { asset: typeof MOCK_ASSETS[number] }) {
+function AssetCard({ asset }: { asset: Asset }) {
   const priceStr = asset.price >= 1000
     ? `$${(asset.price / 1000).toFixed(1)}K`
-    : asset.price >= 1
-    ? `$${asset.price.toFixed(2)}`
-    : `$${asset.price.toFixed(4)}`;
+    : asset.price >= 1 ? `$${asset.price.toFixed(2)}`
+    : asset.price >= 0.01 ? `$${asset.price.toFixed(4)}`
+    : `$${asset.price.toFixed(7)}`;
 
   const accent      = asset.signal === "BUY" ? C.green : asset.signal === "SELL" ? C.red : C.cyan;
   const changeColor = asset.change >= 0 ? C.green : C.red;
@@ -42,78 +133,60 @@ function AssetCard({ asset }: { asset: typeof MOCK_ASSETS[number] }) {
     <View style={[ac.card, {
       borderColor: `${accent}28`,
       shadowColor: accent, shadowOpacity: 0.10,
-      shadowRadius: 14, shadowOffset: { width: 0, height: 3 },
-      elevation: 4,
+      shadowRadius: 14, shadowOffset: { width: 0, height: 3 }, elevation: 4,
     }]}>
-      {/* Accent top bar */}
       <View style={[ac.accent, { backgroundColor: accent }]} />
-
       <View style={ac.top}>
-        {/* Symbol */}
         <View style={ac.left}>
           <Text style={ac.symbol}>{asset.symbol.replace("USD", "")}</Text>
-          <Text style={ac.mcap}>{asset.mktCap}</Text>
+          <Text style={ac.name} numberOfLines={1}>{asset.name}</Text>
+          <Text style={ac.mcap}>{asset.mcap}</Text>
         </View>
-
-        {/* Price */}
         <View style={ac.center}>
           <Text style={ac.price}>{priceStr}</Text>
           <Text style={[ac.change, { color: changeColor }]}>
             {asset.change >= 0 ? "+" : ""}{asset.change.toFixed(2)}%
           </Text>
         </View>
-
-        {/* Sparkline */}
         <View style={ac.sparkWrap}>
-          <MiniSparkline
-            data={sparkData}
-            color={accent}
-            width={74}
-            height={36}
-            showFill
-            strokeWidth={1.8}
-          />
+          <MiniSparkline data={sparkData} color={accent} width={70} height={34} showFill strokeWidth={1.8} />
         </View>
-
-        {/* Signal */}
         <View style={ac.right}>
           <SignalBadge signal={asset.signal} />
-          <Text style={ac.conf}>{asset.confidence}%</Text>
+          <Text style={ac.conf}>{asset.conf}%</Text>
         </View>
       </View>
-
-      {/* Confidence bar */}
       <View style={ac.bottom}>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
             <Text style={ac.confLabel}>AI CONFIDENCE</Text>
-            <View style={[ac.volChip, { borderColor: asset.volume ? `${C.green}35` : `${C.textDim}20` }]}>
-              <Text style={[ac.volText, { color: asset.volume ? C.green : C.textDim }]}>
-                {asset.volume ? "VOL ✓" : "VOL —"}
+            <View style={[ac.volChip, { borderColor: asset.vol ? `${C.green}35` : `${C.textDim}20` }]}>
+              <Text style={[ac.volText, { color: asset.vol ? C.green : C.textDim }]}>
+                {asset.vol ? "VOL ✓" : "VOL —"}
               </Text>
             </View>
           </View>
-          <ConfidenceBar value={asset.confidence} color={accent} />
+          <ConfidenceBar value={asset.conf} color={accent} />
         </View>
       </View>
     </View>
   );
 }
-
 const ac = StyleSheet.create({
   card:     { backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, marginBottom: 10, overflow: "hidden" },
   accent:   { height: 1.5 },
-  sparkWrap:{ justifyContent: "center", marginHorizontal: 4 },
-  top:      { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 14, gap: 10 },
-  left:     { width: 52 },
-  symbol:   { fontSize: 14, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: 0.3 },
-  mcap:     { fontSize: 8,  fontFamily: FONTS.mono, color: C.textDim, marginTop: 3 },
+  top:      { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
+  sparkWrap:{ justifyContent: "center" },
+  left:     { width: 58 },
+  symbol:   { fontSize: 13, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: 0.3 },
+  name:     { fontSize: 8, fontFamily: FONTS.mono, color: C.textMuted, marginTop: 1 },
+  mcap:     { fontSize: 7, fontFamily: FONTS.mono, color: C.textDim, marginTop: 2 },
   center:   { flex: 1 },
-  price:    { fontSize: 16, fontFamily: FONTS.monoBold, color: C.textPrimary },
+  price:    { fontSize: 15, fontFamily: FONTS.monoBold, color: C.textPrimary },
   change:   { fontSize: 10, fontFamily: FONTS.monoMedium, marginTop: 3 },
   right:    { alignItems: "flex-end", gap: 5 },
-  conf:     { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted },
-  bottom:   { paddingHorizontal: 14, paddingBottom: 14 },
+  conf:     { fontSize: 8, fontFamily: FONTS.mono, color: C.textMuted },
+  bottom:   { paddingHorizontal: 14, paddingBottom: 13 },
   confLabel:{ fontSize: 8, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 1 },
   volChip:  { borderRadius: 4, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
   volText:  { fontSize: 7, fontFamily: FONTS.monoBold, letterSpacing: 0.6 },
@@ -126,37 +199,15 @@ export default function MarketsScreen() {
   const insets = useSafeAreaInsets();
   const isWeb  = Platform.OS === "web";
   const topPad = isWeb ? 67 : insets.top + 10;
-  const [filter, setFilter] = useState<Filter>("ALL");
+  const [activeCat, setActiveCat] = useState<Cat>("ALL");
 
-  const breakdown = engine?.symbolBreakdowns;
-  const assets    = breakdown?.length ? breakdown.map(b => ({
-    symbol:     b.symbol,
-    signal:     b.signal as "BUY" | "SELL" | "HOLD",
-    confidence: b.confidence,
-    price:      b.price ?? 0,
-    change:     0,
-    volume:     b.volumeConfirmed ?? true,
-    mktCap:     "—",
-  })) : MOCK_ASSETS;
+  const filtered  = ALL_ASSETS.filter(a => a.cats.includes(activeCat));
+  const catDef    = CATEGORIES.find(c => c.key === activeCat)!;
 
-  const filtered = assets.filter(a => {
-    if (filter === "BUY")  return a.signal === "BUY";
-    if (filter === "SELL") return a.signal === "SELL";
-    if (filter === "HIGH") return a.confidence >= 65;
-    return true;
-  });
-
-  const buyCount  = assets.filter(a => a.signal === "BUY").length;
-  const sellCount = assets.filter(a => a.signal === "SELL").length;
+  const buyCount  = filtered.filter(a => a.signal === "BUY").length;
+  const sellCount = filtered.filter(a => a.signal === "SELL").length;
   const bullish   = buyCount > sellCount ? "BULLISH" : buyCount < sellCount ? "BEARISH" : "SIDEWAYS";
   const regimeColor = bullish === "BULLISH" ? C.green : bullish === "BEARISH" ? C.red : C.cyan;
-
-  const FILTERS: { key: Filter; label: string }[] = [
-    { key: "ALL",  label: `ALL (${assets.length})` },
-    { key: "BUY",  label: `BUY (${buyCount})` },
-    { key: "SELL", label: `SELL (${sellCount})` },
-    { key: "HIGH", label: "HIGH CONF" },
-  ];
 
   return (
     <ScrollView
@@ -165,33 +216,35 @@ export default function MarketsScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={C.cyan} />}
     >
+
       {/* ── Header ── */}
       <View style={s.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={s.title}>AI SCANNER</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <LiveDot color={C.cyan} size={6} />
-            <Text style={s.sub}>LIVE SIGNAL ANALYSIS</Text>
+            <Text style={s.sub}>1,240+ ASSETS MONITORED</Text>
           </View>
         </View>
         <View style={[s.regimeBadge, {
-          borderColor: `${regimeColor}40`,
-          backgroundColor: `${regimeColor}10`,
-          shadowColor: regimeColor, shadowOpacity: 0.15, shadowRadius: 8,
-          shadowOffset: { width: 0, height: 0 }, elevation: 4,
+          borderColor: `${regimeColor}40`, backgroundColor: `${regimeColor}10`,
+          shadowColor: regimeColor, shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 4,
         }]}>
           <Text style={[s.regimeText, { color: regimeColor }]}>{bullish}</Text>
         </View>
       </View>
 
-      {/* ── Market regime bar ── */}
+      {/* ── Scan Indicator ── */}
+      <ScanIndicator />
+
+      {/* ── Regime Summary ── */}
       <View style={s.regimeBar}>
         <View style={s.regimeSeg}>
           <Text style={[s.regimeNum, { color: C.green }]}>{buyCount}</Text>
           <Text style={s.regimeLabel}>BUY</Text>
         </View>
         <View style={[s.regimeSeg, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: C.border }]}>
-          <Text style={[s.regimeNum, { color: C.cyan }]}>{assets.filter(a => a.signal === "HOLD").length}</Text>
+          <Text style={[s.regimeNum, { color: C.cyan }]}>{filtered.filter(a => a.signal === "HOLD").length}</Text>
           <Text style={s.regimeLabel}>HOLD</Text>
         </View>
         <View style={s.regimeSeg}>
@@ -200,40 +253,43 @@ export default function MarketsScreen() {
         </View>
       </View>
 
-      {/* ── Filters ── */}
+      {/* ── Category Filter ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          {FILTERS.map(f => {
-            const active = filter === f.key;
+        <View style={{ flexDirection: "row", gap: 7, paddingRight: 8 }}>
+          {CATEGORIES.map(cat => {
+            const active = activeCat === cat.key;
             return (
               <TouchableOpacity
-                key={f.key}
-                onPress={() => setFilter(f.key)}
+                key={cat.key}
+                onPress={() => setActiveCat(cat.key)}
                 style={[
-                  s.filterBtn,
-                  active && {
-                    borderColor: `${C.cyan}55`, backgroundColor: C.cyanDim,
-                    shadowColor: C.cyan, shadowOpacity: 0.12, shadowRadius: 6, elevation: 3,
-                  },
+                  s.catBtn,
+                  active && { borderColor: `${cat.accent}55`, backgroundColor: `${cat.accent}12`,
+                    shadowColor: cat.accent, shadowOpacity: 0.15, shadowRadius: 6, elevation: 3 },
                 ]}
                 activeOpacity={0.75}
               >
-                <Text style={[s.filterText, active && { color: C.cyan }]}>{f.label}</Text>
+                <Feather name={cat.icon as any} size={10} color={active ? cat.accent : C.textDim} />
+                <Text style={[s.catText, active && { color: cat.accent }]}>{cat.label}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
       </ScrollView>
 
+      {/* ── Asset Count ── */}
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+        <View style={{ width: 3, height: 14, backgroundColor: catDef.accent, borderRadius: 2, marginRight: 10, opacity: 0.85 }} />
+        <Text style={{ fontSize: 9, fontFamily: FONTS.monoBold, color: `${catDef.accent}88`, letterSpacing: 2, flex: 1 }}>
+          {catDef.label}
+        </Text>
+        <Text style={{ fontSize: 9, fontFamily: FONTS.mono, color: C.textDim }}>
+          {filtered.length} assets
+        </Text>
+      </View>
+
       {/* ── Assets ── */}
-      {filtered.length === 0 ? (
-        <View style={s.empty}>
-          <Feather name="bar-chart-2" size={28} color={C.textDim} />
-          <Text style={s.emptyText}>No assets match this filter</Text>
-        </View>
-      ) : (
-        filtered.map((a, i) => <AssetCard key={a.symbol + i} asset={a as any} />)
-      )}
+      {filtered.map((a, i) => <AssetCard key={a.symbol + i} asset={a} />)}
 
     </ScrollView>
   );
@@ -242,9 +298,9 @@ export default function MarketsScreen() {
 const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 16 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
   title:  { fontSize: 22, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: 1.5 },
-  sub:    { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 1 },
+  sub:    { fontSize: 8, fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 1 },
 
   regimeBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.md, borderWidth: 1 },
   regimeText:  { fontSize: 10, fontFamily: FONTS.monoBold, letterSpacing: 1.2 },
@@ -252,19 +308,16 @@ const s = StyleSheet.create({
   regimeBar: {
     flexDirection: "row", backgroundColor: C.surface, borderRadius: RADIUS.xl,
     borderWidth: 1, borderColor: C.border, marginBottom: 14,
-    shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 }, elevation: 3,
+    shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3,
   },
   regimeSeg:   { flex: 1, alignItems: "center", paddingVertical: 12 },
   regimeNum:   { fontSize: 20, fontFamily: FONTS.monoBold },
   regimeLabel: { fontSize: 8, fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 1.2, marginTop: 2 },
 
-  filterBtn: {
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: RADIUS.full,
+  catBtn: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.full,
     borderWidth: 1, borderColor: C.border, backgroundColor: C.surface,
   },
-  filterText: { fontSize: 9, fontFamily: FONTS.monoMedium, color: C.textMuted, letterSpacing: 0.6 },
-
-  empty: { alignItems: "center", paddingVertical: 44, gap: 10 },
-  emptyText: { fontSize: 12, fontFamily: FONTS.monoMedium, color: C.textMuted },
+  catText: { fontSize: 9, fontFamily: FONTS.monoMedium, color: C.textDim, letterSpacing: 0.5 },
 });

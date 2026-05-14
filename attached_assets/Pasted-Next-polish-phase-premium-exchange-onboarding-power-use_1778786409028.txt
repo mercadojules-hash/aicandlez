@@ -1,0 +1,208 @@
+Next polish phase — premium exchange onboarding + power-user personalization.
+
+The app is now entering institutional-grade territory. We are NO longer building a “crypto app.” We are building a luxury AI trading operating system.
+
+Several refinements are needed to push emotional impact, premium feel, and conversion psychology.
+
+CRITICAL GOAL:
+When a user opens the app they should immediately think:
+“This feels expensive.”
+“This feels powerful.”
+“This feels smarter than every other trading app.”
+“I want to connect my exchange immediately.”
+
+====================================
+
+1. FEATURE THE “ADD EXCHANGE” CTA
+   ====================================
+
+The Add Exchange section currently gets visually buried.
+
+We need to transform it into a premium feature card.
+
+Requirements:
+
+* Place Add Exchange ABOVE the connected exchange list
+* Make it a larger elevated glass/neon card
+* Include:
+  • glowing + icon
+  • “Connect Your Exchange”
+  • subtext:
+  “Trade with your own accounts securely”
+* Add supported exchange mini logos:
+  Kraken • Crypto.com • Coinbase • Binance • Bybit • OKX • KuCoin
+* Add subtle animated glow sweep across the card every 6–8 seconds
+* Add premium hover/press feedback
+* Card should feel:
+  “expand your AI trading power”
+
+This is now a PRIMARY conversion element.
+
+====================================
+2. EXCHANGE ONBOARDING EXPERIENCE
+=================================
+
+Create a truly premium onboarding modal flow.
+
+The onboarding should feel closer to:
+
+* Apple Wallet
+* Robinhood Gold
+* Tesla UI
+* Institutional fintech onboarding
+
+NOT like:
+generic API settings.
+
+Requirements:
+
+* Multi-step flow
+* Exchange selection grid with logo cards
+* Animated progress indicator
+* Secure API entry with masked fields
+* “Your funds cannot be withdrawn” security reassurance
+* AES-256 encrypted badge
+* AI compatibility score per exchange
+* Connection quality indicator
+* Estimated latency indicator
+* “Recommended” badges on highest-performing exchanges
+
+Add subtle cinematic transitions between steps.
+
+====================================
+3. EXPAND MARKET COVERAGE
+=========================
+
+The scanner must support MANY more assets.
+
+Current screen feels too limited.
+
+Add:
+
+* horizontal category filters:
+  ALL
+  TRENDING
+  AI TOKENS
+  MEME
+  DEFI
+  LAYER 1
+  GAMING
+  RWA
+  TOP GAINERS
+  HIGH VOLATILITY
+
+AI scanner should appear capable of scanning:
+1000+ assets across exchanges.
+
+Add:
+
+* dynamic loading states
+* rotating market opportunities
+* subtle “AI scanning…” live indicators
+* real-time confidence changes
+
+Users must feel:
+“The AI is constantly searching for opportunities.”
+
+====================================
+4. PREMIUM HOME SCREEN ENHANCEMENTS
+===================================
+
+Upgrade emotional impact.
+
+Add:
+
+* subtle animated ambient background gradient
+* faint moving market particles
+* slight chart shimmer pass
+* dynamic market sentiment banner:
+  BULLISH / RISK OFF / HIGH VOLATILITY / BREAKOUT CONDITIONS
+* tiny rotating “AI insight” text below engine status
+
+Examples:
+“Momentum increasing on high-volume assets”
+“AI detecting elevated volatility”
+“Strong trend continuation probability”
+“Risk conditions stable”
+
+Must feel intelligent but restrained.
+
+====================================
+5. TRADE SCREEN → FEEL MORE POWERFUL
+====================================
+
+Current screen is good.
+Needs stronger “money movement” psychology.
+
+Improve:
+
+* unrealized PnL animation
+* active position pulse glow
+* live updating percentages
+* animated trade execution feedback
+* micro movement in PnL values
+* confidence ring animation
+* floating realized gain particles on profitable trades
+
+DO NOT overdo effects.
+Everything must remain:
+premium
+minimal
+institutional
+clean
+
+====================================
+6. PROFILE SCREEN → FEEL ELITE
+==============================
+
+Profile should feel like:
+“professional AI trader dashboard.”
+
+Add:
+
+* AI trader level progression
+* monthly growth heatmap
+* cumulative AI accuracy
+* top performing asset
+* AI trading streak
+* achievement system:
+  “High Accuracy Week”
+  “Risk Controlled”
+  “Volatility Master”
+* subtle prestige indicators
+
+Make users emotionally invested in improving performance.
+
+====================================
+7. MOST IMPORTANT RULE
+======================
+
+DO NOT turn this into:
+
+* a casino UI
+* gaming UI
+* meme crypto UI
+* flashy retail garbage
+
+We are building:
+BLACKROCK x APPLE x BLOOMBERG x TESLA ENERGY
+
+The app should feel:
+
+* expensive
+* intelligent
+* restrained
+* cinematic
+* premium
+* elite
+* trustworthy
+* scalable
+
+Glow should remain controlled.
+Motion should remain smooth.
+Spacing should remain luxurious.
+
+Less clutter.
+More confidence.
+
+This is now a world-class premium fintech product.

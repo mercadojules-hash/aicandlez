@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, RefreshControl, Animated, Platform,
@@ -12,6 +12,115 @@ import { PortfolioChart } from "@/components/PortfolioChart";
 import { C, FONTS, RADIUS } from "@/constants/theme";
 
 const TAB_BAR_H = 84;
+
+// ── Ambient Background ─────────────────────────────────────────────────────────
+
+function AmbientBackground() {
+  const a1 = useRef(new Animated.Value(0)).current;
+  const a2 = useRef(new Animated.Value(0)).current;
+  const a3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const make = (anim: Animated.Value, dur: number, delay: number) =>
+      Animated.loop(Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(anim, { toValue: 1, duration: dur, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: dur, useNativeDriver: true }),
+      ]));
+    make(a1, 6000, 0).start();
+    make(a2, 8000, 2000).start();
+    make(a3, 7000, 4000).start();
+  }, []);
+
+  const op1 = a1.interpolate({ inputRange: [0, 1], outputRange: [0.04, 0.12] });
+  const op2 = a2.interpolate({ inputRange: [0, 1], outputRange: [0.03, 0.08] });
+  const op3 = a3.interpolate({ inputRange: [0, 1], outputRange: [0.02, 0.07] });
+
+  return (
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      <Animated.View style={[amb.blob, { top: -80, right: -60,  width: 300, height: 300, backgroundColor: C.cyan,   borderRadius: 150, opacity: op1 }]} />
+      <Animated.View style={[amb.blob, { top: 400, left: -80,   width: 260, height: 260, backgroundColor: C.purple, borderRadius: 130, opacity: op2 }]} />
+      <Animated.View style={[amb.blob, { top: 200, right: -100, width: 220, height: 220, backgroundColor: C.green,  borderRadius: 110, opacity: op3 }]} />
+    </View>
+  );
+}
+const amb = StyleSheet.create({ blob: { position: "absolute" } });
+
+// ── Sentiment Banner ───────────────────────────────────────────────────────────
+
+const SENTIMENTS = [
+  { label: "BULLISH MOMENTUM",       color: C.green,  icon: "trending-up" },
+  { label: "BREAKOUT CONDITIONS",    color: C.cyan,   icon: "activity" },
+  { label: "RISK-OFF ENVIRONMENT",   color: C.orange, icon: "alert-triangle" },
+  { label: "HIGH VOLATILITY ALERT",  color: C.red,    icon: "zap" },
+];
+
+function SentimentBanner() {
+  const [idx, setIdx]   = useState(0);
+  const fadeAnim        = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const tick = setInterval(() => {
+      Animated.timing(fadeAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => {
+        setIdx(i => (i + 1) % SENTIMENTS.length);
+        Animated.timing(fadeAnim, { toValue: 1, duration: 420, useNativeDriver: true }).start();
+      });
+    }, 8000);
+    return () => clearInterval(tick);
+  }, []);
+
+  const cur = SENTIMENTS[idx];
+
+  return (
+    <Animated.View style={[sb.wrap, { borderColor: `${cur.color}30`, backgroundColor: `${cur.color}08`, opacity: fadeAnim }]}>
+      <View style={[sb.dot, { backgroundColor: cur.color }]} />
+      <Feather name={cur.icon as any} size={10} color={cur.color} />
+      <Text style={[sb.label, { color: cur.color }]}>{cur.label}</Text>
+      <Text style={sb.tag}>MARKET REGIME</Text>
+    </Animated.View>
+  );
+}
+const sb = StyleSheet.create({
+  wrap:  { flexDirection: "row", alignItems: "center", gap: 7, borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 14 },
+  dot:   { width: 5, height: 5, borderRadius: 3 },
+  label: { flex: 1, fontSize: 10, fontFamily: FONTS.monoBold, letterSpacing: 1.2 },
+  tag:   { fontSize: 8, fontFamily: FONTS.mono, color: C.textDim, letterSpacing: 0.8 },
+});
+
+// ── AI Insight Rotator ─────────────────────────────────────────────────────────
+
+const AI_INSIGHTS = [
+  "Momentum increasing on high-volume assets",
+  "Strong trend continuation probability detected",
+  "Risk conditions stable · AI operating normally",
+  "Elevated volatility across major pairs",
+  "BTC correlation strengthening across altcoins",
+  "AI detecting EMA breakout formation on L1s",
+];
+
+function AIInsight() {
+  const [idx, setIdx] = useState(0);
+  const fade          = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      Animated.timing(fade, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+        setIdx(i => (i + 1) % AI_INSIGHTS.length);
+        Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+      });
+    }, 5000);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <Animated.Text style={[ins.text, { opacity: fade }]}>
+      ✦ {AI_INSIGHTS[idx]}
+    </Animated.Text>
+  );
+}
+const ins = StyleSheet.create({
+  text: { fontSize: 9, fontFamily: FONTS.mono, color: `${C.purple}90`, letterSpacing: 0.5, marginTop: 5, fontStyle: "italic" },
+});
 
 // ── Market Ticker ──────────────────────────────────────────────────────────────
 
@@ -41,24 +150,20 @@ function MarketTicker({ breakdowns }: { breakdowns?: { symbol: string; price?: n
   );
 }
 const tk = StyleSheet.create({
-  row:     { flexDirection: "row", backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: C.border, marginBottom: 14 },
-  item:    { flex: 1, alignItems: "center", paddingVertical: 13 },
-  sep:     { borderRightWidth: 1, borderRightColor: C.border },
-  sym:     { fontSize: 9, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 1.2, marginBottom: 3 },
-  price:   { fontSize: 14, fontFamily: FONTS.monoBold, color: C.textPrimary, marginBottom: 5 },
-  sigBadge:{ borderRadius: 4, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
-  sig:     { fontSize: 8, fontFamily: FONTS.monoBold, letterSpacing: 0.8 },
+  row:      { flexDirection: "row", backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: C.border, marginBottom: 14 },
+  item:     { flex: 1, alignItems: "center", paddingVertical: 13 },
+  sep:      { borderRightWidth: 1, borderRightColor: C.border },
+  sym:      { fontSize: 9, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 1.2, marginBottom: 3 },
+  price:    { fontSize: 14, fontFamily: FONTS.monoBold, color: C.textPrimary, marginBottom: 5 },
+  sigBadge: { borderRadius: 4, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
+  sig:      { fontSize: 8, fontFamily: FONTS.monoBold, letterSpacing: 0.8 },
 });
 
 // ── Stat Tile ─────────────────────────────────────────────────────────────────
 
 function StatTile({ label, value, color = C.textPrimary, sub }: { label: string; value: string; color?: string; sub?: string }) {
   return (
-    <View style={[st.tile, {
-      shadowColor: color, shadowOpacity: 0.12,
-      shadowRadius: 10, shadowOffset: { width: 0, height: 2 },
-      elevation: 3,
-    }]}>
+    <View style={[st.tile, { shadowColor: color, shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 }]}>
       <Text style={[st.value, { color }]}>{value}</Text>
       {sub && <Text style={[st.sub, { color: `${color}80` }]}>{sub}</Text>}
       <Text style={st.label}>{label}</Text>
@@ -123,19 +228,11 @@ function Section({ label, accent = C.cyan, right }: { label: string; accent?: st
 export default function HomeScreen() {
   const { engine, account, positions, trades, isLoading, refresh } = useTrading();
   const insets  = useSafeAreaInsets();
-  const pnlAnim = useRef(new Animated.Value(0)).current;
   const breathe = useRef(new Animated.Value(0)).current;
   const isWeb   = Platform.OS === "web";
   const topPad  = isWeb ? 67 : insets.top + 10;
 
   const pnlColor = account.unrealizedPnL >= 0 ? C.green : C.red;
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.timing(pnlAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.timing(pnlAnim, { toValue: 0, duration: 380, useNativeDriver: true }),
-    ]).start();
-  }, [account.unrealizedPnL]);
 
   useEffect(() => {
     Animated.loop(
@@ -146,7 +243,7 @@ export default function HomeScreen() {
     ).start();
   }, []);
 
-  const engineBorderOpacity = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.18, 0.55] });
+  const engineBorderOp = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.18, 0.55] });
 
   const recentSignals = engine?.recentSignalLog?.slice(0, 5) ?? [
     { id:"s1", symbol:"BTCUSD", action:"BUY"  as const, confidence:74, timestamp: new Date(Date.now()-180000).toISOString(), reason:"EMA cross + volume surge" },
@@ -155,123 +252,119 @@ export default function HomeScreen() {
   ];
 
   return (
-    <ScrollView
-      style={s.root}
-      contentContainerStyle={[s.scroll, { paddingTop: topPad, paddingBottom: TAB_BAR_H + 16 }]}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={C.cyan} />}
-    >
+    <View style={s.root}>
+      <AmbientBackground />
 
-      {/* ── Header ── */}
-      <View style={s.header}>
-        <View>
-          <Text style={s.logoText}>APEX <Text style={{ color: C.cyan }}>TRADER</Text></Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
-            <LiveDot color={engine?.running ? C.green : C.textDim} size={6} />
-            <Text style={s.headerSub}>
-              {engine?.running ? `AI ENGINE ACTIVE · ${engine.exchange ?? "SIM"}` : "AI ENGINE IDLE"}
+      <ScrollView
+        contentContainerStyle={[s.scroll, { paddingTop: topPad, paddingBottom: TAB_BAR_H + 16 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={C.cyan} />}
+      >
+
+        {/* ── Header ── */}
+        <View style={s.header}>
+          <View>
+            <Text style={s.logoText}>APEX <Text style={{ color: C.cyan }}>TRADER</Text></Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
+              <LiveDot color={engine?.running ? C.green : C.textDim} size={6} />
+              <Text style={s.headerSub}>
+                {engine?.running ? `AI ENGINE ACTIVE · ${engine.exchange ?? "SIM"}` : "AI ENGINE IDLE"}
+              </Text>
+            </View>
+          </View>
+          <View style={{ alignItems: "flex-end", gap: 6 }}>
+            <View style={s.modeBadge}>
+              <Text style={s.modeText}>{engine?.mode ?? "SIMULATION"}</Text>
+            </View>
+            <Text style={s.notifHint}>
+              <Feather name="activity" size={9} color={C.textDim} /> {trades.length} trades
             </Text>
           </View>
         </View>
-        <View style={{ alignItems: "flex-end", gap: 6 }}>
-          <View style={s.modeBadge}>
-            <Text style={s.modeText}>{engine?.mode ?? "SIMULATION"}</Text>
-          </View>
-          <Text style={s.notifHint}>
-            <Feather name="activity" size={9} color={C.textDim} /> {trades.length} trades
-          </Text>
-        </View>
-      </View>
 
-      {/* ── Balance Card ── */}
-      <View style={s.balanceCard}>
-        {/* Ambient corner glow */}
-        <View style={s.balanceGlow} />
-        <View style={[s.balanceGlow2, { backgroundColor: `${C.cyan}04` }]} />
+        {/* ── Sentiment Banner ── */}
+        <SentimentBanner />
 
-        <Text style={s.balLabel}>PORTFOLIO EQUITY</Text>
-        <Text style={s.balAmount}>{fmt$(account.equity, 2)}</Text>
-
-        <Animated.View style={{ opacity: pnlAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.5] }) }}>
+        {/* ── Balance Card ── */}
+        <View style={s.balanceCard}>
+          <View style={s.balanceGlow} />
+          <View style={[s.balanceGlow2, { backgroundColor: `${C.cyan}04` }]} />
+          <Text style={s.balLabel}>PORTFOLIO EQUITY</Text>
+          <Text style={s.balAmount}>{fmt$(account.equity, 2)}</Text>
           <Text style={[s.balPnl, { color: pnlColor }]}>
             {account.unrealizedPnL >= 0 ? "+" : ""}{fmt$(account.unrealizedPnL)} unrealized · {fmtPct(account.unrealizedPnL / account.equity * 100)}
           </Text>
-        </Animated.View>
-
-        <View style={s.balRow}>
-          <View style={s.balItem}>
-            <Text style={s.balItemLabel}>CASH</Text>
-            <Text style={s.balItemValue}>{fmt$(account.cashBalance, 0)}</Text>
-          </View>
-          <View style={[s.balItem, { borderLeftWidth: 1, borderLeftColor: C.border, borderRightWidth: 1, borderRightColor: C.border }]}>
-            <Text style={s.balItemLabel}>REALIZED</Text>
-            <Text style={[s.balItemValue, { color: account.realizedPnL >= 0 ? C.green : C.red }]}>
-              {account.realizedPnL >= 0 ? "+" : ""}{fmt$(account.realizedPnL)}
-            </Text>
-          </View>
-          <View style={s.balItem}>
-            <Text style={s.balItemLabel}>FEES PAID</Text>
-            <Text style={[s.balItemValue, { color: C.orange }]}>{fmt$(account.totalFeesPaid)}</Text>
+          <View style={s.balRow}>
+            <View style={s.balItem}>
+              <Text style={s.balItemLabel}>CASH</Text>
+              <Text style={s.balItemValue}>{fmt$(account.cashBalance, 0)}</Text>
+            </View>
+            <View style={[s.balItem, { borderLeftWidth: 1, borderLeftColor: C.border, borderRightWidth: 1, borderRightColor: C.border }]}>
+              <Text style={s.balItemLabel}>REALIZED</Text>
+              <Text style={[s.balItemValue, { color: account.realizedPnL >= 0 ? C.green : C.red }]}>
+                {account.realizedPnL >= 0 ? "+" : ""}{fmt$(account.realizedPnL)}
+              </Text>
+            </View>
+            <View style={s.balItem}>
+              <Text style={s.balItemLabel}>FEES PAID</Text>
+              <Text style={[s.balItemValue, { color: C.orange }]}>{fmt$(account.totalFeesPaid)}</Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* ── Portfolio Chart ── */}
-      <PortfolioChart equity={account.equity} />
+        {/* ── Portfolio Chart ── */}
+        <PortfolioChart equity={account.equity} />
 
-      {/* ── Quick Stats ── */}
-      <View style={{ flexDirection: "row", gap: 8, marginBottom: 18 }}>
-        <StatTile label="WIN RATE"     value={`${account.winRate.toFixed(0)}%`}  color={account.winRate >= 55 ? C.green : C.orange} />
-        <StatTile label="POSITIONS"    value={String(positions.length)}           color={positions.length > 0 ? C.cyan : C.textMuted} />
-        <StatTile label="TOTAL TRADES" value={String(account.totalTrades)}        color={C.textPrimary} />
-      </View>
-
-      {/* ── Engine Status ── */}
-      <Section label="AI ENGINE STATUS" accent={C.purple} />
-      <View style={s.engineCard}>
-        <Animated.View style={[s.engineBreath, { opacity: engineBorderOpacity }]} />
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <LiveDot color={engine?.running ? C.green : "#2a4050"} size={7} />
-            <Text style={[s.engineStatus, { color: engine?.running ? C.green : C.textDim }]}>
-              {engine?.running ? "RUNNING" : "STOPPED"}
-            </Text>
-          </View>
-          <Text style={s.engineDetail}>
-            {engine?.activeSymbol ?? "BTCUSD"} · conf {engine?.confidence ?? 0}%
-          </Text>
-          <Text style={s.engineDetail}>
-            {engine?.signalCount ?? 0} signals generated
-          </Text>
+        {/* ── Quick Stats ── */}
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 18 }}>
+          <StatTile label="WIN RATE"     value={`${account.winRate.toFixed(0)}%`}  color={account.winRate >= 55 ? C.green : C.orange} />
+          <StatTile label="POSITIONS"    value={String(positions.length)}           color={positions.length > 0 ? C.cyan : C.textMuted} />
+          <StatTile label="TOTAL TRADES" value={String(account.totalTrades)}        color={C.textPrimary} />
         </View>
-        <View style={{ alignItems: "flex-end", gap: 5 }}>
-          <Text style={s.engineExch}>{engine?.exchange ?? "KRAKEN"}</Text>
-          {engine?.volumeFilter && (
-            <Text style={s.filterTag}>VOL FILTER</Text>
+
+        {/* ── AI Engine Status ── */}
+        <Section label="AI ENGINE STATUS" accent={C.purple} />
+        <View style={s.engineCard}>
+          <Animated.View style={[s.engineBreath, { opacity: engineBorderOp }]} />
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <LiveDot color={engine?.running ? C.green : "#2a4050"} size={7} />
+              <Text style={[s.engineStatus, { color: engine?.running ? C.green : C.textDim }]}>
+                {engine?.running ? "RUNNING" : "STOPPED"}
+              </Text>
+            </View>
+            <Text style={s.engineDetail}>
+              {engine?.activeSymbol ?? "BTCUSD"} · conf {engine?.confidence ?? 0}%
+            </Text>
+            <AIInsight />
+          </View>
+          <View style={{ alignItems: "flex-end", gap: 5 }}>
+            <Text style={s.engineExch}>{engine?.exchange ?? "KRAKEN"}</Text>
+            {engine?.volumeFilter && <Text style={s.filterTag}>VOL FILTER</Text>}
+          </View>
+        </View>
+
+        {/* ── Live Markets ── */}
+        <Section label="LIVE MARKETS" accent={C.teal} />
+        <MarketTicker breakdowns={engine?.symbolBreakdowns} />
+
+        {/* ── Recent AI Signals ── */}
+        <Section
+          label="RECENT AI SIGNALS"
+          accent={C.cyan}
+          right={<Text style={{ fontSize: 8, fontFamily: FONTS.mono, color: C.textDim }}>{recentSignals.length} recent</Text>}
+        />
+        <View style={s.card}>
+          {recentSignals.map(sig => <SignalRow key={sig.id} sig={sig} />)}
+          {recentSignals.length === 0 && (
+            <Text style={{ textAlign: "center", color: C.textDim, fontSize: 10, fontFamily: FONTS.mono, paddingVertical: 18 }}>
+              No signals yet — engine warming up
+            </Text>
           )}
         </View>
-      </View>
 
-      {/* ── Live Markets ── */}
-      <Section label="LIVE MARKETS" accent={C.teal} />
-      <MarketTicker breakdowns={engine?.symbolBreakdowns} />
-
-      {/* ── Recent AI Signals ── */}
-      <Section
-        label="RECENT AI SIGNALS"
-        accent={C.cyan}
-        right={<Text style={{ fontSize: 8, fontFamily: FONTS.mono, color: C.textDim }}>{recentSignals.length} recent</Text>}
-      />
-      <View style={s.card}>
-        {recentSignals.map(sig => <SignalRow key={sig.id} sig={sig} />)}
-        {recentSignals.length === 0 && (
-          <Text style={{ textAlign: "center", color: C.textDim, fontSize: 10, fontFamily: FONTS.mono, paddingVertical: 18 }}>
-            No signals yet — engine warming up
-          </Text>
-        )}
-      </View>
-
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -279,7 +372,7 @@ const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 16 },
 
-  header:    { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
+  header:    { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
   logoText:  { fontSize: 24, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: 2.5 },
   headerSub: { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 1.2 },
   modeBadge: { backgroundColor: C.cyanDim, borderRadius: RADIUS.sm, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: `${C.cyan}35` },
@@ -292,14 +385,8 @@ const s = StyleSheet.create({
     shadowColor: C.cyan, shadowOpacity: 0.22, shadowRadius: 28,
     shadowOffset: { width: 0, height: 6 }, elevation: 12,
   },
-  balanceGlow: {
-    position: "absolute", top: -60, right: -60, width: 200, height: 200,
-    borderRadius: 100, backgroundColor: `${C.cyan}05`,
-  },
-  balanceGlow2: {
-    position: "absolute", bottom: -40, left: -40, width: 140, height: 140,
-    borderRadius: 70,
-  },
+  balanceGlow:  { position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: 100, backgroundColor: `${C.cyan}05` },
+  balanceGlow2: { position: "absolute", bottom: -40, left: -40, width: 140, height: 140, borderRadius: 70 },
   balLabel:     { fontSize: 8, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 1.8, marginBottom: 5 },
   balAmount:    { fontSize: 42, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: -0.5, marginBottom: 5 },
   balPnl:       { fontSize: 12, fontFamily: FONTS.monoMedium, marginBottom: 16, opacity: 0.9 },
@@ -309,29 +396,17 @@ const s = StyleSheet.create({
   balItemValue: { fontSize: 13, fontFamily: FONTS.monoBold, color: C.textPrimary },
 
   engineCard: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start",
     backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1,
     borderColor: `${C.purple}22`, padding: 16, marginBottom: 18,
     shadowColor: C.purple, shadowOpacity: 0.1, shadowRadius: 14,
-    shadowOffset: { width: 0, height: 3 }, elevation: 4,
-    overflow: "hidden",
+    shadowOffset: { width: 0, height: 3 }, elevation: 4, overflow: "hidden",
   },
-  engineBreath: {
-    position: "absolute", inset: 0, borderRadius: RADIUS.xl,
-    borderWidth: 1, borderColor: C.purple,
-    pointerEvents: "none",
-  } as any,
+  engineBreath: { position: "absolute", inset: 0, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: C.purple, pointerEvents: "none" } as any,
   engineStatus: { fontSize: 14, fontFamily: FONTS.monoBold, letterSpacing: 1 },
-  engineDetail: { fontSize: 9,  fontFamily: FONTS.mono, color: C.textMuted, marginTop: 3 },
+  engineDetail: { fontSize: 9, fontFamily: FONTS.mono, color: C.textMuted, marginTop: 3 },
   engineExch:   { fontSize: 11, fontFamily: FONTS.monoBold, color: C.cyan, letterSpacing: 1.2 },
-  filterTag: {
-    fontSize: 7, fontFamily: FONTS.monoBold, color: C.orange,
-    borderWidth: 1, borderColor: `${C.orange}30`, borderRadius: 3,
-    paddingHorizontal: 5, paddingVertical: 2,
-  },
+  filterTag: { fontSize: 7, fontFamily: FONTS.monoBold, color: C.orange, borderWidth: 1, borderColor: `${C.orange}30`, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2 },
 
-  card: {
-    backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1,
-    borderColor: C.border, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8, marginBottom: 18,
-  },
+  card: { backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: C.border, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8, marginBottom: 18 },
 });
