@@ -1,4 +1,6 @@
-# Apex Trader v1.0.0 — Setup Guide
+# Apex Trader — Setup Guide
+
+> **Updated for Phase 3:** Live Trading Console, Exchange Connection Management (Kraken, Binance.US, Coinbase, Crypto.com), user-scoped simulation accounts, and Clerk authentication.
 
 ## Requirements
 
@@ -61,9 +63,34 @@ pnpm --filter @workspace/api-server run db:push
 
 ---
 
-## 4. Start services
+## 4. Authentication (Clerk)
 
-### Option A — Both services (recommended for development)
+Apex Trader uses [Clerk](https://clerk.com) for user authentication. You need your own Clerk application for local development.
+
+**Steps:**
+
+1. Sign up free at https://clerk.com and create a new **Application**
+2. In **API Keys**, copy both keys into your `.env`:
+   ```bash
+   CLERK_SECRET_KEY=sk_test_...
+   CLERK_PUBLISHABLE_KEY=pk_test_...
+   VITE_CLERK_PUBLISHABLE_KEY=pk_test_...   # same value as above
+   ```
+3. In **User & Authentication → Email, Phone, Username**, enable Email address
+4. In **Paths**, ensure:
+   - Sign-in URL: `/sign-in`
+   - Sign-up URL: `/sign-up`
+   - After sign-in URL: `/command`
+5. (Optional) Enable Google OAuth in **Social Connections**
+
+> Without valid Clerk keys the dashboard redirects all routes to sign-in and
+> the API's `requireAuth` middleware returns 401 on all protected endpoints.
+
+---
+
+## 5. Start services
+
+### Option A — Two terminals (recommended)
 
 **Terminal 1 — API server (port 8080):**
 ```bash
@@ -75,14 +102,19 @@ pnpm --filter @workspace/api-server run dev
 pnpm --filter @workspace/trading-dashboard run dev
 ```
 
-### Option B — Single command (if dev:all script is configured)
+The Vite dev server automatically proxies `/api/*` requests to `localhost:8080` — no separate reverse proxy is needed.
+
+### Option B — Single command
 ```bash
-pnpm run dev:all
+# Install concurrently once: pnpm add -g concurrently
+npx concurrently \
+  "pnpm --filter @workspace/api-server run dev" \
+  "PORT=5173 BASE_PATH=/ pnpm --filter @workspace/trading-dashboard run dev"
 ```
 
 ---
 
-## 5. Verify everything is running
+## 6. Verify everything is running
 
 ```bash
 # API health

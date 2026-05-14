@@ -182,10 +182,12 @@ Hybrid AI crypto trading dashboard — 19 modules, all active. Kraken exchange, 
 - New API: `POST /api/engine/filters` — `{ volumeFilter: boolean, require1HTrend: boolean }`
 - New engine status fields: `volumeFilter`, `require1HTrend`, `symbolBreakdowns[*].volumeConfirmed`, `.marketCondition`, `.trend1H`
 
-**Export ZIP** (`/apex-trader-final-export-v1.zip`):
-- Served from `trading-dashboard/public/`
-- Contains: `README.md` (full feature guide, API reference, arch diagram), `.env.example`, `SETUP.md` (quick-start checklist)
-- Download link in sidebar footer (desktop + mobile)
+**Export ZIP** (`/apex-trader-v2.zip`):
+- Served from `trading-dashboard/public/` — 303 files, ~587 KB
+- Contains: all source (`api-server/src`, `trading-dashboard/src`), all `lib/` packages, `scripts/`, root configs, `.env.example`, `SETUP.md`
+- Excludes: `node_modules/`, `dist/`, `.git/`, other artifacts (natura-ai, natura-web)
+- Download link in sidebar footer (desktop only)
+- Rebuild: `python3 scripts/build-export-zip.py` from workspace root
 
 **Global components (App-level):**
 - `AlertsProvider.tsx` — polls engine every 8s, shows toast alerts for BUY/SELL signals + trade executions. Sound toggle (Web Audio API). Deduplication via signal ID set.

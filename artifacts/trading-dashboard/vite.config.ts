@@ -36,6 +36,10 @@ if (!process.env.BASE_PATH) {
 const apiGuardPlugin: import("vite").Plugin = {
   name: "api-fallback-guard",
   configureServer(server) {
+    // Only intercept /api/* on Replit where the shared reverse proxy routes
+    // /api to the API server.  Locally, server.proxy (below) forwards /api
+    // to port 8080, so we must NOT intercept here.
+    if (!IS_REPLIT) return;
     server.middlewares.use((req, res, next) => {
       const url = req.url ?? "";
       // Strip query string for path matching
@@ -107,6 +111,16 @@ export default defineConfig({
     fs: {
       strict: IS_REPLIT,     // only restrict fs on Replit; locally allow any path
     },
+    // Local development only: proxy /api/* to the API server on port 8080.
+    // On Replit the shared platform proxy handles this at the infra level.
+    ...(!IS_REPLIT && {
+      proxy: {
+        "/api": {
+          target: `http://localhost:${process.env["API_PORT"] ?? "8080"}`,
+          changeOrigin: true,
+        },
+      },
+    }),
   },
   preview: {
     port,
