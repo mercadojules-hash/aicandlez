@@ -1,0 +1,336 @@
+FINAL OPERATOR CONSOLE REFINEMENT — INSTITUTIONAL LAYOUT PASS
+
+The dashboard is now moving strongly in the correct direction and finally beginning to behave like a real AI trading operating system.
+
+The centralized telemetry architecture, operator visualization layer, Activity Hub evolution, and contextual AI monitoring are major improvements.
+
+However, after live operator review, there are still several important production-level UX and architecture issues remaining that need refinement before deployment.
+
+====================================================
+
+1. THE LARGE EMPTY BLACK AREA STILL NEEDS TO BE FULLY UTILIZED
+   ====================================================
+
+The center area has improved significantly, but there is STILL too much dead black space.
+
+Specifically:
+
+* the large upper-middle black area still lacks density
+* the right-side empty region near TAKE PROFIT / STOP LOSS is still underutilized
+* the dashboard still visually loses momentum in this section
+
+====================================================
+REQUIRED CHANGE
+===============
+
+The MAIN CENTER REGION should behave like:
+A LIVE AI OPERATIONS ENGINE.
+
+The center should visually communicate:
+
+* AI activity
+* user activity
+* execution flow
+* exchange orchestration
+* signal generation
+* platform growth
+
+====================================================
+2. ADD LARGE INSTITUTIONAL MAIN TELEMETRY CHART
+===============================================
+
+Replace the remaining dead black space with a large institutional animated telemetry visualization.
+
+This should become the PRIMARY visual centerpiece of the dashboard.
+
+====================================================
+MAIN CENTER CHART REQUIREMENTS
+==============================
+
+OVERLAYED LIVE DATA STREAMS:
+
+* AI Signals Generated
+* User Trading Activity
+* Live Executions
+* Platform Volume
+* Active Users
+* Fees Generated
+* Signal Acceptance/Rejection
+* Exchange Usage Distribution
+* Risk Blocks
+* MTF Confirmation Flow
+
+Visual direction:
+Bloomberg Terminal + TradingView + AI SaaS telemetry.
+
+====================================================
+MOST IMPORTANT VISUAL PRIORITIES
+================================
+
+1. USER ACTIVITY
+
+* users online
+* users actively trading
+* new users joining
+* live vs paper users
+* onboarding spikes
+
+2. AI EXECUTION FLOW
+
+* signals generated
+* accepted
+* filtered
+* rejected
+* MTF confirmation
+* correlation blocks
+* risk gating
+
+3. PLATFORM BUSINESS INTELLIGENCE
+
+* fees generated
+* exchange distribution
+* execution volume
+* active exchange usage
+
+====================================================
+3. ADD REAL LIVE ASSET INTELLIGENCE PANEL
+=========================================
+
+The right-side region near:
+
+* TAKE PROFIT
+* STOP LOSS
+* active asset telemetry
+
+still needs a true institutional asset intelligence display.
+
+====================================================
+REQUIRED CHANGE
+===============
+
+Add:
+LIVE ASSET INTELLIGENCE PANEL
+
+This should dynamically reflect:
+
+* currently active symbol
+* currently selected asset
+* currently executing AI trade
+
+Include:
+
+* real mini candlestick chart
+* micro trend visualization
+* AI confidence pulse
+* volatility visualization
+* execution pressure
+* momentum pulse
+* signal strength indicator
+
+This should feel:
+
+* alive
+* contextual
+* intelligent
+* reactive
+
+NOT:
+
+* static telemetry text
+
+====================================================
+4. TELEMETRY ROWS — REDUCE HEIGHT, NOT TEXT SIZE
+================================================
+
+The telemetry rows improved, but the adjustment reduced the visual impact too aggressively.
+
+The issue was:
+BOX HEIGHT
+NOT:
+typography scale.
+
+====================================================
+REQUIRED CHANGE
+===============
+
+Make the telemetry cards:
+
+* shorter vertically
+* thinner in height
+* tighter vertically
+
+BUT:
+
+* increase number size
+* improve readability
+* preserve hierarchy
+* maintain glow intensity
+
+Goal:
+Institutional telemetry density.
+
+Think:
+Bloomberg compact rows,
+NOT:
+small text.
+
+====================================================
+5. FILL RIGHT-SIDE SPACE MORE AGGRESSIVELY
+==========================================
+
+The right-side area still has underutilized empty space.
+
+This region should contain:
+
+* AI asset intelligence
+* contextual signal telemetry
+* mini execution charts
+* execution pulse
+* volatility pressure
+* AI directional confidence
+
+The dashboard should feel:
+information-dense,
+not sparse.
+
+====================================================
+6. AUTO-TRADING LOGIC — HIGH CONFIDENCE OVERRIDE
+================================================
+
+Current behavior:
+trades are still being blocked even during strong-confidence scenarios.
+
+====================================================
+REQUIRED CHANGE
+===============
+
+If:
+AI confidence > 60%
+
+allow execution override even when:
+
+* some lower-level filters disagree
+  OR
+* MTF hesitation exists
+
+The AI should become:
+more aggressive during high-confidence scenarios.
+
+Current behavior is still slightly too conservative.
+
+Implement:
+HIGH CONFIDENCE OVERRIDE LOGIC.
+
+Example:
+if confidence >= 60%
+allow trade execution unless:
+
+* kill switch active
+* catastrophic risk event
+* max exposure breach
+* exchange disconnected
+
+====================================================
+7. LIVE TERMINAL FEED IS STILL TOO LIMITED
+==========================================
+
+The live terminal stream currently only shows ~10 visible assets/events.
+
+This weakens the perception of:
+
+* platform scale
+* execution activity
+* AI orchestration
+
+====================================================
+REQUIRED CHANGE
+===============
+
+Expand terminal feed density substantially.
+
+Increase:
+
+* visible event count
+* stream depth
+* active telemetry
+* scrolling execution feed
+
+The platform should visually feel:
+busy,
+alive,
+active,
+operational.
+
+====================================================
+8. EXCHANGE BALANCE ISOLATION IS STILL NOT FULLY FIXED
+======================================================
+
+CRITICAL ISSUE:
+
+The Kraken $100 balance is still appearing on other exchanges.
+
+This is still production-critical.
+
+====================================================
+REQUIRED FIX
+============
+
+STRICT EXCHANGE-SCOPED ACCOUNT ISOLATION.
+
+Each exchange MUST maintain independent:
+
+* balances
+* equity
+* positions
+* fees
+* buying power
+* telemetry
+* executions
+
+When switching exchanges:
+ALL account telemetry MUST reload dynamically.
+
+NO fallback/shared balance leakage.
+
+If exchange balance unavailable:
+display:
+
+* —
+* CONNECTING
+* NO ACCOUNT LINKED
+
+NEVER:
+reuse Kraken balances globally.
+
+====================================================
+FINAL DESIGN GOAL
+=================
+
+The dashboard should now feel like:
+
+A REAL AI TRADING OPERATING SYSTEM.
+
+NOT:
+
+* a crypto dashboard
+* a widget collection
+* a SaaS admin page
+
+The UI should visually communicate:
+
+* AI execution is alive
+* users are trading
+* exchanges are flowing
+* telemetry is active
+* onboarding is happening
+* signals are firing
+* risk systems are reacting
+* the platform is scaling live
+
+The platform should feel:
+institutional,
+dense,
+alive,
+reactive,
+intelligent,
+and operational.

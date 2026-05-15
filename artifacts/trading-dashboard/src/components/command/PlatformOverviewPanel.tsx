@@ -7,6 +7,7 @@ interface Props {
   engine?: EngineStatus;
   feeSummary?: FeeSummary;
   exchangeName?: string;
+  liveActive?: boolean;
 }
 
 /* ── Donut chart ─────────────────────────────────────────────────────────────── */
@@ -128,7 +129,7 @@ function fmtPrice(p: number): string {
 }
 
 /* ── Main component ──────────────────────────────────────────────────────────── */
-export function PlatformOverviewPanel({ simAccount, liveBalance, engine, feeSummary, exchangeName }: Props) {
+export function PlatformOverviewPanel({ simAccount, liveBalance, engine, feeSummary, exchangeName, liveActive }: Props) {
   const [assetTab, setAssetTab] = useState<"CRYPTO" | "EQUITIES">("CRYPTO");
   const [equities, setEquities] = useState<EquityRow[]>(EQUITY_BASE);
   const [sessions, setSessions] = useState({ live: 5, paper: 19, newToday: 3 });
@@ -151,8 +152,10 @@ export function PlatformOverviewPanel({ simAccount, liveBalance, engine, feeSumm
   }, []);
 
   /* ── Derived account data ────────────────────────────────────────────────── */
-  const isAlpaca = liveBalance?.source === "live" && String(exchangeName ?? "").toLowerCase().includes("alpaca");
-  const isLive   = liveBalance?.source === "live";
+  // Use authoritative liveActive from parent; fall back to liveBalance source.
+  // This prevents sim $100K from bleeding through when liveBalance hasn't loaded yet.
+  const isAlpaca = (liveActive ?? false) && String(exchangeName ?? "").toLowerCase().includes("alpaca");
+  const isLive   = liveActive ?? (liveBalance?.source === "live");
 
   const liveUSD  = isLive ? (liveBalance!.balances.USD ?? 0) : 0;
   const liveBTC  = isLive ? (liveBalance!.balances.BTC ?? 0) : 0;

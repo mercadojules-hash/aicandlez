@@ -674,20 +674,41 @@ async function tick() {
         (testAction === "BUY"  && mtf.trend1H === "bullish") ||
         (testAction === "SELL" && mtf.trend1H === "bearish");
 
+      // ── High-confidence override (≥ 60%) ──────────────────────────────────
+      // Strong AI conviction bypasses MTF + quality filters. Hard stops (kill
+      // switch, max positions, risk engine) are still enforced in autoExecute.
+      const bestSingleAction: "BUY" | "SELL" | "HOLD" =
+        (mtf.fast.confidence >= mtf.slow.confidence && mtf.fast.decision !== "HOLD")
+          ? mtf.fast.decision as "BUY" | "SELL"
+          : (mtf.slow.decision !== "HOLD" ? mtf.slow.decision as "BUY" | "SELL" : "HOLD");
+
+      const highConfOverride =
+        !testMode &&
+        settings.autoMode &&
+        !settings.killSwitch &&
+        mtf.avgConfidence >= 60 &&
+        bestSingleAction !== "HOLD";
+
+      // When override fires without MTF agreement, take the stronger single-TF direction
+      const effectiveAction: "BUY" | "SELL" | "HOLD" =
+        highConfOverride && !mtf.mtfConfirmed ? bestSingleAction : testAction;
+
       const shouldTrade =
         settings.autoMode &&
         !settings.killSwitch &&
-        (mtf.mtfConfirmed || testSingleTF) &&
-        testAction !== "HOLD" &&
-        mtf.avgConfidence >= confThresh &&
-        volumeGatePass &&
-        sidewaysGatePass &&
-        trend1HGatePass;
+        (mtf.mtfConfirmed || testSingleTF || highConfOverride) &&
+        effectiveAction !== "HOLD" &&
+        mtf.avgConfidence >= (highConfOverride ? 60 : confThresh) &&
+        (volumeGatePass   || highConfOverride) &&
+        (sidewaysGatePass || highConfOverride) &&
+        (trend1HGatePass  || highConfOverride);
 
       // Determine block reason for signal log
       let signalBlockReason: string | null = null;
       if (!settings.autoMode) {
         signalBlockReason = "Auto-mode off";
+      } else if (highConfOverride) {
+        signalBlockReason = null; // high-conf override — executing
       } else if (!mtf.mtfConfirmed && !testSingleTF) {
         signalBlockReason = mtf.blockReason;
       } else if (mtf.avgConfidence < confThresh) {
@@ -697,14 +718,14 @@ async function tick() {
       } else if (!volumeGatePass) {
         signalBlockReason = "Volume below average (low-volume filter)";
       } else if (!trend1HGatePass) {
-        signalBlockReason = `1H trend conflict (trend=${mtf.trend1H}, signal=${testAction})`;
+        signalBlockReason = `1H trend conflict (trend=${mtf.trend1H}, signal=${effectiveAction})`;
       }
 
       appendSignalLog({
         id:           id5m,
         symbol,
         timeframe:    "5m+15m",
-        decision:     mtf.agreedAction,
+        decision:     highConfOverride && !mtf.mtfConfirmed ? bestSingleAction : mtf.agreedAction,
         confidence:   mtf.avgConfidence,
         shortSummary: mtf.fast.shortSummary,
         blockReason:  signalBlockReason,
@@ -717,7 +738,7 @@ async function tick() {
         const execResult = await autoExecute(
           id5m,
           symbol,
-          testAction,
+          effectiveAction as "BUY" | "SELL",
           primaryDecision.price,
           primaryDecision.reasoning ?? "",
           primaryDecision.shortSummary,

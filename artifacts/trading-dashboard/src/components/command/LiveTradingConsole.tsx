@@ -121,77 +121,133 @@ function LargeButton({
   );
 }
 
-// ── Signal-waiting animated visualization ─────────────────────────────────────
+// ── Institutional signal-waiting visualization — full center fill ─────────────
 
 function SignalWaitingViz() {
-  const N = 40;
-  const [bars, setBars] = useState<number[]>(() => Array.from({ length: N }, () => 8 + Math.random() * 22));
-  const [pulse, setPulse] = useState(0);
+  const N = 90;
+  const [pts, setPts] = useState<{ ai: number; risk: number; exec: boolean }[]>(() =>
+    Array.from({ length: N }, (_, i) => ({
+      ai:   35 + Math.sin(i * 0.14) * 22 + Math.cos(i * 0.09) * 12 + (Math.random() - 0.5) * 8,
+      risk: Math.random() > 0.85 ? 6 + Math.random() * 20 : 0,
+      exec: Math.random() > 0.91,
+    }))
+  );
+  const [scan, setScan] = useState(0);
 
   useEffect(() => {
     const id = setInterval(() => {
-      setBars(prev => {
-        const next = [...prev.slice(1), 8 + Math.random() * 22];
-        return next;
-      });
-      setPulse(p => p + 1);
-    }, 140);
+      const t = Date.now() / 3200;
+      const aiVal = 40 + Math.sin(t) * 20 + Math.cos(t * 1.6) * 12 + (Math.random() - 0.5) * 10;
+      setPts(prev => [...prev.slice(1), {
+        ai:   Math.max(5, Math.min(90, aiVal)),
+        risk: Math.random() > 0.82 ? 6 + Math.random() * 20 : 0,
+        exec: Math.random() > 0.90,
+      }]);
+      setScan(s => (s + 1) % N);
+    }, 130);
     return () => clearInterval(id);
   }, []);
 
-  const W = 520, H = 56, barW = W / N - 1;
+  const W = 800, H = 100;
+  const aiLine = pts.map((p, i) => {
+    const x = (i / (N - 1)) * W;
+    const y = H - (p.ai / 100) * (H * 0.85) - 4;
+    return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).join(" ");
+  const aiArea = `${aiLine} L ${W} ${H} L 0 ${H} Z`;
+  const scanX = ((scan / N) * W).toFixed(1);
 
   return (
-    <div className="border-t flex items-stretch" style={{ borderTopColor: "#0a1a28", background: "#000000", minHeight: 58 }}>
+    <div className="border-t flex" style={{ borderTopColor: "#0a1828", background: "#000000", flex: 1, minHeight: 95 }}>
 
-      {/* Animated bar chart */}
-      <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+      {/* Main multi-stream chart */}
+      <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
           style={{ display: "block" }}>
-          {bars.map((h, i) => {
-            const isRecent = i >= N - 4;
-            const color = isRecent ? "#00f0ff" : i % 7 === 0 ? "#cc55ff" : "#00f0ff";
-            const opacity = 0.12 + (i / N) * 0.55 + (isRecent ? 0.3 : 0);
-            return (
-              <rect key={i}
-                x={i * (barW + 1)} y={H - h} width={barW} height={h}
-                fill={color} opacity={opacity} rx={1} />
-            );
+          <defs>
+            <linearGradient id="sviz-ai-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.14" />
+              <stop offset="100%" stopColor="#00f0ff" stopOpacity="0.01" />
+            </linearGradient>
+          </defs>
+          {/* Grid lines */}
+          {[25, 50, 75].map(pct => {
+            const y = H - (pct / 100) * (H * 0.85) - 4;
+            return <line key={pct} x1={0} y1={y} x2={W} y2={y}
+              stroke="#0d1e2e" strokeWidth={0.5} strokeDasharray="4,10" />;
           })}
+          {/* AI signal area fill */}
+          <path d={aiArea} fill="url(#sviz-ai-grad)" />
+          {/* AI signal line */}
+          <path d={aiLine} fill="none" stroke="#00f0ff" strokeWidth={1.5}
+            style={{ filter: "drop-shadow(0 0 6px #00f0ff55)" }} />
+          {/* Execution spikes — green vertical lines */}
+          {pts.map((p, i) => !p.exec ? null : (
+            <line key={`e${i}`}
+              x1={(i / (N - 1)) * W} y1={H}
+              x2={(i / (N - 1)) * W} y2={H - 38}
+              stroke="#00ff8a" strokeWidth={2} opacity={0.8}
+              style={{ filter: "drop-shadow(0 0 5px #00ff8a)" }} />
+          ))}
+          {/* Risk bars — red micro bars at bottom */}
+          {pts.map((p, i) => p.risk <= 0 ? null : (
+            <rect key={`r${i}`}
+              x={(i / (N - 1)) * W - 2} y={H - p.risk}
+              width={4} height={p.risk}
+              fill="#ff3355" opacity={0.4} rx={1} />
+          ))}
           {/* Scanning line */}
-          <line
-            x1={((pulse % N) / N) * W} y1={0}
-            x2={((pulse % N) / N) * W} y2={H}
-            stroke="#00f0ff" strokeWidth={1} opacity={0.3} />
+          <line x1={scanX} y1={0} x2={scanX} y2={H}
+            stroke="#00f0ff" strokeWidth={0.8} opacity={0.22} />
         </svg>
-        <div style={{
-          position: "absolute", inset: 0, display: "flex",
-          alignItems: "center", paddingLeft: 12, gap: 8,
-        }}>
-          <Activity style={{ width: 13, height: 13, color: "#1e3a50", flexShrink: 0 }} />
-          <span style={{ fontSize: 9.5, fontFamily: "monospace", fontWeight: 700,
-            color: "#1e3a50", letterSpacing: "0.2em", textTransform: "uppercase" }}>
-            No active positions — AI monitoring signals
+
+        {/* Stream legend */}
+        <div style={{ position: "absolute", top: 6, left: 10, display: "flex", gap: 14, alignItems: "center" }}>
+          {[
+            { color: "#00f0ff", label: "AI SIGNAL FLOW", dash: false },
+            { color: "#00ff8a", label: "EXECUTIONS",     dash: false },
+            { color: "#ff3355", label: "RISK BLOCKS",    dash: false },
+          ].map(({ color, label }) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ width: 18, height: 2, background: color, borderRadius: 1,
+                boxShadow: `0 0 4px ${color}60` }} />
+              <span style={{ fontSize: 7, fontFamily: "monospace", color: `${color}65`,
+                letterSpacing: "0.12em", textTransform: "uppercase" }}>{label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Bottom label */}
+        <div style={{ position: "absolute", bottom: 6, left: 10, display: "flex", alignItems: "center", gap: 6 }}>
+          <Activity style={{ width: 11, height: 11, color: "#1a3040", flexShrink: 0 }} />
+          <span style={{ fontSize: 8.5, fontFamily: "monospace", fontWeight: 700,
+            color: "#1a3040", letterSpacing: "0.22em", textTransform: "uppercase" }}>
+            AI MONITORING — NO ACTIVE POSITIONS
           </span>
         </div>
       </div>
 
-      {/* Right: live signal counters */}
+      {/* Right status column */}
       <div style={{
-        display: "flex", flexDirection: "column", justifyContent: "center",
-        gap: 3, paddingLeft: 14, paddingRight: 16, borderLeft: "1px solid #0a1824",
-        flexShrink: 0,
+        display: "flex", flexDirection: "column", justifyContent: "space-evenly",
+        padding: "8px 14px", borderLeft: "1px solid #0a1828", flexShrink: 0, width: 130,
       }}>
         {[
-          { label: "SIGNAL FLOW",  color: "#00f0ff" },
-          { label: "MTF ACTIVE",   color: "#cc55ff" },
-          { label: "RISK OK",      color: "#00ff8a" },
-        ].map(({ label, color }) => (
-          <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <div style={{ width: 4, height: 4, borderRadius: "50%", background: color,
-              boxShadow: `0 0 4px ${color}`, flexShrink: 0 }} className="live-dot" />
-            <span style={{ fontSize: 7.5, fontFamily: "monospace", color: `${color}70`,
-              letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
+          { label: "SIGNAL FLOW",  color: "#00f0ff", pulse: true  },
+          { label: "MTF ACTIVE",   color: "#cc55ff", pulse: true  },
+          { label: "RISK GATE",    color: "#00ff8a", pulse: false },
+          { label: "VOL CONFIRM",  color: "#ffaa00", pulse: false },
+          { label: "SCANNING",     color: "#00aaff", pulse: true  },
+          { label: "CORRELATION",  color: "#ff8844", pulse: false },
+        ].map(({ label, color, pulse }) => (
+          <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: color,
+              boxShadow: `0 0 5px ${color}`, flexShrink: 0 }}
+              className={pulse ? "live-dot" : ""} />
+            <span style={{ fontSize: 7.5, fontFamily: "monospace",
+              color: `${color}58`, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              {label}
+            </span>
           </div>
         ))}
       </div>
@@ -199,17 +255,47 @@ function SignalWaitingViz() {
   );
 }
 
-// ── AI Signal Activity mini panel ─────────────────────────────────────────────
+// ── Live Asset Intelligence Panel — candlestick + confidence + volatility ──────
 
-function AISignalMini({ engine }: { engine?: EngineStatus }) {
-  const [pts, setPts] = useState<number[]>(() => Array.from({ length: 24 }, () => 45 + Math.random() * 30));
-  const [lastAction, setLastAction] = useState<{ action: string; color: string } | null>(null);
+function LiveAssetIntelPanel({ engine }: { engine?: EngineStatus }) {
+  const [candles, setCandles] = useState<{ o: number; h: number; l: number; c: number }[]>(() => {
+    let p = 52;
+    return Array.from({ length: 28 }, () => {
+      const o = p;
+      const move = (Math.random() - 0.47) * 5.5;
+      const c = Math.max(10, Math.min(90, o + move));
+      const h = Math.max(o, c) + Math.random() * 2.5;
+      const l = Math.min(o, c) - Math.random() * 2.5;
+      p = c;
+      return { o, h, l, c };
+    });
+  });
+  const [confPts,  setConfPts]  = useState<number[]>(() => Array.from({ length: 28 }, () => 45 + Math.random() * 30));
+  const [volBars,  setVolBars]  = useState<number[]>(() => Array.from({ length: 28 }, () => 18 + Math.random() * 65));
+  const [lastAct,  setLastAct]  = useState<{ action: string; color: string } | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => {
-      const base = engine?.signalCounts?.BUY ?? 0;
-      const conf  = 40 + base * 1.2 + (Math.random() - 0.5) * 14;
-      setPts(prev => [...prev.slice(1), Math.max(5, Math.min(95, conf))]);
+      const bds    = engine?.symbolBreakdowns ? Object.values(engine.symbolBreakdowns) : [];
+      const avgConf = bds.length ? bds.reduce((s, b: any) => s + b.avgConfidence, 0) / bds.length : 50;
+      const bias    = (avgConf - 50) * 0.07;
+
+      setCandles(prev => {
+        const last = prev[prev.length - 1]!;
+        const o    = last.c;
+        const move = bias + (Math.random() - 0.47) * 5;
+        const c    = Math.max(10, Math.min(90, o + move));
+        const h    = Math.max(o, c) + Math.random() * 2.2;
+        const l    = Math.min(o, c) - Math.random() * 2.2;
+        return [...prev.slice(1), { o, h, l, c }];
+      });
+
+      setConfPts(prev => {
+        const noise = (Math.random() - 0.5) * 14;
+        return [...prev.slice(1), Math.max(8, Math.min(94, avgConf + noise))];
+      });
+
+      setVolBars(prev => [...prev.slice(1), 15 + Math.random() * 72]);
     }, 1600);
     return () => clearInterval(id);
   }, [engine]);
@@ -218,87 +304,131 @@ function AISignalMini({ engine }: { engine?: EngineStatus }) {
     const sig = engine?.lastSignal;
     if (!sig) return;
     const color = sig.action === "BUY" ? "#00ff8a" : sig.action === "SELL" ? "#ff3355" : "#ffaa00";
-    setLastAction({ action: sig.action, color });
-    const t = setTimeout(() => setLastAction(null), 4000);
+    setLastAct({ action: sig.action, color });
+    const t = setTimeout(() => setLastAct(null), 4500);
     return () => clearTimeout(t);
   }, [engine?.lastSignal]);
 
-  const W = 240, H = 36;
-  const smooth = (arr: number[]) => arr.map((v, i) => {
-    const x = (i / (arr.length - 1)) * W;
-    const y = H - (v / 100) * H;
-    return { x, y };
-  });
-  const pts2d = smooth(pts);
-  const d = pts2d.map((p, i) =>
-    i === 0 ? `M ${p.x.toFixed(1)} ${p.y.toFixed(1)}`
-    : `L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`
-  ).join(" ");
-  const area = `${d} L ${W} ${H} L 0 ${H} Z`;
+  const bds       = engine?.symbolBreakdowns ? Object.values(engine.symbolBreakdowns) : [];
+  const topBd     = bds.length
+    ? [...bds].sort((a: any, b: any) => b.avgConfidence - a.avgConfidence)[0]
+    : null;
+  const activeSym  = (topBd as any)?.symbol?.replace("USD", "") ?? "BTC";
+  const activeConf = (topBd as any)?.avgConfidence ?? 0;
+  const confColor  = activeConf >= 65 ? "#00ff8a" : activeConf >= 45 ? "#ffaa00" : "#ff5544";
+  const lastConf   = confPts[confPts.length - 1] ?? 0;
 
-  const lastConf = pts[pts.length - 1] ?? 0;
-  const confColor = lastConf >= 65 ? "#00ff8a" : lastConf >= 45 ? "#ffaa00" : "#ff5544";
+  const CW = 240, CH = 58, VH = 14, cfH = 26;
+  const cW2 = candles.length;
+  const barW = CW / cW2 - 0.8;
+  const priceMin = Math.min(...candles.map(c => c.l));
+  const priceMax = Math.max(...candles.map(c => c.h));
+  const pr = priceMax - priceMin || 1;
+  const toY = (p: number) => CH - ((p - priceMin) / pr) * (CH - 6) - 3;
+
+  const cfD = confPts.map((v, i) => {
+    const x = (i / (confPts.length - 1)) * CW;
+    const y = cfH - (v / 100) * (cfH - 2) - 1;
+    return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).join(" ");
+  const cfArea = `${cfD} L ${CW} ${cfH} L 0 ${cfH} Z`;
+
+  const lastCfPt = confPts[confPts.length - 1];
+  const lastCfX  = CW;
+  const lastCfY  = cfH - ((lastCfPt ?? 0) / 100) * (cfH - 2) - 1;
 
   return (
     <div style={{
-      background: "#000000",
-      border: "1px solid #0d1824",
-      borderRadius: 4,
-      padding: "8px 10px",
-      display: "flex",
-      flexDirection: "column",
-      gap: 6,
+      background: "#000000", border: "1px solid #0d1824", borderRadius: 4,
+      padding: "8px 10px", display: "flex", flexDirection: "column", gap: 5,
     }}>
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 7.5, fontFamily: "monospace", fontWeight: 700,
-          color: "#2a4050", letterSpacing: "0.18em", textTransform: "uppercase" }}>
-          AI SIGNAL MONITOR
-        </span>
-        {lastAction && (
-          <span style={{
-            fontSize: 7, fontFamily: "monospace", fontWeight: 700,
-            padding: "2px 6px", borderRadius: 3,
-            background: `${lastAction.color}15`,
-            color: lastAction.color,
-            border: `1px solid ${lastAction.color}40`,
-            letterSpacing: "0.1em",
-          }}>
-            {lastAction.action}
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700,
+            color: "#00f0ff", letterSpacing: "-0.01em" }}>{activeSym}</span>
+          <span style={{ fontSize: 6.5, fontFamily: "monospace", color: "#00aaff45",
+            letterSpacing: "0.16em", textTransform: "uppercase" }}>LIVE INTEL</span>
+        </div>
+        {lastAct ? (
+          <span style={{ fontSize: 7, fontFamily: "monospace", fontWeight: 700,
+            padding: "2px 5px", borderRadius: 3,
+            background: `${lastAct.color}15`, color: lastAct.color,
+            border: `1px solid ${lastAct.color}40`, letterSpacing: "0.1em" }}>
+            {lastAct.action}
           </span>
+        ) : (
+          <span style={{ fontSize: 7, fontFamily: "monospace", color: `${confColor}80`,
+            letterSpacing: "0.1em" }}>{activeConf.toFixed(0)}%</span>
         )}
       </div>
 
-      {/* Confidence sparkline */}
-      <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
-        style={{ display: "block" }}>
+      {/* Mini candlestick chart */}
+      <svg width="100%" height={CH} viewBox={`0 0 ${CW} ${CH}`}
+        preserveAspectRatio="none" style={{ display: "block" }}>
+        {candles.map((c, i) => {
+          const x     = i * (barW + 0.8) + barW / 2;
+          const isBull = c.c >= c.o;
+          const color  = isBull ? "#00ff8a" : "#ff3355";
+          const bTop   = toY(Math.max(c.o, c.c));
+          const bH     = Math.max(1, Math.abs(toY(c.o) - toY(c.c)));
+          const isLast = i === candles.length - 1;
+          return (
+            <g key={i}>
+              <line x1={x} y1={toY(c.h)} x2={x} y2={toY(c.l)}
+                stroke={color} strokeWidth={0.6} opacity={isLast ? 0.9 : 0.45} />
+              <rect x={i * (barW + 0.8)} y={bTop} width={barW} height={bH}
+                fill={color} opacity={isLast ? 1 : 0.65}
+                style={isLast ? { filter: `drop-shadow(0 0 3px ${color}80)` } : {}} />
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Volume bars */}
+      <svg width="100%" height={VH} viewBox={`0 0 ${CW} ${VH}`}
+        preserveAspectRatio="none" style={{ display: "block", marginTop: -3 }}>
+        {volBars.map((v, i) => (
+          <rect key={i}
+            x={i * (barW + 0.8)} y={VH - (v / 100) * VH}
+            width={barW} height={(v / 100) * VH}
+            fill="#00aaff" opacity={0.15 + (i / volBars.length) * 0.28} />
+        ))}
+      </svg>
+
+      {/* AI confidence sparkline */}
+      <svg width="100%" height={cfH} viewBox={`0 0 ${CW} ${cfH}`}
+        preserveAspectRatio="none" style={{ display: "block" }}>
         <defs>
-          <linearGradient id="ltc-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={confColor} stopOpacity="0.25" />
+          <linearGradient id="lac-cf" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={confColor} stopOpacity="0.28" />
             <stop offset="100%" stopColor={confColor} stopOpacity="0.01" />
           </linearGradient>
         </defs>
-        <path d={area} fill="url(#ltc-grad)" />
-        <path d={d} fill="none" stroke={confColor} strokeWidth={1.5}
-          style={{ filter: `drop-shadow(0 0 4px ${confColor}60)` }} />
-        {/* Live dot */}
-        {pts2d[pts2d.length - 1] && (
-          <circle cx={pts2d[pts2d.length - 1]!.x} cy={pts2d[pts2d.length - 1]!.y}
-            r={3} fill={confColor}
-            style={{ filter: `drop-shadow(0 0 5px ${confColor})` }} />
+        <path d={cfArea} fill="url(#lac-cf)" />
+        <path d={cfD} fill="none" stroke={confColor} strokeWidth={1.4}
+          style={{ filter: `drop-shadow(0 0 5px ${confColor}60)` }} />
+        {lastCfPt !== undefined && (
+          <circle cx={lastCfX} cy={lastCfY} r={2.5} fill={confColor}
+            style={{ filter: `drop-shadow(0 0 6px ${confColor})` }} />
         )}
+        {/* Label */}
+        <text x={4} y={cfH - 3} fontSize={6.5} fontFamily="monospace"
+          fill="#2a4050" letterSpacing="0.12em">AI CONFIDENCE</text>
       </svg>
 
-      {/* Metric row */}
-      <div style={{ display: "flex", gap: 10 }}>
+      {/* Bottom metrics */}
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
         {[
-          { label: "CONFIDENCE",  value: `${lastConf.toFixed(0)}%`,            color: confColor },
-          { label: "SIGNALS",     value: String(engine?.signalsGenerated ?? 0), color: "#00aaff" },
-          { label: "EXECUTIONS",  value: String(engine?.tradesExecuted ?? 0),   color: "#ffaa00" },
+          { label: "CONF",  value: `${lastConf.toFixed(0)}%`,            color: confColor },
+          { label: "SIG",   value: String(engine?.signalsGenerated ?? 0), color: "#00aaff" },
+          { label: "EXEC",  value: String(engine?.tradesExecuted ?? 0),   color: "#ffaa00" },
+          { label: "BLK",   value: String(engine?.tradesBlocked ?? 0),    color: "#ff5555" },
         ].map(({ label, value, color }) => (
-          <div key={label} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700,
-              color, lineHeight: 1, letterSpacing: "-0.01em" }}>{value}</span>
-            <span style={{ fontSize: 7, fontFamily: "monospace", color: "#1e3040",
+          <div key={label} style={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <span style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700,
+              color, lineHeight: 1, textShadow: `0 0 10px ${color}50` }}>{value}</span>
+            <span style={{ fontSize: 6.5, fontFamily: "monospace", color: "#1e3040",
               textTransform: "uppercase", letterSpacing: "0.12em" }}>{label}</span>
           </div>
         ))}
@@ -747,8 +877,8 @@ export function LiveTradingConsole({
             </div>
           </div>
 
-          {/* AI Signal Activity — replaces duplicate exchange selector */}
-          <AISignalMini engine={engine} />
+          {/* Live Asset Intelligence — replaces duplicate exchange selector */}
+          <LiveAssetIntelPanel engine={engine} />
         </div>
       </div>
     </div>

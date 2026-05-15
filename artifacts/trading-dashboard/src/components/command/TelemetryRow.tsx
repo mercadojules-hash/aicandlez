@@ -31,8 +31,8 @@ function Cell({
         background:    "#030b14",
         border:        `1px solid ${dim ? "#0c1824" : "#141f2e"}`,
         borderRadius:  3,
-        padding:       "7px 13px",
-        minWidth:      wide ? 120 : 96,
+        padding:       "5px 12px",
+        minWidth:      wide ? 118 : 94,
         position:      "relative",
         overflow:      "hidden",
         flexShrink:    0,
@@ -47,10 +47,10 @@ function Cell({
       <div
         className="font-bold font-mono leading-none tabular-nums"
         style={{
-          fontSize:      18,
+          fontSize:      22,
           color:         valColor,
-          textShadow:    dim ? "none" : `0 0 12px ${color}45, 0 0 22px ${color}18`,
-          marginBottom:  sub ? 4 : 5,
+          textShadow:    dim ? "none" : `0 0 16px ${color}55, 0 0 32px ${color}20`,
+          marginBottom:  sub ? 2 : 3,
           letterSpacing: "-0.02em",
         }}
       >
@@ -61,7 +61,7 @@ function Cell({
       {sub && (
         <div
           className="font-mono uppercase tracking-[0.14em] leading-none"
-          style={{ fontSize: 8, color: subColor, marginBottom: 3 }}
+          style={{ fontSize: 8, color: subColor, marginBottom: 2 }}
         >
           {sub}
         </div>

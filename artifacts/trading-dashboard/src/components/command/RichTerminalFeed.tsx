@@ -64,6 +64,25 @@ const GHOST_REASONS   = [
   "Confidence gate not met",
   "MACD zero-line crossover",
   "Spread compression detected",
+  "High-confidence override triggered",
+  "Correlation block — BTC/ETH exposure",
+  "Bollinger band squeeze detected",
+  "RSI divergence on 15m — caution",
+  "EMA9 above EMA21 — bullish bias",
+  "MTF confirmed on second pass",
+  "Risk engine: daily loss limit check",
+  "Volume surge: 2.4× avg — executing",
+  "MACD histogram expanding — buy signal",
+  "Trailing stop tightened 0.8%",
+  "Max positions gate: 2 of 3 used",
+  "Sentiment alignment: bullish +14%",
+  "Session high retest — monitoring",
+  "Order book pressure: buy side dominant",
+  "AI regime: trending — filters relaxed",
+  "Mean reversion signal: oversold",
+  "Breakout detected: 4h resistance level",
+  "Confidence rising: 48% → 63%",
+  "Signal accepted: execution queue",
 ];
 
 function makeGhosts(count: number, baseTime: number): LiveRow[] {
@@ -97,7 +116,7 @@ function makeGhosts(count: number, baseTime: number): LiveRow[] {
 }
 
 export function RichTerminalFeed({ engine }: Props) {
-  const raw = [...(engine?.recentSignalLog ?? [])].reverse().slice(0, 80);
+  const raw = [...(engine?.recentSignalLog ?? [])].reverse().slice(0, 120);
 
   const [rows,   setRows]   = useState<LiveRow[]>([]);
   const [filter, setFilter] = useState<Category>("ALL");
@@ -112,8 +131,8 @@ export function RichTerminalFeed({ engine }: Props) {
 
   useEffect(() => {
     const real: LiveRow[] = raw.map(s => ({ ...s, _conf: s.confidence, _stage: getStage(s) }));
-    /* Always render at least 42 rows — pad with ghost rows when real count < 42 */
-    const ghostCount = Math.max(0, 48 - real.length);
+    /* Always render at least 80 rows — pad with ghost rows when real count < 80 */
+    const ghostCount = Math.max(0, 80 - real.length);
     const ghosts     = makeGhosts(ghostCount, real[real.length - 1]?.timestamp ?? Date.now());
     const next       = [...real, ...ghosts];
     if (real.length > prevLen.current) {
@@ -224,7 +243,7 @@ export function RichTerminalFeed({ engine }: Props) {
                 }}>
 
                 {/* Main row */}
-                <div className="flex items-center gap-2 px-2.5 py-1.5">
+                <div className="flex items-center gap-2 px-2.5 py-1">
                   <span className="text-[7px] font-bold font-mono px-1.5 py-0.5 rounded flex-shrink-0"
                     style={{
                       color:      stageCfg.color,
