@@ -23,9 +23,9 @@ function Cell({
   return (
     <div
       style={{
-        padding:     "3px 11px",
+        padding:     "5px 14px",
         borderRight: "1px solid #090f1a",
-        flexShrink:  0,
+        flex:        "1 1 0",
         minWidth:    84,
         position:    "relative",
       }}
@@ -327,6 +327,7 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
     overflowX:      "auto",
     scrollbarWidth: "none",
     flex:           1,
+    alignItems:     "stretch",
   };
 
   return (

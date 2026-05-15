@@ -194,8 +194,17 @@ export default function CommandCenter() {
   const isLive   = exchangeStatus?.mode === "live";
   const exName   = exchangeStatus?.exchangeName ?? "kraken";
 
+  // Adapter name → button ID (adapter uses canonical names, buttons use short IDs)
+  const ADAPTER_TO_BTN: Record<string, string> = {
+    "cryptodotcom": "cryptocom",
+    "cryptodotcom.com": "cryptocom",
+    "binanceus": "binance",
+  };
+  const normalizeExId = (n: string) =>
+    ADAPTER_TO_BTN[n.toLowerCase().replace(/[\s._-]/g, "")] ?? n.toLowerCase();
+
   // Resolved active mode: pending click wins until server confirms
-  const confirmedId = !isLive ? "sim" : exName.toLowerCase();
+  const confirmedId = !isLive ? "sim" : normalizeExId(exName);
   const activeId    = pendingMode ?? confirmedId;
   const liveActive  = activeId !== "sim";
 
@@ -209,9 +218,9 @@ export default function CommandCenter() {
     ...Q_OPTS,
   });
 
-  // /api/exchange/balances: poll real exchange balances in LIVE mode only
+  // /api/exchange/balances: keyed by activeId — each exchange has its own cache slot
   const { data: liveBalance } = useQuery<LiveBalance>({
-    queryKey: ["live-balance-cmd"],
+    queryKey: ["live-balance-cmd", activeId],
     queryFn:  () => fetch("/api/exchange/balances", { cache: "no-store" }).then(r => r.json()),
     refetchInterval: liveActive ? 15_000 : false,
     enabled:         liveActive,
@@ -286,6 +295,9 @@ export default function CommandCenter() {
     if (pendingId !== "sim") {
       qc.removeQueries({ queryKey: ["sim-account-cmd"] });
     }
+    // Remove stale live-balance cache for the previous exchange before fetching fresh
+    qc.removeQueries({ queryKey: ["live-balance-cmd"] });
+
     fetch("/api/engine/exchange-mode", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },

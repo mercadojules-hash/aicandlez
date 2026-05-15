@@ -89,19 +89,20 @@ const _orders:         ExchangeOrder[] = [];
 
 // Per-exchange simulated portfolio snapshots
 const EXCHANGE_BALANCES: Record<string, Balances> = {
-  Kraken:   { USD: 100_000, BTC: 0,    ETH: 0,    SOL: 0    },
-  Binance:  { USD: 84_350,  BTC: 0.42, ETH: 3.10, SOL: 22.5 },
-  Coinbase: { USD: 62_100,  BTC: 0.18, ETH: 1.50, SOL: 8.0  },
-  OKX:      { USD: 41_200,  BTC: 0.08, ETH: 0.90, SOL: 5.2  },
-  Bybit:    { USD: 28_750,  BTC: 0.05, ETH: 0.30, SOL: 2.1  },
-  Bitfinex: { USD: 15_000,  BTC: 0.02, ETH: 0.12, SOL: 0    },
-  "Gate.io":{ USD: 22_500,  BTC: 0.04, ETH: 0.25, SOL: 1.8  },
-  KuCoin:   { USD: 11_000,  BTC: 0.01, ETH: 0.08, SOL: 0.5  },
-  Huobi:    { USD:  8_400,  BTC: 0,    ETH: 0.05, SOL: 0    },
-  MEXC:     { USD:  5_100,  BTC: 0,    ETH: 0.02, SOL: 0    },
-  Phemex:   { USD:  3_200,  BTC: 0,    ETH: 0,    SOL: 0    },
-  Uphold:   { USD: 18_750,  BTC: 0.03, ETH: 0.22, SOL: 1.4  },
-  Alpaca:   { USD: 100_000, BTC: 0,    ETH: 0,    SOL: 0    },
+  Kraken:       { USD: 100_000, BTC: 0,    ETH: 0,    SOL: 0    },
+  Binance:      { USD: 84_350,  BTC: 0.42, ETH: 3.10, SOL: 22.5 },
+  Coinbase:     { USD: 62_100,  BTC: 0.18, ETH: 1.50, SOL: 8.0  },
+  CryptoDotCom: { USD: 48_900,  BTC: 0.22, ETH: 1.80, SOL: 14.0 },
+  OKX:          { USD: 41_200,  BTC: 0.08, ETH: 0.90, SOL: 5.2  },
+  Bybit:        { USD: 28_750,  BTC: 0.05, ETH: 0.30, SOL: 2.1  },
+  Bitfinex:     { USD: 15_000,  BTC: 0.02, ETH: 0.12, SOL: 0    },
+  "Gate.io":    { USD: 22_500,  BTC: 0.04, ETH: 0.25, SOL: 1.8  },
+  KuCoin:       { USD: 11_000,  BTC: 0.01, ETH: 0.08, SOL: 0.5  },
+  Huobi:        { USD:  8_400,  BTC: 0,    ETH: 0.05, SOL: 0    },
+  MEXC:         { USD:  5_100,  BTC: 0,    ETH: 0.02, SOL: 0    },
+  Phemex:       { USD:  3_200,  BTC: 0,    ETH: 0,    SOL: 0    },
+  Uphold:       { USD: 18_750,  BTC: 0.03, ETH: 0.22, SOL: 1.4  },
+  Alpaca:       { USD: 100_000, BTC: 0,    ETH: 0,    SOL: 0    },
 };
 
 let _simBalances: Balances = { ...EXCHANGE_BALANCES["Kraken"]! };

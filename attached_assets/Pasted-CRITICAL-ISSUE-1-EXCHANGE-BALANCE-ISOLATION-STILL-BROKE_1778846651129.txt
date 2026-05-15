@@ -1,0 +1,186 @@
+CRITICAL ISSUE #1
+EXCHANGE BALANCE ISOLATION STILL BROKEN
+
+The $100 Binance live balance is still appearing on ALL exchanges.
+
+This means exchange-scoped balance isolation is STILL not correct.
+
+Current problem:
+Switching exchanges changes the label/color/state —
+BUT the underlying balance value persists globally.
+
+Each exchange MUST maintain completely isolated state:
+
+Kraken:
+
+Kraken balances
+Kraken positions
+Kraken executions
+
+Binance:
+
+Binance balances
+Binance positions
+Binance executions
+
+Coinbase:
+
+Coinbase balances
+Coinbase positions
+Coinbase executions
+
+Crypto.com:
+
+Crypto.com balances
+Crypto.com positions
+Crypto.com executions
+
+Simulation:
+
+isolated simulation account only
+
+DO NOT:
+reuse the previously loaded exchange balance.
+
+When exchange changes:
+
+hydrate exchange-specific account state
+clear stale previous balances immediately
+show loading/sync state until correct balance resolves
+
+Absolutely NO global balance persistence.
+
+CRITICAL ISSUE #2
+CRYPTO.COM EXCHANGE BUTTON FAILS
+
+When clicking:
+Crypto.com
+
+the exchange only stays active for ~2 seconds and then reverts/fails.
+
+This indicates:
+
+exchange registry instability
+unsupported exchange fallback
+state hydration reset
+websocket exchange mismatch
+exchange validation loop
+
+Need:
+
+persistent exchange activation
+stable routing state
+proper exchange registry handling
+no auto-reset after selection
+
+The exchange switcher must behave like:
+a production broker router.
+
+CRITICAL ISSUE #3
+TOP RIGHT ASSET CHART NEEDS TO LOOK MORE PROFESSIONAL
+
+The ADA/asset chart in the top-right intelligence panel still looks weak compared to the rest of the dashboard.
+
+Need:
+
+more institutional styling
+smoother chart rendering
+better candle spacing
+stronger glow hierarchy
+cleaner overlays
+more premium chart appearance
+stronger execution-quality feel
+
+Currently:
+it still looks like a lightweight widget.
+
+Goal:
+mini TradingView institutional asset panel.
+
+Need:
+
+smoother candles
+better line rendering
+better volume visualization
+cleaner grid
+stronger asset intelligence presentation
+CRITICAL ISSUE #4
+TELEMETRY BOXES STILL WASTE HORIZONTAL SPACE
+
+The telemetry strips under the ticker STILL do not utilize width correctly.
+
+Problem:
+
+boxes are too narrow
+too much unused right-side space
+fragmented layout
+dashboard width not fully utilized
+
+Need:
+
+spread telemetry horizontally
+wider grouped sections
+fewer tiny isolated cards
+better operator-density
+more efficient use of horizontal space
+
+This applies to BOTH:
+
+the boxes directly under the ticker
+the AI Execution Telemetry row below exchanges
+
+Currently:
+the telemetry stops early and leaves dead space on the right.
+
+The telemetry system should visually stretch across the dashboard width.
+
+CRITICAL ISSUE #5
+LIVE TERMINAL FEED IS TOO BUNCHED TOGETHER
+
+The Live Terminal Feed is still too compressed.
+
+Need:
+
+wider feed
+more spacing between rows
+better readability
+larger event hierarchy
+stronger timestamps
+easier scanning
+
+Currently:
+the feed visually collapses together.
+
+Need:
+institutional operator readability.
+
+Think:
+real-time SOC terminal
+or Bloomberg execution stream.
+
+The feed should feel:
+active
+readable
+important
+high-volume
+
+NOT:
+tiny compressed debug rows.
+
+MOST IMPORTANT
+
+The platform is FINALLY beginning to feel alive.
+
+The top-center orchestration layer is now moving in the correct direction.
+
+Now the remaining work is:
+
+exchange-state correctness
+telemetry spacing
+operator readability
+production-quality chart rendering
+stable exchange orchestration
+efficient use of horizontal space
+
+We are now polishing an institutional AI trading operating system —
+NOT building widgets anymore.
