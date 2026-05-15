@@ -1,0 +1,320 @@
+FINAL PRE-SUBMISSION HOMEPAGE PASS — PURE OLED BLACK + PREMIUM MARKET TERMINAL REFINEMENT
+
+DO NOT redesign the homepage.
+
+The current direction is correct.
+
+This is now a precision refinement pass focused on:
+
+* OLED black depth
+* sharper premium rendering
+* cleaner controls
+* more institutional market feel
+* improved chart sophistication
+* removing “crypto UI glow” energy
+
+The attached reference image is the visual target.
+
+MOST IMPORTANT:
+The background MUST become true deep black.
+
+The app still has:
+
+* too much blue haze
+* ambient cyan fog
+* glow diffusion
+* softened rendering
+
+The final UI should feel:
+
+* luxury AI operating system
+* institutional trading terminal
+* Apple-quality OLED rendering
+* cinematic black titanium interface
+
+NOT:
+
+* neon crypto dashboard
+* gamer UI
+* cyberpunk glow app
+
+---
+
+1. PURE BLACK OLED BACKGROUND
+
+---
+
+Push the entire app closer to:
+
+#000000
+#010101
+#050505
+
+Requirements:
+
+* remove remaining navy/blue wash
+* remove large atmospheric cyan glows
+* reduce global bloom heavily
+* background should visually disappear into OLED black
+
+The homepage should feel:
+
+* infinite black depth
+* floating premium cards
+* isolated lighting only where needed
+
+Keep glow ONLY:
+
+* on edges
+* active telemetry
+* tiny signal accents
+
+No more blue fog layer.
+
+---
+
+2. SHARPEN ALL CARD RENDERING
+
+---
+
+Cards currently feel slightly soft.
+
+Refine:
+
+* sharper 1px edge strokes
+* cleaner corner rendering
+* tighter highlights
+* darker interiors
+* less blur diffusion
+
+Cards should feel:
+
+* machined
+* laser-cut
+* expensive
+* precision engineered
+
+Reduce:
+
+* feathered edge glow
+* oversized bloom
+* soft haze around containers
+
+---
+
+3. FIX THE BUY / HOLD BUTTONS
+
+---
+
+The BUY/HOLD buttons currently look generic and visually weak.
+
+Redesign ONLY the button styling while maintaining layout.
+
+Requirements:
+
+* smaller and more premium
+* cleaner typography
+* sharper borders
+* tighter padding
+* darker interiors
+* restrained glow
+
+BUY button:
+
+* subtle emerald edge
+* black interior
+* crisp highlight edge
+
+HOLD button:
+
+* muted cyan/steel tone
+* no oversized glow
+
+Buttons should feel:
+
+* institutional
+* elite
+* data-terminal quality
+
+NOT:
+
+* neon retail crypto buttons
+
+---
+
+4. ADD PREMIUM CHART SOPHISTICATION
+
+---
+
+Charts are one of the strongest premium indicators.
+
+Enhance chart quality throughout the homepage.
+
+Requirements:
+
+* sharper line rendering
+* more realistic market movement
+* smoother curves
+* subtle animated activity
+* cleaner chart spacing
+* premium anti-aliased look
+
+Add:
+
+* tiny market drift animations
+* subtle waveform motion
+* realistic candle/line rhythm
+* cleaner market telemetry feel
+
+Charts should resemble:
+
+* Bloomberg
+* TradingView premium
+* institutional fintech terminals
+
+NOT:
+
+* toy crypto widgets
+
+---
+
+5. LIVE MARKETS SECTION
+
+---
+
+Improve:
+
+* cleaner spacing
+* sharper dividers
+* better hierarchy
+* tighter typography
+
+Make this section feel:
+
+* active
+* expensive
+* real-time
+* institutional
+
+Reduce:
+
+* cyan haze
+* glow spread
+* soft blur
+
+---
+
+6. RECENT AI SIGNALS PANEL
+
+---
+
+This section should become a premium AI intelligence feed.
+
+Enhance:
+
+* confidence bars
+* row spacing
+* typography hierarchy
+* signal readability
+
+Add:
+
+* subtle confidence pulse
+* tiny live-update shimmer
+* cleaner signal telemetry feel
+
+Reduce:
+
+* glow fog
+* bloom softness
+
+Signals should feel:
+
+* intelligent
+* surgical
+* high-confidence
+
+---
+
+7. BOTTOM NAVIGATION
+
+---
+
+Current navigation still has too much softness.
+
+Refine:
+
+* sharper icons
+* darker glass
+* more OLED depth
+* cleaner active state
+* reduced bloom
+
+Active tab:
+
+* subtle cyan underline glow
+* precision highlight only
+
+Navigation should feel:
+
+* Apple fintech
+* luxury AI infrastructure
+* modern institutional mobile terminal
+
+---
+
+8. MOTION SYSTEM
+
+---
+
+Reduce visible motion intensity overall.
+
+Keep ONLY:
+
+* micro telemetry drift
+* subtle radar pulses
+* faint waveform activity
+* tiny shimmer movement
+* low-opacity AI scan motion
+
+Motion should feel:
+
+* alive
+* intelligent
+* expensive
+
+NOT:
+
+* animated dashboard
+* cyberpunk effects
+
+---
+
+9. FINAL VISUAL TARGET
+
+---
+
+The final homepage should communicate:
+
+* elite AI infrastructure
+* institutional trust
+* premium brokerage technology
+* sophisticated live trading
+* cinematic black OLED rendering
+* luxury fintech quality
+
+The attached reference image is the exact target for:
+
+* sharpness
+* glow restraint
+* black depth
+* premium rendering
+* chart sophistication
+* typography quality
+
+This is the final homepage polish pass before:
+
+* App Store submission
+* Google Play submission
+* production deployment
+* public release
