@@ -1,0 +1,161 @@
+The foundation is good now, but the Home screen still feels too empty and static compared to the premium cinematic AI trading experience we originally designed.
+
+The current version needs:
+
+more visual intensity
+stronger hierarchy
+more movement
+better telemetry density
+more “AI system” atmosphere
+larger premium hero section
+more immersive signal activity
+more futuristic polish
+
+The attached screenshots are the CURRENT implementation.
+Now we need to elevate the Home page into a true premium AI trading experience.
+
+Please focus ONLY on the HOME SCREEN in this pass.
+
+HOME SCREEN IMPROVEMENT PASS:
+
+HERO SECTION UPGRADE
+The top hero area should feel like a live AI system — not a static finance card.
+
+Improve:
+
+animated glow gradients
+subtle moving background particles/grid
+dynamic AI pulse effects
+stronger cyan glow around “APEX TRADER”
+better depth layering
+animated LIVE status pulse
+
+Add:
+
+subtle animated market wave behind the portfolio card
+floating telemetry particles
+dynamic scanning-line effect
+
+The app should feel ALIVE.
+
+PORTFOLIO CARD — MAKE IT PREMIUM
+Current card feels too flat and empty.
+
+Improve:
+
+glassmorphism depth
+stronger neon edge glow
+layered shadows
+animated unrealized P&L pulse
+animated percentage ticker
+live updating feeling
+
+Increase:
+
+spacing precision
+typography hierarchy
+premium visual weight
+
+The $100.0K should dominate visually.
+
+STATS CARDS — MAKE THEM LOOK HIGH-END
+Current:
+too static
+too simple
+too much empty space
+
+Improve:
+
+animated number counting
+soft glow transitions
+active-state lighting
+better contrast
+more futuristic typography
+
+Cards should feel like:
+institutional AI telemetry modules.
+
+AI ENGINE STATUS SECTION
+This section should become a major visual centerpiece.
+
+Add:
+
+animated AI pulse
+live scanning indicator
+confidence waveform
+rotating micro telemetry indicators
+“AI ACTIVE” visual motion
+better KRKN/Exchange badge design
+subtle real-time glow fluctuations
+
+Make it feel:
+like a real AI trading engine is monitoring the market.
+
+LIVE MARKETS SECTION
+Current market cards are too plain.
+
+Improve:
+
+live micro charts inside each card
+animated price movement
+glowing buy/hold indicators
+subtle motion
+more premium spacing
+
+Add:
+
+BTC mini sparkline
+ETH mini sparkline
+SOL mini sparkline
+RECENT AI SIGNALS SECTION
+This section currently feels unfinished.
+
+It should become:
+the emotional core of the app.
+
+Add:
+
+animated confidence bars
+signal pulse effects
+timestamps
+mini directional indicators
+scrolling/live-feed feeling
+more rows visible
+active telemetry motion
+
+Make it feel:
+like the AI is continuously scanning and generating opportunities.
+
+OVERALL VISUAL GOAL
+The Home screen should feel like:
+Bloomberg Terminal + Apple UI + AI Operating System
+cinematic
+neon
+institutional
+immersive
+premium fintech
+high-end AI infrastructure
+
+NOT:
+
+generic crypto dashboard
+basic finance UI
+template app
+IMPORTANT
+Keep:
+the existing layout structure
+the approved color palette
+the approved typography style
+the approved navigation
+
+We are polishing and elevating the approved design — not redesigning it.
+
+Focus:
+visual richness
+motion
+depth
+premium feel
+AI atmosphere
+telemetry immersion
+
+Only improve the Home screen in this pass.

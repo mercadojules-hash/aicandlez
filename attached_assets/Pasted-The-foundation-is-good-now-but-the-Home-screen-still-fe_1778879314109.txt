@@ -1,0 +1,220 @@
+The foundation is good now, but the Home screen still feels too empty and static compared to the premium cinematic AI trading experience we originally designed.
+
+IMPORTANT PRODUCT DIRECTION BEFORE CONTINUING:
+
+The mobile app is a CUSTOMER-FACING AI trading platform.
+
+Core business model:
+
+* Paper trading is ALWAYS FREE
+* Users can explore the app freely in simulation mode
+* Users can paper trade without paying
+* LIVE AI TRADING requires:
+
+  1. $5.99/month subscription
+  2. acceptance of terms/disclaimer
+  3. 2% performance fee ONLY on profitable CLOSED trades
+
+The user should NEVER feel forced into a paywall immediately.
+
+The UX flow should feel:
+
+* premium
+* exciting
+* frictionless
+* AI-assisted
+* confidence-building
+
+The monetization trigger happens ONLY when the user attempts to activate LIVE AI trading.
+
+The “Go Live” / “Activate AI Trading” experience should feel:
+
+* important
+* premium
+* secure
+* institutional
+* trustworthy
+
+NOT:
+
+* spammy
+* crypto-scammy
+* aggressive
+* cheap
+* pop-up heavy
+
+IMPORTANT:
+The app currently only supports a limited set of live exchanges:
+
+* Kraken
+* Coinbase
+* Binance
+* Crypto.com
+* Gemini
+
+Other exchanges remain:
+“Coming Soon”
+
+Now for the HOME SCREEN polish pass:
+
+1. HERO SECTION UPGRADE
+   The top hero area should feel like a live AI system — not a static finance card.
+
+Improve:
+
+* animated glow gradients
+* subtle moving background particles/grid
+* dynamic AI pulse effects
+* stronger cyan glow around “APEX TRADER”
+* better depth layering
+* animated LIVE status pulse
+
+Add:
+
+* subtle animated market wave behind the portfolio card
+* floating telemetry particles
+* dynamic scanning-line effect
+
+The app should feel ALIVE.
+
+2. PORTFOLIO CARD — MAKE IT PREMIUM
+   Current card feels too flat and empty.
+
+Improve:
+
+* glassmorphism depth
+* stronger neon edge glow
+* layered shadows
+* animated unrealized P&L pulse
+* animated percentage ticker
+* live updating feeling
+
+Increase:
+
+* spacing precision
+* typography hierarchy
+* premium visual weight
+
+The $100.0K should dominate visually.
+
+Also visually distinguish:
+
+* FREE simulation mode
+* LIVE AI mode
+
+The user should always understand:
+they are currently paper trading safely for free.
+
+3. STATS CARDS — MAKE THEM LOOK HIGH-END
+   Current:
+
+* too static
+* too simple
+* too much empty space
+
+Improve:
+
+* animated number counting
+* soft glow transitions
+* active-state lighting
+* better contrast
+* more futuristic typography
+
+Cards should feel like:
+institutional AI telemetry modules.
+
+4. AI ENGINE STATUS SECTION
+   This section should become a major visual centerpiece.
+
+Add:
+
+* animated AI pulse
+* live scanning indicator
+* confidence waveform
+* rotating micro telemetry indicators
+* “AI ACTIVE” visual motion
+* better exchange badge design
+* subtle real-time glow fluctuations
+
+Make it feel:
+like a real AI trading engine is monitoring the market.
+
+5. LIVE MARKETS SECTION
+   Current market cards are too plain.
+
+Improve:
+
+* live micro charts inside each card
+* animated price movement
+* glowing buy/hold indicators
+* subtle motion
+* more premium spacing
+
+Add:
+
+* BTC mini sparkline
+* ETH mini sparkline
+* SOL mini sparkline
+
+6. RECENT AI SIGNALS SECTION
+   This section currently feels unfinished.
+
+It should become:
+the emotional core of the app.
+
+Add:
+
+* animated confidence bars
+* signal pulse effects
+* timestamps
+* mini directional indicators
+* scrolling/live-feed feeling
+* more rows visible
+* active telemetry motion
+
+Make it feel:
+like the AI is continuously scanning and generating opportunities.
+
+7. “GO LIVE” EXPERIENCE
+   The Home screen should eventually support:
+
+* a premium “Activate Live AI Trading” CTA
+* NOT an aggressive subscription button
+
+When tapped:
+
+* explain the benefits of LIVE AI trading
+* explain supported exchanges
+* explain the $5.99/month platform fee
+* explain the 2% profitable-trade fee
+* explain that losing trades are NOT charged
+* explain that paper trading remains free forever
+
+This should feel:
+premium, institutional, trustworthy.
+
+8. OVERALL VISUAL GOAL
+   The Home screen should feel like:
+
+* Bloomberg Terminal + Apple UI + AI Operating System
+* cinematic
+* neon
+* institutional
+* immersive
+* premium fintech
+* high-end AI infrastructure
+
+NOT:
+
+* generic crypto dashboard
+* basic finance UI
+* template app
+
+Keep:
+
+* existing layout structure
+* approved color palette
+* approved typography
+* approved navigation
+
+We are elevating the approved design system — not redesigning it.
