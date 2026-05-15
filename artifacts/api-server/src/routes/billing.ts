@@ -16,12 +16,23 @@ type AuthReq = Request & { clerkUserId: string };
 
 // ── Plan definitions (mirrors Stripe product metadata) ────────────────────────
 
+// ── Monetization model ────────────────────────────────────────────────────────
+// $5.99/month membership — covers platform access, infrastructure, AI compute.
+// PLUS 2% performance fee on PROFITABLE CLOSED trades only.
+//   • No fee on losing trades.
+//   • No fee on unrealized PnL.
+//   • Membership and performance fee are disclosed and accepted at onboarding.
+
+export const MEMBERSHIP_PRICE_USD   = 5.99;
+export const PERFORMANCE_FEE_RATE   = 0.02;
+
 export const PLAN_FEATURES: Record<string, {
   name:          string;
   price_monthly: number | null;
   price_yearly:  number | null;
   description:   string;
   features:      string[];
+  performanceFee?: number;
   limits: {
     exchanges:  number | string;
     positions:  number | string;
@@ -30,7 +41,7 @@ export const PLAN_FEATURES: Record<string, {
   };
 }> = {
   free: {
-    name: "Free",
+    name:          "Free",
     price_monthly: 0,
     price_yearly:  0,
     description:   "Paper trading, 1 exchange, core signals",
@@ -44,11 +55,31 @@ export const PLAN_FEATURES: Record<string, {
     ],
     limits: { exchanges: 1, positions: 3, trades: 5, liveTrading: false },
   },
+  starter: {
+    name:           "Starter",
+    price_monthly:  599,   // $5.99 in cents (Stripe standard)
+    price_yearly:   5990,  // $59.90/yr — 2 months free
+    description:    "Platform access + live trading. 2% performance fee on profitable closed trades only.",
+    performanceFee: PERFORMANCE_FEE_RATE,
+    features: [
+      "Live trading enabled",
+      "Up to 3 exchange connections",
+      "Up to 10 active positions",
+      "50 trades/day",
+      "Full MTF signal engine",
+      "AI confidence engine",
+      "90-day backtest history",
+      "2% performance fee on profitable trades only",
+      "No fee on losing trades",
+    ],
+    limits: { exchanges: 3, positions: 10, trades: 50, liveTrading: true },
+  },
   pro: {
-    name: "Pro",
-    price_monthly: 4900,
-    price_yearly:  49000,
-    description:   "Live trading, unlimited signals, advanced analytics",
+    name:           "Pro",
+    price_monthly:  4900,
+    price_yearly:   49000,
+    description:    "Live trading, unlimited signals, advanced analytics. 2% performance fee on profitable closed trades only.",
+    performanceFee: PERFORMANCE_FEE_RATE,
     features: [
       "Live trading enabled",
       "Up to 5 exchange connections",
@@ -58,14 +89,16 @@ export const PLAN_FEATURES: Record<string, {
       "Copy trading",
       "2-year backtest history",
       "Priority API access",
+      "2% performance fee on profitable trades only",
     ],
     limits: { exchanges: 5, positions: 50, trades: "unlimited", liveTrading: true },
   },
   enterprise: {
-    name: "Enterprise",
-    price_monthly: 14900,
-    price_yearly:  149000,
-    description:   "Unlimited everything, priority support, multi-account",
+    name:           "Enterprise",
+    price_monthly:  14900,
+    price_yearly:   149000,
+    description:    "Unlimited everything, priority support, multi-account. 2% performance fee on profitable closed trades only.",
+    performanceFee: PERFORMANCE_FEE_RATE,
     features: [
       "Everything in Pro",
       "Unlimited exchange connections",
@@ -75,6 +108,7 @@ export const PLAN_FEATURES: Record<string, {
       "Dedicated support",
       "Advanced analytics",
       "Unlimited backtest history",
+      "2% performance fee on profitable trades only",
     ],
     limits: { exchanges: "unlimited", positions: "unlimited", trades: "unlimited", liveTrading: true },
   },

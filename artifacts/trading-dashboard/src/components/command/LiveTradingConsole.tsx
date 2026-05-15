@@ -409,14 +409,19 @@ function LiveAssetIntelPanel({ engine }: { engine?: EngineStatus }) {
             AI MICROSTRUCTURE
           </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 7, fontFamily: "monospace",
-            color: pressureLast > 50 ? "#00f0ff55" : "#ff9d3a55",
+            color: pressureLast > 50 ? "#00f0ff50" : "#ff9d3a50",
             letterSpacing: "0.1em" }}>
-            {pressureDir} PRESSURE
+            {pressureDir}
           </span>
-          <span style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700,
-            color: "#2a4050", letterSpacing: "0.08em" }}>
+          <span style={{
+            fontSize: 17, fontFamily: "monospace", fontWeight: 700,
+            color: "#e8f8ff",
+            letterSpacing: "0.04em",
+            textShadow: "0 0 10px #00f0ff50, 0 0 2px #00f0ff30",
+            lineHeight: 1,
+          }}>
             {activeSym}
           </span>
         </div>

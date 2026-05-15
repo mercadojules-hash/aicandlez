@@ -1,17 +1,84 @@
-const PLATFORM_FEE_RATE = 0.03;
+import { db } from "@workspace/db";
+import { performanceFeesTable } from "@workspace/db";
+
+// ── Performance fee constants ─────────────────────────────────────────────────
+// Fee is ONLY charged on realized, closed, PROFITABLE trades.
+// Losing trades: NO FEE.  Unrealized PnL: NO FEE.
+
+export const PERFORMANCE_FEE_RATE = 0.02; // 2%
 
 export interface FeeEntry {
   id:             string;
   tradeId:        string;
+  userId:         string;
+  exchange:       string;
   symbol:         string;
   side:           string;
-  tradeAmountUSD: number;
+  realizedPnl:    number;
   feeUSD:         number;
+  isPaper:        boolean;
   timestamp:      number;
 }
 
+// In-memory cache (for the legacy /fees route while DB is authoritative source)
 const _entries: FeeEntry[] = [];
 let   _totalCollected = 0;
+
+// ── recordPerformanceFee ──────────────────────────────────────────────────────
+// Called when a trade closes with a POSITIVE realized PnL.
+// Persists to DB and caches in-memory.
+// MUST NOT be called for losing trades — caller is responsible for the guard.
+
+export async function recordPerformanceFee(params: {
+  tradeId:    string;
+  userId:     string;
+  exchange:   string;
+  symbol:     string;
+  side:       string;
+  realizedPnl: number;   // must be > 0
+  isPaper:    boolean;
+}): Promise<FeeEntry> {
+  const feeUSD = parseFloat((params.realizedPnl * PERFORMANCE_FEE_RATE).toFixed(6));
+  const id     = `PFEE-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+  const entry: FeeEntry = {
+    id,
+    tradeId:     params.tradeId,
+    userId:      params.userId,
+    exchange:    params.exchange,
+    symbol:      params.symbol,
+    side:        params.side,
+    realizedPnl: params.realizedPnl,
+    feeUSD,
+    isPaper:     params.isPaper,
+    timestamp:   Date.now(),
+  };
+
+  // Persist to DB (fire-and-forget — never block the trade close response)
+  db.insert(performanceFeesTable).values({
+    id,
+    userId:           params.userId,
+    tradeId:          params.tradeId,
+    exchange:         params.exchange,
+    symbol:           params.symbol,
+    side:             params.side,
+    realizedPnl:      params.realizedPnl,
+    feeRate:          PERFORMANCE_FEE_RATE,
+    feeAmountUsd:     feeUSD,
+    settlementStatus: "pending",
+    isPaper:          params.isPaper,
+  }).catch(() => {
+    // DB write failure must not affect trade execution
+  });
+
+  _entries.push(entry);
+  _totalCollected += feeUSD;
+  return entry;
+}
+
+// ── Legacy sync helper (kept for the existing /api/fees routes) ───────────────
+// For backwards-compat: the old recordFee() was sync and didn't need a userId.
+// New code should use recordPerformanceFee() above.
 
 export function recordFee(params: {
   tradeId:   string;
@@ -19,15 +86,18 @@ export function recordFee(params: {
   side:      string;
   amountUSD: number;
 }): FeeEntry {
-  const feeUSD = parseFloat((params.amountUSD * PLATFORM_FEE_RATE).toFixed(4));
+  const feeUSD = parseFloat((params.amountUSD * PERFORMANCE_FEE_RATE).toFixed(6));
   const entry: FeeEntry = {
-    id:             `FEE-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
-    tradeId:        params.tradeId,
-    symbol:         params.symbol,
-    side:           params.side,
-    tradeAmountUSD: params.amountUSD,
+    id:          `PFEE-LEGACY-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+    tradeId:     params.tradeId,
+    userId:      "system",
+    exchange:    "unknown",
+    symbol:      params.symbol,
+    side:        params.side,
+    realizedPnl: params.amountUSD,
     feeUSD,
-    timestamp:      Date.now(),
+    isPaper:     true,
+    timestamp:   Date.now(),
   };
   _entries.push(entry);
   _totalCollected += feeUSD;
@@ -38,7 +108,7 @@ export function getFeeSummary() {
   return {
     totalFeesCollected: parseFloat(_totalCollected.toFixed(4)),
     tradeCount:         _entries.length,
-    feeRatePct:         PLATFORM_FEE_RATE * 100,
+    feeRatePct:         PERFORMANCE_FEE_RATE * 100,
     recentFees:         [..._entries].reverse().slice(0, 10),
   };
 }

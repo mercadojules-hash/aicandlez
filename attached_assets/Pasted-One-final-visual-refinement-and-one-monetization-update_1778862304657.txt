@@ -1,0 +1,129 @@
+One final visual refinement and one monetization update.
+
+━━━━━━━━━━━━━━━━━━━
+
+1. RIGHT-SIDE MICROSTRUCTURE PANEL
+   ━━━━━━━━━━━━━━━━━━━
+
+The new microstructure panel is MUCH better.
+
+The confidence hierarchy, flow rendering, glow, and institutional feel are finally correct.
+
+However:
+
+The ASSET NAME is now too small and difficult to read.
+
+Current issue:
+
+* ticker/asset label visually disappears
+* weak hierarchy
+* operator cannot instantly identify the active asset
+* the larger confidence number now overpowers the symbol label
+
+Please increase:
+
+* asset ticker font size
+* symbol visibility
+* brightness
+* hierarchy weight
+
+Examples:
+BTC/USD
+ETH/USD
+ADA/USD
+
+should be:
+
+* instantly readable
+* bold
+* clean
+* premium
+* high-contrast
+
+Suggested:
+
+* 15px–18px
+* semibold/bold
+* brighter cyan/white
+* stronger spacing
+* clearer positioning in header
+
+The active asset should immediately stand out when scanning the dashboard.
+
+━━━━━━━━━━━━━━━━━━━
+2. MEMBERSHIP + DISCLAIMER UPDATE
+━━━━━━━━━━━━━━━━━━━
+
+We are officially adding:
+
+$5.99/month membership
+
+This is NOT replacing the performance fee model.
+
+The membership covers:
+
+* platform access
+* infrastructure costs
+* admin costs
+* AI compute/orchestration overhead
+
+The monetization model is now:
+
+MONTHLY MEMBERSHIP:
+$5.99/month
+
+PLUS:
+2% performance fee ONLY on profitable CLOSED trades.
+
+━━━━━━━━━━━━━━━━━━━
+DISCLAIMER / USER CONSENT
+━━━━━━━━━━━━━━━━━━━
+
+This must be clearly disclosed during onboarding.
+
+User must explicitly accept:
+
+* monthly membership fee
+* performance fee model
+* only profitable realized trades incur performance fee
+* no fee on losing trades
+* no fee on unrealized profit
+
+━━━━━━━━━━━━━━━━━━━
+ADMIN CONSOLE / DASHBOARD
+━━━━━━━━━━━━━━━━━━━
+
+Please prepare architecture for:
+
+MEMBERSHIP ANALYTICS
+
+* active subscriptions
+* monthly recurring revenue
+* failed payments
+* churn
+* active AI users
+
+PLUS:
+PERFORMANCE FEE ANALYTICS
+
+* realized profitable volume
+* fees generated
+* pending settlements
+* exchange fee totals
+* top profitable users
+
+This does NOT need final UI yet.
+
+But the backend data structure should be prepared now while architecture is being finalized.
+
+━━━━━━━━━━━━━━━━━━━
+FINAL NOTE
+━━━━━━━━━━━━━━━━━━━
+
+The platform is now transitioning from:
+“advanced prototype”
+
+into:
+“deployable AI trading infrastructure.”
+
+The dashboard is finally reaching institutional quality.

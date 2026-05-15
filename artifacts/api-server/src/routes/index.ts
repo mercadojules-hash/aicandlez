@@ -31,6 +31,8 @@ import userNotificationsRouter from "./userNotifications.js";
 import alpacaPaperRouter from "./alpacaPaper.js";
 import userExchangesRouter from "./userExchanges.js";
 import billingRouter from "./billing.js";
+import adminAnalyticsRouter from "./adminAnalytics.js";
+import userConsentRouter from "./userConsent.js";
 
 const router: IRouter = Router();
 
@@ -41,6 +43,8 @@ router.use(userSettingsRouter);
 router.use(userNotificationsRouter);
 router.use(userExchangesRouter);
 router.use(billingRouter);
+router.use(adminAnalyticsRouter);
+router.use(userConsentRouter);
 router.use(signalsRouter);
 router.use(tradesRouter);
 router.use(portfolioRouter);

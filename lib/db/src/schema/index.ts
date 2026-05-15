@@ -9,3 +9,5 @@ export * from "./simPositions";
 export * from "./simTrades";
 export * from "./userNotifications";
 export * from "./userExchangeConnections";
+export * from "./performanceFees";
+export * from "./userConsents";

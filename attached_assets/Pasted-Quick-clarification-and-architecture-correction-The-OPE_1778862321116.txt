@@ -1,0 +1,165 @@
+Quick clarification and architecture correction.
+
+The OPERATOR DASHBOARD is ADMIN ONLY.
+
+This dashboard is NOT customer-facing.
+
+Users will NEVER see:
+
+* operator telemetry
+* fee analytics
+* orchestration metrics
+* admin revenue
+* platform intelligence
+* execution telemetry
+* backend AI activity
+
+This dashboard is strictly:
+ADMIN / OPERATOR INFRASTRUCTURE
+
+Used by:
+
+* me
+* internal admin monitoring
+* AI orchestration oversight
+* revenue monitoring
+* user activity monitoring
+* exchange monitoring
+* execution monitoring
+
+━━━━━━━━━━━━━━━━━━━
+USER FLOW (APP SIDE)
+━━━━━━━━━━━━━━━━━━━
+
+The user experience is:
+
+1. User downloads the app
+2. User paper trades for free
+3. User tests AI trader
+4. If user wants LIVE AI trading:
+
+   * they must accept terms/disclaimer
+   * they must connect a supported exchange
+   * they must activate subscription
+5. Stripe charges:
+   $5.99/month
+
+That fee covers:
+
+* infrastructure
+* AI compute
+* orchestration
+* admin costs
+
+━━━━━━━━━━━━━━━━━━━
+PERFORMANCE FEES
+━━━━━━━━━━━━━━━━━━━
+
+Performance fee tracking remains INTERNAL.
+
+The backend should still track:
+
+* profitable closed trades
+* realized PnL
+* performance fee calculations
+* exchange breakdown
+* user profitability
+
+But this data is:
+ADMIN ONLY.
+
+Displayed ONLY inside:
+
+* operator dashboard
+* admin console
+* internal analytics
+
+NOT in the customer app UI.
+
+━━━━━━━━━━━━━━━━━━━
+STRIPE / SUBSCRIPTION TRACKING
+━━━━━━━━━━━━━━━━━━━
+
+Please prepare backend architecture for:
+
+SUBSCRIPTION ANALYTICS
+inside the admin dashboard.
+
+Track:
+
+* active subscribers
+* monthly recurring revenue
+* Stripe payments received
+* failed payments
+* cancellations
+* trial users
+* exchange connected users
+* users converted from paper trading → live trading
+
+This should appear inside:
+ADMIN / OPERATOR METRICS
+
+Again:
+NOT customer-facing.
+
+━━━━━━━━━━━━━━━━━━━
+SUPPORTED EXCHANGES STRATEGY
+━━━━━━━━━━━━━━━━━━━
+
+Correct.
+
+The more exchanges supported:
+
+* the larger the onboarding funnel
+* the less user friction
+* the higher conversion rate
+
+Because users may only use:
+
+* Robinhood
+* Uphold
+* Coinbase
+* Kraken
+* Gemini
+* Crypto.com
+* Binance
+* Alpaca
+* Bybit
+* KuCoin
+  etc.
+
+The goal is:
+“Connect the exchange you already use.”
+
+NOT:
+“Go open a new exchange.”
+
+That is a major growth advantage.
+
+━━━━━━━━━━━━━━━━━━━
+FINAL UI REFINEMENT
+━━━━━━━━━━━━━━━━━━━
+
+The new right-side microstructure panel is excellent now.
+
+Only remaining visual refinement:
+
+Increase ACTIVE ASSET LABEL readability.
+
+Current asset ticker text is too small.
+
+Please:
+
+* enlarge asset symbol/ticker
+* increase brightness
+* stronger hierarchy
+* clearer spacing
+
+Example:
+BTC/USD
+ETH/USD
+ADA/USD
+
+should immediately stand out visually when scanning the dashboard.
+
+Everything else is moving in the correct direction.
