@@ -57,14 +57,14 @@ function AIWave({ color=G, bars=14 }: { color?:string; bars?:number }) {
   );
 }
 
-// ── Confidence bar ────────────────────────────────────────────────────────────
+// ── Confidence bar (animated fill + living pulse) ─────────────────────────────
 function ConfBar({ value, color, delay="0s" }: { value:number; color:string; delay?:string }) {
   return (
-    <div style={{ height:2.5, background:"#0e0e14", borderRadius:2, overflow:"hidden" }}>
+    <div style={{ height:3, background:"#0a0a12", borderRadius:2, overflow:"hidden" }}>
       <div style={{
         height:"100%", background:color, borderRadius:2,
-        width:`${value}%`, boxShadow:`0 0 8px ${color}80`,
-        animation:`bar-in 0.8s ${delay} ease-out both`,
+        width:`${value}%`, boxShadow:`0 0 8px ${color}90`,
+        animation:`bar-in 0.8s ${delay} ease-out both, bar-breathe 3s ${delay} ease-in-out 0.8s infinite`,
       }}/>
     </div>
   );
@@ -180,25 +180,30 @@ export default function Home() {
         {/* ── Telemetry ticker ────────────────────────────────────────────────── */}
         <Ticker items={tickerItems}/>
 
-        {/* ── User identity bar ───────────────────────────────────────────────── */}
+        {/* ── User identity bar — unified control strip ───────────────────────── */}
         <div style={{
-          display:"flex", alignItems:"center", gap:12, padding:"12px 18px 0",
+          display:"flex", alignItems:"center", gap:12,
+          padding:"12px 14px 10px",
+          background:"rgba(0,229,255,0.02)",
+          borderBottom:"1px solid rgba(0,229,255,0.07)",
         }}>
           {/* Avatar */}
           <div onClick={()=>setLocation("/profile")} style={{
-            width:38, height:38, borderRadius:"50%", flexShrink:0, cursor:"pointer",
-            background:"#0a0a14",
-            border:`1.5px solid ${C}55`,
+            width:40, height:40, borderRadius:"50%", flexShrink:0, cursor:"pointer",
+            background:"#08080e",
+            border:`1.5px solid ${C}60`,
             display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:11, fontFamily:"monospace", fontWeight:900, color:C,
-            boxShadow:`0 0 16px ${C}25, inset 0 0 8px ${C}08`,
+            fontSize:12, fontFamily:"monospace", fontWeight:900, color:C,
+            boxShadow:`0 0 20px ${C}30, inset 0 0 10px ${C}08`,
             position:"relative",
+            animation:"avatar-glow 4s ease-in-out infinite",
           }}>
             {initials.toUpperCase()}
             <div style={{
-              position:"absolute", bottom:0, right:0,
-              width:9, height:9, borderRadius:"50%", background:G,
-              border:`2px solid ${BG}`, boxShadow:`0 0 8px ${G}`,
+              position:"absolute", bottom:1, right:1,
+              width:10, height:10, borderRadius:"50%", background:G,
+              border:`2px solid ${BG}`, boxShadow:`0 0 10px ${G}`,
+              animation:"dot-pulse 2s ease-in-out infinite",
             }}/>
           </div>
 
@@ -207,65 +212,73 @@ export default function Home() {
             <div style={{
               fontSize:13, fontFamily:"monospace", fontWeight:800, color:W,
               overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+              letterSpacing:"0.01em",
             }}>
               {displayName}
             </div>
-            <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:3 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:4 }}>
               <span style={{
-                padding:"1px 7px", borderRadius:3,
-                background:`${pColor}18`, border:`1px solid ${pColor}45`,
+                padding:"2px 8px", borderRadius:3,
+                background:`${pColor}18`, border:`1px solid ${pColor}50`,
                 fontSize:7, fontFamily:"monospace", fontWeight:800,
-                color:pColor, letterSpacing:"0.12em",
-                boxShadow:`0 0 8px ${pColor}20`,
+                color:pColor, letterSpacing:"0.14em",
+                boxShadow:`0 0 10px ${pColor}25`,
               }}>
                 {pLabel}
               </span>
-              <span style={{ fontSize:7, fontFamily:"monospace", color:DIM }}>{exchange}</span>
+              <span style={{ fontSize:7, fontFamily:"monospace", color:DIM, letterSpacing:"0.08em" }}>
+                {exchange}
+              </span>
             </div>
           </div>
 
           {/* Mode + heartbeat */}
           <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
             <div style={{
-              padding:"3px 10px",
-              border:`1px solid ${isLive ? G+"55" : C+"40"}`,
+              padding:"4px 11px",
+              border:`1px solid ${isLive ? G+"60" : C+"45"}`,
               borderRadius:4,
-              background: isLive ? "#002210" : "#001a22",
+              background: isLive ? "#001a0a" : "#00141e",
               fontSize:8, fontFamily:"monospace", fontWeight:800,
-              color: isLive ? G : C, letterSpacing:"0.12em",
-              boxShadow: isLive ? `0 0 10px ${G}20` : `0 0 10px ${C}15`,
+              color: isLive ? G : C, letterSpacing:"0.14em",
+              boxShadow: isLive ? `0 0 12px ${G}25` : `0 0 12px ${C}20`,
               animation:"badge-glow 3s ease-in-out infinite",
             }}>
               {isLive ? "LIVE" : "SIM"}
             </div>
-            {/* AI heartbeat */}
-            <div style={{ position:"relative", width:16, height:16, flexShrink:0 }}>
-              <div style={{ width:8, height:8, borderRadius:"50%", background:G, margin:"4px",
-                boxShadow:`0 0 10px ${G}`, animation:"dot-pulse 2s ease-in-out infinite" }}/>
+            {/* AI heartbeat — larger, brighter */}
+            <div style={{ position:"relative", width:20, height:20, flexShrink:0 }}>
+              <div style={{ width:10, height:10, borderRadius:"50%", background:G, margin:"5px",
+                boxShadow:`0 0 14px ${G}, 0 0 6px ${G}`, animation:"dot-pulse 2s ease-in-out infinite" }}/>
               <div style={{ position:"absolute", inset:0, borderRadius:"50%",
-                border:`1px solid ${G}40`, animation:"ring-out 2.5s ease-out infinite" }}/>
+                border:`1px solid ${G}50`, animation:"ring-out 2s ease-out infinite" }}/>
+              <div style={{ position:"absolute", inset:0, borderRadius:"50%",
+                border:`1px solid ${G}25`, animation:"ring-out 2s ease-out 0.6s infinite" }}/>
             </div>
           </div>
         </div>
 
         {/* ── Brand ───────────────────────────────────────────────────────────── */}
-        <div style={{ padding:"8px 20px 14px" }}>
+        <div style={{ padding:"10px 14px 14px" }}>
           <div style={{
-            fontSize:28, fontWeight:900, fontFamily:"monospace", letterSpacing:"-0.01em",
-            background:`linear-gradient(90deg, ${W} 0%, ${C} 55%, ${G} 100%)`,
+            fontSize:34, fontWeight:900, fontFamily:"monospace", letterSpacing:"-0.02em",
+            background:`linear-gradient(90deg, ${W} 0%, ${W} 32%, ${C} 52%, ${G} 100%)`,
             WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+            filter:"drop-shadow(0 0 24px rgba(0,229,255,0.25))",
             animation:"title-glow 5s ease-in-out infinite",
           }}>
             APEX TRADER
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:3 }}>
-            <span style={{ fontSize:8, fontFamily:"monospace", color:DIM, letterSpacing:"0.12em" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:4 }}>
+            <div style={{ width:5, height:5, borderRadius:"50%", background:G, flexShrink:0,
+              boxShadow:`0 0 8px ${G}`, animation:"dot-pulse 2s ease-in-out infinite" }}/>
+            <span style={{ fontSize:8, fontFamily:"monospace", color:GR, letterSpacing:"0.12em" }}>
               AI ENGINE ACTIVE · {isLive ? "LIVE MODE" : "SIMULATION MODE"} · {exchange}
             </span>
           </div>
         </div>
 
-        <div style={{ padding:"0 16px" }}>
+        <div style={{ padding:"0 12px" }}>
 
           {/* ── PORTFOLIO EQUITY — cinematic hero card ───────────────────────── */}
           <div style={{
@@ -287,8 +300,15 @@ export default function Home() {
             {/* Top edge laser — most prominent glow element */}
             <div aria-hidden style={{
               position:"absolute", top:0, left:0, right:0, height:1,
-              background:`linear-gradient(90deg, transparent 5%, ${C}80 40%, ${G}60 60%, transparent 95%)`,
+              background:`linear-gradient(90deg, transparent 5%, ${C}95 38%, ${G}80 55%, ${C}95 72%, transparent 95%)`,
               animation:"edge-sweep 5s ease-in-out infinite",
+              boxShadow:`0 0 12px ${C}60`,
+            }}/>
+            {/* Second laser — subtler, offset */}
+            <div aria-hidden style={{
+              position:"absolute", top:0, left:0, right:0, height:6,
+              background:`linear-gradient(180deg, ${C}12, transparent)`,
+              animation:"edge-sweep 5s ease-in-out 0.3s infinite",
             }}/>
 
             {/* Holographic shimmer */}
@@ -822,6 +842,8 @@ export default function Home() {
         @keyframes stat-glow     { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.25)} }
         @keyframes cta-glow      { 0%,100%{box-shadow:0 0 28px ${C}18,inset 0 1px 0 rgba(0,229,255,.15)} 50%{box-shadow:0 0 44px ${C}35,inset 0 1px 0 rgba(0,229,255,.25)} }
         @keyframes ticker-scroll { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+        @keyframes bar-breathe   { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.5)} }
+        @keyframes avatar-glow   { 0%,100%{box-shadow:0 0 20px ${C}30,inset 0 0 10px ${C}08} 50%{box-shadow:0 0 28px ${C}50,inset 0 0 14px ${C}12} }
       `}</style>
     </div>
   );

@@ -1,0 +1,109 @@
+This is MUCH closer to the approved Apex AI visual identity.
+
+The restored OLED-black atmosphere and isolated neon glow treatment dramatically improved the premium feel.
+
+The app now feels:
+
+* cinematic
+* institutional
+* high-end
+* futuristic
+* trustworthy
+
+Excellent direction.
+
+Now we are entering refinement phase — NOT redesign phase.
+
+Do NOT add excessive gradients, glows, or effects from this point forward.
+
+Focus on:
+
+* spacing refinement
+* typography hierarchy
+* motion polish
+* immersion
+* subtle realtime energy
+
+Main refinements needed:
+
+1. Content width / immersion:
+   The center content column is still slightly too narrow.
+
+Please:
+
+* reduce side padding slightly
+* widen primary cards slightly
+* let the UI breathe edge-to-edge more naturally
+
+Current layout still feels slightly compressed vertically.
+
+The app should feel:
+native premium mobile OS,
+not a webpage inside a phone frame.
+
+2. Header / identity refinement:
+   The top section is MUCH improved but still needs more presence.
+
+Increase:
+
+* APEX TRADER visual dominance
+* cyan contrast on “TRADER”
+* spacing hierarchy
+* subtle header glow atmosphere
+
+The live pulse indicator should be slightly larger and brighter.
+
+User identity should feel premium:
+
+* avatar
+* name
+* plan badge
+* SIM/LIVE badge
+* exchange indicator
+
+should visually read as one elite control layer.
+
+3. Live system energy:
+   The UI still needs slightly more realtime AI energy.
+
+Add very subtle:
+
+* telemetry motion
+* waveform activity
+* ticker drift
+* confidence pulse movement
+* AI scan flickers
+
+Very restrained.
+Very cinematic.
+
+Think:
+luxury AI operating system.
+
+NOT:
+flashy crypto UI.
+
+4. Portfolio card:
+   The portfolio card is now strong.
+
+Only refine:
+
+* subtle live shimmer motion
+* deeper glass feel
+* cleaner typography spacing
+* stronger edge glow precision
+
+No redesign needed.
+
+5. Maintain visual discipline:
+   The current black/neon balance is finally correct.
+
+Protect:
+
+* deep black backgrounds
+* isolated glow edges
+* restrained gradients
+* premium typography
+* cinematic spacing
+
+The visual direction is now VERY close to production quality.
