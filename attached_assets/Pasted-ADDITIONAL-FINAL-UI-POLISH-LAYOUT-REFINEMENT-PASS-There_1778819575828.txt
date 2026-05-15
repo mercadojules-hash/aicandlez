@@ -1,0 +1,114 @@
+ADDITIONAL FINAL UI POLISH + LAYOUT REFINEMENT PASS
+
+There are several final visual/layout refinements needed for institutional polish and operator readability before deployment.
+
+====================================================
+
+1. ENLARGE EXCHANGE CONTROLS ABOVE ACTIVITY HUB
+   ====================================================
+
+The exchange/trading mode controls above the AI User Activity Hub need to become more visually dominant and easier to operate.
+
+CURRENT ISSUE:
+The controls feel too compressed and visually understated relative to their operational importance.
+
+REQUIRED:
+
+* increase overall control size
+* increase spacing between exchanges
+* improve readability
+* slightly increase typography size
+* improve glow/active state visibility
+* make active exchange state more obvious
+* improve click target size
+
+The exchange orchestration layer should feel:
+
+* important
+* institutional
+* central to platform operation
+
+NOT small secondary buttons.
+
+====================================================
+2. REDUCE SIZE OF LOWER TELEMETRY BOXES
+=======================================
+
+The metric boxes directly under the ticker row currently consume slightly too much vertical space.
+
+REQUIRED:
+
+* slightly reduce box height
+* slightly tighten internal padding
+* reduce unnecessary spacing
+* preserve readability
+* preserve glow hierarchy
+
+Goal:
+Free up more vertical breathing room for:
+
+* charts
+* Activity Hub
+* telemetry streams
+* operator analytics
+
+Do NOT overcompress.
+Just refine proportions slightly.
+
+====================================================
+3. CHANGE ACTIVITY HUB + LIVE STREAM BACKGROUNDS TO PURE BLACK
+==============================================================
+
+CURRENT ISSUE:
+The AI User Activity Hub and Live Activity Stream still use blue-toned container backgrounds.
+
+This weakens the institutional “trading OS” aesthetic.
+
+REQUIRED:
+Convert these sections to:
+
+* true black backgrounds
+* high-contrast neon telemetry styling
+* deeper institutional appearance
+
+Specifically:
+
+* AI User Activity Hub background → black
+* Live Activity Stream background → black
+
+Maintain:
+
+* neon cyan
+* neon purple
+* neon green
+* telemetry glow accents
+
+But remove:
+
+* dark blue panel tinting
+* soft blue overlays
+* blue-gray container fills
+
+====================================================
+GOAL
+====
+
+The dashboard should feel like:
+
+* an institutional trading operating system
+* a centralized AI broker orchestration platform
+* a high-end operator console
+
+NOT:
+
+* a consumer crypto dashboard
+* a gaming UI
+* a blue-themed trading panel
+
+The final aesthetic direction should emphasize:
+
+* black interiors
+* neon telemetry contrast
+* institutional readability
+* operational clarity
+* centralized command feel

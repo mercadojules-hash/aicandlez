@@ -502,10 +502,10 @@ export function LiveTradingConsole({
             <span className="text-[8px] font-bold font-mono tracking-[0.2em]" style={{ color: "#2a4050" }}>
               LIVE TEST CONFIG
             </span>
-            {liveActive && (
+            {liveActive && exName !== "Kraken" && (
               <span className="text-[7px] font-bold font-mono px-1.5 py-0.5 rounded"
                 style={{ background: "#ff990018", color: "#ff9900", border: "1px solid #ff990040" }}>
-                KRAKEN · SPOT ONLY
+                {exName.toUpperCase()} · SPOT ONLY
               </span>
             )}
           </div>

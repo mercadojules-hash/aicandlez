@@ -93,10 +93,11 @@ export function MiddleStatsGrid({ trades, engine, exchangeStatus, feeSummary }: 
   const stressLevel = stress >= 50 ? "HIGH" : stress >= 22 ? "MODERATE" : "LOW";
   const stressLvlColor = stressLevel === "HIGH" ? "#ff3355" : stressLevel === "MODERATE" ? "#ffaa00" : "#00ff8a";
 
-  // Exchange
-  const exName = (exchangeStatus?.exchangeName ?? "Kraken").toUpperCase();
-  const exMode = exchangeStatus?.mode ?? "simulation";
-  const isLive = exMode === "live";
+  // Exchange — no hardcoded fallback, authoritative server state only
+  const rawName = exchangeStatus?.exchangeName;
+  const exName  = rawName ? rawName.toUpperCase() : "—";
+  const exMode  = exchangeStatus?.mode ?? "simulation";
+  const isLive  = exMode === "live";
 
   // Fees
   const feesTotal = feeSummary?.totalFeesCollected ?? 0;

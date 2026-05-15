@@ -1,0 +1,329 @@
+FINAL APEX TRADER — OPERATOR CONSISTENCY + ARCHITECTURE REFINEMENT PHASE
+
+We are now entering the FINAL dashboard refinement and operator-consistency phase before production deployment/server migration.
+
+The platform is NO LONGER in prototype stage.
+
+The dashboard must now behave like:
+
+• a centralized trading operating system
+• a broker orchestration layer
+• a multi-exchange AI execution platform
+• an institutional operator console
+
+The backend/runtime is now stable locally:
+
+* exchanges connected
+* websocket operational
+* AI loop operational
+* DB persistence operational
+* frontend rendering correctly
+
+The remaining work is now ARCHITECTURAL + UX CONSISTENCY.
+
+====================================================
+CRITICAL PRIORITY #1 — CENTRALIZED EXCHANGE STATE
+=================================================
+
+CURRENT PROBLEM:
+
+Different areas of the UI appear to maintain DIFFERENT interpretations of:
+
+* active exchange
+* trading mode
+* broker context
+* account balance
+* simulation/live state
+
+EXAMPLE:
+
+Top telemetry:
+“LIVE TRADING — KRAKEN — SPOT ONLY”
+
+Lower Activity Hub:
+“KRAKEN / SIMULATION BROKER”
+
+This creates severe operator ambiguity and indicates fragmented state management.
+
+====================================================
+REQUIRED FIX
+============
+
+Create ONE centralized authoritative exchange/trading context.
+
+ALL dashboard components must derive state ONLY from:
+
+* activeExchange
+* tradingMode
+* brokerType
+* accountContext
+* portfolioContext
+* executionContext
+
+NO component may:
+
+* assume simulation independently
+* assume Kraken independently
+* assume paper mode independently
+* maintain stale local exchange state
+* display isolated mock telemetry
+
+====================================================
+GOAL
+====
+
+When exchange or mode changes:
+EVERY component updates consistently.
+
+This includes:
+
+* top telemetry
+* Activity Hub
+* account metrics
+* portfolio metrics
+* AI execution layer
+* positions
+* balances
+* fees
+* trade history
+* charts
+* terminal feed
+* exchange labels
+* mode labels
+* execution indicators
+
+ALL components must reflect ONE authoritative state source.
+
+====================================================
+CRITICAL PRIORITY #2 — EXCHANGE BALANCE ISOLATION
+=================================================
+
+CURRENT ISSUE:
+
+Kraken balance leaks into other exchanges.
+
+Example:
+Kraken $100 balance still appears while switching to Coinbase or Simulation.
+
+====================================================
+REQUIRED FIX
+============
+
+Implement strict exchange-scoped account isolation.
+
+Each exchange must maintain isolated:
+
+* balances
+* positions
+* executions
+* fees
+* telemetry
+* portfolio state
+* account equity
+* buying power
+
+Examples:
+
+Kraken:
+
+* Kraken balances only
+
+Alpaca:
+
+* Alpaca balances only
+
+Coinbase:
+
+* Coinbase balances only
+
+Simulation:
+
+* Simulation balances only
+
+Switching exchanges MUST dynamically reload ALL account context.
+
+NO global/shared balance leakage.
+
+====================================================
+CRITICAL PRIORITY #3 — REMOVE DUPLICATE EXCHANGE CONTROLS
+=========================================================
+
+CURRENT ISSUE:
+
+Exchange/trading mode controls exist in MULTIPLE places.
+
+We currently have:
+
+* top-level exchange controls
+* floating exchange controls
+* old right-side exchange selector remnants
+
+This creates:
+
+* visual clutter
+* control ambiguity
+* fragmented UX hierarchy
+
+====================================================
+REQUIRED FIX
+============
+
+Consolidate ALL exchange/trading controls into ONE institutional control area.
+
+RECOMMENDED:
+Place all exchange + mode controls inside:
+
+* Activity Hub header
+  OR
+* top operator telemetry row
+
+REMOVE:
+
+* duplicated selectors
+* floating exchange controls
+* dead right-side control containers
+* disconnected mode widgets
+
+====================================================
+CRITICAL PRIORITY #4 — ACTIVITY HUB LAYOUT HIERARCHY
+====================================================
+
+CURRENT ISSUE:
+
+The Activity Hub still feels visually fragmented.
+
+Problems:
+
+* uneven spacing
+* compressed chart area
+* floating controls
+* disconnected telemetry hierarchy
+* Live Activity Stream squeezing charts
+* weak institutional proportions
+
+====================================================
+REQUIRED FIX
+============
+
+Redesign Activity Hub layout hierarchy to feel like:
+
+* centralized operations center
+* institutional AI command layer
+* platform intelligence monitor
+* broker orchestration console
+
+Improve:
+
+* spacing
+* chart proportions
+* telemetry grouping
+* hierarchy balance
+* operator readability
+* responsive layout logic
+
+The Activity Hub should become:
+THE CORE OF THE ENTIRE PLATFORM.
+
+====================================================
+CRITICAL PRIORITY #5 — TYPOGRAPHY + VISUAL CONSISTENCY
+======================================================
+
+CURRENT ISSUE:
+
+Some active metrics visually appear:
+
+* dim
+* disabled
+* stale
+* inconsistent
+
+Examples:
+
+* MTF Passed
+* MTF Blocked
+* Buy Signals
+* AI telemetry cards
+* lower metrics
+
+Even though values update correctly.
+
+====================================================
+REQUIRED FIX
+============
+
+Create unified institutional visual logic:
+
+* consistent glow rules
+* consistent opacity rules
+* consistent active-state brightness
+* unified typography hierarchy
+* larger labels where necessary
+* stronger readability
+* consistent “live/active” appearance
+
+No telemetry card should look “dead” while updating live.
+
+====================================================
+CRITICAL PRIORITY #6 — OPERATOR-FIRST PLATFORM HIERARCHY
+========================================================
+
+The dashboard’s PRIMARY ROLE is NOT personal trading.
+
+The primary role is:
+
+* monitoring platform growth
+* monitoring AI execution quality
+* monitoring user activity
+* monitoring exchange health
+* monitoring onboarding/retention
+* monitoring revenue/fees
+* monitoring execution efficiency
+* monitoring broker distribution
+
+====================================================
+REQUIRED ADDITIONAL EMPHASIS
+============================
+
+Increase visibility of:
+
+* active users
+* new users today
+* live users vs paper users
+* exchange usage distribution
+* AI execution counts
+* signal acceptance/rejection
+* fees generated
+* broker health
+* websocket health
+* execution latency
+* platform telemetry
+
+The operator layer should visually dominate the system.
+
+====================================================
+FINAL GOAL
+==========
+
+Transform the dashboard from:
+“advanced trading UI”
+
+INTO:
+
+“A centralized multi-exchange AI trading operating system.”
+
+Focus ONLY on:
+
+* exchange/account state consistency
+* operator clarity
+* layout hierarchy
+* centralized orchestration
+* institutional polish
+* production deployment readiness
+
+This is the FINAL operator refinement phase before:
+
+* server deployment
+* VPS migration
+* scaling architecture
+* mobile production rollout
+* live user onboarding

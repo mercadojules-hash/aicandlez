@@ -1,4 +1,4 @@
-import type { EngineStatus, AppSettings, Trade, ExchangeStatus, FeeSummary } from "./types";
+import type { EngineStatus, AppSettings, Trade, ExchangeStatus, FeeSummary, SimAccount, LiveBalance } from "./types";
 import { ago } from "./helpers";
 
 interface Props {
@@ -7,6 +7,8 @@ interface Props {
   trades:         Trade[]        | undefined;
   exchangeStatus: ExchangeStatus | undefined;
   feeSummary:     FeeSummary     | undefined;
+  liveBalance?:   LiveBalance    | undefined;
+  simAccount?:    SimAccount     | undefined;
 }
 
 /* ── Single telemetry cell ───────────────────────────────────────────────── */
@@ -16,11 +18,18 @@ function Cell({
   label: string; value: string | number; sub?: string;
   color?: string; dim?: boolean; pulse?: boolean; wide?: boolean;
 }) {
+  /* Dim = "zero / inactive" state — still visible, just clearly muted */
+  const valColor  = dim ? "#1e3a50" : color;
+  const subColor  = dim ? "#162a3a" : `${color}75`;
+  const barColor  = dim
+    ? `linear-gradient(90deg, transparent, ${color}10, transparent)`
+    : `linear-gradient(90deg, transparent, ${color}50, transparent)`;
+
   return (
     <div
       style={{
         background:    "#030b14",
-        border:        `1px solid ${dim ? "#0e1c28" : "#141f2e"}`,
+        border:        `1px solid ${dim ? "#0c1824" : "#141f2e"}`,
         borderRadius:  3,
         padding:       "14px 20px",
         minWidth:      wide ? 160 : 130,
@@ -32,23 +41,14 @@ function Cell({
       }}
     >
       {/* Top accent bar */}
-      <div
-        style={{
-          position:   "absolute",
-          top: 0, left: 0, right: 0,
-          height:     2,
-          background: dim
-            ? "transparent"
-            : `linear-gradient(90deg, transparent, ${color}50, transparent)`,
-        }}
-      />
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: barColor }} />
 
       {/* Primary value */}
       <div
         className="font-bold font-mono leading-none tabular-nums"
         style={{
           fontSize:      28,
-          color:         dim ? "#112233" : color,
+          color:         valColor,
           textShadow:    dim ? "none" : `0 0 14px ${color}45, 0 0 28px ${color}18`,
           marginBottom:  sub ? 6 : 7,
           letterSpacing: "-0.02em",
@@ -61,16 +61,16 @@ function Cell({
       {sub && (
         <div
           className="font-mono uppercase tracking-[0.14em] leading-none"
-          style={{ fontSize: 9, color: dim ? "#112233" : `${color}75`, marginBottom: 5 }}
+          style={{ fontSize: 9, color: subColor, marginBottom: 5 }}
         >
           {sub}
         </div>
       )}
 
-      {/* Label */}
+      {/* Label — always readable, never invisible */}
       <div
         className="font-mono uppercase leading-none tracking-[0.12em]"
-        style={{ fontSize: 9, color: "#2a4458" }}
+        style={{ fontSize: 9, color: dim ? "#2a4a60" : "#3a5878" }}
       >
         {label}
       </div>
@@ -84,7 +84,7 @@ function RowHeader({ title, color }: { title: string; color: string }) {
     <div
       className="flex-shrink-0 flex items-center"
       style={{
-        writingMode:    "vertical-rl",
+        writingMode:     "vertical-rl",
         textOrientation: "mixed",
         paddingLeft:    10,
         paddingRight:   10,
@@ -107,7 +107,7 @@ function RowHeader({ title, color }: { title: string; color: string }) {
 }
 
 /* ── Main component ──────────────────────────────────────────────────────── */
-export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSummary }: Props) {
+export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSummary, liveBalance, simAccount }: Props) {
   const all      = trades ?? [];
   const open     = all.filter((t) => t.status === "open");
   const closed   = all.filter((t) => t.status === "closed");
@@ -117,17 +117,33 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
   const realPnl  = open.reduce((s, t) => s + (t.pnl ?? 0), 0);
   const exposure = open.reduce((s, t) => s + (t.amount ?? 0), 0);
 
-  const exName     = exchangeStatus?.exchangeName ?? "KRAKEN";
-  const mode       = exchangeStatus?.mode === "live" ? "LIVE" : "SIM";
+  /* ── Exchange / mode — AUTHORITATIVE from server, no hardcoded fallbacks ── */
+  const isLive     = exchangeStatus?.mode === "live";
+  const exName     = exchangeStatus?.exchangeName ?? "—";
+  const mode       = isLive ? "LIVE" : "SIM";
+
+  /* ── Portfolio equity — exchange-scoped, no cross-exchange leakage ─────── */
+  const liveUSD   = isLive && liveBalance?.source === "live" ? (liveBalance.balances.USD ?? null) : null;
+  const simUSD    = exchangeStatus?.simBalances?.USD ?? simAccount?.equity ?? 100_000;
+  const portfolioEq = isLive ? liveUSD : simUSD;
+  const portfolioLabel = isLive
+    ? `${exName.toUpperCase().slice(0, 6)} LIVE USD`
+    : "SIM EQUITY";
+  const portfolioColor = isLive ? "#00ff8a" : "#00f0ff";
+
+  const fmt$ = (n: number) =>
+    n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M`
+    : n >= 1_000   ? `$${(n / 1_000).toFixed(0)}K`
+    : `$${n.toFixed(0)}`;
+
   const execToday  = engine?.tradesExecuted  ?? 0;
   const blocked    = engine?.tradesBlocked   ?? 0;
-  const buySig     = engine?.signalCounts.BUY  ?? 0;
-  const sellSig    = engine?.signalCounts.SELL ?? 0;
+  const buySig     = engine?.signalCounts?.BUY  ?? 0;
+  const sellSig    = engine?.signalCounts?.SELL ?? 0;
   const passedMTF  = engine?.funnel?.passedMTF ?? 0;
   const totalSig   = engine?.signalsGenerated  ?? 0;
   const execCount  = engine?.funnel?.executed  ?? 0;
   const execRate   = totalSig > 0 ? (execCount / totalSig * 100) : 0;
-  const simUSD     = exchangeStatus?.simBalances?.USD ?? 100_000;
   const lastSig    = ago(engine?.lastSignalAt ?? null);
   const volFilter  = engine?.volumeFilter ?? false;
   const mtfBlocked = engine?.mtfBlockCount ?? 0;
@@ -139,20 +155,19 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       })()
     : 0;
 
-  const dailyVolume = execToday * 1240 + (simUSD * 0.012);
-  const acctHealth  = exchangeStatus?.killSwitch ? 0 : Math.max(40, 100 - blocked * 0.15);
+  const acctHealth = exchangeStatus?.killSwitch ? 0 : Math.max(40, 100 - blocked * 0.15);
 
-  /* ── ROW 1: Operational / live state ──────────────────────────────── */
+  /* ── ROW 1: Operational / live state ─────────────────────────────────── */
   const row1: Array<{
     label: string; value: string | number; sub?: string;
     color?: string; dim?: boolean; pulse?: boolean; wide?: boolean;
   }> = [
     {
       label: "BROKER",
-      value: exName.toUpperCase().slice(0, 6),
+      value: exName === "—" ? "—" : exName.toUpperCase().slice(0, 6),
       sub:   `${mode} MODE`,
-      color: mode === "LIVE" ? "#ff3355" : "#00f0ff",
-      pulse: mode === "LIVE",
+      color: isLive ? "#ff3355" : "#00f0ff",
+      pulse: isLive,
       wide:  true,
     },
     {
@@ -170,14 +185,14 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
     {
       label: "OPEN POSITIONS",
       value: open.length,
-      color: open.length > 0 ? "#00f0ff" : "#1a3850",
+      color: open.length > 0 ? "#00f0ff" : "#00a0cc",
       dim:   open.length === 0,
       pulse: open.length > 0,
     },
     {
       label: "EXECUTIONS",
       value: execToday,
-      color: execToday > 0 ? "#ffb800" : "#1a3850",
+      color: execToday > 0 ? "#ffb800" : "#aa7800",
       dim:   execToday === 0,
     },
     {
@@ -187,9 +202,9 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       wide:  true,
     },
     {
-      label: "PORTFOLIO EQ",
-      value: `$${simUSD >= 1000 ? (simUSD / 1000).toFixed(1) + "K" : simUSD.toFixed(0)}`,
-      color: "#00f0ff",
+      label: portfolioLabel,
+      value: portfolioEq != null ? fmt$(portfolioEq) : "—",
+      color: portfolioColor,
       wide:  true,
     },
     {
@@ -231,7 +246,7 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
     {
       label: "EXPOSURE",
       value: exposure > 0 ? `$${exposure.toFixed(0)}` : "$0",
-      color: exposure > 0 ? "#ffb800" : "#1a3850",
+      color: exposure > 0 ? "#ffb800" : "#ffb800",
       dim:   exposure === 0,
     },
     {
@@ -254,31 +269,31 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       label: "AI REJECTIONS",
       value: blocked,
       sub:   blocked > 0 ? "signals filtered" : undefined,
-      color: blocked > 50 ? "#ff2255" : blocked > 20 ? "#ffb800" : "#1a3850",
+      color: blocked > 50 ? "#ff2255" : blocked > 20 ? "#ffb800" : "#ffb800",
       dim:   blocked === 0,
     },
     {
       label: "BUY SIGNALS",
       value: buySig,
-      color: buySig > 0 ? "#00ff8a" : "#1a3850",
+      color: buySig > 0 ? "#00ff8a" : "#00cc66",
       dim:   buySig === 0,
     },
     {
       label: "SELL SIGNALS",
       value: sellSig,
-      color: sellSig > 0 ? "#ff2255" : "#1a3850",
+      color: sellSig > 0 ? "#ff2255" : "#cc2244",
       dim:   sellSig === 0,
     },
     {
       label: "MTF PASSED",
       value: passedMTF,
-      color: passedMTF > 0 ? "#00f0ff" : "#1a3850",
+      color: passedMTF > 0 ? "#00f0ff" : "#00a0cc",
       dim:   passedMTF === 0,
     },
     {
       label: "MTF BLOCKED",
       value: mtfBlocked,
-      color: mtfBlocked > 100 ? "#ff2255" : "#1a3850",
+      color: mtfBlocked > 100 ? "#ff2255" : "#ff8844",
       dim:   mtfBlocked === 0,
     },
     {
@@ -295,15 +310,6 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       label: "MIN CONF",
       value: `${settings?.minConfidence ?? 60}%`,
       color: "#00f0ff",
-    },
-    {
-      label: "DAILY VOLUME",
-      value: dailyVolume >= 1000
-        ? `$${(dailyVolume / 1000).toFixed(1)}K`
-        : `$${dailyVolume.toFixed(0)}`,
-      color: dailyVolume > 0 ? "#00aaff" : "#1a3850",
-      dim:   dailyVolume === 0,
-      wide:  true,
     },
   ];
 

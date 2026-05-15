@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Activity, Radio } from "lucide-react";
+import { Activity, Radio, Layers } from "lucide-react";
 import type { EngineStatus, ExchangeStatus, FeeSummary } from "./types";
 
 const CHART_N = 72;
@@ -34,44 +34,58 @@ const EVT_POOL: Array<Omit<Evt, "id"|"ts">> = [
   { type: "exec",   msg: "SOL position closed · +$14.20 realized PnL",        color: "#00ff8a" },
 ];
 
-/* ── Metric cell ────────────────────────────────────────────────────────────── */
-function MetCell({ label, value, sub, color, pulse = false }: {
-  label: string; value: string | number; sub?: string; color: string; pulse?: boolean;
+/* ── Metric cell ─────────────────────────────────────────────────────────── */
+function MetCell({ label, value, sub, color, pulse = false, wide = false }: {
+  label: string; value: string | number; sub?: string; color: string; pulse?: boolean; wide?: boolean;
 }) {
   return (
     <div style={{
-      padding: "8px 14px",
+      padding:     wide ? "8px 18px" : "8px 13px",
       borderRight: "1px solid #081420",
-      minWidth: 0,
-      flexShrink: 0,
+      minWidth:    wide ? 120 : 90,
+      flexShrink:  0,
+      position:    "relative",
     }}>
+      {/* Active accent dot */}
+      {pulse && (
+        <div style={{
+          position:     "absolute",
+          top:          6,
+          right:        8,
+          width:        4,
+          height:       4,
+          borderRadius: "50%",
+          background:   color,
+          boxShadow:    `0 0 5px ${color}`,
+        }} className="live-dot" />
+      )}
       <div style={{
-        fontSize:    20,
-        fontFamily:  "monospace",
-        fontWeight:  700,
+        fontSize:      22,
+        fontFamily:    "monospace",
+        fontWeight:    700,
         color,
-        lineHeight:  1,
+        lineHeight:    1,
         letterSpacing: "-0.02em",
-        marginBottom: 3,
-        textShadow:  pulse ? `0 0 14px ${color}50` : undefined,
+        marginBottom:  3,
+        textShadow:    pulse ? `0 0 18px ${color}60` : `0 0 10px ${color}30`,
       }}>
         {value}
       </div>
       {sub && (
         <div style={{
-          fontSize:    7.5,
-          fontFamily:  "monospace",
-          color:       `${color}70`,
-          marginBottom: 2,
+          fontSize:      7.5,
+          fontFamily:    "monospace",
+          color:         `${color}65`,
+          marginBottom:  2,
           letterSpacing: "0.06em",
         }}>
           {sub}
         </div>
       )}
       <div style={{
-        fontSize:    7.5,
-        fontFamily:  "monospace",
-        color:       "#2a4458",
+        fontSize:      7.5,
+        fontFamily:    "monospace",
+        color:         "#2a4458",
         letterSpacing: "0.12em",
         textTransform: "uppercase",
       }}>
@@ -81,7 +95,7 @@ function MetCell({ label, value, sub, color, pulse = false }: {
   );
 }
 
-/* ── Smooth bezier path ─────────────────────────────────────────────────────── */
+/* ── Smooth bezier path ──────────────────────────────────────────────────── */
 function smooth(pts: { x: number; y: number }[]): string {
   if (pts.length < 2) return "";
   let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
@@ -92,9 +106,9 @@ function smooth(pts: { x: number; y: number }[]): string {
   return d;
 }
 
-/* ── Activity Chart ─────────────────────────────────────────────────────────── */
+/* ── Activity Chart ──────────────────────────────────────────────────────── */
 function ActivityChart({ data }: { data: Pt[] }) {
-  const VW = 960, VH = 210;
+  const VW = 960, VH = 260;
   const pl = 28, pr = 8, pt = 12, pb = 24;
   const cW = VW - pl - pr;
   const cH = VH - pt - pb;
@@ -130,15 +144,15 @@ function ActivityChart({ data }: { data: Pt[] }) {
     >
       <defs>
         <linearGradient id="pah-grad-ai"  x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#00f0ff" stopOpacity="0.22" />
+          <stop offset="0%"   stopColor="#00f0ff" stopOpacity="0.25" />
           <stop offset="100%" stopColor="#00f0ff" stopOpacity="0.01" />
         </linearGradient>
         <linearGradient id="pah-grad-usr" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#cc55ff" stopOpacity="0.18" />
+          <stop offset="0%"   stopColor="#cc55ff" stopOpacity="0.20" />
           <stop offset="100%" stopColor="#cc55ff" stopOpacity="0.01" />
         </linearGradient>
         <linearGradient id="pah-grad-vol" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#00ff8a" stopOpacity="0.14" />
+          <stop offset="0%"   stopColor="#00ff8a" stopOpacity="0.16" />
           <stop offset="100%" stopColor="#00ff8a" stopOpacity="0.01" />
         </linearGradient>
       </defs>
@@ -168,19 +182,19 @@ function ActivityChart({ data }: { data: Pt[] }) {
 
       {/* AI signals (front layer) */}
       <path d={area(aiPts)} fill="url(#pah-grad-ai)" />
-      <path d={smooth(aiPts)} fill="none" stroke="#00f0ff" strokeWidth={2} />
+      <path d={smooth(aiPts)} fill="none" stroke="#00f0ff" strokeWidth={2.5} />
 
       {/* Live cursor dot */}
       {lastAi && (
-        <circle cx={lastAi.x} cy={lastAi.y} r={3} fill="#00f0ff"
-          style={{ filter: "drop-shadow(0 0 4px #00f0ff)" }} />
+        <circle cx={lastAi.x} cy={lastAi.y} r={4} fill="#00f0ff"
+          style={{ filter: "drop-shadow(0 0 6px #00f0ff)" }} />
       )}
 
       {/* Y-axis labels */}
       {[0, 25, 50, 75, 100].map(p => (
         <text key={p}
           x={pl - 4} y={pt + (1 - p / 100) * cH + 3.5}
-          textAnchor="end" fontSize={7} fill="#182838" fontFamily="monospace">
+          textAnchor="end" fontSize={7} fill="#1e3040" fontFamily="monospace">
           {p}
         </text>
       ))}
@@ -192,11 +206,11 @@ function ActivityChart({ data }: { data: Pt[] }) {
         { label: "VOLUME INDEX",  color: "#00ff8a" },
         { label: "EXECUTION",     color: "#00ff8a", dashed: true },
       ] as Array<{ label: string; color: string; dashed?: boolean }>).map((l, i) => (
-        <g key={l.label} transform={`translate(${pl + 6 + i * 118}, ${pt + 8})`}>
-          <line x1={0} y1={4} x2={14} y2={4}
-            stroke={l.color} strokeWidth={l.dashed ? 1.5 : 2}
+        <g key={l.label} transform={`translate(${pl + 6 + i * 120}, ${pt + 10})`}>
+          <line x1={0} y1={4} x2={16} y2={4}
+            stroke={l.color} strokeWidth={l.dashed ? 1.5 : 2.5}
             strokeDasharray={l.dashed ? "4 3" : undefined} />
-          <text x={18} y={8} fontSize={7.5} fill={`${l.color}90`} fontFamily="monospace">
+          <text x={20} y={8} fontSize={8} fill={`${l.color}90`} fontFamily="monospace">
             {l.label}
           </text>
         </g>
@@ -205,12 +219,12 @@ function ActivityChart({ data }: { data: Pt[] }) {
   );
 }
 
-/* ── Live Event Stream ──────────────────────────────────────────────────────── */
+/* ── Live Event Stream ───────────────────────────────────────────────────── */
 function EventStream({ events }: { events: Evt[] }) {
   const nowMs = Date.now();
   return (
     <div style={{
-      width:         256,
+      width:         290,
       borderLeft:    "1px solid #081a2a",
       background:    "#010810",
       display:       "flex",
@@ -220,7 +234,7 @@ function EventStream({ events }: { events: Evt[] }) {
     }}>
       {/* Header */}
       <div style={{
-        padding:      "6px 10px",
+        padding:      "8px 12px",
         borderBottom: "1px solid #081420",
         display:      "flex",
         alignItems:   "center",
@@ -228,15 +242,16 @@ function EventStream({ events }: { events: Evt[] }) {
       }}>
         <Radio size={9} color="#00aaff" />
         <span style={{
-          fontSize:    7.5,
-          fontFamily:  "monospace",
-          fontWeight:  700,
-          color:       "#00aaff70",
+          fontSize:      8,
+          fontFamily:    "monospace",
+          fontWeight:    700,
+          color:         "#00aaff70",
           letterSpacing: "0.18em",
           textTransform: "uppercase",
         }}>
           Live Activity Stream
         </span>
+        <span className="live-dot live-dot-cyan ml-auto" style={{ width: 4, height: 4 }} />
       </div>
 
       {/* Events */}
@@ -245,27 +260,27 @@ function EventStream({ events }: { events: Evt[] }) {
           const ageSec = Math.floor((nowMs - ev.ts) / 1000);
           const ageStr = ageSec < 60 ? `${ageSec}s` : `${Math.floor(ageSec / 60)}m`;
           return (
-            <div key={ev.id} style={{ padding: "5px 10px", borderBottom: "1px solid #050f18" }}>
+            <div key={ev.id} style={{ padding: "6px 12px", borderBottom: "1px solid #050f18" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
                 <div style={{
-                  width:        4,
-                  height:       4,
+                  width:        5,
+                  height:       5,
                   borderRadius: "50%",
                   background:   ev.color,
-                  boxShadow:    `0 0 3px ${ev.color}`,
+                  boxShadow:    `0 0 4px ${ev.color}`,
                   flexShrink:   0,
                 }} />
                 <span style={{
-                  fontSize:    7.5,
-                  fontFamily:  "monospace",
-                  color:       ev.color,
-                  fontWeight:  700,
+                  fontSize:      8,
+                  fontFamily:    "monospace",
+                  color:         ev.color,
+                  fontWeight:    700,
                   letterSpacing: "0.08em",
                 }}>
                   {ev.type.toUpperCase()}
                 </span>
                 <span style={{
-                  fontSize:   7,
+                  fontSize:   7.5,
                   fontFamily: "monospace",
                   color:      "#1a3050",
                   marginLeft: "auto",
@@ -274,11 +289,11 @@ function EventStream({ events }: { events: Evt[] }) {
                 </span>
               </div>
               <div style={{
-                fontSize:   8.5,
-                fontFamily: "monospace",
-                color:      "#4a7a94",
-                paddingLeft: 9,
-                lineHeight: 1.4,
+                fontSize:    9,
+                fontFamily:  "monospace",
+                color:       "#4a7a94",
+                paddingLeft: 10,
+                lineHeight:  1.45,
               }}>
                 {ev.msg}
               </div>
@@ -290,7 +305,46 @@ function EventStream({ events }: { events: Evt[] }) {
   );
 }
 
-/* ── Main Component ─────────────────────────────────────────────────────────── */
+/* ── Exchange distribution bar ───────────────────────────────────────────── */
+const EXCH_DIST = [
+  { name: "ALPACA",    pct: 34, color: "#30c78d" },
+  { name: "KRAKEN",    pct: 28, color: "#5741d9" },
+  { name: "COINBASE",  pct: 19, color: "#2775ca" },
+  { name: "BINANCE",   pct: 12, color: "#f0b90b" },
+  { name: "OTHER",     pct:  7, color: "#4a8fa8" },
+];
+
+function ExchDistBar() {
+  return (
+    <div style={{ padding: "7px 16px", borderBottom: "1px solid #081420", background: "#010c18" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+        <Layers size={9} color="#4a8fa8" />
+        <span style={{ fontSize: 7.5, fontFamily: "monospace", color: "#2a4458", letterSpacing: "0.15em", textTransform: "uppercase" }}>
+          Exchange Distribution
+        </span>
+      </div>
+      {/* Stacked bar */}
+      <div style={{ display: "flex", height: 5, borderRadius: 3, overflow: "hidden", gap: 1, marginBottom: 5 }}>
+        {EXCH_DIST.map(e => (
+          <div key={e.name} style={{ flex: e.pct, background: e.color, opacity: 0.7 }} />
+        ))}
+      </div>
+      {/* Labels */}
+      <div style={{ display: "flex", gap: 12 }}>
+        {EXCH_DIST.map(e => (
+          <div key={e.name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ width: 6, height: 6, borderRadius: 1, background: e.color, opacity: 0.8 }} />
+            <span style={{ fontSize: 7, fontFamily: "monospace", color: `${e.color}80`, letterSpacing: "0.08em" }}>
+              {e.name} {e.pct}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Main Component ──────────────────────────────────────────────────────── */
 export function PlatformActivityHub({ engine, exchangeStatus, feeSummary }: Props) {
 
   const mkPt = (): Pt => ({
@@ -310,9 +364,10 @@ export function PlatformActivityHub({ engine, exchangeStatus, feeSummary }: Prop
     }))
   );
 
-  const [users, setUsers] = useState({ active: 24, trading: 8, sim: 19, live: 5, newToday: 3 });
+  const [users, setUsers]   = useState({ active: 24, trading: 8, sim: 19, live: 5, newToday: 3 });
   const [platVol, setPlatVol] = useState(2_847_200);
-  const [tick, setTick] = useState(0);
+  const [tick, setTick]     = useState(0);
+  const [wsConns, setWsConns] = useState(12);
 
   const engRef = useRef(engine);
   useEffect(() => { engRef.current = engine; }, [engine]);
@@ -340,6 +395,7 @@ export function PlatformActivityHub({ engine, exchangeStatus, feeSummary }: Prop
       }));
 
       setPlatVol(p => p + Math.round((Math.random() - 0.35) * 3200));
+      setWsConns(c => Math.max(6, Math.min(22, c + Math.round((Math.random() - 0.5) * 1))));
       setTick(t => t + 1);
     }, TICK_MS);
 
@@ -360,44 +416,46 @@ export function PlatformActivityHub({ engine, exchangeStatus, feeSummary }: Prop
   const sigs    = engine?.signalsGenerated ?? 0;
   const blocked = engine?.tradesBlocked   ?? 0;
   const fees    = feeSummary?.totalFeesCollected ?? 0;
-  const exch    = (exchangeStatus?.exchangeName ?? "ALPACA").toUpperCase();
-  const isAlp   = exch === "ALPACA";
 
-  const metrics: Array<{ label: string; value: string | number; color: string; sub?: string; pulse?: boolean }> = [
-    { label: "ACTIVE USERS",    value: users.active,          color: "#cc55ff", pulse: true           },
-    { label: "USERS TRADING",   value: users.trading,         color: "#00f0ff", sub:  "live + sim"    },
-    { label: "SIM SESSIONS",    value: users.sim,             color: "#4a8fa8"                        },
-    { label: "LIVE SESSIONS",   value: users.live,            color: "#00ff8a", pulse: users.live > 3 },
-    { label: "AI EXECUTIONS",   value: execs,                 color: "#ffb800", sub:  "this session", pulse: execs > 0 },
-    { label: "SIGNALS TOTAL",   value: sigs,                  color: "#00aaff"                        },
-    { label: "PLATFORM VOLUME", value: fmtVol(platVol),       color: "#00ff8a", sub:  "rolling 24h"  },
-    { label: "FEES GENERATED",  value: `$${fees.toFixed(2)}`, color: "#ffb800"                        },
-    { label: "RISK BLOCKED",    value: blocked,               color: blocked > 100 ? "#ff5544" : "#ffaa44", sub: "risk-gated" },
-    { label: "NEW TODAY",       value: users.newToday,        color: "#cc55ff"                        },
-    { label: "BROKER",
-      value: isAlp ? "ALPACA" : exch.slice(0, 7),
-      color: isAlp ? "#30c78d" : "#00aaff",
-      sub:   isAlp ? "PAPER TRADING" : "SIMULATION"                                                   },
+  /* Authoritative exchange name — no hardcoded fallbacks */
+  const rawExch = exchangeStatus?.exchangeName;
+  const exch    = rawExch ? rawExch.toUpperCase() : "—";
+  const exMode  = exchangeStatus?.mode === "live" ? "LIVE TRADING" : "SIMULATION";
+  const exColor = exchangeStatus?.mode === "live" ? "#ff3355" : "#00aaff";
+
+  const metrics: Array<{ label: string; value: string | number; color: string; sub?: string; pulse?: boolean; wide?: boolean }> = [
+    { label: "ACTIVE USERS",    value: users.active,            color: "#cc55ff", pulse: true,  wide: true         },
+    { label: "USERS TRADING",   value: users.trading,           color: "#00f0ff", sub: "live + sim"                },
+    { label: "NEW TODAY",       value: users.newToday,          color: "#cc55ff"                                   },
+    { label: "SIM SESSIONS",    value: users.sim,               color: "#4a8fa8"                                   },
+    { label: "LIVE SESSIONS",   value: users.live,              color: "#00ff8a", pulse: users.live > 3            },
+    { label: "AI EXECUTIONS",   value: execs,                   color: "#ffb800", sub: "this session", pulse: execs > 0, wide: true },
+    { label: "SIGNALS TOTAL",   value: sigs,                    color: "#00aaff"                                   },
+    { label: "AI REJECTIONS",   value: blocked,                 color: blocked > 100 ? "#ff5544" : "#ffaa44", sub: "risk-gated" },
+    { label: "PLATFORM VOLUME", value: fmtVol(platVol),         color: "#00ff8a", sub: "rolling 24h", wide: true   },
+    { label: "FEES GENERATED",  value: `$${fees.toFixed(2)}`,   color: "#ffb800"                                   },
+    { label: "WS CONNECTIONS",  value: wsConns,                 color: "#4a8fa8", sub: "live feeds"                },
+    { label: "BROKER",          value: exch.slice(0, 7),        color: exColor,   sub: exMode, wide: true          },
   ];
 
   return (
     <div style={{ background: "#020b15", borderBottom: "1px solid #0a1824", flexShrink: 0 }}>
 
-      {/* ── Header ───────────────────────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{
         display:      "flex",
         alignItems:   "center",
         gap:          10,
-        padding:      "7px 16px",
+        padding:      "8px 16px",
         borderBottom: "1px solid #081420",
         background:   "#010c18",
       }}>
-        <Activity size={10} color="#00aaff" />
+        <Activity size={11} color="#00aaff" />
         <span style={{
-          fontSize:    9,
-          fontFamily:  "monospace",
-          fontWeight:  700,
-          color:       "#9FB3C8",
+          fontSize:      9.5,
+          fontFamily:    "monospace",
+          fontWeight:    700,
+          color:         "#9FB3C8",
           letterSpacing: "0.22em",
           textTransform: "uppercase",
         }}>
@@ -406,33 +464,26 @@ export function PlatformActivityHub({ engine, exchangeStatus, feeSummary }: Prop
         <span style={{
           fontSize:    7.5,
           fontFamily:  "monospace",
-          color:       "#1e3548",
+          color:       "#2a4050",
           letterSpacing: "0.1em",
           marginLeft:  6,
         }}>
           OPERATOR LAYER · REAL-TIME PLATFORM TELEMETRY
         </span>
         <div style={{ flex: 1 }} />
-        <span
-          className="live-dot live-dot-cyan"
-          style={{ width: 5, height: 5 }}
-        />
-        <span style={{
-          fontSize:   8,
-          fontFamily: "monospace",
-          fontWeight: 700,
-          color:      "#00ff8a",
-        }}>
+        <span className="live-dot live-dot-cyan" style={{ width: 5, height: 5 }} />
+        <span style={{ fontSize: 8.5, fontFamily: "monospace", fontWeight: 700, color: "#00ff8a" }}>
           LIVE
         </span>
       </div>
 
-      {/* ── Operator Metrics Strip ────────────────────────────────────────────── */}
+      {/* ── Operator Metrics Strip ─────────────────────────────────────────── */}
       <div style={{
         display:      "flex",
         borderBottom: "1px solid #081420",
         background:   "#010c18",
         overflowX:    "auto",
+        scrollbarWidth: "none",
       }}>
         {metrics.map(m => (
           <MetCell
@@ -442,12 +493,16 @@ export function PlatformActivityHub({ engine, exchangeStatus, feeSummary }: Prop
             color={m.color}
             sub={m.sub}
             pulse={m.pulse}
+            wide={m.wide}
           />
         ))}
       </div>
 
-      {/* ── Chart + Event Stream ──────────────────────────────────────────────── */}
-      <div style={{ display: "flex", height: 230 }}>
+      {/* ── Exchange Distribution Bar ──────────────────────────────────────── */}
+      <ExchDistBar />
+
+      {/* ── Chart + Event Stream ──────────────────────────────────────────── */}
+      <div style={{ display: "flex", height: 280 }}>
 
         {/* Animated activity chart */}
         <div style={{ flex: 1, overflow: "hidden" }}>

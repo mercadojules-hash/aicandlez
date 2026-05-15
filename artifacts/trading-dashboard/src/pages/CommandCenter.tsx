@@ -338,6 +338,7 @@ export default function CommandCenter() {
       <TelemetryRow
         engine={engine} settings={settings}
         trades={trades} exchangeStatus={exchangeStatus} feeSummary={feeSummary}
+        liveBalance={liveBalance} simAccount={simAccount}
       />
 
       {/* ③ Command strip — two rows: top = identity + actions, bottom = exchange switcher */}
