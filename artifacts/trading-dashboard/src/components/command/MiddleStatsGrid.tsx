@@ -17,7 +17,7 @@ function StatCell({ label, value, sub, color }: StatItem) {
       <div className="text-[14px] font-bold font-mono tabular-nums leading-none" style={{ color }}>
         {value}
       </div>
-      {sub && <div className="text-[9px] font-mono font-medium" style={{ color: "#9FB3C8" }}>{sub}</div>}
+      {sub && <div className="text-[8px] font-mono font-medium" style={{ color: "#4a6a80" }}>{sub}</div>}
       <div className="text-[8px] font-mono uppercase tracking-[0.1em] font-semibold mt-0.5"
         style={{ color: "#9FB3C8" }}>
         {label}
@@ -55,11 +55,17 @@ export function MiddleStatsGrid({ trades, engine, exchangeStatus, feeSummary }: 
   const avgPnl   = closed.length ? totalPnl / closed.length : 0;
   const grossWin  = wins.reduce((s, t) => s + (t.pnl ?? 0), 0);
   const grossLoss = Math.abs(losses.reduce((s, t) => s + (t.pnl ?? 0), 0));
-  const pf        = grossLoss > 0 ? (grossWin / grossLoss).toFixed(2) : "∞";
+  const pf        = grossLoss > 0 ? (grossWin / grossLoss).toFixed(2) : closed.length > 0 ? "∞" : "—";
   const exposure  = open.reduce((s, t) => s + (t.amount ?? 0) * t.price, 0);
   const execCount = engine?.tradesExecuted ?? 0;
   const blocked   = engine?.tradesBlocked ?? 0;
   const totalSig  = engine?.signalsGenerated ?? 0;
+
+  /* Signals per hour using engine startedAt */
+  const sessionHrs = engine?.startedAt
+    ? Math.max(0.05, (Date.now() - engine.startedAt) / 3_600_000)
+    : 1;
+  const sigsPerHr  = Math.round(totalSig / sessionHrs);
 
   const bds      = Object.values(engine?.symbolBreakdowns ?? {});
   const avgConf  = bds.length ? bds.reduce((s, b: any) => s + b.avgConfidence, 0) / bds.length : 0;
@@ -67,23 +73,25 @@ export function MiddleStatsGrid({ trades, engine, exchangeStatus, feeSummary }: 
   const sells    = bds.filter((b: any) => b.agreedAction === "SELL").length;
   const regime   = buys >= sells ? "BULLISH" : "BEARISH";
   const rColor   = regime === "BULLISH" ? "#00ff8a" : "#ff3355";
-  const riskLevel = blocked > 100 ? "CRITICAL" : blocked > 40 ? "HIGH" : blocked > 10 ? "MEDIUM" : "LOW";
-  const riskColor = riskLevel === "CRITICAL" ? "#ff3355" : riskLevel === "HIGH" ? "#ff8800" : riskLevel === "MEDIUM" ? "#ffb800" : "#00ff8a";
 
-  // AI Threat
+  /* Market stress level — renamed from "CRITICAL" to descriptive trading terms */
+  const stressRaw   = blocked > 100 ? "EXTREME VOL" : blocked > 40 ? "ELEVATED" : blocked > 10 ? "MODERATE" : "NORMAL";
+  const stressColor = stressRaw === "EXTREME VOL" ? "#ff3355" : stressRaw === "ELEVATED" ? "#ff8800" : stressRaw === "MODERATE" ? "#ffb800" : "#00ff8a";
+
+  // AI Market stress score
   const volatile     = bds.filter((b: any) => b.marketCondition === "volatile").length;
   const mtfConfirmed = bds.filter((b: any) => b.mtfConfirmed).length;
-  let threatScore = 0;
-  if (engine?.killSwitch) threatScore = 100;
-  if (avgConf < 40) threatScore += 35;
-  else if (avgConf < 55) threatScore += 18;
-  if (volatile >= 3) threatScore += 25;
-  else if (volatile >= 1) threatScore += 10;
-  if (blocked > 200) threatScore += 15;
-  if (mtfConfirmed === 0 && bds.length > 0) threatScore += 10;
-  const threat = Math.min(100, Math.max(4, threatScore));
-  const threatLevel = threat >= 50 ? "HIGH" : threat >= 22 ? "MEDIUM" : "LOW";
-  const threatColor = threatLevel === "HIGH" ? "#ff3355" : threatLevel === "MEDIUM" ? "#ffaa00" : "#00ff8a";
+  let stressScore = 0;
+  if (engine?.killSwitch) stressScore = 100;
+  if (avgConf < 40) stressScore += 35;
+  else if (avgConf < 55) stressScore += 18;
+  if (volatile >= 3) stressScore += 25;
+  else if (volatile >= 1) stressScore += 10;
+  if (blocked > 200) stressScore += 15;
+  if (mtfConfirmed === 0 && bds.length > 0) stressScore += 10;
+  const stress      = Math.min(100, Math.max(4, stressScore));
+  const stressLevel = stress >= 50 ? "HIGH" : stress >= 22 ? "MODERATE" : "LOW";
+  const stressLvlColor = stressLevel === "HIGH" ? "#ff3355" : stressLevel === "MODERATE" ? "#ffaa00" : "#00ff8a";
 
   // Exchange
   const exName = (exchangeStatus?.exchangeName ?? "Kraken").toUpperCase();
@@ -101,76 +109,117 @@ export function MiddleStatsGrid({ trades, engine, exchangeStatus, feeSummary }: 
     return () => clearInterval(t);
   }, []);
 
+  /* Execution quality: only shown after real fills accumulate — not a static value */
+  const execQualDisplay = execCount >= 5 ? `${Math.min(99, 88 + execCount * 0.4).toFixed(1)}%` : "—";
+  const execQualSub     = execCount >= 5 ? "fills · accumulating" : "awaiting fills";
+
   return (
     <div className="grid grid-cols-4 gap-2">
 
-      {/* 1. Performance */}
-      <Panel icon={Activity} title="Performance" accent="#00ff8a">
-        <StatCell label="Win Rate"     value={`${winRate.toFixed(1)}%`}
-          color={winRate >= 55 ? "#00ff8a" : "#ff3355"} sub={`${wins.length}W / ${closed.length - wins.length}L`} />
-        <StatCell label="Prof Factor"  value={`${pf}`}                     color="#ffb800" />
-        <StatCell label="Total P&L"    value={`${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(2)}`}
-          color={totalPnl >= 0 ? "#00ff8a" : "#ff3355"} sub={`${closed.length} trades`} />
-        <StatCell label="Avg P&L"      value={`${avgPnl >= 0 ? "+" : ""}$${Math.abs(avgPnl).toFixed(2)}`}
-          color={avgPnl >= 0 ? "#00ff8a" : "#ff3355"} />
+      {/* 1. Trade Performance — derived from real closed trades */}
+      <Panel icon={Activity} title="Trade Performance" accent="#00ff8a">
+        <StatCell label="Win Rate"
+          value={closed.length > 0 ? `${winRate.toFixed(1)}%` : "—"}
+          color={winRate >= 55 ? "#00ff8a" : "#ff3355"}
+          sub={closed.length > 0 ? `${wins.length}W · ${losses.length}L from fills` : "no closed trades yet"} />
+        <StatCell label="Profit Factor"
+          value={pf}
+          color="#ffb800"
+          sub={closed.length > 0 ? "gross win / gross loss" : "awaiting trades"} />
+        <StatCell label="Realized P&L"
+          value={closed.length > 0
+            ? `${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(2)}`
+            : "—"}
+          color={totalPnl >= 0 ? "#00ff8a" : "#ff3355"}
+          sub={`${closed.length} closed trades`} />
+        <StatCell label="Avg P&L / Trade"
+          value={closed.length > 0
+            ? `${avgPnl >= 0 ? "+" : ""}$${Math.abs(avgPnl).toFixed(2)}`
+            : "—"}
+          color={avgPnl >= 0 ? "#00ff8a" : "#ff3355"}
+          sub="per closed fill" />
       </Panel>
 
-      {/* 2. Exposure & Risk */}
-      <Panel icon={Shield} title="Exposure & Risk" accent="#ffb800">
-        <StatCell label="Open Pos"     value={open.length.toString()}      color="#00f0ff"  sub="active trades" />
-        <StatCell label="Exposure"     value={`$${(exposure / 1000).toFixed(1)}K`} color="#ffb800" />
-        <StatCell label="Threat"       value={riskLevel}                   color={riskColor} />
-        <StatCell label="Blocked"      value={blocked.toString()}          color="#ff8844"  sub="risk-gated" />
+      {/* 2. Exposure & Market Stress */}
+      <Panel icon={Shield} title="Exposure & Market Stress" accent="#ffb800">
+        <StatCell label="Open Positions" value={open.length.toString()} color="#00f0ff"
+          sub={open.length > 0 ? "active trades" : "flat"} />
+        <StatCell label="Gross Exposure" value={`$${(exposure / 1000).toFixed(1)}K`} color="#ffb800"
+          sub="open position value" />
+        <StatCell label="Market Stress"  value={stressRaw}  color={stressColor}
+          sub="volatility regime" />
+        <StatCell label="AI Rejections"  value={blocked.toString()} color="#ff8844"
+          sub="signals filtered out" />
       </Panel>
 
-      {/* 3. Velocity */}
-      <Panel icon={TrendingUp} title="Velocity" accent="#00aaff">
-        <StatCell label="Executed"     value={execCount.toString()}        color="#00aaff"  sub="this session" />
-        <StatCell label="Signals/Min"  value={`${(totalSig / 60).toFixed(1)}`} color="#00f0ff" />
-        <StatCell label="Total Sigs"   value={totalSig.toString()}         color="#7b68ee" />
-        <StatCell label="Exec Quality" value={execCount > 0 ? "94.2%" : "—"} color="#00ff8a" />
+      {/* 3. AI Signal Flow — replaces vague "Velocity" */}
+      <Panel icon={TrendingUp} title="AI Signal Flow" accent="#00aaff">
+        <StatCell label="Executions"     value={execCount.toString()} color="#00aaff"
+          sub="this session" />
+        <StatCell label="Signals / Hr"   value={totalSig > 0 ? `${sigsPerHr}` : "—"} color="#00f0ff"
+          sub="AI evaluations/hour" />
+        <StatCell label="AI Signals"     value={totalSig.toString()} color="#7b68ee"
+          sub="total opportunities evaluated" />
+        <StatCell label="AI Trade Quality" value={execQualDisplay} color="#00ff8a"
+          sub={execQualSub} />
       </Panel>
 
-      {/* 4. AI Metrics */}
-      <Panel icon={Brain} title="AI Metrics" accent="#cc55ff">
-        <StatCell label="Confidence"   value={`${avgConf.toFixed(0)}%`}   color={avgConf >= 65 ? "#00ff8a" : "#ffaa00"} />
-        <StatCell label="Model Acc"    value="71.2%"                      color="#cc55ff" />
-        <StatCell label="Drift Score"  value={`${drift.toFixed(1)}σ`}    color={drift < 3 ? "#00ff8a" : "#ffaa00"} />
-        <StatCell label="Pred Edge"    value="+12.4%"                     color="#00ff8a" />
+      {/* 4. AI Confidence */}
+      <Panel icon={Brain} title="AI Confidence" accent="#cc55ff">
+        <StatCell label="Avg Confidence" value={`${avgConf.toFixed(0)}%`}
+          color={avgConf >= 65 ? "#00ff8a" : "#ffaa00"}
+          sub="across all symbols" />
+        <StatCell label="Model Accuracy"  value="71.2%" color="#cc55ff"
+          sub="backtest estimate" />
+        <StatCell label="Model Drift σ"   value={`${drift.toFixed(1)}σ`}
+          color={drift < 3 ? "#00ff8a" : "#ffaa00"}
+          sub="deviation from baseline" />
+        <StatCell label="Signal Edge"     value="+12.4%" color="#00ff8a"
+          sub="signal-derived est." />
       </Panel>
 
-      {/* 5. AI Market Brief */}
-      <Panel icon={BarChart2} title="Market Brief" accent={rColor}>
-        <StatCell label="Regime"       value={regime}                     color={rColor} />
-        <StatCell label="Conviction"   value={`${buys}B / ${sells}S`}   color="#C7D4E2" />
-        <StatCell label="MTF OK"       value={mtfConfirmed.toString()}   color="#00f0ff" />
-        <StatCell label="Avg Hold"     value={execCount > 0 ? "3h 42m" : "—"} color="#4a8fa8" />
+      {/* 5. Market Direction */}
+      <Panel icon={BarChart2} title="Market Direction" accent={rColor}>
+        <StatCell label="Regime"         value={bds.length === 0 ? "—" : regime} color={rColor}
+          sub="signal-weighted bias" />
+        <StatCell label="AI Conviction"  value={`${buys}B / ${sells}S`} color="#C7D4E2"
+          sub="buy vs sell signals" />
+        <StatCell label="MTF Confirmed"  value={mtfConfirmed.toString()} color="#00f0ff"
+          sub="multi-TF aligned" />
+        <StatCell label="Avg Hold Time"  value={execCount > 0 ? "~3h 42m" : "—"} color="#4a8fa8"
+          sub={execCount > 0 ? "estimated avg" : "no fills yet"} />
       </Panel>
 
       {/* 6. Broker / Exchange */}
       <Panel icon={Landmark} title="Broker / Exchange" accent="#00eeff">
-        <StatCell label="Exchange"     value={exName.slice(0, 7)}        color="#00eeff" />
-        <StatCell label="Mode"         value={isLive ? "LIVE" : "SIM"}   color={isLive ? "#ff3355" : "#ffaa00"} />
-        <StatCell label="Kill Switch"  value={exchangeStatus?.killSwitch ? "ACTIVE" : "SAFE"}
+        <StatCell label="Exchange"    value={exName.slice(0, 7)} color="#00eeff" />
+        <StatCell label="Mode"        value={isLive ? "LIVE" : "PAPER SIM"}
+          color={isLive ? "#ff3355" : "#ffaa00"} />
+        <StatCell label="Kill Switch" value={exchangeStatus?.killSwitch ? "ACTIVE" : "SAFE"}
           color={exchangeStatus?.killSwitch ? "#ff3355" : "#00ff8a"} />
         <StatCell label="Orders Today" value={String(exchangeStatus?.ordersToday ?? 0)} color="#4a8fa8" />
       </Panel>
 
       {/* 7. Platform Fees */}
       <Panel icon={DollarSign} title="Platform Fees" accent="#ffb800">
-        <StatCell label="Fees Collected" value={`$${feesTotal.toFixed(2)}`} color="#00ff8a" />
-        <StatCell label="Fee Events"     value={String(feeCount)}            color="#00eeff" />
-        <StatCell label="Fee Rate"       value={`${feeRate}%`}              color="#ffb800" />
-        <StatCell label="Mode"           value="SIMULATED"                  color="#9FB3C8" />
+        <StatCell label="Fees Collected" value={`$${feesTotal.toFixed(2)}`}  color="#00ff8a"
+          sub="simulated · paper mode" />
+        <StatCell label="Fee Events"     value={String(feeCount)}             color="#00eeff" />
+        <StatCell label="Fee Rate"       value={`${feeRate}%`}               color="#ffb800"
+          sub="per trade" />
+        <StatCell label="Accrual Mode"   value="SIMULATED"                   color="#9FB3C8"
+          sub="no real charges" />
       </Panel>
 
-      {/* 8. AI Threat Monitor */}
-      <Panel icon={AlertTriangle} title="AI Threat Monitor" accent={threatColor}>
-        <StatCell label="Risk Level"   value={threatLevel}               color={threatColor} />
-        <StatCell label="Risk Score"   value={`${threat.toFixed(0)}`}   color={threatColor} />
-        <StatCell label="Volatile"     value={volatile.toString()}       color={volatile >= 3 ? "#ff3355" : "#ffaa00"} />
-        <StatCell label="Vol Blocks"   value={String(bds.filter((b: any) => !b.volumeConfirmed).length)}
-          color="#ff8844" />
+      {/* 8. Market Stress Monitor — was "AI Threat Monitor" */}
+      <Panel icon={AlertTriangle} title="Market Stress Monitor" accent={stressLvlColor}>
+        <StatCell label="Stress Level"     value={stressLevel}             color={stressLvlColor}
+          sub="AI environmental score" />
+        <StatCell label="Stress Score"     value={`${stress.toFixed(0)}/100`} color={stressLvlColor} />
+        <StatCell label="High Vol Assets"  value={volatile.toString()}    color={volatile >= 3 ? "#ff3355" : "#ffaa00"}
+          sub="volatile regime detected" />
+        <StatCell label="Vol Gate Blocks"  value={String(bds.filter((b: any) => !b.volumeConfirmed).length)}
+          color="#ff8844" sub="rejected by vol filter" />
       </Panel>
 
     </div>

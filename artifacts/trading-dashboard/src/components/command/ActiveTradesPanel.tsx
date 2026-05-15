@@ -18,11 +18,11 @@ function ConfBar({ pct, color }: { pct: number; color: string }) {
     <div className="flex flex-col gap-0.5">
       <div className="flex justify-between items-center">
         <span className="text-[8px] font-mono font-medium" style={{ color: "#9FB3C8" }}>CONF</span>
-        <span className="text-[10px] font-bold font-mono tabular-nums" style={{ color }}>
+        <span className="text-[11px] font-bold font-mono tabular-nums" style={{ color }}>
           {pct.toFixed(0)}%
         </span>
       </div>
-      <div style={{ height: 4, background: "#0d0d0d", borderRadius: 2, overflow: "hidden" }}>
+      <div style={{ height: 5, background: "#0d0d0d", borderRadius: 2, overflow: "hidden" }}>
         <div style={{
           height: "100%",
           width: `${Math.min(100, pct)}%`,
@@ -64,43 +64,43 @@ function TradeRow({ t, now, conf, isOpen }: {
         style={{ gridTemplateColumns: isOpen ? COL_OPEN : COL_CLOSED }}>
 
         {/* Symbol badge */}
-        <div className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0 text-[9px] font-bold"
+        <div className="w-9 h-9 rounded flex items-center justify-center flex-shrink-0 text-[11px] font-bold"
           style={{ background: `${color}12`, color, border: `1px solid ${color}20` }}>
           {sym.slice(0, 3)}
         </div>
 
         {/* Pair + time */}
         <div>
-          <div className="text-[11px] font-bold font-mono" style={{ color }}>{sym}/USD</div>
-          <div className="text-[8px] font-mono font-medium mt-0.5" style={{ color: "#9FB3C8" }}>{ts}</div>
+          <div className="text-[13px] font-bold font-mono" style={{ color }}>{sym}/USD</div>
+          <div className="text-[9px] font-mono font-medium mt-0.5" style={{ color: "#9FB3C8" }}>{ts}</div>
         </div>
 
         {/* Side */}
-        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded font-mono tracking-wide"
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded font-mono tracking-wide"
           style={{ background: `${sideColor}12`, color: sideColor, border: `1px solid ${sideColor}22` }}>
           {sideUp ? "LONG" : "SHORT"}
         </span>
 
         {/* Size */}
         <div>
-          <div className="text-[10px] font-mono tabular-nums font-bold" style={{ color: "#EAF2FF" }}>
+          <div className="text-[12px] font-mono tabular-nums font-bold" style={{ color: "#EAF2FF" }}>
             {t.amount != null ? t.amount.toFixed(3) : "—"}
           </div>
-          <div className="text-[8px] font-mono font-medium" style={{ color: "#9FB3C8" }}>{sym}</div>
+          <div className="text-[9px] font-mono font-medium" style={{ color: "#9FB3C8" }}>{sym}</div>
         </div>
 
         {/* Entry */}
         <div>
-          <div className="text-[8px] font-mono font-medium mb-0.5" style={{ color: "#9FB3C8" }}>ENTRY</div>
-          <div className="text-[10px] font-bold font-mono tabular-nums" style={{ color: "#C7D4E2" }}>
+          <div className="text-[9px] font-mono font-medium mb-0.5" style={{ color: "#9FB3C8" }}>ENTRY</div>
+          <div className="text-[12px] font-bold font-mono tabular-nums" style={{ color: "#C7D4E2" }}>
             ${fmtPrice(t.price)}
           </div>
         </div>
 
         {/* Current */}
         <div>
-          <div className="text-[8px] font-mono font-medium mb-0.5" style={{ color: "#9FB3C8" }}>NOW</div>
-          <div className="text-[10px] font-bold font-mono tabular-nums" style={{ color: "#EAF2FF" }}>
+          <div className="text-[9px] font-mono font-medium mb-0.5" style={{ color: "#9FB3C8" }}>CURRENT</div>
+          <div className="text-[12px] font-bold font-mono tabular-nums" style={{ color: "#EAF2FF" }}>
             ${fmtPrice(t.price * (1 + Math.sin(Date.now() / 10000 + t.price) * 0.001))}
           </div>
         </div>
@@ -108,17 +108,17 @@ function TradeRow({ t, now, conf, isOpen }: {
         {/* PnL or Status */}
         {isOpen ? (
           <div className="flex flex-col gap-1">
-            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded font-mono inline-block"
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded font-mono inline-block"
               style={{ background: "#00eeff08", color: "#00eeff", border: "1px solid #00eeff20" }}>
               ● OPEN
             </span>
             <div className="flex items-center gap-1">
-              <span className="text-[7px] font-bold px-1 py-0.5 rounded font-mono"
+              <span className="text-[8px] font-bold px-1 py-0.5 rounded font-mono"
                 style={{ background: `${riskColor}10`, color: riskColor, border: `1px solid ${riskColor}18` }}>
-                {conf >= 70 ? "LOW" : conf >= 50 ? "MED" : "HIGH"}
+                {conf >= 70 ? "LOW RISK" : conf >= 50 ? "MED RISK" : "HIGH RISK"}
               </span>
               {age && (
-                <span className="flex items-center gap-0.5 text-[8px] font-mono font-medium"
+                <span className="flex items-center gap-0.5 text-[9px] font-mono font-medium"
                   style={{ color: "#9FB3C8" }}>
                   <Clock className="w-2.5 h-2.5" />{age}
                 </span>
@@ -128,11 +128,11 @@ function TradeRow({ t, now, conf, isOpen }: {
         ) : (
           <div>
             <div className={pnlPos ? "pnl-live-green" : "pnl-live-red"}
-              style={{ fontSize: 14, fontWeight: 700, fontFamily: "monospace" }}>
+              style={{ fontSize: 17, fontWeight: 700, fontFamily: "monospace" }}>
               {pnlPos ? "+" : ""}{pnl.toFixed(3)}
             </div>
             {t.pnlPercent != null && (
-              <div className="text-[8px] font-mono tabular-nums font-medium mt-0.5"
+              <div className="text-[10px] font-mono tabular-nums font-medium mt-0.5"
                 style={{ color: t.pnlPercent >= 0 ? "#00ff8a80" : "#ff335570" }}>
                 {t.pnlPercent >= 0 ? "+" : ""}{t.pnlPercent.toFixed(2)}%
               </div>
@@ -193,11 +193,11 @@ export function ActiveTradesPanel({ trades }: Props) {
 
   const FooterStat = ({ label, value, color }: { label: string; value: string; color: string }) => (
     <div className="flex flex-col items-center px-3 py-1.5 rounded"
-      style={{ background: `${color}06`, border: `1px solid ${color}10`, minWidth: 64 }}>
-      <div className="text-[13px] font-bold font-mono tabular-nums" style={{ color }}>
+      style={{ background: `${color}06`, border: `1px solid ${color}10`, minWidth: 72 }}>
+      <div className="text-[16px] font-bold font-mono tabular-nums" style={{ color }}>
         {value}
       </div>
-      <div className="text-[7px] font-mono tracking-[0.1em] mt-0.5 font-semibold" style={{ color: "#9FB3C8" }}>
+      <div className="text-[8.5px] font-mono tracking-[0.1em] mt-0.5 font-semibold" style={{ color: "#9FB3C8" }}>
         {label}
       </div>
     </div>
@@ -278,7 +278,7 @@ export function ActiveTradesPanel({ trades }: Props) {
         <div className="px-3 py-2 border-t flex items-center gap-2 flex-wrap"
           style={{ borderTopColor: "#111111", marginTop: "auto" }}>
           <FooterStat label="CLOSED"   value={recent.length.toString()}   color="#C7D4E2" />
-          <FooterStat label="WIN RATE" value={`${winPct.toFixed(1)}%`}    color={winPct >= 50 ? "#00ff8a" : "#ffaa00"} />
+          <FooterStat label="REALIZED WIN RATE" value={recent.length > 0 ? `${winPct.toFixed(1)}%` : "—"} color={winPct >= 50 ? "#00ff8a" : "#ffaa00"} />
           <FooterStat label="NET PnL"  value={`${totalPnl >= 0 ? "+" : ""}$${Math.abs(totalPnl).toFixed(2)}`}
             color={totalPnl >= 0 ? "#00ff8a" : "#ff3355"} />
         </div>

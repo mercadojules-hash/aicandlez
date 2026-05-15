@@ -1,0 +1,214 @@
+LOWER OPERATOR TELEMETRY CLARIFICATION PASS
+
+We are now refining the semantic clarity and readability of the lower operator telemetry layer.
+
+IMPORTANT:
+Metrics must become:
+
+* understandable
+* explainable
+* operationally meaningful
+* trustworthy
+
+Avoid vague/fake-feeling terminology.
+
+========================================
+
+1. ACTIVE TRADES / RECENTLY CLOSED
+   ========================================
+
+Layout is good.
+
+Only changes needed:
+
+* increase font sizes
+* larger asset symbols
+* larger PnL values
+* slightly larger entry/current price text
+* improve readability for long-duration operator monitoring
+
+========================================
+2. PERFORMANCE METRICS VALIDATION
+=================================
+
+We need to clearly separate:
+
+* REAL metrics
+  vs
+* DERIVED metrics
+  vs
+* PLACEHOLDER metrics
+
+If metrics are:
+
+* simulated
+* seeded
+* estimated
+* derived from temporary activity
+
+they should either:
+
+* be labeled appropriately
+  OR
+* be replaced with explainable operational metrics.
+
+========================================
+3. “CRITICAL THREAT”
+====================
+
+Replace:
+“Critical Threat”
+
+This wording sounds:
+
+* cybersecurity related
+* system failure related
+* alarming/confusing
+
+Replace with:
+
+* High Volatility
+* Market Stress
+* Elevated Risk
+* AI Defensive Mode
+* Extreme Volatility
+
+Use terminology aligned with trading intelligence.
+
+========================================
+4. “RISK-GATED BLOCKED”
+=======================
+
+Clarify this metric.
+
+If this means:
+AI-filtered/rejected trades,
+rename it.
+
+Suggested replacements:
+
+* Trades Filtered
+* AI Risk Rejections
+* Signals Avoided
+* Risk-Limited Signals
+
+Also add hover/subtext explanation:
+Examples:
+
+* low confidence
+* spread too high
+* insufficient volume
+* volatility rejection
+* correlation conflict
+
+========================================
+5. “VELOCITY”
+=============
+
+Clarify:
+what does Velocity represent?
+
+If:
+
+* trades executed this session
+* executions/hour
+* order flow rate
+* AI activity intensity
+
+make that explicit in the UI.
+
+========================================
+6. “TOTAL SIGS”
+===============
+
+Clarify:
+this likely means:
+total AI-generated signals.
+
+Add:
+
+* explanatory subtext
+* tooltip
+  OR
+* improved label
+
+Examples:
+
+* AI Signals Generated
+* Total Opportunities Evaluated
+* Total Signal Events
+
+========================================
+7. “EXEC QUALITY”
+=================
+
+Clarify this metric.
+
+If this represents:
+
+* execution efficiency
+* signal precision
+* AI trade timing quality
+* slippage reduction
+* profitable execution rate
+
+rename it more clearly.
+
+Suggested replacements:
+
+* AI Execution Score
+* Signal Precision
+* AI Trade Efficiency
+* AI Trade Quality
+* AI Execution Accuracy
+
+This metric is important because it becomes:
+the AI credibility metric.
+
+========================================
+8. WIN RATE / PROFIT FACTOR
+===========================
+
+Verify whether:
+
+* win rate
+* W/L counts
+* profit factor
+
+are currently:
+
+* real
+* simulated
+* seeded
+* derived
+
+If not yet based on real historical closed trades,
+adjust presentation appropriately until true trade history accumulates.
+
+Eventually these metrics should ONLY derive from:
+
+* real fills
+* real closed trades
+* realized PnL
+* actual execution history
+
+========================================
+9. GLOBAL GOAL
+==============
+
+This dashboard is now becoming:
+an institutional AI trading operations console.
+
+Metrics must feel:
+
+* believable
+* explainable
+* operational
+* trustworthy
+
+Avoid:
+
+* vague terminology
+* fake intelligence metrics
+* ambiguous abbreviations
+* unclear operational states

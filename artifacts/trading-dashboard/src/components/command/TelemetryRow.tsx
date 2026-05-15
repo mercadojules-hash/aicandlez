@@ -251,8 +251,9 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       color: avgConf >= 65 ? "#00ff8a" : avgConf >= 45 ? "#ffaa00" : "#ff3355",
     },
     {
-      label: "BLOCKED",
+      label: "AI REJECTIONS",
       value: blocked,
+      sub:   blocked > 0 ? "signals filtered" : undefined,
       color: blocked > 50 ? "#ff2255" : blocked > 20 ? "#ffb800" : "#1a3850",
       dim:   blocked === 0,
     },
