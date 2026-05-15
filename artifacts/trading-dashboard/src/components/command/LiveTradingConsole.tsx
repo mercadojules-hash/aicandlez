@@ -4,6 +4,7 @@ import {
   TrendingUp, TrendingDown, Clock, Zap, AlertTriangle, Activity, X, Trash2,
 } from "lucide-react";
 import type { EngineStatus, AppSettings, Trade, ExchangeStatus, SimAccount, LiveBalance } from "./types";
+import { LiveUserActivityPanel } from "./LiveUserActivityPanel";
 
 // ── Exchange options ──────────────────────────────────────────────────────────
 
@@ -801,8 +802,11 @@ export function LiveTradingConsole({
             />
           </div>
 
-          {/* Active trade / no-position card */}
-          <ActiveTradeCard openTrade={openTrade} simPos={simPos} />
+          {/* Active trade OR live user activity panel */}
+          {(openTrade || simPos)
+            ? <ActiveTradeCard openTrade={openTrade} simPos={simPos} />
+            : <LiveUserActivityPanel engine={engine} />
+          }
         </div>
 
         {/* RIGHT: Configuration Panel */}
