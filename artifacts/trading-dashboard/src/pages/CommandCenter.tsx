@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useLiveConsent, LiveConsentModal } from "@/components/ConsentGate";
 import { Cpu, Clock, ShieldOff, Pause, Play } from "lucide-react";
 
 import { TickerStrips }          from "@/components/command/TickerStrips";
@@ -158,9 +159,12 @@ export default function CommandCenter() {
 
   // Optimistic mode — reflects button click immediately before the server round-trip completes.
   // null = use server state; "sim" | "kraken" | "coinbase" | … = pending click
-  const [pendingMode,  setPendingMode]  = useState<string | null>(null);
-  const [switchError,  setSwitchError]  = useState<string | null>(null);
-  const [closingAll,   setClosingAll]   = useState(false);
+  const [pendingMode,   setPendingMode]   = useState<string | null>(null);
+  const [switchError,   setSwitchError]   = useState<string | null>(null);
+  const [closingAll,    setClosingAll]    = useState(false);
+  const [pendingLiveEx, setPendingLiveEx] = useState<string | null>(null);
+
+  const { hasConsented } = useLiveConsent();
 
   const { data: engine } = useQuery<EngineStatus>({
     queryKey: ["engine-status-cmd"],
@@ -329,8 +333,15 @@ export default function CommandCenter() {
       });
   };
 
-  const selectSim  = ()           => switchExchangeMode("sim", "simulation");
-  const selectLive = (ex: string) => switchExchangeMode(ex.toLowerCase(), ex.toLowerCase());
+  const selectSim  = () => switchExchangeMode("sim", "simulation");
+  const selectLive = (ex: string) => {
+    const id = ex.toLowerCase();
+    if (!hasConsented) {
+      setPendingLiveEx(id);
+    } else {
+      switchExchangeMode(id, id);
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: "#060810" }}>
@@ -470,6 +481,16 @@ export default function CommandCenter() {
         <BottomAnalyticsRow engine={engine} trades={trades} />
 
       </div>
+
+      {/* Live trading consent — shown only when user first tries to activate a live exchange */}
+      <LiveConsentModal
+        open={pendingLiveEx !== null}
+        onConsented={() => {
+          if (pendingLiveEx) switchExchangeMode(pendingLiveEx, pendingLiveEx);
+          setPendingLiveEx(null);
+        }}
+        onCancel={() => setPendingLiveEx(null)}
+      />
     </div>
   );
 }

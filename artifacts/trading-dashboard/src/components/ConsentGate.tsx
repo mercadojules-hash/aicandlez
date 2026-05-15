@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Shield, CheckCircle2, Circle, AlertTriangle, Loader2 } from "lucide-react";
+import { Shield, CheckCircle2, Circle, AlertTriangle, Loader2, X } from "lucide-react";
 
-// ── ConsentGate ───────────────────────────────────────────────────────────────
-// Shown once per user (version "v1.0") on first authenticated dashboard access.
-// Blocks the UI beneath until all five consent items are explicitly checked.
-// On acceptance: POST /api/user/consent — record is persisted to DB.
+// ── Live Trading Consent ───────────────────────────────────────────────────────
+// Shown once per user (version "v1.0") at the moment they first try to activate
+// a live exchange. Paper trading is always free and requires no consent.
+// Modal is non-blocking — the dashboard renders normally behind it.
 
 interface ConsentStatus {
   hasConsented:   boolean;
@@ -17,41 +17,52 @@ const CONSENT_ITEMS = [
   {
     id:    "acceptedTerms",
     label: "I accept the Apex Trader Terms of Service and understand this platform is for informational and research purposes. Crypto trading involves significant risk of loss.",
-    warn:  false,
   },
   {
     id:    "acceptedMembershipFee",
     label: "I understand Apex Trader charges a $5.99/month membership fee covering platform access, infrastructure, and AI compute. This fee applies regardless of trading performance.",
-    warn:  false,
   },
   {
     id:    "acceptedPerformanceFee",
     label: "I understand Apex Trader charges a 2% performance fee on PROFITABLE, CLOSED trades only. This fee is applied to realized gains when a trade closes in profit.",
-    warn:  false,
   },
   {
     id:    "acceptedNoFeeOnLosses",
     label: "I confirm that NO performance fee is charged on losing trades. If a trade closes at a loss, zero performance fee is applied.",
-    warn:  false,
   },
   {
     id:    "acceptedNoUnrealizedFee",
     label: "I confirm that NO performance fee is charged on unrealized PnL. Fees only apply to final, settled trade outcomes — not open positions.",
-    warn:  false,
   },
 ] as const;
 
 type ConsentKey = typeof CONSENT_ITEMS[number]["id"];
 
-export function ConsentGate({ children }: { children: React.ReactNode }) {
-  const qc = useQueryClient();
+// ── Hook ──────────────────────────────────────────────────────────────────────
 
+export function useLiveConsent() {
   const { data, isLoading } = useQuery<ConsentStatus>({
     queryKey: ["user-consent"],
     queryFn:  () => fetch("/api/user/consent").then(r => r.json()),
     staleTime: Infinity,
     retry: false,
   });
+  return {
+    hasConsented: data?.hasConsented ?? false,
+    isLoading,
+  };
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+interface LiveConsentModalProps {
+  open:        boolean;
+  onConsented: () => void;
+  onCancel:    () => void;
+}
+
+export function LiveConsentModal({ open, onConsented, onCancel }: LiveConsentModalProps) {
+  const qc = useQueryClient();
 
   const [checked, setChecked] = useState<Record<ConsentKey, boolean>>({
     acceptedTerms:           false,
@@ -78,31 +89,16 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
         old ? { ...old, hasConsented: true, consentedAt: new Date().toISOString() } : old
       );
       qc.invalidateQueries({ queryKey: ["user-consent"] });
+      onConsented();
     },
   });
 
-  // Already consented or still loading — render children directly
-  if (isLoading) {
-    return (
-      <div style={{
-        position: "fixed", inset: 0, display: "flex",
-        alignItems: "center", justifyContent: "center",
-        background: "#000508",
-      }}>
-        <Loader2 className="w-6 h-6 animate-spin" style={{ color: "#00aaff" }} />
-      </div>
-    );
-  }
+  if (!open) return null;
 
-  if (data?.hasConsented) {
-    return <>{children}</>;
-  }
-
-  // Gate: show consent modal
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 9999,
-      background: "rgba(0,2,8,0.97)",
+      background: "rgba(0,2,8,0.92)",
       backdropFilter: "blur(4px)",
       display: "flex", alignItems: "center", justifyContent: "center",
       padding: "20px",
@@ -116,7 +112,21 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
         maxHeight: "90vh",
         overflow: "auto",
         boxShadow: "0 0 60px #00aaff08, 0 0 120px #00aaff04",
+        position: "relative",
       }}>
+
+        {/* Close (cancel) */}
+        <button
+          onClick={onCancel}
+          style={{
+            position: "absolute", top: 14, right: 14,
+            background: "none", border: "none",
+            cursor: "pointer", padding: 4, color: "#2a4060",
+          }}
+          title="Cancel"
+        >
+          <X size={14} />
+        </button>
 
         {/* Header */}
         <div style={{
@@ -137,13 +147,13 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
               fontSize: 13, fontFamily: "monospace", fontWeight: 700,
               color: "#e8f4ff", letterSpacing: "0.06em",
             }}>
-              PLATFORM ACCESS AGREEMENT
+              LIVE TRADING AGREEMENT
             </div>
             <div style={{
               fontSize: 9, fontFamily: "monospace",
               color: "#3a6080", letterSpacing: "0.14em", marginTop: 2,
             }}>
-              APEX TRADER · VERSION 1.0 · REQUIRED BEFORE ACCESS
+              APEX TRADER · REQUIRED ONCE · BEFORE LIVE EXCHANGE ACTIVATION
             </div>
           </div>
         </div>
@@ -269,7 +279,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
             {isPending ? (
               <><Loader2 className="w-3.5 h-3.5 animate-spin" /> RECORDING CONSENT…</>
             ) : (
-              "I ACCEPT ALL TERMS — ACCESS PLATFORM"
+              "I ACCEPT ALL TERMS — ACTIVATE LIVE TRADING"
             )}
           </button>
 

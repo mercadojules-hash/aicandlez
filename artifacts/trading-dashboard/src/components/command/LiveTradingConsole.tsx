@@ -416,10 +416,10 @@ function LiveAssetIntelPanel({ engine }: { engine?: EngineStatus }) {
             {pressureDir}
           </span>
           <span style={{
-            fontSize: 17, fontFamily: "monospace", fontWeight: 700,
+            fontSize: 22, fontFamily: "monospace", fontWeight: 700,
             color: "#e8f8ff",
-            letterSpacing: "0.04em",
-            textShadow: "0 0 10px #00f0ff50, 0 0 2px #00f0ff30",
+            letterSpacing: "0.06em",
+            textShadow: "0 0 14px #00f0ff60, 0 0 4px #00f0ff40",
             lineHeight: 1,
           }}>
             {activeSym}

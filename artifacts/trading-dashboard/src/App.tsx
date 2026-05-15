@@ -43,7 +43,6 @@ import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
 import Leaderboard from "@/pages/Leaderboard";
 import AlertsPage from "@/pages/Alerts";
-import { ConsentGate } from "@/components/ConsentGate";
 
 // ── Env ───────────────────────────────────────────────────────────────────────
 
@@ -219,9 +218,7 @@ function Protected({ children }: { children: React.ReactNode }) {
       <ClerkLoading><FullPageLoader /></ClerkLoading>
       <ClerkLoaded>
         <Show when="signed-in">
-          <ConsentGate>
-            <Layout>{children}</Layout>
-          </ConsentGate>
+          <Layout>{children}</Layout>
         </Show>
         <Show when="signed-out"><Redirect to="/sign-in" /></Show>
       </ClerkLoaded>
