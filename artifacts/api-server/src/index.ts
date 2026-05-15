@@ -1,3 +1,9 @@
+// ── Load .env file for local development ──────────────────────────────────────
+// Must be the very first import so all process.env reads below see the values.
+// In Replit / Railway / Render the platform injects vars directly — dotenv is a
+// no-op when variables are already set, so this is safe in all environments.
+import "dotenv/config";
+
 import http from "http";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";

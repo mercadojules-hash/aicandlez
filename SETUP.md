@@ -33,6 +33,11 @@ This installs all workspace packages: `lib/api-client-react`, `lib/api-zod`,
 cp .env.example .env
 ```
 
+> **How env loading works locally:**
+> The API server imports `dotenv/config` as its very first statement, which reads
+> your `.env` file automatically before any other code runs. No manual patching
+> needed — just ensure `.env` exists with the values below.
+
 **Minimum required variables:**
 
 ```bash
