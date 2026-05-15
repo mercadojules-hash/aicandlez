@@ -1,0 +1,96 @@
+This is MUCH closer to the approved Apex AI visual direction.
+
+The UI now feels premium and cinematic instead of generic. Great progress.
+
+However, the Home screen still needs more emotional impact, stronger identity, and more “alive AI infrastructure” feeling.
+
+MOST IMPORTANT:
+The top section currently feels anonymous.
+
+Add:
+
+* user avatar/profile image
+* user name
+* plan badge (FREE / PRO / LIVE AI)
+* AI engine pulse indicator
+* connected exchange status
+* active mode indicator
+
+The user should instantly feel:
+“This is MY AI trading system.”
+
+The top hero section needs:
+
+* stronger glow depth
+* layered gradients
+* animated telemetry background
+* subtle scanning effects
+* more cinematic atmosphere
+
+The Portfolio Equity card should become the visual centerpiece.
+
+Increase:
+
+* typography scale
+* contrast
+* visual dominance
+* glow hierarchy
+* depth layering
+
+Add:
+
+* animated unrealized P&L pulse
+* subtle live chart movement in background
+* holographic gradient lighting
+* dynamic AI telemetry motion
+
+The UI still feels too static overall.
+
+Add subtle motion:
+
+* confidence bar animations
+* telemetry pulses
+* micro chart movement
+* AI heartbeat effects
+* live scanning indicators
+* realtime flickers
+* glow breathing animations
+
+DO NOT overdo it.
+Think:
+Apple + Bloomberg + AI operating system.
+
+The “Activate Live AI Trading” section is MUCH better now, but it should feel even more premium because this is the monetization centerpiece.
+
+Emphasize:
+
+* paper trading always free
+* supported exchanges only
+* $5.99 monthly platform fee
+* 2% fee ONLY on profitable CLOSED trades
+* NO fee on losing trades
+
+The activation experience should feel:
+
+* trustworthy
+* secure
+* institutional
+* elite
+* high-end fintech
+
+NOT:
+
+* crypto scammy
+* loud
+* cheap
+* aggressive
+
+The overall visual hierarchy should guide the eye:
+
+1. Apex AI brand
+2. Portfolio equity
+3. AI engine status
+4. AI signals
+5. Live activation CTA
+
+Continue refining the approved design system — do not redesign the layout structure.
