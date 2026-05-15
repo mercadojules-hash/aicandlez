@@ -428,14 +428,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
     location === m.path || (m.path !== "/dashboard" && location.startsWith(m.path));
 
   const platformLinks = [
-    { icon: User,         label: "My Account",     href: "/account", badgeColor: "#00aaff"                      },
-    { icon: ShieldAlert,  label: "Admin Console",   href: "/admin",   badgeColor: "#cc55ff", badge: "OPERATOR"  },
-    { icon: Trophy,       label: "Leaderboard",     href: "/command", badgeColor: "#ffaa00"                      },
-    { icon: Bell,         label: "Alerts",          href: "/command", badgeColor: "#ff6600",  badge: "2"         },
-    { icon: Zap,          label: "AI Models",       href: "/ai",      badgeColor: "#cc55ff",  badge: "3"         },
-    { icon: Users,        label: "Users",           href: "/admin",   badgeColor: "#00aaff",  badge: "1,248"     },
-    { icon: DollarSign,   label: "Revenue",         href: "/admin",   badgeColor: "#ffaa00"                      },
-    { icon: AlertTriangle,label: "Risk Monitor",    href: "/risk",    badgeColor: "#ff8844"                      },
+    { icon: User,         label: "My Account",   href: "/account",     badgeColor: "#00aaff"                    },
+    { icon: ShieldAlert,  label: "Admin Console", href: "/admin",       badgeColor: "#cc55ff", badge: "OPERATOR" },
+    { icon: Trophy,       label: "Leaderboard",   href: "/leaderboard", badgeColor: "#ffaa00"                    },
+    { icon: Bell,         label: "Alerts",        href: "/alerts",      badgeColor: "#ff6600"                    },
+    { icon: Zap,          label: "AI Models",     href: "/ai",          badgeColor: "#cc55ff"                    },
+    { icon: DollarSign,   label: "Revenue",       href: "/admin",       badgeColor: "#ffaa00"                    },
+    { icon: AlertTriangle,label: "Risk Monitor",  href: "/risk",        badgeColor: "#ff8844"                    },
   ];
 
   const SidebarContent = ({ onNavigate, collap }: { onNavigate?: () => void; collap: boolean }) => (
@@ -464,7 +463,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {!collap && (
         <div className="px-2 py-1.5 border-t shrink-0" style={{ borderTopColor: "#0E2030" }}>
           <a
-            href="/apex-trader-operator-console-final.zip"
+            href="/apex-trader-full-export.zip"
             download
             className="flex items-center gap-2 px-2 py-1.5 rounded text-[9px] font-mono font-medium border border-transparent transition-colors"
             style={{ color: "#3a5a70" }}

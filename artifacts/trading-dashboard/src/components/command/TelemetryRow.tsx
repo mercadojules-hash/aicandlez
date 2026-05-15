@@ -11,66 +11,49 @@ interface Props {
   simAccount?:    SimAccount     | undefined;
 }
 
-/* ── Single telemetry cell ───────────────────────────────────────────────── */
+/* ── Flat telemetry cell — no card box, just an inline separator strip ────── */
 function Cell({
-  label, value, sub, color = "#00f0ff", dim = false, pulse = false, wide = false,
+  label, value, color = "#00f0ff", dim = false, pulse = false,
 }: {
-  label: string; value: string | number; sub?: string;
-  color?: string; dim?: boolean; pulse?: boolean; wide?: boolean;
+  label: string; value: string | number;
+  color?: string; dim?: boolean; pulse?: boolean;
 }) {
-  /* Dim = "zero / inactive" state — still visible, just clearly muted */
-  const valColor  = dim ? "#1e3a50" : color;
-  const subColor  = dim ? "#162a3a" : `${color}75`;
-  const barColor  = dim
-    ? `linear-gradient(90deg, transparent, ${color}10, transparent)`
-    : `linear-gradient(90deg, transparent, ${color}50, transparent)`;
+  const valColor = dim ? "#1e3a50" : color;
 
   return (
     <div
       style={{
-        background:    "#030b14",
-        border:        `1px solid ${dim ? "#0c1824" : "#141f2e"}`,
-        borderRadius:  3,
-        padding:       "5px 12px",
-        minWidth:      wide ? 118 : 94,
-        position:      "relative",
-        overflow:      "hidden",
-        flexShrink:    0,
-        transition:    "border-color 0.25s",
-        ...(pulse && !dim ? { animation: "border-march 3s ease-in-out infinite" } : {}),
+        padding:     "3px 11px",
+        borderRight: "1px solid #090f1a",
+        flexShrink:  0,
+        minWidth:    84,
+        position:    "relative",
       }}
     >
-      {/* Top accent bar */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: barColor }} />
+      {pulse && !dim && (
+        <div style={{
+          position: "absolute", top: 5, right: 7,
+          width: 3.5, height: 3.5, borderRadius: "50%",
+          background: color, boxShadow: `0 0 5px ${color}`,
+        }} className="live-dot" />
+      )}
 
-      {/* Primary value */}
       <div
         className="font-bold font-mono leading-none tabular-nums"
         style={{
           fontSize:      22,
           color:         valColor,
-          textShadow:    dim ? "none" : `0 0 16px ${color}55, 0 0 32px ${color}20`,
-          marginBottom:  sub ? 2 : 3,
+          textShadow:    dim ? "none" : `0 0 14px ${color}45, 0 0 28px ${color}18`,
+          marginBottom:  3,
           letterSpacing: "-0.02em",
         }}
       >
         {value}
       </div>
 
-      {/* Sub-label */}
-      {sub && (
-        <div
-          className="font-mono uppercase tracking-[0.14em] leading-none"
-          style={{ fontSize: 8, color: subColor, marginBottom: 2 }}
-        >
-          {sub}
-        </div>
-      )}
-
-      {/* Label — always readable, never invisible */}
       <div
-        className="font-mono uppercase leading-none tracking-[0.12em]"
-        style={{ fontSize: 8, color: dim ? "#2a4a60" : "#3a5878" }}
+        className="font-mono uppercase leading-none tracking-[0.11em]"
+        style={{ fontSize: 7, color: dim ? "#213040" : "#3a5878" }}
       >
         {label}
       </div>
@@ -78,27 +61,23 @@ function Cell({
   );
 }
 
-/* ── Row header label ────────────────────────────────────────────────────── */
-function RowHeader({ title, color }: { title: string; color: string }) {
+/* ── Vertical rail label ─────────────────────────────────────────────────── */
+function RailHeader({ title, color }: { title: string; color: string }) {
   return (
     <div
       className="flex-shrink-0 flex items-center"
       style={{
         writingMode:     "vertical-rl",
         textOrientation: "mixed",
-        paddingLeft:    10,
-        paddingRight:   10,
-        paddingTop:     14,
-        paddingBottom:  14,
-        borderRight:    `1px solid ${color}22`,
-        background:     `${color}06`,
-        marginRight:    4,
-        alignSelf:      "stretch",
+        padding:         "6px 7px",
+        borderRight:     `1px solid ${color}18`,
+        background:      `${color}04`,
+        alignSelf:       "stretch",
       }}
     >
       <span
         className="font-mono font-bold tracking-[0.22em] uppercase"
-        style={{ fontSize: 7, color: `${color}80`, transform: "rotate(180deg)" }}
+        style={{ fontSize: 6, color: `${color}65`, transform: "rotate(180deg)" }}
       >
         {title}
       </span>
@@ -117,15 +96,14 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
   const realPnl  = open.reduce((s, t) => s + (t.pnl ?? 0), 0);
   const exposure = open.reduce((s, t) => s + (t.amount ?? 0), 0);
 
-  /* ── Exchange / mode — AUTHORITATIVE from server, no hardcoded fallbacks ── */
-  const isLive     = exchangeStatus?.mode === "live";
-  const exName     = exchangeStatus?.exchangeName ?? "—";
-  const mode       = isLive ? "LIVE" : "SIM";
+  const isLive   = exchangeStatus?.mode === "live";
+  const exName   = exchangeStatus?.exchangeName ?? "—";
+  const mode     = isLive ? "LIVE" : "SIM";
 
   /* ── Portfolio equity — exchange-scoped, no cross-exchange leakage ─────── */
-  const liveUSD   = isLive && liveBalance?.source === "live" ? (liveBalance.balances.USD ?? null) : null;
-  const simUSD    = exchangeStatus?.simBalances?.USD ?? simAccount?.equity ?? 100_000;
-  const portfolioEq = isLive ? liveUSD : simUSD;
+  const liveUSD      = isLive && liveBalance?.source === "live" ? (liveBalance.balances.USD ?? null) : null;
+  const simUSD       = exchangeStatus?.simBalances?.USD ?? simAccount?.equity ?? null;
+  const portfolioEq  = isLive ? liveUSD : simUSD;
   const portfolioLabel = isLive
     ? `${exName.toUpperCase().slice(0, 6)} LIVE USD`
     : "SIM EQUITY";
@@ -157,22 +135,22 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
 
   const acctHealth = exchangeStatus?.killSwitch ? 0 : Math.max(40, 100 - blocked * 0.15);
 
-  /* ── ROW 1: Operational / live state ─────────────────────────────────── */
-  const row1: Array<{
-    label: string; value: string | number; sub?: string;
-    color?: string; dim?: boolean; pulse?: boolean; wide?: boolean;
-  }> = [
+  /* ── Rail 1: Operational / live state ─────────────────────────────────── */
+  const rail1: Array<{ label: string; value: string | number; color?: string; dim?: boolean; pulse?: boolean }> = [
     {
       label: "BROKER",
       value: exName === "—" ? "—" : exName.toUpperCase().slice(0, 6),
-      sub:   `${mode} MODE`,
       color: isLive ? "#ff3355" : "#00f0ff",
       pulse: isLive,
-      wide:  true,
+    },
+    {
+      label: "MODE",
+      value: mode,
+      color: isLive ? "#ff3355" : "#ffaa00",
     },
     {
       label: "AI ENGINE",
-      value: engine?.running ? "ONLINE" : "OFFLINE",
+      value: engine?.running ? "ON" : "OFF",
       color: engine?.running ? "#00ff8a" : "#ff2255",
       pulse: engine?.running,
     },
@@ -196,16 +174,10 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       dim:   execToday === 0,
     },
     {
-      label: "FEES COLLECTED",
-      value: `$${(feeSummary?.totalFeesCollected ?? 0).toFixed(2)}`,
-      color: "#00ff8a",
-      wide:  true,
-    },
-    {
       label: portfolioLabel,
       value: portfolioEq != null ? fmt$(portfolioEq) : "—",
       color: portfolioColor,
-      wide:  true,
+      dim:   portfolioEq == null,
     },
     {
       label: "ACCT HEALTH",
@@ -215,62 +187,30 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
     },
     {
       label: "LAST SIGNAL",
-      value: lastSig,
+      value: engine?.lastSignalAt ? lastSig : "—",
       color: "#00f0ff",
       dim:   !engine?.lastSignalAt,
-      wide:  true,
+    },
+    {
+      label: "FEES COLLECTED",
+      value: `$${(feeSummary?.totalFeesCollected ?? 0).toFixed(2)}`,
+      color: "#00ff8a",
     },
   ];
 
-  /* ── ROW 2: Performance / signals / infrastructure ─────────────────── */
-  const row2: Array<{
-    label: string; value: string | number; sub?: string;
-    color?: string; dim?: boolean; pulse?: boolean; wide?: boolean;
-  }> = [
-    {
-      label: "REALIZED P&L",
-      value: totalPnl >= 0
-        ? `+$${Math.abs(totalPnl).toFixed(0)}`
-        : `-$${Math.abs(totalPnl).toFixed(0)}`,
-      color: totalPnl >= 0 ? "#00ff8a" : "#ff2255",
-      pulse: Math.abs(totalPnl) > 0,
-      wide:  true,
-    },
-    {
-      label: "UNREALIZED",
-      value: realPnl >= 0
-        ? `+$${Math.abs(realPnl).toFixed(2)}`
-        : `-$${Math.abs(realPnl).toFixed(2)}`,
-      color: realPnl >= 0 ? "#00ff8a" : "#ff2255",
-    },
-    {
-      label: "EXPOSURE",
-      value: exposure > 0 ? `$${exposure.toFixed(0)}` : "$0",
-      color: exposure > 0 ? "#ffb800" : "#ffb800",
-      dim:   exposure === 0,
-    },
-    {
-      label: "ACCT MODE",
-      value: settings?.autoMode ? "AUTO" : "MANUAL",
-      color: settings?.autoMode ? "#00ff8a" : "#ffb800",
-      pulse: settings?.autoMode,
-    },
-    {
-      label: "AI WIN RATE",
-      value: `${winRate.toFixed(1)}%`,
-      color: winRate >= 55 ? "#00ff8a" : winRate >= 40 ? "#ffb800" : "#ff2255",
-    },
+  /* ── Rail 2: AI execution analytics ─────────────────────────────────── */
+  const rail2: Array<{ label: string; value: string | number; color?: string; dim?: boolean; pulse?: boolean }> = [
     {
       label: "AI CONFIDENCE",
-      value: `${avgConf.toFixed(0)}%`,
+      value: engine ? `${avgConf.toFixed(0)}%` : "—",
       color: avgConf >= 65 ? "#00ff8a" : avgConf >= 45 ? "#ffaa00" : "#ff3355",
+      dim:   !engine,
     },
     {
-      label: "AI REJECTIONS",
-      value: blocked,
-      sub:   blocked > 0 ? "signals filtered" : undefined,
-      color: blocked > 50 ? "#ff2255" : blocked > 20 ? "#ffb800" : "#ffb800",
-      dim:   blocked === 0,
+      label: "SIGNALS TOTAL",
+      value: totalSig,
+      color: "#00aaff",
+      dim:   totalSig === 0,
     },
     {
       label: "BUY SIGNALS",
@@ -297,6 +237,12 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       dim:   mtfBlocked === 0,
     },
     {
+      label: "AI REJECTIONS",
+      value: blocked,
+      color: blocked > 50 ? "#ff2255" : "#ffb800",
+      dim:   blocked === 0,
+    },
+    {
       label: "EXEC RATE",
       value: `${execRate.toFixed(1)}%`,
       color: execRate > 60 ? "#00ff8a" : execRate > 20 ? "#ffb800" : "#ff2255",
@@ -313,31 +259,100 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
     },
   ];
 
-  const rowStyle: React.CSSProperties = {
+  /* ── Rail 3: Account / P&L ───────────────────────────────────────────── */
+  const rail3: Array<{ label: string; value: string | number; color?: string; dim?: boolean; pulse?: boolean }> = [
+    {
+      label: "REALIZED P&L",
+      value: closed.length > 0
+        ? (totalPnl >= 0 ? `+$${Math.abs(totalPnl).toFixed(0)}` : `-$${Math.abs(totalPnl).toFixed(0)}`)
+        : "—",
+      color: totalPnl >= 0 ? "#00ff8a" : "#ff2255",
+      pulse: Math.abs(totalPnl) > 0 && closed.length > 0,
+      dim:   closed.length === 0,
+    },
+    {
+      label: "UNREALIZED P&L",
+      value: open.length > 0
+        ? (realPnl >= 0 ? `+$${Math.abs(realPnl).toFixed(2)}` : `-$${Math.abs(realPnl).toFixed(2)}`)
+        : "—",
+      color: realPnl >= 0 ? "#00ff8a" : "#ff2255",
+      dim:   open.length === 0,
+    },
+    {
+      label: "EXPOSURE",
+      value: exposure > 0 ? `$${exposure.toFixed(0)}` : "$0",
+      color: exposure > 0 ? "#ffb800" : "#ffb800",
+      dim:   exposure === 0,
+    },
+    {
+      label: "AI WIN RATE",
+      value: closed.length > 0 ? `${winRate.toFixed(1)}%` : "—",
+      color: winRate >= 55 ? "#00ff8a" : winRate >= 40 ? "#ffb800" : "#ff2255",
+      dim:   closed.length === 0,
+    },
+    {
+      label: "ACCT MODE",
+      value: settings?.autoMode ? "AUTO" : "MANUAL",
+      color: settings?.autoMode ? "#00ff8a" : "#ffb800",
+      pulse: settings?.autoMode,
+    },
+    {
+      label: "STOP LOSS",
+      value: settings ? `${settings.stopLossPercent ?? 2}%` : "—",
+      color: "#ff8844",
+      dim:   !settings,
+    },
+    {
+      label: "TAKE PROFIT",
+      value: settings ? `${settings.takeProfitPercent ?? 4}%` : "—",
+      color: "#00ff8a",
+      dim:   !settings,
+    },
+    {
+      label: "MAX TRADES/DAY",
+      value: settings?.maxTradesPerDay ?? "—",
+      color: "#9FB3C8",
+      dim:   !settings,
+    },
+    {
+      label: "POSITION SIZE",
+      value: settings ? `${((settings.allocation ?? 0.01) * 100).toFixed(1)}%` : "—",
+      color: "#9FB3C8",
+      dim:   !settings,
+    },
+  ];
+
+  const stripStyle: React.CSSProperties = {
     display:        "flex",
-    gap:            7,
     overflowX:      "auto",
     scrollbarWidth: "none",
-    padding:        "0 8px",
     flex:           1,
   };
 
   return (
-    <div style={{ background: "#000000", borderBottom: "1px solid #101e2c" }}>
+    <div style={{ background: "#000000", borderBottom: "1px solid #0c1824" }}>
 
-      {/* ── Row 1: Operational / live state ─────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "stretch", borderBottom: "1px solid #0a1824" }}>
-        <RowHeader title="OPERATIONAL STATUS" color="#00f0ff" />
-        <div style={{ ...rowStyle, paddingTop: 7, paddingBottom: 6 }}>
-          {row1.map((c) => <Cell key={c.label} {...c} />)}
+      {/* ── Rail 1: Operational ────────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "stretch", borderBottom: "1px solid #08111a" }}>
+        <RailHeader title="OPERATIONAL" color="#00f0ff" />
+        <div style={stripStyle}>
+          {rail1.map((c) => <Cell key={c.label} {...c} />)}
         </div>
       </div>
 
-      {/* ── Row 2: Performance / analytics ──────────────────────────────── */}
+      {/* ── Rail 2: AI Execution ───────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "stretch", borderBottom: "1px solid #08111a" }}>
+        <RailHeader title="AI EXECUTION" color="#cc55ff" />
+        <div style={stripStyle}>
+          {rail2.map((c) => <Cell key={c.label} {...c} />)}
+        </div>
+      </div>
+
+      {/* ── Rail 3: Account / P&L ─────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "stretch" }}>
-        <RowHeader title="PERFORMANCE ANALYTICS" color="#cc55ff" />
-        <div style={{ ...rowStyle, paddingTop: 6, paddingBottom: 7 }}>
-          {row2.map((c) => <Cell key={c.label} {...c} />)}
+        <RailHeader title="ACCOUNT" color="#ffaa00" />
+        <div style={stripStyle}>
+          {rail3.map((c) => <Cell key={c.label} {...c} />)}
         </div>
       </div>
 

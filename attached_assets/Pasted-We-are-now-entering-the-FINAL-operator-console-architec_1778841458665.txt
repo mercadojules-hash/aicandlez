@@ -1,0 +1,362 @@
+We are now entering the FINAL operator-console architecture and production readiness phase for Apex Trader.
+
+I am attaching a reference image showing the direction we want the dashboard to evolve toward.
+
+IMPORTANT:
+We are NOT rebuilding the dashboard.
+We are refining and consolidating the existing architecture into a true institutional AI trading operating system.
+
+KEEP:
+
+existing ticker rows
+existing exchange system
+existing execution engine
+existing activity feeds
+existing command structure
+
+BUT:
+the top command-center hierarchy must evolve to match the attached reference style and institutional density.
+
+The current build is still wasting premium visual real estate and still behaving too much like:
+“widgets inside containers.”
+
+We need:
+“institutional AI operator platform.”
+
+CRITICAL DESIGN GOAL
+
+The ENTIRE TOP CENTER REGION should feel like:
+
+LIVE AI EXECUTION CORE
+
+NOT:
+
+empty black space
+disconnected trade cards
+isolated widgets
+dead containers
+
+The attached reference image demonstrates the density, hierarchy, balance, and operational cohesion we want.
+
+Use it as the visual benchmark.
+
+REBUILD THE TOP CENTER REGION
+
+CURRENT PROBLEM:
+There is still a massive empty black void in the center of the dashboard.
+
+This is the single most valuable visual real estate in the entire platform.
+
+That area MUST become:
+
+LIVE PLATFORM ACTIVITY OVERVIEW
+
+similar to the attached reference.
+
+WHAT MUST LIVE THERE
+
+Replace the empty region with:
+
+FULL-WIDTH INSTITUTIONAL TELEMETRY CHART
+
+Animated.
+Dense.
+Alive.
+Reactive.
+
+The chart should visualize OVERLAYED LIVE DATA STREAMS:
+
+AI signals generated
+live executions
+active users
+user activity
+platform volume
+risk blocks
+signal rejections
+signal acceptance
+exchange activity
+onboarding spikes
+
+This should visually feel like:
+
+Bloomberg Terminal
++
+TradingView
++
+Institutional SaaS telemetry wall
++
+AI execution engine
+
+TOP CENTER LAYOUT TARGET
+
+LEFT:
+Keep:
+
+STOP AI TRADER
+PAUSE TRADING
+KILL SWITCH
+CLOSE POSITIONS
+
+CENTER:
+Large institutional telemetry visualization
+
+RIGHT:
+LIVE ASSET INTELLIGENCE
++
+AI SIGNAL MONITOR
+
+Exactly like the attached reference.
+
+KEEP EXISTING TICKER ROWS
+
+IMPORTANT:
+DO NOT remove the existing ticker rows.
+
+They are good.
+
+KEEP:
+
+crypto ticker row
+macro ticker row
+equities ticker row
+
+But improve:
+
+spacing
+typography
+readability
+glow consistency
+update smoothness
+FIX THE 23 TELEMETRY BOXES UNDER THE TICKERS
+
+CURRENT PROBLEM:
+The telemetry card rows are still wasting vertical space.
+
+The cards are:
+
+too tall
+too padded
+visually repetitive
+consuming too much dashboard height
+
+This section currently feels like:
+“many small widgets stacked.”
+
+We want:
+“dense institutional telemetry.”
+
+NEW DESIGN DIRECTION
+
+Compress those telemetry rows into:
+
+HIGH-DENSITY TERMINAL STRIPS
+
+Think:
+Bloomberg status rails
+or
+exchange telemetry lanes
+
+NOT:
+large boxed cards.
+
+TARGET STRUCTURE
+
+Instead of:
+23 separate chunky boxes
+
+Convert them into:
+2–3 compressed telemetry rails
+
+Examples:
+
+PLATFORM STATUS RAIL
+
+AI ENGINE
+EXECUTIONS
+WIN RATE
+LATENCY
+FEES
+ACCOUNT HEALTH
+ACTIVE USERS
+
+AI EXECUTION RAIL
+
+SIGNALS
+REJECTIONS
+FILTERED
+MTF PASS
+EXECUTION RATE
+CONFIDENCE
+RISK STATE
+
+ACCOUNT / EXCHANGE RAIL
+
+BROKER
+EQUITY
+OPEN POSITIONS
+LIVE/PAPER
+ACTIVE EXCHANGE
+SESSION STATUS
+IMPORTANT
+
+Numbers should become:
+
+BIGGER
+brighter
+easier to read
+
+Containers should become:
+
+THINNER
+shorter
+denser
+more terminal-like
+
+Less wasted vertical height.
+More institutional density.
+
+REMOVE MOCK / FAKE DATA
+
+VERY IMPORTANT.
+
+We are approaching production deployment.
+
+REMOVE:
+
+fake balances
+fake PnL
+fake user counts
+fake fees
+fake exchange stats
+fake executions
+fake platform metrics
+
+ONLY display:
+
+live data
+real calculated metrics
+true backend telemetry
+actual exchange/account state
+
+If data is unavailable:
+show:
+
+—
+CONNECTING
+NO DATA
+WAITING
+
+DO NOT fabricate numbers anymore.
+
+EXCHANGE ISOLATION MUST BE ABSOLUTE
+
+This is still partially broken.
+
+The Kraken $100 balance still leaks into other exchanges.
+
+That must NEVER happen.
+
+Each exchange must maintain isolated state:
+
+Kraken:
+
+balances
+trades
+positions
+telemetry
+
+Coinbase:
+
+balances
+positions
+telemetry
+
+Simulation:
+
+fully isolated
+
+No global fallback balances.
+No inherited account state.
+No balance bleed-through.
+
+LEFT SIDEBAR BUTTONS ARE BROKEN
+
+The following currently do not function:
+
+Leaderboard
+Alerts
+Users
+
+Fix all navigation wiring.
+
+All sidebar sections should:
+
+route correctly
+render correctly
+maintain layout consistency
+preserve state
+LIVE TERMINAL FEED
+
+The live activity feed is GOOD.
+
+But:
+increase density further.
+
+Show MORE events simultaneously.
+
+We want:
+operator-level monitoring density.
+
+Target:
+20–30 visible rows without scrolling.
+
+FINAL DESIGN LANGUAGE
+
+The dashboard should now feel like:
+
+institutional AI operating system
+centralized broker orchestration layer
+real-time execution nerve center
+platform operator console
+AI execution infrastructure
+
+NOT:
+
+crypto template
+trading widgets
+admin dashboard
+SaaS cards
+MOST IMPORTANT FINAL NOTE
+
+The attached reference image is the visual target.
+
+Do NOT clone it literally.
+
+Use it as:
+
+layout hierarchy guidance
+density guidance
+telemetry guidance
+operator-console guidance
+institutional styling guidance
+
+The platform should feel:
+ALIVE
+DENSE
+INTELLIGENT
+OPERATIONAL
+REAL-TIME
+PRODUCTION READY
+
+Before export:
+
+verify no dead black regions remain
+verify no duplicate controls exist
+verify no mock telemetry exists
+verify exchange isolation works
+verify sidebar navigation works
+verify typography hierarchy is consistent
+verify telemetry density matches institutional systems
+
+Also:
+Please include the updated production ZIP export name clearly in the response so we do not accidentally download an older archive again.

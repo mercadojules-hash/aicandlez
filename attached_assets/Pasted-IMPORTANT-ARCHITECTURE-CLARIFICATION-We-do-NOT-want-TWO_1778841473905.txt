@@ -1,0 +1,132 @@
+IMPORTANT ARCHITECTURE CLARIFICATION
+
+We do NOT want TWO “Live Platform Activity” systems.
+
+Right now there is already an AI / platform telemetry visualization lower in the dashboard.
+
+DO NOT duplicate that functionality again in the top-center region.
+
+The TOP CENTER REGION has a DIFFERENT purpose.
+
+---
+
+TOP CENTER SHOULD BECOME:
+LIVE USER ACTIVITY COMMAND LAYER
+--------------------------------
+
+The top-center visualization should focus primarily on:
+
+USER BEHAVIOR
+LIVE PLATFORM TRAFFIC
+REAL-TIME OPERATOR INTELLIGENCE
+
+NOT another generic AI activity chart.
+
+---
+
+## THE DIFFERENCE
+
+LOWER HUB (existing):
+Keep focused on:
+
+* AI execution telemetry
+* platform orchestration
+* execution flow
+* risk systems
+* signal generation
+* exchange distribution
+* engine health
+
+TOP CENTER (new):
+Should focus on:
+
+* LIVE USER ACTIVITY
+* active users
+* users trading now
+* onboarding spikes
+* paper vs live users
+* exchange usage by users
+* user engagement
+* live session activity
+* execution participation
+* account linking activity
+* user traffic flow
+
+---
+
+## WHAT THE TOP CENTER SHOULD VISUALLY FEEL LIKE
+
+Think:
+“real-time AI trading platform operator traffic monitor”
+
+NOT:
+“another AI signal chart.”
+
+The top center should visually communicate:
+
+THE PLATFORM IS ACTIVE
+USERS ARE TRADING
+THE ECOSYSTEM IS ALIVE
+
+---
+
+## TOP CENTER LIVE USER ACTIVITY VISUALIZATION
+
+Suggested overlay streams:
+
+CYAN:
+active users online
+
+PURPLE:
+users trading now
+
+GREEN:
+live executions initiated by users
+
+ORANGE:
+new users joining
+
+YELLOW:
+exchange connections
+
+RED:
+risk blocks / rejected executions
+
+BLUE:
+platform traffic volume
+
+---
+
+## RIGHT SIDE PANEL
+
+The RIGHT SIDE panel next to this top-center visualization should remain:
+
+LIVE ASSET INTELLIGENCE
+
+This is GOOD directionally.
+
+But:
+
+* improve spacing
+* improve chart readability
+* improve hierarchy
+* reduce wasted padding
+* keep it visually aligned with the new top-center user activity system
+
+---
+
+## VERY IMPORTANT
+
+The goal is:
+
+# TOP CENTER
+
+LIVE USER ACTIVITY + PLATFORM TRAFFIC
+
+# LOWER HUB
+
+AI EXECUTION + PLATFORM TELEMETRY
+
+These are TWO DIFFERENT operator layers.
+
+Please architect them separately.

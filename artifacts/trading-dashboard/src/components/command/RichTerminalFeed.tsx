@@ -232,6 +232,7 @@ export function RichTerminalFeed({ engine }: Props) {
 
             return (
               <div key={s.id}
+                className="flex items-center gap-2 px-2 py-0.5"
                 style={{
                   borderBottom: `1px solid ${isGhost ? "#080808" : "#0d0d0d"}`,
                   borderLeft:   `2px solid ${stageCfg.color}${isGhost ? "18" : isFilled ? "90" : "35"}`,
@@ -240,61 +241,52 @@ export function RichTerminalFeed({ engine }: Props) {
                     : isBlocked ? "#ff33550c" : isFilled ? "#00ff8a08" : i === 0 ? "#050505" : "transparent",
                   opacity:      isGhost ? 0.38 : 1,
                   animation:    (!isGhost && i === 0) ? "feed-row-in 0.25s ease-out" : undefined,
+                  minHeight:    18,
                 }}>
 
-                {/* Main row */}
-                <div className="flex items-center gap-2 px-2.5 py-1">
-                  <span className="text-[7px] font-bold font-mono px-1.5 py-0.5 rounded flex-shrink-0"
-                    style={{
-                      color:      stageCfg.color,
-                      background: `${stageCfg.color}12`,
-                      border:     `1px solid ${stageCfg.color}22`,
-                      minWidth:   40,
-                      textAlign:  "center",
-                    }}>
-                    {stageCfg.label}
-                  </span>
-                  <span className="text-[9px] font-mono tabular-nums flex-shrink-0 font-semibold"
-                    style={{ color: isGhost ? "#4a6a80" : "#C7D4E2" }}>
-                    {ts}
-                  </span>
-                  <span className="text-[11px] font-bold font-mono flex-shrink-0"
-                    style={{
-                      color: decColor,
-                      textShadow: (!isGhost && s.decision !== "HOLD") ? `0 0 8px ${decColor}50` : undefined,
-                    }}>
-                    {s.decision}
-                  </span>
-                  <span className="text-[11px] font-bold font-mono flex-shrink-0" style={{ color: symColor }}>
-                    {sym}
-                  </span>
-                  <span className="text-[10px] font-bold font-mono tabular-nums flex-shrink-0"
-                    style={{ color: isGhost ? "#2a4a5a" : confColor }}>
-                    {s._conf.toFixed(0)}%
-                  </span>
-                  <span className="text-[9px] font-mono truncate flex-1"
-                    style={{ color: isGhost ? "#2a3a4a" : isBlocked ? "#ff335580" : "#9FB3C8" }}>
-                    {isBlocked ? `⚠ ${s.blockReason}` : (s.shortSummary ?? "")}
-                  </span>
-                  <span className="text-[7px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
-                    style={{ color: isGhost ? "#1a2a30" : "#C7D4E2", background: "#080808", border: "1px solid #121212" }}>
-                    KRK
-                  </span>
+                <span className="text-[7px] font-bold font-mono px-1.5 rounded flex-shrink-0"
+                  style={{
+                    color:      stageCfg.color,
+                    background: `${stageCfg.color}10`,
+                    border:     `1px solid ${stageCfg.color}20`,
+                    minWidth:   36,
+                    textAlign:  "center",
+                    lineHeight: "16px",
+                  }}>
+                  {stageCfg.label}
+                </span>
+                <span className="text-[8px] font-mono tabular-nums flex-shrink-0 font-semibold"
+                  style={{ color: isGhost ? "#3a5a70" : "#C7D4E2" }}>
+                  {ts}
+                </span>
+                <span className="text-[10px] font-bold font-mono flex-shrink-0"
+                  style={{
+                    color: decColor,
+                    textShadow: (!isGhost && s.decision !== "HOLD") ? `0 0 8px ${decColor}50` : undefined,
+                  }}>
+                  {s.decision}
+                </span>
+                <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: symColor }}>
+                  {sym}
+                </span>
+                {/* Inline confidence mini-bar */}
+                <div style={{ width: 36, height: 3, background: "#0a0a0a", borderRadius: 2, flexShrink: 0, overflow: "hidden" }}>
+                  <div style={{
+                    height: "100%",
+                    width:  `${Math.min(100, s._conf)}%`,
+                    background: isGhost ? "#1a2a35" : confColor,
+                    borderRadius: 2,
+                    transition: "width 0.8s ease",
+                  }} />
                 </div>
-
-                {/* Confidence bar */}
-                <div style={{ paddingLeft: 64, paddingRight: 10, paddingBottom: 4 }}>
-                  <div style={{ height: 2, background: "#080808", borderRadius: 2 }}>
-                    <div style={{
-                      height:     "100%",
-                      width:      `${Math.min(100, s._conf)}%`,
-                      background: isGhost ? "#1a2a35" : confColor,
-                      borderRadius: 2,
-                      opacity:    isGhost ? 0.5 : 0.6,
-                      transition: "width 0.8s ease",
-                    }} />
-                  </div>
-                </div>
+                <span className="text-[9px] font-bold font-mono tabular-nums flex-shrink-0"
+                  style={{ color: isGhost ? "#2a4a5a" : confColor }}>
+                  {s._conf.toFixed(0)}%
+                </span>
+                <span className="text-[8px] font-mono truncate flex-1"
+                  style={{ color: isGhost ? "#1e3040" : isBlocked ? "#ff335570" : "#9FB3C8" }}>
+                  {isBlocked ? `⚠ ${s.blockReason}` : (s.shortSummary ?? "")}
+                </span>
               </div>
             );
           })}

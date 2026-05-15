@@ -41,6 +41,8 @@ import Settings from "@/pages/Settings";
 import Billing from "@/pages/Billing";
 import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
+import Leaderboard from "@/pages/Leaderboard";
+import AlertsPage from "@/pages/Alerts";
 
 // ── Env ───────────────────────────────────────────────────────────────────────
 
@@ -319,6 +321,12 @@ function Router() {
       </Route>
       <Route path="/account">
         <Protected><Account /></Protected>
+      </Route>
+      <Route path="/leaderboard">
+        <Protected><Leaderboard /></Protected>
+      </Route>
+      <Route path="/alerts">
+        <Protected><AlertsPage /></Protected>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>
