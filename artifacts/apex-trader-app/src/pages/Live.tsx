@@ -11,7 +11,7 @@ const ACTIVE_EXCHANGES = [
 ];
 
 const COMING_SOON = [
-  "Bybit", "OKX", "KuCoin", "Gate.io", "Bitget", "MEXC", "Alpaca", "Robinhood",
+  "Bybit", "OKX", "KuCoin", "Gate.io", "Bitget", "MEXC", "Robinhood", "Uphold",
 ];
 
 function GlowButton({

@@ -28,7 +28,7 @@ const LOGO: Record<string, string> = {
   gemini:    "G",
 };
 
-const COMING_SOON = ["bybit", "okx", "kucoin", "gate", "bitget", "mexc", "alpaca"];
+const COMING_SOON = ["bybit", "okx", "kucoin", "gate", "bitget", "mexc", "robinhood", "uphold"];
 
 export default function Exchanges() {
   const [, setLocation] = useLocation();
