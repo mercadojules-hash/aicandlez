@@ -601,7 +601,7 @@ export function LiveTradingConsole({
 
   // In LIVE mode: show real exchange USD balance. In SIM mode: show simulation equity.
   // Strict exchange-scope: never fall back to sim balance when in live mode
-  const liveUSD      = liveActive && liveBalance?.source === "live" ? (liveBalance.balances.USD ?? null) : null;
+  const liveUSD      = liveActive && liveBalance?.source === "live" ? (liveBalance.balances?.USD ?? null) : null;
   const balance      = liveActive ? liveUSD : (simAccount?.equity ?? simAccount?.account?.cashBalance ?? null);
   const balanceLabel = liveActive
     ? (liveUSD != null ? `${exName.toUpperCase()} LIVE USD` : "CONNECTING…")

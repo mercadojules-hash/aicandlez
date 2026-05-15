@@ -425,7 +425,7 @@ export default function CommandCenter() {
         <CryptoChartGrid breakdowns={breakdowns} />
 
         {/* ⑤ Three-column: Platform Overview | Terminal Feed | Scanner */}
-        <div className="grid gap-2" style={{ gridTemplateColumns: "305px 1fr 290px", height: 820 }}>
+        <div className="grid gap-2" style={{ gridTemplateColumns: "305px 1fr 290px", height: 960 }}>
           <PlatformOverviewPanel simAccount={liveActive ? undefined : simAccount} liveBalance={liveBalance} engine={engine} feeSummary={feeSummary} exchangeName={exchangeStatus?.exchangeName} liveActive={liveActive} />
           <RichTerminalFeed engine={engine} />
           <OpportunityScanner breakdowns={breakdowns} />

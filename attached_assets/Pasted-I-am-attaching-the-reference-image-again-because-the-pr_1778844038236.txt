@@ -1,0 +1,256 @@
+I am attaching the reference image again because the previous implementation completely missed the intended operator-center hierarchy.
+
+The current top section still feels like:
+
+scattered widgets
+disconnected telemetry
+unused space
+compressed terminal feed
+small isolated trade card floating in empty black space
+
+This is NOT the intended institutional command-center layout.
+
+The top section must now be rebuilt using the attached reference as the visual hierarchy guide.
+
+CRITICAL TOP-SECTION REBUILD
+
+The large black region in the center is STILL being wasted.
+
+That entire area should become the:
+
+LIVE USER ACTIVITY + AI EXECUTION CORE
+
+NOT:
+
+empty dead space
+single floating trade card
+isolated trade telemetry
+NEW REQUIRED TOP LAYOUT
+
+TOP CENTER SECTION SHOULD CONTAIN:
+
+LEFT SIDE:
+
+AI execution telemetry
+live AI signal overlays
+active user activity
+live execution flow
+platform volume
+risk blocks
+exchange activity
+onboarding activity
+AI signal acceptance/rejection
+live executions
+
+CENTER:
+A LARGE animated institutional multi-stream chart.
+
+This should visually feel like:
+
+Bloomberg terminal
+TradingView institutional overlay
+AI orchestration engine
+live neural platform telemetry
+
+MULTIPLE animated streams:
+
+cyan = AI signals
+green = executions
+purple = user activity
+orange = platform volume
+red = risk blocks
+
+This chart should dominate the top center visually.
+
+RIGHT SIDE:
+LIVE ASSET INTELLIGENCE
+
+larger candlestick visualization
+asset confidence
+execution quality
+AI strength
+signal pulse
+active exchange routing
+THE CURRENT SMALL FLOATING TRADE CARD MUST GO
+
+The current tiny trade card floating in empty black space is visually wrong.
+
+Do NOT:
+
+center a single trade card in empty space
+isolate one trade in a giant black container
+
+Instead:
+embed active trades INSIDE the telemetry layer itself.
+
+LIVE TERMINAL FEED REGRESSION
+
+The terminal feed was made TOO SMALL.
+
+This is now a regression.
+
+The Live Terminal Feed should be:
+
+larger
+taller
+denser
+institutional
+highly active visually
+
+It should display MANY rows simultaneously.
+
+Target:
+18–25 visible rows minimum.
+
+Current implementation is too compressed and visually minimized.
+
+Restore the terminal prominence.
+
+TICKER TELEMETRY BOXES ARE STILL WRONG
+
+The 23 small boxes under the ticker still waste vertical space.
+
+Problem:
+
+too many boxed containers
+repetitive borders
+poor density
+visually noisy
+dashboard fragmentation
+
+DO NOT:
+keep stacking tiny bordered cards.
+
+Instead:
+convert this into:
+
+slim institutional telemetry rails
+OR
+grouped segmented operator strips
+
+Goal:
+Bloomberg terminal density.
+
+The data itself is useful.
+The containerization is wrong.
+
+Make them:
+
+thinner vertically
+less boxed
+more integrated
+more data-dense
+cleaner hierarchy
+
+Larger numbers are GOOD.
+Tall empty boxes are BAD.
+
+LIVE USER ACTIVITY
+
+IMPORTANT:
+We do NOT need another “Live Platform Activity” section.
+
+We ALREADY have lower platform telemetry.
+
+The TOP section should specifically focus on:
+
+LIVE USER ACTIVITY.
+
+Track:
+
+users online
+users trading
+new users
+onboarding activity
+live vs paper users
+exchange distribution
+live AI executions
+user interaction spikes
+
+This is the actual business intelligence layer.
+
+KRaken CLICK = BOOTSTRAP ERROR
+
+CRITICAL BUG:
+
+Clicking Kraken causes:
+
+Cannot read properties of undefined (reading 'balances')
+
+This means:
+exchange state orchestration is STILL broken.
+
+The exchange switching system must NEVER crash.
+
+Need:
+
+safe optional chaining
+null guards
+proper exchange-state hydration
+isolated exchange balance handling
+
+NO exchange click should ever white-screen the dashboard.
+
+MOCK DATA REMOVAL
+
+We are preparing for:
+
+production rollout
+live trading
+real telemetry
+
+Remove ALL fake/mock/generated values.
+
+No fake:
+
+users
+balances
+fees
+executions
+signals
+
+Use:
+
+actual backend state
+actual exchange state
+actual AI state
+actual telemetry streams
+LEFT SIDEBAR BUTTONS STILL DO NOT WORK
+
+These buttons still do nothing:
+
+Leaderboard
+Alerts
+Users
+
+Need:
+
+actual routing
+OR
+disabled state
+OR
+hidden until implemented
+
+Dead buttons reduce production quality.
+
+FINAL DESIGN GOAL
+
+The platform should feel like:
+
+NOT:
+“a trading dashboard with widgets”
+
+BUT:
+“a live AI trading operating system”
+
+The attached reference image is the intended direction for:
+
+visual hierarchy
+density
+orchestration
+operator-centric layout
+institutional styling
+live telemetry flow
+
+Most important:
+THE TOP HALF OF THE DASHBOARD MUST FEEL ALIVE.
