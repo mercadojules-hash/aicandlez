@@ -53,13 +53,13 @@ function ExchangeSwitcher({
 }) {
 
   return (
-    <div className="flex items-center gap-px flex-shrink-0"
+    <div className="flex items-center gap-1 flex-shrink-0"
       style={{
-        background: "#010810",
-        border:     "1px solid #0d1e2e",
-        borderRadius: 8,
-        padding:    "3px",
-        overflow:   "hidden",
+        background:   "#000000",
+        border:       "1px solid #141f2e",
+        borderRadius: 10,
+        padding:      "5px",
+        overflow:     "hidden",
       }}>
       {EXCHANGES.map(ex => {
         const isActive   = activeId === ex.id;
@@ -75,21 +75,21 @@ function ExchangeSwitcher({
               else            onSelectLive(ex.id);
             }}
             title={isDisabled ? `${ex.label} — coming soon` : `Switch to ${ex.label}`}
-            className="flex items-center gap-1.5 rounded-md font-mono font-bold transition-all flex-shrink-0"
+            className="flex items-center gap-2 rounded-lg font-mono font-bold transition-all flex-shrink-0"
             style={{
-              padding:       "6px 11px",
-              fontSize:      "9px",
-              letterSpacing: "0.09em",
+              padding:       "10px 18px",
+              fontSize:      "11px",
+              letterSpacing: "0.11em",
               whiteSpace:    "nowrap",
               cursor:        isDisabled ? "not-allowed" : "pointer",
               ...(isActive ? {
-                background: `${ex.color}20`,
+                background: `${ex.color}22`,
                 color:       ex.color,
-                border:     `1px solid ${ex.color}55`,
-                boxShadow:  `0 0 14px ${ex.color}30, inset 0 0 10px ${ex.color}10`,
+                border:     `1px solid ${ex.color}70`,
+                boxShadow:  `0 0 22px ${ex.color}40, 0 0 8px ${ex.color}20, inset 0 0 14px ${ex.color}12`,
               } : isDisabled ? {
                 background: "transparent",
-                color:      "#1a2e3a",
+                color:      "#182838",
                 border:     "1px solid transparent",
               } : {
                 background: "transparent",
@@ -100,8 +100,8 @@ function ExchangeSwitcher({
             onMouseEnter={e => {
               if (!isActive && !isDisabled) {
                 e.currentTarget.style.color      = "#C7D4E2";
-                e.currentTarget.style.background = "#0d1e2e";
-                e.currentTarget.style.border     = `1px solid ${ex.color}30`;
+                e.currentTarget.style.background = "#0a1622";
+                e.currentTarget.style.border     = `1px solid ${ex.color}35`;
               }
             }}
             onMouseLeave={e => {
@@ -112,11 +112,11 @@ function ExchangeSwitcher({
               }
             }}
           >
-            {/* Active health indicator */}
+            {/* Active pulse indicator */}
             {isActive && (
               <span
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0 live-dot"
-                style={{ background: ex.color, boxShadow: `0 0 6px ${ex.color}` }}
+                className="w-2 h-2 rounded-full flex-shrink-0 live-dot"
+                style={{ background: ex.color, boxShadow: `0 0 8px ${ex.color}, 0 0 16px ${ex.color}60` }}
               />
             )}
 
@@ -125,11 +125,12 @@ function ExchangeSwitcher({
             {/* PAPER badge on Alpaca */}
             {ex.isPaper && !isDisabled && (
               <span
-                className="text-[6.5px] font-bold px-1 py-px rounded-sm font-mono leading-none"
+                className="font-bold px-1.5 py-0.5 rounded font-mono leading-none"
                 style={{
+                  fontSize:   "7.5px",
                   background: `${ex.color}18`,
-                  color:      isActive ? ex.color : `${ex.color}80`,
-                  border:     `1px solid ${ex.color}30`,
+                  color:      isActive ? ex.color : `${ex.color}70`,
+                  border:     `1px solid ${ex.color}35`,
                 }}
               >
                 PAPER
@@ -138,8 +139,8 @@ function ExchangeSwitcher({
 
             {/* SOON badge */}
             {ex.soon && (
-              <span className="text-[6px] font-bold px-1 py-px rounded-sm font-mono leading-none"
-                style={{ background: "#ffffff06", color: "#2a4050", border: "1px solid #1a2a35" }}>
+              <span className="font-bold px-1.5 py-0.5 rounded font-mono leading-none"
+                style={{ fontSize: "7px", background: "#ffffff06", color: "#1e3040", border: "1px solid #141e28" }}>
                 SOON
               </span>
             )}

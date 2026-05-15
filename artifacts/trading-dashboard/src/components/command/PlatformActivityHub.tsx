@@ -158,7 +158,7 @@ function ActivityChart({ data }: { data: Pt[] }) {
       </defs>
 
       {/* Background */}
-      <rect x={pl} y={pt} width={cW} height={cH} fill="#010b16" rx={2} />
+      <rect x={pl} y={pt} width={cW} height={cH} fill="#000000" rx={2} />
 
       {/* Grid lines */}
       {gridYs.map((y, i) => (
@@ -225,8 +225,8 @@ function EventStream({ events }: { events: Evt[] }) {
   return (
     <div style={{
       width:         290,
-      borderLeft:    "1px solid #081a2a",
-      background:    "#010810",
+      borderLeft:    "1px solid #0d1a24",
+      background:    "#000000",
       display:       "flex",
       flexDirection: "column",
       overflow:      "hidden",
@@ -235,7 +235,8 @@ function EventStream({ events }: { events: Evt[] }) {
       {/* Header */}
       <div style={{
         padding:      "8px 12px",
-        borderBottom: "1px solid #081420",
+        borderBottom: "1px solid #0d1824",
+        background:   "#000000",
         display:      "flex",
         alignItems:   "center",
         gap:          6,
@@ -260,7 +261,7 @@ function EventStream({ events }: { events: Evt[] }) {
           const ageSec = Math.floor((nowMs - ev.ts) / 1000);
           const ageStr = ageSec < 60 ? `${ageSec}s` : `${Math.floor(ageSec / 60)}m`;
           return (
-            <div key={ev.id} style={{ padding: "6px 12px", borderBottom: "1px solid #050f18" }}>
+            <div key={ev.id} style={{ padding: "6px 12px", borderBottom: "1px solid #0a0a0a" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
                 <div style={{
                   width:        5,
@@ -316,7 +317,7 @@ const EXCH_DIST = [
 
 function ExchDistBar() {
   return (
-    <div style={{ padding: "7px 16px", borderBottom: "1px solid #081420", background: "#010c18" }}>
+    <div style={{ padding: "7px 16px", borderBottom: "1px solid #0d1824", background: "#000000" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
         <Layers size={9} color="#4a8fa8" />
         <span style={{ fontSize: 7.5, fontFamily: "monospace", color: "#2a4458", letterSpacing: "0.15em", textTransform: "uppercase" }}>
@@ -439,7 +440,7 @@ export function PlatformActivityHub({ engine, exchangeStatus, feeSummary }: Prop
   ];
 
   return (
-    <div style={{ background: "#020b15", borderBottom: "1px solid #0a1824", flexShrink: 0 }}>
+    <div style={{ background: "#000000", borderBottom: "1px solid #0d1824", flexShrink: 0 }}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{
@@ -447,8 +448,8 @@ export function PlatformActivityHub({ engine, exchangeStatus, feeSummary }: Prop
         alignItems:   "center",
         gap:          10,
         padding:      "8px 16px",
-        borderBottom: "1px solid #081420",
-        background:   "#010c18",
+        borderBottom: "1px solid #0d1824",
+        background:   "#000000",
       }}>
         <Activity size={11} color="#00aaff" />
         <span style={{
@@ -480,8 +481,8 @@ export function PlatformActivityHub({ engine, exchangeStatus, feeSummary }: Prop
       {/* ── Operator Metrics Strip ─────────────────────────────────────────── */}
       <div style={{
         display:      "flex",
-        borderBottom: "1px solid #081420",
-        background:   "#010c18",
+        borderBottom: "1px solid #0d1824",
+        background:   "#000000",
         overflowX:    "auto",
         scrollbarWidth: "none",
       }}>
