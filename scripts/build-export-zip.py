@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT    = Path(__file__).parent.parent.resolve()
 ZIP_PREFIX = "apex-trader"
-OUTPUT  = ROOT / "artifacts" / "trading-dashboard" / "public" / "apex-trader-operator-console-v5.zip"
+OUTPUT  = ROOT / "artifacts" / "trading-dashboard" / "public" / "apex-trader-operator-console-FINAL-v1.zip"
 
 # ── Directories/names to prune everywhere ─────────────────────────────────────
 PRUNE_DIRS: set[str] = {
