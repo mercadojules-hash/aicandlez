@@ -166,6 +166,15 @@ export default function CommandCenter() {
 
   const { hasConsented } = useLiveConsent();
 
+  // Role check — admins and operators bypass ALL consumer-facing gates
+  const { data: authMe } = useQuery<{ role?: string }>({
+    queryKey: ["auth-me"],
+    queryFn:  () => fetch("/api/auth/me", { cache: "no-store" }).then(r => r.json()),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const isOperator = authMe?.role === "admin" || authMe?.role === "super-admin";
+
   const { data: engine } = useQuery<EngineStatus>({
     queryKey: ["engine-status-cmd"],
     queryFn:  () => fetch("/api/engine/status", { cache: "no-store" }).then(r => r.json()),
@@ -336,10 +345,11 @@ export default function CommandCenter() {
   const selectSim  = () => switchExchangeMode("sim", "simulation");
   const selectLive = (ex: string) => {
     const id = ex.toLowerCase();
-    if (!hasConsented) {
-      setPendingLiveEx(id);
-    } else {
+    // Operators/admins: never show consumer consent gate — switch immediately
+    if (isOperator || hasConsented) {
       switchExchangeMode(id, id);
+    } else {
+      setPendingLiveEx(id);
     }
   };
 
