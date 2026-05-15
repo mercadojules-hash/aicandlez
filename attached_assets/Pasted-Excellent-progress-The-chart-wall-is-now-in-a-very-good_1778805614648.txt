@@ -1,0 +1,198 @@
+Excellent progress. The chart wall is now in a very good place visually — leave the crypto chart grid structure intact.
+
+Now we need to refine the LOWER OPERATIONS ROW for readability, operator intelligence, and space utilization.
+
+PRIORITY GOALS:
+
+* improve readability
+* reduce dead space
+* increase operator visibility
+* better utilize Alpaca/equities integration
+* make metrics easier to monitor at scale
+
+========================================
+
+1. PLATFORM OVERVIEW SECTION
+   ========================================
+
+The circular chart is visually strong but currently wastes operational value.
+
+RIGHT NOW:
+
+* it still references Simulation even while Kraken/Alpaca are active
+* the data shown is not meaningful enough
+
+CHANGE IT TO SOMETHING IMPORTANT.
+
+Suggested operator metrics for the circular visualization:
+
+* Live vs Paper Users
+* AI Trade Success Rate
+* User Retention %
+* Active Traders vs Idle Users
+* Portfolio Allocation Split
+* Exchange Distribution
+* Profitability Ratio
+* Risk Exposure Meter
+
+It should feel like:
+"mission critical operator telemetry"
+
+NOT decorative filler.
+
+ALSO:
+
+* increase ALL text size
+* increase metric number size
+* improve spacing/padding
+* improve readability across the entire lower telemetry row
+
+Current text is too small for long-duration operator monitoring.
+
+========================================
+2. TOP ASSETS SECTION
+=====================
+
+Keep the Top Crypto Assets section.
+
+BUT:
+
+* increase from TOP 10 → TOP 15
+* use the extra vertical space available
+* larger fonts
+* larger percentages
+* larger prices
+* better spacing between rows
+
+Then:
+
+DUPLICATE the module and create:
+TOP EQUITIES
+
+Powered through Alpaca market feeds.
+
+Examples:
+
+* AAPL
+* NVDA
+* TSLA
+* META
+* MSFT
+* AMZN
+* GOOGL
+* SPY
+* QQQ
+* AMD
+  etc.
+
+This is important now that Alpaca exists in the ecosystem.
+
+The platform should begin feeling:
+multi-asset
+not crypto-only.
+
+========================================
+3. LIVE TERMINAL FEED
+=====================
+
+Move the Live Feed slightly rightward since there is now empty space available beside the terminal.
+
+Then:
+increase visible rows.
+
+CURRENT:
+~10 rows visible
+
+TARGET:
+~20 visible rows
+
+I expected this expansion once we exited simulation mode.
+
+The terminal should feel:
+institutional
+dense
+alive
+high-frequency
+
+NOT compressed.
+
+========================================
+4. AI OPPORTUNITY SCANNER
+=========================
+
+This section is already excellent visually.
+
+Only refinements needed:
+
+* increase percentage number size
+* keep percentages BRIGHT at all times
+* do NOT allow percentages to become dim/faded
+* maintain vivid color contrast regardless of signal state
+
+Also:
+increase:
+TOP 10 → TOP 15 opportunities
+
+to better fill the available container space.
+
+REMOVE:
+"View All Opportunities"
+
+The link currently does nothing and creates dead UX.
+
+========================================
+5. OPPORTUNITY SCANNER HEADER
+=============================
+
+At the top:
+"A.I. Long & Short"
+
+There are percentages shown on the right side.
+
+Clarify what those percentages represent.
+
+If they are:
+
+* confidence distribution
+* directional sentiment
+* long/short bias
+* execution probability
+* bullish/bearish weighting
+
+then make that explicit in the UI.
+
+Current presentation is ambiguous.
+
+Operator should instantly understand:
+
+* what the percentages mean
+* what system state they represent
+* whether they reflect:
+
+  * market bias
+  * AI confidence
+  * signal weighting
+  * directional probability
+  * execution likelihood
+
+========================================
+6. GLOBAL LOWER ROW REFINEMENT
+==============================
+
+Across the ENTIRE lower section:
+
+* slightly larger fonts
+* slightly larger percentages
+* larger labels
+* improved spacing
+* better readability from distance
+
+Current operator density is excellent —
+but readability still feels too compressed.
+
+Goal:
+Bloomberg / institutional operations feel.
+
+NOT tiny developer dashboard text.
+
+Please implement all refinements while preserving the existing neon cinematic design language and black interior containers.
