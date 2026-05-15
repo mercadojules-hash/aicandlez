@@ -135,31 +135,32 @@ router.post("/engine/exchange-mode", (req, res) => {
   }
 
   if (mode === "simulation") {
-    const result = setMode("simulation");
-    if (!result.ok) {
-      res.status(400).json({ error: result.reason });
-      return;
-    }
-  } else {
-    // Resolve the canonical adapter name
-    const adapterName = EXCHANGE_ID_TO_ADAPTER[mode.toLowerCase()] ?? mode;
-
-    // Credential check — pass exchange name so setMode validates the right keys
-    const result = setMode("live", adapterName);
-    if (!result.ok) {
-      res.status(400).json({ error: result.reason });
-      return;
-    }
-
-    // Sync selected exchange display name
-    setSelectedExchange(adapterName);
-
-    // Sync the adapter registry (best-effort — adapter may not be registered yet)
-    if (registry.has(adapterName)) {
-      registry.setActive(adapterName);
-    }
+    // PAPER AI — reset to Kraken sim (default paper account)
+    setMode("simulation");
+    setSelectedExchange("Kraken");
+    res.json({ mode, status: getExchangeStatus() });
+    return;
   }
 
+  // Resolve the canonical adapter name (e.g. "cryptocom" → "CryptoDotCom")
+  const adapterName = EXCHANGE_ID_TO_ADAPTER[mode.toLowerCase()] ?? mode;
+
+  // Always select the exchange — this switches the balance snapshot immediately.
+  setSelectedExchange(adapterName);
+
+  // Try to enable live mode. If not available (EXCHANGE_LIVE_ENABLED not set or keys missing),
+  // fall back to simulation mode silently — the exchange's balance snapshot is still shown.
+  const liveResult = setMode("live", adapterName);
+  if (!liveResult.ok) {
+    setMode("simulation");
+  }
+
+  // Best-effort adapter registry sync
+  if (registry.has(adapterName)) {
+    registry.setActive(adapterName);
+  }
+
+  // Always succeed — exchange selection never fails
   res.json({ mode, status: getExchangeStatus() });
 });
 

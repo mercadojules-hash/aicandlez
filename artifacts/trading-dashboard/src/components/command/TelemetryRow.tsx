@@ -100,14 +100,18 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
   const exName   = exchangeStatus?.exchangeName ?? "—";
   const mode     = isLive ? "LIVE" : "SIM";
 
-  /* ── Portfolio equity — exchange-scoped, no cross-exchange leakage ─────── */
-  const liveUSD      = isLive && liveBalance?.source === "live" ? (liveBalance.balances?.USD ?? null) : null;
-  const simUSD       = exchangeStatus?.simBalances?.USD ?? simAccount?.equity ?? null;
-  const portfolioEq  = isLive ? liveUSD : simUSD;
-  const portfolioLabel = isLive
-    ? `${exName.toUpperCase().slice(0, 6)} LIVE USD`
+  /* ── Portfolio equity — each exchange has isolated state ───────────────── */
+  // liveBalance is now fetched for ALL non-sim exchanges (live or snapshot).
+  // It's only undefined while the exchange switch is in flight or in PAPER AI mode.
+  const exchangeUSD  = liveBalance?.balances?.USD ?? null;
+  const simUSD       = simAccount?.equity ?? exchangeStatus?.simBalances?.USD ?? null;
+  const portfolioEq  = liveBalance ? exchangeUSD : simUSD;
+
+  const srcLabel = isLive && liveBalance?.source === "live" ? "LIVE" : "SIM";
+  const portfolioLabel = liveBalance
+    ? `${exName.toUpperCase().slice(0, 6)} ${srcLabel} USD`
     : "SIM EQUITY";
-  const portfolioColor = isLive ? "#00ff8a" : "#00f0ff";
+  const portfolioColor = isLive && liveBalance?.source === "live" ? "#00ff8a" : liveBalance ? "#00aaff" : "#00f0ff";
 
   const fmt$ = (n: number) =>
     n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M`

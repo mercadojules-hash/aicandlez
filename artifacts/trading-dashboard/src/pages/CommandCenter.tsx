@@ -203,10 +203,19 @@ export default function CommandCenter() {
   const normalizeExId = (n: string) =>
     ADAPTER_TO_BTN[n.toLowerCase().replace(/[\s._-]/g, "")] ?? n.toLowerCase();
 
-  // Resolved active mode: pending click wins until server confirms
-  const confirmedId = !isLive ? "sim" : normalizeExId(exName);
-  const activeId    = pendingMode ?? confirmedId;
-  const liveActive  = activeId !== "sim";
+  // Resolved confirmed exchange ID from server state.
+  // "sim" only when mode=simulation AND exchange=Kraken (the PAPER AI default).
+  // Any other exchange (Binance, CryptoDotCom, etc.) keeps its own button highlighted
+  // even when falling back to simulation mode (balance snapshot still shown).
+  const confirmedId = !exchangeStatus
+    ? "sim"
+    : !isLive && exName === "Kraken"
+      ? "sim"
+      : normalizeExId(exName);
+
+  // pendingMode wins optimistically for instant UI feedback
+  const activeId   = pendingMode ?? confirmedId;
+  const liveActive = activeId !== "sim";
 
   // /api/simulation/account: only poll when in simulation mode (confirmed + not switching to live)
   const simEnabled = !liveActive;
@@ -218,12 +227,14 @@ export default function CommandCenter() {
     ...Q_OPTS,
   });
 
-  // /api/exchange/balances: keyed by activeId — each exchange has its own cache slot
+  // /api/exchange/balances: keyed by confirmedId (server-confirmed exchange) — never activeId.
+  // Disabled while pendingMode is set so we never fetch with the OLD server state, then cache
+  // the wrong balance under the new exchange's key.  Enabled again once the switch resolves.
   const { data: liveBalance } = useQuery<LiveBalance>({
-    queryKey: ["live-balance-cmd", activeId],
+    queryKey: ["live-balance-cmd", confirmedId],
     queryFn:  () => fetch("/api/exchange/balances", { cache: "no-store" }).then(r => r.json()),
-    refetchInterval: liveActive ? 15_000 : false,
-    enabled:         liveActive,
+    refetchInterval: confirmedId !== "sim" ? 12_000 : false,
+    enabled:         confirmedId !== "sim" && pendingMode === null,
     ...Q_OPTS,
   });
 
@@ -255,6 +266,9 @@ export default function CommandCenter() {
 
   const invalidateExchange = () => {
     qc.invalidateQueries({ queryKey: ["exchange-status-cmd"] });
+    // After the switch resolves, wipe any stale balance cache so the next enable
+    // cycle fetches fresh data for the newly confirmed exchange.
+    qc.removeQueries({ queryKey: ["live-balance-cmd"] });
     void refetchExchange().then(() => setPendingMode(null));
   };
 

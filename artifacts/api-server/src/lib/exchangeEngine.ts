@@ -220,15 +220,23 @@ export async function fetchLiveBalances(): Promise<Balances> {
     };
   }
 
-  // Default: Kraken
-  if (!isApiConfigured()) throw new Error("Kraken API keys not configured");
-  const raw = await krakenPrivate<Record<string, string>>("Balance");
-  return {
-    USD: parseFloat(raw["ZUSD"] ?? raw["USD"] ?? "0"),
-    BTC: parseFloat(raw["XXBT"] ?? raw["XBT"] ?? "0"),
-    ETH: parseFloat(raw["XETH"] ?? raw["ETH"] ?? "0"),
-    SOL: parseFloat(raw["SOL"]  ?? "0"),
-  };
+  if (_selectedExchange === "Kraken") {
+    if (!isExchangeConfigured("Kraken")) throw new Error("Kraken API keys not configured");
+    const raw = await krakenPrivate<Record<string, string>>("Balance");
+    return {
+      USD: parseFloat(raw["ZUSD"] ?? raw["USD"] ?? "0"),
+      BTC: parseFloat(raw["XXBT"] ?? raw["XBT"] ?? "0"),
+      ETH: parseFloat(raw["XETH"] ?? raw["ETH"] ?? "0"),
+      SOL: parseFloat(raw["SOL"]  ?? "0"),
+    };
+  }
+
+  // All other exchanges: return their isolated simulation portfolio snapshot.
+  // Real API integration for Binance, CryptoDotCom, Bybit etc. is not yet implemented.
+  const snap = EXCHANGE_BALANCES[_selectedExchange];
+  if (snap) return { ...snap };
+
+  throw new Error(`Live balances not available for ${_selectedExchange}`);
 }
 
 // ── Price estimate (use last Kraken ticker) ──────────────────────────────────
