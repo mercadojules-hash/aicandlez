@@ -256,181 +256,308 @@ function SignalWaitingViz() {
   );
 }
 
-// ── Live Asset Intelligence Panel — candlestick + confidence + volatility ──────
+// ── Smooth bezier path helper (Catmull-Rom → cubic bezier) ───────────────────
+function smoothSvgPath(pts: [number, number][]): string {
+  if (pts.length < 2) return "";
+  let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1];
+    const [x1, y1] = pts[i];
+    const tension  = 0.38;
+    const cpx0 = x0 + (x1 - x0) * tension;
+    const cpx1 = x1 - (x1 - x0) * tension;
+    d += ` C ${cpx0.toFixed(1)} ${y0.toFixed(1)} ${cpx1.toFixed(1)} ${y1.toFixed(1)} ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+  }
+  return d;
+}
+
+// ── AI Microstructure Panel — flowing liquidity wave + pressure gradient ──────
 
 function LiveAssetIntelPanel({ engine }: { engine?: EngineStatus }) {
-  const [candles, setCandles] = useState<{ o: number; h: number; l: number; c: number }[]>(() => {
-    let p = 52;
-    return Array.from({ length: 28 }, () => {
-      const o = p;
-      const move = (Math.random() - 0.47) * 5.5;
-      const c = Math.max(10, Math.min(90, o + move));
-      const h = Math.max(o, c) + Math.random() * 2.5;
-      const l = Math.min(o, c) - Math.random() * 2.5;
-      p = c;
-      return { o, h, l, c };
-    });
+  const N = 48;
+
+  // Primary: AI confidence flow (smooth cyan wave)
+  const [flowPts, setFlowPts] = useState<number[]>(() => {
+    const pts: number[] = [];
+    let v = 52;
+    for (let i = 0; i < N; i++) {
+      v = Math.max(8, Math.min(92, v + (Math.random() - 0.48) * 12 + Math.sin(i * 0.22) * 5));
+      pts.push(v);
+    }
+    return pts;
   });
-  const [confPts,  setConfPts]  = useState<number[]>(() => Array.from({ length: 28 }, () => 45 + Math.random() * 30));
-  const [volBars,  setVolBars]  = useState<number[]>(() => Array.from({ length: 28 }, () => 18 + Math.random() * 65));
-  const [lastAct,  setLastAct]  = useState<{ action: string; color: string } | null>(null);
+
+  // Secondary: market pressure (smooth orange/amber wave, offset phase)
+  const [pressurePts, setPressurePts] = useState<number[]>(() => {
+    const pts: number[] = [];
+    let v = 45;
+    for (let i = 0; i < N; i++) {
+      v = Math.max(8, Math.min(88, v + (Math.random() - 0.50) * 10 + Math.cos(i * 0.19) * 4));
+      pts.push(v);
+    }
+    return pts;
+  });
+
+  // Volume depth bars (translucent, bottom-aligned)
+  const [volBars, setVolBars] = useState<number[]>(() =>
+    Array.from({ length: N }, () => 12 + Math.random() * 60)
+  );
+
+  // Execution heat events
+  const [execEvents, setExecEvents] = useState<number[]>([]);
+  // Pulse dots at confidence peaks
+  const [pulseDots, setPulseDots] = useState<number[]>([]);
+
+  const [scan, setScan] = useState(0);
 
   useEffect(() => {
     const id = setInterval(() => {
-      const bds    = engine?.symbolBreakdowns ? Object.values(engine.symbolBreakdowns) : [];
-      const avgConf = bds.length ? bds.reduce((s, b: any) => s + b.avgConfidence, 0) / bds.length : 50;
-      const bias    = (avgConf - 50) * 0.07;
+      const bds     = engine?.symbolBreakdowns ? Object.values(engine.symbolBreakdowns) : [];
+      const avgConf = bds.length
+        ? bds.reduce((s, b: any) => s + (b.avgConfidence ?? 0), 0) / bds.length
+        : 50;
+      const t = Date.now() / 4000;
 
-      setCandles(prev => {
-        const last = prev[prev.length - 1]!;
-        const o    = last.c;
-        const move = bias + (Math.random() - 0.47) * 5;
-        const c    = Math.max(10, Math.min(90, o + move));
-        const h    = Math.max(o, c) + Math.random() * 2.2;
-        const l    = Math.min(o, c) - Math.random() * 2.2;
-        return [...prev.slice(1), { o, h, l, c }];
+      setFlowPts(prev => {
+        const next = Math.max(8, Math.min(92,
+          avgConf + (Math.random() - 0.48) * 11 + Math.sin(t * 1.3) * 7
+        ));
+        return [...prev.slice(1), next];
       });
 
-      setConfPts(prev => {
-        const noise = (Math.random() - 0.5) * 14;
-        return [...prev.slice(1), Math.max(8, Math.min(94, avgConf + noise))];
+      setPressurePts(prev => {
+        const next = Math.max(8, Math.min(88,
+          prev[prev.length - 1]! + (Math.random() - 0.50) * 9 + Math.cos(t * 1.7) * 5
+        ));
+        return [...prev.slice(1), next];
       });
 
-      setVolBars(prev => [...prev.slice(1), 15 + Math.random() * 72]);
-    }, 1600);
+      setVolBars(prev => [...prev.slice(1), 12 + Math.random() * 62]);
+
+      // Execution heat: mark index when trade fires
+      setExecEvents(prev => {
+        const fired = Math.random() > 0.88;
+        return fired ? [...prev.slice(-6), N - 1] : prev.map(e => e - 1).filter(e => e >= 0);
+      });
+
+      // Pulse dots at local confidence peaks
+      setPulseDots(prev => {
+        const last   = flowPts[flowPts.length - 1] ?? 0;
+        const second = flowPts[flowPts.length - 2] ?? 0;
+        const isPeak = last > 68 && last > second;
+        return isPeak ? [N - 1, ...prev.slice(0, 3)] : prev.map(e => e - 1).filter(e => e >= 0);
+      });
+
+      setScan(s => (s + 1) % N);
+    }, 1400);
     return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine]);
 
-  useEffect(() => {
-    const sig = engine?.lastSignal;
-    if (!sig) return;
-    const color = sig.action === "BUY" ? "#00ff8a" : sig.action === "SELL" ? "#ff3355" : "#ffaa00";
-    setLastAct({ action: sig.action, color });
-    const t = setTimeout(() => setLastAct(null), 4500);
-    return () => clearTimeout(t);
-  }, [engine?.lastSignal]);
-
-  const bds       = engine?.symbolBreakdowns ? Object.values(engine.symbolBreakdowns) : [];
-  const topBd     = bds.length
+  // Derived live metrics
+  const bds        = engine?.symbolBreakdowns ? Object.values(engine.symbolBreakdowns) : [];
+  const topBd      = bds.length
     ? [...bds].sort((a: any, b: any) => b.avgConfidence - a.avgConfidence)[0]
     : null;
   const activeSym  = (topBd as any)?.symbol?.replace("USD", "") ?? "BTC";
-  const activeConf = (topBd as any)?.avgConfidence ?? 0;
-  const confColor  = activeConf >= 65 ? "#00ff8a" : activeConf >= 45 ? "#ffaa00" : "#ff5544";
-  const lastConf   = confPts[confPts.length - 1] ?? 0;
+  const liveConf   = flowPts[flowPts.length - 1] ?? 0;
+  const confColor  = liveConf >= 65 ? "#00f0ff" : liveConf >= 45 ? "#ff9d3a" : "#ff4466";
+  const pressureLast = pressurePts[pressurePts.length - 1] ?? 0;
+  const pressureDir  = pressureLast > 50 ? "BUYING" : "SELLING";
 
-  const CW = 240, CH = 58, VH = 14, cfH = 26;
-  const cW2 = candles.length;
-  const barW = CW / cW2 - 0.8;
-  const priceMin = Math.min(...candles.map(c => c.l));
-  const priceMax = Math.max(...candles.map(c => c.h));
-  const pr = priceMax - priceMin || 1;
-  const toY = (p: number) => CH - ((p - priceMin) / pr) * (CH - 6) - 3;
+  // SVG geometry
+  const W = 260, H = 90, VH = 16;
 
-  const cfD = confPts.map((v, i) => {
-    const x = (i / (confPts.length - 1)) * CW;
-    const y = cfH - (v / 100) * (cfH - 2) - 1;
-    return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
-  }).join(" ");
-  const cfArea = `${cfD} L ${CW} ${cfH} L 0 ${cfH} Z`;
+  const toPt = (v: number, h: number): number => h - (v / 100) * (h - 6) - 3;
 
-  const lastCfPt = confPts[confPts.length - 1];
-  const lastCfX  = CW;
-  const lastCfY  = cfH - ((lastCfPt ?? 0) / 100) * (cfH - 2) - 1;
+  const flowCoords: [number, number][] = flowPts.map((v, i) => [
+    (i / (N - 1)) * W, toPt(v, H),
+  ]);
+  const pressureCoords: [number, number][] = pressurePts.map((v, i) => [
+    (i / (N - 1)) * W, toPt(v, H),
+  ]);
+
+  const flowPath     = smoothSvgPath(flowCoords);
+  const pressurePath = smoothSvgPath(pressureCoords);
+  const flowAreaPath = `${flowPath} L ${W} ${H} L 0 ${H} Z`;
+
+  const scanX = ((scan / N) * W).toFixed(1);
+
+  const [lastFX, lastFY] = flowCoords[flowCoords.length - 1] ?? [W, H / 2];
 
   return (
     <div style={{
-      background: "#000000", border: "1px solid #0d1824", borderRadius: 4,
-      padding: "8px 10px", display: "flex", flexDirection: "column", gap: 5,
+      background: "#000000",
+      border: "1px solid #0d1824",
+      borderRadius: 6,
+      overflow: "hidden",
+      display: "flex",
+      flexDirection: "column",
     }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700,
-            color: "#00f0ff", letterSpacing: "-0.01em" }}>{activeSym}</span>
-          <span style={{ fontSize: 6.5, fontFamily: "monospace", color: "#00aaff45",
-            letterSpacing: "0.16em", textTransform: "uppercase" }}>LIVE INTEL</span>
-        </div>
-        {lastAct ? (
-          <span style={{ fontSize: 7, fontFamily: "monospace", fontWeight: 700,
-            padding: "2px 5px", borderRadius: 3,
-            background: `${lastAct.color}15`, color: lastAct.color,
-            border: `1px solid ${lastAct.color}40`, letterSpacing: "0.1em" }}>
-            {lastAct.action}
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "7px 10px",
+        borderBottom: "1px solid #07121c",
+        background: "#010608",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#00f0ff",
+            boxShadow: "0 0 6px #00f0ff", flexShrink: 0 }} className="live-dot" />
+          <span style={{ fontSize: 8, fontFamily: "monospace", fontWeight: 700,
+            color: "#00f0ff88", letterSpacing: "0.22em", textTransform: "uppercase" }}>
+            AI MICROSTRUCTURE
           </span>
-        ) : (
-          <span style={{ fontSize: 7, fontFamily: "monospace", color: `${confColor}80`,
-            letterSpacing: "0.1em" }}>{activeConf.toFixed(0)}%</span>
-        )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 7, fontFamily: "monospace",
+            color: pressureLast > 50 ? "#00f0ff55" : "#ff9d3a55",
+            letterSpacing: "0.1em" }}>
+            {pressureDir} PRESSURE
+          </span>
+          <span style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700,
+            color: "#2a4050", letterSpacing: "0.08em" }}>
+            {activeSym}
+          </span>
+        </div>
       </div>
 
-      {/* Mini candlestick chart */}
-      <svg width="100%" height={CH} viewBox={`0 0 ${CW} ${CH}`}
-        preserveAspectRatio="none" style={{ display: "block" }}>
-        {candles.map((c, i) => {
-          const x     = i * (barW + 0.8) + barW / 2;
-          const isBull = c.c >= c.o;
-          const color  = isBull ? "#00ff8a" : "#ff3355";
-          const bTop   = toY(Math.max(c.o, c.c));
-          const bH     = Math.max(1, Math.abs(toY(c.o) - toY(c.c)));
-          const isLast = i === candles.length - 1;
+      {/* ── Main wave panel ──────────────────────────────────────────────────── */}
+      <div style={{ position: "relative", flex: 1 }}>
+        <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="none" style={{ display: "block" }}>
+          <defs>
+            {/* Cyan flow gradient */}
+            <linearGradient id="ms-flow-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor="#00f0ff" stopOpacity="0.18" />
+              <stop offset="55%"  stopColor="#00f0ff" stopOpacity="0.04" />
+              <stop offset="100%" stopColor="#00f0ff" stopOpacity="0.00" />
+            </linearGradient>
+            {/* Horizontal pressure gradient (left=sell, right=buy) */}
+            <linearGradient id="ms-pressure-bg" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%"   stopColor="#ff3355" stopOpacity="0.04" />
+              <stop offset="50%"  stopColor="#000000" stopOpacity="0.00" />
+              <stop offset="100%" stopColor="#00f0ff" stopOpacity="0.05" />
+            </linearGradient>
+            {/* Glow filter for execution events */}
+            <filter id="ms-exec-glow">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+
+          {/* Directional pressure background */}
+          <rect x={0} y={0} width={W} height={H} fill="url(#ms-pressure-bg)" />
+
+          {/* Subtle horizontal grid lines */}
+          {[25, 50, 75].map(pct => {
+            const y = toPt(pct, H);
+            return (
+              <line key={pct} x1={0} y1={y} x2={W} y2={y}
+                stroke="#0c1e2a" strokeWidth={0.5} strokeDasharray="3,12" />
+            );
+          })}
+
+          {/* Volume depth bars (bottom, translucent) */}
+          {volBars.map((v, i) => {
+            const bw  = (W / N) * 0.72;
+            const bx  = (i / N) * W;
+            const bh  = (v / 100) * (H * 0.28);
+            const age = i / N;
+            return (
+              <rect key={i} x={bx} y={H - bh} width={bw} height={bh}
+                fill={`rgba(0,180,255,${0.06 + age * 0.10})`} rx={1} />
+            );
+          })}
+
+          {/* Pressure wave (secondary — amber, dim, smooth) */}
+          <path d={pressurePath} fill="none"
+            stroke="#ff9d3a" strokeWidth={1}
+            strokeOpacity={0.22}
+            strokeDasharray="none"
+            style={{ filter: "drop-shadow(0 0 3px #ff9d3a30)" }} />
+
+          {/* Flow area fill */}
+          <path d={flowAreaPath} fill="url(#ms-flow-fill)" />
+
+          {/* Primary flow line (cyan, glowing) */}
+          <path d={flowPath} fill="none" stroke="#00f0ff" strokeWidth={1.6}
+            style={{ filter: "drop-shadow(0 0 6px #00f0ff55)" }} />
+
+          {/* Execution heat events (vertical glow spikes) */}
+          {execEvents.map((idx, i) => {
+            if (idx < 0 || idx >= N) return null;
+            const ex = (idx / (N - 1)) * W;
+            return (
+              <g key={i} filter="url(#ms-exec-glow)">
+                <line x1={ex} y1={H} x2={ex} y2={H * 0.35}
+                  stroke="#00ff8a" strokeWidth={1.5} opacity={0.7} />
+                <circle cx={ex} cy={H * 0.35} r={2} fill="#00ff8a" opacity={0.9} />
+              </g>
+            );
+          })}
+
+          {/* Confidence pulse dots at signal peaks */}
+          {pulseDots.map((idx, i) => {
+            if (idx < 0 || idx >= flowCoords.length) return null;
+            const [px, py] = flowCoords[idx] ?? [0, 0];
+            return (
+              <circle key={i} cx={px} cy={py} r={2.8} fill="#00f0ff" opacity={0.8}
+                style={{ filter: "drop-shadow(0 0 5px #00f0ff)" }} />
+            );
+          })}
+
+          {/* Live tip dot */}
+          <circle cx={lastFX} cy={lastFY} r={3} fill="#00f0ff"
+            style={{ filter: "drop-shadow(0 0 8px #00f0ff)" }} className="live-dot" />
+
+          {/* Scanning sweep line */}
+          <line x1={scanX} y1={0} x2={scanX} y2={H}
+            stroke="#00f0ff" strokeWidth={0.6} opacity={0.14} />
+
+          {/* Legend: top-left stream labels */}
+          <text x={6} y={11} fontSize={6} fontFamily="monospace"
+            fill="#00f0ff40" letterSpacing="0.1em" textAnchor="start">AI FLOW</text>
+          <text x={6} y={21} fontSize={6} fontFamily="monospace"
+            fill="#ff9d3a30" letterSpacing="0.1em" textAnchor="start">MKT PRESSURE</text>
+        </svg>
+      </div>
+
+      {/* ── Volume bar mini-strip ─────────────────────────────────────────────── */}
+      <svg width="100%" height={VH} viewBox={`0 0 ${W} ${VH}`}
+        preserveAspectRatio="none" style={{ display: "block", marginTop: -1 }}>
+        {volBars.map((v, i) => {
+          const bw  = (W / N) * 0.7;
+          const bx  = (i / N) * W;
+          const bh  = (v / 100) * VH;
+          const age = i / N;
           return (
-            <g key={i}>
-              <line x1={x} y1={toY(c.h)} x2={x} y2={toY(c.l)}
-                stroke={color} strokeWidth={0.6} opacity={isLast ? 0.9 : 0.45} />
-              <rect x={i * (barW + 0.8)} y={bTop} width={barW} height={bH}
-                fill={color} opacity={isLast ? 1 : 0.65}
-                style={isLast ? { filter: `drop-shadow(0 0 3px ${color}80)` } : {}} />
-            </g>
+            <rect key={i} x={bx} y={VH - bh} width={bw} height={bh}
+              fill={`rgba(0,160,220,${0.10 + age * 0.20})`} rx={0.5} />
           );
         })}
       </svg>
 
-      {/* Volume bars */}
-      <svg width="100%" height={VH} viewBox={`0 0 ${CW} ${VH}`}
-        preserveAspectRatio="none" style={{ display: "block", marginTop: -3 }}>
-        {volBars.map((v, i) => (
-          <rect key={i}
-            x={i * (barW + 0.8)} y={VH - (v / 100) * VH}
-            width={barW} height={(v / 100) * VH}
-            fill="#00aaff" opacity={0.15 + (i / volBars.length) * 0.28} />
-        ))}
-      </svg>
-
-      {/* AI confidence sparkline */}
-      <svg width="100%" height={cfH} viewBox={`0 0 ${CW} ${cfH}`}
-        preserveAspectRatio="none" style={{ display: "block" }}>
-        <defs>
-          <linearGradient id="lac-cf" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={confColor} stopOpacity="0.28" />
-            <stop offset="100%" stopColor={confColor} stopOpacity="0.01" />
-          </linearGradient>
-        </defs>
-        <path d={cfArea} fill="url(#lac-cf)" />
-        <path d={cfD} fill="none" stroke={confColor} strokeWidth={1.4}
-          style={{ filter: `drop-shadow(0 0 5px ${confColor}60)` }} />
-        {lastCfPt !== undefined && (
-          <circle cx={lastCfX} cy={lastCfY} r={2.5} fill={confColor}
-            style={{ filter: `drop-shadow(0 0 6px ${confColor})` }} />
-        )}
-        {/* Label */}
-        <text x={4} y={cfH - 3} fontSize={6.5} fontFamily="monospace"
-          fill="#2a4050" letterSpacing="0.12em">AI CONFIDENCE</text>
-      </svg>
-
-      {/* Bottom metrics */}
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
+      {/* ── Bottom metrics row ───────────────────────────────────────────────── */}
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "flex-end",
+        padding: "6px 10px 7px",
+        borderTop: "1px solid #07121c",
+        background: "#010608",
+      }}>
         {[
-          { label: "CONF",  value: `${lastConf.toFixed(0)}%`,            color: confColor },
-          { label: "SIG",   value: String(engine?.signalsGenerated ?? 0), color: "#00aaff" },
-          { label: "EXEC",  value: String(engine?.tradesExecuted ?? 0),   color: "#ffaa00" },
-          { label: "BLK",   value: String(engine?.tradesBlocked ?? 0),    color: "#ff5555" },
+          { label: "FLOW",  value: `${liveConf.toFixed(0)}%`,             color: confColor  },
+          { label: "SIG",   value: String(engine?.signalsGenerated ?? 0),  color: "#00aaff"  },
+          { label: "EXEC",  value: String(engine?.tradesExecuted ?? 0),    color: "#00ff8a"  },
+          { label: "BLK",   value: String(engine?.tradesBlocked ?? 0),     color: "#ff4455"  },
         ].map(({ label, value, color }) => (
-          <div key={label} style={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-            <span style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700,
-              color, lineHeight: 1, textShadow: `0 0 10px ${color}50` }}>{value}</span>
-            <span style={{ fontSize: 6.5, fontFamily: "monospace", color: "#1e3040",
-              textTransform: "uppercase", letterSpacing: "0.12em" }}>{label}</span>
+          <div key={label} style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
+            <span style={{
+              fontSize: 14, fontFamily: "monospace", fontWeight: 700,
+              color, lineHeight: 1, textShadow: `0 0 12px ${color}60`,
+            }}>{value}</span>
+            <span style={{ fontSize: 6, fontFamily: "monospace", color: "#1a3040",
+              textTransform: "uppercase", letterSpacing: "0.14em" }}>{label}</span>
           </div>
         ))}
       </div>
@@ -830,7 +957,13 @@ export function LiveTradingConsole({
               <label className="text-[10px] font-bold font-mono" style={{ color: "#9FB3C8" }}>
                 AI CONFIDENCE THRESHOLD
               </label>
-              <span className="text-[16px] font-bold font-mono tabular-nums" style={{ color: "#00aaff" }}>
+              <span className="font-bold font-mono tabular-nums" style={{
+                fontSize: 36,
+                lineHeight: 1,
+                color: "#00f0ff",
+                textShadow: "0 0 14px #00f0ffaa, 0 0 32px #00f0ff44, 0 0 2px #00f0ff",
+                letterSpacing: "-0.02em",
+              }}>
                 {confidence}
               </span>
             </div>

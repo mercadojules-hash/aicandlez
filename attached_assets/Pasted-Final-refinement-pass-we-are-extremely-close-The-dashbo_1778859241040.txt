@@ -1,0 +1,156 @@
+Final refinement pass — we are extremely close. The dashboard finally feels alive and institutional. The orchestration layer, exchange switching, telemetry density, and operator flow are moving in the correct direction.
+
+There are only TWO final refinements remaining before we freeze the dashboard and move to cloud deployment + Stripe/performance-fee infrastructure.
+
+━━━━━━━━━━━━━━━━━━━
+
+1. RIGHT-SIDE MINI CHART REDESIGN
+   ━━━━━━━━━━━━━━━━━━━
+
+The chart under:
+
+AI CONFIDENCE THRESHOLD
+MAX POSITION SIZE
+
+still looks weak compared to the rest of the platform.
+
+Current issues:
+
+* the red/green oscillating lines feel generic
+* visually noisy
+* looks like a placeholder widget
+* does not match institutional UI quality
+* the current line movement feels “retail trading app”
+* lacks premium AI visualization feel
+
+REPLACE IT with a cleaner:
+LIVE AI MICROSTRUCTURE PANEL
+
+Desired design:
+
+* dark institutional background
+* subtle neon glow
+* smooth flowing line
+* volumetric depth
+* confidence pulse visualization
+* cleaner market pressure rendering
+* fewer harsh zig-zag movements
+* more cinematic / Bloomberg / TradingView institutional style
+
+Think:
+AI ORDER FLOW VISUALIZATION
+—not—
+cheap RSI widget.
+
+Better approach:
+
+* soft flowing cyan/orange liquidity wave
+* translucent volume bars
+* confidence pulse dots
+* directional market pressure gradient
+* execution heat intensity
+* smoother interpolation curves
+* cleaner typography
+* more breathing room
+
+The panel should feel:
+
+* premium
+* intelligent
+* predictive
+* AI-driven
+* institutional
+
+NOT:
+
+* crypto indicator spam
+
+━━━━━━━━━━━━━━━━━━━
+2. AI CONFIDENCE NUMBER
+━━━━━━━━━━━━━━━━━━━
+
+The current confidence value:
+
+65
+
+needs to be MUCH larger.
+
+This is one of the most important numbers on the entire dashboard.
+
+Make it:
+
+* significantly larger
+* bolder
+* brighter
+* stronger glow
+* visually dominant
+
+Think:
+“AI confidence command metric”
+
+It should immediately draw the operator’s eye.
+
+Suggested:
+
+* 28px–40px range
+* strong cyan glow
+* dominant hierarchy
+* positioned more intentionally inside the panel
+
+━━━━━━━━━━━━━━━━━━━
+ALSO IMPORTANT — PERFORMANCE FEE ENGINE
+━━━━━━━━━━━━━━━━━━━
+
+After this dashboard freeze, the next backend system we are building is:
+
+PERFORMANCE FEE TRACKING
+
+The platform will ONLY record:
+
+* REALIZED
+* CLOSED
+* PROFITABLE
+  trades.
+
+NOT unrealized PnL.
+
+We need backend architecture prepared for:
+
+if (trade.closed && trade.realizedPnl > 0) {
+performanceFee = realizedPnl * 0.02
+}
+
+Store:
+
+* user
+* exchange
+* asset
+* realized pnl
+* fee amount
+* timestamp
+* trade ID
+* settlement status
+
+Future admin console panels will display:
+
+* total fees earned
+* pending settlements
+* profitable user volume
+* exchange fee generation
+* AI-generated profit metrics
+
+This is the monetization layer after dashboard completion.
+
+━━━━━━━━━━━━━━━━━━━
+FINAL NOTE
+━━━━━━━━━━━━━━━━━━━
+
+The dashboard is no longer in “prototype” territory.
+
+It now feels like:
+
+* an institutional operator terminal
+* AI execution infrastructure
+* real orchestration software
+
+We are now polishing operator intelligence and monetization infrastructure — not rebuilding UI anymore.
