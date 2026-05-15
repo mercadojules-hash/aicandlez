@@ -464,7 +464,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {!collap && (
         <div className="px-2 py-1.5 border-t shrink-0" style={{ borderTopColor: "#0E2030" }}>
           <a
-            href="/apex-trader-v2.zip"
+            href="/apex-trader-operator-console-final.zip"
             download
             className="flex items-center gap-2 px-2 py-1.5 rounded text-[9px] font-mono font-medium border border-transparent transition-colors"
             style={{ color: "#3a5a70" }}

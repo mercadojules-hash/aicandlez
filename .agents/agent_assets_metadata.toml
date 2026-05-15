@@ -53,3 +53,9 @@ id = "SHOebhX3MotQwO1iotH50"
 uri = "file://artifacts/trading-dashboard/public/apex-trader-full-export.zip"
 type = "unspecified"
 title = "Apex Trader — Full Export (v3, deployment-ready)"
+
+[[outputs]]
+id = "86-olokKdKucQg-oUArZc"
+uri = "file://artifacts/trading-dashboard/public/apex-trader-operator-console-final.zip"
+type = "unspecified"
+title = "apex-trader-operator-console-final.zip — Latest build with all refinements"
