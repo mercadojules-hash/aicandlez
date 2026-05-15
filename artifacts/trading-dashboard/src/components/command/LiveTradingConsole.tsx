@@ -121,6 +121,192 @@ function LargeButton({
   );
 }
 
+// ── Signal-waiting animated visualization ─────────────────────────────────────
+
+function SignalWaitingViz() {
+  const N = 40;
+  const [bars, setBars] = useState<number[]>(() => Array.from({ length: N }, () => 8 + Math.random() * 22));
+  const [pulse, setPulse] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setBars(prev => {
+        const next = [...prev.slice(1), 8 + Math.random() * 22];
+        return next;
+      });
+      setPulse(p => p + 1);
+    }, 140);
+    return () => clearInterval(id);
+  }, []);
+
+  const W = 520, H = 56, barW = W / N - 1;
+
+  return (
+    <div className="border-t flex items-stretch" style={{ borderTopColor: "#0a1a28", background: "#000000", minHeight: 58 }}>
+
+      {/* Animated bar chart */}
+      <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+        <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+          style={{ display: "block" }}>
+          {bars.map((h, i) => {
+            const isRecent = i >= N - 4;
+            const color = isRecent ? "#00f0ff" : i % 7 === 0 ? "#cc55ff" : "#00f0ff";
+            const opacity = 0.12 + (i / N) * 0.55 + (isRecent ? 0.3 : 0);
+            return (
+              <rect key={i}
+                x={i * (barW + 1)} y={H - h} width={barW} height={h}
+                fill={color} opacity={opacity} rx={1} />
+            );
+          })}
+          {/* Scanning line */}
+          <line
+            x1={((pulse % N) / N) * W} y1={0}
+            x2={((pulse % N) / N) * W} y2={H}
+            stroke="#00f0ff" strokeWidth={1} opacity={0.3} />
+        </svg>
+        <div style={{
+          position: "absolute", inset: 0, display: "flex",
+          alignItems: "center", paddingLeft: 12, gap: 8,
+        }}>
+          <Activity style={{ width: 13, height: 13, color: "#1e3a50", flexShrink: 0 }} />
+          <span style={{ fontSize: 9.5, fontFamily: "monospace", fontWeight: 700,
+            color: "#1e3a50", letterSpacing: "0.2em", textTransform: "uppercase" }}>
+            No active positions — AI monitoring signals
+          </span>
+        </div>
+      </div>
+
+      {/* Right: live signal counters */}
+      <div style={{
+        display: "flex", flexDirection: "column", justifyContent: "center",
+        gap: 3, paddingLeft: 14, paddingRight: 16, borderLeft: "1px solid #0a1824",
+        flexShrink: 0,
+      }}>
+        {[
+          { label: "SIGNAL FLOW",  color: "#00f0ff" },
+          { label: "MTF ACTIVE",   color: "#cc55ff" },
+          { label: "RISK OK",      color: "#00ff8a" },
+        ].map(({ label, color }) => (
+          <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ width: 4, height: 4, borderRadius: "50%", background: color,
+              boxShadow: `0 0 4px ${color}`, flexShrink: 0 }} className="live-dot" />
+            <span style={{ fontSize: 7.5, fontFamily: "monospace", color: `${color}70`,
+              letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── AI Signal Activity mini panel ─────────────────────────────────────────────
+
+function AISignalMini({ engine }: { engine?: EngineStatus }) {
+  const [pts, setPts] = useState<number[]>(() => Array.from({ length: 24 }, () => 45 + Math.random() * 30));
+  const [lastAction, setLastAction] = useState<{ action: string; color: string } | null>(null);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const base = engine?.signalCounts?.BUY ?? 0;
+      const conf  = 40 + base * 1.2 + (Math.random() - 0.5) * 14;
+      setPts(prev => [...prev.slice(1), Math.max(5, Math.min(95, conf))]);
+    }, 1600);
+    return () => clearInterval(id);
+  }, [engine]);
+
+  useEffect(() => {
+    const sig = engine?.lastSignal;
+    if (!sig) return;
+    const color = sig.action === "BUY" ? "#00ff8a" : sig.action === "SELL" ? "#ff3355" : "#ffaa00";
+    setLastAction({ action: sig.action, color });
+    const t = setTimeout(() => setLastAction(null), 4000);
+    return () => clearTimeout(t);
+  }, [engine?.lastSignal]);
+
+  const W = 240, H = 36;
+  const smooth = (arr: number[]) => arr.map((v, i) => {
+    const x = (i / (arr.length - 1)) * W;
+    const y = H - (v / 100) * H;
+    return { x, y };
+  });
+  const pts2d = smooth(pts);
+  const d = pts2d.map((p, i) =>
+    i === 0 ? `M ${p.x.toFixed(1)} ${p.y.toFixed(1)}`
+    : `L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`
+  ).join(" ");
+  const area = `${d} L ${W} ${H} L 0 ${H} Z`;
+
+  const lastConf = pts[pts.length - 1] ?? 0;
+  const confColor = lastConf >= 65 ? "#00ff8a" : lastConf >= 45 ? "#ffaa00" : "#ff5544";
+
+  return (
+    <div style={{
+      background: "#000000",
+      border: "1px solid #0d1824",
+      borderRadius: 4,
+      padding: "8px 10px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 6,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 7.5, fontFamily: "monospace", fontWeight: 700,
+          color: "#2a4050", letterSpacing: "0.18em", textTransform: "uppercase" }}>
+          AI SIGNAL MONITOR
+        </span>
+        {lastAction && (
+          <span style={{
+            fontSize: 7, fontFamily: "monospace", fontWeight: 700,
+            padding: "2px 6px", borderRadius: 3,
+            background: `${lastAction.color}15`,
+            color: lastAction.color,
+            border: `1px solid ${lastAction.color}40`,
+            letterSpacing: "0.1em",
+          }}>
+            {lastAction.action}
+          </span>
+        )}
+      </div>
+
+      {/* Confidence sparkline */}
+      <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+        style={{ display: "block" }}>
+        <defs>
+          <linearGradient id="ltc-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={confColor} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={confColor} stopOpacity="0.01" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill="url(#ltc-grad)" />
+        <path d={d} fill="none" stroke={confColor} strokeWidth={1.5}
+          style={{ filter: `drop-shadow(0 0 4px ${confColor}60)` }} />
+        {/* Live dot */}
+        {pts2d[pts2d.length - 1] && (
+          <circle cx={pts2d[pts2d.length - 1]!.x} cy={pts2d[pts2d.length - 1]!.y}
+            r={3} fill={confColor}
+            style={{ filter: `drop-shadow(0 0 5px ${confColor})` }} />
+        )}
+      </svg>
+
+      {/* Metric row */}
+      <div style={{ display: "flex", gap: 10 }}>
+        {[
+          { label: "CONFIDENCE",  value: `${lastConf.toFixed(0)}%`,            color: confColor },
+          { label: "SIGNALS",     value: String(engine?.signalsGenerated ?? 0), color: "#00aaff" },
+          { label: "EXECUTIONS",  value: String(engine?.tradesExecuted ?? 0),   color: "#ffaa00" },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <span style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700,
+              color, lineHeight: 1, letterSpacing: "-0.01em" }}>{value}</span>
+            <span style={{ fontSize: 7, fontFamily: "monospace", color: "#1e3040",
+              textTransform: "uppercase", letterSpacing: "0.12em" }}>{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Active Trade Card ─────────────────────────────────────────────────────────
 
 function ActiveTradeCard({ openTrade, simPos }: {
@@ -137,14 +323,7 @@ function ActiveTradeCard({ openTrade, simPos }: {
   const pos   = simPos;
 
   if (!trade && !pos) {
-    return (
-      <div className="flex items-center gap-3 px-4 py-3 border-t" style={{ borderTopColor: "#0d1e2e" }}>
-        <Activity className="w-4 h-4 flex-shrink-0" style={{ color: "#2a4050" }} />
-        <span className="text-[11px] font-mono font-medium" style={{ color: "#2a4050" }}>
-          NO ACTIVE POSITIONS — AI WAITING FOR SIGNAL
-        </span>
-      </div>
-    );
+    return <SignalWaitingViz />;
   }
 
   const symbol    = trade?.symbol  ?? pos?.symbol  ?? "—";
@@ -290,9 +469,12 @@ export function LiveTradingConsole({
   const openTrade  = openTrades[0];
 
   // In LIVE mode: show real exchange USD balance. In SIM mode: show simulation equity.
-  const krakenUSD  = liveActive && liveBalance?.source === "live" ? liveBalance.balances.USD : null;
-  const balance    = krakenUSD ?? simAccount?.equity ?? simAccount?.account?.cashBalance;
-  const balanceLabel = liveActive && krakenUSD != null ? "LIVE BALANCE (USD)" : "ACCOUNT EQUITY";
+  // Strict exchange-scope: never fall back to sim balance when in live mode
+  const liveUSD      = liveActive && liveBalance?.source === "live" ? (liveBalance.balances.USD ?? null) : null;
+  const balance      = liveActive ? liveUSD : (simAccount?.equity ?? simAccount?.account?.cashBalance ?? null);
+  const balanceLabel = liveActive
+    ? (liveUSD != null ? `${exName.toUpperCase()} LIVE USD` : "CONNECTING…")
+    : "ACCOUNT EQUITY";
   const unrealPnL  = simAccount?.unrealizedPnL ?? 0;
 
   // ── Status banner color ───────────────────────────────────────────────────
@@ -458,7 +640,7 @@ export function LiveTradingConsole({
               label={balanceLabel}
               value={balance != null ? fmt$(balance, 0) : "—"}
               big
-              valueColor={krakenUSD != null ? "#00ff8a" : "#EAF2FF"}
+              valueColor={liveUSD != null ? "#00ff8a" : "#EAF2FF"}
             />
             <StatCard
               label="TOTAL REALIZED P&L"
@@ -565,47 +747,8 @@ export function LiveTradingConsole({
             </div>
           </div>
 
-          {/* Exchange mode selector */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold font-mono" style={{ color: "#9FB3C8" }}>
-              TRADING MODE
-            </label>
-            <div className="flex gap-1.5">
-              <button
-                onClick={onSelectSim}
-                className="flex-1 font-mono font-bold text-[10px] rounded py-2 transition-all border"
-                style={!liveActive ? {
-                  background: "#ffaa0018",
-                  color:       "#ffaa00",
-                  borderColor: "#ffaa0050",
-                  boxShadow:   "0 0 10px #ffaa0020",
-                } : {
-                  background: "transparent",
-                  color:       "#4a6070",
-                  borderColor: "#1a2a36",
-                }}>
-                ⊙ SIMULATION
-              </button>
-              {LIVE_EXCHANGES.map(ex => (
-                <button
-                  key={ex.id}
-                  onClick={() => onSelectLive(ex.id)}
-                  className="flex-1 font-mono font-bold text-[9px] rounded py-2 transition-all border"
-                  style={activeId === ex.id ? {
-                    background: `${ex.color}18`,
-                    color:       ex.color,
-                    borderColor: `${ex.color}50`,
-                    boxShadow:   `0 0 10px ${ex.color}20`,
-                  } : {
-                    background: "transparent",
-                    color:       "#4a6070",
-                    borderColor: "#1a2a36",
-                  }}>
-                  {ex.label.split(".")[0]}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* AI Signal Activity — replaces duplicate exchange selector */}
+          <AISignalMini engine={engine} />
         </div>
       </div>
     </div>

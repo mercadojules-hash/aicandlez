@@ -31,8 +31,8 @@ function Cell({
         background:    "#030b14",
         border:        `1px solid ${dim ? "#0c1824" : "#141f2e"}`,
         borderRadius:  3,
-        padding:       "10px 16px",
-        minWidth:      wide ? 145 : 115,
+        padding:       "7px 13px",
+        minWidth:      wide ? 120 : 96,
         position:      "relative",
         overflow:      "hidden",
         flexShrink:    0,
@@ -47,10 +47,10 @@ function Cell({
       <div
         className="font-bold font-mono leading-none tabular-nums"
         style={{
-          fontSize:      23,
+          fontSize:      18,
           color:         valColor,
-          textShadow:    dim ? "none" : `0 0 14px ${color}45, 0 0 28px ${color}18`,
-          marginBottom:  sub ? 5 : 6,
+          textShadow:    dim ? "none" : `0 0 12px ${color}45, 0 0 22px ${color}18`,
+          marginBottom:  sub ? 4 : 5,
           letterSpacing: "-0.02em",
         }}
       >
@@ -61,7 +61,7 @@ function Cell({
       {sub && (
         <div
           className="font-mono uppercase tracking-[0.14em] leading-none"
-          style={{ fontSize: 8.5, color: subColor, marginBottom: 4 }}
+          style={{ fontSize: 8, color: subColor, marginBottom: 3 }}
         >
           {sub}
         </div>
@@ -70,7 +70,7 @@ function Cell({
       {/* Label — always readable, never invisible */}
       <div
         className="font-mono uppercase leading-none tracking-[0.12em]"
-        style={{ fontSize: 8.5, color: dim ? "#2a4a60" : "#3a5878" }}
+        style={{ fontSize: 8, color: dim ? "#2a4a60" : "#3a5878" }}
       >
         {label}
       </div>
@@ -315,10 +315,10 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
 
   const rowStyle: React.CSSProperties = {
     display:        "flex",
-    gap:            8,
+    gap:            7,
     overflowX:      "auto",
     scrollbarWidth: "none",
-    padding:        "0 10px",
+    padding:        "0 8px",
     flex:           1,
   };
 
@@ -328,7 +328,7 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       {/* ── Row 1: Operational / live state ─────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "stretch", borderBottom: "1px solid #0a1824" }}>
         <RowHeader title="OPERATIONAL STATUS" color="#00f0ff" />
-        <div style={{ ...rowStyle, paddingTop: 9, paddingBottom: 8 }}>
+        <div style={{ ...rowStyle, paddingTop: 7, paddingBottom: 6 }}>
           {row1.map((c) => <Cell key={c.label} {...c} />)}
         </div>
       </div>
@@ -336,7 +336,7 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
       {/* ── Row 2: Performance / analytics ──────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "stretch" }}>
         <RowHeader title="PERFORMANCE ANALYTICS" color="#cc55ff" />
-        <div style={{ ...rowStyle, paddingTop: 8, paddingBottom: 9 }}>
+        <div style={{ ...rowStyle, paddingTop: 6, paddingBottom: 7 }}>
           {row2.map((c) => <Cell key={c.label} {...c} />)}
         </div>
       </div>

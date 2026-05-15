@@ -1,0 +1,283 @@
+FINAL OPERATOR CENTER + LAYOUT CONSOLIDATION PASS
+
+The dashboard architecture is significantly improved, but after live review there are still several major UX and operator-consistency issues remaining before deployment.
+
+====================================================
+
+1. REMOVE REMAINING DUPLICATE TRADING MODE AREA
+   ====================================================
+
+CURRENT ISSUE:
+
+The upper-right “TRADING MODE” / exchange control area still behaves like a detached floating control cluster.
+
+Even after prior cleanup, this area:
+
+* still feels disconnected
+* wastes prime dashboard space
+* duplicates exchange-state visibility
+* weakens operator hierarchy
+
+====================================================
+REQUIRED CHANGE
+===============
+
+Remove the remaining detached trading mode block entirely.
+
+DO NOT replace it with:
+
+* more exchange buttons
+* duplicated broker state
+* static controls
+
+Instead:
+convert this area into:
+LIVE OPERATOR TELEMETRY SPACE.
+
+====================================================
+2. CONVERT LARGE EMPTY BLACK CENTER SPACE INTO MAIN OPERATOR CHART
+==================================================================
+
+The large black empty area above the ticker row is currently massively underutilized.
+
+This should become:
+
+THE MAIN PLATFORM OPERATIONS VISUALIZATION LAYER.
+
+====================================================
+MAIN CENTER CHART REQUIREMENTS
+==============================
+
+Create a large animated institutional-style live telemetry chart showing OVERLAYED DATA STREAMS:
+
+* AI Signals Generated
+* User Trading Activity
+* Live Executions
+* Platform Volume
+* Active Users
+* Fees Generated
+* Signal Acceptance/Rejection
+* Exchange Usage Distribution
+
+Visual direction:
+Bloomberg + TradingView + SaaS operator telemetry.
+
+====================================================
+MOST IMPORTANT DATA TO VISUALIZE
+================================
+
+1. LIVE USER ACTIVITY (highest priority)
+
+Track:
+
+* users currently online
+* users actively trading
+* new users joining
+* paper vs live users
+* onboarding spikes
+* activity surges
+
+This is critical for platform operations.
+
+---
+
+2. AI EXECUTION FLOW
+
+Show:
+
+* AI signals generated
+* executions accepted
+* executions filtered
+* executions rejected
+* MTF confirmations
+* risk gate activity
+
+This becomes:
+the AI behavior monitoring layer.
+
+---
+
+3. PLATFORM FEES / REVENUE
+
+Chart:
+
+* fees collected today
+* rolling revenue
+* average fee per user
+* execution fees by exchange
+
+This becomes:
+the operator business intelligence layer.
+
+---
+
+4. EXCHANGE DISTRIBUTION
+
+Visualize:
+
+* Kraken %
+* Alpaca %
+* Coinbase %
+* Binance %
+* Simulation %
+
+Allows:
+
+* broker dominance tracking
+* onboarding trends
+* exchange health monitoring
+
+====================================================
+3. ADD MINI LIVE ASSET CHART IN RIGHT-SIDE DEAD SPACE
+=====================================================
+
+The empty space near:
+
+* TAKE PROFIT
+* STOP LOSS
+* active asset telemetry
+
+is still wasted.
+
+====================================================
+REQUIRED CHANGE
+===============
+
+Add a contextual mini live asset intelligence chart there.
+
+This chart should dynamically reflect:
+
+* currently active asset
+  OR
+* currently selected symbol
+  OR
+* currently executing AI trade
+
+Suggested telemetry:
+
+* micro price movement
+* execution flow
+* volatility pulse
+* AI confidence trend
+* momentum visualization
+
+This area should feel:
+
+* alive
+* contextual
+* reactive
+* intelligent
+
+NOT:
+
+* empty filler space
+
+====================================================
+4. REDUCE TELEMETRY CARD HEIGHT FURTHER
+=======================================
+
+The two telemetry rows are still consuming too much vertical space.
+
+Examples:
+
+* CRYPTO
+* ONLINE
+* SAFE
+* AUTO
+* -$0
+* +$0
+* $100
+* 29%
+
+====================================================
+REQUIRED CHANGE
+===============
+
+Further compress these cards institutionally:
+
+* reduce height
+* tighten padding
+* reduce vertical whitespace
+* preserve readability
+* preserve glow hierarchy
+
+Goal:
+free significantly more vertical room for:
+
+* operator charting
+* activity telemetry
+* AI monitoring
+* live feeds
+
+Design direction:
+more Bloomberg terminal density,
+less oversized SaaS cards.
+
+====================================================
+5. EXCHANGE BALANCE ISOLATION STILL NOT FULLY FIXED
+===================================================
+
+CRITICAL ISSUE:
+
+Switching exchanges still displays the Kraken $100 balance on all exchanges.
+
+This means exchange state architecture is still partially leaking shared account data.
+
+====================================================
+REQUIRED FIX
+============
+
+Enforce STRICT exchange-scoped balance/account isolation.
+
+Each exchange MUST maintain isolated:
+
+* balances
+* buying power
+* equity
+* fees
+* positions
+* executions
+* telemetry
+
+Switching exchanges MUST dynamically reload:
+
+* account context
+* broker balances
+* PnL
+* open positions
+* telemetry
+
+NO global/shared balance leakage may remain.
+
+This is production-critical before deployment.
+
+====================================================
+FINAL GOAL
+==========
+
+The center of the dashboard should NO LONGER feel like:
+“widgets and containers.”
+
+It should feel like:
+
+“A living AI trading operating system.”
+
+The platform should visually communicate:
+
+* the AI is active
+* users are trading
+* exchanges are flowing
+* telemetry is alive
+* executions are occurring
+* onboarding is happening
+* the platform is growing in real time
+
+Remove:
+
+* dead space
+* floating controls
+* oversized telemetry cards
+* disconnected visual hierarchy
+
+Transform the dashboard into:
+a centralized institutional AI operations center.
