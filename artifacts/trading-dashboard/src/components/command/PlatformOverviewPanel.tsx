@@ -157,10 +157,10 @@ export function PlatformOverviewPanel({ simAccount, liveBalance, engine, feeSumm
   const isAlpaca = (liveActive ?? false) && String(exchangeName ?? "").toLowerCase().includes("alpaca");
   const isLive   = liveActive ?? (liveBalance?.source === "live");
 
-  const liveUSD  = isLive ? (liveBalance!.balances.USD ?? 0) : 0;
-  const liveBTC  = isLive ? (liveBalance!.balances.BTC ?? 0) : 0;
-  const liveETH  = isLive ? (liveBalance!.balances.ETH ?? 0) : 0;
-  const liveSOL  = isLive ? (liveBalance!.balances.SOL ?? 0) : 0;
+  const liveUSD  = isLive ? (liveBalance?.balances?.USD ?? 0) : 0;
+  const liveBTC  = isLive ? (liveBalance?.balances?.BTC ?? 0) : 0;
+  const liveETH  = isLive ? (liveBalance?.balances?.ETH ?? 0) : 0;
+  const liveSOL  = isLive ? (liveBalance?.balances?.SOL ?? 0) : 0;
 
   const equity   = isLive ? liveUSD : (simAccount?.equity ?? 0);
   const cash     = isLive ? liveUSD : (simAccount?.account?.cashBalance ?? 0);

@@ -15,10 +15,10 @@ export function BrokerStatusCard({ exchangeStatus, simAccount, liveBalance }: Pr
   const isLive   = mode === "live";
 
   /* ── Exchange-scoped balance (strict isolation) ───────────────────────── */
-  const liveUSD  = isLive && liveBalance?.source === "live" ? (liveBalance.balances.USD ?? null) : null;
-  const liveBTC  = isLive && liveBalance?.source === "live" ? (liveBalance.balances.BTC ?? 0) : 0;
-  const liveETH  = isLive && liveBalance?.source === "live" ? (liveBalance.balances.ETH ?? 0) : 0;
-  const liveSOL  = isLive && liveBalance?.source === "live" ? (liveBalance.balances.SOL ?? 0) : 0;
+  const liveUSD  = isLive && liveBalance?.source === "live" ? (liveBalance.balances?.USD ?? null) : null;
+  const liveBTC  = isLive && liveBalance?.source === "live" ? (liveBalance.balances?.BTC ?? 0) : 0;
+  const liveETH  = isLive && liveBalance?.source === "live" ? (liveBalance.balances?.ETH ?? 0) : 0;
+  const liveSOL  = isLive && liveBalance?.source === "live" ? (liveBalance.balances?.SOL ?? 0) : 0;
 
   const simBal  = exchangeStatus?.simBalances;
   const simUSD  = simBal?.USD ?? simAccount?.account?.cashBalance ?? 100_000;
