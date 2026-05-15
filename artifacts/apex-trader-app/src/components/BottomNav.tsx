@@ -1,151 +1,110 @@
 import { Link, useLocation } from "wouter";
 
-interface NavItem {
-  path:    string;
-  label:   string;
-  icon:    React.ReactNode;
-  isLive?: boolean;
-}
+// ── Icons ──────────────────────────────────────────────────────────────────────
+const HomeIcon = ({ active }: { active: boolean }) => (
+  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+    <path d="M2 9.5L11 2L20 9.5V20H14V14H8V20H2V9.5Z"
+      stroke={active ? "#00e5ff" : "#3a3f5c"} strokeWidth="1.5"
+      strokeLinecap="round" strokeLinejoin="round" fill="none" />
+  </svg>
+);
 
-function DashIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.9"/>
-      <rect x="11" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.5"/>
-      <rect x="1" y="11" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.5"/>
-      <rect x="11" y="11" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.7"/>
-    </svg>
-  );
-}
-function SignalIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <path d="M1 13 C 3 13, 4 5, 6 5 S 8 10, 10 10 S 13 7, 14 7 S 16 9, 17 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-    </svg>
-  );
-}
-function PortfolioIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <rect x="1" y="10" width="3" height="7" rx="1" fill="currentColor" opacity="0.5"/>
-      <rect x="6" y="6"  width="3" height="11" rx="1" fill="currentColor" opacity="0.7"/>
-      <rect x="11" y="3" width="3" height="14" rx="1" fill="currentColor" opacity="0.9"/>
-      <rect x="16" y="7" width="2" height="10" rx="1" fill="currentColor" opacity="0.6"/>
-    </svg>
-  );
-}
-function AccountIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <circle cx="9" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <path d="M2 16c0-3.314 3.134-6 7-6s7 2.686 7 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-    </svg>
-  );
-}
+const TradeIcon = ({ active }: { active: boolean }) => (
+  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+    <polyline points="3,16 8,10 13,13 19,6"
+      stroke={active ? "#00e5ff" : "#3a3f5c"} strokeWidth="1.5"
+      strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <polyline points="14,6 19,6 19,11"
+      stroke={active ? "#00e5ff" : "#3a3f5c"} strokeWidth="1.5"
+      strokeLinecap="round" strokeLinejoin="round" fill="none" />
+  </svg>
+);
 
-const ITEMS: NavItem[] = [
-  { path: "/",          label: "Dashboard", icon: <DashIcon />       },
-  { path: "/signals",   label: "Signals",   icon: <SignalIcon />     },
-  { path: "/portfolio", label: "Portfolio", icon: <PortfolioIcon />  },
-  { path: "/live",      label: "Live",      isLive: true,
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M9 1L11.5 7H17L12.5 10.5L14.5 17L9 13L3.5 17L5.5 10.5L1 7H6.5L9 1Z"
-          fill="currentColor" opacity="0.9"/>
-      </svg>
-    ),
-  },
-  { path: "/account",   label: "Account",   icon: <AccountIcon />    },
+const MarketsIcon = ({ active }: { active: boolean }) => (
+  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+    <rect x="3" y="13" width="3" height="7" rx="1"
+      fill={active ? "#00e5ff" : "#3a3f5c"} />
+    <rect x="9" y="9"  width="3" height="11" rx="1"
+      fill={active ? "#00e5ff" : "#3a3f5c"} opacity="0.85" />
+    <rect x="15" y="4" width="3" height="16" rx="1"
+      fill={active ? "#00e5ff" : "#3a3f5c"} opacity="0.7" />
+  </svg>
+);
+
+const ProfileIcon = ({ active }: { active: boolean }) => (
+  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+    <circle cx="11" cy="7.5" r="3.5"
+      stroke={active ? "#00e5ff" : "#3a3f5c"} strokeWidth="1.5" fill="none" />
+    <path d="M3 19.5c0-3.866 3.582-7 8-7s8 3.134 8 7"
+      stroke={active ? "#00e5ff" : "#3a3f5c"} strokeWidth="1.5"
+      strokeLinecap="round" fill="none" />
+  </svg>
+);
+
+const TABS = [
+  { path: "/",        label: "Home",    Icon: HomeIcon    },
+  { path: "/trade",   label: "Trade",   Icon: TradeIcon   },
+  { path: "/markets", label: "Markets", Icon: MarketsIcon },
+  { path: "/profile", label: "Profile", Icon: ProfileIcon },
 ];
 
 export function BottomNav() {
   const [location] = useLocation();
 
+  const isActive = (path: string) =>
+    path === "/"
+      ? location === "/"
+      : location === path || location.startsWith(path + "/");
+
   return (
     <nav style={{
-      background:  "#020a14",
-      borderTop:   "1px solid #0d2035",
-      display:     "flex",
-      paddingBottom: "env(safe-area-inset-bottom, 0px)",
-      flexShrink: 0,
+      background:    "#070710",
+      borderTop:     "1px solid #1a1c2e",
+      display:       "flex",
+      paddingBottom: "env(safe-area-inset-bottom, 4px)",
+      flexShrink:    0,
     }}>
-      {ITEMS.map(item => {
-        const active = location === item.path
-          || (item.path !== "/" && location.startsWith(item.path));
-
-        const activeColor = item.isLive ? "#00ff8a" : "#00aaff";
-
+      {TABS.map(({ path, label, Icon }) => {
+        const active = isActive(path);
         return (
-          <Link key={item.path} href={item.path} style={{
+          <Link key={path} href={path} style={{
             flex:           1,
             display:        "flex",
             flexDirection:  "column",
             alignItems:     "center",
             justifyContent: "center",
-            gap:            3,
-            height:         56,
+            gap:            4,
+            height:         58,
             textDecoration: "none",
-            color:          active ? activeColor : "#1e3a50",
-            transition:     "color 0.2s ease",
             position:       "relative",
           }}>
-            {/* Active top indicator */}
             {active && (
               <div style={{
-                position:     "absolute",
-                top:          0,
-                left:         "50%",
-                transform:    "translateX(-50%)",
-                width:        24,
-                height:       2,
-                background:   activeColor,
-                borderRadius: "0 0 2px 2px",
-                boxShadow:    `0 0 8px ${activeColor}`,
-              }} />
-            )}
-
-            {/* Live tab special badge */}
-            {item.isLive && (
-              <div style={{
                 position:   "absolute",
-                top:        8,
-                right:      "calc(50% - 18px)",
-                width:      6,
-                height:     6,
-                borderRadius: "50%",
-                background: "#00ff8a",
-                boxShadow:  "0 0 8px #00ff8a",
-                animation:  active ? "none" : "nav-pulse 2s ease infinite",
+                top:        0,
+                left:       "50%",
+                transform:  "translateX(-50%)",
+                width:      32,
+                height:     2,
+                background: "#00e5ff",
+                borderRadius: "0 0 2px 2px",
+                boxShadow:  "0 0 10px #00e5ff80",
               }} />
             )}
-
-            <span style={{
-              color:     active ? activeColor : "#1e3a50",
-              transition: "color 0.2s ease",
-            }}>
-              {item.icon}
-            </span>
-
+            <Icon active={active} />
             <span style={{
               fontSize:      8,
               fontFamily:    "monospace",
               fontWeight:    700,
-              letterSpacing: "0.08em",
+              letterSpacing: "0.1em",
               textTransform: "uppercase",
-              color:         active ? activeColor : "#1e3a50",
-              transition:    "color 0.2s ease",
+              color:         active ? "#00e5ff" : "#3a3f5c",
             }}>
-              {item.label}
+              {label}
             </span>
           </Link>
         );
       })}
-      <style>{`
-        @keyframes nav-pulse {
-          0%, 100% { opacity: 1;   box-shadow: 0 0 8px #00ff8a; }
-          50%       { opacity: 0.3; box-shadow: 0 0 3px #00ff8a; }
-        }
-      `}</style>
     </nav>
   );
 }

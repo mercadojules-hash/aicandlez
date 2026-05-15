@@ -16,7 +16,7 @@ export default function Consent() {
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["live-eligibility"] });
-      setLocation("/live");
+      setLocation("/trade");
     },
   });
 

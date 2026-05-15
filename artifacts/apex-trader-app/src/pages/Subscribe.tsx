@@ -16,7 +16,7 @@ export default function Subscribe() {
       api.post<{ url: string }>("/billing/checkout", {
         planId,
         billingPeriod:  "monthly",
-        successUrl: `${window.location.origin}/apex-trader-app/live?checkout=success`,
+        successUrl: `${window.location.origin}/apex-trader-app/trade?checkout=success`,
         cancelUrl:  `${window.location.origin}/apex-trader-app/subscribe`,
       }),
     onSuccess: ({ url }) => { window.location.href = url; },

@@ -1,16 +1,9 @@
-// ── Apex Trader Mobile — API Client ───────────────────────────────────────────
-// All API calls go through the shared api-server at /api.
-// Auth is carried via the session cookie (same origin) — no manual token needed.
-
 const BASE = "/api";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     credentials: "include",
   });
   if (!res.ok) {
@@ -21,13 +14,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  get:    <T>(path: string)                        => apiFetch<T>(path),
-  post:   <T>(path: string, body?: unknown)        => apiFetch<T>(path, { method: "POST",   body: JSON.stringify(body) }),
-  put:    <T>(path: string, body?: unknown)        => apiFetch<T>(path, { method: "PUT",    body: JSON.stringify(body) }),
-  delete: <T>(path: string)                        => apiFetch<T>(path, { method: "DELETE" }),
+  get:    <T>(path: string)                 => apiFetch<T>(path),
+  post:   <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "POST",   body: JSON.stringify(body) }),
+  put:    <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "PUT",    body: JSON.stringify(body) }),
+  delete: <T>(path: string)                 => apiFetch<T>(path, { method: "DELETE" }),
 };
-
-// ── Response Types ─────────────────────────────────────────────────────────────
 
 export interface EngineStatus {
   running:          boolean;
@@ -41,11 +32,11 @@ export interface EngineStatus {
 }
 
 export interface RiskStatus {
-  level:            string;
-  dailyPnL:         number;
-  dailyPnLPct:      number;
-  tradesUsedToday:  number;
-  tradesRemaining:  number;
+  level:           string;
+  dailyPnL:        number;
+  dailyPnLPct:     number;
+  tradesUsedToday: number;
+  tradesRemaining: number;
 }
 
 export interface MobileStatus {
@@ -57,11 +48,11 @@ export interface MobileStatus {
 }
 
 export interface Position {
-  id:         string;
-  symbol:     string;
-  side:       string;
-  size:       number;
-  entryPrice: number;
+  id:            string;
+  symbol:        string;
+  side:          string;
+  size:          number;
+  entryPrice:    number;
   currentPrice?: number;
   unrealizedPnL?: number;
 }
@@ -117,9 +108,9 @@ export interface Plan {
 }
 
 export interface ConsentStatus {
-  hasConsented:    boolean;
-  consentVersion:  string;
-  consentedAt:     string | null;
+  hasConsented:   boolean;
+  consentVersion: string;
+  consentedAt:    string | null;
 }
 
 export interface AuthMe {
@@ -127,4 +118,24 @@ export interface AuthMe {
   email: string;
   role:  string;
   plan:  string;
+}
+
+export interface SimAccount {
+  balance:      number;
+  totalTrades:  number;
+  winRate:      number;
+  realizedPnL:  number;
+  feesPaid:     number;
+}
+
+export interface SimTrade {
+  id:         string;
+  symbol:     string;
+  side:       string;
+  pnl:        number;
+  pnlPct:     number;
+  score?:     number;
+  closedAt:   string;
+  entryPrice: number;
+  exitPrice:  number;
 }
