@@ -59,3 +59,9 @@ id = "86-olokKdKucQg-oUArZc"
 uri = "file://artifacts/trading-dashboard/public/apex-trader-operator-console-final.zip"
 type = "unspecified"
 title = "apex-trader-operator-console-final.zip — Latest build with all refinements"
+
+[[outputs]]
+id = "41KXx6WxYOfYOaAsMkILs"
+uri = "file://artifacts/trading-dashboard/public/apex-trader-operator-console-v5.zip"
+type = "unspecified"
+title = "apex-trader-operator-console-v5.zip"

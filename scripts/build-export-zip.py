@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT    = Path(__file__).parent.parent.resolve()
 ZIP_PREFIX = "apex-trader"
-OUTPUT  = ROOT / "artifacts" / "trading-dashboard" / "public" / "apex-trader-full-export.zip"
+OUTPUT  = ROOT / "artifacts" / "trading-dashboard" / "public" / "apex-trader-operator-console-v5.zip"
 
 # ── Directories/names to prune everywhere ─────────────────────────────────────
 PRUNE_DIRS: set[str] = {
@@ -236,7 +236,7 @@ def main() -> None:
     print(f"  Files:  {stats['files']:,}")
     print(f"  Size:   {size_mb:.2f} MB  ({size_kb:,.0f} KB)")
     print(f"  Path:   {OUTPUT}")
-    print(f"  URL:    /apex-trader-full-export.zip\n")
+    print(f"  URL:    /apex-trader-operator-console-v5.zip\n")
 
     if not ok:
         sys.exit(1)
