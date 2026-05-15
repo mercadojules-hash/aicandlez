@@ -115,7 +115,7 @@ export default function Signals() {
     refetchInterval: 5_000,
   });
 
-  const entries = data ? Object.entries(data.breakdowns) : [];
+  const entries = data?.breakdowns ? Object.entries(data.breakdowns) : [];
 
   return (
     <div style={{ padding: "16px 16px 80px" }}>
