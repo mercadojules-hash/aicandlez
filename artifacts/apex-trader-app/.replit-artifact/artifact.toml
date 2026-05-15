@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/apex-trader-app/"
+title = "Apex Trader App"
+version = "1.0.0"
+id = "artifacts/apex-trader-app"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/apex-trader-app/" ]
+localPort = 21259
+
+[services.development]
+run = "pnpm --filter @workspace/apex-trader-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/apex-trader-app", "run", "build" ]
+publicDir = "artifacts/apex-trader-app/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21259"
+BASE_PATH = "/apex-trader-app/"

@@ -1,0 +1,126 @@
+Next mobile app implementation phase for Apex Trader — MOBILE APP ONLY (NOT operator dashboard).
+
+The operator dashboard/admin console is finalized locally and should remain untouched for now.
+
+We are now preparing the mobile app onboarding and monetization architecture.
+
+GOAL:
+Users can freely use PAPER TRADING without any subscription, payment, or consent gate.
+
+Only when the user attempts to activate LIVE TRADING should the subscription/paywall/disclaimer flow appear.
+
+MOBILE APP REQUIREMENTS
+
+FREE ACCESS:
+
+* Paper trading must remain completely free
+* No subscription required for simulation mode
+* No consent modal required for paper trading
+* Users should be able to:
+
+  * create account
+  * connect supported exchanges
+  * monitor telemetry
+  * use simulation mode
+  * test AI trading
+  * explore dashboard features
+
+LIVE TRADING ACTIVATION FLOW:
+When the user attempts to:
+
+* activate live trading
+* connect live API keys
+* switch from SIM → LIVE
+* enable real execution
+
+THEN trigger the monetization/consent flow.
+
+LIVE TRADING REQUIREMENTS:
+
+1. $5.99/month subscription via Stripe
+2. 2% performance fee ONLY on PROFITABLE CLOSED trades
+3. NO performance fee on:
+
+   * losing trades
+   * unrealized PnL
+   * open positions
+   * paper trades
+4. Subscription required BEFORE live trading activation
+5. User must accept all disclosures before activation
+
+DISCLAIMER / CONSENT FLOW:
+The live trading consent flow should clearly state:
+
+* Crypto trading involves risk
+* Apex Trader is AI-assisted trading software
+* User remains responsible for their own financial decisions
+* $5.99/month subscription fee applies for live platform access
+* 2% performance fee applies ONLY to profitable closed trades
+* No fee is charged on losing trades
+* No fee is charged on unrealized/open trades
+* Consent timestamp must be recorded
+
+SUPPORTED EXCHANGES:
+Live trading should ONLY work with exchanges currently supported by the backend exchange architecture.
+
+Current supported/planned exchange routing:
+
+* Kraken
+* Coinbase
+* Binance
+* Crypto.com
+* Gemini
+* Bybit
+* OKX
+* KuCoin
+* Gate.io
+* Bitget
+* MEXC
+* Alpaca
+* Robinhood (future)
+* Uphold (future)
+
+If an exchange is unsupported:
+
+* show “COMING SOON”
+* disable live activation
+* allow paper trading only
+
+IMPORTANT:
+This monetization/consent flow belongs ONLY inside the mobile app consumer experience.
+
+DO NOT:
+
+* add consumer paywalls to the operator dashboard
+* show subscription modals to admin/operator accounts
+* modify the operator console behavior
+
+SUBSCRIPTION SYSTEM:
+Prepare the architecture only:
+
+* Stripe customer creation
+* subscription state
+* active/inactive membership
+* webhook-ready structure
+* billing status
+* cancellation handling
+* admin analytics tracking
+* fee aggregation tracking
+
+ADMIN ANALYTICS (backend only):
+Track:
+
+* total subscribers
+* active live traders
+* MRR
+* total profitable trades
+* total fees owed
+* total fees collected
+* exchange usage distribution
+* subscription conversion rate
+
+Do NOT finalize UI styling yet.
+Do NOT finalize onboarding visuals yet.
+Do NOT deploy production Stripe yet.
+
+This phase is architecture + flow preparation only for the mobile app.

@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { eq, and } from "drizzle-orm";
+import { db, usersTable, userConsentsTable } from "@workspace/db";
 import { engineStats } from "../lib/tradingLoop.js";
 import { getExchangeStatus } from "../lib/exchangeEngine.js";
 import { getStatus as getRiskStatus } from "../lib/riskEngine.js";
@@ -7,6 +9,12 @@ import { userEngineRegistry } from "../services/users/UserEngineRegistry.js";
 import { drawdownProtection } from "../services/risk/DrawdownProtection.js";
 import { executionTelemetry } from "../services/telemetry/ExecutionTelemetry.js";
 import { breakers } from "../services/risk/CircuitBreaker.js";
+import { requireAuth } from "../middlewares/requireAuth.js";
+import type { Request } from "express";
+
+type AuthReq = Request & { clerkUserId: string };
+
+const CURRENT_CONSENT_VERSION = "v1.0";
 
 // ── Mobile API routes ─────────────────────────────────────────────────────────
 //
@@ -156,6 +164,75 @@ router.get("/mobile/platform", (_req, res) => {
     })),
     ts: Date.now(),
   });
+});
+
+// ── Live trading eligibility check ───────────────────────────────────────────
+// GET /api/mobile/live-trading/eligibility
+// Auth-required. Combines subscription + consent checks into a single call.
+// Response drives the mobile app's live trading gate UI.
+
+router.get("/mobile/live-trading/eligibility", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
+  try {
+    const [user] = await db
+      .select({
+        plan:                 usersTable.plan,
+        planStatus:           usersTable.planStatus,
+        stripeSubscriptionId: usersTable.stripeSubscriptionId,
+        stripeCustomerId:     usersTable.stripeCustomerId,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, userId))
+      .limit(1);
+
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    const hasActiveSub =
+      user.plan !== "free" && user.planStatus === "active";
+
+    if (!hasActiveSub) {
+      res.json({
+        eligible:    false,
+        reason:      "requires_subscription",
+        plan:        user.plan,
+        planStatus:  user.planStatus,
+        hasConsented: false,
+      });
+      return;
+    }
+
+    const [consent] = await db
+      .select({ id: userConsentsTable.id, createdAt: userConsentsTable.createdAt })
+      .from(userConsentsTable)
+      .where(and(
+        eq(userConsentsTable.userId, userId),
+        eq(userConsentsTable.consentVersion, CURRENT_CONSENT_VERSION),
+      ))
+      .limit(1);
+
+    if (!consent) {
+      res.json({
+        eligible:    false,
+        reason:      "requires_consent",
+        plan:        user.plan,
+        planStatus:  user.planStatus,
+        hasConsented: false,
+      });
+      return;
+    }
+
+    res.json({
+      eligible:    true,
+      reason:      "ok",
+      plan:        user.plan,
+      planStatus:  user.planStatus,
+      hasConsented: true,
+      consentedAt:  consent.createdAt,
+    });
+  } catch (err) {
+    req.log.error({ err }, "GET /mobile/live-trading/eligibility failed");
+    res.status(500).json({ error: "Failed to check live trading eligibility" });
+  }
 });
 
 // ── Push notification registration (Phase 2) ─────────────────────────────────
