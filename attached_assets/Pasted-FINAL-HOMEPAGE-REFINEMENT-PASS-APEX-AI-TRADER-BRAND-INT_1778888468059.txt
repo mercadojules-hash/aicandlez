@@ -1,0 +1,267 @@
+FINAL HOMEPAGE REFINEMENT PASS — APEX AI TRADER BRAND INTEGRATION + PREMIUM TERMINAL POLISH
+
+The attached new “APEX AI TRADER” logo is now the official app branding.
+Replace the current text-based title with the uploaded logo asset throughout the mobile homepage.
+
+DO NOT redesign the layout.
+
+This is now a premium rendering + UI refinement pass before App Store / Google Play submission.
+
+CRITICAL VISUAL TARGET:
+The app should feel like:
+
+* a luxury institutional trading terminal
+* ultra-clean OLED rendering
+* deep black cinematic UI
+* sharp premium typography
+* restrained glow
+* high-end fintech aesthetic
+
+NOT:
+
+* gaming UI
+* neon crypto meme app
+* fuzzy glow-heavy interface
+* blurry “cyberpunk” styling
+
+====================================================
+GLOBAL COLOR SYSTEM
+===================
+
+APP BACKGROUND:
+
+* pure OLED black
+* #000000
+
+ALL MAIN CONTAINERS / CARDS:
+
+* inner fill color:
+* #0d151e
+
+This is mandatory.
+
+Current cards still feel too blue/foggy.
+
+The containers should:
+
+* feel denser
+* flatter
+* sharper
+* more premium
+* more architectural
+
+Add:
+
+* subtle inner shadow
+* crisp edge definition
+* restrained cyan edge glow only
+* reduced bloom by ~70%
+
+NO ambient haze.
+
+====================================================
+LOGO INTEGRATION
+================
+
+Use the uploaded APEX AI TRADER logo.
+
+Requirements:
+
+* replace text title completely
+* scale proportionally
+* slightly tighter vertical spacing
+* keep crisp rendering
+* no heavy glow around logo
+* allow subtle cyan edge luminance only
+
+Top bar should feel:
+
+* executive
+* premium
+* minimal
+
+====================================================
+TYPOGRAPHY UPDATE
+=================
+
+The current font feels outdated and “computer terminal.”
+
+Replace with a cleaner institutional fintech typeface.
+
+Target style:
+
+* modern
+* premium
+* sharp
+* highly legible
+* elegant spacing
+
+Think:
+
+* Apple finance UI
+* Bloomberg mobile
+* Revolut Ultra
+* institutional dashboard typography
+
+Increase:
+
+* clarity
+* weight hierarchy
+* spacing consistency
+
+Avoid:
+
+* retro terminal fonts
+* arcade/computer fonts
+* sci-fi fonts
+
+====================================================
+BUTTON REFINEMENT
+=================
+
+The BUY / HOLD buttons currently look weak and cheap.
+
+Redesign them WITHOUT changing layout.
+
+NEW BUTTON STYLE:
+
+* compact pill buttons
+* crisp edges
+* stronger contrast
+* subtle depth
+* minimal glow
+* premium exchange feel
+
+BUY:
+
+* restrained emerald accent
+* no neon explosion
+
+HOLD:
+
+* cool cyan/steel accent
+
+Buttons should resemble:
+“professional execution controls”
+NOT gaming badges.
+
+====================================================
+CHART SYSTEM UPGRADE
+====================
+
+Charts make the app feel premium.
+Lean INTO charts.
+
+Improve:
+
+* line rendering quality
+* smoothing
+* anti-aliasing
+* live market movement feel
+
+Add:
+
+* subtle animated micro movement
+* slight data drift
+* elegant line transitions
+
+NO exaggerated animations.
+
+Chart lines should feel:
+
+* expensive
+* institutional
+* live
+
+Use:
+
+* cyan
+* green
+* blue-white
+
+Very restrained.
+
+====================================================
+LIVE MARKET SECTION
+===================
+
+Increase sophistication:
+
+* tighter spacing
+* cleaner dividers
+* improved hierarchy
+* sharper labels
+
+Add subtle:
+
+* live pulse indicators
+* ticker motion
+* market activity feel
+
+====================================================
+RECENT AI SIGNALS
+=================
+
+This section is strong already.
+
+Refine only:
+
+* progress bars
+* spacing
+* typography
+* alignment
+* row contrast
+
+Bars should:
+
+* glow less
+* render sharper
+* feel more data-driven
+
+====================================================
+BOTTOM NAVIGATION
+=================
+
+Keep current layout.
+
+Refine:
+
+* icon sharpness
+* spacing
+* active state precision
+* reduce blur/glow
+
+Should feel:
+
+* Apple-quality rendering
+* fintech premium
+* highly polished
+
+====================================================
+MOST IMPORTANT NOTES
+====================
+
+1. PURE BLACK BACKGROUND
+   #000000
+
+2. ALL CONTAINERS:
+   #0d151e
+
+3. Reduce ALL glow by ~70%
+
+4. Sharpen rendering everywhere
+
+5. Replace title with uploaded logo
+
+6. Improve charts significantly
+
+7. Premium institutional feel ONLY
+
+8. Do NOT redesign layout
+
+This should now feel ready for:
+
+* App Store screenshots
+* Google Play screenshots
+* investor demos
+* production launch
