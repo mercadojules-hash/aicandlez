@@ -1,382 +1,245 @@
 #!/usr/bin/env python3
 """
-Build the Apex Trader standalone export ZIP.
+Apex Trader — Full Project Export Builder
+Produces a clean, complete, deployable ZIP of the entire Apex Trader workspace.
 
-  python3 scripts/build-export-zip.py [output_path]
+Usage:
+  python3 scripts/build-export-zip.py
 
-Default output: artifacts/trading-dashboard/public/apex-trader-v2.zip
-
-All files are placed under an "apex-trader/" prefix so the extracted folder
-is a self-contained workspace named "apex-trader".
-
-The bundled root config files (pnpm-workspace.yaml, package.json, tsconfig.json)
-are Apex Trader-only — natura-ai, natura-web, mockup-sandbox, and all Expo/mobile
-references are stripped out.
+Output: artifacts/trading-dashboard/public/apex-trader-full-export.zip
 """
 
-import io
 import os
 import sys
 import zipfile
 from pathlib import Path
 
-ROOT = Path(__file__).parent.parent.resolve()
-OUTPUT = Path(sys.argv[1]) if len(sys.argv) > 1 else (
-    ROOT / "artifacts/trading-dashboard/public/apex-trader-v2.zip"
-)
+ROOT    = Path(__file__).parent.parent.resolve()
+ZIP_PREFIX = "apex-trader"
+OUTPUT  = ROOT / "artifacts" / "trading-dashboard" / "public" / "apex-trader-full-export.zip"
 
-ZIP_PREFIX = "apex-trader"   # All paths in the ZIP go under this folder
+# ── Directories/names to prune everywhere ─────────────────────────────────────
+PRUNE_DIRS: set[str] = {
+    "node_modules", "dist", ".git", ".cache", "__pycache__",
+    ".expo", ".turbo", ".pnpm-store", "coverage",
+    ".replit-artifact",        # Replit platform metadata
+    ".agents",                 # Replit agent metadata
+    ".local",                  # Agent skills / session data
+    "attached_assets",         # Uploaded assets — not source
+}
 
-# ── Directories to walk (relative to ROOT) ────────────────────────────────────
-# Only Apex Trader packages.
-INCLUDE_DIRS = [
-    "artifacts/api-server/src",
-    "artifacts/trading-dashboard/src",
-    "lib/api-spec",            # openapi.yaml + orval.config.ts + package.json
-    "lib/api-client-react/src",
-    "lib/api-zod/src",
-    "lib/db/src",
-    "scripts/src",
+PRUNE_FILES: set[str] = {
+    ".env", ".env.local", ".env.development.local", ".env.production.local",
+    ".DS_Store", "Thumbs.db",
+}
+
+PRUNE_SUFFIXES: set[str] = {
+    ".tsbuildinfo",            # TypeScript build cache — regenerated
+    ".log", ".pid",
+}
+
+# Public ZIPs from previous exports (in trading-dashboard/public/)
+PRUNE_FILENAME_STARTSWITH = ("apex-trader", "ai-trader-platform")
+
+
+# ── Packages to include (relative to ROOT) ────────────────────────────────────
+INCLUDE_PACKAGES = [
+    # Shared libraries
+    "lib/db",
+    "lib/api-spec",
+    "lib/api-client-react",
+    "lib/api-zod",
+    # Apex Trader artifacts
+    "artifacts/api-server",
+    "artifacts/trading-dashboard",
+    # Utility scripts
+    "scripts",
 ]
 
-# ── Individual root-level files to include (relative to ROOT) ─────────────────
-INCLUDE_FILES = [
-    # api-server root configs
-    "artifacts/api-server/package.json",
-    "artifacts/api-server/tsconfig.json",
-    # trading-dashboard root configs
-    "artifacts/trading-dashboard/index.html",
-    "artifacts/trading-dashboard/vite.config.ts",
-    "artifacts/trading-dashboard/components.json",
-    "artifacts/trading-dashboard/package.json",
-    "artifacts/trading-dashboard/tsconfig.json",
-    # trading-dashboard static assets
-    "artifacts/trading-dashboard/public/logo.svg",
-    "artifacts/trading-dashboard/public/favicon.svg",
-    "artifacts/trading-dashboard/public/opengraph.jpg",
-    # lib package configs
-    "lib/api-client-react/package.json",
-    "lib/api-client-react/tsconfig.json",
-    "lib/api-zod/package.json",
-    "lib/api-zod/tsconfig.json",
-    "lib/db/drizzle.config.ts",
-    "lib/db/package.json",
-    "lib/db/tsconfig.json",
-    # scripts
-    "scripts/package.json",
-    "scripts/tsconfig.json",
-    # setup docs
+# ── Root-level standalone files ───────────────────────────────────────────────
+ROOT_FILES = [
     ".env.example",
-    "SETUP.md",
+    "package.json",
+    "pnpm-workspace.yaml",
+    "pnpm-lock.yaml",
+    "tsconfig.json",
     "tsconfig.base.json",
+    "SETUP.md",
+    "DEPLOYMENT.md",
+    "README.md",
+    ".gitignore",
+    "render.yaml",
+    "railway.json",
+    "nixpacks.toml",
 ]
 
-# ── Root configs that need Apex Trader-only rewriting ─────────────────────────
-# These are generated/modified in memory so the ZIP recipient can run
-# `pnpm install` without needing natura-ai, natura-web, or mockup-sandbox.
+# ── Files to force-exclude inside packages ────────────────────────────────────
+# (old ZIP artefacts sitting in public/ of trading-dashboard)
+def should_include(abs_path: Path) -> bool:
+    """Return True if this file should be included in the export."""
 
-APEX_PACKAGE_JSON = """\
-{
-  "name": "apex-trader",
-  "version": "2.0.0",
-  "license": "MIT",
-  "engines": {
-    "node": ">=20"
-  },
-  "scripts": {
-    "dev": "pnpm --filter @workspace/trading-dashboard run dev",
-    "dev:api": "pnpm --filter @workspace/api-server run dev",
-    "dev:all": "concurrently --kill-others-on-fail --names \\"api,web\\" --prefix-colors \\"cyan,magenta\\" \\"pnpm run dev:api\\" \\"pnpm run dev\\"",
-    "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm --filter @workspace/api-server run typecheck && pnpm --filter @workspace/trading-dashboard run typecheck"
-  },
-  "private": true,
-  "devDependencies": {
-    "concurrently": "^9.1.2",
-    "prettier": "^3.8.1",
-    "typescript": "~5.9.2"
-  },
-  "dependencies": {
-    "express-rate-limit": "^8.5.1",
-    "stripe": "^22.1.1",
-    "stripe-replit-sync": "^1.0.0"
-  }
-}
-"""
-
-APEX_PNPM_WORKSPACE_YAML = """\
-# ============================================================================
-# Apex Trader — pnpm workspace configuration
-# ============================================================================
-#
-# Security: minimum release age guards against supply-chain attacks.
-# Any npm package version must have been published at least 1 day before
-# pnpm will allow installing it.
-# ============================================================================
-minimumReleaseAge: 1440
-
-minimumReleaseAgeExclude:
-  - '@replit/*'
-  - stripe-replit-sync
-
-packages:
-  - artifacts/api-server
-  - artifacts/trading-dashboard
-  - lib/*
-  - scripts
-
-catalog:
-  '@replit/vite-plugin-cartographer': ^0.5.1
-  '@replit/vite-plugin-dev-banner': ^0.1.1
-  '@replit/vite-plugin-runtime-error-modal': ^0.0.6
-  '@tailwindcss/vite': ^4.1.14
-  '@tanstack/react-query': ^5.90.21
-  '@types/node': ^25.3.3
-  '@types/react': ^19.2.0
-  '@types/react-dom': ^19.2.0
-  '@vitejs/plugin-react': ^5.0.4
-  class-variance-authority: ^0.7.1
-  clsx: ^2.1.1
-  drizzle-orm: ^0.45.2
-  framer-motion: ^12.23.24
-  lucide-react: ^0.545.0
-  react: 19.1.0
-  react-dom: 19.1.0
-  tailwind-merge: ^3.3.1
-  tailwindcss: ^4.1.14
-  tsx: ^4.21.0
-  vite: ^7.3.2
-  zod: ^3.25.76
-
-autoInstallPeers: false
-
-onlyBuiltDependencies:
-  - '@swc/core'
-  - esbuild
-  - msw
-  - unrs-resolver
-
-overrides:
-  # Remove platform-specific native binaries to keep install lean.
-  # Delete this entire overrides section if you hit install errors on
-  # macOS or Windows.
-  "esbuild>@esbuild/darwin-arm64": "-"
-  "esbuild>@esbuild/darwin-x64": "-"
-  "esbuild>@esbuild/freebsd-arm64": "-"
-  "esbuild>@esbuild/freebsd-x64": "-"
-  "esbuild>@esbuild/linux-arm": "-"
-  "esbuild>@esbuild/linux-arm64": "-"
-  "esbuild>@esbuild/linux-ia32": "-"
-  "esbuild>@esbuild/linux-loong64": "-"
-  "esbuild>@esbuild/linux-mips64el": "-"
-  "esbuild>@esbuild/linux-ppc64": "-"
-  "esbuild>@esbuild/linux-riscv64": "-"
-  "esbuild>@esbuild/linux-s390x": "-"
-  "esbuild>@esbuild/netbsd-arm64": "-"
-  "esbuild>@esbuild/netbsd-x64": "-"
-  "esbuild>@esbuild/openbsd-arm64": "-"
-  "esbuild>@esbuild/openbsd-x64": "-"
-  "esbuild>@esbuild/sunos-x64": "-"
-  "esbuild>@esbuild/win32-arm64": "-"
-  "esbuild>@esbuild/win32-ia32": "-"
-  "esbuild>@esbuild/win32-x64": "-"
-  "esbuild>@esbuild/aix-ppc64": '-'
-  "esbuild>@esbuild/android-arm": '-'
-  "esbuild>@esbuild/android-arm64": '-'
-  "esbuild>@esbuild/android-x64": '-'
-  "esbuild>@esbuild/openharmony-arm64": '-'
-  "lightningcss>lightningcss-android-arm64": "-"
-  "lightningcss>lightningcss-darwin-arm64": "-"
-  "lightningcss>lightningcss-darwin-x64": "-"
-  "lightningcss>lightningcss-freebsd-x64": "-"
-  "lightningcss>lightningcss-linux-arm-gnueabihf": "-"
-  "lightningcss>lightningcss-linux-arm64-gnu": "-"
-  "lightningcss>lightningcss-linux-arm64-musl": "-"
-  "lightningcss>lightningcss-linux-x64-musl": "-"
-  "lightningcss>lightningcss-win32-arm64-msvc": "-"
-  "lightningcss>lightningcss-win32-x64-msvc": "-"
-  "@tailwindcss/oxide>@tailwindcss/oxide-android-arm64": "-"
-  "@tailwindcss/oxide>@tailwindcss/oxide-darwin-arm64": "-"
-  "@tailwindcss/oxide>@tailwindcss/oxide-darwin-x64": "-"
-  "@tailwindcss/oxide>@tailwindcss/oxide-freebsd-x64": "-"
-  "@tailwindcss/oxide>@tailwindcss/oxide-linux-arm-gnueabihf": "-"
-  "@tailwindcss/oxide>@tailwindcss/oxide-linux-arm64-gnu": "-"
-  "@tailwindcss/oxide>@tailwindcss/oxide-linux-arm64-musl": "-"
-  "@tailwindcss/oxide>@tailwindcss/oxide-win32-arm64-msvc": "-"
-  "@tailwindcss/oxide>@tailwindcss/oxide-win32-x64-msvc": "-"
-  "@tailwindcss/oxide>@tailwindcss/oxide-linux-x64-musl": "-"
-  "rollup>@rollup/rollup-android-arm-eabi": "-"
-  "rollup>@rollup/rollup-android-arm64": "-"
-  "rollup>@rollup/rollup-darwin-arm64": "-"
-  "rollup>@rollup/rollup-darwin-x64": "-"
-  "rollup>@rollup/rollup-freebsd-arm64": "-"
-  "rollup>@rollup/rollup-freebsd-x64": "-"
-  "rollup>@rollup/rollup-linux-arm-gnueabihf": "-"
-  "rollup>@rollup/rollup-linux-arm-musleabihf": "-"
-  "rollup>@rollup/rollup-linux-arm64-gnu": "-"
-  "rollup>@rollup/rollup-linux-arm64-musl": "-"
-  "rollup>@rollup/rollup-linux-loong64-gnu": "-"
-  "rollup>@rollup/rollup-linux-loong64-musl": "-"
-  "rollup>@rollup/rollup-linux-ppc64-gnu": "-"
-  "rollup>@rollup/rollup-linux-ppc64-musl": "-"
-  "rollup>@rollup/rollup-linux-riscv64-gnu": "-"
-  "rollup>@rollup/rollup-linux-riscv64-musl": "-"
-  "rollup>@rollup/rollup-linux-s390x-gnu": "-"
-  "rollup>@rollup/rollup-linux-x64-musl": "-"
-  "rollup>@rollup/rollup-openbsd-x64": "-"
-  "rollup>@rollup/rollup-openharmony-arm64": "-"
-  "rollup>@rollup/rollup-win32-arm64-msvc": "-"
-  "rollup>@rollup/rollup-win32-ia32-msvc": "-"
-  "rollup>@rollup/rollup-win32-x64-gnu": "-"
-  "rollup>@rollup/rollup-win32-x64-msvc": "-"
-  "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
-  esbuild: "0.27.3"
-"""
-
-APEX_TSCONFIG_JSON = """\
-{
-  "extends": "./tsconfig.base.json",
-  "compileOnSave": false,
-  "files": [],
-  "references": [
-    { "path": "./lib/db" },
-    { "path": "./lib/api-client-react" },
-    { "path": "./lib/api-zod" }
-  ]
-}
-"""
-
-# ── Injected custom files in the ZIP (arcname -> text content) ─────────────────
-CUSTOM_TEXT_FILES = {
-    "package.json": APEX_PACKAGE_JSON,
-    "pnpm-workspace.yaml": APEX_PNPM_WORKSPACE_YAML,
-    "tsconfig.json": APEX_TSCONFIG_JSON,
-}
-
-# ── Excluded directory names (skip anywhere in the tree) ──────────────────────
-SKIP_DIRS = {
-    "node_modules", "dist", ".git", ".local", ".replit-artifact",
-    "__pycache__", ".cache", "coverage",
-}
-
-# ── Excluded file suffixes and names ──────────────────────────────────────────
-SKIP_SUFFIXES = {".zip", ".tsbuildinfo", ".log", ".env"}
-SKIP_NAMES = {".env", ".DS_Store"}
-
-
-def should_skip_file(path: Path) -> bool:
-    return path.suffix in SKIP_SUFFIXES or path.name in SKIP_NAMES
-
-
-def arc(rel_path: str) -> str:
-    """Prefix a relative path with the ZIP top-level folder."""
-    return f"{ZIP_PREFIX}/{rel_path}"
-
-
-def add_dir(zf: zipfile.ZipFile, dir_rel: str) -> int:
-    count = 0
-    base = ROOT / dir_rel
-    if not base.exists():
-        print(f"  WARNING: directory not found — {dir_rel}")
-        return 0
-    for dirpath, dirnames, filenames in os.walk(base):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
-        for fname in filenames:
-            fpath = Path(dirpath) / fname
-            if should_skip_file(fpath):
-                continue
-            arcname = arc(str(fpath.relative_to(ROOT)))
-            zf.write(fpath, arcname)
-            count += 1
-    return count
-
-
-def add_file(zf: zipfile.ZipFile, file_rel: str) -> bool:
-    fpath = ROOT / file_rel
-    if not fpath.exists():
-        print(f"  WARNING: file not found — {file_rel}")
+    # Prune by filename
+    if abs_path.name in PRUNE_FILES:
         return False
-    if should_skip_file(fpath):
+
+    # Prune by suffix
+    if abs_path.suffix in PRUNE_SUFFIXES:
         return False
-    zf.write(fpath, arc(file_rel))
+
+    # Drop old ZIP files from public/
+    name_lower = abs_path.name.lower()
+    if abs_path.suffix == ".zip":
+        for pat in PRUNE_FILENAME_STARTSWITH:
+            if name_lower.startswith(pat):
+                return False
+
+    # Skip declaration map files from lib/dist — keep .d.ts only
+    if abs_path.suffix == ".d.ts.map":
+        return False
+
     return True
 
 
-def add_text(zf: zipfile.ZipFile, arcname: str, content: str) -> None:
-    zf.writestr(arc(arcname), content.encode("utf-8"))
+def add_package(zf: zipfile.ZipFile, pkg_rel: str, stats: dict) -> None:
+    pkg_dir = ROOT / pkg_rel
+    if not pkg_dir.exists():
+        print(f"  SKIP (missing): {pkg_rel}")
+        return
+
+    before = stats["files"]
+    for dirpath, dirnames, filenames in os.walk(pkg_dir):
+        # Prune dirs in-place so os.walk doesn't descend into them
+        dirnames[:] = [d for d in dirnames if d not in PRUNE_DIRS]
+
+        for fname in filenames:
+            abs_file = Path(dirpath) / fname
+            if not should_include(abs_file):
+                continue
+            rel_to_root = abs_file.relative_to(ROOT)
+            arcname = f"{ZIP_PREFIX}/{rel_to_root}"
+            zf.write(abs_file, arcname)
+            stats["files"] += 1
+            stats["bytes"] += abs_file.stat().st_size
+
+    added = stats["files"] - before
+    print(f"  {added:>4} files  ← {pkg_rel}")
+
+
+def add_root_files(zf: zipfile.ZipFile, stats: dict) -> None:
+    print("  Root files:")
+    for fname in ROOT_FILES:
+        fpath = ROOT / fname
+        if not fpath.exists():
+            print(f"          SKIP (missing): {fname}")
+            continue
+        if not should_include(fpath):
+            continue
+        zf.write(fpath, f"{ZIP_PREFIX}/{fname}")
+        stats["files"] += 1
+        stats["bytes"] += fpath.stat().st_size
+        print(f"         + {fname}")
+
+
+def spot_check(zf: zipfile.ZipFile) -> bool:
+    names = set(zf.namelist())
+    checks = [
+        # API server core
+        f"{ZIP_PREFIX}/artifacts/api-server/src/app.ts",
+        f"{ZIP_PREFIX}/artifacts/api-server/src/index.ts",
+        f"{ZIP_PREFIX}/artifacts/api-server/src/routes/userExchanges.ts",
+        f"{ZIP_PREFIX}/artifacts/api-server/src/services/exchanges/adapters/KrakenAdapter.ts",
+        f"{ZIP_PREFIX}/artifacts/api-server/src/services/exchanges/adapters/AlpacaAdapter.ts",
+        f"{ZIP_PREFIX}/artifacts/api-server/src/services/exchanges/adapters/CoinbaseAdapter.ts",
+        f"{ZIP_PREFIX}/artifacts/api-server/src/services/exchanges/adapters/BinanceAdapter.ts",
+        f"{ZIP_PREFIX}/artifacts/api-server/src/services/vault/CredentialVault.ts",
+        f"{ZIP_PREFIX}/artifacts/api-server/src/lib/wsServer.ts",
+        f"{ZIP_PREFIX}/artifacts/api-server/src/lib/tradingLoop.ts",
+        f"{ZIP_PREFIX}/artifacts/api-server/build.mjs",
+        f"{ZIP_PREFIX}/artifacts/api-server/package.json",
+        f"{ZIP_PREFIX}/artifacts/api-server/tsconfig.json",
+        # Dashboard
+        f"{ZIP_PREFIX}/artifacts/trading-dashboard/src/App.tsx",
+        f"{ZIP_PREFIX}/artifacts/trading-dashboard/src/pages/CommandCenter.tsx",
+        f"{ZIP_PREFIX}/artifacts/trading-dashboard/src/components/command/ActiveTradesPanel.tsx",
+        f"{ZIP_PREFIX}/artifacts/trading-dashboard/src/components/command/MiddleStatsGrid.tsx",
+        f"{ZIP_PREFIX}/artifacts/trading-dashboard/src/components/command/AIThreatMonitor.tsx",
+        f"{ZIP_PREFIX}/artifacts/trading-dashboard/src/components/command/TelemetryRow.tsx",
+        f"{ZIP_PREFIX}/artifacts/trading-dashboard/vite.config.ts",
+        f"{ZIP_PREFIX}/artifacts/trading-dashboard/package.json",
+        # Shared libs
+        f"{ZIP_PREFIX}/lib/db/src/schema/userExchangeConnections.ts",
+        f"{ZIP_PREFIX}/lib/db/src/schema/users.ts",
+        f"{ZIP_PREFIX}/lib/db/drizzle.config.ts",
+        f"{ZIP_PREFIX}/lib/api-spec/openapi.yaml",
+        f"{ZIP_PREFIX}/lib/api-client-react/src/index.ts",
+        f"{ZIP_PREFIX}/lib/api-zod/src/index.ts",
+        # Root configs
+        f"{ZIP_PREFIX}/.env.example",
+        f"{ZIP_PREFIX}/package.json",
+        f"{ZIP_PREFIX}/pnpm-workspace.yaml",
+        f"{ZIP_PREFIX}/pnpm-lock.yaml",
+        f"{ZIP_PREFIX}/tsconfig.json",
+        f"{ZIP_PREFIX}/tsconfig.base.json",
+        f"{ZIP_PREFIX}/SETUP.md",
+        f"{ZIP_PREFIX}/DEPLOYMENT.md",
+    ]
+
+    all_ok = True
+    print("\n  Spot-check critical files:")
+    for c in checks:
+        ok = c in names
+        status = "OK  " if ok else "MISS"
+        if not ok:
+            all_ok = False
+        print(f"    [{status}] {c.replace(ZIP_PREFIX + '/', '')}")
+
+    # Verify excluded packages are absent
+    excluded_patterns = ["natura-ai", "natura-web", "mockup-sandbox"]
+    leaked = [n for n in names if any(p in n for p in excluded_patterns)]
+    if leaked:
+        print(f"\n  ERROR: {len(leaked)} excluded-package files found in ZIP:")
+        for l in leaked[:5]:
+            print(f"    {l}")
+        all_ok = False
+    else:
+        print(f"\n  Exclusion check: PASS (no natura-ai / natura-web / mockup-sandbox files)")
+
+    return all_ok
 
 
 def main() -> None:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Building Apex Trader ZIP: {OUTPUT.relative_to(ROOT)}")
-    print(f"ZIP prefix: {ZIP_PREFIX}/")
-    print()
+    if OUTPUT.exists():
+        OUTPUT.unlink()
 
-    total = 0
-    with zipfile.ZipFile(OUTPUT, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+    stats: dict = {"files": 0, "bytes": 0}
+    print(f"\nBuilding Apex Trader full export ZIP...")
+    print(f"  Root:   {ROOT}")
+    print(f"  Output: {OUTPUT.relative_to(ROOT)}\n")
 
-        # 1. Source directories
-        for d in INCLUDE_DIRS:
-            n = add_dir(zf, d)
-            print(f"  [dir]   {d}  ({n} files)")
-            total += n
+    print("  Packages:")
+    with zipfile.ZipFile(OUTPUT, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        for pkg in INCLUDE_PACKAGES:
+            add_package(zf, pkg, stats)
 
-        # 2. Individual files
-        file_count = sum(1 for f in INCLUDE_FILES if add_file(zf, f))
-        print(f"  [files] {file_count} individual config / asset files")
-        total += file_count
+        print()
+        add_root_files(zf, stats)
 
-        # 3. Apex Trader-only root configs (overwrite the monorepo versions)
-        for arcname, content in CUSTOM_TEXT_FILES.items():
-            add_text(zf, arcname, content)
-            print(f"  [gen]   {arcname}  (Apex Trader-only)")
-        total += len(CUSTOM_TEXT_FILES)
+        # Spot-check while zip is still open
+        ok = spot_check(zf)
 
-    size_kb = OUTPUT.stat().st_size / 1024
-    print()
-    print(f"Done — {total} entries, {size_kb:.1f} KB")
-    print(f"Saved: {OUTPUT}")
-    print()
+    size_bytes = OUTPUT.stat().st_size
+    size_kb    = size_bytes / 1024
+    size_mb    = size_kb / 1024
 
-    # ── Spot-check key files are present ──────────────────────────────────────
-    print("Spot-check:")
-    checks = [
-        f"{ZIP_PREFIX}/artifacts/api-server/src/app.ts",
-        f"{ZIP_PREFIX}/artifacts/trading-dashboard/src/pages/CommandCenter.tsx",
-        f"{ZIP_PREFIX}/artifacts/trading-dashboard/src/components/command/LiveTradingConsole.tsx",
-        f"{ZIP_PREFIX}/artifacts/trading-dashboard/vite.config.ts",
-        f"{ZIP_PREFIX}/lib/db/src/schema/userExchangeConnections.ts",
-        f"{ZIP_PREFIX}/lib/api-client-react/src/index.ts",
-        f"{ZIP_PREFIX}/lib/api-zod/src/index.ts",
-        f"{ZIP_PREFIX}/.env.example",
-        f"{ZIP_PREFIX}/SETUP.md",
-        f"{ZIP_PREFIX}/package.json",
-        f"{ZIP_PREFIX}/pnpm-workspace.yaml",
-        f"{ZIP_PREFIX}/tsconfig.json",
-        f"{ZIP_PREFIX}/tsconfig.base.json",
-    ]
-    with zipfile.ZipFile(OUTPUT) as zf:
-        names = set(zf.namelist())
-        all_ok = True
-        for c in checks:
-            ok = c in names
-            if not ok:
-                all_ok = False
-            print(f"  {'OK  ' if ok else 'MISS'} {c}")
-        # Verify no Expo / Natura files crept in
-        bad = [n for n in names if any(x in n for x in
-               ["natura", "natura-ai", "natura-web", "mockup-sandbox", "expo"])]
-        if bad:
-            print(f"\n  ERROR: {len(bad)} unwanted files found:")
-            for b in bad[:5]:
-                print(f"    {b}")
-            all_ok = False
-        else:
-            print(f"\n  No natura / expo files — clean Apex Trader only")
-        if all_ok:
-            print("\n  All checks passed.")
-        else:
-            print("\n  Some checks FAILED — review output above.")
+    print(f"\n{'✓ Export complete!' if ok else '✗ Export complete with warnings!'}")
+    print(f"  Files:  {stats['files']:,}")
+    print(f"  Size:   {size_mb:.2f} MB  ({size_kb:,.0f} KB)")
+    print(f"  Path:   {OUTPUT}")
+    print(f"  URL:    /apex-trader-full-export.zip\n")
+
+    if not ok:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

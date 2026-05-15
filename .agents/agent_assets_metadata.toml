@@ -47,3 +47,9 @@ id = "xDZwvOSnFF9bjjxvqbylG"
 uri = "file://artifacts/trading-dashboard/public/apex-trader-v2.zip"
 type = "unspecified"
 title = "apex-trader-v2.zip — with live API keys"
+
+[[outputs]]
+id = "SHOebhX3MotQwO1iotH50"
+uri = "file://artifacts/trading-dashboard/public/apex-trader-full-export.zip"
+type = "unspecified"
+title = "Apex Trader — Full Project Export"

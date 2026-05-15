@@ -1,0 +1,101 @@
+We have completed the full operator dashboard refinement pass and manual review.
+
+Please prepare a COMPLETE updated export/ZIP of the entire Apex Trader ecosystem for local deployment and server migration.
+
+IMPORTANT:
+Do NOT omit any dependencies, configs, environment templates, or build-related files.
+
+The export must include EVERYTHING required for a clean local install and future cloud deployment.
+
+FINAL EXPORT REQUIREMENTS:
+
+1. FULL PROJECT EXPORT
+   Include:
+
+* trading dashboard frontend
+* API/backend server
+* mobile app
+* shared libraries
+* exchange adapters
+* websocket infrastructure
+* Alpaca integration
+* Coinbase integration
+* Kraken integration
+* all updated operator telemetry components
+* all routing logic
+* all configuration files
+
+2. INCLUDE ALL BUILD / WORKSPACE FILES
+   Verify inclusion of:
+
+* package.json files
+* pnpm-workspace.yaml
+* lockfiles
+* tsconfig files
+* vite config
+* tailwind config
+* postcss config
+* drizzle config
+* eslint/prettier configs
+* build scripts
+* Docker/deployment configs if present
+
+3. ENVIRONMENT FILES / TEMPLATES
+   IMPORTANT:
+   Do NOT expose real secrets in the ZIP.
+
+However:
+include:
+
+* updated `.env.example`
+  OR
+* sanitized `.env.template`
+
+with ALL required variables documented.
+
+Must include:
+
+* ALPACA_API_KEY
+* ALPACA_SECRET_KEY
+* ALPACA_BASE_URL
+* ALPACA_PAPER
+* COINBASE variables
+* KRAKEN variables
+* CLERK variables
+* DATABASE_URL
+* websocket/env requirements
+* all runtime requirements
+
+4. VERIFY DEPENDENCIES
+   Before exporting:
+   run a final verification to ensure:
+
+* all imports resolve
+* no missing packages
+* no missing adapters
+* no missing shared libs
+* no broken aliases
+* no missing workspace references
+
+5. VERIFY BUILD HEALTH
+   Confirm:
+
+* dashboard builds cleanly
+* API server starts cleanly
+* mobile app compiles
+* Alpaca integration works
+* websocket feeds initialize
+* no critical runtime errors exist
+
+6. ZIP DELIVERY
+   Please provide:
+
+* final ZIP export
+* clean folder structure
+* production-ready workspace
+
+This export will be:
+
+* deployed locally first
+* validated in VS Code
+* then prepared for cloud/server deployment.
