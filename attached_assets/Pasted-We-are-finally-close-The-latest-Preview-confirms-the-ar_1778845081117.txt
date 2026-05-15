@@ -1,0 +1,169 @@
+We are finally close.
+
+The latest Preview confirms the architecture direction is improving significantly.
+
+HOWEVER there are still 4 major issues preventing this from feeling like a true institutional AI operating system.
+
+IMPORTANT:
+I am attaching two screenshots.
+
+The SECOND screenshot proves the top-center visualization IS capable of rendering correctly.
+
+For approximately 1–2 seconds after refresh:
+
+the large animated institutional chart appears correctly
+the telemetry hierarchy looks correct
+the layout finally feels alive
+
+Then something in the reactive lifecycle destroys/replaces it.
+
+This is NOT a design issue anymore.
+
+This is now a:
+STATE / HYDRATION / RERENDER issue.
+
+CRITICAL BUG #1
+CENTER CHART DISAPPEARS AFTER REFRESH
+
+The large institutional telemetry visualization appears briefly after refresh and then disappears/reverts.
+
+This means:
+
+the component renders correctly initially
+then some state update/remount overwrites it
+
+Likely causes:
+
+conditional render fallback
+stale exchange state hydration
+websocket reconnect overwrite
+async telemetry initialization
+effect dependency loop
+dashboard state reset
+trade-card fallback re-triggering
+
+Need to investigate:
+
+component mount lifecycle
+websocket update flow
+exchange state hydration
+conditional rendering logic
+telemetry initialization order
+
+IMPORTANT:
+The chart version shown in screenshot #2 is the CORRECT direction.
+
+That version should remain permanently rendered.
+
+DO NOT revert back to:
+
+empty black space
+tiny floating trade card
+dead center area
+CRITICAL BUG #2
+LIVE TERMINAL FEED IS STILL TOO SMALL
+
+The terminal feed is still visually minimized.
+
+It should be:
+
+much larger
+much taller
+more readable
+higher density
+operator-focused
+
+Current issue:
+
+text is too tiny
+rows are too compressed
+feed visually disappears into the background
+
+Target:
+18–25 visible rows minimum.
+
+Need:
+
+larger row text
+larger timestamps
+stronger color hierarchy
+more visible event flow
+wider feed container
+taller terminal region
+
+The feed should feel like:
+REAL-TIME AI OPERATIONS.
+
+NOT:
+tiny debug console text.
+
+CRITICAL ISSUE #3
+TICKER TELEMETRY STRIPS STILL WASTE SPACE
+
+The strips below the ticker are still inefficient.
+
+Problem:
+
+too much empty horizontal space on the right
+cards too narrow
+fragmented telemetry
+wasted dashboard real estate
+
+At minimum:
+make the telemetry strips WIDER.
+
+Currently:
+small centered metrics leave dead space to the right.
+
+Need:
+
+wider grouped telemetry sections
+more horizontal fill
+stronger operator density
+less fragmented cards
+
+The data is fine.
+The layout efficiency is not.
+
+The telemetry should visually span the dashboard width.
+
+CRITICAL ISSUE #4
+TOP SECTION STILL NEEDS MORE “ALIVE” FEEL
+
+The top-center visualization is finally close in screenshot #2.
+
+That is the CORRECT direction.
+
+Now improve:
+
+animation smoothness
+signal pulses
+stream motion
+execution spikes
+active-user movement
+platform telemetry responsiveness
+
+Need the entire top section to feel:
+
+reactive
+alive
+dynamic
+continuously updating
+
+Like:
+a real AI orchestration layer.
+
+MOST IMPORTANT
+
+DO NOT revert to:
+
+isolated trade card
+dead black space
+empty placeholder center
+
+The chart-based orchestration layout is the correct architecture.
+
+The issue now is:
+keeping it mounted consistently after state hydration.
+
+Please debug WHY the chart disappears after initial render and keep the institutional telemetry visualization permanently active.

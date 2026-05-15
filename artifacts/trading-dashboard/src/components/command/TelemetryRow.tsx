@@ -101,7 +101,7 @@ export function TelemetryRow({ engine, settings, trades, exchangeStatus, feeSumm
   const mode     = isLive ? "LIVE" : "SIM";
 
   /* ── Portfolio equity — exchange-scoped, no cross-exchange leakage ─────── */
-  const liveUSD      = isLive && liveBalance?.source === "live" ? (liveBalance.balances.USD ?? null) : null;
+  const liveUSD      = isLive && liveBalance?.source === "live" ? (liveBalance.balances?.USD ?? null) : null;
   const simUSD       = exchangeStatus?.simBalances?.USD ?? simAccount?.equity ?? null;
   const portfolioEq  = isLive ? liveUSD : simUSD;
   const portfolioLabel = isLive

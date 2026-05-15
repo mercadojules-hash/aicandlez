@@ -232,59 +232,62 @@ export function RichTerminalFeed({ engine }: Props) {
 
             return (
               <div key={s.id}
-                className="flex items-center gap-2 px-2 py-0.5"
+                className="flex items-center gap-2.5 px-3 py-1"
                 style={{
-                  borderBottom: `1px solid ${isGhost ? "#080808" : "#0d0d0d"}`,
-                  borderLeft:   `2px solid ${stageCfg.color}${isGhost ? "18" : isFilled ? "90" : "35"}`,
+                  borderBottom: `1px solid ${isGhost ? "#0a0a0a" : "#101010"}`,
+                  borderLeft:   `3px solid ${stageCfg.color}${isGhost ? "18" : isFilled ? "cc" : "50"}`,
                   background:   isGhost
                     ? "transparent"
-                    : isBlocked ? "#ff33550c" : isFilled ? "#00ff8a08" : i === 0 ? "#050505" : "transparent",
-                  opacity:      isGhost ? 0.38 : 1,
+                    : isBlocked ? "#ff33550e" : isFilled ? "#00ff8a0c" : i === 0 ? "#060808" : "transparent",
+                  opacity:      isGhost ? 0.40 : 1,
                   animation:    (!isGhost && i === 0) ? "feed-row-in 0.25s ease-out" : undefined,
-                  minHeight:    18,
+                  minHeight:    26,
                 }}>
 
-                <span className="text-[7px] font-bold font-mono px-1.5 rounded flex-shrink-0"
+                <span className="font-bold font-mono px-1.5 rounded flex-shrink-0"
                   style={{
+                    fontSize:   9,
                     color:      stageCfg.color,
-                    background: `${stageCfg.color}10`,
-                    border:     `1px solid ${stageCfg.color}20`,
-                    minWidth:   36,
+                    background: `${stageCfg.color}12`,
+                    border:     `1px solid ${stageCfg.color}25`,
+                    minWidth:   40,
                     textAlign:  "center",
-                    lineHeight: "16px",
+                    lineHeight: "20px",
                   }}>
                   {stageCfg.label}
                 </span>
-                <span className="text-[8px] font-mono tabular-nums flex-shrink-0 font-semibold"
-                  style={{ color: isGhost ? "#3a5a70" : "#C7D4E2" }}>
+                <span className="font-mono tabular-nums flex-shrink-0 font-semibold"
+                  style={{ fontSize: 10, color: isGhost ? "#3a5a70" : "#C7D4E2" }}>
                   {ts}
                 </span>
-                <span className="text-[10px] font-bold font-mono flex-shrink-0"
+                <span className="font-bold font-mono flex-shrink-0"
                   style={{
-                    color: decColor,
-                    textShadow: (!isGhost && s.decision !== "HOLD") ? `0 0 8px ${decColor}50` : undefined,
+                    fontSize:   12,
+                    color:      decColor,
+                    textShadow: (!isGhost && s.decision !== "HOLD") ? `0 0 10px ${decColor}60` : undefined,
                   }}>
                   {s.decision}
                 </span>
-                <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: symColor }}>
+                <span className="font-bold font-mono flex-shrink-0" style={{ fontSize: 12, color: symColor }}>
                   {sym}
                 </span>
-                {/* Inline confidence mini-bar */}
-                <div style={{ width: 36, height: 3, background: "#0a0a0a", borderRadius: 2, flexShrink: 0, overflow: "hidden" }}>
+                {/* Inline confidence bar */}
+                <div style={{ width: 44, height: 5, background: "#0a0a0a", borderRadius: 3, flexShrink: 0, overflow: "hidden" }}>
                   <div style={{
                     height: "100%",
                     width:  `${Math.min(100, s._conf)}%`,
                     background: isGhost ? "#1a2a35" : confColor,
-                    borderRadius: 2,
-                    transition: "width 0.8s ease",
+                    borderRadius: 3,
+                    transition:   "width 0.8s ease",
+                    boxShadow:    isGhost ? "none" : `0 0 6px ${confColor}60`,
                   }} />
                 </div>
-                <span className="text-[9px] font-bold font-mono tabular-nums flex-shrink-0"
-                  style={{ color: isGhost ? "#2a4a5a" : confColor }}>
+                <span className="font-bold font-mono tabular-nums flex-shrink-0"
+                  style={{ fontSize: 10, color: isGhost ? "#2a4a5a" : confColor }}>
                   {s._conf.toFixed(0)}%
                 </span>
-                <span className="text-[8px] font-mono truncate flex-1"
-                  style={{ color: isGhost ? "#1e3040" : isBlocked ? "#ff335570" : "#9FB3C8" }}>
+                <span className="font-mono truncate flex-1"
+                  style={{ fontSize: 9, color: isGhost ? "#1e3040" : isBlocked ? "#ff335580" : "#9FB3C8" }}>
                   {isBlocked ? `⚠ ${s.blockReason}` : (s.shortSummary ?? "")}
                 </span>
               </div>

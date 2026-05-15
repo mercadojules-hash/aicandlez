@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Maximize2 } from "lucide-react";
-import type { EngineStatus } from "./types";
+import type { EngineStatus, Trade, SimAccount } from "./types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const N        = 120;   // chart data points
-const TICK_MS  = 1200;  // update interval
+const TICK_MS  = 700;   // update interval — fast enough to feel alive
 
 type TF = "1M" | "5M" | "15M" | "1H" | "4H" | "1D";
 const TIMEFRAMES: TF[] = ["1M", "5M", "15M", "1H", "4H", "1D"];
@@ -19,7 +19,11 @@ interface Pt {
   riskBlocks:  number;  // red
 }
 
-interface Props { engine?: EngineStatus }
+interface Props {
+  engine?:    EngineStatus;
+  openTrade?: Trade;
+  simPos?:    SimAccount["positions"][0];
+}
 
 // ── Stream config ─────────────────────────────────────────────────────────────
 
@@ -259,7 +263,7 @@ function StatCell({
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export function LiveUserActivityPanel({ engine }: Props) {
+export function LiveUserActivityPanel({ engine, openTrade, simPos }: Props) {
 
   const [data,       setData]       = useState<Pt[]>(seed);
   const [tf,         setTf]         = useState<TF>("5M");
@@ -278,59 +282,69 @@ export function LiveUserActivityPanel({ engine }: Props) {
 
   useEffect(() => {
     const id = setInterval(() => {
-      const eng   = engRef.current;
-      const execs = eng?.tradesExecuted ?? 0;
-      const sigs  = eng?.signalsGenerated ?? 0;
+      const eng    = engRef.current;
+      const execs  = eng?.tradesExecuted ?? 0;
+      const sigs   = eng?.signalsGenerated ?? 0;
       const isExec = execs > prevExecRef.current;
       const isSig  = sigs  > prevSigRef.current;
       prevExecRef.current = execs;
       prevSigRef.current  = sigs;
 
       const running = eng?.running ?? false;
-      const sigBase = running ? 55 : 28;
-      const usrBase = running ? 48 : 30;
+      const sigBase = running ? 58 : 28;
+      const usrBase = running ? 52 : 32;
 
       setData(prev => {
         const last = prev[prev.length - 1] ?? prev[0];
+        // Natural oscillation — each stream has its own rhythm
+        const t = Date.now() / 1000;
         const next: Pt = {
-          aiSignals:    clamp(last.aiSignals    + (sigBase - last.aiSignals)   * 0.08 + (isSig  ? 25 : 0) + rand(-5, 5), 5, 97),
-          executions:   clamp(last.executions   + (isExec ? 80 : -8)          + rand(-4, 4), 2, 98),
-          userActivity: clamp(last.userActivity + (usrBase - last.userActivity)* 0.06 + rand(-4, 4), 8, 94),
-          volume:       clamp(last.volume       + (running ? 3 : -2)           + rand(-6, 7), 4, 96),
-          activeUsers:  clamp(last.activeUsers  + (running ? 1.5 : -1)         + rand(-3, 3), 10, 90),
-          riskBlocks:   clamp(last.riskBlocks   + (eng?.tradesBlocked ?? 0 > 0 ? 2 : -1) + rand(-3, 3), 2, 60),
+          aiSignals:    clamp(last.aiSignals    + (sigBase - last.aiSignals)    * 0.1  + (isSig  ? 30 : 0) + Math.sin(t * 0.9) * 3 + rand(-6, 6),   5, 97),
+          executions:   clamp(last.executions   + (isExec  ? 85 : -10)                  + Math.cos(t * 1.3) * 2 + rand(-5, 5),                       2, 98),
+          userActivity: clamp(last.userActivity + (usrBase - last.userActivity) * 0.07 + Math.sin(t * 0.5) * 4 + rand(-5, 5),                        8, 94),
+          volume:       clamp(last.volume       + (running  ? 4 : -3)                   + Math.sin(t * 0.7) * 5 + rand(-7, 8),                        4, 96),
+          activeUsers:  clamp(last.activeUsers  + (running  ? 2 : -1.5)                 + Math.cos(t * 0.4) * 3 + rand(-4, 4),                       10, 90),
+          riskBlocks:   clamp(last.riskBlocks   + ((eng?.tradesBlocked ?? 0) > 0 ? 3 : -1.5) + rand(-4, 4),                                           2, 65),
         };
         return [...prev.slice(1), next];
       });
 
       if (isExec) {
-        setExecPulses(prev => [...prev.slice(-15), N - 1]);
-        setVolUSD(p => p + 8_000 + Math.random() * 20_000);
+        setExecPulses(prev => [...prev.slice(-18), N - 1]);
+        setVolUSD(p => p + 8_000 + Math.random() * 22_000);
       }
 
-      setActiveSessions(p => clamp(p + Math.round(rand(-1.5, 1.5)), 10, 60));
-      setTradingNow(p     => clamp(p + Math.round(rand(-0.8, 0.8)), 2, 25));
-      setNewToday(p       => p + (Math.random() < 0.12 ? 1 : 0));
-      if (running) setVolUSD(p => p + Math.random() * 800);
+      setActiveSessions(p => clamp(p + Math.round(rand(-2, 2)),   10, 60));
+      setTradingNow(p     => clamp(p + Math.round(rand(-1, 1)),    2,  25));
+      setNewToday(p       => p + (Math.random() < 0.14 ? 1 : 0));
+      if (running) setVolUSD(p => p + Math.random() * 1_200);
     }, TICK_MS);
     return () => clearInterval(id);
   }, []);
 
-  const riskBlocks  = engine?.tradesBlocked  ?? 0;
-  const execCount   = engine?.tradesExecuted ?? 0;
-  const sigCount    = engine?.signalsGenerated ?? 0;
-  const fmtVol      = volUSD >= 1_000_000
+  const riskBlocks = engine?.tradesBlocked   ?? 0;
+  const execCount  = engine?.tradesExecuted  ?? 0;
+  const sigCount   = engine?.signalsGenerated ?? 0;
+  const fmtVol     = volUSD >= 1_000_000
     ? `$${(volUSD / 1_000_000).toFixed(2)}M`
     : `$${(volUSD / 1_000).toFixed(0)}K`;
 
+  // Active position data (from either live trade or sim position)
+  const hasActiveTrade = !!(openTrade || simPos);
+  const activeSym   = openTrade?.symbol ?? simPos?.symbol ?? "";
+  const activeSide  = (openTrade?.side  ?? simPos?.side.toUpperCase() ?? "").toUpperCase();
+  const activePnl   = openTrade?.pnl    ?? simPos?.unrealizedPnL ?? 0;
+  const activePnlPct = openTrade?.pnlPercent ?? simPos?.unrealizedPnLPct ?? 0;
+  const sideColor   = activeSide === "BUY" ? "#00ff8a" : "#ff3355";
+
   return (
     <div style={{
-      flex:        1,
-      display:     "flex",
+      flex:          1,
+      display:       "flex",
       flexDirection: "column",
-      background:  "#000000",
-      minHeight:   0,
-      overflow:    "hidden",
+      background:    "#000000",
+      minHeight:     0,
+      overflow:      "hidden",
     }}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
@@ -338,12 +352,11 @@ export function LiveUserActivityPanel({ engine }: Props) {
         display:      "flex",
         alignItems:   "center",
         gap:          10,
-        padding:      "6px 14px",
+        padding:      "5px 14px",
         borderBottom: "1px solid #0b1a26",
         flexShrink:   0,
         background:   "#000000",
       }}>
-        {/* Title */}
         <span className="live-dot" style={{ width: 5, height: 5, background: "#00f0ff", boxShadow: "0 0 8px #00f0ff" }} />
         <span style={{
           fontSize:      9.5,
@@ -355,60 +368,91 @@ export function LiveUserActivityPanel({ engine }: Props) {
         }}>
           Live Platform Activity Overview
         </span>
-        <span style={{ fontSize: 7.5, fontFamily: "monospace", color: "#1e3040", letterSpacing: "0.1em" }}>
+        <span style={{ fontSize: 7, fontFamily: "monospace", color: "#1a2e40", letterSpacing: "0.1em" }}>
           · USER TRAFFIC · AI EXECUTION · PLATFORM INTELLIGENCE
         </span>
 
         <div style={{ flex: 1 }} />
 
-        {/* Legend */}
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        {/* Legend — inline, compact */}
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {STREAMS.map(s => (
             <span key={s.key} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <svg width={14} height={2} style={{ flexShrink: 0 }}>
-                <line x1={0} y1={1} x2={14} y2={1} stroke={s.color} strokeWidth={2.5} />
+              <svg width={14} height={3} style={{ flexShrink: 0 }}>
+                <line x1={0} y1={1.5} x2={14} y2={1.5} stroke={s.color} strokeWidth={2.5} />
               </svg>
-              <span style={{ fontSize: 7, fontFamily: "monospace", color: `${s.color}80`, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: 7, fontFamily: "monospace", color: `${s.color}75`, letterSpacing: "0.07em", whiteSpace: "nowrap" }}>
                 {s.label}
               </span>
             </span>
           ))}
         </div>
 
-        <div style={{ width: 1, height: 16, background: "#0d1e2e", margin: "0 8px" }} />
+        <div style={{ width: 1, height: 14, background: "#0d1e2e", margin: "0 8px" }} />
 
         {/* Timeframe selector */}
-        <div style={{ display: "flex", gap: 2 }}>
+        <div style={{ display: "flex", gap: 1 }}>
           {TIMEFRAMES.map(t => (
-            <button
-              key={t}
-              onClick={() => setTf(t)}
-              style={{
-                fontSize:      7.5,
-                fontFamily:    "monospace",
-                fontWeight:    700,
-                padding:       "2px 6px",
-                borderRadius:  3,
-                border:        tf === t ? "1px solid #00f0ff40" : "1px solid transparent",
-                background:    tf === t ? "#00f0ff12" : "transparent",
-                color:         tf === t ? "#00f0ff"   : "#2a4a60",
-                cursor:        "pointer",
-                letterSpacing: "0.06em",
-                transition:    "all 0.15s",
-              }}
-            >
+            <button key={t} onClick={() => setTf(t)} style={{
+              fontSize: 7.5, fontFamily: "monospace", fontWeight: 700,
+              padding: "2px 5px", borderRadius: 3,
+              border:      tf === t ? "1px solid #00f0ff40" : "1px solid transparent",
+              background:  tf === t ? "#00f0ff12" : "transparent",
+              color:       tf === t ? "#00f0ff" : "#2a4a60",
+              cursor: "pointer", letterSpacing: "0.06em", transition: "all 0.12s",
+            }}>
               {t}
             </button>
           ))}
         </div>
-
-        <Maximize2 size={9} color="#1e3040" style={{ marginLeft: 8, flexShrink: 0 }} />
+        <Maximize2 size={9} color="#1a2e40" style={{ marginLeft: 6, flexShrink: 0 }} />
       </div>
 
-      {/* ── Chart ──────────────────────────────────────────────────────────── */}
+      {/* ── Chart — always rendered, fills remaining space ──────────────────── */}
       <div style={{ flex: 1, overflow: "hidden", minHeight: 0, position: "relative" }}>
         <ActivityChart data={data} execPulses={execPulses} />
       </div>
+
+      {/* ── Active position overlay — shown when a trade is open ────────────── */}
+      {hasActiveTrade && (
+        <div style={{
+          display:      "flex",
+          alignItems:   "center",
+          gap:          12,
+          padding:      "5px 14px",
+          borderTop:    `1px solid ${sideColor}28`,
+          background:   `${sideColor}06`,
+          flexShrink:   0,
+        }}>
+          <span className="live-dot" style={{ width: 4, height: 4, background: sideColor, boxShadow: `0 0 6px ${sideColor}` }} />
+          <span style={{ fontSize: 8, fontFamily: "monospace", fontWeight: 700, color: `${sideColor}90`, letterSpacing: "0.15em" }}>
+            ACTIVE POSITION
+          </span>
+          <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 800, color: "#EAF2FF" }}>
+            {activeSym.replace("USD","")}
+          </span>
+          <span style={{
+            fontSize: 9, fontFamily: "monospace", fontWeight: 700,
+            padding: "1px 6px", borderRadius: 3,
+            background: `${sideColor}18`, color: sideColor, border: `1px solid ${sideColor}40`,
+          }}>
+            {activeSide}
+          </span>
+          <span style={{
+            fontSize: 12, fontFamily: "monospace", fontWeight: 800,
+            color: activePnl >= 0 ? "#00ff8a" : "#ff3355",
+          }}>
+            {activePnl >= 0 ? "+" : ""}{activePnl.toFixed(2)}
+            <span style={{ fontSize: 9, opacity: 0.7, marginLeft: 4 }}>
+              ({activePnlPct >= 0 ? "+" : ""}{activePnlPct.toFixed(2)}%)
+            </span>
+          </span>
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 7, fontFamily: "monospace", color: "#2a4050", letterSpacing: "0.1em" }}>
+            UNREALIZED P&L · LIVE
+          </span>
+        </div>
+      )}
 
       {/* ── Stats strip ────────────────────────────────────────────────────── */}
       <div style={{
@@ -419,12 +463,12 @@ export function LiveUserActivityPanel({ engine }: Props) {
         overflowX:      "auto",
         scrollbarWidth: "none",
       }}>
-        <StatCell label="ACTIVE USERS"    value={String(activeSessions)} color="#00ccaa" pulse />
-        <StatCell label="TRADING NOW"     value={String(tradingNow)}     color="#cc55ff" />
-        <StatCell label="NEW TODAY"       value={String(newToday)}       color="#ff9900" />
-        <StatCell label="AI SIGNALS"      value={String(sigCount)}       color="#00f0ff" pulse={sigCount > 0} />
-        <StatCell label="VOLUME TODAY"    value={fmtVol}                 color="#ffcc00" />
-        <StatCell label="EXECUTIONS"      value={String(execCount)}      color="#00ff8a" pulse={execCount > 0}
+        <StatCell label="ACTIVE USERS"  value={String(activeSessions)} color="#00ccaa" pulse />
+        <StatCell label="TRADING NOW"   value={String(tradingNow)}     color="#cc55ff" />
+        <StatCell label="NEW TODAY"     value={String(newToday)}       color="#ff9900" />
+        <StatCell label="AI SIGNALS"    value={String(sigCount)}       color="#00f0ff" pulse={sigCount > 0} />
+        <StatCell label="VOLUME TODAY"  value={fmtVol}                 color="#ffcc00" />
+        <StatCell label="EXECUTIONS"    value={String(execCount)}      color="#00ff8a" pulse={execCount > 0}
           sub={riskBlocks > 0 ? `${riskBlocks} BLOCKED` : undefined} />
       </div>
     </div>

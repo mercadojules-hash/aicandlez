@@ -802,11 +802,9 @@ export function LiveTradingConsole({
             />
           </div>
 
-          {/* Active trade OR live user activity panel */}
-          {(openTrade || simPos)
-            ? <ActiveTradeCard openTrade={openTrade} simPos={simPos} />
-            : <LiveUserActivityPanel engine={engine} />
-          }
+          {/* Activity panel is ALWAYS mounted — chart never unmounts on data hydration.
+              Trade data is passed as props and shown as an inline overlay strip. */}
+          <LiveUserActivityPanel engine={engine} openTrade={openTrade} simPos={simPos} />
         </div>
 
         {/* RIGHT: Configuration Panel */}
