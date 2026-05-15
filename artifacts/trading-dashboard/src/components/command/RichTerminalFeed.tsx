@@ -50,7 +50,8 @@ interface LiveRow extends SignalLogEntry { _conf: number; _stage: string; _ghost
 /* ── Synthetic historical rows that fill dead space ─────────────────────────
    These are styled dimmer so real entries stay visually dominant.          */
 const GHOST_SYMBOLS   = ["BTCUSD","ETHUSD","SOLUSD","XRPUSD","DOGEUSD","AVAXUSD","LINKUSD","ADAUSD"];
-const GHOST_DECISIONS = ["BUY","SELL","HOLD","HOLD","BUY","SELL"];
+const GHOST_DECISIONS = ["BUY","SELL","HOLD","HOLD","BUY","SELL","HOLD","BUY"];
+const GHOST_TIMEFRAMES = ["5m","5m","15m","1h","5m","15m","5m","1h"];
 const GHOST_REASONS   = [
   "EMA cross confirmed, RSI pullback",
   "Volume below threshold — blocked",
@@ -72,26 +73,52 @@ const GHOST_REASONS   = [
   "MTF confirmed on second pass",
   "Risk engine: daily loss limit check",
   "Volume surge: 2.4× avg — executing",
-  "MACD histogram expanding — buy signal",
+  "MACD histogram expanding",
   "Trailing stop tightened 0.8%",
   "Max positions gate: 2 of 3 used",
   "Sentiment alignment: bullish +14%",
   "Session high retest — monitoring",
-  "Order book pressure: buy side dominant",
+  "Order book pressure: buy-side dominant",
   "AI regime: trending — filters relaxed",
   "Mean reversion signal: oversold",
-  "Breakout detected: 4h resistance level",
+  "Breakout detected: 4h resistance",
   "Confidence rising: 48% → 63%",
   "Signal accepted: execution queue",
+  "Volatility gate: ATR below threshold",
+  "Funding rate elevated — skipping long",
+  "Momentum score: 0.71 — strong",
+  "Spread too wide: execution skipped",
+  "AI re-scan: second confirmation",
+  "Regime shift detected: ranging → trending",
+  "EMA21 flat — consolidation zone",
+  "RSI 14 at 52 — neutral momentum",
+  "Microstructure: accumulation pattern",
+  "Cluster analysis: support at key level",
+  "Liquidity thin: order depth insufficient",
+  "Multi-asset correlation: 0.88 BTC/ETH",
+  "HTF alignment: 1h + 4h converging",
+  "ADX 28 — trend gaining strength",
+  "Price action: doji cluster forming",
+  "AI uncertainty: mixed signals — hold",
+  "Reversion distance: 1.2σ — trigger near",
+  "Open interest spike: long squeeze risk",
+  "Chain data: whale accumulation signal",
 ];
 
 function makeGhosts(count: number, baseTime: number): LiveRow[] {
   const rows: LiveRow[] = [];
   for (let i = 0; i < count; i++) {
+    // Cycle through all 8 symbols deterministically so every asset is visible
     const sym  = GHOST_SYMBOLS[i % GHOST_SYMBOLS.length];
     const dec  = GHOST_DECISIONS[i % GHOST_DECISIONS.length];
-    const conf = 15 + Math.floor(Math.sin(i * 2.3 + 1) * 22 + Math.cos(i * 1.7) * 18 + 40);
-    const clampedConf = Math.max(8, Math.min(88, conf));
+    const tf   = GHOST_TIMEFRAMES[i % GHOST_TIMEFRAMES.length];
+    // Multi-frequency confidence wave so the feed has varied density
+    const conf = Math.floor(
+      35 + Math.sin(i * 1.7 + 0.8) * 20
+         + Math.cos(i * 2.9 + 1.2) * 14
+         + Math.sin(i * 0.5) * 8
+    );
+    const clampedConf = Math.max(6, Math.min(91, conf));
     const stageKey =
       dec !== "HOLD" && clampedConf >= 72 ? "EXECUTION" :
       dec !== "HOLD" && clampedConf >= 60 ? "ROUTING"   :
@@ -100,13 +127,13 @@ function makeGhosts(count: number, baseTime: number): LiveRow[] {
     rows.push({
       id:           `ghost-${i}`,
       symbol:       sym,
-      timeframe:    i % 2 === 0 ? "5m" : "15m",
+      timeframe:    tf,
       decision:     dec,
       confidence:   clampedConf,
       shortSummary: GHOST_REASONS[i % GHOST_REASONS.length],
       blockReason:  stageKey === "SCANNING" ? "Low conviction" : null,
       executedAs:   null,
-      timestamp:    baseTime - (i + 1) * 47_000,
+      timestamp:    baseTime - (i + 1) * 34_000,
       _conf:        clampedConf,
       _stage:       stageKey,
       _ghost:       true,
@@ -116,7 +143,7 @@ function makeGhosts(count: number, baseTime: number): LiveRow[] {
 }
 
 export function RichTerminalFeed({ engine }: Props) {
-  const raw = [...(engine?.recentSignalLog ?? [])].reverse().slice(0, 120);
+  const raw = [...(engine?.recentSignalLog ?? [])].reverse().slice(0, 200);
 
   const [rows,   setRows]   = useState<LiveRow[]>([]);
   const [filter, setFilter] = useState<Category>("ALL");
@@ -131,8 +158,8 @@ export function RichTerminalFeed({ engine }: Props) {
 
   useEffect(() => {
     const real: LiveRow[] = raw.map(s => ({ ...s, _conf: s.confidence, _stage: getStage(s) }));
-    /* Always render at least 80 rows — pad with ghost rows when real count < 80 */
-    const ghostCount = Math.max(0, 80 - real.length);
+    /* Always render at least 150 rows — fills the feed with full market-scan depth */
+    const ghostCount = Math.max(0, 150 - real.length);
     const ghosts     = makeGhosts(ghostCount, real[real.length - 1]?.timestamp ?? Date.now());
     const next       = [...real, ...ghosts];
     if (real.length > prevLen.current) {

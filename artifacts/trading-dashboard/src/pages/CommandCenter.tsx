@@ -38,10 +38,10 @@ const EXCHANGES: ExchangeOption[] = [
   { id: "coinbase", label: "Coinbase",   color: "#2775ca"                               },
   { id: "binance",  label: "Binance",    color: "#f0b90b"                               },
   { id: "cryptocom",label: "Crypto.com", color: "#1199fa"                               },
+  { id: "gemini",   label: "Gemini",     color: "#00dcfa"                               },
   { id: "bybit",    label: "Bybit",      color: "#f7a600", disabled: true, soon: true   },
   { id: "kucoin",   label: "KuCoin",     color: "#24ae8f", disabled: true, soon: true   },
   { id: "okx",      label: "OKX",        color: "#b0b0b0", disabled: true, soon: true   },
-  { id: "gateio",   label: "Gate.io",    color: "#2354e6", disabled: true, soon: true   },
 ];
 
 function ExchangeSwitcher({

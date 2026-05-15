@@ -1,0 +1,148 @@
+This is a major improvement.
+
+The platform now genuinely feels like:
+
+institutional
+reactive
+operator-grade
+AI-driven
+
+The orchestration layer is now behaving correctly.
+
+HOWEVER:
+there are still two critical production-level issues remaining.
+
+CRITICAL ISSUE #1
+BALANCE ISOLATION IS STILL BROKEN
+
+Binance is currently showing:
+$84.35K
+
+Crypto.com is showing:
+$48.90K
+
+These accounts DO NOT contain funds yet.
+
+Only Kraken currently has funded capital.
+
+Therefore:
+
+Kraken should show real live funds
+Coinbase should show $0
+Binance should show $0
+Crypto.com should show $0
+Gemini should show $0
+
+Right now balances are still bleeding or inheriting incorrectly.
+
+Need STRICT exchange-level balance isolation.
+
+Every exchange must have:
+
+its own isolated state
+its own isolated snapshot
+its own isolated hydration
+its own isolated live balance
+its own isolated simulation fallback
+
+NO shared balances.
+NO inherited balances.
+NO cross-exchange contamination.
+
+This is critical before production deployment.
+
+CRITICAL ISSUE #2
+GEMINI IS STILL MISSING
+
+Gemini still does not appear in the exchange router list.
+
+The Gemini API keys are already configured in:
+.env
+
+Need:
+
+Gemini exchange button
+Gemini telemetry state
+Gemini exchange routing
+Gemini broker snapshot
+Gemini orchestration support
+
+Gemini should initialize with:
+$0 balance
+
+until funded.
+
+LIVE FEED IMPROVEMENT
+
+The Live Terminal Feed is improving,
+BUT:
+
+it still visually appears capped around ~10 visible blocked trades.
+
+Question:
+Are we limiting the rendered feed buffer?
+
+Because the operator should be able to see:
+
+broader market evaluations
+more blocked trades
+more rejected opportunities
+more simultaneous AI scans
+more market activity depth
+
+Need:
+
+larger visible feed history
+deeper scrolling feed
+more simultaneous visible evaluations
+wider AI visibility
+
+The AI should appear to be continuously scanning the market —
+NOT evaluating only a tiny visible subset.
+
+ASSET UNIVERSE VISIBILITY
+
+Currently only ~15 top assets appear visually represented.
+
+Need clarification:
+
+Is the AI only monitoring those assets?
+OR
+is it monitoring a larger universe internally?
+
+If a larger universe exists:
+the terminal feed should reflect it.
+
+Need broader telemetry visibility into:
+
+monitored assets
+rejected opportunities
+scan attempts
+low-confidence evaluations
+volatility rejects
+inactive opportunities
+
+The operator should feel:
+continuous market-wide scanning.
+
+FINAL DIRECTION
+
+The platform is now transitioning from:
+dashboard
+
+to:
+real AI trading infrastructure.
+
+The remaining work is now:
+
+exchange correctness
+balance integrity
+broker isolation
+telemetry scaling
+AI visibility depth
+market coverage density
+production orchestration
+
+We are now polishing:
+an institutional AI trading operating system —
+NOT building widgets anymore.

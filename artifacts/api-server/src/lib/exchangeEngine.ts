@@ -87,22 +87,19 @@ let _paused:           boolean      = false;
 let _selectedExchange: string       = "Kraken";
 const _orders:         ExchangeOrder[] = [];
 
-// Per-exchange simulated portfolio snapshots
+// Per-exchange simulated fallback snapshots — only used in paper/sim mode when switching
+// to a specific exchange. Values reflect real funded state ($0 for unfunded accounts).
+// fetchLiveBalances() returns real API data for Kraken/Coinbase/Alpaca and $0 for others.
 const EXCHANGE_BALANCES: Record<string, Balances> = {
-  Kraken:       { USD: 100_000, BTC: 0,    ETH: 0,    SOL: 0    },
-  Binance:      { USD: 84_350,  BTC: 0.42, ETH: 3.10, SOL: 22.5 },
-  Coinbase:     { USD: 62_100,  BTC: 0.18, ETH: 1.50, SOL: 8.0  },
-  CryptoDotCom: { USD: 48_900,  BTC: 0.22, ETH: 1.80, SOL: 14.0 },
-  OKX:          { USD: 41_200,  BTC: 0.08, ETH: 0.90, SOL: 5.2  },
-  Bybit:        { USD: 28_750,  BTC: 0.05, ETH: 0.30, SOL: 2.1  },
-  Bitfinex:     { USD: 15_000,  BTC: 0.02, ETH: 0.12, SOL: 0    },
-  "Gate.io":    { USD: 22_500,  BTC: 0.04, ETH: 0.25, SOL: 1.8  },
-  KuCoin:       { USD: 11_000,  BTC: 0.01, ETH: 0.08, SOL: 0.5  },
-  Huobi:        { USD:  8_400,  BTC: 0,    ETH: 0.05, SOL: 0    },
-  MEXC:         { USD:  5_100,  BTC: 0,    ETH: 0.02, SOL: 0    },
-  Phemex:       { USD:  3_200,  BTC: 0,    ETH: 0,    SOL: 0    },
-  Uphold:       { USD: 18_750,  BTC: 0.03, ETH: 0.22, SOL: 1.4  },
-  Alpaca:       { USD: 100_000, BTC: 0,    ETH: 0,    SOL: 0    },
+  Kraken:       { USD: 0, BTC: 0, ETH: 0, SOL: 0 },  // real balance from API when live
+  Binance:      { USD: 0, BTC: 0, ETH: 0, SOL: 0 },  // unfunded — $0
+  Coinbase:     { USD: 0, BTC: 0, ETH: 0, SOL: 0 },  // real balance from API when live
+  CryptoDotCom: { USD: 0, BTC: 0, ETH: 0, SOL: 0 },  // unfunded — $0
+  Gemini:       { USD: 0, BTC: 0, ETH: 0, SOL: 0 },  // unfunded — $0
+  OKX:          { USD: 0, BTC: 0, ETH: 0, SOL: 0 },
+  Bybit:        { USD: 0, BTC: 0, ETH: 0, SOL: 0 },
+  KuCoin:       { USD: 0, BTC: 0, ETH: 0, SOL: 0 },
+  Alpaca:       { USD: 0, BTC: 0, ETH: 0, SOL: 0 },  // real balance from API when live
 };
 
 let _simBalances: Balances = { ...EXCHANGE_BALANCES["Kraken"]! };
@@ -118,13 +115,14 @@ function isExchangeConfigured(exchange: string): boolean {
   if (ex === "cryptocom" || ex === "cryptocomdotcom" || ex === "cryptodotcom") {
     return !!(process.env["CRYPTOCOM_API_KEY"] && process.env["CRYPTOCOM_API_SECRET"]);
   }
-  if (ex === "alpaca") return !!(process.env["ALPACA_API_KEY"] && process.env["ALPACA_SECRET_KEY"]);
+  if (ex === "gemini")  return !!(process.env["GEMINI_API_KEY"]  && process.env["GEMINI_API_SECRET"]);
+  if (ex === "alpaca")  return !!(process.env["ALPACA_API_KEY"]  && process.env["ALPACA_SECRET_KEY"]);
   return false;
 }
 
 /** Returns list of exchange IDs that have API credentials configured */
 export function getConfiguredExchanges(): string[] {
-  return (["Kraken", "Binance", "Coinbase", "CryptoDotCom", "Alpaca"] as const)
+  return (["Kraken", "Binance", "Coinbase", "CryptoDotCom", "Gemini", "Alpaca"] as const)
     .filter(e => isExchangeConfigured(e));
 }
 
@@ -231,12 +229,10 @@ export async function fetchLiveBalances(): Promise<Balances> {
     };
   }
 
-  // All other exchanges: return their isolated simulation portfolio snapshot.
-  // Real API integration for Binance, CryptoDotCom, Bybit etc. is not yet implemented.
-  const snap = EXCHANGE_BALANCES[_selectedExchange];
-  if (snap) return { ...snap };
-
-  throw new Error(`Live balances not available for ${_selectedExchange}`);
+  // All other exchanges (Binance, Gemini, CryptoDotCom, Bybit, etc.):
+  // Live API integration not yet implemented — return $0 to reflect actual unfunded state.
+  // Do NOT use EXCHANGE_BALANCES snapshots here; those are fictional and cause balance bleed.
+  return { USD: 0, BTC: 0, ETH: 0, SOL: 0 };
 }
 
 // ── Price estimate (use last Kraken ticker) ──────────────────────────────────
