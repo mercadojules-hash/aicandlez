@@ -63,12 +63,12 @@
   --elevate-1: rgba(255,255,255,.04);
   --elevate-2: rgba(255,255,255,.09);
 
-  --background:    215 100% 4%;
+  --background:    0 0% 0%;
   --foreground:    210 70% 92%;
-  --border:        212 62% 13%;
-  --input:         212 62% 13%;
+  --border:        212 30% 10%;
+  --input:         212 30% 10%;
   --ring:          207 100% 50%;
-  --card:          214 74% 7%;
+  --card:          214 60% 6%;
   --card-foreground: 210 70% 92%;
   --card-border:   212 62% 13%;
   --sidebar:       214 74% 7%;

@@ -53,14 +53,14 @@ function sparkPath(pts: number[], w: number, h: number): string {
 function MiniSparkline({ symbol, up, w = 96, h = 38 }: { symbol: string; up: boolean; w?: number; h?: number }) {
   const pts  = miniSparkData(symbol, up);
   const d    = sparkPath(pts, w, h);
-  const col  = up ? "rgba(0,255,136,0.75)" : "rgba(255,80,80,0.70)";
+  const col  = up ? "rgba(0,220,110,0.62)" : "rgba(230,70,70,0.58)";
   const gid  = `sg-${symbol}-${up ? "u" : "d"}`;
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} shapeRendering="geometricPrecision"
       style={{ overflow: "visible", flexShrink: 0 }}>
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor={col} stopOpacity="0.14"/>
+          <stop offset="0%"   stopColor={col} stopOpacity="0.09"/>
           <stop offset="100%" stopColor={col} stopOpacity="0"/>
         </linearGradient>
       </defs>
@@ -68,7 +68,7 @@ function MiniSparkline({ symbol, up, w = 96, h = 38 }: { symbol: string; up: boo
       <path d={`${d} L ${w} ${h} L 0 ${h} Z`}
         fill={`url(#${gid})`} />
       {/* line */}
-      <path d={d} fill="none" stroke={col} strokeWidth="1.4"
+      <path d={d} fill="none" stroke={col} strokeWidth="1.2"
         strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
@@ -84,15 +84,15 @@ function Donut({ value, color, label, size = 70 }: { value: number; color: strin
     <div style={{ textAlign: "center" }}>
       <svg width={size} height={size} shapeRendering="geometricPrecision">
         <circle cx={cx} cy={cx} r={r} fill="none"
-          stroke="rgba(255,255,255,0.06)" strokeWidth="6"/>
+          stroke="rgba(255,255,255,0.05)" strokeWidth="5"/>
         <circle cx={cx} cy={cx} r={r} fill="none"
-          stroke={color} strokeWidth="6"
+          stroke={color} strokeWidth="5"
           strokeDasharray={`${fill} ${circ - fill}`}
           strokeLinecap="round"
           transform={`rotate(-90 ${cx} ${cx})`}
           style={{ transition: "stroke-dasharray 0.6s ease" }}/>
-        <text x={cx} y={cx + 5} textAnchor="middle"
-          fill={color} fontSize="14" fontWeight="700"
+        <text x={cx} y={cx + 4} textAnchor="middle"
+          fill={GR} fontSize="13" fontWeight="600"
           fontFamily={MONO}>{value}</text>
       </svg>
       <div style={{ fontSize: 7, fontFamily: SANS, fontWeight: 500, color: DIM,
@@ -109,7 +109,7 @@ function PositionCard({ pos }: { pos: Portfolio["positions"][number] }) {
   const sl     = pos.entryPrice * (pos.side === "BUY" ? 0.965 : 1.035);
   const tp     = pos.entryPrice * (pos.side === "BUY" ? 1.040 : 0.960);
   const pnlPct = pos.entryPrice > 0 ? (pnl / (pos.entryPrice * pos.size)) * 100 : 0;
-  const borderCol = up ? "rgba(0,255,136,0.18)" : "rgba(255,51,85,0.15)";
+  const borderCol = up ? "rgba(0,255,136,0.11)" : "rgba(255,51,85,0.09)";
 
   return (
     <div style={{ background: CARD, border: `1px solid ${borderCol}`,
@@ -178,7 +178,7 @@ function PositionCard({ pos }: { pos: Portfolio["positions"][number] }) {
         </div>
 
         {/* Micro sparkline — right-aligned, supports the card, doesn't dominate it */}
-        <div style={{ flexShrink: 0, opacity: 0.85 }}>
+        <div style={{ flexShrink: 0, opacity: 0.68 }}>
           <MiniSparkline symbol={pos.symbol} up={up} w={88} h={34}/>
         </div>
       </div>
@@ -201,35 +201,40 @@ function TradeRow({ trade }: { trade: SimTrade }) {
   return (
     <div style={{ display: "flex", alignItems: "center",
       padding: "11px 0", borderBottom: `1px solid rgba(255,255,255,0.05)` }}>
-      <div style={{ width: 2, height: 32, background: col, opacity: 0.65,
+      <div style={{ width: 2, height: 28, background: col, opacity: 0.45,
         borderRadius: 2, flexShrink: 0, marginRight: 14 }}/>
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontFamily: MONO, fontWeight: 700, color: W }}>
+        <div style={{ fontSize: 13, fontFamily: MONO, fontWeight: 600,
+          color: "rgba(255,255,255,0.88)" }}>
           {trade.symbol}
         </div>
-        <div style={{ fontSize: 8, fontFamily: SANS, color: DIM, marginTop: 2 }}>
+        <div style={{ fontSize: 8, fontFamily: SANS, color: GR, marginTop: 2 }}>
           {trade.side} · {trade.closedAt}
         </div>
       </div>
       <div style={{ textAlign: "right", flex: 1 }}>
-        <div style={{ fontSize: 13, fontFamily: MONO, fontWeight: 600, color: col }}>
+        <div style={{ fontSize: 13, fontFamily: MONO, fontWeight: 600,
+          color: up ? "rgba(0,220,110,0.82)" : "rgba(230,70,70,0.80)" }}>
           {up ? "+" : ""}${Math.abs(trade.pnl).toFixed(2)}
         </div>
-        <div style={{ fontSize: 9, fontFamily: MONO, color: col, opacity: 0.65, marginTop: 1 }}>
+        <div style={{ fontSize: 9, fontFamily: MONO,
+          color: up ? "rgba(0,220,110,0.55)" : "rgba(230,70,70,0.52)", marginTop: 1 }}>
           {up ? "+" : ""}{trade.pnlPct.toFixed(2)}%
         </div>
       </div>
       {trade.score !== undefined && (
         <div style={{ marginLeft: 12, width: 30, height: 30, borderRadius: 6,
-          background: trade.score >= 70 ? "rgba(0,255,136,0.08)"
-                    : trade.score >= 50 ? "rgba(255,148,0,0.08)"
-                    : "rgba(255,51,85,0.08)",
-          border: `1px solid ${trade.score >= 70 ? "rgba(0,255,136,0.22)"
-                              : trade.score >= 50 ? "rgba(255,148,0,0.22)"
-                              : "rgba(255,51,85,0.22)"}`,
+          background: trade.score >= 70 ? "rgba(0,210,100,0.06)"
+                    : trade.score >= 50 ? "rgba(255,148,0,0.06)"
+                    : "rgba(230,70,70,0.06)",
+          border: `1px solid ${trade.score >= 70 ? "rgba(0,210,100,0.18)"
+                              : trade.score >= 50 ? "rgba(255,148,0,0.18)"
+                              : "rgba(230,70,70,0.18)"}`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 10, fontFamily: MONO, fontWeight: 700,
-          color: trade.score >= 70 ? G : trade.score >= 50 ? O : R }}>
+          fontSize: 10, fontFamily: MONO, fontWeight: 600,
+          color: trade.score >= 70 ? "rgba(0,210,100,0.80)"
+               : trade.score >= 50 ? "rgba(255,148,0,0.80)"
+               : "rgba(230,70,70,0.78)" }}>
           {trade.score}
         </div>
       )}
@@ -344,8 +349,8 @@ export default function Trade() {
 
           {/* KILL */}
           <button onClick={() => killMutation.mutate()} style={{
-            background: "rgba(255,51,85,0.07)",
-            border: "1px solid rgba(255,51,85,0.20)",
+            background: "rgba(255,51,85,0.05)",
+            border: "1px solid rgba(255,51,85,0.18)",
             borderRadius: 10, padding: "13px 0",
             cursor: "pointer", display: "flex", flexDirection: "column",
             alignItems: "center", gap: 7,
@@ -361,8 +366,8 @@ export default function Trade() {
 
           {/* PAUSE */}
           <button onClick={() => pauseMutation.mutate()} style={{
-            background: "rgba(255,148,0,0.07)",
-            border: "1px solid rgba(255,148,0,0.20)",
+            background: "rgba(255,148,0,0.05)",
+            border: "1px solid rgba(255,148,0,0.18)",
             borderRadius: 10, padding: "13px 0",
             cursor: "pointer", display: "flex", flexDirection: "column",
             alignItems: "center", gap: 7,
@@ -379,8 +384,8 @@ export default function Trade() {
 
           {/* AUTO */}
           <button onClick={() => autoMutation.mutate()} style={{
-            background: engine?.autoMode ? "rgba(0,229,255,0.08)" : "rgba(255,255,255,0.03)",
-            border: `1px solid ${engine?.autoMode ? "rgba(0,229,255,0.28)" : "rgba(0,229,255,0.15)"}`,
+            background: engine?.autoMode ? "rgba(0,229,255,0.06)" : "rgba(255,255,255,0.02)",
+            border: `1px solid ${engine?.autoMode ? "rgba(0,229,255,0.22)" : "rgba(0,229,255,0.12)"}`,
             borderRadius: 10, padding: "13px 0",
             cursor: "pointer", display: "flex", flexDirection: "column",
             alignItems: "center", gap: 7,
@@ -401,14 +406,14 @@ export default function Trade() {
 
         {/* ── Metrics panel ───────────────────────────────────────────────── */}
         <div style={{ background: CARD, border: `1px solid ${E}`,
-          borderRadius: 14, padding: "18px 16px", marginBottom: 16 }}>
+          borderRadius: 14, padding: "18px 16px", marginBottom: 12 }}>
 
           {/* Donuts */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
             marginBottom: 16 }}>
-            <Donut value={winPct}     color={G} label="Win / Loss"/>
-            <Donut value={confidence} color={P} label="AI Confidence"/>
-            <Donut value={exposure}   color={C} label="Exposure"/>
+            <Donut value={winPct}     color="rgba(0,210,100,0.60)"  label="Win / Loss"/>
+            <Donut value={confidence} color="rgba(130,80,215,0.62)" label="AI Confidence"/>
+            <Donut value={exposure}   color="rgba(0,185,215,0.58)"  label="Exposure"/>
           </div>
 
           {/* Stat row */}
@@ -445,7 +450,7 @@ export default function Trade() {
         {/* ── Total unrealized P&L ────────────────────────────────────────── */}
         <div style={{ background: CARD,
           border: `1px solid ${openPnL >= 0 ? "rgba(0,255,136,0.18)" : "rgba(255,51,85,0.15)"}`,
-          borderRadius: 12, padding: "14px 18px", marginBottom: 20,
+          borderRadius: 12, padding: "14px 18px", marginBottom: 14,
           display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 500, color: GR,
@@ -464,7 +469,7 @@ export default function Trade() {
         </div>
 
         {/* ── Open positions ───────────────────────────────────────────────── */}
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 15 }}>
           <SectionHead label="Open Positions" count={positions.length}/>
           {positions.length === 0 && (
             <div style={{ background: CARD, border: `1px solid ${E}`,

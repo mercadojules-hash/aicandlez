@@ -1,0 +1,145 @@
+FINAL TRADE PAGE REFINEMENT — PRODUCTION PASS
+
+The Trade page is now VERY close.
+
+Do NOT redesign anything.
+
+This is now a precision polish pass focused on:
+
+* OLED black depth
+* chart integration
+* reducing remaining neon energy
+* tightening institutional density
+
+====================================================
+
+1. TRUE OLED BLACK BACKGROUND
+   ====================================================
+
+The page background still reads slightly navy/blue.
+
+Push the ENTIRE page background to:
+
+#000000
+
+No gradients.
+No blue wash.
+No atmospheric haze.
+
+The empty spaces BETWEEN cards should disappear into black.
+
+====================================================
+2. POSITION CARD BORDER ENERGY
+==============================
+
+The asset cards are close but still slightly too cyan/red outlined.
+
+Reduce border visibility another 20–30%.
+
+Target:
+
+* subtle architectural definition
+* not glowing framed boxes
+
+The cards themselves should remain:
+#0d151e
+
+====================================================
+3. MICRO CHART INTEGRATION
+==========================
+
+The micro charts are excellent directionally.
+
+Now integrate them more naturally into the cards.
+
+Current issue:
+they still feel slightly “placed on top.”
+
+Adjust:
+
+* slightly lower opacity
+* slightly thinner stroke
+* slightly tighter vertical placement
+* blend into the telemetry layout more organically
+
+The chart should feel like part of the execution data itself.
+
+====================================================
+4. KPI DONUT WIDGETS
+====================
+
+The top circular widgets still feel slightly too “crypto UI.”
+
+Reduce:
+
+* saturation
+* glow
+* ring brightness
+
+Keep the information hierarchy but make them feel more:
+Bloomberg / institutional analytics.
+
+====================================================
+5. SECTION SPACING
+==================
+
+Tighten vertical spacing slightly between:
+
+* metrics panel
+* unrealized P&L
+* open positions
+* trade history
+
+Not cramped.
+
+Just denser and more premium.
+
+====================================================
+6. TRADE HISTORY CARDS
+======================
+
+These are looking good.
+
+Minor refinement:
+
+* slightly reduce green/red intensity
+* make typography 2–3% brighter
+* improve contrast subtly
+
+====================================================
+7. EXECUTION BUTTONS
+====================
+
+KILL / PAUSE / AUTO are MUCH better.
+
+Final tweak:
+
+* slightly reduce fill saturation
+* increase typography clarity
+* maintain semantic color identity
+
+Goal:
+professional trading controls.
+
+====================================================
+8. FINAL VISUAL TARGET
+======================
+
+The app should now feel like:
+
+# Apex AI Trader
+
+premium institutional AI execution terminal.
+
+Not:
+retail crypto app.
+
+This should feel polished enough for:
+
+* App Store screenshots
+* Google Play screenshots
+* investor demos
+* production launch
+
+No redesigns.
+Only refinement and rendering precision.
