@@ -22,7 +22,7 @@ const O    = "#ff9400";
 const R    = "#ff3355";
 const W    = "#ffffff";
 const GR   = "#8892a4";
-const DIM  = "#3a3f5c";
+const DIM  = "#647385";
 const GOLD = "#ffd200";
 
 // ── Surface tokens ─────────────────────────────────────────────────────────────
@@ -109,15 +109,13 @@ function fmt(n: number) {
   return Math.abs(n) >= 1_000 ? `$${(n/1_000).toFixed(1)}K` : `$${n.toFixed(2)}`;
 }
 function planColor(p: string) {
-  if (p.includes("live")||p.includes("pro"))     return G;
-  if (p.includes("starter")||p.includes("paid")) return C;
-  return DIM;
+  if (p.includes("active")||p.includes("paid")||p.includes("live")) return G;
+  if (p.includes("trial")) return C;
+  return C;
 }
 function planLabel(p: string) {
-  if (p.includes("live"))    return "Live AI";
-  if (p.includes("pro"))     return "Pro";
-  if (p.includes("starter")) return "Starter";
-  return "Free";
+  if (p.includes("active")||p.includes("paid")||p.includes("live")) return "Active";
+  return "Trial";
 }
 
 const MKTS = [

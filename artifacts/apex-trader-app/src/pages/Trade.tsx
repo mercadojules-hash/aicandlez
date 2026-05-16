@@ -13,7 +13,7 @@ const O    = "#ff9400";
 const R    = "#ff3355";
 const W    = "#ffffff";
 const GR   = "#8892a4";
-const DIM  = "#3a3f5c";
+const DIM  = "#647385";
 const SANS = "Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif";
 const MONO = "'SF Mono', 'Fira Code', 'JetBrains Mono', 'Roboto Mono', monospace";
 
@@ -91,7 +91,7 @@ function Donut({ value, color, label, size = 70 }: { value: number; color: strin
           strokeLinecap="round"
           transform={`rotate(-90 ${cx} ${cx})`}
           style={{ transition: "stroke-dasharray 0.6s ease" }}/>
-        <text x={cx} y={cx + 5} textAnchor="middle"
+        <text x={cx} y={cx} textAnchor="middle" dominantBaseline="central"
           fill="rgba(255,255,255,0.80)" fontSize="14" fontWeight="700"
           fontFamily={MONO}>{value}</text>
       </svg>

@@ -1,0 +1,231 @@
+FINAL BILLING MODEL + PROFILE ALIGNMENT PASS
+
+Good progress, but several business model and UX details are incorrect and must be corrected before moving forward.
+
+This is NOT a redesign.
+This is a refinement + business logic correction pass.
+
+Maintain:
+- pure black OLED background
+- #0d151e card interiors
+- institutional fintech styling
+- restrained color system
+- readable typography
+- App Store-quality polish
+
+────────────────────
+1. BILLING MODEL IS INCORRECT
+────────────────────
+
+The current pricing structure is wrong.
+
+REMOVE:
+- Pro plan
+- Institutional plan
+- “7-Day Free Trial” on Starter
+- multi-tier upgrade structure
+
+The actual business model is:
+
+────────────────────
+FREE TRIAL
+────────────────────
+
+Users get:
+- 7 days free paper trading
+- AI scanner access
+- simulated trading
+- dashboard access
+- analytics preview
+
+After 7 days:
+paper trading requires subscription.
+
+────────────────────
+SINGLE PAID PLAN
+────────────────────
+
+ONLY ONE PAID PLAN EXISTS:
+
+$5.99/month
+
+This includes:
+- continued paper trading
+- AI scanner
+- simulated trading
+- analytics
+- portfolio intelligence
+- journal/history
+- mobile + desktop access
+
+NO fake enterprise tiers.
+NO fake institutional pricing.
+NO fake premium upsells.
+
+Keep it realistic and believable.
+
+────────────────────
+2. REMOVE ALL “PRO” LANGUAGE
+────────────────────
+
+Remove:
+- Upgrade to Pro
+- Institutional AI
+- Enterprise references
+- multi-tier references
+- “Current Plan” logic for fake plans
+
+This app should feel:
+lean
+premium
+credible
+realistic
+
+NOT like a fake SaaS landing page.
+
+────────────────────
+3. EXCHANGE API FLOW — IMPORTANT
+────────────────────
+
+Users WILL need their own exchange API keys.
+
+The UI should explain this clearly and professionally.
+
+Add onboarding copy like:
+
+“To enable live trading, connect your personal exchange account using API credentials generated directly from your exchange.”
+
+Add:
+- “API keys remain under your control”
+- “Withdrawal permissions are never requested”
+- “Read & Trade permissions only”
+- “Generate API keys from Kraken/Coinbase/Binance settings”
+
+This is important for:
+- realism
+- trust
+- compliance
+- App Store review clarity
+
+────────────────────
+4. PROFILE PAGE — DONUT ALIGNMENT FIX
+────────────────────
+
+The AI Score / Consistency / Efficiency circles are visually off-center.
+
+Fix:
+- perfect vertical alignment
+- perfect horizontal centering
+- equal spacing
+- equal label positioning
+
+Currently the circles feel slightly floating/misaligned inside the card.
+
+Need precision alignment.
+
+────────────────────
+5. PROFILE PAGE — READABILITY PASS
+────────────────────
+
+Some labels are still too faint.
+
+Lift readability slightly for:
+- section labels
+- sublabels
+- footer copy
+- settings subtitles
+- member since text
+
+DO NOT add glow.
+DO NOT increase saturation.
+
+Use:
+- opacity
+- font weight
+- spacing
+- typography hierarchy
+
+────────────────────
+6. BILLING PAGE REFINEMENT
+────────────────────
+
+The billing page should feel:
+- clean
+- trustworthy
+- minimal
+- production-ready
+
+Think:
+- Apple subscription management
+- ChatGPT billing
+- Stripe customer portal
+- Coinbase One
+
+NOT:
+- crypto hype page
+- gaming subscription page
+
+Need:
+- cleaner hierarchy
+- better spacing
+- more believable pricing structure
+- realistic subscription language
+
+────────────────────
+7. ADD SUBSCRIPTION MODAL / PAYWALL
+────────────────────
+
+We now need the actual paywall/subscription popup.
+
+Trigger examples:
+- after trial expires
+- trying to enable live trading
+- advanced features
+- reconnect after free period
+
+Style:
+- elegant modal
+- dark institutional styling
+- subtle blur background
+- premium typography
+- single CTA:
+  “Subscribe for $5.99/month”
+
+Include:
+- 7-day free access explanation
+- benefits list
+- cancel anytime
+- secure billing note
+
+Should feel:
+high-conversion
+minimal
+credible
+
+────────────────────
+8. FINAL PRODUCT CONSISTENCY PASS
+────────────────────
+
+Audit all pages:
+- Home
+- Trade
+- Markets
+- Profile
+- Billing
+- Exchanges
+- Legal
+
+Ensure:
+- same spacing rhythm
+- same border system
+- same typography hierarchy
+- same readability standards
+- same token usage
+
+Everything should now feel like:
+ONE cohesive institutional trading platform.
+
+No TypeScript errors.
+No dead interactions.
+No fake upgrade tiers.
+Production-ready refinement only.
