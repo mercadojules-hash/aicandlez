@@ -7,7 +7,7 @@ import aicandlezLogo from "@assets/AICandlez_Final_Logo_3_1778962760188.png";
 import {
   api,
   type MobileStatus, type Portfolio, type SimAccount,
-  type SignalBreakdown, type Subscription,
+  type Subscription,
 } from "@/lib/api";
 
 const SANS = "Inter, 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
@@ -190,18 +190,102 @@ function ParticleField() {
   );
 }
 
-function Ticker({ items }: { items:string[] }) {
-  const t = items.join("   ·   ") + "   ·   " + items.join("   ·   ");
+const CRYPTO_TICKS = [
+  { sym:"BTC",   price:"$68,120", pct:"+2.41%", up:true  },
+  { sym:"ETH",   price:"$3,512",  pct:"+1.83%", up:true  },
+  { sym:"SOL",   price:"$188.40", pct:"-0.31%", up:false },
+  { sym:"XRP",   price:"$0.5912", pct:"+3.14%", up:true  },
+  { sym:"ADA",   price:"$0.4488", pct:"+1.20%", up:true  },
+  { sym:"DOGE",  price:"$0.1642", pct:"-0.85%", up:false },
+  { sym:"AVAX",  price:"$36.80",  pct:"+4.21%", up:true  },
+  { sym:"DOT",   price:"$7.92",   pct:"+0.88%", up:true  },
+  { sym:"LINK",  price:"$18.44",  pct:"+2.30%", up:true  },
+  { sym:"MATIC", price:"$0.9240", pct:"-1.10%", up:false },
+];
+const EQUITIES_TICKS = [
+  { sym:"NVDA",  price:"$875",    pct:"+3.14%", up:true  },
+  { sym:"TSLA",  price:"$177",    pct:"+1.22%", up:true  },
+  { sym:"AAPL",  price:"$192",    pct:"+0.64%", up:true  },
+  { sym:"META",  price:"$514",    pct:"+2.88%", up:true  },
+  { sym:"SPY",   price:"$521",    pct:"+0.58%", up:true  },
+  { sym:"QQQ",   price:"$445",    pct:"+0.91%", up:true  },
+  { sym:"MSFT",  price:"$415",    pct:"+0.44%", up:true  },
+  { sym:"GOOGL", price:"$170",    pct:"+1.10%", up:true  },
+  { sym:"ES1!",  price:"5,282",   pct:"+0.48%", up:true  },
+  { sym:"NQ1!",  price:"18,620",  pct:"+0.72%", up:true  },
+];
+
+type TickRow = { sym:string; price:string; pct:string; up:boolean };
+
+function TickerRow({ items, label, labelColor, speed }: {
+  items:TickRow[]; label:string; labelColor:string; speed:number;
+}) {
+  const doubled = [...items, ...items];
   return (
-    <div style={{ overflow:"hidden", height:18, background:`${BG}`,
-      borderBottom:`1px solid ${ESUB}`, position:"relative" }}>
+    <div style={{
+      display:"flex", alignItems:"stretch",
+      height:34, overflow:"hidden",
+      borderBottom:`1px solid ${ESUB}`,
+    }}>
       <div style={{
-        display:"inline-flex", whiteSpace:"nowrap", paddingLeft:"100%",
-        animation:"ticker-scroll 36s linear infinite",
-        fontSize:7.5, fontFamily:MONO, color:DIM, letterSpacing:"0.08em", lineHeight:"18px",
+        flexShrink:0, width:62,
+        display:"flex", alignItems:"center", justifyContent:"center",
+        background:`${labelColor}07`,
+        borderRight:`1px solid ${ESUB}`,
       }}>
-        {t}
+        <span style={{
+          fontSize:7, fontFamily:SANS, fontWeight:800, color:labelColor,
+          letterSpacing:"0.16em", textTransform:"uppercase" as const,
+        }}>{label}</span>
       </div>
+      <div style={{ flex:1, overflow:"hidden", position:"relative" }}>
+        <div style={{
+          display:"inline-flex", alignItems:"center", height:"100%",
+          whiteSpace:"nowrap",
+          animation:`ticker-scroll ${speed}s linear infinite`,
+        }}>
+          {doubled.map((t, i) => (
+            <div key={i} style={{
+              display:"inline-flex", alignItems:"center", gap:8,
+              padding:"0 16px",
+              borderRight:`1px solid ${ESUB}`,
+              height:"100%",
+            }}>
+              <span style={{
+                fontSize:10.5, fontFamily:SANS, fontWeight:700, color:W,
+                letterSpacing:"0.01em",
+              }}>{t.sym}</span>
+              <span style={{
+                fontSize:10.5, fontFamily:MONO, fontWeight:500, color:"rgba(255,255,255,0.80)",
+              }}>{t.price}</span>
+              <div style={{
+                display:"flex", alignItems:"center", gap:3,
+                padding:"2px 6px", borderRadius:4,
+                background: t.up ? "rgba(0,255,136,0.09)" : "rgba(255,51,85,0.09)",
+                border:`1px solid ${t.up ? "rgba(0,255,136,0.18)" : "rgba(255,51,85,0.18)"}`,
+              }}>
+                <span style={{ fontSize:7, color:t.up?G:R, lineHeight:1 }}>{t.up?"▲":"▼"}</span>
+                <span style={{
+                  fontSize:9.5, fontFamily:MONO, fontWeight:700,
+                  color:t.up?G:R,
+                }}>{t.pct}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DualTicker() {
+  return (
+    <div style={{
+      background:"rgba(0,4,14,0.98)",
+      borderBottom:`1px solid rgba(255,255,255,0.05)`,
+    }}>
+      <TickerRow items={CRYPTO_TICKS}   label="CRYPTO" labelColor={C} speed={44}/>
+      <TickerRow items={EQUITIES_TICKS} label="STOCKS" labelColor={P} speed={48}/>
     </div>
   );
 }
@@ -224,8 +308,6 @@ export default function Home() {
     queryKey:["mobile-portfolio"], queryFn:()=>api.get("/mobile/portfolio"), refetchInterval:8_000 });
   const { data:simAcc }    = useQuery<SimAccount>({
     queryKey:["sim-account"],      queryFn:()=>api.get("/account"),          retry:false, staleTime:60_000 });
-  const { data:signals }   = useQuery<{ breakdowns:Record<string,SignalBreakdown> }>({
-    queryKey:["mobile-signals"],   queryFn:()=>api.get("/mobile/signals"),   refetchInterval:5_000 });
   const { data:sub }       = useQuery<Subscription>({
     queryKey:["subscription"],     queryFn:()=>api.get("/billing/subscription"), staleTime:120_000, retry:false });
 
@@ -239,20 +321,12 @@ export default function Home() {
   const trades   = simAcc?.totalTrades ?? 41;
   const realized = simAcc?.realizedPnL ?? 3800;
   const fees     = simAcc?.feesPaid    ?? 142.88;
-  const sigList  = signals?.breakdowns ? Object.entries(signals.breakdowns).slice(0,5) : [];
   const plan     = (sub?.plan ?? "free").toLowerCase();
   const pColor   = planColor(plan);
   const pLabel   = planLabel(plan);
   const exchange = engine?.exchange?.toUpperCase() ?? "ALPACA";
   const initials = "AM";
   const name     = "Alex Morgan";
-
-  const tickerItems = [
-    `BTC $68,120 ▲2.4%`, `ETH $3,512 ▲1.8%`, `SOL $188 ▼0.3%`,
-    `NVDA $875 ▲3.1%`, `TSLA $177 ▲1.2%`, `SPY $521 ▲0.6%`,
-    `AI SIG ${sigList.length}`, `ENGINE ${engine?.running?"LIVE":"IDLE"}`,
-    `POSITIONS ${posCount}`, `WIN RATE ${winRate}%`,
-  ];
 
   function handleLaunch() {
     if (launching || brokerStatus !== "idle") return;
@@ -317,8 +391,8 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── Ticker ──────────────────────────────────────────────────────────── */}
-      <Ticker items={tickerItems}/>
+      {/* ── Dual Market Ticker ──────────────────────────────────────────────── */}
+      <DualTicker/>
 
       {/* ── Hero — AI Engine Status ──────────────────────────────────────────── */}
       <div style={{
@@ -492,10 +566,11 @@ export default function Home() {
 
             {/* Big balance */}
             <div style={{
-              fontSize:52, fontWeight:900, color:W, fontFamily:MONO,
-              letterSpacing:"-0.04em", lineHeight:1,
+              fontSize:52, fontWeight:800, color:W,
+              fontFamily:"'SF Pro Display','Inter','Helvetica Neue',system-ui,-apple-system,sans-serif",
+              letterSpacing:"-0.03em", lineHeight:1,
               animation:"num-pop 0.6s ease-out both",
-              textShadow:`0 0 40px rgba(255,255,255,0.08)`,
+              textShadow:`0 0 40px rgba(255,255,255,0.06)`,
             }}>
               {fmt(tv)}
             </div>
@@ -694,96 +769,6 @@ export default function Home() {
                       <span style={{ fontSize:7, fontFamily:MONO, color:DIM }}>
                         {MKTS_CONF[sym]??60}%
                       </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ── AI Signal Feed ───────────────────────────────────────────────────── */}
-        <div style={{ marginBottom:18 }}>
-          <SH label="AI Signal Feed" right={`${sigList.length} active`} color={G}/>
-          <div style={{
-            position:"relative",
-            background:`linear-gradient(160deg, #0a1622, #080f1c)`,
-            border:`1px solid rgba(0,255,136,0.10)`,
-            borderRadius:16, overflow:"hidden",
-            boxShadow:`0 8px 32px rgba(0,0,0,0.9), 0 0 0 0.5px rgba(0,255,136,0.05) inset`,
-          }}>
-            {/* Card-level scan sweep */}
-            <div aria-hidden style={{
-              position:"absolute", top:0, left:0, right:0, height:1,
-              background:`linear-gradient(90deg, transparent 10%, ${G}50 45%, ${G}40 55%, transparent 90%)`,
-              animation:"edge-sweep 10s ease-in-out 2s infinite",
-              pointerEvents:"none",
-            }}/>
-            {/* Feed header with live typewriter */}
-            <div style={{
-              padding:"10px 14px", borderBottom:`1px solid ${ESUB}`,
-              background:"rgba(0,255,136,0.03)",
-              display:"flex", alignItems:"center", gap:8,
-            }}>
-              <div style={{ display:"flex", gap:3 }}>
-                {[0,1,2].map(i => (
-                  <div key={i} style={{
-                    width:2, height:[8,14,10][i], background:G, borderRadius:1,
-                    animation:`wave-bar 1.8s ease-in-out ${(i*0.25).toFixed(2)}s infinite alternate`,
-                  }}/>
-                ))}
-              </div>
-              <span style={{ fontSize:9, fontFamily:SANS, fontWeight:600, color:G }}>
-                Live Signal Feed
-              </span>
-              <div style={{ marginLeft:"auto", fontSize:8, fontFamily:MONO, color:DIM,
-                animation:"scan-text 3s ease-in-out infinite" }}>
-                SCANNING
-              </div>
-            </div>
-
-            {sigList.length === 0 ? (
-              <div style={{ padding:"24px 0", textAlign:"center" }}>
-                <div style={{ display:"flex", justifyContent:"center", marginBottom:10 }}>
-                  <AIWave color={C} bars={10}/>
-                </div>
-                <div style={{ fontSize:10, fontFamily:SANS, color:DIM }}>Engine warming up…</div>
-              </div>
-            ) : sigList.map(([sym, bd], i) => {
-              const conf  = bd.confidence ?? 0;
-              const age   = Math.floor((Date.now()-bd.lastUpdated)/1000);
-              const ageT  = age<60 ? `${age}s` : `${Math.floor(age/60)}m`;
-              const color = AC[bd.action]??GR;
-              return (
-                <div key={sym} style={{
-                  display:"flex", alignItems:"stretch",
-                  borderBottom: i<sigList.length-1 ? `1px solid ${ESUB}` : "none",
-                  animation:`card-in 0.3s ${(i*0.07).toFixed(2)}s ease-out both`,
-                }}>
-                  <div style={{
-                    width:3, background:`linear-gradient(180deg, ${color}, ${color}44)`,
-                    boxShadow:`0 0 4px ${color}33`, flexShrink:0,
-                  }}/>
-                  <div style={{ flex:"0 0 68px", padding:"12px 10px" }}>
-                    <div style={{ fontSize:13, fontFamily:SANS, fontWeight:700, color:W }}>
-                      {sym.replace("USD","")}
-                    </div>
-                    <div style={{ fontSize:8, fontFamily:MONO, color:DIM, marginTop:3 }}>{ageT} ago</div>
-                  </div>
-                  <div style={{ flex:1, padding:"12px 8px" }}>
-                    <div style={{ fontSize:9, fontFamily:SANS, color:DIM, marginBottom:6 }}>
-                      EMA+RSI confluence
-                    </div>
-                    <ConfBar value={conf} color={color} delay={`${i*0.1}s`}/>
-                  </div>
-                  <div style={{ padding:"12px 14px 12px 8px", textAlign:"right", flexShrink:0 }}>
-                    <div style={{ fontSize:13, fontFamily:MONO, fontWeight:700, color,
-                      marginBottom:2 }}>
-                      {conf.toFixed(1)}%
-                    </div>
-                    <div style={{ fontSize:8, fontFamily:SANS, fontWeight:700,
-                      color, letterSpacing:"0.04em" }}>
-                      {bd.action}
                     </div>
                   </div>
                 </div>
