@@ -47,6 +47,7 @@ const MKTS = [
   { sym:"SPY",  label:"S&P 500",   price:"$521",    pct:"+0.6%", action:"LONG",  trend:"up"   as const },
 ];
 const AC: Record<string,string> = { LONG:G, SHORT:R, HOLD:C };
+const MKTS_CONF: Record<string,number> = { BTC:74, ETH:68, SOL:45, NVDA:81, TSLA:63, SPY:72 };
 
 const AI_LINES = [
   "AI detected bullish momentum on BTC…",
@@ -275,8 +276,8 @@ export default function Home() {
         {/* Brand logo — horizontal full version */}
         <img src={aicandlezLogo} alt="AICandlez"
           style={{
-            height:36, width:"auto", objectFit:"contain", maxWidth:180,
-            filter:"drop-shadow(0 0 12px rgba(0,229,255,0.25)) brightness(1.05)",
+            height:50, width:"auto", objectFit:"contain", maxWidth:230,
+            filter:"drop-shadow(0 0 22px rgba(0,229,255,0.38)) brightness(1.09)",
           }}/>
 
         {/* Right side: mode pill + avatar */}
@@ -330,21 +331,37 @@ export default function Home() {
         boxShadow:`0 20px 60px rgba(0,0,0,0.95), 0 0 80px rgba(0,229,255,0.03) inset`,
       }}>
 
-        {/* Ambient glow orbs */}
+        {/* Ambient glow orbs — breathing */}
         <div aria-hidden style={{
-          position:"absolute", top:-40, left:-20, width:200, height:200, borderRadius:"50%",
-          background:`radial-gradient(circle, rgba(0,229,255,0.06) 0%, transparent 70%)`,
+          position:"absolute", top:-50, left:-30, width:260, height:260, borderRadius:"50%",
+          background:`radial-gradient(circle, rgba(0,229,255,0.09) 0%, transparent 70%)`,
           pointerEvents:"none",
+          animation:"orb-breathe 9s ease-in-out infinite",
         }}/>
         <div aria-hidden style={{
-          position:"absolute", bottom:-30, right:-10, width:160, height:160, borderRadius:"50%",
-          background:`radial-gradient(circle, rgba(155,92,245,0.07) 0%, transparent 70%)`,
+          position:"absolute", bottom:-40, right:-20, width:200, height:200, borderRadius:"50%",
+          background:`radial-gradient(circle, rgba(155,92,245,0.10) 0%, transparent 70%)`,
           pointerEvents:"none",
+          animation:"orb-breathe 9s ease-in-out 4.5s infinite",
         }}/>
         <div aria-hidden style={{
-          position:"absolute", top:0, left:0, right:0, height:1,
-          background:`linear-gradient(90deg, transparent 10%, ${C}60 40%, ${G}40 60%, transparent 90%)`,
+          position:"absolute", top:"38%", right:"18%", width:90, height:90, borderRadius:"50%",
+          background:`radial-gradient(circle, rgba(0,255,136,0.07) 0%, transparent 70%)`,
+          pointerEvents:"none",
+          animation:"orb-breathe 6s ease-in-out 2s infinite",
+        }}/>
+        {/* Top laser edge */}
+        <div aria-hidden style={{
+          position:"absolute", top:0, left:0, right:0, height:1.5,
+          background:`linear-gradient(90deg, transparent 8%, ${C}70 38%, ${G}50 56%, ${C}65 74%, transparent 92%)`,
           animation:"edge-sweep 8s ease-in-out infinite",
+        }}/>
+        {/* Horizontal scan line */}
+        <div aria-hidden style={{
+          position:"absolute", left:0, right:0, height:1,
+          background:`linear-gradient(90deg, transparent, rgba(0,229,255,0.15), transparent)`,
+          animation:"scan-line 5s linear infinite",
+          pointerEvents:"none",
         }}/>
 
         <ParticleField />
@@ -425,9 +442,13 @@ export default function Home() {
         <div style={{
           position:"relative", overflow:"hidden", borderRadius:20,
           marginBottom:12, padding:"22px 20px 20px",
-          background:`linear-gradient(145deg, #0d1a28 0%, #0a1520 60%, #080f1a 100%)`,
-          border:`1px solid rgba(255,255,255,0.08)`,
-          boxShadow:`0 20px 60px rgba(0,0,0,0.95), 0 0 1px rgba(0,229,255,0.08) inset`,
+          background:`linear-gradient(145deg, #0d1c2e 0%, #0a1622 60%, #080f1c 100%)`,
+          border:`1px solid rgba(0,229,255,0.12)`,
+          boxShadow:[
+            "0 24px 70px rgba(0,0,0,0.97)",
+            "0 0 0 0.5px rgba(0,229,255,0.06) inset",
+            "0 2px 4px rgba(0,229,255,0.04) inset",
+          ].join(", "),
         }}>
           {/* Laser top edge */}
           <div aria-hidden style={{
@@ -435,10 +456,18 @@ export default function Home() {
             background:`linear-gradient(90deg, transparent 5%, ${C}70 35%, ${G}55 55%, ${C}65 75%, transparent 95%)`,
             animation:"edge-sweep 7s ease-in-out infinite",
           }}/>
-          {/* Bottom ambient glow */}
+          {/* Bottom ambient glow — breathing */}
           <div aria-hidden style={{
-            position:"absolute", bottom:0, left:"20%", right:"20%", height:40,
-            background:`radial-gradient(ellipse, rgba(0,255,136,0.06) 0%, transparent 70%)`,
+            position:"absolute", bottom:0, left:"15%", right:"15%", height:60,
+            background:`radial-gradient(ellipse, rgba(0,255,136,0.08) 0%, transparent 70%)`,
+            pointerEvents:"none",
+            animation:"orb-breathe 6s ease-in-out infinite",
+          }}/>
+          {/* Shimmer sweep */}
+          <div aria-hidden style={{
+            position:"absolute", top:0, bottom:0, width:"30%",
+            background:`linear-gradient(90deg, transparent, rgba(255,255,255,0.015), transparent)`,
+            animation:"shimmer-sweep 8s ease-in-out infinite",
             pointerEvents:"none",
           }}/>
 
@@ -596,7 +625,16 @@ export default function Home() {
                   display:"flex", alignItems:"center", gap:10, padding:"12px 14px",
                   borderBottom: i<MKTS.length-1 ? `1px solid ${ESUB}` : "none",
                   animation:`card-in 0.3s ${(i*0.06).toFixed(2)}s ease-out both`,
+                  background:`${ac}02`,
+                  position:"relative", overflow:"hidden",
                 }}>
+                  {/* Subtle row scan sweep */}
+                  <div aria-hidden style={{
+                    position:"absolute", inset:0,
+                    background:`linear-gradient(90deg, transparent 0%, ${ac}06 50%, transparent 100%)`,
+                    animation:`row-shimmer 12s ease-in-out ${i*2}s infinite`,
+                    pointerEvents:"none",
+                  }}/>
                   <div style={{
                     width:3, height:36, borderRadius:2, flexShrink:0,
                     background:`linear-gradient(180deg, ${ac}, ${ac}44)`,
@@ -629,17 +667,34 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div style={{
-                    padding:"4px 12px",
-                    background:`${ac}08`,
-                    border:`1px solid ${ac}28`,
-                    borderRadius:20,
-                    fontSize:8, fontFamily:SANS, fontWeight:700,
-                    color:ac, letterSpacing:"0.05em",
-                    boxShadow: `0 0 8px ${ac}12`,
-                    flexShrink:0,
-                  }}>
-                    {action}
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:5, flexShrink:0 }}>
+                    <div style={{
+                      padding:"4px 12px",
+                      background:`${ac}0a`,
+                      border:`1px solid ${ac}30`,
+                      borderRadius:20,
+                      fontSize:8, fontFamily:SANS, fontWeight:700,
+                      color:ac, letterSpacing:"0.05em",
+                      boxShadow: `0 0 10px ${ac}18`,
+                    }}>
+                      {action}
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                      <div style={{
+                        width:32, height:2, background:"rgba(255,255,255,0.05)",
+                        borderRadius:2, overflow:"hidden",
+                      }}>
+                        <div style={{
+                          width:`${MKTS_CONF[sym]??60}%`, height:"100%",
+                          background:`linear-gradient(90deg, ${ac}66, ${ac})`,
+                          borderRadius:2,
+                          boxShadow:`0 0 4px ${ac}55`,
+                        }}/>
+                      </div>
+                      <span style={{ fontSize:7, fontFamily:MONO, color:DIM }}>
+                        {MKTS_CONF[sym]??60}%
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
@@ -651,11 +706,19 @@ export default function Home() {
         <div style={{ marginBottom:18 }}>
           <SH label="AI Signal Feed" right={`${sigList.length} active`} color={G}/>
           <div style={{
-            background:`linear-gradient(160deg, #0a1520, #080f1a)`,
-            border:`1px solid ${E}`,
+            position:"relative",
+            background:`linear-gradient(160deg, #0a1622, #080f1c)`,
+            border:`1px solid rgba(0,255,136,0.10)`,
             borderRadius:16, overflow:"hidden",
-            boxShadow:`0 8px 32px rgba(0,0,0,0.9)`,
+            boxShadow:`0 8px 32px rgba(0,0,0,0.9), 0 0 0 0.5px rgba(0,255,136,0.05) inset`,
           }}>
+            {/* Card-level scan sweep */}
+            <div aria-hidden style={{
+              position:"absolute", top:0, left:0, right:0, height:1,
+              background:`linear-gradient(90deg, transparent 10%, ${G}50 45%, ${G}40 55%, transparent 90%)`,
+              animation:"edge-sweep 10s ease-in-out 2s infinite",
+              pointerEvents:"none",
+            }}/>
             {/* Feed header with live typewriter */}
             <div style={{
               padding:"10px 14px", borderBottom:`1px solid ${ESUB}`,
@@ -750,11 +813,18 @@ export default function Home() {
               background:`linear-gradient(90deg, transparent 5%, rgba(155,92,245,0.60) 38%, rgba(0,229,255,0.45) 60%, transparent 95%)`,
               animation:"edge-sweep 6s ease-in-out infinite",
             }}/>
-            {/* Ambient purple glow */}
+            {/* Ambient glow — breathing with energy buildup on launch */}
             <div aria-hidden style={{
-              position:"absolute", top:-40, right:-20, width:160, height:160, borderRadius:"50%",
-              background:`radial-gradient(circle, rgba(155,92,245,0.08), transparent 70%)`,
+              position:"absolute", top:-50, right:-30, width:200, height:200, borderRadius:"50%",
+              background:`radial-gradient(circle, rgba(155,92,245,0.10), transparent 70%)`,
               pointerEvents:"none",
+              animation: launching ? "orb-breathe 1.5s ease-in-out infinite" : "orb-breathe 7s ease-in-out infinite",
+            }}/>
+            <div aria-hidden style={{
+              position:"absolute", bottom:-30, left:-20, width:140, height:140, borderRadius:"50%",
+              background:`radial-gradient(circle, rgba(0,229,255,0.07), transparent 70%)`,
+              pointerEvents:"none",
+              animation: launching ? "orb-breathe 1s ease-in-out 0.5s infinite" : "orb-breathe 9s ease-in-out 3s infinite",
             }}/>
 
             {/* Rocket launch overlay */}
@@ -893,10 +963,15 @@ export default function Home() {
         @keyframes pnl-flash       { 0%,100%{opacity:1} 50%{opacity:.7} }
         @keyframes cursor-blink    { 0%,100%{opacity:1} 50%{opacity:0} }
         @keyframes particle-float  { from{transform:translate(0,0) scale(1);opacity:.3} to{transform:translate(8px,-12px) scale(1.4);opacity:.6} }
-        @keyframes rocket-launch   { 0%{transform:translateY(0) scale(1)} 20%{transform:translateY(4px) scale(0.95)} 40%{transform:translateY(-8px) scale(1.1)} 100%{transform:translateY(-120px) scale(0.6);opacity:0} }
+        @keyframes rocket-launch   { 0%{transform:translateY(0) scale(1)} 20%{transform:translateY(4px) scale(0.95)} 40%{transform:translateY(-8px) scale(1.1)} 100%{transform:translateY(-140px) scale(0.5);opacity:0} }
         @keyframes rocket-button   { 0%{transform:translateY(0)} 30%{transform:translateY(2px)} 100%{transform:translateY(-20px);opacity:0} }
-        @keyframes trail-fade      { 0%{opacity:0;transform:scaleY(0)} 30%{opacity:1;transform:scaleY(1)} 100%{opacity:0;height:60px} }
+        @keyframes trail-fade      { 0%{opacity:0;height:4px} 40%{opacity:1;height:40px} 100%{opacity:0;height:80px} }
         @keyframes fade-in         { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes orb-breathe     { 0%,100%{opacity:0.6;transform:scale(1)} 50%{opacity:1;transform:scale(1.18)} }
+        @keyframes scan-line       { 0%{top:-2px;opacity:0} 5%{opacity:1} 95%{opacity:0.5} 100%{top:100%;opacity:0} }
+        @keyframes shimmer-sweep   { 0%{left:-30%;opacity:0} 20%{opacity:1} 80%{opacity:0.4} 100%{left:130%;opacity:0} }
+        @keyframes row-shimmer     { 0%,100%{opacity:0} 50%{opacity:1} }
+        @keyframes glow-pulse      { 0%,100%{box-shadow:0 0 14px rgba(0,229,255,0.06)} 50%{box-shadow:0 0 36px rgba(0,229,255,0.18),0 0 60px rgba(0,229,255,0.06)} }
         .page-enter                { animation: card-in 0.35s ease-out both; }
       `}</style>
     </div>
