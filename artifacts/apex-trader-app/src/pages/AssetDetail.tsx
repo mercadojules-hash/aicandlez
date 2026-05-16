@@ -474,16 +474,17 @@ export default function AssetDetail() {
   const [executing, setExecuting] = useState<"buy"|"sell"|"auto"|null>(null);
   const [autoActive, setAutoActive] = useState(false);
 
-  const params = new URLSearchParams(window.location.search);
-  const sym    = (params.get("sym") ?? "BTC").toUpperCase();
-  const type   = params.get("type") ?? "crypto";
+  const params    = new URLSearchParams(window.location.search);
+  const sym       = (params.get("sym") ?? "BTC").toUpperCase();
+  const type      = params.get("type") ?? "crypto";
+  const backRoute = type === "equity" ? "/equities" : "/markets";
   const asset  = ASSET_DB[sym];
 
   if (!asset) {
     return (
       <div style={{ background:BG, minHeight:"100%", padding:"80px 24px", textAlign:"center" }}>
         <div style={{ fontFamily:SANS, color:GR }}>Asset not found: {sym}</div>
-        <button onClick={() => setLocation(-1 as unknown as string)}
+        <button onClick={() => setLocation(backRoute)}
           style={{ marginTop:16, color:C, background:"none", border:"none",
             cursor:"pointer", fontFamily:SANS, fontSize:13 }}>← Back</button>
       </div>
@@ -527,7 +528,7 @@ export default function AssetDetail() {
         padding:"13px 16px 11px",
         display:"flex", alignItems:"center", gap:12,
       }}>
-        <button onClick={() => setLocation(-1 as unknown as string)} style={{
+        <button onClick={() => setLocation(backRoute)} style={{
           background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.09)",
           borderRadius:8, padding:"6px 10px", cursor:"pointer",
           display:"flex", alignItems:"center",
