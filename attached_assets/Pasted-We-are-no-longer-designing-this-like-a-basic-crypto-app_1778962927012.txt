@@ -1,0 +1,277 @@
+We are no longer designing this like a basic crypto app.
+This must feel like a premium AI-powered institutional trading platform — cinematic, futuristic, polished, alive, and visually addictive.
+
+The new AICandlez branding is now MUCH stronger than portions of the UI.
+The home screen needs a complete visual elevation to match the quality of the new logo and overall vision.
+
+GOAL:
+The app should feel like:
+
+* Robinhood + Bloomberg + Tesla + Apple + futuristic AI terminal
+* premium SaaS
+* AI automation
+* institutional trading intelligence
+* luxury fintech
+* not template/mobile-kit design
+
+━━━━━━━━━━━━━━━━━━━
+HOME PAGE REDESIGN REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━
+
+The home page currently feels too static and too vertically stacked.
+
+I want:
+
+* more motion
+* better spacing
+* stronger hierarchy
+* premium glow effects
+* live AI feeling
+* more cinematic UI depth
+* stronger typography
+* better information architecture
+
+The app should feel alive the second it opens.
+
+━━━━━━━━━━━━━━━━━━━
+TOP HEADER SECTION
+━━━━━━━━━━━━━━━━━━━
+
+Move the user profile/avatar to the RIGHT side.
+
+Move the AICandlez logo to the LEFT side.
+
+The logo should now be significantly larger and more visible.
+
+Use the NEW horizontal logo version:
+Rocket icon + AICANDLEZ text.
+
+Desktop/tablet:
+
+* logo height approximately 42–52px
+* balanced padding
+* subtle cyan glow
+* crisp rendering
+
+Mobile:
+
+* responsive scaling
+* preserve readability
+* do NOT crowd the top bar
+
+The logo should feel like a real company brand — not a small app icon.
+
+━━━━━━━━━━━━━━━━━━━
+HOME PAGE HERO AREA
+━━━━━━━━━━━━━━━━━━━
+
+The first visible section should immediately impress users.
+
+I want:
+
+* subtle animated gradient background
+* ambient glow effects
+* moving AI particles or floating trading energy
+* depth/layering
+* glassmorphism where appropriate
+* dynamic lighting
+
+Add:
+
+* a LIVE AI STATUS indicator
+* active engine pulse animation
+* moving signal wave
+* subtle trading telemetry animations
+
+This area should feel like:
+“the AI is actively trading right now.”
+
+━━━━━━━━━━━━━━━━━━━
+PORTFOLIO CARD REDESIGN
+━━━━━━━━━━━━━━━━━━━
+
+The portfolio card needs to feel:
+
+* richer
+* larger
+* more premium
+* less flat
+
+Improve:
+
+* spacing
+* typography scale
+* hierarchy
+* glow accents
+* gradients
+* hover/touch feedback
+
+Add:
+
+* animated unrealized PnL pulse
+* moving graph line
+* subtle live-value refresh effect
+* better balance between metrics
+
+DO NOT make it cluttered.
+
+Keep it elegant and institutional.
+
+━━━━━━━━━━━━━━━━━━━
+LIVE MARKET SECTION
+━━━━━━━━━━━━━━━━━━━
+
+The current live market section still feels too basic.
+
+Upgrade it with:
+
+* cleaner spacing
+* modern typography
+* mini charts with glow
+* smoother curves
+* subtle movement
+* AI confidence indicators
+* cleaner LONG/HOLD tags
+
+The charts should look:
+
+* smooth
+* reactive
+* premium
+* not template-generated
+
+━━━━━━━━━━━━━━━━━━━
+AI SIGNAL FEED
+━━━━━━━━━━━━━━━━━━━
+
+This section should feel like a real AI terminal.
+
+Add:
+
+* streaming activity
+* live signal pulses
+* typing effect
+* confidence indicators
+* timestamp movement
+* AI reasoning snippets
+
+Examples:
+“AI detected bullish momentum…”
+“ETH volatility compression identified…”
+“BTC breakout probability increasing…”
+
+The feed should continuously feel alive.
+
+━━━━━━━━━━━━━━━━━━━
+LIVE TRADING ACTIVATION CARD
+━━━━━━━━━━━━━━━━━━━
+
+This section should become a MAJOR visual focal point.
+
+When the user presses:
+“Start AI Trading”
+
+I want:
+
+* cinematic activation animation
+* rocket ignition effect
+* neon energy buildup
+* pulse/glow expansion
+* subtle vibration/shake
+* launch transition
+
+IMPORTANT:
+Use the new rocket branding as an animation asset.
+
+The rocket should:
+
+* launch vertically upward
+* accelerate smoothly
+* leave glowing teal energy trails
+* disappear off-screen
+
+This should feel incredibly satisfying and premium.
+
+NOT cheesy.
+
+Think:
+Tesla startup animation meets futuristic trading AI.
+
+━━━━━━━━━━━━━━━━━━━
+BOTTOM NAVIGATION
+━━━━━━━━━━━━━━━━━━━
+
+The app will eventually contain approximately 8 pages total,
+BUT ONLY 5 MAIN BOTTOM TABS.
+
+The bottom navigation must feel:
+
+* futuristic
+* premium
+* minimal
+* floating
+* responsive
+
+Current/future primary tabs:
+
+1. Home
+2. Trade
+3. Crypto
+4. Equities
+5. Profile
+
+Other pages should be accessed through:
+
+* modals
+* nested navigation
+* profile/settings stacks
+* overlays
+* internal routing
+
+The bottom nav should:
+
+* glow subtly
+* animate on press
+* have premium transitions
+* use motion intelligently
+
+━━━━━━━━━━━━━━━━━━━
+DESIGN LANGUAGE
+━━━━━━━━━━━━━━━━━━━
+
+Overall design direction:
+
+* black backgrounds
+* teal/cyan neon accents
+* controlled glow
+* cinematic contrast
+* glass layers
+* institutional typography
+* premium spacing
+* fluid animations
+* AI energy
+* futuristic but believable
+
+DO NOT:
+
+* use generic crypto templates
+* overuse glow
+* clutter the interface
+* make it look gamer-ish
+* make typography too small
+* make sections feel flat/static
+
+━━━━━━━━━━━━━━━━━━━
+FINAL GOAL
+━━━━━━━━━━━━━━━━━━━
+
+The app should feel good enough that:
+
+* users want to screenshot it
+* investors are impressed
+* it feels like a real funded startup
+* it visually competes with top fintech apps
+* the branding and UI finally feel unified
+
+This should feel like:
+“A next-generation AI trading platform.”
