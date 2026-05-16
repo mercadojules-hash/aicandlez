@@ -17,6 +17,7 @@ import Subscribe from "@/pages/Subscribe";
 import Consent   from "@/pages/Consent";
 import Billing   from "@/pages/Billing";
 import LegalPage from "@/pages/LegalPage";
+import Equities  from "@/pages/Equities";
 
 // ── Env ────────────────────────────────────────────────────────────────────────
 const clerkPubKey   = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
@@ -130,8 +131,9 @@ function Pages() {
     <Switch>
       <Route path="/"        component={() => <Protected><Home /></Protected>} />
       <Route path="/trade"   component={() => <Protected><Trade /></Protected>} />
-      <Route path="/markets" component={() => <Protected><Markets /></Protected>} />
-      <Route path="/profile" component={() => <Protected><Profile /></Protected>} />
+      <Route path="/markets"  component={() => <Protected><Markets  /></Protected>} />
+      <Route path="/equities" component={() => <Protected><Equities /></Protected>} />
+      <Route path="/profile"  component={() => <Protected><Profile  /></Protected>} />
       <Route path="/subscribe"   component={() => <Protected><Subscribe /></Protected>} />
       <Route path="/consent"     component={() => <Protected><Consent /></Protected>} />
       <Route path="/exchanges"   component={() => <Redirect to="/profile" />} />

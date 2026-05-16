@@ -120,11 +120,14 @@ function planLabel(p: string) {
 }
 
 const MKTS = [
-  { sym:"BTC", price:"$68,120", action:"BUY",  trend:"up"   as const },
-  { sym:"ETH", price:"$3,512",  action:"BUY",  trend:"up"   as const },
-  { sym:"SOL", price:"$188",    action:"HOLD", trend:"flat" as const },
+  { sym:"BTC",  price:"$68,120", action:"LONG",  trend:"up"   as const },
+  { sym:"ETH",  price:"$3,512",  action:"LONG",  trend:"up"   as const },
+  { sym:"SOL",  price:"$188",    action:"HOLD",  trend:"flat" as const },
+  { sym:"NVDA", price:"$875",    action:"LONG",  trend:"up"   as const },
+  { sym:"TSLA", price:"$177",    action:"LONG",  trend:"up"   as const },
+  { sym:"SPY",  price:"$521",    action:"LONG",  trend:"up"   as const },
 ];
-const AC: Record<string,string> = { BUY:G, SELL:R, HOLD:C };
+const AC: Record<string,string> = { LONG:G, SHORT:R, HOLD:C };
 
 // ── Minimal ticker ─────────────────────────────────────────────────────────────
 function Ticker({ items }: { items:string[] }) {
@@ -177,8 +180,9 @@ export default function Home() {
 
   const tickerItems = [
     `BTC $68,120 ▲`, `ETH $3,512 ▲`, `SOL $188 ▼`,
+    `NVDA $875 ▲`, `TSLA $177 ▲`, `SPY $521 ▲`, `QQQ $443 ▲`, `PLTR $24.80 ▲`,
     `SIG ${sigList.length}`, `ENG ${engine?.running?"RUNNING":"IDLE"}`,
-    `EXC ${exchange}`, `POS ${posCount}`, `WIN ${winRate}%`,
+    `POS ${posCount}`, `WIN ${winRate}%`,
   ];
 
   return (

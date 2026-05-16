@@ -16,18 +16,18 @@ const SANS = "Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-s
 const MONO = "'SF Mono', 'Fira Code', 'JetBrains Mono', 'Roboto Mono', monospace";
 
 const ACTION_COLOR: Record<string, string> = {
-  BUY:  "rgba(0,210,100,0.82)",
-  SELL: "rgba(230,70,70,0.82)",
-  HOLD: "rgba(0,185,215,0.70)",
+  LONG: "rgba(0,230,120,0.92)",
+  SHORT:"rgba(255,51,85,0.90)",
+  HOLD: "rgba(0,185,215,0.75)",
 };
 const ACTION_BG: Record<string, string> = {
-  BUY:  "rgba(0,210,100,0.07)",
-  SELL: "rgba(230,70,70,0.07)",
+  LONG: "rgba(0,230,120,0.07)",
+  SHORT:"rgba(255,51,85,0.07)",
   HOLD: "rgba(0,185,215,0.06)",
 };
 const ACTION_BORDER: Record<string, string> = {
-  BUY:  "rgba(0,210,100,0.22)",
-  SELL: "rgba(230,70,70,0.22)",
+  LONG: "rgba(0,230,120,0.24)",
+  SHORT:"rgba(255,51,85,0.24)",
   HOLD: "rgba(0,185,215,0.18)",
 };
 
@@ -36,7 +36,7 @@ function seededPts(seed: string, action: string): number[] {
   let s = 5381;
   for (let i = 0; i < seed.length; i++) s = (((s << 5) + s) ^ seed.charCodeAt(i)) >>> 0;
   const rand = () => { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return (s >>> 0) / 0x100000000; };
-  const trend = action === "BUY" ? 1.1 : action === "SELL" ? -1.1 : 0.05;
+  const trend = action === "LONG" ? 1.1 : action === "SHORT" ? -1.1 : 0.05;
   const pts: number[] = [];
   let v = 48;
   for (let i = 0; i < 20; i++) {
@@ -76,21 +76,21 @@ function MiniSpark({ sym, action, w = 72, h = 28 }: { sym: string; action: strin
 // ── Extended mock market data ────────────────────────────────────────────────────
 type AssetMeta = { price: string; change: string; vol: string; action: string; confidence: number; volConf: boolean };
 const MOCK_ASSETS: Record<string, AssetMeta> = {
-  BNBUSD:   { price:"$594.20",  change:"-1.23%", vol:"$86B",  action:"SELL", confidence:63, volConf:true  },
-  XRPUSD:   { price:"$0.6240",  change:"+3.12%", vol:"$35B",  action:"BUY",  confidence:71, volConf:true  },
-  ADAUSD:   { price:"$0.4510",  change:"+1.45%", vol:"$12B",  action:"BUY",  confidence:54, volConf:false },
-  AVAXUSD:  { price:"$37.80",   change:"+4.21%", vol:"$28B",  action:"BUY",  confidence:74, volConf:true  },
-  DOTUSD:   { price:"$8.92",    change:"-0.88%", vol:"$15B",  action:"HOLD", confidence:49, volConf:false },
-  LINKUSD:  { price:"$17.45",   change:"+2.55%", vol:"$22B",  action:"BUY",  confidence:68, volConf:true  },
-  MATICUSD: { price:"$0.8810",  change:"+1.78%", vol:"$18B",  action:"BUY",  confidence:61, volConf:true  },
-  DOGEUSD:  { price:"$0.1430",  change:"-2.11%", vol:"$31B",  action:"SELL", confidence:66, volConf:true  },
-  LTCUSD:   { price:"$89.20",   change:"+0.94%", vol:"$12B",  action:"HOLD", confidence:52, volConf:false },
-  ATOMUSD:  { price:"$9.74",    change:"-1.55%", vol:"$9B",   action:"SELL", confidence:58, volConf:true  },
-  UNIUSD:   { price:"$10.85",   change:"+3.88%", vol:"$14B",  action:"BUY",  confidence:67, volConf:true  },
-  AAVEUSD:  { price:"$98.40",   change:"-0.62%", vol:"$8B",   action:"HOLD", confidence:51, volConf:false },
-  INJUSD:   { price:"$32.20",   change:"+5.44%", vol:"$11B",  action:"BUY",  confidence:76, volConf:true  },
-  NEARUSD:  { price:"$7.18",    change:"+2.94%", vol:"$10B",  action:"BUY",  confidence:65, volConf:true  },
-  FILUSD:   { price:"$6.84",    change:"-1.98%", vol:"$7B",   action:"SELL", confidence:60, volConf:true  },
+  BNBUSD:   { price:"$594.20",  change:"-1.23%", vol:"$86B",  action:"SHORT", confidence:63, volConf:true  },
+  XRPUSD:   { price:"$0.6240",  change:"+3.12%", vol:"$35B",  action:"LONG",  confidence:71, volConf:true  },
+  ADAUSD:   { price:"$0.4510",  change:"+1.45%", vol:"$12B",  action:"LONG",  confidence:54, volConf:false },
+  AVAXUSD:  { price:"$37.80",   change:"+4.21%", vol:"$28B",  action:"LONG",  confidence:74, volConf:true  },
+  DOTUSD:   { price:"$8.92",    change:"-0.88%", vol:"$15B",  action:"HOLD",  confidence:49, volConf:false },
+  LINKUSD:  { price:"$17.45",   change:"+2.55%", vol:"$22B",  action:"LONG",  confidence:68, volConf:true  },
+  MATICUSD: { price:"$0.8810",  change:"+1.78%", vol:"$18B",  action:"LONG",  confidence:61, volConf:true  },
+  DOGEUSD:  { price:"$0.1430",  change:"-2.11%", vol:"$31B",  action:"SHORT", confidence:66, volConf:true  },
+  LTCUSD:   { price:"$89.20",   change:"+0.94%", vol:"$12B",  action:"HOLD",  confidence:52, volConf:false },
+  ATOMUSD:  { price:"$9.74",    change:"-1.55%", vol:"$9B",   action:"SHORT", confidence:58, volConf:true  },
+  UNIUSD:   { price:"$10.85",   change:"+3.88%", vol:"$14B",  action:"LONG",  confidence:67, volConf:true  },
+  AAVEUSD:  { price:"$98.40",   change:"-0.62%", vol:"$8B",   action:"HOLD",  confidence:51, volConf:false },
+  INJUSD:   { price:"$32.20",   change:"+5.44%", vol:"$11B",  action:"LONG",  confidence:76, volConf:true  },
+  NEARUSD:  { price:"$7.18",    change:"+2.94%", vol:"$10B",  action:"LONG",  confidence:65, volConf:true  },
+  FILUSD:   { price:"$6.84",    change:"-1.98%", vol:"$7B",   action:"SHORT", confidence:60, volConf:true  },
 };
 
 const LIVE_META: Record<string, Partial<AssetMeta>> = {
@@ -99,7 +99,7 @@ const LIVE_META: Record<string, Partial<AssetMeta>> = {
   SOLUSD: { price:"$188.40", change:"-0.42%", vol:"$84B"  },
 };
 
-type Filter = "ALL" | "BUY" | "SELL" | "HIGH_CONF";
+type Filter = "ALL" | "LONG" | "SHORT" | "HIGH_CONF";
 
 // ── Compact asset row ────────────────────────────────────────────────────────────
 function AssetRow({ sym, bd, meta }: { sym: string; bd: SignalBreakdown; meta: Partial<AssetMeta> }) {
@@ -187,11 +187,17 @@ export default function Markets() {
     refetchInterval: 5_000,
   });
 
+  // Normalize API action terminology: BUY→LONG, SELL→SHORT (engine speaks BUY/SELL, UI speaks LONG/SHORT)
+  const normalizeAction = (a: string) => a === "BUY" ? "LONG" : a === "SELL" ? "SHORT" : a;
+  const normalizedLive = Object.fromEntries(
+    Object.entries(data?.breakdowns ?? {}).map(([k, v]) => [k, { ...v, action: normalizeAction(v.action) }])
+  );
+
   // Merge live engine signals + extended mock assets
   const allBreakdowns: Record<string, SignalBreakdown> = {
-    ...(data?.breakdowns ?? {}),
+    ...normalizedLive,
     ...Object.entries(MOCK_ASSETS).reduce((acc, [sym, m]) => {
-      if (!data?.breakdowns?.[sym]) {
+      if (!normalizedLive[sym]) {
         acc[sym] = {
           symbol: sym, action: m.action, confidence: m.confidence,
           mtfConfirmed: m.volConf, volumeConfirmed: m.volConf,
@@ -204,20 +210,20 @@ export default function Markets() {
   };
 
   const entries   = Object.entries(allBreakdowns);
-  const buys      = entries.filter(([, b]) => b.action === "BUY").length;
-  const sells     = entries.filter(([, b]) => b.action === "SELL").length;
+  const longs     = entries.filter(([, b]) => b.action === "LONG").length;
+  const shorts    = entries.filter(([, b]) => b.action === "SHORT").length;
   const holds     = entries.filter(([, b]) => b.action === "HOLD").length;
   const highConf  = entries.filter(([, b]) => b.confidence >= 65).length;
-  const regime    = buys > sells + 2 ? "BULLISH" : sells > buys + 2 ? "BEARISH" : "MIXED";
-  const regimeCol = regime === "BULLISH" ? "rgba(0,210,100,0.82)" : regime === "BEARISH" ? "rgba(230,70,70,0.82)" : "rgba(0,185,215,0.70)";
+  const regime    = longs > shorts + 2 ? "BULLISH" : shorts > longs + 2 ? "BEARISH" : "MIXED";
+  const regimeCol = regime === "BULLISH" ? "rgba(0,230,120,0.88)" : regime === "BEARISH" ? "rgba(255,51,85,0.88)" : "rgba(0,185,215,0.75)";
 
   const strongest = entries.length
     ? entries.reduce((best, curr) => curr[1].confidence > best[1].confidence ? curr : best, entries[0])
     : null;
 
   const filtered = entries.filter(([, b]) => {
-    if (filter === "BUY")       return b.action === "BUY";
-    if (filter === "SELL")      return b.action === "SELL";
+    if (filter === "LONG")      return b.action === "LONG";
+    if (filter === "SHORT")     return b.action === "SHORT";
     if (filter === "HIGH_CONF") return b.confidence >= 65;
     return true;
   });
@@ -234,7 +240,7 @@ export default function Markets() {
         <div>
           <div style={{ fontSize: 22, fontWeight: 700, color: W, fontFamily: SANS,
             letterSpacing: "-0.01em" }}>
-            AI Scanner
+            Crypto
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5 }}>
             <div style={{ width: 5, height: 5, borderRadius: "50%",
@@ -273,10 +279,10 @@ export default function Markets() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr",
             borderBottom: `1px solid rgba(255,255,255,0.05)`, paddingBottom: 12, marginBottom: 12 }}>
             {([
-              { val: buys,     label: "Buying",   color: "rgba(0,210,100,0.82)"  },
-              { val: sells,    label: "Selling",  color: "rgba(230,70,70,0.82)"  },
-              { val: holds,    label: "Hold",     color: "rgba(0,185,215,0.70)"  },
-              { val: highConf, label: "High Conf",color: "rgba(255,255,255,0.80)"},
+              { val: longs,    label: "Long",     color: "rgba(0,230,120,0.90)"  },
+              { val: shorts,   label: "Short",    color: "rgba(255,51,85,0.88)"  },
+              { val: holds,    label: "Hold",     color: "rgba(0,185,215,0.75)"  },
+              { val: highConf, label: "High Conf",color: "rgba(255,255,255,0.82)"},
             ] as { val:number; label:string; color:string }[]).map(({ val, label, color }) => (
               <div key={label} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 20, fontFamily: MONO, fontWeight: 700, color }}>{val}</div>
@@ -338,8 +344,8 @@ export default function Markets() {
         <div style={{ display: "flex", gap: 7, marginBottom: 12, flexWrap: "wrap" as const }}>
           {([
             ["ALL",       `All (${entries.length})`],
-            ["BUY",       `Buy (${buys})`],
-            ["SELL",      `Sell (${sells})`],
+            ["LONG",      `Long (${longs})`],
+            ["SHORT",     `Short (${shorts})`],
             ["HIGH_CONF", `High Conf (${highConf})`],
           ] as [Filter, string][]).map(([key, label]) => {
             const active = filter === key;

@@ -107,8 +107,8 @@ function PositionCard({ pos }: { pos: Portfolio["positions"][number] }) {
   const pnl    = pos.unrealizedPnL ?? 0;
   const up     = pnl >= 0;
   const col    = up ? G : R;
-  const sl     = pos.entryPrice * (pos.side === "BUY" ? 0.965 : 1.035);
-  const tp     = pos.entryPrice * (pos.side === "BUY" ? 1.040 : 0.960);
+  const sl     = pos.entryPrice * (pos.side === "LONG" ? 0.965 : 1.035);
+  const tp     = pos.entryPrice * (pos.side === "LONG" ? 1.040 : 0.960);
   const pnlPct = pos.entryPrice > 0 ? (pnl / (pos.entryPrice * pos.size)) * 100 : 0;
   const borderCol = up ? "rgba(0,255,136,0.11)" : "rgba(255,51,85,0.09)";
 
@@ -189,11 +189,12 @@ function PositionCard({ pos }: { pos: Portfolio["positions"][number] }) {
 
 // ── Trade history row ────────────────────────────────────────────────────────────
 const MOCK_HISTORY: SimTrade[] = [
-  { id:"1", symbol:"BTC", side:"BUY",  pnl:  84.00, pnlPct:  2.58, score:88, closedAt:"25h ago",  entryPrice:67000, exitPrice:68732 },
-  { id:"2", symbol:"ETH", side:"SELL", pnl: 112.00, pnlPct:  3.87, score:91, closedAt:"49h ago",  entryPrice:3400,  exitPrice:3268  },
-  { id:"3", symbol:"SOL", side:"BUY",  pnl: -16.80, pnlPct: -2.76, score:44, closedAt:"73h ago",  entryPrice:192,   exitPrice:186.7 },
-  { id:"4", symbol:"BTC", side:"BUY",  pnl:  84.00, pnlPct:  2.19, score:78, closedAt:"97h ago",  entryPrice:66500, exitPrice:67957 },
-  { id:"5", symbol:"ETH", side:"BUY",  pnl: 130.00, pnlPct:  3.93, score:85, closedAt:"121h ago", entryPrice:3350,  exitPrice:3482  },
+  { id:"1", symbol:"BTC",  side:"LONG",  pnl:  84.00, pnlPct:  2.58, score:88, closedAt:"25h ago",  entryPrice:67000, exitPrice:68732 },
+  { id:"2", symbol:"ETH",  side:"SHORT", pnl: 112.00, pnlPct:  3.87, score:91, closedAt:"49h ago",  entryPrice:3400,  exitPrice:3268  },
+  { id:"3", symbol:"NVDA", side:"LONG",  pnl:  61.40, pnlPct:  7.53, score:82, closedAt:"55h ago",  entryPrice:815,   exitPrice:876.4 },
+  { id:"4", symbol:"SOL",  side:"LONG",  pnl: -16.80, pnlPct: -2.76, score:44, closedAt:"73h ago",  entryPrice:192,   exitPrice:186.7 },
+  { id:"5", symbol:"TSLA", side:"SHORT", pnl:  43.20, pnlPct:  2.89, score:76, closedAt:"97h ago",  entryPrice:191,   exitPrice:185.5 },
+  { id:"6", symbol:"BTC",  side:"LONG",  pnl: 130.00, pnlPct:  3.93, score:85, closedAt:"121h ago", entryPrice:66500, exitPrice:69113 },
 ];
 
 function TradeRow({ trade }: { trade: SimTrade }) {

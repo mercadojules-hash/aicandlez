@@ -1,0 +1,305 @@
+MAJOR PRODUCT PIVOT — APEX AI TRADER IS NOW A MULTI-ASSET AI TRADING PLATFORM
+
+We are officially pivoting away from:
+
+* crypto-only identity
+* exchange-centric architecture
+* API-key onboarding
+* retail crypto dashboard UX
+
+Apex AI Trader is now becoming:
+
+AN AI-POWERED MULTI-ASSET TRADING PLATFORM
+
+Powered by:
+
+* Alpaca Broker API
+* AI execution engine
+* AI market intelligence
+* paper trading + live trading onboarding
+* Stripe subscriptions
+
+This changes the ENTIRE product direction.
+
+==================================================
+NEW PRODUCT POSITIONING
+=======================
+
+The app should now feel like:
+
+* institutional AI trading platform
+* modern fintech app
+* AI-powered investing terminal
+* multi-asset execution system
+
+NOT:
+
+* crypto utility
+* exchange manager
+* crypto meme dashboard
+* exchange API tool
+
+==================================================
+REMOVE CRYPTO-FIRST FEELING
+===========================
+
+The app currently visually feels:
+“crypto-focused.”
+
+That must change immediately.
+
+We are now supporting:
+
+* Crypto
+* Equities
+* ETFs
+* eventually Options
+
+The UI should reflect:
+AI-powered multi-market intelligence.
+
+==================================================
+NEW APP STRUCTURE
+=================
+
+BOTTOM NAVIGATION SHOULD EVOLVE INTO:
+
+1. Home
+2. Trade
+3. Markets
+4. Crypto
+5. Equities
+6. Profile
+
+IMPORTANT:
+Crypto and Equities are now SEPARATE experiences.
+
+==================================================
+CRYPTO TAB
+==========
+
+Purpose:
+AI crypto market intelligence + crypto execution.
+
+Include:
+
+* BTC
+* ETH
+* SOL
+* DOGE
+* AVAX
+* XRP
+* LINK
+* ADA
+* etc.
+
+Features:
+
+* crypto AI scanner
+* crypto sentiment
+* volatility metrics
+* momentum heat
+* AI signals
+* crypto watchlists
+* AI confidence
+* live crypto telemetry
+
+==================================================
+EQUITIES TAB
+============
+
+NEW PAGE REQUIRED.
+
+This page should feel:
+Bloomberg + AI equities terminal.
+
+Include:
+
+* TSLA
+* NVDA
+* AAPL
+* MSFT
+* META
+* AMZN
+* SPY
+* QQQ
+* AMD
+* PLTR
+* COIN
+* etc.
+
+Features:
+
+* equities scanner
+* AI long/short signals
+* earnings sentiment
+* momentum scans
+* institutional flow feel
+* sector heat
+* market regime indicators
+* AI confidence
+* live telemetry
+
+==================================================
+IMPORTANT — SHORT SELLING SUPPORT
+=================================
+
+The app must now visually support BOTH:
+
+* LONG positions
+* SHORT positions
+
+UI language should evolve from:
+BUY / SELL
+
+to:
+LONG / SHORT
+
+throughout the platform.
+
+Position cards should visually distinguish:
+
+* bullish AI trades
+* bearish AI trades
+
+==================================================
+NEW DESIGN DIRECTION
+====================
+
+The app must now feel like:
+
+AI-powered institutional multi-asset trading terminal.
+
+Visual references:
+
+* Bloomberg
+* TradingView
+* Robinhood Gold
+* Coinbase Advanced
+* modern prop trading dashboards
+
+NOT:
+
+* crypto-only neon casino app
+
+==================================================
+VISUAL SYSTEM UPDATE
+====================
+
+KEEP:
+
+* OLED black background
+* #0d151e containers
+* neon color palette
+* glowing telemetry
+* premium charts
+* institutional spacing
+
+BUT:
+increase market sophistication.
+
+Need:
+
+* more equities visual identity
+* less crypto-only styling
+* more financial-terminal feel
+
+==================================================
+CHARTS
+======
+
+Charts should now support:
+
+* crypto
+* equities
+* sector rotation
+* AI momentum
+* long/short indicators
+
+Increase:
+
+* chart visibility
+* line thickness
+* neon accents
+* AI signal clarity
+
+==================================================
+GLOBAL CTA UPDATE
+=================
+
+Replace all exchange language globally.
+
+NO:
+
+* Connect Exchange
+* API Key
+* Exchange Hub
+
+NEW LANGUAGE:
+
+* Start AI Trading
+* Open Trading Account
+* Connect Brokerage Account
+* Powered by Alpaca
+
+==================================================
+BROKER ARCHITECTURE
+===================
+
+Users no longer choose exchanges.
+
+The app uses:
+
+* Alpaca Broker infrastructure
+* AI execution engine
+* unified account system
+
+Keep exchanges ONLY on the private operator/admin dashboard.
+
+NOT inside the user app.
+
+==================================================
+HOME PAGE EVOLUTION
+===================
+
+The Home page should now immediately communicate:
+
+“AI-powered multi-asset trading platform.”
+
+Need:
+
+* crypto + equities telemetry
+* AI scanner intelligence
+* long/short opportunities
+* market regime indicators
+* AI performance metrics
+* portfolio intelligence
+
+==================================================
+NEW PRODUCT GOAL
+================
+
+Apex AI Trader should now feel like:
+
+“An AI hedge-fund experience for retail users.”
+
+NOT:
+“a crypto app.”
+
+==================================================
+IMPLEMENTATION PRIORITY
+=======================
+
+1. Remove exchange-centric UX
+2. Add Equities tab
+3. Update all trading terminology
+4. Add LONG/SHORT support visually
+5. Add multi-asset scanner logic
+6. Increase institutional feel globally
+7. Keep sandbox paper-trading architecture
+8. Maintain App Store-grade polish
+
+Run full TypeScript check after all updates.
+Zero console errors.
+Zero dead routes.
+Production-grade UX only.
