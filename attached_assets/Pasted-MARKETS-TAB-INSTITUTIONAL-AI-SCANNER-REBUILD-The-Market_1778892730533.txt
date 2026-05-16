@@ -1,0 +1,190 @@
+MARKETS TAB — INSTITUTIONAL AI SCANNER REBUILD
+
+The Markets tab regressed from the previous direction.
+
+The current version feels:
+
+* too sparse
+* too empty
+* too prototype-level
+* not enough market intelligence density
+
+The Trade page now feels premium.
+The Markets page must match that same institutional quality.
+
+DO NOT redesign the visual system.
+
+Keep:
+
+* OLED black background
+* #0d151e containers
+* restrained charts
+* institutional typography
+* premium telemetry style
+
+====================================================
+
+1. RESTORE MARKET DENSITY
+   ====================================================
+
+The previous version with ~20 visible assets was directionally correct.
+
+The Markets tab should feel like:
+a live AI market intelligence scanner.
+
+Increase visible assets significantly.
+
+Target:
+12–20 visible market entries via scroll.
+
+This page should feel:
+active, alive, scanning markets continuously.
+
+====================================================
+2. REDUCE EMPTY SPACE
+=====================
+
+There is far too much dead black space below the cards.
+
+Tighten:
+
+* vertical spacing
+* section gaps
+* container padding
+
+Increase information density substantially.
+
+====================================================
+3. ASSET CARD REFINEMENT
+========================
+
+Current cards are good structurally.
+
+Improve:
+
+* readability
+* hierarchy
+* scan speed
+
+Each asset row should clearly show:
+
+* symbol
+* current price
+* % change
+* AI direction
+* confidence
+* mini chart
+
+At a glance.
+
+====================================================
+4. MICRO CHARTS
+===============
+
+The micro charts are good directionally.
+
+Improve:
+
+* chart readability
+* slightly stronger line clarity
+* tighter integration into the card layout
+
+The charts should feel:
+real-time telemetry.
+
+====================================================
+5. AI SCANNER HEADER
+====================
+
+The “AI SCANNER” section should feel more authoritative.
+
+Increase:
+
+* visual confidence
+* title clarity
+* hierarchy
+
+This is the identity of the page.
+
+It should feel like:
+an institutional AI market scanner.
+
+====================================================
+6. FILTER BAR
+=============
+
+The filter pills are currently too faint and small.
+
+Improve:
+
+* readability
+* touch clarity
+* spacing
+* typography contrast
+
+Keep them restrained.
+Do NOT make them neon.
+
+====================================================
+7. MARKET STATISTICS
+====================
+
+Add more market intelligence density near the top.
+
+Possible additions:
+
+* bullish count
+* bearish count
+* high confidence setups
+* strongest momentum asset
+* market regime
+* AI sentiment pulse
+
+The page should immediately communicate:
+AI is scanning the market continuously.
+
+====================================================
+8. BACKGROUND + CONTAINERS
+==========================
+
+Maintain:
+
+* pure black OLED background
+* #0d151e card interiors
+
+Absolutely NO navy haze.
+NO atmospheric blue wash.
+NO glow fog.
+
+====================================================
+9. READABILITY
+==============
+
+Same rule as Trade page:
+premium AND readable.
+
+No faint hidden text.
+
+All important market information should:
+
+* scan quickly
+* read instantly
+* feel trustworthy
+
+====================================================
+10. FINAL TARGET
+================
+
+This page should feel like:
+
+Bloomberg AI scanner
++
+institutional crypto telemetry
++
+AI-assisted market intelligence terminal.
+
+NOT:
+retail crypto list.
+
+The Markets tab should feel:
+alive, intelligent, premium, dense, actionable.
