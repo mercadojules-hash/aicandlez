@@ -91,11 +91,11 @@ function Donut({ value, color, label, size = 70 }: { value: number; color: strin
           strokeLinecap="round"
           transform={`rotate(-90 ${cx} ${cx})`}
           style={{ transition: "stroke-dasharray 0.6s ease" }}/>
-        <text x={cx} y={cx + 4} textAnchor="middle"
-          fill={GR} fontSize="13" fontWeight="600"
+        <text x={cx} y={cx + 5} textAnchor="middle"
+          fill="rgba(255,255,255,0.80)" fontSize="14" fontWeight="700"
           fontFamily={MONO}>{value}</text>
       </svg>
-      <div style={{ fontSize: 7, fontFamily: SANS, fontWeight: 500, color: DIM,
+      <div style={{ fontSize: 7, fontFamily: SANS, fontWeight: 500, color: GR,
         letterSpacing: "0.11em", marginTop: 2, textTransform: "uppercase" as const }}>{label}</div>
     </div>
   );
@@ -132,7 +132,7 @@ function PositionCard({ pos }: { pos: Portfolio["positions"][number] }) {
               {pos.side}
             </span>
           </div>
-          <div style={{ fontSize: 9, fontFamily: SANS, color: DIM }}>
+          <div style={{ fontSize: 9, fontFamily: SANS, color: GR }}>
             <span style={{ fontFamily: MONO }}>{pos.size}</span>
             {" @ "}
             <span style={{ fontFamily: MONO }}>{pos.entryPrice.toFixed(0)}</span>
@@ -156,13 +156,13 @@ function PositionCard({ pos }: { pos: Portfolio["positions"][number] }) {
         {/* SL / price / TP */}
         <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ textAlign: "left" }}>
-            <div style={{ fontSize: 7, fontFamily: SANS, color: DIM, letterSpacing: "0.1em",
+            <div style={{ fontSize: 7, fontFamily: SANS, color: GR, letterSpacing: "0.1em",
               marginBottom: 2 }}>SL</div>
             <div style={{ fontSize: 10, fontFamily: MONO, fontWeight: 600,
               color: "rgba(255,51,85,0.80)" }}>${sl.toFixed(0)}</div>
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 7, fontFamily: SANS, color: DIM, letterSpacing: "0.1em",
+            <div style={{ fontSize: 7, fontFamily: SANS, color: GR, letterSpacing: "0.1em",
               marginBottom: 2 }}>CURRENT</div>
             <div style={{ fontSize: 12, fontFamily: MONO, fontWeight: 700, color: W }}>
               ${(pos.currentPrice ?? pos.entryPrice).toLocaleString("en-US",
@@ -170,7 +170,7 @@ function PositionCard({ pos }: { pos: Portfolio["positions"][number] }) {
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 7, fontFamily: SANS, color: DIM, letterSpacing: "0.1em",
+            <div style={{ fontSize: 7, fontFamily: SANS, color: GR, letterSpacing: "0.1em",
               marginBottom: 2 }}>TP</div>
             <div style={{ fontSize: 10, fontFamily: MONO, fontWeight: 600,
               color: "rgba(0,255,136,0.80)" }}>${tp.toFixed(0)}</div>
@@ -205,7 +205,7 @@ function TradeRow({ trade }: { trade: SimTrade }) {
         borderRadius: 2, flexShrink: 0, marginRight: 14 }}/>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 13, fontFamily: MONO, fontWeight: 600,
-          color: "rgba(255,255,255,0.88)" }}>
+          color: "rgba(255,255,255,0.93)" }}>
           {trade.symbol}
         </div>
         <div style={{ fontSize: 8, fontFamily: SANS, color: GR, marginTop: 2 }}>
@@ -218,7 +218,7 @@ function TradeRow({ trade }: { trade: SimTrade }) {
           {up ? "+" : ""}${Math.abs(trade.pnl).toFixed(2)}
         </div>
         <div style={{ fontSize: 9, fontFamily: MONO,
-          color: up ? "rgba(0,220,110,0.55)" : "rgba(230,70,70,0.52)", marginTop: 1 }}>
+          color: up ? "rgba(0,220,110,0.72)" : "rgba(230,70,70,0.68)", marginTop: 1 }}>
           {up ? "+" : ""}{trade.pnlPct.toFixed(2)}%
         </div>
       </div>
@@ -248,7 +248,8 @@ function SectionHead({ label, count }: { label: string; count?: number }) {
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
       <div style={{ width: 2, height: 13, background: "rgba(255,255,255,0.25)",
         borderRadius: 2, flexShrink: 0 }}/>
-      <span style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600, color: GR,
+      <span style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
+        color: "rgba(255,255,255,0.50)",
         letterSpacing: "0.18em", textTransform: "uppercase" as const }}>
         {label}
       </span>
@@ -399,7 +400,7 @@ export default function Trade() {
                 strokeWidth="1.4" strokeLinecap="round"/>
             </svg>
             <span style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
-              color: engine?.autoMode ? "rgba(0,229,255,0.90)" : "rgba(0,229,255,0.55)",
+              color: engine?.autoMode ? "rgba(0,229,255,0.90)" : "rgba(0,229,255,0.72)",
               letterSpacing: "0.09em" }}>AUTO</span>
           </button>
         </div>
@@ -426,8 +427,8 @@ export default function Trade() {
             ] as { val:string; sub:string; label:string; color:string }[]).map(({ val, sub, label, color }) => (
               <div key={label} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 14, fontFamily: MONO, fontWeight: 700, color }}>{val}</div>
-                {sub && <div style={{ fontSize: 7, color: DIM, fontFamily: SANS }}>{sub}</div>}
-                <div style={{ fontSize: 7, color: DIM, fontFamily: SANS,
+                {sub && <div style={{ fontSize: 7, color: GR, fontFamily: SANS }}>{sub}</div>}
+                <div style={{ fontSize: 7, color: GR, fontFamily: SANS,
                   letterSpacing: "0.08em", marginTop: 2, textTransform: "uppercase" as const }}>
                   {label}
                 </div>
@@ -457,7 +458,7 @@ export default function Trade() {
               letterSpacing: "0.14em", textTransform: "uppercase" as const, marginBottom: 4 }}>
               Total Unrealized P&L
             </div>
-            <div style={{ fontSize: 9, fontFamily: SANS, color: DIM }}>
+            <div style={{ fontSize: 9, fontFamily: SANS, color: GR }}>
               <span style={{ fontFamily: MONO }}>{positions.length}</span>
               {" "}open position{positions.length !== 1 ? "s" : ""}
             </div>
@@ -474,7 +475,7 @@ export default function Trade() {
           {positions.length === 0 && (
             <div style={{ background: CARD, border: `1px solid ${E}`,
               borderRadius: 12, padding: "28px 0", textAlign: "center",
-              fontSize: 10, fontFamily: SANS, color: DIM, letterSpacing: "0.06em" }}>
+              fontSize: 10, fontFamily: SANS, color: GR, letterSpacing: "0.06em" }}>
               No open positions
             </div>
           )}
@@ -499,7 +500,7 @@ export default function Trade() {
               letterSpacing: "0.08em", textTransform: "uppercase" as const }}>
               Activate Live Trading
             </div>
-            <div style={{ fontSize: 8, fontFamily: SANS, color: DIM, marginTop: 3 }}>
+            <div style={{ fontSize: 8, fontFamily: SANS, color: GR, marginTop: 3 }}>
               $5.99/mo + 2% on profitable trades
             </div>
           </div>

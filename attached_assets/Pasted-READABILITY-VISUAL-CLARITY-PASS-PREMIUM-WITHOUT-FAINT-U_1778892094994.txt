@@ -1,0 +1,156 @@
+READABILITY + VISUAL CLARITY PASS — PREMIUM WITHOUT FAINT UI
+
+The visual direction is now correct.
+
+HOWEVER:
+
+Some numbers, labels, and metadata across the Trade page have become:
+
+* too faint
+* too small
+* too low-contrast
+
+This app must feel:
+premium AND instantly readable.
+
+We are NOT designing for screenshots only.
+We are designing for real users trading quickly.
+
+====================================================
+
+1. MINIMUM READABILITY STANDARD
+   ====================================================
+
+No important data should require visual effort to read.
+
+Increase clarity for:
+
+* prices
+* P&L values
+* timestamps
+* asset labels
+* KPI values
+* confidence percentages
+* execution labels
+* metadata rows
+
+Goal:
+all important information readable at arm’s length on mobile.
+
+====================================================
+2. TYPOGRAPHY HIERARCHY
+=======================
+
+Keep the premium institutional aesthetic,
+BUT improve hierarchy.
+
+Increase:
+
+* primary numbers: +6–8%
+* secondary metadata: +4–5%
+* timestamps: +1 step
+* section labels: slightly brighter
+
+Do NOT make everything large.
+
+Only improve scanability.
+
+====================================================
+3. FAINT TEXT PROBLEM
+=====================
+
+A lot of the gray text has become too dim after the desaturation pass.
+
+Current issue:
+some metadata visually disappears into the OLED background.
+
+Adjust:
+
+* lift dim text brightness slightly
+* increase opacity modestly
+* maintain subtlety
+* preserve premium feel
+
+This should feel:
+high-end institutional UI,
+NOT hidden UI.
+
+====================================================
+4. KPI DONUT VALUES
+===================
+
+The center values inside the donut widgets are currently too faint.
+
+Increase:
+
+* contrast
+* clarity
+* readability
+
+Keep:
+
+* reduced glow
+* reduced saturation
+
+But the values themselves must read instantly.
+
+====================================================
+5. POSITION CARDS
+=================
+
+Improve readability for:
+
+* entry prices
+* SL/TP labels
+* small metadata rows
+* timestamp labels
+
+Very small typography lift only.
+
+Do NOT enlarge the cards.
+
+====================================================
+6. TRADE HISTORY
+================
+
+The trade history section needs:
+
+* slightly brighter text
+* slightly more readable timestamps
+* stronger hierarchy between symbol / P&L / metadata
+
+Right now the information density is excellent,
+but some values disappear visually.
+
+====================================================
+7. GENERAL UI RULE
+==================
+
+The app should now feel:
+
+premium institutional execution software
+WITH excellent usability.
+
+Not:
+minimalist UI that sacrifices readability.
+
+====================================================
+8. IMPORTANT
+============
+
+DO NOT:
+
+* reintroduce glow
+* reintroduce neon
+* increase saturation
+* add decorative effects
+
+ONLY improve:
+
+* readability
+* contrast hierarchy
+* data clarity
+* usability
+
+The app should feel:
+sharp, premium, dense, readable, trustworthy.
