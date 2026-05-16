@@ -1,0 +1,210 @@
+FINAL HOMEPAGE POLISH PASS — LOGO REPLACEMENT + CONTAINER COLOR + TYPOGRAPHY REFINEMENT
+
+The updated 300x68 “APEX AI TRADER” logo has now been uploaded.
+
+Replace the current header title/logo with this exact resized asset.
+
+DO NOT redesign the homepage.
+
+The layout direction is now correct.
+
+This pass is focused ONLY on:
+
+* container interior color accuracy
+* typography refinement
+* sharper rendering
+* premium institutional feel
+* logo integration cleanup
+
+====================================================
+CRITICAL ISSUE STILL NOT FIXED
+==============================
+
+The container interiors are STILL too blue.
+
+This MUST be corrected.
+
+ALL primary containers/cards must use:
+
+#0d151e
+
+This includes:
+
+* portfolio card
+* stats cards
+* AI engine status card
+* live markets card
+* recent AI signals card
+* bottom feed container
+
+The cards should feel:
+
+* darker
+* denser
+* more premium
+* less glowing
+* more architectural
+
+NO navy haze.
+NO cyan fog overlay.
+NO blue bloom.
+
+The containers should visually separate from the pure black background while still remaining subtle and premium.
+
+====================================================
+BACKGROUND
+==========
+
+Entire app background:
+#000000
+
+Pure OLED black.
+
+No gradients behind the layout.
+No ambient fog.
+No blue atmosphere.
+
+====================================================
+TYPOGRAPHY UPDATE (IMPORTANT)
+=============================
+
+The current font still feels:
+
+* outdated
+* terminal-like
+* low-end tech
+* “computer font”
+
+Replace with a cleaner modern institutional fintech font.
+
+Target:
+
+* luxury fintech
+* Apple-quality rendering
+* modern trading platform
+* Bloomberg/Revolut style
+
+Typography should feel:
+
+* sharper
+* cleaner
+* more executive
+* premium mobile OS quality
+
+Avoid:
+
+* retro terminal fonts
+* sci-fi fonts
+* monospaced aesthetics
+* hacker-style typography
+
+Improve:
+
+* weight hierarchy
+* spacing
+* label clarity
+* alignment
+* readability
+
+====================================================
+LOGO INTEGRATION
+================
+
+Use the uploaded 300x68 logo exactly.
+
+Requirements:
+
+* crisp rendering
+* no blur
+* no oversized glow
+* tighter alignment
+* cleaner spacing in header
+
+The top section should feel:
+
+* premium
+* minimal
+* expensive
+* institutional
+
+====================================================
+CHARTS
+======
+
+The charts are moving in the correct direction.
+
+Refine:
+
+* line sharpness
+* anti-aliasing
+* subtle movement
+* smoother rendering
+
+The charts should feel:
+
+* premium market terminal
+* institutional dashboard
+* expensive data visualization
+
+NOT:
+
+* gaming neon charts
+* crypto meme charts
+
+====================================================
+BUY / HOLD BUTTONS
+==================
+
+Better than before but still need refinement.
+
+Make them:
+
+* smaller
+* sharper
+* cleaner
+* more professional
+
+They should resemble:
+“execution controls”
+NOT badges.
+
+Reduce:
+
+* glow
+* saturation
+* visual noise
+
+====================================================
+FINAL GOAL
+==========
+
+This homepage should now feel:
+
+* App Store ready
+* investor-ready
+* premium fintech
+* modern AI trading platform
+
+Visual references:
+
+* Bloomberg mobile
+* Apple Wallet precision
+* institutional trading dashboards
+* luxury dark UI systems
+
+NOT:
+
+* cyberpunk UI
+* gaming dashboard
+* crypto casino aesthetic
+
+If this pass is successful, we move to:
+
+1. Trade page
+2. Markets page
+3. Terminal page
+4. Profile page
+5. final onboarding/auth polish
+6. production deployment cleanup tomorrow
+
+This is the final homepage refinement pass before submission screenshots.
