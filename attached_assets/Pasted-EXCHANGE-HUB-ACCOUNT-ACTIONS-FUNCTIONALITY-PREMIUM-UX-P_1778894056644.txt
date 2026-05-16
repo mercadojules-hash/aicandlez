@@ -1,0 +1,281 @@
+EXCHANGE HUB + ACCOUNT ACTIONS — FUNCTIONALITY + PREMIUM UX PASS
+
+We are now beyond visual polish.
+
+This pass is focused on:
+- functional interactions
+- realistic fintech UX
+- exchange onboarding flow
+- production-grade account experience
+- trust and conversion
+
+IMPORTANT:
+DO NOT redesign the app.
+DO NOT add gaming UI.
+DO NOT add excessive glow.
+
+Maintain:
+- pure black OLED background
+- #0d151e card interiors
+- restrained institutional styling
+- App Store-quality fintech aesthetic
+
+────────────────────
+1. ALL SETTINGS ROWS MUST FUNCTION
+────────────────────
+
+The following rows currently do nothing:
+
+- Billing & Plan
+- Terms & Conditions
+- Privacy Policy
+- Risk Disclosure
+- Trading Disclaimer
+- Manage Exchanges
+
+These MUST now be functional.
+
+Requirements:
+- tap feedback
+- proper navigation
+- working modal/sheet/page transitions
+
+Use:
+- smooth native-feeling mobile transitions
+- premium banking-app interaction quality
+
+────────────────────
+2. BILLING & PLAN PAGE
+────────────────────
+
+Create a real premium subscription page.
+
+This page should feel:
+- Apple-level polished
+- Robinhood Gold quality
+- Stripe pricing page quality
+- high-conversion but premium
+
+Include:
+- Free Plan
+- Pro Plan
+- Institutional/Elite Plan
+
+Features examples:
+- AI execution engine
+- live trading
+- multi-exchange routing
+- advanced AI scanner
+- higher trade limits
+- portfolio intelligence
+- real-time alerts
+- premium analytics
+
+Pricing cards:
+- elegant
+- restrained
+- premium typography
+- subtle accent borders
+- NO giant glowing neon boxes
+
+Add:
+- “Start Free Trial”
+- “Upgrade to Pro”
+- restore purchases placeholder
+
+Must feel production-ready.
+
+────────────────────
+3. TERMS / PRIVACY / DISCLOSURE PAGES
+────────────────────
+
+Create clean legal document screens.
+
+Each should open its own page/modal.
+
+Use:
+- readable typography
+- proper spacing
+- scrollable content
+- dark fintech styling
+
+Need realistic placeholder legal copy:
+- not lorem ipsum
+- not fake hacker text
+
+Use real fintech/trading wording.
+
+────────────────────
+4. MANAGE EXCHANGES → EXCHANGE HUB
+────────────────────
+
+The Exchange Hub needs major refinement.
+
+Current issues:
+- too empty
+- weak hierarchy
+- disconnected feeling
+- buttons feel dead
+- no onboarding flow
+- lacks trust
+
+Improve:
+- spacing
+- typography hierarchy
+- exchange branding hierarchy
+- onboarding clarity
+- account connection realism
+
+────────────────────
+5. ADD ROBINHOOD
+────────────────────
+
+Robinhood is missing from active exchanges.
+
+Add:
+- Robinhood
+- recognizable RH green accent
+- proper placement with:
+  Kraken
+  Coinbase
+  Binance
+  Crypto.com
+  Gemini
+
+Supported exchanges should feel complete.
+
+────────────────────
+6. CONNECT BUTTONS MUST WORK
+────────────────────
+
+Every CONNECT button must now:
+- open a modal/sheet
+OR
+- navigate to exchange connection flow
+
+Need realistic onboarding UX:
+- API Key
+- API Secret
+- Passphrase if required
+- exchange permissions explanation
+- encrypted/security messaging
+
+Do NOT actually connect to live APIs yet.
+
+This is UI/UX flow only.
+
+────────────────────
+7. EXCHANGE CONNECTION MODAL
+────────────────────
+
+Create a premium modal.
+
+Style reference:
+- Coinbase Advanced
+- Kraken Pro
+- Stripe dashboard
+- Robinhood Gold onboarding
+
+Modal includes:
+- exchange logo
+- API credential fields
+- security explanation
+- encrypted storage message
+- “Connect Exchange”
+- “Cancel”
+
+Add:
+“Your API credentials are encrypted and securely stored.”
+
+Must feel trustworthy and professional.
+
+────────────────────
+8. CONNECTED / DISCONNECTED STATES
+────────────────────
+
+Add realistic states:
+- Connected
+- Not Connected
+- Pending Verification
+- Read Only
+- Trading Enabled
+
+Add subtle status indicators.
+
+No glow abuse.
+
+────────────────────
+9. COMING SOON EXCHANGES
+────────────────────
+
+The “coming soon” exchanges are too faint.
+
+Improve readability.
+
+Keep secondary hierarchy,
+but users should still clearly see:
+- Robinhood
+- Bybit
+- KuCoin
+- OKX
+- Uphold
+etc.
+
+────────────────────
+10. EXCHANGE HUB VISUAL IMPROVEMENTS
+────────────────────
+
+Current page needs:
+- better density
+- stronger visual structure
+- better spacing rhythm
+- more premium onboarding feel
+
+Add:
+- security/trust area
+- supported exchanges explanation
+- API permissions summary
+- live trading compatibility info
+- paper trading messaging
+
+Should feel like:
+Bloomberg onboarding
+NOT a crypto meme dashboard.
+
+────────────────────
+11. GLOBAL FUNCTIONALITY PASS
+────────────────────
+
+Audit the app for:
+- dead buttons
+- dead rows
+- fake interactions
+- broken navigation
+- empty states
+- missing transitions
+
+Every major UI element should now:
+- respond
+- animate properly
+- feel intentional
+
+────────────────────
+12. FINAL APP STORE PREP
+────────────────────
+
+This app is now approaching:
+- TestFlight
+- Google Play internal testing
+- investor demos
+- website launch
+
+Everything should feel:
+- premium
+- coherent
+- trustworthy
+- functional
+- institutional-grade
+
+No TypeScript errors.
+No console errors.
+Production-ready refinement pass only.

@@ -12,6 +12,8 @@ import Profile   from "@/pages/Profile";
 import Subscribe from "@/pages/Subscribe";
 import Consent   from "@/pages/Consent";
 import Exchanges from "@/pages/Exchanges";
+import Billing   from "@/pages/Billing";
+import LegalPage from "@/pages/LegalPage";
 
 // ── Env ────────────────────────────────────────────────────────────────────────
 const clerkPubKey   = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
@@ -28,14 +30,16 @@ const queryClient = new QueryClient({
 });
 
 // ── Loading / Error states ─────────────────────────────────────────────────────
+const SANS = "Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif";
+
 function FullPageLoader() {
   return (
     <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-      alignItems: "center", justifyContent: "center", background: "#080810", gap: 20 }}>
-      <div style={{ fontSize: 9, fontFamily: "monospace", color: "#2a3050",
-        letterSpacing: "0.3em" }}>APEX TRADER</div>
-      <div style={{ width: 24, height: 24, border: "2px solid #1a1d2e",
-        borderTopColor: "#00e5ff", borderRadius: "50%",
+      alignItems: "center", justifyContent: "center", background: "#000000", gap: 20 }}>
+      <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
+        color: "rgba(136,146,164,0.40)", letterSpacing: "0.3em" }}>APEX TRADER</div>
+      <div style={{ width: 22, height: 22, border: "1.5px solid rgba(255,255,255,0.07)",
+        borderTopColor: "rgba(0,229,255,0.70)", borderRadius: "50%",
         animation: "apex-spin 0.7s linear infinite" }} />
       <style>{`@keyframes apex-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
@@ -45,12 +49,16 @@ function FullPageLoader() {
 function MissingKeyError() {
   return (
     <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-      alignItems: "center", justifyContent: "center", background: "#080810",
-      gap: 12, fontFamily: "monospace" }}>
-      <div style={{ fontSize: 9, color: "#2a3050", letterSpacing: "0.2em" }}>APEX TRADER</div>
-      <div style={{ fontSize: 13, color: "#ff3355", fontWeight: "bold" }}>CONFIGURATION REQUIRED</div>
-      <div style={{ fontSize: 10, color: "#3a4060", padding: "10px 16px",
-        background: "#0d0e1a", border: "1px solid #1c1f32", borderRadius: 6, lineHeight: 1.6 }}>
+      alignItems: "center", justifyContent: "center", background: "#000000",
+      gap: 12, fontFamily: SANS }}>
+      <div style={{ fontSize: 9, fontWeight: 600,
+        color: "rgba(136,146,164,0.40)", letterSpacing: "0.2em" }}>APEX TRADER</div>
+      <div style={{ fontSize: 13, color: "rgba(255,51,85,0.85)", fontWeight: 600 }}>
+        Configuration Required
+      </div>
+      <div style={{ fontSize: 10, color: "rgba(136,146,164,0.60)", padding: "10px 16px",
+        background: "#0d151e", border: "1px solid rgba(255,255,255,0.07)",
+        borderRadius: 8, lineHeight: 1.6 }}>
         VITE_CLERK_PUBLISHABLE_KEY is not set.
       </div>
     </div>
@@ -61,7 +69,7 @@ function MissingKeyError() {
 function AuthPage({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center",
-      minHeight: "100%", padding: "24px 16px", background: "#080810" }}>
+      minHeight: "100%", padding: "24px 16px", background: "#000000" }}>
       {children}
     </div>
   );
@@ -98,10 +106,13 @@ function CacheInvalidator() {
   return null;
 }
 
-// ── Nav (only when signed in, not on auth pages) ───────────────────────────────
+// ── Sub-page paths (no bottom nav) ─────────────────────────────────────────────
+const SUB_PAGES = ["/sign-", "/exchanges", "/billing", "/legal", "/subscribe", "/consent"];
+
 function Nav() {
   const [loc] = useLocation();
-  if (loc.startsWith("/sign-")) return null;
+  const isSubPage = SUB_PAGES.some(p => loc.startsWith(p));
+  if (isSubPage) return null;
   return (
     <ClerkLoaded>
       <Show when="signed-in"><BottomNav /></Show>
@@ -122,6 +133,8 @@ function Pages() {
       <Route path="/subscribe"  component={() => <Protected><Subscribe /></Protected>} />
       <Route path="/consent"    component={() => <Protected><Consent /></Protected>} />
       <Route path="/exchanges"  component={() => <Protected><Exchanges /></Protected>} />
+      <Route path="/billing"    component={() => <Protected><Billing /></Protected>} />
+      <Route path="/legal/:type" component={() => <Protected><LegalPage /></Protected>} />
       {/* Auth */}
       <Route path="/sign-in/*?" component={() => (
         <AuthPage>
@@ -146,11 +159,11 @@ function Pages() {
   );
 }
 
-// ── Mobile shell (480px, full height) ─────────────────────────────────────────
+// ── Mobile shell ───────────────────────────────────────────────────────────────
 function Shell() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh",
-      maxWidth: 480, margin: "0 auto", background: "#080810", overflow: "hidden" }}>
+      maxWidth: 480, margin: "0 auto", background: "#000000", overflow: "hidden" }}>
       <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden",
         paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <Pages />
@@ -160,7 +173,7 @@ function Shell() {
   );
 }
 
-// ── Clerk provider ────────────────────────────────────────────────────────────
+// ── Clerk provider ─────────────────────────────────────────────────────────────
 function ClerkWithProviders() {
   const [, setLocation] = useLocation();
   return (
@@ -169,8 +182,8 @@ function ClerkWithProviders() {
       proxyUrl={clerkProxyUrl}
       appearance={{
         variables: {
-          colorBackground:      "#0d0e1a",
-          colorInputBackground: "#080810",
+          colorBackground:      "#0d151e",
+          colorInputBackground: "#060e18",
           colorInputText:       "#e8f4ff",
           colorText:            "#e8f4ff",
           colorTextSecondary:   "#3a4060",
@@ -178,7 +191,7 @@ function ClerkWithProviders() {
           colorDanger:          "#ff3355",
           colorSuccess:         "#00ff88",
           borderRadius:         "10px",
-          fontFamily:           "monospace",
+          fontFamily:           "Inter, -apple-system, sans-serif",
         },
       }}
       signInUrl={`${basePath}/sign-in`}

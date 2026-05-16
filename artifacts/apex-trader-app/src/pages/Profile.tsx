@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useClerk, useUser } from "@clerk/react";
 import { useLocation } from "wouter";
 import { api, type Portfolio, type Subscription } from "@/lib/api";
@@ -8,8 +8,6 @@ const BG   = "#000000";
 const CARD = "#0d151e";
 const E    = "rgba(255,255,255,0.07)";
 const C    = "#00e5ff";
-const G    = "#00ff88";
-const P    = "#9b5cf5";
 const W    = "#ffffff";
 const GR   = "#8892a4";
 const GOLD = "#ffd200";
@@ -35,16 +33,15 @@ function Donut({ value, color, label, size = 78 }: { value: number; color: strin
           fontSize="15" fontWeight="700" fontFamily={MONO}>{value}</text>
       </svg>
       <div style={{ fontSize: 8, fontFamily: SANS, fontWeight: 500,
-        color: "rgba(136,146,164,0.85)",
-        letterSpacing: "0.10em", marginTop: 4,
-        textTransform: "uppercase" as const }}>
+        color: "rgba(136,146,164,0.85)", letterSpacing: "0.10em",
+        marginTop: 4, textTransform: "uppercase" as const }}>
         {label}
       </div>
     </div>
   );
 }
 
-// ── Monthly bar chart ────────────────────────────────────────────────────────────
+// ── Monthly chart ────────────────────────────────────────────────────────────────
 const MONTHS  = ["NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY"];
 const PERF    = [-180, 420, 640, 510, 820, 580, 370];
 const MAX_ABS = Math.max(...PERF.map(Math.abs));
@@ -53,9 +50,8 @@ function MonthlyChart() {
   return (
     <div style={{ background: CARD, border: `1px solid ${E}`, borderRadius: 10, padding: "14px 16px" }}>
       <div style={{ fontSize: 8, fontFamily: SANS, fontWeight: 500,
-        color: "rgba(136,146,164,0.85)",
-        letterSpacing: "0.14em", marginBottom: 14,
-        textTransform: "uppercase" as const }}>
+        color: "rgba(136,146,164,0.85)", letterSpacing: "0.14em",
+        marginBottom: 14, textTransform: "uppercase" as const }}>
         Monthly AI Performance
       </div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 80, marginBottom: 8 }}>
@@ -100,15 +96,15 @@ function StatCard({ value, label, color, sub }: { value: string; label: string; 
         <div style={{ fontSize: 8, fontFamily: SANS, color: "rgba(136,146,164,0.85)", marginBottom: 3 }}>{sub}</div>
       )}
       <div style={{ fontSize: 8, fontFamily: SANS, fontWeight: 500,
-        color: "rgba(136,146,164,0.85)",
-        letterSpacing: "0.10em", textTransform: "uppercase" as const }}>
+        color: "rgba(136,146,164,0.85)", letterSpacing: "0.10em",
+        textTransform: "uppercase" as const }}>
         {label}
       </div>
     </div>
   );
 }
 
-// ── Settings row ─────────────────────────────────────────────────────────────────
+// ── Reusable row ─────────────────────────────────────────────────────────────────
 function SettingsRow({ label, sub, onPress, divider = true }: {
   label: string; sub?: string; onPress: () => void; divider?: boolean;
 }) {
@@ -163,13 +159,6 @@ export default function Profile() {
     staleTime: 60_000,
   });
 
-  const portal = useMutation({
-    mutationFn: () => api.post<{ url: string }>("/billing/portal", {
-      returnUrl: `${window.location.origin}/apex-trader-app/profile`,
-    }),
-    onSuccess: ({ url }) => { window.location.href = url; },
-  });
-
   const tv       = portfolio?.totalValue ?? 103800;
   const plan     = sub?.plan ?? "free";
   const initials = ((user?.firstName?.[0] ?? "A") + (user?.lastName?.[0] ?? "C")).toUpperCase();
@@ -188,12 +177,11 @@ export default function Profile() {
       <div style={{ margin: "16px 16px 14px", background: CARD, border: `1px solid ${E}`,
         borderRadius: 16, padding: "20px 18px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-
           {/* Avatar */}
           <div style={{ position: "relative", flexShrink: 0 }}>
             <div style={{ width: 62, height: 62, borderRadius: "50%",
-              background: `linear-gradient(135deg, rgba(0,229,255,0.14), rgba(155,92,245,0.14))`,
-              border: `1.5px solid rgba(0,229,255,0.40)`,
+              background: "linear-gradient(135deg, rgba(0,229,255,0.14), rgba(155,92,245,0.14))",
+              border: "1.5px solid rgba(0,229,255,0.40)",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 20, fontFamily: MONO, fontWeight: 700, color: C }}>
               {initials}
@@ -202,8 +190,7 @@ export default function Profile() {
               borderRadius: "50%", background: "rgba(0,210,100,0.90)",
               border: "2px solid #000000" }}/>
           </div>
-
-          {/* User info */}
+          {/* Info */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
               <span style={{ fontSize: 19, fontFamily: SANS, fontWeight: 700, color: W,
@@ -221,8 +208,9 @@ export default function Profile() {
                 {plan}
               </span>
             </div>
-            <div style={{ fontSize: 11, fontFamily: SANS, color: "rgba(136,146,164,0.90)", marginBottom: 3,
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+            <div style={{ fontSize: 11, fontFamily: SANS, color: "rgba(136,146,164,0.90)",
+              marginBottom: 3, overflow: "hidden", textOverflow: "ellipsis",
+              whiteSpace: "nowrap" as const }}>
               {email}
             </div>
             <div style={{ fontSize: 9, fontFamily: SANS, color: "rgba(136,146,164,0.65)" }}>
@@ -234,7 +222,7 @@ export default function Profile() {
 
       <div style={{ padding: "0 16px" }}>
 
-        {/* ── KPI 2×2 grid ────────────────────────────────────────────────── */}
+        {/* ── KPI 2×2 ─────────────────────────────────────────────────────── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
           <StatCard value={`$${(tv / 1000).toFixed(1)}K`}        label="Equity"    color={C} />
           <StatCard value={`+$${(realized / 1000).toFixed(1)}K`} label="Realized"  color="rgba(0,210,100,0.88)" />
@@ -245,10 +233,7 @@ export default function Profile() {
         {/* ── Performance Intelligence ─────────────────────────────────────── */}
         <div style={{ marginBottom: 18 }}>
           <SectionHead label="Performance Intelligence" accent="rgba(155,92,245,0.60)"/>
-
           <MonthlyChart/>
-
-          {/* Donut gauges */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
             marginTop: 12, background: CARD, border: `1px solid ${E}`,
             borderRadius: 10, padding: "16px 0" }}>
@@ -256,11 +241,9 @@ export default function Profile() {
             <Donut value={59} color="rgba(0,185,215,0.78)"   label="Consistency" />
             <Donut value={57} color="rgba(0,200,100,0.76)"   label="Efficiency"  />
           </div>
-
-          {/* Cumulative return */}
           <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between",
             alignItems: "center", padding: "13px 0",
-            borderTop: `1px solid rgba(255,255,255,0.06)` }}>
+            borderTop: "1px solid rgba(255,255,255,0.06)" }}>
             <span style={{ fontSize: 13, fontFamily: SANS, fontWeight: 500, color: W }}>
               Cumulative Return
             </span>
@@ -271,7 +254,7 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* ── Account actions ──────────────────────────────────────────────── */}
+        {/* ── Account ──────────────────────────────────────────────────────── */}
         <div style={{ marginBottom: 12 }}>
           <SectionHead label="Account"/>
           <div style={{ background: CARD, border: `1px solid ${E}`,
@@ -283,7 +266,7 @@ export default function Profile() {
             />
             <SettingsRow
               label="Billing & Plan"
-              onPress={() => portal.mutate()}
+              onPress={() => setLocation("/billing")}
               divider={false}
             />
           </div>
@@ -294,17 +277,17 @@ export default function Profile() {
           <SectionHead label="Legal & Compliance"/>
           <div style={{ background: CARD, border: `1px solid ${E}`,
             borderRadius: 14, overflow: "hidden" }}>
-            <SettingsRow label="Terms & Conditions" onPress={() => {}} />
-            <SettingsRow label="Privacy Policy"     onPress={() => {}} />
-            <SettingsRow label="Risk Disclosure"    onPress={() => {}} />
-            <SettingsRow label="Trading Disclaimer" onPress={() => {}} divider={false} />
+            <SettingsRow label="Terms & Conditions" onPress={() => setLocation("/legal/terms")}   />
+            <SettingsRow label="Privacy Policy"     onPress={() => setLocation("/legal/privacy")} />
+            <SettingsRow label="Risk Disclosure"    onPress={() => setLocation("/legal/risk")}    />
+            <SettingsRow label="Trading Disclaimer" onPress={() => setLocation("/legal/disclaimer")} divider={false} />
           </div>
         </div>
 
         {/* ── Sign out ─────────────────────────────────────────────────────── */}
         <button onClick={() => signOut()} style={{
           width: "100%", padding: "15px 0", background: "transparent",
-          border: `1px solid rgba(255,51,85,0.22)`, borderRadius: 12,
+          border: "1px solid rgba(255,51,85,0.22)", borderRadius: 12,
           color: "rgba(255,51,85,0.75)",
           fontFamily: SANS, fontSize: 12, fontWeight: 600,
           letterSpacing: "0.06em", cursor: "pointer",
@@ -317,8 +300,7 @@ export default function Profile() {
         <div style={{ background: CARD, border: `1px solid ${E}`,
           borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
           <div style={{ fontSize: 10, fontFamily: SANS, fontWeight: 400,
-            color: "rgba(136,146,164,0.85)",
-            lineHeight: 1.7 }}>
+            color: "rgba(136,146,164,0.85)", lineHeight: 1.7 }}>
             Trading involves risk and may result in loss of capital. Apex AI Trader does not provide financial advice. Past performance does not guarantee future results.
           </div>
         </div>
