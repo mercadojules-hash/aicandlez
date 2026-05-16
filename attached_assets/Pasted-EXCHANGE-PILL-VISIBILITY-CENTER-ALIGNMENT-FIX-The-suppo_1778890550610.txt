@@ -1,0 +1,130 @@
+EXCHANGE PILL VISIBILITY + CENTER ALIGNMENT FIX
+
+The supported exchange row is currently too visually suppressed.
+
+The pills look:
+
+* disabled
+* hidden
+* low-opacity
+* visually collapsed into the background
+
+This section should feel like:
+“supported institutional execution venues”
+
+NOT muted metadata tags.
+
+====================================================
+
+1. CENTER THE EXCHANGE ROW
+   ====================================================
+
+Center the entire supported exchange pill group horizontally.
+
+Current issue:
+
+* pills are drifting left
+* uneven visual balance
+* weak hierarchy
+
+The exchange row should:
+
+* sit centered beneath the CTA card
+* feel intentional
+* read as a unified exchange ecosystem
+
+Use:
+justify-content: center
+
+and tighten spacing slightly.
+
+====================================================
+2. INCREASE PILL VISIBILITY
+===========================
+
+Current pills are too dark and too transparent.
+
+Increase:
+
+* border visibility
+* text brightness
+* opacity slightly
+
+BUT:
+do NOT make them glow heavily.
+
+Goal:
+premium subtle visibility.
+
+====================================================
+3. EXCHANGE PILL STYLE TARGET
+=============================
+
+They should feel like:
+Bloomberg terminal routing chips
+or
+institutional execution venue selectors.
+
+NOT:
+disabled filter tags.
+
+====================================================
+4. REFINED STYLING
+==================
+
+Increase:
+
+* pill height slightly
+* horizontal padding slightly
+* font weight slightly
+
+Suggested direction:
+
+* font-weight: 500–600
+* opacity increase ~15%
+* slightly brighter border alpha
+* slightly brighter text alpha
+
+====================================================
+5. COLOR TREATMENT
+==================
+
+Keep restrained exchange-specific accents:
+
+* Kraken → subtle purple
+* Coinbase → restrained blue
+* Binance → restrained amber
+* Robinhood → muted emerald
+* Crypto.com → muted cyan-blue
+* Gemini → muted aqua
+
+VERY subtle.
+
+No glow blobs.
+No neon capsules.
+
+====================================================
+6. IMPORTANT
+============
+
+Keep container interiors:
+#0d151e
+
+Keep app background:
+pure black (#000000)
+
+Do NOT reintroduce:
+
+* cyan fog
+* blue haze
+* purple wash
+* atmospheric glow
+
+This is ONLY:
+visibility
+alignment
+hierarchy
+premium polish
+
+The current direction is correct.
+The exchange pills simply need stronger presence and proper centering.

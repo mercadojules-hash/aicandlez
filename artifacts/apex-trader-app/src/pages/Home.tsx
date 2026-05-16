@@ -655,15 +655,23 @@ export default function Home() {
                 letterSpacing:"0.12em", textTransform:"uppercase" as const, marginBottom:8 }}>
                 Supported Live Exchanges
               </div>
-              <div style={{ display:"flex", gap:5, flexWrap:"wrap" as const }}>
-                {["Kraken","Coinbase","Binance","Robinhood","Crypto.com","Gemini"].map(e => (
-                  <span key={e} style={{
-                    padding:"3px 10px",
-                    background:"rgba(255,255,255,0.03)",
-                    border:`1px solid ${E}`,
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap" as const, justifyContent:"center" }}>
+                {([
+                  { name:"Kraken",     accent:"rgba(155,92,245," },
+                  { name:"Coinbase",   accent:"rgba(80,130,255," },
+                  { name:"Binance",    accent:"rgba(255,184,0,"  },
+                  { name:"Robinhood",  accent:"rgba(0,200,120,"  },
+                  { name:"Crypto.com", accent:"rgba(0,160,220,"  },
+                  { name:"Gemini",     accent:"rgba(0,210,200,"  },
+                ] as { name:string; accent:string }[]).map(({ name, accent }) => (
+                  <span key={name} style={{
+                    padding:"4px 13px",
+                    background:`${accent}0.06)`,
+                    border:`1px solid ${accent}0.28)`,
                     borderRadius:20,
-                    fontSize:9, fontFamily:SANS, fontWeight:400, color:DIM,
-                  }}>{e}</span>
+                    fontSize:9, fontFamily:SANS, fontWeight:500, color:GR,
+                    letterSpacing:"0.02em",
+                  }}>{name}</span>
                 ))}
               </div>
             </div>
