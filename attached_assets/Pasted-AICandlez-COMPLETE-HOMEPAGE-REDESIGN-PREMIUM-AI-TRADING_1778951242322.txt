@@ -1,0 +1,299 @@
+AICandlez — COMPLETE HOMEPAGE REDESIGN (PREMIUM AI TRADING APP UI)
+
+We are redesigning the ENTIRE mobile app experience for AICandlez.
+
+The current UI is too basic.
+
+We want a HIGH-END futuristic AI trading experience similar to:
+
+Robinhood + Bloomberg + Bybit + futuristic cyberpunk fintech
+cinematic neon motion
+premium iOS app quality
+WOW-factor animations
+dark mode first
+
+The attached references are the visual direction.
+
+CRITICAL:
+This must feel like:
+
+a billion-dollar AI trading platform
+institutional-grade
+futuristic
+cinematic
+alive
+
+NOT generic React cards.
+
+CORE BRAND DIRECTION
+
+Brand:
+AICandlez
+
+Theme:
+
+AI-powered autonomous trading
+rockets
+candles
+market intelligence
+neon energy
+cinematic finance
+
+Primary colors:
+
+deep black backgrounds (#050505)
+neon teal
+electric green
+cyan glow
+subtle orange accents
+optional purple gradients
+
+Use:
+
+glassmorphism
+bloom effects
+glowing charts
+animated gradients
+soft neon shadows
+premium typography
+
+NO:
+
+flat boring cards
+gray containers
+dull spacing
+tiny fonts
+static feeling
+
+Everything should feel:
+
+alive
+reactive
+intelligent
+premium
+HOMEPAGE REDESIGN REQUIREMENTS
+
+Completely redesign the home screen.
+
+The homepage should feel like opening:
+“THE FUTURE OF AI TRADING”
+
+HERO SECTION (TOP OF APP)
+
+TOP HEADER:
+
+LEFT:
+
+AICandlez logo icon
+“AICandlez”
+LIVE indicator with pulsing green dot
+
+RIGHT:
+
+AI status badge
+notification icon
+profile icon
+
+Background:
+
+animated subtle grid
+moving particles
+faint glowing candlestick patterns
+MAIN HERO CARD
+
+Create a MASSIVE hero card near top.
+
+This should include:
+
+TITLE:
+“AI Trading Engine”
+
+SUBTITLE:
+“Autonomous market intelligence”
+
+LIVE STATS:
+
+Daily PnL
+Win rate
+AI confidence
+Active trades
+Portfolio balance
+
+Use:
+
+glowing animated line chart
+moving numbers
+animated gradients
+live ticker movement
+
+This card should feel:
+
+cinematic
+glowing
+alive
+LIVE AI TRADING BUTTON (MOST IMPORTANT)
+
+Create a HUGE centerpiece button:
+
+“LIVE AI TRADING”
+
+When user clicks it:
+A FULL ROCKET LAUNCH ANIMATION HAPPENS.
+
+Requirements:
+
+rocket ignites
+smoke particles
+neon thrusters
+candle flame trail
+screen glow pulse
+camera shake subtle
+upward acceleration
+transitions into live trading mode
+
+The rocket should resemble the AICandlez branding/logo style.
+
+This is a MAJOR wow-factor feature.
+
+Animation should feel:
+
+Apple-quality
+smooth
+cinematic
+premium
+
+Use:
+
+Framer Motion
+Lottie
+SVG animation
+particle effects if needed
+
+IMPORTANT:
+The rocket launch should NOT feel childish.
+It should feel:
+
+elite
+financial
+AI-powered
+futuristic
+LIVE MARKET MODULES
+
+Below hero section:
+
+Create modular premium sections:
+
+AI Opportunity Scanner
+top AI trades
+glowing confidence bars
+animated signals
+BUY / SELL pulse states
+AI Market Sentiment
+bullish / bearish meter
+animated dial
+neon glow
+Portfolio Intelligence
+allocation donut chart
+animated transitions
+profit/loss glow
+Active AI Bots
+each bot has:
+status
+PnL
+market pair
+AI confidence
+animated pulse
+Market Heatmap
+glowing crypto asset grid
+animated gains/losses
+MOBILE DESIGN QUALITY
+
+This MUST feel:
+
+App Store featured
+dribbble-level UI
+modern fintech
+ultra polished
+
+Spacing:
+
+premium
+breathable
+cinematic
+
+Typography:
+
+larger
+cleaner
+modern
+
+Cards:
+
+soft glassmorphism
+blurred dark panels
+subtle borders
+glow edges
+
+Charts:
+
+animated
+smooth
+neon lines
+MOTION DESIGN
+
+Add:
+
+animated transitions
+hover glow
+floating particles
+pulsing status indicators
+subtle parallax
+animated gradients
+chart motion
+dynamic loading states
+
+The app should NEVER feel static.
+
+TECH STACK
+
+Use:
+
+React Native / Expo
+Reanimated
+Framer Motion where possible
+Skia charts if available
+Lottie animations
+SVG effects
+gradient animations
+
+Performance still matters.
+Animations must remain smooth on iPhone.
+
+HOMEPAGE GOAL
+
+The homepage should immediately make users say:
+
+“WOW.”
+
+It should look:
+
+futuristic
+intelligent
+powerful
+premium
+alive
+
+The “LIVE AI TRADING” rocket launch should become the signature interaction of the entire app.
+
+Use the attached references for:
+
+neon fintech aesthetic
+futuristic charts
+dashboard inspiration
+spacing
+glow treatment
+cinematic composition
+
+DO NOT create a generic crypto dashboard.
+
+Create a next-generation AI trading experience.

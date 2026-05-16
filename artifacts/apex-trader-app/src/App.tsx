@@ -188,6 +188,7 @@ function ClerkWithProviders() {
       publishableKey={clerkPubKey!}
       proxyUrl={clerkProxyUrl}
       appearance={{
+        logoImageUrl: `${window.location.origin}${basePath}/aicandlez-logo.png`,
         variables: {
           colorBackground:      "#0d151e",
           colorInputBackground: "#060e18",

@@ -505,10 +505,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </button>
 
           <div className="flex items-center gap-2 select-none">
-            <Cpu className="w-3.5 h-3.5 shrink-0" style={{ color: "#00eeff", filter: "drop-shadow(0 0 6px #00eeff)" }} />
+            <img src={`${import.meta.env.BASE_URL}aicandlez-logo.png`} alt="AICandlez"
+              style={{ height: 24, width: 24, objectFit: "contain", borderRadius: 4,
+                filter: "drop-shadow(0 0 8px rgba(0,229,255,0.35))" }}/>
             <div className="font-mono text-[12px] font-bold tracking-[0.22em]">
-              <span style={{ color: "#4a7a90" }}>APEX</span>
-              <span style={{ color: "#00eeff", textShadow: "0 0 16px #00eeff70" }}> TRADER</span>
+              <span style={{ color: "#4a7a90" }}>AI</span>
+              <span style={{ color: "#00eeff", textShadow: "0 0 16px #00eeff70" }}>CANDLEZ</span>
             </div>
             <span className="hidden sm:inline text-[8px] font-mono tracking-widest font-medium"
               style={{ color: "#3a5a70" }}>
@@ -541,9 +543,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           style={{ background: "#000810", borderRight: "1px solid #0A1E2E" }}
         >
           <div className="h-10 flex items-center gap-2 px-3 border-b shrink-0" style={{ borderBottomColor: "#0A1E2E" }}>
-            <Cpu className="w-3.5 h-3.5" style={{ color: "#00eeff" }} />
+            <img src={`${import.meta.env.BASE_URL}aicandlez-logo.png`} alt="AICandlez"
+              style={{ height: 22, width: 22, objectFit: "contain", borderRadius: 3 }}/>
             <span className="font-mono text-[11px] font-bold tracking-[0.18em]">
-              APEX<span style={{ color: "#00eeff" }}>TRADER</span>
+              AI<span style={{ color: "#00eeff" }}>CANDLEZ</span>
             </span>
             <button onClick={() => setMobileOpen(false)} className="ml-auto p-1 rounded" style={{ color: "#4a6a80" }}>
               <X className="w-3.5 h-3.5" />

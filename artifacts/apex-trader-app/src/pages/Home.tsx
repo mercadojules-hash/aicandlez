@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
-import apexLogo from "@assets/Apex_AI_Logo_300x68_1778889006762.png";
+import aicandlezLogo from "@assets/AICandlez_Final_Logo_1778961152749.png";
 import {
   api,
   type MobileStatus, type Portfolio, type SimAccount,
@@ -255,9 +255,9 @@ export default function Home() {
       {/* ── Logo header ─────────────────────────────────────────────────────── */}
       <div style={{ padding:"9px 16px 8px" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:16 }}>
-          {/* New 300×68 logo — crisp, no heavy glow */}
-          <img src={apexLogo} alt="Apex AI Trader"
-            style={{ height:48, width:"auto", objectFit:"contain", imageRendering:"crisp-edges" }}/>
+          <img src={aicandlezLogo} alt="AICandlez"
+            style={{ height:42, width:42, objectFit:"contain", borderRadius:8,
+              filter:"drop-shadow(0 0 10px rgba(0,229,255,0.30))" }}/>
 
           {/* Live/Sim indicator pill */}
           <div style={{
