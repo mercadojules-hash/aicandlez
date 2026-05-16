@@ -3,93 +3,124 @@ import { useClerk, useUser } from "@clerk/react";
 import { useLocation } from "wouter";
 import { api, type Portfolio, type Subscription } from "@/lib/api";
 
-const S = "#0d0e1a", B = "#1c1f32", C = "#00e5ff", G = "#00ff88",
-      P = "#9b5cf5", W = "#ffffff", GR = "#8892a4", DIM = "#3a3f5c",
-      GOLD = "#ffd200";
+// ── Design tokens ───────────────────────────────────────────────────────────────
+const BG   = "#000000";
+const CARD = "#0d151e";
+const E    = "rgba(255,255,255,0.07)";
+const C    = "#00e5ff";
+const G    = "#00ff88";
+const P    = "#9b5cf5";
+const W    = "#ffffff";
+const GR   = "#8892a4";
+const GOLD = "#ffd200";
+const SANS = "Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif";
+const MONO = "'SF Mono', 'Fira Code', 'JetBrains Mono', 'Roboto Mono', monospace";
 
-// ── Donut gauge ────────────────────────────────────────────────────────────────
-function Donut({ value, color, label, size = 76 }: { value: number; color: string; label: string; size?: number }) {
-  const r = (size - 12) / 2, c = size / 2;
+// ── Donut gauge ─────────────────────────────────────────────────────────────────
+function Donut({ value, color, label, size = 78 }: { value: number; color: string; label: string; size?: number }) {
+  const r    = (size - 14) / 2;
+  const cx   = size / 2;
   const circ = 2 * Math.PI * r;
   const fill = (value / 100) * circ;
   return (
     <div style={{ textAlign: "center" }}>
       <svg width={size} height={size}>
-        <circle cx={c} cy={c} r={r} fill="none" stroke="#1a1d30" strokeWidth="7" />
-        <circle cx={c} cy={c} r={r} fill="none" stroke={color} strokeWidth="7"
+        <circle cx={cx} cy={cx} r={r} fill="none"
+          stroke="rgba(255,255,255,0.06)" strokeWidth="6"/>
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke={color} strokeWidth="6"
           strokeDasharray={`${fill} ${circ - fill}`} strokeLinecap="round"
-          transform={`rotate(-90 ${c} ${c})`}
-          style={{ filter: `drop-shadow(0 0 4px ${color}80)` }} />
-        <text x={c} y={c + 6} textAnchor="middle" fill={color}
-          fontSize="16" fontWeight="900" fontFamily="monospace">{value}</text>
+          transform={`rotate(-90 ${cx} ${cx})`}/>
+        <text x={cx} y={cx + 5} textAnchor="middle"
+          fill="rgba(255,255,255,0.88)"
+          fontSize="15" fontWeight="700" fontFamily={MONO}>{value}</text>
       </svg>
-      <div style={{ fontSize: 8, fontFamily: "monospace", color: DIM, letterSpacing: "0.12em", marginTop: 4 }}>
+      <div style={{ fontSize: 8, fontFamily: SANS, fontWeight: 500, color: GR,
+        letterSpacing: "0.10em", marginTop: 4,
+        textTransform: "uppercase" as const }}>
         {label}
       </div>
     </div>
   );
 }
 
-// ── Monthly bar chart ──────────────────────────────────────────────────────────
-const MONTHS  = ["NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY"];
-const PERF    = [-180, 420, 640, 510, 820, 580, 370];
+// ── Monthly bar chart ────────────────────────────────────────────────────────────
+const MONTHS = ["NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY"];
+const PERF   = [-180, 420, 640, 510, 820, 580, 370];
 const MAX_ABS = Math.max(...PERF.map(Math.abs));
 
 function MonthlyChart() {
   return (
-    <div style={{ background: "#09091a", border: `1px solid ${B}`, borderRadius: 10, padding: "14px 16px" }}>
-      <div style={{ fontSize: 9, fontFamily: "monospace", color: DIM, letterSpacing: "0.16em", marginBottom: 14 }}>
-        MONTHLY AI PERFORMANCE
+    <div style={{ background: CARD, border: `1px solid ${E}`, borderRadius: 10, padding: "14px 16px" }}>
+      <div style={{ fontSize: 8, fontFamily: SANS, fontWeight: 500, color: GR,
+        letterSpacing: "0.14em", marginBottom: 14,
+        textTransform: "uppercase" as const }}>
+        Monthly AI Performance
       </div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 80, marginBottom: 8 }}>
         {PERF.map((v, i) => {
-          const up  = v >= 0;
-          const h   = Math.max(4, (Math.abs(v) / MAX_ABS) * 70);
-          const col = up ? G : "#ff3355";
+          const up    = v >= 0;
+          const h     = Math.max(4, (Math.abs(v) / MAX_ABS) * 70);
+          const col   = up ? "rgba(0,210,100,0.82)" : "rgba(230,70,70,0.82)";
+          const last  = i === MONTHS.length - 1;
           return (
             <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column",
               alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
               <div style={{ width: "100%", height: h, background: col,
-                borderRadius: "3px 3px 0 0", opacity: i === MONTHS.length - 1 ? 1 : 0.65,
-                boxShadow: i === MONTHS.length - 1 ? `0 0 12px ${col}60` : "none" }} />
+                borderRadius: "3px 3px 0 0",
+                opacity: last ? 1 : 0.68 }}/>
             </div>
           );
         })}
       </div>
       <div style={{ display: "flex", gap: 6 }}>
-        {MONTHS.map((m, i) => (
-          <div key={m} style={{ flex: 1, textAlign: "center", fontSize: 7, fontFamily: "monospace",
-            color: i === MONTHS.length - 1 ? W : DIM, fontWeight: i === MONTHS.length - 1 ? 700 : 400 }}>
-            {m}
-          </div>
-        ))}
+        {MONTHS.map((m, i) => {
+          const last = i === MONTHS.length - 1;
+          return (
+            <div key={m} style={{ flex: 1, textAlign: "center", fontSize: 7,
+              fontFamily: SANS, fontWeight: last ? 600 : 400,
+              color: last ? W : GR }}>
+              {m}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
+// ── KPI stat card ────────────────────────────────────────────────────────────────
 function StatCard({ value, label, color, sub }: { value: string; label: string; color: string; sub?: string }) {
   return (
-    <div style={{ background: "#0b0c18", border: `1px solid ${B}`, borderRadius: 12, padding: "16px 14px" }}>
-      <div style={{ fontSize: 22, fontFamily: "monospace", fontWeight: 900, color, marginBottom: 4, lineHeight: 1 }}>
+    <div style={{ background: CARD, border: `1px solid ${E}`, borderRadius: 12, padding: "16px 14px" }}>
+      <div style={{ fontSize: 24, fontFamily: MONO, fontWeight: 700, color, marginBottom: 5, lineHeight: 1 }}>
         {value}
       </div>
-      {sub && <div style={{ fontSize: 8, fontFamily: "monospace", color: DIM, marginBottom: 2 }}>{sub}</div>}
-      <div style={{ fontSize: 8, fontFamily: "monospace", color: DIM, letterSpacing: "0.14em" }}>{label}</div>
+      {sub && (
+        <div style={{ fontSize: 8, fontFamily: SANS, color: GR, marginBottom: 3 }}>{sub}</div>
+      )}
+      <div style={{ fontSize: 8, fontFamily: SANS, fontWeight: 500, color: GR,
+        letterSpacing: "0.10em", textTransform: "uppercase" as const }}>
+        {label}
+      </div>
     </div>
   );
 }
 
+// ── Main page ────────────────────────────────────────────────────────────────────
 export default function Profile() {
-  const { signOut }  = useClerk();
-  const { user }     = useUser();
+  const { signOut }     = useClerk();
+  const { user }        = useUser();
   const [, setLocation] = useLocation();
 
   const { data: portfolio } = useQuery<Portfolio>({
-    queryKey: ["mobile-portfolio"], queryFn: () => api.get("/mobile/portfolio"), staleTime: 30_000,
+    queryKey: ["mobile-portfolio"],
+    queryFn:  () => api.get("/mobile/portfolio"),
+    staleTime: 30_000,
   });
   const { data: sub } = useQuery<Subscription>({
-    queryKey: ["subscription"], queryFn: () => api.get("/billing/subscription"), staleTime: 60_000,
+    queryKey: ["subscription"],
+    queryFn:  () => api.get("/billing/subscription"),
+    staleTime: 60_000,
   });
 
   const portal = useMutation({
@@ -100,122 +131,157 @@ export default function Profile() {
   });
 
   const tv       = portfolio?.totalValue ?? 103800;
-  const pnl      = portfolio?.openPnL    ?? 127.35;
   const plan     = sub?.plan ?? "free";
-  const initials = (user?.firstName?.[0] ?? "") + (user?.lastName?.[0] ?? "T");
+  const initials = ((user?.firstName?.[0] ?? "") + (user?.lastName?.[0] ?? "T")).toUpperCase() || "AT";
   const email    = user?.emailAddresses?.[0]?.emailAddress ?? "trader@apexai.com";
   const name     = user?.fullName ?? user?.firstName ?? "Apex Trader";
 
-  const realized = 3800;
-  const fees     = 142.88;
-  const winRate  = 63.2;
+  const realized  = 3800;
+  const fees      = 142.88;
+  const winRate   = 63.2;
   const cumReturn = 3847;
 
   return (
-    <div className="page-enter" style={{ background: "#080810", minHeight: "100%", paddingBottom: 24 }}>
+    <div className="page-enter" style={{ background: BG, minHeight: "100%", paddingBottom: 28 }}>
 
-      {/* ── Profile Card ────────────────────────────────────────────────────── */}
-      <div style={{ margin: "16px 16px 12px", background: S, border: `1px solid ${B}`,
-        borderRadius: 16, padding: "18px 18px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      {/* ── Profile identity card ──────────────────────────────────────────── */}
+      <div style={{ margin: "16px 16px 14px", background: CARD, border: `1px solid ${E}`,
+        borderRadius: 16, padding: "20px 18px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+
+          {/* Avatar */}
           <div style={{ position: "relative", flexShrink: 0 }}>
-            <div style={{ width: 56, height: 56, borderRadius: "50%",
-              background: `linear-gradient(135deg, ${C}30, ${P}30)`,
-              border: `2px solid ${C}60`,
+            <div style={{ width: 62, height: 62, borderRadius: "50%",
+              background: `linear-gradient(135deg, rgba(0,229,255,0.14), rgba(155,92,245,0.14))`,
+              border: `1.5px solid rgba(0,229,255,0.40)`,
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 18, fontFamily: "monospace", fontWeight: 900, color: C }}>
-              {initials.toUpperCase() || "AT"}
+              fontSize: 20, fontFamily: MONO, fontWeight: 700,
+              color: C }}>
+              {initials}
             </div>
             <div style={{ position: "absolute", bottom: 2, right: 2, width: 10, height: 10,
-              borderRadius: "50%", background: G, border: "2px solid #080810",
-              boxShadow: `0 0 6px ${G}` }} />
+              borderRadius: "50%", background: "rgba(0,210,100,0.90)",
+              border: "2px solid #000000" }}/>
           </div>
+
+          {/* User info */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-              <span style={{ fontSize: 17, fontFamily: "monospace", fontWeight: 900, color: W,
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
-              <span style={{ padding: "2px 8px", background: C+"18", border: `1px solid ${C}40`,
-                borderRadius: 4, fontSize: 8, fontFamily: "monospace", fontWeight: 700,
-                color: C, letterSpacing: "0.1em", flexShrink: 0 }}>
-                {plan.toUpperCase()}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+              <span style={{ fontSize: 19, fontFamily: SANS, fontWeight: 700, color: W,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                {name}
+              </span>
+              {/* Plan badge */}
+              <span style={{ padding: "2px 9px",
+                background: plan === "free" ? "rgba(255,255,255,0.05)" : "rgba(0,229,255,0.08)",
+                border: `1px solid ${plan === "free" ? "rgba(255,255,255,0.14)" : "rgba(0,229,255,0.25)"}`,
+                borderRadius: 4, fontSize: 8, fontFamily: SANS, fontWeight: 600,
+                color: plan === "free" ? GR : C,
+                letterSpacing: "0.07em", flexShrink: 0,
+                textTransform: "uppercase" as const }}>
+                {plan}
               </span>
             </div>
-            <div style={{ fontSize: 10, fontFamily: "monospace", color: DIM, marginBottom: 2,
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email}</div>
-            <div style={{ fontSize: 8, fontFamily: "monospace", color: DIM, opacity: 0.6 }}>Member since Jan 2025</div>
+            <div style={{ fontSize: 11, fontFamily: SANS, color: GR, marginBottom: 3,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+              {email}
+            </div>
+            <div style={{ fontSize: 8, fontFamily: SANS,
+              color: "rgba(136,146,164,0.60)" }}>
+              Member since Jan 2025
+            </div>
           </div>
         </div>
       </div>
 
       <div style={{ padding: "0 16px" }}>
 
-        {/* ── Stats 2×2 ───────────────────────────────────────────────────── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-          <StatCard value={`$${(tv / 1000).toFixed(1)}K`} label="EQUITY"    color={C} />
-          <StatCard value={`+$${(realized / 1000).toFixed(1)}K`} label="REALIZED" color={G} />
-          <StatCard value={`${winRate}%`} label="WIN RATE"  color={G} sub="4W · 1L" />
-          <StatCard value={`$${fees.toFixed(2)}`} label="FEES PAID" color={GOLD} />
+        {/* ── KPI 2×2 grid ────────────────────────────────────────────────── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
+          <StatCard value={`$${(tv / 1000).toFixed(1)}K`}         label="Equity"    color={C} />
+          <StatCard value={`+$${(realized / 1000).toFixed(1)}K`}  label="Realized"  color="rgba(0,210,100,0.88)" />
+          <StatCard value={`${winRate}%`}                          label="Win Rate"  color="rgba(0,210,100,0.88)" sub="4W · 1L" />
+          <StatCard value={`$${fees.toFixed(2)}`}                  label="Fees Paid" color={GOLD} />
         </div>
 
         {/* ── Performance Intelligence ─────────────────────────────────────── */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-            <div style={{ width: 3, height: 14, background: P, borderRadius: 2 }} />
-            <span style={{ fontSize: 9, color: GR, letterSpacing: "0.2em", fontFamily: "monospace", fontWeight: 700 }}>
-              PERFORMANCE INTELLIGENCE
+        <div style={{ marginBottom: 18 }}>
+          {/* Section heading */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <div style={{ width: 2, height: 13, background: "rgba(155,92,245,0.60)",
+              borderRadius: 2, flexShrink: 0 }}/>
+            <span style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
+              color: "rgba(255,255,255,0.50)", letterSpacing: "0.18em",
+              textTransform: "uppercase" as const }}>
+              Performance Intelligence
             </span>
           </div>
 
-          <MonthlyChart />
+          <MonthlyChart/>
 
           {/* Donut gauges */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", marginTop: 16 }}>
-            <Donut value={71} color={P} label="AI SCORE"    />
-            <Donut value={59} color={C} label="CONSISTENCY" />
-            <Donut value={57} color={G} label="EFFICIENCY"  />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+            marginTop: 14, background: CARD, border: `1px solid ${E}`,
+            borderRadius: 10, padding: "16px 0" }}>
+            <Donut value={71} color="rgba(155,92,245,0.80)"  label="AI Score"    />
+            <Donut value={59} color="rgba(0,185,215,0.78)"   label="Consistency" />
+            <Donut value={57} color="rgba(0,200,100,0.76)"   label="Efficiency"  />
           </div>
 
           {/* Cumulative return */}
-          <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between",
-            alignItems: "center", padding: "12px 0", borderTop: `1px solid ${B}` }}>
-            <span style={{ fontSize: 13, fontFamily: "monospace", color: W }}>Cumulative Return</span>
-            <span style={{ fontSize: 16, fontFamily: "monospace", fontWeight: 800, color: G }}>
+          <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between",
+            alignItems: "center", padding: "13px 0",
+            borderTop: `1px solid rgba(255,255,255,0.06)` }}>
+            <span style={{ fontSize: 13, fontFamily: SANS, fontWeight: 500, color: W }}>
+              Cumulative Return
+            </span>
+            <span style={{ fontSize: 16, fontFamily: MONO, fontWeight: 700,
+              color: "rgba(0,210,100,0.88)" }}>
               +${cumReturn.toLocaleString()}
             </span>
           </div>
         </div>
 
-        {/* ── Account actions ─────────────────────────────────────────────── */}
-        <div style={{ background: S, border: `1px solid ${B}`, borderRadius: 14, overflow: "hidden", marginBottom: 12 }}>
-          {[
-            { label: "Manage Exchanges",  action: () => setLocation("/exchanges"), color: C },
-            { label: "Billing & Plan",    action: () => portal.mutate(), color: GR },
-          ].map(({ label, action, color }, i) => (
+        {/* ── Account actions ──────────────────────────────────────────────── */}
+        <div style={{ background: CARD, border: `1px solid ${E}`,
+          borderRadius: 14, overflow: "hidden", marginBottom: 12 }}>
+          {([
+            { label: "Manage Exchanges", action: () => setLocation("/exchanges"), color: W },
+            { label: "Billing & Plan",   action: () => portal.mutate(),          color: W },
+          ] as { label: string; action: () => void; color: string }[]).map(({ label, action }, i) => (
             <button key={label} onClick={action} style={{
-              width: "100%", padding: "15px 18px", background: "transparent",
-              border: "none", borderBottom: i === 0 ? `1px solid ${B}` : "none",
+              width: "100%", padding: "18px 20px", background: "transparent",
+              border: "none",
+              borderBottom: i === 0 ? `1px solid rgba(255,255,255,0.06)` : "none",
               display: "flex", justifyContent: "space-between", alignItems: "center",
               cursor: "pointer",
             }}>
-              <span style={{ fontSize: 13, fontFamily: "monospace", color }}>{label}</span>
-              <span style={{ fontSize: 12, color: DIM }}>›</span>
+              <span style={{ fontSize: 14, fontFamily: SANS, fontWeight: 500, color: W }}>
+                {label}
+              </span>
+              <span style={{ fontSize: 16, fontFamily: SANS,
+                color: "rgba(255,255,255,0.35)", lineHeight: 1 }}>›</span>
             </button>
           ))}
         </div>
 
+        {/* ── Sign out ─────────────────────────────────────────────────────── */}
         <button onClick={() => signOut()} style={{
-          width: "100%", padding: "14px 0", background: "transparent",
-          border: `1px solid #ff335528`, borderRadius: 12, color: "#ff3355",
-          fontFamily: "monospace", fontSize: 11, fontWeight: 700,
-          letterSpacing: "0.1em", cursor: "pointer",
+          width: "100%", padding: "15px 0", background: "transparent",
+          border: `1px solid rgba(255,51,85,0.22)`, borderRadius: 12,
+          color: "rgba(255,51,85,0.75)",
+          fontFamily: SANS, fontSize: 12, fontWeight: 600,
+          letterSpacing: "0.06em", cursor: "pointer",
         }}>
-          SIGN OUT
+          Sign Out
         </button>
 
-        <div style={{ marginTop: 16, textAlign: "center", fontSize: 7, fontFamily: "monospace",
-          color: DIM, lineHeight: 1.9, letterSpacing: "0.06em" }}>
-          APEX TRADER · WITHDRAWAL PERMISSIONS NEVER REQUESTED{"\n"}
-          PAPER TRADING ALWAYS FREE
+        {/* ── Footer ───────────────────────────────────────────────────────── */}
+        <div style={{ marginTop: 18, textAlign: "center", fontSize: 7, fontFamily: SANS,
+          color: GR, lineHeight: 2.0, letterSpacing: "0.06em" }}>
+          Apex Trader · Withdrawal permissions never requested
+          {"\n"}
+          Paper trading always free
         </div>
       </div>
     </div>

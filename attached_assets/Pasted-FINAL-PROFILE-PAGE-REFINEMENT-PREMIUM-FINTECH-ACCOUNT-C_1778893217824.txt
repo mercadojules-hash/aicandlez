@@ -1,0 +1,170 @@
+FINAL PROFILE PAGE REFINEMENT — PREMIUM FINTECH ACCOUNT CENTER
+
+The Profile page direction is correct.
+
+DO NOT redesign the page.
+
+This is now a precision refinement pass focused on:
+- readability
+- spacing
+- hierarchy
+- account premium feel
+- cleaner analytics rendering
+- better CTA clarity
+
+IMPORTANT:
+Keep:
+- pure OLED black background
+- #0d151e container interiors
+- restrained institutional styling
+- no gaming glow
+- no crypto neon atmosphere
+
+────────────────────
+1. PROFILE HEADER
+────────────────────
+
+The profile identity card is good but needs:
+- slightly better hierarchy
+- slightly more premium spacing
+
+Adjustments:
+- increase name size slightly
+- email slightly brighter
+- make FREE badge more refined and less “tag-like”
+- slightly larger avatar initials
+- increase spacing between avatar and user info
+
+Goal:
+Feels like a premium fintech account center.
+
+────────────────────
+2. KPI CARDS
+────────────────────
+
+The KPI cards are correct structurally.
+
+Improve:
+- slightly larger numeric values
+- brighter labels
+- slightly tighter vertical spacing
+
+The values should be readable instantly.
+
+Especially:
+- equity
+- realized
+- win rate
+- fees paid
+
+No faint text.
+
+────────────────────
+3. PERFORMANCE CHART
+────────────────────
+
+The monthly performance chart is good.
+
+Refine:
+- slightly sharper bars
+- slightly brighter month labels
+- improve chart readability
+
+Keep:
+- restrained
+- clean
+- institutional
+
+NO glow.
+
+────────────────────
+4. DONUT ANALYTICS
+────────────────────
+
+The AI Score / Consistency / Efficiency rings are still slightly too faint.
+
+Improve:
+- readability
+- center number visibility
+- label visibility
+
+Reduce “ghosted” appearance.
+
+Users should not squint.
+
+────────────────────
+5. SETTINGS ROWS
+────────────────────
+
+“Manage Exchanges”
+“Billing & Plan”
+
+Need:
+- slightly taller rows
+- clearer tap targets
+- brighter labels
+- improved chevron visibility
+
+Feels like modern premium mobile banking UI.
+
+────────────────────
+6. SIGN OUT BUTTON
+────────────────────
+
+The red sign out button is too faint.
+
+Make:
+- more readable
+- slightly more contrast
+- still restrained
+
+Do NOT make it bright red.
+
+Just clearer.
+
+────────────────────
+7. FOOTER TEXT
+────────────────────
+
+The tiny footer text at the bottom is too dim.
+
+Increase readability slightly.
+
+Still secondary.
+
+────────────────────
+8. FINAL CONSISTENCY PASS
+────────────────────
+
+Ensure:
+- all pages now use identical:
+  - spacing rhythm
+  - typography hierarchy
+  - border treatment
+  - #0d151e card interiors
+  - OLED black backgrounds
+  - reduced glow system
+
+The app should now feel like ONE unified premium trading platform.
+
+────────────────────
+AFTER THIS PAGE:
+Next step is the subscription/paywall popup flow.
+
+That popup should feel:
+- ultra premium
+- high-conversion
+- Apple-level polished
+- institutional fintech
+- not spammy
+- not gaming UI
+
+Think:
+Robinhood Gold
+TradingView Premium
+Bloomberg Terminal onboarding
+Stripe pricing modal
+
+No TypeScript errors.
+No console errors.
+Production-ready refinement pass only.
