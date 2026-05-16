@@ -1,0 +1,194 @@
+TRADE PAGE — OLED BLACK FOUNDATION + MICRO CHART EXECUTION PASS
+
+The Trade page structure is correct.
+
+Do NOT redesign the layout.
+
+This pass is focused on:
+
+* pure OLED black depth
+* institutional execution styling
+* premium rendering
+* integrated micro charts
+* reducing remaining “crypto neon UI” feeling
+
+====================================================
+
+1. PAGE BACKGROUND — PURE BLACK ONLY
+   ====================================================
+
+The Trade page background still contains:
+
+* navy haze
+* cyan atmosphere
+* gradient contamination
+* blue fog between cards
+
+This must be removed completely.
+
+The page background MUST be:
+
+#000000
+
+True OLED black.
+
+The cards should float sharply above the black foundation.
+
+No ambient color bleed behind cards.
+
+====================================================
+2. CARD INTERIORS
+=================
+
+All containers/cards remain:
+
+#0d151e
+
+This is now the universal platform card color.
+
+Maintain consistency with Homepage.
+
+====================================================
+3. ADD MICRO CHARTS TO ASSET CONTAINERS
+=======================================
+
+VERY IMPORTANT.
+
+Each asset position card should contain a small integrated chart/sparkline.
+
+Examples:
+
+* BTCUSD
+* DOGEUSD
+* AVAXUSD
+
+These charts should:
+
+* feel live
+* feel premium
+* feel institutional
+
+NOT decorative crypto graphs.
+
+====================================================
+4. MICRO CHART STYLE
+====================
+
+Charts must be:
+
+* thin
+* sharp
+* elegant
+* restrained
+* anti-aliased cleanly
+
+Avoid:
+
+* oversized charts
+* glowing lines
+* thick strokes
+* exaggerated animations
+
+Think:
+Bloomberg mini execution charts
+or
+TradingView compact telemetry.
+
+====================================================
+5. MICRO CHART PLACEMENT
+========================
+
+Place the chart:
+
+* inside the asset card
+* aligned toward the right side or center-right
+* integrated into the execution layout
+
+Do NOT allow charts to overpower:
+
+* price
+* P&L
+* trade direction
+* stop loss / take profit info
+
+Charts should support the trade card, not dominate it.
+
+====================================================
+6. CHART COLOR LOGIC
+====================
+
+Use restrained directional colors:
+
+* profitable positions:
+  muted emerald/cyan line
+
+* losing positions:
+  restrained red/orange line
+
+No neon glow.
+No bloom.
+No animated laser lines.
+
+====================================================
+7. TOP EXECUTION BUTTONS
+========================
+
+KILL / PAUSE / AUTO still need refinement.
+
+Reduce:
+
+* saturation
+* glow
+* gaming UI feel
+
+Keep semantic colors:
+
+* KILL → restrained deep red
+* PAUSE → restrained amber
+* AUTO → restrained cyan
+
+Make them feel:
+professional execution controls.
+
+====================================================
+8. REMOVE COLOR BLEED
+=====================
+
+The space BETWEEN cards should visually collapse into:
+pure black (#000000)
+
+Remove:
+
+* cyan haze
+* blue fog
+* purple contamination
+* atmospheric gradients
+
+====================================================
+9. TYPOGRAPHY
+=============
+
+Current typography direction is correct.
+
+Keep:
+
+* Inter / SF Pro
+* sans for labels/text
+* mono only for numbers
+
+Do NOT reintroduce hacker fonts.
+
+====================================================
+10. OVERALL GOAL
+================
+
+The app should now feel like:
+
+AI-powered institutional mobile trading terminal.
+
+NOT:
+retail crypto dashboard.
+
+The homepage already moved in the right direction.
+
+The Trade page should now match that level of polish and sophistication.
