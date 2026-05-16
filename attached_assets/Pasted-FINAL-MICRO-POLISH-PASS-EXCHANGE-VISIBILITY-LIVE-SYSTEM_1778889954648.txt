@@ -1,0 +1,160 @@
+FINAL MICRO-POLISH PASS — EXCHANGE VISIBILITY + LIVE SYSTEM ENERGY
+
+The homepage is now very close.
+
+The cyan haze issue is fixed correctly.
+Typography is MUCH better.
+Container architecture now feels premium.
+
+This is now a MICRO-POLISH pass only.
+
+DO NOT redesign anything.
+
+====================================================
+
+1. EXCHANGE VISIBILITY (IMPORTANT)
+   ====================================================
+
+The exchanges are currently too visually weak.
+
+Kraken / Simulation / future Robinhood routing should feel like:
+
+* active execution environments
+* brokerage routing destinations
+* institutional exchange controls
+
+NOT tiny metadata labels.
+
+Increase hierarchy slightly for:
+
+* exchange names
+* mode indicators
+* routing status
+* active exchange pills
+
+Make them:
+
+* easier to scan
+* more premium
+* more intentional
+
+Still restrained.
+
+====================================================
+2. ADD ROBINHOOD TO SUPPORTED EXCHANGES
+=======================================
+
+Robinhood secrets are already configured.
+
+Add Robinhood anywhere supported exchanges are shown.
+
+Supported exchanges should visually include:
+
+* Kraken
+* Coinbase
+* Binance
+* Robinhood
+* Simulation
+
+Robinhood styling:
+
+* subtle emerald accent
+* premium dark execution feel
+* NOT bright retail Robinhood green
+
+====================================================
+3. LOGO SCALE ADJUSTMENT
+========================
+
+The new logo integration is correct.
+
+Increase size slightly:
+~8–12%
+
+The current logo is slightly too small and loses authority.
+
+Keep:
+
+* sharp rendering
+* zero glow
+* clean spacing
+
+====================================================
+4. LIVE SYSTEM ENERGY
+=====================
+
+The app still needs slightly more “live market system” feel.
+
+Add VERY subtle:
+
+* ticker drift
+* chart breathing
+* signal pulse movement
+* micro telemetry motion
+
+Almost invisible.
+
+Think:
+“expensive AI operating system.”
+
+NOT animated crypto dashboard.
+
+====================================================
+5. CHART REFINEMENT
+===================
+
+Charts still feel slightly flat.
+
+Improve:
+
+* line sharpness
+* anti-aliasing
+* rendering quality
+* movement realism
+
+The charts should feel:
+
+* premium
+* expensive
+* institutional
+
+NOT decorative.
+
+====================================================
+6. TOP HEADER SPACING
+=====================
+
+Slightly tighten:
+
+* top spacing
+* logo alignment
+* relationship between:
+  logo
+  AI engine status
+  exchange routing
+
+Goal:
+more premium density.
+
+====================================================
+7. KEEP EVERYTHING ELSE
+=======================
+
+Do NOT redesign.
+Do NOT increase glow.
+Do NOT add cyberpunk effects.
+
+The current direction is finally correct.
+
+This is now:
+
+* production polish
+* App Store screenshot quality
+* investor demo quality
+
+After this pass we move to:
+
+1. Trade page
+2. Markets page
+3. Terminal page
+4. Profile page

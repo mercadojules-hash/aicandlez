@@ -59,7 +59,7 @@ function Sparkline({ seed, trend, w=78, h=28, animDelay="0s" }: {
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} shapeRendering="geometricPrecision"
       style={{ overflow:"visible", animation:`chart-drift 14s ease-in-out ${animDelay} infinite` }}>
-      <path d={d} fill="none" stroke={col} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d={d} fill="none" stroke={col} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
@@ -222,18 +222,18 @@ export default function Home() {
             }}>
               {pLabel}
             </span>
-            <span style={{ fontSize:8, fontFamily:SANS, color:DIM }}>{exchange}</span>
+            <span style={{ fontSize:9, fontFamily:SANS, fontWeight:500, color:GR, letterSpacing:"0.04em" }}>{exchange}</span>
           </div>
         </div>
 
         {/* Mode badge + heartbeat */}
         <div style={{ display:"flex", alignItems:"center", gap:9, flexShrink:0 }}>
           <div style={{
-            padding:"3px 10px", borderRadius:3,
-            border:`1px solid ${E}`,
+            padding:"3px 11px", borderRadius:3,
+            border:`1px solid ${isLive ? "rgba(0,255,136,0.25)" : "rgba(0,229,255,0.20)"}`,
             background: isLive ? "#001508" : "#00101a",
-            fontSize:8, fontFamily:SANS, fontWeight:600,
-            color: isLive ? G : C, letterSpacing:"0.06em",
+            fontSize:9, fontFamily:SANS, fontWeight:600,
+            color: isLive ? G : C, letterSpacing:"0.05em",
           }}>
             {isLive ? "Live" : "Simulation"}
           </div>
@@ -250,11 +250,11 @@ export default function Home() {
       </div>
 
       {/* ── Logo header ─────────────────────────────────────────────────────── */}
-      <div style={{ padding:"13px 16px 11px" }}>
+      <div style={{ padding:"9px 16px 8px" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:16 }}>
           {/* New 300×68 logo — crisp, no heavy glow */}
           <img src={apexLogo} alt="Apex AI Trader"
-            style={{ height:42, width:"auto", objectFit:"contain", imageRendering:"crisp-edges" }}/>
+            style={{ height:48, width:"auto", objectFit:"contain", imageRendering:"crisp-edges" }}/>
 
           {/* Live/Sim indicator pill */}
           <div style={{
@@ -276,7 +276,8 @@ export default function Home() {
           <div style={{ width:4, height:4, borderRadius:"50%", background:G, flexShrink:0,
             animation:"dot-pulse 2.5s ease-in-out 0.4s infinite" }}/>
           <span style={{ fontSize:10, fontFamily:SANS, fontWeight:400, color:DIM }}>
-            AI Engine Active · {isLive ? "Live Mode" : "Simulation Mode"} · {exchange}
+            AI Engine Active · {isLive ? "Live Mode" : "Simulation Mode"}
+            {" · "}<span style={{ color:GR, fontWeight:500 }}>{exchange}</span>
           </span>
         </div>
       </div>
@@ -655,7 +656,7 @@ export default function Home() {
                 Supported Live Exchanges
               </div>
               <div style={{ display:"flex", gap:5, flexWrap:"wrap" as const }}>
-                {["Kraken","Coinbase","Binance","Crypto.com","Gemini"].map(e => (
+                {["Kraken","Coinbase","Binance","Robinhood","Crypto.com","Gemini"].map(e => (
                   <span key={e} style={{
                     padding:"3px 10px",
                     background:"rgba(255,255,255,0.03)",
