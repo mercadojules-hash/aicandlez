@@ -1,0 +1,192 @@
+We are VERY close now.
+
+The Crypto + Equities market pages and the individual asset detail pages are finally reaching the premium institutional feel we wanted.
+
+DO NOT redesign the layout structure.
+
+Only make the following focused upgrades:
+
+PRIORITY 1 — GLOBAL AI AUTO-TRADING CTA
+
+Both the CRYPTO tab and EQUITIES tab need a large premium CTA section near the top:
+
+“LET AI TRADE FOR ME”
+
+This is one of the MOST important product features.
+
+The purpose:
+The user enables autonomous AI trading and the AI intelligently selects the best assets automatically.
+
+Requirements:
+
+large cinematic premium CTA card
+institutional fintech styling
+animated glow/shimmer
+visible AI scanning effect
+should feel like “Wall Street AI autopilot”
+
+The CTA should clearly explain:
+
+AI scans the market continuously
+AI chooses highest-confidence assets
+AI manages entries/exits automatically
+max simultaneous trades limit
+risk management active
+stop-loss protection enabled
+
+IMPORTANT:
+Set a visible trade limit:
+
+“Max 6 Active AI Trades”
+or
+“AI currently managing 0/6 positions”
+
+This is VERY important psychologically because:
+
+it creates controlled exposure
+feels safer
+feels intelligent and intentional
+prevents the app from feeling reckless
+
+When enabled:
+AI should automatically populate the TRADE page with positions it opened itself.
+
+Meaning:
+Crypto/Equities page = AI selection
+Trade page = AI active execution monitor
+
+That connection is critical.
+
+PRIORITY 2 — ADD TICKERS TO BOTH MARKET PAGES
+
+Both:
+
+Crypto tab
+Equities tab
+
+Need premium scrolling market tickers at the top.
+
+NOT identical to Home.
+
+Different behavior per section:
+
+CRYPTO PAGE:
+
+more aggressive movement
+crypto-only assets
+BTC dominance
+top gainers/losers
+faster motion
+more energetic
+
+EQUITIES PAGE:
+
+cleaner institutional terminal feel
+equities + futures
+calmer movement
+Bloomberg style
+
+Must remain readable.
+No tiny fonts.
+
+PRIORITY 3 — IMPROVE THE INDIVIDUAL ASSET CHARTS
+
+The asset detail pages are strong now but the chart still needs more “WOW factor.”
+
+Current chart is good structurally —
+but it needs more depth and realism.
+
+Upgrade the charts to feel closer to:
+
+TradingView
+Robinhood premium
+institutional crypto terminals
+
+Improve:
+
+candle rendering
+glow depth
+volume bars
+EMA lines
+motion
+chart layering
+visual polish
+subtle animations
+stronger live-market feeling
+
+The chart should immediately impress users.
+
+It should feel:
+
+expensive
+intelligent
+real
+cinematic
+trustworthy
+
+IMPORTANT:
+Do NOT make the charts cluttered.
+Premium simplicity > overload.
+
+PRIORITY 4 — INDIVIDUAL ASSET AI EXECUTION AREA
+
+On each individual asset page:
+(BTC page, NVDA page, etc.)
+
+Add a more prominent AI execution section:
+
+Include:
+
+“AI BUY”
+“AI SELL”
+“AUTO TRADE”
+buttons
+
+AUTO TRADE should be the hero action.
+
+The page should make users feel:
+“I trust the AI to trade this asset.”
+
+Include:
+
+AI confidence
+trade setup quality
+volatility
+momentum
+AI commentary
+multi-timeframe confirmation
+
+This page is psychologically the most important page in the app.
+
+This is where users decide:
+“Do I trust this AI with my money?”
+
+IMPORTANT
+
+DO NOT:
+
+redesign navigation
+redesign bottom tabs
+redesign structure
+overcomplicate UI
+add clutter
+
+ONLY:
+
+polish
+strengthen
+deepen
+premium-ize
+improve motion and trust
+
+The app is now in the final refinement phase.
+
+We are optimizing:
+
+trust
+realism
+emotional impact
+perceived intelligence
+premium fintech feel
+
+NOT rebuilding layouts anymore.
