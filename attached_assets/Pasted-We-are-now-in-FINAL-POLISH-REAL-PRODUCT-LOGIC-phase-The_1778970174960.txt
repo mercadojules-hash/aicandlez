@@ -1,0 +1,228 @@
+We are now in FINAL POLISH + REAL PRODUCT LOGIC phase.
+
+The app is looking extremely strong visually.
+
+Now we need to refine:
+
+business logic
+persistence
+settings behavior
+premium profile experience
+subscription/payment accuracy
+
+DO NOT redesign the app.
+
+Only make the following focused upgrades:
+
+PRIORITY 1 — CHANGE PERFORMANCE FEE FROM 2% → 3% (WINS ONLY)
+
+Update ALL references throughout the app:
+
+Current:
+“2% on profitable trades”
+
+New:
+“3% performance fee on profitable closed trades only”
+
+IMPORTANT:
+This must be reflected consistently across:
+
+pricing UI
+onboarding
+AI trading cards
+account/profile page
+Stripe subscription/payment logic
+any fee descriptions
+legal/disclaimer sections
+
+Clarify clearly:
+
+NO fee on losing trades
+fee only applies to PROFITABLE CLOSED trades
+AI risk management remains active
+
+This is critical business logic.
+
+PRIORITY 2 — PERSISTENT AI AUTO-TRADING MODE
+
+Right now AUTO TRADE feels session-based.
+
+We need true persistent AI mode.
+
+Behavior required:
+
+When user enables:
+“LET AI TRADE FOR ME”
+
+The AI should CONTINUE trading automatically in the background until the user disables it manually.
+
+Meaning:
+
+toggle ON = persistent autonomous mode
+survives page refresh
+survives app navigation
+survives reopening the app
+reflected globally across the platform
+
+Example:
+If AI Auto Trade is ON:
+
+Trade page shows active AI positions
+Crypto/Equities pages reflect active AI scanning
+Profile page/settings reflect “AI ACTIVE”
+
+Need persistent state handling:
+
+local persistence for now
+architecture ready for backend persistence later
+
+This should feel like:
+“AI portfolio manager is actively running.”
+
+NOT:
+“temporary button click.”
+
+Very important psychologically.
+
+PRIORITY 3 — PROFILE PAGE UPGRADE
+
+The Profile page structure is good —
+but it still feels too much like a standard settings page.
+
+We need it to feel:
+premium
+intelligent
+wealth-management
+AI-powered
+institutional
+
+Current layout is fine.
+DO NOT redesign the structure.
+
+Only enhance it.
+
+UPGRADES NEEDED:
+
+Add AI STATUS section
+
+Prominent card near the top:
+
+Examples:
+
+AI ACTIVE
+Autonomous Mode Enabled
+4/6 AI Positions Running
+Risk Engine Active
+AI Monitoring 124 Assets
+Multi-Timeframe Confirmation Enabled
+
+Should feel like:
+“Your AI hedge fund is online.”
+
+Add subtle:
+
+glow pulse
+scanning indicator
+live activity feeling
+Add PERFORMANCE INSIGHTS
+
+Make the profile feel smarter.
+
+Examples:
+
+Best Performing Asset
+Avg Trade Duration
+AI Win Rate
+Most Profitable Sector
+Highest Confidence Trade
+Monthly AI Performance
+Total AI Trades Executed
+Risk Score
+
+Use:
+
+mini charts
+bars
+circular metrics
+elegant data visuals
+
+Keep it premium and clean.
+
+Add SETTINGS SECTION
+
+Need real AI management settings.
+
+Examples:
+
+AI SETTINGS
+
+Autonomous Trading [toggle]
+Max Concurrent AI Trades (1–6)
+Risk Level (Low / Balanced / Aggressive)
+Stop Loss Protection
+AI Trade Notifications
+Auto Reinvest Profits
+Paper Trading Mode
+
+These settings should feel:
+institutional
+serious
+trustworthy
+
+NOT generic mobile settings UI.
+
+Add CONNECTED ACCOUNTS / EXCHANGE STATUS
+
+Need a premium account connection section:
+
+Examples:
+
+Kraken Connected
+Coinbase Coming Soon
+Alpaca Connected
+Stripe Billing Active
+
+Use:
+
+status pills
+green connection indicators
+institutional fintech styling
+Add WITHDRAW / PROFITS AREA
+
+Very important psychologically.
+
+Need a section showing:
+
+withdrawable profits
+realized gains
+AI fees paid
+current AI-managed capital
+
+This helps the platform feel REAL.
+
+FINAL IMPORTANT NOTES
+
+DO NOT:
+
+redesign navigation
+redesign bottom tabs
+rebuild layouts
+overcomplicate UI
+
+ONLY:
+
+strengthen trust
+improve persistence
+deepen realism
+improve fintech quality
+make the AI feel truly alive
+
+We are now polishing for:
+
+App Store quality
+investor/demo quality
+user trust
+retention
+monetization
+
+The app is extremely close now.

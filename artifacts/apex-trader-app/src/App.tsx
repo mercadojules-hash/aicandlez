@@ -8,6 +8,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { SubscriptionModal }    from "@/components/SubscriptionModal";
 import { BrokerConnectionProvider }        from "@/contexts/BrokerConnectionContext";
+import { AIAutoTradeProvider }             from "@/contexts/AIAutoTradeContext";
 import { TradingAccountOnboardingModal }   from "@/components/TradingAccountOnboardingModal";
 import Home      from "@/pages/Home";
 import Trade     from "@/pages/Trade";
@@ -165,6 +166,7 @@ function Pages() {
 // ── Mobile shell ───────────────────────────────────────────────────────────────
 function Shell() {
   return (
+    <AIAutoTradeProvider>
     <BrokerConnectionProvider>
       <SubscriptionProvider>
         <div style={{ display: "flex", flexDirection: "column", height: "100dvh",
@@ -179,6 +181,7 @@ function Shell() {
         <TradingAccountOnboardingModal />
       </SubscriptionProvider>
     </BrokerConnectionProvider>
+    </AIAutoTradeProvider>
   );
 }
 

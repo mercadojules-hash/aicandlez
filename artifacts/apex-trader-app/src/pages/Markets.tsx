@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
 import { useQuery } from "@tanstack/react-query";
 import { api, type SignalBreakdown } from "@/lib/api";
 
@@ -70,7 +71,7 @@ function CryptoTicker() {
 
 // ── AI AutoPilot CTA ──────────────────────────────────────────────────────────────
 function AutoPilotCard() {
-  const [enabled, setEnabled] = useState(false);
+  const { enabled, setEnabled } = useAIAutoTrade();
   const positions = 0;
   const MAX = 6;
   return (
@@ -558,7 +559,7 @@ export default function Markets() {
 
         <div style={{ marginTop:16, padding:"11px 14px", background:CARD, border:`1px solid ${E}`, borderRadius:8,
           fontSize:8, fontFamily:SANS, color:GR, lineHeight:1.7 }}>
-          Tap any asset to view AI analysis and execution. Paper trading free · Live $5.99/mo + 2% performance fee.
+          Tap any asset to view AI analysis and execution. Paper trading free · Live $5.99/mo + 3% performance fee.
         </div>
       </div>
 

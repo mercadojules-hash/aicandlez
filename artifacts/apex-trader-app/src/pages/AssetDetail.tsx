@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -472,7 +473,7 @@ export default function AssetDetail() {
   const [, setLocation] = useLocation();
   const [tf, setTf] = useState<TF>("4H");
   const [executing, setExecuting] = useState<"buy"|"sell"|"auto"|null>(null);
-  const [autoActive, setAutoActive] = useState(false);
+  const { enabled: autoActive, setEnabled: setAutoActiveCtx } = useAIAutoTrade();
 
   const params    = new URLSearchParams(window.location.search);
   const sym       = (params.get("sym") ?? "BTC").toUpperCase();
@@ -513,7 +514,7 @@ export default function AssetDetail() {
   const mtf1D = conf > 65;
 
   const handleExec = (type2: "buy"|"sell"|"auto") => {
-    if (type2 === "auto") setAutoActive(v => !v);
+    if (type2 === "auto") setAutoActiveCtx(!autoActive);
     else { setExecuting(type2); setTimeout(() => setExecuting(null), 2200); }
   };
 
