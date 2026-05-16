@@ -361,7 +361,7 @@ export default function Profile() {
   const { signOut }     = useClerk();
   const [, setLocation] = useLocation();
   const { openOnboarding } = useBrokerConnection();
-  const { enabled: aiEnabled } = useAIAutoTrade();
+  const { enabled: aiEnabled, setEnabled: setAiEnabled } = useAIAutoTrade();
 
   // AI settings (local — backend-ready architecture)
   const [maxTrades,    setMaxTrades]    = useState(6);
@@ -551,7 +551,7 @@ export default function Profile() {
               label="Autonomous Trading"
               sub="AI selects, enters and exits positions automatically"
               value={aiEnabled}
-              onChange={() => {}}
+              onChange={setAiEnabled}
               divider={true}
             />
             <StepperRow
