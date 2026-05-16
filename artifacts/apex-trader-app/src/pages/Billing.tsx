@@ -7,167 +7,65 @@ const BG   = "#000000";
 const CARD = "#0d151e";
 const E    = "rgba(255,255,255,0.07)";
 const C    = "#00e5ff";
-const P    = "#9b5cf5";
 const W    = "#ffffff";
 const GR   = "#8892a4";
 const SANS = "Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif";
 const MONO = "'SF Mono', 'Fira Code', 'JetBrains Mono', 'Roboto Mono', monospace";
 
-// ── Static plan definitions ─────────────────────────────────────────────────────
-const PLANS = [
-  {
-    id:             "free",
-    name:           "Free",
-    price:          0,
-    perfFee:        null as null | number,
-    accent:         "rgba(255,255,255,0.25)",
-    accentBg:       "rgba(255,255,255,0.03)",
-    accentBorder:   E,
-    cta:            null as string | null,
-    features: [
-      "Paper trading (unlimited)",
-      "AI market scanner — 18 assets",
-      "Signal intelligence dashboard",
-      "Trade journal & analytics",
-      "Portfolio performance tracking",
-      "Mobile & web access",
-    ],
-  },
-  {
-    id:             "starter",
-    name:           "Starter",
-    price:          5.99,
-    perfFee:        2,
-    accent:         C,
-    accentBg:       "rgba(0,229,255,0.05)",
-    accentBorder:   "rgba(0,229,255,0.22)",
-    cta:            "Start 7-Day Free Trial",
-    features: [
-      "Everything in Free",
-      "Live trading on 1 exchange",
-      "AI auto-execution engine",
-      "Real-time trade alerts",
-      "Advanced AI signal analytics",
-      "Priority signal processing",
-      "Stop-loss & take-profit automation",
-    ],
-  },
-  {
-    id:             "pro",
-    name:           "Pro",
-    price:          19.99,
-    perfFee:        1,
-    accent:         P,
-    accentBg:       "rgba(155,92,245,0.05)",
-    accentBorder:   "rgba(155,92,245,0.22)",
-    cta:            "Upgrade to Pro",
-    features: [
-      "Everything in Starter",
-      "Multi-exchange routing",
-      "Institutional AI models",
-      "Portfolio intelligence engine",
-      "Advanced risk management suite",
-      "Priority support",
-      "Custom signal thresholds",
-      "Unlimited trade history export",
-    ],
-  },
+const FEATURES = [
+  "Paper & simulated trading (unlimited)",
+  "AI scanner across 18 assets",
+  "Live AI trade execution",
+  "Real-time signal alerts",
+  "Portfolio intelligence & analytics",
+  "Trade journal with AI scoring",
+  "Risk management automation",
+  "Mobile + web access",
 ];
 
-// ── Plan card ────────────────────────────────────────────────────────────────────
-function PlanCard({
-  plan, isCurrent, onUpgrade, loading,
-}: {
-  plan: typeof PLANS[0];
-  isCurrent: boolean;
-  onUpgrade: (id: string) => void;
-  loading: boolean;
-}) {
-  const { accent, accentBg, accentBorder } = plan;
+// ── Status card ──────────────────────────────────────────────────────────────────
+function StatusCard({ sub }: { sub: Subscription | undefined }) {
+  const plan    = sub?.plan ?? "free";
+  const active  = plan !== "free";
+  const accent  = active ? "rgba(0,210,100,0.88)" : "rgba(255,180,0,0.78)";
+  const bgColor = active ? "rgba(0,210,100,0.04)" : "rgba(255,180,0,0.04)";
+  const border  = active ? "rgba(0,210,100,0.18)" : "rgba(255,180,0,0.16)";
 
   return (
-    <div style={{ background: isCurrent ? accentBg : CARD,
-      border: `1px solid ${isCurrent ? accentBorder : E}`,
-      borderRadius: 14, overflow: "hidden", marginBottom: 14 }}>
-
-      {/* Card header */}
-      <div style={{ padding: "18px 18px 0" }}>
-        <div style={{ display: "flex", justifyContent: "space-between",
-          alignItems: "flex-start", marginBottom: 6 }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: W }}>
-                {plan.name}
-              </span>
-              {isCurrent && (
-                <span style={{ padding: "2px 8px",
-                  background: accent + "18", border: `1px solid ${accent}35`,
-                  borderRadius: 4, fontSize: 8, fontFamily: SANS, fontWeight: 600,
-                  color: accent, letterSpacing: "0.06em" }}>
-                  Current Plan
-                </span>
-              )}
-            </div>
-            {plan.perfFee && (
-              <div style={{ fontSize: 9, fontFamily: SANS, color: "rgba(255,180,0,0.78)" }}>
-                + {plan.perfFee}% performance fee on profitable trades
-              </div>
-            )}
+    <div style={{ background: bgColor, border: `1px solid ${border}`,
+      borderRadius: 14, padding: "16px 18px", marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between",
+        alignItems: "center", marginBottom: active ? 6 : 0 }}>
+        <div>
+          <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
+            color: accent, letterSpacing: "0.10em",
+            textTransform: "uppercase" as const, marginBottom: 4 }}>
+            {active ? "Active Subscription" : "Free Trial"}
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 24, fontFamily: MONO, fontWeight: 700, color: accent,
-              lineHeight: 1 }}>
-              {plan.price === 0 ? "Free" : `$${plan.price}`}
-            </div>
-            {plan.price > 0 && (
-              <div style={{ fontSize: 9, fontFamily: SANS, color: GR, marginTop: 3 }}>/ month</div>
-            )}
+          <div style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: W }}>
+            {active ? "Apex AI Trader" : "7-Day Free Access"}
           </div>
         </div>
-      </div>
-
-      {/* Divider */}
-      <div style={{ height: 1, background: E, margin: "14px 0" }}/>
-
-      {/* Feature list */}
-      <div style={{ padding: "0 18px 18px" }}>
-        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          {plan.features.map(f => (
-            <li key={f} style={{ display: "flex", gap: 10, alignItems: "flex-start",
-              padding: "5px 0" }}>
-              <span style={{ fontSize: 10, color: accent + "c0",
-                flexShrink: 0, marginTop: 2 }}>✓</span>
-              <span style={{ fontSize: 12, fontFamily: SANS, color: "rgba(255,255,255,0.75)",
-                lineHeight: 1.5 }}>
-                {f}
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        {/* CTA button */}
-        {plan.cta && !isCurrent && (
-          <button
-            disabled={loading}
-            onClick={() => onUpgrade(plan.id)}
-            style={{ width: "100%", marginTop: 16, padding: "14px 0",
-              background: accent + "12",
-              border: `1px solid ${accent}40`,
-              borderRadius: 10, color: loading ? GR : accent,
-              fontFamily: SANS, fontSize: 13, fontWeight: 600,
-              letterSpacing: "0.03em",
-              cursor: loading ? "wait" : "pointer",
-              transition: "all 0.15s ease" }}>
-            {loading ? "Redirecting…" : plan.cta}
-          </button>
-        )}
-        {isCurrent && plan.price > 0 && (
-          <div style={{ marginTop: 14, textAlign: "center", fontSize: 9,
-            fontFamily: SANS, color: GR }}>
-            Renews monthly · Cancel anytime
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 22, fontFamily: MONO, fontWeight: 700, color: accent, lineHeight: 1 }}>
+            {active ? "$5.99" : "Free"}
           </div>
-        )}
+          {active && (
+            <div style={{ fontSize: 9, fontFamily: SANS, color: GR, marginTop: 3 }}>/ month</div>
+          )}
+        </div>
       </div>
+      {active && (
+        <div style={{ fontSize: 9, fontFamily: SANS, color: GR, marginTop: 2 }}>
+          Renews monthly · Cancel anytime
+        </div>
+      )}
+      {!active && (
+        <div style={{ fontSize: 10, fontFamily: SANS, color: "rgba(255,180,0,0.70)",
+          marginTop: 6 }}>
+          Full access for 7 days — no credit card required to start
+        </div>
+      )}
     </div>
   );
 }
@@ -176,16 +74,16 @@ function PlanCard({
 export default function Billing() {
   const [, setLocation] = useLocation();
 
-  const { data: sub } = useQuery<Subscription>({
+  const { data: sub, isLoading } = useQuery<Subscription>({
     queryKey:  ["subscription"],
     queryFn:   () => api.get("/billing/subscription"),
     staleTime: 60_000,
   });
 
   const checkout = useMutation({
-    mutationFn: (planId: string) =>
+    mutationFn: () =>
       api.post<{ url: string }>("/billing/checkout", {
-        planId,
+        planId:        "starter",
         billingPeriod: "monthly",
         successUrl: `${window.location.origin}/apex-trader-app/profile?checkout=success`,
         cancelUrl:  `${window.location.origin}/apex-trader-app/billing`,
@@ -193,33 +91,34 @@ export default function Billing() {
     onSuccess: ({ url }) => { window.location.href = url; },
   });
 
-  const currentPlan = sub?.plan ?? "free";
+  const isSubscribed = sub?.plan && sub.plan !== "free";
 
   return (
-    <div className="page-enter" style={{ background: BG, minHeight: "100%", paddingBottom: 32 }}>
+    <div className="page-enter" style={{ background: BG, minHeight: "100%", paddingBottom: 36 }}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div style={{ padding: "18px 20px 20px",
-        borderBottom: `1px solid ${E}` }}>
+      <div style={{ padding: "18px 20px 18px", borderBottom: `1px solid ${E}` }}>
         <button onClick={() => setLocation("/profile")} style={{
           background: "none", border: "none", cursor: "pointer",
           fontFamily: SANS, fontSize: 10, fontWeight: 500,
-          color: GR, letterSpacing: "0.04em",
-          padding: "0 0 10px 0", display: "block",
+          color: GR, padding: "0 0 10px 0", display: "block",
         }}>
           ← Profile
         </button>
         <div style={{ fontSize: 22, fontFamily: SANS, fontWeight: 700, color: W }}>
-          Plans & Billing
+          Billing & Plan
         </div>
         <div style={{ fontSize: 11, fontFamily: SANS, color: GR, marginTop: 5, lineHeight: 1.5 }}>
-          Paper trading is always free. Subscribe for live AI execution.
+          One plan. Everything included.
         </div>
       </div>
 
       <div style={{ padding: "20px 16px 0" }}>
 
-        {/* Checkout error */}
+        {/* Status card */}
+        {!isLoading && <StatusCard sub={sub} />}
+
+        {/* Error */}
         {checkout.isError && (
           <div style={{ background: "rgba(255,51,85,0.07)",
             border: "1px solid rgba(255,51,85,0.22)",
@@ -229,41 +128,126 @@ export default function Billing() {
           </div>
         )}
 
-        {/* Plan cards */}
-        {PLANS.map(plan => (
-          <PlanCard
-            key={plan.id}
-            plan={plan}
-            isCurrent={currentPlan === plan.id}
-            onUpgrade={id => checkout.mutate(id)}
-            loading={checkout.isPending}
-          />
-        ))}
+        {/* Plan card */}
+        <div style={{ background: CARD,
+          border: "1px solid rgba(0,229,255,0.18)",
+          borderRadius: 16, overflow: "hidden", marginBottom: 16 }}>
+
+          {/* Plan header */}
+          <div style={{ padding: "20px 20px 16px",
+            borderBottom: `1px solid ${E}`,
+            background: "rgba(0,229,255,0.02)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between",
+              alignItems: "flex-start" }}>
+              <div>
+                <div style={{ fontSize: 10, fontFamily: SANS, fontWeight: 600,
+                  color: C, letterSpacing: "0.10em",
+                  textTransform: "uppercase" as const, marginBottom: 6 }}>
+                  Apex AI Trader
+                </div>
+                <div style={{ fontSize: 13, fontFamily: SANS,
+                  color: GR, lineHeight: 1.5, maxWidth: 200 }}>
+                  Full access to every feature, every day.
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 30, fontFamily: MONO, fontWeight: 700,
+                  color: W, lineHeight: 1 }}>
+                  $5.99
+                </div>
+                <div style={{ fontSize: 10, fontFamily: SANS, color: GR, marginTop: 4 }}>
+                  / month
+                </div>
+              </div>
+            </div>
+            <div style={{ marginTop: 10, fontSize: 9, fontFamily: SANS,
+              color: "rgba(255,180,0,0.72)" }}>
+              + 2% performance fee on profitable closed trades only
+            </div>
+          </div>
+
+          {/* Features */}
+          <div style={{ padding: "16px 20px 20px" }}>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {FEATURES.map(f => (
+                <li key={f} style={{ display: "flex", gap: 10,
+                  alignItems: "flex-start", padding: "5px 0" }}>
+                  <span style={{ fontSize: 10, color: "rgba(0,210,100,0.75)",
+                    flexShrink: 0, marginTop: 2 }}>✓</span>
+                  <span style={{ fontSize: 12, fontFamily: SANS,
+                    color: "rgba(255,255,255,0.78)", lineHeight: 1.5 }}>
+                    {f}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            {/* Trial note */}
+            <div style={{ marginTop: 16, padding: "10px 14px",
+              background: "rgba(0,229,255,0.04)",
+              border: "1px solid rgba(0,229,255,0.12)",
+              borderRadius: 8 }}>
+              <div style={{ fontSize: 10, fontFamily: SANS, fontWeight: 600,
+                color: "rgba(0,229,255,0.80)", marginBottom: 2 }}>
+                7 days free to start
+              </div>
+              <div style={{ fontSize: 9, fontFamily: SANS, color: GR, lineHeight: 1.6 }}>
+                Full access from day one. Cancel before day 7 and you won't be charged.
+              </div>
+            </div>
+
+            {/* CTA */}
+            {!isSubscribed && (
+              <button
+                disabled={checkout.isPending}
+                onClick={() => checkout.mutate()}
+                style={{
+                  width: "100%", marginTop: 16, padding: "15px 0",
+                  background: checkout.isPending
+                    ? "rgba(0,229,255,0.06)" : "rgba(0,229,255,0.12)",
+                  border: "1px solid rgba(0,229,255,0.35)",
+                  borderRadius: 12, color: checkout.isPending ? GR : C,
+                  fontFamily: SANS, fontSize: 14, fontWeight: 600,
+                  cursor: checkout.isPending ? "wait" : "pointer",
+                  transition: "all 0.15s ease",
+                }}>
+                {checkout.isPending ? "Redirecting…" : "Start Free — Then $5.99/mo"}
+              </button>
+            )}
+
+            {isSubscribed && (
+              <div style={{ marginTop: 16, textAlign: "center", fontSize: 10,
+                fontFamily: SANS, color: GR }}>
+                Manage or cancel via Stripe customer portal
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Trust strip */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
           gap: 8, marginBottom: 16 }}>
           {[
-            { icon: "🔒", label: "Stripe Secure",  sub: "Payment processing" },
-            { icon: "↩",  label: "Cancel Anytime", sub: "No lock-in"         },
-            { icon: "✓",  label: "No Hidden Fees", sub: "Clear pricing"      },
-          ].map(({ icon, label, sub }) => (
+            { label: "Stripe Secure",  sub: "Payment processing" },
+            { label: "Cancel Anytime", sub: "No lock-in"         },
+            { label: "No Hidden Fees", sub: "Clear pricing"      },
+          ].map(({ label, sub }) => (
             <div key={label} style={{ background: CARD, border: `1px solid ${E}`,
-              borderRadius: 10, padding: "12px 10px", textAlign: "center" }}>
-              <div style={{ fontSize: 16, marginBottom: 6 }}>{icon}</div>
+              borderRadius: 10, padding: "12px 10px", textAlign: "center" as const }}>
               <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
-                color: W, marginBottom: 2 }}>{label}</div>
+                color: "rgba(255,255,255,0.80)", marginBottom: 3 }}>{label}</div>
               <div style={{ fontSize: 8, fontFamily: SANS, color: GR }}>{sub}</div>
             </div>
           ))}
         </div>
 
-        {/* Footer note */}
+        {/* Footer */}
         <div style={{ padding: "12px 16px", background: CARD,
           border: `1px solid ${E}`, borderRadius: 8 }}>
           <div style={{ fontSize: 9, fontFamily: SANS, color: GR, lineHeight: 1.8 }}>
-            Subscriptions billed monthly via Stripe. Performance fees apply only to closed profitable trades.
-            Apex AI Trader never holds funds or requests withdrawal access from connected exchanges.
+            Billed monthly via Stripe. Performance fees apply only to closed profitable trades —
+            never on unrealised gains. Apex AI Trader never holds funds or requests
+            withdrawal access from connected exchanges.
           </div>
         </div>
       </div>

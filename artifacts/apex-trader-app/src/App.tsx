@@ -5,6 +5,8 @@ import {
 } from "@clerk/react";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { BottomNav } from "@/components/BottomNav";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
+import { SubscriptionModal }    from "@/components/SubscriptionModal";
 import Home      from "@/pages/Home";
 import Trade     from "@/pages/Trade";
 import Markets   from "@/pages/Markets";
@@ -37,9 +39,11 @@ function FullPageLoader() {
     <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", background: "#000000", gap: 20 }}>
       <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
-        color: "rgba(136,146,164,0.40)", letterSpacing: "0.3em" }}>APEX TRADER</div>
-      <div style={{ width: 22, height: 22, border: "1.5px solid rgba(255,255,255,0.07)",
-        borderTopColor: "rgba(0,229,255,0.70)", borderRadius: "50%",
+        color: "rgba(136,146,164,0.35)", letterSpacing: "0.3em" }}>APEX TRADER</div>
+      <div style={{ width: 22, height: 22,
+        border: "1.5px solid rgba(255,255,255,0.07)",
+        borderTopColor: "rgba(0,229,255,0.70)",
+        borderRadius: "50%",
         animation: "apex-spin 0.7s linear infinite" }} />
       <style>{`@keyframes apex-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
@@ -52,7 +56,7 @@ function MissingKeyError() {
       alignItems: "center", justifyContent: "center", background: "#000000",
       gap: 12, fontFamily: SANS }}>
       <div style={{ fontSize: 9, fontWeight: 600,
-        color: "rgba(136,146,164,0.40)", letterSpacing: "0.2em" }}>APEX TRADER</div>
+        color: "rgba(136,146,164,0.35)", letterSpacing: "0.2em" }}>APEX TRADER</div>
       <div style={{ fontSize: 13, color: "rgba(255,51,85,0.85)", fontWeight: 600 }}>
         Configuration Required
       </div>
@@ -65,7 +69,7 @@ function MissingKeyError() {
   );
 }
 
-// ── Auth pages ─────────────────────────────────────────────────────────────────
+// ── Auth page wrapper ──────────────────────────────────────────────────────────
 function AuthPage({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center",
@@ -106,13 +110,12 @@ function CacheInvalidator() {
   return null;
 }
 
-// ── Sub-page paths (no bottom nav) ─────────────────────────────────────────────
+// ── Sub-pages — no bottom nav ──────────────────────────────────────────────────
 const SUB_PAGES = ["/sign-", "/exchanges", "/billing", "/legal", "/subscribe", "/consent"];
 
 function Nav() {
   const [loc] = useLocation();
-  const isSubPage = SUB_PAGES.some(p => loc.startsWith(p));
-  if (isSubPage) return null;
+  if (SUB_PAGES.some(p => loc.startsWith(p))) return null;
   return (
     <ClerkLoaded>
       <Show when="signed-in"><BottomNav /></Show>
@@ -124,18 +127,15 @@ function Nav() {
 function Pages() {
   return (
     <Switch>
-      {/* Primary tabs */}
       <Route path="/"        component={() => <Protected><Home /></Protected>} />
       <Route path="/trade"   component={() => <Protected><Trade /></Protected>} />
       <Route path="/markets" component={() => <Protected><Markets /></Protected>} />
       <Route path="/profile" component={() => <Protected><Profile /></Protected>} />
-      {/* Sub-pages */}
-      <Route path="/subscribe"  component={() => <Protected><Subscribe /></Protected>} />
-      <Route path="/consent"    component={() => <Protected><Consent /></Protected>} />
-      <Route path="/exchanges"  component={() => <Protected><Exchanges /></Protected>} />
-      <Route path="/billing"    component={() => <Protected><Billing /></Protected>} />
+      <Route path="/subscribe"   component={() => <Protected><Subscribe /></Protected>} />
+      <Route path="/consent"     component={() => <Protected><Consent /></Protected>} />
+      <Route path="/exchanges"   component={() => <Protected><Exchanges /></Protected>} />
+      <Route path="/billing"     component={() => <Protected><Billing /></Protected>} />
       <Route path="/legal/:type" component={() => <Protected><LegalPage /></Protected>} />
-      {/* Auth */}
       <Route path="/sign-in/*?" component={() => (
         <AuthPage>
           <SignIn routing="path" path={`${basePath}/sign-in`}
@@ -148,12 +148,10 @@ function Pages() {
             signInUrl={`${basePath}/sign-in`} fallbackRedirectUrl={`${basePath}/`} />
         </AuthPage>
       )} />
-      {/* Legacy redirects */}
       <Route path="/signals"   component={() => <Redirect to="/markets" />} />
       <Route path="/portfolio" component={() => <Redirect to="/trade"   />} />
       <Route path="/live"      component={() => <Redirect to="/trade"   />} />
       <Route path="/account"   component={() => <Redirect to="/profile" />} />
-      {/* 404 */}
       <Route component={() => <Redirect to="/" />} />
     </Switch>
   );
@@ -162,14 +160,18 @@ function Pages() {
 // ── Mobile shell ───────────────────────────────────────────────────────────────
 function Shell() {
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100dvh",
-      maxWidth: 480, margin: "0 auto", background: "#000000", overflow: "hidden" }}>
-      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden",
-        paddingTop: "env(safe-area-inset-top, 0px)" }}>
-        <Pages />
+    <SubscriptionProvider>
+      <div style={{ display: "flex", flexDirection: "column", height: "100dvh",
+        maxWidth: 480, margin: "0 auto", background: "#000000", overflow: "hidden" }}>
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden",
+          paddingTop: "env(safe-area-inset-top, 0px)" }}>
+          <Pages />
+        </div>
+        <Nav />
       </div>
-      <Nav />
-    </div>
+      {/* Global paywall — renders above everything when triggered */}
+      <SubscriptionModal />
+    </SubscriptionProvider>
   );
 }
 
