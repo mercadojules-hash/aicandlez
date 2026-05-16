@@ -2,20 +2,66 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+
+    <!-- Viewport — cover for iOS notch/home indicator -->
+    <meta name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0,
+               user-scalable=no, viewport-fit=cover" />
+
+    <!-- Theme color — black OLED -->
+    <meta name="theme-color" content="#000000" />
+    <meta name="msapplication-TileColor" content="#000000" />
+    <meta name="msapplication-navbutton-color" content="#000000" />
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AICandlez" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="apple-touch-icon" href="%BASE_URL%aicandlez-logo.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%aicandlez-logo.png" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="%BASE_URL%manifest.json" />
+
+    <!-- SEO -->
     <title>AICandlez — AI Trading Platform</title>
     <meta name="description" content="AICandlez — AI-powered multi-asset trading platform. Crypto, equities, and ETFs powered by Alpaca." />
     <meta name="robots" content="index, follow" />
-    <meta property="og:title" content="AICandlez — AI Trading Platform" />
-    <meta property="og:description" content="AICandlez — AI-powered multi-asset trading platform. Crypto, equities, and ETFs powered by Alpaca." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="AICandlez — AI Trading Platform" />
+    <meta name="application-name" content="AICandlez" />
+
+    <!-- Open Graph -->
+    <meta property="og:title"       content="AICandlez — AI Trading Platform" />
+    <meta property="og:description" content="AI-powered multi-asset trading platform. Crypto, equities, and ETFs powered by Alpaca." />
+    <meta property="og:type"        content="website" />
+    <meta property="og:image"       content="%BASE_URL%opengraph.jpg" />
+
+    <!-- Twitter card -->
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="AICandlez — AI Trading Platform" />
     <meta name="twitter:description" content="AICandlez — AI-powered multi-asset trading platform. Crypto, equities, and ETFs powered by Alpaca." />
+    <meta name="twitter:image"       content="%BASE_URL%opengraph.jpg" />
+
+    <!-- Icons -->
     <link rel="icon" type="image/png" href="%BASE_URL%aicandlez-logo.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="shortcut icon"        href="%BASE_URL%favicon.svg" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet" />
+
+    <!-- Baseline: OLED black, no tap flash, no bounce -->
+    <style>
+      html, body, #root {
+        margin: 0; padding: 0; height: 100%;
+        background: #000000;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        overscroll-behavior: none;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

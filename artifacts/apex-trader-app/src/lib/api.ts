@@ -139,3 +139,65 @@ export interface SimTrade {
   entryPrice: number;
   exitPrice:  number;
 }
+
+export interface AlpacaHealth {
+  configured:     boolean;
+  auth:           boolean;
+  marketData:     boolean;
+  equity:         number;
+  buyingPower:    number;
+  status:         string;
+  accountBlocked: boolean;
+  isPaper:        boolean;
+}
+
+export interface AlpacaAccount {
+  equity:         number;
+  cash:           number;
+  buyingPower:    number;
+  portfolioValue: number;
+  isPaper:        boolean;
+  status:         string;
+  daytradeCount:  number;
+  accountBlocked: boolean;
+  tradingBlocked: boolean;
+}
+
+export interface AlpacaPosition {
+  id:           string;
+  symbol:       string;
+  qty:          number;
+  qtyAvail:     number;
+  side:         "BUY" | "SELL";
+  assetClass:   string;
+  entryPrice:   number;
+  currentPrice: number;
+  pnl:          number;
+  pnlPct:       number;
+  marketValue:  number;
+}
+
+export interface AlpacaOrder {
+  id:           string;
+  clientId:     string | null;
+  symbol:       string;
+  side:         "BUY" | "SELL";
+  type:         string;
+  qty:          number;
+  filledQty:    number;
+  avgFillPrice: number;
+  limitPrice:   number | null;
+  status:       string;
+  timeInForce:  string;
+  submittedAt:  string;
+  filledAt:     string | null;
+  canceledAt:   string | null;
+}
+
+export interface AlpacaActivateResult {
+  ok:         boolean;
+  exchange:   string;
+  isPaper:    boolean;
+  equity:     number;
+  buyingPower: number;
+}

@@ -1,0 +1,37 @@
+{
+  "name": "AICandlez",
+  "short_name": "AICandlez",
+  "description": "AI-powered multi-asset trading platform. Crypto, equities, and ETFs powered by Alpaca.",
+  "start_url": "/apex-trader-app/",
+  "scope": "/apex-trader-app/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "lang": "en-US",
+  "categories": ["finance", "productivity"],
+  "screenshots": [],
+  "icons": [
+    {
+      "src": "aicandlez-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "aicandlez-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "apex-logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": []
+}

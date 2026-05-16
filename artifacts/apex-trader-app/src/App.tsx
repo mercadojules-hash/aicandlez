@@ -11,6 +11,7 @@ import { BrokerConnectionProvider }        from "@/contexts/BrokerConnectionCont
 import { AIAutoTradeProvider }             from "@/contexts/AIAutoTradeContext";
 import { UserProfileProvider }             from "@/contexts/UserProfileContext";
 import { TradingAccountOnboardingModal }   from "@/components/TradingAccountOnboardingModal";
+import { AlpacaAutoTrader }               from "@/components/AlpacaAutoTrader";
 import Home      from "@/pages/Home";
 import Trade     from "@/pages/Trade";
 import Markets   from "@/pages/Markets";
@@ -181,6 +182,7 @@ function Shell() {
         </div>
         <SubscriptionModal />
         <TradingAccountOnboardingModal />
+        <AlpacaAutoTrader />
       </SubscriptionProvider>
     </BrokerConnectionProvider>
     </AIAutoTradeProvider>

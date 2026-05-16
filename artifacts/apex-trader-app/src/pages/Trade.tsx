@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type MobileStatus, type Portfolio, type SimTrade } from "@/lib/api";
+import { api, type MobileStatus, type Portfolio, type SimTrade, type AlpacaPosition } from "@/lib/api";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 
@@ -456,6 +456,8 @@ export default function Trade() {
   const { openOnboarding, status: brokerStatus } = useBrokerConnection();
   const tick = useLiveTimer();
 
+  const isAlpacaActive = brokerStatus === "paper_active" || brokerStatus === "live_active";
+
   const { data: status } = useQuery<MobileStatus>({
     queryKey: ["mobile-status"],
     queryFn:  () => api.get("/mobile/status"),
@@ -471,11 +473,33 @@ export default function Trade() {
     queryFn:  () => api.get("/simulation/trades"),
     retry: false, staleTime: 30_000,
   });
+  const { data: alpacaPositions } = useQuery<AlpacaPosition[]>({
+    queryKey: ["alpaca-positions"],
+    queryFn:  () => api.get<AlpacaPosition[]>("/exchange/alpaca/positions"),
+    enabled:  isAlpacaActive,
+    refetchInterval: 10_000,
+    retry: false,
+  });
 
   const engine    = status?.engine;
   const isLive    = engine?.mode === "live";
-  const positions = portfolio?.positions ?? [];
-  const openPnL   = portfolio?.openPnL ?? 0;
+
+  // Use real Alpaca positions when broker is active, otherwise fall back to sim
+  const alpacaMapped: Portfolio["positions"] = (alpacaPositions ?? []).map(p => ({
+    id:            p.id,
+    symbol:        p.symbol,
+    side:          p.side,
+    size:          p.qty,
+    entryPrice:    p.entryPrice,
+    currentPrice:  p.currentPrice,
+    unrealizedPnL: p.pnl,
+  }));
+  const positions = isAlpacaActive && alpacaMapped.length > 0
+    ? alpacaMapped
+    : (portfolio?.positions ?? []);
+  const openPnL = isAlpacaActive && alpacaMapped.length > 0
+    ? alpacaMapped.reduce((sum, p) => sum + (p.unrealizedPnL ?? 0), 0)
+    : (portfolio?.openPnL ?? 0);
   const history   = tradeHistory?.trades?.length ? tradeHistory.trades : MOCK_HISTORY;
   const wins      = history.filter(t => t.pnl > 0).length;
   const winPct    = history.length > 0 ? Math.round((wins / history.length) * 100) : 80;

@@ -1,9 +1,10 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
+import type { AlpacaActivateResult } from "@/lib/api";
 
 interface AIAutoTradeCtx {
-  enabled:    boolean;
-  setEnabled: (v: boolean) => void;
-  positions:  number;
+  enabled:      boolean;
+  setEnabled:   (v: boolean) => void;
+  positions:    number;
   maxPositions: number;
 }
 
@@ -24,6 +25,18 @@ export function AIAutoTradeProvider({ children }: { children: ReactNode }) {
     setEnabledRaw(v);
     try { localStorage.setItem("apex_ai_autotrade", v ? "true" : "false"); }
     catch {}
+
+    // When enabling, try to activate Alpaca paper trading
+    if (v) {
+      void fetch("/api/exchange/alpaca/activate", { method: "POST" })
+        .then(r => r.ok ? r.json() as Promise<AlpacaActivateResult> : null)
+        .then(data => {
+          if (data?.ok) {
+            console.debug("[AIAutoTrade] Alpaca activated — equity:", data.equity);
+          }
+        })
+        .catch(() => { /* credentials may not be set — silently ignore */ });
+    }
   };
 
   return (

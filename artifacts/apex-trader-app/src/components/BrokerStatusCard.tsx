@@ -86,10 +86,17 @@ interface BrokerStatusCardProps {
   compact?: boolean;
 }
 
+function fmtUSD(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000)     return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  return `$${n.toFixed(2)}`;
+}
+
 export function BrokerStatusCard({ compact = false }: BrokerStatusCardProps) {
-  const { status, accountNumber, openOnboarding } = useBrokerConnection();
+  const { status, accountNumber, openOnboarding, equity, buyingPower, alpacaOk, marketDataOk } =
+    useBrokerConnection();
   const cfg = CONFIG[status];
-  const isActive = status === "paper_active" || status === "live_active";
+  const isActive  = status === "paper_active" || status === "live_active";
   const isPending = status === "pending_verification";
 
   return (
@@ -156,10 +163,32 @@ export function BrokerStatusCard({ compact = false }: BrokerStatusCardProps) {
         )}
       </div>
 
-      {/* Alpaca badge — only on active states */}
-      {isActive && (
+      {/* Live account metrics — equity + buying power */}
+      {isActive && equity > 0 && !compact && (
         <div style={{
           marginTop:10, paddingTop:8,
+          borderTop:"1px solid rgba(255,255,255,0.05)",
+          display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:4,
+        }}>
+          {[
+            { label:"Equity",       value: fmtUSD(equity),      color: G  },
+            { label:"Buying Power", value: fmtUSD(buyingPower), color: C  },
+            { label:"Market Data",  value: marketDataOk ? "Live" : "—",  color: marketDataOk ? G : GR },
+          ].map(({ label, value, color }) => (
+            <div key={label} style={{ textAlign:"center" }}>
+              <div style={{ fontSize:11, fontFamily:MONO, fontWeight:700, color }}>{value}</div>
+              <div style={{ fontSize:7.5, fontFamily:SANS, color:GR, marginTop:2,
+                letterSpacing:"0.08em", textTransform:"uppercase" as const }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Alpaca badge */}
+      {isActive && (
+        <div style={{
+          marginTop: equity > 0 && !compact ? 8 : 10,
+          paddingTop: equity > 0 && !compact ? 8 : 8,
           borderTop:"1px solid rgba(255,255,255,0.05)",
           display:"flex", alignItems:"center", gap:6,
         }}>
@@ -177,6 +206,17 @@ export function BrokerStatusCard({ compact = false }: BrokerStatusCardProps) {
           <div style={{ fontSize:8, fontFamily:SANS, color:"rgba(136,146,164,0.45)" }}>
             Sandbox · Paper Mode
           </div>
+          {alpacaOk && (
+            <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:4 }}>
+              <div style={{
+                width:5, height:5, borderRadius:"50%",
+                background:"rgba(0,255,136,0.85)",
+                boxShadow:"0 0 5px rgba(0,255,136,0.55)",
+              }}/>
+              <span style={{ fontSize:7, fontFamily:SANS, color:"rgba(0,255,136,0.65)",
+                letterSpacing:"0.06em" }}>CONNECTED</span>
+            </div>
+          )}
         </div>
       )}
 

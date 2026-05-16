@@ -5,7 +5,17 @@ import { logger } from "../lib/logger.js";
 
 const router = Router();
 
-const ALPACA_HOST = "paper-api.alpaca.markets";
+// ── Host resolution ───────────────────────────────────────────────────────────
+// Priority: ALPACA_PAPER env flag > ALPACA_BASE_URL > default live
+function tradingHost(): string {
+  if (process.env["ALPACA_PAPER"] === "true") {
+    return "paper-api.alpaca.markets";
+  }
+  if (process.env["ALPACA_BASE_URL"]) {
+    try { return new URL(process.env["ALPACA_BASE_URL"]).hostname; } catch {}
+  }
+  return "api.alpaca.markets";
+}
 
 function alpacaHeaders(): Record<string, string> {
   return {
@@ -20,9 +30,10 @@ function isConfigured(): boolean {
 }
 
 function alpacaGet<T>(path: string): Promise<T> {
+  const host = tradingHost();
   return new Promise((resolve, reject) => {
     const req = https.get(
-      { hostname: ALPACA_HOST, path, headers: alpacaHeaders() },
+      { hostname: host, path, headers: alpacaHeaders() },
       res => {
         let d = "";
         res.on("data", c => { d += c as string; });
@@ -45,13 +56,14 @@ function alpacaGet<T>(path: string): Promise<T> {
 }
 
 function alpacaPost<T>(path: string, bodyStr: string): Promise<T> {
+  const host = tradingHost();
   return new Promise((resolve, reject) => {
     const headers = {
       ...alpacaHeaders(),
       "Content-Length": String(Buffer.byteLength(bodyStr)),
     };
     const req = https.request(
-      { hostname: ALPACA_HOST, path, method: "POST", headers },
+      { hostname: host, path, method: "POST", headers },
       res => {
         let d = "";
         res.on("data", c => { d += c as string; });
@@ -72,6 +84,22 @@ function alpacaPost<T>(path: string, bodyStr: string): Promise<T> {
     req.on("error", reject);
     req.write(bodyStr);
     req.end();
+  });
+}
+
+function alpacaDataGet<T>(path: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    https.get(
+      { hostname: "data.alpaca.markets", path, headers: alpacaHeaders() },
+      res => {
+        let d = "";
+        res.on("data", c => { d += c as string; });
+        res.on("end", () => {
+          try { resolve(JSON.parse(d) as T); }
+          catch { reject(new Error(`Non-JSON data response: ${d.slice(0, 200)}`)); }
+        });
+      }
+    ).on("error", reject);
   });
 }
 
@@ -121,6 +149,54 @@ interface AlpacaRawOrder {
   limit_price?: string | null;
 }
 
+// ── GET /api/exchange/alpaca/health ──────────────────────────────────────────
+// Quick connectivity check — auth + market data
+
+router.get("/exchange/alpaca/health", async (req, res) => {
+  if (!isConfigured()) {
+    res.json({ configured: false, auth: false, marketData: false, equity: 0, buyingPower: 0 });
+    return;
+  }
+
+  let auth = false;
+  let equity = 0;
+  let buyingPower = 0;
+  let status = "";
+  let accountBlocked = false;
+
+  try {
+    const acct = await alpacaGet<AlpacaRawAccount>("/v2/account");
+    auth         = true;
+    equity       = parseFloat(acct.equity);
+    buyingPower  = parseFloat(acct.buying_power);
+    status       = acct.status;
+    accountBlocked = acct.account_blocked || acct.trading_blocked;
+  } catch (err) {
+    req.log.warn({ err }, "Alpaca auth check failed");
+  }
+
+  let marketData = false;
+  try {
+    const data = await alpacaDataGet<{ bars: Record<string, unknown[]> }>(
+      "/v1beta3/crypto/us/latest/bars?symbols=BTC%2FUSD"
+    );
+    marketData = Object.keys(data.bars ?? {}).length > 0;
+  } catch (err) {
+    req.log.warn({ err }, "Alpaca market data check failed");
+  }
+
+  res.json({
+    configured:     true,
+    auth,
+    marketData,
+    equity,
+    buyingPower,
+    status,
+    accountBlocked,
+    isPaper:        tradingHost().includes("paper"),
+  });
+});
+
 // ── GET /api/exchange/alpaca/account ─────────────────────────────────────────
 
 router.get("/exchange/alpaca/account", async (req, res) => {
@@ -135,7 +211,7 @@ router.get("/exchange/alpaca/account", async (req, res) => {
       cash:           parseFloat(acct.cash),
       buyingPower:    parseFloat(acct.buying_power),
       portfolioValue: parseFloat(acct.portfolio_value),
-      isPaper:        process.env["ALPACA_PAPER"] === "true",
+      isPaper:        tradingHost().includes("paper"),
       status:         acct.status,
       daytradeCount:  acct.daytrade_count,
       accountBlocked: acct.account_blocked,
@@ -215,7 +291,6 @@ router.get("/exchange/alpaca/orders", async (req, res) => {
 });
 
 // ── POST /api/exchange/alpaca/activate ───────────────────────────────────────
-// Sets Alpaca as the active exchange and verifies connectivity
 
 router.post("/exchange/alpaca/activate", async (req, res) => {
   if (!isConfigured()) {
@@ -225,11 +300,11 @@ router.post("/exchange/alpaca/activate", async (req, res) => {
   try {
     const acct = await alpacaGet<AlpacaRawAccount>("/v2/account");
     setSelectedExchange("Alpaca");
-    logger.info("Alpaca set as active exchange (paper: %s)", process.env["ALPACA_PAPER"]);
+    logger.info("Alpaca set as active exchange (host: %s)", tradingHost());
     res.json({
       ok:             true,
       exchange:       "Alpaca",
-      isPaper:        process.env["ALPACA_PAPER"] === "true",
+      isPaper:        tradingHost().includes("paper"),
       equity:         parseFloat(acct.equity),
       buyingPower:    parseFloat(acct.buying_power),
       status:         getExchangeStatus(),
@@ -241,7 +316,6 @@ router.post("/exchange/alpaca/activate", async (req, res) => {
 });
 
 // ── POST /api/exchange/alpaca/order ──────────────────────────────────────────
-// Place a paper order through Alpaca
 
 router.post("/exchange/alpaca/order", async (req, res) => {
   if (!isConfigured()) {
@@ -259,8 +333,7 @@ router.post("/exchange/alpaca/order", async (req, res) => {
   }
 
   try {
-    // Alpaca crypto uses symbol format BTC/USD, equities use BTCUSD
-    const alpacaSymbol = symbol.replace("USD", "/USD").replace("//", "/");
+    const alpacaSymbol = symbol.includes("/") ? symbol : symbol.replace(/([A-Z]+)(USD)$/, "$1/$2");
 
     const body: Record<string, string | number> = {
       symbol:        alpacaSymbol,
