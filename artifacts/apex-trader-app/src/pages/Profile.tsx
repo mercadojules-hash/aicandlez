@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { useClerk, useUser } from "@clerk/react";
+import { useClerk } from "@clerk/react";
 import { useLocation } from "wouter";
 import { api, type Portfolio, type Subscription } from "@/lib/api";
+import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
+import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 
 // ── Design tokens ───────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -166,8 +168,8 @@ function SectionHead({ label, accent = "rgba(255,255,255,0.30)" }: { label: stri
 // ── Main page ─────────────────────────────────────────────────────────────────────
 export default function Profile() {
   const { signOut }     = useClerk();
-  const { user }        = useUser();
   const [, setLocation] = useLocation();
+  const { openOnboarding } = useBrokerConnection();
 
   const { data: portfolio } = useQuery<Portfolio>({
     queryKey:  ["mobile-portfolio"],
@@ -283,15 +285,21 @@ export default function Profile() {
           </div>
         </div>
 
+        {/* ── Trading Account Status ───────────────────────────────────────── */}
+        <div style={{ marginBottom: 18 }}>
+          <SectionHead label="Trading Account" accent={C}/>
+          <BrokerStatusCard />
+        </div>
+
         {/* ── Account ──────────────────────────────────────────────────────── */}
         <div style={{ marginBottom: 12 }}>
           <SectionHead label="Account"/>
           <div style={{ background: CARD, border: `1px solid ${E}`,
             borderRadius: 14, overflow: "hidden" }}>
             <SettingsRow
-              label="Manage Exchanges"
-              sub="API keys encrypted and securely stored"
-              onPress={() => setLocation("/exchanges")}
+              label="AI Trading Account"
+              sub="Powered by Alpaca · Sandbox paper mode"
+              onPress={openOnboarding}
             />
             <SettingsRow
               label="Billing & Plan"

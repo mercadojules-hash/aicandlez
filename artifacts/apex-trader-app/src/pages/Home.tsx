@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
+import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import apexLogo from "@assets/Apex_AI_Logo_300x68_1778889006762.png";
 import {
   api,
@@ -143,7 +144,7 @@ function Ticker({ items }: { items:string[] }) {
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { showPaywall } = useSubscription();
+  const { openOnboarding, status: brokerStatus } = useBrokerConnection();
 
   const { data:status }    = useQuery<MobileStatus>({
     queryKey:["mobile-status"],    queryFn:()=>api.get("/mobile/status"),    refetchInterval:5_000 });
@@ -647,48 +648,28 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Supported exchanges */}
+            {/* Broker account status */}
             <div style={{ marginBottom:16 }}>
-              <div style={{ fontSize:8, fontFamily:SANS, fontWeight:600, color:DIM,
-                letterSpacing:"0.12em", textTransform:"uppercase" as const, marginBottom:8 }}>
-                Supported Live Exchanges
-              </div>
-              <div style={{ display:"flex", gap:6, flexWrap:"wrap" as const, justifyContent:"center" }}>
-                {([
-                  { name:"Kraken",     accent:"rgba(155,92,245," },
-                  { name:"Coinbase",   accent:"rgba(80,130,255," },
-                  { name:"Binance",    accent:"rgba(255,184,0,"  },
-                  { name:"Robinhood",  accent:"rgba(0,200,120,"  },
-                  { name:"Crypto.com", accent:"rgba(0,160,220,"  },
-                  { name:"Gemini",     accent:"rgba(0,210,200,"  },
-                ] as { name:string; accent:string }[]).map(({ name, accent }) => (
-                  <span key={name} style={{
-                    padding:"4px 13px",
-                    background:`${accent}0.06)`,
-                    border:`1px solid ${accent}0.28)`,
-                    borderRadius:20,
-                    fontSize:9, fontFamily:SANS, fontWeight:500, color:GR,
-                    letterSpacing:"0.02em",
-                  }}>{name}</span>
-                ))}
-              </div>
+              <BrokerStatusCard />
             </div>
 
-            {/* CTA button */}
-            <button onClick={() => showPaywall("live_trading")} style={{
-              width:"100%", padding:"14px 0",
-              background:"rgba(0,229,255,0.10)",
-              border:`1px solid rgba(0,229,255,0.38)`,
-              borderRadius:10,
-              color:C, fontFamily:SANS, fontSize:13,
-              fontWeight:700, letterSpacing:"0.03em", cursor:"pointer",
-              animation:"cta-glow 5s ease-in-out infinite",
-            }}>
-              Activate Live AI Trading →
-            </button>
+            {/* CTA — only when not yet connected */}
+            {(brokerStatus === "idle") && (
+              <button onClick={openOnboarding} style={{
+                width:"100%", padding:"15px 0",
+                background:"linear-gradient(135deg, rgba(0,229,255,0.16), rgba(155,92,245,0.12))",
+                border:`1px solid rgba(0,229,255,0.48)`,
+                borderRadius:10,
+                color:C, fontFamily:SANS, fontSize:14,
+                fontWeight:700, letterSpacing:"0.02em", cursor:"pointer",
+                animation:"cta-glow 5s ease-in-out infinite",
+              }}>
+                Start AI Trading →
+              </button>
+            )}
             <div style={{ marginTop:8, textAlign:"center" as const,
               fontSize:9, fontFamily:SANS, color:DIM }}>
-              Institutional-grade AI · Withdrawal permissions never requested
+              Open your AI-powered trading account in minutes.
             </div>
           </div>
         </div>

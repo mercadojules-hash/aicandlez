@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type MobileStatus, type Portfolio, type SimTrade } from "@/lib/api";
-import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
+import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 
 // ── Design tokens (mirrors Home.tsx) ───────────────────────────────────────────
 const BG   = "#000000";
@@ -268,7 +269,7 @@ function SectionHead({ label, count }: { label: string; count?: number }) {
 // ── Main page ────────────────────────────────────────────────────────────────────
 export default function Trade() {
   const qc = useQueryClient();
-  const { showPaywall } = useSubscription();
+  const { openOnboarding, status: brokerStatus } = useBrokerConnection();
 
   const { data: status } = useQuery<MobileStatus>({
     queryKey: ["mobile-status"],
@@ -491,30 +492,20 @@ export default function Trade() {
           </div>
         </div>
 
-        {/* ── Activate live CTA ────────────────────────────────────────────── */}
-        <div style={{ padding: "13px 16px", background: "rgba(0,229,255,0.04)",
-          border: `1px solid rgba(0,229,255,0.14)`, borderRadius: 10,
-          display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600, color: C,
-              letterSpacing: "0.08em", textTransform: "uppercase" as const }}>
-              Activate Live Trading
-            </div>
-            <div style={{ fontSize: 8, fontFamily: SANS, color: GR, marginTop: 3 }}>
-              $5.99/mo + 2% on profitable trades
-            </div>
-          </div>
-          <button onClick={() => showPaywall("live_trading")} style={{
-            padding: "7px 16px",
-            background: "rgba(0,229,255,0.12)",
-            border: "1px solid rgba(0,229,255,0.38)",
-            borderRadius: 6, color: C,
-            fontFamily: SANS, fontSize: 9, fontWeight: 700,
-            letterSpacing: "0.06em", cursor: "pointer",
+        {/* ── Broker account status ────────────────────────────────────────── */}
+        <BrokerStatusCard />
+        {brokerStatus === "idle" && (
+          <button onClick={openOnboarding} style={{
+            width: "100%", padding: "14px 0", marginTop: 10,
+            background: "linear-gradient(135deg, rgba(0,229,255,0.15), rgba(155,92,245,0.11))",
+            border: "1px solid rgba(0,229,255,0.45)",
+            borderRadius: 10, color: C,
+            fontFamily: SANS, fontSize: 13, fontWeight: 700,
+            letterSpacing: "0.02em", cursor: "pointer",
           }}>
-            Activate →
+            Start AI Trading →
           </button>
-        </div>
+        )}
       </div>
 
       <style>{`

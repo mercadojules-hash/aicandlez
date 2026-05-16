@@ -7,13 +7,14 @@ import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/reac
 import { BottomNav } from "@/components/BottomNav";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { SubscriptionModal }    from "@/components/SubscriptionModal";
+import { BrokerConnectionProvider }        from "@/contexts/BrokerConnectionContext";
+import { TradingAccountOnboardingModal }   from "@/components/TradingAccountOnboardingModal";
 import Home      from "@/pages/Home";
 import Trade     from "@/pages/Trade";
 import Markets   from "@/pages/Markets";
 import Profile   from "@/pages/Profile";
 import Subscribe from "@/pages/Subscribe";
 import Consent   from "@/pages/Consent";
-import Exchanges from "@/pages/Exchanges";
 import Billing   from "@/pages/Billing";
 import LegalPage from "@/pages/LegalPage";
 
@@ -133,7 +134,7 @@ function Pages() {
       <Route path="/profile" component={() => <Protected><Profile /></Protected>} />
       <Route path="/subscribe"   component={() => <Protected><Subscribe /></Protected>} />
       <Route path="/consent"     component={() => <Protected><Consent /></Protected>} />
-      <Route path="/exchanges"   component={() => <Protected><Exchanges /></Protected>} />
+      <Route path="/exchanges"   component={() => <Redirect to="/profile" />} />
       <Route path="/billing"     component={() => <Protected><Billing /></Protected>} />
       <Route path="/legal/:type" component={() => <Protected><LegalPage /></Protected>} />
       <Route path="/sign-in/*?" component={() => (
@@ -160,18 +161,20 @@ function Pages() {
 // ── Mobile shell ───────────────────────────────────────────────────────────────
 function Shell() {
   return (
-    <SubscriptionProvider>
-      <div style={{ display: "flex", flexDirection: "column", height: "100dvh",
-        maxWidth: 480, margin: "0 auto", background: "#000000", overflow: "hidden" }}>
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden",
-          paddingTop: "env(safe-area-inset-top, 0px)" }}>
-          <Pages />
+    <BrokerConnectionProvider>
+      <SubscriptionProvider>
+        <div style={{ display: "flex", flexDirection: "column", height: "100dvh",
+          maxWidth: 480, margin: "0 auto", background: "#000000", overflow: "hidden" }}>
+          <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden",
+            paddingTop: "env(safe-area-inset-top, 0px)" }}>
+            <Pages />
+          </div>
+          <Nav />
         </div>
-        <Nav />
-      </div>
-      {/* Global paywall — renders above everything when triggered */}
-      <SubscriptionModal />
-    </SubscriptionProvider>
+        <SubscriptionModal />
+        <TradingAccountOnboardingModal />
+      </SubscriptionProvider>
+    </BrokerConnectionProvider>
   );
 }
 

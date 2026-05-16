@@ -1,0 +1,222 @@
+We are pivoting Apex AI Trader away from manual exchange/API-key onboarding and rebuilding the platform architecture around Alpaca Broker API + Stripe subscriptions.
+
+This is now a consumer fintech onboarding platform — NOT an exchange connector dashboard.
+
+CRITICAL PRODUCT CHANGES
+
+REMOVE completely:
+
+* Kraken exchange mode
+* Coinbase exchange mode
+* Binance exchange mode
+* Exchange switcher tabs
+* “Manage Exchanges”
+* API key onboarding forms
+* API key/secret storage
+* exchange connection instructions
+* exchange-specific settings pages
+* exchange credential modals
+* any copy referencing “paste API keys”
+
+REPLACE WITH:
+ONE unified brokerage flow powered by Alpaca Broker API.
+
+NEW PRODUCT FLOW
+
+1. User signs in
+
+* Apple
+* Google
+* Email
+
+2. User subscribes
+
+* Stripe subscription
+* Apple/Google billing later for mobile
+
+3. User taps:
+   “Start AI Trading”
+   OR
+   “Connect Trading Account”
+
+4. App launches onboarding flow:
+
+* identity verification
+* KYC
+* account creation
+* disclosures
+* account approval
+
+5. Alpaca Broker infrastructure handles:
+
+* brokerage account creation
+* account verification
+* compliance
+* paper/live accounts
+
+6. Apex AI engine handles:
+
+* AI analysis
+* signals
+* execution
+* automation
+* portfolio intelligence
+
+ARCHITECTURE UPDATE
+
+We are now building:
+
+* AI-powered retail trading platform
+* fintech onboarding system
+* broker-connected infrastructure
+
+NOT:
+
+* exchange management software
+* retail API-key utility
+* multi-exchange dashboard
+
+UI/UX CHANGES REQUIRED
+
+GLOBAL:
+
+* neon-bright visual system
+* stronger glow accents
+* thicker chart lines
+* brighter greens/yellows/reds
+* increase visual contrast everywhere
+* all pages should feel “alive”
+* dark institutional fintech aesthetic
+
+HOME / TRADE / MARKETS:
+Replace all “Activate Live AI Trading” sections with ONE consistent CTA system:
+
+PRIMARY CTA:
+“Start AI Trading”
+
+Secondary copy:
+“Open your AI-powered trading account in minutes.”
+
+Button behavior:
+
+* opens Alpaca onboarding modal/flow
+* no exchange selection
+* no API key forms
+
+PROFILE PAGE:
+
+* remove visible personal account identity references where inappropriate
+* keep professional fintech aesthetic
+* maintain centered donut alignment fixes
+* maintain readability improvements
+
+NEW REQUIRED COMPONENTS
+
+1. TradingAccountOnboardingModal.tsx
+   Features:
+
+* fintech onboarding flow
+* multi-step UI
+* identity/KYC placeholders
+* “powered by Alpaca”
+* smooth animations
+* neon glow accents
+* mobile-first design
+
+2. BrokerConnectionContext.tsx
+   Global broker/account state:
+
+* connected
+* pending_verification
+* paper_active
+* live_active
+* rejected
+* onboarding_required
+
+3. BrokerStatusCard.tsx
+   Reusable component for:
+
+* Home
+* Trade
+* Profile
+
+Shows:
+
+* Paper Trading Active
+* Verification Pending
+* Live Trading Enabled
+* Account Approval Status
+
+4. Remove exchange terminology globally
+   Replace:
+
+* exchange
+* API keys
+* connect exchange
+
+With:
+
+* trading account
+* AI trading account
+* broker account
+* connected account
+
+SANDBOX MODE
+
+IMPORTANT:
+Keep EVERYTHING in Alpaca Sandbox/Paper mode for now.
+
+DO NOT:
+
+* implement real funding
+* withdrawals
+* ACH
+* live money movement
+
+ONLY:
+
+* paper trading
+* onboarding UI
+* simulated execution
+* broker account structure
+
+NEW BUSINESS MODEL POSITIONING
+
+Apex AI Trader should now feel like:
+
+* Robinhood + AI
+* modern fintech app
+* AI-assisted investing platform
+
+NOT:
+
+* crypto dev tool
+* terminal utility
+* exchange admin dashboard
+
+DESIGN PRIORITY
+
+The app needs:
+
+* stronger neon color palette
+* vivid green/yellow profit accents
+* more animated glow states
+* brighter active indicators
+* thicker chart strokes
+* cleaner CTA hierarchy
+* App Store-grade polish
+
+FINAL GOAL
+
+One clean onboarding experience:
+
+User downloads app →
+Creates account →
+Subscribes →
+Taps “Start AI Trading” →
+Completes onboarding →
+AI begins paper trading automatically.
+
+No exchanges.
+No pasted API keys.
+No technical setup friction.
