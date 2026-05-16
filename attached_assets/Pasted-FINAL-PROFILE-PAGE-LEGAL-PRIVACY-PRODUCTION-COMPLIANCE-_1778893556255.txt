@@ -1,0 +1,154 @@
+FINAL PROFILE PAGE — LEGAL + PRIVACY + PRODUCTION COMPLIANCE PASS
+
+The Profile page is now visually correct.
+
+DO NOT redesign the layout.
+
+This pass is focused on:
+- privacy
+- production readiness
+- legal compliance
+- fintech trust signals
+- cleaner account realism
+
+────────────────────
+1. REMOVE PERSONAL INFORMATION
+────────────────────
+
+Remove:
+- Jules Mercado
+- mercadojules@gmail.com
+
+Replace with generic production-safe placeholder account info:
+
+Name:
+Alex Carter
+
+Email:
+alex.carter@apextrader.ai
+
+Member Since:
+Member since Jan 2026
+
+The app must NOT contain real developer personal information anywhere in production UI/screenshots.
+
+────────────────────
+2. ADD LEGAL / COMPLIANCE SECTION
+────────────────────
+
+Under:
+- “Billing & Plan”
+- above “Sign Out”
+
+Add a new clean institutional section:
+
+LEGAL & COMPLIANCE
+
+Rows:
+- Terms & Conditions
+- Privacy Policy
+- Risk Disclosure
+- Trading Disclaimer
+
+Style:
+- same row system as existing settings rows
+- same typography hierarchy
+- same spacing
+- same #0d151e card interior
+- same neutral borders
+
+NO extra glow.
+
+────────────────────
+3. ADD FINTECH DISCLAIMER BLOCK
+────────────────────
+
+At the bottom of the Profile page above the footer text, add a compact disclaimer container.
+
+Style:
+- subtle
+- clean
+- readable
+- premium fintech
+
+Container:
+- #0d151e interior
+- subtle neutral border
+- no glow
+
+Text:
+
+“Trading involves risk and may result in loss of capital. Apex AI Trader does not provide financial advice. Past performance does not guarantee future results.”
+
+Typography:
+- readable
+- secondary hierarchy
+- NOT tiny
+- users should not squint
+
+────────────────────
+4. ADD SECURITY / TRUST MICROCOPY
+────────────────────
+
+Under “Manage Exchanges” add a subtle security helper line:
+
+“API keys encrypted and securely stored”
+
+Very subtle.
+Professional.
+Builds trust.
+
+────────────────────
+5. PROFILE PAGE FINAL READABILITY PASS
+────────────────────
+
+Several text areas are STILL slightly too faint on mobile.
+
+Lift readability slightly for:
+- footer text
+- secondary labels
+- member since
+- disclaimer text
+- legal rows
+- settings subtitles
+
+Goal:
+Readable at arm’s length on an iPhone.
+
+Do NOT reduce contrast again.
+
+────────────────────
+6. FINAL MOBILE APP STORE READINESS PASS
+────────────────────
+
+Ensure:
+- no personal developer information
+- no placeholder lorem ipsum
+- no debug text
+- no fake terminal artifacts
+- no UI overlap
+- no clipped text
+- no unreadable labels
+- no navy background bleed
+
+Entire app should now feel:
+- premium
+- institutional
+- production-ready
+- App Store quality
+- fintech-grade
+
+The visual language should now resemble:
+- Robinhood Gold
+- TradingView
+- Coinbase Advanced
+- Bloomberg mobile terminal
+
+NOT:
+- gaming UI
+- cyberpunk UI
+- crypto meme app
+
+No TypeScript errors.
+No console errors.
+Production-ready refinement pass only.
