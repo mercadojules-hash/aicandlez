@@ -182,9 +182,9 @@ export default function Profile() {
 
   const tv       = portfolio?.totalValue ?? 103800;
   const plan     = sub?.plan ?? "free";
-  const initials = ((user?.firstName?.[0] ?? "A") + (user?.lastName?.[0] ?? "C")).toUpperCase();
-  const email    = user?.emailAddresses?.[0]?.emailAddress ?? "alex.carter@apextrader.ai";
-  const name     = user?.fullName ?? user?.firstName ?? "Alex Carter";
+  const initials = "AM";
+  const email    = "alex@apexai.trade";
+  const name     = "Alex Morgan";
 
   const realized  = 3800;
   const fees      = 142.88;

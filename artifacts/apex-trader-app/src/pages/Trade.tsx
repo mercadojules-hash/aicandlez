@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import { api, type MobileStatus, type Portfolio, type SimTrade } from "@/lib/api";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 // ── Design tokens (mirrors Home.tsx) ───────────────────────────────────────────
 const BG   = "#000000";
@@ -53,7 +53,7 @@ function sparkPath(pts: number[], w: number, h: number): string {
 function MiniSparkline({ symbol, up, w = 96, h = 38 }: { symbol: string; up: boolean; w?: number; h?: number }) {
   const pts  = miniSparkData(symbol, up);
   const d    = sparkPath(pts, w, h);
-  const col  = up ? "rgba(0,220,110,0.62)" : "rgba(230,70,70,0.58)";
+  const col  = up ? "rgba(0,235,120,0.88)" : "rgba(255,60,60,0.85)";
   const gid  = `sg-${symbol}-${up ? "u" : "d"}`;
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} shapeRendering="geometricPrecision"
@@ -267,8 +267,8 @@ function SectionHead({ label, count }: { label: string; count?: number }) {
 
 // ── Main page ────────────────────────────────────────────────────────────────────
 export default function Trade() {
-  const [, setLocation] = useLocation();
   const qc = useQueryClient();
+  const { showPaywall } = useSubscription();
 
   const { data: status } = useQuery<MobileStatus>({
     queryKey: ["mobile-status"],
@@ -412,9 +412,9 @@ export default function Trade() {
           {/* Donuts */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
             marginBottom: 16 }}>
-            <Donut value={winPct}     color="rgba(0,210,100,0.60)"  label="Win / Loss"/>
-            <Donut value={confidence} color="rgba(130,80,215,0.62)" label="AI Confidence"/>
-            <Donut value={exposure}   color="rgba(0,185,215,0.58)"  label="Exposure"/>
+            <Donut value={winPct}     color="rgba(0,230,120,0.88)"  label="Win / Loss"/>
+            <Donut value={confidence} color="rgba(155,92,245,0.88)" label="AI Confidence"/>
+            <Donut value={exposure}   color="rgba(0,229,255,0.85)"  label="Exposure"/>
           </div>
 
           {/* Stat row */}
@@ -504,15 +504,15 @@ export default function Trade() {
               $5.99/mo + 2% on profitable trades
             </div>
           </div>
-          <button onClick={() => setLocation("/subscribe")} style={{
-            padding: "7px 14px",
-            background: "rgba(0,229,255,0.10)",
-            border: "1px solid rgba(0,229,255,0.28)",
+          <button onClick={() => showPaywall("live_trading")} style={{
+            padding: "7px 16px",
+            background: "rgba(0,229,255,0.12)",
+            border: "1px solid rgba(0,229,255,0.38)",
             borderRadius: 6, color: C,
-            fontFamily: SANS, fontSize: 9, fontWeight: 600,
+            fontFamily: SANS, fontSize: 9, fontWeight: 700,
             letterSpacing: "0.06em", cursor: "pointer",
           }}>
-            Go Live →
+            Activate →
           </button>
         </div>
       </div>

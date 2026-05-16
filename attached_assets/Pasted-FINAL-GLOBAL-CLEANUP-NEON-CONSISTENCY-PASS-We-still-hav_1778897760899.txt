@@ -1,0 +1,202 @@
+FINAL GLOBAL CLEANUP + NEON CONSISTENCY PASS
+
+We still have OLD components and OLD pricing logic leaking into the app.
+
+The screenshots prove the following issues are NOT fully fixed yet.
+
+This is now a GLOBAL REFACTOR + CONSISTENCY PASS.
+
+DO NOT partially patch.
+
+Audit ALL pages, ALL components, ALL constants, ALL mock data, ALL routes.
+
+--------------------------------------------------
+1. REMOVE ALL OLD BILLING TIERS GLOBALLY
+--------------------------------------------------
+
+Delete ALL references to:
+
+- Pro
+- Starter
+- Institutional
+- $599
+- $4900
+- fake enterprise pricing
+- old subscription structures
+
+There should ONLY be:
+
+FREE TRIAL
+- 7 days
+- full paper trading access
+
+APEX AI TRADER
+- $5.99/month
+- 2% performance fee ONLY on profitable CLOSED trades
+- no fees on losing trades
+
+This must be reflected EVERYWHERE:
+- Home
+- Trade
+- Markets
+- Profile
+- Billing
+- Subscription Modal
+- CTA buttons
+- labels
+- plan badges
+- constants
+- mock data
+- context providers
+
+--------------------------------------------------
+2. REMOVE REAL PERSONAL INFO
+--------------------------------------------------
+
+My real name and email are STILL showing.
+
+Replace ALL user info globally with:
+
+Name:
+Alex Morgan
+
+Email:
+alex@apexai.trade
+
+Avatar initials:
+AM
+
+Member Since:
+Jan 2026
+
+Audit ALL pages and auth fallback states.
+
+--------------------------------------------------
+3. GLOBAL “ACTIVATE LIVE AI TRADING” SYSTEM
+--------------------------------------------------
+
+Every page must contain a CONSISTENT premium CTA section:
+
+ACTIVATE LIVE AI TRADING
+
+This section should:
+- look prominent
+- use bright neon cyan/green glow
+- feel premium
+- be identical across all pages
+
+The CTA must ALWAYS open the CORRECT subscription/paywall flow.
+
+Right now some buttons still open old pricing systems.
+
+Fix globally.
+
+All CTA actions must route into:
+SubscriptionProvider → showPaywall("live_trading")
+
+NO old routes.
+NO old modal logic.
+NO fake tier pages.
+
+--------------------------------------------------
+4. NEON VISUAL PASS
+--------------------------------------------------
+
+Increase visual energy throughout the ENTIRE app.
+
+Current UI is still too muted.
+
+TARGET:
+institutional + cyberpunk + premium fintech
+
+Increase:
+- neon greens
+- neon yellows
+- cyan
+- subtle magenta accents
+- brighter chart lines
+- brighter PnL
+- stronger highlights
+
+DO NOT:
+- add gaming UI
+- add cartoon glow
+- overblur everything
+
+Maintain:
+- black OLED background
+- professional layout
+- premium spacing
+
+--------------------------------------------------
+5. CHART + SPARKLINE IMPROVEMENTS
+--------------------------------------------------
+
+ALL chart lines are too thin/faint.
+
+Increase globally:
+
+- strokeWidth
+- saturation
+- opacity
+- chart visibility
+
+BUY charts:
+- neon green/cyan
+
+SELL charts:
+- neon red/orange
+
+Lines should feel alive and premium.
+
+--------------------------------------------------
+6. REMOVE OLD TOKEN SYSTEMS
+--------------------------------------------------
+
+Audit ALL pages for old:
+- DIM
+- old opacity systems
+- old color variables
+- old card backgrounds
+- old mock themes
+
+Everything should use ONE token system only.
+
+--------------------------------------------------
+7. GLOBAL CONSISTENCY CHECK
+--------------------------------------------------
+
+Audit ALL pages:
+- Home
+- Trade
+- Markets
+- Profile
+- Billing
+- Exchanges
+- Legal
+- Paywall modal
+
+Ensure:
+- same spacing rhythm
+- same card styling
+- same border language
+- same typography system
+- same CTA style
+- same neon language
+
+--------------------------------------------------
+8. CLEAN BUILD VERIFICATION
+--------------------------------------------------
+
+After edits:
+
+- run full TypeScript check
+- verify zero errors
+- verify zero console warnings
+- verify all buttons route correctly
+- verify no duplicate pricing systems remain
+
+Then provide:
+- list of ALL files modified
+- confirmation old pricing logic is fully removed
+- confirmation all CTAs use the same paywall flow

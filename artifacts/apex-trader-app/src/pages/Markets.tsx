@@ -11,7 +11,7 @@ const G    = "#00ff88";
 const R    = "#ff3355";
 const W    = "#ffffff";
 const GR   = "#8892a4";
-const DIM  = "#3a3f5c";
+const DIM  = "#647385";
 const SANS = "Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif";
 const MONO = "'SF Mono', 'Fira Code', 'JetBrains Mono', 'Roboto Mono', monospace";
 
@@ -67,7 +67,7 @@ function MiniSpark({ sym, action, w = 72, h = 28 }: { sym: string; action: strin
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} shapeRendering="geometricPrecision"
       style={{ overflow: "visible", flexShrink: 0 }}>
-      <path d={d} fill="none" stroke={col} strokeWidth="1.2"
+      <path d={d} fill="none" stroke={col} strokeWidth="1.8"
         strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
@@ -137,7 +137,7 @@ function AssetRow({ sym, bd, meta }: { sym: string; bd: SignalBreakdown; meta: P
 
         {/* Col 3 — Sparkline (flex fills remaining space) */}
         <div style={{ flex: 1, display: "flex", justifyContent: "center",
-          alignItems: "center", opacity: 0.80 }}>
+          alignItems: "center" }}>
           <MiniSpark sym={sym} action={action}/>
         </div>
 
@@ -387,7 +387,7 @@ export default function Markets() {
         <div style={{ marginTop: 16, padding: "11px 14px", background: CARD,
           border: `1px solid ${E}`, borderRadius: 8,
           fontSize: 8, fontFamily: SANS, color: GR, lineHeight: 1.7 }}>
-          Paper trading is always free. Live execution requires a Starter subscription ($5.99/mo + 2% on wins).
+          Paper trading is always free. Live AI trading is $5.99/mo + 2% performance fee on profitable closed trades only.
         </div>
       </div>
 

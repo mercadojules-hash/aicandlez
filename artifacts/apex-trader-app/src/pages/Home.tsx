@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useUser } from "@clerk/react";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import apexLogo from "@assets/Apex_AI_Logo_300x68_1778889006762.png";
 import {
   api,
@@ -59,7 +59,7 @@ function Sparkline({ seed, trend, w=78, h=28, animDelay="0s" }: {
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} shapeRendering="geometricPrecision"
       style={{ overflow:"visible", animation:`chart-drift 14s ease-in-out ${animDelay} infinite` }}>
-      <path d={d} fill="none" stroke={col} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d={d} fill="none" stroke={col} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
@@ -143,7 +143,7 @@ function Ticker({ items }: { items:string[] }) {
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { user } = useUser();
+  const { showPaywall } = useSubscription();
 
   const { data:status }    = useQuery<MobileStatus>({
     queryKey:["mobile-status"],    queryFn:()=>api.get("/mobile/status"),    refetchInterval:5_000 });
@@ -171,8 +171,8 @@ export default function Home() {
   const pColor   = planColor(plan);
   const pLabel   = planLabel(plan);
   const exchange = engine?.exchange?.toUpperCase() ?? "KRAKEN";
-  const initials = (user?.firstName?.[0]??"A")+(user?.lastName?.[0]??"T");
-  const name     = user?.firstName ?? "Apex Trader";
+  const initials = "AM";
+  const name     = "Alex Morgan";
 
   const tickerItems = [
     `BTC $68,120 ▲`, `ETH $3,512 ▲`, `SOL $188 ▼`,
@@ -675,10 +675,10 @@ export default function Home() {
             </div>
 
             {/* CTA button */}
-            <button onClick={()=>setLocation("/subscribe")} style={{
+            <button onClick={() => showPaywall("live_trading")} style={{
               width:"100%", padding:"14px 0",
-              background:"rgba(0,229,255,0.06)",
-              border:`1px solid rgba(0,229,255,0.25)`,
+              background:"rgba(0,229,255,0.10)",
+              border:`1px solid rgba(0,229,255,0.38)`,
               borderRadius:10,
               color:C, fontFamily:SANS, fontSize:13,
               fontWeight:700, letterSpacing:"0.03em", cursor:"pointer",
