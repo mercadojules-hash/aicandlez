@@ -9,6 +9,7 @@ import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { SubscriptionModal }    from "@/components/SubscriptionModal";
 import { BrokerConnectionProvider }        from "@/contexts/BrokerConnectionContext";
 import { AIAutoTradeProvider }             from "@/contexts/AIAutoTradeContext";
+import { UserProfileProvider }             from "@/contexts/UserProfileContext";
 import { TradingAccountOnboardingModal }   from "@/components/TradingAccountOnboardingModal";
 import Home      from "@/pages/Home";
 import Trade     from "@/pages/Trade";
@@ -166,6 +167,7 @@ function Pages() {
 // ── Mobile shell ───────────────────────────────────────────────────────────────
 function Shell() {
   return (
+    <UserProfileProvider>
     <AIAutoTradeProvider>
     <BrokerConnectionProvider>
       <SubscriptionProvider>
@@ -182,6 +184,7 @@ function Shell() {
       </SubscriptionProvider>
     </BrokerConnectionProvider>
     </AIAutoTradeProvider>
+    </UserProfileProvider>
   );
 }
 
