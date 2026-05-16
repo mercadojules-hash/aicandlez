@@ -1,0 +1,304 @@
+This next update is for BOTH the CRYPTO tab AND the EQUITIES tab at the SAME TIME.
+
+They should BOTH use:
+
+* the same layout
+* the same premium styling
+* the same scrolling asset list system
+* the same cinematic asset detail page structure
+
+The only difference between the two tabs should be:
+
+* the asset data
+* the accent color nuances
+* the market labels
+
+DO NOT build Crypto differently from Equities.
+
+They should feel like:
+two sections of the SAME institutional AI trading platform.
+
+━━━━━━━━━━━━━━━━━━━
+IMPORTANT ARCHITECTURE
+━━━━━━━━━━━━━━━━━━━
+
+We are now building:
+
+1. CRYPTO MARKET PAGE
+2. EQUITIES MARKET PAGE
+
+AND:
+
+3. INDIVIDUAL ASSET DETAIL PAGE
+   (shared structure used by BOTH tabs)
+
+Meaning:
+
+Crypto asset click:
+BTC → opens BTC Asset Detail Page
+
+Equities asset click:
+NVDA → opens NVDA Asset Detail Page
+
+Same page system.
+Same cinematic design language.
+Same execution engine.
+
+━━━━━━━━━━━━━━━━━━━
+CRYPTO TAB REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━
+
+Crypto tab should show:
+
+* Top crypto assets
+* AI confidence
+* direction
+* mini live charts
+* LONG / SHORT / HOLD status
+* volume
+* momentum
+
+Examples:
+BTC
+ETH
+SOL
+XRP
+ADA
+DOGE
+LINK
+AVAX
+MATIC
+DOT
+
+Scrollable vertically.
+
+Each row:
+clickable.
+
+━━━━━━━━━━━━━━━━━━━
+EQUITIES TAB REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━
+
+Equities tab should mirror the Crypto tab EXACTLY.
+
+Examples:
+NVDA
+TSLA
+AAPL
+META
+MSFT
+GOOGL
+SPY
+QQQ
+AMD
+AMZN
+
+Same:
+
+* layout
+* cards
+* glow system
+* charts
+* confidence bars
+* AI signals
+* scrolling behavior
+
+NO redesign between tabs.
+
+━━━━━━━━━━━━━━━━━━━
+MOST IMPORTANT FEATURE
+━━━━━━━━━━━━━━━━━━━
+
+Tapping ANY asset from:
+
+* Crypto
+  OR
+* Equities
+
+must open a dedicated:
+ASSET DETAIL / AI EXECUTION PAGE.
+
+━━━━━━━━━━━━━━━━━━━
+ASSET DETAIL PAGE
+━━━━━━━━━━━━━━━━━━━
+
+This page should become:
+the BEST looking page in the app.
+
+This is the:
+“wow factor”
+page.
+
+━━━━━━━━━━━━━━━━━━━
+ASSET DETAIL PAGE MUST INCLUDE
+━━━━━━━━━━━━━━━━━━━
+
+TOP SECTION
+
+* Asset symbol
+* Full name
+* Live price
+* Daily %
+* AI Status:
+
+  * Bullish
+  * Bearish
+  * Neutral
+
+━━━━━━━━━━━━━━━━━━━
+MAIN CHART
+━━━━━━━━━━━━━━━━━━━
+
+Large cinematic TradingView-style chart.
+
+Needs:
+
+* glowing candles
+* live motion
+* EMA overlays
+* support/resistance
+* TP/SL zones
+* AI entry markers
+* volume bars
+* premium gradients
+* smooth animation
+
+Timeframes:
+
+* 1H
+* 4H
+* 1D
+* 1W
+
+This chart should feel:
+alive.
+
+━━━━━━━━━━━━━━━━━━━
+AI ANALYSIS AREA
+━━━━━━━━━━━━━━━━━━━
+
+Show:
+
+* AI confidence
+* momentum
+* volatility
+* sentiment
+* trend strength
+* multi-timeframe confirmation
+* volume analysis
+
+Use:
+
+* rings
+* glow bars
+* micro charts
+* premium metrics
+
+━━━━━━━━━━━━━━━━━━━
+AI REASONING PANEL
+━━━━━━━━━━━━━━━━━━━
+
+Add professional AI commentary like:
+
+“Bullish continuation confirmed on 4H and Daily trend.”
+
+“Volume expansion supports breakout probability.”
+
+“Risk-adjusted entry favorable.”
+
+“Momentum remains above threshold confidence.”
+
+The AI should sound:
+institutional
+professional
+calculated
+
+NOT hype/gambling.
+
+━━━━━━━━━━━━━━━━━━━
+EXECUTION BUTTONS
+━━━━━━━━━━━━━━━━━━━
+
+Create LARGE premium buttons:
+
+* AI BUY
+* AI SELL
+* AUTO TRADE
+
+AUTO TRADE should feel:
+powerful
+intelligent
+premium
+
+NOT like a normal button.
+
+━━━━━━━━━━━━━━━━━━━
+RISK MANAGEMENT
+━━━━━━━━━━━━━━━━━━━
+
+Show:
+
+* stop loss %
+* take profit %
+* max exposure
+* risk level
+
+Add:
+“Maximum 5 concurrent AI positions.”
+
+This makes the AI feel disciplined.
+
+━━━━━━━━━━━━━━━━━━━
+RELATED ASSETS
+━━━━━━━━━━━━━━━━━━━
+
+Bottom horizontal scroll:
+“Related Opportunities”
+
+Examples:
+ETH
+SOL
+LINK
+NVDA
+TSLA
+SPY
+
+Each:
+clickable
+with mini charts + confidence.
+
+━━━━━━━━━━━━━━━━━━━
+VERY IMPORTANT
+━━━━━━━━━━━━━━━━━━━
+
+DO NOT:
+
+* redesign the app structure
+* redesign bottom navigation
+* remove current branding
+* flatten the UI
+* simplify the visuals
+
+KEEP:
+
+* black/cyan institutional aesthetic
+* cinematic glow system
+* premium typography
+* high-end fintech feel
+
+━━━━━━━━━━━━━━━━━━━
+FINAL GOAL
+━━━━━━━━━━━━━━━━━━━
+
+The Crypto tab and Equities tab should BOTH feel:
+premium
+alive
+institutional
+intelligent
+
+And the individual asset page should make users think:
+
+“This AI actually knows how to trade professionally.”
+
+NOT:
+“This is another crypto app.”
