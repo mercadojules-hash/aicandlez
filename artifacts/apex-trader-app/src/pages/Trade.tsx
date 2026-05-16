@@ -1,12 +1,14 @@
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type MobileStatus, type Portfolio, type SimTrade } from "@/lib/api";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 
-// ── Design tokens (mirrors Home.tsx) ───────────────────────────────────────────
+// ── Design tokens ────────────────────────────────────────────────────────────────
 const BG   = "#000000";
 const CARD = "#0d151e";
 const E    = "rgba(255,255,255,0.07)";
+const ESUB = "rgba(255,255,255,0.04)";
 const C    = "#00e5ff";
 const G    = "#00ff88";
 const P    = "#9b5cf5";
@@ -15,23 +17,57 @@ const R    = "#ff3355";
 const W    = "#ffffff";
 const GR   = "#8892a4";
 const DIM  = "#647385";
-const SANS = "Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif";
-const MONO = "'SF Mono', 'Fira Code', 'JetBrains Mono', 'Roboto Mono', monospace";
+const SANS = "'SF Pro Display','Inter',system-ui,-apple-system,BlinkMacSystemFont,sans-serif";
+const MONO = "'SF Mono','JetBrains Mono','Roboto Mono',Consolas,monospace";
 
-// ── Mini sparkline helpers ──────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────────
+const AI_STRATEGIES = ["EMA+RSI", "MTF TREND", "BREAKOUT", "MOMENTUM", "CONFLUENCE"];
+
+const MOCK_HISTORY: SimTrade[] = [
+  { id:"1",  symbol:"BTCUSD", side:"LONG",  pnl:  84.00, pnlPct:  2.58, score:88, closedAt:"2h ago",  entryPrice:67000, exitPrice:68732 },
+  { id:"2",  symbol:"ETHUSD", side:"SHORT", pnl: 112.00, pnlPct:  3.87, score:91, closedAt:"4h ago",  entryPrice:3400,  exitPrice:3268  },
+  { id:"3",  symbol:"NVDA",   side:"LONG",  pnl:  61.40, pnlPct:  7.53, score:82, closedAt:"6h ago",  entryPrice:815,   exitPrice:876.4 },
+  { id:"4",  symbol:"SOLUSD", side:"LONG",  pnl: -16.80, pnlPct: -2.76, score:44, closedAt:"9h ago",  entryPrice:192,   exitPrice:186.7 },
+  { id:"5",  symbol:"TSLA",   side:"SHORT", pnl:  43.20, pnlPct:  2.89, score:76, closedAt:"13h ago", entryPrice:191,   exitPrice:185.5 },
+  { id:"6",  symbol:"BTCUSD", side:"LONG",  pnl: 130.00, pnlPct:  3.93, score:85, closedAt:"18h ago", entryPrice:66500, exitPrice:69113 },
+  { id:"7",  symbol:"AAPL",   side:"LONG",  pnl:  22.40, pnlPct:  1.24, score:71, closedAt:"22h ago", entryPrice:189,   exitPrice:191.3 },
+  { id:"8",  symbol:"ETHUSD", side:"LONG",  pnl:  88.60, pnlPct:  2.91, score:87, closedAt:"28h ago", entryPrice:3350,  exitPrice:3447.6},
+  { id:"9",  symbol:"META",   side:"SHORT", pnl: -29.00, pnlPct: -1.48, score:38, closedAt:"34h ago", entryPrice:498,   exitPrice:505.4 },
+  { id:"10", symbol:"NVDA",   side:"LONG",  pnl: 142.00, pnlPct:  9.12, score:93, closedAt:"41h ago", entryPrice:820,   exitPrice:894.8 },
+];
+
+// ── Live ticker hook ─────────────────────────────────────────────────────────────
+function useLiveTimer() {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick(i => i + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return tick;
+}
+
+function fmtDuration(secs: number): string {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2,"0")}m`;
+  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+}
+
+// ── Spark data helpers ───────────────────────────────────────────────────────────
 function miniSparkData(symbol: string, up: boolean): number[] {
   const seed = symbol.split("").reduce((a, c) => a + c.charCodeAt(0), 17);
   const pts: number[] = [];
   let v = 48;
-  for (let i = 0; i < 22; i++) {
+  for (let i = 0; i < 30; i++) {
     const n = ((seed * (i + 5) * 2053 + i * 397) % 1000) / 1000;
-    v += (n - 0.48) * 11;
+    v += (n - 0.48) * 9;
     v = Math.max(8, Math.min(92, v));
     pts.push(v);
   }
-  const bias = up ? 9 : -9;
-  for (let i = pts.length - 6; i < pts.length; i++) {
-    pts[i] = Math.max(8, Math.min(92, pts[i] + bias * ((i - (pts.length - 6)) / 5)));
+  const bias = up ? 10 : -10;
+  for (let i = pts.length - 8; i < pts.length; i++) {
+    pts[i] = Math.max(8, Math.min(92, pts[i] + bias * ((i - (pts.length - 8)) / 7)));
   }
   return pts;
 }
@@ -45,232 +81,380 @@ function sparkPath(pts: number[], w: number, h: number): string {
   const ys = pts.map(p => h - pad - ((p - min) / range) * (h - pad * 2));
   let d = `M ${xs[0].toFixed(1)} ${ys[0].toFixed(1)}`;
   for (let i = 1; i < pts.length; i++) {
-    const cpx = ((xs[i - 1] + xs[i]) / 2).toFixed(1);
+    const cpx = ((xs[i-1] + xs[i]) / 2).toFixed(1);
     d += ` C ${cpx} ${ys[i-1].toFixed(1)} ${cpx} ${ys[i].toFixed(1)} ${xs[i].toFixed(1)} ${ys[i].toFixed(1)}`;
   }
   return d;
 }
 
-function MiniSparkline({ symbol, up, w = 96, h = 38 }: { symbol: string; up: boolean; w?: number; h?: number }) {
+// ── Premium sparkline ────────────────────────────────────────────────────────────
+function PremiumSparkline({ symbol, up, w = 100, h = 44, animDelay = "0s" }: {
+  symbol: string; up: boolean; w?: number; h?: number; animDelay?: string;
+}) {
   const pts  = miniSparkData(symbol, up);
   const d    = sparkPath(pts, w, h);
-  const col  = up ? "rgba(0,235,120,0.88)" : "rgba(255,60,60,0.85)";
-  const gid  = `sg-${symbol}-${up ? "u" : "d"}`;
+  const col  = up ? "#00eb78" : "#ff3c3c";
+  const gid  = `spk-${symbol.replace(/[^a-z0-9]/gi,"")}-${up ? "u" : "d"}`;
+  const min  = Math.min(...pts), max = Math.max(...pts);
+  const range = max - min || 1;
+  const pad  = h * 0.08;
+  const endY = h - pad - ((pts[pts.length-1] - min) / range) * (h - pad * 2);
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} shapeRendering="geometricPrecision"
-      style={{ overflow: "visible", flexShrink: 0 }}>
+      style={{ overflow:"visible", flexShrink:0,
+        animation:`chart-drift 8s ease-in-out ${animDelay} infinite` }}>
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor={col} stopOpacity="0.09"/>
+          <stop offset="0%"   stopColor={col} stopOpacity="0.22"/>
+          <stop offset="55%"  stopColor={col} stopOpacity="0.05"/>
           <stop offset="100%" stopColor={col} stopOpacity="0"/>
         </linearGradient>
+        <filter id={`gf-${gid}`} x="-10%" y="-50%" width="120%" height="200%">
+          <feGaussianBlur stdDeviation="1.4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
       </defs>
-      {/* subtle fill area */}
-      <path d={`${d} L ${w} ${h} L 0 ${h} Z`}
-        fill={`url(#${gid})`} />
-      {/* line */}
-      <path d={d} fill="none" stroke={col} strokeWidth="1.2"
-        strokeLinecap="round" strokeLinejoin="round"/>
+      {/* Faint grid */}
+      {[0.3, 0.5, 0.7].map((t, i) => (
+        <line key={i} x1={0} y1={h*t} x2={w} y2={h*t}
+          stroke="rgba(255,255,255,0.035)" strokeWidth="0.5" strokeDasharray="2 4"/>
+      ))}
+      {/* Area fill */}
+      <path d={`${d} L ${w} ${h} L 0 ${h} Z`} fill={`url(#${gid})`}/>
+      {/* Glow undercoat */}
+      <path d={d} fill="none" stroke={col} strokeWidth="3.5"
+        strokeOpacity="0.14" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* Crisp main line with glow filter */}
+      <path d={d} fill="none" stroke={col} strokeWidth="1.6"
+        strokeLinecap="round" strokeLinejoin="round" filter={`url(#gf-${gid})`}/>
+      {/* End-cap: outer halo */}
+      <circle cx={w} cy={endY} r="5" fill={col} opacity="0.12"/>
+      {/* End-cap: mid glow */}
+      <circle cx={w} cy={endY} r="3" fill={col} opacity="0.65"/>
+      {/* End-cap: bright core */}
+      <circle cx={w} cy={endY} r="1.4" fill="white" opacity="0.95"/>
     </svg>
   );
 }
 
-// ── Donut gauge ─────────────────────────────────────────────────────────────────
-function Donut({ value, color, label, size = 70 }: { value: number; color: string; label: string; size?: number }) {
-  const r    = (size - 12) / 2;
+// ── Donut ring metric ────────────────────────────────────────────────────────────
+function Donut({ value, color, label, sub, size = 78 }: {
+  value: number; color: string; label: string; sub?: string; size?: number;
+}) {
+  const r    = (size - 14) / 2;
   const cx   = size / 2;
   const circ = 2 * Math.PI * r;
   const fill = Math.min(value / 100, 1) * circ;
   return (
-    <div style={{ textAlign: "center" }}>
-      <svg width={size} height={size} shapeRendering="geometricPrecision">
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:7 }}>
+      <svg width={size} height={size} shapeRendering="geometricPrecision"
+        style={{ overflow:"visible" }}>
+        {/* Ambient outer ring */}
+        <circle cx={cx} cy={cx} r={r + 5} fill="none"
+          stroke={color} strokeWidth="0.5" strokeOpacity="0.12"/>
+        {/* Track */}
         <circle cx={cx} cy={cx} r={r} fill="none"
-          stroke="rgba(255,255,255,0.05)" strokeWidth="5"/>
+          stroke="rgba(255,255,255,0.05)" strokeWidth="5.5"/>
+        {/* Value arc */}
         <circle cx={cx} cy={cx} r={r} fill="none"
-          stroke={color} strokeWidth="5"
+          stroke={color} strokeWidth="5.5"
           strokeDasharray={`${fill} ${circ - fill}`}
           strokeLinecap="round"
           transform={`rotate(-90 ${cx} ${cx})`}
-          style={{ transition: "stroke-dasharray 0.6s ease" }}/>
-        <text x={cx} y={cx} textAnchor="middle" dominantBaseline="central"
-          fill="rgba(255,255,255,0.80)" fontSize="14" fontWeight="700"
-          fontFamily={MONO}>{value}</text>
+          style={{
+            transition:"stroke-dasharray 0.8s ease",
+            filter:`drop-shadow(0 0 5px ${color}55)`,
+          }}/>
+        {/* Center value */}
+        <text x={cx} y={cx - 4} textAnchor="middle" dominantBaseline="central"
+          fill="rgba(255,255,255,0.92)" fontSize="16" fontWeight="800"
+          fontFamily="'SF Pro Display','Inter',sans-serif">{value}</text>
+        {/* Center % */}
+        <text x={cx} y={cx + 11} textAnchor="middle" dominantBaseline="central"
+          fill={color} fontSize="7.5" fontWeight="700"
+          fontFamily="'SF Pro Display','Inter',sans-serif"
+          style={{ letterSpacing:"0.06em" }}>%</text>
       </svg>
-      <div style={{ fontSize: 7, fontFamily: SANS, fontWeight: 500, color: GR,
-        letterSpacing: "0.11em", marginTop: 2, textTransform: "uppercase" as const }}>{label}</div>
+      <div style={{ textAlign:"center" }}>
+        <div style={{ fontSize:8, fontFamily:SANS, fontWeight:700,
+          color:"rgba(255,255,255,0.55)", letterSpacing:"0.14em",
+          textTransform:"uppercase" as const }}>{label}</div>
+        {sub && (
+          <div style={{ fontSize:7, fontFamily:SANS, color:DIM, marginTop:2,
+            letterSpacing:"0.06em" }}>{sub}</div>
+        )}
+      </div>
     </div>
   );
 }
 
-// ── Position card ────────────────────────────────────────────────────────────────
-function PositionCard({ pos }: { pos: Portfolio["positions"][number] }) {
-  const pnl    = pos.unrealizedPnL ?? 0;
-  const up     = pnl >= 0;
-  const col    = up ? G : R;
-  const sl     = pos.entryPrice * (pos.side === "LONG" ? 0.965 : 1.035);
-  const tp     = pos.entryPrice * (pos.side === "LONG" ? 1.040 : 0.960);
-  const pnlPct = pos.entryPrice > 0 ? (pnl / (pos.entryPrice * pos.size)) * 100 : 0;
-  const borderCol = up ? "rgba(0,255,136,0.11)" : "rgba(255,51,85,0.09)";
+// ── TP / SL progress bar ─────────────────────────────────────────────────────────
+function TpSlBar({ sl, tp, current, up }: { sl:number; tp:number; current:number; up:boolean }) {
+  const pct = Math.max(0, Math.min(100, ((current - sl) / (tp - sl)) * 100));
+  const barCol = up
+    ? "linear-gradient(90deg, rgba(255,51,85,0.45), rgba(0,255,136,0.85))"
+    : "linear-gradient(90deg, rgba(255,51,85,0.45), rgba(255,148,0,0.75))";
+  return (
+    <div style={{ marginTop:10 }}>
+      <div style={{
+        position:"relative", height:3,
+        background:"rgba(255,255,255,0.05)", borderRadius:2,
+      }}>
+        <div style={{
+          position:"absolute", left:0, width:`${pct}%`, height:"100%",
+          background:barCol, borderRadius:2,
+          transition:"width 1.2s ease",
+        }}/>
+        <div style={{
+          position:"absolute", left:`${pct}%`, top:-1.5,
+          width:2, height:6,
+          background:"white", borderRadius:1,
+          transform:"translateX(-50%)",
+          boxShadow:"0 0 5px rgba(255,255,255,0.85)",
+        }}/>
+      </div>
+      <div style={{ display:"flex", justifyContent:"space-between", marginTop:5 }}>
+        <span style={{ fontSize:7.5, fontFamily:MONO, color:"rgba(255,51,85,0.65)" }}>
+          SL ${sl.toFixed(0)}
+        </span>
+        <span style={{ fontSize:7.5, fontFamily:MONO, color:GR }}>
+          ${current.toLocaleString("en-US",{maximumFractionDigits:0})}
+        </span>
+        <span style={{ fontSize:7.5, fontFamily:MONO, color:"rgba(0,255,136,0.65)" }}>
+          TP ${tp.toFixed(0)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Position card ─────────────────────────────────────────────────────────────────
+function PositionCard({ pos, tick }: { pos: Portfolio["positions"][number]; tick: number }) {
+  const pnl     = pos.unrealizedPnL ?? 0;
+  const up      = pnl >= 0;
+  const col     = up ? G : R;
+  const current = pos.currentPrice ?? pos.entryPrice;
+  const sl      = pos.entryPrice * (pos.side === "LONG" ? 0.965 : 1.035);
+  const tp      = pos.entryPrice * (pos.side === "LONG" ? 1.042 : 0.958);
+  const pnlPct  = pos.entryPrice > 0 ? (pnl / (pos.entryPrice * pos.size)) * 100 : 0;
+  const symHash = pos.symbol.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  const aiConf  = 55 + (symHash * 7 + 13) % 34;
+  const strategy = AI_STRATEGIES[symHash % AI_STRATEGIES.length];
+  const elapsed  = 1800 + (symHash % 5400) + tick;
+  const duration = fmtDuration(elapsed);
 
   return (
-    <div style={{ background: CARD, border: `1px solid ${borderCol}`,
-      borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
+    <div style={{
+      position:"relative", overflow:"hidden",
+      background:`linear-gradient(160deg, #0e1c2e 0%, #0a1520 100%)`,
+      border:`1px solid ${up ? "rgba(0,255,136,0.14)" : "rgba(255,51,85,0.12)"}`,
+      borderRadius:14, padding:"14px 16px", marginBottom:10,
+      boxShadow:[
+        "0 8px 32px rgba(0,0,0,0.90)",
+        `0 0 0 0.5px ${up ? "rgba(0,255,136,0.06)" : "rgba(255,51,85,0.05)"} inset`,
+      ].join(","),
+    }}>
+      {/* Top laser edge */}
+      <div aria-hidden style={{
+        position:"absolute", top:0, left:0, right:0, height:1.5,
+        background:`linear-gradient(90deg, transparent 8%, ${col}65 38%, ${col}50 60%, transparent 92%)`,
+        animation:`edge-sweep ${5 + (symHash % 4)}s ease-in-out infinite`,
+      }}/>
+      {/* Ambient corner glow */}
+      <div aria-hidden style={{
+        position:"absolute", top:-20, right:-10, width:110, height:110, borderRadius:"50%",
+        background:`radial-gradient(circle, ${col}07 0%, transparent 70%)`,
+        pointerEvents:"none",
+        animation:"orb-breathe 7s ease-in-out infinite",
+      }}/>
 
-      {/* Row 1 — symbol + side badge + P&L */}
-      <div style={{ display: "flex", justifyContent: "space-between",
-        alignItems: "flex-start", marginBottom: 12 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 15, fontFamily: MONO, fontWeight: 700, color: W }}>
-              {pos.symbol}
-            </span>
-            <span style={{ padding: "2px 8px",
-              background: up ? "rgba(0,255,136,0.08)" : "rgba(255,51,85,0.08)",
-              border: `1px solid ${up ? "rgba(0,255,136,0.22)" : "rgba(255,51,85,0.22)"}`,
-              borderRadius: 4,
-              fontSize: 8, fontFamily: SANS, fontWeight: 600, color: col,
-              letterSpacing: "0.08em" }}>
-              {pos.side}
-            </span>
-          </div>
-          <div style={{ fontSize: 9, fontFamily: SANS, color: GR }}>
-            <span style={{ fontFamily: MONO }}>{pos.size}</span>
-            {" @ "}
-            <span style={{ fontFamily: MONO }}>{pos.entryPrice.toFixed(0)}</span>
-            {" · 2h ago"}
-          </div>
-        </div>
-
-        {/* P&L block */}
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 18, fontFamily: MONO, fontWeight: 700, color: col }}>
-            {up ? "+" : ""}${Math.abs(pnl).toFixed(2)}
-          </div>
-          <div style={{ fontSize: 10, fontFamily: MONO, color: col, opacity: 0.75, marginTop: 1 }}>
-            {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
-          </div>
-        </div>
-      </div>
-
-      {/* Row 2 — SL / current price / TP + sparkline */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {/* SL / price / TP */}
-        <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ textAlign: "left" }}>
-            <div style={{ fontSize: 7, fontFamily: SANS, color: GR, letterSpacing: "0.1em",
-              marginBottom: 2 }}>SL</div>
-            <div style={{ fontSize: 10, fontFamily: MONO, fontWeight: 600,
-              color: "rgba(255,51,85,0.80)" }}>${sl.toFixed(0)}</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 7, fontFamily: SANS, color: GR, letterSpacing: "0.1em",
-              marginBottom: 2 }}>CURRENT</div>
-            <div style={{ fontSize: 12, fontFamily: MONO, fontWeight: 700, color: W }}>
-              ${(pos.currentPrice ?? pos.entryPrice).toLocaleString("en-US",
-                { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      <div style={{ position:"relative" }}>
+        {/* Row 1: symbol + badges + PnL */}
+        <div style={{ display:"flex", justifyContent:"space-between",
+          alignItems:"flex-start", marginBottom:10 }}>
+          <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              {/* Live pulse dot */}
+              <div style={{
+                width:5, height:5, borderRadius:"50%", background:col, flexShrink:0,
+                boxShadow:`0 0 7px ${col}99`,
+                animation:"dot-pulse 2s ease-in-out infinite",
+              }}/>
+              <span style={{ fontSize:16, fontFamily:SANS, fontWeight:800, color:W,
+                letterSpacing:"-0.01em" }}>
+                {pos.symbol.replace("USD","")}
+              </span>
+              <span style={{
+                padding:"2px 8px",
+                background: up ? "rgba(0,255,136,0.08)" : "rgba(255,51,85,0.08)",
+                border:`1px solid ${up ? "rgba(0,255,136,0.22)" : "rgba(255,51,85,0.22)"}`,
+                borderRadius:4,
+                fontSize:8, fontFamily:SANS, fontWeight:700, color:col,
+                letterSpacing:"0.08em",
+              }}>{pos.side}</span>
+            </div>
+            {/* Strategy + timer */}
+            <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+              <span style={{
+                padding:"2px 7px",
+                background:"rgba(155,92,245,0.08)",
+                border:"1px solid rgba(155,92,245,0.20)",
+                borderRadius:4,
+                fontSize:7.5, fontFamily:MONO, fontWeight:600, color:P,
+                letterSpacing:"0.05em",
+              }}>{strategy}</span>
+              <span style={{ fontSize:8, fontFamily:MONO, color:DIM,
+                animation:"timer-tick 1s step-end infinite" }}>
+                ⏱ {duration}
+              </span>
             </div>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 7, fontFamily: SANS, color: GR, letterSpacing: "0.1em",
-              marginBottom: 2 }}>TP</div>
-            <div style={{ fontSize: 10, fontFamily: MONO, fontWeight: 600,
-              color: "rgba(0,255,136,0.80)" }}>${tp.toFixed(0)}</div>
+          {/* PnL */}
+          <div style={{ textAlign:"right" }}>
+            <div style={{
+              fontSize:20, fontFamily:SANS, fontWeight:800,
+              color:col, letterSpacing:"-0.02em",
+              animation:"pnl-flash 3s ease-in-out infinite",
+            }}>
+              {up ? "+" : ""}${Math.abs(pnl).toFixed(2)}
+            </div>
+            <div style={{ fontSize:10, fontFamily:MONO, color:col, opacity:0.75, marginTop:1 }}>
+              {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+            </div>
           </div>
         </div>
 
-        {/* Micro sparkline — right-aligned, supports the card, doesn't dominate it */}
-        <div style={{ flexShrink: 0, opacity: 0.68 }}>
-          <MiniSparkline symbol={pos.symbol} up={up} w={88} h={34}/>
+        {/* Row 2: size + entry + AI confidence */}
+        <div style={{ display:"flex", alignItems:"center",
+          justifyContent:"space-between", marginBottom:10 }}>
+          <div style={{ fontSize:9, fontFamily:SANS, color:GR }}>
+            <span style={{ fontFamily:MONO }}>{pos.size}</span>
+            {" @ "}
+            <span style={{ fontFamily:MONO }}>
+              ${pos.entryPrice.toLocaleString("en-US",{maximumFractionDigits:0})}
+            </span>
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <span style={{ fontSize:7.5, fontFamily:SANS, color:DIM, letterSpacing:"0.08em" }}>
+              AI CONF
+            </span>
+            <div style={{
+              width:50, height:3, background:"rgba(255,255,255,0.06)",
+              borderRadius:2, overflow:"hidden",
+            }}>
+              <div style={{
+                width:`${aiConf}%`, height:"100%",
+                background:`linear-gradient(90deg, rgba(155,92,245,0.55), rgba(155,92,245,1))`,
+                borderRadius:2,
+                boxShadow:"0 0 4px rgba(155,92,245,0.55)",
+              }}/>
+            </div>
+            <span style={{ fontSize:8, fontFamily:MONO, fontWeight:700, color:P }}>{aiConf}%</span>
+          </div>
+        </div>
+
+        {/* Row 3: TP/SL bar + chart */}
+        <div style={{ display:"flex", alignItems:"flex-end", gap:12 }}>
+          <div style={{ flex:1 }}>
+            <TpSlBar sl={sl} tp={tp} current={current} up={up}/>
+          </div>
+          <div style={{ flexShrink:0, marginBottom:2, opacity:0.88 }}>
+            <PremiumSparkline symbol={pos.symbol} up={up} w={96} h={40}
+              animDelay={`${symHash % 8}s`}/>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Trade history row ────────────────────────────────────────────────────────────
-const MOCK_HISTORY: SimTrade[] = [
-  { id:"1", symbol:"BTC",  side:"LONG",  pnl:  84.00, pnlPct:  2.58, score:88, closedAt:"25h ago",  entryPrice:67000, exitPrice:68732 },
-  { id:"2", symbol:"ETH",  side:"SHORT", pnl: 112.00, pnlPct:  3.87, score:91, closedAt:"49h ago",  entryPrice:3400,  exitPrice:3268  },
-  { id:"3", symbol:"NVDA", side:"LONG",  pnl:  61.40, pnlPct:  7.53, score:82, closedAt:"55h ago",  entryPrice:815,   exitPrice:876.4 },
-  { id:"4", symbol:"SOL",  side:"LONG",  pnl: -16.80, pnlPct: -2.76, score:44, closedAt:"73h ago",  entryPrice:192,   exitPrice:186.7 },
-  { id:"5", symbol:"TSLA", side:"SHORT", pnl:  43.20, pnlPct:  2.89, score:76, closedAt:"97h ago",  entryPrice:191,   exitPrice:185.5 },
-  { id:"6", symbol:"BTC",  side:"LONG",  pnl: 130.00, pnlPct:  3.93, score:85, closedAt:"121h ago", entryPrice:66500, exitPrice:69113 },
-];
-
+// ── Trade history row ─────────────────────────────────────────────────────────────
 function TradeRow({ trade }: { trade: SimTrade }) {
-  const up  = trade.pnl >= 0;
-  const col = up ? G : R;
+  const up      = trade.pnl >= 0;
+  const pnlCol  = up ? G : R;
+  const scoreCol = trade.score !== undefined
+    ? (trade.score >= 70 ? G : trade.score >= 50 ? O : R) : GR;
   return (
-    <div style={{ display: "flex", alignItems: "center",
-      padding: "11px 0", borderBottom: `1px solid rgba(255,255,255,0.05)` }}>
-      <div style={{ width: 2, height: 28, background: col, opacity: 0.45,
-        borderRadius: 2, flexShrink: 0, marginRight: 14 }}/>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontFamily: MONO, fontWeight: 600,
-          color: "rgba(255,255,255,0.93)" }}>
-          {trade.symbol}
+    <div style={{
+      display:"flex", alignItems:"center",
+      padding:"10px 16px",
+      borderBottom:`1px solid ${ESUB}`,
+    }}>
+      <div style={{
+        width:2.5, height:36, flexShrink:0, marginRight:12, borderRadius:2,
+        background:`linear-gradient(180deg, ${pnlCol}, ${pnlCol}44)`,
+        boxShadow:`0 0 5px ${pnlCol}33`,
+      }}/>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:13, fontFamily:SANS, fontWeight:700, color:W,
+          letterSpacing:"-0.01em" }}>
+          {trade.symbol.replace("USD","")}
         </div>
-        <div style={{ fontSize: 8, fontFamily: SANS, color: GR, marginTop: 2 }}>
-          {trade.side} · {trade.closedAt}
+        <div style={{ fontSize:8, fontFamily:SANS, color:GR, marginTop:2 }}>
+          <span style={{ color:pnlCol, fontWeight:600 }}>{trade.side}</span>
+          {" · "}
+          <span style={{ fontFamily:MONO }}>${trade.entryPrice.toLocaleString("en-US",{maximumFractionDigits:0})}</span>
+          <span style={{ color:DIM }}> → </span>
+          <span style={{ fontFamily:MONO }}>${trade.exitPrice.toLocaleString("en-US",{maximumFractionDigits:0})}</span>
+          {" · "}
+          <span style={{ color:DIM }}>{trade.closedAt}</span>
         </div>
       </div>
-      <div style={{ textAlign: "right", flex: 1 }}>
-        <div style={{ fontSize: 13, fontFamily: MONO, fontWeight: 600,
-          color: up ? "rgba(0,220,110,0.82)" : "rgba(230,70,70,0.80)" }}>
+      <div style={{ flexShrink:0, marginRight:10, opacity:0.65 }}>
+        <PremiumSparkline symbol={trade.symbol + trade.id} up={up} w={52} h={24}/>
+      </div>
+      <div style={{ textAlign:"right", marginRight:10, flexShrink:0 }}>
+        <div style={{ fontSize:13, fontFamily:MONO, fontWeight:700, color:pnlCol }}>
           {up ? "+" : ""}${Math.abs(trade.pnl).toFixed(2)}
         </div>
-        <div style={{ fontSize: 9, fontFamily: MONO,
-          color: up ? "rgba(0,220,110,0.72)" : "rgba(230,70,70,0.68)", marginTop: 1 }}>
+        <div style={{ fontSize:9, fontFamily:MONO, color:pnlCol, opacity:0.72, marginTop:1 }}>
           {up ? "+" : ""}{trade.pnlPct.toFixed(2)}%
         </div>
       </div>
       {trade.score !== undefined && (
-        <div style={{ marginLeft: 12, width: 30, height: 30, borderRadius: 6,
-          background: trade.score >= 70 ? "rgba(0,210,100,0.06)"
-                    : trade.score >= 50 ? "rgba(255,148,0,0.06)"
-                    : "rgba(230,70,70,0.06)",
-          border: `1px solid ${trade.score >= 70 ? "rgba(0,210,100,0.18)"
-                              : trade.score >= 50 ? "rgba(255,148,0,0.18)"
-                              : "rgba(230,70,70,0.18)"}`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 10, fontFamily: MONO, fontWeight: 600,
-          color: trade.score >= 70 ? "rgba(0,210,100,0.80)"
-               : trade.score >= 50 ? "rgba(255,148,0,0.80)"
-               : "rgba(230,70,70,0.78)" }}>
-          {trade.score}
-        </div>
+        <div style={{
+          width:28, height:28, borderRadius:6, flexShrink:0,
+          background:`${scoreCol}08`, border:`1px solid ${scoreCol}22`,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:9.5, fontFamily:MONO, fontWeight:700, color:scoreCol,
+        }}>{trade.score}</div>
       )}
     </div>
   );
 }
 
-// ── Section header ───────────────────────────────────────────────────────────────
-function SectionHead({ label, count }: { label: string; count?: number }) {
+// ── Section header ────────────────────────────────────────────────────────────────
+function SectionHead({ label, count, color = GR }: {
+  label: string; count?: number; color?: string;
+}) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-      <div style={{ width: 2, height: 13, background: "rgba(255,255,255,0.25)",
-        borderRadius: 2, flexShrink: 0 }}/>
-      <span style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
-        color: "rgba(255,255,255,0.50)",
-        letterSpacing: "0.18em", textTransform: "uppercase" as const }}>
+    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+      <div style={{
+        width:2.5, height:14, background:color, borderRadius:2, flexShrink:0,
+        opacity:0.60, boxShadow:`0 0 6px ${color}55`,
+      }}/>
+      <span style={{ fontSize:9, fontFamily:SANS, fontWeight:700,
+        color:"rgba(255,255,255,0.50)",
+        letterSpacing:"0.18em", textTransform:"uppercase" as const }}>
         {label}
       </span>
       {count !== undefined && (
-        <div style={{ marginLeft: "auto", minWidth: 20, height: 20, borderRadius: 4,
-          background: "rgba(255,255,255,0.05)", border: `1px solid ${E}`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 10, fontFamily: MONO, fontWeight: 600, color: GR, padding: "0 5px" }}>
-          {count}
-        </div>
+        <div style={{
+          marginLeft:"auto", minWidth:22, height:20, borderRadius:4,
+          background:"rgba(255,255,255,0.04)", border:`1px solid ${E}`,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:10, fontFamily:MONO, fontWeight:600, color:GR, padding:"0 5px",
+        }}>{count}</div>
       )}
     </div>
   );
 }
 
-// ── Main page ────────────────────────────────────────────────────────────────────
+// ── Main page ─────────────────────────────────────────────────────────────────────
 export default function Trade() {
   const qc = useQueryClient();
   const { openOnboarding, status: brokerStatus } = useBrokerConnection();
+  const tick = useLiveTimer();
 
   const { data: status } = useQuery<MobileStatus>({
     queryKey: ["mobile-status"],
@@ -312,207 +496,314 @@ export default function Trade() {
   });
 
   return (
-    <div className="page-enter" style={{ background: BG, minHeight: "100%", paddingBottom: 28 }}>
+    <div className="page-enter" style={{ background:BG, minHeight:"100%", paddingBottom:28 }}>
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div style={{ padding: "18px 20px 14px",
-        display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+      {/* ── Header ───────────────────────────────────────────────────────────── */}
+      <div style={{ padding:"18px 20px 14px",
+        display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: W, fontFamily: SANS,
-            letterSpacing: "-0.01em" }}>
+          <div style={{ fontSize:22, fontWeight:800, color:W,
+            fontFamily:SANS, letterSpacing:"-0.02em" }}>
             Live Trading
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5 }}>
-            <div style={{ width: 5, height: 5, borderRadius: "50%", background: G,
-              flexShrink: 0, animation: "dot-pulse 2.5s ease-in-out infinite" }}/>
-            <span style={{ fontSize: 9, fontFamily: SANS, fontWeight: 500, color: GR,
-              letterSpacing: "0.12em", textTransform: "uppercase" as const }}>
-              AI Engine Active
+          <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:5 }}>
+            <div style={{
+              width:5, height:5, borderRadius:"50%", background:G, flexShrink:0,
+              boxShadow:`0 0 8px ${G}99`,
+              animation:"dot-pulse 2.5s ease-in-out infinite",
+            }}/>
+            <span style={{ fontSize:9, fontFamily:SANS, fontWeight:500, color:GR,
+              letterSpacing:"0.12em", textTransform:"uppercase" as const }}>
+              AI Engine {engine?.running ? "Active" : "Standby"}
             </span>
           </div>
         </div>
-
-        {/* Mode badge */}
         <div style={{
-          padding: "3px 11px",
-          border: `1px solid ${isLive ? "rgba(0,255,136,0.25)" : "rgba(0,229,255,0.20)"}`,
-          background: isLive ? "#001508" : "#00101a",
-          borderRadius: 4, marginTop: 4,
-          fontSize: 9, fontFamily: SANS, fontWeight: 600,
-          color: isLive ? G : C, letterSpacing: "0.05em",
+          padding:"4px 12px",
+          border:`1px solid ${isLive ? "rgba(0,255,136,0.25)" : "rgba(0,229,255,0.20)"}`,
+          background: isLive ? "rgba(0,255,136,0.06)" : "rgba(0,229,255,0.04)",
+          borderRadius:20, marginTop:4,
+          display:"flex", alignItems:"center", gap:5,
         }}>
-          {isLive ? "Live" : "Simulation"}
+          <div style={{ width:4, height:4, borderRadius:"50%",
+            background: isLive ? G : C,
+            animation:"dot-pulse 2.5s ease-in-out infinite" }}/>
+          <span style={{ fontSize:8, fontFamily:SANS, fontWeight:700,
+            color: isLive ? G : C, letterSpacing:"0.06em" }}>
+            {isLive ? "LIVE" : "SIM"}
+          </span>
         </div>
       </div>
 
-      <div style={{ padding: "0 16px" }}>
+      <div style={{ padding:"0 12px" }}>
 
-        {/* ── Execution controls ──────────────────────────────────────────── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
-
-          {/* KILL */}
+        {/* ── Control buttons ──────────────────────────────────────────────── */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14 }}>
           <button onClick={() => killMutation.mutate()} style={{
-            background: "rgba(255,51,85,0.05)",
-            border: "1px solid rgba(255,51,85,0.18)",
-            borderRadius: 10, padding: "13px 0",
-            cursor: "pointer", display: "flex", flexDirection: "column",
-            alignItems: "center", gap: 7,
+            background:"rgba(255,51,85,0.05)",
+            border:"1px solid rgba(255,51,85,0.18)",
+            borderRadius:12, padding:"13px 0", cursor:"pointer",
+            display:"flex", flexDirection:"column", alignItems:"center", gap:7,
           }}>
             <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
               <circle cx="11" cy="11" r="8.5" stroke="rgba(255,51,85,0.70)" strokeWidth="1.4"/>
               <path d="M7.5 7.5l7 7M14.5 7.5l-7 7" stroke="rgba(255,51,85,0.80)"
                 strokeWidth="1.8" strokeLinecap="round"/>
             </svg>
-            <span style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
-              color: "rgba(255,51,85,0.85)", letterSpacing: "0.09em" }}>KILL</span>
+            <span style={{ fontSize:9, fontFamily:SANS, fontWeight:700,
+              color:"rgba(255,51,85,0.85)", letterSpacing:"0.09em" }}>KILL</span>
           </button>
 
-          {/* PAUSE */}
           <button onClick={() => pauseMutation.mutate()} style={{
-            background: "rgba(255,148,0,0.05)",
-            border: "1px solid rgba(255,148,0,0.18)",
-            borderRadius: 10, padding: "13px 0",
-            cursor: "pointer", display: "flex", flexDirection: "column",
-            alignItems: "center", gap: 7,
+            background:"rgba(255,148,0,0.05)",
+            border:"1px solid rgba(255,148,0,0.18)",
+            borderRadius:12, padding:"13px 0", cursor:"pointer",
+            display:"flex", flexDirection:"column", alignItems:"center", gap:7,
           }}>
             <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
-              <rect x="6.5" y="5.5" width="3" height="11" rx="1.5"
-                fill="rgba(255,148,0,0.75)"/>
-              <rect x="12.5" y="5.5" width="3" height="11" rx="1.5"
-                fill="rgba(255,148,0,0.75)"/>
+              <rect x="6.5" y="5.5" width="3" height="11" rx="1.5" fill="rgba(255,148,0,0.75)"/>
+              <rect x="12.5" y="5.5" width="3" height="11" rx="1.5" fill="rgba(255,148,0,0.75)"/>
             </svg>
-            <span style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
-              color: "rgba(255,148,0,0.85)", letterSpacing: "0.09em" }}>PAUSE</span>
+            <span style={{ fontSize:9, fontFamily:SANS, fontWeight:700,
+              color:"rgba(255,148,0,0.85)", letterSpacing:"0.09em" }}>PAUSE</span>
           </button>
 
-          {/* AUTO */}
           <button onClick={() => autoMutation.mutate()} style={{
-            background: engine?.autoMode ? "rgba(0,229,255,0.06)" : "rgba(255,255,255,0.02)",
-            border: `1px solid ${engine?.autoMode ? "rgba(0,229,255,0.22)" : "rgba(0,229,255,0.12)"}`,
-            borderRadius: 10, padding: "13px 0",
-            cursor: "pointer", display: "flex", flexDirection: "column",
-            alignItems: "center", gap: 7,
+            background: engine?.autoMode ? "rgba(0,229,255,0.07)" : "rgba(255,255,255,0.02)",
+            border:`1px solid ${engine?.autoMode ? "rgba(0,229,255,0.25)" : "rgba(0,229,255,0.12)"}`,
+            borderRadius:12, padding:"13px 0", cursor:"pointer",
+            display:"flex", flexDirection:"column", alignItems:"center", gap:7,
           }}>
             <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
               <rect x="3.5" y="3.5" width="15" height="15" rx="2.5"
-                stroke={engine?.autoMode ? "rgba(0,229,255,0.85)" : "rgba(0,229,255,0.50)"}
+                stroke={engine?.autoMode ? "rgba(0,229,255,0.85)" : "rgba(0,229,255,0.40)"}
                 strokeWidth="1.4"/>
               <path d="M7 11h4m4 0h-4m0 0V7m0 4v4"
-                stroke={engine?.autoMode ? "rgba(0,229,255,0.85)" : "rgba(0,229,255,0.50)"}
+                stroke={engine?.autoMode ? "rgba(0,229,255,0.85)" : "rgba(0,229,255,0.40)"}
                 strokeWidth="1.4" strokeLinecap="round"/>
             </svg>
-            <span style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
-              color: engine?.autoMode ? "rgba(0,229,255,0.90)" : "rgba(0,229,255,0.72)",
-              letterSpacing: "0.09em" }}>AUTO</span>
+            <span style={{ fontSize:9, fontFamily:SANS, fontWeight:700,
+              color: engine?.autoMode ? "rgba(0,229,255,0.90)" : "rgba(0,229,255,0.55)",
+              letterSpacing:"0.09em" }}>AUTO</span>
           </button>
         </div>
 
-        {/* ── Metrics panel ───────────────────────────────────────────────── */}
-        <div style={{ background: CARD, border: `1px solid ${E}`,
-          borderRadius: 14, padding: "18px 16px", marginBottom: 12 }}>
+        {/* ── Metrics panel — centered donuts ──────────────────────────────── */}
+        <div style={{
+          position:"relative", overflow:"hidden",
+          background:`linear-gradient(160deg, #0d1822 0%, #090f1c 100%)`,
+          border:"1px solid rgba(255,255,255,0.07)",
+          borderRadius:16, padding:"22px 10px 18px", marginBottom:12,
+          boxShadow:"0 8px 32px rgba(0,0,0,0.90)",
+        }}>
+          {/* Laser top edge */}
+          <div aria-hidden style={{
+            position:"absolute", top:0, left:0, right:0, height:1.5,
+            background:`linear-gradient(90deg, transparent 8%, rgba(155,92,245,0.55) 38%, rgba(0,229,255,0.40) 60%, transparent 92%)`,
+            animation:"edge-sweep 10s ease-in-out infinite",
+          }}/>
 
-          {/* Donuts */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
-            marginBottom: 16 }}>
-            <Donut value={winPct}     color="rgba(0,230,120,0.88)"  label="Win / Loss"/>
-            <Donut value={confidence} color="rgba(155,92,245,0.88)" label="AI Confidence"/>
-            <Donut value={exposure}   color="rgba(0,229,255,0.85)"  label="Exposure"/>
+          {/* Donut trio — perfectly centered, equal columns */}
+          <div style={{
+            display:"grid", gridTemplateColumns:"1fr 1fr 1fr",
+            justifyItems:"center", alignItems:"start",
+            columnGap:0, marginBottom:20,
+          }}>
+            <Donut value={winPct}     color="rgba(0,230,120,0.90)"  label="Win/Loss"   sub={`${wins}W · ${history.length - wins}L`}/>
+            <Donut value={confidence} color="rgba(155,92,245,0.90)" label="AI Conf"    sub="avg confidence"/>
+            <Donut value={exposure}   color="rgba(0,229,255,0.88)"  label="Exposure"   sub="capital deployed"/>
           </div>
 
-          {/* Stat row */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr",
-            borderTop: `1px solid rgba(255,255,255,0.05)`, paddingTop: 14 }}>
+          {/* Stats row */}
+          <div style={{
+            display:"grid", gridTemplateColumns:"repeat(4, 1fr)",
+            borderTop:"1px solid rgba(255,255,255,0.05)",
+            paddingTop:14, textAlign:"center",
+          }}>
             {([
-              { val: "+2",      sub: "wins",  label: "Streak",   color: G },
-              { val: "47m",     sub: "",      label: "Avg Hold", color: C },
-              { val: `${winPct}%`, sub: "",   label: "Win Rate", color: G },
-            ] as { val:string; sub:string; label:string; color:string }[]).map(({ val, sub, label, color }) => (
-              <div key={label} style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 14, fontFamily: MONO, fontWeight: 700, color }}>{val}</div>
-                {sub && <div style={{ fontSize: 7, color: GR, fontFamily: SANS }}>{sub}</div>}
-                <div style={{ fontSize: 7, color: GR, fontFamily: SANS,
-                  letterSpacing: "0.08em", marginTop: 2, textTransform: "uppercase" as const }}>
+              { val:"+2 wins",     label:"Streak",   color:G },
+              { val:"47m",         label:"Avg Hold", color:C },
+              { val:`${history.length}`, label:"Trades",   color:W },
+              { val:`${engine?.signalsGenerated ?? 0}`, label:"Signals",  color:P },
+            ] as { val:string; label:string; color:string }[]).map(({ val, label, color }) => (
+              <div key={label}>
+                <div style={{ fontSize:13, fontFamily:SANS, fontWeight:800, color,
+                  letterSpacing:"-0.01em" }}>{val}</div>
+                <div style={{ fontSize:7.5, fontFamily:SANS, fontWeight:500, color:DIM,
+                  letterSpacing:"0.10em", marginTop:3, textTransform:"uppercase" as const }}>
                   {label}
                 </div>
               </div>
             ))}
-
-            {/* AI status dot */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center",
-              flexDirection: "column", gap: 5 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%",
-                background: G, opacity: 0.80,
-                animation: "dot-pulse 2.5s ease-in-out 0.6s infinite" }}/>
-              <div style={{ fontSize: 7, fontFamily: SANS, fontWeight: 500,
-                color: GR, letterSpacing: "0.1em",
-                textTransform: "uppercase" as const }}>AI Active</div>
-            </div>
           </div>
         </div>
 
-        {/* ── Total unrealized P&L ────────────────────────────────────────── */}
-        <div style={{ background: CARD,
-          border: `1px solid ${openPnL >= 0 ? "rgba(0,255,136,0.18)" : "rgba(255,51,85,0.15)"}`,
-          borderRadius: 12, padding: "14px 18px", marginBottom: 14,
-          display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        {/* ── Total unrealized P&L ─────────────────────────────────────────── */}
+        <div style={{
+          background:CARD,
+          border:`1px solid ${openPnL >= 0 ? "rgba(0,255,136,0.16)" : "rgba(255,51,85,0.14)"}`,
+          borderRadius:12, padding:"13px 18px", marginBottom:14,
+          display:"flex", justifyContent:"space-between", alignItems:"center",
+          boxShadow:`0 0 0 0.5px ${openPnL >= 0 ? "rgba(0,255,136,0.05)" : "rgba(255,51,85,0.04)"} inset`,
+        }}>
           <div>
-            <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 500, color: GR,
-              letterSpacing: "0.14em", textTransform: "uppercase" as const, marginBottom: 4 }}>
-              Total Unrealized P&L
+            <div style={{ fontSize:9, fontFamily:SANS, fontWeight:600, color:GR,
+              letterSpacing:"0.14em", textTransform:"uppercase" as const, marginBottom:4 }}>
+              Unrealized P&L
             </div>
-            <div style={{ fontSize: 9, fontFamily: SANS, color: GR }}>
-              <span style={{ fontFamily: MONO }}>{positions.length}</span>
-              {" "}open position{positions.length !== 1 ? "s" : ""}
+            <div style={{ fontSize:9, fontFamily:SANS, color:GR }}>
+              <span style={{ fontFamily:MONO }}>{positions.length}</span>
+              {" open position"}{positions.length !== 1 ? "s" : ""}
             </div>
           </div>
-          <div style={{ fontSize: 26, fontFamily: MONO, fontWeight: 700,
-            color: openPnL >= 0 ? G : R }}>
+          <div style={{
+            fontSize:26, fontFamily:SANS, fontWeight:800,
+            color: openPnL >= 0 ? G : R, letterSpacing:"-0.02em",
+            animation:"pnl-flash 3s ease-in-out infinite",
+          }}>
             {openPnL >= 0 ? "+" : ""}${Math.abs(openPnL).toFixed(2)}
           </div>
         </div>
 
-        {/* ── Open positions ───────────────────────────────────────────────── */}
-        <div style={{ marginBottom: 15 }}>
-          <SectionHead label="Open Positions" count={positions.length}/>
-          {positions.length === 0 && (
-            <div style={{ background: CARD, border: `1px solid ${E}`,
-              borderRadius: 12, padding: "28px 0", textAlign: "center",
-              fontSize: 10, fontFamily: SANS, color: GR, letterSpacing: "0.06em" }}>
-              No open positions
+        {/* ── Open positions — scrollable ───────────────────────────────────── */}
+        <div style={{ marginBottom:16 }}>
+          <SectionHead label="Open Positions" count={positions.length} color={G}/>
+
+          {positions.length === 0 ? (
+            <div style={{
+              background:CARD, border:`1px solid ${E}`,
+              borderRadius:14, padding:"30px 0", textAlign:"center",
+            }}>
+              <div style={{ display:"flex", justifyContent:"center", marginBottom:10 }}>
+                {[0,1,2,3,4].map(i => (
+                  <div key={i} style={{
+                    width:2, height:[8,14,10,12,7][i],
+                    background:GR, borderRadius:1, margin:"0 2px",
+                    animation:`wave-bar 1.8s ease-in-out ${(i*0.22).toFixed(2)}s infinite alternate`,
+                    opacity:0.35,
+                  }}/>
+                ))}
+              </div>
+              <div style={{ fontSize:10, fontFamily:SANS, color:GR, letterSpacing:"0.06em" }}>
+                No open positions
+              </div>
+              <div style={{ fontSize:8, fontFamily:SANS, color:DIM, marginTop:4 }}>
+                AI monitoring markets in real time
+              </div>
+            </div>
+          ) : (
+            <div style={{ position:"relative" }}>
+              <div className="positions-scroll" style={{
+                maxHeight:460,
+                overflowY:"auto", overflowX:"hidden",
+                scrollBehavior:"smooth",
+                WebkitOverflowScrolling:"touch",
+                paddingRight:2,
+              }}>
+                {positions.map(pos => (
+                  <PositionCard key={pos.id} pos={pos} tick={tick}/>
+                ))}
+              </div>
+              {positions.length > 2 && (
+                <>
+                  <div style={{
+                    position:"absolute", top:0, left:0, right:4, height:18,
+                    background:"linear-gradient(180deg, #000, transparent)",
+                    pointerEvents:"none", zIndex:1,
+                  }}/>
+                  <div style={{
+                    position:"absolute", bottom:0, left:0, right:4, height:32,
+                    background:"linear-gradient(0deg, #000 0%, transparent 100%)",
+                    pointerEvents:"none", zIndex:1,
+                  }}/>
+                </>
+              )}
             </div>
           )}
-          {positions.map(pos => <PositionCard key={pos.id} pos={pos}/>)}
         </div>
 
-        {/* ── Trade history ────────────────────────────────────────────────── */}
-        <div style={{ marginBottom: 16 }}>
-          <SectionHead label="Trade History"/>
-          <div style={{ background: CARD, border: `1px solid ${E}`,
-            borderRadius: 12, padding: "0 16px" }}>
-            {history.slice(0, 5).map(t => <TradeRow key={t.id} trade={t}/>)}
+        {/* ── Trade history — scrollable terminal ──────────────────────────── */}
+        <div style={{ marginBottom:16 }}>
+          <SectionHead label="Trade History" color={C}/>
+          <div style={{
+            position:"relative",
+            background:`linear-gradient(160deg, #0a1620, #080f1a)`,
+            border:`1px solid rgba(0,229,255,0.09)`,
+            borderRadius:14, overflow:"hidden",
+            boxShadow:"0 8px 32px rgba(0,0,0,0.90), 0 0 0 0.5px rgba(0,229,255,0.04) inset",
+          }}>
+            {/* Card top edge */}
+            <div aria-hidden style={{
+              position:"absolute", top:0, left:0, right:0, height:1,
+              background:`linear-gradient(90deg, transparent 10%, ${C}45 45%, transparent 90%)`,
+              animation:"edge-sweep 12s ease-in-out 3s infinite",
+              pointerEvents:"none", zIndex:1,
+            }}/>
+            <div className="history-scroll" style={{
+              maxHeight:300,
+              overflowY:"auto", overflowX:"hidden",
+              scrollBehavior:"smooth",
+              WebkitOverflowScrolling:"touch",
+            }}>
+              {history.map(t => <TradeRow key={t.id} trade={t}/>)}
+            </div>
+            {/* Bottom fade */}
+            <div style={{
+              position:"absolute", bottom:0, left:0, right:0, height:28,
+              background:"linear-gradient(0deg, rgba(8,15,26,1) 0%, transparent 100%)",
+              pointerEvents:"none",
+            }}/>
           </div>
         </div>
 
-        {/* ── Broker account status ────────────────────────────────────────── */}
-        <BrokerStatusCard />
+        {/* ── Broker account status ─────────────────────────────────────────── */}
+        <BrokerStatusCard/>
         {brokerStatus === "idle" && (
           <button onClick={openOnboarding} style={{
-            width: "100%", padding: "14px 0", marginTop: 10,
-            background: "linear-gradient(135deg, rgba(0,229,255,0.15), rgba(155,92,245,0.11))",
-            border: "1px solid rgba(0,229,255,0.45)",
-            borderRadius: 10, color: C,
-            fontFamily: SANS, fontSize: 13, fontWeight: 700,
-            letterSpacing: "0.02em", cursor: "pointer",
+            width:"100%", padding:"15px 0", marginTop:10,
+            background:"linear-gradient(135deg, rgba(0,229,255,0.13), rgba(155,92,245,0.09))",
+            border:"1px solid rgba(0,229,255,0.40)",
+            borderRadius:12, color:C,
+            fontFamily:SANS, fontSize:13, fontWeight:700,
+            letterSpacing:"0.02em", cursor:"pointer",
+            animation:"cta-breathe 4s ease-in-out infinite",
           }}>
             Start AI Trading →
           </button>
         )}
       </div>
 
+      {/* ── Keyframes + scrollbar styles ────────────────────────────────────── */}
       <style>{`
-        @keyframes dot-pulse {
-          0%, 100% { opacity: 1;   transform: scale(1);    }
-          50%       { opacity: 0.4; transform: scale(0.80); }
+        @keyframes dot-pulse   { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.40;transform:scale(0.80)} }
+        @keyframes pnl-flash   { 0%,100%{opacity:1} 50%{opacity:.68} }
+        @keyframes wave-bar    { from{transform:scaleY(.25);opacity:.2} to{transform:scaleY(1);opacity:.65} }
+        @keyframes edge-sweep  { 0%{opacity:.1;transform:scaleX(.25) translateX(-80%)} 50%{opacity:1;transform:scaleX(1) translateX(0)} 100%{opacity:.1;transform:scaleX(.25) translateX(80%)} }
+        @keyframes chart-drift { 0%,100%{transform:translateY(0)} 35%{transform:translateY(-.55px)} 70%{transform:translateY(.28px)} }
+        @keyframes timer-tick  { 0%,49%{opacity:1} 50%,100%{opacity:.55} }
+        @keyframes orb-breathe { 0%,100%{opacity:.55;transform:scale(1)} 50%{opacity:1;transform:scale(1.20)} }
+        @keyframes cta-breathe { 0%,100%{box-shadow:0 0 12px rgba(0,229,255,0.06)} 50%{box-shadow:0 0 28px rgba(0,229,255,0.14)} }
+        @keyframes page-in     { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .page-enter            { animation: page-in 0.35s ease-out both; }
+
+        .positions-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(0,255,136,0.24) transparent;
+        }
+        .positions-scroll::-webkit-scrollbar { width: 2px; }
+        .positions-scroll::-webkit-scrollbar-track { background: transparent; }
+        .positions-scroll::-webkit-scrollbar-thumb {
+          background: rgba(0,255,136,0.28); border-radius: 2px;
+        }
+
+        .history-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(0,229,255,0.20) transparent;
+        }
+        .history-scroll::-webkit-scrollbar { width: 2px; }
+        .history-scroll::-webkit-scrollbar-track { background: transparent; }
+        .history-scroll::-webkit-scrollbar-thumb {
+          background: rgba(0,229,255,0.22); border-radius: 2px;
         }
       `}</style>
     </div>

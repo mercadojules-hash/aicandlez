@@ -1,0 +1,197 @@
+The LIVE TRADING page is now moving in the right direction.
+
+DO NOT redesign the layout structure.
+
+The current structure is GOOD.
+
+Now focus on:
+professional trading UX,
+live readability,
+and premium execution quality.
+
+━━━━━━━━━━━━━━━━━━━
+PRIORITY 1 — SCROLLABLE SECTIONS
+━━━━━━━━━━━━━━━━━━━
+
+The page needs independent scrolling sections.
+
+RIGHT NOW:
+the page feels too vertically constrained.
+
+Add dedicated scroll containers for:
+
+1. OPEN POSITIONS
+2. TRADE HISTORY
+
+Requirements:
+
+• each section gets its own internal smooth scroll
+• fixed card height containers
+• custom thin neon scrollbar
+• maintain clean spacing
+• no layout jumping
+• preserve mobile fluidity
+
+OPEN POSITIONS:
+
+* should support up to 5 simultaneous AI trades
+* keep cards compact but premium
+* smooth inertia scrolling
+
+TRADE HISTORY:
+
+* infinite-feel scrolling terminal feed
+* newest trades pinned at top
+* smooth fade at top/bottom edges
+
+This will make the app feel:
+professional,
+scalable,
+and institutional.
+
+━━━━━━━━━━━━━━━━━━━
+PRIORITY 2 — CENTER THE METRICS SECTION
+━━━━━━━━━━━━━━━━━━━
+
+The circular metrics section currently feels slightly misaligned.
+
+CENTER EVERYTHING perfectly:
+
+• WIN / LOSS
+• AI CONFIDENCE
+• EXPOSURE
+• circular rings
+• metric labels
+• sub-statistics
+
+I want:
+perfect visual symmetry.
+
+The circles should feel:
+balanced,
+intentional,
+and high-end.
+
+Use equal spacing and alignment.
+
+━━━━━━━━━━━━━━━━━━━
+PRIORITY 3 — UPGRADE THE CHARTS
+━━━━━━━━━━━━━━━━━━━
+
+The charts still feel too basic.
+
+I want:
+more premium,
+more cinematic,
+more institutional.
+
+Upgrade ALL charts across the page:
+
+OPEN POSITION CHARTS:
+• smoother curves
+• glowing lines
+• better gradients
+• volume pulse
+• stronger depth
+• live movement
+• subtle scan-line shimmer
+
+PORTFOLIO CHART:
+• higher-end line rendering
+• premium glow
+• realistic market movement
+• smoother interpolation
+• more depth layers
+• faint background grid
+
+MINI CHARTS:
+• sharper
+• cleaner
+• more realistic market behavior
+
+Charts should resemble:
+Bloomberg,
+TradingView,
+Robinhood premium,
+or institutional fintech products.
+
+━━━━━━━━━━━━━━━━━━━
+PRIORITY 4 — OPEN POSITION CARDS
+━━━━━━━━━━━━━━━━━━━
+
+Each active AI trade card should feel:
+ALIVE.
+
+Add:
+• confidence %
+• trade timer
+• AI strategy badge
+• TP / SL visualization
+• subtle pulsing live state
+• animated chart movement
+• stronger hierarchy
+
+The cards currently feel too static.
+
+I want them to feel:
+like the AI is actively managing positions in real-time.
+
+━━━━━━━━━━━━━━━━━━━
+PRIORITY 5 — LIVE TERMINAL FEEL
+━━━━━━━━━━━━━━━━━━━
+
+Increase the “AI terminal” atmosphere slightly.
+
+Add:
+• subtle market pulse animations
+• live updating numerical flickers
+• soft ticker movement polish
+• tiny reactive glow changes
+• terminal scanning energy
+
+VERY IMPORTANT:
+keep everything subtle and premium.
+
+NOT:
+gaming UI.
+
+NOT:
+cheap animations.
+
+Think:
+Apple + Bloomberg + AI.
+
+━━━━━━━━━━━━━━━━━━━
+PRIORITY 6 — MOBILE APP QUALITY
+━━━━━━━━━━━━━━━━━━━
+
+The app should now feel:
+production-ready.
+
+Everything should feel:
+• polished
+• scalable
+• responsive
+• investor-grade
+• App Store quality
+
+This is no longer:
+“prototype UI.”
+
+This should now feel:
+like a real AI trading platform preparing for launch.
+
+━━━━━━━━━━━━━━━━━━━
+FINAL GOAL
+━━━━━━━━━━━━━━━━━━━
+
+When users open this page,
+they should instantly feel:
+
+“this AI is actively trading markets right now.”
+
+The UI should communicate:
+confidence,
+precision,
+speed,
+and intelligence.
