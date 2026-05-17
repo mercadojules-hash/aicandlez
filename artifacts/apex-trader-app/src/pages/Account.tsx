@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useClerk, useUser } from "@clerk/react";
 import { api, type Subscription, type ConsentStatus } from "@/lib/api";
+import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -179,7 +180,7 @@ export default function Account() {
               color="#3a6080"
             />
           )}
-          <Row label="Performance Fee"      value="3% on profits only"         color="#ffaa00" />
+          <Row label="Performance Fee"      value={`${PERFORMANCE_FEE_LABEL} on profits only`} color="#ffaa00" />
           <Row label="Withdrawal Perms"     value="NEVER REQUESTED"            color="#00ff8a" last />
         </Section>
 

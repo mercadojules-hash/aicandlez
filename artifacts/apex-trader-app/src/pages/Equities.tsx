@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
+import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -532,7 +533,7 @@ export default function Equities() {
 
         <div style={{ marginTop:16, padding:"11px 14px", background:CARD, border:`1px solid ${E}`, borderRadius:8,
           fontSize:8, fontFamily:SANS, color:GR, lineHeight:1.7 }}>
-          Tap any stock or ETF to view AI analysis and trade. Paper trading free · Live $5.99/mo + 3% performance fee.
+          Tap any stock or ETF to view AI analysis and trade. Paper trading free · Live $5.99/mo + {PERFORMANCE_FEE_LABEL} performance fee.
         </div>
       </div>
 

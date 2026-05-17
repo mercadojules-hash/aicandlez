@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { api, type LiveEligibility } from "@/lib/api";
+import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
 const ACTIVE_EXCHANGES = [
   { id: "alpaca",   name: "Alpaca",   logo: "A", active: true  },
@@ -88,7 +89,7 @@ function RequiresSubscriptionScreen() {
         </div>
         <div style={{ fontSize: 9, fontFamily: "monospace", color: "#2a4060",
           letterSpacing: "0.1em", marginBottom: 18 }}>
-          PER MONTH + 3% PERFORMANCE FEE ON PROFITS
+          PER MONTH + {PERFORMANCE_FEE_LABEL} PERFORMANCE FEE ON PROFITS
         </div>
         <GlowButton onClick={() => setLocation("/subscribe")}>
           VIEW PLANS & SUBSCRIBE →
@@ -162,7 +163,7 @@ function RequiresConsentScreen() {
 
         <div style={{ display: "flex", justifyContent: "center", gap: 20, marginBottom: 20 }}>
           {[
-            ["3%", "Performance Fee\non Profitable Trades"],
+            [PERFORMANCE_FEE_LABEL, "Performance Fee\non Profitable Trades"],
             ["$0", "Fee on\nLosing Trades"],
             ["0%", "Withdrawal\nPermissions"],
           ].map(([val, label]) => (
@@ -285,7 +286,7 @@ function LiveActiveScreen({ eligibility }: { eligibility: LiveEligibility }) {
             borderRadius: 6, fontSize: 9, fontFamily: "monospace",
             color: "#3a6080", lineHeight: 1.5, letterSpacing: "0.08em" }}>
             LIVE MODE ACTIVE — AI is executing real trades on {engine?.exchange?.toUpperCase()}.
-            A 3% performance fee applies to profitable closed positions.
+            A {PERFORMANCE_FEE_LABEL} performance fee applies to profitable closed positions.
           </div>
         )}
       </div>

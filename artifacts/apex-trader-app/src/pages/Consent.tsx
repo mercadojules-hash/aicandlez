@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { api } from "@/lib/api";
+import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
 export default function Consent() {
   const [, setLocation]        = useLocation();
@@ -47,12 +48,12 @@ export default function Consent() {
             fontFamily: "system-ui, sans-serif" }}>
             <p style={{ marginBottom: 12 }}>
               By enabling live trading, you agree that <strong style={{ color: "#e8f4ff" }}>
-              AICandlez charges a 3% performance fee</strong> on all profitable trades
+              AICandlez charges a {PERFORMANCE_FEE_LABEL} performance fee</strong> on all profitable trades
               executed by the AI engine on your behalf.
             </p>
             <p style={{ marginBottom: 12 }}>
               <strong style={{ color: "#e8f4ff" }}>How it works:</strong> When a trade closes
-              at a profit, 3% of that profit is debited from your account balance and credited to
+              at a profit, {PERFORMANCE_FEE_LABEL} of that profit is debited from your account balance and credited to
               AICandlez's fee ledger. You will see an itemized record of all performance fees
               in your Account page.
             </p>
@@ -81,7 +82,7 @@ export default function Consent() {
           <div style={{ fontSize: 9, fontFamily: "monospace", color: "#2a4060",
             letterSpacing: "0.12em", marginBottom: 10 }}>FEE SUMMARY</div>
           {[
-            ["Performance Fee",     "3% of profitable trades"],
+            ["Performance Fee",     `${PERFORMANCE_FEE_LABEL} of profitable trades`],
             ["Monthly Subscription","$5.99 / month"],
             ["Fee on Losses",       "NONE"],
             ["Withdrawal Access",   "NEVER REQUESTED"],
@@ -161,7 +162,7 @@ export default function Consent() {
           <div style={{ fontSize: 12, lineHeight: 1.7, color: "#8aaccc",
             fontFamily: "system-ui, sans-serif" }}>
             I confirm that I have read and agree to the{" "}
-            <strong style={{ color: "#e8f4ff" }}>3% performance fee</strong> on profitable
+            <strong style={{ color: "#e8f4ff" }}>{PERFORMANCE_FEE_LABEL} performance fee</strong> on profitable
             trades, the <strong style={{ color: "#e8f4ff" }}>$5.99/month subscription</strong>,
             and the risk disclosures. I understand that cryptocurrency trading carries
             substantial risk of loss.

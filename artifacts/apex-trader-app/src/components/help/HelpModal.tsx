@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { GLOSSARY } from "@/hooks/useOnboarding";
+import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
 const SANS = "Inter, 'SF Pro Display', system-ui, -apple-system, sans-serif";
 const MONO = "'SF Mono', 'JetBrains Mono', Consolas, monospace";
@@ -195,7 +196,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                   Always trade within your risk tolerance.
                 </p>
                 <p style={{ margin:0 }}>
-                  A 3% performance fee applies only to profitable closed trades.
+                  A {PERFORMANCE_FEE_LABEL} performance fee applies only to profitable closed trades.
                   No fee is charged on losing trades or unrealized P&L.
                 </p>
               </div>

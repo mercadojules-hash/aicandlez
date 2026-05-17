@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useClerk } from "@clerk/react";
 import { useLocation } from "wouter";
 import { api, type Portfolio, type Subscription, type SimAccount } from "@/lib/api";
+import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
@@ -572,7 +573,7 @@ export default function Profile() {
           <StatCard value={`$${(tv/1000).toFixed(1)}K`}        label="Portfolio Value"       color={C}  sub="simulation equity"/>
           <StatCard value={`+$${(realized/1000).toFixed(1)}K`} label="Realized P&L"          color="rgba(0,210,100,0.88)" sub="lifetime · simulated"/>
           <StatCard value={`${winRate}%`}                       label="Win Rate"              color="rgba(0,210,100,0.88)" sub="4W · 1L"/>
-          <StatCard value={`$${fees.toFixed(2)}`}               label="Performance Fees (3%)" color={GOLD} sub="on closed profits only"/>
+          <StatCard value={`$${fees.toFixed(2)}`}               label={`Performance Fees (${PERFORMANCE_FEE_LABEL})`} color={GOLD} sub="on closed profits only"/>
         </div>
 
         {/* ── Performance Intelligence ─────────────────────────────────────── */}
@@ -629,7 +630,7 @@ export default function Profile() {
             {[
               { label:"Capital Under AI Management", val:`$${tv.toLocaleString()}`,    color:C },
               { label:"Realized P&L (All-Time · Simulated)",     val:`+$${realized.toLocaleString()}`, color:"rgba(0,255,136,0.88)" },
-              { label:"AI Performance Fees (3%)",     val:`–$${fees.toFixed(2)}`,      color:GOLD },
+              { label:`AI Performance Fees (${PERFORMANCE_FEE_LABEL})`,     val:`–$${fees.toFixed(2)}`,      color:GOLD },
               { label:"Net Profit After Fees",        val:`+$${netProfit.toFixed(2)}`, color:"rgba(0,255,136,0.88)" },
             ].map(({ label, val, color }, i, arr) => (
               <div key={label} style={{ display:"flex", justifyContent:"space-between",
@@ -846,7 +847,7 @@ export default function Profile() {
           <div style={{ fontSize:10, fontFamily:SANS, color:"rgba(136,146,164,0.88)", lineHeight:1.75 }}>
             Trading involves risk and may result in loss of capital. Apex AI Trader does not provide
             financial advice. Past performance does not guarantee future results.
-            A 3% performance fee applies only to profitable closed trades.
+            A {PERFORMANCE_FEE_LABEL} performance fee applies only to profitable closed trades.
           </div>
         </div>
 
@@ -855,7 +856,7 @@ export default function Profile() {
           color:"rgba(136,146,164,0.65)", lineHeight:2.0 }}>
           AICandlez · Withdrawal permissions never requested
           <br/>
-          7-Day AI Paper Trading Trial · 3% performance fee on profits only · v1.0.0
+          7-Day AI Paper Trading Trial · {PERFORMANCE_FEE_LABEL} performance fee on profits only · v1.0.0
         </div>
       </div>
 

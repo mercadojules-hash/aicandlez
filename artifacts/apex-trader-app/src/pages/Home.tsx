@@ -11,6 +11,7 @@ import {
   type MobileStatus, type Portfolio, type SimAccount,
   type Subscription, type SignalBreakdown,
 } from "@/lib/api";
+import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
 const SANS = "Inter, 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
 const MONO = "'SF Mono', 'JetBrains Mono', Consolas, monospace";
@@ -906,7 +907,7 @@ export default function Home() {
                 </div>
                 {[
                   { icon:"◈", text:"$5.99 / month platform fee",          color:C  },
-                  { icon:"◈", text:"3% on profitable closed trades only",  color:C  },
+                  { icon:"◈", text:`${PERFORMANCE_FEE_LABEL} on profitable closed trades only`,  color:C  },
                   { icon:"◉", text:"Zero fee on losing trades — ever",     color:G  },
                   { icon:"◉", text:"Paper trading remains free forever",    color:G  },
                   { icon:"◉", text:"Cancel anytime — no lock-in",          color:G  },

@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useSubscription, type PaywallReason } from "@/contexts/SubscriptionContext";
 import { api } from "@/lib/api";
+import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
 // ── Design tokens ───────────────────────────────────────────────────────────────
 const CARD = "#0d151e";
@@ -123,7 +124,7 @@ export function SubscriptionModal() {
           </div>
           <div style={{ fontSize: 10, fontFamily: SANS,
             color: "rgba(255,180,0,0.78)", marginBottom: 16 }}>
-            + 3% performance fee on profitable closed trades
+            + {PERFORMANCE_FEE_LABEL} performance fee on profitable closed trades
           </div>
 
           {/* Trial note */}

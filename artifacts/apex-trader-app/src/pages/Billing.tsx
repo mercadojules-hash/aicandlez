@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { api, type Subscription } from "@/lib/api";
+import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
 // ── Design tokens ───────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -162,7 +163,7 @@ export default function Billing() {
             </div>
             <div style={{ marginTop: 10, fontSize: 9, fontFamily: SANS,
               color: "rgba(255,180,0,0.72)" }}>
-              + 3% performance fee on profitable closed trades only
+              + {PERFORMANCE_FEE_LABEL} performance fee on profitable closed trades only
             </div>
           </div>
 
