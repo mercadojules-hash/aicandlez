@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useUser } from "@clerk/react";
 import { api, type SignalBreakdown, type MobileSignalsResponse } from "@/lib/api";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
 
@@ -104,12 +105,88 @@ function Badge({ label, color }: { label: string; color: string }) {
   );
 }
 
+function FilterToggle({
+  label, on, color, disabled, onClick,
+}: {
+  label:    string;
+  on:       boolean;
+  color:    string;
+  disabled: boolean;
+  onClick:  () => void;
+}) {
+  const activeColor = on ? color : "#2a4060";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding:       "4px 10px",
+        background:    activeColor + "12",
+        border:        `1px solid ${activeColor}40`,
+        borderRadius:  4,
+        fontSize:      9,
+        fontFamily:    "monospace",
+        fontWeight:    700,
+        color:         activeColor,
+        letterSpacing: "0.08em",
+        whiteSpace:    "nowrap",
+        cursor:        disabled ? "not-allowed" : "pointer",
+        opacity:       disabled ? 0.5 : 1,
+        userSelect:    "none",
+        WebkitTapHighlightColor: "transparent",
+      }}
+    >
+      {label} {on ? "ON" : "OFF"}
+    </button>
+  );
+}
+
 export default function Signals() {
+  const queryClient = useQueryClient();
+  const { isSignedIn } = useUser();
+
   const { data, isLoading, isError } = useQuery<MobileSignalsResponse>({
     queryKey:        ["signal-breakdowns"],
     queryFn:         () => api.get("/mobile/signals"),
     refetchInterval: 5_000,
   });
+
+  const filterMutation = useMutation<
+    { volumeFilter: boolean; require1HTrend: boolean },
+    Error,
+    { volumeFilter: boolean; require1HTrend: boolean },
+    { previous?: MobileSignalsResponse }
+  >({
+    mutationFn: (body) =>
+      api.post("/engine/filters", body),
+    onMutate: async (body) => {
+      await queryClient.cancelQueries({ queryKey: ["signal-breakdowns"] });
+      const previous = queryClient.getQueryData<MobileSignalsResponse>(["signal-breakdowns"]);
+      if (previous?.signalFilter) {
+        queryClient.setQueryData<MobileSignalsResponse>(["signal-breakdowns"], {
+          ...previous,
+          signalFilter: {
+            volumeFilter:   body.volumeFilter,
+            require1HTrend: body.require1HTrend,
+          },
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _body, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(["signal-breakdowns"], ctx.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["signal-breakdowns"] });
+    },
+  });
+
+  const filter      = data?.signalFilter;
+  const canToggle   = Boolean(isSignedIn && filter);
+  const isMutating  = filterMutation.isPending;
 
   const entries = data?.breakdowns ? Object.entries(data.breakdowns) : [];
 
@@ -124,13 +201,43 @@ export default function Signals() {
         <div style={{ fontSize: 20, fontFamily: "monospace", fontWeight: 700, color: "#e8f4ff" }}>
           Signal Feed
         </div>
-        {data?.signalFilter && (
-          <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-            <Badge label={data.signalFilter.volumeFilter ? "VOL FILTER ON" : "VOL FILTER OFF"}
-              color={data.signalFilter.volumeFilter ? "#00ff8a" : "#2a4060"} />
-            <Badge label={data.signalFilter.require1HTrend ? "1H TREND ON" : "1H TREND OFF"}
-              color={data.signalFilter.require1HTrend ? "#00aaff" : "#2a4060"} />
-          </div>
+        {filter && (
+          <>
+            <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <FilterToggle
+                label="VOL FILTER"
+                on={filter.volumeFilter}
+                color="#00ff8a"
+                disabled={!canToggle || isMutating}
+                onClick={() => filterMutation.mutate({
+                  volumeFilter:   !filter.volumeFilter,
+                  require1HTrend: filter.require1HTrend,
+                })}
+              />
+              <FilterToggle
+                label="1H TREND"
+                on={filter.require1HTrend}
+                color="#00aaff"
+                disabled={!canToggle || isMutating}
+                onClick={() => filterMutation.mutate({
+                  volumeFilter:   filter.volumeFilter,
+                  require1HTrend: !filter.require1HTrend,
+                })}
+              />
+            </div>
+            {!isSignedIn && (
+              <div style={{ marginTop: 6, fontSize: 8, fontFamily: "monospace",
+                color: "#2a4060", letterSpacing: "0.08em" }}>
+                SIGN IN TO ADJUST FILTERS
+              </div>
+            )}
+            {filterMutation.isError && (
+              <div style={{ marginTop: 6, fontSize: 8, fontFamily: "monospace",
+                color: "#ff4466", letterSpacing: "0.08em" }}>
+                FILTER UPDATE FAILED — {filterMutation.error?.message ?? "RETRY"}
+              </div>
+            )}
+          </>
         )}
       </div>
 
