@@ -117,14 +117,14 @@ export function Navbar() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <a
-            href="/apex-trader-app/"
+            href="/aicandlez-app/"
             className="btn-ghost"
             style={{ padding: "10px 20px", fontSize: 14 }}
           >
             Sign In
           </a>
           <a
-            href="/apex-trader-app/"
+            href="/aicandlez-app/"
             className="btn-primary"
             style={{ padding: "10px 20px", fontSize: 14 }}
           >

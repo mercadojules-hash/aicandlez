@@ -184,7 +184,7 @@ The global `riskEngine.ts` maintains a **single shared config** (kill switch, po
 
 ### Notification Infrastructure Health
 
-- **Web Push (VAPID):** Service worker at `apex-trader-app/public/sw.js` — handles push events, notification click with action buttons
+- **Web Push (VAPID):** Service worker at `aicandlez-app/public/sw.js` — handles push events, notification click with action buttons
 - **Expo Push:** Mobile push token storage + `NotificationDispatcher` handles Expo tokens
 - **Offline fallback:** `wsServer.ts:broadcastNotification()` — if no active WS connection, fires push notification instead of dropping
 - **Delivery reliability:** Push subscriptions are stored in `userPushTokens` table; expired subscriptions are cleaned up by `NotificationDispatcher`

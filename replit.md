@@ -21,9 +21,9 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 
 ### Push Notification Infrastructure
 - **VAPID keys** generated and stored as shared env vars (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VITE_VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`)
-- **Service worker** at `artifacts/apex-trader-app/public/sw.js` — handles push events, notification click with action buttons, OS-native display with urgency levels
-- **`usePushNotifications` hook** at `artifacts/apex-trader-app/src/hooks/usePushNotifications.ts` — Web Push subscription registration, SW auto-register on sign-in, graceful `unsupported` fallback
-- **`SwRegistrar` component** wired into `apex-trader-app/App.tsx` Shell — registers SW and subscribes to push automatically when user signs in
+- **Service worker** at `artifacts/aicandlez-app/public/sw.js` — handles push events, notification click with action buttons, OS-native display with urgency levels
+- **`usePushNotifications` hook** at `artifacts/aicandlez-app/src/hooks/usePushNotifications.ts` — Web Push subscription registration, SW auto-register on sign-in, graceful `unsupported` fallback
+- **`SwRegistrar` component** wired into `aicandlez-app/App.tsx` Shell — registers SW and subscribes to push automatically when user signs in
 - **`NotificationDispatcher`** at `artifacts/api-server/src/services/notifications/NotificationDispatcher.ts` — VAPID web push sender, expired subscription cleanup, `signalAlert` + `tradeAlert` helpers
 - **Offline push fallback** in `wsServer.ts` — if user has no active WS connection, `broadcastNotification` now triggers a push notification instead of silently dropping it
 - **`POST /api/user/notify`** — auth-gated route to dispatch test push notifications to signed-in user
@@ -39,7 +39,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 
 ### Production Deployment Architecture
 - **`DEPLOYMENT.md`** — complete domain map, DNS records, SSL config, Clerk production setup, push notification setup, Render deploy, Replit deploy, database migrations, pre-deploy checklist, post-deploy verification
-- **`.env.production.example`** — all env vars for all four services (api-server, trading-dashboard, apex-trader-app, landing)
+- **`.env.production.example`** — all env vars for all four services (api-server, trading-dashboard, aicandlez-app, landing)
 - **`render.yaml`** — updated with AICandlez branding, 4 services (aicandlez-api, aicandlez-dashboard, aicandlez-app, aicandlez-landing), VAPID env var placeholders, all exchange API keys, security headers
 - **CORS** — already locked to `aicandlez.com`, `app.aicandlez.com`, `api.aicandlez.com`
 
@@ -47,11 +47,11 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - Zero remaining "AICandlez" / "apexdigital" visible text across all TypeScript/TSX source files
 - Download route: `aicandlez-production.zip` → `aicandlez-production.zip`
 - Sidebar download link: `apex-trader-operator-console-v5.zip` → `aicandlez-operator-console-v5.zip`
-- All three typechecks pass: `api-server`, `trading-dashboard`, `apex-trader-app`
+- All three typechecks pass: `api-server`, `trading-dashboard`, `aicandlez-app`
 
 **Key files (Phase 4):**
-- `artifacts/apex-trader-app/public/sw.js` — Web Push service worker
-- `artifacts/apex-trader-app/src/hooks/usePushNotifications.ts` — push subscription hook
+- `artifacts/aicandlez-app/public/sw.js` — Web Push service worker
+- `artifacts/aicandlez-app/src/hooks/usePushNotifications.ts` — push subscription hook
 - `artifacts/api-server/src/services/notifications/NotificationDispatcher.ts` — VAPID push sender
 - `artifacts/api-server/src/routes/internalNotify.ts` — `POST /api/user/notify` test route
 - `artifacts/api-server/src/lib/wsServer.ts` — offline push fallback in `broadcastNotification`

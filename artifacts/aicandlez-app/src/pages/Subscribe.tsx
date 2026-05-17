@@ -16,8 +16,8 @@ export default function Subscribe() {
       api.post<{ url: string }>("/billing/checkout", {
         planId,
         billingPeriod:  "monthly",
-        successUrl: `${window.location.origin}/apex-trader-app/trade?checkout=success`,
-        cancelUrl:  `${window.location.origin}/apex-trader-app/subscribe`,
+        successUrl: `${window.location.origin}/aicandlez-app/trade?checkout=success`,
+        cancelUrl:  `${window.location.origin}/aicandlez-app/subscribe`,
       }),
     onSuccess: ({ url }) => { window.location.href = url; },
   });

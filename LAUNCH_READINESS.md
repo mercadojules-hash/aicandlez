@@ -1,7 +1,7 @@
 # AICandlez — Launch Readiness Report
 
 _Status as of 2026-05-17. Scope: the consumer mobile/web app under
-`artifacts/apex-trader-app` (the surface that ships to TestFlight / Play
+`artifacts/aicandlez-app` (the surface that ships to TestFlight / Play
 internal) and the marketing site `artifacts/landing`. The
 `trading-dashboard`, `natura-*`, and `mockup-sandbox` artifacts are
 **not** intended for store submission and are out of scope for this
@@ -15,8 +15,8 @@ sweep._
 |---|---|---|
 | Strip dev `console.log` / `console.debug` / `console.info` from app source | ✅ Done | Removed 8 breadcrumbs in `AssetDetail.tsx`, `AlpacaAutoTrader.tsx`, `Profile.tsx`, `AIAutoTradeContext.tsx`. Kept `console.warn` for genuine failure paths (e.g. order rejection). |
 | Hero portfolio = broker equity (precise) | ✅ Done | `fmtPrecise()` removed `.toFixed(1)` rounding — top hero and `BrokerStatusCard` now show byte-identical values. |
-| Compliance phrasing — remove "risk-free" | ✅ Done | 4 occurrences across `apex-trader-app` + `landing` rewritten to "paper-trading only / no real money involved". Important for App Store / Play financial-app review (regulated keyword). |
-| Typecheck (apex-trader-app) | ✅ Pass | `tsc --noEmit` clean. |
+| Compliance phrasing — remove "risk-free" | ✅ Done | 4 occurrences across `aicandlez-app` + `landing` rewritten to "paper-trading only / no real money involved". Important for App Store / Play financial-app review (regulated keyword). |
+| Typecheck (aicandlez-app) | ✅ Pass | `tsc --noEmit` clean. |
 | Typecheck (landing) | ✅ Pass | `tsc --noEmit` clean. |
 | Typecheck (api-server, trading-dashboard) | ✅ Pass | Verified earlier this session. |
 | Typecheck (natura-*) | ❌ Pre-existing failures | Unrelated to launch (Natura is not a submission target). Documented as not-a-blocker. |
@@ -83,7 +83,7 @@ sweep._
 
 | Item | Status | Action |
 |---|---|---|
-| EAS production config | ❌ Not yet | `apex-trader-app` is a Vite SPA, not Expo. For App Store, you need either (a) wrap in Capacitor/Tauri, (b) build a thin Expo shell with WebView, or (c) submit as a TWA on Play. **This is a major architectural decision and the biggest open blocker.** |
+| EAS production config | ❌ Not yet | `aicandlez-app` is a Vite SPA, not Expo. For App Store, you need either (a) wrap in Capacitor/Tauri, (b) build a thin Expo shell with WebView, or (c) submit as a TWA on Play. **This is a major architectural decision and the biggest open blocker.** |
 | Env separation (dev/staging/prod) | ⚠ Partial | `.env.production.example` exists but no automated promotion. |
 | Production API URLs | ✅ Documented | `api.aicandlez.com` in `DEPLOYMENT.md`. |
 | Secret handling | ✅ Solid | Vault uses AES-256-GCM + per-user PBKDF2; never logged. |

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/aicandlez-app/"
+title = "AICandlez App"
+version = "1.0.0"
+id = "artifacts/aicandlez-app"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/aicandlez-app/" ]
+localPort = 21259
+
+[services.development]
+run = "pnpm --filter @workspace/aicandlez-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/aicandlez-app", "run", "build" ]
+publicDir = "artifacts/aicandlez-app/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21259"
+BASE_PATH = "/aicandlez-app/"

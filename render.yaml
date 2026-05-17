@@ -104,8 +104,8 @@ services:
     plan: starter
     buildCommand: >
       pnpm install --frozen-lockfile &&
-      pnpm --filter @workspace/apex-trader-app run build
-    staticPublishPath: artifacts/apex-trader-app/dist
+      pnpm --filter @workspace/aicandlez-app run build
+    staticPublishPath: artifacts/aicandlez-app/dist
     autoDeploy: true
     headers:
       - path: /*

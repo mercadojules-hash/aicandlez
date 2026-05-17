@@ -49,7 +49,7 @@ export default function Account() {
 
   const portal = useMutation({
     mutationFn: () => api.post<{ url: string }>("/billing/portal", {
-      returnUrl: `${window.location.origin}/apex-trader-app/account`,
+      returnUrl: `${window.location.origin}/aicandlez-app/account`,
     }),
     onSuccess: ({ url }) => { window.location.href = url; },
   });

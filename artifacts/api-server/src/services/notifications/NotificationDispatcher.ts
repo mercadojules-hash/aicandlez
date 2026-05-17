@@ -81,7 +81,7 @@ export const NotificationDispatcher = {
       title:      payload.title,
       body:       payload.body,
       notifType:  payload.notifType ?? "general",
-      url:        payload.url       ?? "/apex-trader-app/",
+      url:        payload.url       ?? "/aicandlez-app/",
       tag:        payload.tag       ?? "aicandlez-alert",
       data:       payload.data      ?? {},
     });
@@ -185,7 +185,7 @@ export const NotificationDispatcher = {
       body:      `Confidence ${opts.confidence}% @ ${opts.price}`,
       notifType: "signal",
       tag:       `signal-${opts.symbol}`,
-      url:       "/apex-trader-app/",
+      url:       "/aicandlez-app/",
       data:      { ...opts },
     });
   },
@@ -207,7 +207,7 @@ export const NotificationDispatcher = {
       body:      `${opts.side.toUpperCase()} ${opts.qty} @ ${opts.price}${pnlStr}`,
       notifType: "trade",
       tag:       `trade-${opts.symbol}`,
-      url:       "/apex-trader-app/trade",
+      url:       "/aicandlez-app/trade",
       data:      { ...opts },
     });
   },

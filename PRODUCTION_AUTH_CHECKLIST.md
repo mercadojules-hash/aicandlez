@@ -103,7 +103,7 @@ Then set these env vars on the frontends:
 VITE_CLERK_PROXY_URL=https://api.aicandlez.com/api/__clerk
 ```
 
-This must be set for **both** `trading-dashboard` and `apex-trader-app`.
+This must be set for **both** `trading-dashboard` and `aicandlez-app`.
 
 ### OAuth Redirect URIs (if Google / GitHub login enabled)
 Add to each OAuth provider's allowed callback list:
@@ -140,11 +140,11 @@ VITE_WS_URL=wss://api.aicandlez.com/ws   # Direct WebSocket to API server
 BASE_PATH=/
 ```
 
-### apex-trader-app (build-time Vite vars)
+### aicandlez-app (build-time Vite vars)
 ```env
 VITE_CLERK_PUBLISHABLE_KEY=pk_live_...
 VITE_CLERK_PROXY_URL=https://api.aicandlez.com/api/__clerk
-BASE_PATH=/apex-trader-app
+BASE_PATH=/aicandlez-app
 ```
 
 ### landing (build-time)
@@ -168,7 +168,7 @@ The `artifact.toml` path table (as configured):
 | `/api` | api-server | 8080 |
 | `/ws` | api-server | 8080 |
 | `/landing` | landing | varies |
-| `/apex-trader-app` | apex-trader-app | varies |
+| `/aicandlez-app` | aicandlez-app | varies |
 | `/` (catch-all) | trading-dashboard | varies |
 
 > `/ws` was added to api-server's paths so WebSocket upgrades route correctly.
@@ -280,7 +280,7 @@ Run steps in this exact order to avoid auth failures mid-deploy:
 3. Deploy api-server first    (Clerk proxy + auth must be live before frontends)
 4. Verify api-server health:  curl https://api.aicandlez.com/api/healthz
 5. Deploy trading-dashboard
-6. Deploy apex-trader-app
+6. Deploy aicandlez-app
 7. Deploy landing
 8. Configure Clerk proxy URL in Clerk Dashboard
 9. Configure Stripe webhook endpoint
@@ -336,8 +336,8 @@ curl -s https://app.aicandlez.com | grep -i "aicandlez"
 
 ## 12. Mobile / PWA Auth Continuity
 
-### PWA (apex-trader-app)
-- Service worker at `apex-trader-app/public/sw.js` handles push events offline
+### PWA (aicandlez-app)
+- Service worker at `aicandlez-app/public/sw.js` handles push events offline
 - Clerk auth state is persisted in `localStorage` by Clerk's SDK automatically
 - On PWA re-launch: Clerk rehydrates session from storage, then refreshes token silently
 - If session is stale (>7 days without activity), user is redirected to `/sign-in`

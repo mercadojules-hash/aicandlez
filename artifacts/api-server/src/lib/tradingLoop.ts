@@ -589,7 +589,7 @@ async function autoExecute(
     body:      `${side} $${sizeUSD.toFixed(0)} @ $${pos.entryPrice.toFixed(2)}`,
     notifType: "trade",
     tag:       `trade-${symbol}-${Date.now()}`,
-    url:       "/apex-trader-app/trade",
+    url:       "/aicandlez-app/trade",
     data:      { symbol, side, price: pos.entryPrice, sizeUSD, mode: tradeMode },
   }).catch(() => {});
 

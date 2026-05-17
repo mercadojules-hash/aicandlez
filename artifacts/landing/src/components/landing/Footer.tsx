@@ -282,7 +282,7 @@ export function Footer() {
                 PLATFORM
               </div>
               {[
-                { label: "Launch App", href: "/apex-trader-app/" },
+                { label: "Launch App", href: "/aicandlez-app/" },
                 { label: "Features", href: "#features" },
                 { label: "How It Works", href: "#how-it-works" },
                 { label: "Pricing", href: "#pricing" },

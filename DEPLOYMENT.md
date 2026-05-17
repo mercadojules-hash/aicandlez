@@ -7,7 +7,7 @@
 ```
 aicandlez.com            → Landing (static Vite — artifacts/landing)
 app.aicandlez.com        → Operator console / desktop terminal (artifacts/trading-dashboard)
-app.aicandlez.com/…pwa   → Mobile PWA (artifacts/apex-trader-app)
+app.aicandlez.com/…pwa   → Mobile PWA (artifacts/aicandlez-app)
 api.aicandlez.com        → Express API + WebSocket (artifacts/api-server)
 auth.aicandlez.com       → Clerk auth proxy (optional)
 ```
@@ -98,7 +98,7 @@ VITE_WS_URL=wss://api.aicandlez.com/ws
 VITE_VAPID_PUBLIC_KEY=<same as VAPID_PUBLIC_KEY above>
 ```
 
-### Mobile PWA (apex-trader-app, served under app.aicandlez.com)
+### Mobile PWA (aicandlez-app, served under app.aicandlez.com)
 ```env
 VITE_CLERK_PUBLISHABLE_KEY=pk_live_...
 VITE_API_BASE_URL=https://api.aicandlez.com
@@ -108,7 +108,7 @@ VITE_VAPID_PUBLIC_KEY=<same as VAPID_PUBLIC_KEY above>
 ### Landing (aicandlez.com)
 ```env
 VITE_APP_URL=https://app.aicandlez.com
-VITE_PWA_URL=https://app.aicandlez.com/apex-trader-app/
+VITE_PWA_URL=https://app.aicandlez.com/aicandlez-app/
 ```
 
 ---
@@ -286,7 +286,7 @@ curl https://api.aicandlez.com/api/healthz | jq .
 wscat -c wss://api.aicandlez.com/ws
 
 # PWA manifest
-curl https://app.aicandlez.com/apex-trader-app/manifest.json | jq .
+curl https://app.aicandlez.com/aicandlez-app/manifest.json | jq .
 
 # CORS preflight
 curl -H "Origin: https://app.aicandlez.com" \

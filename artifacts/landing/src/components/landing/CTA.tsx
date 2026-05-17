@@ -86,7 +86,7 @@ export function CTA() {
           }}
         >
           <a
-            href="/apex-trader-app/"
+            href="/aicandlez-app/"
             className="btn-primary"
             style={{ fontSize: 17, padding: "16px 36px" }}
           >
@@ -96,7 +96,7 @@ export function CTA() {
             Launch AICandlez — Free
           </a>
           <a
-            href="/apex-trader-app/"
+            href="/aicandlez-app/"
             className="btn-ghost"
             style={{ fontSize: 17, padding: "16px 36px" }}
           >

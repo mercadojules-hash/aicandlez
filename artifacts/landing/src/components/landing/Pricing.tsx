@@ -88,7 +88,7 @@ export function Pricing() {
                 </div>
               ))}
             </div>
-            <a href="/apex-trader-app/" className="btn-ghost" style={{ width: "100%", justifyContent: "center" }}>
+            <a href="/aicandlez-app/" className="btn-ghost" style={{ width: "100%", justifyContent: "center" }}>
               Start Paper Trading
             </a>
           </div>
@@ -162,7 +162,7 @@ export function Pricing() {
                 </div>
               ))}
             </div>
-            <a href="/apex-trader-app/" className="btn-primary" style={{ width: "100%", justifyContent: "center" }}>
+            <a href="/aicandlez-app/" className="btn-primary" style={{ width: "100%", justifyContent: "center" }}>
               Start Live Trading
             </a>
           </div>

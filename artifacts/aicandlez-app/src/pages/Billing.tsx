@@ -86,8 +86,8 @@ export default function Billing() {
       api.post<{ url: string }>("/billing/checkout", {
         planId:        "starter",
         billingPeriod: "monthly",
-        successUrl: `${window.location.origin}/apex-trader-app/profile?checkout=success`,
-        cancelUrl:  `${window.location.origin}/apex-trader-app/billing`,
+        successUrl: `${window.location.origin}/aicandlez-app/profile?checkout=success`,
+        cancelUrl:  `${window.location.origin}/aicandlez-app/billing`,
       }),
     onSuccess: ({ url }) => { window.location.href = url; },
   });
