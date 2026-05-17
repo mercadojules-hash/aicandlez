@@ -20,8 +20,8 @@ export default function Landing() {
         <div className="flex items-center gap-2">
           <Cpu className="w-4 h-4" style={{ color: "#00eeff", filter: "drop-shadow(0 0 6px #00eeff)" }} />
           <span className="font-mono text-[13px] font-bold tracking-[0.22em]">
-            <span style={{ color: "#4a7a90" }}>APEX</span>
-            <span style={{ color: "#00eeff", textShadow: "0 0 16px #00eeff70" }}> TRADER</span>
+            <span style={{ color: "#4a7a90" }}>AI</span>
+            <span style={{ color: "#00eeff", textShadow: "0 0 16px #00eeff70" }}>CANDLEZ</span>
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -135,7 +135,7 @@ export default function Landing() {
 
       <footer className="py-6 px-6 text-center border-t" style={{ borderColor: "#0A1820" }}>
         <span className="text-[9px] font-mono tracking-widest uppercase" style={{ color: "#1e3a50" }}>
-          APEX TRADER · Institutional AI Trading Infrastructure
+          AICANDLEZ · Institutional AI Trading Infrastructure
         </span>
       </footer>
     </div>

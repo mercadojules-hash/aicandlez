@@ -16,15 +16,15 @@ interface ConsentStatus {
 const CONSENT_ITEMS = [
   {
     id:    "acceptedTerms",
-    label: "I accept the Apex Trader Terms of Service and understand this platform is for informational and research purposes. Crypto trading involves significant risk of loss.",
+    label: "I accept the AICandlez Terms of Service and understand this platform is for informational and research purposes. Crypto trading involves significant risk of loss.",
   },
   {
     id:    "acceptedMembershipFee",
-    label: "I understand Apex Trader charges a $5.99/month membership fee covering platform access, infrastructure, and AI compute. This fee applies regardless of trading performance.",
+    label: "I understand AICandlez charges a $5.99/month membership fee covering platform access, infrastructure, and AI compute. This fee applies regardless of trading performance.",
   },
   {
     id:    "acceptedPerformanceFee",
-    label: "I understand Apex Trader charges a 2% performance fee on PROFITABLE, CLOSED trades only. This fee is applied to realized gains when a trade closes in profit.",
+    label: "I understand AICandlez charges a 2% performance fee on PROFITABLE, CLOSED trades only. This fee is applied to realized gains when a trade closes in profit.",
   },
   {
     id:    "acceptedNoFeeOnLosses",
@@ -153,7 +153,7 @@ export function LiveConsentModal({ open, onConsented, onCancel }: LiveConsentMod
               fontSize: 9, fontFamily: "monospace",
               color: "#3a6080", letterSpacing: "0.14em", marginTop: 2,
             }}>
-              APEX TRADER · REQUIRED ONCE · BEFORE LIVE EXCHANGE ACTIVATION
+              AICANDLEZ · REQUIRED ONCE · BEFORE LIVE EXCHANGE ACTIVATION
             </div>
           </div>
         </div>

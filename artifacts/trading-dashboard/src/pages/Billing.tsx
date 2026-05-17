@@ -424,7 +424,7 @@ export default function Billing() {
         >
           <CreditCard className="w-3 h-3 shrink-0 mt-0.5" style={{ color: "#4a6a80" }} />
           <span>
-            Payments are processed securely by Stripe. Apex Trader never stores your card details.
+            Payments are processed securely by Stripe. AICandlez never stores your card details.
             Subscriptions can be canceled at any time from the billing portal.
           </span>
         </div>

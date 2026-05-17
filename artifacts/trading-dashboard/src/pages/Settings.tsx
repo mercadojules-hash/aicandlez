@@ -793,7 +793,7 @@ function ExchangeConnectionsSection() {
         </div>
         <p className="font-mono text-[8px] leading-relaxed" style={{ color: "#8a5a40" }}>
           Create API keys with <strong style={{ color: "#ff8844" }}>trading permissions only</strong>. Never enable
-          withdrawals. Apex Trader does not support or request withdrawal access.
+          withdrawals. AICandlez does not support or request withdrawal access.
           Live trading defaults to disabled — you must explicitly enable it per connection.
         </p>
       </div>

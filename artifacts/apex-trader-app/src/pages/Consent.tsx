@@ -47,13 +47,13 @@ export default function Consent() {
             fontFamily: "system-ui, sans-serif" }}>
             <p style={{ marginBottom: 12 }}>
               By enabling live trading, you agree that <strong style={{ color: "#e8f4ff" }}>
-              Apex Trader charges a 3% performance fee</strong> on all profitable trades
+              AICandlez charges a 3% performance fee</strong> on all profitable trades
               executed by the AI engine on your behalf.
             </p>
             <p style={{ marginBottom: 12 }}>
               <strong style={{ color: "#e8f4ff" }}>How it works:</strong> When a trade closes
               at a profit, 3% of that profit is debited from your account balance and credited to
-              Apex Trader's fee ledger. You will see an itemized record of all performance fees
+              AICandlez's fee ledger. You will see an itemized record of all performance fees
               in your Account page.
             </p>
             <p style={{ marginBottom: 12 }}>
@@ -62,7 +62,7 @@ export default function Consent() {
               no fee is charged.
             </p>
             <p style={{ marginBottom: 12 }}>
-              <strong style={{ color: "#e8f4ff" }}>Withdrawal permissions:</strong> Apex Trader
+              <strong style={{ color: "#e8f4ff" }}>Withdrawal permissions:</strong> AICandlez
               will NEVER request withdrawal permissions from your exchange. Only read and trade
               permissions are used. Your funds remain under your control at all times.
             </p>

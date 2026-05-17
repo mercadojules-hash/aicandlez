@@ -45,7 +45,7 @@ function FullPageLoader() {
     <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", background: "#000000", gap: 20 }}>
       <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
-        color: "rgba(136,146,164,0.35)", letterSpacing: "0.3em" }}>APEX TRADER</div>
+        color: "rgba(136,146,164,0.35)", letterSpacing: "0.3em" }}>AICANDLEZ</div>
       <div style={{ width: 22, height: 22,
         border: "1.5px solid rgba(255,255,255,0.07)",
         borderTopColor: "rgba(0,229,255,0.70)",
@@ -62,7 +62,7 @@ function MissingKeyError() {
       alignItems: "center", justifyContent: "center", background: "#000000",
       gap: 12, fontFamily: SANS }}>
       <div style={{ fontSize: 9, fontWeight: 600,
-        color: "rgba(136,146,164,0.35)", letterSpacing: "0.2em" }}>APEX TRADER</div>
+        color: "rgba(136,146,164,0.35)", letterSpacing: "0.2em" }}>AICANDLEZ</div>
       <div style={{ fontSize: 13, color: "rgba(255,51,85,0.85)", fontWeight: 600 }}>
         Configuration Required
       </div>

@@ -34,7 +34,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, EBSta
           fontFamily: "ui-monospace, SFMono-Regular, monospace",
         }}>
           <div style={{ fontSize: 11, color: "#4a6a80", letterSpacing: "0.2em" }}>
-            APEX TRADER
+            AICANDLEZ
           </div>
           <div style={{ fontSize: 13, color: "#ff4455", fontWeight: "bold" }}>
             BOOTSTRAP ERROR

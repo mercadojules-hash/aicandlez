@@ -126,7 +126,7 @@ export default function Subscribe() {
         <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50",
           letterSpacing: "0.08em", lineHeight: 1.6 }}>
           Subscriptions are billed monthly. Cancel any time. Powered by Stripe.
-          Apex Trader never requests withdrawal permissions from your exchange.
+          AICandlez never requests withdrawal permissions from your exchange.
         </div>
       </div>
     </div>

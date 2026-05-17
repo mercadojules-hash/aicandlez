@@ -87,7 +87,7 @@ function MissingKeyError() {
       background: "#000508", gap: 12,
       fontFamily: "ui-monospace, SFMono-Regular, monospace",
     }}>
-      <div style={{ fontSize: 11, color: "#4a6a80", letterSpacing: "0.2em" }}>APEX TRADER</div>
+      <div style={{ fontSize: 11, color: "#4a6a80", letterSpacing: "0.2em" }}>AICANDLEZ</div>
       <div style={{ fontSize: 13, color: "#ff8844", fontWeight: "bold" }}>CONFIGURATION REQUIRED</div>
       <div style={{
         fontSize: 11, color: "#7a9eb8", maxWidth: 420, textAlign: "center", lineHeight: 1.6,
@@ -356,7 +356,7 @@ function ClerkProviderWithRoutes() {
         signIn: {
           start: {
             title:    "Welcome back",
-            subtitle: "Sign in to access Apex Trader",
+            subtitle: "Sign in to access AICandlez",
           },
         },
         signUp: {
