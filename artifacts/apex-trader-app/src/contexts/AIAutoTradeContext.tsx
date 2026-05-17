@@ -17,13 +17,13 @@ const AIAutoTradeContext = createContext<AIAutoTradeCtx>({
 
 export function AIAutoTradeProvider({ children }: { children: ReactNode }) {
   const [enabled, setEnabledRaw] = useState<boolean>(() => {
-    try { return localStorage.getItem("apex_ai_autotrade") === "true"; }
+    try { return localStorage.getItem("ac_ai_autotrade") === "true"; }
     catch { return false; }
   });
 
   const setEnabled = (v: boolean) => {
     setEnabledRaw(v);
-    try { localStorage.setItem("apex_ai_autotrade", v ? "true" : "false"); }
+    try { localStorage.setItem("ac_ai_autotrade", v ? "true" : "false"); }
     catch {}
 
     // When enabling, try to activate Alpaca paper trading

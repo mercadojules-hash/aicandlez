@@ -71,10 +71,10 @@ function FullPageLoader() {
         border: "2px solid #0D2035",
         borderTopColor: "#00aaff",
         borderRadius: "50%",
-        animation: "apex-spin 0.7s linear infinite",
+        animation: "ac-spin 0.7s linear infinite",
       }} />
       {/* Inline keyframes — no external CSS dependency */}
-      <style>{`@keyframes apex-spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`@keyframes ac-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

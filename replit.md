@@ -44,8 +44,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **CORS** — already locked to `aicandlez.com`, `app.aicandlez.com`, `api.aicandlez.com`
 
 ### Production Readiness Audit (T005)
-- Zero remaining "Apex Trader" / "apexdigital" visible text across all TypeScript/TSX source files
-- Download route: `apex-trader-production.zip` → `aicandlez-production.zip`
+- Zero remaining "AICandlez" / "apexdigital" visible text across all TypeScript/TSX source files
+- Download route: `aicandlez-production.zip` → `aicandlez-production.zip`
 - Sidebar download link: `apex-trader-operator-console-v5.zip` → `aicandlez-operator-console-v5.zip`
 - All three typechecks pass: `api-server`, `trading-dashboard`, `apex-trader-app`
 
@@ -182,7 +182,7 @@ Clerk is fully integrated. Provisioned app: `app_3DeE2sfuhHWTY73M9jlbRCKabFx`.
 - `src/App.tsx` — `ClerkProvider` wrapping all routes, `ClerkQueryClientCacheInvalidator`
 - `src/components/Layout.tsx` — `UserBlock` shows real user name/email, sign-out button via `useUser` + `useClerk`
 - `src/pages/Landing.tsx` — branded public landing page
-- Clerk appearance: dark terminal theme (#050D1A card, #00aaff primary, monospace font, Apex Trader logo)
+- Clerk appearance: dark terminal theme (#050D1A card, #00aaff primary, monospace font, AICandlez logo)
 - `public/logo.svg` — branded SVG logo shown in Clerk UI
 - CSS: `@layer theme, base, clerk, components, utilities` (Tailwind v4 + Clerk layer)
 - `vite.config.ts`: `tailwindcss({ optimize: false })` (prevents prod CSS layer reordering)
@@ -225,7 +225,7 @@ Hybrid AI crypto trading dashboard — 19 modules, all active. Kraken exchange, 
 - New API: `POST /api/engine/filters` — `{ volumeFilter: boolean, require1HTrend: boolean }`
 - New engine status fields: `volumeFilter`, `require1HTrend`, `symbolBreakdowns[*].volumeConfirmed`, `.marketCondition`, `.trend1H`
 
-**Export ZIP** (`/apex-trader-v2.zip`):
+**Export ZIP** (`/aicandlez-v2.zip`):
 - Served from `trading-dashboard/public/` — 303 files, ~587 KB
 - Contains: all source (`api-server/src`, `trading-dashboard/src`), all `lib/` packages, `scripts/`, root configs, `.env.example`, `SETUP.md`
 - Excludes: `node_modules/`, `dist/`, `.git/`, other artifacts (natura-ai, natura-web)

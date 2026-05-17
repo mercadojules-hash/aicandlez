@@ -18,7 +18,7 @@ type AuthReq = Request & { clerkUserId: string };
 
 const DIST_DIR   = import.meta.dirname;
 const NATURA_ZIP = path.resolve(DIST_DIR, "natura-ai.zip");
-const PROD_ZIP   = path.resolve(DIST_DIR, "apex-trader-production.zip");
+const PROD_ZIP   = path.resolve(DIST_DIR, "aicandlez-production.zip");
 
 // ── GET /api/internal/download/natura ─────────────────────────────────────────
 router.get(

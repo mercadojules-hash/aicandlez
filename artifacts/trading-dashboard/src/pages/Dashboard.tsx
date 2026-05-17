@@ -69,7 +69,7 @@ export default function Dashboard() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Cpu className="w-4 h-4 text-primary" />
-            <span className="text-xs font-mono text-primary tracking-widest uppercase">ApexTrader · Hybrid AI Trading System</span>
+            <span className="text-xs font-mono text-primary tracking-widest uppercase">AICandlez · Hybrid AI Trading System</span>
           </div>
           <h1 className="text-xl font-bold tracking-tight">System Dashboard</h1>
           <p className="text-xs text-muted-foreground mt-0.5">Module 1 of 14 · Foundation & Shell · All systems nominal</p>

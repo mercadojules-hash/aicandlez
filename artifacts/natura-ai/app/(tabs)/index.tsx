@@ -320,7 +320,7 @@ export default function HomeScreen() {
         {/* ── Header ── */}
         <View style={s.header}>
           <View>
-            <Text style={s.logoText}>APEX <Text style={{ color: C.cyan }}>TRADER</Text></Text>
+            <Text style={s.logoText}>AC <Text style={{ color: C.cyan }}>LZ/Text></Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
               <LiveDot color={engine?.running ? C.green : C.textDim} size={6} />
               <Text style={s.headerSub}>

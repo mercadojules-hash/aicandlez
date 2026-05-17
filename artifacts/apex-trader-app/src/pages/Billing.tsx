@@ -44,7 +44,7 @@ function StatusCard({ sub }: { sub: Subscription | undefined }) {
             {active ? "Active Subscription" : "Free Trial"}
           </div>
           <div style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: W }}>
-            {active ? "Apex AI Trader" : "7-Day Free Access"}
+            {active ? "AICandlez" : "7-Day Free Access"}
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -144,7 +144,7 @@ export default function Billing() {
                 <div style={{ fontSize: 10, fontFamily: SANS, fontWeight: 600,
                   color: C, letterSpacing: "0.10em",
                   textTransform: "uppercase" as const, marginBottom: 6 }}>
-                  Apex AI Trader
+                  AICandlez
                 </div>
                 <div style={{ fontSize: 13, fontFamily: SANS,
                   color: GR, lineHeight: 1.5, maxWidth: 200 }}>
@@ -247,7 +247,7 @@ export default function Billing() {
           border: `1px solid ${E}`, borderRadius: 8 }}>
           <div style={{ fontSize: 9, fontFamily: SANS, color: GR, lineHeight: 1.8 }}>
             Billed monthly via Stripe. Performance fees apply only to closed profitable trades —
-            never on unrealised gains. Apex AI Trader never holds funds or requests
+            never on unrealised gains. AICandlez never holds funds or requests
             withdrawal access from connected exchanges.
           </div>
         </div>

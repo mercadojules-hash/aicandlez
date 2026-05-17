@@ -188,7 +188,7 @@ export default function TerminalScreen() {
       {/* ── Cursor blink ── */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 }}>
         <Text style={s.cursor}>▮</Text>
-        <Text style={s.cursorText}>APEX ENGINE RUNNING · POLLING 5s</Text>
+        <Text style={s.cursorText}>AICANDLEZ ENGINE RUNNING · POLLING 5s</Text>
       </View>
 
     </ScrollView>

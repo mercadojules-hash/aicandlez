@@ -304,7 +304,7 @@ function StepDisclosures({
         onChange={v => setData({ ...data, age:v })}
       />
       <CheckRow
-        label="I agree to the Apex AI Trader Terms of Service, Privacy Policy, and Alpaca's Customer Agreement."
+        label="I agree to the AICandlez Terms of Service, Privacy Policy, and Alpaca's Customer Agreement."
         checked={data.terms}
         onChange={v => setData({ ...data, terms:v })}
       />
@@ -339,14 +339,14 @@ function StepProcessing({ onComplete }: { onComplete: (acct: string) => void }) 
           border:`2px solid rgba(255,255,255,0.06)`,
           borderTopColor: C,
           borderRadius:"50%",
-          animation:"apex-spin 0.8s linear infinite",
+          animation:"ac-spin 0.8s linear infinite",
         }}/>
         <div style={{
           position:"absolute", inset:8,
           border:`2px solid rgba(255,255,255,0.04)`,
           borderTopColor: P,
           borderRadius:"50%",
-          animation:"apex-spin 1.3s linear reverse infinite",
+          animation:"ac-spin 1.3s linear reverse infinite",
         }}/>
       </div>
 
@@ -376,7 +376,7 @@ function StepProcessing({ onComplete }: { onComplete: (acct: string) => void }) 
       </div>
 
       <style>{`
-        @keyframes apex-spin { to { transform: rotate(360deg); } }
+        @keyframes ac-spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );
@@ -559,7 +559,7 @@ export function TradingAccountOnboardingModal() {
           }}>
             <div style={{ fontSize:9, fontFamily:SANS, fontWeight:700,
               color:"rgba(255,255,255,0.25)", letterSpacing:"0.22em" }}>
-              APEX AI TRADER
+              AICANDLEZ
             </div>
             {!isProcessing && (
               <button onClick={handleClose} style={{

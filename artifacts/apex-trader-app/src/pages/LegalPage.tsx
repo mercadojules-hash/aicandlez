@@ -19,7 +19,7 @@ const DOCS: Record<string, Doc> = {
     sections: [
       {
         heading: "1. Acceptance of Terms",
-        body: "By accessing or using Apex AI Trader, you agree to be bound by these Terms and Conditions. If you do not agree to these terms, you may not use the service. We reserve the right to update these terms at any time with reasonable notice.",
+        body: "By accessing or using AICandlez, you agree to be bound by these Terms and Conditions. If you do not agree to these terms, you may not use the service. We reserve the right to update these terms at any time with reasonable notice.",
       },
       {
         heading: "2. Account Registration",
@@ -31,11 +31,11 @@ const DOCS: Record<string, Doc> = {
       },
       {
         heading: "4. API Key Responsibility",
-        body: "You are solely responsible for the API keys you provide. By connecting an exchange, you authorize Apex AI Trader to execute trades on your behalf according to your configured settings. We request only read and trade permissions — withdrawal permissions are never requested or used.",
+        body: "You are solely responsible for the API keys you provide. By connecting an exchange, you authorize AICandlez to execute trades on your behalf according to your configured settings. We request only read and trade permissions — withdrawal permissions are never requested or used.",
       },
       {
         heading: "5. Prohibited Activities",
-        body: "You may not use Apex AI Trader for market manipulation, money laundering, or any activity that violates applicable laws or exchange terms of service. You may not attempt to reverse-engineer or exploit the platform's AI systems.",
+        body: "You may not use AICandlez for market manipulation, money laundering, or any activity that violates applicable laws or exchange terms of service. You may not attempt to reverse-engineer or exploit the platform's AI systems.",
       },
       {
         heading: "6. Service Availability",
@@ -43,7 +43,7 @@ const DOCS: Record<string, Doc> = {
       },
       {
         heading: "7. Limitation of Liability",
-        body: "To the maximum extent permitted by law, Apex AI Trader and its affiliates are not liable for any indirect, incidental, or consequential damages arising from your use of the service, including trading losses, loss of data, or business interruption.",
+        body: "To the maximum extent permitted by law, AICandlez and its affiliates are not liable for any indirect, incidental, or consequential damages arising from your use of the service, including trading losses, loss of data, or business interruption.",
       },
       {
         heading: "8. Termination",
@@ -105,7 +105,7 @@ const DOCS: Record<string, Doc> = {
       },
       {
         heading: "Exchange Counterparty Risk",
-        body: "Connected exchanges are independent third-party services. Apex AI Trader is not responsible for exchange security breaches, technical failures, insolvency, or regulatory actions affecting connected exchanges. Always maintain independent records of your holdings.",
+        body: "Connected exchanges are independent third-party services. AICandlez is not responsible for exchange security breaches, technical failures, insolvency, or regulatory actions affecting connected exchanges. Always maintain independent records of your holdings.",
       },
       {
         heading: "Regulatory Risk",
@@ -117,7 +117,7 @@ const DOCS: Record<string, Doc> = {
       },
       {
         heading: "Acknowledgement",
-        body: "By using the live trading features of Apex AI Trader, you acknowledge that you have read and understood these risk disclosures, that you are trading with funds you can afford to lose, and that you bear sole responsibility for your trading decisions.",
+        body: "By using the live trading features of AICandlez, you acknowledge that you have read and understood these risk disclosures, that you are trading with funds you can afford to lose, and that you bear sole responsibility for your trading decisions.",
       },
     ],
   },
@@ -128,11 +128,11 @@ const DOCS: Record<string, Doc> = {
     sections: [
       {
         heading: "Not Financial Advice",
-        body: "Apex AI Trader is a technology platform that provides AI-generated trading signals and automated execution tools. Nothing on this platform constitutes financial, investment, legal, or tax advice. All trading signals, recommendations, and analytics are for informational and educational purposes only.",
+        body: "AICandlez is a technology platform that provides AI-generated trading signals and automated execution tools. Nothing on this platform constitutes financial, investment, legal, or tax advice. All trading signals, recommendations, and analytics are for informational and educational purposes only.",
       },
       {
         heading: "No Guarantee of Profits",
-        body: "Apex AI Trader makes no representation or guarantee that use of the platform will result in profits. All trading involves risk of loss. The AI trading engine is a tool to assist your trading — not a guarantee of returns. Past performance of the AI system does not predict future results.",
+        body: "AICandlez makes no representation or guarantee that use of the platform will result in profits. All trading involves risk of loss. The AI trading engine is a tool to assist your trading — not a guarantee of returns. Past performance of the AI system does not predict future results.",
       },
       {
         heading: "User Responsibility",
@@ -140,7 +140,7 @@ const DOCS: Record<string, Doc> = {
       },
       {
         heading: "Tax Obligations",
-        body: "Trading activity may generate taxable events depending on your jurisdiction. You are solely responsible for determining, reporting, and paying any applicable taxes on your trading gains. Apex AI Trader does not provide tax advice and is not responsible for your tax obligations.",
+        body: "Trading activity may generate taxable events depending on your jurisdiction. You are solely responsible for determining, reporting, and paying any applicable taxes on your trading gains. AICandlez does not provide tax advice and is not responsible for your tax obligations.",
       },
       {
         heading: "Simulation vs. Live Trading",
@@ -148,7 +148,7 @@ const DOCS: Record<string, Doc> = {
       },
       {
         heading: "Regulatory Compliance",
-        body: "It is your responsibility to ensure that your use of this platform complies with all applicable laws and regulations in your jurisdiction. Apex AI Trader does not operate as a registered broker-dealer, investment adviser, or financial institution.",
+        body: "It is your responsibility to ensure that your use of this platform complies with all applicable laws and regulations in your jurisdiction. AICandlez does not operate as a registered broker-dealer, investment adviser, or financial institution.",
       },
     ],
   },
@@ -205,7 +205,7 @@ export default function LegalPage() {
         <div style={{ padding: "12px 16px", background: CARD,
           border: `1px solid ${E}`, borderRadius: 8, marginTop: 4 }}>
           <div style={{ fontSize: 9, fontFamily: SANS, color: GR, lineHeight: 1.8 }}>
-            Questions? Contact us at legal@apextrader.ai
+            Questions? Contact us at legal@aicandlez.com
           </div>
         </div>
       </div>

@@ -151,7 +151,7 @@ body {
 }
 
 /* ── Spinner ──────────────────────────────────────────────────────────────── */
-@keyframes apex-spin {
+@keyframes ac-spin {
   to { transform: rotate(360deg); }
 }
 

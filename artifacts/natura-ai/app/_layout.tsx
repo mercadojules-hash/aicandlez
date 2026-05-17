@@ -19,9 +19,9 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 10_000, retry: 1, refetchOnWindowFocus: false } },
 });
 
-// ── Apex Splash ───────────────────────────────────────────────────────────────
+// ── Brand Splash ───────────────────────────────────────────────────────────────
 
-function ApexSplash({ visible }: { visible: boolean }) {
+function BrandSplash({ visible }: { visible: boolean }) {
   const opacity   = useRef(new Animated.Value(1)).current;
   const logoScale = useRef(new Animated.Value(0.85)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -50,7 +50,7 @@ function ApexSplash({ visible }: { visible: boolean }) {
       <View style={styles.glowOuter} />
       <View style={styles.glowInner} />
       <Animated.View style={{ alignItems: "center", transform: [{ scale: logoScale }], opacity: logoOpacity }}>
-        <Text style={styles.splashLogo}>APEX</Text>
+        <Text style={styles.splashLogo}>AC</Text>
         <Text style={styles.splashSub}>AI TRADER</Text>
         <View style={styles.splashDivider} />
         <Text style={styles.splashTag}>INSTITUTIONAL CRYPTO INTELLIGENCE</Text>
@@ -86,7 +86,7 @@ export default function RootLayout() {
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg }, animation: "fade" }}>
               <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
             </Stack>
-            <ApexSplash visible={!nativeSplashHidden} />
+            <BrandSplash visible={!nativeSplashHidden} />
           </TradingProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

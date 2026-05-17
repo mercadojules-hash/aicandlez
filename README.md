@@ -1,4 +1,4 @@
-# Apex Trader — AI Crypto Trading Platform v1.0.0
+# AICandlez — AI Crypto Trading Platform v1.0.0
 
 Institutional-grade Bloomberg/Palantir/Hyperliquid-style AI crypto trading platform.  
 Built on a pnpm monorepo with React + Vite frontend, Express 5 backend, PostgreSQL, and a full exchange adapter layer supporting 6 exchanges.

@@ -870,10 +870,10 @@ export default function ProfileScreen() {
             <Avatar initials="AT" size={68} />
             <View style={p.identityInfo}>
               <View style={{ flexDirection:"row", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-                <Text style={p.userName}>Apex Trader</Text>
+                <Text style={p.userName}>AICandlez</Text>
                 <View style={p.proBadge}><Text style={p.proBadgeText}>PRO</Text></View>
               </View>
-              <Text style={p.userEmail}>trader@apexai.com</Text>
+              <Text style={p.userEmail}>user@aicandlez.com</Text>
               <Text style={p.userMeta}>Member since Jan 2025</Text>
             </View>
           </View>

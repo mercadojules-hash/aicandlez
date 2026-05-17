@@ -224,7 +224,7 @@ The global `riskEngine.ts` maintains a **single shared config** (kill switch, po
 
 ### Lower Priority
 
-10. **Export ZIP contains source code:** `GET /api/apex-trader-v2.zip` serves the full source — ensure this route is removed or auth-gated before public launch.
+10. **Export ZIP contains source code:** `GET /api/aicandlez-v2.zip` serves the full source — ensure this route is removed or auth-gated before public launch.
 
 11. **Test mode trades reach DB:** `engineStats.testMode` trades are stored in `tradesTable` with `mode: "test"`. These are not isolated from user views. Recommend adding a `isTest` column filter to all user-facing trade queries.
 
@@ -278,7 +278,7 @@ The global `riskEngine.ts` maintains a **single shared config** (kill switch, po
 | Rate limiting on auth routes | ⚠️ Missing | `/api/auth/me` has no rate limiting. Add `express-rate-limit` to auth and trading routes. |
 | Admin role enforcement | ✅ `requireRole("admin")` middleware exists | Verify all admin routes use it |
 | Session fixation | ✅ Clerk handles session management | Clerk rotates session tokens automatically |
-| Source code exposure | ⚠️ Medium | `GET /api/apex-trader-v2.zip` serves full source. Auth-gate or remove before public launch. |
+| Source code exposure | ⚠️ Medium | `GET /api/aicandlez-v2.zip` serves full source. Auth-gate or remove before public launch. |
 | VAPID key rotation | Medium | `VAPID_PRIVATE_KEY` is static. If leaked, all push subscriptions must be re-registered. Document rotation procedure. |
 
 ---

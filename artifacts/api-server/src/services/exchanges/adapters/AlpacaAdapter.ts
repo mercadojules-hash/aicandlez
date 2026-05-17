@@ -204,7 +204,7 @@ export class AlpacaAdapter extends BaseExchangeAdapter {
       };
     }
 
-    const clientId = req.clientId ?? `apex-${Date.now()}-${this.orderSeq++}`;
+    const clientId = req.clientId ?? `ac-${Date.now()}-${this.orderSeq++}`;
     const body: AlpacaOrderRequest = {
       symbol:           this.normaliseSymbol(req.symbol),
       qty:              req.qty.toFixed(8),

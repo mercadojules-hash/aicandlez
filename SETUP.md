@@ -1,4 +1,4 @@
-# Apex Trader — Setup Guide
+# AICandlez — Setup Guide
 
 > **Updated for Phase 3:** Live Trading Console, Exchange Connection Management (Kraken, Binance.US, Coinbase, Crypto.com), user-scoped simulation accounts, and Clerk authentication.
 
@@ -42,7 +42,7 @@ cp .env.example .env
 
 ```bash
 # For full DB persistence (app works without it in mock mode)
-DATABASE_URL=postgresql://postgres:password@localhost:5432/apex_trader
+DATABASE_URL=postgresql://postgres:password@localhost:5432/aicandlez
 
 # Session security — generate with:
 # node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -58,7 +58,7 @@ VAULT_MASTER_KEY=your_random_32_char_vault_key_here
 
 ```bash
 # Create the database
-createdb apex_trader
+createdb aicandlez
 
 # Run migrations via Drizzle
 pnpm --filter @workspace/db run migrate
@@ -70,7 +70,7 @@ pnpm --filter @workspace/api-server run db:push
 
 ## 4. Authentication (Clerk)
 
-Apex Trader uses [Clerk](https://clerk.com) for user authentication. You need your own Clerk application for local development.
+AICandlez uses [Clerk](https://clerk.com) for user authentication. You need your own Clerk application for local development.
 
 **Steps:**
 

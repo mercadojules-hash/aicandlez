@@ -208,8 +208,8 @@ function WsIndicator({ connected }: { connected: boolean }) {
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
-const STORAGE_SOUND = "apex_sound_v1";
-const STORAGE_SEEN  = "apex_seen_signals_v1";
+const STORAGE_SOUND = "ac_sound_v1";
+const STORAGE_SEEN  = "ac_seen_signals_v1";
 const MAX_VISIBLE   = 4;
 const MAX_SEEN_SIZE = 200;
 

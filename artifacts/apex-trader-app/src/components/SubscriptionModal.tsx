@@ -25,7 +25,7 @@ const FEATURES = [
 const REASON_COPY: Record<NonNullable<PaywallReason>, { title: string; sub: string }> = {
   trial_expired: {
     title: "Your free trial has ended",
-    sub:   "Subscribe to keep using Apex AI Trader.",
+    sub:   "Subscribe to keep using AICandlez.",
   },
   live_trading: {
     title: "Live trading requires a subscription",
@@ -33,7 +33,7 @@ const REASON_COPY: Record<NonNullable<PaywallReason>, { title: string; sub: stri
   },
   feature_locked: {
     title: "Subscription required",
-    sub:   "Get full access to Apex AI Trader for $5.99/mo.",
+    sub:   "Get full access to AICandlez for $5.99/mo.",
   },
 };
 
@@ -100,7 +100,7 @@ export function SubscriptionModal() {
               fontSize: 10, fontFamily: SANS, fontWeight: 600, color: C,
               letterSpacing: "0.05em",
             }}>
-              Apex AI Trader
+              AICandlez
             </span>
           </div>
 

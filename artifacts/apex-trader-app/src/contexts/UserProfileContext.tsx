@@ -14,12 +14,12 @@ export interface UserProfile {
   paperMode:    boolean;
 }
 
-const STORAGE_KEY = "apex_user_profile";
+const STORAGE_KEY = "ac_user_profile";
 
 const DEFAULTS: UserProfile = {
   name:          "Alex Morgan",
   username:      "alexmorgan",
-  email:         "alex@apexai.trade",
+  email:         "user@aicandlez.com",
   avatarUrl:     null,
   riskLevel:     "balanced",
   maxTrades:     6,

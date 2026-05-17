@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Apex AI Trader",
+    "name": "AICandlez",
     "slug": "natura-ai",
     "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "apex-trader",
+    "scheme": "aicandlez",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
@@ -19,8 +19,8 @@
       "buildNumber": "3",
       "infoPlist": {
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
-        "NSPhotoLibraryUsageDescription": "Allow Apex Trader to access your photo library for your profile picture.",
-        "NSCameraUsageDescription": "Allow Apex Trader to access your camera to take a profile photo."
+        "NSPhotoLibraryUsageDescription": "Allow AICandlez to access your photo library for your profile picture.",
+        "NSCameraUsageDescription": "Allow AICandlez to access your camera to take a profile photo."
       }
     },
     "android": {
@@ -33,8 +33,8 @@
     "web": {
       "favicon": "./public/favicon.png",
       "bundler": "metro",
-      "name": "Apex AI Trader",
-      "shortName": "Apex",
+      "name": "AICandlez",
+      "shortName": "AICandlez",
       "description": "Institutional AI-powered crypto trading platform",
       "themeColor": "#00aaff",
       "backgroundColor": "#000000",

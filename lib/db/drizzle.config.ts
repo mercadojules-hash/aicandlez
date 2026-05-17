@@ -12,6 +12,6 @@ export default defineConfig({
   schema: path.join(__dirname, "./src/schema/index.ts"),
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgresql://localhost:5432/apex_trader",
+    url: process.env.DATABASE_URL ?? "postgresql://localhost:5432/aicandlez",
   },
 });

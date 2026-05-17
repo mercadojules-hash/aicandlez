@@ -851,7 +851,7 @@ export default function Profile() {
         <div style={{ background:CARD, border:`1px solid ${E}`,
           borderRadius:10, padding:"14px 16px", marginBottom:16 }}>
           <div style={{ fontSize:10, fontFamily:SANS, color:"rgba(136,146,164,0.88)", lineHeight:1.75 }}>
-            Trading involves risk and may result in loss of capital. Apex AI Trader does not provide
+            Trading involves risk and may result in loss of capital. AICandlez does not provide
             financial advice. Past performance does not guarantee future results.
             A {PERFORMANCE_FEE_LABEL} performance fee applies only to profitable closed trades.
           </div>

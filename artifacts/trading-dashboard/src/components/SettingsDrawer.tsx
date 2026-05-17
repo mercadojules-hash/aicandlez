@@ -19,7 +19,7 @@ interface AppSettings {
 
 // ── Local storage cache key ───────────────────────────────────────────────────
 
-const STORAGE_KEY = "apex_settings_cache_v1";
+const STORAGE_KEY = "ac_settings_cache_v1";
 
 function loadCache(): Partial<AppSettings> {
   try {

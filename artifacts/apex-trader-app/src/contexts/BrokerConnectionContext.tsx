@@ -27,7 +27,7 @@ interface BrokerContextType {
 }
 
 // ── Persistence ───────────────────────────────────────────────────────────────
-const SK = "apex_broker";
+const SK = "ac_broker";
 
 function loadStatus(): BrokerStatus {
   try { return (localStorage.getItem(`${SK}_status`) as BrokerStatus) || "idle"; }

@@ -41,7 +41,7 @@ const PLANS: PlanSpec[] = [
 
 async function seedProducts(): Promise<void> {
   const stripe = await getUncachableStripeClient();
-  console.log("🔧 Apex Trader — Seeding Stripe products...\n");
+  console.log("🔧 AICandlez — Seeding Stripe products...\n");
 
   for (const plan of PLANS) {
     // Check if product already exists

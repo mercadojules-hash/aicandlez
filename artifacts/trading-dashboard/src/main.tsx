@@ -20,7 +20,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, EBSta
   }
 
   override componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error("[Apex] Bootstrap render error:", error.message, info.componentStack);
+    console.error("[AICandlez] Bootstrap render error:", error.message, info.componentStack);
   }
 
   override render() {

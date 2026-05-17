@@ -55,8 +55,8 @@ function FullPageLoader() {
         border: "1.5px solid rgba(255,255,255,0.07)",
         borderTopColor: "rgba(0,229,255,0.70)",
         borderRadius: "50%",
-        animation: "apex-spin 0.7s linear infinite" }} />
-      <style>{`@keyframes apex-spin { to { transform: rotate(360deg); } }`}</style>
+        animation: "ac-spin 0.7s linear infinite" }} />
+      <style>{`@keyframes ac-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

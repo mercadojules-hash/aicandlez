@@ -101,7 +101,7 @@ function ApiOnboardingPanel() {
           {[
             { n: "1", text: "Log in to your exchange and go to API Management or Account Settings" },
             { n: "2", text: "Create a new API key — enable Read and Trade permissions only" },
-            { n: "3", text: "Never enable Withdrawal permissions — Apex AI Trader does not request them" },
+            { n: "3", text: "Never enable Withdrawal permissions — AICandlez does not request them" },
             { n: "4", text: "Copy your API key and secret, then paste them in the Connect form below" },
           ].map(({ n, text }) => (
             <div key={n} style={{ display: "flex", gap: 12, alignItems: "flex-start",

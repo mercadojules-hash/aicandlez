@@ -1,4 +1,4 @@
-// ── Apex AI Trader — Dark Institutional Theme ─────────────────────────────────
+// ── AICandlez — Dark Institutional Theme ─────────────────────────────────
 
 export const C = {
   bg:       "#000000",
