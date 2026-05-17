@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
+import { ExecutionFeedback, type ExecutionFeedbackPayload } from "@/components/ExecutionFeedback";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -480,7 +480,9 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   const [, setLocation] = useLocation();
   const [tf, setTf] = useState<TF>("4H");
   const [executing, setExecuting] = useState<"buy"|"sell"|"auto"|null>(null);
-  const [toast, setToast] = useState<{ kind:"success"|"error"; msg:string } | null>(null);
+  const [feedback, setFeedback] = useState<ExecutionFeedbackPayload | null>(null);
+  const pushFeedback = (p: Omit<ExecutionFeedbackPayload, "nonce">) =>
+    setFeedback({ ...p, nonce: Date.now() });
   const { enabled: autoActive, setEnabled: setAutoActiveCtx } = useAIAutoTrade();
   const queryClient = useQueryClient();
 
@@ -510,12 +512,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
     console.log("[AssetDetail] mounted →", { sym, type, hasData: !!asset });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Toast auto-dismiss (longer = more visible) ───────────────────────────────
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 5500);
-    return () => clearTimeout(t);
-  }, [toast]);
+  // Feedback auto-dismiss is owned by <ExecutionFeedback> itself.
 
   // ── Paper-trade execution mutation ───────────────────────────────────────────
   // Uses the Alpaca paper endpoint (same one AlpacaAutoTrader uses for AI auto-trades).
@@ -560,9 +557,23 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
       void queryClient.invalidateQueries({ queryKey: ["alpaca-orders"] });
       void queryClient.invalidateQueries({ queryKey: ["alpaca-account"] });
       const verb = side === "BUY" ? "LONG" : "SHORT";
-      setToast({
-        kind: "success",
-        msg:  `✓ Paper ${verb} ${sym} · $1,000 · order ${order.id.slice(0, 8)} · status: ${order.status}`,
+      // Map raw Alpaca status → cinematic feedback state
+      // filled              → "filled"   (TRADE EXECUTED chord)
+      // partially_filled    → "filled"
+      // accepted / pending_*→ "pending"  (PENDING FILL tick)
+      // anything else       → "submitted"
+      const s = (order.status ?? "").toLowerCase();
+      const state: ExecutionFeedbackPayload["state"] =
+        /^filled|partially_filled$/.test(s)        ? "filled"
+        : /pending|accepted|new|held/.test(s)      ? "pending"
+        : "submitted";
+      pushFeedback({
+        state,
+        symbol:   sym,
+        side:     verb,
+        notional: 1000,
+        orderId:  order.id,
+        status:   order.status,
       });
     },
     onError: (err) => {
@@ -572,7 +583,12 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
       if (/not configured/i.test(msg))     friendly = "Paper broker not configured — contact admin";
       else if (/401|unauthor/i.test(msg))  friendly = "Paper broker rejected credentials";
       else if (/insufficient/i.test(msg))  friendly = "Insufficient paper buying power";
-      setToast({ kind: "error", msg: `Paper order failed — ${friendly}` });
+      else if (/not found/i.test(msg))     friendly = `${sym} not supported by paper broker`;
+      pushFeedback({
+        state:   "rejected",
+        symbol:  sym,
+        message: friendly,
+      });
     },
     onSettled: () => {
       // Hold "EXECUTING…" ~750ms so the state change is perceptible even when the
@@ -621,7 +637,8 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
     if (type2 === "auto") { setAutoActiveCtx(!autoActive); return; }
     if (orderMutation.isPending || executing) return;
     setExecuting(type2);
-    setToast(null); // clear any stale toast so the new result is unmistakable
+    setFeedback(null); // clear any stale feedback so the new result is unmistakable
+    pushFeedback({ state: "submitted", symbol: sym }); // instant ack — fires the blip + cyan banner
     orderMutation.mutate(type2 === "buy" ? "BUY" : "SELL");
   };
 
@@ -636,27 +653,10 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   return (
     <div className="page-enter" style={{ background:BG, minHeight:"100%", paddingBottom:40 }}>
 
-      {/* ── Toast (execution feedback) ─────────────────────────────────────────
-           Rendered via portal to <body> so `position:fixed` escapes the
-           transformed .page-enter containing block (otherwise it's invisible).
-       */}
-      {toast && typeof document !== "undefined" && createPortal(
-        <div role="status" aria-live="polite" onClick={() => setToast(null)} style={{
-          position:"fixed", top:20, left:"50%", transform:"translateX(-50%)", zIndex:2147483647,
-          padding:"14px 20px", borderRadius:14, maxWidth:"min(440px, calc(100vw - 32px))",
-          background: toast.kind === "success" ? "rgba(0,40,20,0.96)" : "rgba(40,0,12,0.96)",
-          border: `1.5px solid ${toast.kind === "success" ? "rgba(0,255,136,0.55)" : "rgba(255,51,85,0.60)"}`,
-          color: toast.kind === "success" ? "rgba(0,255,136,0.98)" : "rgba(255,150,160,0.98)",
-          fontFamily: SANS, fontSize: 12, fontWeight: 600, letterSpacing: "0.02em",
-          boxShadow: "0 12px 50px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)",
-          backdropFilter: "blur(24px)",
-          cursor:"pointer",
-          animation: "apex-spin 0s",  // forces compositor layer
-        }}>
-          {toast.msg}
-        </div>,
-        document.body,
-      )}
+      {/* Cinematic execution feedback — banner, sound, and animations all owned
+          by the component. Portaled to <body> internally. */}
+      <ExecutionFeedback payload={feedback} onDismiss={() => setFeedback(null)} />
+
 
       {/* ── Sticky header ────────────────────────────────────────────────────── */}
       <div style={{
