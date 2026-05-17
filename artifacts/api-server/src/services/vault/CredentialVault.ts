@@ -11,18 +11,24 @@ import { logger } from "../../lib/logger.js";
 //   - IV is randomly generated per credential write
 //   - Auth tag is stored alongside ciphertext for tamper detection
 //   - Plain credentials are NEVER stored, logged, or returned in API responses
-//   - In-memory map used here; Phase 2 will persist to PostgreSQL (encrypted column)
+//   - VAULT_MASTER_KEY is server-only — never included in any VITE_* / frontend build
+//
+// Key requirements:
+//   - VAULT_MASTER_KEY must be set in production (validateEnv crashes if missing)
+//   - Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+//   - Minimum length: 32 characters (64 hex recommended)
+//   - NEVER rotate after users have stored credentials — rotation requires re-encryption
+//   - Store in Replit Secrets (never in .env committed to git)
+//
+// Fallback dev key:
+//   - Only used when VAULT_MASTER_KEY is absent in development
+//   - Credentials encrypted with the dev key are unreadable with the production key
+//   - A startup warning is logged when fallback is active (see validateEnv.ts)
 //
 // Usage:
-//   await vault.store(userId, "Kraken", { apiKey: "...", apiSecret: "..." });
-//   const creds = await vault.retrieve(userId, "Kraken");
+//   await vault.encryptBlob(userId, { apiKey: "...", apiSecret: "..." });
+//   const creds = vault.decryptBlob(userId, blob);
 //   // → { apiKey: "...", apiSecret: "..." } (decrypted, in-memory only)
-//
-// Exchange connection wizard in the frontend should:
-//   1. Accept credentials over HTTPS
-//   2. POST to /api/vault/store (body never logged)
-//   3. Test credentials via /api/vault/test-connection
-//   4. If test passes, credentials are vaulted and never exposed again
 
 export interface ExchangeCredentials {
   apiKey:      string;
@@ -45,9 +51,14 @@ interface VaultEntry {
 // ── Vault ─────────────────────────────────────────────────────────────────────
 
 class CredentialVault {
-  private store = new Map<string, VaultEntry>();   // key: `${userId}:${exchange}`
+  private entries = new Map<string, VaultEntry>();   // key: `${userId}:${exchange}`
 
-  // ── Store ─────────────────────────────────────────────────────────────────
+  /** True when the vault has a real master key; false when using fallback. */
+  get isKeyConfigured(): boolean {
+    return Boolean(process.env["VAULT_MASTER_KEY"]);
+  }
+
+  // ── Store (in-memory, legacy path) ────────────────────────────────────────
 
   store_creds(userId: string, exchange: string, creds: ExchangeCredentials): void {
     const key     = this.deriveKey(userId);
@@ -58,11 +69,11 @@ class CredentialVault {
     const encrypted = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
     const authTag   = cipher.getAuthTag();
 
-    const mapKey = this.mapKey(userId, exchange);
+    const mapKey = this.entryKey(userId, exchange);
     const now    = Date.now();
-    const existing = this.store.get(mapKey);
+    const existing = this.entries.get(mapKey);
 
-    this.store.set(mapKey, {
+    this.entries.set(mapKey, {
       userId,
       exchange,
       iv:         iv.toString("hex"),
@@ -76,10 +87,10 @@ class CredentialVault {
     logger.info({ userId, exchange }, "CredentialVault: credentials stored (encrypted)");
   }
 
-  // ── Retrieve ──────────────────────────────────────────────────────────────
+  // ── Retrieve (in-memory, legacy path) ─────────────────────────────────────
 
   retrieve(userId: string, exchange: string): ExchangeCredentials | null {
-    const entry = this.store.get(this.mapKey(userId, exchange));
+    const entry = this.entries.get(this.entryKey(userId, exchange));
     if (!entry) return null;
 
     try {
@@ -101,14 +112,14 @@ class CredentialVault {
   // ── Delete ────────────────────────────────────────────────────────────────
 
   delete(userId: string, exchange: string): boolean {
-    const deleted = this.store.delete(this.mapKey(userId, exchange));
+    const deleted = this.entries.delete(this.entryKey(userId, exchange));
     if (deleted) logger.info({ userId, exchange }, "CredentialVault: credentials deleted");
     return deleted;
   }
 
-  // ── Encrypt / decrypt for DB persistence ─────────────────────────────────
-  // These allow callers to produce an encrypted blob for DB storage and
-  // restore credentials from it later — without exposing the key material.
+  // ── Encrypt for DB persistence ────────────────────────────────────────────
+  // Produces a JSON string safe to store in the encrypted_blob column.
+  // The blob is bound to userId — a different user cannot decrypt it.
 
   encryptBlob(userId: string, creds: ExchangeCredentials): string {
     const key      = this.deriveKey(userId);
@@ -124,6 +135,10 @@ class CredentialVault {
     });
   }
 
+  // ── Decrypt from DB persistence ───────────────────────────────────────────
+  // Returns null on any failure — callers must handle the null case and
+  // prompt the user to reconnect the exchange.
+
   decryptBlob(userId: string, blob: string): ExchangeCredentials | null {
     try {
       const { iv: ivHex, authTag: tagHex, ciphertext: ctHex } = JSON.parse(blob) as {
@@ -138,7 +153,7 @@ class CredentialVault {
       const plain = decipher.update(ct).toString("utf8") + decipher.final("utf8");
       return JSON.parse(plain) as ExchangeCredentials;
     } catch {
-      logger.error({ userId }, "CredentialVault: decryptBlob failed — possible tampering");
+      logger.error({ userId }, "CredentialVault: decryptBlob failed — possible key mismatch or tampering");
       return null;
     }
   }
@@ -147,7 +162,7 @@ class CredentialVault {
 
   listConnected(userId: string): Array<{ exchange: string; label?: string; updatedAt: number }> {
     const results: Array<{ exchange: string; label?: string; updatedAt: number }> = [];
-    for (const [k, entry] of this.store) {
+    for (const entry of this.entries.values()) {
       if (entry.userId === userId) {
         results.push({ exchange: entry.exchange, label: entry.label, updatedAt: entry.updatedAt });
       }
@@ -156,18 +171,46 @@ class CredentialVault {
   }
 
   has(userId: string, exchange: string): boolean {
-    return this.store.has(this.mapKey(userId, exchange));
+    return this.entries.has(this.entryKey(userId, exchange));
   }
 
   // ── Key derivation ────────────────────────────────────────────────────────
+  // VAULT_MASTER_KEY is the root secret — all user keys are derived from it.
+  // In production: missing key → process.exit(1) via validateEnv before reaching here.
+  // In development: missing key → falls back to insecure dev string + logs a warning.
+  // The derived key (Buffer) is never logged, stored, or returned to callers.
 
   private deriveKey(userId: string): Buffer {
-    const master = process.env["VAULT_MASTER_KEY"] ?? "default-dev-key-not-for-production-000";
-    // PBKDF2: 32-byte key for AES-256, userId as salt, 100k iterations
+    const isProd = process.env["NODE_ENV"] === "production";
+    const master = process.env["VAULT_MASTER_KEY"];
+
+    if (!master) {
+      if (isProd) {
+        // validateEnv should have caught this at startup, but guard defensively.
+        logger.error("VAULT_MASTER_KEY is not set in production — refusing to derive encryption key");
+        throw new Error("VAULT_MASTER_KEY is required in production");
+      }
+      // Dev fallback — credentials encrypted here are NOT portable to production.
+      return crypto.pbkdf2Sync(
+        "default-dev-key-not-for-production-000",
+        userId,
+        100_000,
+        32,
+        "sha256",
+      );
+    }
+
+    if (master.length < 32) {
+      logger.warn(
+        { length: master.length },
+        "VAULT_MASTER_KEY is shorter than 32 characters — use at least 64 hex characters for AES-256 strength",
+      );
+    }
+
     return crypto.pbkdf2Sync(master, userId, 100_000, 32, "sha256");
   }
 
-  private mapKey(userId: string, exchange: string): string {
+  private entryKey(userId: string, exchange: string): string {
     return `${userId}:${exchange.toLowerCase()}`;
   }
 
@@ -176,11 +219,11 @@ class CredentialVault {
   stats(): { totalEntries: number; uniqueUsers: number; exchangeBreakdown: Record<string, number> } {
     const users = new Set<string>();
     const exchanges: Record<string, number> = {};
-    for (const e of this.store.values()) {
+    for (const e of this.entries.values()) {
       users.add(e.userId);
       exchanges[e.exchange] = (exchanges[e.exchange] ?? 0) + 1;
     }
-    return { totalEntries: this.store.size, uniqueUsers: users.size, exchangeBreakdown: exchanges };
+    return { totalEntries: this.entries.size, uniqueUsers: users.size, exchangeBreakdown: exchanges };
   }
 }
 

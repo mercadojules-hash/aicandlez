@@ -11,6 +11,7 @@ const REQUIRED_PRODUCTION: string[] = [
   "CLERK_SECRET_KEY",
   "CLERK_PUBLISHABLE_KEY",
   "SESSION_SECRET",
+  "VAULT_MASTER_KEY",   // AES-256 master key for CredentialVault — see CredentialVault.ts
 ];
 
 // ── Recommended (warn if absent) ──────────────────────────────────────────────
@@ -34,6 +35,18 @@ export function validateEnv(): void {
     } else {
       logger.warn({ missing }, msg + " — continuing in dev mode");
     }
+  }
+
+  // ── VAULT_MASTER_KEY dev warning ─────────────────────────────────────────────
+  // Warn loudly in development when the credential vault is using the insecure
+  // fallback key. Any exchange API keys stored while this warning is active are
+  // encrypted with the dev key and CANNOT be decrypted in production.
+  if (!isProd && !process.env["VAULT_MASTER_KEY"]) {
+    logger.warn(
+      "⚠  VAULT_MASTER_KEY is not set — CredentialVault is using the insecure " +
+      "fallback dev key. Exchange credentials stored now will NOT be readable in " +
+      "production. Set VAULT_MASTER_KEY before storing any real API keys.",
+    );
   }
 
   const missingRec = RECOMMENDED.filter((key) => !process.env[key]);
