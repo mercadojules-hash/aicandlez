@@ -57,7 +57,7 @@ function makeRng(seed: string) {
   return () => { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return (s >>> 0) / 0xffffffff; };
 }
 
-function genCandles(sym: string, tf: string, n = 54): Candle[] {
+function genCandles(sym: string, tf: string, n = 110): Candle[] {
   const rng  = makeRng(sym + tf + "v3");
   const base = ASSET_DB[sym]?.basePrice ?? 100;
   const vols: Record<string,number> = { "1H":0.007, "4H":0.016, "1D":0.030, "1W":0.062 };
@@ -92,23 +92,33 @@ function formatPriceLabel(p: number, base: number): string {
   return `${p.toFixed(4)}`;
 }
 
-// ── Premium cinematic chart ───────────────────────────────────────────────────────
+// ── Institutional candle chart (Bloomberg / TradingView aesthetic) ───────────
+// Design principles:
+//   • Deep black canvas with a faint horizontal price grid (no gradients)
+//   • Many thin candles (n=110), 1px wicks, square bodies, no glow
+//   • Restrained EMA palette: amber (EMA9) + steel-blue (EMA21), 1px lines
+//   • Bullish/bearish: bullish = hollow body w/ green outline (TradingView OHLC)
+//     bearish = solid red body. This is the canonical institutional convention.
+//   • Volume pane separated by a thin divider; flat bars, no rounded corners
+//   • TP / SL / SUP / RES are still annotated but at lower visual weight
 function CandleChart({ sym, tf }: { sym: string; tf: string }) {
   const candles  = genCandles(sym, tf);
   const N        = candles.length;
-  const VB_W     = 370;
-  const CH       = 190;   // candle chart height
-  const VOL_H    = 36;    // volume area height
-  const GAP      = 8;     // gap between chart and volume
-  const cW       = VB_W / N;
-  const bW       = Math.max(cW * 0.58, 2.2);
+  const VB_W     = 380;
+  const CH       = 220;   // candle chart height (taller — more data density)
+  const VOL_H    = 42;    // volume pane height
+  const GAP      = 4;     // tight gap between price and volume panes
+  const RIGHT_AXIS = 34;  // reserved area on the right for price labels
+  const PLOT_W   = VB_W - RIGHT_AXIS;
+  const cW       = PLOT_W / N;
+  const bW       = Math.max(cW * 0.62, 1.4);  // thin bodies
   const base     = ASSET_DB[sym]?.basePrice ?? 100;
 
   const highs = candles.map(c => c.h);
   const lows  = candles.map(c => c.l);
   const maxP  = Math.max(...highs);
   const minP  = Math.min(...lows);
-  const padP  = (maxP - minP) * 0.08;
+  const padP  = (maxP - minP) * 0.06;
 
   const py  = (p: number) => CH - ((p - minP + padP) / (maxP - minP + padP * 2)) * CH;
   const maxV = Math.max(...candles.map(c => c.v));
@@ -117,29 +127,16 @@ function CandleChart({ sym, tf }: { sym: string; tf: string }) {
   const ema9   = calcEma(closes, 9);
   const ema21  = calcEma(closes, 21);
 
-  const curvePath = (vals: number[]) => {
-    return vals.map((v, i) => {
-      const x = ((i + 0.5) * cW).toFixed(1);
-      const y = py(v).toFixed(1);
-      if (i === 0) return `M ${x} ${y}`;
-      const prevX = ((i - 0.5) * cW).toFixed(1);
-      const cx    = (((i - 0.5) * cW + (i + 0.5) * cW) / 2).toFixed(1);
-      return `C ${cx} ${py(vals[i-1]).toFixed(1)} ${cx} ${y} ${x} ${y}`;
-    }).join(" ");
-  };
+  // Straight polylines for EMAs — institutional charts do NOT use bezier curves
+  const linePath = (vals: number[]) =>
+    vals.map((v, i) => `${i === 0 ? "M" : "L"} ${((i + 0.5) * cW).toFixed(2)} ${py(v).toFixed(2)}`).join(" ");
+  const ema9Path  = linePath(ema9);
+  const ema21Path = linePath(ema21);
 
-  const ema9Path  = curvePath(ema9);
-  const ema21Path = curvePath(ema21);
-
-  // Area fill path under EMA9
-  const startX = (0.5 * cW).toFixed(1);
-  const endX   = ((N - 0.5) * cW).toFixed(1);
-  const ema9AreaPath = `${ema9Path} L ${endX} ${CH} L ${startX} ${CH} Z`;
-
-  // S/R levels
-  const recentLows  = lows.slice(-30);
-  const recentHighs = highs.slice(-30);
-  const support = Math.min(...recentLows) + (Math.max(...recentLows) - Math.min(...recentLows)) * 0.10;
+  // S/R levels — kept but rendered at low weight
+  const recentLows  = lows.slice(-40);
+  const recentHighs = highs.slice(-40);
+  const support = Math.min(...recentLows)  + (Math.max(...recentLows)  - Math.min(...recentLows))  * 0.10;
   const resist  = Math.max(...recentHighs) - (Math.max(...recentHighs) - Math.min(...recentHighs)) * 0.10;
 
   const action  = ASSET_DB[sym]?.action ?? "HOLD";
@@ -148,203 +145,194 @@ function CandleChart({ sym, tf }: { sym: string; tf: string }) {
   const tpP     = curP * (isLong ? 1.045 : 0.955);
   const slP     = curP * (isLong ? 0.962 : 1.038);
 
-  const gid = sym.toLowerCase().replace(/[^a-z0-9]/g, "x");
   const entryIdxA = Math.floor(N * 0.54);
   const entryIdxB = Math.floor(N * 0.76);
 
-  // Price labels (4 horizontal levels)
-  const priceLevels = [0.12, 0.35, 0.60, 0.85].map(t => ({
+  // 6 horizontal price levels — institutional charts use denser grids
+  const priceLevels = [0.08, 0.24, 0.40, 0.56, 0.72, 0.88].map(t => ({
     y: CH * t,
     p: maxP + padP - t * (maxP - minP + padP * 2),
   }));
 
-  const lastCandle = candles[N - 1];
-  const lastCX     = (N - 0.5) * cW;
-  const lastCloseY = py(lastCandle.c);
+  // Time axis ticks — 5 evenly spaced markers across the bottom
+  const timeIdxs = [0, Math.floor(N * 0.25), Math.floor(N * 0.50), Math.floor(N * 0.75), N - 1];
+  const tfBars: Record<string, number> = { "1H": 1, "4H": 4, "1D": 24, "1W": 168 };
+  const barsBack = tfBars[tf] ?? 1;
+  const timeLabel = (idx: number) => {
+    const hoursAgo = (N - 1 - idx) * barsBack;
+    if (hoursAgo === 0) return "now";
+    if (tf === "1W") return `${Math.round(hoursAgo / 168)}w`;
+    if (tf === "1D") return `${Math.round(hoursAgo / 24)}d`;
+    if (tf === "4H" || tf === "1H") return `${hoursAgo}h`;
+    return `${hoursAgo}h`;
+  };
+
+  const lastCandle  = candles[N - 1];
+  const lastCX      = (N - 0.5) * cW;
+  const lastCloseY  = py(lastCandle.c);
   const lastIsGreen = lastCandle.c >= lastCandle.o;
-  const lastCol = lastIsGreen ? "#00eb78" : "#ff3c3c";
+
+  // Institutional palette
+  const BULL = "#26a69a";   // teal-green (TradingView default)
+  const BEAR = "#ef5350";   // muted red
+  const EMA9_COL  = "#e0a317";   // amber
+  const EMA21_COL = "#5b8def";   // steel blue
+  const GRID_COL  = "rgba(255,255,255,0.045)";
+  const AXIS_COL  = "rgba(255,255,255,0.35)";
 
   return (
-    <svg viewBox={`0 0 ${VB_W} ${CH + GAP + VOL_H}`} width="100%"
-      shapeRendering="geometricPrecision" style={{ display:"block" }}>
+    <svg viewBox={`0 0 ${VB_W} ${CH + GAP + VOL_H + 12}`} width="100%"
+      shapeRendering="crispEdges" style={{ display:"block" }}>
       <defs>
-        {/* Chart background gradient */}
-        <linearGradient id={`chartbg-${gid}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor={isLong ? "rgba(0,40,20,0.20)" : "rgba(40,0,10,0.20)"}/>
-          <stop offset="100%" stopColor="rgba(0,0,0,0)"/>
-        </linearGradient>
-
-        {/* EMA9 area fill gradient (action-colored) */}
-        <linearGradient id={`ema9area-${gid}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor={isLong ? "rgba(0,235,120,0.18)" : action === "SHORT" ? "rgba(255,51,85,0.14)" : "rgba(0,229,255,0.12)"}/>
-          <stop offset="100%" stopColor="rgba(0,0,0,0)"/>
-        </linearGradient>
-
-        {/* Volume gradient (each bar) */}
-        <linearGradient id={`vol-green-${gid}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="rgba(0,235,120,0.55)"/>
-          <stop offset="100%" stopColor="rgba(0,235,120,0.10)"/>
-        </linearGradient>
-        <linearGradient id={`vol-red-${gid}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="rgba(255,60,60,0.50)"/>
-          <stop offset="100%" stopColor="rgba(255,60,60,0.10)"/>
-        </linearGradient>
-
-        {/* Glow filters */}
-        <filter id={`glow-wide-${gid}`} x="-40%" y="-100%" width="180%" height="300%">
-          <feGaussianBlur stdDeviation="2.5" result="b"/>
-          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        <filter id={`glow-tight-${gid}`} x="-20%" y="-60%" width="140%" height="220%">
-          <feGaussianBlur stdDeviation="1.2" result="b"/>
-          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        <filter id={`glow-candle-${gid}`} x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="1.6" result="b"/>
-          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        <filter id={`glow-live-${gid}`} x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur stdDeviation="3" result="b"/>
-          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        {/* Single subtle pulse for the live candle — no glow filters elsewhere */}
+        <filter id="live-pulse" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="1.4"/>
         </filter>
       </defs>
 
-      {/* Background gradient */}
-      <rect x={0} y={0} width={VB_W} height={CH} fill={`url(#chartbg-${gid})`}/>
+      {/* Deep black background for the price pane */}
+      <rect x={0} y={0} width={VB_W} height={CH} fill="#000"/>
 
-      {/* Price grid lines + labels */}
+      {/* Price grid + right-side axis labels */}
       {priceLevels.map((lvl, i) => (
         <g key={i}>
-          <line x1={0} y1={lvl.y} x2={VB_W - 34} y2={lvl.y}
-            stroke="rgba(255,255,255,0.04)" strokeWidth="0.8" strokeDasharray="3 8"/>
-          <text x={VB_W - 2} y={lvl.y - 2} textAnchor="end"
-            fill="rgba(255,255,255,0.28)" fontSize="6.5" fontFamily="'SF Mono',monospace">
+          <line x1={0} y1={lvl.y} x2={PLOT_W} y2={lvl.y} stroke={GRID_COL} strokeWidth="1"/>
+          <text x={VB_W - 3} y={lvl.y + 2.5} textAnchor="end"
+            fill={AXIS_COL} fontSize="7" fontFamily="'SF Mono',monospace">
             {formatPriceLabel(lvl.p, base)}
           </text>
         </g>
       ))}
 
-      {/* Support zone */}
-      <rect x={0} y={py(support * 1.004)} width={VB_W - 30}
-        height={Math.max(Math.abs(py(support * 0.996) - py(support * 1.004)), 2)}
-        fill="rgba(0,255,136,0.06)"/>
-      <line x1={0} y1={py(support)} x2={VB_W - 30} y2={py(support)}
-        stroke="rgba(0,255,136,0.45)" strokeWidth="0.9" strokeDasharray="4 7"/>
-      <text x={4} y={py(support) - 3}
-        fill="rgba(0,255,136,0.60)" fontSize="6" fontFamily="'SF Mono',monospace">SUP</text>
+      {/* SUP / RES — very low weight, dashed */}
+      <line x1={0} y1={py(support)} x2={PLOT_W} y2={py(support)}
+        stroke="rgba(38,166,154,0.40)" strokeWidth="0.8" strokeDasharray="3 5"/>
+      <text x={3} y={py(support) - 2} fill="rgba(38,166,154,0.65)"
+        fontSize="6" fontFamily="'SF Mono',monospace" letterSpacing="0.08em">SUP</text>
 
-      {/* Resistance zone */}
-      <rect x={0} y={py(resist * 1.004)} width={VB_W - 30}
-        height={Math.max(Math.abs(py(resist * 0.996) - py(resist * 1.004)), 2)}
-        fill="rgba(255,51,85,0.06)"/>
-      <line x1={0} y1={py(resist)} x2={VB_W - 30} y2={py(resist)}
-        stroke="rgba(255,51,85,0.45)" strokeWidth="0.9" strokeDasharray="4 7"/>
-      <text x={4} y={py(resist) - 3}
-        fill="rgba(255,51,85,0.60)" fontSize="6" fontFamily="'SF Mono',monospace">RES</text>
+      <line x1={0} y1={py(resist)} x2={PLOT_W} y2={py(resist)}
+        stroke="rgba(239,83,80,0.40)" strokeWidth="0.8" strokeDasharray="3 5"/>
+      <text x={3} y={py(resist) - 2} fill="rgba(239,83,80,0.65)"
+        fontSize="6" fontFamily="'SF Mono',monospace" letterSpacing="0.08em">RES</text>
 
-      {/* TP line */}
-      <line x1={0} y1={py(tpP)} x2={VB_W - 30} y2={py(tpP)}
-        stroke="rgba(0,255,136,0.55)" strokeWidth="0.8" strokeDasharray="2 5"/>
-      <text x={4} y={py(tpP) - 3}
-        fill="rgba(0,255,136,0.65)" fontSize="6" fontFamily="'SF Mono',monospace">TP</text>
+      {/* TP / SL */}
+      <line x1={0} y1={py(tpP)} x2={PLOT_W} y2={py(tpP)}
+        stroke="rgba(38,166,154,0.55)" strokeWidth="0.7" strokeDasharray="2 4"/>
+      <text x={3} y={py(tpP) - 2} fill="rgba(38,166,154,0.75)"
+        fontSize="6" fontFamily="'SF Mono',monospace" letterSpacing="0.08em">TP</text>
 
-      {/* SL line */}
-      <line x1={0} y1={py(slP)} x2={VB_W - 30} y2={py(slP)}
-        stroke="rgba(255,51,85,0.55)" strokeWidth="0.8" strokeDasharray="2 5"/>
-      <text x={4} y={py(slP) + 9}
-        fill="rgba(255,51,85,0.65)" fontSize="6" fontFamily="'SF Mono',monospace">SL</text>
+      <line x1={0} y1={py(slP)} x2={PLOT_W} y2={py(slP)}
+        stroke="rgba(239,83,80,0.55)" strokeWidth="0.7" strokeDasharray="2 4"/>
+      <text x={3} y={py(slP) + 7} fill="rgba(239,83,80,0.75)"
+        fontSize="6" fontFamily="'SF Mono',monospace" letterSpacing="0.08em">SL</text>
 
-      {/* EMA9 area fill — subtle colored zone under the line */}
-      <path d={ema9AreaPath} fill={`url(#ema9area-${gid})`}/>
+      {/* Volume pane background (slightly lifted from pure black for separation) */}
+      <rect x={0} y={CH + GAP} width={VB_W} height={VOL_H} fill="rgba(255,255,255,0.015)"/>
+      <line x1={0} y1={CH + GAP} x2={VB_W} y2={CH + GAP}
+        stroke="rgba(255,255,255,0.08)" strokeWidth="0.5"/>
 
-      {/* Volume bars — gradient filled */}
+      {/* Volume bars — flat fill, no gradient, no rounded corners */}
       {candles.map((c, i) => {
         const cx  = (i + 0.5) * cW;
-        const bar = (c.v / maxV) * VOL_H * 0.88;
+        const bar = (c.v / maxV) * VOL_H * 0.92;
         const vY  = CH + GAP + VOL_H - bar;
         const isG = c.c >= c.o;
         return (
           <rect key={i} x={cx - bW / 2} y={vY} width={bW} height={bar}
-            fill={isG ? `url(#vol-green-${gid})` : `url(#vol-red-${gid})`} rx="0.6"/>
+            fill={isG ? "rgba(38,166,154,0.55)" : "rgba(239,83,80,0.55)"}/>
         );
       })}
 
-      {/* EMA 21 — purple, wide glow */}
-      <path d={ema21Path} fill="none"
-        stroke="rgba(155,92,245,0.35)" strokeWidth="3.5" strokeLinecap="round"
-        filter={`url(#glow-wide-${gid})`}/>
-      <path d={ema21Path} fill="none"
-        stroke="rgba(155,92,245,0.72)" strokeWidth="1.4" strokeLinecap="round"/>
+      {/* EMA 21 — steel blue, 1px straight line */}
+      <path d={ema21Path} fill="none" stroke={EMA21_COL} strokeWidth="1"
+        strokeLinejoin="round" opacity="0.85"/>
 
-      {/* EMA 9 — cyan, tight glow + wide glow stacked */}
-      <path d={ema9Path} fill="none"
-        stroke="rgba(0,229,255,0.30)" strokeWidth="4" strokeLinecap="round"
-        filter={`url(#glow-wide-${gid})`}/>
-      <path d={ema9Path} fill="none"
-        stroke="rgba(0,229,255,0.85)" strokeWidth="1.6" strokeLinecap="round"
-        filter={`url(#glow-tight-${gid})`}/>
+      {/* EMA 9 — amber, 1px straight line */}
+      <path d={ema9Path} fill="none" stroke={EMA9_COL} strokeWidth="1"
+        strokeLinejoin="round" opacity="0.95"/>
 
-      {/* Candles — with glow filter */}
+      {/* Candles — TradingView convention:
+            bullish = hollow body (stroke only) with bull color
+            bearish = solid filled body with bear color
+          Wicks are 1px straight lines, full opacity. */}
       {candles.map((c, i) => {
-        const isLast  = i === N - 1;
-        const cx      = (i + 0.5) * cW;
         const isGreen = c.c >= c.o;
-        const col     = isGreen ? "#00eb78" : "#ff3c3c";
+        const col     = isGreen ? BULL : BEAR;
+        const cx      = (i + 0.5) * cW;
         const bodyTop = py(Math.max(c.o, c.c));
         const bodyBot = py(Math.min(c.o, c.c));
-        const bodyH   = Math.max(bodyBot - bodyTop, 1.2);
+        const bodyH   = Math.max(bodyBot - bodyTop, 0.8);
         return (
-          <g key={i} filter={isLast ? undefined : `url(#glow-candle-${gid})`}>
-            {/* Wick */}
+          <g key={i}>
             <line x1={cx} y1={py(c.h)} x2={cx} y2={py(c.l)}
-              stroke={col} strokeWidth={isLast ? "1.0" : "0.7"} strokeOpacity={isLast ? 0.80 : 0.55}/>
-            {/* Body */}
-            <rect x={cx - bW / 2} y={bodyTop} width={bW} height={bodyH}
-              fill={col} fillOpacity={isGreen ? (isLast ? 0.95 : 0.82) : (isLast ? 0.92 : 0.76)} rx="0.6"/>
+              stroke={col} strokeWidth="1" shapeRendering="crispEdges"/>
+            {isGreen ? (
+              <rect x={cx - bW / 2 + 0.5} y={bodyTop + 0.5}
+                width={Math.max(bW - 1, 0.8)} height={Math.max(bodyH - 1, 0.4)}
+                fill="#000" stroke={col} strokeWidth="1" shapeRendering="crispEdges"/>
+            ) : (
+              <rect x={cx - bW / 2} y={bodyTop} width={bW} height={bodyH}
+                fill={col} shapeRendering="crispEdges"/>
+            )}
           </g>
         );
       })}
 
-      {/* AI entry markers */}
+      {/* AI entry markers — small unobtrusive triangles below the bar */}
       {([entryIdxA, entryIdxB] as number[]).map((idx, k) => {
         if (!candles[idx]) return null;
         const cx   = (idx + 0.5) * cW;
-        const tipY = py(candles[idx].l) + 5;
-        const col  = isLong ? "#00ff88" : "#ff3355";
+        const tipY = py(candles[idx].l) + 6;
+        const col  = isLong ? BULL : BEAR;
         return (
-          <g key={k} filter={`url(#glow-tight-${gid})`}>
-            <polygon points={`${cx},${tipY - 8} ${cx - 5},${tipY + 3} ${cx + 5},${tipY + 3}`}
-              fill={col} fillOpacity={0.90}/>
-            <text x={cx} y={tipY + 13} textAnchor="middle"
-              fill={col} fontSize="5.5" fontFamily="'SF Mono',monospace" fillOpacity="0.80">AI</text>
+          <g key={k}>
+            <polygon points={`${cx},${tipY - 5} ${cx - 3},${tipY + 1} ${cx + 3},${tipY + 1}`}
+              fill={col} fillOpacity="0.85"/>
+            <text x={cx} y={tipY + 8} textAnchor="middle"
+              fill={col} fontSize="5" fontFamily="'SF Mono',monospace" fillOpacity="0.75"
+              letterSpacing="0.05em">AI</text>
           </g>
         );
       })}
 
-      {/* Current price horizontal line */}
-      <line x1={0} y1={py(curP)} x2={VB_W - 30} y2={py(curP)}
-        stroke="rgba(255,255,255,0.16)" strokeWidth="0.6" strokeDasharray="2 6"/>
-      <rect x={VB_W - 28} y={py(curP) - 6} width={28} height={12} rx="3"
-        fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.5"/>
-      <text x={VB_W - 14} y={py(curP) + 4} textAnchor="middle"
-        fill="rgba(255,255,255,0.80)" fontSize="6.5" fontFamily="'SF Mono',monospace">
+      {/* Current price marker — solid axis tag (Bloomberg-style) */}
+      <line x1={0} y1={py(curP)} x2={PLOT_W} y2={py(curP)}
+        stroke="rgba(255,255,255,0.20)" strokeWidth="0.6" strokeDasharray="2 3"/>
+      <rect x={PLOT_W} y={py(curP) - 7} width={RIGHT_AXIS} height={14}
+        fill={lastIsGreen ? BULL : BEAR}/>
+      <text x={PLOT_W + RIGHT_AXIS / 2} y={py(curP) + 3} textAnchor="middle"
+        fill="#000" fontSize="7" fontWeight="700" fontFamily="'SF Mono',monospace">
         {formatPriceLabel(curP, base)}
       </text>
 
-      {/* Live last-candle pulse indicator */}
-      <g filter={`url(#glow-live-${gid})`} style={{ animation:"candle-live 1.8s ease-in-out infinite" }}>
-        <circle cx={lastCX} cy={lastCloseY} r="5.5" fill="none"
-          stroke={lastCol} strokeWidth="1" opacity="0.40"/>
-        <circle cx={lastCX} cy={lastCloseY} r="3" fill={lastCol} opacity="0.90"/>
+      {/* Subtle live pulse on the most recent close */}
+      <g filter="url(#live-pulse)" style={{ animation:"candle-live 1.8s ease-in-out infinite" }}>
+        <circle cx={lastCX} cy={lastCloseY} r="2"
+          fill={lastIsGreen ? BULL : BEAR} opacity="0.85"/>
       </g>
 
-      {/* EMA legend */}
+      {/* Top-left EMA legend — compact, monospaced */}
       <g>
-        <rect x={4} y={4} width={7} height={2.5} rx={1.2} fill="rgba(0,229,255,0.85)"/>
-        <text x={14} y={9.5} fill="rgba(0,229,255,0.65)" fontSize="7" fontFamily="'SF Mono',monospace">EMA9</text>
-        <rect x={46} y={4} width={7} height={2.5} rx={1.2} fill="rgba(155,92,245,0.78)"/>
-        <text x={56} y={9.5} fill="rgba(155,92,245,0.65)" fontSize="7" fontFamily="'SF Mono',monospace">EMA21</text>
+        <rect x={4} y={4} width={8} height={1.5} fill={EMA9_COL}/>
+        <text x={15} y={9} fill={EMA9_COL} fontSize="7"
+          fontFamily="'SF Mono',monospace" letterSpacing="0.04em">EMA 9</text>
+        <rect x={48} y={4} width={8} height={1.5} fill={EMA21_COL}/>
+        <text x={59} y={9} fill={EMA21_COL} fontSize="7"
+          fontFamily="'SF Mono',monospace" letterSpacing="0.04em">EMA 21</text>
+        <text x={100} y={9} fill="rgba(255,255,255,0.40)" fontSize="7"
+          fontFamily="'SF Mono',monospace" letterSpacing="0.04em">{tf} · {N} bars</text>
       </g>
+
+      {/* Time axis labels at the bottom */}
+      {timeIdxs.map((idx, k) => {
+        const x = (idx + 0.5) * cW;
+        const anchor = k === 0 ? "start" : k === timeIdxs.length - 1 ? "end" : "middle";
+        return (
+          <text key={k} x={x} y={CH + GAP + VOL_H + 9} textAnchor={anchor as any}
+            fill={AXIS_COL} fontSize="6.5" fontFamily="'SF Mono',monospace"
+            letterSpacing="0.04em">{timeLabel(idx)}</text>
+        );
+      })}
     </svg>
   );
 }

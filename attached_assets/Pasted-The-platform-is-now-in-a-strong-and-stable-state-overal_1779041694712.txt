@@ -1,0 +1,72 @@
+The platform is now in a strong and stable state overall. The biggest remaining visual weakness is specifically the candlestick/chart rendering on the asset profile pages.
+
+I want to move the charts away from the current “mobile neon crypto app” feel and toward a more institutional Bloomberg/TradingView-style aesthetic.
+
+This is NOT a functionality rebuild. The charts already work. This is a visual maturity/polish pass.
+
+Target direction:
+
+* Bloomberg terminal
+* institutional trading dashboards
+* TradingView professional density
+* darker and more premium
+* more analytical and data-dense
+* less oversized / less playful
+
+Please upgrade the chart presentation layer on the asset profile pages with focus on:
+
+Candlestick Improvements
+
+* thinner candle bodies
+* sharper wick rendering
+* tighter candle spacing
+* more candles visible on screen
+* smoother candle transitions
+* less rounded styling
+* more precise/professional rendering
+
+Visual Style
+
+* deeper blacks
+* reduced glow intensity
+* more restrained neon usage
+* subtle gradients only
+* cleaner chart container styling
+* professional grid lines
+* muted but premium EMA colors
+* improved contrast hierarchy
+
+Market Data Feel
+
+* make the chart feel denser and more institutional
+* increase visible data density
+* reduce oversized empty spacing
+* improve volume bar styling
+* improve chart readability at a glance
+
+Overall Goal
+The rest of the platform now feels premium, cinematic, and believable. The chart engine needs to visually catch up with the maturity level of:
+
+* the execution feedback system
+* AI overlays
+* portfolio containers
+* terminal styling
+* order confirmations
+
+Do NOT redesign the rest of the app.
+
+This task is specifically:
+
+* chart visual refinement
+* chart rendering polish
+* institutional trading aesthetic upgrade
+
+Priority:
+
+* maintain performance
+* maintain responsiveness
+* avoid introducing rendering instability
+* no regressions to working trading flows
+
+The objective is:
+“Bloomberg-terminal-meets-modern-AI-trading-platform.”
