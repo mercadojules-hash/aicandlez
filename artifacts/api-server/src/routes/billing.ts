@@ -253,9 +253,13 @@ router.post("/billing/checkout", requireAuth, async (req, res): Promise<void> =>
     const customerId = await ensureStripeCustomer(userId, user.billingEmail ?? user.email);
     const stripe     = await getUncachableStripeClient();
 
-    const baseUrl = process.env["REPLIT_DOMAINS"]
-      ? `https://${process.env["REPLIT_DOMAINS"].split(",")[0]}`
-      : "http://localhost:80";
+    // Priority: explicit WEBHOOK_BASE_URL (production custom domain) →
+    // REPLIT_DOMAINS (Replit Reserved VM) → localhost (dev fallback).
+    const baseUrl =
+      process.env["WEBHOOK_BASE_URL"] ??
+      (process.env["REPLIT_DOMAINS"]
+        ? `https://${process.env["REPLIT_DOMAINS"].split(",")[0]}`
+        : "http://localhost:80");
 
     const session = await stripe.checkout.sessions.create({
       customer:             customerId,
@@ -300,9 +304,11 @@ router.post("/billing/portal", requireAuth, async (req, res): Promise<void> => {
 
     const stripe = await getUncachableStripeClient();
 
-    const baseUrl = process.env["REPLIT_DOMAINS"]
-      ? `https://${process.env["REPLIT_DOMAINS"].split(",")[0]}`
-      : "http://localhost:80";
+    const baseUrl =
+      process.env["WEBHOOK_BASE_URL"] ??
+      (process.env["REPLIT_DOMAINS"]
+        ? `https://${process.env["REPLIT_DOMAINS"].split(",")[0]}`
+        : "http://localhost:80");
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer:   customerId,

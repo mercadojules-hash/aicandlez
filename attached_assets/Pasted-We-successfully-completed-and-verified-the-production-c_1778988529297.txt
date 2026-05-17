@@ -1,0 +1,146 @@
+We successfully completed and verified the production credential vault implementation for AICandlez.
+
+Current completed security milestones:
+
+* VAULT_MASTER_KEY implemented and verified
+* AES-256-GCM encryption/decryption verified
+* Production hard-fail validation confirmed
+* No frontend exposure of secrets
+* No secret logging paths
+* Per-user key isolation verified
+* Credential vault production-ready
+* Paper trading architecture operational
+* Websocket infrastructure active
+* Cloudflare architecture planning complete
+
+We are now transitioning into the next production phase.
+
+NEXT PRIORITY: Production Clerk Authentication Infrastructure
+
+Please implement and verify the following production auth architecture safely and systematically.
+
+OBJECTIVES
+
+1. Prepare production Clerk integration
+2. Support cross-subdomain authentication
+3. Stabilize session persistence
+4. Prepare mobile/PWA auth continuity
+5. Prepare production deployment architecture
+
+TARGET DOMAIN STRUCTURE
+
+* aicandlez.com → landing
+* app.aicandlez.com → trading dashboard frontend
+* api.aicandlez.com → backend API
+* auth.aicandlez.com → authentication routing (if needed)
+
+TASKS
+
+1. Audit current Clerk implementation
+
+* identify all auth-related files
+* identify current dev keys usage
+* identify current Clerk providers/hooks
+* identify all environment variables currently used
+* identify any hardcoded localhost callbacks
+
+2. Prepare production-safe environment variable structure
+
+Backend:
+
+* CLERK_SECRET_KEY
+* CLERK_PUBLISHABLE_KEY
+
+Frontend:
+
+* VITE_CLERK_PUBLISHABLE_KEY
+
+Ensure:
+
+* no secret key leakage
+* no frontend exposure
+* no duplicated env handling
+* no dev/prod mixing
+
+3. Configure cross-subdomain authentication strategy
+
+Verify:
+
+* cookie domain handling
+* secure cookies
+* sameSite settings
+* session persistence across:
+
+  * aicandlez.com
+  * app.aicandlez.com
+  * api.aicandlez.com
+
+4. Audit websocket authentication flow
+
+Verify:
+
+* websocket reconnect handling
+* auth persistence after reconnect
+* token refresh handling
+* invalid session handling
+* logout propagation
+
+5. Prepare production deployment compatibility
+
+Verify:
+
+* frontend build compatibility
+* backend production runtime compatibility
+* Cloudflare proxy compatibility
+* HTTPS-only handling
+* secure headers
+* CORS configuration
+
+6. Add production readiness verification checklist
+
+Please create:
+
+* PRODUCTION_AUTH_CHECKLIST.md
+
+Include:
+
+* required DNS records
+* Clerk dashboard settings
+* required callback URLs
+* required redirect URLs
+* required environment variables
+* deployment order
+* production validation tests
+
+7. Verify mobile/PWA compatibility
+
+Ensure:
+
+* auth persistence on mobile browsers
+* PWA session continuity
+* refresh recovery
+* proper token restoration
+
+IMPORTANT
+
+DO NOT:
+
+* enable live trading
+* enable real exchange execution
+* change credential vault implementation
+* expose any secret keys
+* break existing paper trading mode
+
+Paper trading only must remain active.
+
+DELIVERABLES REQUESTED
+
+Please provide:
+
+1. Full auth architecture report
+2. All files modified
+3. Any required DNS records
+4. Required Clerk dashboard configuration
+5. Any environment variables needed
+6. Production deployment recommendations
+7. Any remaining blockers before Reserved VM deployment

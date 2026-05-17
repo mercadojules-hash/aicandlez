@@ -304,9 +304,13 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     }
     if (!token) return;
 
-    const proto   = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host    = window.location.host;
-    const wsUrl   = `${proto}//${host}/ws?token=${encodeURIComponent(token)}`;
+    // VITE_WS_URL lets production deployments point directly at the API server's
+    // WebSocket endpoint (e.g. wss://api.aicandlez.com/ws) rather than relying
+    // on the reverse proxy to forward /ws from the frontend's own hostname.
+    const wsBase  = (import.meta.env.VITE_WS_URL as string | undefined)?.replace(/\/$/, "");
+    const wsUrl   = wsBase
+      ? `${wsBase}?token=${encodeURIComponent(token)}`
+      : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
 
     let ws: WebSocket;
     try {

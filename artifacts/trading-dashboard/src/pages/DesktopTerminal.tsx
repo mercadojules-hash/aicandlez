@@ -43,8 +43,11 @@ function useTerminalWS(token: string | null, onSignal: (s: SignalEntry) => void)
 
   useEffect(() => {
     if (!token) return;
-    const proto    = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const url      = `${proto}//${window.location.host}${BASE}/ws?token=${token}`;
+    // VITE_WS_URL lets production deployments target the API server directly.
+    const wsBase   = (import.meta.env.VITE_WS_URL as string | undefined)?.replace(/\/$/, "");
+    const url      = wsBase
+      ? `${wsBase}?token=${token}`
+      : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}${BASE}/ws?token=${token}`;
     const ws       = new WebSocket(url);
     wsRef.current  = ws;
 
