@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
@@ -507,31 +506,9 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   const backRoute = type === "equity" ? "/equities" : "/markets";
   const asset  = ASSET_DB[sym];
 
-  // ── Arrival flash — full-screen symbol announcement so navigation is unmistakable.
-  //   Without this, two assets with similar layouts/seeded data look identical
-  //   and users can't tell the page changed. The flash is the visual proof.
-  const [arrival, setArrival] = useState(true);
+  // Mount-time log retained for QA (lightweight — no overlay, no verification spam)
   useEffect(() => {
-    const t = setTimeout(() => setArrival(false), 850);
-    return () => clearTimeout(t);
-  }, []);
-
-  // Mount-time verification logs — prove EVERY symbol-derived value rehydrated.
-  // Useful for QA: if any of these diverge from `sym`, that's a real state leak.
-  useEffect(() => {
-    console.log("[AssetDetail] mounted →", { sym, type, hasData: !!asset });
-    console.log("[AssetDetail] verify →", {
-      routeSym, routeType,
-      resolvedSym:   sym,
-      resolvedType:  type,
-      assetName:     asset?.name,
-      assetPrice:    asset?.price,
-      assetAction:   asset?.action,
-      chartSym:      sym,            // chart is driven by `sym` directly (line ~720)
-      aiAnalysisSym: sym,            // AI reasoning lines computed from `sym` (getReasoningLines)
-      relatedListLen:related.length, // proves related row rebuilt for this asset
-      url:           typeof window !== "undefined" ? window.location.pathname : null,
-    });
+    console.log("[AssetDetail] mounted →", { sym, type });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Feedback auto-dismiss is owned by <ExecutionFeedback> itself.
@@ -636,10 +613,9 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   const chCol    = isUp ? G : R;
   const sigCol   = SIG_COLOR[action] ?? GR;
   const reasons  = getReasoningLines(sym, action, conf);
-  // Stable order — DO NOT filter out the current symbol. Keeping the full list
-  // in a fixed order means tapping a card never reshuffles the row; only the
-  // "VIEWING" highlight moves. This prevents the "tap reversed itself" illusion.
-  const related  = type === "crypto" ? RELATED_CRYPTO : RELATED_EQUITY;
+  // Standard related list — filter out the current asset (you can't navigate to
+  // the page you're already on). Matches the simple pattern in Markets/Equities.
+  const related  = (type === "crypto" ? RELATED_CRYPTO : RELATED_EQUITY).filter(s => s !== sym).slice(0, 8);
   const sg       = setupGrade(conf);
 
   // Seeded metrics
@@ -678,61 +654,6 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
       {/* Cinematic execution feedback — banner, sound, and animations all owned
           by the component. Portaled to <body> internally. */}
       <ExecutionFeedback payload={feedback} onDismiss={() => setFeedback(null)} />
-
-      {/* ── Arrival flash ──────────────────────────────────────────────────────
-          Unmistakable full-screen announcement on every mount so users
-          KNOW they navigated. Portaled to <body> to escape page-enter's
-          transformed containing block. Fades in 0→1 in 120ms, holds, fades
-          out 1→0 in ~300ms. Total visible time ~850ms — long enough to
-          register, short enough to never block interaction.
-      */}
-      {arrival && typeof document !== "undefined" && createPortal(
-        <div aria-hidden style={{
-          position:"fixed", inset:0, zIndex:2147483646,
-          display:"flex", alignItems:"center", justifyContent:"center",
-          flexDirection:"column" as const,
-          pointerEvents:"none",
-          background:`radial-gradient(circle at center, ${sigCol}22 0%, rgba(0,0,0,0.72) 45%, rgba(0,0,0,0.92) 100%)`,
-          backdropFilter:"blur(8px)",
-          animation:"arrival-flash 0.85s cubic-bezier(0.16,1,0.3,1) forwards",
-        }}>
-          <div style={{
-            fontSize:9, fontFamily:SANS, fontWeight:700,
-            color:sigCol, letterSpacing:"0.40em",
-            textTransform:"uppercase" as const,
-            marginBottom:8, opacity:0.85,
-            textShadow:`0 0 16px ${sigCol}`,
-          }}>{type === "crypto" ? "Crypto" : "Equity"}</div>
-          <div style={{
-            fontSize:"clamp(64px, 18vw, 140px)", fontFamily:MONO, fontWeight:800,
-            color:W, letterSpacing:"-0.04em", lineHeight:1,
-            textShadow:`0 0 40px ${sigCol}aa, 0 0 80px ${sigCol}55`,
-            animation:"arrival-symbol 0.85s cubic-bezier(0.16,1,0.3,1) forwards",
-          }}>{sym}</div>
-          {asset?.name && (
-            <div style={{
-              fontSize:13, fontFamily:SANS, fontWeight:500,
-              color:"rgba(255,255,255,0.78)", marginTop:10,
-              letterSpacing:"0.02em",
-            }}>{asset.name}</div>
-          )}
-          <div style={{
-            marginTop:18,
-            padding:"4px 12px",
-            background:SIG_BG[action], border:`1px solid ${SIG_BORDER[action]}`,
-            borderRadius:6, fontSize:10, fontFamily:SANS, fontWeight:800,
-            color:sigCol, letterSpacing:"0.18em",
-          }}>
-            {action === "LONG" ? "BULLISH" : action === "SHORT" ? "BEARISH" : "NEUTRAL"} · {conf}%
-          </div>
-          <style>{`
-            @keyframes arrival-flash  { 0%{opacity:0} 14%{opacity:1} 60%{opacity:1} 100%{opacity:0} }
-            @keyframes arrival-symbol { 0%{transform:scale(0.82);opacity:0} 18%{transform:scale(1.04);opacity:1} 50%{transform:scale(1)} 100%{transform:scale(1.02);opacity:0} }
-          `}</style>
-        </div>,
-        document.body,
-      )}
-
 
       {/* ── Sticky header ────────────────────────────────────────────────────── */}
       <div style={{
@@ -1144,49 +1065,19 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
             {related.map(rsym => {
               const ra = ASSET_DB[rsym];
               if (!ra) return null;
-              const rcol     = SIG_COLOR[ra.action] ?? GR;
-              const rHash    = rsym.split("").reduce((a,c) => a + c.charCodeAt(0), 0);
-              const rConf    = 50 + (rHash * 7 + 13) % 44;
-              const isActive = rsym === sym;
+              const rcol  = SIG_COLOR[ra.action] ?? GR;
+              const rHash = rsym.split("").reduce((a,c) => a + c.charCodeAt(0), 0);
+              const rConf = 50 + (rHash * 7 + 13) % 44;
               return (
                 <button key={rsym}
-                  ref={isActive ? (el => {
-                    // Scroll the currently-viewed card into view on mount so the user
-                    // can see WHICH card represents the asset they just navigated to.
-                    if (el) el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-                  }) : undefined}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isActive) {
-                      console.log("[related-card] already viewing", rsym);
-                      return; // no-op: can't navigate to the page you're already on
-                    }
-                    navigateToAsset(rsym, ra.type);
-                  }}
-                  aria-current={isActive ? "page" : undefined}
+                  onClick={(e) => { e.stopPropagation(); navigateToAsset(rsym, ra.type); }}
                   style={{
                     flexShrink:0, width:100,
-                    background: isActive ? "rgba(0,229,255,0.10)" : CARD,
-                    border: isActive
-                      ? `1.5px solid ${C}`
-                      : `1px solid ${SIG_BORDER[ra.action] ?? E}`,
-                    boxShadow: isActive ? `0 0 18px rgba(0,229,255,0.30)` : "none",
-                    borderRadius:13, padding:"11px 10px 9px",
-                    cursor: isActive ? "default" : "pointer",
+                    background:CARD, border:`1px solid ${SIG_BORDER[ra.action] ?? E}`,
+                    borderRadius:13, padding:"11px 10px 9px", cursor:"pointer",
                     textAlign:"left" as const,
-                    position:"relative" as const,
-                    transition:"background 0.2s, border-color 0.2s, box-shadow 0.25s",
                   }}>
-                  {isActive && (
-                    <div style={{
-                      position:"absolute" as const, top:-6, right:6,
-                      fontSize:6.5, fontFamily:SANS, fontWeight:800,
-                      color:"#000", background:C, padding:"2px 5px",
-                      borderRadius:3, letterSpacing:"0.10em",
-                    }}>VIEWING</div>
-                  )}
-                  <div style={{ fontSize:11, fontFamily:MONO, fontWeight:700,
-                    color: isActive ? C : W, marginBottom:3 }}>{rsym}</div>
+                  <div style={{ fontSize:11, fontFamily:MONO, fontWeight:700, color:W, marginBottom:3 }}>{rsym}</div>
                   <div style={{ marginBottom:7 }}>
                     <MicroSpark sym={rsym} action={ra.action} w={80} h={22}/>
                   </div>
