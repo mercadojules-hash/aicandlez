@@ -24,7 +24,7 @@ const CONSENT_ITEMS = [
   },
   {
     id:    "acceptedPerformanceFee",
-    label: "I understand AICandlez charges a 2% performance fee on PROFITABLE, CLOSED trades only. This fee is applied to realized gains when a trade closes in profit.",
+    label: "I understand AICandlez charges a 3% performance fee on PROFITABLE, CLOSED trades only. This fee is applied to realized gains when a trade closes in profit.",
   },
   {
     id:    "acceptedNoFeeOnLosses",
@@ -184,7 +184,7 @@ export function LiveConsentModal({ open, onConsented, onCancel }: LiveConsentMod
             <div style={{
               fontSize: 22, fontFamily: "monospace", fontWeight: 700,
               color: "#00ff8a", textShadow: "0 0 12px #00ff8a60",
-            }}>2%</div>
+            }}>3%</div>
             <div style={{ fontSize: 8, fontFamily: "monospace", color: "#3a6080",
               letterSpacing: "0.14em", marginTop: 3 }}>PROFITABLE TRADES ONLY</div>
             <div style={{ fontSize: 8, fontFamily: "monospace", color: "#2a5070",

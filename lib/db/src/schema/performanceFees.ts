@@ -2,7 +2,7 @@ import { pgTable, text, varchar, real, timestamp, boolean, index } from "drizzle
 import { usersTable } from "./users";
 
 // ── performance_fees ──────────────────────────────────────────────────────────
-// Records every 2% performance fee charged on REALIZED, CLOSED, PROFITABLE
+// Records every 3% performance fee charged on REALIZED, CLOSED, PROFITABLE
 // trades only.  No fee is ever charged on losing trades or unrealized PnL.
 //
 // Settlement flow:

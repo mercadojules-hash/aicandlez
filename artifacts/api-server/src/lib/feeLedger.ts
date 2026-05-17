@@ -5,7 +5,7 @@ import { performanceFeesTable } from "@workspace/db";
 // Fee is ONLY charged on realized, closed, PROFITABLE trades.
 // Losing trades: NO FEE.  Unrealized PnL: NO FEE.
 
-export const PERFORMANCE_FEE_RATE = 0.02; // 2%
+export const PERFORMANCE_FEE_RATE = 0.03; // 3%
 
 export interface FeeEntry {
   id:             string;

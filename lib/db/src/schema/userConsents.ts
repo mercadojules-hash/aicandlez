@@ -7,7 +7,7 @@ import { usersTable } from "./users";
 // consent_version allows us to re-show the gate when terms change.
 // Current version: "v1.0" — covers:
 //   • $5.99/month membership fee
-//   • 2% performance fee on PROFITABLE CLOSED trades only
+//   • 3% performance fee on PROFITABLE CLOSED trades only
 //   • No fee on losing trades
 //   • No fee on unrealized PnL
 
