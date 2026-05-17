@@ -14,14 +14,14 @@ const router = Router();
 router.get("/system/verification", async (_req, res) => {
   const now = Date.now();
 
-  // ── 1. Kraken data status ──────────────────────────────────────────────────
-  let krakenStatus: { ok: boolean; symbol: string; close: number; timestamp: number; ageSeconds: number } | null = null;
+  // ── 1. Market data status ──────────────────────────────────────────────────
+  let marketDataStatus: { ok: boolean; symbol: string; close: number; timestamp: number; ageSeconds: number } | null = null;
   try {
     const candles = await getCandles("BTCUSD", "1h", 1);
     if (candles.length > 0) {
       const last = candles[candles.length - 1]!;
       const ageMs = now - last.time * 1000;   // .time is Unix seconds
-      krakenStatus = {
+      marketDataStatus = {
         ok:         ageMs < 7_200_000,        // fresh if < 2 hours old
         symbol:     "BTCUSD",
         close:      last.close,
@@ -204,7 +204,7 @@ router.get("/system/verification", async (_req, res) => {
   const backtestCapabilities = {
     timeframes:    ["1h (~30d)", "4h (~120d)", "1d (~365d)", "15m (~5d)", "5m (~1.7d)"],
     strategy:      "EMA Crossover (12/26/50)",
-    dataSource:    "Kraken REST API (live candles)",
+    dataSource:    "Alpaca / Binance public API (live candles)",
     periodsEndpoint: "/api/backtest/periods",
   };
 
@@ -212,7 +212,7 @@ router.get("/system/verification", async (_req, res) => {
   res.json({
     generatedAt: new Date().toISOString(),
     checks: {
-      krakenData:         krakenStatus,
+      marketData:         marketDataStatus,
       lastSignal:         lastSignalRow,
       mtfGate:            mtfStatus,
       autoTrading:        autoTradeStatus,

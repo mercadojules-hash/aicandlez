@@ -224,12 +224,6 @@ export default function Exchange() {
     onSuccess:  invalidate,
   });
 
-  const selectExchangeMutation = useMutation({
-    mutationFn: (name: string) =>
-      apiFetch("/api/exchange/select", { method: "POST", body: JSON.stringify({ name }) }),
-    onSuccess: invalidate,
-  });
-
   const handleExecute = async () => {
     const amt = parseFloat(amountUSD);
     if (!amt || !preview) return;
@@ -275,7 +269,7 @@ export default function Exchange() {
           </div>
           <div>
             <h1 className="text-lg font-bold leading-tight">Exchange Integration</h1>
-            <p className="text-xs text-muted-foreground">{status?.exchangeName ?? "Exchange"} · Simulation &amp; live order execution · Risk-gated</p>
+            <p className="text-xs text-muted-foreground">Alpaca · Paper &amp; live order execution · Risk-gated</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -387,30 +381,9 @@ export default function Exchange() {
                 </span>
               </div>
             ))}
-            {/* Exchange selector — shown when multiple exchanges are configured */}
-            {status?.configuredExchanges && status.configuredExchanges.length > 0 && (
-              <div className="mt-1 flex flex-col gap-1.5 border-t border-border/30 pt-2">
-                <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Switch Exchange</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {status.configuredExchanges.map(ex => (
-                    <button
-                      key={ex}
-                      onClick={() => selectExchangeMutation.mutate(ex)}
-                      className={`text-xs px-2.5 py-1 rounded-md border font-semibold transition-colors ${
-                        status.exchangeName === ex
-                          ? "border-primary/60 bg-primary/15 text-primary"
-                          : "border-border/40 bg-card/40 text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                      }`}
-                    >
-                      {ex}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
             {!status?.apiConfigured && (
               <div className="mt-1 text-[10px] text-muted-foreground bg-card/60 rounded-lg p-2 leading-relaxed">
-                Configure API keys in Secrets (e.g. <code className="text-primary">KRAKEN_API_KEY</code> / <code className="text-primary">COINBASE_API_KEY</code>),
+                Add <code className="text-primary">ALPACA_API_KEY</code> and <code className="text-primary">ALPACA_SECRET_KEY</code> to Secrets,
                 then set <code className="text-primary">EXCHANGE_LIVE_ENABLED=true</code> to unlock LIVE mode.
               </div>
             )}

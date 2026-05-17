@@ -1,10 +1,9 @@
-import crypto from "node:crypto";
-import https from "node:https";
 import { validateTrade, getStatus as getRiskStatus } from "./riskEngine.js";
+import { getTicker }      from "./marketData.js";
 import { CoinbaseAdapter } from "../services/exchanges/adapters/CoinbaseAdapter.js";
-import { AlpacaAdapter }  from "../services/exchanges/adapters/AlpacaAdapter.js";
+import { AlpacaAdapter }   from "../services/exchanges/adapters/AlpacaAdapter.js";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ExchangeMode  = "simulation" | "live";
 export type OrderSide     = "buy" | "sell";
@@ -12,21 +11,21 @@ export type OrderType     = "market" | "limit";
 export type OrderStatus   = "filled" | "rejected" | "cancelled" | "open";
 
 export interface ExchangeOrder {
-  id:            string;
-  symbol:        string;            // e.g. "BTCUSD"
-  krakenPair:    string;            // e.g. "XXBTZUSD"
-  side:          OrderSide;
-  orderType:     OrderType;
-  volumeBase:    number;            // in base currency (BTC / ETH / SOL)
-  limitPrice?:   number;
-  fillPrice:     number;
-  valueUSD:      number;
-  feeUSD:        number;
-  status:        OrderStatus;
-  mode:          ExchangeMode;
-  timestamp:     number;
-  krakenOrderId?: string;
-  riskChecks:    RiskGate[];
+  id:               string;
+  symbol:           string;          // e.g. "BTCUSD"
+  nativePair:       string;          // e.g. "BTC/USD" (Alpaca notation)
+  side:             OrderSide;
+  orderType:        OrderType;
+  volumeBase:       number;          // in base currency (BTC / ETH / SOL)
+  limitPrice?:      number;
+  fillPrice:        number;
+  valueUSD:         number;
+  feeUSD:           number;
+  status:           OrderStatus;
+  mode:             ExchangeMode;
+  timestamp:        number;
+  exchangeOrderId?: string;          // broker-assigned order ID
+  riskChecks:       RiskGate[];
   rejectionReason?: string;
 }
 
@@ -37,17 +36,17 @@ export interface RiskGate {
 }
 
 export interface OrderPreview {
-  symbol:       string;
-  krakenPair:   string;
-  side:         OrderSide;
-  orderType:    OrderType;
-  volumeBase:   number;
+  symbol:        string;
+  nativePair:    string;          // exchange-native symbol
+  side:          OrderSide;
+  orderType:     OrderType;
+  volumeBase:    number;
   estimatedFill: number;
-  valueUSD:     number;
-  feeUSD:       number;
-  riskGates:    RiskGate[];
-  allowed:      boolean;
-  blockedBy:    string[];
+  valueUSD:      number;
+  feeUSD:        number;
+  riskGates:     RiskGate[];
+  allowed:       boolean;
+  blockedBy:     string[];
 }
 
 export interface ExchangeStatus {
@@ -55,12 +54,12 @@ export interface ExchangeStatus {
   killSwitch:        boolean;
   paused:            boolean;
   liveCapable:       boolean;       // env vars present AND EXCHANGE_LIVE_ENABLED=true
-  apiConfigured:     boolean;       // KRAKEN_API_KEY + KRAKEN_API_SECRET both set
+  apiConfigured:     boolean;       // ALPACA_API_KEY + ALPACA_SECRET_KEY both set
   liveEnabled:       boolean;       // EXCHANGE_LIVE_ENABLED=true
   ordersToday:       number;
   lastOrderAt:       number | null;
   simBalances:       Balances;
-  exchangeName:      string;        // selected exchange display name
+  exchangeName:      string;
 }
 
 export interface Balances {
@@ -70,48 +69,40 @@ export interface Balances {
   SOL: number;
 }
 
-// ── Kraken pair config ───────────────────────────────────────────────────────
+// ── Alpaca symbol map ─────────────────────────────────────────────────────────
 
-const KRAKEN_PAIRS: Record<string, string> = {
-  BTCUSD: "XXBTZUSD",
-  ETHUSD: "XETHZUSD",
-  SOLUSD: "SOLUSD",
+const ALPACA_PAIRS: Record<string, string> = {
+  BTCUSD:  "BTC/USD",
+  ETHUSD:  "ETH/USD",
+  SOLUSD:  "SOL/USD",
+  XRPUSD:  "XRP/USD",
+  DOGEUSD: "DOGE/USD",
+  AVAXUSD: "AVAX/USD",
+  LINKUSD: "LINK/USD",
+  ADAUSD:  "ADA/USD",
 };
-const TAKER_FEE = 0.0026; // 0.26% Kraken taker fee
 
-// ── Singleton state ──────────────────────────────────────────────────────────
+const TAKER_FEE = 0.0; // Alpaca charges 0% fee for crypto
+
+// ── Singleton state ───────────────────────────────────────────────────────────
 
 let _mode:             ExchangeMode = "simulation";
 let _killSwitch:       boolean      = false;
 let _paused:           boolean      = false;
-let _selectedExchange: string       = "Kraken";
+let _selectedExchange: string       = "Alpaca";
 const _orders:         ExchangeOrder[] = [];
 
-// Per-exchange simulated fallback snapshots — only used in paper/sim mode when switching
-// to a specific exchange. Values reflect real funded state ($0 for unfunded accounts).
-// fetchLiveBalances() returns real API data for Kraken/Coinbase/Alpaca and $0 for others.
-const EXCHANGE_BALANCES: Record<string, Balances> = {
-  Kraken:       { USD: 0, BTC: 0, ETH: 0, SOL: 0 },  // real balance from API when live
-  Binance:      { USD: 0, BTC: 0, ETH: 0, SOL: 0 },  // unfunded — $0
-  Coinbase:     { USD: 0, BTC: 0, ETH: 0, SOL: 0 },  // real balance from API when live
-  CryptoDotCom: { USD: 0, BTC: 0, ETH: 0, SOL: 0 },  // unfunded — $0
-  Gemini:       { USD: 0, BTC: 0, ETH: 0, SOL: 0 },  // unfunded — $0
-  OKX:          { USD: 0, BTC: 0, ETH: 0, SOL: 0 },
-  Bybit:        { USD: 0, BTC: 0, ETH: 0, SOL: 0 },
-  KuCoin:       { USD: 0, BTC: 0, ETH: 0, SOL: 0 },
-  Alpaca:       { USD: 0, BTC: 0, ETH: 0, SOL: 0 },  // real balance from API when live
-};
+// Simulated portfolio for paper trading
+const PAPER_BALANCES: Balances = { USD: 100_000, BTC: 0, ETH: 0, SOL: 0 };
 
-let _simBalances: Balances = { ...EXCHANGE_BALANCES["Kraken"]! };
+let _simBalances: Balances = { ...PAPER_BALANCES };
 
-// ── Env helpers ──────────────────────────────────────────────────────────────
+// ── Env helpers ───────────────────────────────────────────────────────────────
 
-/** Per-exchange credential check — normalises common ID variants */
 function isExchangeConfigured(exchange: string): boolean {
   const ex = exchange.toLowerCase().replace(/[\s._-]/g, "");
-  if (ex === "kraken")                         return !!(process.env["KRAKEN_API_KEY"]    && process.env["KRAKEN_API_SECRET"]);
-  if (ex === "binance" || ex === "binanceus")  return !!(process.env["BINANCE_API_KEY"]   && process.env["BINANCE_API_SECRET"]);
-  if (ex === "coinbase")                       return !!(process.env["COINBASE_API_KEY"]  && process.env["COINBASE_API_SECRET"]);
+  if (ex === "binance" || ex === "binanceus") return !!(process.env["BINANCE_API_KEY"]   && process.env["BINANCE_API_SECRET"]);
+  if (ex === "coinbase")                      return !!(process.env["COINBASE_API_KEY"]  && process.env["COINBASE_API_SECRET"]);
   if (ex === "cryptocom" || ex === "cryptocomdotcom" || ex === "cryptodotcom") {
     return !!(process.env["CRYPTOCOM_API_KEY"] && process.env["CRYPTOCOM_API_SECRET"]);
   }
@@ -120,9 +111,8 @@ function isExchangeConfigured(exchange: string): boolean {
   return false;
 }
 
-/** Returns list of exchange IDs that have API credentials configured */
 export function getConfiguredExchanges(): string[] {
-  return (["Kraken", "Binance", "Coinbase", "CryptoDotCom", "Gemini", "Alpaca"] as const)
+  return (["Binance", "Coinbase", "CryptoDotCom", "Gemini", "Alpaca"] as const)
     .filter(e => isExchangeConfigured(e));
 }
 
@@ -136,62 +126,7 @@ function isLiveCapable(): boolean {
   return isApiConfigured() && isLiveEnabled();
 }
 
-// ── Kraken private API ───────────────────────────────────────────────────────
-
-function krakenSign(path: string, postData: string, nonce: string, secret: string): string {
-  const sha256Hash = crypto.createHash("sha256").update(nonce + postData).digest();
-  return crypto
-    .createHmac("sha512", Buffer.from(secret, "base64"))
-    .update(Buffer.concat([Buffer.from(path), sha256Hash]))
-    .digest("base64");
-}
-
-async function krakenPrivate<T>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
-  const key    = process.env["KRAKEN_API_KEY"]!;
-  const secret = process.env["KRAKEN_API_SECRET"]!;
-  const nonce  = Date.now().toString();
-  const path   = `/0/private/${endpoint}`;
-
-  const body = new URLSearchParams({ nonce, ...params }).toString();
-  const sign = krakenSign(path, body, nonce, secret);
-
-  return new Promise((resolve, reject) => {
-    const req = https.request(
-      {
-        hostname: "api.kraken.com",
-        path,
-        method:  "POST",
-        headers: {
-          "API-Key":      key,
-          "API-Sign":     sign,
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Content-Length": Buffer.byteLength(body),
-        },
-      },
-      (res) => {
-        let data = "";
-        res.on("data", (chunk) => { data += chunk; });
-        res.on("end", () => {
-          try {
-            const parsed = JSON.parse(data) as { error: string[]; result: T };
-            if (parsed.error?.length) {
-              reject(new Error(parsed.error.join(", ")));
-            } else {
-              resolve(parsed.result);
-            }
-          } catch {
-            reject(new Error("Failed to parse Kraken response"));
-          }
-        });
-      },
-    );
-    req.on("error", reject);
-    req.write(body);
-    req.end();
-  });
-}
-
-// ── Live balances ────────────────────────────────────────────────────────────
+// ── Live balances ─────────────────────────────────────────────────────────────
 
 export async function fetchLiveBalances(): Promise<Balances> {
   if (_selectedExchange === "Coinbase") {
@@ -218,47 +153,18 @@ export async function fetchLiveBalances(): Promise<Balances> {
     };
   }
 
-  if (_selectedExchange === "Kraken") {
-    if (!isExchangeConfigured("Kraken")) throw new Error("Kraken API keys not configured");
-    const raw = await krakenPrivate<Record<string, string>>("Balance");
-    return {
-      USD: parseFloat(raw["ZUSD"] ?? raw["USD"] ?? "0"),
-      BTC: parseFloat(raw["XXBT"] ?? raw["XBT"] ?? "0"),
-      ETH: parseFloat(raw["XETH"] ?? raw["ETH"] ?? "0"),
-      SOL: parseFloat(raw["SOL"]  ?? "0"),
-    };
-  }
-
-  // All other exchanges (Binance, Gemini, CryptoDotCom, Bybit, etc.):
-  // Live API integration not yet implemented — return $0 to reflect actual unfunded state.
-  // Do NOT use EXCHANGE_BALANCES snapshots here; those are fictional and cause balance bleed.
+  // Other exchanges: not yet implemented for live balances
   return { USD: 0, BTC: 0, ETH: 0, SOL: 0 };
 }
 
-// ── Price estimate (use last Kraken ticker) ──────────────────────────────────
+// ── Price estimate ─────────────────────────────────────────────────────────────
 
 async function estimatePrice(symbol: string): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const pair = KRAKEN_PAIRS[symbol];
-    if (!pair) return reject(new Error(`Unknown symbol: ${symbol}`));
-
-    https.get(`https://api.kraken.com/0/public/Ticker?pair=${pair}`, (res) => {
-      let data = "";
-      res.on("data", (c) => { data += c; });
-      res.on("end", () => {
-        try {
-          const json = JSON.parse(data) as { result: Record<string, { c: string[] }> };
-          const entry = Object.values(json.result)[0];
-          resolve(parseFloat(entry.c[0]));
-        } catch {
-          reject(new Error("Ticker parse failed"));
-        }
-      });
-    }).on("error", reject);
-  });
+  const ticker = await getTicker(symbol);
+  return ticker.price;
 }
 
-// ── Risk gates ───────────────────────────────────────────────────────────────
+// ── Risk gates ────────────────────────────────────────────────────────────────
 
 function buildRiskGates(valueUSD: number): { gates: RiskGate[]; allowed: boolean; blockedBy: string[] } {
   const blockedBy: string[] = [];
@@ -304,14 +210,14 @@ function buildRiskGates(valueUSD: number): { gates: RiskGate[]; allowed: boolean
   return { gates, allowed: blockedBy.length === 0, blockedBy };
 }
 
-// ── Order ID ─────────────────────────────────────────────────────────────────
+// ── Order ID ──────────────────────────────────────────────────────────────────
 
 let _orderSeq = 1;
 function nextOrderId(): string {
   return `EX-${Date.now()}-${String(_orderSeq++).padStart(4, "0")}`;
 }
 
-// ── Simulation helpers ───────────────────────────────────────────────────────
+// ── Simulation helpers ────────────────────────────────────────────────────────
 
 function baseAsset(symbol: string): keyof Balances {
   if (symbol === "BTCUSD") return "BTC";
@@ -323,15 +229,15 @@ function baseAsset(symbol: string): keyof Balances {
 function applySimBalance(order: ExchangeOrder) {
   const asset = baseAsset(order.symbol);
   if (order.side === "buy") {
-    _simBalances.USD  = Math.max(0, _simBalances.USD - order.valueUSD - order.feeUSD);
-    _simBalances[asset] = (_simBalances[asset] ?? 0) + order.volumeBase;
+    _simBalances.USD      = Math.max(0, _simBalances.USD - order.valueUSD - order.feeUSD);
+    _simBalances[asset]   = (_simBalances[asset] ?? 0) + order.volumeBase;
   } else {
-    _simBalances[asset] = Math.max(0, (_simBalances[asset] ?? 0) - order.volumeBase);
-    _simBalances.USD  += order.valueUSD - order.feeUSD;
+    _simBalances[asset]   = Math.max(0, (_simBalances[asset] ?? 0) - order.volumeBase);
+    _simBalances.USD     += order.valueUSD - order.feeUSD;
   }
 }
 
-// ── Preview ──────────────────────────────────────────────────────────────────
+// ── Preview ───────────────────────────────────────────────────────────────────
 
 export async function previewOrder(
   symbol:    string,
@@ -340,18 +246,18 @@ export async function previewOrder(
   amountUSD: number,
   limitPrice?: number,
 ): Promise<OrderPreview> {
-  const krakenPair    = KRAKEN_PAIRS[symbol];
-  if (!krakenPair) throw new Error(`Unsupported symbol: ${symbol}`);
+  const nativePair = ALPACA_PAIRS[symbol];
+  if (!nativePair) throw new Error(`Unsupported symbol: ${symbol}`);
 
-  const fillPrice     = orderType === "limit" && limitPrice ? limitPrice : await estimatePrice(symbol);
-  const volumeBase    = amountUSD / fillPrice;
-  const valueUSD      = volumeBase * fillPrice;
-  const feeUSD        = valueUSD * TAKER_FEE;
+  const fillPrice  = orderType === "limit" && limitPrice ? limitPrice : await estimatePrice(symbol);
+  const volumeBase = amountUSD / fillPrice;
+  const valueUSD   = volumeBase * fillPrice;
+  const feeUSD     = valueUSD * TAKER_FEE;
 
   const { gates, allowed, blockedBy } = buildRiskGates(valueUSD);
 
   return {
-    symbol, krakenPair, side, orderType, volumeBase,
+    symbol, nativePair, side, orderType, volumeBase,
     estimatedFill: fillPrice,
     valueUSD:      parseFloat(valueUSD.toFixed(2)),
     feeUSD:        parseFloat(feeUSD.toFixed(4)),
@@ -361,7 +267,7 @@ export async function previewOrder(
   };
 }
 
-// ── Execute ──────────────────────────────────────────────────────────────────
+// ── Execute ───────────────────────────────────────────────────────────────────
 
 export async function executeOrder(
   symbol:    string,
@@ -370,8 +276,8 @@ export async function executeOrder(
   amountUSD: number,
   limitPrice?: number,
 ): Promise<ExchangeOrder> {
-  const krakenPair = KRAKEN_PAIRS[symbol];
-  if (!krakenPair) throw new Error(`Unsupported symbol: ${symbol}`);
+  const nativePair = ALPACA_PAIRS[symbol];
+  if (!nativePair) throw new Error(`Unsupported symbol: ${symbol}`);
 
   const fillPrice  = orderType === "limit" && limitPrice ? limitPrice : await estimatePrice(symbol);
   const volumeBase = amountUSD / fillPrice;
@@ -383,7 +289,7 @@ export async function executeOrder(
   const order: ExchangeOrder = {
     id:         nextOrderId(),
     symbol,
-    krakenPair,
+    nativePair,
     side,
     orderType,
     volumeBase:  parseFloat(volumeBase.toFixed(8)),
@@ -411,46 +317,45 @@ export async function executeOrder(
     return order;
   }
 
-  // ── LIVE execution via Kraken ─────────────────────────────────────────────
-  const params: Record<string, string> = {
-    pair:      krakenPair,
-    type:      side,
-    ordertype: orderType === "market" ? "market" : "limit",
-    volume:    volumeBase.toFixed(8),
-  };
-  if (orderType === "limit" && limitPrice) {
-    params["price"] = limitPrice.toFixed(2);
-  }
+  // ── LIVE execution via Alpaca ──────────────────────────────────────────────
+  const liveAdapter = new AlpacaAdapter();
+  const result = await liveAdapter.placeOrder({
+    symbol,
+    side:      side as "buy" | "sell",
+    type:      orderType,
+    qty:       volumeBase,
+    clientId:  order.id,
+    ...(orderType === "limit" && limitPrice ? { limitPrice } : {}),
+  });
 
-  const result = await krakenPrivate<{ txid: string[]; descr: { order: string } }>("AddOrder", params);
-  order.krakenOrderId = result.txid?.[0];
-  order.status        = "open";   // market orders typically fill immediately; limit stays open
+  order.exchangeOrderId = result.exchangeOrderId;
+  order.status          = result.status === "filled" ? "filled" : "open";
   if (orderType === "market") order.status = "filled";
 
   _orders.unshift(order);
   return order;
 }
 
-// ── Public getters / setters ─────────────────────────────────────────────────
+// ── Public getters / setters ──────────────────────────────────────────────────
 
 export function getExchangeStatus(): ExchangeStatus & { configuredExchanges: string[] } {
-  const today    = new Date().toISOString().slice(0, 10);
+  const today      = new Date().toISOString().slice(0, 10);
   const startOfDay = new Date(today).getTime();
-  const ordersToday = _orders.filter((o) => o.timestamp >= startOfDay && o.status === "filled").length;
-  const lastOrder   = _orders.find((o) => o.status === "filled");
+  const ordersToday  = _orders.filter((o) => o.timestamp >= startOfDay && o.status === "filled").length;
+  const lastOrder    = _orders.find((o) => o.status === "filled");
 
   return {
-    mode:                 _mode,
-    killSwitch:           _killSwitch,
-    paused:               _paused,
-    liveCapable:          isLiveCapable(),
-    apiConfigured:        isApiConfigured(),
-    liveEnabled:          isLiveEnabled(),
+    mode:                _mode,
+    killSwitch:          _killSwitch,
+    paused:              _paused,
+    liveCapable:         isLiveCapable(),
+    apiConfigured:       isApiConfigured(),
+    liveEnabled:         isLiveEnabled(),
     ordersToday,
-    lastOrderAt:          lastOrder?.timestamp ?? null,
-    simBalances:          { ..._simBalances },
-    exchangeName:         _selectedExchange,
-    configuredExchanges:  getConfiguredExchanges(),
+    lastOrderAt:         lastOrder?.timestamp ?? null,
+    simBalances:         { ..._simBalances },
+    exchangeName:        _selectedExchange,
+    configuredExchanges: getConfiguredExchanges(),
   };
 }
 
@@ -486,7 +391,4 @@ export function resetSimBalances(): Balances {
 
 export function setSelectedExchange(name: string): void {
   _selectedExchange = name;
-  // Switch to this exchange's simulated portfolio snapshot
-  const snap = EXCHANGE_BALANCES[name];
-  if (snap) _simBalances = { ...snap };
 }

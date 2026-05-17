@@ -87,7 +87,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <HealthCard icon={<Server className="w-4 h-4" />} label="API Server"   ok={apiHealth.ok}   value={apiHealth.ok ? `${apiHealth.latencyMs}ms` : "offline"} />
         <HealthCard icon={<Radio    className="w-4 h-4" />} label="WebSocket"  ok={false}           value="Module 3"    dim />
-        <HealthCard icon={<Database className="w-4 h-4" />} label="Data Feed"  ok={true}            value="Kraken · Live" />
+        <HealthCard icon={<Database className="w-4 h-4" />} label="Data Feed"  ok={true}            value="Alpaca · Live" />
         <HealthCard icon={<Brain    className="w-4 h-4" />} label="AI Engine"  ok={true}            value="Reasoning" />
         <HealthCard icon={<Shield   className="w-4 h-4" />} label="Risk Engine" ok={true}           value="Active" />
       </div>
@@ -187,7 +187,7 @@ export default function Dashboard() {
               <ArchRow icon={<TrendingUp className="w-3 h-3" />} label="Frontend"  value="React + Vite + Tailwind"  ok />
               <ArchRow icon={<Server     className="w-3 h-3" />} label="Backend"   value="Express · Node.js"         ok />
               <ArchRow icon={<Radio      className="w-3 h-3" />} label="Realtime"  value="WebSocket (Module 3)"      />
-              <ArchRow icon={<Database   className="w-3 h-3" />} label="Data"      value="Kraken API · Live"          ok />
+              <ArchRow icon={<Database   className="w-3 h-3" />} label="Data"      value="Alpaca API · Live"          ok />
               <ArchRow icon={<Brain      className="w-3 h-3" />} label="AI"        value="Reasoning Engine · Live"   ok />
               <ArchRow icon={<Shield     className="w-3 h-3" />} label="Risk"      value="Risk Engine · Active"       ok />
               <ArchRow icon={<Zap        className="w-3 h-3" />} label="Execution" value="Live Broker (Module 13)"   />
@@ -201,7 +201,7 @@ export default function Dashboard() {
               Build Complete · 14/14 Modules
             </div>
             <div className="p-4 flex flex-col gap-1.5 text-[11px] text-muted-foreground">
-              {["Market Data · Live Kraken feed", "AI Reasoning · EMA + RSI signals", "Risk Management · Kill switch + position limits", "Backtesting · Walk-forward validation", "Sentiment AI · News confidence integration"].map((item) => (
+              {["Market Data · Live Alpaca feed", "AI Reasoning · EMA + RSI signals", "Risk Management · Kill switch + position limits", "Backtesting · Walk-forward validation", "Sentiment AI · News confidence integration"].map((item) => (
                 <div key={item} className="flex items-start gap-1.5">
                   <Circle className="w-2.5 h-2.5 mt-0.5 shrink-0 text-primary/50" />
                   {item}

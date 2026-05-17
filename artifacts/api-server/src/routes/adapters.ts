@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { registry } from "../services/exchanges/ExchangeRegistry.js";
 // Live adapters
-import { KrakenAdapter, KRAKEN_CONFIG }       from "../services/exchanges/adapters/KrakenAdapter.js";
+import { AlpacaAdapter, ALPACA_CONFIG }        from "../services/exchanges/adapters/AlpacaAdapter.js";
 import { BinanceAdapter, BINANCE_CONFIG }      from "../services/exchanges/adapters/BinanceAdapter.js";
 import { CoinbaseAdapter, COINBASE_CONFIG }    from "../services/exchanges/adapters/CoinbaseAdapter.js";
 import { BybitAdapter, BYBIT_CONFIG }          from "../services/exchanges/adapters/BybitAdapter.js";
@@ -45,7 +45,7 @@ const router = Router();
 function bootstrapAdapters(): void {
   const adapters = [
     // Live
-    new KrakenAdapter(KRAKEN_CONFIG),
+    new AlpacaAdapter(ALPACA_CONFIG),
     new BinanceAdapter(BINANCE_CONFIG),
     new CoinbaseAdapter(COINBASE_CONFIG),
     new BybitAdapter(BYBIT_CONFIG),
@@ -70,9 +70,9 @@ function bootstrapAdapters(): void {
     }
   }
 
-  // Default active adapter: Kraken (matches existing engine)
+  // Default active adapter: Alpaca
   if (!registry.activeId()) {
-    try { registry.setActive("Kraken"); } catch { /* ignore if already set */ }
+    try { registry.setActive("Alpaca"); } catch { /* ignore if already set */ }
   }
 }
 

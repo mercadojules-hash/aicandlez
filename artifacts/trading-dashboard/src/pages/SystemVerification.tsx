@@ -7,7 +7,7 @@ import {
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-interface KrakenStatus {
+interface MarketDataStatus {
   ok: boolean; symbol: string; close: number; timestamp: number; ageSeconds: number;
 }
 interface SignalRow {
@@ -39,7 +39,7 @@ interface BacktestCaps { timeframes: string[]; strategy: string; dataSource: str
 interface VerificationData {
   generatedAt: string;
   checks: {
-    krakenData:        KrakenStatus | null;
+    marketData:        MarketDataStatus | null;
     lastSignal:        SignalRow | null;
     mtfGate:           MtfStatus;
     autoTrading:       AutoTradeStatus;
@@ -149,7 +149,7 @@ export default function SystemVerification() {
 
   // ── Derived status values ──────────────────────────────────────────────────
 
-  const krakenSt: Status = c?.krakenData?.ok ? "ok" : c?.krakenData ? "warn" : "fail";
+  const krakenSt: Status = c?.marketData?.ok ? "ok" : c?.marketData ? "warn" : "fail";
 
   const signalSt: Status = c?.lastSignal
     ? new Date(c.lastSignal.timestamp).getTime() > Date.now() - 600_000 ? "ok" : "warn"
@@ -250,15 +250,15 @@ export default function SystemVerification() {
       {!isLoading && c && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
 
-          {/* 1 · Kraken Data */}
-          <CheckCard icon={<Database className="w-4 h-4" />} title="Kraken Live Data" status={krakenSt}>
+          {/* 1 · Market Data */}
+          <CheckCard icon={<Database className="w-4 h-4" />} title="Market Data" status={krakenSt}>
             <Row label="Status" value={
-              <Badge label={c.krakenData?.ok ? "LIVE" : "STALE"} variant={c.krakenData?.ok ? "ok" : "warn"} />
+              <Badge label={c.marketData?.ok ? "LIVE" : "STALE"} variant={c.marketData?.ok ? "ok" : "warn"} />
             } />
-            <Row label="Symbol"    value={c.krakenData?.symbol ?? "—"} mono />
-            <Row label="Last close" value={c.krakenData ? `$${fmt(c.krakenData.close)}` : "—"} mono />
-            <Row label="Candle age" value={c.krakenData ? `${c.krakenData.ageSeconds}s` : "—"} mono />
-            <Row label="Source"    value="Kraken REST /OHLC" />
+            <Row label="Symbol"    value={c.marketData?.symbol ?? "—"} mono />
+            <Row label="Last close" value={c.marketData ? `$${fmt(c.marketData.close)}` : "—"} mono />
+            <Row label="Candle age" value={c.marketData ? `${c.marketData.ageSeconds}s` : "—"} mono />
+            <Row label="Source"    value="Alpaca / Binance public API" />
           </CheckCard>
 
           {/* 2 · Last Signal */}

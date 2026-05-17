@@ -34,8 +34,7 @@ type ExchangeOption = {
 
 const EXCHANGES: ExchangeOption[] = [
   { id: "sim",      label: "PAPER AI",   color: "#ffaa00", isSim: true                  },
-  { id: "alpaca",   label: "ALPACA",     color: "#30c78d", isPaper: true                },
-  { id: "kraken",   label: "Kraken",     color: "#5741d9"                               },
+  { id: "alpaca",   label: "ALPACA",     color: "#ffbe00"                               },
   { id: "coinbase", label: "Coinbase",   color: "#2775ca"                               },
   { id: "binance",  label: "Binance",    color: "#f0b90b"                               },
   { id: "cryptocom",label: "Crypto.com", color: "#1199fa"                               },
@@ -205,7 +204,7 @@ export default function CommandCenter() {
   const isKill   = exchangeStatus?.killSwitch ?? false;
   const isPaused = exchangeStatus?.paused     ?? false;
   const isLive   = exchangeStatus?.mode === "live";
-  const exName   = exchangeStatus?.exchangeName ?? "kraken";
+  const exName   = exchangeStatus?.exchangeName ?? "alpaca";
 
   // Adapter name → button ID (adapter uses canonical names, buttons use short IDs)
   const ADAPTER_TO_BTN: Record<string, string> = {
@@ -217,12 +216,12 @@ export default function CommandCenter() {
     ADAPTER_TO_BTN[n.toLowerCase().replace(/[\s._-]/g, "")] ?? n.toLowerCase();
 
   // Resolved confirmed exchange ID from server state.
-  // "sim" only when mode=simulation AND exchange=Kraken (the PAPER AI default).
+  // "sim" only when mode=simulation AND exchange=Alpaca (the PAPER AI default).
   // Any other exchange (Binance, CryptoDotCom, etc.) keeps its own button highlighted
   // even when falling back to simulation mode (balance snapshot still shown).
   const confirmedId = !exchangeStatus
     ? "sim"
-    : !isLive && exName === "Kraken"
+    : !isLive && exName === "Alpaca"
       ? "sim"
       : normalizeExId(exName);
 

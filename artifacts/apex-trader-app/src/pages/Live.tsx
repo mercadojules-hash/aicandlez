@@ -3,7 +3,7 @@ import { useLocation, useSearch } from "wouter";
 import { api, type LiveEligibility } from "@/lib/api";
 
 const ACTIVE_EXCHANGES = [
-  { id: "kraken",   name: "Kraken",   logo: "K", active: true  },
+  { id: "alpaca",   name: "Alpaca",   logo: "A", active: true  },
   { id: "coinbase", name: "Coinbase", logo: "C", active: true  },
   { id: "binance",  name: "Binance",  logo: "B", active: true  },
   { id: "cryptocom",name: "Crypto.com",logo: "ᶜ",active: true  },

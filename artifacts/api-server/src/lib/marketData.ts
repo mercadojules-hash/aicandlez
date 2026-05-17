@@ -1,5 +1,7 @@
+import https from "node:https";
+
 export interface Candle {
-  time: number;
+  time: number;   // Unix seconds
   open: number;
   high: number;
   low: number;
@@ -26,108 +28,231 @@ interface CacheEntry<T> {
   fetchedAt: number;
 }
 
-export const KRAKEN_PAIRS: Record<string, string> = {
-  BTCUSD:  "XBTUSD",
-  ETHUSD:  "ETHUSD",
-  SOLUSD:  "SOLUSD",
-  XRPUSD:  "XRPUSD",
-  DOGEUSD: "XDGUSD",
-  AVAXUSD: "AVAXUSD",
-  LINKUSD: "LINKUSD",
-  ADAUSD:  "ADAUSD",
+// ── Symbol maps ──────────────────────────────────────────────────────────────
+
+const ALPACA_SYMBOLS: Record<string, string> = {
+  BTCUSD:  "BTC/USD",
+  ETHUSD:  "ETH/USD",
+  SOLUSD:  "SOL/USD",
+  XRPUSD:  "XRP/USD",
+  DOGEUSD: "DOGE/USD",
+  AVAXUSD: "AVAX/USD",
+  LINKUSD: "LINK/USD",
+  ADAUSD:  "ADA/USD",
 };
 
-export const SUPPORTED_SYMBOLS = Object.keys(KRAKEN_PAIRS);
+// Public fallback data source — no auth required
+const FALLBACK_SYMBOLS: Record<string, string> = {
+  BTCUSD:  "BTCUSDT",
+  ETHUSD:  "ETHUSDT",
+  SOLUSD:  "SOLUSDT",
+  XRPUSD:  "XRPUSDT",
+  DOGEUSD: "DOGEUSDT",
+  AVAXUSD: "AVAXUSDT",
+  LINKUSD: "LINKUSDT",
+  ADAUSD:  "ADAUSDT",
+};
+
+const ALPACA_TF: Record<string, string> = {
+  "1m": "1Min", "5m": "5Min", "15m": "15Min", "30m": "30Min",
+  "1h": "1Hour", "4h": "4Hour", "1d": "1Day",
+};
+
+const FALLBACK_TF: Record<string, string> = {
+  "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
+  "1h": "1h", "4h": "4h", "1d": "1d",
+};
+
+const TF_TO_MS: Record<string, number> = {
+  "1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
+  "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000,
+};
+
+export const SUPPORTED_SYMBOLS    = Object.keys(ALPACA_SYMBOLS);
 export const SUPPORTED_TIMEFRAMES = ["1m", "5m", "15m", "1h"];
 export const BACKTEST_TIMEFRAMES  = ["1m", "5m", "15m", "1h", "4h", "1d"];
 
-const KRAKEN_INTERVALS: Record<string, number> = {
-  "1m": 1,
-  "5m": 5,
-  "15m": 15,
-  "1h": 60,
-  "4h": 240,
-  "1d": 1440,
-};
-
 const CANDLE_TTL: Record<string, number> = {
-  "1m": 30_000,
-  "5m": 60_000,
-  "15m": 90_000,
-  "1h": 120_000,
-  "4h": 300_000,
-  "1d": 600_000,
+  "1m": 30_000, "5m": 60_000, "15m": 90_000,
+  "1h": 120_000, "4h": 300_000, "1d": 600_000,
 };
-
 const TICKER_TTL = 15_000;
 
 const candleCache = new Map<string, CacheEntry<Candle[]>>();
 const tickerCache = new Map<string, CacheEntry<TickerData>>();
 
-async function fetchKrakenOHLC(symbol: string, timeframe: string): Promise<Candle[]> {
-  const pair = KRAKEN_PAIRS[symbol];
-  const interval = KRAKEN_INTERVALS[timeframe] ?? 60;
-  const url = `https://api.kraken.com/0/public/OHLC?pair=${pair}&interval=${interval}`;
+// ── Alpaca data API (primary — requires ALPACA_API_KEY) ───────────────────────
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
-  if (!res.ok) throw new Error(`Kraken OHLC HTTP ${res.status}`);
+interface AlpacaBar { t: string; o: number; h: number; l: number; c: number; v: number }
 
-  const data = (await res.json()) as { error: string[]; result: Record<string, unknown> };
-  if (data.error?.length) throw new Error(data.error[0]);
-
-  const resultKey = Object.keys(data.result).find((k) => k !== "last")!;
-  const raw = data.result[resultKey] as number[][];
-
-  return raw.map((c) => ({
-    time: c[0],
-    open: Number(c[1]),
-    high: Number(c[2]),
-    low: Number(c[3]),
-    close: Number(c[4]),
-    volume: Number(c[6]),
-  }));
-}
-
-async function fetchKrakenTicker(symbol: string): Promise<TickerData> {
-  const pair = KRAKEN_PAIRS[symbol];
-  const url = `https://api.kraken.com/0/public/Ticker?pair=${pair}`;
-
-  const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
-  if (!res.ok) throw new Error(`Kraken Ticker HTTP ${res.status}`);
-
-  const data = (await res.json()) as { error: string[]; result: Record<string, Record<string, string[]>> };
-  if (data.error?.length) throw new Error(data.error[0]);
-
-  const resultKey = Object.keys(data.result)[0];
-  const t = data.result[resultKey];
-
-  const price = parseFloat(t.c[0]);
-  const open24h = parseFloat(t.o as unknown as string);
-  const change24h = parseFloat((price - open24h).toFixed(2));
-  const changePercent24h = parseFloat(((change24h / open24h) * 100).toFixed(2));
-
+function alpacaHeaders(): Record<string, string> {
   return {
-    symbol,
-    price,
-    bid: parseFloat(t.b[0]),
-    ask: parseFloat(t.a[0]),
-    open24h,
-    high24h: parseFloat(t.h[1]),
-    low24h: parseFloat(t.l[1]),
-    volume24h: parseFloat(t.v[1]),
-    change24h,
-    changePercent24h,
-    lastUpdated: Date.now(),
+    "APCA-API-KEY-ID":     process.env["ALPACA_API_KEY"]    ?? "",
+    "APCA-API-SECRET-KEY": process.env["ALPACA_SECRET_KEY"] ?? "",
   };
 }
 
-export async function getCandles(symbol: string, timeframe: string, limit = 100): Promise<Candle[]> {
-  const key = `${symbol}_${timeframe}`;
-  const ttl = CANDLE_TTL[timeframe] ?? 60_000;
+function isAlpacaConfigured(): boolean {
+  return !!(process.env["ALPACA_API_KEY"] && process.env["ALPACA_SECRET_KEY"]);
+}
+
+function alpacaDataGet<T>(path: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    https.get(
+      { hostname: "data.alpaca.markets", path, headers: alpacaHeaders() },
+      res => {
+        let d = "";
+        res.on("data", c => { d += c as string; });
+        res.on("end", () => {
+          try { resolve(JSON.parse(d) as T); }
+          catch { reject(new Error(`Alpaca data: non-JSON — ${d.slice(0, 200)}`)); }
+        });
+      }
+    ).on("error", reject);
+  });
+}
+
+async function fetchAlpacaCandles(
+  symbol: string, timeframe: string, limit: number,
+): Promise<Candle[]> {
+  const pair = ALPACA_SYMBOLS[symbol];
+  if (!pair) throw new Error(`Unsupported symbol: ${symbol}`);
+  const tf     = ALPACA_TF[timeframe] ?? "5Min";
+  const tfMs   = TF_TO_MS[timeframe]  ?? 300_000;
+  const end    = new Date().toISOString();
+  const start  = new Date(Date.now() - limit * tfMs * 1.5).toISOString();
+  const enc    = encodeURIComponent(pair);
+
+  const data = await alpacaDataGet<{ bars: Record<string, AlpacaBar[]> }>(
+    `/v1beta3/crypto/us/bars?symbols=${enc}&timeframe=${tf}&start=${start}&end=${end}&limit=${limit}&sort=asc`
+  );
+  const bars = data.bars?.[pair] ?? [];
+  return bars.slice(-limit).map(b => ({
+    time:   Math.floor(new Date(b.t).getTime() / 1000),
+    open:   b.o,
+    high:   b.h,
+    low:    b.l,
+    close:  b.c,
+    volume: b.v,
+  }));
+}
+
+async function fetchAlpacaTicker(symbol: string): Promise<TickerData> {
+  const pair = ALPACA_SYMBOLS[symbol];
+  if (!pair) throw new Error(`Unsupported symbol: ${symbol}`);
+  const enc  = encodeURIComponent(pair);
+
+  const data = await alpacaDataGet<{ bars: Record<string, AlpacaBar> }>(
+    `/v1beta3/crypto/us/latest/bars?symbols=${enc}`
+  );
+  const bar   = data.bars?.[pair];
+  const price = bar?.c ?? 0;
+  return {
+    symbol,
+    price,
+    bid:              price * 0.9999,
+    ask:              price * 1.0001,
+    open24h:          price,
+    high24h:          bar?.h ?? price,
+    low24h:           bar?.l ?? price,
+    volume24h:        bar?.v ?? 0,
+    change24h:        0,
+    changePercent24h: 0,
+    lastUpdated:      Date.now(),
+  };
+}
+
+// ── Public fallback data source (no auth required) ────────────────────────────
+
+interface FallbackKline {
+  0: number; 1: string; 2: string; 3: string; 4: string; 5: string;
+}
+
+interface FallbackTicker24h {
+  lastPrice: string; bidPrice: string; askPrice: string;
+  openPrice: string; highPrice: string; lowPrice: string;
+  volume: string; priceChange: string; priceChangePercent: string;
+}
+
+async function fetchFallbackCandles(
+  symbol: string, timeframe: string, limit: number,
+): Promise<Candle[]> {
+  const sym      = FALLBACK_SYMBOLS[symbol];
+  if (!sym) throw new Error(`Unsupported symbol: ${symbol}`);
+  const interval = FALLBACK_TF[timeframe] ?? "5m";
+  const url      = `/api/v3/klines?symbol=${sym}&interval=${interval}&limit=${limit}`;
+
+  return new Promise((resolve, reject) => {
+    https.get({ hostname: "api.binance.com", path: url }, res => {
+      let d = "";
+      res.on("data", c => { d += c as string; });
+      res.on("end", () => {
+        try {
+          const klines = JSON.parse(d) as FallbackKline[];
+          resolve(klines.map(k => ({
+            time:   Math.floor(k[0] / 1000),
+            open:   parseFloat(k[1]),
+            high:   parseFloat(k[2]),
+            low:    parseFloat(k[3]),
+            close:  parseFloat(k[4]),
+            volume: parseFloat(k[5]),
+          })));
+        } catch {
+          reject(new Error(`Candle data parse failed: ${d.slice(0, 200)}`));
+        }
+      });
+    }).on("error", reject);
+  });
+}
+
+async function fetchFallbackTicker(symbol: string): Promise<TickerData> {
+  const sym = FALLBACK_SYMBOLS[symbol];
+  if (!sym) throw new Error(`Unsupported symbol: ${symbol}`);
+  const url = `/api/v3/ticker/24hr?symbol=${sym}`;
+
+  return new Promise((resolve, reject) => {
+    https.get({ hostname: "api.binance.com", path: url }, res => {
+      let d = "";
+      res.on("data", c => { d += c as string; });
+      res.on("end", () => {
+        try {
+          const t = JSON.parse(d) as FallbackTicker24h;
+          const price = parseFloat(t.lastPrice);
+          resolve({
+            symbol,
+            price,
+            bid:              parseFloat(t.bidPrice),
+            ask:              parseFloat(t.askPrice),
+            open24h:          parseFloat(t.openPrice),
+            high24h:          parseFloat(t.highPrice),
+            low24h:           parseFloat(t.lowPrice),
+            volume24h:        parseFloat(t.volume),
+            change24h:        parseFloat(t.priceChange),
+            changePercent24h: parseFloat(t.priceChangePercent),
+            lastUpdated:      Date.now(),
+          });
+        } catch {
+          reject(new Error(`Ticker data parse failed: ${d.slice(0, 200)}`));
+        }
+      });
+    }).on("error", reject);
+  });
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+export async function getCandles(
+  symbol: string, timeframe: string, limit = 100,
+): Promise<Candle[]> {
+  const key    = `${symbol}_${timeframe}`;
+  const ttl    = CANDLE_TTL[timeframe] ?? 60_000;
   const cached = candleCache.get(key);
   if (cached && Date.now() - cached.fetchedAt < ttl) return cached.data.slice(-limit);
 
-  const candles = await fetchKrakenOHLC(symbol, timeframe);
+  const candles = isAlpacaConfigured()
+    ? await fetchAlpacaCandles(symbol, timeframe, limit)
+    : await fetchFallbackCandles(symbol, timeframe, limit);
+
   candleCache.set(key, { data: candles, fetchedAt: Date.now() });
   return candles.slice(-limit);
 }
@@ -136,7 +261,13 @@ export async function getTicker(symbol: string): Promise<TickerData> {
   const cached = tickerCache.get(symbol);
   if (cached && Date.now() - cached.fetchedAt < TICKER_TTL) return cached.data;
 
-  const ticker = await fetchKrakenTicker(symbol);
+  const ticker = isAlpacaConfigured()
+    ? await fetchAlpacaTicker(symbol)
+    : await fetchFallbackTicker(symbol);
+
   tickerCache.set(symbol, { data: ticker, fetchedAt: Date.now() });
   return ticker;
 }
+
+// ── Compat: some route files iterate this for the supported symbol list ───────
+export const SYMBOL_MAP = ALPACA_SYMBOLS;

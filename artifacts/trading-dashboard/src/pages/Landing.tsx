@@ -87,7 +87,7 @@ export default function Landing() {
           style={{ borderColor: "#0D2035" }}>
           {[
             { label: "Modules", value: "19" },
-            { label: "Exchanges", value: "Kraken" },
+            { label: "Broker", value: "Alpaca" },
             { label: "Assets", value: "BTC · ETH · SOL" },
             { label: "Mode", value: "SIM + LIVE" },
           ].map(s => (

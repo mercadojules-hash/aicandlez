@@ -114,7 +114,6 @@ router.post("/engine/filters", requireAuth, (req, res) => {
 // Normalises frontend IDs ("kraken", "coinbase", "binance", "cryptocom") to the
 // exact name used by ExchangeRegistry and the credential-check helpers.
 const EXCHANGE_ID_TO_ADAPTER: Record<string, string> = {
-  kraken:     "Kraken",
   coinbase:   "Coinbase",
   binance:    "Binance",
   binanceus:  "Binance",
@@ -159,9 +158,9 @@ router.post("/engine/exchange-mode", requireAuth, async (req, res) => {
   }
 
   if (mode === "simulation") {
-    // PAPER AI — reset to Kraken sim (default paper account)
+    // PAPER AI — reset to Alpaca sim (default paper account)
     setMode("simulation");
-    setSelectedExchange("Kraken");
+    setSelectedExchange("Alpaca");
     res.json({ mode, status: getExchangeStatus() });
     return;
   }

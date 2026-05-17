@@ -120,7 +120,7 @@ const RISK_LEVELS = [
   { value: "high",     label: "High",     desc: "≤4% stop loss, larger positions",   color: "#ff6600" },
 ];
 
-const EXCHANGES = ["Kraken", "Binance", "Coinbase"];
+const EXCHANGES = ["Alpaca", "Binance", "Coinbase"];
 const TIMEZONES = ["UTC", "US/Eastern", "US/Pacific", "Europe/London", "Asia/Tokyo", "Asia/Singapore"];
 const CURRENCIES = ["USD", "EUR", "GBP", "JPY"];
 
@@ -1040,7 +1040,7 @@ export default function Settings() {
               <ToggleSwitch value={merged.volumeFilter ?? true} onChange={v => set("volumeFilter", v)} label="VOLUME CONFIRMATION" desc="Only trade when current 5m volume ≥ 85% of 20-bar rolling average" />
               <ToggleSwitch value={merged.require1HTrend ?? false} onChange={v => set("require1HTrend", v)} label="1H TREND ALIGNMENT" desc="Require 1H EMA9 to align with signal direction before executing" />
             </div>
-            <SelectInput label="PREFERRED EXCHANGE" value={merged.preferredExchange ?? "Kraken"} options={EXCHANGES} onChange={v => set("preferredExchange", v)} />
+            <SelectInput label="PREFERRED EXCHANGE" value={merged.preferredExchange ?? "Alpaca"} options={EXCHANGES} onChange={v => set("preferredExchange", v)} />
           </Section>
 
           {/* ── Notifications ─────────────────────────────────────────── */}

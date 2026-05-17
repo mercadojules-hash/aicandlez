@@ -44,7 +44,7 @@ import {
 
 export const MODULE_LIST = [
   { id:  1, path: "/dashboard",   icon: LayoutDashboard,   label: "Dashboard",           group: "CORE",  status: "active",  sublabel: "System shell & roadmap"             },
-  { id:  2, path: "/market",      icon: Radio,             label: "Market Data",         group: "CORE",  status: "active",  sublabel: "Live Kraken candle feed"            },
+  { id:  2, path: "/market",      icon: Radio,             label: "Market Data",         group: "CORE",  status: "active",  sublabel: "Live market candle feed"            },
   { id:  3, path: "/indicators",  icon: BarChart3,         label: "Indicators",          group: "CORE",  status: "active",  sublabel: "EMA, RSI, candlestick rendering"    },
   { id:  4, path: "/ai",          icon: Brain,             label: "AI Reasoning",        group: "AI",    status: "active",  sublabel: "EMA+RSI signal engine, BUY/SELL"   },
   { id:  5, path: "/risk",        icon: Shield,            label: "Risk Management",     group: "RISK",  status: "active",  sublabel: "Kill switch, daily loss limit"      },
@@ -57,7 +57,7 @@ export const MODULE_LIST = [
   { id: 12, path: "/journal",     icon: BookOpen,          label: "Trade Journal",       group: "TRADE", status: "active",  sublabel: "Scored trade feedback, win rate"    },
   { id: 13, path: "/validation",  icon: ShieldCheck,       label: "Validation",          group: "RISK",  status: "active",  sublabel: "Walk-forward OOS, overfitting grade"},
   { id: 14, path: "/sentiment",   icon: MessageSquare,     label: "Sentiment AI",        group: "AI",    status: "active",  sublabel: "News scoring, Fear & Greed index"  },
-  { id: 15, path: "/exchange",    icon: ArrowLeftRight,    label: "Exchange",            group: "CORE",  status: "active",  sublabel: "Kraken, sim/live, kill switch"      },
+  { id: 15, path: "/exchange",    icon: ArrowLeftRight,    label: "Exchange",            group: "CORE",  status: "active",  sublabel: "Alpaca, paper/live, kill switch"    },
   { id: 16, path: "/syscheck",    icon: ClipboardCheck,    label: "System Verification", group: "SYS",   status: "active",  sublabel: "Full engine health check, 10 systems"},
   { id: 17, path: "/debug",       icon: Bug,               label: "Signal Debug",        group: "SYS",   status: "active",  sublabel: "MTF funnel, signal quality filters" },
   { id: 18, path: "/charts",      icon: BarChart2,         label: "Multi-Asset Chart",   group: "TRADE", status: "active",  sublabel: "BTC/ETH/SOL side-by-side, EMA9/21"  },

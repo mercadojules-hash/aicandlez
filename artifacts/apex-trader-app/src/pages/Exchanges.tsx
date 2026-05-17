@@ -21,8 +21,8 @@ type ExchangeEntry = {
 };
 
 const ALL_EXCHANGES: ExchangeEntry[] = [
-  { id: "kraken",    name: "Kraken",     logo: "K",  active: true,  color: "#7b4fff",
-    needsPassphrase: false, apiGuide: "Settings → API → Generate Key" },
+  { id: "alpaca",    name: "Alpaca",     logo: "A",  active: true,  color: "#ffbe00",
+    needsPassphrase: false, apiGuide: "Dashboard → Paper Trading → API Keys → Generate Key" },
   { id: "coinbase",  name: "Coinbase",   logo: "C",  active: true,  color: "#0052ff",
     needsPassphrase: false, apiGuide: "Profile → API → New API Key" },
   { id: "binance",   name: "Binance",    logo: "B",  active: true,  color: "#f0b90b",

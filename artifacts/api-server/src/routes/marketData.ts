@@ -15,7 +15,7 @@ router.get("/market-data", async (req, res) => {
       symbols: SUPPORTED_SYMBOLS,
       timeframes: SUPPORTED_TIMEFRAMES,
       tickers,
-      source: "Kraken",
+      source: "Alpaca",
       timestamp: Date.now(),
     });
   } catch (err: unknown) {
@@ -55,7 +55,7 @@ router.get("/market-data/:symbol", async (req, res) => {
       ticker,
       candles,
       count: candles.length,
-      source: "Kraken",
+      source: "Alpaca",
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -702,7 +702,7 @@ export default function Profile() {
           <SectionHead label="Connected Accounts" accent="rgba(0,255,136,0.55)"/>
           <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, overflow:"hidden" }}>
             <ExchangeRow
-              name="Kraken" status="PAPER · CONNECTED" statusCol="rgba(0,225,120,0.85)"
+              name="Alpaca" status="PAPER · CONNECTED" statusCol="rgba(0,225,120,0.85)"
               icon="K"
               iconBg="rgba(130,80,220,0.13)" iconBorder="rgba(130,80,220,0.35)" iconColor="rgba(160,100,255,0.90)"
             />

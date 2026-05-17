@@ -163,7 +163,7 @@ export default function MarketData() {
             <span className="text-xs font-mono text-primary tracking-widest uppercase">Module 02 · Market Data</span>
           </div>
           <h1 className="text-xl font-bold">Live Market Feed</h1>
-          <p className="text-sm text-muted-foreground">Real-time OHLCV data · Source: Kraken Exchange</p>
+          <p className="text-sm text-muted-foreground">Real-time OHLCV data · Source: Alpaca Markets</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -312,7 +312,7 @@ export default function MarketData() {
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground/40 font-mono">
             <Activity className="w-3 h-3" />
-            {symbol.replace("USD", "/USD")} via Kraken
+            {symbol.replace("USD", "/USD")} via Alpaca
           </div>
         </div>
 

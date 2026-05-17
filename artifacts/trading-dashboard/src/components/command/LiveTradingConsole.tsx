@@ -695,7 +695,7 @@ export function LiveTradingConsole({
   const isRunning  = engine?.running ?? false;
   const isKill     = exchangeStatus?.killSwitch ?? false;
   const isPaused   = exchangeStatus?.paused     ?? false;
-  const exName     = exchangeStatus?.exchangeName ?? "Kraken";
+  const exName     = exchangeStatus?.exchangeName ?? "Alpaca";
 
   // Confidence slider with local state + debounced save
   const [confidence, setConfidence] = useState(settings?.minConfidence ?? 45);
@@ -948,7 +948,7 @@ export function LiveTradingConsole({
             <span className="text-[8px] font-bold font-mono tracking-[0.2em]" style={{ color: "#2a4050" }}>
               LIVE TEST CONFIG
             </span>
-            {liveActive && exName !== "Kraken" && (
+            {liveActive && exName !== "Alpaca" && (
               <span className="text-[7px] font-bold font-mono px-1.5 py-0.5 rounded"
                 style={{ background: "#ff990018", color: "#ff9900", border: "1px solid #ff990040" }}>
                 {exName.toUpperCase()} · SPOT ONLY
@@ -988,7 +988,7 @@ export function LiveTradingConsole({
               <span>95 · STRICT</span>
             </div>
             <div className="text-[8px] font-mono px-2 py-1.5 rounded" style={{ background: "#00aaff0a", color: "#00aaff60", border: "1px solid #00aaff18" }}>
-              TESTING RANGE: 40–55 recommended for Kraken spot
+              TESTING RANGE: 40–55 recommended for Alpaca spot
             </div>
           </div>
 

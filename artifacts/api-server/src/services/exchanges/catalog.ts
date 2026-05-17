@@ -47,16 +47,16 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
   // ── Tier 1 — Live (fully implemented) ──────────────────────────────────────
 
   {
-    id: "Kraken", name: "Kraken", url: "https://www.kraken.com", logo: "kraken",
+    id: "Alpaca", name: "Alpaca", url: "https://alpaca.markets", logo: "alpaca",
     requiresPassphrase: false,
-    requiredPerms: "Query Funds, Query Open Orders & Trades, Create & Modify Orders",
+    requiredPerms: "Read + Trade (no withdrawal permissions required)",
     warnings: [
-      "Do NOT enable withdrawal permissions.",
-      "Use a restricted key scoped to trading only.",
+      "Do NOT share your secret key.",
+      "Use paper trading keys until you are ready for live execution.",
     ],
-    takerFeePct: 0.26, makerFeePct: 0.16,
-    rateLimit: { ordersPerSecond: 1, requestsPerMinute: 60 },
-    status: "live", features: ["spot", "futures"], adapterAvailable: true,
+    takerFeePct: 0.00, makerFeePct: 0.00,
+    rateLimit: { ordersPerSecond: 10, requestsPerMinute: 200 },
+    status: "live", features: ["spot"], adapterAvailable: true,
   },
   {
     id: "Binance", name: "Binance", url: "https://www.binance.com", logo: "binance",
