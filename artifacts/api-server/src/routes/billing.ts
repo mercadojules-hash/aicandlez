@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
+import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import {
   getUncachableStripeClient,
   getStripePublishableKey,
@@ -377,6 +378,17 @@ export async function syncSubscriptionStatus(
       updatedAt:  new Date(),
     })
     .where(eq(usersTable.clerkUserId, clerkUserId));
+
+  const eventType =
+    planStatus === "canceled" || planStatus === "expired" ? "SUBSCRIPTION_EXPIRED" :
+    planStatus === "past_due" || planStatus === "unpaid"  ? "BILLING_FAILED"       :
+    "SUBSCRIPTION_CHANGED";
+
+  auditLogger.append(clerkUserId, eventType, {
+    plan, planStatus, stripeSubscriptionId,
+  }, {
+    severity: eventType === "BILLING_FAILED" ? "critical" : eventType === "SUBSCRIPTION_EXPIRED" ? "warn" : "info",
+  });
 }
 
 export default router;

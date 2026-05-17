@@ -10,12 +10,14 @@ import { logger } from "../../lib/logger.js";
 //   - Kill switch activations
 //   - Credential vault access
 //   - User authentication events
+//   - Subscription / billing events
 //   - Admin actions
 //
 // Design principles:
 //   - Entries are NEVER deleted or modified (regulatory compliance)
 //   - Each entry has a deterministic hash of its content for tamper detection
-//   - In Phase 2: persisted to append-only PostgreSQL table with WAL replication
+//   - Persisted to PostgreSQL audit_log table (append-only, WAL-replicated)
+//   - In-memory ring buffer (50k) for low-latency query without DB round-trip
 //   - Entries are structured for export to SIEM / compliance reporting
 
 import crypto from "node:crypto";
@@ -36,9 +38,14 @@ export type AuditEventType =
   | "CREDENTIAL_DELETED"
   | "USER_LOGIN"
   | "USER_LOGOUT"
+  | "AUTH_FAILURE"
   | "SETTINGS_CHANGED"
   | "CIRCUIT_BREAKER_TRIPPED"
   | "DRAWDOWN_ALERT"
+  | "SUBSCRIPTION_CHANGED"
+  | "SUBSCRIPTION_EXPIRED"
+  | "BILLING_FAILED"
+  | "WITHDRAWAL_ATTEMPT"
   | "ADMIN_ACTION";
 
 export interface AuditEntry {
@@ -92,7 +99,7 @@ class AuditLoggerStore {
 
     this.entries.push(entry);
     if (this.entries.length > this.MAX_ENTRIES) {
-      this.entries.shift();  // drop oldest (only acceptable truncation point)
+      this.entries.shift();
     }
 
     // Forward to structured server log
@@ -104,7 +111,34 @@ class AuditLoggerStore {
       logger.info({ auditId: id, userId, type }, `AUDIT: ${type}`);
     }
 
+    // Persist to DB asynchronously — fire-and-forget, never blocks the caller
+    this.persistAsync(entry);
+
     return entry;
+  }
+
+  // ── DB persistence (fire-and-forget) ──────────────────────────────────────
+
+  private persistAsync(entry: AuditEntry): void {
+    import("@workspace/db").then(({ db, auditLogTable }) => {
+      return db.insert(auditLogTable).values({
+        id:        entry.id,
+        hash:      entry.hash,
+        tsMs:      entry.timestamp,
+        userId:    entry.userId,
+        sessionId: entry.sessionId,
+        ipAddress: entry.ipAddress,
+        type:      entry.type,
+        exchange:  entry.exchange,
+        symbol:    entry.symbol,
+        payload:   entry.payload,
+        severity:  entry.severity,
+      });
+    }).catch((err: unknown) => {
+      // Non-fatal: DB may not be migrated yet, or may be temporarily unavailable.
+      // The entry is already in the in-memory ring buffer and server log.
+      logger.warn({ auditId: entry.id, err }, "AUDIT: DB persist failed (in-memory only)");
+    });
   }
 
   // ── Query ─────────────────────────────────────────────────────────────────
@@ -155,11 +189,12 @@ class AuditLoggerStore {
   private defaultSeverity(type: AuditEventType): AuditEntry["severity"] {
     const critical: AuditEventType[] = [
       "KILL_SWITCH_ON", "CIRCUIT_BREAKER_TRIPPED", "DRAWDOWN_ALERT",
-      "RISK_VIOLATION", "ADMIN_ACTION",
+      "RISK_VIOLATION", "ADMIN_ACTION", "WITHDRAWAL_ATTEMPT", "BILLING_FAILED",
     ];
     const warn: AuditEventType[] = [
       "TRADE_REJECTED", "EXCHANGE_DISCONNECTED", "MODE_CHANGED",
-      "CREDENTIAL_DELETED",
+      "CREDENTIAL_DELETED", "SUBSCRIPTION_EXPIRED", "AUTH_FAILURE",
+      "KILL_SWITCH_OFF",
     ];
     if (critical.includes(type)) return "critical";
     if (warn.includes(type))     return "warn";

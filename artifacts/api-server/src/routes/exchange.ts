@@ -15,6 +15,7 @@ import {
   type ExchangeMode,
 } from "../lib/exchangeEngine.js";
 import { requireAuth } from "../middlewares/requireAuth.js";
+import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -85,8 +86,18 @@ router.post("/exchange/mode", requireAuth, async (req, res) => {
 });
 
 // ── Kill switch ───────────────────────────────────────────────────────────────
-router.post("/exchange/kill", requireAuth, (_req, res) => {
-  const active = toggleKillSwitch();
+router.post("/exchange/kill", requireAuth, (req, res) => {
+  const active    = toggleKillSwitch();
+  const userId    = (req as import("express").Request & { clerkUserId?: string }).clerkUserId ?? "system";
+  const ipAddress = req.ip ?? req.socket?.remoteAddress ?? null;
+
+  auditLogger.append(
+    userId,
+    active ? "KILL_SWITCH_ON" : "KILL_SWITCH_OFF",
+    { source: "exchange-engine", reason: "manual", active },
+    { severity: active ? "critical" : "warn", ipAddress: ipAddress ?? undefined },
+  );
+
   res.json({ killSwitch: active, status: getExchangeStatus() });
 });
 

@@ -1,0 +1,111 @@
+Strategic Architecture Change — Consolidate Trading Infrastructure Around Alpaca
+
+After reviewing the platform direction and operational complexity, we are simplifying the exchange architecture.
+
+New Direction:
+Alpaca will become the primary and unified trading infrastructure for:
+
+* paper trading
+* live trading
+* equities
+* crypto
+* future asset expansion
+
+Kraken is no longer needed, including for paper trading.
+
+Please begin removing Kraken-specific architecture and consolidate the platform around Alpaca.
+
+Required Tasks:
+
+1. Remove Kraken Dependencies
+   Audit and remove:
+
+* Kraken API integrations
+* Kraken adapters
+* Kraken exchange modes
+* Kraken environment variables
+* Kraken-specific websocket logic
+* Kraken telemetry
+* Kraken balance handling
+* Kraken order routing
+* Kraken branding references
+* Kraken UI toggles/tabs
+* Kraken simulation logic
+
+2. Simplify Exchange Architecture
+   Refactor the platform to support:
+
+* Alpaca Paper Trading
+* Alpaca Live Trading (future locked until enabled)
+
+This should become the single trading infrastructure path.
+
+3. Unified Asset Support
+   The architecture should now be designed around Alpaca handling:
+
+* equities
+* crypto
+* paper trading
+* future multi-asset support
+
+Avoid exchange-specific UI fragmentation.
+
+4. UI/UX Cleanup
+   Remove:
+
+* exchange switching tabs
+* Kraken references
+* “multiple exchange” language
+* exchange selector complexity
+
+Replace with cleaner terminology:
+
+* Paper Trading
+* Live Trading
+* AI Trading Mode
+* Simulation Active
+* Live Locked
+
+5. Backend Cleanup
+   Refactor:
+
+* ExchangeAdapter abstractions if no longer needed
+* exchange mode routes
+* exchange switching state logic
+* multi-exchange telemetry
+* redundant exchange config layers
+
+The platform should become operationally simpler and more maintainable.
+
+6. Risk Reduction Goal
+   The objective is:
+
+* lower operational complexity
+* easier debugging
+* safer live rollout
+* cleaner infrastructure
+* fewer failure points
+* faster scaling
+* simplified compliance posture
+
+7. Preserve Existing Safety Controls
+   Do NOT remove:
+
+* simulation/live separation
+* kill switches
+* auth gates
+* risk engine protections
+* subscription gating
+* paper trading restrictions
+
+8. Final Deliverable
+   Please provide:
+
+* list of removed Kraken components
+* simplified architecture overview
+* remaining exchange dependencies
+* operational improvements from consolidation
+* screenshots of cleaned UI
+* confirmation that all paper trading now routes through Alpaca infrastructure only
+
+Live trading must remain disabled during all refactoring and testing.

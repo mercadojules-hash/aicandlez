@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   getConfig, getStatus, updateConfig, validateTrade, toggleKillSwitch,
 } from "../lib/riskEngine.js";
+import { auditLogger } from "../services/telemetry/AuditLogger.js";
 
 const router = Router();
 
@@ -31,8 +32,18 @@ router.post("/risk/validate", (req, res) => {
 });
 
 // POST /risk/kill-switch — toggle kill switch
-router.post("/risk/kill-switch", (_req, res) => {
-  const active = toggleKillSwitch();
+router.post("/risk/kill-switch", (req, res) => {
+  const active    = toggleKillSwitch();
+  const userId    = (req as import("express").Request & { clerkUserId?: string }).clerkUserId ?? "system";
+  const ipAddress = req.ip ?? req.socket?.remoteAddress ?? null;
+
+  auditLogger.append(
+    userId,
+    active ? "KILL_SWITCH_ON" : "KILL_SWITCH_OFF",
+    { source: "risk-engine", reason: "manual", active },
+    { severity: active ? "critical" : "warn", ipAddress: ipAddress ?? undefined },
+  );
+
   res.json({ killSwitchActive: active, status: getStatus() });
 });
 

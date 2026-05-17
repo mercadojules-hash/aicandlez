@@ -1,0 +1,126 @@
+We are now entering the production hardening and operational safety phase for AICandlez.
+
+The UI, Stripe billing flow, subscription gating, authentication, and push notification foundations are now functioning correctly. The next priority is production-grade trading safety, failure handling, and operational resilience before beta launch.
+
+Please perform a full production safety and reliability audit focused on autonomous trading risk management.
+
+Priority Areas:
+
+1. Live Trading Safety Architecture
+   Before any live trading is enabled, implement and verify:
+
+* global emergency kill switch
+* per-user kill switch
+* max daily loss limits
+* max account drawdown protection
+* max position sizing limits
+* exposure limits per asset
+* trade frequency throttling
+* cooldown periods after consecutive losses
+* automatic trading suspension on abnormal activity
+* API failure fail-safe behavior
+* exchange disconnect fail-safe behavior
+* websocket reconnect protection
+* duplicate order prevention
+* stale signal rejection
+* invalid price execution protection
+
+2. Account Isolation
+   Ensure every user account is fully isolated:
+
+* positions
+* balances
+* signals
+* websocket streams
+* risk engine calculations
+* autonomous trading state
+* subscriptions
+* notifications
+* exchange API keys
+
+No cross-account leakage should be possible.
+
+3. Audit Logging System
+   Add production-grade audit logging for:
+
+* login activity
+* failed auth attempts
+* exchange mode changes
+* live trading activation attempts
+* order executions
+* order failures
+* kill switch events
+* subscription changes
+* withdrawals
+* API errors
+* websocket disconnects
+* risk engine interventions
+
+Logs should support future compliance/debugging requirements.
+
+4. Exchange Failure Handling
+   Simulate and test:
+
+* Kraken API downtime
+* websocket interruptions
+* partial fills
+* rate limits
+* invalid responses
+* delayed market data
+* stale candles
+* exchange timeout conditions
+
+The system should fail safely without placing dangerous or duplicate trades.
+
+5. AI Trading Safety Validation
+   Validate:
+
+* no AI execution without confirmed market data
+* no trade execution with stale indicators
+* no autonomous trading without active subscription
+* simulation/live separation integrity
+* confidence threshold enforcement
+* stop-loss enforcement
+* take-profit enforcement
+* trailing stop validation
+
+6. Notification Reliability
+   Verify push notifications for:
+
+* trade execution
+* stop-loss triggers
+* emergency shutdowns
+* login/security alerts
+* subscription expiration
+* billing failures
+* exchange disconnects
+* AI trade opportunities
+
+Both:
+
+* web/browser push
+* Expo mobile push
+
+must be tested for delivery reliability.
+
+7. Production Readiness Report
+   Please provide:
+
+* architecture weaknesses
+* remaining safety risks
+* high-risk failure points
+* beta launch blockers
+* scalability concerns
+* security concerns
+* operational recommendations
+* disaster recovery concerns
+* recommended monitoring/telemetry additions
+
+8. IMPORTANT
+   Live trading must remain disabled during all testing:
+
+* liveEnabled = false
+* simulation mode only
+* no real exchange execution
+
+This phase should focus entirely on operational safety, reliability, and production hardening before any public beta deployment.

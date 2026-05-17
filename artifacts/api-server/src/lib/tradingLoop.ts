@@ -14,6 +14,7 @@ import { addJournalEntry } from "./tradeJournalEngine.js";
 import { sendTradeExecutedSMS } from "./notifications.js";
 import { broadcastSignal, broadcastTrade } from "./wsServer.js";
 import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
+import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { logger } from "./logger.js";
 
 function genId() { return crypto.randomUUID(); }
@@ -328,6 +329,23 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
     getCandles(symbol, "15m", 150),
   ]);
 
+  // ── Stale market data guard ────────────────────────────────────────────────
+  // Rejects signal generation when the exchange is returning old/cached candles.
+  // Candle.time may be Unix seconds OR milliseconds — normalise to ms.
+  const STALE_THRESHOLD_MS = 15 * 60 * 1000;
+  const lastCandle5m = candles5m[candles5m.length - 1];
+  if (!lastCandle5m || candles5m.length === 0) {
+    throw new Error(`No 5m candles available for ${symbol} — exchange may be down.`);
+  }
+  const candleTimeMs = lastCandle5m.time > 1e10 ? lastCandle5m.time : lastCandle5m.time * 1000;
+  const candleAgeMs  = Date.now() - candleTimeMs;
+  if (candleAgeMs > STALE_THRESHOLD_MS) {
+    throw new Error(
+      `Stale 5m market data for ${symbol}: last candle is ${Math.round(candleAgeMs / 60_000)}min old ` +
+      `(threshold: 15min). Possible exchange outage — signal rejected.`,
+    );
+  }
+
   const fast = runAIDecision(symbol, "5m",  candles5m);
   const slow = runAIDecision(symbol, "15m", candles15m);
 
@@ -494,6 +512,9 @@ async function autoExecute(
       message: `Auto-trade blocked for ${symbol}: risk engine — ${riskCheck.violations.join("; ")}`,
       details: { symbol, side, violations: riskCheck.violations },
     });
+    auditLogger.append("system", "TRADE_REJECTED", {
+      symbol, side, sizeUSD, violations: riskCheck.violations, gate: "risk_engine",
+    }, { symbol, severity: "warn" });
     return { executed: false, blockReason: `Risk engine: ${riskCheck.violations.join("; ")}` };
   }
 
@@ -507,6 +528,9 @@ async function autoExecute(
       message: `Auto-trade failed for ${symbol} ${side}: ${result.error}`,
       details: { symbol, side, error: result.error },
     });
+    auditLogger.append("system", "TRADE_REJECTED", {
+      symbol, side, error: result.error, gate: "simulation_engine",
+    }, { symbol, severity: "warn" });
     return { executed: false, blockReason: `Sim engine: ${result.error}` };
   }
 
@@ -539,6 +563,16 @@ async function autoExecute(
 
   const tag = isTest ? "[TEST MODE]" : "[AUTO]";
   logger.info({ symbol, side, sizeUSD, entryPrice: pos.entryPrice, shortSummary, tradeMode }, `${tag} Trade executed`);
+
+  auditLogger.append("system", "TRADE_EXECUTED", {
+    symbol, side, sizeUSD,
+    entryPrice:  pos.entryPrice,
+    stopLoss:    parseFloat(stopLoss.toFixed(2)),
+    takeProfit:  parseFloat(takeProfit.toFixed(2)),
+    signalId,
+    shortSummary,
+    tradeMode,
+  }, { symbol });
 
   await db.insert(logsTable).values({
     id: genId(), type: "trade", level: "success",
