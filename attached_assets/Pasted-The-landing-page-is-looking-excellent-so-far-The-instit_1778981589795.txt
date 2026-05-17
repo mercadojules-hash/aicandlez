@@ -1,0 +1,120 @@
+The landing page is looking excellent so far. The institutional fintech direction is exactly what we want. We now want to move into the next phase: deeper ecosystem integration + notification infrastructure planning.
+
+IMPORTANT:
+AICandlez is NOT just a landing page or mobile app.
+
+The long-term goal is a full AI trading ecosystem with:
+
+* mobile app
+* desktop/web trading platform
+* landing/marketing site
+* shared AI infrastructure
+* shared broker/auth infrastructure
+
+The website will eventually become:
+app.aicandlez.com
+
+with a full desktop trading terminal/dashboard for power users.
+
+Please continue improving the landing experience while also preparing the architecture direction for the future desktop platform.
+
+NEXT LANDING ITERATIONS:
+
+1. Add more cinematic depth:
+
+* subtle market motion
+* animated background grid
+* live ticker movement
+* AI scanner pulse effects
+* volumetric glow
+* subtle layered depth
+
+Keep it premium and restrained — NOT flashy or gaming-style.
+
+2. Add mobile app showcase section:
+
+* iPhone mockups
+* dashboard screenshots
+* AI execution previews
+* autonomous trading visuals
+* crypto/equities previews
+
+3. Add AI intelligence visualization layer:
+   We want the site to emphasize:
+
+* AI scanning
+* confidence analysis
+* opportunity detection
+* risk management
+* autonomous execution
+
+The site should feel like:
+“a living AI market intelligence system.”
+
+4. Add stronger trust layer:
+
+* Alpaca infrastructure
+* paper trading verification
+* real-time market data
+* security/compliance indicators
+* AI monitoring systems
+
+5. Prepare future desktop platform architecture:
+   Please outline recommended structure for:
+
+* app.aicandlez.com
+* desktop dashboard deployment
+* shared auth
+* shared API infrastructure
+* shared websocket/live data systems
+
+MOST IMPORTANT NEW REQUEST:
+
+We want to begin planning push notifications for BOTH:
+
+* mobile app (iOS + Android)
+* desktop/web platform
+
+Please outline the recommended architecture and implementation strategy for:
+
+MOBILE PUSH:
+
+* Expo/EAS push notifications
+* APNs
+* Firebase/FCM
+* autonomous trade alerts
+* AI signal notifications
+* stop-loss alerts
+* volatility/risk alerts
+
+WEB/DESKTOP PUSH:
+
+* browser push notifications
+* service worker architecture
+* websocket/live alerts
+* in-app notification center
+* toast alerts
+* optional sound alerts
+
+The AI system should eventually notify users in real time for:
+
+* BUY/SELL execution
+* AI confidence spikes
+* stop-loss triggers
+* portfolio changes
+* volatility/risk changes
+* market opportunity detection
+* autonomous trade activity
+
+We want the notification system designed as a CORE platform feature — not an afterthought.
+
+Please also recommend:
+
+* notification infrastructure
+* backend event architecture
+* preferred providers/services
+* scaling strategy
+* best practices for fintech/trading apps
+
+The long-term goal is:
+institutional-grade AI trading infrastructure across web + mobile.

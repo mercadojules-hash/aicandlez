@@ -1,6 +1,9 @@
 import { Navbar } from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
 import { AppPreview } from "@/components/landing/AppPreview";
+import { AIIntelligence } from "@/components/landing/AIIntelligence";
+import { MobileShowcase } from "@/components/landing/MobileShowcase";
+import { EcosystemArch } from "@/components/landing/EcosystemArch";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { Features } from "@/components/landing/Features";
 import { Pricing } from "@/components/landing/Pricing";
@@ -14,6 +17,9 @@ export function LandingPage() {
       <Navbar />
       <Hero />
       <AppPreview />
+      <AIIntelligence />
+      <MobileShowcase />
+      <EcosystemArch />
       <HowItWorks />
       <Features />
       <Pricing />
