@@ -1,0 +1,73 @@
+New QA findings after retesting interaction flow:
+
+1. Related Opportunities asset cards are still broken
+   Current behavior:
+
+* tapping a bottom asset card does NOT reliably navigate to that asset’s page
+* instead, it toggles between two assets/states
+* repeated taps appear to flip the existing asset state instead of routing cleanly
+
+Example:
+
+* tapping TSLA/META/MSFT/AAPL does not consistently open that symbol’s own detail page
+* current asset sometimes re-renders/toggles instead
+
+This suggests:
+
+* stale state reuse
+* route params not rehydrating correctly
+* component not remounting on symbol change
+* local state mutation instead of true navigation
+* possible URL/state desync
+
+Please investigate:
+
+* asset detail routing lifecycle
+* navigateToAsset()
+* URL param syncing
+* useEffect dependencies
+* stale symbol state
+* whether the asset page needs a key={symbol} remount strategy
+* whether local state is mutating without triggering a full rerender
+
+2. AI Buy / AI Sell execution UX regressed
+   Current behavior now:
+
+* EXECUTING… flashes for less than 1 second
+* appears visually “glitchy”
+* looks like the UI wants to switch state but immediately aborts/resets
+* no visible order confirmation
+* no visible position update
+* no success/failure indication
+
+This now feels more like:
+
+* immediate promise rejection
+* optimistic state instantly reverting
+* mutation invalidation race
+* async state overwrite
+* execution callback failing silently
+* request succeeding but UI resetting too early
+
+Please investigate:
+
+* execution mutation lifecycle
+* loading state timing
+* optimistic updates
+* invalidation/refetch race conditions
+* silent catch blocks
+* whether simulated order creation actually succeeds
+
+Need explicit visible feedback:
+
+* EXECUTING state duration
+* success toast
+* failure toast
+* simulated position created
+* portfolio update confirmation
+
+Important:
+DO NOT add new features yet.
+Current priority is interaction reliability and deterministic UI behavior.
+
+We are now in platform QA/stabilization mode.

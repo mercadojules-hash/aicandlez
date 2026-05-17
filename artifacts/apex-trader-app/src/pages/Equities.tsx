@@ -527,7 +527,7 @@ export default function Equities() {
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
           {filtered.map(([sym, meta]) => (
             <AssetRow key={sym} sym={sym} meta={meta}
-              onClick={() => setLocation(`/asset?sym=${sym}&type=equity`)}/>
+              onClick={() => setLocation(`/asset/equity/${sym}`)}/>
           ))}
         </div>
 

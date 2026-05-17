@@ -548,7 +548,7 @@ export default function Markets() {
           {filtered.map(([sym, bd]) => {
             const meta = CRYPTO_ASSETS[sym] ?? {};
             return <AssetRow key={sym} sym={sym} bd={bd} meta={meta}
-              onClick={() => setLocation(`/asset?sym=${sym.replace("USD","")}&type=crypto`)}/>;
+              onClick={() => setLocation(`/asset/crypto/${sym.replace("USD","")}`)}/>;
           })}
         </div>
 

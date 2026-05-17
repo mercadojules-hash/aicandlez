@@ -471,39 +471,43 @@ function setupGrade(conf: number): { grade:string; label:string; color:string } 
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────────
-function readUrlAsset(): { sym: string; type: string } {
-  if (typeof window === "undefined") return { sym: "BTC", type: "crypto" };
-  const p = new URLSearchParams(window.location.search);
-  return {
-    sym:  (p.get("sym") ?? "BTC").toUpperCase(),
-    type:  p.get("type") ?? "crypto",
-  };
+interface AssetDetailProps {
+  routeSym?:  string;
+  routeType?: string;
 }
 
-export default function AssetDetail() {
-  const [location, setLocation] = useLocation();
+export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = {}) {
+  const [, setLocation] = useLocation();
   const [tf, setTf] = useState<TF>("4H");
   const [executing, setExecuting] = useState<"buy"|"sell"|"auto"|null>(null);
   const [toast, setToast] = useState<{ kind:"success"|"error"; msg:string } | null>(null);
   const { enabled: autoActive, setEnabled: setAutoActiveCtx } = useAIAutoTrade();
   const queryClient = useQueryClient();
 
-  // Reactive sym/type — re-read from URL whenever wouter location OR popstate fires
-  const [{ sym, type }, setAssetParams] = useState(readUrlAsset);
-  useEffect(() => {
-    setAssetParams(readUrlAsset());
-    const onPop = () => setAssetParams(readUrlAsset());
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [location]);
+  // sym/type come from route params (component is keyed on them in App.tsx → fresh mount per asset).
+  // Fallback to ?sym=&type= query for legacy callers.
+  const sym = (() => {
+    if (routeSym) return routeSym.toUpperCase();
+    if (typeof window !== "undefined") {
+      return (new URLSearchParams(window.location.search).get("sym") ?? "BTC").toUpperCase();
+    }
+    return "BTC";
+  })();
+  const type = (() => {
+    if (routeType) return routeType;
+    if (typeof window !== "undefined") {
+      return new URLSearchParams(window.location.search).get("type") ?? "crypto";
+    }
+    return "crypto";
+  })();
 
   const backRoute = type === "equity" ? "/equities" : "/markets";
   const asset  = ASSET_DB[sym];
 
-  // ── Toast auto-dismiss ──────────────────────────────────────────────────────
+  // ── Toast auto-dismiss (longer = more visible) ───────────────────────────────
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 4000);
+    const t = setTimeout(() => setToast(null), 5500);
     return () => clearTimeout(t);
   }, [toast]);
 
@@ -542,7 +546,11 @@ export default function AssetDetail() {
         : msg;
       setToast({ kind: "error", msg: friendly });
     },
-    onSettled: () => setExecuting(null),
+    onSettled: () => {
+      // Hold "EXECUTING…" visible for a perceptible window so users SEE the state change
+      // even when the request resolves in <300ms. Prevents the "glitchy flash" regression.
+      setTimeout(() => setExecuting(null), 750);
+    },
   });
 
   if (!asset) {
@@ -580,17 +588,18 @@ export default function AssetDetail() {
   const handleExec = (type2: "buy"|"sell"|"auto") => {
     console.log("[ai-exec] click", { type: type2, sym });
     if (type2 === "auto") { setAutoActiveCtx(!autoActive); return; }
-    if (orderMutation.isPending) return;
+    if (orderMutation.isPending || executing) return;
     setExecuting(type2);
+    setToast(null); // clear any stale toast so the new result is unmistakable
     orderMutation.mutate(type2 === "buy" ? "BUY" : "SELL");
   };
 
   const navigateToAsset = (rsym: string, rtype: string) => {
     console.log("[related-card] navigate →", rsym, rtype);
-    const url = `/asset?sym=${rsym}&type=${rtype}`;
-    setLocation(url);                                  // wouter pathname update
-    setAssetParams({ sym: rsym.toUpperCase(), type: rtype }); // immediate re-render
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Path-based route → wouter mounts a fresh AssetDetail (keyed on `${type}:${sym}` in App.tsx).
+    // No state mutation here; the remount handles all symbol-specific state cleanly.
+    setLocation(`/asset/${rtype}/${rsym.toUpperCase()}`);
+    window.scrollTo({ top: 0, behavior: "auto" });
   };
 
   return (

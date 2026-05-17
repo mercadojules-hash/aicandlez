@@ -142,7 +142,14 @@ function Pages() {
       <Route path="/trade"   component={() => <Protected><Trade /></Protected>} />
       <Route path="/markets"  component={() => <Protected><Markets  /></Protected>} />
       <Route path="/equities" component={() => <Protected><Equities /></Protected>} />
-      <Route path="/asset"    component={() => <Protected><AssetDetail /></Protected>} />
+      <Route path="/asset/:type/:sym">
+        {(params) => (
+          <Protected>
+            <AssetDetail key={`${params.type}:${params.sym}`} routeSym={params.sym} routeType={params.type} />
+          </Protected>
+        )}
+      </Route>
+      <Route path="/asset" component={() => <Protected><AssetDetail key="default" /></Protected>} />
       <Route path="/profile"  component={() => <Protected><Profile  /></Protected>} />
       <Route path="/subscribe"   component={() => <Protected><Subscribe /></Protected>} />
       <Route path="/consent"     component={() => <Protected><Consent /></Protected>} />
