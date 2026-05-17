@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import aicandlezLogo from "@assets/AICandlez_Final_Logo_3_1778962760188.png";
+import { UpgradeBanner } from "@/components/UpgradeBanner";
 import {
   api,
   type MobileStatus, type Portfolio, type SimAccount,
@@ -393,6 +394,7 @@ export default function Home() {
 
       {/* ── Dual Market Ticker ──────────────────────────────────────────────── */}
       <DualTicker/>
+      <UpgradeBanner/>
 
       {/* ── Hero — AI Engine Status ──────────────────────────────────────────── */}
       <div style={{

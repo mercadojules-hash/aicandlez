@@ -7,6 +7,7 @@ import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
 import { useUserProfile, type UserProfile } from "@/contexts/UserProfileContext";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -378,6 +379,7 @@ export default function Profile() {
   const { openOnboarding } = useBrokerConnection();
   const { enabled: aiEnabled, setEnabled: setAiEnabled } = useAIAutoTrade();
   const { profile, updateProfile } = useUserProfile();
+  const pushNotifs = usePushNotifications();
 
   // Edit-mode state (draft)
   const [editing,      setEditing]      = useState(false);
@@ -741,6 +743,47 @@ export default function Profile() {
                 <div style={{ fontSize:9, fontFamily:SANS, color:GR, marginTop:2 }}>Powered by Alpaca · Sandbox paper mode</div>
               </div>
               <span style={{ fontSize:18, color:"rgba(255,255,255,0.30)" }}>›</span>
+            </button>
+            <button
+              onClick={() => {
+                if (!pushNotifs.subscribed) void pushNotifs.subscribe();
+                else void pushNotifs.unsubscribe();
+              }}
+              disabled={pushNotifs.loading || pushNotifs.permission === "denied" || !pushNotifs.supported}
+              style={{
+                width:"100%", padding:"17px 20px", background:"transparent", border:"none",
+                borderBottom:"1px solid rgba(255,255,255,0.06)",
+                display:"flex", justifyContent:"space-between", alignItems:"center",
+                cursor: pushNotifs.supported && pushNotifs.permission !== "denied" ? "pointer" : "default",
+                opacity: !pushNotifs.supported ? 0.45 : 1,
+              }}>
+              <div>
+                <div style={{ fontSize:14, fontFamily:SANS, fontWeight:500, color:W, textAlign:"left" as const }}>
+                  Push Notifications
+                </div>
+                <div style={{ fontSize:9, fontFamily:SANS, color:GR, marginTop:2 }}>
+                  {!pushNotifs.supported
+                    ? "Not supported in this browser"
+                    : pushNotifs.permission === "denied"
+                      ? "Blocked by browser — check site settings"
+                      : pushNotifs.subscribed
+                        ? "Enabled · Trade alerts + signals"
+                        : "Disabled · Tap to enable trade alerts"}
+                </div>
+              </div>
+              <div style={{
+                width:38, height:22, borderRadius:11,
+                background: pushNotifs.subscribed ? "rgba(0,229,255,0.18)" : "rgba(255,255,255,0.07)",
+                border:`1px solid ${pushNotifs.subscribed ? "rgba(0,229,255,0.38)" : "rgba(255,255,255,0.12)"}`,
+                transition:"all 0.2s", display:"flex", alignItems:"center", padding:"2px", flexShrink:0,
+              }}>
+                <div style={{
+                  width:16, height:16, borderRadius:"50%",
+                  background: pushNotifs.subscribed ? C : "rgba(255,255,255,0.30)",
+                  transform:`translateX(${pushNotifs.subscribed ? 16 : 0}px)`,
+                  transition:"transform 0.22s", flexShrink:0,
+                }}/>
+              </div>
             </button>
             <button onClick={() => setLocation("/billing")} style={{
               width:"100%", padding:"17px 20px", background:"transparent", border:"none",

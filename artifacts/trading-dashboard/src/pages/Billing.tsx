@@ -14,21 +14,25 @@ interface Plan {
   priceIds: { monthly?: string; yearly?: string };
 }
 interface Subscription {
-  plan: string; planStatus: string; stripeCustomerId: string | null;
+  plan: string; planStatus: string | null; stripeCustomerId: string | null;
   stripeSubscriptionId: string | null; trialEndsAt: string | null;
   limits: PlanLimit; features: string[];
+  isActive?: boolean; isPaid?: boolean; isTrialing?: boolean;
+  canLiveTrade?: boolean; daysUntilTrialEnd?: number | null;
 }
 
 // ── Plan icon mapping ─────────────────────────────────────────────────────────
 
 const PLAN_ICONS: Record<string, React.ElementType> = {
   free:       Zap,
+  starter:    Star,
   pro:        Sparkles,
   enterprise: Building2,
 };
 
 const PLAN_COLORS: Record<string, string> = {
   free:       "#4a6a80",
+  starter:    "#00cc88",
   pro:        "#00aaff",
   enterprise: "#cc55ff",
 };
@@ -287,6 +291,43 @@ export default function Billing() {
           </div>
         )}
 
+        {/* Trial countdown / status banner */}
+        {subscription && (
+          subscription.isTrialing ? (
+            <div
+              className="flex items-center justify-between gap-4 px-4 py-3 rounded border"
+              style={{
+                background:   (subscription.daysUntilTrialEnd ?? 99) <= 3 ? "#1a0d0a" : "#011018",
+                borderColor:  (subscription.daysUntilTrialEnd ?? 99) <= 3 ? "#ff884430" : "#00aaff25",
+              }}
+            >
+              <div>
+                <div className="font-mono text-[9px] font-bold tracking-wider mb-0.5"
+                  style={{ color: (subscription.daysUntilTrialEnd ?? 99) <= 3 ? "#ff8844" : "#00aaff" }}>
+                  TRIAL ACTIVE
+                </div>
+                <div className="font-mono text-[12px] font-bold" style={{ color: "#EAF2FF" }}>
+                  {subscription.daysUntilTrialEnd === 0
+                    ? "Trial ends today"
+                    : `${subscription.daysUntilTrialEnd ?? 0} days remaining`}
+                </div>
+              </div>
+              <div className="font-mono text-[9px] font-bold px-3 py-1.5 rounded"
+                style={{ background: "#00aaff15", border: "1px solid #00aaff30", color: "#00aaff" }}>
+                Subscribe now
+              </div>
+            </div>
+          ) : !subscription.isActive && subscription.plan !== "free" ? (
+            <div
+              className="flex items-center gap-2 px-4 py-3 rounded border font-mono text-[11px]"
+              style={{ background: "#1a0d0d", borderColor: "#ff445530", color: "#ff8844" }}
+            >
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              Subscription issue — please update your billing details
+            </div>
+          ) : null
+        )}
+
         {/* Current subscription banner */}
         {subscription && subscription.stripeSubscriptionId && (
           <div
@@ -310,7 +351,7 @@ export default function Billing() {
                     border:     `1px solid ${subscription.planStatus === "active" ? "#00ff8a30" : "#ff884430"}`,
                   }}
                 >
-                  {subscription.planStatus.toUpperCase()}
+                  {(subscription.planStatus ?? "none").toUpperCase()}
                 </span>
               </div>
             </div>

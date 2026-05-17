@@ -17,7 +17,7 @@ import {
 import { clearAllPositions } from "../lib/simulationEngine.js";
 import { registry } from "../services/exchanges/ExchangeRegistry.js";
 import { db } from "@workspace/db";
-import { tradesTable, logsTable } from "@workspace/db";
+import { tradesTable, logsTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import {
   generateId,
@@ -129,11 +129,33 @@ const EXCHANGE_ID_TO_ADAPTER: Record<string, string> = {
 // ── POST /engine/exchange-mode ────────────────────────────────────────────────
 // Unified exchange switcher. body: { mode: "simulation" | "kraken" | "coinbase" | ... }
 // "simulation" → paper trading.  Any exchange name → live mode on that exchange.
-router.post("/engine/exchange-mode", requireAuth, (req, res) => {
+router.post("/engine/exchange-mode", requireAuth, async (req, res) => {
   const { mode } = (req.body ?? {}) as { mode?: string };
   if (!mode || typeof mode !== "string") {
     res.status(400).json({ error: 'body must include { mode: "simulation" | "<exchange>" }' });
     return;
+  }
+
+  // Gate live exchange selection behind Starter plan or higher
+  if (mode !== "simulation") {
+    const userId = (req as import("express").Request & { clerkUserId?: string }).clerkUserId ?? "";
+    try {
+      const [user] = await db
+        .select({ plan: usersTable.plan, planStatus: usersTable.planStatus })
+        .from(usersTable)
+        .where(eq(usersTable.clerkUserId, userId))
+        .limit(1);
+      const planOk   = user?.plan === "starter" || user?.plan === "pro" || user?.plan === "enterprise";
+      const statusOk = !user?.planStatus || user.planStatus === "active" || user.planStatus === "trialing";
+      if (!planOk || !statusOk) {
+        res.status(402).json({
+          error:      "Live trading requires a Starter plan or higher",
+          code:       "PLAN_REQUIRED",
+          upgradeUrl: "/billing",
+        });
+        return;
+      }
+    } catch { /* fail open on DB errors — don't block users */ }
   }
 
   if (mode === "simulation") {

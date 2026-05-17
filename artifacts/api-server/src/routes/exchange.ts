@@ -15,6 +15,9 @@ import {
   type ExchangeMode,
 } from "../lib/exchangeEngine.js";
 import { requireAuth } from "../middlewares/requireAuth.js";
+import { db } from "@workspace/db";
+import { usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -46,11 +49,32 @@ router.get("/exchange/balances", async (_req, res) => {
 });
 
 // ── Set mode ──────────────────────────────────────────────────────────────────
-router.post("/exchange/mode", requireAuth, (req, res) => {
+router.post("/exchange/mode", requireAuth, async (req, res) => {
   const { mode } = req.body as { mode: ExchangeMode };
   if (mode !== "simulation" && mode !== "live") {
     res.status(400).json({ error: "mode must be 'simulation' or 'live'" });
     return;
+  }
+  // Gate live mode behind Starter plan or higher
+  if (mode === "live") {
+    const userId = (req as import("express").Request & { clerkUserId?: string }).clerkUserId ?? "";
+    try {
+      const [user] = await db
+        .select({ plan: usersTable.plan, planStatus: usersTable.planStatus })
+        .from(usersTable)
+        .where(eq(usersTable.clerkUserId, userId))
+        .limit(1);
+      const planOk   = user?.plan === "starter" || user?.plan === "pro" || user?.plan === "enterprise";
+      const statusOk = !user?.planStatus || user.planStatus === "active" || user.planStatus === "trialing";
+      if (!planOk || !statusOk) {
+        res.status(402).json({
+          error:      "Live trading requires a Starter plan or higher",
+          code:       "PLAN_REQUIRED",
+          upgradeUrl: "/billing",
+        });
+        return;
+      }
+    } catch { /* fail open on DB errors */ }
   }
   const result = setMode(mode);
   if (!result.ok) {

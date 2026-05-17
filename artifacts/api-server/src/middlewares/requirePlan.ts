@@ -11,9 +11,9 @@ import { eq } from "drizzle-orm";
 //
 // Returns 402 Payment Required if the user's plan doesn't meet the minimum.
 
-type Plan = "free" | "pro" | "enterprise";
+type Plan = "free" | "starter" | "pro" | "enterprise";
 
-const PLAN_RANK: Record<Plan, number> = { free: 0, pro: 1, enterprise: 2 };
+const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, enterprise: 3 };
 
 export function requirePlan(minimum: Plan) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type MobileStatus, type Portfolio, type SimTrade, type AlpacaPosition } from "@/lib/api";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
+import { UpgradeBanner } from "@/components/UpgradeBanner";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -558,6 +559,8 @@ export default function Trade() {
           </span>
         </div>
       </div>
+
+      <UpgradeBanner />
 
       <div style={{ padding:"0 12px" }}>
 

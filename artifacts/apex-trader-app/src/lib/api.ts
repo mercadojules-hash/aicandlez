@@ -88,11 +88,18 @@ export interface LiveEligibility {
 }
 
 export interface Subscription {
-  plan:        string;
-  planStatus:  string;
+  plan:                  string;
+  planStatus:            string | null;
   stripeCustomerId?:     string;
   stripeSubscriptionId?: string;
-  limits:      { liveTrading: boolean; exchanges: number | string; positions: number | string };
+  trialEndsAt?:          string | null;
+  billingEmail?:         string | null;
+  isActive:              boolean;
+  isPaid:                boolean;
+  isTrialing:            boolean;
+  canLiveTrade:          boolean;
+  daysUntilTrialEnd:     number | null;
+  limits:      { liveTrading: boolean; exchanges: number | string; positions: number | string; trades: number | string };
   features:    string[];
 }
 

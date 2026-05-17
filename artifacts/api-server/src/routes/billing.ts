@@ -232,16 +232,34 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
       } catch { /* stripe schema not yet initialized */ }
     }
 
+    const planStr    = user.plan       ?? "free";
+    const statusStr  = user.planStatus ?? null;
+    const isActive   = planStr === "free" || statusStr === "active" || statusStr === "trialing";
+    const isPaid     = planStr !== "free";
+    const isTrialing = statusStr === "trialing";
+    const planLimits = PLAN_FEATURES[planStr]?.limits ?? PLAN_FEATURES["free"]!.limits;
+    const canLiveTrade = planLimits.liveTrading && isActive && isPaid;
+
+    const trialEnd         = user.trialEndsAt ? new Date(user.trialEndsAt) : null;
+    const daysUntilTrialEnd = trialEnd
+      ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86_400_000))
+      : null;
+
     res.json({
-      plan:                 user.plan,
-      planStatus:           user.planStatus,
+      plan:                 planStr,
+      planStatus:           statusStr,
       stripeCustomerId:     user.stripeCustomerId,
       stripeSubscriptionId: user.stripeSubscriptionId,
       trialEndsAt:          user.trialEndsAt,
       billingEmail:         user.billingEmail,
       subscription:         stripeSubscription,
-      limits:               PLAN_FEATURES[user.plan]?.limits ?? PLAN_FEATURES["free"]!.limits,
-      features:             PLAN_FEATURES[user.plan]?.features ?? PLAN_FEATURES["free"]!.features,
+      isActive,
+      isPaid,
+      isTrialing,
+      canLiveTrade,
+      daysUntilTrialEnd,
+      limits:               planLimits,
+      features:             PLAN_FEATURES[planStr]?.features ?? PLAN_FEATURES["free"]!.features,
     });
   } catch (err) {
     req.log.error({ err }, "GET /billing/subscription failed");

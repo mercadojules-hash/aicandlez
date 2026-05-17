@@ -1,0 +1,100 @@
+We completed Stripe checkout verification successfully, but during live UX testing I found several important monetization and engagement issues that need to be addressed before beta launch.
+
+Subscription / Paywall Logic Issues
+Right now authenticated users can freely navigate the platform after login and there is only a single CTA area that says:
+
+“Switch to Live Trading — Withdraw Real Profits”
+
+This CTA currently only appears in one section of the profile/settings area.
+
+Required Changes:
+
+1. Global Upgrade CTA System
+   The upgrade/subscription CTA should appear consistently across the platform for non-subscribed users, including:
+
+* dashboard
+* trade page
+* AI scanner page
+* portfolio page
+* profile/settings
+* notifications area
+* mobile app screens
+
+The platform should continuously reinforce conversion opportunities until the user becomes an active paid subscriber.
+
+2. Subscription State Detection
+   Implement a proper subscription state system:
+
+* guest user
+* authenticated free user
+* trial user
+* paid subscriber
+* expired subscription
+* canceled subscription
+
+UI should dynamically adapt based on subscription status.
+
+3. Feature Gating
+   Non-paying users should NOT have unrestricted access to premium features. Add gated behavior for:
+
+* live trading
+* AI execution
+* advanced analytics
+* autonomous mode
+* real-time signals
+* withdrawals
+* premium scanners
+* push notifications (premium tier logic if intended)
+
+4. Push Notification System (Very Important)
+   Both the desktop/web platform and the mobile app need push notification infrastructure.
+
+Required support:
+Desktop/Web:
+
+* browser push notifications
+* AI trade alerts
+* execution alerts
+* stop-loss alerts
+* subscription/billing alerts
+* login/security alerts
+
+Mobile App:
+
+* Expo push notifications
+* iOS notification permissions
+* Android notification permissions
+* background notifications
+* trade execution alerts
+* AI signal alerts
+* risk alerts
+* subscription alerts
+
+5. Notification Preferences
+   Add notification settings controls so users can:
+
+* enable/disable categories
+* choose push/email/SMS (future-ready)
+* configure alert thresholds
+
+6. Monetization UX Improvements
+   The platform currently feels fully unlocked after login. We need stronger SaaS monetization UX:
+
+* locked premium cards
+* blurred premium analytics
+* upgrade banners
+* premium badges
+* feature comparison prompts
+* trial countdowns
+* upgrade modals
+* “Unlock AI Trading” prompts
+* “Upgrade to Activate Live Trading” messaging
+
+7. Mobile + Desktop Consistency
+   Ensure all subscription gating and notification systems behave consistently across:
+
+* desktop dashboard
+* mobile responsive web
+* Expo mobile app
+
+Please review the entire authenticated user flow from the perspective of a new free-tier user and identify all missing monetization prompts, missing gating logic, and missing engagement systems before beta deployment.

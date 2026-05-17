@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
 import { useQuery } from "@tanstack/react-query";
 import { api, type SignalBreakdown } from "@/lib/api";
+import { UpgradeBanner } from "@/components/UpgradeBanner";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -457,6 +458,8 @@ export default function Markets() {
           <span style={{ fontSize:8, fontFamily:SANS, fontWeight:700, color:regCol, letterSpacing:"0.06em" }}>{regime}</span>
         </div>
       </div>
+
+      <UpgradeBanner />
 
       <div style={{ padding:"0 14px" }}>
 

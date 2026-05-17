@@ -13,6 +13,7 @@ import { computeCorrelationMatrix } from "./correlationEngine.js";
 import { addJournalEntry } from "./tradeJournalEngine.js";
 import { sendTradeExecutedSMS } from "./notifications.js";
 import { broadcastSignal, broadcastTrade } from "./wsServer.js";
+import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
 import { logger } from "./logger.js";
 
 function genId() { return crypto.randomUUID(); }
@@ -547,6 +548,16 @@ async function autoExecute(
 
   // SMS fires ONLY after a real trade is confirmed — never for signals, HOLDs, or blocked trades
   void sendTradeExecutedSMS(symbol, side, pos.entryPrice);
+
+  // Push notification to all subscribed devices (fire-and-forget — must not block trade confirmation)
+  void NotificationDispatcher.broadcastToAll({
+    title:     `${side === "BUY" ? "🟢" : "🔴"} Trade Executed — ${symbol}`,
+    body:      `${side} $${sizeUSD.toFixed(0)} @ $${pos.entryPrice.toFixed(2)}`,
+    notifType: "trade",
+    tag:       `trade-${symbol}-${Date.now()}`,
+    url:       "/apex-trader-app/trade",
+    data:      { symbol, side, price: pos.entryPrice, sizeUSD, mode: tradeMode },
+  }).catch(() => {});
 
   // Broadcast trade execution in real time to connected WebSocket clients
   broadcastTrade({

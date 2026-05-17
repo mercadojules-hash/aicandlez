@@ -111,9 +111,36 @@ export const NotificationDispatcher = {
             }
           }
         } else if (row.platform === "expo") {
-          // Expo Push API — for future native build
-          // TODO: implement via https://exp.host/--/api/v2/push/send
-          logger.debug({ userId, tokenId: row.id }, "NotificationDispatcher: Expo push not yet implemented");
+          // Expo Push API — https://exp.host/--/api/v2/push/send
+          try {
+            const expoResp = await fetch("https://exp.host/--/api/v2/push/send", {
+              method:  "POST",
+              headers: {
+                Accept:           "application/json",
+                "Accept-Encoding": "gzip, deflate",
+                "Content-Type":   "application/json",
+              },
+              body: JSON.stringify({
+                to:        row.token,
+                title:     payload.title,
+                body:      payload.body,
+                data:      { ...payload.data, notifType: payload.notifType, url: payload.url },
+                sound:     payload.notifType === "risk" ? { critical: true, volume: 1.0, name: "default" } : "default",
+                priority:  payload.notifType === "risk" ? "high" : "normal",
+                channelId: payload.notifType ?? "default",
+              }),
+            });
+            if (expoResp.ok) {
+              result.sent++;
+              logger.debug({ userId, tokenId: row.id }, "NotificationDispatcher: Expo push sent");
+            } else {
+              result.failed++;
+              logger.warn({ userId, status: expoResp.status }, "NotificationDispatcher: Expo push rejected");
+            }
+          } catch (err) {
+            result.failed++;
+            logger.warn({ err, userId }, "NotificationDispatcher: Expo push failed");
+          }
         }
       }),
     );

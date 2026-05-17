@@ -12,6 +12,8 @@ import { LiveDot } from "@/components/LiveDot";
 import { PerformancePanel } from "@/components/PerformancePanel";
 import { TradingModeToggle } from "@/components/TradingModeToggle";
 import { C, FONTS, RADIUS } from "@/constants/theme";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
 
 const TAB_BAR_H = 88;
 
@@ -803,6 +805,51 @@ export default function ProfileScreen() {
 
   const [modalOpen,    setModalOpen]    = useState(false);
   const [tradingMode,  setTradingMode]  = useState<"paper"|"live">("paper");
+  const [pushEnabled,  setPushEnabled]  = useState(false);
+
+  useEffect(() => {
+    async function checkPush() {
+      if (Platform.OS === "web" || !Device.isDevice) return;
+      const { status } = await Notifications.getPermissionsAsync();
+      setPushEnabled(status === "granted");
+    }
+    void checkPush();
+  }, []);
+
+  async function togglePushNotifications() {
+    if (!Device.isDevice) {
+      Alert.alert("Push Notifications", "Push notifications require a physical device.");
+      return;
+    }
+    if (pushEnabled) {
+      Alert.alert(
+        "Disable Notifications",
+        "To disable notifications, go to your phone's Settings → Notifications → AICandlez.",
+      );
+      return;
+    }
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission Required", "Enable notifications in your phone settings to receive trade alerts.");
+      return;
+    }
+    try {
+      const tokenData = await Notifications.getExpoPushTokenAsync();
+      await fetch("/api/user/push-token", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          token:      tokenData.data,
+          platform:   "expo",
+          deviceName: Device.deviceName ?? "Mobile",
+        }),
+        credentials: "include",
+      });
+      setPushEnabled(true);
+    } catch {
+      Alert.alert("Error", "Could not register push token. Please try again.");
+    }
+  }
 
   const totalPnL = account.realizedPnL;
   const winRate  = account.winRate;
@@ -877,7 +924,13 @@ export default function ProfileScreen() {
         {/* ── Account Settings ── */}
         <SH label="ACCOUNT SETTINGS" accent={C.teal} />
         <View style={p.settingsCard}>
-          <SettingRow icon="bell"     label="Notifications"   value="All alerts"  accent={C.cyan}   />
+          <SettingRow
+            icon="bell"
+            label="Push Notifications"
+            value={pushEnabled ? "Enabled" : Platform.OS === "web" ? "Web only" : "Disabled"}
+            accent={pushEnabled ? C.green : C.cyan}
+            onPress={togglePushNotifications}
+          />
           <SettingRow icon="shield"   label="Security"        value="2FA enabled" accent={C.green}  />
           <SettingRow icon="sliders"  label="Risk Parameters" value="Moderate"    accent={C.purple} />
           <SettingRow icon="globe"    label="Timezone"        value="UTC−5"       accent={C.teal}   />

@@ -42,10 +42,7 @@ export function SubscriptionModal() {
   const checkout = useMutation({
     mutationFn: () =>
       api.post<{ url: string }>("/billing/checkout", {
-        planId:        "apex_ai_trader",
-        billingPeriod: "monthly",
-        successUrl: `${window.location.origin}/apex-trader-app/profile?checkout=success`,
-        cancelUrl:  `${window.location.origin}/apex-trader-app/`,
+        priceId: "price_1TXwwmIzLCdrkUtzba1Dg1Ul",
       }),
     onSuccess: ({ url }) => { window.location.href = url; },
   });
