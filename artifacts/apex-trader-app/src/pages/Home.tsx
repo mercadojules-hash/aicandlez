@@ -9,7 +9,7 @@ import { UpgradeBanner } from "@/components/UpgradeBanner";
 import {
   api,
   type MobileStatus, type Portfolio, type SimAccount,
-  type Subscription, type SignalBreakdown,
+  type Subscription, type SignalBreakdown, type MobileSignalsResponse,
 } from "@/lib/api";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
@@ -299,8 +299,8 @@ export default function Home() {
     queryKey:["sim-account"],      queryFn:()=>api.get("/account"),          retry:false, staleTime:60_000 });
   const { data:sub }       = useQuery<Subscription>({
     queryKey:["subscription"],     queryFn:()=>api.get("/billing/subscription"), staleTime:120_000, retry:false });
-  const { data:symbolsData } = useQuery<{ symbols: SignalBreakdown[] }>({
-    queryKey:["mobile-symbols"],   queryFn:()=>api.get("/mobile/symbols"), refetchInterval:8_000, retry:false });
+  const { data:signalsData } = useQuery<MobileSignalsResponse>({
+    queryKey:["mobile-signals"],   queryFn:()=>api.get("/mobile/signals"), refetchInterval:8_000, retry:false });
   const { user } = useUser();
 
   const engine   = status?.engine;
@@ -320,10 +320,11 @@ export default function Home() {
 
 
 
-    const breakdowns: Record<string, SignalBreakdown> = {};
-    for (const b of symbolsData?.symbols ?? []) {
-      breakdowns[b.symbol] = b;
-    }
+    const breakdowns: Record<string, SignalBreakdown> = signalsData?.breakdowns ?? {};
+    const topSignals: SignalBreakdown[] = Object.values(breakdowns)
+      .filter(b => b.action && b.action !== "HOLD")
+      .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+      .slice(0, 5);
     const aiLines = (() => {
       const lines: string[] = [];
       for (const sym of MKT_SYMS) {
@@ -711,6 +712,149 @@ export default function Home() {
               <div style={{ fontSize:7.5, fontFamily:SANS, color:`${color}35`, marginTop:2 }}>{sub}</div>
             </div>
           ))}
+        </div>
+
+        {/* ── Live AI Signal Feed ──────────────────────────────────────────────── */}
+        <div style={{ marginBottom:18 }}>
+          <SH
+            label="AI Signal Feed"
+            color={P}
+            right={engine?.running ? "LIVE" : "STANDBY"}
+          />
+          <div style={{
+            background:`linear-gradient(160deg, #0a1520, #080f1a)`,
+            border:`1px solid ${E}`,
+            borderRadius:16, overflow:"hidden",
+            boxShadow:`0 8px 32px rgba(0,0,0,0.9)`,
+          }}>
+            {topSignals.length === 0 ? (
+              <div style={{
+                padding:"22px 16px",
+                textAlign:"center" as const,
+                fontFamily:SANS,
+              }}>
+                <div style={{
+                  fontSize:11, color:GR, fontWeight:600,
+                  letterSpacing:"0.04em", marginBottom:6,
+                }}>
+                  No active signals yet
+                </div>
+                <div style={{ fontSize:9, color:DIM, letterSpacing:"0.06em" }}>
+                  {engine?.running
+                    ? "Engine is scanning — high-confidence setups will appear here"
+                    : "AI engine on standby — signals will stream live when active"}
+                </div>
+              </div>
+            ) : topSignals.map((bd, i) => {
+              const action = bd.action ?? "HOLD";
+              const ac = AC[action] ?? W;
+              const sym = bd.symbol;
+              const short = MKT_SHORT[sym] ?? sym.replace("USD", "");
+              const fullLabel = MKT_LABEL[sym] ?? sym;
+              const conf = bd.confidence ?? 0;
+              const lastUpdated = bd.lastUpdated
+                ? Math.max(0, Math.floor((Date.now() - bd.lastUpdated) / 1000))
+                : null;
+              return (
+                <div key={sym} style={{
+                  display:"flex", alignItems:"center", gap:10, padding:"12px 14px",
+                  borderBottom: i<topSignals.length-1 ? `1px solid ${ESUB}` : "none",
+                  animation:`card-in 0.3s ${(i*0.06).toFixed(2)}s ease-out both`,
+                  background:`${ac}02`,
+                  position:"relative", overflow:"hidden",
+                }}>
+                  <div aria-hidden style={{
+                    position:"absolute", inset:0,
+                    background:`linear-gradient(90deg, transparent 0%, ${ac}06 50%, transparent 100%)`,
+                    animation:`row-shimmer 12s ease-in-out ${i*2}s infinite`,
+                    pointerEvents:"none",
+                  }}/>
+                  <div style={{
+                    width:3, height:42, borderRadius:2, flexShrink:0,
+                    background:`linear-gradient(180deg, ${ac}, ${ac}44)`,
+                    boxShadow:`0 0 6px ${ac}44`,
+                  }}/>
+
+                  <div style={{ flex:"0 0 74px" }}>
+                    <div style={{ fontSize:12, fontFamily:SANS, fontWeight:700, color:W,
+                      letterSpacing:"0.01em", marginBottom:2 }}>
+                      {short}
+                    </div>
+                    <div style={{ fontSize:8, fontFamily:SANS, color:DIM }}>{fullLabel}</div>
+                  </div>
+
+                  <div style={{ flex:1, display:"flex", flexDirection:"column", gap:5 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:5, flexWrap:"wrap" }}>
+                      {bd.mtfConfirmed && (
+                        <span style={{
+                          fontSize:7, fontFamily:SANS, fontWeight:700,
+                          color:G, letterSpacing:"0.08em",
+                          padding:"2px 6px", borderRadius:4,
+                          background:"rgba(0,255,136,0.07)",
+                          border:`1px solid rgba(0,255,136,0.20)`,
+                        }}>MTF</span>
+                      )}
+                      {bd.volumeConfirmed && (
+                        <span style={{
+                          fontSize:7, fontFamily:SANS, fontWeight:700,
+                          color:C, letterSpacing:"0.08em",
+                          padding:"2px 6px", borderRadius:4,
+                          background:"rgba(0,229,255,0.06)",
+                          border:`1px solid rgba(0,229,255,0.20)`,
+                        }}>VOL</span>
+                      )}
+                      {bd.trend1H && bd.trend1H !== "neutral" && (
+                        <span style={{
+                          fontSize:7, fontFamily:SANS, fontWeight:700,
+                          color:GOLD, letterSpacing:"0.08em",
+                          padding:"2px 6px", borderRadius:4,
+                          background:"rgba(255,210,0,0.05)",
+                          border:`1px solid rgba(255,210,0,0.18)`,
+                        }}>1H {bd.trend1H.toUpperCase()}</span>
+                      )}
+                      {lastUpdated !== null && (
+                        <span style={{
+                          marginLeft:"auto",
+                          fontSize:8, fontFamily:MONO, color:DIM,
+                        }}>
+                          {lastUpdated < 60 ? `${lastUpdated}s` : `${Math.floor(lastUpdated/60)}m`} ago
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      <div style={{
+                        flex:1, height:3, background:"rgba(255,255,255,0.05)",
+                        borderRadius:2, overflow:"hidden",
+                      }}>
+                        <div style={{
+                          width:`${conf}%`, height:"100%",
+                          background:`linear-gradient(90deg, ${ac}66, ${ac})`,
+                          borderRadius:2,
+                          boxShadow:`0 0 4px ${ac}55`,
+                        }}/>
+                      </div>
+                      <span style={{ fontSize:9, fontFamily:MONO, fontWeight:700, color:ac }}>
+                        {conf}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    padding:"4px 12px",
+                    background:`${ac}0a`,
+                    border:`1px solid ${ac}30`,
+                    borderRadius:20,
+                    fontSize:8, fontFamily:SANS, fontWeight:700,
+                    color:ac, letterSpacing:"0.05em",
+                    boxShadow: `0 0 10px ${ac}18`,
+                    flexShrink:0,
+                  }}>
+                    {action}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* ── Live Markets ─────────────────────────────────────────────────────── */}
