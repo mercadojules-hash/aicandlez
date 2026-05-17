@@ -760,41 +760,48 @@ export default function Profile() {
             </button>
             <button
               onClick={() => {
-                if (!pushNotifs.subscribed) void pushNotifs.subscribe();
-                else void pushNotifs.unsubscribe();
+                const next = !profile.notifications;
+                console.log("[push-toggle] click → next:", next, "supported:", pushNotifs.supported, "permission:", pushNotifs.permission);
+                updateProfile({ notifications: next });
+                if (pushNotifs.supported && pushNotifs.permission !== "denied") {
+                  if (next) void pushNotifs.subscribe();
+                  else      void pushNotifs.unsubscribe();
+                }
               }}
-              disabled={pushNotifs.loading || pushNotifs.permission === "denied" || !pushNotifs.supported}
+              disabled={pushNotifs.loading}
               style={{
                 width:"100%", padding:"17px 20px", background:"transparent", border:"none",
                 borderBottom:"1px solid rgba(255,255,255,0.06)",
                 display:"flex", justifyContent:"space-between", alignItems:"center",
-                cursor: pushNotifs.supported && pushNotifs.permission !== "denied" ? "pointer" : "default",
-                opacity: !pushNotifs.supported ? 0.45 : 1,
+                cursor: pushNotifs.loading ? "wait" : "pointer",
+                opacity: pushNotifs.loading ? 0.6 : 1,
               }}>
               <div>
                 <div style={{ fontSize:14, fontFamily:SANS, fontWeight:500, color:W, textAlign:"left" as const }}>
                   Push Notifications
                 </div>
-                <div style={{ fontSize:9, fontFamily:SANS, color:GR, marginTop:2 }}>
-                  {!pushNotifs.supported
-                    ? "Not supported in this browser"
-                    : pushNotifs.permission === "denied"
-                      ? "Blocked by browser — check site settings"
-                      : pushNotifs.subscribed
-                        ? "Enabled · Trade alerts + signals"
-                        : "Disabled · Tap to enable trade alerts"}
+                <div style={{ fontSize:9, fontFamily:SANS, color:GR, marginTop:2, textAlign:"left" as const }}>
+                  {profile.notifications
+                    ? (pushNotifs.supported
+                        ? (pushNotifs.permission === "denied"
+                            ? "Enabled in app · Browser blocked — check site settings"
+                            : pushNotifs.subscribed
+                              ? "Enabled · Trade alerts + signals"
+                              : "Enabled · Grant browser permission to receive pushes")
+                        : "Enabled · In-app alerts only (push not supported in this browser)")
+                    : "Disabled · Tap to enable trade alerts"}
                 </div>
               </div>
               <div style={{
                 width:38, height:22, borderRadius:11,
-                background: pushNotifs.subscribed ? "rgba(0,229,255,0.18)" : "rgba(255,255,255,0.07)",
-                border:`1px solid ${pushNotifs.subscribed ? "rgba(0,229,255,0.38)" : "rgba(255,255,255,0.12)"}`,
+                background: profile.notifications ? "rgba(0,229,255,0.18)" : "rgba(255,255,255,0.07)",
+                border:`1px solid ${profile.notifications ? "rgba(0,229,255,0.38)" : "rgba(255,255,255,0.12)"}`,
                 transition:"all 0.2s", display:"flex", alignItems:"center", padding:"2px", flexShrink:0,
               }}>
                 <div style={{
                   width:16, height:16, borderRadius:"50%",
-                  background: pushNotifs.subscribed ? C : "rgba(255,255,255,0.30)",
-                  transform:`translateX(${pushNotifs.subscribed ? 16 : 0}px)`,
+                  background: profile.notifications ? C : "rgba(255,255,255,0.30)",
+                  transform:`translateX(${profile.notifications ? 16 : 0}px)`,
                   transition:"transform 0.22s", flexShrink:0,
                 }}/>
               </div>

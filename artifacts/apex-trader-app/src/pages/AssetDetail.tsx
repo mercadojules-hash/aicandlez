@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
+import { api } from "@/lib/api";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -469,17 +471,79 @@ function setupGrade(conf: number): { grade:string; label:string; color:string } 
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────────
+function readUrlAsset(): { sym: string; type: string } {
+  if (typeof window === "undefined") return { sym: "BTC", type: "crypto" };
+  const p = new URLSearchParams(window.location.search);
+  return {
+    sym:  (p.get("sym") ?? "BTC").toUpperCase(),
+    type:  p.get("type") ?? "crypto",
+  };
+}
+
 export default function AssetDetail() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [tf, setTf] = useState<TF>("4H");
   const [executing, setExecuting] = useState<"buy"|"sell"|"auto"|null>(null);
+  const [toast, setToast] = useState<{ kind:"success"|"error"; msg:string } | null>(null);
   const { enabled: autoActive, setEnabled: setAutoActiveCtx } = useAIAutoTrade();
+  const queryClient = useQueryClient();
 
-  const params    = new URLSearchParams(window.location.search);
-  const sym       = (params.get("sym") ?? "BTC").toUpperCase();
-  const type      = params.get("type") ?? "crypto";
+  // Reactive sym/type — re-read from URL whenever wouter location OR popstate fires
+  const [{ sym, type }, setAssetParams] = useState(readUrlAsset);
+  useEffect(() => {
+    setAssetParams(readUrlAsset());
+    const onPop = () => setAssetParams(readUrlAsset());
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [location]);
+
   const backRoute = type === "equity" ? "/equities" : "/markets";
   const asset  = ASSET_DB[sym];
+
+  // ── Toast auto-dismiss ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // ── Simulated order mutation ────────────────────────────────────────────────
+  const orderMutation = useMutation({
+    mutationFn: async (side: "BUY" | "SELL") => {
+      const basePrice = ASSET_DB[sym]?.basePrice ?? 100;
+      const sizeUSD   = 1000;
+      console.log("[ai-exec] dispatch", { symbol: sym, side, sizeUSD, basePrice });
+      const res = await api.post<{
+        success: boolean;
+        position?: { id: string; symbol: string; side: string; size: number; entryPrice: number };
+        error?: string;
+      }>("/simulation/order", { symbol: sym, side, sizeUSD });
+      console.log("[ai-exec] response", res);
+      return res;
+    },
+    onSuccess: (res, side) => {
+      void queryClient.invalidateQueries({ queryKey: ["mobile-portfolio"] });
+      void queryClient.invalidateQueries({ queryKey: ["sim-account"] });
+      if (res.success && res.position) {
+        console.log("[ai-exec] simulated position created", res.position);
+        setToast({
+          kind: "success",
+          msg:  `${side === "BUY" ? "LONG" : "SHORT"} ${sym} · $1,000 · paper trade filled`,
+        });
+      } else {
+        setToast({ kind: "error", msg: res.error ?? "Order rejected by risk engine" });
+      }
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn("[ai-exec] error", msg);
+      const friendly = /401|unauthor/i.test(msg)
+        ? "Sign in required to place paper trades"
+        : msg;
+      setToast({ kind: "error", msg: friendly });
+    },
+    onSettled: () => setExecuting(null),
+  });
 
   if (!asset) {
     return (
@@ -514,12 +578,39 @@ export default function AssetDetail() {
   const mtf1D = conf > 65;
 
   const handleExec = (type2: "buy"|"sell"|"auto") => {
-    if (type2 === "auto") setAutoActiveCtx(!autoActive);
-    else { setExecuting(type2); setTimeout(() => setExecuting(null), 2200); }
+    console.log("[ai-exec] click", { type: type2, sym });
+    if (type2 === "auto") { setAutoActiveCtx(!autoActive); return; }
+    if (orderMutation.isPending) return;
+    setExecuting(type2);
+    orderMutation.mutate(type2 === "buy" ? "BUY" : "SELL");
+  };
+
+  const navigateToAsset = (rsym: string, rtype: string) => {
+    console.log("[related-card] navigate →", rsym, rtype);
+    const url = `/asset?sym=${rsym}&type=${rtype}`;
+    setLocation(url);                                  // wouter pathname update
+    setAssetParams({ sym: rsym.toUpperCase(), type: rtype }); // immediate re-render
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
     <div className="page-enter" style={{ background:BG, minHeight:"100%", paddingBottom:40 }}>
+
+      {/* ── Toast (execution feedback) ───────────────────────────────────────── */}
+      {toast && (
+        <div role="status" aria-live="polite" style={{
+          position:"fixed", top:14, left:"50%", transform:"translateX(-50%)", zIndex:1000,
+          padding:"11px 16px", borderRadius:12, maxWidth:"calc(100% - 32px)",
+          background: toast.kind === "success" ? "rgba(0,40,20,0.92)" : "rgba(40,0,12,0.92)",
+          border: `1px solid ${toast.kind === "success" ? "rgba(0,255,136,0.45)" : "rgba(255,51,85,0.50)"}`,
+          color: toast.kind === "success" ? "rgba(0,255,136,0.95)" : "rgba(255,140,150,0.95)",
+          fontFamily: SANS, fontSize: 12, fontWeight: 600, letterSpacing: "0.02em",
+          boxShadow: "0 10px 40px rgba(0,0,0,0.6)",
+          backdropFilter: "blur(20px)",
+        }}>
+          {toast.kind === "success" ? "✓ " : "⚠ "}{toast.msg}
+        </div>
+      )}
 
       {/* ── Sticky header ────────────────────────────────────────────────────── */}
       <div style={{
@@ -936,7 +1027,7 @@ export default function AssetDetail() {
               const rConf = 50 + (rHash * 7 + 13) % 44;
               return (
                 <button key={rsym}
-                  onClick={() => setLocation(`/asset?sym=${rsym}&type=${ra.type}`)}
+                  onClick={(e) => { e.stopPropagation(); navigateToAsset(rsym, ra.type); }}
                   style={{
                     flexShrink:0, width:100,
                     background:CARD, border:`1px solid ${SIG_BORDER[ra.action] ?? E}`,
