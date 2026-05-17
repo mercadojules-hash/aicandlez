@@ -1,0 +1,92 @@
+Potential Data Consistency / Telemetry Issue Found
+
+I noticed a likely mismatch between:
+
+* AI Portfolio Manager totals
+* Trade History data
+* Realized gains / fee calculations
+
+Current issue:
+The AI Portfolio Manager shows:
+
+* Realized Gains: +$3.8K
+* Fees: $114
+
+However, the visible Trade History entries only total approximately:
+~+$637 profit combined
+
+This suggests one of the following:
+
+* Portfolio Manager is using lifetime aggregate PnL
+* Trade History is only showing a partial subset
+* Mock/demo trades are mixed with real simulation trades
+* Closed trade accounting is inconsistent
+* Fee calculations are not aligned with visible trades
+* Different data sources are powering different widgets
+
+Please investigate and verify:
+
+1. Data Source Consistency
+   Confirm whether:
+
+* AI Portfolio Manager
+* Trade History
+* Open Positions
+* Unrealized PnL
+* Realized PnL
+* Fee calculations
+
+are all reading from the SAME simulation/accounting source.
+
+2. Trade History Scope
+   Clarify whether Trade History:
+
+* only shows recent trades
+* excludes closed positions
+* excludes historical trades
+* uses mock/demo seed data
+* truncates older trades
+
+3. Simulation Accounting Validation
+   Please validate:
+
+* realized PnL calculations
+* unrealized PnL calculations
+* fee calculations
+* cumulative account growth
+* balance tracking
+* position close accounting
+
+4. Mock Data Audit
+   Identify whether any widgets are still using:
+
+* hardcoded demo data
+* seeded UI placeholder data
+* disconnected fake telemetry
+* frontend-only sample values
+
+The platform should avoid inconsistent financial numbers because users will immediately notice trust issues.
+
+5. UI Transparency
+   If the platform is intentionally showing:
+
+* recent trades only
+* rolling windows
+* partial history
+
+then label the sections clearly:
+
+* “Recent Trades”
+* “Last 10 Trades”
+* “Lifetime PnL”
+* “30-Day Performance”
+  etc.
+
+6. Deliverable
+   Please provide:
+
+* source of truth architecture for trading telemetry
+* explanation of current mismatch
+* fixes applied
+* screenshots after correction
+* confirmation that all financial widgets reconcile correctly

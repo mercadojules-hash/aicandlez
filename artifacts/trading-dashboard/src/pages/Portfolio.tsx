@@ -189,7 +189,7 @@ export default function Portfolio() {
           </div>
           <div>
             <h1 className="text-xl font-semibold text-slate-100">Portfolio Management</h1>
-            <p className="text-sm text-slate-400">Allocation · Exposure Tracking · Position Limits</p>
+            <p className="text-sm text-slate-400">My Simulation Account · Allocation · Exposure Tracking · Position Limits</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -341,7 +341,7 @@ export default function Portfolio() {
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-500">Realized </span>
+                    <span className="text-slate-500">Realized P&L (Lifetime) </span>
                     <span className={`font-mono font-semibold ${pnlColor(p.realizedPnL)}`}>
                       {pnlSign(p.realizedPnL)}{fmtUSD(p.realizedPnL)}
                     </span>

@@ -1,4 +1,5 @@
 import { getAccountSummary } from "./simulationEngine.js";
+import { getUserAccountSummary } from "./userSimRegistry.js";
 
 // ── Config store (in-memory, survives restarts as defaults) ───────────────────
 
@@ -82,25 +83,46 @@ function displayName(symbol: string): string {
   return map[symbol] ?? symbol.replace("USD", "");
 }
 
-// ── Main function ──────────────────────────────────────────────────────────────
+// ── Build PortfolioOverview from a normalised summary shape ───────────────────
+// Both the global simulationEngine and userSimRegistry summaries are mapped
+// to this common shape before building the overview.
 
-export async function getPortfolioOverview(): Promise<PortfolioOverview> {
-  const summary = await getAccountSummary();
+interface NormalisedSummary {
+  equity:          number;
+  cashBalance:     number;
+  startingBalance: number;
+  totalPnL:        number;
+  totalPnLPct:     number;
+  unrealizedPnL:   number;
+  realizedPnL:     number;
+  positionCount:   number;
+  positions: Array<{
+    id:               string;
+    symbol:           string;
+    side:             "BUY" | "SELL";
+    quantity:         number;
+    entryPrice:       number;
+    entryTime:        number;
+    sizeUSD:          number;
+    currentPrice?:    number;
+    marketValue?:     number;
+    unrealizedPnL?:   number;
+    unrealizedPnLPct?: number;
+  }>;
+}
 
-  const equity       = summary.equity;
-  const cashBalance  = summary.account.cashBalance;
+function buildOverview(summary: NormalisedSummary): PortfolioOverview {
+  const { equity, cashBalance } = summary;
   const positionValue = equity - cashBalance;
+  const cashPct       = equity > 0 ? (cashBalance  / equity) * 100 : 100;
+  const exposurePct   = equity > 0 ? (positionValue / equity) * 100 : 0;
 
-  const cashPct     = equity > 0 ? (cashBalance  / equity) * 100 : 100;
-  const exposurePct = equity > 0 ? (positionValue / equity) * 100 : 0;
-
-  // ── Per-position views ─────────────────────────────────────────────────────
   const positions: PositionView[] = summary.positions.map(p => {
-    const mktVal    = p.marketValue      ?? p.sizeUSD;
-    const uPnL      = p.unrealizedPnL    ?? 0;
-    const uPnLPct   = p.unrealizedPnLPct ?? 0;
-    const curPrice  = p.currentPrice     ?? p.entryPrice;
-    const allocPct  = equity > 0 ? (mktVal / equity) * 100 : 0;
+    const mktVal   = p.marketValue      ?? p.sizeUSD;
+    const uPnL     = p.unrealizedPnL    ?? 0;
+    const uPnLPct  = p.unrealizedPnLPct ?? 0;
+    const curPrice = p.currentPrice     ?? p.entryPrice;
+    const allocPct = equity > 0 ? (mktVal / equity) * 100 : 0;
 
     return {
       id:               p.id,
@@ -120,7 +142,6 @@ export async function getPortfolioOverview(): Promise<PortfolioOverview> {
     };
   });
 
-  // ── Allocation breakdown ───────────────────────────────────────────────────
   const allocation: AllocationItem[] = [
     ...positions.map(p => ({
       label:    p.displayName,
@@ -150,15 +171,57 @@ export async function getPortfolioOverview(): Promise<PortfolioOverview> {
       totalPnL:          summary.totalPnL,
       totalPnLPct:       summary.totalPnLPct,
       unrealizedPnL:     summary.unrealizedPnL,
-      realizedPnL:       summary.account.totalRealized,
+      realizedPnL:       summary.realizedPnL,
       positionCount:     summary.positionCount,
       capacityRemaining: Math.max(0, config.maxPositions - summary.positionCount),
       positionsFull:     summary.positionCount >= config.maxPositions,
       exposureBreached:  exposurePct > config.maxExposurePct,
-      startingBalance:   summary.account.startingBalance,
+      startingBalance:   summary.startingBalance,
     },
     positions,
     allocation,
     fetchedAt: Date.now(),
   };
+}
+
+// ── Main function ──────────────────────────────────────────────────────────────
+// When userId is provided the overview is built from the caller's personal
+// simulation account (DB-backed, per-user).  Without a userId the legacy global
+// simulation engine is used as a fallback (admin / system-level views only).
+
+export async function getPortfolioOverview(userId?: string): Promise<PortfolioOverview> {
+  if (userId) {
+    const s = await getUserAccountSummary(userId);
+
+    const norm: NormalisedSummary = {
+      equity:          s.equity,
+      cashBalance:     s.balance,
+      startingBalance: s.startBalance,
+      totalPnL:        s.totalPnL,
+      totalPnLPct:     s.totalPnLPct,
+      unrealizedPnL:   s.unrealizedPnL,
+      realizedPnL:     s.totalRealized,
+      positionCount:   s.positionCount,
+      positions:       s.positions,
+    };
+
+    return buildOverview(norm);
+  }
+
+  // ── Legacy fallback: global simulation engine (unauthenticated paths) ──────
+  const summary = await getAccountSummary();
+
+  const norm: NormalisedSummary = {
+    equity:          summary.equity,
+    cashBalance:     summary.account.cashBalance,
+    startingBalance: summary.account.startingBalance,
+    totalPnL:        summary.totalPnL,
+    totalPnLPct:     summary.totalPnLPct,
+    unrealizedPnL:   summary.unrealizedPnL,
+    realizedPnL:     summary.account.totalRealized,
+    positionCount:   summary.positionCount,
+    positions:       summary.positions,
+  };
+
+  return buildOverview(norm);
 }

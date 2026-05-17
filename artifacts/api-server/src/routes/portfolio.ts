@@ -1,12 +1,18 @@
 import { Router } from "express";
+import type { Request } from "express";
+import { requireAuth } from "../middlewares/requireAuth.js";
 import { getPortfolioOverview, updatePortfolioConfig } from "../lib/portfolioEngine.js";
+
+type AuthReq = Request & { clerkUserId: string };
 
 const router = Router();
 
-// GET /portfolio/overview — full live portfolio state (backed by simulation engine)
-router.get("/portfolio/overview", async (_req, res) => {
+// GET /portfolio/overview — auth-gated, returns the signed-in user's personal
+// simulation portfolio (positions, realised PnL, allocation).
+router.get("/portfolio/overview", requireAuth, async (req, res) => {
+  const userId = (req as AuthReq).clerkUserId;
   try {
-    const overview = await getPortfolioOverview();
+    const overview = await getPortfolioOverview(userId);
     res.json(overview);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -14,7 +20,7 @@ router.get("/portfolio/overview", async (_req, res) => {
 });
 
 // PATCH /portfolio/config — update position / exposure limits
-router.patch("/portfolio/config", (req, res) => {
+router.patch("/portfolio/config", requireAuth, (req, res) => {
   const { maxPositions, maxExposurePct, maxSinglePositionPct } = req.body ?? {};
   const patch: Parameters<typeof updatePortfolioConfig>[0] = {};
 

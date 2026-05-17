@@ -12,6 +12,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
+// Raw shape returned by GET /api/simulation/trades (per-user, DB-backed)
+interface UserSimTrade {
+  id:             string;
+  symbol:         string;
+  side:           "BUY" | "SELL";
+  quantity:       number;
+  entryPrice:     number;
+  exitPrice:      number;
+  entryTime:      number;   // unix ms
+  exitTime:       number;   // unix ms
+  sizeUSD:        number;
+  realizedPnL:    number;
+  realizedPnLPct: number;
+  durationMs:     number;
+  closeReason:    string;
+}
+
+// Normalised shape used throughout this page
 interface Trade {
   id:          string;
   symbol:      string;
@@ -29,6 +47,27 @@ interface Trade {
   reason:      string | null;
   timestamp:   string;
   closedAt:    string | null;
+}
+
+function normalizeSimTrade(t: UserSimTrade): Trade {
+  return {
+    id:         t.id,
+    symbol:     t.symbol,
+    side:       t.side,
+    amount:     t.sizeUSD,
+    price:      t.entryPrice,
+    exitPrice:  t.exitPrice,
+    pnl:        t.realizedPnL,
+    pnlPercent: t.realizedPnLPct,
+    status:     "closed",
+    mode:       "simulation",
+    signalId:   null,
+    stopLoss:   null,
+    takeProfit: null,
+    reason:     t.closeReason,
+    timestamp:  new Date(t.entryTime).toISOString(),
+    closedAt:   new Date(t.exitTime).toISOString(),
+  };
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -120,7 +159,7 @@ function calcSummary(trades: Trade[]): Summary {
 
 // ── Paper trading account ──────────────────────────────────────────────────────
 
-const START_BALANCE = 10_000;
+const START_BALANCE = 100_000;
 
 function getLivePrice(t: Trade): number {
   return safeNum(t.price);
@@ -337,21 +376,22 @@ export default function Journal() {
     refetch,
     isFetching,
   } = useQuery<Trade[]>({
-    queryKey: ["/trades"],
+    queryKey: ["/simulation/trades"],
     queryFn: async () => {
-      const res = await fetch("/api/trades", { cache: "no-store" });
+      // Uses the auth-gated, per-user DB-backed simulation trade history
+      const res = await fetch("/api/simulation/trades", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      return Array.isArray(data) ? data : (data?.trades ?? []);
+      const data: UserSimTrade[] = await res.json();
+      return Array.isArray(data) ? data.map(normalizeSimTrade) : [];
     },
-    refetchInterval:            15_000,   // auto-refresh every 15s
+    refetchInterval:            15_000,
     refetchIntervalInBackground: true,
     staleTime:                  5_000,
   });
 
   function handleRefresh() {
-    void refetch();                        // immediate refetch — NOT just invalidate
-    void qc.refetchQueries({ queryKey: ["/trades"] });
+    void refetch();
+    void qc.refetchQueries({ queryKey: ["/simulation/trades"] });
   }
 
   const safeTrades = Array.isArray(trades) ? trades : [];
@@ -378,7 +418,7 @@ export default function Journal() {
           </div>
           <div>
             <h1 className="text-lg font-bold">Trade Journal</h1>
-            <p className="text-[11px] text-muted-foreground">Live data · Active positions · Closed history · Auto-refresh 15s</p>
+            <p className="text-[11px] text-muted-foreground">My simulation trades · Closed history · Lifetime P&L · Auto-refresh 15s</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -406,8 +446,8 @@ export default function Journal() {
       <div className="rounded-xl border border-border/50 bg-card/40 p-4 space-y-3">
         <div className="flex items-center gap-2 mb-1">
           <Wallet className="w-3.5 h-3.5 text-primary" />
-          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Paper Trading Account</span>
-          <span className="ml-auto text-[10px] font-mono text-muted-foreground/60">all values calculated client-side</span>
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">My Simulation Account</span>
+          <span className="ml-auto text-[10px] font-mono text-muted-foreground/60">based on your closed simulation trades</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {/* Card 1 — Starting Balance */}
@@ -419,7 +459,7 @@ export default function Journal() {
             <div className="text-xl font-bold font-mono">
               ${START_BALANCE.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">Paper money · fixed</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">Simulation starting balance</div>
           </div>
 
           {/* Card 2 — Account Value (equity) */}
@@ -539,8 +579,8 @@ export default function Journal() {
 
             {!isLoading && open.length === 0 && (
               <EmptyState
-                message="No active trades"
-                sub="Run force-test or wait for the engine to execute a signal"
+                message="No open positions"
+                sub="Open positions are shown here — trade history is in the Closed section below"
               />
             )}
 
