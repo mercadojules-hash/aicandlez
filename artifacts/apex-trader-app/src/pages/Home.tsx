@@ -10,6 +10,7 @@ import {
   api,
   type MobileStatus, type Portfolio, type SimAccount,
   type Subscription, type SignalBreakdown, type MobileSignalsResponse,
+  type MobileTickersResponse, type MobileTicker,
 } from "@/lib/api";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
@@ -186,32 +187,24 @@ function ParticleField() {
   );
 }
 
-const CRYPTO_TICKS = [
-  { sym:"BTC",   price:"$68,120", pct:"+2.41%", up:true  },
-  { sym:"ETH",   price:"$3,512",  pct:"+1.83%", up:true  },
-  { sym:"SOL",   price:"$188.40", pct:"-0.31%", up:false },
-  { sym:"XRP",   price:"$0.5912", pct:"+3.14%", up:true  },
-  { sym:"ADA",   price:"$0.4488", pct:"+1.20%", up:true  },
-  { sym:"DOGE",  price:"$0.1642", pct:"-0.85%", up:false },
-  { sym:"AVAX",  price:"$36.80",  pct:"+4.21%", up:true  },
-  { sym:"DOT",   price:"$7.92",   pct:"+0.88%", up:true  },
-  { sym:"LINK",  price:"$18.44",  pct:"+2.30%", up:true  },
-  { sym:"MATIC", price:"$0.9240", pct:"-1.10%", up:false },
-];
-const EQUITIES_TICKS = [
-  { sym:"NVDA",  price:"$875",    pct:"+3.14%", up:true  },
-  { sym:"TSLA",  price:"$177",    pct:"+1.22%", up:true  },
-  { sym:"AAPL",  price:"$192",    pct:"+0.64%", up:true  },
-  { sym:"META",  price:"$514",    pct:"+2.88%", up:true  },
-  { sym:"SPY",   price:"$521",    pct:"+0.58%", up:true  },
-  { sym:"QQQ",   price:"$445",    pct:"+0.91%", up:true  },
-  { sym:"MSFT",  price:"$415",    pct:"+0.44%", up:true  },
-  { sym:"GOOGL", price:"$170",    pct:"+1.10%", up:true  },
-  { sym:"ES1!",  price:"5,282",   pct:"+0.48%", up:true  },
-  { sym:"NQ1!",  price:"18,620",  pct:"+0.72%", up:true  },
-];
-
 type TickRow = { sym:string; price:string; pct:string; up:boolean };
+
+function formatTickerPrice(p: number): string {
+  if (p >= 1000)  return `$${p.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  if (p >= 1)     return `$${p.toFixed(2)}`;
+  if (p >= 0.01)  return `$${p.toFixed(4)}`;
+  return `$${p.toFixed(6)}`;
+}
+
+function tickerToRow(t: MobileTicker): TickRow {
+  const sign = t.changePercent24h >= 0 ? "+" : "";
+  return {
+    sym:   t.short,
+    price: formatTickerPrice(t.price),
+    pct:   `${sign}${t.changePercent24h.toFixed(2)}%`,
+    up:    t.up,
+  };
+}
 
 function TickerRow({ items, label, labelColor, speed }: {
   items:TickRow[]; label:string; labelColor:string; speed:number;
@@ -274,14 +267,37 @@ function TickerRow({ items, label, labelColor, speed }: {
   );
 }
 
-function DualTicker() {
+function LiveTicker({ items, isLoading }: { items: TickRow[]; isLoading: boolean }) {
+  if (isLoading || items.length === 0) {
+    return (
+      <div style={{
+        background:"rgba(0,4,14,0.98)",
+        borderBottom:`1px solid rgba(255,255,255,0.05)`,
+        height:34,
+        display:"flex", alignItems:"center", paddingLeft:14,
+      }}>
+        <span style={{
+          fontSize:9, fontFamily:SANS, fontWeight:700, color:DIM,
+          letterSpacing:"0.16em", textTransform:"uppercase" as const,
+        }}>
+          {isLoading ? "Loading market data…" : "Market data unavailable"}
+        </span>
+      </div>
+    );
+  }
+  // Split crypto list into two scrolling rows for visual density
+  const mid = Math.ceil(items.length / 2);
+  const rowA = items.slice(0, mid);
+  const rowB = items.slice(mid);
   return (
     <div style={{
       background:"rgba(0,4,14,0.98)",
       borderBottom:`1px solid rgba(255,255,255,0.05)`,
     }}>
-      <TickerRow items={CRYPTO_TICKS}   label="CRYPTO" labelColor={C} speed={44}/>
-      <TickerRow items={EQUITIES_TICKS} label="STOCKS" labelColor={P} speed={48}/>
+      <TickerRow items={rowA} label="CRYPTO" labelColor={C} speed={44}/>
+      {rowB.length > 0 && (
+        <TickerRow items={rowB} label="MARKETS" labelColor={P} speed={48}/>
+      )}
     </div>
   );
 }
@@ -301,6 +317,8 @@ export default function Home() {
     queryKey:["subscription"],     queryFn:()=>api.get("/billing/subscription"), staleTime:120_000, retry:false });
   const { data:signalsData } = useQuery<MobileSignalsResponse>({
     queryKey:["mobile-signals"],   queryFn:()=>api.get("/mobile/signals"), refetchInterval:8_000, retry:false });
+  const { data:tickersData, isLoading:tickersLoading } = useQuery<MobileTickersResponse>({
+    queryKey:["mobile-tickers"],   queryFn:()=>api.get("/mobile/tickers"), refetchInterval:15_000, retry:false });
   const { user } = useUser();
 
   const engine   = status?.engine;
@@ -344,17 +362,33 @@ export default function Home() {
       return () => clearInterval(t);
     }, [aiLines.length]);
 
+    const tickerMap: Record<string, MobileTicker> = {};
+    for (const t of tickersData?.tickers ?? []) tickerMap[t.symbol] = t;
+    const tickerRows: TickRow[] = (tickersData?.tickers ?? []).map(tickerToRow);
+
+    const tickerCount = tickersData?.tickers?.length ?? 0;
+    const tickersReady = !tickersLoading || tickerCount > 0;
     const mktCards = MKT_SYMS.map(sym => {
       const bd = breakdowns[sym];
+      const tk = tickerMap[sym];
+      const pctNum = tk?.changePercent24h;
+      const pctSign = pctNum !== undefined && pctNum >= 0 ? "+" : "";
+      const priceState: "ok" | "loading" | "unavailable" =
+        tk ? "ok" : (tickersReady ? "unavailable" : "loading");
       return {
         sym:    MKT_SHORT[sym],
         fullSym: sym,
         label:  MKT_LABEL[sym],
-        price:  "—",
-        pct:    "—",
+        price:  tk ? formatTickerPrice(tk.price) : (priceState === "loading" ? "Loading…" : "Unavailable"),
+        pct:    pctNum !== undefined ? `${pctSign}${pctNum.toFixed(2)}%` : (priceState === "loading" ? "…" : "n/a"),
+        priceState,
         action: (bd?.action ?? "HOLD") as string,
         conf:   bd?.confidence ?? 50,
-        trend:  (bd?.action === "LONG" ? "up" : bd?.action === "SHORT" ? "down" : "flat") as "up"|"down"|"flat",
+        trend:  (
+          tk
+            ? (tk.changePercent24h > 0.1 ? "up" : tk.changePercent24h < -0.1 ? "down" : "flat")
+            : bd?.action === "LONG" ? "up" : bd?.action === "SHORT" ? "down" : "flat"
+        ) as "up"|"down"|"flat",
       };
     });
 
@@ -421,8 +455,8 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── Dual Market Ticker ──────────────────────────────────────────────── */}
-      <DualTicker/>
+      {/* ── Live Market Ticker ──────────────────────────────────────────────── */}
+      <LiveTicker items={tickerRows} isLoading={tickersLoading && tickerRows.length === 0}/>
       <UpgradeBanner/>
 
       {/* ── Hero — AI Engine Status ──────────────────────────────────────────── */}
@@ -866,9 +900,12 @@ export default function Home() {
             borderRadius:16, overflow:"hidden",
             boxShadow:`0 8px 32px rgba(0,0,0,0.9)`,
           }}>
-            {mktCards.map(({ sym, label: symLabel, price, pct, action, conf, trend }, i) => {
+            {mktCards.map(({ sym, label: symLabel, price, pct, priceState, action, conf, trend }, i) => {
               const ac = AC[action]??W;
               const pctPos = !pct.startsWith("-");
+              const isLive = priceState === "ok";
+              const priceColor = isLive ? W : DIM;
+              const pctColor   = !isLive ? DIM : (pctPos ? G : R);
               return (
                 <div key={sym} style={{
                   display:"flex", alignItems:"center", gap:10, padding:"12px 14px",
@@ -903,14 +940,20 @@ export default function Home() {
                       animDelay={`${i*3.5}s`}/>
                   </div>
 
-                  <div style={{ textAlign:"right", flex:"0 0 70px" }}>
-                    <div style={{ fontSize:13, fontFamily:MONO, fontWeight:700, color:W,
-                      marginBottom:3 }}>
+                  <div style={{ textAlign:"right", flex:"0 0 78px" }}>
+                    <div style={{
+                      fontSize: isLive ? 13 : 10, fontFamily:MONO,
+                      fontWeight: isLive ? 700 : 500,
+                      color: priceColor,
+                      marginBottom:3,
+                      letterSpacing: isLive ? undefined : "0.04em",
+                    }}>
                       {price}
                     </div>
                     <div style={{
                       fontSize:9, fontFamily:MONO, fontWeight:600,
-                      color: pctPos ? G : R,
+                      color: pctColor,
+                      fontStyle: isLive ? "normal" : "italic",
                     }}>
                       {pct}
                     </div>

@@ -5,6 +5,7 @@ import { engineStats } from "../lib/tradingLoop.js";
 import { getExchangeStatus } from "../lib/exchangeEngine.js";
 import { getStatus as getRiskStatus } from "../lib/riskEngine.js";
 import { getAccountSummary } from "../lib/simulationEngine.js";
+import { getTicker, SUPPORTED_SYMBOLS } from "../lib/marketData.js";
 import { userEngineRegistry } from "../services/users/UserEngineRegistry.js";
 import { drawdownProtection } from "../services/risk/DrawdownProtection.js";
 import { executionTelemetry } from "../services/telemetry/ExecutionTelemetry.js";
@@ -153,6 +154,35 @@ router.get("/mobile/signals", (_req, res) => {
     },
     ts: Date.now(),
   });
+});
+
+// ── Live ticker prices (Home market cards + scrolling ticker) ────────────────
+// GET /api/mobile/tickers
+router.get("/mobile/tickers", async (_req, res) => {
+  try {
+    const results = await Promise.all(
+      SUPPORTED_SYMBOLS.map(async (s) => {
+        try {
+          const t = await getTicker(s);
+          return {
+            symbol:           t.symbol,
+            short:            t.symbol.replace(/USD$/, ""),
+            price:            t.price,
+            change24h:        t.change24h,
+            changePercent24h: t.changePercent24h,
+            up:               t.changePercent24h >= 0,
+          };
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const tickers = results.filter((x): x is NonNullable<typeof x> => x !== null);
+    res.json({ tickers, ts: Date.now() });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Tickers unavailable";
+    res.status(500).json({ error: msg });
+  }
 });
 
 // ── Symbol breakdowns (mini signal cards) ────────────────────────────────────

@@ -156,6 +156,20 @@ export interface SimTrade {
   exitPrice:  number;
 }
 
+export interface MobileTicker {
+  symbol:           string;
+  short:            string;
+  price:            number;
+  change24h:        number;
+  changePercent24h: number;
+  up:               boolean;
+}
+
+export interface MobileTickersResponse {
+  tickers: MobileTicker[];
+  ts:      number;
+}
+
 export interface AlpacaHealth {
   configured:     boolean;
   auth:           boolean;

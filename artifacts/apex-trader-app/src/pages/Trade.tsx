@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type MobileStatus, type Portfolio, type SimTrade, type AlpacaPosition } from "@/lib/api";
+import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, type MobileStatus, type Portfolio, type SimTrade, type AlpacaPosition, type SignalBreakdown } from "@/lib/api";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
@@ -45,23 +45,6 @@ function fmtDuration(secs: number): string {
 }
 
 // ── Spark data helpers ───────────────────────────────────────────────────────────
-function miniSparkData(symbol: string, up: boolean): number[] {
-  const seed = symbol.split("").reduce((a, c) => a + c.charCodeAt(0), 17);
-  const pts: number[] = [];
-  let v = 48;
-  for (let i = 0; i < 30; i++) {
-    const n = ((seed * (i + 5) * 2053 + i * 397) % 1000) / 1000;
-    v += (n - 0.48) * 9;
-    v = Math.max(8, Math.min(92, v));
-    pts.push(v);
-  }
-  const bias = up ? 10 : -10;
-  for (let i = pts.length - 8; i < pts.length; i++) {
-    pts[i] = Math.max(8, Math.min(92, pts[i] + bias * ((i - (pts.length - 8)) / 7)));
-  }
-  return pts;
-}
-
 function sparkPath(pts: number[], w: number, h: number): string {
   if (pts.length < 2) return "";
   const min = Math.min(...pts), max = Math.max(...pts);
@@ -77,11 +60,30 @@ function sparkPath(pts: number[], w: number, h: number): string {
   return d;
 }
 
+// ── Sparkline placeholder (when no real data is available) ──────────────────────
+function SparklinePlaceholder({ w, h, label = "—" }: { w: number; h: number; label?: string }) {
+  return (
+    <div style={{
+      width: w, height: h, flexShrink: 0,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      border: "1px dashed rgba(255,255,255,0.08)",
+      borderRadius: 4,
+      fontSize: 8, fontFamily: MONO, color: DIM,
+      letterSpacing: "0.08em",
+    }}>
+      {label}
+    </div>
+  );
+}
+
 // ── Premium sparkline ────────────────────────────────────────────────────────────
-function PremiumSparkline({ symbol, up, w = 100, h = 44, animDelay = "0s" }: {
-  symbol: string; up: boolean; w?: number; h?: number; animDelay?: string;
+function PremiumSparkline({ symbol, up, points, w = 100, h = 44, animDelay = "0s" }: {
+  symbol: string; up: boolean; points?: number[]; w?: number; h?: number; animDelay?: string;
 }) {
-  const pts  = miniSparkData(symbol, up);
+  if (!points || points.length < 2) {
+    return <SparklinePlaceholder w={w} h={h}/>;
+  }
+  const pts  = points;
   const d    = sparkPath(pts, w, h);
   const col  = up ? "#00eb78" : "#ff3c3c";
   const gid  = `spk-${symbol.replace(/[^a-z0-9]/gi,"")}-${up ? "u" : "d"}`;
@@ -224,7 +226,7 @@ function TpSlBar({ sl, tp, current, up }: { sl:number; tp:number; current:number
 }
 
 // ── Position card ─────────────────────────────────────────────────────────────────
-function PositionCard({ pos, tick }: { pos: Portfolio["positions"][number]; tick: number }) {
+function PositionCard({ pos, tick, sparkPoints }: { pos: Portfolio["positions"][number]; tick: number; sparkPoints?: number[] }) {
   const pnl     = pos.unrealizedPnL ?? 0;
   const up      = pnl >= 0;
   const col     = up ? G : R;
@@ -346,7 +348,7 @@ function PositionCard({ pos, tick }: { pos: Portfolio["positions"][number]; tick
             <TpSlBar sl={sl} tp={tp} current={current} up={up}/>
           </div>
           <div style={{ flexShrink:0, marginBottom:2, opacity:0.88 }}>
-            <PremiumSparkline symbol={pos.symbol} up={up} w={96} h={40}
+            <PremiumSparkline symbol={pos.symbol} up={up} points={sparkPoints} w={96} h={40}
               animDelay={`${symHash % 8}s`}/>
           </div>
         </div>
@@ -388,7 +390,15 @@ function TradeRow({ trade }: { trade: SimTrade }) {
         </div>
       </div>
       <div style={{ flexShrink:0, marginRight:10, opacity:0.65 }}>
-        <PremiumSparkline symbol={trade.symbol + trade.id} up={up} w={52} h={24}/>
+        <PremiumSparkline
+          symbol={trade.symbol + trade.id} up={up} w={52} h={24}
+          points={(() => {
+            // Build a real entry→exit line with light interpolation
+            const a = trade.entryPrice, b = trade.exitPrice;
+            if (!Number.isFinite(a) || !Number.isFinite(b)) return undefined;
+            const N = 10;
+            return Array.from({ length: N }, (_, i) => a + ((b - a) * i) / (N - 1));
+          })()}/>
       </div>
       <div style={{ textAlign:"right", marginRight:10, flexShrink:0 }}>
         <div style={{ fontSize:13, fontFamily:MONO, fontWeight:700, color:pnlCol }}>
@@ -467,6 +477,12 @@ export default function Trade() {
     refetchInterval: 10_000,
     retry: false,
   });
+  const { data: symbolsData } = useQuery<{ symbols: SignalBreakdown[] }>({
+    queryKey: ["mobile-symbols"],
+    queryFn:  () => api.get("/mobile/symbols"),
+    refetchInterval: 8_000,
+    retry: false,
+  });
 
   const engine    = status?.engine;
   const isLive    = engine?.mode === "live";
@@ -491,8 +507,42 @@ export default function Trade() {
   const isMockHistory = false;
     const wins    = history.filter(t => t.pnl > 0).length;
     const winPct  = history.length > 0 ? Math.round((wins / history.length) * 100) : 0;
-  const confidence = 62;
-  const exposure   = 56;
+
+  // ── Live AI confidence: avg confidence across symbols currently scored by engine
+  const breakdowns = symbolsData?.symbols ?? [];
+  const confidence = breakdowns.length > 0
+    ? Math.round(breakdowns.reduce((s, b) => s + (b.confidence ?? 0), 0) / breakdowns.length)
+    : null;
+
+  // ── Live exposure: capital deployed in open positions vs. total portfolio value
+  const totalValue = portfolio?.totalValue ?? 0;
+  const deployed   = positions.reduce(
+    (s, p) => s + Math.abs((p.currentPrice ?? p.entryPrice) * p.size),
+    0,
+  );
+  const exposure = totalValue > 0
+    ? Math.min(100, Math.round((deployed / totalValue) * 100))
+    : null;
+
+  // ── Live candle data per open-position symbol (for real sparklines) ──────────
+  const uniqueSymbols = Array.from(new Set(positions.map(p => p.symbol)));
+  const candleQueries = useQueries({
+    queries: uniqueSymbols.map(sym => ({
+      queryKey: ["candles", sym, "5m"],
+      queryFn:  () => api.get<{ close: number }[]>(`/candles?symbol=${sym}&timeframe=5m&limit=30`),
+      refetchInterval: 60_000,
+      staleTime: 30_000,
+      retry: false,
+    })),
+  });
+  const candleClosesBySymbol: Record<string, number[]> = {};
+  uniqueSymbols.forEach((sym, i) => {
+    const q = candleQueries[i];
+    const data = q?.data;
+    if (Array.isArray(data) && data.length >= 2) {
+      candleClosesBySymbol[sym] = data.map(c => c.close).filter(n => Number.isFinite(n));
+    }
+  });
 
   const killMutation  = useMutation({
     mutationFn: () => api.post("/engine/kill-switch", { active: true }),
@@ -624,8 +674,8 @@ export default function Trade() {
             columnGap:0, marginBottom:20,
           }}>
             <Donut value={winPct}     color="rgba(0,230,120,0.90)"  label="Win/Loss"  sub={`${wins}W · ${history.length - wins}L`} tooltipTerm="Win Rate"/>
-            <Donut value={confidence} color="rgba(155,92,245,0.90)" label="AI Conf"   sub="avg confidence"   tooltipTerm="AI Confidence"/>
-            <Donut value={exposure}   color="rgba(0,229,255,0.88)"  label="Exposure"  sub="capital deployed"  tooltipTerm="Exposure"/>
+            <Donut value={confidence ?? 0} color="rgba(155,92,245,0.90)" label="AI Conf"   sub={confidence === null ? "no signals yet" : "avg confidence"}   tooltipTerm="AI Confidence"/>
+            <Donut value={exposure   ?? 0} color="rgba(0,229,255,0.88)"  label="Exposure"  sub={exposure === null ? "no positions"   : "capital deployed"}  tooltipTerm="Exposure"/>
           </div>
 
           {/* Stats row */}
@@ -715,7 +765,7 @@ export default function Trade() {
                 paddingRight:2,
               }}>
                 {positions.map(pos => (
-                  <PositionCard key={pos.id} pos={pos} tick={tick}/>
+                  <PositionCard key={pos.id} pos={pos} tick={tick} sparkPoints={candleClosesBySymbol[pos.symbol]}/>
                 ))}
               </div>
               {positions.length > 2 && (
