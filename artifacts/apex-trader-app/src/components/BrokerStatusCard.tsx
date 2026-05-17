@@ -1,4 +1,5 @@
 import { useBrokerConnection, type BrokerStatus } from "@/contexts/BrokerConnectionContext";
+import { useState } from "react";
 
 const SANS = "Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif";
 const MONO = "'SF Mono', 'Fira Code', 'JetBrains Mono', monospace";
@@ -80,6 +81,17 @@ const CONFIG: Record<BrokerStatus, StatusConfig> = {
     btnColor:  R,
     btnBorder: "rgba(255,51,85,0.35)",
   },
+  credential_error: {
+    label:     "API Credentials Invalid",
+    sub:       "Server keys rejected by Alpaca (HTTP 401)",
+    dot:       "rgba(255,148,0,0.92)",
+    dotGlow:   "0 0 6px rgba(255,148,0,0.60)",
+    border:    "rgba(255,148,0,0.22)",
+    bg:        "rgba(255,148,0,0.04)",
+    btnLabel:  "Get Paper Keys",
+    btnColor:  "#ff9400",
+    btnBorder: "rgba(255,148,0,0.38)",
+  },
 };
 
 interface BrokerStatusCardProps {
@@ -93,11 +105,15 @@ function fmtUSD(n: number): string {
 }
 
 export function BrokerStatusCard({ compact = false }: BrokerStatusCardProps) {
-  const { status, accountNumber, openOnboarding, equity, buyingPower, alpacaOk, marketDataOk } =
-    useBrokerConnection();
-  const cfg = CONFIG[status];
+  const {
+    status, accountNumber, openOnboarding,
+    equity, buyingPower, alpacaOk, marketDataOk, credentialError,
+  } = useBrokerConnection();
+  const [showDetail, setShowDetail] = useState(false);
+  const cfg       = CONFIG[status];
   const isActive  = status === "paper_active" || status === "live_active";
   const isPending = status === "pending_verification";
+  const isCredErr = status === "credential_error";
 
   return (
     <div style={{
@@ -146,7 +162,13 @@ export function BrokerStatusCard({ compact = false }: BrokerStatusCardProps) {
         {/* Action button */}
         {cfg.btnLabel && (
           <button
-            onClick={status === "idle" || status === "onboarding" ? openOnboarding : undefined}
+            onClick={
+              isCredErr
+                ? () => setShowDetail(d => !d)
+                : status === "idle" || status === "onboarding"
+                  ? openOnboarding
+                  : undefined
+            }
             style={{
               flexShrink:0,
               padding:"6px 13px",
@@ -158,10 +180,77 @@ export function BrokerStatusCard({ compact = false }: BrokerStatusCardProps) {
               whiteSpace:"nowrap" as const,
             }}
           >
-            {cfg.btnLabel}
+            {isCredErr ? (showDetail ? "Hide Fix" : "Show Fix") : cfg.btnLabel}
           </button>
         )}
       </div>
+
+      {/* Credential error — expandable fix guide */}
+      {isCredErr && showDetail && (
+        <div style={{
+          marginTop:10, paddingTop:10,
+          borderTop:"1px solid rgba(255,148,0,0.15)",
+        }}>
+          <div style={{
+            fontSize:8.5, fontFamily:SANS, color:"rgba(255,148,0,0.85)",
+            fontWeight:600, letterSpacing:"0.05em", marginBottom:6,
+          }}>
+            HOW TO FIX — GET PAPER TRADING KEYS
+          </div>
+          {[
+            "1. Go to app.alpaca.markets",
+            "2. Switch to the Paper Trading environment (toggle top-left)",
+            "3. Click 'Your API Keys' in the right sidebar",
+            "4. Generate new keys — they start with PK (not CK)",
+            "5. Update ALPACA_API_KEY + ALPACA_SECRET_KEY in Replit Secrets",
+            "6. Restart the API server",
+          ].map(step => (
+            <div key={step} style={{
+              fontSize:8, fontFamily:SANS,
+              color:"rgba(136,146,164,0.80)", lineHeight:1.7,
+            }}>
+              {step}
+            </div>
+          ))}
+          <div style={{
+            marginTop:8, padding:"5px 8px",
+            background:"rgba(255,148,0,0.07)",
+            border:"1px solid rgba(255,148,0,0.18)",
+            borderRadius:4,
+            fontSize:7.5, fontFamily:MONO,
+            color:"rgba(255,148,0,0.70)",
+            letterSpacing:"0.04em",
+          }}>
+            CK prefix = Broker API (for building brokerages — not for personal paper trading)
+            <br />PK prefix = Paper Trading API (required for this app)
+          </div>
+          <a
+            href="https://app.alpaca.markets/paper-trading/overview"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display:"inline-block", marginTop:8,
+              padding:"5px 12px",
+              background:"rgba(255,148,0,0.10)",
+              border:"1px solid rgba(255,148,0,0.30)",
+              borderRadius:5,
+              fontSize:8, fontFamily:SANS, fontWeight:700,
+              color:"#ff9400", letterSpacing:"0.06em",
+              textDecoration:"none",
+            }}
+          >
+            Open Alpaca Paper Trading →
+          </a>
+          {credentialError && (
+            <div style={{
+              marginTop:8, fontSize:7.5, fontFamily:MONO,
+              color:"rgba(136,146,164,0.45)", wordBreak:"break-word" as const,
+            }}>
+              {credentialError}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Live account metrics — equity + buying power */}
       {isActive && equity > 0 && !compact && (

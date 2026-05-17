@@ -8,7 +8,8 @@ export type BrokerStatus =
   | "pending_verification"
   | "paper_active"
   | "live_active"
-  | "rejected";
+  | "rejected"
+  | "credential_error";
 
 interface BrokerContextType {
   status:            BrokerStatus;
@@ -22,6 +23,7 @@ interface BrokerContextType {
   buyingPower:       number;
   alpacaOk:          boolean;
   marketDataOk:      boolean;
+  credentialError:   string | null;
 }
 
 // ── Persistence ───────────────────────────────────────────────────────────────
@@ -45,15 +47,13 @@ export function BrokerConnectionProvider({ children }: { children: ReactNode }) 
   const [isOnboardingOpen, setOpen]      = useState(false);
   const [equity,        setEquity]       = useState(0);
   const [buyingPower,   setBuyingPower]  = useState(0);
-  const [alpacaOk,      setAlpacaOk]    = useState(false);
-  const [marketDataOk,  setMarketDataOk] = useState(false);
+  const [alpacaOk,        setAlpacaOk]       = useState(false);
+  const [marketDataOk,    setMarketDataOk]   = useState(false);
+  const [credentialError, setCredentialError] = useState<string | null>(null);
 
-  // On mount: verify credentials if already active
+  // On mount: always run a health check so credential_error shows immediately
   useEffect(() => {
-    const s = loadStatus();
-    if (s === "paper_active" || s === "live_active") {
-      void checkHealth(s);
-    }
+    void checkHealth(loadStatus());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -62,21 +62,36 @@ export function BrokerConnectionProvider({ children }: { children: ReactNode }) 
       const res = await fetch("/api/exchange/alpaca/health");
       if (!res.ok) return;
       const data = (await res.json()) as AlpacaHealth;
-      if (!data.configured || !data.auth) {
-        // Credentials missing or invalid — reset to idle
-        setStatusRaw("idle");
+
+      if (!data.configured) {
+        setCredentialError("Alpaca API keys are not configured in server environment.");
+        if (currentStatus === "paper_active" || currentStatus === "live_active") {
+          setStatusRaw("credential_error");
+        }
         return;
       }
+
+      if (!data.auth) {
+        // Keys present but invalid — distinguish Broker vs Paper key type
+        const hint = "Credentials rejected (HTTP 401). You may be using Broker API keys (CK prefix). Paper trading requires Paper Trading API keys (PK prefix) — generate them at app.alpaca.markets under Paper Trading → API Keys.";
+        setCredentialError(hint);
+        if (currentStatus === "paper_active" || currentStatus === "live_active") {
+          setStatusRaw("credential_error");
+        }
+        return;
+      }
+
+      // Credentials are valid
+      setCredentialError(null);
       setEquity(data.equity);
       setBuyingPower(data.buyingPower);
       setAlpacaOk(data.auth);
       setMarketDataOk(data.marketData);
-      // Persist active status (already set)
       if (currentStatus !== "paper_active" && currentStatus !== "live_active") {
         setStatusRaw("paper_active");
       }
     } catch {
-      // Network error — don't reset, just leave as-is
+      // Network error — don't reset
     }
   }
 
@@ -104,6 +119,7 @@ export function BrokerConnectionProvider({ children }: { children: ReactNode }) 
       closeOnboarding: () => setOpen(false),
       setStatus,
       equity, buyingPower, alpacaOk, marketDataOk,
+      credentialError,
     }}>
       {children}
     </Ctx.Provider>
