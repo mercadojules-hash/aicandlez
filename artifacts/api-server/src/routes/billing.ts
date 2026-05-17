@@ -306,7 +306,7 @@ router.post("/billing/checkout", requireAuth, async (req, res): Promise<void> =>
       cancel_url:           `${baseUrl}/billing?canceled=1`,
       allow_promotion_codes: true,
       subscription_data: {
-        trial_period_days: 14,
+        trial_period_days: 7,
         metadata:          { clerkUserId: userId },
       },
     });

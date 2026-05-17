@@ -208,7 +208,7 @@ export default function Account() {
         <div style={{ marginTop: 16, textAlign: "center", fontSize: 8,
           fontFamily: "monospace", color: "#1a3040", letterSpacing: "0.08em",
           lineHeight: 1.8 }}>
-          AICANDLEZ · PAPER TRADING IS ALWAYS FREE{"\n"}
+          AICANDLEZ · PAPER TRADING ACTIVE — LIVE TRADING LOCKED{"\n"}
           WITHDRAWAL PERMISSIONS ARE NEVER REQUESTED
         </div>
       </div>

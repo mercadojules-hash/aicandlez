@@ -42,9 +42,9 @@ export function UpgradeBanner() {
         <div style={{ fontSize: 11 }}>⏱</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: C, marginBottom: 2 }}>
-            Trial active — {daysUntilTrialEnd} days remaining
+            AI Paper Trial — {daysUntilTrialEnd} days remaining
           </div>
-          <div style={{ fontSize: 10, color: GR }}>Subscribe before trial ends to keep live trading access</div>
+          <div style={{ fontSize: 10, color: GR }}>Subscribe to unlock live AI trading</div>
         </div>
         <BannerBtn color={C} border="rgba(0,229,255,0.30)" onClick={() => navigate("/billing")}>
           Subscribe
@@ -113,12 +113,12 @@ export function UpgradeBanner() {
         <div style={{ fontSize: 11 }}>✨</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: "#9b5cf5", marginBottom: 2 }}>
-            Upgrade to live AI trading
+            Paper Trading Active — Unlock Live AI Trading
           </div>
-          <div style={{ fontSize: 10, color: GR }}>14-day free trial • $5.99/mo • Cancel anytime</div>
+          <div style={{ fontSize: 10, color: GR }}>7-day free AI paper trading trial • $5.99/mo</div>
         </div>
         <BannerBtn color="#9b5cf5" border="rgba(155,92,245,0.38)" onClick={() => showPaywall("feature_locked")}>
-          Try free
+          Start 7-Day Trial
         </BannerBtn>
       </BannerShell>
     );

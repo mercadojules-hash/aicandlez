@@ -1,0 +1,100 @@
+Additional UX/Subscription Issues Found During Live Testing
+
+We still have inconsistent trial messaging and incomplete monetization gating across the platform.
+
+Critical Fixes Needed:
+
+1. Trial Messaging Consistency
+   The platform currently shows conflicting messaging:
+
+* “14-day free trial”
+* “Try free”
+* “Paper trading mode — always free”
+
+This is incorrect and inconsistent.
+
+The intended offer is:
+✅ 7-Day Free AI Paper Trading Trial
+
+Please standardize this wording across ALL:
+
+* dashboard banners
+* pricing page
+* profile/settings
+* mobile app
+* CTA buttons
+* onboarding flows
+* upgrade modals
+* subscription prompts
+* locked feature cards
+
+Approved messaging examples:
+
+* “7-Day Free AI Paper Trading Trial”
+* “Try AI Paper Trading Free for 7 Days”
+* “Upgrade to Unlock Live AI Trading”
+* “Paper Trading Active — Live Trading Locked”
+
+2. Remove “14-Day Trial”
+   Completely remove all references to:
+
+* “14-day free trial”
+* “14 days free”
+* “14-day access”
+
+The product is a 7-day paper trading trial, not a 14-day subscription trial.
+
+3. Equities Page Missing Upgrade Gating
+   The Equities section currently lacks:
+
+* upgrade banners
+* locked premium indicators
+* live AI trading prompts
+* subscription CTA reinforcement
+
+This creates inconsistent monetization UX.
+
+Add upgrade prompts and premium gating throughout:
+
+* Equities
+* Crypto
+* Scanner
+* Portfolio
+* Signals
+* Analytics
+* Autonomous mode
+* Performance intelligence
+
+4. Subscription State UI
+   Free/trial users should clearly see:
+
+* LIVE TRADING LOCKED
+* PAPER TRADING ACTIVE
+* Upgrade Required
+* Days Remaining
+* Premium Features Locked
+
+The platform should never feel fully unlocked for free-tier users.
+
+5. CTA Standardization
+   Replace vague wording like:
+
+* “Try free”
+
+With clearer conversion-focused wording:
+
+* “Start 7-Day AI Trial”
+* “Unlock Live AI Trading”
+* “Upgrade to Trade Real Funds”
+* “Activate AI Live Mode”
+
+6. Mobile + Desktop Audit
+   Please audit all pages/screens on:
+
+* desktop dashboard
+* mobile responsive web
+* Expo mobile app
+
+to ensure monetization messaging, subscription gating, and trial wording are fully consistent platform-wide.
+
+Please provide screenshots after the monetization/gating consistency pass is complete.

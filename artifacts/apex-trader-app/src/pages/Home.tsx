@@ -641,7 +641,7 @@ export default function Home() {
               }}>
                 <div style={{ width:5, height:5, borderRadius:"50%", background:C, flexShrink:0,
                   animation:"dot-pulse 2.5s ease-in-out infinite" }}/>
-                Paper trading mode · No real funds at risk · Always free
+                Paper Trading Active · Live AI Trading Locked · Upgrade to Unlock
               </div>
             )}
           </div>

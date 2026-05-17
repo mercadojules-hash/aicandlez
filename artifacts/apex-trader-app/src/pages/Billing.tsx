@@ -211,7 +211,7 @@ export default function Billing() {
                   cursor: checkout.isPending ? "wait" : "pointer",
                   transition: "all 0.15s ease",
                 }}>
-                {checkout.isPending ? "Redirecting…" : "Start Free — Then $5.99/mo"}
+                {checkout.isPending ? "Redirecting…" : "Start 7-Day AI Paper Trading Trial"}
               </button>
             )}
 

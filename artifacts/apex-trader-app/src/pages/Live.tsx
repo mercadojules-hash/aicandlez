@@ -79,8 +79,8 @@ function RequiresSubscriptionScreen() {
         </div>
         <div style={{ fontSize: 11, fontFamily: "system-ui, sans-serif", color: "#6090b0",
           lineHeight: 1.6, marginBottom: 18 }}>
-          Paper trading is always free. Subscribe to the Starter plan to execute
-          real trades on your connected exchange.
+          Try AI Paper Trading Free for 7 Days. Subscribe to the Starter plan
+          to unlock live trade execution on your connected exchange.
         </div>
         <div style={{ fontSize: 24, fontFamily: "monospace", fontWeight: 800, color: "#00aaff",
           marginBottom: 4 }}>
@@ -120,8 +120,8 @@ function RequiresSubscriptionScreen() {
         border: "1px solid #0d2035", borderRadius: 6 }}>
         <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50",
           letterSpacing: "0.08em", lineHeight: 1.6 }}>
-          Paper trading is always free and unlimited. You can observe the AI and practice
-          risk-free before committing to live trading.
+          7-Day Free AI Paper Trading Trial. Observe the AI and practice risk-free
+          before unlocking live AI trading.
         </div>
       </div>
     </div>

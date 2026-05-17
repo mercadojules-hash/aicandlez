@@ -840,9 +840,9 @@ export default function Profile() {
         {/* ── Footer ───────────────────────────────────────────────────────── */}
         <div style={{ textAlign:"center" as const, fontSize:9, fontFamily:SANS,
           color:"rgba(136,146,164,0.65)", lineHeight:2.0 }}>
-          Apex AI Trader · Withdrawal permissions never requested
+          AICandlez · Withdrawal permissions never requested
           <br/>
-          Paper trading always free · 3% performance fee on profits only · v1.0.0
+          7-Day AI Paper Trading Trial · 3% performance fee on profits only · v1.0.0
         </div>
       </div>
 

@@ -134,7 +134,7 @@ export function PaywallModal() {
             >
               <Feather name="star" size={16} color="#fff" />
               <Text style={[styles.ctaText, { fontFamily: "Inter_700Bold" }]}>
-                Start Free Trial
+                Start 7-Day AI Trial
               </Text>
             </TouchableOpacity>
             <Text style={[styles.fine, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>

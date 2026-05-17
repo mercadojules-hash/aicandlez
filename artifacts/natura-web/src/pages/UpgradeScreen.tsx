@@ -84,7 +84,7 @@ export default function UpgradeScreen() {
       <div className="upgrade-cta-section">
         <button className="upgrade-cta-btn" onClick={handleUpgrade}>
           <Sparkles size={17} style={{ display: "inline", marginRight: 8, verticalAlign: "middle" }} />
-          Start Free Trial
+          Start 7-Day AI Trial
         </button>
         <p className="upgrade-cta-sub">Cancel anytime · No commitment</p>
       </div>

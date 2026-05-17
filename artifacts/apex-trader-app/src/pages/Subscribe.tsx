@@ -39,7 +39,7 @@ export default function Subscribe() {
         </div>
         <div style={{ fontSize: 11, fontFamily: "system-ui, sans-serif", color: "#3a6080",
           lineHeight: 1.5, marginTop: 6 }}>
-          Paper trading is always free. Subscribe to execute real trades.
+          Try AI Paper Trading Free for 7 Days. Subscribe to Unlock Live AI Trading.
         </div>
       </div>
 

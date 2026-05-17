@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type SignalBreakdown } from "@/lib/api";
+import { UpgradeBanner } from "@/components/UpgradeBanner";
 
 interface SignalBreakdowns {
   breakdowns: Record<string, SignalBreakdown>;
@@ -119,6 +120,7 @@ export default function Signals() {
 
   return (
     <div style={{ padding: "16px 16px 80px" }}>
+      <UpgradeBanner />
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 9, fontFamily: "monospace", color: "#2a4060",
           letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 4 }}>
@@ -168,8 +170,8 @@ export default function Signals() {
         border: "1px solid #0d2035", borderRadius: 6 }}>
         <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50",
           letterSpacing: "0.08em", lineHeight: 1.6 }}>
-          Signals are free to view. Auto-trading in paper mode is always free.
-          Live trade execution requires a Starter subscription.
+          Signals are free to view. Try AI Paper Trading Free for 7 Days.
+          Upgrade to Unlock Live AI Trading.
         </div>
       </div>
     </div>

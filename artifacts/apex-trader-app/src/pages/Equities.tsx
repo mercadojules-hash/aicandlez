@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
+import { UpgradeBanner } from "@/components/UpgradeBanner";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -409,6 +410,7 @@ export default function Equities() {
 
       {/* ── Ticker ──────────────────────────────────────────────────────────── */}
       <EquityTicker/>
+      <UpgradeBanner />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div style={{ padding:"16px 20px 12px",

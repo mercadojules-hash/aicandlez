@@ -182,7 +182,7 @@ export function SubscriptionModal() {
               transition: "all 0.15s ease",
               marginBottom: 10,
             }}>
-            {checkout.isPending ? "Redirecting…" : "Start Free — Then $5.99/mo"}
+            {checkout.isPending ? "Redirecting…" : "Start 7-Day AI Paper Trading Trial"}
           </button>
 
           {/* Dismiss */}

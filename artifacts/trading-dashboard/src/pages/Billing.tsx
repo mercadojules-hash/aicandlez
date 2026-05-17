@@ -101,7 +101,7 @@ function PlanCard({
               </div>
             )}
             <div className="font-mono text-[8px] mt-1" style={{ color: "#3a5a70" }}>
-              14-day free trial included
+              7-day free AI paper trading trial
             </div>
           </>
         )}
@@ -256,7 +256,7 @@ export default function Billing() {
             Choose your plan
           </h1>
           <p className="font-mono text-[11px] mt-1" style={{ color: "#4a6a80" }}>
-            All plans include a 14-day free trial. Cancel anytime.
+            Start with a 7-day free AI paper trading trial. Cancel anytime.
           </p>
         </div>
 
