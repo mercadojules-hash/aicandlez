@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
-import { api } from "@/lib/api";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -504,6 +503,12 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   const backRoute = type === "equity" ? "/equities" : "/markets";
   const asset  = ASSET_DB[sym];
 
+  // Mount-time log — proves the component remounted with the correct symbol.
+  // Helps QA distinguish "navigation didn't fire" from "I clicked a card with the same symbol".
+  useEffect(() => {
+    console.log("[AssetDetail] mounted →", { sym, type, hasData: !!asset });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Toast auto-dismiss (longer = more visible) ───────────────────────────────
   useEffect(() => {
     if (!toast) return;
@@ -511,44 +516,66 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
     return () => clearTimeout(t);
   }, [toast]);
 
-  // ── Simulated order mutation ────────────────────────────────────────────────
-  const orderMutation = useMutation({
-    mutationFn: async (side: "BUY" | "SELL") => {
-      const basePrice = ASSET_DB[sym]?.basePrice ?? 100;
-      const sizeUSD   = 1000;
-      console.log("[ai-exec] dispatch", { symbol: sym, side, sizeUSD, basePrice });
-      const res = await api.post<{
-        success: boolean;
-        position?: { id: string; symbol: string; side: string; size: number; entryPrice: number };
-        error?: string;
-      }>("/simulation/order", { symbol: sym, side, sizeUSD });
-      console.log("[ai-exec] response", res);
-      return res;
+  // ── Paper-trade execution mutation ───────────────────────────────────────────
+  // Uses the Alpaca paper endpoint (same one AlpacaAutoTrader uses for AI auto-trades).
+  // This is the canonical paper-trading path: no Clerk auth required, real orders
+  // visible immediately on the Trade page and in Alpaca dashboards.
+  interface AlpacaOrderResp {
+    id:           string;
+    symbol:       string;
+    side:         string;
+    status:       string;
+    qty:          number;
+    filledQty:    number;
+    avgFillPrice: number;
+    submittedAt:  string;
+    filledAt:     string | null;
+  }
+  const orderMutation = useMutation<AlpacaOrderResp, Error, "BUY" | "SELL">({
+    mutationFn: async (side) => {
+      const notional = 1000;
+      // BTC → BTC/USD for Alpaca crypto; equities (TSLA, AAPL…) stay bare
+      const alpacaSymbol = type === "crypto" ? `${sym}/USD` : sym;
+      console.log("[ai-exec] dispatch", { symbol: alpacaSymbol, side, notional, type });
+      const res = await fetch("/api/exchange/alpaca/order", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ symbol: alpacaSymbol, side: side.toLowerCase(), notional }),
+      });
+      const body = await res.json().catch(() => ({}));
+      console.log("[ai-exec] response", { status: res.status, body });
+      if (!res.ok) {
+        const err = (body as { error?: string }).error ?? `HTTP ${res.status}`;
+        throw new Error(err);
+      }
+      return body as AlpacaOrderResp;
     },
-    onSuccess: (res, side) => {
+    onSuccess: (order, side) => {
+      console.log("[ai-exec] paper order placed", order);
+      // Refresh every screen that shows positions/orders
       void queryClient.invalidateQueries({ queryKey: ["mobile-portfolio"] });
       void queryClient.invalidateQueries({ queryKey: ["sim-account"] });
-      if (res.success && res.position) {
-        console.log("[ai-exec] simulated position created", res.position);
-        setToast({
-          kind: "success",
-          msg:  `${side === "BUY" ? "LONG" : "SHORT"} ${sym} · $1,000 · paper trade filled`,
-        });
-      } else {
-        setToast({ kind: "error", msg: res.error ?? "Order rejected by risk engine" });
-      }
+      void queryClient.invalidateQueries({ queryKey: ["alpaca-positions"] });
+      void queryClient.invalidateQueries({ queryKey: ["alpaca-orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["alpaca-account"] });
+      const verb = side === "BUY" ? "LONG" : "SHORT";
+      setToast({
+        kind: "success",
+        msg:  `✓ Paper ${verb} ${sym} · $1,000 · order ${order.id.slice(0, 8)} · status: ${order.status}`,
+      });
     },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
+    onError: (err) => {
+      const msg = err.message;
       console.warn("[ai-exec] error", msg);
-      const friendly = /401|unauthor/i.test(msg)
-        ? "Sign in required to place paper trades"
-        : msg;
-      setToast({ kind: "error", msg: friendly });
+      let friendly = msg;
+      if (/not configured/i.test(msg))     friendly = "Paper broker not configured — contact admin";
+      else if (/401|unauthor/i.test(msg))  friendly = "Paper broker rejected credentials";
+      else if (/insufficient/i.test(msg))  friendly = "Insufficient paper buying power";
+      setToast({ kind: "error", msg: `Paper order failed — ${friendly}` });
     },
     onSettled: () => {
-      // Hold "EXECUTING…" visible for a perceptible window so users SEE the state change
-      // even when the request resolves in <300ms. Prevents the "glitchy flash" regression.
+      // Hold "EXECUTING…" ~750ms so the state change is perceptible even when the
+      // request resolves in <300ms. Prevents the "glitchy flash" regression.
       setTimeout(() => setExecuting(null), 750);
     },
   });
