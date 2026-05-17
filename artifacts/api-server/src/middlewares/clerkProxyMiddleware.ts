@@ -11,7 +11,7 @@
  * dashboard — all auth configuration is done through the Auth pane.
  *
  * IMPORTANT:
- * - Only active in production (Clerk proxying doesn't work for dev instances)
+ * - Active whenever CLERK_SECRET_KEY is set (dev and prod).
  * - Must be mounted BEFORE express.json() middleware
  *
  * Usage in app.ts:
@@ -25,6 +25,25 @@ import type { IncomingHttpHeaders } from "http";
 
 const CLERK_FAPI = "https://frontend-api.clerk.dev";
 export const CLERK_PROXY_PATH = "/api/__clerk";
+
+/**
+ * The proxy URL that is registered in the Clerk dashboard for this instance.
+ * When VITE_CLERK_PROXY_URL is set (the production proxy URL), Clerk will only
+ * accept requests whose Clerk-Proxy-Url header matches a registered value.
+ * We always send this registered URL so that requests from the Replit dev
+ * sandbox (whose dynamic hostname can't be pre-registered) are accepted too.
+ */
+const REGISTERED_PROXY_URL: string | undefined = (() => {
+  const raw = process.env.VITE_CLERK_PROXY_URL;
+  if (!raw) return undefined;
+  try {
+    // Normalise: ensure it ends with the canonical path
+    const u = new URL(raw);
+    return u.origin + CLERK_PROXY_PATH;
+  } catch {
+    return undefined;
+  }
+})();
 
 /**
  * Returns the first effective public hostname for the given request,
@@ -53,11 +72,11 @@ export function getClerkProxyHost(req: {
 }
 
 export function clerkProxyMiddleware(): RequestHandler {
-  // Only run proxy in production — Clerk proxying doesn't work for dev instances
-  if (process.env.NODE_ENV !== "production") {
-    return (_req, _res, next) => next();
-  }
-
+  // Gate on secret key presence only — not NODE_ENV.
+  // Live Clerk keys embed the production FAPI domain (clerk.aicandlez.com) in
+  // the publishable key, so both dev (Replit sandbox) and prod must route Clerk
+  // requests through this proxy. The secret key is absent only in environments
+  // that haven't provisioned Clerk, which is the right guard.
   const secretKey = process.env.CLERK_SECRET_KEY;
   if (!secretKey) {
     return (_req, _res, next) => next();
@@ -70,12 +89,26 @@ export function clerkProxyMiddleware(): RequestHandler {
       path.replace(new RegExp(`^${CLERK_PROXY_PATH}`), ""),
     on: {
       proxyReq: (proxyReq, req) => {
+        // Clerk validates the Clerk-Proxy-Url header against the proxy URLs
+        // registered in its dashboard. We always send the registered production
+        // URL (from VITE_CLERK_PROXY_URL) so that requests originating from the
+        // dynamic Replit dev sandbox are accepted — that domain can never be
+        // pre-registered. Falls back to computing the URL from the request host
+        // when no registered URL is configured (e.g. fresh dev env).
         const protocol = req.headers["x-forwarded-proto"] || "https";
         const host = getClerkProxyHost(req) || "";
-        const proxyUrl = `${protocol}://${host}${CLERK_PROXY_PATH}`;
+        const dynamicProxyUrl = `${protocol}://${host}${CLERK_PROXY_PATH}`;
+        const clerkProxyUrl = REGISTERED_PROXY_URL ?? dynamicProxyUrl;
+        const registeredHost = REGISTERED_PROXY_URL
+          ? new URL(REGISTERED_PROXY_URL).host
+          : host;
 
-        proxyReq.setHeader("Clerk-Proxy-Url", proxyUrl);
+        proxyReq.setHeader("Clerk-Proxy-Url", clerkProxyUrl);
         proxyReq.setHeader("Clerk-Secret-Key", secretKey);
+        // Override X-Forwarded-Host with the registered proxy's hostname so
+        // Clerk FAPI doesn't reject the request because of the dynamic Replit
+        // dev sandbox domain (which can never be pre-registered in the dashboard).
+        proxyReq.setHeader("X-Forwarded-Host", registeredHost);
 
         const xff = req.headers["x-forwarded-for"];
         const clientIp =

@@ -26,7 +26,8 @@ import AssetDetail from "@/pages/AssetDetail";
 
 // ── Env ────────────────────────────────────────────────────────────────────────
 const clerkPubKey   = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL       as string | undefined;
+// Empty in dev (Clerk loads from CNAME or CDN directly), auto-set in prod.
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL as string | undefined;
 const basePath      = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
 function stripBase(p: string) {
