@@ -162,7 +162,7 @@ function RequiresConsentScreen() {
 
         <div style={{ display: "flex", justifyContent: "center", gap: 20, marginBottom: 20 }}>
           {[
-            ["3%", "Performance Fee\non Profitable Trades"],
+            ["2%", "Performance Fee\non Profitable Trades"],
             ["$0", "Fee on\nLosing Trades"],
             ["0%", "Withdrawal\nPermissions"],
           ].map(([val, label]) => (

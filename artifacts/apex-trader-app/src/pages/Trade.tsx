@@ -488,6 +488,7 @@ export default function Trade() {
     ? alpacaMapped.reduce((sum, p) => sum + (p.unrealizedPnL ?? 0), 0)
     : (portfolio?.openPnL ?? 0);
   const history = tradeHistory?.trades ?? [];
+  const isMockHistory = false;
     const wins    = history.filter(t => t.pnl > 0).length;
     const winPct  = history.length > 0 ? Math.round((wins / history.length) * 100) : 0;
   const confidence = 62;

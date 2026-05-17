@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useUser } from "@clerk/react";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import aicandlezLogo from "@assets/AICandlez_Final_Logo_3_1778962760188.png";
@@ -8,7 +9,7 @@ import { UpgradeBanner } from "@/components/UpgradeBanner";
 import {
   api,
   type MobileStatus, type Portfolio, type SimAccount,
-  type Subscription,
+  type Subscription, type SignalBreakdown,
 } from "@/lib/api";
 
 const SANS = "Inter, 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
@@ -297,6 +298,9 @@ export default function Home() {
     queryKey:["sim-account"],      queryFn:()=>api.get("/account"),          retry:false, staleTime:60_000 });
   const { data:sub }       = useQuery<Subscription>({
     queryKey:["subscription"],     queryFn:()=>api.get("/billing/subscription"), staleTime:120_000, retry:false });
+  const { data:symbolsData } = useQuery<{ symbols: SignalBreakdown[] }>({
+    queryKey:["mobile-symbols"],   queryFn:()=>api.get("/mobile/symbols"), refetchInterval:8_000, retry:false });
+  const { user } = useUser();
 
   const engine   = status?.engine;
   const isLive   = engine?.mode === "live";
@@ -315,13 +319,16 @@ export default function Home() {
 
 
 
-    const breakdowns = status?.engine?.symbolBreakdowns ?? {};
+    const breakdowns: Record<string, SignalBreakdown> = {};
+    for (const b of symbolsData?.symbols ?? []) {
+      breakdowns[b.symbol] = b;
+    }
     const aiLines = (() => {
       const lines: string[] = [];
       for (const sym of MKT_SYMS) {
         const bd = breakdowns[sym];
-        if (bd?.signal && bd.signal !== "HOLD") {
-          lines.push(`${MKT_SHORT[sym]} ${bd.signal} signal — confidence ${bd.confidence ?? 0}%`);
+        if (bd?.action && bd.action !== "HOLD") {
+          lines.push(`${MKT_SHORT[sym]} ${bd.action} signal — confidence ${bd.confidence ?? 0}%`);
         }
       }
       return lines.length > 0 ? lines : FALLBACK_AI_LINES;
@@ -336,19 +343,16 @@ export default function Home() {
     }, [aiLines.length]);
 
     const mktCards = MKT_SYMS.map(sym => {
-      const bd  = breakdowns[sym];
-      const ticker = status?.engine?.tickers?.[sym];
-      const price  = ticker?.price ?? null;
-      const pct    = ticker?.changePct ?? null;
+      const bd = breakdowns[sym];
       return {
         sym:    MKT_SHORT[sym],
         fullSym: sym,
         label:  MKT_LABEL[sym],
-        price:  price != null ? `$${price.toLocaleString("en-US",{maximumFractionDigits:2})}` : "—",
-        pct:    pct   != null ? `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%` : "—",
-        action: (bd?.signal ?? "HOLD") as string,
+        price:  "—",
+        pct:    "—",
+        action: (bd?.action ?? "HOLD") as string,
         conf:   bd?.confidence ?? 50,
-        trend:  (bd?.signal === "LONG" ? "up" : bd?.signal === "SHORT" ? "down" : "flat") as "up"|"down"|"flat",
+        trend:  (bd?.action === "LONG" ? "up" : bd?.action === "SHORT" ? "down" : "flat") as "up"|"down"|"flat",
       };
     });
 
@@ -406,7 +410,7 @@ export default function Home() {
             position:"relative",
             boxShadow:`0 0 0 2px rgba(0,229,255,0.06)`,
           }}>
-            {(status?.user?.firstName?.[0] ?? "?").toUpperCase()}
+            {(user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0] ?? "?").toUpperCase()}
             <div style={{
               position:"absolute", bottom:0, right:0, width:9, height:9,
               borderRadius:"50%", background:G, border:`2px solid ${BG}`,
