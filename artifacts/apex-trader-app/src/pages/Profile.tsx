@@ -562,10 +562,10 @@ export default function Profile() {
 
         {/* ── Stats 2×2 ───────────────────────────────────────────────────── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:18 }}>
-          <StatCard value={`$${(tv/1000).toFixed(1)}K`}        label="Equity"       color={C}/>
-          <StatCard value={`+$${(realized/1000).toFixed(1)}K`} label="Realized"     color="rgba(0,210,100,0.88)"/>
-          <StatCard value={`${winRate}%`}                       label="Win Rate"     color="rgba(0,210,100,0.88)" sub="4W · 1L"/>
-          <StatCard value={`$${fees.toFixed(2)}`}               label="AI Fees (3%)" color={GOLD}/>
+          <StatCard value={`$${(tv/1000).toFixed(1)}K`}        label="Portfolio Value"       color={C}  sub="simulation equity"/>
+          <StatCard value={`+$${(realized/1000).toFixed(1)}K`} label="Realized P&L"          color="rgba(0,210,100,0.88)" sub="lifetime · simulated"/>
+          <StatCard value={`${winRate}%`}                       label="Win Rate"              color="rgba(0,210,100,0.88)" sub="4W · 1L"/>
+          <StatCard value={`$${fees.toFixed(2)}`}               label="Performance Fees (3%)" color={GOLD} sub="on closed profits only"/>
         </div>
 
         {/* ── Performance Intelligence ─────────────────────────────────────── */}
@@ -607,9 +607,9 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* ── Capital & Withdrawals ─────────────────────────────────────────── */}
+        {/* ── Simulation Performance ───────────────────────────────────────── */}
         <div style={{ marginBottom:18 }}>
-          <SectionHead label="Capital & Withdrawals" accent="rgba(255,200,0,0.65)"/>
+          <SectionHead label="Simulation Performance" accent="rgba(255,200,0,0.65)"/>
           <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16 }}>
             <div style={{ background:"rgba(255,148,0,0.07)", borderBottom:"1px solid rgba(255,148,0,0.15)",
               padding:"9px 16px", display:"flex", alignItems:"center", gap:8, borderRadius:"16px 16px 0 0" }}>
@@ -621,7 +621,7 @@ export default function Profile() {
             </div>
             {[
               { label:"Capital Under AI Management", val:`$${tv.toLocaleString()}`,    color:C },
-              { label:"Realized P&L (All Time)",     val:`+$${realized.toLocaleString()}`, color:"rgba(0,255,136,0.88)" },
+              { label:"Realized P&L (All-Time · Simulated)",     val:`+$${realized.toLocaleString()}`, color:"rgba(0,255,136,0.88)" },
               { label:"AI Performance Fees (3%)",     val:`–$${fees.toFixed(2)}`,      color:GOLD },
               { label:"Net Profit After Fees",        val:`+$${netProfit.toFixed(2)}`, color:"rgba(0,255,136,0.88)" },
             ].map(({ label, val, color }, i, arr) => (
@@ -638,7 +638,7 @@ export default function Profile() {
                 background:"rgba(0,229,255,0.07)", border:"1px solid rgba(0,229,255,0.22)",
                 borderRadius:10, color:C, fontFamily:SANS, fontSize:12, fontWeight:600,
                 letterSpacing:"0.04em", cursor:"pointer",
-              }}>Switch to Live Trading — Withdraw Real Profits →</button>
+              }}>Enable Live AI Trading →</button>
             </div>
           </div>
         </div>
@@ -698,27 +698,33 @@ export default function Profile() {
         </div>
 
         {/* ── Connected Accounts ───────────────────────────────────────────── */}
-        <div style={{ marginBottom:18 }}>
-          <SectionHead label="Connected Accounts" accent="rgba(0,255,136,0.55)"/>
+        {/* BROKER */}
+        <div style={{ marginBottom:14 }}>
+          <SectionHead label="Broker Connection" accent="rgba(0,255,136,0.55)"/>
           <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, overflow:"hidden" }}>
             <ExchangeRow
-              name="Alpaca" status="PAPER · CONNECTED" statusCol="rgba(0,225,120,0.85)"
-              icon="K"
-              iconBg="rgba(130,80,220,0.13)" iconBorder="rgba(130,80,220,0.35)" iconColor="rgba(160,100,255,0.90)"
-            />
-            <ExchangeRow
-              name="Alpaca" status="PAPER · CONNECTED" statusCol="rgba(0,225,120,0.85)"
+              name="Alpaca (Paper Account)" status="PAPER · CONNECTED" statusCol="rgba(0,225,120,0.85)"
               icon="A"
               iconBg="rgba(0,200,230,0.10)" iconBorder="rgba(0,200,230,0.30)" iconColor="rgba(0,220,255,0.90)"
             />
+          </div>
+          <div style={{ marginTop:6, fontSize:8.5, fontFamily:SANS, color:DIM, lineHeight:1.6, padding:"0 4px" }}>
+            Withdrawal permissions are never requested. Read + Trade permissions only.
+          </div>
+        </div>
+
+        {/* BILLING */}
+        <div style={{ marginBottom:18 }}>
+          <SectionHead label="Billing" accent="rgba(0,114,255,0.55)"/>
+          <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, overflow:"hidden" }}>
             <ExchangeRow
-              name="Stripe" status="BILLING ACTIVE"    statusCol="rgba(0,114,255,0.82)"
+              name="Stripe" status="SUBSCRIPTION ACTIVE" statusCol="rgba(0,114,255,0.82)"
               icon="$"
               iconBg="rgba(0,80,255,0.10)"  iconBorder="rgba(0,100,255,0.28)" iconColor="rgba(80,140,255,0.90)"
             />
           </div>
-          <div style={{ marginTop:8, fontSize:8.5, fontFamily:SANS, color:DIM, lineHeight:1.6, padding:"0 4px" }}>
-            Withdrawal permissions are never requested. Read + Trade permissions only.
+          <div style={{ marginTop:6, fontSize:8.5, fontFamily:SANS, color:DIM, lineHeight:1.6, padding:"0 4px" }}>
+            Manage your subscription and payment method in Billing & Plan.
           </div>
         </div>
 

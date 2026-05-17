@@ -4,6 +4,7 @@ import { api, type MobileStatus, type Portfolio, type SimTrade, type AlpacaPosit
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
+import { MetricTooltip } from "@/components/help/MetricTooltip";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -139,8 +140,8 @@ function PremiumSparkline({ symbol, up, w = 100, h = 44, animDelay = "0s" }: {
 }
 
 // ── Donut ring metric ────────────────────────────────────────────────────────────
-function Donut({ value, color, label, sub, size = 78 }: {
-  value: number; color: string; label: string; sub?: string; size?: number;
+function Donut({ value, color, label, sub, size = 78, tooltipTerm }: {
+  value: number; color: string; label: string; sub?: string; size?: number; tooltipTerm?: string;
 }) {
   const r    = (size - 14) / 2;
   const cx   = size / 2;
@@ -179,7 +180,12 @@ function Donut({ value, color, label, sub, size = 78 }: {
       <div style={{ textAlign:"center" }}>
         <div style={{ fontSize:8, fontFamily:SANS, fontWeight:700,
           color:"rgba(255,255,255,0.55)", letterSpacing:"0.14em",
-          textTransform:"uppercase" as const }}>{label}</div>
+          textTransform:"uppercase" as const,
+          display:"flex", alignItems:"center", justifyContent:"center", gap:3,
+        }}>
+          {label}
+          {tooltipTerm && <MetricTooltip term={tooltipTerm} inline />}
+        </div>
         {sub && (
           <div style={{ fontSize:7, fontFamily:SANS, color:DIM, marginTop:2,
             letterSpacing:"0.06em" }}>{sub}</div>
@@ -501,7 +507,8 @@ export default function Trade() {
   const openPnL = isAlpacaActive && alpacaMapped.length > 0
     ? alpacaMapped.reduce((sum, p) => sum + (p.unrealizedPnL ?? 0), 0)
     : (portfolio?.openPnL ?? 0);
-  const history   = tradeHistory?.trades?.length ? tradeHistory.trades : MOCK_HISTORY;
+  const isMockHistory = !tradeHistory?.trades?.length;
+  const history   = isMockHistory ? MOCK_HISTORY : (tradeHistory?.trades ?? MOCK_HISTORY);
   const wins      = history.filter(t => t.pnl > 0).length;
   const winPct    = history.length > 0 ? Math.round((wins / history.length) * 100) : 80;
   const confidence = 62;
@@ -529,7 +536,7 @@ export default function Trade() {
         <div>
           <div style={{ fontSize:22, fontWeight:800, color:W,
             fontFamily:SANS, letterSpacing:"-0.02em" }}>
-            Live Trading
+            {isLive ? "Live Trading" : "AI Trading"}
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:5 }}>
             <div style={{
@@ -555,7 +562,7 @@ export default function Trade() {
             animation:"dot-pulse 2.5s ease-in-out infinite" }}/>
           <span style={{ fontSize:8, fontFamily:SANS, fontWeight:700,
             color: isLive ? G : C, letterSpacing:"0.06em" }}>
-            {isLive ? "LIVE" : "SIM"}
+            {isLive ? "LIVE" : "PAPER"}
           </span>
         </div>
       </div>
@@ -636,9 +643,9 @@ export default function Trade() {
             justifyItems:"center", alignItems:"start",
             columnGap:0, marginBottom:20,
           }}>
-            <Donut value={winPct}     color="rgba(0,230,120,0.90)"  label="Win/Loss"   sub={`${wins}W · ${history.length - wins}L`}/>
-            <Donut value={confidence} color="rgba(155,92,245,0.90)" label="AI Conf"    sub="avg confidence"/>
-            <Donut value={exposure}   color="rgba(0,229,255,0.88)"  label="Exposure"   sub="capital deployed"/>
+            <Donut value={winPct}     color="rgba(0,230,120,0.90)"  label="Win/Loss"  sub={`${wins}W · ${history.length - wins}L`} tooltipTerm="Win Rate"/>
+            <Donut value={confidence} color="rgba(155,92,245,0.90)" label="AI Conf"   sub="avg confidence"   tooltipTerm="AI Confidence"/>
+            <Donut value={exposure}   color="rgba(0,229,255,0.88)"  label="Exposure"  sub="capital deployed"  tooltipTerm="Exposure"/>
           </div>
 
           {/* Stats row */}
@@ -751,7 +758,10 @@ export default function Trade() {
 
         {/* ── Trade history — scrollable terminal ──────────────────────────── */}
         <div style={{ marginBottom:16 }}>
-          <SectionHead label="Trade History" color={C}/>
+          <SectionHead
+            label={isMockHistory ? "Recent Trades (Sample Data)" : `Trade History · ${history.length} closed`}
+            color={isMockHistory ? "rgba(255,148,0,0.75)" : C}
+          />
           <div style={{
             position:"relative",
             background:`linear-gradient(160deg, #0a1620, #080f1a)`,
@@ -766,6 +776,18 @@ export default function Trade() {
               animation:"edge-sweep 12s ease-in-out 3s infinite",
               pointerEvents:"none", zIndex:1,
             }}/>
+            {isMockHistory && (
+              <div style={{
+                padding:"8px 14px 6px",
+                background:"rgba(255,148,0,0.05)",
+                borderBottom:"1px solid rgba(255,148,0,0.12)",
+                fontSize:9, fontFamily:SANS, color:"rgba(255,148,0,0.75)",
+                display:"flex", alignItems:"center", gap:6,
+              }}>
+                <span>⚠</span>
+                <span>Showing sample trades — your closed trades will appear here once AI executes</span>
+              </div>
+            )}
             <div className="history-scroll" style={{
               maxHeight:300,
               overflowY:"auto", overflowX:"hidden",

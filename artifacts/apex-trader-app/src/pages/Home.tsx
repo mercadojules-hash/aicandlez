@@ -618,7 +618,7 @@ export default function Home() {
             }}>
               {[
                 { label:"Cash",      val:fmt(tv*0.855), color:W,    sub:"available" },
-                { label:"Realized",  val:realized>=0?`+${fmt(realized)}`:fmt(realized), color:G, sub:"closed trades" },
+                { label:"Realized",  val:realized>=0?`+${fmt(realized)}`:fmt(realized), color:G, sub:"lifetime · simulated" },
                 { label:"Fees",      val:`$${fees.toFixed(2)}`, color:GOLD, sub:"total paid" },
               ].map(({ label, val, color, sub }) => (
                 <div key={label} style={{ textAlign:"center" }}>
