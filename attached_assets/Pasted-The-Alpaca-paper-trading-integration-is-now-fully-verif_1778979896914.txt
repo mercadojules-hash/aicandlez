@@ -1,0 +1,138 @@
+The Alpaca paper trading integration is now fully verified and stable.
+
+We are ready to move into the next major phase:
+
+AICandlez.com public landing website + production hardening.
+
+Please begin simultaneously:
+
+1. Build the new:
+   artifacts/landing
+
+inside the existing monorepo/project structure.
+
+2. Begin production-hardening/security tasks:
+
+* Helmet
+* rate limiting
+* CORS lockdown
+* production auth preparation
+* environment separation planning
+
+LANDING PAGE GOALS:
+
+The landing page should feel:
+
+* cinematic
+* institutional
+* AI-powered
+* premium fintech
+* modern
+* trustworthy
+
+NOT:
+
+* generic SaaS
+* crypto scam
+* cluttered
+
+VISUAL DIRECTION:
+
+* black OLED backgrounds
+* premium typography
+* subtle motion
+* glowing market visuals
+* institutional fintech aesthetic
+* AI trading atmosphere
+* high-end startup feel
+
+LANDING PAGE STRUCTURE:
+
+HERO SECTION
+
+* AICandlez branding
+* autonomous AI trading messaging
+* live market visuals
+* animated charts/tickers
+* strong CTA buttons
+
+PRIMARY CTA BUTTONS
+
+* Launch App
+* Join Waitlist
+* Download iOS
+* Download Android
+
+APP PREVIEW SECTION
+
+* mobile screenshots
+* dashboard previews
+* AI execution visuals
+* Trade page previews
+* Crypto/Equities previews
+
+HOW IT WORKS
+
+* AI scans markets
+* confidence analysis
+* autonomous execution
+* stop-loss protection
+* multi-timeframe confirmation
+* real-time monitoring
+
+FEATURES SECTION
+
+* autonomous AI trading
+* live market data
+* real-time sync
+* portfolio monitoring
+* AI confidence system
+* institutional-grade analytics
+
+PRICING SECTION
+Clearly explain:
+
+* 3% fee ONLY on profitable closed trades
+* no fee on losing trades
+
+TRUST / INFRASTRUCTURE SECTION
+
+* Alpaca paper trading integration
+* real-time market data
+* autonomous monitoring
+* secure infrastructure
+* AI-powered execution
+
+LEGAL / COMPLIANCE SECTION
+Need:
+
+* Privacy Policy
+* Terms of Service
+* Risk Disclosure
+* “Not financial advice”
+* AI trading disclaimer
+
+IMPORTANT:
+Keep the existing AICandlez visual language consistent with the mobile app:
+
+* same aesthetic
+* same glow system
+* same typography feel
+* same institutional fintech atmosphere
+
+We are prioritizing:
+
+* launch readiness
+* App Store readiness
+* trust
+* onboarding
+* conversion
+* production polish
+
+Please also outline:
+
+* recommended deployment flow
+* Replit deployment strategy
+* custom domain connection process for Namecheap
+* how/when we should configure DNS records
+* recommended production deployment sequence

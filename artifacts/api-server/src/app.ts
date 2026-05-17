@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import helmet from "helmet";
 import pinoHttp from "pino-http";
 import { rateLimit } from "express-rate-limit";
 import { clerkMiddleware } from "@clerk/express";
@@ -20,9 +21,10 @@ import { logger } from "./lib/logger.js";
 function buildAllowedOrigins(): string[] {
   const origins: string[] = [
     // Production custom domains
-    "https://app.apexdigital.design",
-    "https://api.apexdigital.design",
-    "https://apexdigital.design",
+    "https://aicandlez.com",
+    "https://www.aicandlez.com",
+    "https://app.aicandlez.com",
+    "https://api.aicandlez.com",
   ];
 
   // Replit preview domains (dev + staging — REPLIT_DOMAINS is comma-separated)
@@ -86,6 +88,14 @@ const app: Express = express();
 
 // Trust proxy headers from Railway/Render/Replit reverse proxies
 app.set("trust proxy", 1);
+
+// ── Helmet (security headers) ─────────────────────────────────────────────────
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Managed by the frontend separately
+    crossOriginEmbedderPolicy: false, // Allows cross-origin iframes (charts, widgets)
+  }),
+);
 
 app.use(
   pinoHttp({
