@@ -364,4 +364,59 @@ router.post("/exchange/alpaca/order", async (req, res) => {
   }
 });
 
+// ── POST /api/exchange/alpaca/test-trigger ────────────────────────────────────
+// E2E autonomous trading test: simulates a high-confidence BUY signal and
+// immediately places a real paper order — mirrors exactly what AlpacaAutoTrader
+// does client-side when it receives a passing signal.
+
+router.post("/exchange/alpaca/test-trigger", async (req, res) => {
+  if (!isConfigured()) {
+    res.status(503).json({ error: "Alpaca credentials not configured" });
+    return;
+  }
+  const { symbol = "BTC/USD", side = "buy", notional = 100 } = (req.body ?? {}) as {
+    symbol?: string; side?: string; notional?: number;
+  };
+
+  const mockSignal = {
+    symbol,
+    action:     side.toUpperCase(),
+    confidence: 75,
+    note:       "Injected test signal — autonomous trading loop verification",
+    ts:         Date.now(),
+  };
+
+  try {
+    const body: Record<string, string | number> = {
+      symbol,
+      side:          side.toLowerCase(),
+      type:          "market",
+      time_in_force: "gtc",
+      notional,
+    };
+
+    const order = await alpacaPost<AlpacaRawOrder>("/v2/orders", JSON.stringify(body));
+    req.log.info({ symbol, side, notional }, "Alpaca test-trigger paper order placed");
+
+    res.json({
+      ok:       true,
+      signal:   mockSignal,
+      order: {
+        id:           order.id,
+        symbol:       order.symbol.replace("/", ""),
+        side:         order.side.toUpperCase(),
+        status:       order.status,
+        qty:          parseFloat(order.qty ?? "0"),
+        filledQty:    parseFloat(order.filled_qty ?? "0"),
+        avgFillPrice: parseFloat(order.filled_avg_price ?? "0"),
+        submittedAt:  order.submitted_at,
+        filledAt:     order.filled_at ?? null,
+      },
+    });
+  } catch (err) {
+    req.log.error({ err }, "Alpaca test-trigger failed");
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
 export default router;
