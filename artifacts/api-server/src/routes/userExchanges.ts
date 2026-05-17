@@ -7,6 +7,7 @@ import { vault } from "../services/vault/CredentialVault.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { EXCHANGE_CATALOG, CATALOG_BY_ID, CONNECTABLE_EXCHANGE_IDS } from "../services/exchanges/catalog.js";
 // Live adapters
+import { KrakenAdapter }         from "../services/exchanges/adapters/KrakenAdapter.js";
 import { AlpacaAdapter }         from "../services/exchanges/adapters/AlpacaAdapter.js";
 import { BinanceAdapter }        from "../services/exchanges/adapters/BinanceAdapter.js";
 import { CoinbaseAdapter }       from "../services/exchanges/adapters/CoinbaseAdapter.js";
@@ -51,6 +52,7 @@ function makeAdapter(exchange: string, creds: ExchangeCredentials): BaseExchange
   const cfg = { apiKey: creds.apiKey, apiSecret: creds.apiSecret, passphrase: creds.passphrase };
   switch (exchange) {
     // Live
+    case "Kraken":       return new KrakenAdapter(cfg);
     case "Alpaca":       return new AlpacaAdapter(cfg);
     case "Binance":      return new BinanceAdapter(cfg);
     case "Coinbase":     return new CoinbaseAdapter(cfg);

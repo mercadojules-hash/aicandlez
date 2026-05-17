@@ -387,7 +387,7 @@ export default function Exchanges() {
           Exchange Hub
         </div>
         <div style={{ fontSize: 11, fontFamily: SANS, color: GR, marginTop: 4 }}>
-          Connect your exchange accounts to enable live trading
+          AI Paper Trading · Alpaca Paper &amp; Live · Simulation Active
         </div>
       </div>
 
@@ -430,7 +430,7 @@ export default function Exchanges() {
           <span style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
             color: "rgba(255,255,255,0.50)", letterSpacing: "0.18em",
             textTransform: "uppercase" as const }}>
-            Live Trading · 6 Exchanges
+            Alpaca Paper Trading · Live Trading Locked
           </span>
         </div>
 
@@ -550,8 +550,9 @@ export default function Exchanges() {
         <div style={{ padding: "12px 16px", background: CARD,
           border: `1px solid ${E}`, borderRadius: 8 }}>
           <div style={{ fontSize: 9, fontFamily: SANS, color: GR, lineHeight: 1.8 }}>
-            Paper simulation works with all exchanges. Live trading currently available on
-            Kraken, Coinbase, Binance, Crypto.com, Gemini, and Robinhood.
+            AI Paper Trading uses the built-in simulation engine — no exchange connection required.
+            Alpaca Paper &amp; Live trading is available via your connected Alpaca account.
+            Live trading on other exchanges is locked pending your plan activation.
           </div>
         </div>
       </div>
