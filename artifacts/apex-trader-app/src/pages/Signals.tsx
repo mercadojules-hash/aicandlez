@@ -1,11 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, type SignalBreakdown } from "@/lib/api";
+import { api, type SignalBreakdown, type MobileSignalsResponse } from "@/lib/api";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
-
-interface SignalBreakdowns {
-  breakdowns: Record<string, SignalBreakdown>;
-  signalFilter: { volumeFilter: boolean; require1HTrend: boolean };
-}
 
 const ACTION_COLOR: Record<string, string> = {
   BUY:  "#00ff8a",
@@ -110,7 +105,7 @@ function Badge({ label, color }: { label: string; color: string }) {
 }
 
 export default function Signals() {
-  const { data, isLoading, isError } = useQuery<SignalBreakdowns>({
+  const { data, isLoading, isError } = useQuery<MobileSignalsResponse>({
     queryKey:        ["signal-breakdowns"],
     queryFn:         () => api.get("/mobile/signals"),
     refetchInterval: 5_000,

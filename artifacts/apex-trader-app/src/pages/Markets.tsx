@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
 import { useQuery } from "@tanstack/react-query";
-import { api, type SignalBreakdown } from "@/lib/api";
+import { api, type SignalBreakdown, type MobileSignalsResponse } from "@/lib/api";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────────
@@ -380,10 +380,7 @@ export default function Markets() {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [, setLocation] = useLocation();
 
-  const { data, isLoading } = useQuery<{
-    breakdowns: Record<string, SignalBreakdown>;
-    signalFilter: { volumeFilter: boolean; require1HTrend: boolean };
-  }>({
+  const { data, isLoading } = useQuery<MobileSignalsResponse>({
     queryKey: ["mobile-signals"],
     queryFn:  () => api.get("/mobile/signals"),
     refetchInterval: 5_000,

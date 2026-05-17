@@ -103,10 +103,46 @@ router.get("/mobile/positions", async (_req, res) => {
   }
 });
 
-// ── Recent signals (last 10) ──────────────────────────────────────────────────
+// ── Signal breakdowns + recent signals ────────────────────────────────────────
 // GET /api/mobile/signals
+//
+// Returns the live engine state the mobile Markets and Signals screens consume:
+//   - `breakdowns`: per-symbol MTF breakdown keyed by symbol, with normalized
+//     fields matching the frontend `SignalBreakdown` contract.
+//   - `signalFilter`: current quality-filter toggles (volume + 1H trend).
+// Also keeps the legacy `signals` / `counts` / `funnel` fields for any older
+// clients still relying on them.
 router.get("/mobile/signals", (_req, res) => {
+  const breakdowns: Record<string, {
+    symbol:          string;
+    action:          string;
+    confidence:      number;
+    mtfConfirmed:    boolean;
+    volumeConfirmed: boolean;
+    marketCondition: string;
+    trend1H:         string;
+    blockReason:     string | null;
+    lastUpdated:     number;
+  }> = {};
+  for (const [symbol, b] of Object.entries(engineStats.symbolBreakdowns)) {
+    breakdowns[symbol] = {
+      symbol:          b.symbol,
+      action:          b.agreedAction,
+      confidence:      b.avgConfidence,
+      mtfConfirmed:    b.mtfConfirmed,
+      volumeConfirmed: b.volumeConfirmed,
+      marketCondition: b.marketCondition,
+      trend1H:         b.trend1H,
+      blockReason:     b.blockReason && b.blockReason.length > 0 ? b.blockReason : null,
+      lastUpdated:     b.lastUpdated,
+    };
+  }
   res.json({
+    breakdowns,
+    signalFilter: {
+      volumeFilter:   engineStats.volumeFilter,
+      require1HTrend: engineStats.require1HTrend,
+    },
     signals:  engineStats.recentSignalLog,
     counts:   engineStats.signalCounts,
     funnel: {
@@ -115,6 +151,7 @@ router.get("/mobile/signals", (_req, res) => {
       executed:  engineStats.funnelExecuted,
       blocked:   engineStats.funnelBlockedMTF,
     },
+    ts: Date.now(),
   });
 });
 

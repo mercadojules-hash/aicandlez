@@ -78,6 +78,15 @@ export interface SignalBreakdown {
   lastUpdated:     number;
 }
 
+export interface MobileSignalsResponse {
+  breakdowns:   Record<string, SignalBreakdown>;
+  signalFilter: { volumeFilter: boolean; require1HTrend: boolean };
+  signals?:     unknown[];
+  counts?:      { BUY: number; SELL: number; HOLD: number };
+  funnel?:      { total: number; passedMTF: number; executed: number; blocked: number };
+  ts?:          number;
+}
+
 export interface LiveEligibility {
   eligible:     boolean;
   reason:       "ok" | "requires_subscription" | "requires_consent";
