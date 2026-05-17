@@ -598,7 +598,10 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   const chCol    = isUp ? G : R;
   const sigCol   = SIG_COLOR[action] ?? GR;
   const reasons  = getReasoningLines(sym, action, conf);
-  const related  = (type === "crypto" ? RELATED_CRYPTO : RELATED_EQUITY).filter(s => s !== sym).slice(0, 7);
+  // Stable order — DO NOT filter out the current symbol. Keeping the full list
+  // in a fixed order means tapping a card never reshuffles the row; only the
+  // "VIEWING" highlight moves. This prevents the "tap reversed itself" illusion.
+  const related  = type === "crypto" ? RELATED_CRYPTO : RELATED_EQUITY;
   const sg       = setupGrade(conf);
 
   // Seeded metrics
@@ -1065,19 +1068,49 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
             {related.map(rsym => {
               const ra = ASSET_DB[rsym];
               if (!ra) return null;
-              const rcol  = SIG_COLOR[ra.action] ?? GR;
-              const rHash = rsym.split("").reduce((a,c) => a + c.charCodeAt(0), 0);
-              const rConf = 50 + (rHash * 7 + 13) % 44;
+              const rcol     = SIG_COLOR[ra.action] ?? GR;
+              const rHash    = rsym.split("").reduce((a,c) => a + c.charCodeAt(0), 0);
+              const rConf    = 50 + (rHash * 7 + 13) % 44;
+              const isActive = rsym === sym;
               return (
                 <button key={rsym}
-                  onClick={(e) => { e.stopPropagation(); navigateToAsset(rsym, ra.type); }}
+                  ref={isActive ? (el => {
+                    // Scroll the currently-viewed card into view on mount so the user
+                    // can see WHICH card represents the asset they just navigated to.
+                    if (el) el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+                  }) : undefined}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isActive) {
+                      console.log("[related-card] already viewing", rsym);
+                      return; // no-op: can't navigate to the page you're already on
+                    }
+                    navigateToAsset(rsym, ra.type);
+                  }}
+                  aria-current={isActive ? "page" : undefined}
                   style={{
                     flexShrink:0, width:100,
-                    background:CARD, border:`1px solid ${SIG_BORDER[ra.action] ?? E}`,
-                    borderRadius:13, padding:"11px 10px 9px", cursor:"pointer",
+                    background: isActive ? "rgba(0,229,255,0.10)" : CARD,
+                    border: isActive
+                      ? `1.5px solid ${C}`
+                      : `1px solid ${SIG_BORDER[ra.action] ?? E}`,
+                    boxShadow: isActive ? `0 0 18px rgba(0,229,255,0.30)` : "none",
+                    borderRadius:13, padding:"11px 10px 9px",
+                    cursor: isActive ? "default" : "pointer",
                     textAlign:"left" as const,
+                    position:"relative" as const,
+                    transition:"background 0.2s, border-color 0.2s, box-shadow 0.25s",
                   }}>
-                  <div style={{ fontSize:11, fontFamily:MONO, fontWeight:700, color:W, marginBottom:3 }}>{rsym}</div>
+                  {isActive && (
+                    <div style={{
+                      position:"absolute" as const, top:-6, right:6,
+                      fontSize:6.5, fontFamily:SANS, fontWeight:800,
+                      color:"#000", background:C, padding:"2px 5px",
+                      borderRadius:3, letterSpacing:"0.10em",
+                    }}>VIEWING</div>
+                  )}
+                  <div style={{ fontSize:11, fontFamily:MONO, fontWeight:700,
+                    color: isActive ? C : W, marginBottom:3 }}>{rsym}</div>
                   <div style={{ marginBottom:7 }}>
                     <MicroSpark sym={rsym} action={ra.action} w={80} h={22}/>
                   </div>
