@@ -202,7 +202,7 @@ export function BrokerStatusCard({ compact = false }: BrokerStatusCardProps) {
             "2. Switch to the Paper Trading environment (toggle top-left)",
             "3. Click 'Your API Keys' in the right sidebar",
             "4. Generate new keys — they start with PK (not CK)",
-            "5. Update ALPACA_API_KEY + ALPACA_SECRET_KEY in Replit Secrets",
+            "5. Update ALPACA_API_KEY + ALPACA_SECRET_KEY in environment secrets",
             "6. Restart the API server",
           ].map(step => (
             <div key={step} style={{

@@ -162,7 +162,7 @@ export default function Billing() {
             </div>
             <div style={{ marginTop: 10, fontSize: 9, fontFamily: SANS,
               color: "rgba(255,180,0,0.72)" }}>
-              + 3% performance fee on profitable closed trades only
+              + 2% performance fee on profitable closed trades only
             </div>
           </div>
 

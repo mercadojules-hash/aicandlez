@@ -1,0 +1,88 @@
+Use Option A — start a fresh Agent conversation.
+
+The current session’s Plan-mode lock is clearly corrupted at the system level and continuing to fight it is wasting time.
+
+In the new Replit Agent conversation, use this exact instruction:
+
+“Execute the production readiness pass on apex-trader-app.”
+
+Then carry forward this exact implementation list:
+
+1. Trade.tsx
+
+* remove MOCK_HISTORY array
+* remove hash-seeded/random aiConf generation
+* replace with real simulation/account telemetry
+* show proper SIMULATION badge
+* show clean empty state when no real trades exist
+
+2. Home.tsx
+
+* remove static MKTS
+* remove MKTS_CONF
+* remove fake AI_LINES
+* wire signals to real /api/mobile/signals
+* wire market cards to real backend telemetry
+* no fabricated AI probabilities
+
+3. Profile.tsx
+
+* remove hardcoded realized/winRate values
+* use authenticated SimAccount data
+* standardize fee multiplier to 2%
+* label monthly chart as “Illustrative” unless real historical data exists
+
+4. BrokerStatusCard.tsx
+
+* replace “Replit Secrets” wording with “environment secrets”
+
+5. Fee consistency
+   Standardize ALL fee references:
+   3% → 2%
+
+Across:
+
+* Consent.tsx
+* Billing.tsx
+* Live.tsx
+* Account.tsx
+* SubscriptionModal.tsx
+* Markets.tsx
+* Equities.tsx
+* Profile.tsx
+* Home.tsx
+
+6. Trust-layer rules
+
+* no fake financial telemetry
+* no hardcoded market pricing pretending to be live
+* no fabricated AI signals
+* no seeded/random confidence values
+* no mock data once real telemetry exists
+
+7. Empty states preferred over fake data
+   If backend data unavailable:
+
+* show loading
+* show unavailable
+* show delayed/simulation labels
+* NEVER fabricate market activity
+
+8. Preserve:
+
+* auth stability
+* telemetry/accounting fixes
+* current visual aesthetic
+* paper/live safety separation
+* onboarding/help architecture
+
+9. After execution:
+
+* typecheck
+* build validation
+* restart services
+* visual verification in Preview
+* screenshots
+* implementation report
+
+This will be much faster and cleaner than continuing to fight the corrupted planning session.

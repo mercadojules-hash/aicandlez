@@ -1,0 +1,132 @@
+Excellent — auth is stable now and the financial telemetry architecture looks trustworthy again.
+
+Next phase:
+I want to move from “prototype polish” into “production-grade product behavior.”
+
+Please perform a full architecture + UX refinement pass focused on REAL USER READINESS.
+
+Priority Objectives:
+
+1. Real User State Persistence
+
+* Ensure onboarding state persists correctly per authenticated user (not just localStorage)
+* Persist:
+
+  * onboarding completion
+  * risk settings
+  * AI mode preferences
+  * paper/live mode
+  * watchlists
+  * notification preferences
+* Verify no state resets on refresh/login/logout
+
+2. Trade History / Portfolio Infrastructure
+
+* Audit all trade-history sources
+* Ensure:
+
+  * no sample data appears once real user trades exist
+  * labels clearly distinguish:
+
+    * sample trades
+    * simulated trades
+    * live trades
+  * pagination architecture exists
+  * historical filtering architecture exists
+* Add placeholder architecture for:
+
+  * 7D / 30D / All-Time performance views
+  * downloadable trade exports
+  * realized vs unrealized breakdown charts
+
+3. Production UX Audit
+   Review the ENTIRE mobile app as if preparing for App Store launch.
+
+Audit for:
+
+* ambiguous labels
+* fake-looking financial metrics
+* spacing inconsistencies
+* responsiveness issues
+* overflow/cutoff text
+* dark-on-dark readability
+* misleading terminology
+* duplicated stats
+* dead buttons
+* confusing toggles
+* inconsistent iconography
+* inconsistent capitalization
+* fake “institutional” language that harms trust
+* unrealistic financial phrasing
+* anything that could make users question legitimacy
+
+4. Live vs Paper Trading Safety
+   Add stronger visual differentiation between:
+
+* PAPER
+* SIMULATION
+* LIVE
+
+Requirements:
+
+* impossible to confuse live vs simulated trading
+* persistent top-level status visibility
+* mode-aware colors
+* mode-aware wording
+* confirmation architecture before enabling live trading
+* warning architecture before real brokerage execution
+
+5. Brokerage / Billing Architecture
+   Audit connected account systems.
+
+Requirements:
+
+* separate clearly:
+
+  * broker connection
+  * billing subscription
+  * AI permissions
+  * exchange status
+* no duplicated Alpaca entries
+* no fake connection states
+* no misleading “connected” indicators without verification
+
+6. AI Explainability / Trust Layer
+   Strengthen user trust.
+
+Add/improve:
+
+* “Why this trade?” explanations
+* confidence explanation tooltips
+* risk explanation tooltips
+* exposure explanation
+* simple-language AI reasoning summaries
+* explainable metrics
+
+Goal:
+The platform should feel:
+
+* transparent
+* trustworthy
+* production-grade
+* financially coherent
+* safe
+* institutionally polished
+* App Store ready
+
+IMPORTANT:
+Before changing anything:
+
+* audit existing architecture carefully
+* avoid breaking working auth
+* avoid reintroducing global telemetry contamination
+* avoid fake placeholder financial behavior
+* preserve the current visual aesthetic
+
+After implementation:
+
+1. run typecheck
+2. run build validation
+3. restart workflows
+4. verify visually in Preview
+5. provide screenshots + full implementation report

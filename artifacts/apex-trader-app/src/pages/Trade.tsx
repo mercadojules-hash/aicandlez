@@ -25,18 +25,6 @@ const MONO = "'SF Mono','JetBrains Mono','Roboto Mono',Consolas,monospace";
 // ── Constants ────────────────────────────────────────────────────────────────────
 const AI_STRATEGIES = ["EMA+RSI", "MTF TREND", "BREAKOUT", "MOMENTUM", "CONFLUENCE"];
 
-const MOCK_HISTORY: SimTrade[] = [
-  { id:"1",  symbol:"BTCUSD", side:"LONG",  pnl:  84.00, pnlPct:  2.58, score:88, closedAt:"2h ago",  entryPrice:67000, exitPrice:68732 },
-  { id:"2",  symbol:"ETHUSD", side:"SHORT", pnl: 112.00, pnlPct:  3.87, score:91, closedAt:"4h ago",  entryPrice:3400,  exitPrice:3268  },
-  { id:"3",  symbol:"NVDA",   side:"LONG",  pnl:  61.40, pnlPct:  7.53, score:82, closedAt:"6h ago",  entryPrice:815,   exitPrice:876.4 },
-  { id:"4",  symbol:"SOLUSD", side:"LONG",  pnl: -16.80, pnlPct: -2.76, score:44, closedAt:"9h ago",  entryPrice:192,   exitPrice:186.7 },
-  { id:"5",  symbol:"TSLA",   side:"SHORT", pnl:  43.20, pnlPct:  2.89, score:76, closedAt:"13h ago", entryPrice:191,   exitPrice:185.5 },
-  { id:"6",  symbol:"BTCUSD", side:"LONG",  pnl: 130.00, pnlPct:  3.93, score:85, closedAt:"18h ago", entryPrice:66500, exitPrice:69113 },
-  { id:"7",  symbol:"AAPL",   side:"LONG",  pnl:  22.40, pnlPct:  1.24, score:71, closedAt:"22h ago", entryPrice:189,   exitPrice:191.3 },
-  { id:"8",  symbol:"ETHUSD", side:"LONG",  pnl:  88.60, pnlPct:  2.91, score:87, closedAt:"28h ago", entryPrice:3350,  exitPrice:3447.6},
-  { id:"9",  symbol:"META",   side:"SHORT", pnl: -29.00, pnlPct: -1.48, score:38, closedAt:"34h ago", entryPrice:498,   exitPrice:505.4 },
-  { id:"10", symbol:"NVDA",   side:"LONG",  pnl: 142.00, pnlPct:  9.12, score:93, closedAt:"41h ago", entryPrice:820,   exitPrice:894.8 },
-];
 
 // ── Live ticker hook ─────────────────────────────────────────────────────────────
 function useLiveTimer() {
@@ -245,7 +233,6 @@ function PositionCard({ pos, tick }: { pos: Portfolio["positions"][number]; tick
   const tp      = pos.entryPrice * (pos.side === "LONG" ? 1.042 : 0.958);
   const pnlPct  = pos.entryPrice > 0 ? (pnl / (pos.entryPrice * pos.size)) * 100 : 0;
   const symHash = pos.symbol.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  const aiConf  = 55 + (symHash * 7 + 13) % 34;
   const strategy = AI_STRATEGIES[symHash % AI_STRATEGIES.length];
   const elapsed  = 1800 + (symHash % 5400) + tick;
   const duration = fmtDuration(elapsed);
@@ -342,21 +329,14 @@ function PositionCard({ pos, tick }: { pos: Portfolio["positions"][number]; tick
             </span>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-            <span style={{ fontSize:7.5, fontFamily:SANS, color:DIM, letterSpacing:"0.08em" }}>
-              AI CONF
-            </span>
-            <div style={{
-              width:50, height:3, background:"rgba(255,255,255,0.06)",
-              borderRadius:2, overflow:"hidden",
-            }}>
-              <div style={{
-                width:`${aiConf}%`, height:"100%",
-                background:`linear-gradient(90deg, rgba(155,92,245,0.55), rgba(155,92,245,1))`,
-                borderRadius:2,
-                boxShadow:"0 0 4px rgba(155,92,245,0.55)",
-              }}/>
-            </div>
-            <span style={{ fontSize:8, fontFamily:MONO, fontWeight:700, color:P }}>{aiConf}%</span>
+            <span style={{
+              padding:"2px 8px",
+              background:"rgba(0,229,255,0.06)",
+              border:"1px solid rgba(0,229,255,0.18)",
+              borderRadius:4,
+              fontSize:7.5, fontFamily:SANS, fontWeight:700,
+              color:"rgba(0,229,255,0.75)", letterSpacing:"0.10em",
+            }}>SIMULATION</span>
           </div>
         </div>
 
@@ -507,10 +487,9 @@ export default function Trade() {
   const openPnL = isAlpacaActive && alpacaMapped.length > 0
     ? alpacaMapped.reduce((sum, p) => sum + (p.unrealizedPnL ?? 0), 0)
     : (portfolio?.openPnL ?? 0);
-  const isMockHistory = !tradeHistory?.trades?.length;
-  const history   = isMockHistory ? MOCK_HISTORY : (tradeHistory?.trades ?? MOCK_HISTORY);
-  const wins      = history.filter(t => t.pnl > 0).length;
-  const winPct    = history.length > 0 ? Math.round((wins / history.length) * 100) : 80;
+  const history = tradeHistory?.trades ?? [];
+    const wins    = history.filter(t => t.pnl > 0).length;
+    const winPct  = history.length > 0 ? Math.round((wins / history.length) * 100) : 0;
   const confidence = 62;
   const exposure   = 56;
 

@@ -39,28 +39,21 @@ function planLabel(p: string) {
   return "Trial";
 }
 
-const MKTS = [
-  { sym:"BTC",  label:"Bitcoin",   price:"$68,120", pct:"+2.4%", action:"LONG",  trend:"up"   as const },
-  { sym:"ETH",  label:"Ethereum",  price:"$3,512",  pct:"+1.8%", action:"LONG",  trend:"up"   as const },
-  { sym:"SOL",  label:"Solana",    price:"$188",    pct:"-0.3%", action:"HOLD",  trend:"flat" as const },
-  { sym:"NVDA", label:"Nvidia",    price:"$875",    pct:"+3.1%", action:"LONG",  trend:"up"   as const },
-  { sym:"TSLA", label:"Tesla",     price:"$177",    pct:"+1.2%", action:"LONG",  trend:"up"   as const },
-  { sym:"SPY",  label:"S&P 500",   price:"$521",    pct:"+0.6%", action:"LONG",  trend:"up"   as const },
-];
 const AC: Record<string,string> = { LONG:G, SHORT:R, HOLD:C };
-const MKTS_CONF: Record<string,number> = { BTC:74, ETH:68, SOL:45, NVDA:81, TSLA:63, SPY:72 };
 
-const AI_LINES = [
-  "AI detected bullish momentum on BTC…",
-  "BTCUSD breakout probability: 74%",
-  "ETH volatility compression identified…",
-  "Analyzing 1H EMA alignment across 6 assets",
-  "SOL holding key support zone — monitoring",
-  "NVDA momentum confirmation in progress…",
-  "Signal quality threshold: PASSED",
-  "Multi-timeframe confluence detected on ETH",
-  "BTC 4H EMA9 crossed above EMA21…",
+const MKT_SYMS = ["BTCUSD","ETHUSD","SOLUSD"];
+const MKT_LABEL: Record<string,string> = { BTCUSD:"Bitcoin", ETHUSD:"Ethereum", SOLUSD:"Solana" };
+const MKT_SHORT: Record<string,string> = { BTCUSD:"BTC",     ETHUSD:"ETH",      SOLUSD:"SOL"    };
+
+const FALLBACK_AI_LINES = [
+  "Scanning markets for high-confidence setups…",
+  "Analyzing multi-timeframe EMA alignment…",
+  "Signal quality filter: active",
+  "Volume confirmation check in progress…",
   "Risk parameters verified — position sizing OK",
+  "Monitoring BTC, ETH, SOL for breakouts…",
+  "MTF confluence detection running…",
+  "Awaiting engine signal data…",
 ];
 
 function useTypewriter(text: string, speed = 36) {
@@ -296,13 +289,6 @@ export default function Home() {
   const { openOnboarding, status: brokerStatus } = useBrokerConnection();
   const [lineIdx, setLineIdx] = useState(0);
   const [launching, setLaunching] = useState(false);
-  const typedLine = useTypewriter(AI_LINES[lineIdx]);
-
-  useEffect(() => {
-    const t = setInterval(() => setLineIdx(i => (i+1) % AI_LINES.length), 3800);
-    return () => clearInterval(t);
-  }, []);
-
   const { data:status }    = useQuery<MobileStatus>({
     queryKey:["mobile-status"],    queryFn:()=>api.get("/mobile/status"),    refetchInterval:5_000 });
   const { data:portfolio } = useQuery<Portfolio>({
@@ -318,18 +304,55 @@ export default function Home() {
   const pnl      = portfolio?.openPnL     ?? 0;
   const pnlPct   = tv > 0 ? (pnl/tv*100) : 0;
   const posCount = portfolio?.positions?.length ?? 0;
-  const winRate  = simAcc?.winRate     ?? 63;
-  const trades   = simAcc?.totalTrades ?? 41;
-  const realized = simAcc?.realizedPnL ?? 3800;
-  const fees     = simAcc?.feesPaid    ?? 142.88;
+  const winRate  = simAcc?.winRate     ?? 0;
+  const trades   = simAcc?.totalTrades ?? 0;
+  const realized = simAcc?.realizedPnL ?? 0;
+  const fees     = simAcc?.feesPaid    ?? 0;
   const plan     = (sub?.plan ?? "free").toLowerCase();
   const pColor   = planColor(plan);
   const pLabel   = planLabel(plan);
   const exchange = engine?.exchange?.toUpperCase() ?? "ALPACA";
-  const initials = "AM";
-  const name     = "Alex Morgan";
 
-  function handleLaunch() {
+
+
+    const breakdowns = status?.engine?.symbolBreakdowns ?? {};
+    const aiLines = (() => {
+      const lines: string[] = [];
+      for (const sym of MKT_SYMS) {
+        const bd = breakdowns[sym];
+        if (bd?.signal && bd.signal !== "HOLD") {
+          lines.push(`${MKT_SHORT[sym]} ${bd.signal} signal — confidence ${bd.confidence ?? 0}%`);
+        }
+      }
+      return lines.length > 0 ? lines : FALLBACK_AI_LINES;
+    })();
+
+    const typedLine = useTypewriter(aiLines[lineIdx % aiLines.length]);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+      const t = setInterval(() => setLineIdx(i => (i+1) % aiLines.length), 3800);
+      return () => clearInterval(t);
+    }, [aiLines.length]);
+
+    const mktCards = MKT_SYMS.map(sym => {
+      const bd  = breakdowns[sym];
+      const ticker = status?.engine?.tickers?.[sym];
+      const price  = ticker?.price ?? null;
+      const pct    = ticker?.changePct ?? null;
+      return {
+        sym:    MKT_SHORT[sym],
+        fullSym: sym,
+        label:  MKT_LABEL[sym],
+        price:  price != null ? `$${price.toLocaleString("en-US",{maximumFractionDigits:2})}` : "—",
+        pct:    pct   != null ? `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%` : "—",
+        action: (bd?.signal ?? "HOLD") as string,
+        conf:   bd?.confidence ?? 50,
+        trend:  (bd?.signal === "LONG" ? "up" : bd?.signal === "SHORT" ? "down" : "flat") as "up"|"down"|"flat",
+      };
+    });
+
+    function handleLaunch() {
     if (launching || brokerStatus !== "idle") return;
     setLaunching(true);
     setTimeout(() => { setLaunching(false); openOnboarding(); }, 1600);
@@ -383,7 +406,7 @@ export default function Home() {
             position:"relative",
             boxShadow:`0 0 0 2px rgba(0,229,255,0.06)`,
           }}>
-            {initials}
+            {(status?.user?.firstName?.[0] ?? "?").toUpperCase()}
             <div style={{
               position:"absolute", bottom:0, right:0, width:9, height:9,
               borderRadius:"50%", background:G, border:`2px solid ${BG}`,
@@ -694,13 +717,13 @@ export default function Home() {
             borderRadius:16, overflow:"hidden",
             boxShadow:`0 8px 32px rgba(0,0,0,0.9)`,
           }}>
-            {MKTS.map(({ sym, label: symLabel, price, pct, action, trend }, i) => {
+            {mktCards.map(({ sym, label: symLabel, price, pct, action, conf, trend }, i) => {
               const ac = AC[action]??W;
               const pctPos = !pct.startsWith("-");
               return (
                 <div key={sym} style={{
                   display:"flex", alignItems:"center", gap:10, padding:"12px 14px",
-                  borderBottom: i<MKTS.length-1 ? `1px solid ${ESUB}` : "none",
+                  borderBottom: i<mktCards.length-1 ? `1px solid ${ESUB}` : "none",
                   animation:`card-in 0.3s ${(i*0.06).toFixed(2)}s ease-out both`,
                   background:`${ac}02`,
                   position:"relative", overflow:"hidden",
@@ -762,14 +785,14 @@ export default function Home() {
                         borderRadius:2, overflow:"hidden",
                       }}>
                         <div style={{
-                          width:`${MKTS_CONF[sym]??60}%`, height:"100%",
+                          width:`${conf}%`, height:"100%",
                           background:`linear-gradient(90deg, ${ac}66, ${ac})`,
                           borderRadius:2,
                           boxShadow:`0 0 4px ${ac}55`,
                         }}/>
                       </div>
                       <span style={{ fontSize:7, fontFamily:MONO, color:DIM }}>
-                        {MKTS_CONF[sym]??60}%
+                        {conf}%
                       </span>
                     </div>
                   </div>
@@ -879,7 +902,7 @@ export default function Home() {
                 </div>
                 {[
                   { icon:"◈", text:"$5.99 / month platform fee",          color:C  },
-                  { icon:"◈", text:"3% on profitable closed trades only",  color:C  },
+                  { icon:"◈", text:"2% on profitable closed trades only",  color:C  },
                   { icon:"◉", text:"Zero fee on losing trades — ever",     color:G  },
                   { icon:"◉", text:"Paper trading remains free forever",    color:G  },
                   { icon:"◉", text:"Cancel anytime — no lock-in",          color:G  },
