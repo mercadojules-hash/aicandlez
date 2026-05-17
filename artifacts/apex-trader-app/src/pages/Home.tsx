@@ -304,7 +304,7 @@ function LiveTicker({ items, isLoading }: { items: TickRow[]; isLoading: boolean
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { openOnboarding, status: brokerStatus } = useBrokerConnection();
+  const { openOnboarding, status: brokerStatus, equity: alpacaEquity, buyingPower: alpacaBP } = useBrokerConnection();
   const [lineIdx, setLineIdx] = useState(0);
   const [launching, setLaunching] = useState(false);
   const { data:status }    = useQuery<MobileStatus>({
@@ -323,9 +323,24 @@ export default function Home() {
 
   const engine   = status?.engine;
   const isLive   = engine?.mode === "live";
-  const tv       = portfolio?.totalValue  ?? 100_000;
+
+  // ── Portfolio Value source of truth ───────────────────────────────────────
+  // When an Alpaca paper/live account is connected, the broker IS the single
+  // source of truth — bind the top hero card to live Alpaca equity so it
+  // matches the BrokerStatusCard at the bottom exactly. Before connection,
+  // fall back to the AI sim allocation ($100K default).
+  const brokerConnected = brokerStatus === "paper_active" || brokerStatus === "live_active";
+  const tv       = brokerConnected
+    ? (alpacaEquity > 0 ? alpacaEquity : (portfolio?.totalValue ?? 100_000))
+    : (portfolio?.totalValue ?? 100_000);
   const pnl      = portfolio?.openPnL     ?? 0;
   const pnlPct   = tv > 0 ? (pnl/tv*100) : 0;
+  // Cash available — real Alpaca buying power when connected, else 85% heuristic
+  const cashAvail = brokerConnected && alpacaBP > 0 ? alpacaBP : tv * 0.855;
+  // Source label for the top card so the user knows EXACTLY what they're seeing
+  const portfolioSourceLabel = brokerConnected
+    ? (brokerStatus === "live_active" ? "Alpaca · Live" : "Alpaca · Paper")
+    : "AI Sim Allocation";
   const posCount = portfolio?.positions?.length ?? 0;
   const winRate  = simAcc?.winRate     ?? 0;
   const trades   = simAcc?.totalTrades ?? 0;
@@ -615,9 +630,23 @@ export default function Home() {
               display:"flex", alignItems:"flex-start", justifyContent:"space-between",
               marginBottom:6,
             }}>
-              <div style={{ fontSize:9, fontFamily:SANS, fontWeight:700, color:DIM,
-                letterSpacing:"0.18em", textTransform:"uppercase" as const }}>
-                Portfolio Value
+              <div>
+                <div style={{ fontSize:9, fontFamily:SANS, fontWeight:700, color:DIM,
+                  letterSpacing:"0.18em", textTransform:"uppercase" as const }}>
+                  Portfolio Value
+                </div>
+                <div style={{ fontSize:8, fontFamily:MONO, fontWeight:600,
+                  color: brokerConnected ? G : DIM,
+                  letterSpacing:"0.08em", marginTop:3,
+                  textTransform:"uppercase" as const }}>
+                  {brokerConnected && (
+                    <span style={{ display:"inline-block", width:5, height:5, borderRadius:"50%",
+                      background:G, marginRight:5, verticalAlign:"middle",
+                      boxShadow:`0 0 6px ${G}`,
+                      animation:"dot-pulse 2.5s ease-in-out infinite" }}/>
+                  )}
+                  {portfolioSourceLabel}
+                </div>
               </div>
               <div style={{
                 fontSize:8, fontFamily:SANS, fontWeight:600,
@@ -680,7 +709,7 @@ export default function Home() {
               marginTop:14, borderTop:`1px solid ${ESUB}`, paddingTop:14, gap:8,
             }}>
               {[
-                { label:"Cash",      val:fmt(tv*0.855), color:W,    sub:"available" },
+                { label:"Cash",      val:fmt(cashAvail), color:W,    sub: brokerConnected ? "buying power" : "available" },
                 { label:"Realized",  val:realized>=0?`+${fmt(realized)}`:fmt(realized), color:G, sub:"lifetime · simulated" },
                 { label:"Fees",      val:`$${fees.toFixed(2)}`, color:GOLD, sub:"total paid" },
               ].map(({ label, val, color, sub }) => (
