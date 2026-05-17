@@ -3,8 +3,11 @@ import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
-import { getUncachableStripeClient } from "../stripeClient.js";
-import { getStripeSync } from "../stripeClient.js";
+import {
+  getUncachableStripeClient,
+  getStripePublishableKey,
+  getStripeSync,
+} from "../stripeClient.js";
 import type { Request } from "express";
 
 // ── Billing routes ────────────────────────────────────────────────────────────
@@ -135,6 +138,21 @@ async function ensureStripeCustomer(userId: string, email: string): Promise<stri
 
   return customer.id;
 }
+
+// ── GET /api/billing/publishable-key ─────────────────────────────────────────
+// Returns the Stripe publishable key matching the current environment
+// (test key in development, live key in production — always from the connector).
+// Safe to call without auth; publishable key is not a secret.
+
+router.get("/billing/publishable-key", async (_req, res): Promise<void> => {
+  try {
+    const publishableKey = await getStripePublishableKey();
+    const mode = publishableKey.startsWith("pk_live_") ? "live" : "test";
+    res.json({ publishableKey, mode });
+  } catch (err) {
+    res.status(503).json({ error: "Stripe connector unavailable" });
+  }
+});
 
 // ── GET /api/billing/plans ────────────────────────────────────────────────────
 // Returns plan metadata + Stripe price IDs (from synced stripe schema).

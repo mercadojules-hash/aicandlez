@@ -55,7 +55,7 @@ async function getCredentials(): Promise<{ secretKey: string; publishableKey: st
 export async function getUncachableStripeClient(): Promise<Stripe> {
   const { secretKey } = await getCredentials();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return new Stripe(secretKey, { apiVersion: "2025-08-27.basil" as any });
+  return new Stripe(secretKey, { apiVersion: "2026-04-22.dahlia" as any });
 }
 
 /** Return publishable key for client-side operations. */
