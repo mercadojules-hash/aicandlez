@@ -1,2 +1,2 @@
-export const PERFORMANCE_FEE_PCT = 2;
+export const PERFORMANCE_FEE_PCT = 3;
 export const PERFORMANCE_FEE_LABEL = `${PERFORMANCE_FEE_PCT}%`;
