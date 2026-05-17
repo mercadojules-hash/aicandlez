@@ -22,6 +22,10 @@ export type WsEventType =
   | "market_data"
   | "signal"
   | "trade_executed"
+  | "position_update"
+  | "portfolio_update"
+  | "scanner_update"
+  | "notification"
   | "system_status"
   | "error";
 
@@ -208,6 +212,49 @@ export function broadcastSystemStatus(status: {
       try { ws.send(msg); } catch { clients.delete(ws); }
     }
   }
+}
+
+export function broadcastNotification(
+  userId: string,
+  notification: {
+    notifType: string;
+    title:     string;
+    message:   string;
+    data?:     Record<string, unknown>;
+  },
+): void {
+  if (clients.size === 0) return;
+  const msg = JSON.stringify({
+    type:      "notification",
+    notifType: notification.notifType,
+    title:     notification.title,
+    message:   notification.message,
+    data:      notification.data ?? null,
+    timestamp: Date.now(),
+  });
+  for (const [ws, client] of clients) {
+    if (ws.readyState === WebSocket.OPEN && client.userId === userId) {
+      try { ws.send(msg); } catch { clients.delete(ws); }
+    }
+  }
+}
+
+export function broadcastToUser(
+  userId:  string,
+  type:    WsEventType,
+  payload: Record<string, unknown>,
+): void {
+  if (clients.size === 0) return;
+  const msg = JSON.stringify({ type, ...payload, timestamp: Date.now() });
+  for (const [ws, client] of clients) {
+    if (ws.readyState === WebSocket.OPEN && client.userId === userId) {
+      try { ws.send(msg); } catch { clients.delete(ws); }
+    }
+  }
+}
+
+export function getConnectedUserIds(): string[] {
+  return Array.from(clients.values()).map((c) => c.userId);
 }
 
 export function getWsStats(): { connected: number } {

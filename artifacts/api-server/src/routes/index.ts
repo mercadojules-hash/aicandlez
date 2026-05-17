@@ -33,6 +33,7 @@ import userExchangesRouter from "./userExchanges.js";
 import billingRouter from "./billing.js";
 import adminAnalyticsRouter from "./adminAnalytics.js";
 import userConsentRouter from "./userConsent.js";
+import pushTokensRouter from "./pushTokens.js";
 
 const router: IRouter = Router();
 
@@ -45,6 +46,7 @@ router.use(userExchangesRouter);
 router.use(billingRouter);
 router.use(adminAnalyticsRouter);
 router.use(userConsentRouter);
+router.use(pushTokensRouter);
 router.use(signalsRouter);
 router.use(tradesRouter);
 router.use(portfolioRouter);

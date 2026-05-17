@@ -1,0 +1,172 @@
+Excellent progress. The landing page, ecosystem architecture, Alpaca integration, and autonomous AI execution are now feeling like a real fintech platform ecosystem.
+
+The direction is exactly correct:
+
+* institutional
+* AI-first
+* premium
+* cinematic
+* real-time
+
+We now want to move into the next major phase:
+
+REAL-TIME INFRASTRUCTURE + DESKTOP TERMINAL EVOLUTION.
+
+PRIORITY 1 — WEBSOCKET UPGRADE
+
+Please begin replacing polling systems with true real-time WebSocket infrastructure where appropriate.
+
+Especially:
+
+* AlertsProvider
+* AI signal feed
+* Trade execution updates
+* position synchronization
+* AI scanner updates
+* live portfolio updates
+
+The platform should begin feeling:
+instant
+alive
+reactive
+institutional
+
+NOT:
+poll-based or delayed.
+
+We want the desktop terminal experience to eventually feel closer to:
+
+* TradingView
+* Bloomberg
+* Hyperliquid
+* institutional crypto terminals
+
+with an AI-first layer.
+
+IMPORTANT:
+Keep architecture scalable and modular.
+
+Please outline:
+
+* recommended websocket architecture
+* user session handling
+* scaling considerations
+* event bus integration
+* reconnect/retry behavior
+* authenticated websocket handling
+
+PRIORITY 2 — NOTIFICATION INFRASTRUCTURE IMPLEMENTATION
+
+Please begin implementing the notification foundation.
+
+FIRST PRIORITY:
+
+* WebSocket live alerts
+* in-app notification center
+* toast alerts
+* AI trade execution notifications
+
+SECOND PRIORITY:
+
+* Expo push token registration
+* mobile push notification infrastructure
+* user_push_tokens table
+* backend notification routing
+
+We want notifications to become a CORE platform feature.
+
+The AI should feel:
+active
+intelligent
+continuously monitoring the market
+
+Examples:
+
+* BUY/SELL execution
+* stop-loss triggers
+* AI confidence spikes
+* opportunity detection
+* volatility/risk alerts
+* portfolio changes
+
+IMPORTANT:
+Keep notification hierarchy intelligent and restrained.
+Premium fintech feel > spam.
+
+PRIORITY 3 — DESKTOP TERMINAL EVOLUTION
+
+The trading dashboard is now evolving into:
+app.aicandlez.com
+
+Please begin planning the next-generation desktop terminal direction.
+
+Future terminal goals:
+
+* multi-panel layouts
+* detachable/resizable panes
+* advanced chart systems
+* persistent watchlists
+* multi-timeframe grids
+* AI heatmaps
+* live AI scanner
+* AI reasoning panels
+* portfolio intelligence
+* execution analytics
+* keyboard shortcuts
+* command palette
+
+IMPORTANT:
+Do NOT attempt to build all of this immediately.
+
+We want:
+strong architecture foundations first.
+
+Focus now on:
+
+* real-time infrastructure
+* notification systems
+* scalability
+* modularity
+* responsiveness
+* stability
+
+NOT:
+feature overload.
+
+PRIORITY 4 — LANDING PAGE CONTINUED POLISH
+
+The landing page direction is excellent.
+
+Continue refining:
+
+* motion depth
+* live market atmosphere
+* cinematic layering
+* AI visualization
+* trust systems
+* mobile app showcase
+* desktop dashboard previews
+
+IMPORTANT:
+Keep the aesthetic:
+premium
+institutional
+restrained
+high-end
+
+Avoid:
+
+* excessive glow
+* gaming aesthetics
+* crypto-scam visuals
+* clutter
+
+We are optimizing for:
+
+* trust
+* sophistication
+* AI intelligence
+* premium fintech positioning
+* long-term scalability
+
+The ecosystem direction is now becoming very strong.

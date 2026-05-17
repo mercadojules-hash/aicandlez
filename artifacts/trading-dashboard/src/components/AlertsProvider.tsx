@@ -1,6 +1,7 @@
 import {
   createContext, useContext, useState, useEffect, useRef, useCallback,
 } from "react";
+import { useAuth } from "@clerk/react";
 import { TrendingUp, TrendingDown, Zap, CheckCircle2, X, Volume2, VolumeX } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -18,6 +19,7 @@ export interface Alert {
 interface AlertsCtx {
   alerts: Alert[];
   soundEnabled: boolean;
+  wsConnected: boolean;
   toggleSound: () => void;
   dismiss: (id: string) => void;
 }
@@ -25,7 +27,7 @@ interface AlertsCtx {
 // ── Context ───────────────────────────────────────────────────────────────────
 
 const Ctx = createContext<AlertsCtx>({
-  alerts: [], soundEnabled: false,
+  alerts: [], soundEnabled: false, wsConnected: false,
   toggleSound: () => {}, dismiss: () => {},
 });
 
@@ -119,8 +121,6 @@ function AlertToast({ alert, onDismiss }: { alert: Alert; onDismiss: () => void 
 }
 
 // ── Trade execution flash banner ───────────────────────────────────────────────
-// Fires only on real trade execution (type === "trade"). Full-viewport, center-
-// screen, impossible to miss. Auto-dismisses after 3.5 s.
 
 interface TradeFlash {
   id: string;
@@ -147,10 +147,7 @@ function TradeFlashBanner({ flash, onDone }: { flash: TradeFlash; onDone: () => 
         transition-all duration-300
         ${phase === "out" ? "opacity-0 scale-105" : phase === "in" ? "opacity-0 scale-95" : "opacity-100 scale-100"}`}
     >
-      {/* backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
-
-      {/* card */}
       <div
         className="relative flex flex-col items-center gap-3 px-10 py-8 rounded-2xl shadow-[0_0_80px_rgba(0,0,0,0.8)] border-2"
         style={{
@@ -159,12 +156,10 @@ function TradeFlashBanner({ flash, onDone }: { flash: TradeFlash; onDone: () => 
           boxShadow: `0 0 60px ${color}50, 0 0 120px ${color}20`,
         }}
       >
-        {/* pulsing ring */}
         <div
           className="absolute inset-0 rounded-2xl animate-ping opacity-20 pointer-events-none"
           style={{ border: `2px solid ${color}` }}
         />
-
         <div className="flex items-center gap-3">
           <Zap className="w-8 h-8" style={{ color }} />
           <span className="text-3xl sm:text-4xl font-black tracking-widest uppercase" style={{ color }}>
@@ -172,22 +167,41 @@ function TradeFlashBanner({ flash, onDone }: { flash: TradeFlash; onDone: () => 
           </span>
           <Zap className="w-8 h-8" style={{ color }} />
         </div>
-
         {sym && (
           <div className="flex items-center gap-2">
-            <div
-              className="px-3 py-1 rounded-lg text-lg font-black tracking-wide"
-              style={{ backgroundColor: color + "25", color }}
-            >
+            <div className="px-3 py-1 rounded-lg text-lg font-black tracking-wide" style={{ backgroundColor: color + "25", color }}>
               {sym}
             </div>
           </div>
         )}
-
-        <div className="text-sm text-white/70 font-mono text-center leading-relaxed">
-          {flash.body}
-        </div>
+        <div className="text-sm text-white/70 font-mono text-center leading-relaxed">{flash.body}</div>
       </div>
+    </div>
+  );
+}
+
+// ── WS connection indicator ───────────────────────────────────────────────────
+
+function WsIndicator({ connected }: { connected: boolean }) {
+  return (
+    <div
+      title={connected ? "Live WebSocket connected" : "Polling (WebSocket disconnected)"}
+      className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono"
+      style={{
+        color:      connected ? "#00ff88" : "#647385",
+        background: connected ? "rgba(0,255,136,0.06)" : "rgba(255,255,255,0.03)",
+        border:     `1px solid ${connected ? "rgba(0,255,136,0.15)" : "rgba(255,255,255,0.06)"}`,
+      }}
+    >
+      <span
+        style={{
+          width: 5, height: 5, borderRadius: "50%",
+          background: connected ? "#00ff88" : "#647385",
+          animation: connected ? "pulse 2s ease-in-out infinite" : "none",
+          display: "inline-block",
+        }}
+      />
+      {connected ? "LIVE" : "POLL"}
     </div>
   );
 }
@@ -210,16 +224,21 @@ interface EngineStatus {
 }
 
 export function AlertsProvider({ children }: { children: React.ReactNode }) {
+  const { getToken, isSignedIn } = useAuth();
+
   const [alerts,       setAlerts]       = useState<Alert[]>([]);
   const [tradeFlash,   setTradeFlash]   = useState<TradeFlash | null>(null);
+  const [wsConnected,  setWsConnected]  = useState(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
     try { return localStorage.getItem(STORAGE_SOUND) !== "false"; } catch { return false; }
   });
 
   const seenIds        = useRef<Set<string>>(new Set());
   const prevTradeCount = useRef<number | null>(null);
+  const wsRef          = useRef<WebSocket | null>(null);
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectDelay = useRef(1000);
 
-  // Restore seen IDs from storage (to survive hot-reload)
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_SEEN);
@@ -243,19 +262,11 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       playBeep(alert.type);
     }
 
-    // For trade execution: show the high-visibility flash banner
     if (alert.type === "trade") {
-      setTradeFlash({
-        id:     alert.id,
-        symbol: alert.symbol,
-        body:   alert.body,
-      });
+      setTradeFlash({ id: alert.id, symbol: alert.symbol, body: alert.body });
     }
 
-    setAlerts((prev) => {
-      const next = [alert, ...prev].slice(0, MAX_VISIBLE);
-      return next;
-    });
+    setAlerts((prev) => [alert, ...prev].slice(0, MAX_VISIBLE));
   }, [soundEnabled]);
 
   const dismiss = useCallback((id: string) => {
@@ -270,7 +281,144 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Poll engine status for new signals / trades
+  // ── WebSocket connection ───────────────────────────────────────────────────
+
+  const connectWs = useCallback(async () => {
+    if (!isSignedIn) return;
+
+    // Clean up existing connection
+    if (wsRef.current) {
+      wsRef.current.onopen = null;
+      wsRef.current.onmessage = null;
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    let token: string | null = null;
+    try {
+      token = await getToken();
+    } catch {
+      return;
+    }
+    if (!token) return;
+
+    const proto   = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const host    = window.location.host;
+    const wsUrl   = `${proto}//${host}/ws?token=${encodeURIComponent(token)}`;
+
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch {
+      return;
+    }
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      setWsConnected(true);
+      reconnectDelay.current = 1000; // reset backoff
+      ws.send(JSON.stringify({ type: "subscribe", symbols: ["BTCUSD", "ETHUSD", "SOLUSD"] }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data as string) as {
+          type: string;
+          symbol?: string;
+          action?: string;
+          confidence?: number;
+          reason?: string;
+          side?: string;
+          price?: number;
+          sizeUSD?: number;
+          id?: string;
+          title?: string;
+          message?: string;
+          timestamp?: number;
+        };
+
+        if (msg.type === "signal" && msg.symbol && msg.action && msg.action !== "HOLD") {
+          const id    = msg.id ?? `ws-sig-${msg.symbol}-${msg.timestamp ?? Date.now()}`;
+          const isBuy = msg.action === "BUY";
+          const sym   = msg.symbol.replace("USD", "");
+          push({
+            id,
+            type:       isBuy ? "buy" : "sell",
+            symbol:     msg.symbol,
+            title:      `${isBuy ? "BUY" : "SELL"} Signal — ${sym}`,
+            body:       msg.reason ?? `${msg.action} signal detected`,
+            confidence: msg.confidence,
+            timestamp:  msg.timestamp ?? Date.now(),
+          });
+        }
+
+        if (msg.type === "trade_executed" && msg.symbol) {
+          const id  = msg.id ?? `ws-trade-${msg.symbol}-${msg.timestamp ?? Date.now()}`;
+          const sym = msg.symbol.replace("USD", "");
+          push({
+            id,
+            type:      "trade",
+            symbol:    msg.symbol,
+            title:     `Trade Executed — ${sym} ${msg.side ?? ""}`,
+            body:      `$${(msg.sizeUSD ?? 0).toFixed(0)} @ $${(msg.price ?? 0).toFixed(2)}`,
+            timestamp: msg.timestamp ?? Date.now(),
+          });
+        }
+
+        if (msg.type === "notification" && msg.title) {
+          const id  = msg.id ?? `ws-notif-${msg.timestamp ?? Date.now()}`;
+          push({
+            id,
+            type:      "mtf",
+            symbol:    "",
+            title:     msg.title,
+            body:      msg.message ?? "",
+            timestamp: msg.timestamp ?? Date.now(),
+          });
+        }
+      } catch {}
+    };
+
+    ws.onclose = (event) => {
+      setWsConnected(false);
+      wsRef.current = null;
+      if (event.code === 4001 || event.code === 4003) return; // auth failure — don't retry
+
+      // Exponential backoff reconnect
+      const delay = Math.min(reconnectDelay.current, 30_000);
+      reconnectDelay.current = Math.min(delay * 2, 30_000);
+      reconnectTimer.current = setTimeout(() => {
+        void connectWs();
+      }, delay);
+    };
+
+    ws.onerror = () => {
+      ws.close();
+    };
+  }, [isSignedIn, getToken, push]);
+
+  // Connect on mount / sign-in
+  useEffect(() => {
+    if (isSignedIn) {
+      void connectWs();
+    }
+    return () => {
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      if (wsRef.current) {
+        wsRef.current.onclose = null;
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [isSignedIn, connectWs]);
+
+  // ── Polling fallback ───────────────────────────────────────────────────────
+  // Runs at 30s (reduced from 8s) as reliability net for signals the WS may miss.
+  // If WS is connected we only poll every 30s; if disconnected, poll every 8s
+  // to maintain responsiveness.
+
   useEffect(() => {
     const poll = async () => {
       try {
@@ -278,12 +426,10 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
         if (!res.ok) return;
         const data: EngineStatus = await res.json();
 
-        // Check recentSignalLog for new BUY/SELL signals (signal alerts only — NOT for executed trades)
         for (const entry of (data.recentSignalLog ?? [])) {
           if (entry.decision === "HOLD") continue;
           if (seenIds.current.has(entry.id)) continue;
 
-          // Signal alert — shows for every non-HOLD signal (with or without execution)
           const isBuy  = entry.decision === "BUY";
           const symLbl = entry.symbol.replace("USD", "");
           push({
@@ -296,7 +442,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
             timestamp:  entry.timestamp,
           });
 
-          // Execution alert — only fires when the signal was actually executed as a trade
           if (entry.executedAs) {
             const tradeAlertId = `trade-${entry.id}`;
             push({
@@ -311,8 +456,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // Fallback: watch raw tradesExecuted counter for increment
-        // (catches trades placed via force-test or manual orders that may not appear in recentSignalLog)
         const tc = data.tradesExecuted ?? 0;
         if (prevTradeCount.current !== null && tc > prevTradeCount.current) {
           const tradeId = `trade-count-${tc}`;
@@ -329,16 +472,15 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     };
 
-    poll(); // immediate
-    const interval = setInterval(poll, 8000);
+    poll();
+    const interval = setInterval(poll, wsConnected ? 30_000 : 8_000);
     return () => clearInterval(interval);
-  }, [push]);
+  }, [push, wsConnected]);
 
   return (
-    <Ctx.Provider value={{ alerts, soundEnabled, toggleSound, dismiss }}>
+    <Ctx.Provider value={{ alerts, soundEnabled, wsConnected, toggleSound, dismiss }}>
       {children}
 
-      {/* High-visibility trade execution flash — center screen, impossible to miss */}
       {tradeFlash && (
         <TradeFlashBanner
           key={tradeFlash.id}
@@ -349,8 +491,8 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
       {/* Toast stack — fixed top-right */}
       <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none w-[320px] max-w-[calc(100vw-2rem)]">
-        {/* Sound toggle button */}
-        <div className="pointer-events-auto flex justify-end mb-1">
+        <div className="pointer-events-auto flex justify-end items-center gap-2 mb-1">
+          <WsIndicator connected={wsConnected} />
           {alerts.length > 0 && (
             <button
               onClick={toggleSound}
@@ -368,7 +510,8 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
       {/* Persistent sound toggle — always visible in corner when no alerts */}
       {alerts.length === 0 && (
-        <div className="fixed bottom-20 right-4 z-[9998]">
+        <div className="fixed bottom-20 right-4 z-[9998] flex flex-col gap-2 items-end">
+          <WsIndicator connected={wsConnected} />
           <button
             onClick={toggleSound}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold bg-card/80 backdrop-blur border border-border/30 text-muted-foreground/60 hover:text-muted-foreground transition-colors shadow"

@@ -12,6 +12,7 @@ import { checkTrailingStops } from "./trailingStopEngine.js";
 import { computeCorrelationMatrix } from "./correlationEngine.js";
 import { addJournalEntry } from "./tradeJournalEngine.js";
 import { sendTradeExecutedSMS } from "./notifications.js";
+import { broadcastSignal, broadcastTrade } from "./wsServer.js";
 import { logger } from "./logger.js";
 
 function genId() { return crypto.randomUUID(); }
@@ -290,6 +291,16 @@ async function persistSignal(
     mtfConfirmed,
   };
 
+  // Broadcast non-HOLD signals in real time to connected WebSocket clients
+  if (decision.decision !== "HOLD") {
+    broadcastSignal({
+      symbol:     decision.symbol,
+      action:     decision.decision,
+      confidence: decision.confidence,
+      reason:     decision.shortSummary,
+    });
+  }
+
   return id;
 }
 
@@ -536,6 +547,14 @@ async function autoExecute(
 
   // SMS fires ONLY after a real trade is confirmed — never for signals, HOLDs, or blocked trades
   void sendTradeExecutedSMS(symbol, side, pos.entryPrice);
+
+  // Broadcast trade execution in real time to connected WebSocket clients
+  broadcastTrade({
+    symbol,
+    side,
+    price:   pos.entryPrice,
+    sizeUSD: sizeUSD,
+  });
 
   return { executed: true, blockReason: null };
 }
