@@ -1,7 +1,7 @@
 services:
   # ── API Backend ──────────────────────────────────────────────────────────────
   - type: web
-    name: apex-trader-api
+    name: aicandlez-api
     env: node
     region: oregon
     plan: starter
@@ -19,7 +19,7 @@ services:
         value: production
       - key: DATABASE_URL
         fromDatabase:
-          name: apex-trader-db
+          name: aicandlez-db
           property: connectionString
       - key: CLERK_SECRET_KEY
         sync: false
@@ -27,14 +27,40 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
-      - key: WEBHOOK_BASE_URL
-        value: https://api.apexdigital.design
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:hello@aicandlez.com
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: KRAKEN_API_KEY
+        sync: false
+      - key: KRAKEN_API_SECRET
+        sync: false
+      - key: BINANCE_API_KEY
+        sync: false
+      - key: BINANCE_API_SECRET
+        sync: false
+      - key: COINBASE_API_KEY
+        sync: false
+      - key: COINBASE_API_SECRET
+        sync: false
+      - key: CRYPTOCOM_API_KEY
+        sync: false
+      - key: CRYPTOCOM_API_SECRET
+        sync: false
       - key: ALLOWED_ORIGINS
-        value: https://app.apexdigital.design,https://apexdigital.design
+        value: https://aicandlez.com,https://www.aicandlez.com,https://app.aicandlez.com
+      - key: EXCHANGE_LIVE_ENABLED
+        value: "false"
 
-  # ── Dashboard Frontend (static) ───────────────────────────────────────────────
+  # ── Trading Dashboard / Desktop Terminal (static) ────────────────────────────
   - type: web
-    name: apex-trader-dashboard
+    name: aicandlez-dashboard
     env: static
     region: oregon
     plan: starter
@@ -53,6 +79,9 @@ services:
       - path: /*
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()
     routes:
       - type: rewrite
         source: /*
@@ -60,10 +89,71 @@ services:
     envVars:
       - key: VITE_CLERK_PUBLISHABLE_KEY
         sync: false
+      - key: VITE_VAPID_PUBLIC_KEY
+        sync: false
       - key: VITE_API_BASE_URL
-        value: https://api.apexdigital.design
+        value: https://api.aicandlez.com
+      - key: VITE_WS_URL
+        value: wss://api.aicandlez.com/ws
+
+  # ── Mobile PWA (static) ──────────────────────────────────────────────────────
+  - type: web
+    name: aicandlez-app
+    env: static
+    region: oregon
+    plan: starter
+    buildCommand: >
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @workspace/apex-trader-app run build
+    staticPublishPath: artifacts/apex-trader-app/dist
+    autoDeploy: true
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /sw.js
+        name: Service-Worker-Allowed
+        value: /
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: VITE_VAPID_PUBLIC_KEY
+        sync: false
+      - key: VITE_API_BASE_URL
+        value: https://api.aicandlez.com
+
+  # ── Marketing Landing (static) ───────────────────────────────────────────────
+  - type: web
+    name: aicandlez-landing
+    env: static
+    region: oregon
+    plan: starter
+    buildCommand: >
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @workspace/landing run build
+    staticPublishPath: artifacts/landing/dist
+    autoDeploy: true
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_APP_URL
+        value: https://app.aicandlez.com
 
 databases:
-  - name: apex-trader-db
+  - name: aicandlez-db
     plan: starter
     region: oregon
+    databaseName: aicandlez

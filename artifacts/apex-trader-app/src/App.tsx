@@ -12,6 +12,7 @@ import { AIAutoTradeProvider }             from "@/contexts/AIAutoTradeContext";
 import { UserProfileProvider }             from "@/contexts/UserProfileContext";
 import { TradingAccountOnboardingModal }   from "@/components/TradingAccountOnboardingModal";
 import { AlpacaAutoTrader }               from "@/components/AlpacaAutoTrader";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import Home      from "@/pages/Home";
 import Trade     from "@/pages/Trade";
 import Markets   from "@/pages/Markets";
@@ -165,6 +166,12 @@ function Pages() {
   );
 }
 
+// ── Service worker + push registration (renders nothing) ──────────────────────
+function SwRegistrar() {
+  usePushNotifications();
+  return null;
+}
+
 // ── Mobile shell ───────────────────────────────────────────────────────────────
 function Shell() {
   return (
@@ -183,6 +190,7 @@ function Shell() {
         <SubscriptionModal />
         <TradingAccountOnboardingModal />
         <AlpacaAutoTrader />
+        <SwRegistrar />
       </SubscriptionProvider>
     </BrokerConnectionProvider>
     </AIAutoTradeProvider>

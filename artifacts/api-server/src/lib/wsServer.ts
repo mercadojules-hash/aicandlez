@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import type { Server } from "http";
 import { verifyToken } from "@clerk/backend";
 import { logger } from "./logger.js";
+import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
 
 // ── Client registry ───────────────────────────────────────────────────────────
 
@@ -223,7 +224,6 @@ export function broadcastNotification(
     data?:     Record<string, unknown>;
   },
 ): void {
-  if (clients.size === 0) return;
   const msg = JSON.stringify({
     type:      "notification",
     notifType: notification.notifType,
@@ -232,10 +232,22 @@ export function broadcastNotification(
     data:      notification.data ?? null,
     timestamp: Date.now(),
   });
+
+  let deliveredViaWs = false;
   for (const [ws, client] of clients) {
     if (ws.readyState === WebSocket.OPEN && client.userId === userId) {
-      try { ws.send(msg); } catch { clients.delete(ws); }
+      try { ws.send(msg); deliveredViaWs = true; } catch { clients.delete(ws); }
     }
+  }
+
+  // User is offline — send push notification as fallback
+  if (!deliveredViaWs) {
+    NotificationDispatcher.sendToUser(userId, {
+      title:     notification.title,
+      body:      notification.message,
+      notifType: notification.notifType as "signal" | "trade" | "risk" | "system" | "general",
+      data:      notification.data,
+    }).catch((err) => logger.warn({ err, userId }, "wsServer: offline push fallback failed"));
   }
 }
 

@@ -1,250 +1,298 @@
-# Apex Trader — Production Deployment Guide
+# AICandlez — Production Deployment Guide
 
-## Architecture
+> Last updated: May 2026
+
+## Platform Architecture
 
 ```
-apexdigital.design          → Marketing / WordPress
-app.apexdigital.design      → Dashboard (React + Vite, static)
-api.apexdigital.design      → API + WebSocket (Express + Node.js)
+aicandlez.com            → Landing (static Vite — artifacts/landing)
+app.aicandlez.com        → Operator console / desktop terminal (artifacts/trading-dashboard)
+app.aicandlez.com/…pwa   → Mobile PWA (artifacts/apex-trader-app)
+api.aicandlez.com        → Express API + WebSocket (artifacts/api-server)
+auth.aicandlez.com       → Clerk auth proxy (optional)
 ```
-
-The platform is a pnpm monorepo. The API server and dashboard are deployed as separate services.
 
 ---
 
-## Quick Start (Render — Recommended)
+## 1. DNS Records
 
-Render has native monorepo support and a free managed PostgreSQL tier.
+Configure at your DNS provider (Cloudflare recommended — use Full Strict SSL mode):
 
-### 1. Fork / push to GitHub
+### Root domain
+```
+@          A        <server-ip>           ; or CNAME to Replit/Render URL
+www        CNAME    aicandlez.com
+```
 
-Push this repository to a GitHub account accessible to your Render workspace.
+### Subdomains
+```
+app        CNAME    <replit-deploy-url>   ; trading dashboard + PWA
+api        CNAME    <api-server-url>      ; REST + WebSocket
+auth       CNAME    <clerk-proxy-url>     ; optional Clerk proxy
+```
 
-### 2. Create a new Render Blueprint
+### Email / Verification
+```
+@          TXT      "v=spf1 include:sendgrid.net ~all"
+@          TXT      "google-site-verification=<code>"
+```
 
-1. Go to **render.com → New → Blueprint**
-2. Point it at your repository root
-3. Render reads `render.yaml` automatically — it will provision:
-   - `apex-trader-api` — Node.js web service (API + WebSocket)
-   - `apex-trader-dashboard` — Static site (React dashboard)
-   - `apex-trader-db` — PostgreSQL database
-
-### 3. Set secret environment variables
-
-In the Render dashboard, set the following on the `apex-trader-api` service:
-
-| Variable | Value |
-|---|---|
-| `CLERK_SECRET_KEY` | Your Clerk secret key (`sk_live_...`) |
-| `CLERK_PUBLISHABLE_KEY` | Your Clerk publishable key (`pk_live_...`) |
-| `VAULT_MASTER_KEY` | 32+ char random secret (never change after first deploy) |
-| `STRIPE_SECRET_KEY` | Your Stripe secret key (optional — billing) |
-
-On the `apex-trader-dashboard` service:
-
-| Variable | Value |
-|---|---|
-| `VITE_CLERK_PUBLISHABLE_KEY` | Your Clerk publishable key |
-
-`DATABASE_URL`, `SESSION_SECRET`, and `WEBHOOK_BASE_URL` are pre-configured in `render.yaml`.
-
-### 4. Deploy
-
-Click **Apply** — Render runs the build and start commands automatically.
-
-Health check: `GET https://api.apexdigital.design/api/healthz`
+### Cloudflare settings
+- SSL mode: **Full (strict)**
+- Enable **HSTS** under SSL/TLS → Edge Certificates
+- Enable **Always Use HTTPS**
+- WebSocket proxying: enabled by default in Cloudflare
 
 ---
 
-## Quick Start (Railway)
+## 2. Environment Variables
 
-### 1. Create a new Railway project
+### API Server (api.aicandlez.com)
+```env
+NODE_ENV=production
+PORT=8080
+DATABASE_URL=postgresql://user:pass@host/aicandlez
 
+# Clerk (production instance — pk_live_ / sk_live_)
+CLERK_SECRET_KEY=sk_live_...
+CLERK_PUBLISHABLE_KEY=pk_live_...
+
+# CORS
+ALLOWED_ORIGINS=https://aicandlez.com,https://www.aicandlez.com,https://app.aicandlez.com
+
+# Session
+SESSION_SECRET=<64-char-random-hex>
+
+# Push Notifications — generate with:
+#   node -e "const wp=require('web-push'); const k=wp.generateVAPIDKeys(); console.log(k)"
+VAPID_PUBLIC_KEY=<base64url-public-key>
+VAPID_PRIVATE_KEY=<base64url-private-key>
+VAPID_SUBJECT=mailto:hello@aicandlez.com
+
+# Exchange APIs (only needed for LIVE mode)
+KRAKEN_API_KEY=...
+KRAKEN_API_SECRET=...
+BINANCE_API_KEY=...
+BINANCE_API_SECRET=...
+COINBASE_API_KEY=...
+COINBASE_API_SECRET=...
+CRYPTOCOM_API_KEY=...
+CRYPTOCOM_API_SECRET=...
+
+# Stripe (live keys)
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID_MONTHLY=price_...
+STRIPE_PRICE_ID_ANNUAL=price_...
+
+# Feature flags
+EXCHANGE_LIVE_ENABLED=true
+```
+
+### Trading Dashboard / Operator Console (app.aicandlez.com)
+```env
+VITE_CLERK_PUBLISHABLE_KEY=pk_live_...
+VITE_CLERK_PROXY_URL=https://auth.aicandlez.com
+VITE_API_BASE_URL=https://api.aicandlez.com
+VITE_WS_URL=wss://api.aicandlez.com/ws
+VITE_VAPID_PUBLIC_KEY=<same as VAPID_PUBLIC_KEY above>
+```
+
+### Mobile PWA (apex-trader-app, served under app.aicandlez.com)
+```env
+VITE_CLERK_PUBLISHABLE_KEY=pk_live_...
+VITE_API_BASE_URL=https://api.aicandlez.com
+VITE_VAPID_PUBLIC_KEY=<same as VAPID_PUBLIC_KEY above>
+```
+
+### Landing (aicandlez.com)
+```env
+VITE_APP_URL=https://app.aicandlez.com
+VITE_PWA_URL=https://app.aicandlez.com/apex-trader-app/
+```
+
+---
+
+## 3. Clerk Production Setup
+
+### 3a. Switch to production instance
+1. In Clerk dashboard, create a **Production** instance (separate from dev)
+2. Update all `CLERK_*` env vars to `pk_live_` and `sk_live_` prefixes
+3. The app is provisioned at: `app_3DeE2sfuhHWTY73M9jlbRCKabFx` (dev)
+
+### 3b. Allowed origins
+Add these in Clerk Dashboard → Domains:
+```
+https://aicandlez.com
+https://www.aicandlez.com
+https://app.aicandlez.com
+https://api.aicandlez.com
+```
+
+### 3c. Redirect URLs
+```
+Sign-in success:   https://app.aicandlez.com/command
+Sign-up success:   https://app.aicandlez.com/command
+After sign-out:    https://aicandlez.com/
+```
+
+### 3d. Cross-subdomain sessions
+- Configure `domain: .aicandlez.com` in Clerk session settings
+- This allows `app.aicandlez.com` and `api.aicandlez.com` to share one session cookie
+- Enables "sign in once, access all surfaces" (mobile, desktop, API)
+
+### 3e. OAuth providers (optional)
+- Google OAuth: configure callback as `https://app.aicandlez.com/sign-in/sso-callback`
+- Apple Sign In (for TestFlight): requires Apple Developer Program + OAuth app
+
+---
+
+## 4. Push Notification Setup
+
+### 4a. VAPID key generation (one-time setup)
 ```bash
-railway login
-railway init
+node -e "
+const wp = require('web-push');
+const keys = wp.generateVAPIDKeys();
+console.log('VAPID_PUBLIC_KEY=' + keys.publicKey);
+console.log('VAPID_PRIVATE_KEY=' + keys.privateKey);
+"
 ```
 
-Or create via the Railway dashboard and link your GitHub repo.
+Store both keys as environment secrets. The public key also needs to be set as `VITE_VAPID_PUBLIC_KEY` in all frontend builds.
 
-### 2. Add a PostgreSQL plugin
+### 4b. Web Push flow
+1. User signs in → service worker registers at `BASE_URL/sw.js`
+2. User grants notification permission → browser creates push subscription
+3. Subscription JSON sent to `POST /api/user/push-token` (stored in `user_push_tokens`)
+4. API server sends pushes via `NotificationDispatcher.sendToUser(userId, payload)`
+5. Service worker receives push → shows OS notification
 
-In your Railway project → **New → Database → PostgreSQL**.
-Railway automatically sets `DATABASE_URL` in your service environment.
-
-### 3. Configure services
-
-Railway reads `railway.json` and `nixpacks.toml` from the repo root.
-
-Set these environment variables in Railway:
-
-| Variable | Value |
-|---|---|
-| `NODE_ENV` | `production` |
-| `CLERK_SECRET_KEY` | `sk_live_...` |
-| `CLERK_PUBLISHABLE_KEY` | `pk_live_...` |
-| `SESSION_SECRET` | 64-char random string |
-| `VAULT_MASTER_KEY` | 32-char random string |
-| `WEBHOOK_BASE_URL` | `https://api.apexdigital.design` |
-| `EXCHANGE_LIVE_ENABLED` | `false` (enable only when ready) |
-
-### 4. Deploy
-
-```bash
-railway up
-```
+### 4c. Expo Push (future — native TestFlight build)
+1. Enroll in Apple Developer Program ($99/year)
+2. Create App ID: `com.aicandlez.app`
+3. Enable push notification entitlement
+4. Configure `eas.json` for EAS Build
+5. Build: `eas build --platform ios --profile production`
+6. Submit: `eas submit --platform ios`
 
 ---
 
-## Custom Domain Setup
+## 5. Render.com Deployment
 
-### DNS Records (add at your DNS provider)
-
-```
-# API backend
-api.apexdigital.design   CNAME   your-render-service.onrender.com
-                    OR   CNAME   your-railway-service.up.railway.app
-
-# Dashboard frontend
-app.apexdigital.design   CNAME   your-render-static-site.onrender.com
-                    OR   CNAME   your-railway-frontend.up.railway.app
+Deploy all services from `render.yaml`:
+```bash
+render deploy --yaml render.yaml
 ```
 
-Both Render and Railway provide free TLS via Let's Encrypt — no manual SSL cert needed.
-
-### Clerk domain configuration
-
-In your Clerk dashboard:
-1. Go to **Domains** → add `app.apexdigital.design`
-2. Update **Redirect URLs** to include `https://app.apexdigital.design`
-3. Update **Sign-in URL** to `https://app.apexdigital.design/sign-in`
-
-### Stripe webhook configuration
-
-After deploying, update the Stripe webhook endpoint:
-1. Stripe Dashboard → **Webhooks → Edit**
-2. Set endpoint URL to `https://api.apexdigital.design/api/stripe/webhook`
-3. Or set `WEBHOOK_BASE_URL=https://api.apexdigital.design` — the server registers it automatically on startup.
+Services:
+| Service               | Type    | Domain                  |
+|-----------------------|---------|-------------------------|
+| `aicandlez-api`       | Web     | api.aicandlez.com       |
+| `aicandlez-dashboard` | Static  | app.aicandlez.com       |
+| `aicandlez-landing`   | Static  | aicandlez.com           |
+| `aicandlez-db`        | DB      | internal                |
 
 ---
 
-## Build Commands Reference
+## 6. Replit Deployment (Current)
 
+1. Click **Deploy** in the Replit workspace
+2. Each artifact auto-maps to its `previewPath`
+3. Add custom domains in Replit project settings → Deployments → Custom Domain
+4. Replit provisions Let's Encrypt TLS automatically for `.replit.app` and custom domains
+
+---
+
+## 7. Database Migrations
+
+Migrations run automatically on API server start. To run manually:
 ```bash
-# Full build (all libs + API server bundle)
-pnpm install --frozen-lockfile
-pnpm run typecheck:libs
-pnpm --filter @workspace/api-server run build
-
-# Database migrations (run before starting the server)
 pnpm --filter @workspace/api-server run migrate
-
-# Start the production server
-pnpm --filter @workspace/api-server run start
-
-# Build the dashboard (static files → artifacts/trading-dashboard/dist/)
-pnpm --filter @workspace/trading-dashboard run build
 ```
 
+Schema tables:
+| Table                       | Purpose                          |
+|-----------------------------|----------------------------------|
+| `users`                     | Clerk user registry              |
+| `user_settings`             | Per-user AI/risk/notification prefs |
+| `user_push_tokens`          | Push notification subscriptions  |
+| `user_exchange_connections` | Encrypted exchange API keys      |
+| `user_notifications`        | In-app notification inbox        |
+| `sim_accounts`              | Paper trading balances           |
+| `sim_positions`             | Open paper positions             |
+| `sim_trades`                | Closed paper trade history       |
+
 ---
 
-## WebSocket Connection
+## 8. Pre-Deployment Checklist
 
-The API server exposes a WebSocket endpoint at `/ws` on the same port as the HTTP API.
+### Code
+- [ ] `pnpm run typecheck` passes (zero errors)
+- [ ] No `console.log` in server code (use `req.log` / `logger`)
+- [ ] No hardcoded dev credentials
 
-**Mobile app / external clients:**
+### Auth
+- [ ] Clerk production instance keys (`pk_live_`, `sk_live_`)
+- [ ] Redirect URLs updated for production domains
+- [ ] Cross-subdomain session cookie configured
 
+### Security  
+- [ ] `NODE_ENV=production` on all server services
+- [ ] `ALLOWED_ORIGINS` locked to production domains only
+- [ ] VAPID keys generated and stored as secrets (not in code)
+- [ ] `EXCHANGE_LIVE_ENABLED=true` only after security review
+- [ ] Database not publicly accessible (connection string only via env)
+
+### Push Notifications
+- [ ] VAPID keys generated and set in env
+- [ ] `VITE_VAPID_PUBLIC_KEY` set in all frontend builds
+- [ ] Service worker accessible at `/sw.js` from PWA scope
+- [ ] Notification permission prompt tested on iOS Safari and Chrome
+
+### PWA / Mobile
+- [ ] `manifest.json` `start_url` and `scope` correct for production path
+- [ ] Icons present: 192x192 and 512x512 maskable
+- [ ] `apple-mobile-web-app-title` = "AICandlez"
+- [ ] PWA install prompt appears on Chrome/Safari
+
+### SEO
+- [ ] Landing title: "AICandlez — Institutional-Grade AI Trading"
+- [ ] All OG / Twitter card meta tags complete
+- [ ] `robots.txt` allows crawling
+- [ ] Google Search Console property verified
+
+### Stripe
+- [ ] Live keys active (not `sk_test_`)
+- [ ] Webhook endpoint registered: `https://api.aicandlez.com/api/stripe/webhook`
+- [ ] `STRIPE_WEBHOOK_SECRET` set from Stripe dashboard
+
+### TestFlight
+- [ ] Apple Developer Program enrolled
+- [ ] App ID: `com.aicandlez.app` created
+- [ ] Push notification entitlement enabled in App ID
+- [ ] Privacy policy URL: `https://aicandlez.com` (linked in footer)
+- [ ] `eas.json` configured for production profile
+
+---
+
+## 9. Post-Deploy Verification
+
+```bash
+# API health
+curl https://api.aicandlez.com/api/healthz | jq .
+
+# WebSocket
+wscat -c wss://api.aicandlez.com/ws
+
+# PWA manifest
+curl https://app.aicandlez.com/apex-trader-app/manifest.json | jq .
+
+# CORS preflight
+curl -H "Origin: https://app.aicandlez.com" \
+     -H "Access-Control-Request-Method: POST" \
+     -X OPTIONS https://api.aicandlez.com/api/auth/me -v 2>&1 | grep "access-control"
+
+# Push token API (requires auth token)
+curl -H "Authorization: Bearer $TOKEN" https://api.aicandlez.com/api/user/push-tokens
 ```
-wss://api.apexdigital.design/ws?token=<clerk_jwt>
-```
-
-Pass the Clerk session JWT as a query parameter. The server verifies it before accepting the connection.
-
-**Supported events (server → client):**
-
-| Event | Payload |
-|---|---|
-| `connected` | `{ userId, subscriptions[] }` |
-| `market_data` | `{ symbol, price, volume, timestamp }` |
-| `signal` | `{ symbol, action, confidence, reason, timestamp }` |
-| `trade_executed` | `{ symbol, side, price, sizeUSD, timestamp }` |
-| `system_status` | `{ killSwitch, autoMode, uptime, timestamp }` |
-| `pong` | `{ timestamp }` |
-
-**Supported events (client → server):**
-
-| Event | Payload |
-|---|---|
-| `ping` | `{}` |
-| `subscribe` | `{ symbols: ["BTCUSD", "ETHUSD"] }` |
-| `unsubscribe` | `{ symbols: ["SOLUSD"] }` |
-
-Default subscriptions on connect: `BTCUSD`, `ETHUSD`, `SOLUSD`.
-
----
-
-## Health Checks
-
-| Endpoint | Description |
-|---|---|
-| `GET /api/healthz` | Full status: DB ping, WS count, uptime |
-| `GET /api/livez` | Lightweight liveness probe (no DB call) |
-
-Both return HTTP 200 when healthy, 503 when degraded.
-
----
-
-## Environment Variables Reference
-
-See `.env.example` for the full list with descriptions.
-
-**Required in production:**
-
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `CLERK_SECRET_KEY` | Clerk server-side secret |
-| `CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
-| `SESSION_SECRET` | Session signing secret (min 32 chars) |
-| `VAULT_MASTER_KEY` | AES-256 vault master key (min 32 chars) |
-| `WEBHOOK_BASE_URL` | Public API base URL for Stripe webhook |
-
-**Optional but recommended:**
-
-| Variable | Description |
-|---|---|
-| `STRIPE_SECRET_KEY` | Stripe billing (auto-set by Replit integration) |
-| `EXCHANGE_LIVE_ENABLED` | `true` to unlock live trading (default: `false`) |
-| `KRAKEN_API_KEY` / `KRAKEN_API_SECRET` | Live Kraken trading |
-
----
-
-## Production Checklist
-
-- [ ] `DATABASE_URL` set and database is reachable
-- [ ] `CLERK_SECRET_KEY` and `CLERK_PUBLISHABLE_KEY` set
-- [ ] `SESSION_SECRET` is a random 64-char string (never the example value)
-- [ ] `VAULT_MASTER_KEY` is a random 32-char string (never change after first use)
-- [ ] `WEBHOOK_BASE_URL` points to production API domain
-- [ ] `EXCHANGE_LIVE_ENABLED=false` (enable deliberately when ready)
-- [ ] Clerk dashboard: production domain added, redirect URLs updated
-- [ ] Stripe webhook endpoint updated to `https://api.apexdigital.design/api/stripe/webhook`
-- [ ] DNS records propagated (`api.*` and `app.*` subdomains)
-- [ ] TLS active on both subdomains
-- [ ] `GET /api/healthz` returns `{ "status": "ok", "db": { "status": "ok" } }`
-- [ ] WebSocket connection test: `wscat -c "wss://api.apexdigital.design/ws?token=<jwt>"`
-- [ ] Sign-in flow works on `app.apexdigital.design`
-- [ ] Billing page loads and Stripe Checkout opens
-- [ ] `EXCHANGE_LIVE_ENABLED` left `false` until full production sign-off
-
----
-
-## Mobile App Connectivity (Phase 6)
-
-The mobile app (Expo / React Native) will connect to:
-
-- **REST API:** `https://api.apexdigital.design/api`
-- **WebSocket:** `wss://api.apexdigital.design/ws?token=<clerk_jwt>`
-- **Auth:** Clerk Bearer token (obtained via `@clerk/expo`)
-
-No localhost references — the mobile app requires the production API to be live.

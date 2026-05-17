@@ -6,7 +6,7 @@ const router: IRouter = Router();
 
 const DIST_DIR    = import.meta.dirname;
 const NATURA_ZIP  = path.resolve(DIST_DIR, "natura-ai.zip");
-const PROD_ZIP    = path.resolve(DIST_DIR, "apex-trader-production.zip");
+const PROD_ZIP    = path.resolve(DIST_DIR, "aicandlez-production.zip");
 
 router.get("/download-zip", (_req, res) => {
   if (!fs.existsSync(NATURA_ZIP)) {
@@ -26,7 +26,7 @@ router.get("/download-production", (_req, res) => {
     res.status(503).json({ error: "Production ZIP not yet built — run a fresh build" });
     return;
   }
-  res.download(PROD_ZIP, "apex-trader-production.zip", (err) => {
+  res.download(PROD_ZIP, "aicandlez-production.zip", (err) => {
     if (err && !res.headersSent) {
       res.status(500).json({ error: "Download failed", detail: String(err) });
     }

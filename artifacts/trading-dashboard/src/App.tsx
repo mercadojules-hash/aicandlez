@@ -43,6 +43,7 @@ import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
 import Leaderboard from "@/pages/Leaderboard";
 import AlertsPage from "@/pages/Alerts";
+import DesktopTerminal from "@/pages/DesktopTerminal";
 
 // ── Env ───────────────────────────────────────────────────────────────────────
 
@@ -329,6 +330,9 @@ function Router() {
       </Route>
       <Route path="/alerts">
         <Protected><AlertsPage /></Protected>
+      </Route>
+      <Route path="/desktop">
+        <Protected><DesktopTerminal /></Protected>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>

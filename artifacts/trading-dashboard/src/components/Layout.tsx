@@ -38,6 +38,7 @@ import {
   Users,
   Wallet,
   X,
+  Monitor,
   Zap,
 } from "lucide-react";
 
@@ -61,6 +62,7 @@ export const MODULE_LIST = [
   { id: 17, path: "/debug",       icon: Bug,               label: "Signal Debug",        group: "SYS",   status: "active",  sublabel: "MTF funnel, signal quality filters" },
   { id: 18, path: "/charts",      icon: BarChart2,         label: "Multi-Asset Chart",   group: "TRADE", status: "active",  sublabel: "BTC/ETH/SOL side-by-side, EMA9/21"  },
   { id: 19, path: "/command",     icon: Cpu,               label: "Command Center",      group: "SYS",   status: "active",  sublabel: "Unified one-screen trading view"    },
+  { id: 20, path: "/desktop",     icon: Monitor,           label: "Desktop Terminal",    group: "SYS",   status: "active",  sublabel: "Power-user multi-panel trading view"},
 ];
 
 /* Group accent colors */
@@ -463,7 +465,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {!collap && (
         <div className="px-2 py-1.5 border-t shrink-0" style={{ borderTopColor: "#0E2030" }}>
           <a
-            href="/apex-trader-operator-console-v5.zip"
+            href="/aicandlez-operator-console-v5.zip"
             download
             className="flex items-center gap-2 px-2 py-1.5 rounded text-[9px] font-mono font-medium border border-transparent transition-colors"
             style={{ color: "#3a5a70" }}

@@ -34,6 +34,7 @@ import billingRouter from "./billing.js";
 import adminAnalyticsRouter from "./adminAnalytics.js";
 import userConsentRouter from "./userConsent.js";
 import pushTokensRouter from "./pushTokens.js";
+import internalNotifyRouter from "./internalNotify.js";
 
 const router: IRouter = Router();
 
@@ -47,6 +48,7 @@ router.use(billingRouter);
 router.use(adminAnalyticsRouter);
 router.use(userConsentRouter);
 router.use(pushTokensRouter);
+router.use(internalNotifyRouter);
 router.use(signalsRouter);
 router.use(tradesRouter);
 router.use(portfolioRouter);

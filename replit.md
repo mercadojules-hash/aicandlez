@@ -17,6 +17,49 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Build**: esbuild (CJS bundle)
 - **Auth**: Replit-managed Clerk (httpOnly cookie on web, Bearer for mobile)
 
+## Phase 4 — Production Deployment Foundation (COMPLETE)
+
+### Push Notification Infrastructure
+- **VAPID keys** generated and stored as shared env vars (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VITE_VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`)
+- **Service worker** at `artifacts/apex-trader-app/public/sw.js` — handles push events, notification click with action buttons, OS-native display with urgency levels
+- **`usePushNotifications` hook** at `artifacts/apex-trader-app/src/hooks/usePushNotifications.ts` — Web Push subscription registration, SW auto-register on sign-in, graceful `unsupported` fallback
+- **`SwRegistrar` component** wired into `apex-trader-app/App.tsx` Shell — registers SW and subscribes to push automatically when user signs in
+- **`NotificationDispatcher`** at `artifacts/api-server/src/services/notifications/NotificationDispatcher.ts` — VAPID web push sender, expired subscription cleanup, `signalAlert` + `tradeAlert` helpers
+- **Offline push fallback** in `wsServer.ts` — if user has no active WS connection, `broadcastNotification` now triggers a push notification instead of silently dropping it
+- **`POST /api/user/notify`** — auth-gated route to dispatch test push notifications to signed-in user
+- **`web-push` + `@types/web-push`** installed on `api-server`
+
+### Desktop Terminal (Module 20)
+- New page `artifacts/trading-dashboard/src/pages/DesktopTerminal.tsx` at `/desktop`
+- Power-user multi-panel layout: live ticker bar (BTC/ETH/SOL), Signal Feed widget, Position Monitor, AI Brief, Risk Monitor, Event Log
+- Each widget has maximize/minimize toggle for focus mode
+- WebSocket hook for real-time signal delivery; polls all data sources every 30s
+- Added to `MODULE_LIST` as module 20 (`Monitor` icon, SYS group) in sidebar
+- Auth-protected route in trading-dashboard App.tsx
+
+### Production Deployment Architecture
+- **`DEPLOYMENT.md`** — complete domain map, DNS records, SSL config, Clerk production setup, push notification setup, Render deploy, Replit deploy, database migrations, pre-deploy checklist, post-deploy verification
+- **`.env.production.example`** — all env vars for all four services (api-server, trading-dashboard, apex-trader-app, landing)
+- **`render.yaml`** — updated with AICandlez branding, 4 services (aicandlez-api, aicandlez-dashboard, aicandlez-app, aicandlez-landing), VAPID env var placeholders, all exchange API keys, security headers
+- **CORS** — already locked to `aicandlez.com`, `app.aicandlez.com`, `api.aicandlez.com`
+
+### Production Readiness Audit (T005)
+- Zero remaining "Apex Trader" / "apexdigital" visible text across all TypeScript/TSX source files
+- Download route: `apex-trader-production.zip` → `aicandlez-production.zip`
+- Sidebar download link: `apex-trader-operator-console-v5.zip` → `aicandlez-operator-console-v5.zip`
+- All three typechecks pass: `api-server`, `trading-dashboard`, `apex-trader-app`
+
+**Key files (Phase 4):**
+- `artifacts/apex-trader-app/public/sw.js` — Web Push service worker
+- `artifacts/apex-trader-app/src/hooks/usePushNotifications.ts` — push subscription hook
+- `artifacts/api-server/src/services/notifications/NotificationDispatcher.ts` — VAPID push sender
+- `artifacts/api-server/src/routes/internalNotify.ts` — `POST /api/user/notify` test route
+- `artifacts/api-server/src/lib/wsServer.ts` — offline push fallback in `broadcastNotification`
+- `artifacts/trading-dashboard/src/pages/DesktopTerminal.tsx` — Module 20 power-user page
+- `DEPLOYMENT.md` — full production deployment guide
+- `.env.production.example` — production env var template
+- `render.yaml` — updated multi-service deploy config
+
 ## Phase 3 — Exchange Connection Management (COMPLETE)
 
 Each user can connect their own exchange accounts with encrypted API key storage.
