@@ -25,6 +25,7 @@ import {
   generateSimulatedPrice,
   calculatePnL,
 } from "../lib/trading.js";
+import { requireAuth } from "../middlewares/requireAuth.js";
 
 const router = Router();
 
@@ -61,17 +62,17 @@ router.get("/engine/status", (_req, res) => {
   });
 });
 
-router.post("/engine/start", (_req, res) => {
+router.post("/engine/start", requireAuth, (_req, res) => {
   startTradingLoop();
   res.json({ started: true, message: "Trading loop started" });
 });
 
-router.post("/engine/stop", (_req, res) => {
+router.post("/engine/stop", requireAuth, (_req, res) => {
   stopTradingLoop();
   res.json({ stopped: true, message: "Trading loop stopped" });
 });
 
-router.post("/engine/testmode", (req, res) => {
+router.post("/engine/testmode", requireAuth, (req, res) => {
   const { enabled } = req.body ?? {};
   if (typeof enabled !== "boolean") {
     res.status(400).json({ error: "body must include { enabled: boolean }" });
@@ -86,7 +87,7 @@ router.post("/engine/testmode", (req, res) => {
   });
 });
 
-router.post("/engine/filters", (req, res) => {
+router.post("/engine/filters", requireAuth, (req, res) => {
   const body = req.body ?? {};
   let changed = false;
 
@@ -128,7 +129,7 @@ const EXCHANGE_ID_TO_ADAPTER: Record<string, string> = {
 // ── POST /engine/exchange-mode ────────────────────────────────────────────────
 // Unified exchange switcher. body: { mode: "simulation" | "kraken" | "coinbase" | ... }
 // "simulation" → paper trading.  Any exchange name → live mode on that exchange.
-router.post("/engine/exchange-mode", (req, res) => {
+router.post("/engine/exchange-mode", requireAuth, (req, res) => {
   const { mode } = (req.body ?? {}) as { mode?: string };
   if (!mode || typeof mode !== "string") {
     res.status(400).json({ error: 'body must include { mode: "simulation" | "<exchange>" }' });
@@ -168,7 +169,7 @@ router.post("/engine/exchange-mode", (req, res) => {
 // ── POST /engine/close-all-positions ─────────────────────────────────────────
 // Bulk-closes every open trade in tradesTable (simulated exit price + PnL) and
 // clears the in-memory simulationEngine positions so the funnel unblocks.
-router.post("/engine/close-all-positions", async (_req, res) => {
+router.post("/engine/close-all-positions", requireAuth, async (_req, res) => {
   // Fetch all open trades
   const openTrades = await db
     .select()
@@ -207,7 +208,7 @@ router.post("/engine/close-all-positions", async (_req, res) => {
 // Uses the same insert pattern as POST /api/trades.
 // Does NOT go through placeOrder() — no simulation balance deducted.
 // Mode is always "test". Safe: no real orders placed.
-router.post("/engine/force-test-trades", async (_req, res) => {
+router.post("/engine/force-test-trades", requireAuth, async (_req, res) => {
   // ── Config ──
   const SYMBOLS: Array<"BTCUSD" | "ETHUSD" | "SOLUSD"> = ["BTCUSD", "ETHUSD", "SOLUSD"];
   const SIDES:   Array<"BUY" | "SELL">                  = ["BUY", "SELL"];

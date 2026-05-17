@@ -14,6 +14,7 @@ import {
   type OrderType,
   type ExchangeMode,
 } from "../lib/exchangeEngine.js";
+import { requireAuth } from "../middlewares/requireAuth.js";
 
 const router = Router();
 
@@ -45,7 +46,7 @@ router.get("/exchange/balances", async (_req, res) => {
 });
 
 // ── Set mode ──────────────────────────────────────────────────────────────────
-router.post("/exchange/mode", (req, res) => {
+router.post("/exchange/mode", requireAuth, (req, res) => {
   const { mode } = req.body as { mode: ExchangeMode };
   if (mode !== "simulation" && mode !== "live") {
     res.status(400).json({ error: "mode must be 'simulation' or 'live'" });
@@ -60,19 +61,19 @@ router.post("/exchange/mode", (req, res) => {
 });
 
 // ── Kill switch ───────────────────────────────────────────────────────────────
-router.post("/exchange/kill", (_req, res) => {
+router.post("/exchange/kill", requireAuth, (_req, res) => {
   const active = toggleKillSwitch();
   res.json({ killSwitch: active, status: getExchangeStatus() });
 });
 
 // ── Pause ─────────────────────────────────────────────────────────────────────
-router.post("/exchange/pause", (_req, res) => {
+router.post("/exchange/pause", requireAuth, (_req, res) => {
   const paused = togglePause();
   res.json({ paused, status: getExchangeStatus() });
 });
 
 // ── Reset simulation balances ─────────────────────────────────────────────────
-router.post("/exchange/sim/reset", (_req, res) => {
+router.post("/exchange/sim/reset", requireAuth, (_req, res) => {
   const balances = resetSimBalances();
   res.json({ balances, status: getExchangeStatus() });
 });
@@ -100,7 +101,7 @@ router.post("/exchange/order/preview", async (req, res) => {
 });
 
 // ── Execute order ─────────────────────────────────────────────────────────────
-router.post("/exchange/order/execute", async (req, res) => {
+router.post("/exchange/order/execute", requireAuth, async (req, res) => {
   const { symbol, side, orderType, amountUSD, limitPrice } = req.body as {
     symbol:     string;
     side:       OrderSide;
@@ -122,7 +123,7 @@ router.post("/exchange/order/execute", async (req, res) => {
 });
 
 // ── Select exchange (UI label) ─────────────────────────────────────────────────
-router.post("/exchange/select", (req, res) => {
+router.post("/exchange/select", requireAuth, (req, res) => {
   const { name } = req.body as { name: string };
   if (!name || typeof name !== "string") {
     res.status(400).json({ error: "name is required" });
