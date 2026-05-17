@@ -121,7 +121,7 @@ function RequiresSubscriptionScreen() {
         border: "1px solid #0d2035", borderRadius: 6 }}>
         <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50",
           letterSpacing: "0.08em", lineHeight: 1.6 }}>
-          7-Day Free AI Paper Trading Trial. Observe the AI and practice risk-free
+          7-Day Free AI Paper Trading Trial. Observe the AI and practice with virtual capital — no real money is used
           before unlocking live AI trading.
         </div>
       </div>

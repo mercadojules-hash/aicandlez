@@ -494,11 +494,6 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   const backRoute = type === "equity" ? "/equities" : "/markets";
   const asset  = ASSET_DB[sym];
 
-  // Mount-time log retained for QA (lightweight — no overlay, no verification spam)
-  useEffect(() => {
-    console.log("[AssetDetail] mounted →", { sym, type });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Feedback auto-dismiss is owned by <ExecutionFeedback> itself.
 
   // ── Paper-trade execution mutation ───────────────────────────────────────────
@@ -521,14 +516,12 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
       const notional = 1000;
       // BTC → BTC/USD for Alpaca crypto; equities (TSLA, AAPL…) stay bare
       const alpacaSymbol = type === "crypto" ? `${sym}/USD` : sym;
-      console.log("[ai-exec] dispatch", { symbol: alpacaSymbol, side, notional, type });
       const res = await fetch("/api/exchange/alpaca/order", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ symbol: alpacaSymbol, side: side.toLowerCase(), notional }),
       });
       const body = await res.json().catch(() => ({}));
-      console.log("[ai-exec] response", { status: res.status, body });
       if (!res.ok) {
         const err = (body as { error?: string }).error ?? `HTTP ${res.status}`;
         throw new Error(err);
@@ -536,7 +529,6 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
       return body as AlpacaOrderResp;
     },
     onSuccess: (order, side) => {
-      console.log("[ai-exec] paper order placed", order);
       // Refresh every screen that shows positions/orders
       void queryClient.invalidateQueries({ queryKey: ["mobile-portfolio"] });
       void queryClient.invalidateQueries({ queryKey: ["sim-account"] });
@@ -619,7 +611,6 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   const mtf1D = conf > 65;
 
   const handleExec = (type2: "buy"|"sell"|"auto") => {
-    console.log("[ai-exec] click", { type: type2, sym });
     if (type2 === "auto") { setAutoActiveCtx(!autoActive); return; }
     if (orderMutation.isPending || executing) return;
     setExecuting(type2);
@@ -629,7 +620,6 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   };
 
   const navigateToAsset = (rsym: string, rtype: string) => {
-    console.log("[related-card] navigate →", rsym, rtype);
     // Path-based route → wouter mounts a fresh AssetDetail (keyed on `${type}:${sym}` in App.tsx).
     // No state mutation here; the remount handles all symbol-specific state cleanly.
     setLocation(`/asset/${rtype}/${rsym.toUpperCase()}`);

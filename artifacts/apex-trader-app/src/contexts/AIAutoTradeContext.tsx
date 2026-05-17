@@ -30,11 +30,7 @@ export function AIAutoTradeProvider({ children }: { children: ReactNode }) {
     if (v) {
       void fetch("/api/exchange/alpaca/activate", { method: "POST" })
         .then(r => r.ok ? r.json() as Promise<AlpacaActivateResult> : null)
-        .then(data => {
-          if (data?.ok) {
-            console.debug("[AIAutoTrade] Alpaca activated — equity:", data.equity);
-          }
-        })
+        .then(() => { /* Alpaca activated (or unavailable) — no client-side action needed */ })
         .catch(() => { /* credentials may not be set — silently ignore */ });
     }
   };

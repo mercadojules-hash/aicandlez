@@ -57,10 +57,7 @@ export function AlpacaAutoTrader() {
         });
 
         if (orderRes.ok) {
-          const order = (await orderRes.json()) as { id: string; symbol: string; side: string; status: string };
-          console.info(
-            `[AlpacaAutoTrader] Paper order placed — ${order.side} ${order.symbol} ($${ORDER_NOTIONAL}) | status: ${order.status}`
-          );
+          await orderRes.json();
         } else {
           const err = (await orderRes.json().catch(() => ({}))) as { error?: string };
           console.warn("[AlpacaAutoTrader] Order failed:", err.error ?? `HTTP ${orderRes.status}`);

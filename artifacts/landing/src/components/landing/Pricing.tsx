@@ -71,7 +71,7 @@ export function Pricing() {
               </span>
             </div>
             <p style={{ color: "#647385", fontSize: 14, marginBottom: 28, lineHeight: 1.6 }}>
-              Practice with $100,000 of simulated capital. Full AI engine, all signals, all features — risk-free.
+              Practice with $100,000 of simulated capital. Full AI engine, all signals, all features — paper-trading only, no real money involved.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }}>
               {[

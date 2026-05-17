@@ -1,0 +1,120 @@
+The platform is now entering launch-hardening and App Store readiness mode.
+
+We are no longer prioritizing new major features. The focus now is:
+
+* production stability
+* mobile polish
+* App Store/TestFlight readiness
+* Google Play readiness
+* performance
+* trust
+* deployment preparation
+
+Current state:
+
+* AI Buy/Sell execution works
+* Alpaca paper trading connected
+* cinematic execution feedback works
+* institutional chart redesign completed
+* portfolio synchronization fixed
+* navigation stable overall
+* major runtime issues resolved
+
+Now I want a final production-prep sweep.
+
+Priority tasks:
+
+1. Production Build Readiness
+
+* verify clean production builds for iOS + Android
+* remove remaining dev-only logs
+* remove unused imports/components
+* verify no runtime overlays
+* verify no TypeScript warnings/errors
+* verify no hydration issues
+* verify no broken mobile navigation states
+
+2. Mobile Performance Pass
+
+* audit re-renders
+* reduce unnecessary animation overhead
+* reduce excessive glow/shadow repaints
+* verify smooth scrolling on lower-end devices
+* optimize chart rendering performance
+* verify no memory leaks during long sessions
+* verify websocket/event cleanup on unmount
+
+3. App Store / Google Play Compliance Pass
+   Review wording and flows for:
+
+* “paper trading”
+* “AI trading”
+* “simulated execution”
+* financial disclaimers
+* risk disclosures
+
+Avoid anything implying:
+
+* guaranteed profits
+* financial promises
+* autonomous wealth generation
+
+The app should clearly communicate:
+
+* educational analytics
+* simulated/paper trading
+* AI-assisted market insights
+
+4. Final UI Consistency Audit
+   Check:
+
+* spacing consistency
+* typography scaling
+* bottom nav spacing
+* overflow handling
+* safe-area handling
+* loading states
+* empty states
+* animation timing consistency
+* dark mode consistency
+* status bar appearance
+
+5. TestFlight / Play Internal Testing Preparation
+   Prepare app for:
+
+* internal testing
+* screenshot generation
+* demo recording
+* App Store previews
+* investor demos
+
+Need:
+
+* believable telemetry
+* stable live states
+* visually polished flows
+* no fake-feeling inconsistencies
+
+6. Build + Deployment Preparation
+   Prepare:
+
+* EAS production configuration
+* environment separation (dev/staging/prod)
+* production API URLs
+* secure env handling
+* release-ready configs
+* app icons/splash verification
+* production bundle cleanup
+
+7. Final Deliverables
+   Once complete, provide:
+
+* production readiness report
+* remaining blocker list
+* App Store risk warnings
+* Google Play risk warnings
+* recommended next deployment sequence
+* TestFlight checklist
+* production build checklist
+
+We are now transitioning from rapid prototyping into launch preparation and deployment architecture.

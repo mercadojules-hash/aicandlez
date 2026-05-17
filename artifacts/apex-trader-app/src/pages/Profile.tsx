@@ -692,7 +692,7 @@ export default function Profile() {
             />
             <AIToggle
               label="Paper Trading Mode"
-              sub="Simulate trades risk-free with virtual capital"
+              sub="Simulate trades with virtual capital — no real money involved"
               value={profile.paperMode}
               onChange={v => updateProfile({ paperMode: v })}
               divider={false}
@@ -761,7 +761,6 @@ export default function Profile() {
             <button
               onClick={() => {
                 const next = !profile.notifications;
-                console.log("[push-toggle] click → next:", next, "supported:", pushNotifs.supported, "permission:", pushNotifs.permission);
                 updateProfile({ notifications: next });
                 if (pushNotifs.supported && pushNotifs.permission !== "denied") {
                   if (next) void pushNotifs.subscribe();

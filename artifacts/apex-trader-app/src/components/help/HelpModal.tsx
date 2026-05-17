@@ -157,7 +157,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                   <li>Trades execute against real market prices</li>
                   <li>Profits and losses are simulated only</li>
                   <li>Cannot withdraw simulated profits</li>
-                  <li>Safe to test AI strategies risk-free</li>
+                  <li>Test AI strategies with virtual capital — no real money involved</li>
                 </ul>
               </div>
               <div style={{ background:"rgba(0,255,136,0.05)", border:"1px solid rgba(0,255,136,0.15)",
