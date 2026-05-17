@@ -123,7 +123,7 @@ export function SubscriptionModal() {
           </div>
           <div style={{ fontSize: 10, fontFamily: SANS,
             color: "rgba(255,180,0,0.78)", marginBottom: 16 }}>
-            + 2% performance fee on profitable closed trades
+            + 3% performance fee on profitable closed trades
           </div>
 
           {/* Trial note */}

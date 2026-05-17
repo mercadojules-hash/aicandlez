@@ -195,7 +195,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                   Always trade within your risk tolerance.
                 </p>
                 <p style={{ margin:0 }}>
-                  A 2% performance fee applies only to profitable closed trades.
+                  A 3% performance fee applies only to profitable closed trades.
                   No fee is charged on losing trades or unrealized P&L.
                 </p>
               </div>

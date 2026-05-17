@@ -774,7 +774,17 @@ export default function Trade() {
               scrollBehavior:"smooth",
               WebkitOverflowScrolling:"touch",
             }}>
-              {history.map(t => <TradeRow key={t.id} trade={t}/>)}
+              {history.length === 0 ? (
+                <div style={{
+                  padding:"32px 16px", textAlign:"center",
+                  fontFamily:SANS, fontSize:11, color:"rgba(255,255,255,0.45)",
+                  letterSpacing:"0.04em",
+                }}>
+                  No closed trades yet — your AI trade history will appear here.
+                </div>
+              ) : (
+                history.map(t => <TradeRow key={t.id} trade={t}/>)
+              )}
             </div>
             {/* Bottom fade */}
             <div style={{

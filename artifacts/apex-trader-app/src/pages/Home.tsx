@@ -906,7 +906,7 @@ export default function Home() {
                 </div>
                 {[
                   { icon:"◈", text:"$5.99 / month platform fee",          color:C  },
-                  { icon:"◈", text:"2% on profitable closed trades only",  color:C  },
+                  { icon:"◈", text:"3% on profitable closed trades only",  color:C  },
                   { icon:"◉", text:"Zero fee on losing trades — ever",     color:G  },
                   { icon:"◉", text:"Paper trading remains free forever",    color:G  },
                   { icon:"◉", text:"Cancel anytime — no lock-in",          color:G  },
