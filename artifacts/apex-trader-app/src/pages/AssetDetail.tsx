@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
@@ -632,20 +633,26 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   return (
     <div className="page-enter" style={{ background:BG, minHeight:"100%", paddingBottom:40 }}>
 
-      {/* ── Toast (execution feedback) ───────────────────────────────────────── */}
-      {toast && (
-        <div role="status" aria-live="polite" style={{
-          position:"fixed", top:14, left:"50%", transform:"translateX(-50%)", zIndex:1000,
-          padding:"11px 16px", borderRadius:12, maxWidth:"calc(100% - 32px)",
-          background: toast.kind === "success" ? "rgba(0,40,20,0.92)" : "rgba(40,0,12,0.92)",
-          border: `1px solid ${toast.kind === "success" ? "rgba(0,255,136,0.45)" : "rgba(255,51,85,0.50)"}`,
-          color: toast.kind === "success" ? "rgba(0,255,136,0.95)" : "rgba(255,140,150,0.95)",
+      {/* ── Toast (execution feedback) ─────────────────────────────────────────
+           Rendered via portal to <body> so `position:fixed` escapes the
+           transformed .page-enter containing block (otherwise it's invisible).
+       */}
+      {toast && typeof document !== "undefined" && createPortal(
+        <div role="status" aria-live="polite" onClick={() => setToast(null)} style={{
+          position:"fixed", top:20, left:"50%", transform:"translateX(-50%)", zIndex:2147483647,
+          padding:"14px 20px", borderRadius:14, maxWidth:"min(440px, calc(100vw - 32px))",
+          background: toast.kind === "success" ? "rgba(0,40,20,0.96)" : "rgba(40,0,12,0.96)",
+          border: `1.5px solid ${toast.kind === "success" ? "rgba(0,255,136,0.55)" : "rgba(255,51,85,0.60)"}`,
+          color: toast.kind === "success" ? "rgba(0,255,136,0.98)" : "rgba(255,150,160,0.98)",
           fontFamily: SANS, fontSize: 12, fontWeight: 600, letterSpacing: "0.02em",
-          boxShadow: "0 10px 40px rgba(0,0,0,0.6)",
-          backdropFilter: "blur(20px)",
+          boxShadow: "0 12px 50px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)",
+          backdropFilter: "blur(24px)",
+          cursor:"pointer",
+          animation: "apex-spin 0s",  // forces compositor layer
         }}>
-          {toast.kind === "success" ? "✓ " : "⚠ "}{toast.msg}
-        </div>
+          {toast.msg}
+        </div>,
+        document.body,
       )}
 
       {/* ── Sticky header ────────────────────────────────────────────────────── */}
