@@ -33,6 +33,11 @@ const ESUB = "rgba(255,255,255,0.04)";
 function fmt(n: number) {
   return Math.abs(n) >= 1_000 ? `$${(n/1_000).toFixed(1)}K` : `$${n.toFixed(2)}`;
 }
+// Precise dollars w/ thousands separators — used for the hero portfolio value
+// so it matches the BrokerStatusCard exactly (no lossy "K" rounding).
+function fmtPrecise(n: number) {
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 function planColor(p: string) {
   if (p.includes("active")||p.includes("paid")||p.includes("live")) return G;
   return C;
@@ -658,15 +663,18 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Big balance */}
+            {/* Big balance — precise dollars (matches BrokerStatusCard exactly
+                when an Alpaca account is connected). Auto-shrinks at higher
+                magnitudes so 7-digit equities don't overflow on mobile. */}
             <div style={{
-              fontSize:52, fontWeight:800, color:W,
+              fontSize: tv >= 1_000_000 ? 38 : tv >= 100_000 ? 44 : 52,
+              fontWeight:800, color:W,
               fontFamily:"'SF Pro Display','Inter','Helvetica Neue',system-ui,-apple-system,sans-serif",
               letterSpacing:"-0.03em", lineHeight:1,
               animation:"num-pop 0.6s ease-out both",
               textShadow:`0 0 40px rgba(255,255,255,0.06)`,
             }}>
-              {fmt(tv)}
+              {fmtPrecise(tv)}
             </div>
 
             {/* PnL row */}
