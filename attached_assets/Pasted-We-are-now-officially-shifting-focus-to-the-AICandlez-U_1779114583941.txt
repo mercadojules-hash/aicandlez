@@ -1,0 +1,177 @@
+We are now officially shifting focus to the **AICandlez USER DESKTOP DASHBOARD** experience.
+
+This is NOT the mobile UI anymore.
+This should feel like a professional institutional AI trading workstation — Bloomberg Terminal meets TradingView meets AI hedge fund.
+
+The overall visual identity should remain:
+
+* matte black backgrounds
+* neon green glow accents
+* cinematic AI atmosphere
+* dense professional data
+* premium fintech feel
+* minimal empty space
+* high information density without clutter
+
+IMPORTANT:
+The layout structure below is VERY intentional. Please follow it exactly.
+
+==================================================
+DESKTOP DASHBOARD LAYOUT STRUCTURE
+==================================
+
+## TOP LEVEL (FULL WIDTH):
+
+A full-width live Bloomberg/TradingView-style chart row spanning horizontally across the top of the dashboard.
+
+Requirements:
+
+* multiple live mini charts going across
+* animated/live movement
+* BTC, ETH, SOL, NVDA, TSLA, SPY etc.
+* glowing green/red price movement
+* smooth institutional look
+* should immediately feel “live”
+* charts should NOT look frozen/static
+* black backgrounds inside chart containers
+* subtle neon glow only (reduce excessive blur/glow)
+
+This top row is the “market heartbeat” of the platform.
+
+==================================================
+
+## SECOND LEVEL:
+
+LEFT SIDE:
+ACTIVE POSITIONS PANEL
+
+RIGHT SIDE:
+CLOSED POSITIONS / TRADE HISTORY PANEL
+
+These should sit side-by-side on the same row.
+
+ACTIVE POSITIONS PANEL:
+
+* live open trades
+* pnl
+* entry
+* stop loss
+* take profit
+* AI confidence
+* trailing stop status
+* live updating
+* long + short positions
+* ability to pause/close
+
+CLOSED POSITIONS PANEL:
+
+* recently closed trades
+* realized pnl
+* timestamps
+* AI execution summary
+* win/loss indicators
+* green/red profitability
+* scrollable history
+
+Both panels should feel like a hedge fund terminal.
+
+==================================================
+
+## THIRD LEVEL:
+
+LEFT SIDE:
+TOP 20 CRYPTO SIGNALS
+
+RIGHT SIDE:
+TOP 20 EQUITY SIGNALS
+
+These are the centerpiece data sections.
+
+CRYPTO PANEL:
+
+* BTC
+* ETH
+* SOL
+* XRP
+* ADA
+* AVAX
+* etc.
+
+EQUITIES PANEL:
+
+* NVDA
+* TSLA
+* AAPL
+* MSFT
+* META
+* AMD
+* etc.
+
+VERY IMPORTANT:
+These sections MUST support BOTH:
+
+* LONG trades
+* SHORT trades
+
+The UI should visually distinguish:
+
+* long = green bullish styling
+* short = red bearish styling
+
+Each signal row should include:
+
+* ticker
+* mini chart
+* AI confidence %
+* entry
+* stop loss
+* take profit
+* BUY / SELL buttons
+* AI Auto Trade button
+* live pnl movement
+* signal type (scalp / swing / momentum / breakout etc.)
+
+The screenshots attached are ONLY for visual inspiration and styling direction.
+
+==================================================
+CRITICAL DESIGN RULES
+=====================
+
+* NO large empty black containers
+* NO washed out gray containers
+* all inner containers should remain black
+* prioritize readability
+* increase font visibility where needed
+* avoid tiny text
+* premium cinematic fintech feel
+* maintain responsive desktop spacing
+* use subtle motion/animation
+* make dashboard feel “alive”
+
+==================================================
+OVERALL GOAL
+============
+
+The user should feel:
+“I am operating an institutional AI trading system.”
+
+NOT:
+“I am using a generic crypto dashboard.”
+
+This should feel like:
+
+* Bloomberg Terminal
+* AI hedge fund software
+* institutional trading workstation
+* advanced AI execution platform
+
+Focus heavily on:
+
+* hierarchy
+* spacing
+* alignment
+* premium feel
+* data density
+* live activity
+* execution intelligence
+* visual sophistication
