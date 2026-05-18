@@ -1,0 +1,174 @@
+This is NOT what we asked for.
+
+You built a promotional landing section instead of the actual functional AI Signals experience.
+
+The Signals page is supposed to be:
+• data-heavy
+• alive
+• signal-driven
+• content-rich
+• institutional
+• interactive
+
+Right now there is too much EMPTY SPACE and not enough REAL SIGNAL CONTENT.
+
+The page should immediately show:
+TOP 10 LIVE AI SIGNALS.
+
+NOT marketing banners.
+
+---
+
+## REMOVE / REDUCE
+
+Reduce or remove:
+• giant hero spacing
+• large empty black areas
+• oversized promotional copy
+• marketing-style layout
+
+This is an APP SCREEN.
+Not a landing page.
+
+---
+
+## WHAT THE SCREEN SHOULD ACTUALLY SHOW
+
+The Signals page should instantly display:
+
+• Top 10 AI signals
+• Real crypto icons
+• Real equities icons
+• AI confidence %
+• Strong Buy / Buy / Sell
+• Entry zone
+• Take profit
+• Stop loss
+• Live mini charts
+• LONG / SHORT
+• timestamps
+• signal cards
+• glowing confidence indicators
+
+The reference image already shows EXACTLY what the structure should look like.
+
+Follow it closely.
+
+---
+
+## TOP TABS
+
+The tabs should be:
+
+• Active Signals
+• Crypto
+• Equities
+
+NOT promotional sections.
+
+---
+
+## ACTIVE SIGNALS TAB
+
+This tab should display:
+TOP 10 BEST SIGNALS RIGHT NOW
+
+Examples:
+• BTC
+• ETH
+• SOL
+• ADA
+• AVAX
+• TSLA
+• NVDA
+• AAPL
+• META
+• AMZN
+
+The screen should feel:
+• busy
+• alive
+• scanning
+• high activity
+• premium institutional AI
+
+---
+
+## EVERY SIGNAL CARD MUST INCLUDE
+
+• Real asset icon/logo
+• Asset name
+• LONG or SHORT
+• Swing trade / Position trade / Scalp
+• Live price
+• 24h %
+• AI Confidence %
+• STRONG BUY / BUY / SELL
+• Entry Zone
+• Take Profit
+• Stop Loss
+• Mini animated chart
+• timestamp
+
+---
+
+## VERY IMPORTANT
+
+The signal cards themselves ARE the content.
+
+The page should be FILLED with them.
+
+No huge empty promotional areas.
+
+The reference screenshot already demonstrates the correct density and layout.
+
+---
+
+## CLICKABLE CARDS
+
+Every asset card MUST navigate to:
+FULL ASSET PROFILE PAGE
+
+Examples:
+• BTC profile
+• ETH profile
+• TSLA profile
+
+---
+
+## ASSET PROFILE PAGE
+
+The asset profile page should contain:
+
+• Large live chart
+• AI insight section
+• Confidence ring
+• Bullish/Bearish state
+• Buy button
+• Sell button
+• LARGE glowing AI AUTO TRADE button underneath
+
+This page should feel:
+• cinematic
+• powerful
+• institutional
+• futuristic
+
+---
+
+## FINAL DIRECTION
+
+The app should now feel like:
+“An AI trading operating system.”
+
+NOT:
+“A landing page with promo banners.”
+
+Reduce empty space.
+Increase real trading intelligence content.
+Increase signal density.
+Increase interaction.
+Increase realism.
+
+The attached reference screenshots are the target layout.
+Follow them closely.

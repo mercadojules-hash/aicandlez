@@ -3,8 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { api, type MobileSignalsResponse, type MobileTickersResponse, type SignalBreakdown } from "@/lib/api";
 import { CryptoIcon, SYM_LABEL, SYM_SHORT } from "@/components/CryptoIcon";
-import { EquityIcon, EQUITY_NAME, SUPPORTED_EQUITIES } from "@/components/EquityIcon";
-import logoMaster from "@/assets/aicandlez-logo-master.png";
+import { EquityIcon, EQUITY_NAME } from "@/components/EquityIcon";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const BG          = "#000000";
@@ -256,6 +255,57 @@ function CinematicBackground() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Equity preview signals — deterministic, day-seeded. Until the real AI
+// equity engine is wired to a live backend, the Equities tab + the mixed
+// Active feed surface these as preview rows. Each card is tagged isPreview
+// so the visual is honest. Values are stable for the day (idempotent).
+// ═══════════════════════════════════════════════════════════════════════════
+function makeEqRng(seed: string) {
+  let s = 5381;
+  for (let i = 0; i < seed.length; i++) s = (((s<<5)+s) ^ seed.charCodeAt(i)) >>> 0;
+  return () => { s ^= s<<13; s ^= s>>17; s ^= s<<5; return ((s>>>0)/0xffffffff); };
+}
+
+type PreviewRow = {
+  breakdown: SignalBreakdown;
+  ticker:    { price: number; changePercent24h: number; up: boolean };
+};
+
+const EQUITY_BASES: Array<{ sym: string; base: number }> = [
+  { sym: "TSLA", base: 182.50 },
+  { sym: "NVDA", base: 138.40 },
+  { sym: "AAPL", base: 189.40 },
+  { sym: "META", base: 512.80 },
+  { sym: "AMZN", base: 184.60 },
+  { sym: "MSFT", base: 414.20 },
+];
+
+function makeEquityPreviews(): PreviewRow[] {
+  const d = new Date();
+  const seed = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+  return EQUITY_BASES.map((e) => {
+    const rng = makeEqRng(`${seed}-${e.sym}`);
+    const r1 = rng(), r2 = rng(), r3 = rng(), r4 = rng();
+    const action = r1 > 0.78 ? "SELL" : r1 > 0.12 ? "BUY" : "HOLD";
+    const confidence = Math.round(58 + r2 * 36);
+    const changePct  = (r3 - 0.42) * 5.5;
+    const price      = e.base * (1 + (r3 - 0.5) * 0.05);
+    return {
+      breakdown: {
+        symbol: e.sym, action, confidence,
+        mtfConfirmed:    r4 > 0.35,
+        volumeConfirmed: r4 > 0.55,
+        marketCondition: r1 > 0.55 ? "TRENDING" : "RANGING",
+        trend1H:         r2 > 0.6 ? "BULLISH" : r2 > 0.3 ? "BEARISH" : "NEUTRAL",
+        blockReason:     null,
+        lastUpdated:     Date.now() - Math.round(r1 * 4200) * 1000,
+      },
+      ticker: { price, changePercent24h: changePct, up: changePct >= 0 },
+    };
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN — AI Signals page
 // ═══════════════════════════════════════════════════════════════════════════
 type TabKey = "active" | "crypto" | "equities";
@@ -290,19 +340,39 @@ export default function AISignals() {
     return m;
   }, [tickersQ.data]);
 
-  // Build active signals list: only actionable BUY/SELL from real engine, joined
-  // with real ticker price. Anything without a price is excluded (no fakes).
-  // Active = top-N highest-conviction signals (ranked by confidence).
+  // Equity preview rows — stable per day.
+  const equityPreviews = useMemo(() => makeEquityPreviews(), []);
+
+  // Active = TOP 10 mixed (real crypto BUY/SELL + equity BUY/SELL preview),
+  // ranked by AI confidence. Density-first: matches institutional feed style.
   const activeSignals = useMemo(() => {
     const breakdowns = signalsQ.data?.breakdowns ?? {};
-    return Object.values(breakdowns)
+    const crypto = Object.values(breakdowns)
       .filter(b => {
         const a = b.action.toUpperCase();
         return (a === "BUY" || a === "SELL") && !!tickerBySym[b.symbol];
       })
-      .sort((a, b) => b.confidence - a.confidence)
+      .map(b => ({
+        kind: "crypto" as const,
+        breakdown: b,
+        ticker: tickerBySym[b.symbol]!,
+        isPreview: false,
+      }));
+    const equity = equityPreviews
+      .filter(p => p.breakdown.action !== "HOLD")
+      .map(p => ({
+        kind: "equity" as const,
+        breakdown: p.breakdown,
+        ticker: p.ticker,
+        isPreview: true,
+      }));
+    return [...crypto, ...equity]
+      .sort((a, b) =>
+        (b.breakdown.confidence - a.breakdown.confidence) ||
+        a.breakdown.symbol.localeCompare(b.breakdown.symbol)
+      )
       .slice(0, 10);
-  }, [signalsQ.data, tickerBySym]);
+  }, [signalsQ.data, tickerBySym, equityPreviews]);
 
   // Crypto tab = ALL crypto signals (BUY/SELL/HOLD) ranked by confidence.
   // Real data only — any breakdown missing a live ticker is excluded.
@@ -310,8 +380,19 @@ export default function AISignals() {
     const breakdowns = signalsQ.data?.breakdowns ?? {};
     return Object.values(breakdowns)
       .filter(b => !!tickerBySym[b.symbol])
-      .sort((a, b) => b.confidence - a.confidence);
+      .sort((a, b) =>
+        (b.confidence - a.confidence) ||
+        a.symbol.localeCompare(b.symbol)
+      );
   }, [signalsQ.data, tickerBySym]);
+
+  // Equities tab = all 6 preview rows ranked by confidence.
+  const equitySignals = useMemo(() =>
+    [...equityPreviews].sort((a, b) =>
+      (b.breakdown.confidence - a.breakdown.confidence) ||
+      a.breakdown.symbol.localeCompare(b.breakdown.symbol)
+    ),
+    [equityPreviews]);
 
   const loading = signalsQ.isLoading || tickersQ.isLoading;
 
@@ -323,100 +404,59 @@ export default function AISignals() {
       <CinematicBackground/>
 
       <div style={{ position: "relative", zIndex: 1 }}>
-        {/* ═══════════════════════════════════════════════════════════════ */}
-        {/* HERO HEADER — large glowing logo + tagline                       */}
-        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* COMPACT HEADER — institutional, signal-first. No marketing hero. */}
         <div style={{
-          position: "relative", padding: "20px 16px 12px",
-          textAlign: "center",
+          padding: "14px 16px 8px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          {/* logo glow under-layer */}
-          <div style={{
-            position: "absolute", top: 12, left: "50%",
-            transform: "translateX(-50%)",
-            width: 240, height: 90,
-            background: `radial-gradient(ellipse, ${BRAND_GLOW} 0%, transparent 70%)`,
-            filter: "blur(20px)", pointerEvents: "none",
-            animation: "orb-breathe 5s ease-in-out infinite",
-          }}/>
-          <img src={logoMaster} alt="AICandlez"
-            style={{
-              position: "relative",
-              height: 44, maxWidth: "70%", objectFit: "contain",
-              filter: `drop-shadow(0 0 18px ${BRAND_GLOW}) drop-shadow(0 4px 22px rgba(0,200,83,0.45))`,
-            }}/>
-          <div style={{
-            marginTop: 14,
-            fontSize: 24, fontFamily: SANS, fontWeight: 800,
-            letterSpacing: -0.8, lineHeight: 1.15, color: TEXT,
-          }}>
-            AI Signals.<br/>
-            <span style={{
-              background: `linear-gradient(135deg, ${BRAND} 0%, ${BRAND_BRGT} 100%)`,
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              backgroundClip: "text", filter: `drop-shadow(0 0 14px ${BRAND_GLOW})`,
-            }}>Smarter Decisions.</span>
-          </div>
-
-          {/* Feature pills — three quick-trust indicators */}
-          <div style={{
-            marginTop: 14, display: "flex", justifyContent: "center", gap: 12,
-            padding: "0 4px", flexWrap: "wrap",
-          }}>
-            <FeaturePill icon={IconCrosshair} title="High Accuracy"
-              subtitle="Proven AI · historical performance"/>
-            <FeaturePill icon={IconBolt}      title="Real-Time Alerts"
-              subtitle="High-probability setups"/>
-            <FeaturePill icon={IconChart}     title="Actionable"
-              subtitle="Entry · targets · risk"/>
-          </div>
-
-          {/* Title row with filter / settings */}
-          <div style={{
-            marginTop: 22, display: "flex", alignItems: "center",
-            justifyContent: "space-between", padding: "0 4px",
-          }}>
-            <span style={{
-              fontSize: 22, fontFamily: SANS, fontWeight: 800,
-              letterSpacing: -0.5, color: TEXT,
-              textShadow: `0 0 18px ${BRAND_BLOOM}`,
-            }}>AI Signals</span>
-            <div style={{ display: "flex", gap: 8 }}>
-              <IconButton aria-label="Filter">{IconFilter}</IconButton>
-              <IconButton aria-label="Settings" onClick={() => setLocation("/profile")}>
-                {IconSettings}
-              </IconButton>
+          <div>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 7,
+              fontSize: 9, fontFamily: SANS, fontWeight: 800,
+              color: BRAND, letterSpacing: 1.6, textTransform: "uppercase",
+            }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: "50%", background: BRAND,
+                boxShadow: `0 0 10px ${BRAND_GLOW}`,
+                animation: "dot-pulse 1.6s ease-in-out infinite",
+              }}/>
+              Live · Scanning 24/7
             </div>
+            <div style={{
+              marginTop: 3, fontSize: 22, fontFamily: SANS, fontWeight: 800,
+              letterSpacing: -0.6, color: TEXT,
+              textShadow: `0 0 14px ${BRAND_BLOOM}`,
+            }}>AI Signals</div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <IconButton aria-label="Filter">{IconFilter}</IconButton>
+            <IconButton aria-label="Settings" onClick={() => setLocation("/profile")}>
+              {IconSettings}
+            </IconButton>
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════ */}
-        {/* TAB BAR — Active / Watchlist / History                           */}
-        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* Tab bar — Active / Crypto / Equities */}
         <div style={{
-          margin: "4px 16px 16px",
+          margin: "4px 16px 12px",
           display: "flex", gap: 4, padding: 4, borderRadius: 999,
           background: "rgba(255,255,255,0.03)",
           border: `1px solid ${BORDER}`,
         }}>
           <TabPill
-            label="Active Signals" badge={activeSignals.length}
+            label="Active" badge={activeSignals.length}
             active={tab === "active"} onClick={() => setTab("active")}/>
           <TabPill
             label="Crypto" badge={cryptoSignals.length}
             active={tab === "crypto"} onClick={() => setTab("crypto")}/>
           <TabPill
-            label="Equities"
+            label="Equities" badge={equitySignals.length}
             active={tab === "equities"} onClick={() => setTab("equities")}/>
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════ */}
-        {/* SIGNAL CARDS                                                     */}
-        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* Signal cards — the page IS the feed */}
         <div style={{ padding: "0 16px" }}>
-          {loading && (
-            <LoadingState/>
-          )}
+          {loading && <LoadingState/>}
 
           {!loading && tab === "active" && (
             activeSignals.length === 0
@@ -425,23 +465,25 @@ export default function AISignals() {
                   body="The AI is continuously scanning the market. New high-confidence opportunities will appear here as they form."/>
               : <>
                   <div style={{
-                    margin: "2px 2px 12px", display: "flex", alignItems: "center",
-                    gap: 8, fontSize: 10.5, fontFamily: SANS, fontWeight: 700,
+                    margin: "2px 2px 10px", display: "flex", alignItems: "center",
+                    justifyContent: "space-between",
+                    fontSize: 10.5, fontFamily: SANS, fontWeight: 700,
                     color: TEXT_DIM, letterSpacing: 1.2, textTransform: "uppercase",
                   }}>
-                    <span style={{
-                      width: 6, height: 6, borderRadius: "50%", background: BRAND,
-                      boxShadow: `0 0 10px ${BRAND_GLOW}`,
-                      animation: "dot-pulse 1.8s ease-in-out infinite",
-                    }}/>
-                    Top {activeSignals.length} · ranked by AI confidence
+                    <span>Top {activeSignals.length} Best Signals</span>
+                    <span style={{ color: BRAND }}>Sorted by Confidence</span>
                   </div>
-                  {activeSignals.map(b => (
+                  {activeSignals.map((row, i) => (
                     <SignalCard
-                      key={b.symbol}
-                      breakdown={b}
-                      ticker={tickerBySym[b.symbol]}
-                      onOpen={() => openAsset("crypto", SYM_SHORT[b.symbol] ?? b.symbol.replace("USD",""))}/>
+                      key={`${row.kind}:${row.breakdown.symbol}`}
+                      rank={i + 1}
+                      kind={row.kind}
+                      isPreview={row.isPreview}
+                      breakdown={row.breakdown}
+                      ticker={row.ticker}
+                      onOpen={() => openAsset(row.kind, row.kind === "crypto"
+                        ? (SYM_SHORT[row.breakdown.symbol] ?? row.breakdown.symbol.replace("USD",""))
+                        : row.breakdown.symbol)}/>
                   ))}
                 </>
           )}
@@ -451,9 +493,11 @@ export default function AISignals() {
               ? <EmptyState
                   title="No crypto data available"
                   body="The AI engine could not load crypto signals. Retrying automatically."/>
-              : cryptoSignals.map(b => (
+              : cryptoSignals.map((b, i) => (
                   <SignalCard
                     key={b.symbol}
+                    rank={i + 1}
+                    kind="crypto"
                     breakdown={b}
                     ticker={tickerBySym[b.symbol]}
                     onOpen={() => openAsset("crypto", SYM_SHORT[b.symbol] ?? b.symbol.replace("USD",""))}/>
@@ -461,16 +505,17 @@ export default function AISignals() {
           )}
 
           {!loading && tab === "equities" && (
-            <EquitiesScaffold onOpen={(s) => openAsset("equity", s)}/>
+            equitySignals.map((row, i) => (
+              <SignalCard
+                key={row.breakdown.symbol}
+                rank={i + 1}
+                kind="equity"
+                isPreview
+                breakdown={row.breakdown}
+                ticker={row.ticker}
+                onOpen={() => openAsset("equity", row.breakdown.symbol)}/>
+            ))
           )}
-        </div>
-
-        {/* ═══════════════════════════════════════════════════════════════ */}
-        {/* BOTTOM CTA — AI Signal Engine                                    */}
-        {/* ═══════════════════════════════════════════════════════════════ */}
-        <div style={{ padding: "20px 16px 0" }}>
-          <AISignalEngineCard
-            onLearnMore={() => setLocation("/subscribe")}/>
         </div>
       </div>
     </div>
@@ -480,38 +525,6 @@ export default function AISignals() {
 // ═══════════════════════════════════════════════════════════════════════════
 // Sub-components
 // ═══════════════════════════════════════════════════════════════════════════
-
-function FeaturePill({ icon, title, subtitle }: {
-  icon: React.ReactNode; title: string; subtitle: string;
-}) {
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
-      borderRadius: 12,
-      background: `linear-gradient(135deg, ${SURFACE_2} 0%, ${SURFACE} 100%)`,
-      border: `1px solid ${BORDER_HI}`,
-      boxShadow: `0 4px 14px rgba(0,0,0,0.4), 0 0 18px -10px ${BRAND_GLOW}`,
-      maxWidth: 160,
-    }}>
-      <div style={{
-        width: 26, height: 26, borderRadius: 8, flexShrink: 0,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: `${BRAND}1A`, border: `1px solid ${BORDER_HI}`,
-        color: BRAND, boxShadow: `0 0 10px ${BRAND_BLOOM}`,
-      }}>{icon}</div>
-      <div style={{ textAlign: "left", minWidth: 0 }}>
-        <div style={{
-          fontSize: 10.5, fontFamily: SANS, fontWeight: 700, color: BRAND,
-          letterSpacing: -0.1, lineHeight: 1.1,
-        }}>{title}</div>
-        <div style={{
-          fontSize: 9, fontFamily: SANS, color: TEXT_DIM, marginTop: 2,
-          lineHeight: 1.2, letterSpacing: 0.1,
-        }}>{subtitle}</div>
-      </div>
-    </div>
-  );
-}
 
 function IconButton({ children, onClick, "aria-label": aria }: {
   children: React.ReactNode; onClick?: () => void; "aria-label": string;
@@ -564,10 +577,13 @@ function TabPill({ label, badge, active, onClick }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // SignalCard — the marquee card matching the reference design exactly
 // ─────────────────────────────────────────────────────────────────────────────
-function SignalCard({ breakdown, ticker, onOpen }: {
+function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPreview }: {
   breakdown: SignalBreakdown;
   ticker: { price: number; changePercent24h: number; up: boolean };
   onOpen?: () => void;
+  rank?: number;
+  kind?: "crypto" | "equity";
+  isPreview?: boolean;
 }) {
   const isLong = breakdown.action.toUpperCase() === "BUY";
   const isHold = breakdown.action.toUpperCase() === "HOLD";
@@ -578,7 +594,13 @@ function SignalCard({ breakdown, ticker, onOpen }: {
   const accent = isHold ? TEXT_SUB : (isLong ? BRAND : NEG);
   const accentDeep = isHold ? TEXT_DIM : (isLong ? BRAND_DEEP : NEG_DEEP);
   const trendDir: "up"|"down" = isHold ? (ticker.up ? "up" : "down") : (isLong ? "up" : "down");
-  const short = SYM_SHORT[breakdown.symbol] ?? breakdown.symbol.replace("USD","");
+  const short = kind === "equity"
+    ? breakdown.symbol
+    : (SYM_SHORT[breakdown.symbol] ?? breakdown.symbol.replace("USD",""));
+  const titleLabel = kind === "equity" ? breakdown.symbol : `${short}/USDT`;
+  const subLabel   = kind === "equity"
+    ? (EQUITY_NAME[breakdown.symbol] ?? breakdown.symbol)
+    : (SYM_LABEL[breakdown.symbol] ?? short);
 
   return (
     <div
@@ -622,22 +644,42 @@ function SignalCard({ breakdown, ticker, onOpen }: {
         pointerEvents: "none",
       }}/>
 
-      {/* Top row: icon + asset · grade pill */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-        <CryptoIcon sym={breakdown.symbol} size={44}/>
+      {/* Top row: rank + icon + asset · grade pill */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        {rank !== undefined && (
+          <div style={{
+            width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+            marginTop: 11,
+            background: "rgba(255,255,255,0.04)",
+            border: `1px solid ${BORDER}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 11, fontFamily: SANS, fontWeight: 800,
+            color: TEXT_SUB, fontVariantNumeric: "tabular-nums",
+            letterSpacing: -0.3,
+          }}>{rank}</div>
+        )}
+        {kind === "equity"
+          ? <EquityIcon sym={breakdown.symbol} size={44}/>
+          : <CryptoIcon sym={breakdown.symbol} size={44}/>}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontSize: 16, fontFamily: SANS, fontWeight: 800, color: TEXT,
             letterSpacing: -0.3, lineHeight: 1.1,
           }}>
-            {short}/USDT
+            {titleLabel}
           </div>
+          <div style={{
+            fontSize: 9.5, fontFamily: SANS, color: TEXT_DIM,
+            marginTop: 2, lineHeight: 1.1,
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            maxWidth: 160,
+          }}>{subLabel}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, flexWrap: "wrap" }}>
             {/* LONG / SHORT pill */}
             <span style={{
               padding: "2px 7px", borderRadius: 4,
-              background: isLong ? `${BRAND}1F` : `${NEG}1F`,
-              border: `1px solid ${isLong ? BORDER_HI : "rgba(255,64,96,0.30)"}`,
+              background: isHold ? "rgba(255,255,255,0.05)" : (isLong ? `${BRAND}1F` : `${NEG}1F`),
+              border: `1px solid ${isHold ? BORDER : (isLong ? BORDER_HI : "rgba(255,64,96,0.30)")}`,
               fontSize: 9, fontFamily: SANS, fontWeight: 800,
               color: accent, letterSpacing: 0.8, textTransform: "uppercase",
             }}>{isHold ? "Hold" : isLong ? "Long" : "Short"}</span>
@@ -648,15 +690,27 @@ function SignalCard({ breakdown, ticker, onOpen }: {
           </div>
         </div>
 
-        {/* Signal grade badge */}
-        <div style={{
-          padding: "5px 10px", borderRadius: 8,
-          background: gc.bg, border: `1px solid ${gc.border}`,
-          fontSize: 10, fontFamily: SANS, fontWeight: 800,
-          color: gc.fg, letterSpacing: 0.8,
-          boxShadow: `0 0 14px ${gc.bloom}`,
-          whiteSpace: "nowrap",
-        }}>{grade}</div>
+        {/* Signal grade badge + optional PREVIEW indicator (stacked) */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+          <div style={{
+            padding: "5px 10px", borderRadius: 8,
+            background: gc.bg, border: `1px solid ${gc.border}`,
+            fontSize: 10, fontFamily: SANS, fontWeight: 800,
+            color: gc.fg, letterSpacing: 0.8,
+            boxShadow: `0 0 14px ${gc.bloom}`,
+            whiteSpace: "nowrap",
+          }}>{grade}</div>
+          {isPreview && (
+            <div style={{
+              padding: "2px 6px", borderRadius: 4,
+              background: "rgba(124,255,0,0.10)",
+              border: "1px solid rgba(124,255,0,0.28)",
+              fontSize: 8, fontFamily: SANS, fontWeight: 800,
+              color: BRAND_BRGT, letterSpacing: 1.2,
+              whiteSpace: "nowrap",
+            }}>PREVIEW</div>
+          )}
+        </div>
       </div>
 
       {/* Price + sparkline + confidence row */}
@@ -781,61 +835,6 @@ function QualityChip({ label }: { label: string }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AI Signal Engine — bottom CTA card
-// ─────────────────────────────────────────────────────────────────────────────
-function AISignalEngineCard({ onLearnMore }: { onLearnMore: () => void }) {
-  return (
-    <div style={{
-      position: "relative", overflow: "hidden",
-      borderRadius: 18, padding: "14px 14px",
-      background: `
-        radial-gradient(circle at 100% 0%, ${BRAND_GLOW} 0%, transparent 55%),
-        linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 100%)
-      `,
-      border: `1px solid ${BORDER_HI}`,
-      boxShadow: `0 10px 30px rgba(0,0,0,0.5), 0 0 22px -8px ${BRAND_GLOW}`,
-      display: "flex", alignItems: "center", gap: 12,
-    }}>
-      {/* Top sweep */}
-      <div style={{
-        position: "absolute", top: 0, left: 0, right: 0, height: 1,
-        background: `linear-gradient(90deg, transparent 0%, ${BRAND_GLOW} 50%, transparent 100%)`,
-        animation: "edge-sweep 5s ease-in-out infinite",
-      }}/>
-      <div style={{
-        width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-        background: `linear-gradient(135deg, ${BRAND}22 0%, ${BRAND_DEEP}30 100%)`,
-        border: `1px solid ${BORDER_HI}`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        color: BRAND, boxShadow: `0 0 16px ${BRAND_GLOW}`,
-      }}>{IconSparkle}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: 13, fontFamily: SANS, fontWeight: 800, color: TEXT,
-          letterSpacing: -0.2,
-        }}>AI Signal Engine</div>
-        <div style={{
-          fontSize: 10.5, fontFamily: SANS, color: TEXT_SUB,
-          marginTop: 2, lineHeight: 1.35,
-        }}>
-          Analyzes 50+ indicators, market sentiment &amp; volume patterns 24/7.
-        </div>
-      </div>
-      <button onClick={onLearnMore} style={{
-        padding: "9px 14px", borderRadius: 999,
-        background: `linear-gradient(135deg, ${BRAND_DEEP} 0%, ${BRAND} 100%)`,
-        border: `1px solid ${BRAND_BRGT}`,
-        color: "#001b06", cursor: "pointer",
-        fontSize: 11, fontFamily: SANS, fontWeight: 800,
-        letterSpacing: 0.3, whiteSpace: "nowrap",
-        boxShadow: `0 6px 18px ${BRAND_GLOW}, inset 0 1px 0 rgba(255,255,255,0.25)`,
-        display: "flex", alignItems: "center", gap: 5,
-      }}>Learn More <span style={{ fontSize: 13 }}>›</span></button>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Empty + loading states
 // ─────────────────────────────────────────────────────────────────────────────
 function EmptyState({ title, body }: { title: string; body: string }) {
@@ -864,107 +863,6 @@ function EmptyState({ title, body }: { title: string; body: string }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// EquitiesScaffold — honest "AI equity engine launching" state. Lists the
-// supported equities as clickable cards (which route to their AssetDetail
-// page) but does NOT fabricate prices, confidence values, or trade levels —
-// the equity AI engine is not yet wired into the backend.
-// ─────────────────────────────────────────────────────────────────────────────
-function EquitiesScaffold({ onOpen }: { onOpen: (sym: string) => void }) {
-  return (
-    <div>
-      {/* Headline status card */}
-      <div style={{
-        position: "relative", overflow: "hidden",
-        marginBottom: 14, borderRadius: 18, padding: "18px 16px",
-        background: `
-          radial-gradient(circle at 100% 0%, ${BRAND_GLOW} 0%, transparent 60%),
-          linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 60%, ${BG} 100%)
-        `,
-        border: `1px solid ${BORDER_HI}`,
-        boxShadow: `0 10px 32px rgba(0,0,0,0.55), 0 0 24px -10px ${BRAND_GLOW}`,
-      }}>
-        <div aria-hidden style={{
-          position: "absolute", top: 0, left: 0, right: 0, height: 1,
-          background: `linear-gradient(90deg, transparent 0%, ${BRAND_GLOW} 50%, transparent 100%)`,
-          animation: "edge-sweep 6s ease-in-out infinite",
-        }}/>
-        <div style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          padding: "3px 8px", borderRadius: 999,
-          background: `${BRAND}1A`, border: `1px solid ${BORDER_HI}`,
-          fontSize: 9, fontFamily: SANS, fontWeight: 800, color: BRAND,
-          letterSpacing: 1.4, textTransform: "uppercase",
-        }}>
-          <span style={{
-            width: 6, height: 6, borderRadius: "50%", background: BRAND,
-            boxShadow: `0 0 10px ${BRAND_GLOW}`,
-            animation: "dot-pulse 1.8s ease-in-out infinite",
-          }}/>
-          Launching Soon
-        </div>
-        <div style={{
-          marginTop: 12, fontSize: 18, fontFamily: SANS, fontWeight: 800,
-          letterSpacing: -0.4, color: TEXT,
-        }}>
-          AI Equity Signal Engine
-        </div>
-        <div style={{
-          marginTop: 6, fontSize: 11.5, fontFamily: SANS,
-          color: TEXT_SUB, lineHeight: 1.55, maxWidth: 360,
-        }}>
-          Real-time AI signals for major US equities are entering final
-          validation. Tap any ticker below to preview its asset profile.
-          Live signals will activate automatically once the equity engine
-          goes online.
-        </div>
-      </div>
-
-      {/* Equity grid — supported tickers (real names, no fake prices) */}
-      <div style={{
-        display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
-      }}>
-        {SUPPORTED_EQUITIES.map((s) => (
-          <div
-            key={s}
-            role="button"
-            tabIndex={0}
-            onClick={() => onOpen(s)}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(s); } }}
-            style={{
-              position: "relative", overflow: "hidden",
-              padding: "14px 12px", borderRadius: 14, cursor: "pointer",
-              background: `linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 100%)`,
-              border: `1px solid ${BORDER}`,
-              boxShadow: `0 8px 24px rgba(0,0,0,0.50), 0 0 0 1px rgba(102,255,102,0.04) inset`,
-              transition: "transform 0.18s ease, box-shadow 0.2s ease",
-              display: "flex", alignItems: "center", gap: 12,
-            }}>
-            <EquityIcon sym={s} size={40}/>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontSize: 14, fontFamily: SANS, fontWeight: 800,
-                color: TEXT, letterSpacing: -0.2, lineHeight: 1.1,
-              }}>{s}</div>
-              <div style={{
-                fontSize: 10, fontFamily: SANS, color: TEXT_DIM,
-                marginTop: 3, lineHeight: 1.2,
-                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-              }}>{EQUITY_NAME[s]}</div>
-              <div style={{
-                marginTop: 6, fontSize: 8, fontFamily: SANS, fontWeight: 700,
-                color: BRAND, letterSpacing: 1.2,
-                textTransform: "uppercase",
-                opacity: 0.85,
-              }}>Preview · Engine pending</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function LoadingState() {
   return (
     <div style={{ padding: "8px 0" }}>
@@ -984,22 +882,6 @@ function LoadingState() {
 // ═══════════════════════════════════════════════════════════════════════════
 // Inline icons
 // ═══════════════════════════════════════════════════════════════════════════
-const IconCrosshair = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="9"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/>
-    <line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/><circle cx="12" cy="12" r="2"/>
-  </svg>
-);
-const IconBolt = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M13 2 L4 14 L11 14 L9 22 L20 9 L13 9 Z"/>
-  </svg>
-);
-const IconChart = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 17 L8 12 L13 15 L21 6"/><polyline points="15 6 21 6 21 12"/>
-  </svg>
-);
 const IconFilter = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
