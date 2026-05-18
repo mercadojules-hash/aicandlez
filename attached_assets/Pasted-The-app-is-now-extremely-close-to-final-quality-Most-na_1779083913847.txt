@@ -1,0 +1,149 @@
+The app is now extremely close to final quality. Most navigation and UI flows are working perfectly. This is now a refinement/polish pass only — DO NOT redesign the app.
+
+FINAL UI / LOGIC CLEANUP PASS
+1. AI Market Scanner Status Messaging
+
+Right now the scanner only says:
+
+“AI is scanning the market — no high-confidence signals right now. Sit tight.”
+
+Expand the AI scanner intelligence messaging dynamically.
+
+Examples of states it should display:
+
+“Market sentiment: Bullish”
+“High volatility detected”
+“Momentum increasing across crypto markets”
+“Equity market cooling”
+“Strong breakout activity detected”
+“Low-confidence market conditions”
+“Accumulation patterns forming”
+“Risk elevated — choppy market”
+“Trend continuation likely”
+“Bearish pressure increasing”
+
+The scanner should feel ALIVE and intelligent, not static.
+
+Use:
+
+live signal density
+volatility
+AI confidence averages
+bullish/bearish ratios
+momentum
+volume trends
+
+to rotate status messaging.
+
+Keep:
+
+radar UI
+animation
+green neon style
+current layout
+
+unchanged.
+
+2. Bottom Navigation Background Color
+
+The bottom navigation still has a bluish/cyan tint.
+
+Update the ENTIRE bottom navigation surface to match the app’s primary neon-green/black visual system.
+
+Requirements:
+
+remove remaining cyan/blue tint
+use deep black + green glow
+preserve readability
+keep active state glow
+keep icons exactly as they are
+
+Goal:
+The nav should visually feel like the rest of the institutional neon-green UI.
+
+3. Home Page Section Scrolling Behavior
+
+The following sections should EACH have independent scrolling containers:
+
+Top Gainers
+Active Trades
+Trade History
+
+Each section should maintain its own scroll behavior independently.
+
+Expected behavior:
+
+Active Trades → capped visual list around 6 active positions
+Trade History → larger historical feed (20+ items)
+Top Gainers → top 10 most profitable assets overall
+
+Do NOT make the entire page one giant scrolling list.
+
+Each module should feel like a live terminal panel.
+
+4. Top Gainers Logic
+
+“Top Gainers” should NOT simply show random market assets.
+
+It should represent:
+
+highest-performing profitable assets
+strongest AI-performing opportunities
+best realized or projected performers
+
+Prioritize:
+
+realized PnL
+confidence
+momentum
+profitability
+win rate contribution
+
+Goal:
+Make Top Gainers feel like elite AI-selected opportunities.
+
+5. Remove ALL Remaining $5.99 References
+
+There are still old pricing references remaining.
+
+REMOVE ALL OLD:
+
+“$5.99/mo”
+old pricing text
+outdated promotional text
+outdated trial wording
+
+I found remaining references:
+
+purple banner area on Home page
+Profile → Billing & Plan
+
+Everything must reflect the FINAL pricing structure ONLY:
+
+Paper Trading → Free
+AI Trading → $15.99/mo
+AI Trading Pro → $39.99/mo
+
+Search entire codebase for:
+
+5.99
+599
+old trial copy
+outdated pricing labels
+
+and fully clean all remnants.
+
+IMPORTANT:
+This is a refinement pass only.
+
+DO NOT:
+
+redesign layouts
+change cards
+change confidence rings
+change membership structure
+change navigation structure
+change spacing
+change typography hierarchy
+
+The app is now in a very strong state visually and functionally.

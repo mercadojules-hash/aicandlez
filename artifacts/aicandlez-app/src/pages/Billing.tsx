@@ -49,7 +49,7 @@ function StatusCard({ sub }: { sub: Subscription | undefined }) {
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 22, fontFamily: MONO, fontWeight: 700, color: accent, lineHeight: 1 }}>
-            {active ? "$5.99" : "Free"}
+            {active ? "$15.99" : "Free"}
           </div>
           {active && (
             <div style={{ fontSize: 9, fontFamily: SANS, color: GR, marginTop: 3 }}>/ month</div>
@@ -154,7 +154,7 @@ export default function Billing() {
               <div style={{ textAlign: "right", flexShrink: 0 }}>
                 <div style={{ fontSize: 30, fontFamily: MONO, fontWeight: 700,
                   color: W, lineHeight: 1 }}>
-                  $5.99
+                  $15.99
                 </div>
                 <div style={{ fontSize: 10, fontFamily: SANS, color: GR, marginTop: 4 }}>
                   / month

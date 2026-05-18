@@ -83,7 +83,7 @@ export default function Consent() {
             letterSpacing: "0.12em", marginBottom: 10 }}>FEE SUMMARY</div>
           {[
             ["Performance Fee",     `${PERFORMANCE_FEE_LABEL} of profitable trades`],
-            ["Monthly Subscription","$5.99 / month"],
+            ["Monthly Subscription","AI Trading $15.99 · Pro $39.99 / month"],
             ["Fee on Losses",       "NONE"],
             ["Withdrawal Access",   "NEVER REQUESTED"],
           ].map(([k, v]) => (
@@ -163,7 +163,7 @@ export default function Consent() {
             fontFamily: "system-ui, sans-serif" }}>
             I confirm that I have read and agree to the{" "}
             <strong style={{ color: "#e8f4ff" }}>{PERFORMANCE_FEE_LABEL} performance fee</strong> on profitable
-            trades, the <strong style={{ color: "#e8f4ff" }}>$5.99/month subscription</strong>,
+            trades, the <strong style={{ color: "#e8f4ff" }}>monthly subscription (AI Trading $15.99 or Pro $39.99)</strong>,
             and the risk disclosures. I understand that cryptocurrency trading carries
             substantial risk of loss.
           </div>

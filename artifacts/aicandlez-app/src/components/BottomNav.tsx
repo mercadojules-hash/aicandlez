@@ -83,16 +83,17 @@ export function BottomNav() {
       flexShrink: 0,
     }}>
       <div style={{
-        background: "rgba(6,14,24,0.94)",
+        background: "linear-gradient(180deg, rgba(4,10,6,0.96) 0%, rgba(0,0,0,0.98) 100%)",
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
-        border: "1px solid rgba(255,255,255,0.07)",
+        border: "1px solid rgba(102,255,102,0.14)",
         borderRadius: 28,
         display: "flex",
         boxShadow: [
-          "0 8px 32px rgba(0,0,0,0.70)",
-          "0 2px 8px rgba(0,0,0,0.50)",
-          "0 0 0 0.5px rgba(102,255,102,0.08) inset",
+          "0 8px 32px rgba(0,0,0,0.80)",
+          "0 2px 10px rgba(0,0,0,0.60)",
+          "0 0 28px rgba(102,255,102,0.06)",
+          "0 0 0 0.5px rgba(102,255,102,0.12) inset",
         ].join(", "),
         overflow: "hidden",
       }}>

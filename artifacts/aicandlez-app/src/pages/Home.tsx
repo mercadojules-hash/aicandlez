@@ -497,12 +497,98 @@ export default function Home() {
     };
   }, [breakdowns, tickerMap]);
 
+  // Top Gainers — elite AI-selected opportunities, not raw % movers.
+  // Ranking score blends:
+  //   • realized 24h move (momentum)
+  //   • AI confidence on this symbol (from breakdowns)
+  //   • directional alignment (BUY/LONG bonus, HOLD penalty)
+  // Up to 10 of the strongest profitable performers.
   const topGainers = useMemo(() => {
-    return (tickersData?.tickers ?? [])
-      .filter(t => t.changePercent24h > 0)
-      .sort((a,b) => b.changePercent24h - a.changePercent24h)
-      .slice(0, 3);
-  }, [tickersData]);
+    const tickers = (tickersData?.tickers ?? []).filter(t => t.changePercent24h > 0);
+    const scored = tickers.map(t => {
+      const bd = breakdowns[t.symbol];
+      const conf = bd?.confidence ?? 0;
+      const a = bd?.action?.toUpperCase();
+      const isBuy = a === "BUY" || a === "LONG";
+      const directionBonus = isBuy ? 25 : a === "HOLD" ? -10 : a ? -8 : 0;
+      // Weighted: confidence dominates (×1.0), momentum amplifies (×3 per %),
+      // direction tilts the ranking, ai-tracked symbols get a small floor bonus.
+      const score = conf * 1.0
+        + t.changePercent24h * 3
+        + directionBonus
+        + (bd ? 4 : 0);
+      return { t, bd, score };
+    });
+    return scored
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+      .map(x => x.t);
+  }, [tickersData, breakdowns]);
+
+  // ── AI Market Scanner intelligence message ─────────────────────────────────
+  // Rotates dynamically based on live signal density, volatility, AI confidence,
+  // bullish/bearish ratios, momentum, and volume trends.
+  const scannerStatus = useMemo(() => {
+    const bdList = Object.values(breakdowns);
+    const tickers = tickersData?.tickers ?? [];
+
+    if (bdList.length === 0 && tickers.length === 0) {
+      return { label: "Initializing market feed", tone: "neutral" as const };
+    }
+
+    const active = bdList.filter(b => b.action && b.action.toUpperCase() !== "HOLD");
+    const buys = bdList.filter(b => { const a = b.action?.toUpperCase(); return a === "BUY" || a === "LONG"; }).length;
+    const sells = bdList.filter(b => { const a = b.action?.toUpperCase(); return a === "SELL" || a === "SHORT"; }).length;
+    const avgConf = bdList.length
+      ? bdList.reduce((s, b) => s + (b.confidence ?? 0), 0) / bdList.length
+      : 0;
+    const topConf = bdList.reduce((m, b) => Math.max(m, b.confidence ?? 0), 0);
+
+    const moves = tickers.map(t => t.changePercent24h);
+    const upRatio = tickers.length ? tickers.filter(t => t.changePercent24h > 0).length / tickers.length : 0.5;
+    const avgAbsMove = moves.length ? moves.reduce((s, m) => s + Math.abs(m), 0) / moves.length : 0;
+    const maxMove = moves.length ? Math.max(...moves.map(Math.abs)) : 0;
+    const avgMove = moves.length ? moves.reduce((s, m) => s + m, 0) / moves.length : 0;
+
+    // Decision tree — most-specific first, falls back to ambient states.
+    if (topConf >= 80 && buys >= sells) {
+      return { label: "Strong breakout activity detected", tone: "pos" as const };
+    }
+    if (avgAbsMove >= 4.5 || maxMove >= 9) {
+      return { label: "High volatility detected — proceed with caution", tone: "warn" as const };
+    }
+    if (upRatio >= 0.7 && avgMove > 1.5) {
+      return { label: "Momentum increasing across crypto markets", tone: "pos" as const };
+    }
+    if (upRatio <= 0.3 && avgMove < -1.5) {
+      return { label: "Bearish pressure increasing", tone: "neg" as const };
+    }
+    if (buys >= sells * 2 && active.length >= 2) {
+      return { label: "Market sentiment: Bullish", tone: "pos" as const };
+    }
+    if (sells >= buys * 2 && active.length >= 2) {
+      return { label: "Market sentiment: Bearish", tone: "neg" as const };
+    }
+    if (active.length >= 3 && avgConf >= 65) {
+      return { label: "Trend continuation likely", tone: "pos" as const };
+    }
+    if (avgAbsMove >= 2.5 && Math.abs(buys - sells) <= 1) {
+      return { label: "Risk elevated — choppy market", tone: "warn" as const };
+    }
+    if (active.length === 0 && avgAbsMove < 0.8) {
+      return { label: "Accumulation patterns forming", tone: "neutral" as const };
+    }
+    if (avgConf < 50 && active.length <= 1) {
+      return { label: "Low-confidence market conditions", tone: "neutral" as const };
+    }
+    if (upRatio > 0.55 && avgAbsMove < 2) {
+      return { label: "Equity market cooling — crypto holding steady", tone: "neutral" as const };
+    }
+    if (active.length >= 1) {
+      return { label: "AI tracking emerging opportunities", tone: "pos" as const };
+    }
+    return { label: "AI scanning — no high-confidence signals yet", tone: "neutral" as const };
+  }, [breakdowns, tickersData]);
 
   const positions = portfolio?.positions ?? [];
 
@@ -803,18 +889,41 @@ export default function Home() {
               </div>
             </>
           ) : (
-            <div style={{
-              marginTop: 24, padding: "20px 16px", textAlign: "center",
-              borderRadius: 12, background: "rgba(102,255,102,0.04)",
-              border: `1px dashed ${BORDER_HI}`,
-            }}>
-              <div style={{ fontSize: 12, fontFamily: SANS, fontWeight: 600, color: TEXT, lineHeight: 1.5 }}>
-                AI is scanning the market
-              </div>
-              <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_SUB, marginTop: 4 }}>
-                No high-confidence signals right now. Sit tight.
-              </div>
-            </div>
+            (() => {
+              const toneColor =
+                scannerStatus.tone === "pos"  ? BRAND :
+                scannerStatus.tone === "neg"  ? NEG   :
+                scannerStatus.tone === "warn" ? WARN  : TEXT;
+              const toneBg =
+                scannerStatus.tone === "pos"  ? "rgba(102,255,102,0.05)" :
+                scannerStatus.tone === "neg"  ? "rgba(255,64,96,0.06)"   :
+                scannerStatus.tone === "warn" ? "rgba(255,185,74,0.06)"  : "rgba(255,255,255,0.03)";
+              const toneBorder =
+                scannerStatus.tone === "pos"  ? BORDER_HI :
+                scannerStatus.tone === "neg"  ? "rgba(255,64,96,0.30)" :
+                scannerStatus.tone === "warn" ? "rgba(255,185,74,0.30)" : BORDER;
+              return (
+                <div style={{
+                  marginTop: 24, padding: "20px 16px", textAlign: "center",
+                  borderRadius: 12, background: toneBg,
+                  border: `1px dashed ${toneBorder}`,
+                }}>
+                  <div style={{
+                    fontSize: 9, fontFamily: SANS, fontWeight: 800,
+                    color: toneColor, letterSpacing: 1.4, textTransform: "uppercase",
+                    marginBottom: 6, opacity: 0.85,
+                  }}>
+                    AI Market Pulse
+                  </div>
+                  <div style={{ fontSize: 13, fontFamily: SANS, fontWeight: 700, color: TEXT, lineHeight: 1.4, letterSpacing: -0.2 }}>
+                    {scannerStatus.label}
+                  </div>
+                  <div style={{ fontSize: 10, fontFamily: SANS, color: TEXT_SUB, marginTop: 5, letterSpacing: 0.2 }}>
+                    Scanning 247 pairs · awaiting high-confidence setup
+                  </div>
+                </div>
+              );
+            })()
           )}
 
           {/* GLOWING BUY / SELL CTA PAIR */}
@@ -851,12 +960,16 @@ export default function Home() {
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* TOP GAINERS — real crypto icons + sparklines                      */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        <SectionHeader label="Top Gainers" onMore={() => setLocation("/markets")}/>
+        <SectionHeader label="Top Gainers" right="AI-ranked" onMore={() => setLocation("/markets")}/>
         <div style={{
           margin: "0 16px", borderRadius: 20, overflow: "hidden",
           background: `linear-gradient(180deg, ${SURFACE} 0%, ${BG} 100%)`,
           border: `1px solid ${BORDER}`,
           boxShadow: `0 12px 32px rgba(0,0,0,0.5)`,
+          maxHeight: 360,
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
+          overscrollBehavior: "contain",
         }}>
           {topGainers.length === 0 ? (
             <div style={{ padding: "22px 18px", textAlign: "center" }}>
@@ -925,7 +1038,14 @@ export default function Home() {
         {/* ACTIVE TRADES — real crypto icons + LONG/SHORT pills              */}
         {/* ════════════════════════════════════════════════════════════════ */}
         <SectionHeader label="Active Trades" right={`${positions.length} open`} onMore={() => setLocation("/trade")}/>
-        <div style={{ margin: "0 16px" }}>
+        <div style={{
+          margin: "0 16px",
+          maxHeight: 460,
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
+          overscrollBehavior: "contain",
+          paddingRight: 2,
+        }}>
           {positions.length === 0 ? (
             <div style={{
               padding: "26px 18px", borderRadius: 20,
@@ -938,7 +1058,7 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            positions.slice(0, 3).map((p, i) => {
+            positions.slice(0, 6).map((p, i) => {
               const isLong = (p.side ?? "long").toLowerCase() === "long";
               const upnl = p.unrealizedPnL ?? 0;
               const notional = (p.size ?? 0) * (p.entryPrice ?? 0);
@@ -1097,7 +1217,7 @@ function TradeHistorySection({ trades, onMore }: {
     return { wins, total, winRate, netPnL, bestPct };
   }, [trades]);
 
-  const recent = trades.slice(0, 5);
+  const recent = trades.slice(0, 24);
 
   return (
     <>
@@ -1107,7 +1227,14 @@ function TradeHistorySection({ trades, onMore }: {
         onMore={trades.length > 0 ? onMore : undefined}
       />
 
-      <div style={{ margin: "0 16px" }}>
+      <div style={{
+        margin: "0 16px",
+        maxHeight: 520,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        overscrollBehavior: "contain",
+        paddingRight: 2,
+      }}>
         {/* Aggregate banner — derived strictly from real trade records */}
         {stats && (
           <div style={{

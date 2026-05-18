@@ -33,7 +33,7 @@ const REASON_COPY: Record<NonNullable<PaywallReason>, { title: string; sub: stri
   },
   feature_locked: {
     title: "Subscription required",
-    sub:   "Get full access to AICandlez for $5.99/mo.",
+    sub:   "Get full access to AICandlez from $15.99/mo.",
   },
 };
 
@@ -118,7 +118,7 @@ export function SubscriptionModal() {
           <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
             <span style={{ fontSize: 36, fontFamily: MONO, fontWeight: 700, color: W,
               lineHeight: 1 }}>
-              $5.99
+              $15.99
             </span>
             <span style={{ fontSize: 12, fontFamily: SANS, color: GR }}>/ month</span>
           </div>
