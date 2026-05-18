@@ -1,0 +1,104 @@
+We are entering final production phase for BOTH the AICandlez platform and the Expo iOS app submission.
+
+CONTEXT:
+
+* Admin dashboard `/command` is FINAL.
+* User portal `/portal` is now visually aligned with the institutional engine.
+* Kraken remains ADMIN ONLY.
+* All customer trading is Alpaca-routed only.
+* Pricing is FINAL:
+  • Free = Paper Trading only (7-day access)
+  • Starter = $15.99/month = 3 concurrent AI trades
+  • Pro = $39.99/month = 12 concurrent AI trades
+
+USER PORTAL STATUS:
+The live market heartbeat row, animated signal strips, confidence rings, pulsing execution bars, BUY/SELL pills, and live signal panels now match the energy and visual hierarchy of `/command`.
+
+Before launch we need FINAL hardening + production readiness.
+
+PRIORITY TASKS:
+
+1. SECURITY / ROLE GATING
+
+* Verify non-admin users CANNOT access:
+  • /command
+  • /exchange
+  • /debug
+  • /institutional
+  • Kraken endpoints
+  • engine-control routes
+* Confirm all operator routes require super-admin role.
+* Confirm customer accounts only see Alpaca functionality.
+
+2. PORTAL UX POLISH
+
+* Add subtle “LIVE” pulsing indicator near top banner/logo.
+* Improve spacing slightly between lower signal rows.
+* Ensure mobile responsiveness does not overcrowd charts.
+* Add premium locked visual treatment for free users:
+  • subtle blur/overlay
+  • “Upgrade to activate AI execution”
+  • maintain institutional look.
+
+3. EXECUTION BAR FINALIZATION
+
+* Free:
+  • locked state only
+  • upgrade modal opens
+* Starter:
+  • capacity meter 0/3
+  • ARM EXECUTION enabled
+* Pro:
+  • capacity meter 0/12
+* Armed state:
+  • red DISARM state
+  • animated edge glow
+  • pulsing orb
+* Confirm 80% confidence floor still enforced globally.
+
+4. REAL TELEMETRY
+
+* Ensure customer metrics display:
+  • REAL Alpaca telemetry
+  • OR clearly marked simulated/demo values
+* Avoid fake-looking balances that could confuse users.
+
+5. DEPLOYMENT PREP
+   We are preparing to go LIVE using Replit deployment infrastructure first.
+
+Need:
+
+* deployment architecture recommendation
+* exact Replit services to deploy
+* required secrets checklist
+* production Clerk setup checklist
+* Stripe live-mode checklist
+* Namecheap DNS table for:
+  • aicandlez.com
+  • app.aicandlez.com
+  • admin.aicandlez.com
+  • api.aicandlez.com
+
+6. ADMIN LOGIN
+   Need secure super-admin bootstrap flow for:
+   [mercadojules@gmail.com](mailto:mercadojules@gmail.com)
+
+7. IOS APP SUBMISSION CONTINUATION
+   We also need to continue debugging the Expo/EAS submission issue.
+
+Current status:
+
+* Expo prebuild succeeds.
+* Metro config fixed.
+* CocoaPods SSL issue is local only.
+* Remaining blocker:
+  INVALID UUID APPID / corrupted EAS project linkage.
+
+Need:
+
+* completely clean Expo/EAS relink
+* confirm correct project binding
+* final iOS production build
+* TestFlight submission
+
+Continue from here carefully WITHOUT regressing the working dashboards.

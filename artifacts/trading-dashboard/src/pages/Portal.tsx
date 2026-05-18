@@ -181,9 +181,37 @@ function LogoBanner({ tier }: { tier: Plan }) {
         fontFamily: N.FONT_MONO, fontSize: 10, letterSpacing: "0.4em",
         color: N.BRAND, fontWeight: 600, position: "relative", zIndex: 1,
         textShadow: `0 0 8px ${N.BRAND_GLOW}`,
+        display: "flex", alignItems: "center", gap: 12,
       }}>
-        AI · CANDLEZ · TRADING
+        <span>AI · CANDLEZ · TRADING</span>
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "3px 9px",
+          background: `${N.LONG}10`,
+          border: `1px solid ${N.LONG}55`,
+          borderRadius: 999,
+          color: N.LONG, fontSize: 9, letterSpacing: "0.28em",
+          textShadow: `0 0 6px ${N.LONG_GLOW}`,
+        }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: "50%",
+            background: N.LONG,
+            boxShadow: `0 0 8px ${N.LONG}, 0 0 16px ${N.LONG_GLOW}`,
+            animation: "live-pulse-portal 1.2s infinite",
+          }} />
+          LIVE
+        </span>
       </div>
+      <style>{`
+        @keyframes live-pulse-portal {
+          0%,100% { opacity: 1;   transform: scale(1);    }
+          50%     { opacity: 0.4; transform: scale(1.35); }
+        }
+        @keyframes neon-pulse {
+          0%,100% { opacity: 1;   transform: scale(1);   }
+          50%     { opacity: 0.5; transform: scale(1.2); }
+        }
+      `}</style>
       <div style={{
         marginTop: 6,
         padding: "4px 14px",
@@ -204,10 +232,10 @@ function LogoBanner({ tier }: { tier: Plan }) {
 
 // ── Metric tile ──────────────────────────────────────────────────────────────
 function MetricTile({
-  label, value, delta, positive = true, accent = N.BRAND,
+  label, value, delta, positive = true, accent = N.BRAND, demo = false,
 }: {
   label: string; value: string; delta?: string;
-  positive?: boolean; accent?: string;
+  positive?: boolean; accent?: string; demo?: boolean;
 }) {
   return (
     <div style={{
@@ -228,7 +256,18 @@ function MetricTile({
       <div style={{
         fontSize: 9, color: N.TEXT_2,
         letterSpacing: "0.16em", fontWeight: 600,
-      }}>{label}</div>
+        display: "flex", alignItems: "center", gap: 6,
+      }}>
+        <span>{label}</span>
+        {demo && (
+          <span style={{
+            fontSize: 7, padding: "1px 5px", borderRadius: 2,
+            background: `${N.WARN}18`, color: N.WARN,
+            border: `1px solid ${N.WARN}40`,
+            letterSpacing: "0.18em", fontWeight: 700,
+          }}>DEMO</span>
+        )}
+      </div>
       <div style={{
         fontSize: 22, color: N.TEXT_0, fontWeight: 700,
         fontVariantNumeric: "tabular-nums",
@@ -482,20 +521,25 @@ function PlanCard({ plan }: { plan: "starter" | "pro" }) {
 }
 
 // ── Panel scaffold ───────────────────────────────────────────────────────────
-function Panel({ title, accent = N.BRAND, children, height = 280 }: {
-  title:   string;
-  accent?: string;
-  height?: number;
+function Panel({
+  title, accent = N.BRAND, children, height = 280, locked = false, onUnlock,
+}: {
+  title:    string;
+  accent?:  string;
+  height?:  number;
+  locked?:  boolean;
+  onUnlock?: () => void;
   children: React.ReactNode;
 }) {
   return (
     <div style={{
       background: N.SURFACE_1,
-      border: `1px solid ${N.BORDER}`,
+      border: `1px solid ${locked ? `${N.GOLD}30` : N.BORDER}`,
       borderRadius: 6,
       display: "flex", flexDirection: "column",
       overflow: "hidden",
       fontFamily: N.FONT_MONO,
+      position: "relative",
     }}>
       <div style={{
         padding: "10px 14px",
@@ -505,19 +549,86 @@ function Panel({ title, accent = N.BRAND, children, height = 280 }: {
       }}>
         <span style={{
           width: 6, height: 6, borderRadius: "50%",
-          background: accent, boxShadow: `0 0 8px ${accent}, 0 0 18px ${accent}50`,
+          background: locked ? N.GOLD : accent,
+          boxShadow: `0 0 8px ${locked ? N.GOLD : accent}, 0 0 18px ${locked ? N.GOLD_GLOW : accent + "50"}`,
           animation: "neon-pulse 1.4s infinite",
         }} />
         <span style={{
           fontSize: 10, letterSpacing: "0.22em",
           color: N.TEXT_0, fontWeight: 800,
         }}>{title}</span>
+        {locked && (
+          <span style={{
+            marginLeft: "auto",
+            fontSize: 8, padding: "2px 7px",
+            background: `${N.GOLD}18`, color: N.GOLD,
+            border: `1px solid ${N.GOLD}40`,
+            borderRadius: 2, letterSpacing: "0.22em", fontWeight: 700,
+          }}>LOCKED</span>
+        )}
       </div>
       <div style={{
         flex: 1, padding: 14, height,
         overflowY: "auto", overflowX: "hidden",
+        position: "relative",
       }}>
-        {children}
+        <div
+          aria-hidden={locked || undefined}
+          {...(locked ? { inert: "" as unknown as boolean } : {})}
+          style={{
+            filter: locked ? "blur(3.5px)" : "none",
+            opacity: locked ? 0.55 : 1,
+            pointerEvents: locked ? "none" : "auto",
+            transition: "filter 200ms ease",
+          }}>
+          {children}
+        </div>
+
+        {locked && (
+          <div style={{
+            position: "absolute", inset: 0,
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            gap: 10, padding: 16, textAlign: "center",
+            background: `radial-gradient(ellipse at center, ${N.BG}cc 0%, ${N.BG}f5 70%)`,
+          }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: "50%",
+              background: N.SURFACE_2,
+              border: `1px solid ${N.GOLD}60`,
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              boxShadow: `0 0 18px ${N.GOLD_GLOW}`,
+            }}>
+              <Lock size={16} color={N.GOLD} />
+            </div>
+            <div style={{
+              fontSize: 11, color: N.TEXT_0, fontWeight: 800,
+              letterSpacing: "0.16em",
+            }}>UPGRADE TO ACTIVATE AI EXECUTION</div>
+            <div style={{
+              fontSize: 9, color: N.TEXT_2, letterSpacing: "0.14em",
+              maxWidth: 240, lineHeight: 1.5,
+            }}>
+              Live trade data unlocks when you enable AI execution on Starter or Pro.
+            </div>
+            <button
+              onClick={onUnlock}
+              style={{
+                marginTop: 6,
+                padding: "8px 16px",
+                background: `linear-gradient(180deg, ${N.GOLD} 0%, ${N.GOLD_DEEP} 100%)`,
+                border: `1px solid ${N.GOLD}`,
+                borderRadius: 3,
+                color: "#1a0e00", fontSize: 10, fontWeight: 800,
+                letterSpacing: "0.18em",
+                fontFamily: N.FONT_MONO, cursor: "pointer",
+                boxShadow: `0 0 16px ${N.GOLD_GLOW}`,
+              }}
+            >
+              VIEW UPGRADE OPTIONS →
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -622,21 +733,22 @@ export default function Portal() {
 
       <LogoBanner tier={tier} />
 
-      {/* Metrics row */}
+      {/* Metrics row — values are paper-account demo until Alpaca account
+          telemetry is wired; tiles tagged with DEMO so users aren't misled. */}
       <div style={{
         padding: "12px 24px 0",
         display: "grid",
         gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
         gap: 10,
       }}>
-        <MetricTile label="TOTAL P/L"        value="+$1,284.42"  delta="+1.28%"    positive />
-        <MetricTile label="WIN RATE"         value="68.4%"       delta="+2.1%"     positive />
-        <MetricTile label="ACTIVE AI TRADES" value={`0 / ${cap.cap || "—"}`} delta={tier.toUpperCase()} positive />
-        <MetricTile label="TODAY"            value="+$184.20"    delta="+0.18%"    positive />
-        <MetricTile label="MONTHLY"          value="+$2,940.80"  delta="+2.94%"    positive />
-        <MetricTile label="AI CONFIDENCE"    value="78%"         delta="STRONG"    positive />
-        <MetricTile label="BEST ASSET"       value="BTC/USD"     delta="+$420.00"  positive />
-        <MetricTile label="EQUITY"           value="$101,284.42" />
+        <MetricTile label="TOTAL P/L"        value="+$1,284.42"  delta="+1.28%"    positive demo />
+        <MetricTile label="WIN RATE"         value="68.4%"       delta="+2.1%"     positive demo />
+        <MetricTile label="ACTIVE AI TRADES" value={`0 / ${cap.cap || "—"}`} delta={tier.toUpperCase()} positive demo />
+        <MetricTile label="TODAY"            value="+$184.20"    delta="+0.18%"    positive demo />
+        <MetricTile label="MONTHLY"          value="+$2,940.80"  delta="+2.94%"    positive demo />
+        <MetricTile label="AI CONFIDENCE"    value="78%"         delta="STRONG"    positive demo />
+        <MetricTile label="BEST ASSET"       value="BTC/USD"     delta="+$420.00"  positive demo />
+        <MetricTile label="EQUITY"           value="$101,284.42" demo />
       </div>
 
       {/* Live cross-asset heartbeat (institutional row) */}
@@ -667,14 +779,14 @@ export default function Portal() {
         gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
         gap: 10,
       }}>
-        <Panel title="ACTIVE TRADES">
+        <Panel title="ACTIVE TRADES" locked={tier === "free"} onUnlock={() => setUpgradeOpen(true)}>
           {ACTIVE_TRADES.map((t) => (
             <Row key={t.sym} left={`${t.sym}  ${t.side}`} right={t.pnl}
                  color={t.up ? N.LONG : N.SHORT} sub={t.sub} />
           ))}
         </Panel>
 
-        <Panel title="TRADE HISTORY">
+        <Panel title="TRADE HISTORY" locked={tier === "free"} onUnlock={() => setUpgradeOpen(true)}>
           {TRADE_HISTORY.map((t, i) => (
             <Row key={`${t.sym}-${i}`} left={t.sym} right={t.pnl}
                  color={t.up ? N.LONG : N.SHORT} sub={t.sub} />
@@ -706,13 +818,13 @@ export default function Portal() {
           </div>
         </Panel>
 
-        <Panel title="AI AUTO TRADE QUEUE">
+        <Panel title="AI AUTO TRADE QUEUE" locked={tier === "free"} onUnlock={() => setUpgradeOpen(true)}>
           {QUEUE.map((q) => (
             <Row key={q.sym} left={`${q.sym}  ${q.side}`} right={q.conf}
                  color={N.BRAND} sub={q.state} />
           ))}
           <div style={{ marginTop: 10, color: N.TEXT_2, fontSize: 9, letterSpacing: "0.14em" }}>
-            AI EXECUTES IN ORDER OF CONFIDENCE · CAPACITY GATED BY PLAN
+            AI EXECUTES IN ORDER OF CONFIDENCE · 80% MIN CONFIDENCE FLOOR · CAPACITY GATED BY PLAN
           </div>
         </Panel>
       </div>

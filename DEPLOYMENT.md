@@ -296,3 +296,149 @@ curl -H "Origin: https://app.aicandlez.com" \
 # Push token API (requires auth token)
 curl -H "Authorization: Bearer $TOKEN" https://api.aicandlez.com/api/user/push-tokens
 ```
+
+---
+
+## 10. Tonight's Launch Sequence — `aicandlez.com` Go-Live
+
+### A. DNS (Namecheap → Cloudflare recommended)
+Add these records on Namecheap (or migrate nameservers to Cloudflare first
+for full proxy/HSTS — strongly recommended):
+
+| Type   | Host    | Value                                  | TTL  | Purpose                       |
+| ------ | ------- | -------------------------------------- | ---- | ----------------------------- |
+| A/ALIAS| `@`     | `<deploy IP>` or CNAME to deploy host  | Auto | Landing — `aicandlez.com`     |
+| CNAME  | `www`   | `aicandlez.com`                        | Auto | Landing alias                 |
+| CNAME  | `app`   | `<trading-dashboard deploy URL>`       | Auto | Customer Portal + PWA         |
+| CNAME  | `admin` | `<trading-dashboard deploy URL>`       | Auto | Operator console alias        |
+| CNAME  | `api`   | `<api-server deploy URL>`              | Auto | REST + WebSocket              |
+| TXT    | `@`     | `v=spf1 include:_spf.google.com ~all`  | Auto | Email (if Google Workspace)   |
+
+Note: `app` and `admin` can share the same artifact — the router decides
+who lands where based on role. Use Cloudflare page rules if you want to
+hard-split routing.
+
+### B. Replit Deploy (recommended for tonight)
+Deploy the **api-server** + **trading-dashboard** + **landing** artifacts as
+three separate Replit Reserved VM or Autoscale deployments. Each one binds
+its own subdomain via Replit's custom-domain panel.
+
+1. `api.aicandlez.com`  → api-server (Reserved VM — persistent for WebSocket)
+2. `app.aicandlez.com`  → trading-dashboard (Autoscale OK)
+3. `admin.aicandlez.com`→ same trading-dashboard deployment (second domain mapping)
+4. `aicandlez.com`      → landing (Autoscale)
+
+Use `suggest_deploy` from the agent when ready.
+
+### C. Production Secrets — Required Before Go-Live
+
+Set in each deployment's secret panel (NOT in code):
+
+**Shared:**
+- `DATABASE_URL` — production Postgres (Neon/Replit DB)
+- `SESSION_SECRET` — `openssl rand -hex 32`
+- `VAULT_MASTER_KEY` — `openssl rand -hex 32` (do NOT rotate after first encrypt)
+- `NODE_ENV=production`
+
+**Clerk (production instance):**
+- `CLERK_SECRET_KEY` → from Clerk dashboard `sk_live_…`
+- `VITE_CLERK_PUBLISHABLE_KEY` → `pk_live_…`
+- `CLERK_WEBHOOK_SECRET` (optional, for JIT mirror)
+
+**Stripe (LIVE):**
+- `STRIPE_SECRET_KEY` → `sk_live_…`
+- `STRIPE_WEBHOOK_SECRET` → from registered webhook
+- `VITE_STRIPE_PUBLISHABLE_KEY` → `pk_live_…`
+- `STRIPE_PRICE_STARTER_MONTHLY` → live `$15.99` price ID
+- `STRIPE_PRICE_PRO_MONTHLY` → live `$39.99` price ID
+
+**Push (web):**
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VITE_VAPID_PUBLIC_KEY` /
+  `VAPID_SUBJECT=mailto:hello@aicandlez.com`
+
+**Exchanges (admin-only LIVE mode):**
+- `KRAKEN_API_KEY` / `KRAKEN_API_SECRET`
+- `EXCHANGE_LIVE_ENABLED=true` (admin global kill-switch)
+- Alpaca: per-user encrypted via vault (no global key needed)
+
+**CORS lock:**
+- `ALLOWED_ORIGINS=https://aicandlez.com,https://app.aicandlez.com,https://admin.aicandlez.com,https://api.aicandlez.com`
+
+### D. Clerk Production Checklist
+
+- [ ] Switch app to Production instance (or create new prod app)
+- [ ] Add `aicandlez.com`, `app.aicandlez.com`, `admin.aicandlez.com` as
+      authorized domains
+- [ ] Configure Google OAuth in production (separate client ID from dev)
+- [ ] Set sign-in/sign-up redirect URLs to `/portal` (default user redirect)
+- [ ] Brand: dark terminal theme, AICandlez logo
+- [ ] Email templates: `From: AICandlez <hello@aicandlez.com>`
+- [ ] Verify deliverability with sender domain DKIM/SPF records
+
+### E. Stripe Production Checklist
+
+- [ ] Activate live mode in Stripe dashboard
+- [ ] Create live Products: `AI Trading ($15.99/mo)` and `AI Trading Pro ($39.99/mo)`
+- [ ] Copy live price IDs into `STRIPE_PRICE_*` env vars
+- [ ] Add webhook endpoint:
+      `https://api.aicandlez.com/api/billing/webhook`
+      events: `checkout.session.completed`, `customer.subscription.*`,
+      `invoice.payment_failed`
+- [ ] Set tax behavior to **exclusive** (or inclusive per jurisdiction)
+- [ ] Test purchase with live test card → confirm sub created → confirm
+      `users.plan` row updates
+
+### F. Super-Admin Bootstrap
+
+`mercadojules@gmail.com` is allowlisted in
+`artifacts/api-server/src/lib/adminAllowlist.ts`. On first sign-in:
+1. Clerk webhook (or `GET /api/auth/me`) fires JIT provisioning.
+2. `usersTable` row is created with `role='super-admin'`.
+3. Action is audit-logged as `ADMIN_ACTION · auto_promote_allowlisted_email`.
+4. `HomeRoute` redirects to `/command` on next page load.
+
+Confirm by:
+```sql
+SELECT clerk_user_id, email, role
+FROM users
+WHERE email = 'mercadojules@gmail.com';
+```
+
+### G. Pre-Flight Verification
+
+```bash
+# 1. Customer cannot access admin routes
+curl -i https://api.aicandlez.com/api/exchange/status \
+     -H "Authorization: Bearer <customer-token>"   # → 403
+
+# 2. Engine-control rejects non-admin
+curl -i -X POST https://api.aicandlez.com/api/engine/stop \
+     -H "Authorization: Bearer <customer-token>"   # → 403
+
+# 3. Public market data still works for everyone
+curl https://api.aicandlez.com/api/engine/status        # → 200
+curl https://api.aicandlez.com/api/healthz              # → 200
+
+# 4. Live confidence floor is 80
+grep LIVE_EXECUTION_MIN_CONFIDENCE artifacts/api-server/src/lib/tradingLoop.ts
+# → export const LIVE_EXECUTION_MIN_CONFIDENCE = 80;
+```
+
+### H. iOS / EAS Submission — Follow-Up Track
+
+Mobile is a **separate work track** (Expo `natura-ai` artifact). Current
+status from prior session:
+- Expo prebuild succeeds
+- Metro config fixed
+- CocoaPods SSL is a local-only macOS issue
+- Remaining blocker: corrupted EAS project linkage / invalid UUID appId
+
+Next steps (requires Apple credentials, deferred to a follow-up task):
+1. `eas init --force` from a clean checkout to re-link project
+2. Verify `app.json` `extra.eas.projectId` matches new EAS UUID
+3. `eas build --platform ios --profile production --clear-cache`
+4. `eas submit --platform ios --latest`
+5. TestFlight invite test users
+
+> The web platform launch (api/app/admin/landing) is **independent** of
+> iOS submission and can ship tonight without waiting on EAS.
