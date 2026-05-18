@@ -1,0 +1,25 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# macOS
+.DS_Store
+
+# Native
+ios/
+android/
+.xcode.env.local
+
+# EAS
+.eas/
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Env
+.env
+.env.local
