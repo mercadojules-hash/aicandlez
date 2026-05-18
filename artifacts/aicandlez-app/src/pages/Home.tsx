@@ -997,34 +997,61 @@ export default function Home() {
                 Loading live market data…
               </div>
             </div>
-          ) : topGainers.map((t, i) => (
-            <div key={t.symbol} onClick={() => setLocation("/markets")} style={{
-              display: "flex", alignItems: "center", gap: 12,
-              padding: "15px 18px",
-              borderBottom: i < topGainers.length - 1 ? `1px solid ${BORDER}` : "none",
-              cursor: "pointer",
-              transition: "background 0.2s ease",
-            }}>
-              <CryptoIcon sym={t.symbol} size={38}/>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.1 }}>
-                  {t.short ?? SYM_SHORT[t.symbol] ?? t.symbol.replace("USD","")}/USDT
+          ) : topGainers.map((t, i) => {
+            // Live AI signal lookup from real breakdowns (no fabrication)
+            const bd = breakdowns[t.symbol];
+            const sigAction = bd?.action?.toUpperCase();
+            const sigBullish = sigAction === "BUY" || sigAction === "LONG";
+            const showSignal = bd && sigAction && sigAction !== "HOLD";
+            return (
+              <div key={t.symbol} onClick={() => setLocation("/markets")} style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "15px 18px",
+                borderBottom: i < topGainers.length - 1 ? `1px solid ${BORDER}` : "none",
+                cursor: "pointer",
+                transition: "background 0.2s ease",
+              }}>
+                <CryptoIcon sym={t.symbol} size={38}/>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.1 }}>
+                      {t.short ?? SYM_SHORT[t.symbol] ?? t.symbol.replace("USD","")}/USDT
+                    </span>
+                    {showSignal && (
+                      <span style={{
+                        padding: "2px 6px", borderRadius: 4,
+                        background: sigBullish ? `${BRAND}1F` : `${NEG}1F`,
+                        border: `1px solid ${sigBullish ? BORDER_HI : "rgba(255,64,96,0.30)"}`,
+                        fontSize: 8, fontFamily: SANS, fontWeight: 800,
+                        color: sigBullish ? BRAND : NEG,
+                        letterSpacing: 0.8, textTransform: "uppercase",
+                      }}>{sigAction}</span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                    <span style={{ fontSize: 11, fontFamily: SANS, color: TEXT_DIM }}>
+                      {SYM_LABEL[t.symbol] ?? t.symbol}
+                    </span>
+                    {showSignal && (
+                      <span style={{ fontSize: 10, fontFamily: SANS, fontWeight: 700, color: BRAND, letterSpacing: 0.3 }}>
+                        · AI {bd!.confidence}%
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_DIM, marginTop: 2 }}>
-                  {SYM_LABEL[t.symbol] ?? t.symbol}
+                <Sparkline seed={`gain-${t.symbol}`} trend="up" w={64} h={28}
+                  color={showSignal ? (sigBullish ? BRAND : NEG) : BRAND}/>
+                <div style={{ textAlign: "right", minWidth: 84 }}>
+                  <div style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: TEXT, fontVariantNumeric: "tabular-nums" }}>
+                    {fmtPx(t.price)}
+                  </div>
+                  <div style={{ fontSize: 11, fontFamily: SANS, fontWeight: 600, color: POS, marginTop: 2 }}>
+                    +{t.changePercent24h.toFixed(2)}%
+                  </div>
                 </div>
               </div>
-              <Sparkline seed={`gain-${t.symbol}`} trend="up" w={64} h={28}/>
-              <div style={{ textAlign: "right", minWidth: 84 }}>
-                <div style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: TEXT, fontVariantNumeric: "tabular-nums" }}>
-                  {fmtPx(t.price)}
-                </div>
-                <div style={{ fontSize: 11, fontFamily: SANS, fontWeight: 600, color: POS, marginTop: 2 }}>
-                  +{t.changePercent24h.toFixed(2)}%
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* ════════════════════════════════════════════════════════════════ */}
