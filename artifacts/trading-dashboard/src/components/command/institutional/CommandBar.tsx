@@ -14,13 +14,13 @@ interface Exchange {
   id: string; label: string; color: string; disabled?: boolean; soon?: boolean; isSim?: boolean;
 }
 
+// Operator console = LIVE-ONLY crypto execution.
+// No paper / simulation / Alpaca tabs are exposed on this surface.
 const EXCHANGES: Exchange[] = [
-  { id: "sim",       label: "PAPER AI",   color: N.WARN,    isSim: true },
-  { id: "alpaca",    label: "ALPACA",     color: "#ffbe00" },
+  { id: "kraken",    label: "KRAKEN",     color: N.GOLD },
   { id: "coinbase",  label: "COINBASE",   color: "#2775ca" },
   { id: "binance",   label: "BINANCE",    color: "#f0b90b" },
   { id: "cryptocom", label: "CRYPTO.COM", color: "#1199fa" },
-  { id: "kraken",    label: "KRAKEN",     color: "#7d3cf8" },
   { id: "bybit",     label: "BYBIT",      color: "#f7a600", disabled: true, soon: true },
   { id: "kucoin",    label: "KUCOIN",     color: "#24ae8f", disabled: true, soon: true },
   { id: "okx",       label: "OKX",        color: "#b0b0b0", disabled: true, soon: true },
@@ -64,13 +64,15 @@ export function CommandBar({
   const isPaused  = exchangeStatus?.paused ?? false;
   const isKill    = exchangeStatus?.killSwitch ?? false;
 
-  const equity = liveActive
-    ? (liveBalance?.balances?.USD ?? null)
-    : (simAccount?.equity ?? null);
-  const pnl       = simAccount?.totalPnL ?? null;
-  const pnlPct    = simAccount?.totalPnLPct ?? null;
-  const pnlPos    = (pnl ?? 0) >= 0;
-  const openCount = simAccount?.positionCount ?? 0;
+  // Operator console: equity, PnL, and open-position count ALL come from the
+  // live broker. simAccount is intentionally ignored here so no paper/sim
+  // data can ever leak onto /command.
+  void simAccount;
+  const equity    = liveActive ? (liveBalance?.balances?.USD ?? null) : null;
+  const pnl       = null as number | null;
+  const pnlPct    = null as number | null;
+  const pnlPos    = true;
+  const openCount = 0;
 
   return (
     <header
@@ -143,8 +145,8 @@ export function CommandBar({
         />
         <Stat
           label="MODE"
-          value={liveActive ? activeId.toUpperCase() : "PAPER"}
-          color={liveActive ? N.LONG : N.WARN}
+          value={liveActive ? activeId.toUpperCase() : "STANDBY"}
+          color={liveActive ? N.GOLD : N.TEXT_2}
         />
       </div>
 
@@ -160,7 +162,7 @@ export function CommandBar({
             <button
               key={ex.id}
               disabled={disabled}
-              onClick={() => disabled ? undefined : ex.isSim ? onSelectSim() : onSelectLive(ex.id)}
+              onClick={() => disabled ? undefined : onSelectLive(ex.id)}
               title={disabled ? `${ex.label} — coming soon` : `Switch to ${ex.label}`}
               className="text-[8.5px] font-bold tracking-[0.14em] px-2 py-1 rounded transition-all flex-shrink-0"
               style={{

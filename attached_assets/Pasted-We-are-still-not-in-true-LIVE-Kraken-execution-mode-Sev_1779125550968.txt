@@ -1,0 +1,136 @@
+We are still not in true LIVE Kraken execution mode. Several critical operator-console issues remain unresolved on /command.
+
+CURRENT ISSUES STILL PRESENT
+
+1. PAPER / ALPACA SIMULATION IS STILL ACTIVE
+The dashboard is STILL showing:
+- “PAPER”
+- “PAPER AI”
+- Alpaca paper balance of $100,000
+
+This must be completely removed from the OPERATOR dashboard.
+
+IMPORTANT:
+The operator console is NOT a paper trading interface anymore.
+
+Required changes:
+- Remove ALL paper trading state from operator mode
+- Remove “PAPER” labels
+- Remove “PAPER AI”
+- Remove Alpaca paper telemetry
+- Remove fake balances
+- Remove all mock execution/account data
+
+The ONLY active live broker should be:
+KRAKEN
+
+2. KRAKEN IS NOT ACTUALLY ACTIVATING
+When I click Kraken:
+- it does not illuminate
+- it does not become active
+- it does not load the real Kraken balance
+- the dashboard does not switch to LIVE mode
+
+I already have valid Kraken API keys configured.
+
+Required:
+- Kraken must become the default and ONLY active live crypto exchange
+- Clicking Kraken should:
+  • illuminate the Kraken tab
+  • activate LIVE mode
+  • pull REAL account balance
+  • pull REAL open positions
+  • pull REAL live orders
+  • pull REAL trade history
+  • pull REAL unrealized PnL
+- Dashboard telemetry must come directly from Kraken APIs
+- If Kraken account balance is ~$100, show the REAL $100 balance — NOT paper money
+
+3. EXECUTION STATE COLORS STILL WRONG
+The “ENABLE LIVE AI CRYPTO EXECUTION” and
+“ENABLE LIVE AI EQUITIES EXECUTION” controls are not visually correct.
+
+Required visual states:
+
+STANDBY
+- dark neutral
+- no glow
+
+ARMED / LIVE
+- ORANGE/GOLD glow
+- active pulse
+- obvious “LIVE” state
+
+HALTED / STOPPED
+- RED glow
+- emergency stop styling
+- clearly disabled
+
+Current UI still looks muted and inactive.
+
+Make the visual state impossible to miss.
+
+4. OPERATOR DASHBOARD SHOULD NEVER SHOW SIMULATION
+No simulation language should exist anywhere on /command.
+
+Remove:
+- simulation
+- paper
+- paper AI
+- simulated execution
+- fake positions
+- fake blotter rows
+- mock account balances
+
+Operator mode is now:
+LIVE EXECUTION ONLY
+
+5. LIVE POSITIONS PANEL MUST BE REAL KRAKEN POSITIONS ONLY
+The Active Positions section should ONLY display:
+- real Kraken open positions
+- real entry prices
+- real size
+- real unrealized PnL
+- real stop levels
+
+If no positions exist:
+show EMPTY STATE.
+
+Do NOT render fake/demo positions.
+
+6. HARD EXECUTION RULES
+Keep the existing backend protection:
+
+NO LIVE ORDER MAY EXECUTE BELOW 80% AI CONFIDENCE
+
+This rule must remain enforced BOTH:
+- frontend
+- backend
+
+7. LIVE EXECUTION FLOW
+Desired final behavior:
+
+- Kraken active by default
+- Real Kraken balance visible
+- No paper trading visible
+- No fake balances
+- No simulation mode
+- LIVE toggle arms engine
+- Orange = armed/live
+- Red = halted
+- Real trades execute ONLY through Kraken
+- Dashboard telemetry reflects REAL broker activity only
+
+8. VERIFY API PIPELINE
+Audit and verify:
+- Kraken API connectivity
+- exchange mode state management
+- execution routing
+- telemetry source
+- broker switching logic
+- frontend exchange activation state
+- websocket/live balance updates
+
+Current evidence suggests the UI is still partially connected to paper/simulation infrastructure instead of the real Kraken execution layer.
+
+I need the operator dashboard to behave like a true institutional live execution console — not a paper trading simulator.

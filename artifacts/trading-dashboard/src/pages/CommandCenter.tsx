@@ -15,7 +15,7 @@
  */
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LiveConsentModal, useLiveConsent } from "@/components/ConsentGate";
 
 // ── Operator bypass ───────────────────────────────────────────────────────────
@@ -96,7 +96,11 @@ export default function CommandCenter() {
   /* ── Active exchange ──────────────────────────────────────────────────── */
   const mode       = exchangeStatus?.mode ?? "simulation";
   const liveActive = mode !== "simulation" && (exchangeStatus?.liveEnabled ?? false);
-  const activeId   = liveActive ? mode : "sim";
+  // Operator surface is LIVE-only — default the highlighted exchange tab to
+  // KRAKEN when the engine hasn't reported a live mode yet (so the tab is
+  // visually selected the moment the page mounts, even before the auto-arm
+  // effect resolves).
+  const activeId   = liveActive ? mode : "kraken";
   const isPaused   = exchangeStatus?.paused ?? false;
 
   /* ── Consent flow ─────────────────────────────────────────────────────── */
@@ -151,6 +155,21 @@ export default function CommandCenter() {
     // omitted from deps to avoid re-firing on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOperator, pendingLiveEx]);
+
+  // Operator default: if the engine is sitting in `simulation` mode when an
+  // operator opens the console, auto-activate KRAKEN live mode so the
+  // dashboard is real-broker by default (no manual click required).
+  const autoKrakenFired = useRef(false);
+  useEffect(() => {
+    if (!isOperator || !isRoleResolved) return;
+    if (!exchangeStatus) return; // wait for status fetch
+    if (autoKrakenFired.current) return;
+    if (mode === "simulation") {
+      autoKrakenFired.current = true;
+      switchExchangeMode("kraken", "kraken");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOperator, isRoleResolved, exchangeStatus, mode]);
 
   /* ── Live-trading control bars (operator) ─────────────────────────────── */
   // Operator surface uses institutional language — no "SIMULATION" pills.
@@ -218,7 +237,7 @@ export default function CommandCenter() {
       <CommandBar
         engine={engine}
         exchangeStatus={exchangeStatus}
-        simAccount={liveActive ? undefined : simAccount}
+        simAccount={undefined}
         liveBalance={liveBalance}
         activeId={activeId}
         liveActive={liveActive}
