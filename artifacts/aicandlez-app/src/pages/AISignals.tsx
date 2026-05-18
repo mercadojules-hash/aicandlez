@@ -170,40 +170,51 @@ function SignalSparkline({ seed, trend, w = 110, h = 38, color }: {
 // Confidence ring — large prominent gauge, color-state, animated pulse
 // ═══════════════════════════════════════════════════════════════════════════
 function ConfidenceGauge({ value }: { value: number }) {
-  const size = 88;
-  const r = 36;
+  const size = 96;
+  const r = 40;
   const c = 2 * Math.PI * r;
   const pct = Math.max(0, Math.min(100, value));
   const color = confidenceColor(pct);
   const dash = (pct / 100) * c;
   return (
     <div style={{
-      position: "relative", width: size, height: size, flexShrink: 0,
+      display: "flex", flexDirection: "column", alignItems: "center",
+      flexShrink: 0, gap: 6,
     }}>
-      {/* Institutional gauge — large, prominent, restrained glow */}
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={size/2} cy={size/2} r={r}
-          fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={5}/>
-        <circle cx={size/2} cy={size/2} r={r}
-          fill="none" stroke={color} strokeWidth={5} strokeLinecap="round"
-          strokeDasharray={`${dash} ${c}`}
-          transform={`rotate(-90 ${size/2} ${size/2})`}
-          opacity={0.92}
-        />
-      </svg>
+      {/* Institutional AI score — dominant visual hierarchy.
+          Inside ring = ONLY the percentage. Label sits below. */}
       <div style={{
-        position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center", lineHeight: 1,
+        position: "relative", width: size, height: size,
+        filter: `drop-shadow(0 0 14px ${BRAND_BLOOM})`,
       }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <circle cx={size/2} cy={size/2} r={r}
+            fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={6}/>
+          <circle cx={size/2} cy={size/2} r={r}
+            fill="none" stroke={color} strokeWidth={6} strokeLinecap="round"
+            strokeDasharray={`${dash} ${c}`}
+            transform={`rotate(-90 ${size/2} ${size/2})`}
+            opacity={0.95}
+          />
+        </svg>
         <div style={{
-          fontSize: 24, fontFamily: SANS, fontWeight: 800, color,
-          letterSpacing: -0.6, fontVariantNumeric: "tabular-nums",
-        }}>{Math.round(pct)}%</div>
-        <div style={{
-          fontSize: 8, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
-          letterSpacing: 1.0, textTransform: "uppercase", marginTop: 4,
-        }}>AI Confidence</div>
+          position: "absolute", inset: 0, display: "flex",
+          alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            fontSize: 30, fontFamily: SANS, fontWeight: 900, color,
+            letterSpacing: -1.2, fontVariantNumeric: "tabular-nums",
+            lineHeight: 1, textShadow: `0 0 12px ${color}55`,
+          }}>{Math.round(pct)}<span style={{
+            fontSize: 14, fontWeight: 800, marginLeft: 1,
+            letterSpacing: -0.2,
+          }}>%</span></div>
+        </div>
       </div>
+      <div style={{
+        fontSize: 8.5, fontFamily: SANS, fontWeight: 800, color: TEXT_DIM,
+        letterSpacing: 1.4, textTransform: "uppercase",
+      }}>AI Confidence</div>
     </div>
   );
 }
@@ -288,6 +299,59 @@ const EQUITY_BASES: Array<{ sym: string; base: number }> = [
   { sym: "INTC", base:  21.40 },
   { sym: "DIS",  base:  98.70 },
 ];
+
+// Crypto pool — top 20 by market relevance. Real engine breakdowns
+// (BTC/ETH/SOL etc.) take precedence when present; the rest are
+// deterministic, day-seeded previews so the feed always feels populated.
+// No "PREVIEW" badge is shown — equity-style post-click routing handles
+// the not-yet-live state silently.
+const CRYPTO_BASES: Array<{ sym: string; base: number; name: string }> = [
+  { sym: "BTC",  base: 71_500, name: "Bitcoin" },
+  { sym: "ETH",  base:  3_820, name: "Ethereum" },
+  { sym: "SOL",  base:    178, name: "Solana" },
+  { sym: "XRP",  base:   0.62, name: "Ripple" },
+  { sym: "ADA",  base:   0.49, name: "Cardano" },
+  { sym: "AVAX", base:     38, name: "Avalanche" },
+  { sym: "DOGE", base:   0.16, name: "Dogecoin" },
+  { sym: "LINK", base:     17, name: "Chainlink" },
+  { sym: "HBAR", base:   0.11, name: "Hedera" },
+  { sym: "SUI",  base:   1.85, name: "Sui" },
+  { sym: "LTC",  base:     86, name: "Litecoin" },
+  { sym: "BCH",  base:    470, name: "Bitcoin Cash" },
+  { sym: "PEPE", base: 0.0000089, name: "Pepe" },
+  { sym: "SHIB", base: 0.0000241, name: "Shiba Inu" },
+  { sym: "DOT",  base:    7.4, name: "Polkadot" },
+  { sym: "NEAR", base:    5.2, name: "NEAR Protocol" },
+  { sym: "FET",  base:    1.6, name: "Fetch.ai" },
+  { sym: "TAO",  base:    420, name: "Bittensor" },
+  { sym: "AAVE", base:    132, name: "Aave" },
+  { sym: "UNI",  base:    9.8, name: "Uniswap" },
+];
+
+function makeCryptoPreviews(): PreviewRow[] {
+  const d = new Date();
+  const seed = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+  return CRYPTO_BASES.map((e) => {
+    const rng = makeEqRng(`${seed}-crypto-${e.sym}`);
+    const r1 = rng(), r2 = rng(), r3 = rng(), r4 = rng();
+    const action = r1 > 0.78 ? "SELL" : r1 > 0.12 ? "BUY" : "HOLD";
+    const confidence = Math.round(58 + r2 * 36);
+    const changePct  = (r3 - 0.42) * 6.8;
+    const price      = e.base * (1 + (r3 - 0.5) * 0.06);
+    return {
+      breakdown: {
+        symbol: `${e.sym}USD`, action, confidence,
+        mtfConfirmed:    r4 > 0.30,
+        volumeConfirmed: r4 > 0.50,
+        marketCondition: r1 > 0.55 ? "TRENDING" : "RANGING",
+        trend1H:         r2 > 0.6 ? "BULLISH" : r2 > 0.3 ? "BEARISH" : "NEUTRAL",
+        blockReason:     null,
+        lastUpdated:     Date.now() - Math.round(r1 * 4200) * 1000,
+      },
+      ticker: { price, changePercent24h: changePct, up: changePct >= 0 },
+    };
+  });
+}
 
 function makeEquityPreviews(): PreviewRow[] {
   const d = new Date();
@@ -390,18 +454,37 @@ export default function AISignals() {
       .slice(0, 10);
   }, [signalsQ.data, tickerBySym, equityPreviews]);
 
-  // Crypto tab = TOP 10 crypto signals ranked by AI confidence.
-  // Real data only — any breakdown missing a live ticker is excluded.
+  // Crypto previews — stable per day. Used to fill out the top-20 feed
+  // for the long tail of assets the live engine does not yet cover.
+  const cryptoPreviews = useMemo(() => makeCryptoPreviews(), []);
+
+  // Crypto tab = TOP 20 by AI confidence. Real engine breakdowns
+  // (with a live ticker) take precedence over the day-seeded preview row
+  // for the same symbol; everything else is filled in by previews.
   const cryptoSignals = useMemo(() => {
     const breakdowns = signalsQ.data?.breakdowns ?? {};
-    return Object.values(breakdowns)
+    const realRows = Object.values(breakdowns)
       .filter(b => !!tickerBySym[b.symbol])
+      .map(b => ({
+        breakdown: b,
+        ticker: tickerBySym[b.symbol]!,
+        isPreview: false,
+      }));
+    const realSyms = new Set(realRows.map(r => r.breakdown.symbol));
+    const previewRows = cryptoPreviews
+      .filter(p => !realSyms.has(p.breakdown.symbol))
+      .map(p => ({
+        breakdown: p.breakdown,
+        ticker: p.ticker,
+        isPreview: true,
+      }));
+    return [...realRows, ...previewRows]
       .sort((a, b) =>
-        (b.confidence - a.confidence) ||
-        a.symbol.localeCompare(b.symbol)
+        (b.breakdown.confidence - a.breakdown.confidence) ||
+        a.breakdown.symbol.localeCompare(b.breakdown.symbol)
       )
-      .slice(0, 10);
-  }, [signalsQ.data, tickerBySym]);
+      .slice(0, 20);
+  }, [signalsQ.data, tickerBySym, cryptoPreviews]);
 
   // Equities tab = TOP 20 preview rows ranked by confidence.
   const equitySignals = useMemo(() =>
@@ -511,10 +594,10 @@ export default function AISignals() {
           {!loading && tab === "crypto" && (() => {
             const q = cryptoQuery.trim().toLowerCase();
             const list = q
-              ? cryptoSignals.filter(b =>
-                  b.symbol.toLowerCase().includes(q) ||
-                  (SYM_LABEL[b.symbol] ?? "").toLowerCase().includes(q) ||
-                  (SYM_SHORT[b.symbol] ?? "").toLowerCase().includes(q))
+              ? cryptoSignals.filter(r =>
+                  r.breakdown.symbol.toLowerCase().includes(q) ||
+                  (SYM_LABEL[r.breakdown.symbol] ?? "").toLowerCase().includes(q) ||
+                  (SYM_SHORT[r.breakdown.symbol] ?? "").toLowerCase().includes(q))
               : cryptoSignals;
             return cryptoSignals.length === 0
               ? <EmptyState
@@ -530,14 +613,15 @@ export default function AISignals() {
                     <span>Top {list.length} Crypto Signals</span>
                     <span style={{ color: BRAND }}>Sorted by Confidence</span>
                   </div>
-                  {list.map((b, i) => (
+                  {list.map((row, i) => (
                     <SignalCard
-                      key={b.symbol}
+                      key={row.breakdown.symbol}
                       rank={i + 1}
                       kind="crypto"
-                      breakdown={b}
-                      ticker={tickerBySym[b.symbol]}
-                      onOpen={() => openAsset("crypto", SYM_SHORT[b.symbol] ?? b.symbol.replace("USD",""))}/>
+                      isPreview={row.isPreview}
+                      breakdown={row.breakdown}
+                      ticker={row.ticker}
+                      onOpen={() => openAsset("crypto", SYM_SHORT[row.breakdown.symbol] ?? row.breakdown.symbol.replace("USD",""))}/>
                   ))}
                   <SearchBar
                     placeholder="Search crypto…"
@@ -847,10 +931,12 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
         </div>
       </div>
 
-      {/* Price + sparkline + confidence row */}
+      {/* Price + sparkline + confidence row.
+          alignItems:flex-start lifts the confidence gauge up so it sits
+          higher in the card with breathing room from the metrics below. */}
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        marginTop: 12, gap: 12,
+        display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+        marginTop: 6, gap: 12,
       }}>
         <div style={{ minWidth: 0 }}>
           <div style={{

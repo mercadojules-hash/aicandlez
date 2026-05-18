@@ -150,9 +150,18 @@ export function CryptoIcon({ sym, size = 36, glow = true }: { sym: string; size?
 }
 
 export const SYM_LABEL: Record<string,string> = {
-  BTCUSD:"Bitcoin", ETHUSD:"Ethereum", SOLUSD:"Solana",
-  ADAUSD:"Cardano", AVAXUSD:"Avalanche", DOGEUSD:"Dogecoin",
+  BTCUSD:"Bitcoin",    ETHUSD:"Ethereum",     SOLUSD:"Solana",
+  ADAUSD:"Cardano",    AVAXUSD:"Avalanche",   DOGEUSD:"Dogecoin",
+  XRPUSD:"Ripple",     LINKUSD:"Chainlink",   HBARUSD:"Hedera",
+  SUIUSD:"Sui",        LTCUSD:"Litecoin",     BCHUSD:"Bitcoin Cash",
+  PEPEUSD:"Pepe",      SHIBUSD:"Shiba Inu",   DOTUSD:"Polkadot",
+  NEARUSD:"NEAR Protocol", FETUSD:"Fetch.ai", TAOUSD:"Bittensor",
+  AAVEUSD:"Aave",      UNIUSD:"Uniswap",
 };
 export const SYM_SHORT: Record<string,string> = {
-  BTCUSD:"BTC", ETHUSD:"ETH", SOLUSD:"SOL", ADAUSD:"ADA", AVAXUSD:"AVAX", DOGEUSD:"DOGE",
+  BTCUSD:"BTC",   ETHUSD:"ETH",   SOLUSD:"SOL",   ADAUSD:"ADA",
+  AVAXUSD:"AVAX", DOGEUSD:"DOGE", XRPUSD:"XRP",   LINKUSD:"LINK",
+  HBARUSD:"HBAR", SUIUSD:"SUI",   LTCUSD:"LTC",   BCHUSD:"BCH",
+  PEPEUSD:"PEPE", SHIBUSD:"SHIB", DOTUSD:"DOT",   NEARUSD:"NEAR",
+  FETUSD:"FET",   TAOUSD:"TAO",   AAVEUSD:"AAVE", UNIUSD:"UNI",
 };
