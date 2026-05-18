@@ -25,6 +25,8 @@ services:
         sync: false
       - key: CLERK_PUBLISHABLE_KEY
         sync: false
+      - key: VITE_CLERK_PROXY_URL
+        value: https://api.aicandlez.com/api/__clerk
       - key: SESSION_SECRET
         generateValue: true
       - key: VAPID_PUBLIC_KEY
@@ -89,6 +91,8 @@ services:
     envVars:
       - key: VITE_CLERK_PUBLISHABLE_KEY
         sync: false
+      - key: VITE_CLERK_PROXY_URL
+        value: https://api.aicandlez.com/api/__clerk
       - key: VITE_VAPID_PUBLIC_KEY
         sync: false
       - key: VITE_API_BASE_URL
@@ -124,6 +128,8 @@ services:
     envVars:
       - key: VITE_CLERK_PUBLISHABLE_KEY
         sync: false
+      - key: VITE_CLERK_PROXY_URL
+        value: https://api.aicandlez.com/api/__clerk
       - key: VITE_VAPID_PUBLIC_KEY
         sync: false
       - key: VITE_API_BASE_URL

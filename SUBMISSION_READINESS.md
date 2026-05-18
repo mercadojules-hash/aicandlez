@@ -251,3 +251,96 @@ eas submit --platform android --latest --track internal
 | Do App Store submission artifacts contain only AICandlez branding? | **Yes** for the PWA bundle (`dist/`) — zero "natura" or "apex" strings found in the production JS/CSS/HTML/manifest/sw. **For the mobile bundle**, the Expo project at `artifacts/natura-ai/` has been rebranded — `expo.name="AICandlez"`, `expo.scheme="aicandlez"`, splash text "AC", all in-app strings use AICandlez. The directory name `natura-ai/` and Expo `slug="natura-ai"` are internal-only and never shown to App Store reviewers or end users. |
 
 The `natura-ai` directory naming is the last cosmetic remnant — it's just where the Expo project lives on disk. Renaming the directory is a larger refactor (touches workflows, EAS project linkage, package name) and is **not required** for App Store approval. Reviewers see `expo.name="AICandlez"`, the bundle ID, and the app icon — none of which expose the directory name.
+
+---
+
+## FINAL STABILIZATION PASS (2026-05-18, evening) — All blockers resolved ✅
+
+### 1. Production Clerk keys — ✅ RESOLVED (Blocker #1)
+
+| Item | Status |
+|---|---|
+| Production `pk_live_*` key | ✅ Stored in Replit Secrets as `VITE_CLERK_PUBLISHABLE_KEY_LIVE` |
+| Production `sk_live_*` key | ✅ Stored in Replit Secrets as `CLERK_SECRET_KEY_LIVE` |
+| Production build embeds `pk_live_*` when env var is `pk_live_*` | ✅ Verified: `pk_live_Y2xlcmsuYWljYW5kbGV6LmNvbSQ` (= `clerk.aicandlez.com$`) embedded in JS bundle |
+| FAPI proxy URL activates only for `pk_live_*` keys | ✅ Verified: `https://api.aicandlez.com/api/__clerk` appears in dist when built with live key, absent when built with dev key |
+| Dev preview still uses dev keys | ✅ Unchanged — only the `_LIVE`-suffixed secrets were added; the default `VITE_CLERK_PUBLISHABLE_KEY` remains the dev key for local preview |
+| Stripe production keys | ✅ Already on `pk_live_*` (bonus confirmation — `pk_live_51TWaIZ...` embedded) |
+
+**How to deploy with live keys**:
+- **Replit Deployments**: secrets are already available; ensure the production deploy environment maps `VITE_CLERK_PUBLISHABLE_KEY` ← `VITE_CLERK_PUBLISHABLE_KEY_LIVE` and `CLERK_SECRET_KEY` ← `CLERK_SECRET_KEY_LIVE`, or rename the live secrets to the unsuffixed names in the Production environment scope.
+- **Render**: in the Render dashboard for `aicandlez-app`, `aicandlez-dashboard`, and `aicandlez-api`, paste the live values into the `VITE_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` env vars (render.yaml already marks them `sync: false` — they're expected to be filled in manually).
+
+### 2. Mobile bundle identifiers — ✅ RESOLVED (Blockers #2 + #3)
+
+User chose the **clean rebrand path** (resets TestFlight history, gains a clean App Store identity).
+
+| Field | Before | After |
+|---|---|---|
+| `expo.ios.bundleIdentifier` | `com.naturaai.app` | `com.aicandlez.app` |
+| `expo.ios.buildNumber` | (carried over) | `"1"` (reset) |
+| `expo.android.package` | not set (build would fail) | `"com.aicandlez.app"` |
+| `expo.android.versionCode` | not set | `1` |
+| `expo.scheme` | `aicandlez` | `aicandlez` (unchanged) |
+| `expo.slug` | `natura-ai` | `natura-ai` (unchanged — internal-only, preserves EAS project linkage) |
+
+### 3. Logo asset bloat — ✅ RESOLVED (Blocker #4)
+
+| Metric | Before | After |
+|---|---|---|
+| `attached_assets/AICandlez_Final_Logo_3_*.png` (referenced by Home.tsx) | 2.1 MB @ 7500×2048 | Replaced with `src/assets/aicandlez-logo.png` — **66 KB** @ 512×140 |
+| `public/aicandlez-logo.png` | n/a | **40 KB** |
+| `public/aicandlez-icon.png` | n/a | **9.8 KB** @ 192×192 (PWA icon) |
+| Stale `public/apex-logo.png` | 2.0 MB | ✅ Deleted |
+| Stale `public/aicandlez-logo-lg.png` | 3.7 MB | ✅ Deleted |
+| **Total logo footprint** | **~7.8 MB** | **~116 KB** (98.5% reduction) |
+| **`aicandlez-app/dist/` production build size** | ~8.3 MB | **816 KB** (90% reduction) |
+| Home.tsx import | `@assets/AICandlez_Final_Logo_3_...` (2.1 MB) | `../assets/aicandlez-logo.png` (66 KB) |
+
+### 4. Production build verification — ✅ PASS
+
+Built `aicandlez-app` twice (once with dev key, once with live key) and ran branding scans:
+
+- ✅ 188 modules transformed, 2.8s–3.0s build time
+- ✅ Bundle: `index-*.js` 578 KB (gzip 158 KB), `index-*.css` 94 KB (gzip 16 KB), logo 66 KB
+- ✅ Total `dist/` size: **816 KB** (was 8.3 MB)
+- ✅ Zero `apex` or `natura` strings anywhere in dist (HTML/JS/CSS/manifest/sw/assets)
+- ✅ When built with `pk_live_*`: 3 `pk_live_` literals (1 SDK constant + 1 Clerk key + 1 Stripe key), 1 `pk_test_` (SDK constant only — `k2="pk_test_"` for prefix detection), FAPI proxy URL activates
+- ✅ When built with `pk_test_*` (dev preview): FAPI proxy URL absent (correct — dev keys talk directly to Clerk's hosted FAPI)
+
+### 5. Final blocker table
+
+| # | Blocker | Status |
+|---|---|---|
+| 1 | Production build embeds Clerk dev key | ✅ **RESOLVED** — live keys stored, build verified |
+| 2 | `android.package` not set | ✅ **RESOLVED** — set to `com.aicandlez.app` |
+| 3 | `ios.bundleIdentifier` is `com.naturaai.app` | ✅ **RESOLVED** — rebranded to `com.aicandlez.app` (build #1 reset) |
+| 4 | 7.8 MB of redundant logo PNGs | ✅ **RESOLVED** — 116 KB total, dist 90% smaller |
+| 5 | Full e2e QA not yet run | 🟡 RECOMMENDED — run the testing skill before Render deploy |
+| 6 | App Store Connect listing metadata | 🟢 EXTERNAL — set in App Store Connect dashboard |
+| 7 | Clerk production instance display name | 🟢 EXTERNAL — confirm in Clerk dashboard (host is `clerk.aicandlez.com` ✅) |
+| 8 | Stripe production product names | 🟢 EXTERNAL — verify in Stripe dashboard (live keys already in use ✅) |
+| 9 | Service worker takeover for `/apex-trader-app/` | 🟢 OPTIONAL — not exposed in production |
+
+### 6. Ready-to-ship checklist (what's left for the user)
+
+1. **In Render** (or Replit Deployments production env): paste `VITE_CLERK_PUBLISHABLE_KEY` = your `pk_live_*` and `CLERK_SECRET_KEY` = your `sk_live_*` into env vars for `aicandlez-app`, `aicandlez-dashboard`, and `aicandlez-api`. (Both keys are already stored in Replit Secrets under their `_LIVE` suffix — copy them across.)
+2. **Run e2e QA** with the testing skill on the dev preview (covers the manual list in §2.B above).
+3. **Render deploy** → verify the 4 services come up green at `aicandlez.com`, `app.aicandlez.com`, `api.aicandlez.com`.
+4. **EAS build** with `eas build --platform ios --profile production` and `eas build --platform android --profile production`.
+5. **EAS submit** → uploads to App Store Connect (TestFlight) and Google Play Console (Internal Testing).
+6. **TestFlight internal testers** — 1 week of testing before external review.
+7. **Submit for App Store review**; set Play Console to "Internal testing" first, then "Closed testing" → "Production".
+
+**Code-side stabilization is COMPLETE. All remaining steps are external configuration in Render, App Store Connect, Google Play Console, Clerk, and Stripe dashboards.**
+
+### 7. Render.yaml Clerk proxy URL — ✅ RESOLVED (post-review fix)
+
+Code review surfaced one missed wiring detail: `render.yaml` declared `VITE_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` (with `sync: false`), but did NOT declare `VITE_CLERK_PROXY_URL`. Without this, the live-key conditional in `App.tsx` (`startsWith("pk_live_") ? import.meta.env.VITE_CLERK_PROXY_URL : undefined`) would resolve to `undefined` on Render, defeating the proxy.
+
+Fixed by adding `VITE_CLERK_PROXY_URL: https://api.aicandlez.com/api/__clerk` as a `value:` (constant, no secret) to all three relevant services in render.yaml:
+- `aicandlez-api` (server-side `clerkProxyMiddleware` reads `process.env.VITE_CLERK_PROXY_URL`)
+- `aicandlez-dashboard` (Vite static build reads it at compile time)
+- `aicandlez-app` (Vite static build reads it at compile time)
+
+Verified: production build still 816 KB, FAPI proxy URL still embedded.
