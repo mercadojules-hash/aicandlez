@@ -1,0 +1,154 @@
+We are doing a COMPLETE visual redesign of the AICandlez mobile app.
+
+IMPORTANT:
+The attached concept design is now the PRIMARY visual direction for the app.
+I want the REAL app to match this design language almost EXACTLY.
+
+DO NOT improvise a different aesthetic.
+DO NOT use generic dashboards.
+DO NOT revert back to the old UI style.
+
+The new direction is:
+
+• ultra-premium fintech aesthetic
+• cinematic dark UI
+• deep black backgrounds
+• neon green glow accents
+• glassmorphism cards
+• luxury crypto/trading interface
+• smooth gradients and lighting
+• high-end modern mobile fintech design
+• extremely polished spacing and typography
+• realistic glowing trading charts
+• sophisticated shadows and reflections
+• subtle particle/background energy effects
+• premium App Store quality visuals
+
+The attached screenshots are the exact quality level I expect.
+
+BRAND COLORS
+
+Primary neon green:
+#66FF66
+
+Secondary greens:
+#00C853
+#7CFF00
+#39FF14
+
+Background:
+Pure black / near-black
+#000000
+#050505
+#0A0A0A
+
+Cards:
+dark glassmorphism with subtle transparency
+
+Glow:
+soft neon green bloom
+
+LOGO IMPLEMENTATION
+
+I attached the FINAL AICandlez logos.
+
+Use these exact assets:
+• horizontal logo
+• app icon logo
+
+The logo style itself should influence the entire UI aesthetic.
+
+The app should visually feel like:
+“Bloomberg Terminal meets Apple-level fintech polish with neon AI energy.”
+
+HOME SCREEN REQUIREMENTS
+
+The attached “AI-Powered Trading Built for Real Results” design is now the target.
+
+Rebuild the Home screen to closely match it:
+
+TOP SECTION:
+• centered premium AICandlez logo
+• luxury typography
+• glowing live market indicators
+• animated candle/chart background effects
+
+PORTFOLIO CARD:
+• rounded premium glass card
+• glowing performance chart
+• exact visual hierarchy similar to concept image
+• realistic spacing/padding
+• large portfolio numbers
+• smooth shadows and depth
+
+QUICK ACTION BUTTONS:
+• AI Scan
+• Open Trades
+• Auto Trade
+• Deposit
+
+Use premium iconography and glass buttons.
+
+MARKET INSIGHTS SECTION:
+• BTC/USDT bullish signal
+• AI confidence meter
+• realistic market intelligence UI
+• glowing progress bars
+
+TOP GAINERS:
+• animated mini charts
+• premium list rows
+• crypto logos/icons
+• subtle neon graph glow
+
+BOTTOM NAVIGATION:
+• luxury dark navigation bar
+• glowing active tab
+• soft blur/transparency
+
+VERY IMPORTANT
+
+The CURRENT app is NOT visually close enough.
+
+I need this redesign elevated dramatically to match the attached concept art.
+
+This is now the benchmark quality:
+• App Store featured-app quality
+• Dribbble-level fintech UI
+• ultra-modern crypto app
+• visually addictive
+• premium luxury feel
+
+The attached images should be treated as direct design references — especially:
+• spacing
+• typography
+• glow intensity
+• color palette
+• card structure
+• chart style
+• icon treatment
+• lighting
+• gradients
+
+TECHNICAL REQUIREMENTS
+
+• preserve existing functionality
+• redesign UI/UX only
+• React Native + Expo compatible
+• optimize for iPhone screenshots
+• smooth animations
+• responsive layout
+• maintain performance
+• no oversized assets
+
+DELIVERABLES
+Complete redesigned Home screen
+Updated design system
+Premium reusable UI components
+Improved typography hierarchy
+Enhanced charts/graphs
+Refined navigation
+Better onboarding polish
+App Store quality visual consistency
+
+The final result should feel like a premium $100M-funded AI trading platform mobile app.
