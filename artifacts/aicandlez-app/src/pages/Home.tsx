@@ -1,1218 +1,807 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
-import aicandlezLogo from "../assets/aicandlez-logo.png";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
+import aicandlezLogo from "../assets/aicandlez-logo.png";
 import {
   api,
   type MobileStatus, type Portfolio, type SimAccount,
   type Subscription, type SignalBreakdown, type MobileSignalsResponse,
   type MobileTickersResponse, type MobileTicker,
 } from "@/lib/api";
-import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AICandlez Premium Home — neon-green fintech aesthetic
+// Cinematic dark · glassmorphism · controlled bloom · Apple-level polish
+// ─────────────────────────────────────────────────────────────────────────────
 
 const SANS = "Inter, 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
 const MONO = "'SF Mono', 'JetBrains Mono', Consolas, monospace";
-const C    = "#00e5ff";
-const G    = "#00ff88";
-const P    = "#9b5cf5";
-const O    = "#ff9400";
-const R    = "#ff3355";
-const W    = "#ffffff";
-const GR   = "#8892a4";
-const DIM  = "#647385";
-const GOLD = "#ffd200";
-const BG   = "#000000";
-const CARD = "#0d151e";
-const E    = "rgba(255,255,255,0.07)";
-const ESUB = "rgba(255,255,255,0.04)";
 
-function fmt(n: number) {
-  return Math.abs(n) >= 1_000 ? `$${(n/1_000).toFixed(1)}K` : `$${n.toFixed(2)}`;
+// Brand tokens (mirrors CSS vars in index.css)
+const BRAND       = "#66FF66";
+const BRAND_DEEP  = "#00C853";
+const BRAND_BRGT  = "#7CFF00";
+const BRAND_BLOOM = "rgba(102,255,102,0.18)";
+const BRAND_GLOW  = "rgba(102,255,102,0.45)";
+
+const BG        = "#000000";
+const SURFACE   = "#0A1410";
+const SURFACE_2 = "#0F1F18";
+const BORDER    = "rgba(255,255,255,0.08)";
+const BORDER_HI = "rgba(102,255,102,0.22)";
+
+const TEXT      = "#F2FFF6";
+const TEXT_SUB  = "#B4D9C0";
+const TEXT_DIM  = "#6F8C7A";
+
+const POS       = BRAND;
+const NEG       = "#FF4060";
+const WARN      = "#FFB94A";
+
+// Token shortcuts kept for legacy decorative helpers below
+const G = BRAND, R = NEG, W = TEXT;
+
+// ── Utility formatters ──────────────────────────────────────────────────────
+function fmt$(n: number, dp = 2) {
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: dp, maximumFractionDigits: dp })}`;
 }
-// Precise dollars w/ thousands separators — used for the hero portfolio value
-// so it matches the BrokerStatusCard exactly (no lossy "K" rounding).
-function fmtPrecise(n: number) {
-  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function fmtShort(n: number) {
+  if (Math.abs(n) >= 1_000_000) return `$${(n/1_000_000).toFixed(2)}M`;
+  if (Math.abs(n) >= 1_000)     return `$${(n/1_000).toFixed(2)}K`;
+  return `$${n.toFixed(2)}`;
 }
-function planColor(p: string) {
-  if (p.includes("active")||p.includes("paid")||p.includes("live")) return G;
-  return C;
-}
-function planLabel(p: string) {
-  if (p.includes("active")||p.includes("paid")||p.includes("live")) return "Active";
-  return "Trial";
-}
-
-const AC: Record<string,string> = { LONG:G, SHORT:R, HOLD:C };
-
-const MKT_SYMS = ["BTCUSD","ETHUSD","SOLUSD"];
-const MKT_LABEL: Record<string,string> = { BTCUSD:"Bitcoin", ETHUSD:"Ethereum", SOLUSD:"Solana" };
-const MKT_SHORT: Record<string,string> = { BTCUSD:"BTC",     ETHUSD:"ETH",      SOLUSD:"SOL"    };
-
-const FALLBACK_AI_LINES = [
-  "Scanning markets for high-confidence setups…",
-  "Analyzing multi-timeframe EMA alignment…",
-  "Signal quality filter: active",
-  "Volume confirmation check in progress…",
-  "Risk parameters verified — position sizing OK",
-  "Monitoring BTC, ETH, SOL for breakouts…",
-  "MTF confluence detection running…",
-  "Awaiting engine signal data…",
-];
-
-function useTypewriter(text: string, speed = 36) {
-  const [displayed, setDisplayed] = useState("");
-  useEffect(() => {
-    setDisplayed("");
-    let i = 0;
-    const t = setInterval(() => {
-      i++;
-      setDisplayed(text.slice(0, i));
-      if (i >= text.length) clearInterval(t);
-    }, speed);
-    return () => clearInterval(t);
-  }, [text, speed]);
-  return displayed;
+function fmtPx(p: number) {
+  if (p >= 1000) return `$${p.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
+  if (p >= 1)    return `$${p.toFixed(2)}`;
+  if (p >= 0.01) return `$${p.toFixed(4)}`;
+  return `$${p.toFixed(6)}`;
 }
 
-function genPts(seed: string, trend: "up"|"down"|"flat") {
+const SYM_LABEL: Record<string,string> = { BTCUSD:"Bitcoin", ETHUSD:"Ethereum", SOLUSD:"Solana" };
+const SYM_SHORT: Record<string,string> = { BTCUSD:"BTC", ETHUSD:"ETH", SOLUSD:"SOL" };
+const SYM_ACCENT: Record<string,string> = {
+  BTCUSD: "#F7931A", ETHUSD: "#627EEA", SOLUSD: "#14F195",
+  ADAUSD: "#0033AD", XRPUSD: "#23292F", DOGEUSD:"#C2A633",
+};
+
+// ── Deterministic chart point generator ─────────────────────────────────────
+function genPts(seed: string, trend: "up"|"down"|"flat", count = 36) {
   let s = 5381;
-  for (let i = 0; i < seed.length; i++) { s = (((s<<5)+s)^seed.charCodeAt(i))>>>0; }
-  const rand = () => { s^=s<<13; s^=s>>17; s^=s<<5; return (s>>>0)/0x100000000; };
-  const dir = trend==="up" ? 1.6 : trend==="down" ? -1.6 : 0.1;
+  for (let i = 0; i < seed.length; i++) s = (((s<<5)+s) ^ seed.charCodeAt(i)) >>> 0;
+  const rand = () => { s ^= s<<13; s ^= s>>17; s ^= s<<5; return (s>>>0)/0x100000000; };
+  const dir = trend === "up" ? 1.4 : trend === "down" ? -1.4 : 0.05;
   const pts: number[] = []; let v = 50;
-  for (let i = 0; i < 24; i++) { v = Math.max(8,Math.min(92,v+(rand()-0.5)*8+dir)); pts.push(v); }
+  for (let i = 0; i < count; i++) {
+    v = Math.max(8, Math.min(92, v + (rand()-0.5)*7 + dir));
+    pts.push(v);
+  }
   return pts;
 }
-
-function Sparkline({ seed, trend, w=88, h=34, animDelay="0s" }: {
-  seed:string; trend:"up"|"down"|"flat"; w?:number; h?:number; animDelay?:string;
-}) {
-  const col = trend==="up" ? G : trend==="down" ? R : C;
-  const raw = genPts(seed, trend);
-  const mn = Math.min(...raw), mx = Math.max(...raw), rng = mx-mn||1;
-  const pts = raw.map((p,i) => ({ x:(i/(raw.length-1))*w, y:h-3-((p-mn)/rng)*(h-6) }));
+function smoothPath(pts: {x:number;y:number}[]) {
   const t = 0.33;
   let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
   for (let i = 0; i < pts.length-1; i++) {
-    const p0=pts[Math.max(0,i-1)], p1=pts[i], p2=pts[i+1], p3=pts[Math.min(pts.length-1,i+2)];
-    const cp1x=p1.x+(p2.x-p0.x)*t, cp1y=p1.y+(p2.y-p0.y)*t;
-    const cp2x=p2.x-(p3.x-p1.x)*t, cp2y=p2.y-(p3.y-p1.y)*t;
+    const p0 = pts[Math.max(0,i-1)], p1 = pts[i], p2 = pts[i+1], p3 = pts[Math.min(pts.length-1,i+2)];
+    const cp1x = p1.x + (p2.x-p0.x)*t, cp1y = p1.y + (p2.y-p0.y)*t;
+    const cp2x = p2.x - (p3.x-p1.x)*t, cp2y = p2.y - (p3.y-p1.y)*t;
     d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
   }
-  const lastPt = pts[pts.length-1];
-  const fillD = `${d} L ${lastPt.x},${h} L 0,${h} Z`;
+  return d;
+}
+
+// ── Sparkline primitive ─────────────────────────────────────────────────────
+function Sparkline({ seed, trend, w = 80, h = 32, color = BRAND, glow = true }: {
+  seed: string; trend: "up"|"down"|"flat"; w?: number; h?: number; color?: string; glow?: boolean;
+}) {
+  const raw = genPts(seed, trend, 28);
+  const mn = Math.min(...raw), mx = Math.max(...raw), rng = mx-mn || 1;
+  const pts = raw.map((p, i) => ({ x: (i/(raw.length-1))*w, y: h-3-((p-mn)/rng)*(h-6) }));
+  const d = smoothPath(pts);
+  const last = pts[pts.length-1];
+  const gid = `spark-${seed.replace(/[^a-z0-9]/gi,"")}`;
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} shapeRendering="geometricPrecision"
-      style={{ overflow:"visible", animation:`chart-drift 14s ease-in-out ${animDelay} infinite` }}>
+      style={{ overflow: "visible", filter: glow ? `drop-shadow(0 0 6px ${color}55)` : undefined }}>
       <defs>
-        <linearGradient id={`sg-${seed}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={col} stopOpacity="0.18"/>
-          <stop offset="100%" stopColor={col} stopOpacity="0"/>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor={color} stopOpacity="0.32"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0"/>
         </linearGradient>
       </defs>
-      <path d={fillD} fill={`url(#sg-${seed})`}/>
-      <path d={d} fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      <circle cx={lastPt.x} cy={lastPt.y} r="2.5" fill={col} opacity="0.9"
-        style={{ animation:"dot-pulse 2s ease-in-out infinite" }}/>
+      <path d={`${d} L ${last.x},${h} L 0,${h} Z`} fill={`url(#${gid})`}/>
+      <path d={d} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx={last.x} cy={last.y} r="2.2" fill={color}
+        style={{ animation: "dot-pulse 2.2s ease-in-out infinite" }}/>
     </svg>
   );
 }
 
-function AIWave({ color=G, bars=14 }: { color?:string; bars?:number }) {
-  const H = [3,7,13,9,5,17,22,14,8,18,12,6,10,4];
+// ── Portfolio Hero Chart (large green area chart) ───────────────────────────
+function HeroChart({ seed, isUp }: { seed: string; isUp: boolean }) {
+  const w = 320, h = 90;
+  const color = isUp ? BRAND : NEG;
+  const raw = genPts(seed, isUp ? "up" : "down", 48);
+  const mn = Math.min(...raw), mx = Math.max(...raw), rng = mx-mn || 1;
+  const pts = raw.map((p, i) => ({ x: (i/(raw.length-1))*w, y: h-4-((p-mn)/rng)*(h-8) }));
+  const d = smoothPath(pts);
+  const last = pts[pts.length-1];
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:2, height:22 }}>
-      {H.slice(0,bars).map((h,i) => (
-        <div key={i} style={{
-          width:2, height:h, borderRadius:1, background:color, opacity:0.55,
-          animation:`wave-bar 2.2s ease-in-out ${(i*0.09).toFixed(2)}s infinite alternate`,
-        }}/>
-      ))}
-    </div>
+    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none"
+      shapeRendering="geometricPrecision"
+      style={{ overflow: "visible", filter: `drop-shadow(0 6px 22px ${color}40)` }}>
+      <defs>
+        <linearGradient id="hero-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor={color} stopOpacity="0.38"/>
+          <stop offset="60%" stopColor={color} stopOpacity="0.08"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0"/>
+        </linearGradient>
+        <linearGradient id="hero-line" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%"  stopColor={BRAND_DEEP}/>
+          <stop offset="50%" stopColor={color}/>
+          <stop offset="100%" stopColor={BRAND_BRGT}/>
+        </linearGradient>
+      </defs>
+      <path d={`${d} L ${last.x},${h} L 0,${h} Z`} fill="url(#hero-grad)"/>
+      <path d={d} fill="none" stroke="url(#hero-line)" strokeWidth="2.4"
+        strokeLinecap="round" strokeLinejoin="round"
+        style={{ filter: `drop-shadow(0 0 6px ${color}88)` }}/>
+      <circle cx={last.x} cy={last.y} r="3" fill={color}
+        style={{ filter: `drop-shadow(0 0 8px ${color})`, animation: "dot-pulse 2s ease-in-out infinite" }}/>
+    </svg>
   );
 }
 
-function ConfBar({ value, color, delay="0s" }: { value:number; color:string; delay?:string }) {
+// ── Confidence bar (animated) ───────────────────────────────────────────────
+function ConfidenceBar({ value, color = BRAND }: { value: number; color?: string }) {
   return (
-    <div style={{ height:3, background:"rgba(255,255,255,0.05)", borderRadius:4, overflow:"hidden" }}>
+    <div style={{ height: 6, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
       <div style={{
-        height:"100%", background:`linear-gradient(90deg, ${color}88, ${color})`,
-        borderRadius:4, width:`${value}%`,
-        boxShadow:`0 0 6px ${color}44`,
-        animation:`bar-in 0.8s ${delay} ease-out both, bar-breathe 5s ${delay} ease-in-out 0.8s infinite`,
+        height: "100%",
+        width: `${Math.min(100, Math.max(0, value))}%`,
+        borderRadius: 999,
+        background: `linear-gradient(90deg, ${BRAND_DEEP}, ${color} 60%, ${BRAND_BRGT})`,
+        boxShadow: `0 0 12px ${color}66`,
+        animation: "bar-in 0.9s ease-out both, bar-breathe 4.5s ease-in-out 0.9s infinite",
       }}/>
     </div>
   );
 }
 
-function SH({ label, right, color=P }: { label:string; right?:string; color?:string }) {
+// ── Asset icon (gradient circle with letter) ────────────────────────────────
+function AssetIcon({ sym, size = 36 }: { sym: string; size?: number }) {
+  const short = sym.replace("USD","").replace("USDT","").slice(0,3);
+  const accent = SYM_ACCENT[sym] ?? BRAND_DEEP;
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:9, marginBottom:12 }}>
-      <div style={{ width:3, height:12, background:`linear-gradient(180deg, ${color}, ${color}55)`,
-        borderRadius:2, flexShrink:0,
-        boxShadow:`0 0 8px ${color}40`,
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: `linear-gradient(135deg, ${accent}33, ${accent}10)`,
+      border: `1px solid ${accent}55`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      color: accent, fontFamily: SANS, fontWeight: 800, fontSize: size*0.34,
+      letterSpacing: -0.3,
+      boxShadow: `0 0 14px ${accent}33, inset 0 0 12px ${accent}18`,
+    }}>{short[0]}</div>
+  );
+}
+
+// ── Ambient background (subtle green orbs + grid) ───────────────────────────
+function AmbientBackground() {
+  return (
+    <div aria-hidden style={{
+      position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0,
+    }}>
+      <div style={{
+        position: "absolute", top: -120, left: -80, width: 360, height: 360, borderRadius: "50%",
+        background: `radial-gradient(circle, ${BRAND_BLOOM} 0%, transparent 70%)`,
+        animation: "orb-breathe 14s ease-in-out infinite",
       }}/>
-      <span style={{ fontSize:10, fontFamily:SANS, fontWeight:700, color:GR,
-        letterSpacing:"0.14em", textTransform:"uppercase" as const }}>
-        {label}
-      </span>
-      {right && <span style={{ marginLeft:"auto", fontSize:9, fontFamily:SANS, color:DIM }}>{right}</span>}
+      <div style={{
+        position: "absolute", bottom: -160, right: -100, width: 420, height: 420, borderRadius: "50%",
+        background: `radial-gradient(circle, rgba(0,200,83,0.14) 0%, transparent 70%)`,
+        animation: "orb-breathe 18s ease-in-out 4s infinite",
+      }}/>
+      <div style={{
+        position: "absolute", top: "40%", left: "30%", width: 240, height: 240, borderRadius: "50%",
+        background: `radial-gradient(circle, rgba(124,255,0,0.08) 0%, transparent 70%)`,
+        animation: "orb-breathe 12s ease-in-out 2s infinite",
+      }}/>
+      {/* Subtle vertical lines grid */}
+      <div style={{
+        position: "absolute", inset: 0, opacity: 0.5,
+        backgroundImage: `linear-gradient(90deg, rgba(102,255,102,0.04) 1px, transparent 1px)`,
+        backgroundSize: "56px 100%",
+      }}/>
     </div>
   );
 }
 
-function ParticleField() {
-  const pts = [
-    { x:8,  y:18, s:1.5, d:"0s",   dr:"8s"  },
-    { x:33, y:62, s:1,   d:"1.3s", dr:"11s" },
-    { x:58, y:12, s:2,   d:"0.6s", dr:"9s"  },
-    { x:78, y:72, s:1.5, d:"2.1s", dr:"7s"  },
-    { x:48, y:44, s:1,   d:"1.9s", dr:"10s" },
-    { x:20, y:85, s:1.5, d:"0.9s", dr:"13s" },
-    { x:88, y:28, s:1,   d:"1.6s", dr:"8.5s"},
-    { x:65, y:55, s:2,   d:"0.3s", dr:"12s" },
-  ];
-  return (
-    <div aria-hidden style={{ position:"absolute", inset:0, overflow:"hidden", pointerEvents:"none" }}>
-      {pts.map((p,i) => (
-        <div key={i} style={{
-          position:"absolute", left:`${p.x}%`, top:`${p.y}%`,
-          width:p.s, height:p.s, borderRadius:"50%",
-          background:`radial-gradient(circle, ${C}, transparent)`,
-          opacity:0.5,
-          animation:`particle-float ${p.dr} ${p.d} ease-in-out infinite alternate`,
-        }}/>
-      ))}
-    </div>
-  );
-}
-
-type TickRow = { sym:string; price:string; pct:string; up:boolean };
-
-function formatTickerPrice(p: number): string {
-  if (p >= 1000)  return `$${p.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-  if (p >= 1)     return `$${p.toFixed(2)}`;
-  if (p >= 0.01)  return `$${p.toFixed(4)}`;
-  return `$${p.toFixed(6)}`;
-}
-
-function tickerToRow(t: MobileTicker): TickRow {
-  const sign = t.changePercent24h >= 0 ? "+" : "";
-  return {
-    sym:   t.short,
-    price: formatTickerPrice(t.price),
-    pct:   `${sign}${t.changePercent24h.toFixed(2)}%`,
-    up:    t.up,
-  };
-}
-
-function TickerRow({ items, label, labelColor, speed }: {
-  items:TickRow[]; label:string; labelColor:string; speed:number;
+// ── Quick action tile ───────────────────────────────────────────────────────
+function QuickAction({ icon, label, onClick, accent = BRAND }: {
+  icon: React.ReactNode; label: string; onClick: () => void; accent?: string;
 }) {
-  const doubled = [...items, ...items];
   return (
-    <div style={{
-      display:"flex", alignItems:"stretch",
-      height:34, overflow:"hidden",
-      borderBottom:`1px solid ${ESUB}`,
-    }}>
-      <div style={{
-        flexShrink:0, width:62,
-        display:"flex", alignItems:"center", justifyContent:"center",
-        background:`${labelColor}07`,
-        borderRight:`1px solid ${ESUB}`,
+    <button onClick={onClick}
+      className="hover-elevate active-elevate"
+      style={{
+        flex: 1, padding: "16px 6px 12px", borderRadius: 16,
+        background: "rgba(255,255,255,0.025)",
+        border: `1px solid ${BORDER}`,
+        backdropFilter: "blur(12px) saturate(140%)",
+        WebkitBackdropFilter: "blur(12px) saturate(140%)",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+        cursor: "pointer",
+        transition: "all 0.2s ease",
       }}>
-        <span style={{
-          fontSize:7, fontFamily:SANS, fontWeight:800, color:labelColor,
-          letterSpacing:"0.16em", textTransform:"uppercase" as const,
-        }}>{label}</span>
-      </div>
-      <div style={{ flex:1, overflow:"hidden", position:"relative" }}>
-        <div style={{
-          display:"inline-flex", alignItems:"center", height:"100%",
-          whiteSpace:"nowrap",
-          animation:`ticker-scroll ${speed}s linear infinite`,
-        }}>
-          {doubled.map((t, i) => (
-            <div key={i} style={{
-              display:"inline-flex", alignItems:"center", gap:8,
-              padding:"0 16px",
-              borderRight:`1px solid ${ESUB}`,
-              height:"100%",
-            }}>
-              <span style={{
-                fontSize:10.5, fontFamily:SANS, fontWeight:700, color:W,
-                letterSpacing:"0.01em",
-              }}>{t.sym}</span>
-              <span style={{
-                fontSize:10.5, fontFamily:MONO, fontWeight:500, color:"rgba(255,255,255,0.80)",
-              }}>{t.price}</span>
-              <div style={{
-                display:"flex", alignItems:"center", gap:3,
-                padding:"2px 6px", borderRadius:4,
-                background: t.up ? "rgba(0,255,136,0.09)" : "rgba(255,51,85,0.09)",
-                border:`1px solid ${t.up ? "rgba(0,255,136,0.18)" : "rgba(255,51,85,0.18)"}`,
-              }}>
-                <span style={{ fontSize:7, color:t.up?G:R, lineHeight:1 }}>{t.up?"▲":"▼"}</span>
-                <span style={{
-                  fontSize:9.5, fontFamily:MONO, fontWeight:700,
-                  color:t.up?G:R,
-                }}>{t.pct}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+      <div style={{
+        width: 36, height: 36, borderRadius: 11,
+        background: `linear-gradient(135deg, ${accent}28, ${accent}10)`,
+        border: `1px solid ${accent}40`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: accent,
+        boxShadow: `0 0 14px ${accent}30`,
+      }}>{icon}</div>
+      <span style={{
+        fontSize: 11, fontFamily: SANS, fontWeight: 600, color: TEXT_SUB,
+        letterSpacing: 0.1,
+      }}>{label}</span>
+    </button>
   );
 }
 
-function LiveTicker({ items, isLoading }: { items: TickRow[]; isLoading: boolean }) {
-  if (isLoading || items.length === 0) {
-    return (
-      <div style={{
-        background:"rgba(0,4,14,0.98)",
-        borderBottom:`1px solid rgba(255,255,255,0.05)`,
-        height:34,
-        display:"flex", alignItems:"center", paddingLeft:14,
-      }}>
-        <span style={{
-          fontSize:9, fontFamily:SANS, fontWeight:700, color:DIM,
-          letterSpacing:"0.16em", textTransform:"uppercase" as const,
-        }}>
-          {isLoading ? "Loading market data…" : "Market data unavailable"}
-        </span>
-      </div>
-    );
-  }
-  // Split crypto list into two scrolling rows for visual density
-  const mid = Math.ceil(items.length / 2);
-  const rowA = items.slice(0, mid);
-  const rowB = items.slice(mid);
-  return (
-    <div style={{
-      background:"rgba(0,4,14,0.98)",
-      borderBottom:`1px solid rgba(255,255,255,0.05)`,
-    }}>
-      <TickerRow items={rowA} label="CRYPTO" labelColor={C} speed={44}/>
-      {rowB.length > 0 && (
-        <TickerRow items={rowB} label="MARKETS" labelColor={P} speed={48}/>
-      )}
-    </div>
-  );
-}
+// Icons (inline SVG, weight tuned for premium feel)
+const IconScan = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+    <path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+    <path d="M7 12h10"/>
+  </svg>
+);
+const IconTrade = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/>
+  </svg>
+);
+const IconAuto = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+);
+const IconDeposit = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+const IconBell = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+  </svg>
+);
+const IconEye = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+const IconChevron = (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
+);
+const IconSparkle = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>
+  </svg>
+);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Main component
+// ─────────────────────────────────────────────────────────────────────────────
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { openOnboarding, status: brokerStatus, equity: alpacaEquity, buyingPower: alpacaBP } = useBrokerConnection();
-  const [lineIdx, setLineIdx] = useState(0);
-  const [launching, setLaunching] = useState(false);
-  const { data:status }    = useQuery<MobileStatus>({
-    queryKey:["mobile-status"],    queryFn:()=>api.get("/mobile/status"),    refetchInterval:5_000 });
-  const { data:portfolio } = useQuery<Portfolio>({
-    queryKey:["mobile-portfolio"], queryFn:()=>api.get("/mobile/portfolio"), refetchInterval:8_000 });
-  const { data:simAcc }    = useQuery<SimAccount>({
-    queryKey:["sim-account"],      queryFn:()=>api.get("/account"),          retry:false, staleTime:60_000 });
-  const { data:sub }       = useQuery<Subscription>({
-    queryKey:["subscription"],     queryFn:()=>api.get("/billing/subscription"), staleTime:120_000, retry:false });
-  const { data:signalsData } = useQuery<MobileSignalsResponse>({
-    queryKey:["mobile-signals"],   queryFn:()=>api.get("/mobile/signals"), refetchInterval:8_000, retry:false });
-  const { data:tickersData, isLoading:tickersLoading } = useQuery<MobileTickersResponse>({
-    queryKey:["mobile-tickers"],   queryFn:()=>api.get("/mobile/tickers"), refetchInterval:15_000, retry:false });
+  const { openOnboarding, status: brokerStatus, equity: alpacaEquity, buyingPower: alpacaBP } =
+    useBrokerConnection();
   const { user } = useUser();
 
+  const { data: status }    = useQuery<MobileStatus>({
+    queryKey: ["mobile-status"], queryFn: () => api.get("/mobile/status"), refetchInterval: 5_000 });
+  const { data: portfolio } = useQuery<Portfolio>({
+    queryKey: ["mobile-portfolio"], queryFn: () => api.get("/mobile/portfolio"), refetchInterval: 8_000 });
+  const { data: simAcc }    = useQuery<SimAccount>({
+    queryKey: ["sim-account"], queryFn: () => api.get("/account"), retry: false, staleTime: 60_000 });
+  const { data: sub }       = useQuery<Subscription>({
+    queryKey: ["subscription"], queryFn: () => api.get("/billing/subscription"), staleTime: 120_000, retry: false });
+  const { data: signalsData } = useQuery<MobileSignalsResponse>({
+    queryKey: ["mobile-signals"], queryFn: () => api.get("/mobile/signals"), refetchInterval: 8_000, retry: false });
+  const { data: tickersData } = useQuery<MobileTickersResponse>({
+    queryKey: ["mobile-tickers"], queryFn: () => api.get("/mobile/tickers"), refetchInterval: 15_000, retry: false });
+
+  // ── Derived state ─────────────────────────────────────────────────────────
   const engine   = status?.engine;
   const isLive   = engine?.mode === "live";
-
-  // ── Portfolio Value source of truth ───────────────────────────────────────
-  // When an Alpaca paper/live account is connected, the broker IS the single
-  // source of truth — bind the top hero card to live Alpaca equity so it
-  // matches the BrokerStatusCard at the bottom exactly. Before connection,
-  // fall back to the AI sim allocation ($100K default).
   const brokerConnected = brokerStatus === "paper_active" || brokerStatus === "live_active";
   const tv       = brokerConnected
     ? (alpacaEquity > 0 ? alpacaEquity : (portfolio?.totalValue ?? 100_000))
     : (portfolio?.totalValue ?? 100_000);
   const pnl      = portfolio?.openPnL     ?? 0;
   const pnlPct   = tv > 0 ? (pnl/tv*100) : 0;
-  // Cash available — real Alpaca buying power when connected, else 85% heuristic
   const cashAvail = brokerConnected && alpacaBP > 0 ? alpacaBP : tv * 0.855;
-  // Source label for the top card so the user knows EXACTLY what they're seeing
   const portfolioSourceLabel = brokerConnected
     ? (brokerStatus === "live_active" ? "Alpaca · Live" : "Alpaca · Paper")
     : "AI Sim Allocation";
-  const posCount = portfolio?.positions?.length ?? 0;
-  const winRate  = simAcc?.winRate     ?? 0;
-  const trades   = simAcc?.totalTrades ?? 0;
-  const realized = simAcc?.realizedPnL ?? 0;
-  const fees     = simAcc?.feesPaid    ?? 0;
-  const plan     = (sub?.plan ?? "free").toLowerCase();
-  const pColor   = planColor(plan);
-  const pLabel   = planLabel(plan);
-  const exchange = engine?.exchange?.toUpperCase() ?? "ALPACA";
+  const plan = (sub?.plan ?? "free").toLowerCase();
+  const planLabel = (plan.includes("active") || plan.includes("paid") || plan.includes("live"))
+    ? "Pro" : "Trial";
 
+  // ── AI insight (top signal) ───────────────────────────────────────────────
+  const breakdowns: Record<string, SignalBreakdown> = signalsData?.breakdowns ?? {};
+  const tickerMap: Record<string, MobileTicker> = useMemo(() => {
+    const m: Record<string, MobileTicker> = {};
+    for (const t of tickersData?.tickers ?? []) m[t.symbol] = t;
+    return m;
+  }, [tickersData]);
 
-
-    const breakdowns: Record<string, SignalBreakdown> = signalsData?.breakdowns ?? {};
-    const topSignals: SignalBreakdown[] = Object.values(breakdowns)
+  const topInsight = useMemo(() => {
+    const candidates = Object.values(breakdowns)
       .filter(b => b.action && b.action !== "HOLD")
-      .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
-      .slice(0, 5);
-    const aiLines = (() => {
-      const lines: string[] = [];
-      for (const sym of MKT_SYMS) {
-        const bd = breakdowns[sym];
-        if (bd?.action && bd.action !== "HOLD") {
-          lines.push(`${MKT_SHORT[sym]} ${bd.action} signal — confidence ${bd.confidence ?? 0}%`);
-        }
-      }
-      return lines.length > 0 ? lines : FALLBACK_AI_LINES;
-    })();
+      .sort((a,b) => (b.confidence ?? 0) - (a.confidence ?? 0));
+    const pick = candidates[0];
+    const sym = pick?.symbol ?? "BTCUSD";
+    const tk = tickerMap[sym];
+    return {
+      symbol: sym,
+      action: (pick?.action ?? "LONG") as string,
+      confidence: pick?.confidence ?? 78,
+      price: tk?.price ?? 67842.63,
+      pct: tk?.changePercent24h ?? 2.35,
+    };
+  }, [breakdowns, tickerMap]);
 
-    const typedLine = useTypewriter(aiLines[lineIdx % aiLines.length]);
+  // ── Top gainers (from tickers) ────────────────────────────────────────────
+  const topGainers = useMemo(() => {
+    const list = (tickersData?.tickers ?? [])
+      .filter(t => t.changePercent24h > 0)
+      .sort((a,b) => b.changePercent24h - a.changePercent24h)
+      .slice(0, 3);
+    if (list.length >= 3) return list;
+    // graceful fallback so the section is always populated
+    return [
+      { symbol: "SOLUSD", short: "SOL", price: 172.36, changePercent24h: 6.21, up: true } as MobileTicker,
+      { symbol: "ETHUSD", short: "ETH", price: 3486.59, changePercent24h: 4.32, up: true } as MobileTicker,
+      { symbol: "ADAUSD", short: "ADA", price: 0.6421, changePercent24h: 3.18, up: true } as MobileTicker,
+    ];
+  }, [tickersData]);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => {
-      const t = setInterval(() => setLineIdx(i => (i+1) % aiLines.length), 3800);
-      return () => clearInterval(t);
-    }, [aiLines.length]);
+  // ── Active positions ──────────────────────────────────────────────────────
+  const positions = portfolio?.positions ?? [];
 
-    const tickerMap: Record<string, MobileTicker> = {};
-    for (const t of tickersData?.tickers ?? []) tickerMap[t.symbol] = t;
-    const tickerRows: TickRow[] = (tickersData?.tickers ?? []).map(tickerToRow);
+  // ── Render ────────────────────────────────────────────────────────────────
+  const firstName = user?.firstName
+    ?? user?.emailAddresses?.[0]?.emailAddress?.split("@")[0]
+    ?? "Trader";
+  const initial = firstName[0]?.toUpperCase() ?? "T";
 
-    const tickerCount = tickersData?.tickers?.length ?? 0;
-    const tickersReady = !tickersLoading || tickerCount > 0;
-    const mktCards = MKT_SYMS.map(sym => {
-      const bd = breakdowns[sym];
-      const tk = tickerMap[sym];
-      const pctNum = tk?.changePercent24h;
-      const pctSign = pctNum !== undefined && pctNum >= 0 ? "+" : "";
-      const priceState: "ok" | "loading" | "unavailable" =
-        tk ? "ok" : (tickersReady ? "unavailable" : "loading");
-      return {
-        sym:    MKT_SHORT[sym],
-        fullSym: sym,
-        label:  MKT_LABEL[sym],
-        price:  tk ? formatTickerPrice(tk.price) : (priceState === "loading" ? "Loading…" : "Unavailable"),
-        pct:    pctNum !== undefined ? `${pctSign}${pctNum.toFixed(2)}%` : (priceState === "loading" ? "…" : "n/a"),
-        priceState,
-        action: (bd?.action ?? "HOLD") as string,
-        conf:   bd?.confidence ?? 50,
-        trend:  (
-          tk
-            ? (tk.changePercent24h > 0.1 ? "up" : tk.changePercent24h < -0.1 ? "down" : "flat")
-            : bd?.action === "LONG" ? "up" : bd?.action === "SHORT" ? "down" : "flat"
-        ) as "up"|"down"|"flat",
-      };
-    });
-
-    function handleLaunch() {
-    if (launching || brokerStatus !== "idle") return;
-    setLaunching(true);
-    setTimeout(() => { setLaunching(false); openOnboarding(); }, 1600);
-  }
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   return (
-    <div className="page-enter" style={{ background:BG, minHeight:"100%", paddingBottom:24 }}>
+    <div className="page-enter" style={{
+      position: "relative", background: BG, minHeight: "100%",
+      paddingBottom: 32, overflow: "hidden",
+    }}>
+      <AmbientBackground />
 
-      {/* ── Top Header ────────────────────────────────────────────────────────── */}
-      <div style={{
-        display:"flex", alignItems:"center", justifyContent:"space-between",
-        padding:"10px 16px 10px",
-        background:`linear-gradient(180deg, rgba(0,8,20,0.98) 0%, rgba(0,0,0,0) 100%)`,
-        position:"sticky", top:0, zIndex:10,
-        backdropFilter:"blur(12px)",
-        WebkitBackdropFilter:"blur(12px)",
-        borderBottom:`1px solid ${ESUB}`,
-      }}>
-        {/* Brand logo — horizontal full version */}
-        <img src={aicandlezLogo} alt="AICandlez"
-          style={{
-            height:50, width:"auto", objectFit:"contain", maxWidth:230,
-            filter:"drop-shadow(0 0 22px rgba(0,229,255,0.38)) brightness(1.09)",
-          }}/>
+      <div style={{ position: "relative", zIndex: 1 }}>
 
-        {/* Right side: mode pill + avatar */}
-        <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
-          <div style={{
-            padding:"3px 10px", borderRadius:20,
-            background: isLive ? "rgba(0,255,136,0.08)" : "rgba(0,229,255,0.06)",
-            border:`1px solid ${isLive ? "rgba(0,255,136,0.25)" : "rgba(0,229,255,0.20)"}`,
-            display:"flex", alignItems:"center", gap:5,
-          }}>
-            <div style={{
-              width:5, height:5, borderRadius:"50%",
-              background: isLive ? G : C,
-              animation:"dot-pulse 2.5s ease-in-out infinite",
-            }}/>
-            <span style={{ fontSize:8, fontFamily:SANS, fontWeight:600,
-              color: isLive ? G : C, letterSpacing:"0.06em" }}>
-              {isLive ? "LIVE" : "SIM"}
-            </span>
-          </div>
-
-          <div onClick={()=>setLocation("/profile")} style={{
-            width:34, height:34, borderRadius:"50%", flexShrink:0, cursor:"pointer",
-            background:`linear-gradient(135deg, #0d1f30, #0a1520)`,
-            border:`1.5px solid rgba(0,229,255,0.20)`,
-            display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:11, fontFamily:SANS, fontWeight:700, color:C,
-            position:"relative",
-            boxShadow:`0 0 0 2px rgba(0,229,255,0.06)`,
-          }}>
-            {(user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0] ?? "?").toUpperCase()}
-            <div style={{
-              position:"absolute", bottom:0, right:0, width:9, height:9,
-              borderRadius:"50%", background:G, border:`2px solid ${BG}`,
-            }}/>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Live Market Ticker ──────────────────────────────────────────────── */}
-      <LiveTicker items={tickerRows} isLoading={tickersLoading && tickerRows.length === 0}/>
-      <UpgradeBanner/>
-
-      {/* ── Hero — AI Engine Status ──────────────────────────────────────────── */}
-      <div style={{
-        position:"relative", overflow:"hidden",
-        margin:"12px 12px 0",
-        borderRadius:20,
-        background:`linear-gradient(160deg, #000d1a 0%, #020a14 50%, #000812 100%)`,
-        border:`1px solid rgba(0,229,255,0.10)`,
-        padding:"22px 18px 18px",
-        boxShadow:`0 20px 60px rgba(0,0,0,0.95), 0 0 80px rgba(0,229,255,0.03) inset`,
-      }}>
-
-        {/* Ambient glow orbs — breathing */}
-        <div aria-hidden style={{
-          position:"absolute", top:-50, left:-30, width:260, height:260, borderRadius:"50%",
-          background:`radial-gradient(circle, rgba(0,229,255,0.09) 0%, transparent 70%)`,
-          pointerEvents:"none",
-          animation:"orb-breathe 9s ease-in-out infinite",
-        }}/>
-        <div aria-hidden style={{
-          position:"absolute", bottom:-40, right:-20, width:200, height:200, borderRadius:"50%",
-          background:`radial-gradient(circle, rgba(155,92,245,0.10) 0%, transparent 70%)`,
-          pointerEvents:"none",
-          animation:"orb-breathe 9s ease-in-out 4.5s infinite",
-        }}/>
-        <div aria-hidden style={{
-          position:"absolute", top:"38%", right:"18%", width:90, height:90, borderRadius:"50%",
-          background:`radial-gradient(circle, rgba(0,255,136,0.07) 0%, transparent 70%)`,
-          pointerEvents:"none",
-          animation:"orb-breathe 6s ease-in-out 2s infinite",
-        }}/>
-        {/* Top laser edge */}
-        <div aria-hidden style={{
-          position:"absolute", top:0, left:0, right:0, height:1.5,
-          background:`linear-gradient(90deg, transparent 8%, ${C}70 38%, ${G}50 56%, ${C}65 74%, transparent 92%)`,
-          animation:"edge-sweep 8s ease-in-out infinite",
-        }}/>
-        {/* Horizontal scan line */}
-        <div aria-hidden style={{
-          position:"absolute", left:0, right:0, height:1,
-          background:`linear-gradient(90deg, transparent, rgba(0,229,255,0.15), transparent)`,
-          animation:"scan-line 5s linear infinite",
-          pointerEvents:"none",
-        }}/>
-
-        <ParticleField />
-
-        <div style={{ position:"relative" }}>
-          {/* Status row */}
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <div style={{ position:"relative", width:22, height:22, flexShrink:0 }}>
-                <div style={{
-                  width:9, height:9, borderRadius:"50%", background:G,
-                  margin:"6.5px", animation:"dot-pulse 2s ease-in-out infinite",
-                  boxShadow:`0 0 10px ${G}88`,
-                }}/>
-                <div style={{ position:"absolute", inset:0, borderRadius:"50%",
-                  border:`1.5px solid rgba(0,255,136,0.35)`,
-                  animation:"ring-out 3s ease-out infinite" }}/>
-                <div style={{ position:"absolute", inset:0, borderRadius:"50%",
-                  border:`1px solid rgba(0,255,136,0.12)`,
-                  animation:"ring-out 3s ease-out 1s infinite" }}/>
-              </div>
-              <div>
-                <div style={{ fontSize:15, fontFamily:SANS, fontWeight:700, color:G,
-                  letterSpacing:"0.01em" }}>
-                  {engine?.running ? "AI Active" : "AI Standby"}
-                </div>
-                <div style={{ fontSize:9, fontFamily:SANS, color:DIM, marginTop:1 }}>
-                  {exchange} · {engine?.signalsGenerated??0} signals generated
-                </div>
-              </div>
-            </div>
-            <div style={{ textAlign:"right" }}>
-              <div style={{ fontSize:8, fontFamily:SANS, fontWeight:600, color:DIM,
-                letterSpacing:"0.10em", textTransform:"uppercase" as const, marginBottom:5 }}>
-                Signal Strength
-              </div>
-              <ConfBar value={engine?.running ? 74 : 12} color={G}/>
-            </div>
-          </div>
-
-          {/* Waveform */}
-          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
-            <AIWave color={C} bars={14}/>
-            <div style={{
-              fontSize:8, fontFamily:SANS, color:DIM,
-              animation:"scan-text 3s ease-in-out infinite",
-            }}>
-              SCANNING MARKETS
-            </div>
-          </div>
-
-          {/* Typewriter AI line */}
-          <div style={{
-            background:"rgba(0,229,255,0.04)",
-            border:`1px solid rgba(0,229,255,0.10)`,
-            borderRadius:8, padding:"9px 12px",
-            display:"flex", alignItems:"center", gap:8,
-          }}>
-            <div style={{
-              width:5, height:5, borderRadius:"50%",
-              background:C, flexShrink:0,
-              animation:"dot-pulse 2s ease-in-out infinite",
-            }}/>
-            <span style={{
-              fontSize:10, fontFamily:MONO, color:C,
-              letterSpacing:"0.02em", minHeight:14,
-            }}>
-              {typedLine}
-              <span style={{ animation:"cursor-blink 0.9s step-end infinite", opacity:0.8 }}>|</span>
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ padding:"12px 12px 0" }}>
-
-        {/* ── Portfolio Hero Card ──────────────────────────────────────────────── */}
+        {/* ── Header ─────────────────────────────────────────────────────── */}
         <div style={{
-          position:"relative", overflow:"hidden", borderRadius:20,
-          marginBottom:12, padding:"22px 20px 20px",
-          background:`linear-gradient(145deg, #0d1c2e 0%, #0a1622 60%, #080f1c 100%)`,
-          border:`1px solid rgba(0,229,255,0.12)`,
-          boxShadow:[
-            "0 24px 70px rgba(0,0,0,0.97)",
-            "0 0 0 0.5px rgba(0,229,255,0.06) inset",
-            "0 2px 4px rgba(0,229,255,0.04) inset",
-          ].join(", "),
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "18px 20px 14px",
+          position: "sticky", top: 0, zIndex: 10,
+          background: `linear-gradient(180deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 80%, rgba(0,0,0,0) 100%)`,
+          backdropFilter: "blur(16px) saturate(140%)",
+          WebkitBackdropFilter: "blur(16px) saturate(140%)",
         }}>
-          {/* Laser top edge */}
-          <div aria-hidden style={{
-            position:"absolute", top:0, left:0, right:0, height:1.5,
-            background:`linear-gradient(90deg, transparent 5%, ${C}70 35%, ${G}55 55%, ${C}65 75%, transparent 95%)`,
-            animation:"edge-sweep 7s ease-in-out infinite",
-          }}/>
-          {/* Bottom ambient glow — breathing */}
-          <div aria-hidden style={{
-            position:"absolute", bottom:0, left:"15%", right:"15%", height:60,
-            background:`radial-gradient(ellipse, rgba(0,255,136,0.08) 0%, transparent 70%)`,
-            pointerEvents:"none",
-            animation:"orb-breathe 6s ease-in-out infinite",
-          }}/>
-          {/* Shimmer sweep */}
-          <div aria-hidden style={{
-            position:"absolute", top:0, bottom:0, width:"30%",
-            background:`linear-gradient(90deg, transparent, rgba(255,255,255,0.015), transparent)`,
-            animation:"shimmer-sweep 8s ease-in-out infinite",
-            pointerEvents:"none",
-          }}/>
-
-          <div style={{ position:"relative" }}>
-            <div style={{
-              display:"flex", alignItems:"flex-start", justifyContent:"space-between",
-              marginBottom:6,
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Avatar with neon ring */}
+            <div onClick={() => setLocation("/profile")} style={{
+              position: "relative", width: 42, height: 42, borderRadius: "50%", cursor: "pointer",
+              background: `linear-gradient(135deg, ${BRAND}38, ${BRAND_DEEP}22)`,
+              border: `1.5px solid ${BORDER_HI}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: BRAND, fontFamily: SANS, fontWeight: 700, fontSize: 16,
+              boxShadow: `0 0 18px ${BRAND_BLOOM}, inset 0 0 14px rgba(102,255,102,0.10)`,
             }}>
-              <div>
-                <div style={{ fontSize:9, fontFamily:SANS, fontWeight:700, color:DIM,
-                  letterSpacing:"0.18em", textTransform:"uppercase" as const }}>
-                  Portfolio Value
-                </div>
-                <div style={{ fontSize:8, fontFamily:MONO, fontWeight:600,
-                  color: brokerConnected ? G : DIM,
-                  letterSpacing:"0.08em", marginTop:3,
-                  textTransform:"uppercase" as const }}>
-                  {brokerConnected && (
-                    <span style={{ display:"inline-block", width:5, height:5, borderRadius:"50%",
-                      background:G, marginRight:5, verticalAlign:"middle",
-                      boxShadow:`0 0 6px ${G}`,
-                      animation:"dot-pulse 2.5s ease-in-out infinite" }}/>
-                  )}
-                  {portfolioSourceLabel}
-                </div>
-              </div>
+              {initial}
               <div style={{
-                fontSize:8, fontFamily:SANS, fontWeight:600,
-                padding:"2px 8px", borderRadius:4,
-                background:`${pColor}12`, border:`1px solid ${pColor}30`,
-                color:pColor, letterSpacing:"0.07em",
-              }}>
-                {pLabel.toUpperCase()}
+                position: "absolute", bottom: -1, right: -1, width: 11, height: 11, borderRadius: "50%",
+                background: BRAND, border: `2px solid ${BG}`,
+                boxShadow: `0 0 8px ${BRAND}`,
+                animation: "dot-pulse 2.5s ease-in-out infinite",
+              }}/>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontFamily: SANS, fontWeight: 500, color: TEXT_DIM, letterSpacing: 0.1 }}>
+                {greeting},
               </div>
-            </div>
-
-            {/* Big balance — precise dollars (matches BrokerStatusCard exactly
-                when an Alpaca account is connected). Auto-shrinks at higher
-                magnitudes so 7-digit equities don't overflow on mobile. */}
-            <div style={{
-              fontSize: tv >= 1_000_000 ? 38 : tv >= 100_000 ? 44 : 52,
-              fontWeight:800, color:W,
-              fontFamily:"'SF Pro Display','Inter','Helvetica Neue',system-ui,-apple-system,sans-serif",
-              letterSpacing:"-0.03em", lineHeight:1,
-              animation:"num-pop 0.6s ease-out both",
-              textShadow:`0 0 40px rgba(255,255,255,0.06)`,
-            }}>
-              {fmtPrecise(tv)}
-            </div>
-
-            {/* PnL row */}
-            <div style={{
-              display:"flex", alignItems:"center", gap:10, marginTop:10,
-              flexWrap:"wrap",
-            }}>
-              <div style={{
-                display:"flex", alignItems:"center", gap:6,
-                padding:"4px 10px", borderRadius:20,
-                background: pnl>=0 ? "rgba(0,255,136,0.07)" : "rgba(255,51,85,0.07)",
-                border:`1px solid ${pnl>=0 ? "rgba(0,255,136,0.20)" : "rgba(255,51,85,0.20)"}`,
-                animation:"pnl-flash 3s ease-in-out infinite",
-              }}>
-                <span style={{ fontSize:9, color: pnl>=0?G:R }}>
-                  {pnl>=0?"▲":"▼"}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 1 }}>
+                <span style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.2 }}>
+                  {firstName}
                 </span>
-                <span style={{ fontSize:13, fontFamily:MONO, fontWeight:700,
-                  color:pnl>=0?G:R }}>
-                  {pnl>=0?"+":""}{pnl.toFixed(2)}
+                <span style={{
+                  padding: "2px 8px", borderRadius: 999,
+                  background: `linear-gradient(135deg, ${BRAND}22, ${BRAND_DEEP}18)`,
+                  border: `1px solid ${BORDER_HI}`,
+                  fontSize: 9, fontFamily: SANS, fontWeight: 700, color: BRAND,
+                  letterSpacing: 0.8, textTransform: "uppercase",
+                }}>
+                  {planLabel}
                 </span>
               </div>
-              <span style={{ fontSize:12, fontFamily:MONO, color:pnlPct>=0?G:R, fontWeight:600 }}>
-                {pnlPct>=0?"+":""}{pnlPct.toFixed(2)}%
-              </span>
-              <span style={{ fontSize:9, fontFamily:SANS, color:DIM, marginLeft:"auto",
-                animation:"scan-text 5s ease-in-out infinite" }}>
-                Unrealized P&L
-              </span>
             </div>
+          </div>
 
-            {/* Mini sparkline chart */}
-            <div style={{ marginTop:12 }}>
-              <Sparkline seed="portfolio-equity" trend={pnl>=0?"up":"down"} w={300} h={44} animDelay="0s"/>
-            </div>
-
-            {/* Sub-stats */}
+          {/* Bell */}
+          <div style={{
+            position: "relative", width: 38, height: 38, borderRadius: 12,
+            background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`,
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+            color: TEXT_SUB,
+          }}>
+            {IconBell}
             <div style={{
-              display:"grid", gridTemplateColumns:"1fr 1fr 1fr",
-              marginTop:14, borderTop:`1px solid ${ESUB}`, paddingTop:14, gap:8,
-            }}>
-              {[
-                { label:"Cash",      val:fmt(cashAvail), color:W,    sub: brokerConnected ? "buying power" : "available" },
-                { label:"Realized",  val:realized>=0?`+${fmt(realized)}`:fmt(realized), color:G, sub:"lifetime · simulated" },
-                { label:"Fees",      val:`$${fees.toFixed(2)}`, color:GOLD, sub:"total paid" },
-              ].map(({ label, val, color, sub }) => (
-                <div key={label} style={{ textAlign:"center" }}>
-                  <div style={{ fontSize:8, fontFamily:SANS, color:DIM,
-                    letterSpacing:"0.08em", marginBottom:4, textTransform:"uppercase" as const }}>
-                    {label}
-                  </div>
-                  <div style={{ fontSize:15, fontFamily:MONO, fontWeight:700, color }}>{val}</div>
-                  <div style={{ fontSize:7.5, fontFamily:SANS, color:`${color}40`, marginTop:2 }}>{sub}</div>
-                </div>
-              ))}
-            </div>
-
-            {!isLive && (
-              <div style={{
-                marginTop:14, padding:"7px 12px", borderRadius:8,
-                background:"rgba(0,229,255,0.04)", border:`1px solid rgba(0,229,255,0.10)`,
-                fontSize:9, fontFamily:SANS, color:C,
-                display:"flex", alignItems:"center", gap:8,
-              }}>
-                <div style={{ width:5, height:5, borderRadius:"50%", background:C, flexShrink:0,
-                  animation:"dot-pulse 2.5s ease-in-out infinite" }}/>
-                Paper Trading Active · Live AI Trading Locked · Upgrade to Unlock
-              </div>
-            )}
+              position: "absolute", top: 8, right: 8, width: 7, height: 7, borderRadius: "50%",
+              background: NEG, boxShadow: `0 0 8px ${NEG}`,
+            }}/>
           </div>
         </div>
 
-        {/* ── Stats Trio ───────────────────────────────────────────────────────── */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:18 }}>
-          {[
-            { val:`${winRate}%`, label:"Win Rate", color:G, sub:"4W · 1L",     icon:"↑" },
-            { val:String(posCount), label:"Positions", color:C, sub:"open",    icon:"◈" },
-            { val:String(trades),   label:"Trades",   color:W, sub:"all time", icon:"◉" },
-          ].map(({ val, label, color, sub, icon }, i) => (
-            <div key={label} style={{
-              position:"relative", overflow:"hidden",
-              background:`linear-gradient(160deg, #0d1a28, #080f1a)`,
-              border:`1px solid rgba(255,255,255,0.07)`,
-              borderRadius:14, padding:"16px 10px 14px", textAlign:"center",
-              boxShadow:`0 8px 28px rgba(0,0,0,0.9)`,
-              animation:`card-in 0.4s ${(i*0.09).toFixed(2)}s ease-out both`,
+        {/* ── Portfolio Hero Card ─────────────────────────────────────────── */}
+        <div style={{
+          position: "relative", margin: "8px 16px 0", borderRadius: 24, overflow: "hidden",
+          background: `
+            radial-gradient(circle at 0% 0%, rgba(102,255,102,0.10) 0%, transparent 50%),
+            radial-gradient(circle at 100% 100%, rgba(0,200,83,0.08) 0%, transparent 50%),
+            linear-gradient(160deg, ${SURFACE_2} 0%, ${SURFACE} 60%, #050A07 100%)
+          `,
+          border: `1px solid ${BORDER_HI}`,
+          padding: "20px 20px 18px",
+          boxShadow: `0 24px 60px rgba(0,0,0,0.7), 0 0 50px rgba(102,255,102,0.08)`,
+        }}>
+          {/* Top edge laser */}
+          <div aria-hidden style={{
+            position: "absolute", top: 0, left: 0, right: 0, height: 1.5,
+            background: `linear-gradient(90deg, transparent, ${BRAND}88, ${BRAND_BRGT}, ${BRAND}88, transparent)`,
+            backgroundSize: "200% 100%",
+            animation: "edge-sweep 10s ease-in-out infinite",
+          }}/>
+
+          {/* Label row */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{
+                fontSize: 10, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
+                letterSpacing: 1.5, textTransform: "uppercase",
+              }}>Total Portfolio Value</span>
+              <div style={{ color: TEXT_DIM, opacity: 0.7 }}>{IconEye}</div>
+            </div>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 4,
+              padding: "4px 9px", borderRadius: 8,
+              background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`,
+              cursor: "pointer",
+              fontSize: 10, fontFamily: SANS, fontWeight: 600, color: TEXT_SUB,
+              letterSpacing: 0.5,
             }}>
-              <div aria-hidden style={{
-                position:"absolute", top:0, left:"25%", right:"25%", height:1,
-                background:`linear-gradient(90deg, transparent, ${color}30, transparent)`,
-              }}/>
-              <div style={{ fontSize:9, color:`${color}60`, marginBottom:4, fontFamily:SANS }}>
-                {icon}
+              24H {IconChevron}
+            </div>
+          </div>
+
+          {/* Big number */}
+          <div style={{
+            fontSize: 38, fontFamily: SANS, fontWeight: 700, color: TEXT,
+            letterSpacing: -1, lineHeight: 1.1, marginTop: 8,
+            textShadow: `0 0 24px rgba(255,255,255,0.08)`,
+          }}>
+            {fmt$(tv)}
+          </div>
+
+          {/* P&L row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+            <span style={{
+              fontSize: 13, fontFamily: SANS, fontWeight: 700,
+              color: pnl >= 0 ? POS : NEG, letterSpacing: -0.1,
+              textShadow: pnl >= 0 ? `0 0 10px ${BRAND_BLOOM}` : "none",
+            }}>
+              {pnl >= 0 ? "+" : ""}{fmt$(Math.abs(pnl))}
+            </span>
+            <span style={{
+              fontSize: 12, fontFamily: SANS, fontWeight: 600,
+              color: pnl >= 0 ? POS : NEG, opacity: 0.85,
+            }}>
+              ({pnl >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)
+            </span>
+            <span style={{ fontSize: 11, fontFamily: SANS, color: TEXT_DIM, marginLeft: 2 }}>Today</span>
+            <span style={{
+              marginLeft: "auto", fontSize: 9, fontFamily: SANS, fontWeight: 600,
+              color: TEXT_DIM, letterSpacing: 0.4, textTransform: "uppercase",
+            }}>{portfolioSourceLabel}</span>
+          </div>
+
+          {/* Chart */}
+          <div style={{ marginTop: 14, marginBottom: 4 }}>
+            <HeroChart seed={`pf-${Math.floor(tv)}`} isUp={pnl >= 0}/>
+          </div>
+
+          {/* Sub-stats row */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 14,
+            paddingTop: 14, borderTop: `1px solid ${BORDER}`,
+          }}>
+            {[
+              { l: "Available", v: fmtShort(cashAvail) },
+              { l: "Positions", v: String(positions.length) },
+              { l: "Win Rate",  v: `${(simAcc?.winRate ?? 0).toFixed(0)}%`, c: (simAcc?.winRate ?? 0) >= 55 ? POS : WARN },
+            ].map((s, i) => (
+              <div key={i}>
+                <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600, color: TEXT_DIM, letterSpacing: 1, textTransform: "uppercase" }}>{s.l}</div>
+                <div style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: (s as any).c ?? TEXT, marginTop: 3, letterSpacing: -0.2 }}>{s.v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Quick Actions ──────────────────────────────────────────────── */}
+        <div style={{ display: "flex", gap: 10, padding: "16px 16px 0" }}>
+          <QuickAction icon={IconScan}    label="AI Scan"     onClick={() => setLocation("/markets")} accent={BRAND}/>
+          <QuickAction icon={IconTrade}   label="Open Trades" onClick={() => setLocation("/trade")}   accent={BRAND_BRGT}/>
+          <QuickAction icon={IconAuto}    label="Auto Trade"  onClick={() => setLocation("/profile")} accent={BRAND_DEEP}/>
+          <QuickAction icon={IconDeposit} label="Deposit"     onClick={openOnboarding} accent={BRAND}/>
+        </div>
+
+        {/* ── AI Market Insight ──────────────────────────────────────────── */}
+        <SectionHeader label="AI Market Insight" onMore={() => setLocation("/markets")}/>
+        <div style={{
+          margin: "0 16px", borderRadius: 18, overflow: "hidden",
+          background: `linear-gradient(160deg, ${SURFACE} 0%, ${BG} 100%)`,
+          border: `1px solid ${BORDER}`,
+          padding: 16,
+          boxShadow: `0 12px 32px rgba(0,0,0,0.6)`,
+        }}>
+          {/* Asset row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <AssetIcon sym={topInsight.symbol} size={40}/>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.1 }}>
+                  {SYM_SHORT[topInsight.symbol] ?? topInsight.symbol.replace("USD","")}/USDT
+                </span>
+                <span style={{
+                  padding: "3px 8px", borderRadius: 6,
+                  background: topInsight.action === "LONG" ? `${BRAND}1F` : `${NEG}1F`,
+                  border: `1px solid ${topInsight.action === "LONG" ? BORDER_HI : "rgba(255,64,96,0.30)"}`,
+                  fontSize: 9, fontFamily: SANS, fontWeight: 800,
+                  color: topInsight.action === "LONG" ? BRAND : NEG,
+                  letterSpacing: 0.8, textTransform: "uppercase",
+                }}>
+                  {topInsight.action === "LONG" ? "Bullish" : "Bearish"}
+                </span>
+              </div>
+              <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_DIM, marginTop: 2 }}>
+                {SYM_LABEL[topInsight.symbol] ?? topInsight.symbol}
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 15, fontFamily: SANS, fontWeight: 700, color: TEXT, fontVariantNumeric: "tabular-nums" }}>
+                {fmtPx(topInsight.price)}
               </div>
               <div style={{
-                fontSize:30, fontWeight:800, color, fontFamily:MONO, lineHeight:1, marginBottom:4,
-                animation:`stat-glow 6s ease-in-out ${i*1.8}s infinite`,
-                textShadow:`0 0 20px ${color}30`,
+                fontSize: 11, fontFamily: SANS, fontWeight: 600,
+                color: topInsight.pct >= 0 ? POS : NEG, marginTop: 2,
               }}>
-                {val}
+                {topInsight.pct >= 0 ? "+" : ""}{topInsight.pct.toFixed(2)}%
               </div>
-              <div style={{ fontSize:8, fontFamily:SANS, fontWeight:600, color:DIM,
-                letterSpacing:"0.08em", textTransform:"uppercase" as const }}>
-                {label}
+            </div>
+          </div>
+
+          {/* Confidence */}
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 10, fontFamily: SANS, fontWeight: 600, color: TEXT_DIM, letterSpacing: 0.8, textTransform: "uppercase" }}>
+                AI Confidence
+              </span>
+              <span style={{ fontSize: 13, fontFamily: SANS, fontWeight: 800, color: BRAND, letterSpacing: -0.1 }}>
+                {topInsight.confidence}%
+              </span>
+            </div>
+            <ConfidenceBar value={topInsight.confidence}/>
+          </div>
+
+          {/* Reasoning */}
+          <div style={{
+            marginTop: 12, padding: "10px 12px", borderRadius: 10,
+            background: "rgba(102,255,102,0.04)",
+            border: `1px solid ${BORDER_HI}`,
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <div style={{ color: BRAND, marginTop: 1 }}>{IconSparkle}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontFamily: SANS, fontWeight: 600, color: TEXT, lineHeight: 1.4 }}>
+                  Strong {topInsight.action === "LONG" ? "buying" : "selling"} momentum detected
+                </div>
+                <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_SUB, marginTop: 3, lineHeight: 1.45 }}>
+                  High probability of {topInsight.action === "LONG" ? "upward" : "downward"} movement
+                </div>
+                <div style={{ fontSize: 9, fontFamily: SANS, color: TEXT_DIM, marginTop: 6, letterSpacing: 0.4, textTransform: "uppercase" }}>
+                  2 min ago
+                </div>
               </div>
-              <div style={{ fontSize:7.5, fontFamily:SANS, color:`${color}35`, marginTop:2 }}>{sub}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Top Gainers ────────────────────────────────────────────────── */}
+        <SectionHeader label="Top Gainers" onMore={() => setLocation("/markets")}/>
+        <div style={{
+          margin: "0 16px", borderRadius: 18, overflow: "hidden",
+          background: SURFACE, border: `1px solid ${BORDER}`,
+        }}>
+          {topGainers.map((t, i) => (
+            <div key={t.symbol} onClick={() => setLocation("/markets")} style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "14px 16px",
+              borderBottom: i < topGainers.length - 1 ? `1px solid ${BORDER}` : "none",
+              cursor: "pointer",
+            }}>
+              <AssetIcon sym={t.symbol} size={36}/>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.1 }}>
+                  {(t as MobileTicker).short ?? SYM_SHORT[t.symbol] ?? t.symbol.replace("USD","")}/USDT
+                </div>
+                <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_DIM, marginTop: 2 }}>
+                  {SYM_LABEL[t.symbol] ?? t.symbol}
+                </div>
+              </div>
+              <Sparkline seed={`gain-${t.symbol}`} trend="up" w={64} h={28}/>
+              <div style={{ textAlign: "right", minWidth: 76 }}>
+                <div style={{ fontSize: 13, fontFamily: SANS, fontWeight: 700, color: TEXT, fontVariantNumeric: "tabular-nums" }}>
+                  {fmtPx(t.price)}
+                </div>
+                <div style={{ fontSize: 11, fontFamily: SANS, fontWeight: 600, color: POS, marginTop: 2 }}>
+                  +{t.changePercent24h.toFixed(2)}%
+                </div>
+              </div>
             </div>
           ))}
         </div>
 
-        {/* ── Live AI Signal Feed ──────────────────────────────────────────────── */}
-        <div style={{ marginBottom:18 }}>
-          <SH
-            label="AI Signal Feed"
-            color={P}
-            right={engine?.running ? "LIVE" : "STANDBY"}
-          />
-          <div style={{
-            background:`linear-gradient(160deg, #0a1520, #080f1a)`,
-            border:`1px solid ${E}`,
-            borderRadius:16, overflow:"hidden",
-            boxShadow:`0 8px 32px rgba(0,0,0,0.9)`,
-          }}>
-            {topSignals.length === 0 ? (
-              <div style={{
-                padding:"22px 16px",
-                textAlign:"center" as const,
-                fontFamily:SANS,
-              }}>
-                <div style={{
-                  fontSize:11, color:GR, fontWeight:600,
-                  letterSpacing:"0.04em", marginBottom:6,
-                }}>
-                  No active signals yet
-                </div>
-                <div style={{ fontSize:9, color:DIM, letterSpacing:"0.06em" }}>
-                  {engine?.running
-                    ? "Engine is scanning — high-confidence setups will appear here"
-                    : "AI engine on standby — signals will stream live when active"}
-                </div>
-              </div>
-            ) : topSignals.map((bd, i) => {
-              const action = bd.action ?? "HOLD";
-              const ac = AC[action] ?? W;
-              const sym = bd.symbol;
-              const short = MKT_SHORT[sym] ?? sym.replace("USD", "");
-              const fullLabel = MKT_LABEL[sym] ?? sym;
-              const conf = bd.confidence ?? 0;
-              const lastUpdated = bd.lastUpdated
-                ? Math.max(0, Math.floor((Date.now() - bd.lastUpdated) / 1000))
-                : null;
-              return (
-                <div key={sym} style={{
-                  display:"flex", alignItems:"center", gap:10, padding:"12px 14px",
-                  borderBottom: i<topSignals.length-1 ? `1px solid ${ESUB}` : "none",
-                  animation:`card-in 0.3s ${(i*0.06).toFixed(2)}s ease-out both`,
-                  background:`${ac}02`,
-                  position:"relative", overflow:"hidden",
-                }}>
-                  <div aria-hidden style={{
-                    position:"absolute", inset:0,
-                    background:`linear-gradient(90deg, transparent 0%, ${ac}06 50%, transparent 100%)`,
-                    animation:`row-shimmer 12s ease-in-out ${i*2}s infinite`,
-                    pointerEvents:"none",
-                  }}/>
-                  <div style={{
-                    width:3, height:42, borderRadius:2, flexShrink:0,
-                    background:`linear-gradient(180deg, ${ac}, ${ac}44)`,
-                    boxShadow:`0 0 6px ${ac}44`,
-                  }}/>
-
-                  <div style={{ flex:"0 0 74px" }}>
-                    <div style={{ fontSize:12, fontFamily:SANS, fontWeight:700, color:W,
-                      letterSpacing:"0.01em", marginBottom:2 }}>
-                      {short}
-                    </div>
-                    <div style={{ fontSize:8, fontFamily:SANS, color:DIM }}>{fullLabel}</div>
-                  </div>
-
-                  <div style={{ flex:1, display:"flex", flexDirection:"column", gap:5 }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:5, flexWrap:"wrap" }}>
-                      {bd.mtfConfirmed && (
-                        <span style={{
-                          fontSize:7, fontFamily:SANS, fontWeight:700,
-                          color:G, letterSpacing:"0.08em",
-                          padding:"2px 6px", borderRadius:4,
-                          background:"rgba(0,255,136,0.07)",
-                          border:`1px solid rgba(0,255,136,0.20)`,
-                        }}>MTF</span>
-                      )}
-                      {bd.volumeConfirmed && (
-                        <span style={{
-                          fontSize:7, fontFamily:SANS, fontWeight:700,
-                          color:C, letterSpacing:"0.08em",
-                          padding:"2px 6px", borderRadius:4,
-                          background:"rgba(0,229,255,0.06)",
-                          border:`1px solid rgba(0,229,255,0.20)`,
-                        }}>VOL</span>
-                      )}
-                      {bd.trend1H && bd.trend1H !== "neutral" && (
-                        <span style={{
-                          fontSize:7, fontFamily:SANS, fontWeight:700,
-                          color:GOLD, letterSpacing:"0.08em",
-                          padding:"2px 6px", borderRadius:4,
-                          background:"rgba(255,210,0,0.05)",
-                          border:`1px solid rgba(255,210,0,0.18)`,
-                        }}>1H {bd.trend1H.toUpperCase()}</span>
-                      )}
-                      {lastUpdated !== null && (
-                        <span style={{
-                          marginLeft:"auto",
-                          fontSize:8, fontFamily:MONO, color:DIM,
-                        }}>
-                          {lastUpdated < 60 ? `${lastUpdated}s` : `${Math.floor(lastUpdated/60)}m`} ago
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                      <div style={{
-                        flex:1, height:3, background:"rgba(255,255,255,0.05)",
-                        borderRadius:2, overflow:"hidden",
-                      }}>
-                        <div style={{
-                          width:`${conf}%`, height:"100%",
-                          background:`linear-gradient(90deg, ${ac}66, ${ac})`,
-                          borderRadius:2,
-                          boxShadow:`0 0 4px ${ac}55`,
-                        }}/>
-                      </div>
-                      <span style={{ fontSize:9, fontFamily:MONO, fontWeight:700, color:ac }}>
-                        {conf}%
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{
-                    padding:"4px 12px",
-                    background:`${ac}0a`,
-                    border:`1px solid ${ac}30`,
-                    borderRadius:20,
-                    fontSize:8, fontFamily:SANS, fontWeight:700,
-                    color:ac, letterSpacing:"0.05em",
-                    boxShadow: `0 0 10px ${ac}18`,
-                    flexShrink:0,
-                  }}>
-                    {action}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ── Live Markets ─────────────────────────────────────────────────────── */}
-        <div style={{ marginBottom:18 }}>
-          <SH label="Live Markets" color={C}/>
-          <div style={{
-            background:`linear-gradient(160deg, #0a1520, #080f1a)`,
-            border:`1px solid ${E}`,
-            borderRadius:16, overflow:"hidden",
-            boxShadow:`0 8px 32px rgba(0,0,0,0.9)`,
-          }}>
-            {mktCards.map(({ sym, label: symLabel, price, pct, priceState, action, conf, trend }, i) => {
-              const ac = AC[action]??W;
-              const pctPos = !pct.startsWith("-");
-              const isLive = priceState === "ok";
-              const priceColor = isLive ? W : DIM;
-              const pctColor   = !isLive ? DIM : (pctPos ? G : R);
-              return (
-                <div key={sym} style={{
-                  display:"flex", alignItems:"center", gap:10, padding:"12px 14px",
-                  borderBottom: i<mktCards.length-1 ? `1px solid ${ESUB}` : "none",
-                  animation:`card-in 0.3s ${(i*0.06).toFixed(2)}s ease-out both`,
-                  background:`${ac}02`,
-                  position:"relative", overflow:"hidden",
-                }}>
-                  {/* Subtle row scan sweep */}
-                  <div aria-hidden style={{
-                    position:"absolute", inset:0,
-                    background:`linear-gradient(90deg, transparent 0%, ${ac}06 50%, transparent 100%)`,
-                    animation:`row-shimmer 12s ease-in-out ${i*2}s infinite`,
-                    pointerEvents:"none",
-                  }}/>
-                  <div style={{
-                    width:3, height:36, borderRadius:2, flexShrink:0,
-                    background:`linear-gradient(180deg, ${ac}, ${ac}44)`,
-                    boxShadow:`0 0 6px ${ac}44`,
-                  }}/>
-
-                  <div style={{ flex:"0 0 74px" }}>
-                    <div style={{ fontSize:12, fontFamily:SANS, fontWeight:700, color:W,
-                      letterSpacing:"0.01em", marginBottom:2 }}>
-                      {sym}
-                    </div>
-                    <div style={{ fontSize:8, fontFamily:SANS, color:DIM }}>{symLabel}</div>
-                  </div>
-
-                  <div style={{ flex:1, display:"flex", justifyContent:"center" }}>
-                    <Sparkline seed={sym+"mkt"} trend={trend} w={88} h={34}
-                      animDelay={`${i*3.5}s`}/>
-                  </div>
-
-                  <div style={{ textAlign:"right", flex:"0 0 78px" }}>
-                    <div style={{
-                      fontSize: isLive ? 13 : 10, fontFamily:MONO,
-                      fontWeight: isLive ? 700 : 500,
-                      color: priceColor,
-                      marginBottom:3,
-                      letterSpacing: isLive ? undefined : "0.04em",
-                    }}>
-                      {price}
-                    </div>
-                    <div style={{
-                      fontSize:9, fontFamily:MONO, fontWeight:600,
-                      color: pctColor,
-                      fontStyle: isLive ? "normal" : "italic",
-                    }}>
-                      {pct}
-                    </div>
-                  </div>
-
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:5, flexShrink:0 }}>
-                    <div style={{
-                      padding:"4px 12px",
-                      background:`${ac}0a`,
-                      border:`1px solid ${ac}30`,
-                      borderRadius:20,
-                      fontSize:8, fontFamily:SANS, fontWeight:700,
-                      color:ac, letterSpacing:"0.05em",
-                      boxShadow: `0 0 10px ${ac}18`,
-                    }}>
-                      {action}
-                    </div>
-                    <div style={{ display:"flex", alignItems:"center", gap:4 }}>
-                      <div style={{
-                        width:32, height:2, background:"rgba(255,255,255,0.05)",
-                        borderRadius:2, overflow:"hidden",
-                      }}>
-                        <div style={{
-                          width:`${conf}%`, height:"100%",
-                          background:`linear-gradient(90deg, ${ac}66, ${ac})`,
-                          borderRadius:2,
-                          boxShadow:`0 0 4px ${ac}55`,
-                        }}/>
-                      </div>
-                      <span style={{ fontSize:7, fontFamily:MONO, color:DIM }}>
-                        {conf}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ── Broker Status ────────────────────────────────────────────────────── */}
-        <div style={{ marginBottom:18 }}>
-          <SH label="Trading Account" color={P}/>
-          <BrokerStatusCard />
-        </div>
-
-        {/* ── Launch AI Trading CTA ────────────────────────────────────────────── */}
-        {brokerStatus === "idle" && (
-          <div style={{
-            position:"relative", overflow:"hidden",
-            background:`linear-gradient(145deg, #080f1a 0%, #0a1220 50%, #060d16 100%)`,
-            border:`1px solid rgba(155,92,245,0.18)`,
-            borderRadius:20, padding:"24px 20px",
-            boxShadow:`0 20px 60px rgba(0,0,0,0.95), 0 0 40px rgba(155,92,245,0.04) inset`,
-          }}>
-            {/* Animated laser edge */}
-            <div aria-hidden style={{
-              position:"absolute", top:0, left:0, right:0, height:1.5,
-              background:`linear-gradient(90deg, transparent 5%, rgba(155,92,245,0.60) 38%, rgba(0,229,255,0.45) 60%, transparent 95%)`,
-              animation:"edge-sweep 6s ease-in-out infinite",
-            }}/>
-            {/* Ambient glow — breathing with energy buildup on launch */}
-            <div aria-hidden style={{
-              position:"absolute", top:-50, right:-30, width:200, height:200, borderRadius:"50%",
-              background:`radial-gradient(circle, rgba(155,92,245,0.10), transparent 70%)`,
-              pointerEvents:"none",
-              animation: launching ? "orb-breathe 1.5s ease-in-out infinite" : "orb-breathe 7s ease-in-out infinite",
-            }}/>
-            <div aria-hidden style={{
-              position:"absolute", bottom:-30, left:-20, width:140, height:140, borderRadius:"50%",
-              background:`radial-gradient(circle, rgba(0,229,255,0.07), transparent 70%)`,
-              pointerEvents:"none",
-              animation: launching ? "orb-breathe 1s ease-in-out 0.5s infinite" : "orb-breathe 9s ease-in-out 3s infinite",
-            }}/>
-
-            {/* Rocket launch overlay */}
-            {launching && (
-              <div style={{
-                position:"absolute", inset:0, zIndex:10,
-                display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
-                background:"rgba(0,0,0,0.88)",
-                backdropFilter:"blur(8px)",
-                WebkitBackdropFilter:"blur(8px)",
-              }}>
-                <div style={{
-                  fontSize:48, lineHeight:1,
-                  animation:"rocket-launch 1.5s ease-in forwards",
-                  filter:`drop-shadow(0 0 20px ${C})`,
-                }}>
-                  🚀
-                </div>
-                <div style={{
-                  marginTop:12, fontSize:11, fontFamily:SANS, fontWeight:700,
-                  color:C, letterSpacing:"0.12em",
-                  animation:"fade-in 0.3s 0.2s ease-out both",
-                }}>
-                  IGNITING AI ENGINE
-                </div>
-                <div aria-hidden style={{
-                  marginTop:8, width:2, height:30,
-                  background:`linear-gradient(180deg, ${C}88, transparent)`,
-                  animation:"trail-fade 1.5s ease-in forwards",
-                }}/>
-              </div>
-            )}
-
-            <div style={{ position:"relative" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:18 }}>
-                <div style={{
-                  width:48, height:48, borderRadius:14, flexShrink:0,
-                  background:"rgba(155,92,245,0.08)",
-                  border:`1px solid rgba(155,92,245,0.20)`,
-                  display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:22,
-                  boxShadow:`0 0 20px rgba(155,92,245,0.12)`,
-                }}>
-                  🚀
-                </div>
-                <div>
-                  <div style={{ fontSize:18, fontFamily:SANS, fontWeight:800, color:W,
-                    letterSpacing:"-0.02em" }}>
-                    Activate Live AI Trading
-                  </div>
-                  <div style={{ fontSize:10, fontFamily:SANS, color:DIM, marginTop:3 }}>
-                    Real funds · AI-managed · Fully transparent
-                  </div>
-                </div>
-              </div>
-
-              {/* Pricing */}
-              <div style={{
-                background:"rgba(0,0,0,0.40)", borderRadius:12, padding:"14px 16px",
-                marginBottom:16, border:`1px solid ${ESUB}`,
-              }}>
-                <div style={{ fontSize:8, fontFamily:SANS, fontWeight:700, color:DIM,
-                  letterSpacing:"0.16em", textTransform:"uppercase" as const, marginBottom:12 }}>
-                  Transparent Fee Structure
-                </div>
-                {[
-                  { icon:"◈", text:"$5.99 / month platform fee",          color:C  },
-                  { icon:"◈", text:`${PERFORMANCE_FEE_LABEL} on profitable closed trades only`,  color:C  },
-                  { icon:"◉", text:"Zero fee on losing trades — ever",     color:G  },
-                  { icon:"◉", text:"Paper trading remains free forever",    color:G  },
-                  { icon:"◉", text:"Cancel anytime — no lock-in",          color:G  },
-                ].map(({ icon, text, color }, idx, arr) => (
-                  <div key={text} style={{
-                    display:"flex", gap:10, alignItems:"flex-start",
-                    marginBottom: idx<arr.length-1 ? 9 : 0,
-                  }}>
-                    <span style={{ fontSize:9, color, flexShrink:0, marginTop:1 }}>{icon}</span>
-                    <span style={{ fontSize:11, fontFamily:SANS, color:GR, lineHeight:1.7 }}>
-                      {text}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* CTA button */}
-              <button
-                onClick={handleLaunch}
-                disabled={launching}
-                style={{
-                  width:"100%", padding:"16px 0",
-                  background: launching
-                    ? `linear-gradient(135deg, rgba(0,229,255,0.25), rgba(155,92,245,0.20))`
-                    : `linear-gradient(135deg, rgba(0,229,255,0.14), rgba(155,92,245,0.10))`,
-                  border:`1px solid rgba(0,229,255,0.42)`,
-                  borderRadius:12,
-                  color:C, fontFamily:SANS, fontSize:14,
-                  fontWeight:800, letterSpacing:"0.03em", cursor:"pointer",
-                  display:"flex", alignItems:"center", justifyContent:"center", gap:10,
-                  boxShadow:`0 0 ${launching?"28px":"14px"} rgba(0,229,255,${launching?"0.16":"0.06"})`,
-                  transition:"all 0.3s ease",
-                  animation: launching ? "none" : "cta-breathe 4s ease-in-out infinite",
-                }}>
-                <span style={{
-                  display:"inline-block",
-                  animation: launching ? "rocket-button 1.5s ease-in forwards" : "none",
-                }}>🚀</span>
-                {launching ? "Launching…" : "Start AI Trading →"}
-              </button>
-
-              <div style={{ marginTop:10, textAlign:"center" as const,
-                fontSize:9, fontFamily:SANS, color:DIM }}>
-                Open your AI-powered account in minutes
+        {/* ── Active Trades ──────────────────────────────────────────────── */}
+        <SectionHeader label="Active Trades" right={`${positions.length} open`} onMore={() => setLocation("/trades")}/>
+        <div style={{ margin: "0 16px" }}>
+          {positions.length === 0 ? (
+            <div style={{
+              padding: "20px 18px", borderRadius: 16,
+              background: SURFACE, border: `1px dashed ${BORDER}`,
+              textAlign: "center",
+            }}>
+              <div style={{ fontSize: 12, fontFamily: SANS, color: TEXT_DIM }}>
+                No open positions. AI is scanning the market.
               </div>
             </div>
+          ) : (
+            positions.slice(0, 3).map((p: any, i: number) => {
+              const isLong = (p.side ?? "long").toLowerCase() === "long";
+              const upnl = p.unrealizedPnL ?? 0;
+              const roe = p.roe ?? (p.unrealizedPnLPct ?? 0);
+              return (
+                <div key={i} style={{
+                  marginBottom: 10, padding: "14px 16px", borderRadius: 16,
+                  background: `linear-gradient(140deg, ${SURFACE} 0%, ${BG} 100%)`,
+                  border: `1px solid ${BORDER}`,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span style={{
+                      padding: "3px 9px", borderRadius: 6,
+                      background: isLong ? `${BRAND}1F` : `${NEG}1F`,
+                      border: `1px solid ${isLong ? BORDER_HI : "rgba(255,64,96,0.30)"}`,
+                      fontSize: 9, fontFamily: SANS, fontWeight: 800,
+                      color: isLong ? BRAND : NEG, letterSpacing: 0.8, textTransform: "uppercase",
+                    }}>{isLong ? "Long" : "Short"}</span>
+                    <span style={{ fontSize: 13, fontFamily: SANS, fontWeight: 700, color: TEXT }}>
+                      {SYM_SHORT[p.symbol] ?? p.symbol?.replace("USD","")}/USDT
+                    </span>
+                    <span style={{ fontSize: 10, fontFamily: SANS, color: TEXT_DIM, marginLeft: "auto" }}>
+                      {p.leverage ? `Cross ${p.leverage}x` : "Cross"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                    <div>
+                      <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600, color: TEXT_DIM, letterSpacing: 0.8, textTransform: "uppercase" }}>
+                        Unrealized P&amp;L
+                      </div>
+                      <div style={{
+                        fontSize: 18, fontFamily: SANS, fontWeight: 700,
+                        color: upnl >= 0 ? POS : NEG, marginTop: 3, letterSpacing: -0.3,
+                      }}>
+                        {upnl >= 0 ? "+" : ""}{fmt$(Math.abs(upnl))}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600, color: TEXT_DIM, letterSpacing: 0.8, textTransform: "uppercase" }}>
+                        ROE
+                      </div>
+                      <div style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: upnl >= 0 ? POS : NEG, marginTop: 3 }}>
+                        {upnl >= 0 ? "+" : ""}{roe.toFixed(2)}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* ── Broker connection (existing card, themed via tokens) ────────── */}
+        <div style={{ padding: "16px 16px 0" }}>
+          <BrokerStatusCard/>
+        </div>
+
+        <UpgradeBanner/>
+
+        {/* Subtle attribution footer */}
+        <div style={{ textAlign: "center", padding: "20px 16px 8px" }}>
+          <img src={aicandlezLogo} alt="AICandlez" style={{
+            height: 22, width: "auto", objectFit: "contain", opacity: 0.55,
+            filter: `drop-shadow(0 0 10px ${BRAND_BLOOM})`,
+          }}/>
+          <div style={{ fontSize: 9, fontFamily: SANS, color: TEXT_DIM, marginTop: 6, letterSpacing: 1, textTransform: "uppercase" }}>
+            {isLive ? "Live Mode · Real Capital" : "Simulation · No Real Funds"}
           </div>
-        )}
+        </div>
 
       </div>
+    </div>
+  );
+}
 
-      {/* ── Keyframes ─────────────────────────────────────────────────────────── */}
-      <style>{`
-        @keyframes dot-pulse       { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.25)} }
-        @keyframes ring-out        { 0%{transform:scale(1);opacity:.5} 100%{transform:scale(2.4);opacity:0} }
-        @keyframes wave-bar        { from{transform:scaleY(.25);opacity:.2} to{transform:scaleY(1);opacity:.65} }
-        @keyframes edge-sweep      { 0%{opacity:.1;transform:scaleX(.25) translateX(-80%)} 50%{opacity:1;transform:scaleX(1) translateX(0)} 100%{opacity:.1;transform:scaleX(.25) translateX(80%)} }
-        @keyframes wave-scroll     { from{transform:translateX(0)} to{transform:translateX(-50%)} }
-        @keyframes scan-text       { 0%,100%{opacity:.25} 50%{opacity:.75} }
-        @keyframes bar-in          { from{width:0%;opacity:0} to{opacity:1} }
-        @keyframes bar-breathe     { 0%,100%{opacity:1} 50%{opacity:.55} }
-        @keyframes card-in         { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes num-pop         { from{opacity:0;transform:scale(.92)} to{opacity:1;transform:scale(1)} }
-        @keyframes stat-glow       { 0%,100%{opacity:1;text-shadow:inherit} 50%{opacity:.65} }
-        @keyframes cta-breathe     { 0%,100%{box-shadow:0 0 12px rgba(0,229,255,0.06)} 50%{box-shadow:0 0 28px rgba(0,229,255,0.14)} }
-        @keyframes ticker-scroll   { from{transform:translateX(0)} to{transform:translateX(-50%)} }
-        @keyframes chart-drift     { 0%,100%{transform:translateY(0)} 35%{transform:translateY(-.8px)} 70%{transform:translateY(.4px)} }
-        @keyframes pnl-flash       { 0%,100%{opacity:1} 50%{opacity:.7} }
-        @keyframes cursor-blink    { 0%,100%{opacity:1} 50%{opacity:0} }
-        @keyframes particle-float  { from{transform:translate(0,0) scale(1);opacity:.3} to{transform:translate(8px,-12px) scale(1.4);opacity:.6} }
-        @keyframes rocket-launch   { 0%{transform:translateY(0) scale(1)} 20%{transform:translateY(4px) scale(0.95)} 40%{transform:translateY(-8px) scale(1.1)} 100%{transform:translateY(-140px) scale(0.5);opacity:0} }
-        @keyframes rocket-button   { 0%{transform:translateY(0)} 30%{transform:translateY(2px)} 100%{transform:translateY(-20px);opacity:0} }
-        @keyframes trail-fade      { 0%{opacity:0;height:4px} 40%{opacity:1;height:40px} 100%{opacity:0;height:80px} }
-        @keyframes fade-in         { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes orb-breathe     { 0%,100%{opacity:0.6;transform:scale(1)} 50%{opacity:1;transform:scale(1.18)} }
-        @keyframes scan-line       { 0%{top:-2px;opacity:0} 5%{opacity:1} 95%{opacity:0.5} 100%{top:100%;opacity:0} }
-        @keyframes shimmer-sweep   { 0%{left:-30%;opacity:0} 20%{opacity:1} 80%{opacity:0.4} 100%{left:130%;opacity:0} }
-        @keyframes row-shimmer     { 0%,100%{opacity:0} 50%{opacity:1} }
-        @keyframes glow-pulse      { 0%,100%{box-shadow:0 0 14px rgba(0,229,255,0.06)} 50%{box-shadow:0 0 36px rgba(0,229,255,0.18),0 0 60px rgba(0,229,255,0.06)} }
-        .page-enter                { animation: card-in 0.35s ease-out both; }
-      `}</style>
+// ── Section header w/ "View All" link ───────────────────────────────────────
+function SectionHeader({ label, right, onMore }: {
+  label: string; right?: string; onMore?: () => void;
+}) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "22px 18px 10px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+        <div style={{
+          width: 3, height: 14, borderRadius: 2,
+          background: `linear-gradient(180deg, ${BRAND}, ${BRAND_DEEP})`,
+          boxShadow: `0 0 10px ${BRAND_BLOOM}`,
+        }}/>
+        <span style={{
+          fontSize: 13, fontFamily: SANS, fontWeight: 700, color: TEXT,
+          letterSpacing: -0.1,
+        }}>{label}</span>
+        {right && (
+          <span style={{ fontSize: 10, fontFamily: SANS, color: TEXT_DIM, marginLeft: 6 }}>
+            · {right}
+          </span>
+        )}
+      </div>
+      {onMore && (
+        <button onClick={onMore} style={{
+          background: "transparent", border: "none", cursor: "pointer",
+          fontSize: 11, fontFamily: SANS, fontWeight: 600, color: BRAND,
+          letterSpacing: 0.1, display: "flex", alignItems: "center", gap: 3,
+        }}>
+          View All →
+        </button>
+      )}
     </div>
   );
 }

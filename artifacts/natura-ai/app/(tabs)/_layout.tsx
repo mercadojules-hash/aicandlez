@@ -15,13 +15,13 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor:   C.cyan,
-        tabBarInactiveTintColor: "#2a4050",
+        tabBarActiveTintColor:   C.brand,
+        tabBarInactiveTintColor: C.textDim,
         tabBarStyle: {
           position:        "absolute",
-          backgroundColor: isIOS ? "transparent" : C.surface,
+          backgroundColor: isIOS ? "transparent" : "#050A07",
           borderTopWidth:  1,
-          borderTopColor:  C.border,
+          borderTopColor:  C.borderHi,
           height:          tabH + (isWeb ? 34 : insets.bottom),
           paddingBottom:   isWeb ? 34 : insets.bottom,
           elevation: 0,

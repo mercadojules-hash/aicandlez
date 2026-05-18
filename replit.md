@@ -17,6 +17,69 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Build**: esbuild (CJS bundle)
 - **Auth**: Replit-managed Clerk (httpOnly cookie on web, Bearer for mobile)
 
+## Phase 5 — Premium Neon-Green Home Redesign (COMPLETE)
+
+Brand-wide cyan → neon-green pivot. Cinematic dark UI · restrained green
+glow · glassmorphism · Apple-level polish — matches the attached
+concept screenshots.
+
+**Brand palette (final):**
+- `#66FF66` primary brand · `#00C853` deep emerald · `#7CFF00` bright
+  lime · `#39FF14` vivid neon
+- Backgrounds: `#000` / `#050A07` / `#0A1410` / `#0F1F18`
+- Glass primitives: rgba(255,255,255,0.04…0.11), green border accent
+  rgba(102,255,102,0.22)
+
+**Design tokens:**
+- `artifacts/natura-ai/constants/theme.ts` — full rewrite. Adds `C.brand`,
+  `C.brandDeep`, `C.brandBright`, `C.brandVivid`, `C.brandGlow/Bloom/
+  Whisper`, glass tokens, SHADOWS with bloom variants, TYPE/SPACE/RADIUS
+  scales. **Legacy aliases preserved** (`C.cyan`, `C.purple`, `C.teal`,
+  `C.green` all remapped onto the green system) so existing components
+  re-skin automatically.
+- `artifacts/aicandlez-app/src/index.css` — HSL `--primary` shifted from
+  207 (blue) → 120 100% 70% (#66FF66). New CSS vars: `--brand{,-deep,
+  -bright,-vivid,-glow,-bloom,-whisper}`, `--ink-0..3`, `--glass-1..3`.
+  Premium animation library: `brand-pulse`, `orb-breathe`,
+  `ticker-scroll`, `dot-pulse`, `bar-in`, `bar-breathe`, `scan-line`,
+  `edge-sweep`, `chart-drift`, `wave-bar`, `particle-float`, `shimmer`.
+  Utility classes: `.ac-glow{-soft,,-strong}`, `.ac-glass{,-brand}`,
+  `.ac-gradient-text`.
+
+**Home rebuilds (concept-matched 1:1):**
+- `artifacts/aicandlez-app/src/pages/Home.tsx` — Vite/React PWA. Header
+  with neon-ring avatar + greeting + PRO pill + bell w/ red dot; glowing
+  portfolio hero card with `HeroChart` (gradient line + area fill);
+  4 `QuickAction` tiles (AI Scan / Open Trades / Auto Trade / Deposit);
+  AI Market Insight card with `AssetIcon`, BULLISH/BEARISH pill, animated
+  `ConfidenceBar`, reasoning + age; Top Gainers list with mini
+  Sparklines; Active Trades cards with LONG/SHORT pills + ROE;
+  `BrokerStatusCard` and `UpgradeBanner` preserved. All real-data wired
+  to existing queries (`/mobile/status`, `/portfolio`, `/signals`,
+  `/tickers`, `/account`, `/billing/subscription`).
+- `artifacts/natura-ai/app/(tabs)/index.tsx` — Expo/React Native version
+  of the same layout using `Svg/Path/Defs/LinearGradient/Stop/Circle`,
+  `Animated` ambient blobs, `useSafeAreaInsets`, Feather icons.
+  Wired to `useTrading()` (engine, account, positions, alpacaAccount)
+  and `useUser()` from `@/contexts/UserContext` (NOT Clerk — natura-ai
+  is AsyncStorage-only).
+- `artifacts/natura-ai/app/(tabs)/_layout.tsx` — tab bar
+  `tabBarActiveTintColor` → `C.brand`, inactive → `C.textDim`, border →
+  `C.borderHi`, background `#050A07`.
+
+**Verification:**
+- `aicandlez-app` typecheck PASSES clean.
+- `natura-ai` typecheck — zero errors in changed files. Pre-existing
+  errors in legacy wellness leftovers (`pose/*`, `meditation/*`,
+  `ChatBubble`, `useColors`, `data/*.json`) are out of scope.
+
+**Key files (Phase 5):**
+- `artifacts/aicandlez-app/src/pages/Home.tsx` — PWA Home
+- `artifacts/aicandlez-app/src/index.css` — green tokens + animation lib
+- `artifacts/natura-ai/app/(tabs)/index.tsx` — Expo Home
+- `artifacts/natura-ai/constants/theme.ts` — green tokens
+- `artifacts/natura-ai/app/(tabs)/_layout.tsx` — tab bar reskin
+
 ## Phase 4 — Production Deployment Foundation (COMPLETE)
 
 ### Push Notification Infrastructure

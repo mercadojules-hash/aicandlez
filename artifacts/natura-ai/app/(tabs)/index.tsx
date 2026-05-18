@@ -1,21 +1,62 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useMemo } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, RefreshControl, Animated, Platform,
 } from "react-native";
+import Svg, { Path, Defs, LinearGradient, Stop, Circle } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { useTrading, fmt$, fmtPct, fmtAge } from "@/contexts/TradingContext";
-import { SignalBadge, ConfidenceBar } from "@/components/SignalBadge";
-import { LiveDot } from "@/components/LiveDot";
-import { PortfolioChart } from "@/components/PortfolioChart";
-import { TradingModeToggle } from "@/components/TradingModeToggle";
-import { C, FONTS, RADIUS } from "@/constants/theme";
+import { useRouter } from "expo-router";
+import { useTrading, fmt$ } from "@/contexts/TradingContext";
+import { useUser } from "@/contexts/UserContext";
+import { C, FONTS, SPACE, SHADOWS } from "@/constants/theme";
 
 const TAB_BAR_H = 84;
 
-// ── Ambient Background ─────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// AICandlez Mobile Home — premium neon-green fintech UI
+// Matches concept: Greeting + Portfolio hero card + Quick Actions +
+// AI Market Insight + Top Gainers + Active Trades
+// ─────────────────────────────────────────────────────────────────────────────
 
+// ── Utility: deterministic chart points ─────────────────────────────────────
+function genPts(seed: string, trend: "up"|"down"|"flat", count = 36): number[] {
+  let s = 5381;
+  for (let i = 0; i < seed.length; i++) s = (((s<<5)+s) ^ seed.charCodeAt(i)) >>> 0;
+  const rand = () => { s ^= s<<13; s ^= s>>17; s ^= s<<5; return (s>>>0)/0x100000000; };
+  const dir = trend === "up" ? 1.4 : trend === "down" ? -1.4 : 0.05;
+  const pts: number[] = []; let v = 50;
+  for (let i = 0; i < count; i++) {
+    v = Math.max(8, Math.min(92, v + (rand()-0.5)*7 + dir));
+    pts.push(v);
+  }
+  return pts;
+}
+function smoothPath(pts: {x:number;y:number}[]): string {
+  const t = 0.33;
+  let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+  for (let i = 0; i < pts.length-1; i++) {
+    const p0 = pts[Math.max(0,i-1)], p1 = pts[i], p2 = pts[i+1], p3 = pts[Math.min(pts.length-1,i+2)];
+    const cp1x = p1.x + (p2.x-p0.x)*t, cp1y = p1.y + (p2.y-p0.y)*t;
+    const cp2x = p2.x - (p3.x-p1.x)*t, cp2y = p2.y - (p3.y-p1.y)*t;
+    d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+function fmtPx(p: number): string {
+  if (p >= 1000) return `$${p.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
+  if (p >= 1)    return `$${p.toFixed(2)}`;
+  if (p >= 0.01) return `$${p.toFixed(4)}`;
+  return `$${p.toFixed(6)}`;
+}
+
+const SYM_LABEL: Record<string, string> = { BTCUSD: "Bitcoin", ETHUSD: "Ethereum", SOLUSD: "Solana", ADAUSD: "Cardano" };
+const SYM_SHORT: Record<string, string> = { BTCUSD: "BTC", ETHUSD: "ETH", SOLUSD: "SOL", ADAUSD: "ADA" };
+const SYM_ACCENT: Record<string, string> = {
+  BTCUSD: "#F7931A", ETHUSD: "#627EEA", SOLUSD: "#14F195", ADAUSD: "#0033AD",
+};
+
+// ── Ambient Background ─────────────────────────────────────────────────────
 function AmbientBackground() {
   const a1 = useRef(new Animated.Value(0)).current;
   const a2 = useRef(new Animated.Value(0)).current;
@@ -28,284 +69,224 @@ function AmbientBackground() {
         Animated.timing(anim, { toValue: 1, duration: dur, useNativeDriver: true }),
         Animated.timing(anim, { toValue: 0, duration: dur, useNativeDriver: true }),
       ]));
-    make(a1, 6000, 0).start();
-    make(a2, 8000, 2000).start();
-    make(a3, 7000, 4000).start();
+    make(a1, 7000, 0).start();
+    make(a2, 9000, 2000).start();
+    make(a3, 8000, 4000).start();
   }, []);
 
-  const op1 = a1.interpolate({ inputRange: [0, 1], outputRange: [0.04, 0.12] });
-  const op2 = a2.interpolate({ inputRange: [0, 1], outputRange: [0.03, 0.08] });
-  const op3 = a3.interpolate({ inputRange: [0, 1], outputRange: [0.02, 0.07] });
+  const op1 = a1.interpolate({ inputRange: [0,1], outputRange: [0.05, 0.18] });
+  const op2 = a2.interpolate({ inputRange: [0,1], outputRange: [0.04, 0.13] });
+  const op3 = a3.interpolate({ inputRange: [0,1], outputRange: [0.03, 0.10] });
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-      <Animated.View style={[amb.blob, { top: -80, right: -60,  width: 300, height: 300, backgroundColor: C.cyan,   borderRadius: 150, opacity: op1 }]} />
-      <Animated.View style={[amb.blob, { top: 400, left: -80,   width: 260, height: 260, backgroundColor: C.purple, borderRadius: 130, opacity: op2 }]} />
-      <Animated.View style={[amb.blob, { top: 200, right: -100, width: 220, height: 220, backgroundColor: C.green,  borderRadius: 110, opacity: op3 }]} />
+      <Animated.View style={[amb.blob, { top: -100, right: -80,  width: 340, height: 340, backgroundColor: C.brand,     borderRadius: 170, opacity: op1 }]} />
+      <Animated.View style={[amb.blob, { top: 360, left: -100,   width: 300, height: 300, backgroundColor: C.brandDeep, borderRadius: 150, opacity: op2 }]} />
+      <Animated.View style={[amb.blob, { top: 660, right: -120,  width: 280, height: 280, backgroundColor: C.brandBright, borderRadius: 140, opacity: op3 }]} />
     </View>
   );
 }
 const amb = StyleSheet.create({ blob: { position: "absolute" } });
 
-// ── Sentiment Banner ───────────────────────────────────────────────────────────
+// ── Mini sparkline ─────────────────────────────────────────────────────────
+function Sparkline({ seed, trend, w = 72, h = 30, color = C.brand }: {
+  seed: string; trend: "up"|"down"|"flat"; w?: number; h?: number; color?: string;
+}) {
+  const raw = genPts(seed, trend, 24);
+  const mn = Math.min(...raw), mx = Math.max(...raw), rng = mx-mn || 1;
+  const pts = raw.map((p, i) => ({ x: (i/(raw.length-1))*w, y: h-3-((p-mn)/rng)*(h-6) }));
+  const d = smoothPath(pts);
+  const last = pts[pts.length-1];
+  const gid = `sg-${seed.replace(/[^a-z0-9]/gi, "")}`;
+  return (
+    <Svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      <Defs>
+        <LinearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%"   stopColor={color} stopOpacity="0.35" />
+          <Stop offset="100%" stopColor={color} stopOpacity="0"    />
+        </LinearGradient>
+      </Defs>
+      <Path d={`${d} L ${last.x},${h} L 0,${h} Z`} fill={`url(#${gid})`} />
+      <Path d={d} fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+      <Circle cx={last.x} cy={last.y} r={2.2} fill={color}/>
+    </Svg>
+  );
+}
 
-const SENTIMENTS = [
-  { label: "BULLISH MOMENTUM",       color: C.green,  icon: "trending-up" },
-  { label: "BREAKOUT CONDITIONS",    color: C.cyan,   icon: "activity" },
-  { label: "RISK-OFF ENVIRONMENT",   color: C.orange, icon: "alert-triangle" },
-  { label: "HIGH VOLATILITY ALERT",  color: C.red,    icon: "zap" },
-];
+// ── Hero chart (large) ─────────────────────────────────────────────────────
+function HeroChart({ seed, isUp, width }: { seed: string; isUp: boolean; width: number }) {
+  const h = 92;
+  const color = isUp ? C.brand : C.negative;
+  const raw = genPts(seed, isUp ? "up" : "down", 44);
+  const mn = Math.min(...raw), mx = Math.max(...raw), rng = mx-mn || 1;
+  const pts = raw.map((p, i) => ({ x: (i/(raw.length-1))*width, y: h-4-((p-mn)/rng)*(h-8) }));
+  const d = smoothPath(pts);
+  const last = pts[pts.length-1];
+  return (
+    <Svg width={width} height={h}>
+      <Defs>
+        <LinearGradient id="hero-area" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%"   stopColor={color} stopOpacity="0.4"  />
+          <Stop offset="60%"  stopColor={color} stopOpacity="0.08" />
+          <Stop offset="100%" stopColor={color} stopOpacity="0"    />
+        </LinearGradient>
+        <LinearGradient id="hero-line" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0%"   stopColor={C.brandDeep} />
+          <Stop offset="50%"  stopColor={color}/>
+          <Stop offset="100%" stopColor={C.brandBright}/>
+        </LinearGradient>
+      </Defs>
+      <Path d={`${d} L ${last.x},${h} L 0,${h} Z`} fill="url(#hero-area)"/>
+      <Path d={d} fill="none" stroke="url(#hero-line)" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"/>
+      <Circle cx={last.x} cy={last.y} r={3} fill={color}/>
+    </Svg>
+  );
+}
 
-function SentimentBanner() {
-  const [idx, setIdx]   = useState(0);
-  const fadeAnim        = useRef(new Animated.Value(1)).current;
-
+// ── Confidence bar ─────────────────────────────────────────────────────────
+function ConfidenceBar({ value }: { value: number }) {
+  const w = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    const tick = setInterval(() => {
-      Animated.timing(fadeAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => {
-        setIdx(i => (i + 1) % SENTIMENTS.length);
-        Animated.timing(fadeAnim, { toValue: 1, duration: 420, useNativeDriver: true }).start();
-      });
-    }, 8000);
-    return () => clearInterval(tick);
-  }, []);
-
-  const cur = SENTIMENTS[idx];
-
+    Animated.timing(w, { toValue: Math.min(100, Math.max(0, value)), duration: 900, useNativeDriver: false }).start();
+  }, [value]);
+  const widthInterp = w.interpolate({ inputRange: [0, 100], outputRange: ["0%", "100%"] });
   return (
-    <Animated.View style={[sb.wrap, { borderColor: `${cur.color}30`, backgroundColor: `${cur.color}08`, opacity: fadeAnim }]}>
-      <View style={[sb.dot, { backgroundColor: cur.color }]} />
-      <Feather name={cur.icon as any} size={10} color={cur.color} />
-      <Text style={[sb.label, { color: cur.color }]}>{cur.label}</Text>
-      <Text style={sb.tag}>MARKET REGIME</Text>
-    </Animated.View>
-  );
-}
-const sb = StyleSheet.create({
-  wrap:  { flexDirection: "row", alignItems: "center", gap: 7, borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 14 },
-  dot:   { width: 5, height: 5, borderRadius: 3 },
-  label: { flex: 1, fontSize: 10, fontFamily: FONTS.monoBold, letterSpacing: 1.2 },
-  tag:   { fontSize: 8, fontFamily: FONTS.mono, color: C.textDim, letterSpacing: 0.8 },
-});
-
-// ── AI Insight Rotator ─────────────────────────────────────────────────────────
-
-const AI_INSIGHTS = [
-  "Momentum increasing on high-volume assets",
-  "Strong trend continuation probability detected",
-  "Risk conditions stable · AI operating normally",
-  "Elevated volatility across major pairs",
-  "BTC correlation strengthening across altcoins",
-  "AI detecting EMA breakout formation on L1s",
-];
-
-function AIInsight() {
-  const [idx, setIdx] = useState(0);
-  const fade          = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      Animated.timing(fade, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-        setIdx(i => (i + 1) % AI_INSIGHTS.length);
-        Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-      });
-    }, 5000);
-    return () => clearInterval(t);
-  }, []);
-
-  return (
-    <Animated.Text style={[ins.text, { opacity: fade }]}>
-      ✦ {AI_INSIGHTS[idx]}
-    </Animated.Text>
-  );
-}
-const ins = StyleSheet.create({
-  text: { fontSize: 9, fontFamily: FONTS.mono, color: `${C.purple}90`, letterSpacing: 0.5, marginTop: 5, fontStyle: "italic" },
-});
-
-// ── Market Ticker ──────────────────────────────────────────────────────────────
-
-function MarketTicker({ breakdowns }: { breakdowns?: { symbol: string; price?: number; signal: string; confidence: number }[] }) {
-  const items = breakdowns?.length ? breakdowns : [
-    { symbol: "BTCUSD", price: 68_120, signal: "BUY",  confidence: 74 },
-    { symbol: "ETHUSD", price: 3_512,  signal: "BUY",  confidence: 68 },
-    { symbol: "SOLUSD", price: 188.4,  signal: "HOLD", confidence: 52 },
-  ];
-  return (
-    <View style={tk.row}>
-      {items.map((b, i) => {
-        const sigColor = b.signal === "BUY" ? C.green : b.signal === "SELL" ? C.red : C.cyan;
-        return (
-          <View key={b.symbol} style={[tk.item, i < items.length - 1 && tk.sep]}>
-            <Text style={tk.sym}>{b.symbol.replace("USD", "")}</Text>
-            <Text style={tk.price}>
-              {b.price ? `$${b.price.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"}
-            </Text>
-            <View style={[tk.sigBadge, { backgroundColor: `${sigColor}10`, borderColor: `${sigColor}28` }]}>
-              <Text style={[tk.sig, { color: sigColor }]}>{b.signal}</Text>
-            </View>
-          </View>
-        );
-      })}
+    <View style={cb.track}>
+      <Animated.View style={[cb.fill, { width: widthInterp }]} />
     </View>
   );
 }
-const tk = StyleSheet.create({
-  row:      { flexDirection: "row", backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: C.border, marginBottom: 14 },
-  item:     { flex: 1, alignItems: "center", paddingVertical: 13 },
-  sep:      { borderRightWidth: 1, borderRightColor: C.border },
-  sym:      { fontSize: 9, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 1.2, marginBottom: 3 },
-  price:    { fontSize: 14, fontFamily: FONTS.monoBold, color: C.textPrimary, marginBottom: 5 },
-  sigBadge: { borderRadius: 4, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
-  sig:      { fontSize: 8, fontFamily: FONTS.monoBold, letterSpacing: 0.8 },
+const cb = StyleSheet.create({
+  track: { height: 6, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" },
+  fill:  { height: "100%", borderRadius: 999, backgroundColor: C.brand, ...SHADOWS.bloomSm },
 });
 
-// ── Stat Tile ─────────────────────────────────────────────────────────────────
-
-function StatTile({ label, value, color = C.textPrimary, sub }: { label: string; value: string; color?: string; sub?: string }) {
+// ── Asset icon ─────────────────────────────────────────────────────────────
+function AssetIcon({ sym, size = 36 }: { sym: string; size?: number }) {
+  const short = sym.replace("USD", "").replace("USDT", "").slice(0, 3);
+  const accent = SYM_ACCENT[sym] ?? C.brandDeep;
   return (
-    <View style={[st.tile, { shadowColor: color, shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 }]}>
-      <Text style={[st.value, { color }]}>{value}</Text>
-      {sub && <Text style={[st.sub, { color: `${color}80` }]}>{sub}</Text>}
-      <Text style={st.label}>{label}</Text>
+    <View style={[ai.wrap, {
+      width: size, height: size, borderRadius: size/2,
+      backgroundColor: `${accent}22`,
+      borderColor: `${accent}55`,
+      shadowColor: accent, shadowOpacity: 0.25, shadowRadius: 10,
+    }]}>
+      <Text style={[ai.letter, { color: accent, fontSize: size*0.36 }]}>{short[0]}</Text>
     </View>
   );
 }
-const st = StyleSheet.create({
-  tile:  { flex: 1, alignItems: "center", paddingVertical: 14, backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: C.border },
-  value: { fontSize: 22, fontFamily: FONTS.monoBold, letterSpacing: 0.3 },
-  sub:   { fontSize: 9,  fontFamily: FONTS.mono, marginTop: 1 },
-  label: { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 1, marginTop: 4 },
+const ai = StyleSheet.create({
+  wrap: { borderWidth: 1, alignItems: "center", justifyContent: "center", shadowOffset: { width: 0, height: 0 } },
+  letter: { fontFamily: FONTS.monoBold, letterSpacing: -0.3 },
 });
 
-// ── Signal Row ────────────────────────────────────────────────────────────────
-
-function SignalRow({ sig }: { sig: { id: string; symbol: string; action: "BUY"|"SELL"|"HOLD"; confidence: number; timestamp: string; reason?: string } }) {
-  const accent = sig.action === "BUY" ? C.green : sig.action === "SELL" ? C.red : C.cyan;
+// ── Section header ─────────────────────────────────────────────────────────
+function SectionHeader({ label, onMore, right }: { label: string; onMore?: () => void; right?: string }) {
   return (
-    <View style={sr.row}>
-      <View style={[sr.bar, { backgroundColor: accent }]} />
-      <View style={sr.left}>
-        <Text style={sr.sym}>{sig.symbol.replace("USD", "")}</Text>
-        <Text style={sr.time}>{fmtAge(sig.timestamp)}</Text>
+    <View style={sh.wrap}>
+      <View style={sh.left}>
+        <View style={sh.bar} />
+        <Text style={sh.label}>{label}</Text>
+        {right && <Text style={sh.right}> · {right}</Text>}
       </View>
-      <View style={sr.mid}>
-        <Text style={sr.reason} numberOfLines={1}>{sig.reason ?? "EMA+RSI confluence"}</Text>
-        <ConfidenceBar value={sig.confidence} color={accent} />
-      </View>
-      <View style={sr.right}>
-        <SignalBadge signal={sig.action} small />
-        <Text style={sr.conf}>{sig.confidence}%</Text>
-      </View>
+      {onMore && (
+        <TouchableOpacity onPress={onMore} hitSlop={8}>
+          <Text style={sh.more}>View All →</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
-const sr = StyleSheet.create({
-  row:    { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border, gap: 12 },
-  bar:    { width: 2.5, height: 32, borderRadius: 2 },
-  left:   { width: 64 },
-  sym:    { fontSize: 12, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: 0.3 },
-  time:   { fontSize: 8,  fontFamily: FONTS.mono, color: C.textDim, marginTop: 2 },
-  mid:    { flex: 1 },
-  reason: { fontSize: 9,  fontFamily: FONTS.mono, color: C.textSecondary, marginBottom: 5 },
-  right:  { alignItems: "flex-end", gap: 4 },
-  conf:   { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted },
+const sh = StyleSheet.create({
+  wrap:  { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 4, paddingTop: SPACE.xxl, paddingBottom: 10 },
+  left:  { flexDirection: "row", alignItems: "center", gap: 9 },
+  bar:   { width: 3, height: 14, borderRadius: 2, backgroundColor: C.brand, ...SHADOWS.bloomSm },
+  label: { fontSize: 13, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: -0.1 },
+  right: { fontSize: 10, fontFamily: FONTS.mono, color: C.textDim },
+  more:  { fontSize: 11, fontFamily: FONTS.monoSemi, color: C.brand },
 });
 
-// ── Section ───────────────────────────────────────────────────────────────────
-
-function Section({ label, accent = C.cyan, right }: { label: string; accent?: string; right?: React.ReactNode }) {
+// ── Quick Action tile ──────────────────────────────────────────────────────
+function QuickAction({ icon, label, onPress, accent = C.brand }: {
+  icon: string; label: string; onPress: () => void; accent?: string;
+}) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10, marginTop: 6 }}>
-      <View style={{ width: 3, height: 14, backgroundColor: accent, borderRadius: 2, marginRight: 10, opacity: 0.85 }} />
-      <Text style={{ fontSize: 9, fontFamily: FONTS.monoBold, color: `${accent}88`, letterSpacing: 2 }}>{label}</Text>
-      {right && <View style={{ flex: 1, alignItems: "flex-end" }}>{right}</View>}
-    </View>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={qa.wrap}>
+      <View style={[qa.iconWrap, {
+        backgroundColor: `${accent}1F`, borderColor: `${accent}40`,
+        shadowColor: accent, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 4,
+      }]}>
+        <Feather name={icon as any} size={18} color={accent} />
+      </View>
+      <Text style={qa.label}>{label}</Text>
+    </TouchableOpacity>
   );
 }
-
-// ── AI Deployment Status ───────────────────────────────────────────────────────
-
-function AIDeploymentStatus({ mode, engine }: { mode: "paper" | "live"; engine: any }) {
-  const pulse = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0, duration: 1200, useNativeDriver: true }),
-    ])).start();
-  }, []);
-
-  const dotOp = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] });
-
-  const stats = [
-    { label: "PAPER AI",   value: mode === "paper" && engine?.running ? "ACTIVE" : "STANDBY", color: mode === "paper" && engine?.running ? C.green : C.textDim },
-    { label: "LIVE AI",    value: mode === "live" ? "ACTIVE" : "DISABLED",                    color: mode === "live" ? C.orange : C.textDim },
-    { label: "MARKETS",    value: "3 Monitored",                                               color: C.cyan    },
-    { label: "ASSETS",     value: "1,240+ Scanned",                                            color: C.textPrimary },
-    { label: "EXCHANGES",  value: "4 Connected",                                               color: C.purple  },
-    { label: "CONFIDENCE", value: `${engine?.confidence ?? 62}%`,                             color: C.cyan    },
-  ];
-
-  return (
-    <View style={ds.card}>
-      <View style={ds.topLine} />
-      <View style={ds.header}>
-        <Animated.View style={[ds.dot, { opacity: dotOp }]} />
-        <Text style={ds.title}>AI DEPLOYMENT STATUS</Text>
-      </View>
-      <View style={ds.grid}>
-        {stats.map(item => (
-          <View key={item.label} style={ds.item}>
-            <Text style={ds.itemLabel}>{item.label}</Text>
-            <Text style={[ds.itemValue, { color: item.color }]}>{item.value}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-const ds = StyleSheet.create({
-  card:      { backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: `${C.cyan}18`, marginBottom: 18, overflow: "hidden", shadowColor: C.cyan, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
-  topLine:   { height: 1.5, backgroundColor: C.cyan, opacity: 0.22 },
-  header:    { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: C.border },
-  dot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: C.cyan },
-  title:     { fontSize: 9, fontFamily: FONTS.monoBold, color: `${C.cyan}80`, letterSpacing: 2 },
-  grid:      { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 12, paddingVertical: 10 },
-  item:      { width: "33.33%", paddingHorizontal: 4, paddingVertical: 7 },
-  itemLabel: { fontSize: 7, fontFamily: FONTS.mono, color: C.textDim, letterSpacing: 1, marginBottom: 3 },
-  itemValue: { fontSize: 11, fontFamily: FONTS.monoBold },
+const qa = StyleSheet.create({
+  wrap:     { flex: 1, alignItems: "center", paddingVertical: 14, paddingHorizontal: 4, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.025)", borderWidth: 1, borderColor: C.border, gap: 8 },
+  iconWrap: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  label:    { fontSize: 11, fontFamily: FONTS.monoSemi, color: C.textSecondary, letterSpacing: 0.1 },
 });
 
-// ── Home Screen ───────────────────────────────────────────────────────────────
-
+// ─────────────────────────────────────────────────────────────────────────────
+// Home Screen
+// ─────────────────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
-  const { engine, account, positions, trades, isLoading, refresh, alpacaAccount } = useTrading();
+  const { engine, account, positions, isLoading, refresh, alpacaAccount } = useTrading();
   const insets  = useSafeAreaInsets();
-  const breathe = useRef(new Animated.Value(0)).current;
+  const router  = useRouter();
+  const { profile } = useUser();
   const isWeb   = Platform.OS === "web";
-  const topPad  = isWeb ? 67 : insets.top + 10;
+  const topPad  = isWeb ? 24 : insets.top + 6;
 
-  const [tradingMode, setTradingMode] = useState<"paper" | "live">("paper");
+  const firstName = (profile?.name?.trim().split(/\s+/)[0]) || "Trader";
+  const initial = firstName[0]?.toUpperCase() ?? "T";
 
-  const pnlColor = account.unrealizedPnL >= 0 ? C.green : C.red;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(breathe, { toValue: 1, duration: 3600, useNativeDriver: true }),
-        Animated.timing(breathe, { toValue: 0, duration: 3600, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
+  const equity = account.equity;
+  // SimAccount uses `unrealizedPnL` if present, otherwise fall back to dailyPnL/0
+  const upnl: number =
+    (account as any).unrealizedPnL
+    ?? (account as any).dailyPnL
+    ?? positions.reduce((sum, p) => sum + (p.pnl ?? 0), 0);
+  const upnlPct = equity > 0 ? (upnl / equity) * 100 : 0;
+  const isUp = upnl >= 0;
 
-  const engineBorderOp = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.18, 0.55] });
+  // ── AI top insight from engine signals ────────────────────────────────────
+  const topInsight = useMemo(() => {
+    const breakdowns = (engine?.symbolBreakdowns as any[]) ?? [];
+    const candidates = breakdowns
+      .filter(b => b.signal && b.signal !== "HOLD")
+      .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
+    const pick = candidates[0];
+    return {
+      symbol:     pick?.symbol ?? "BTCUSD",
+      action:     (pick?.signal ?? "BUY") as string,
+      confidence: pick?.confidence ?? 87,
+      price:      pick?.price ?? 67_842.63,
+      pct:        pick?.changePct ?? 2.35,
+    };
+  }, [engine?.symbolBreakdowns]);
 
-  const recentSignals = engine?.recentSignalLog?.slice(0, 5) ?? [
-    { id:"s1", symbol:"BTCUSD", action:"BUY"  as const, confidence:74, timestamp: new Date(Date.now()-180000).toISOString(), reason:"EMA cross + volume surge" },
-    { id:"s2", symbol:"ETHUSD", action:"HOLD" as const, confidence:52, timestamp: new Date(Date.now()-720000).toISOString(), reason:"Sideways market — spread <0.15%" },
-    { id:"s3", symbol:"SOLUSD", action:"SELL" as const, confidence:61, timestamp: new Date(Date.now()-1800000).toISOString(), reason:"RSI overbought + EMA bear cross" },
-  ];
+  // ── Top gainers fallback ──────────────────────────────────────────────────
+  const topGainers = useMemo(() => {
+    const breakdowns = (engine?.symbolBreakdowns as any[]) ?? [];
+    const list = breakdowns
+      .filter(b => (b.changePct ?? 0) > 0)
+      .sort((a, b) => (b.changePct ?? 0) - (a.changePct ?? 0))
+      .slice(0, 3);
+    if (list.length >= 3) return list;
+    return [
+      { symbol: "SOLUSD", price: 172.36,   changePct: 6.21 },
+      { symbol: "ETHUSD", price: 3486.59,  changePct: 4.32 },
+      { symbol: "ADAUSD", price: 0.6421,   changePct: 3.18 },
+    ];
+  }, [engine?.symbolBreakdowns]);
+
+  const cashBP = alpacaAccount?.buyingPower ?? account.cashBalance;
 
   return (
     <View style={s.root}>
@@ -314,112 +295,217 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={[s.scroll, { paddingTop: topPad, paddingBottom: TAB_BAR_H + 16 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={C.cyan} />}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={C.brand} />}
       >
 
         {/* ── Header ── */}
         <View style={s.header}>
-          <View>
-            <Text style={s.logoText}>AC <Text style={{ color: C.cyan }}>LZ</Text></Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
-              <LiveDot color={engine?.running ? C.green : C.textDim} size={6} />
-              <Text style={s.headerSub}>
-                {engine?.running ? `AI ENGINE ACTIVE · ${engine.exchange ?? "SIM"}` : "AI ENGINE IDLE"}
-              </Text>
+          <TouchableOpacity onPress={() => router.push("/profile")} activeOpacity={0.7} style={s.headerLeft}>
+            <View style={s.avatar}>
+              <Text style={s.avatarLetter}>{initial}</Text>
+              <View style={s.avatarDot} />
+            </View>
+            <View>
+              <Text style={s.greet}>{greeting},</Text>
+              <View style={s.nameRow}>
+                <Text style={s.name}>{firstName}</Text>
+                <View style={s.proPill}>
+                  <Text style={s.proText}>PRO</Text>
+                </View>
+              </View>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.bellBtn} activeOpacity={0.7}>
+            <Feather name="bell" size={18} color={C.textSecondary} />
+            <View style={s.bellDot} />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Portfolio Hero Card ── */}
+        <View style={s.heroCard}>
+          <View style={s.heroEdge} />
+          <View style={s.heroLabelRow}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={s.heroLabel}>TOTAL PORTFOLIO VALUE</Text>
+              <Feather name="eye" size={12} color={C.textDim} />
+            </View>
+            <View style={s.tfPill}>
+              <Text style={s.tfText}>24H</Text>
+              <Feather name="chevron-down" size={11} color={C.textSecondary} />
             </View>
           </View>
-          <View style={{ alignItems: "flex-end", gap: 8 }}>
-            <TradingModeToggle mode={tradingMode} onChange={setTradingMode} />
-            <Text style={s.notifHint}>
-              <Feather name="activity" size={9} color={C.textDim} /> {trades.length} trades
+
+          <Text style={s.heroValue}>{fmt$(equity, 2)}</Text>
+
+          <View style={s.heroPnlRow}>
+            <Text style={[s.heroPnl, { color: isUp ? C.brand : C.negative }]}>
+              {isUp ? "+" : ""}{fmt$(Math.abs(upnl))}
             </Text>
-          </View>
-        </View>
-
-        {/* ── Sentiment Banner ── */}
-        <SentimentBanner />
-
-        {/* ── Balance Card ── */}
-        <View style={s.balanceCard}>
-          <View style={s.balanceGlow} />
-          <View style={[s.balanceGlow2, { backgroundColor: `${C.cyan}04` }]} />
-          <Text style={s.balLabel}>PORTFOLIO EQUITY</Text>
-          <Text style={s.balAmount}>{fmt$(account.equity, 2)}</Text>
-          <Text style={[s.balPnl, { color: pnlColor }]}>
-            {account.unrealizedPnL >= 0 ? "+" : ""}{fmt$(account.unrealizedPnL)} unrealized · {fmtPct(account.unrealizedPnL / account.equity * 100)}
-          </Text>
-          <View style={s.balRow}>
-            <View style={s.balItem}>
-              <Text style={s.balItemLabel}>CASH</Text>
-              <Text style={s.balItemValue}>{fmt$(account.cashBalance, 0)}</Text>
-            </View>
-            <View style={[s.balItem, { borderLeftWidth: 1, borderLeftColor: C.border, borderRightWidth: 1, borderRightColor: C.border }]}>
-              <Text style={s.balItemLabel}>REALIZED</Text>
-              <Text style={[s.balItemValue, { color: account.realizedPnL >= 0 ? C.green : C.red }]}>
-                {account.realizedPnL >= 0 ? "+" : ""}{fmt$(account.realizedPnL)}
-              </Text>
-            </View>
-            <View style={s.balItem}>
-              <Text style={s.balItemLabel}>BUY POWER</Text>
-              <Text style={[s.balItemValue, { color: C.cyan }]}>
-                {alpacaAccount ? fmt$(alpacaAccount.buyingPower, 0) : "—"}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* ── Portfolio Chart ── */}
-        <PortfolioChart equity={account.equity} />
-
-        {/* ── Quick Stats ── */}
-        <View style={{ flexDirection: "row", gap: 8, marginBottom: 18 }}>
-          <StatTile label="WIN RATE"     value={`${account.winRate.toFixed(0)}%`}  color={account.winRate >= 55 ? C.green : C.orange} />
-          <StatTile label="POSITIONS"    value={String(positions.length)}           color={positions.length > 0 ? C.cyan : C.textMuted} />
-          <StatTile label="TOTAL TRADES" value={String(account.totalTrades)}        color={C.textPrimary} />
-        </View>
-
-        {/* ── AI Deployment Status ── */}
-        <AIDeploymentStatus mode={tradingMode} engine={engine} />
-
-        {/* ── AI Engine Status ── */}
-        <Section label="AI ENGINE STATUS" accent={C.purple} />
-        <View style={s.engineCard}>
-          <Animated.View style={[s.engineBreath, { opacity: engineBorderOp }]} />
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <LiveDot color={engine?.running ? C.green : "#2a4050"} size={7} />
-              <Text style={[s.engineStatus, { color: engine?.running ? C.green : C.textDim }]}>
-                {engine?.running ? "RUNNING" : "STOPPED"}
-              </Text>
-            </View>
-            <Text style={s.engineDetail}>
-              {engine?.activeSymbol ?? "BTCUSD"} · conf {engine?.confidence ?? 0}%
+            <Text style={[s.heroPnlPct, { color: isUp ? C.brand : C.negative }]}>
+              ({isUp ? "+" : ""}{upnlPct.toFixed(2)}%)
             </Text>
-            <AIInsight />
+            <Text style={s.heroPnlTag}>Today</Text>
           </View>
-          <View style={{ alignItems: "flex-end", gap: 5 }}>
-            <Text style={s.engineExch}>{engine?.exchange ?? "ALPACA"}</Text>
-            {engine?.volumeFilter && <Text style={s.filterTag}>VOL FILTER</Text>}
+
+          <View style={s.heroChartWrap}>
+            <HeroChart seed={`pf-${Math.floor(equity)}`} isUp={isUp} width={290} />
+          </View>
+
+          <View style={s.heroStatsRow}>
+            {[
+              { l: "AVAILABLE", v: fmt$(cashBP, 0) },
+              { l: "POSITIONS", v: String(positions.length) },
+              { l: "WIN RATE",  v: `${account.winRate.toFixed(0)}%`,
+                c: account.winRate >= 55 ? C.brand : C.warning },
+            ].map((st, i) => (
+              <View key={i} style={s.heroStat}>
+                <Text style={s.heroStatLabel}>{st.l}</Text>
+                <Text style={[s.heroStatValue, { color: (st as any).c ?? C.textPrimary }]}>{st.v}</Text>
+              </View>
+            ))}
           </View>
         </View>
 
-        {/* ── Live Markets ── */}
-        <Section label="LIVE MARKETS" accent={C.teal} />
-        <MarketTicker breakdowns={engine?.symbolBreakdowns} />
+        {/* ── Quick Actions ── */}
+        <View style={s.quickRow}>
+          <QuickAction icon="maximize"     label="AI Scan"     onPress={() => router.push("/(tabs)/markets")} accent={C.brand}/>
+          <QuickAction icon="trending-up"  label="Open Trades" onPress={() => router.push("/(tabs)/trade")}   accent={C.brandBright}/>
+          <QuickAction icon="cpu"          label="Auto Trade"  onPress={() => router.push("/profile")}        accent={C.brandDeep}/>
+          <QuickAction icon="plus"         label="Deposit"     onPress={() => router.push("/profile")}        accent={C.brand}/>
+        </View>
 
-        {/* ── Recent AI Signals ── */}
-        <Section
-          label="RECENT AI SIGNALS"
-          accent={C.cyan}
-          right={<Text style={{ fontSize: 8, fontFamily: FONTS.mono, color: C.textDim }}>{recentSignals.length} recent</Text>}
+        {/* ── AI Market Insight ── */}
+        <SectionHeader label="AI Market Insight" onMore={() => router.push("/(tabs)/markets")} />
+        <View style={s.insightCard}>
+          <View style={s.insightAssetRow}>
+            <AssetIcon sym={topInsight.symbol} size={40} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={s.assetTitle}>
+                  {SYM_SHORT[topInsight.symbol] ?? topInsight.symbol.replace("USD","")}/USDT
+                </Text>
+                <View style={[s.actionPill, {
+                  backgroundColor: topInsight.action === "BUY" ? `${C.brand}1F` : `${C.negative}1F`,
+                  borderColor:     topInsight.action === "BUY" ? C.borderHi      : "rgba(255,64,96,0.30)",
+                }]}>
+                  <Text style={[s.actionPillText, { color: topInsight.action === "BUY" ? C.brand : C.negative }]}>
+                    {topInsight.action === "BUY" ? "BULLISH" : "BEARISH"}
+                  </Text>
+                </View>
+              </View>
+              <Text style={s.assetSub}>{SYM_LABEL[topInsight.symbol] ?? topInsight.symbol}</Text>
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={s.assetPrice}>{fmtPx(topInsight.price)}</Text>
+              <Text style={[s.assetPct, { color: topInsight.pct >= 0 ? C.brand : C.negative }]}>
+                {topInsight.pct >= 0 ? "+" : ""}{topInsight.pct.toFixed(2)}%
+              </Text>
+            </View>
+          </View>
+
+          <View style={{ marginTop: 14 }}>
+            <View style={s.confRow}>
+              <Text style={s.confLabel}>AI CONFIDENCE</Text>
+              <Text style={s.confValue}>{topInsight.confidence}%</Text>
+            </View>
+            <ConfidenceBar value={topInsight.confidence} />
+          </View>
+
+          <View style={s.reasonBox}>
+            <Feather name="zap" size={14} color={C.brand} style={{ marginTop: 2 }} />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={s.reasonHead}>
+                Strong {topInsight.action === "BUY" ? "buying" : "selling"} momentum detected
+              </Text>
+              <Text style={s.reasonBody}>
+                High probability of {topInsight.action === "BUY" ? "upward" : "downward"} movement
+              </Text>
+              <Text style={s.reasonAge}>2 MIN AGO</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Top Gainers ── */}
+        <SectionHeader label="Top Gainers" onMore={() => router.push("/(tabs)/markets")} />
+        <View style={s.listCard}>
+          {topGainers.map((g, i) => (
+            <TouchableOpacity
+              key={g.symbol}
+              onPress={() => router.push("/(tabs)/markets")}
+              activeOpacity={0.7}
+              style={[s.gainerRow, i < topGainers.length - 1 && s.gainerSep]}>
+              <AssetIcon sym={g.symbol} size={36} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={s.gainerSym}>{SYM_SHORT[g.symbol] ?? g.symbol.replace("USD","")}/USDT</Text>
+                <Text style={s.gainerLabel}>{SYM_LABEL[g.symbol] ?? g.symbol}</Text>
+              </View>
+              <Sparkline seed={`gain-${g.symbol}`} trend="up" w={56} h={26} />
+              <View style={{ alignItems: "flex-end", marginLeft: 10, minWidth: 76 }}>
+                <Text style={s.gainerPrice}>{fmtPx(g.price)}</Text>
+                <Text style={s.gainerPct}>+{(g.changePct ?? 0).toFixed(2)}%</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* ── Active Trades ── */}
+        <SectionHeader
+          label="Active Trades"
+          right={`${positions.length} open`}
+          onMore={() => router.push("/(tabs)/trade")}
         />
-        <View style={s.card}>
-          {recentSignals.map(sig => <SignalRow key={sig.id} sig={sig} />)}
-          {recentSignals.length === 0 && (
-            <Text style={{ textAlign: "center", color: C.textDim, fontSize: 10, fontFamily: FONTS.mono, paddingVertical: 18 }}>
-              No signals yet — engine warming up
-            </Text>
-          )}
+        {positions.length === 0 ? (
+          <View style={s.emptyBox}>
+            <Feather name="activity" size={20} color={C.textDim} />
+            <Text style={s.emptyText}>No open positions. AI is scanning the market.</Text>
+          </View>
+        ) : (
+          positions.slice(0, 3).map((p, i) => {
+            const isLong = (p.side ?? "BUY") === "BUY";
+            const upnlVal = p.pnl ?? 0;
+            const roe = p.pnlPct ?? 0;
+            return (
+              <View key={i} style={s.tradeCard}>
+                <View style={s.tradeHead}>
+                  <View style={[s.actionPill, {
+                    backgroundColor: isLong ? `${C.brand}1F` : `${C.negative}1F`,
+                    borderColor:     isLong ? C.borderHi : "rgba(255,64,96,0.30)",
+                  }]}>
+                    <Text style={[s.actionPillText, { color: isLong ? C.brand : C.negative }]}>
+                      {isLong ? "LONG" : "SHORT"}
+                    </Text>
+                  </View>
+                  <Text style={s.tradeSym}>
+                    {SYM_SHORT[p.symbol] ?? p.symbol.replace("USD","")}/USDT
+                  </Text>
+                  <Text style={s.tradeMeta}>
+                    Cross {(p as any).leverage ?? 1}x
+                  </Text>
+                </View>
+                <View style={s.tradeBody}>
+                  <View>
+                    <Text style={s.tradeStatLabel}>UNREALIZED P&amp;L</Text>
+                    <Text style={[s.tradeStatValue, { color: upnlVal >= 0 ? C.brand : C.negative }]}>
+                      {upnlVal >= 0 ? "+" : ""}{fmt$(Math.abs(upnlVal))}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={s.tradeStatLabel}>ROE</Text>
+                    <Text style={[s.tradeStatValue, { color: upnlVal >= 0 ? C.brand : C.negative, fontSize: 14 }]}>
+                      {upnlVal >= 0 ? "+" : ""}{Number(roe).toFixed(2)}%
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })
+        )}
+
+        {/* Subtle footer */}
+        <View style={s.footer}>
+          <Text style={s.footerText}>
+            {engine?.mode === "LIVE" ? "LIVE MODE · REAL CAPITAL" : "SIMULATION · NO REAL FUNDS"}
+          </Text>
         </View>
 
       </ScrollView>
@@ -431,41 +517,99 @@ const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 16 },
 
-  header:    { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
-  logoText:  { fontSize: 24, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: 2.5 },
-  headerSub: { fontSize: 8,  fontFamily: FONTS.mono, color: C.textMuted, letterSpacing: 1.2 },
-  modeBadge: { backgroundColor: C.cyanDim, borderRadius: RADIUS.sm, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: `${C.cyan}35` },
-  modeText:  { fontSize: 8,  fontFamily: FONTS.monoBold, color: C.cyan, letterSpacing: 1 },
-  notifHint: { fontSize: 8,  fontFamily: FONTS.mono, color: C.textDim },
-
-  balanceCard: {
-    backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1,
-    borderColor: `${C.cyan}32`, padding: 20, marginBottom: 16, overflow: "hidden",
-    shadowColor: C.cyan, shadowOpacity: 0.22, shadowRadius: 28,
-    shadowOffset: { width: 0, height: 6 }, elevation: 12,
+  // Header
+  header:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 4, paddingVertical: 6, marginBottom: 14 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  avatar: {
+    position: "relative", width: 44, height: 44, borderRadius: 22,
+    backgroundColor: "#0F1F18", borderWidth: 1.5, borderColor: C.borderHi,
+    alignItems: "center", justifyContent: "center", ...SHADOWS.bloomSm,
   },
-  balanceGlow:  { position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: 100, backgroundColor: `${C.cyan}05` },
-  balanceGlow2: { position: "absolute", bottom: -40, left: -40, width: 140, height: 140, borderRadius: 70 },
-  balLabel:     { fontSize: 8, fontFamily: FONTS.monoBold, color: C.textMuted, letterSpacing: 1.8, marginBottom: 5 },
-  balAmount:    { fontSize: 42, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: -0.5, marginBottom: 5 },
-  balPnl:       { fontSize: 12, fontFamily: FONTS.monoMedium, marginBottom: 16, opacity: 0.9 },
-  balRow:       { flexDirection: "row", borderTopWidth: 1, borderTopColor: C.border, paddingTop: 14, marginTop: 2 },
-  balItem:      { flex: 1, alignItems: "center" },
-  balItemLabel: { fontSize: 7, fontFamily: FONTS.mono, color: C.textDim, letterSpacing: 1.2, marginBottom: 3 },
-  balItemValue: { fontSize: 13, fontFamily: FONTS.monoBold, color: C.textPrimary },
+  avatarLetter: { fontSize: 17, fontFamily: FONTS.monoBold, color: C.brand },
+  avatarDot:    { position: "absolute", bottom: -1, right: -1, width: 11, height: 11, borderRadius: 6, backgroundColor: C.brand, borderWidth: 2, borderColor: C.bg },
+  greet:        { fontSize: 11, fontFamily: FONTS.mono, color: C.textDim, letterSpacing: 0.1 },
+  nameRow:      { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 1 },
+  name:         { fontSize: 16, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: -0.2 },
+  proPill:      { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: `${C.brand}22`, borderWidth: 1, borderColor: C.borderHi },
+  proText:      { fontSize: 9, fontFamily: FONTS.monoBold, color: C.brand, letterSpacing: 1 },
+  bellBtn:      { position: "relative", width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center" },
+  bellDot:      { position: "absolute", top: 9, right: 9, width: 7, height: 7, borderRadius: 4, backgroundColor: C.negative },
 
-  engineCard: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start",
-    backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1,
-    borderColor: `${C.purple}22`, padding: 16, marginBottom: 18,
-    shadowColor: C.purple, shadowOpacity: 0.1, shadowRadius: 14,
-    shadowOffset: { width: 0, height: 3 }, elevation: 4, overflow: "hidden",
+  // Hero card
+  heroCard: {
+    position: "relative",
+    borderRadius: 24, padding: 20, marginBottom: 16, overflow: "hidden",
+    backgroundColor: C.surface2,
+    borderWidth: 1, borderColor: C.borderHi,
+    ...SHADOWS.cardLg,
   },
-  engineBreath: { position: "absolute", inset: 0, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: C.purple, pointerEvents: "none" } as any,
-  engineStatus: { fontSize: 14, fontFamily: FONTS.monoBold, letterSpacing: 1 },
-  engineDetail: { fontSize: 9, fontFamily: FONTS.mono, color: C.textMuted, marginTop: 3 },
-  engineExch:   { fontSize: 11, fontFamily: FONTS.monoBold, color: C.cyan, letterSpacing: 1.2 },
-  filterTag: { fontSize: 7, fontFamily: FONTS.monoBold, color: C.orange, borderWidth: 1, borderColor: `${C.orange}30`, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2 },
+  heroEdge: {
+    position: "absolute", top: 0, left: 0, right: 0, height: 1.5,
+    backgroundColor: C.brand, opacity: 0.55,
+  },
+  heroLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  heroLabel:    { fontSize: 10, fontFamily: FONTS.monoBold, color: C.textDim, letterSpacing: 1.5 },
+  tfPill:       { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: C.border },
+  tfText:       { fontSize: 10, fontFamily: FONTS.monoSemi, color: C.textSecondary, letterSpacing: 0.5 },
+  heroValue:    { fontSize: 38, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: -1, marginTop: 10 },
+  heroPnlRow:   { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },
+  heroPnl:      { fontSize: 14, fontFamily: FONTS.monoBold, letterSpacing: -0.1 },
+  heroPnlPct:   { fontSize: 12, fontFamily: FONTS.monoSemi, opacity: 0.9 },
+  heroPnlTag:   { fontSize: 11, fontFamily: FONTS.mono, color: C.textDim, marginLeft: 2 },
+  heroChartWrap:{ marginTop: 14, marginBottom: 4, marginLeft: -4 },
+  heroStatsRow: { flexDirection: "row", borderTopWidth: 1, borderTopColor: C.border, paddingTop: 14, marginTop: 10, gap: 10 },
+  heroStat:     { flex: 1 },
+  heroStatLabel:{ fontSize: 9, fontFamily: FONTS.monoBold, color: C.textDim, letterSpacing: 1 },
+  heroStatValue:{ fontSize: 14, fontFamily: FONTS.monoBold, color: C.textPrimary, marginTop: 3, letterSpacing: -0.2 },
 
-  card: { backgroundColor: C.surface, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: C.border, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8, marginBottom: 18 },
+  // Quick actions
+  quickRow: { flexDirection: "row", gap: 10 },
+
+  // Insight card
+  insightCard: {
+    borderRadius: 18, padding: 16, marginBottom: 4,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    ...SHADOWS.card,
+  },
+  insightAssetRow: { flexDirection: "row", alignItems: "center" },
+  assetTitle:      { fontSize: 14, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: -0.1 },
+  assetSub:        { fontSize: 11, fontFamily: FONTS.mono, color: C.textDim, marginTop: 2 },
+  assetPrice:      { fontSize: 15, fontFamily: FONTS.monoBold, color: C.textPrimary },
+  assetPct:        { fontSize: 11, fontFamily: FONTS.monoSemi, marginTop: 2 },
+  actionPill:      { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
+  actionPillText:  { fontSize: 9, fontFamily: FONTS.monoBold, letterSpacing: 0.8 },
+  confRow:         { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
+  confLabel:       { fontSize: 10, fontFamily: FONTS.monoSemi, color: C.textDim, letterSpacing: 0.8 },
+  confValue:       { fontSize: 13, fontFamily: FONTS.monoBold, color: C.brand },
+  reasonBox: {
+    flexDirection: "row", marginTop: 12, padding: 12, borderRadius: 10,
+    backgroundColor: "rgba(102,255,102,0.04)", borderWidth: 1, borderColor: C.borderHi,
+  },
+  reasonHead: { fontSize: 12, fontFamily: FONTS.monoSemi, color: C.textPrimary, lineHeight: 17 },
+  reasonBody: { fontSize: 11, fontFamily: FONTS.mono, color: C.textSecondary, marginTop: 3, lineHeight: 16 },
+  reasonAge:  { fontSize: 9, fontFamily: FONTS.monoBold, color: C.textDim, marginTop: 6, letterSpacing: 0.4 },
+
+  // List card
+  listCard: { borderRadius: 18, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, overflow: "hidden" },
+  gainerRow:{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14 },
+  gainerSep:{ borderBottomWidth: 1, borderBottomColor: C.border },
+  gainerSym:{ fontSize: 13, fontFamily: FONTS.monoBold, color: C.textPrimary, letterSpacing: -0.1 },
+  gainerLabel:{ fontSize: 11, fontFamily: FONTS.mono, color: C.textDim, marginTop: 2 },
+  gainerPrice:{ fontSize: 13, fontFamily: FONTS.monoBold, color: C.textPrimary },
+  gainerPct:  { fontSize: 11, fontFamily: FONTS.monoSemi, color: C.brand, marginTop: 2 },
+
+  // Trade card
+  tradeCard:    { marginBottom: 10, padding: 14, borderRadius: 16, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, ...SHADOWS.card },
+  tradeHead:    { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
+  tradeSym:     { fontSize: 13, fontFamily: FONTS.monoBold, color: C.textPrimary },
+  tradeMeta:    { fontSize: 10, fontFamily: FONTS.mono, color: C.textDim, marginLeft: "auto" },
+  tradeBody:    { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
+  tradeStatLabel:{ fontSize: 9, fontFamily: FONTS.monoBold, color: C.textDim, letterSpacing: 0.8 },
+  tradeStatValue:{ fontSize: 18, fontFamily: FONTS.monoBold, marginTop: 3, letterSpacing: -0.3 },
+
+  emptyBox: { padding: 20, borderRadius: 16, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderStyle: "dashed", alignItems: "center", gap: 8 },
+  emptyText:{ fontSize: 12, fontFamily: FONTS.mono, color: C.textDim, textAlign: "center" },
+
+  footer:    { alignItems: "center", paddingVertical: 18 },
+  footerText:{ fontSize: 9, fontFamily: FONTS.monoBold, color: C.textDim, letterSpacing: 1.2 },
 });

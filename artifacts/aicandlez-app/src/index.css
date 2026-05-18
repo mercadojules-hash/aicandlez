@@ -55,7 +55,12 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* ── AICandlez — always dark ────────────────────────────────────────────────── */
+/* ── AICandlez — Premium Neon-Green Fintech Theme ──────────────────────────
+ * Cinematic dark UI · Apple-level polish · luxury crypto/AI trading aesthetic.
+ * Brand: #66FF66 (primary), #00C853 (deep), #7CFF00 (bright), #39FF14 (vivid).
+ * Pure black backgrounds with controlled neon bloom. Never "Matrix" green —
+ * always sophisticated, restrained, premium.
+ * ─────────────────────────────────────────────────────────────────────── */
 :root {
   --button-outline: rgba(255,255,255,.06);
   --badge-outline:  rgba(255,255,255,.04);
@@ -63,40 +68,63 @@
   --elevate-1: rgba(255,255,255,.04);
   --elevate-2: rgba(255,255,255,.09);
 
+  /* ── Brand palette (raw hex, available as tokens) ─────────────────────── */
+  --brand:         #66FF66;
+  --brand-deep:    #00C853;
+  --brand-bright:  #7CFF00;
+  --brand-vivid:   #39FF14;
+  --brand-glow:    rgba(102,255,102,0.45);
+  --brand-bloom:   rgba(102,255,102,0.18);
+  --brand-whisper: rgba(102,255,102,0.06);
+
+  /* Deep blacks with subtle green warmth */
+  --ink-0: #000000;
+  --ink-1: #050A07;
+  --ink-2: #0A1410;
+  --ink-3: #0F1F18;
+
+  /* Glass primitives */
+  --glass-1: rgba(255,255,255,0.04);
+  --glass-2: rgba(255,255,255,0.07);
+  --glass-3: rgba(255,255,255,0.11);
+  --glass-border: rgba(255,255,255,0.08);
+  --glass-border-hi: rgba(102,255,102,0.22);
+
+  /* ── HSL tokens consumed by Tailwind / shadcn components ──────────────── */
   --background:    0 0% 0%;
-  --foreground:    210 70% 92%;
-  --border:        212 30% 10%;
-  --input:         212 30% 10%;
-  --ring:          207 100% 50%;
-  --card:          214 60% 6%;
-  --card-foreground: 210 70% 92%;
-  --card-border:   212 62% 13%;
-  --sidebar:       214 74% 7%;
-  --sidebar-foreground: 210 70% 92%;
-  --sidebar-border: 212 62% 13%;
-  --sidebar-primary: 207 100% 50%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 207 100% 50%;
-  --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-ring:  207 100% 50%;
-  --popover:       214 74% 7%;
-  --popover-foreground: 210 70% 92%;
-  --popover-border: 212 62% 13%;
-  --primary:       207 100% 50%;
-  --primary-foreground: 0 0% 100%;
-  --secondary:     212 55% 18%;
-  --secondary-foreground: 210 70% 92%;
-  --muted:         212 55% 12%;
-  --muted-foreground: 210 40% 38%;
-  --accent:        150 100% 50%;
-  --accent-foreground: 0 0% 5%;
-  --destructive:   345 100% 63%;
+  --foreground:    140 60% 96%;
+  --border:        140 30% 10%;
+  --input:         140 30% 10%;
+  --ring:          120 100% 70%;          /* #66FF66 */
+  --card:          145 40% 5%;
+  --card-foreground: 140 60% 96%;
+  --card-border:   140 40% 14%;
+  --sidebar:       145 50% 4%;
+  --sidebar-foreground: 140 60% 96%;
+  --sidebar-border: 140 40% 14%;
+  --sidebar-primary: 120 100% 70%;
+  --sidebar-primary-foreground: 0 0% 5%;
+  --sidebar-accent: 120 100% 70%;
+  --sidebar-accent-foreground: 0 0% 5%;
+  --sidebar-ring:  120 100% 70%;
+  --popover:       145 50% 5%;
+  --popover-foreground: 140 60% 96%;
+  --popover-border: 140 40% 14%;
+  --primary:       120 100% 70%;          /* #66FF66 */
+  --primary-foreground: 0 0% 5%;
+  --secondary:     140 35% 14%;
+  --secondary-foreground: 140 60% 96%;
+  --muted:         140 30% 10%;
+  --muted-foreground: 140 18% 50%;
+  --accent:        145 100% 39%;          /* #00C853 deep emerald */
+  --accent-foreground: 0 0% 100%;
+  --destructive:   350 100% 63%;
   --destructive-foreground: 0 0% 100%;
-  --chart-1: 207 100% 50%;
-  --chart-2: 150 100% 50%;
-  --chart-3: 42 100% 50%;
-  --chart-4: 345 100% 63%;
-  --chart-5: 275 80% 60%;
+  --chart-1: 120 100% 70%;                /* brand */
+  --chart-2: 145 100% 39%;                /* emerald */
+  --chart-3: 84 100% 50%;                 /* lime */
+  --chart-4: 350 100% 63%;                /* negative */
+  --chart-5: 40 100% 60%;                 /* warning */
   --app-font-sans:  'Inter', system-ui, sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono:  "SF Mono", "Fira Code", Menlo, monospace;
@@ -162,8 +190,84 @@ body {
 }
 
 @keyframes glow {
-  0%, 100% { box-shadow: 0 0 8px #00aaff60; }
-  50%       { box-shadow: 0 0 18px #00aaffaa; }
+  0%, 100% { box-shadow: 0 0 8px var(--brand-bloom); }
+  50%       { box-shadow: 0 0 22px var(--brand-glow); }
+}
+
+/* ── AICandlez premium animation library ─────────────────────────────────── */
+@keyframes brand-pulse {
+  0%, 100% { opacity: 1;   filter: drop-shadow(0 0 6px var(--brand-bloom)); }
+  50%       { opacity: 0.85; filter: drop-shadow(0 0 14px var(--brand-glow)); }
+}
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1) translate(0,0); opacity: 0.6; }
+  50%       { transform: scale(1.18) translate(8px,-6px); opacity: 1; }
+}
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes dot-pulse {
+  0%, 100% { transform: scale(1);    opacity: 1;   }
+  50%       { transform: scale(1.4);  opacity: 0.55;}
+}
+@keyframes bar-in {
+  from { width: 0%; }
+}
+@keyframes bar-breathe {
+  0%, 100% { filter: brightness(1)   drop-shadow(0 0 4px var(--brand-bloom)); }
+  50%       { filter: brightness(1.15) drop-shadow(0 0 10px var(--brand-glow)); }
+}
+@keyframes scan-line {
+  0%   { top: -2%;   opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 102%;  opacity: 0; }
+}
+@keyframes edge-sweep {
+  0%, 100% { background-position: 0% 50%;   }
+  50%       { background-position: 100% 50%; }
+}
+@keyframes chart-drift {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-1.5px); }
+}
+@keyframes wave-bar {
+  from { transform: scaleY(0.4); }
+  to   { transform: scaleY(1.2); }
+}
+@keyframes particle-float {
+  from { transform: translate(0,0)   scale(1);    opacity: 0.4; }
+  to   { transform: translate(6px,-8px) scale(1.4); opacity: 0.9; }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* ── Premium reusable utility classes (use sparingly) ────────────────────── */
+.ac-glow-soft  { box-shadow: 0 0 20px var(--brand-bloom);    }
+.ac-glow       { box-shadow: 0 0 30px var(--brand-glow);     }
+.ac-glow-strong{ box-shadow: 0 0 50px var(--brand-glow), 0 0 100px var(--brand-bloom); }
+.ac-text-glow  { text-shadow: 0 0 14px var(--brand-bloom);   }
+.ac-glass {
+  background: var(--glass-1);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+.ac-glass-brand {
+  background: var(--brand-whisper);
+  border: 1px solid var(--glass-border-hi);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+.ac-gradient-text {
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-bright) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 /* ── Scrollbars hidden ────────────────────────────────────────────────────── */
