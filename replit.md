@@ -17,6 +17,59 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Build**: esbuild (CJS bundle)
 - **Auth**: Replit-managed Clerk (httpOnly cookie on web, Bearer for mobile)
 
+## Phase 5.1 — PWA Home: Radar Core UI + Real Icons + Brand Header (COMPLETE)
+
+User feedback iteration on Phase 5 benchmark. Pushed PWA Home harder
+toward concept art (Apple keynote + Bloomberg Terminal + futuristic
+AI OS aesthetic).
+
+**Assets (new):**
+- `artifacts/aicandlez-app/src/assets/aicandlez-logo-master.png` —
+  premium green horizontal master logo (from attached_assets)
+- `artifacts/aicandlez-app/src/assets/aicandlez-icon-master.png` —
+  square app icon (radar center medallion)
+- Same files mirrored into `artifacts/natura-ai/assets/`
+
+**Brand header:**
+- Centered prominent master logo at top of `Home.tsx` with green
+  underglow + drop-shadow stack
+- Old footer logo REMOVED — only status pip remains in footer
+
+**Real branded crypto icons** (replaces placeholder circles):
+Inline SVG components in `Home.tsx` — `BTCIcon`, `ETHIcon`, `SOLIcon`,
+`ADAIcon`, `AVAXIcon`, `DOGEIcon` + `GenericTokenIcon` fallback +
+`CryptoIcon` symbol dispatcher. Each with brand-correct gradient bg +
+glow. Used in Top Gainers, Active Trades, AI Market Scanner callout.
+
+**RadarScanner (core UI system):**
+- New `RadarScanner` component (`Home.tsx`) — concentric rings,
+  cross-hairs, rotating SVG sweep arm with `radar-sweep-rotate`
+  keyframes, asset blips with `radar-ping` expansion rings, center
+  AICandlez icon medallion with breathing glow, status badge below.
+- Becomes the visual centerpiece of the "AI Market Scanner" section.
+- Reusable for AI scanning, loading, opportunity detection, confidence
+  visualization, market analysis, signal states.
+
+**Cinematic typography & atmospheric depth:**
+- Portfolio hero: 48px bold number, tabular-nums, letter-spacing
+  -1.6, text-shadow glow
+- New `CinematicBackground`: 3 ambient breathing green orbs, 2 angled
+  light rays, fine vertical grid, edge vignette (fixed z-0)
+- Portfolio hero card: layered radial gradients, animated top-edge
+  sweep, deeper shadow
+
+**Glowing BUY/SELL CTAs:**
+- Pair at bottom of AI Market Scanner: BUY (brand→deep gradient,
+  bright border, bloom + lift), SELL (deep wine, red border, soft red
+  bloom). Hover translateY micro-interaction. Routes to `/trade`.
+
+**Verification:** `aicandlez-app` typecheck CLEAN. Vite HMR hot-reload
+clean. Zero browser console errors.
+
+**Key files (Phase 5.1):**
+- `artifacts/aicandlez-app/src/pages/Home.tsx` — major rewrite
+- `artifacts/aicandlez-app/src/assets/aicandlez-{logo,icon}-master.png`
+
 ## Phase 5 — Premium Neon-Green Home Redesign (COMPLETE)
 
 Brand-wide cyan → neon-green pivot. Cinematic dark UI · restrained green

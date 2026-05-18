@@ -1,11 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
-import aicandlezLogo from "../assets/aicandlez-logo.png";
+import aicandlezLogoMaster from "../assets/aicandlez-logo-master.png";
+import aicandlezIconMaster from "../assets/aicandlez-icon-master.png";
 import {
   api,
   type MobileStatus, type Portfolio, type SimAccount,
@@ -13,39 +14,333 @@ import {
   type MobileTickersResponse, type MobileTicker,
 } from "@/lib/api";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AICandlez Premium Home — neon-green fintech aesthetic
-// Cinematic dark · glassmorphism · controlled bloom · Apple-level polish
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// AICandlez — Premium Neon-Green Trading OS · Home Screen
+// Cinematic dark · radar scanner core UI · real crypto icons · glowing BUY/SELL
+// Visual benchmark: Apple keynote + Bloomberg Terminal + futuristic AI OS
+// ═══════════════════════════════════════════════════════════════════════════
 
 const SANS = "Inter, 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
-const MONO = "'SF Mono', 'JetBrains Mono', Consolas, monospace";
 
-// Brand tokens (mirrors CSS vars in index.css)
+// Brand
 const BRAND       = "#66FF66";
 const BRAND_DEEP  = "#00C853";
 const BRAND_BRGT  = "#7CFF00";
 const BRAND_BLOOM = "rgba(102,255,102,0.18)";
 const BRAND_GLOW  = "rgba(102,255,102,0.45)";
 
+// Surfaces
 const BG        = "#000000";
 const SURFACE   = "#0A1410";
 const SURFACE_2 = "#0F1F18";
 const BORDER    = "rgba(255,255,255,0.08)";
 const BORDER_HI = "rgba(102,255,102,0.22)";
 
-const TEXT      = "#F2FFF6";
-const TEXT_SUB  = "#B4D9C0";
-const TEXT_DIM  = "#6F8C7A";
+// Text
+const TEXT     = "#F2FFF6";
+const TEXT_SUB = "#B4D9C0";
+const TEXT_DIM = "#6F8C7A";
 
-const POS       = BRAND;
-const NEG       = "#FF4060";
-const WARN      = "#FFB94A";
+const POS = BRAND;
+const NEG = "#FF4060";
+const WARN = "#FFB94A";
 
-// Token shortcuts kept for legacy decorative helpers below
-const G = BRAND, R = NEG, W = TEXT;
+// ═══════════════════════════════════════════════════════════════════════════
+// Real branded crypto asset icons (inline SVG, recognizable, premium)
+// ═══════════════════════════════════════════════════════════════════════════
 
-// ── Utility formatters ──────────────────────────────────────────────────────
+type CryptoIconProps = { size?: number; glow?: boolean };
+
+function BTCIcon({ size = 36, glow = true }: CryptoIconProps) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: "linear-gradient(135deg, #F7931A 0%, #C76E0F 100%)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      boxShadow: glow ? "0 0 14px rgba(247,147,26,0.45), inset 0 0 10px rgba(255,255,255,0.10)" : "none",
+    }}>
+      <svg width={size*0.62} height={size*0.62} viewBox="0 0 32 32" fill="none">
+        <path d="M21.34 14.4c.3-1.98-1.21-3.04-3.27-3.75l.67-2.68-1.63-.41-.65 2.61c-.43-.11-.87-.21-1.31-.31l.66-2.63-1.63-.41-.67 2.68c-.36-.08-.71-.16-1.05-.25v-.01l-2.25-.56-.43 1.74s1.21.28 1.18.3c.66.16.78.6.76.95l-.77 3.05c.05.01.11.03.17.05l-.17-.04-1.07 4.28c-.08.2-.28.5-.74.38.02.02-1.18-.3-1.18-.3l-.81 1.87 2.13.53c.4.1.78.21 1.16.3l-.68 2.71 1.63.41.67-2.68c.44.12.88.23 1.3.34l-.67 2.66 1.63.41.68-2.71c2.78.53 4.86.32 5.74-2.2.71-2.03-.04-3.21-1.51-3.97 1.07-.25 1.87-.95 2.09-2.4zm-3.74 5.24c-.5 2.03-3.91.93-5.01.66l.9-3.59c1.1.27 4.64.82 4.11 2.93zm.5-5.27c-.46 1.84-3.3.91-4.21.68l.81-3.25c.91.23 3.88.65 3.4 2.57z" fill="white"/>
+      </svg>
+    </div>
+  );
+}
+
+function ETHIcon({ size = 36, glow = true }: CryptoIconProps) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: "linear-gradient(135deg, #6F7DEE 0%, #3A4DB5 100%)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      boxShadow: glow ? "0 0 14px rgba(98,126,234,0.45), inset 0 0 10px rgba(255,255,255,0.10)" : "none",
+    }}>
+      <svg width={size*0.50} height={size*0.62} viewBox="0 0 32 32" fill="none">
+        <path d="M16 2 L16 11.7 L24.5 15.5 Z" fill="white" opacity="0.95"/>
+        <path d="M16 2 L16 11.7 L7.5 15.5 Z" fill="white" opacity="0.65"/>
+        <path d="M16 14 L16 22 L24.5 17 Z" fill="white" opacity="0.85"/>
+        <path d="M16 14 L16 22 L7.5 17 Z" fill="white" opacity="0.55"/>
+        <path d="M16 23.5 L16 30 L24.5 18.5 Z" fill="white" opacity="0.85"/>
+        <path d="M16 23.5 L16 30 L7.5 18.5 Z" fill="white" opacity="0.55"/>
+      </svg>
+    </div>
+  );
+}
+
+function SOLIcon({ size = 36, glow = true }: CryptoIconProps) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: "linear-gradient(135deg, #0A0F1E 0%, #1A2640 100%)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      boxShadow: glow ? "0 0 14px rgba(20,241,149,0.40), inset 0 0 10px rgba(20,241,149,0.10)" : "none",
+    }}>
+      <svg width={size*0.62} height={size*0.42} viewBox="0 0 32 22" fill="none">
+        <defs>
+          <linearGradient id="sol-g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#14F195"/><stop offset="100%" stopColor="#9945FF"/>
+          </linearGradient>
+        </defs>
+        <path d="M6 4 L26 4 L24 0 L4 0 Z" fill="url(#sol-g)"/>
+        <path d="M6 13 L26 13 L24 9 L4 9 Z" fill="url(#sol-g)" opacity="0.85"/>
+        <path d="M6 22 L26 22 L24 18 L4 18 Z" fill="url(#sol-g)" opacity="0.7"/>
+      </svg>
+    </div>
+  );
+}
+
+function ADAIcon({ size = 36, glow = true }: CryptoIconProps) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: "linear-gradient(135deg, #1259D6 0%, #0033AD 100%)",
+      display: "flex", alignItems: "center", justifyContent: "center", position: "relative",
+      boxShadow: glow ? "0 0 14px rgba(18,89,214,0.45), inset 0 0 10px rgba(255,255,255,0.08)" : "none",
+    }}>
+      <svg width={size*0.7} height={size*0.7} viewBox="0 0 32 32" fill="none">
+        {/* Cardano stylized atomic dots */}
+        <circle cx="16" cy="16" r="1.6" fill="white"/>
+        <circle cx="16" cy="7"  r="1.2" fill="white"/>
+        <circle cx="16" cy="25" r="1.2" fill="white"/>
+        <circle cx="8"  cy="11.5" r="1.2" fill="white"/>
+        <circle cx="24" cy="11.5" r="1.2" fill="white"/>
+        <circle cx="8"  cy="20.5" r="1.2" fill="white"/>
+        <circle cx="24" cy="20.5" r="1.2" fill="white"/>
+        <circle cx="6"  cy="16" r="0.9" fill="white" opacity="0.7"/>
+        <circle cx="26" cy="16" r="0.9" fill="white" opacity="0.7"/>
+      </svg>
+    </div>
+  );
+}
+
+function AVAXIcon({ size = 36, glow = true }: CryptoIconProps) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: "linear-gradient(135deg, #E84142 0%, #B0282A 100%)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      boxShadow: glow ? "0 0 14px rgba(232,65,66,0.45), inset 0 0 10px rgba(255,255,255,0.08)" : "none",
+    }}>
+      <svg width={size*0.58} height={size*0.58} viewBox="0 0 32 32" fill="none">
+        <path d="M16 6 L26 24 L20 24 L17.6 19.6 L14.4 19.6 L16 16.6 L17 18.6 L19 18.6 L16 12.6 L11 24 L6 24 Z" fill="white"/>
+      </svg>
+    </div>
+  );
+}
+
+function DOGEIcon({ size = 36, glow = true }: CryptoIconProps) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: "linear-gradient(135deg, #D9B848 0%, #A38525 100%)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      boxShadow: glow ? "0 0 14px rgba(217,184,72,0.45), inset 0 0 10px rgba(255,255,255,0.10)" : "none",
+    }}>
+      <svg width={size*0.6} height={size*0.65} viewBox="0 0 24 26" fill="none">
+        <path d="M5 2 L13 2 C18.5 2 22 6 22 13 C22 20 18.5 24 13 24 L5 24 Z M9 6 L9 11 L7 11 L7 15 L9 15 L9 20 L13 20 C16 20 18 17.5 18 13 C18 8.5 16 6 13 6 Z" fill="white"/>
+      </svg>
+    </div>
+  );
+}
+
+function GenericTokenIcon({ sym, size = 36 }: { sym: string; size?: number }) {
+  const letter = sym.replace("USD","").replace("USDT","").slice(0,3)[0] ?? "?";
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: `linear-gradient(135deg, ${BRAND_DEEP}55, ${BRAND}22)`,
+      border: `1px solid ${BORDER_HI}`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      color: BRAND, fontFamily: SANS, fontWeight: 800, fontSize: size*0.36,
+      boxShadow: `0 0 12px ${BRAND_BLOOM}`,
+    }}>{letter}</div>
+  );
+}
+
+function CryptoIcon({ sym, size = 36, glow = true }: { sym: string; size?: number; glow?: boolean }) {
+  const s = sym.replace("USDT","").replace("USD","");
+  switch (s) {
+    case "BTC":  return <BTCIcon size={size} glow={glow}/>;
+    case "ETH":  return <ETHIcon size={size} glow={glow}/>;
+    case "SOL":  return <SOLIcon size={size} glow={glow}/>;
+    case "ADA":  return <ADAIcon size={size} glow={glow}/>;
+    case "AVAX": return <AVAXIcon size={size} glow={glow}/>;
+    case "DOGE": return <DOGEIcon size={size} glow={glow}/>;
+    default:     return <GenericTokenIcon sym={sym} size={size}/>;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RADAR SCANNER — core UI system for AI scanning / signals / confidence
+// ═══════════════════════════════════════════════════════════════════════════
+
+type RadarBlip = { sym: string; angle: number; r: number; strong?: boolean };
+
+function RadarScanner({
+  size = 260,
+  blips = [],
+  status = "SCANNING",
+}: {
+  size?: number;
+  blips?: RadarBlip[];
+  status?: string;
+}) {
+  const cx = size / 2;
+  const cy = size / 2;
+  const maxR = size / 2 - 12;
+
+  return (
+    <div style={{
+      position: "relative", width: size, height: size,
+      margin: "0 auto",
+    }}>
+      {/* Outer atmospheric glow */}
+      <div style={{
+        position: "absolute", inset: -20, borderRadius: "50%",
+        background: `radial-gradient(circle, ${BRAND_BLOOM} 0%, transparent 70%)`,
+        animation: "orb-breathe 6s ease-in-out infinite",
+        pointerEvents: "none",
+      }}/>
+
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
+        style={{ position: "absolute", inset: 0 }}>
+        <defs>
+          {/* Sweep gradient */}
+          <linearGradient id="radar-sweep" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+            <stop offset="0%"  stopColor={BRAND_BRGT} stopOpacity="0"/>
+            <stop offset="70%" stopColor={BRAND}      stopOpacity="0.4"/>
+            <stop offset="100%" stopColor={BRAND_BRGT} stopOpacity="0.95"/>
+          </linearGradient>
+          <radialGradient id="radar-fill" cx="50%" cy="50%" r="50%">
+            <stop offset="0%"  stopColor="#000000" stopOpacity="0.0"/>
+            <stop offset="60%" stopColor="#031309" stopOpacity="0.55"/>
+            <stop offset="100%" stopColor="#000000" stopOpacity="0.85"/>
+          </radialGradient>
+          <filter id="radar-glow">
+            <feGaussianBlur stdDeviation="2"/>
+          </filter>
+        </defs>
+
+        {/* Outer ring */}
+        <circle cx={cx} cy={cy} r={maxR} fill="url(#radar-fill)"
+          stroke={BRAND} strokeWidth="0.8" strokeOpacity="0.55"/>
+        {/* Concentric rings */}
+        {[0.78, 0.56, 0.34].map((f, i) => (
+          <circle key={i} cx={cx} cy={cy} r={maxR*f}
+            fill="none" stroke={BRAND} strokeOpacity={0.18 + i*0.05}
+            strokeDasharray={i === 0 ? "0" : "2 4"} strokeWidth="0.6"/>
+        ))}
+        {/* Cross-hairs */}
+        <line x1={cx} y1={cy-maxR} x2={cx} y2={cy+maxR}
+          stroke={BRAND} strokeOpacity="0.16" strokeWidth="0.6" strokeDasharray="3 5"/>
+        <line x1={cx-maxR} y1={cy} x2={cx+maxR} y2={cy}
+          stroke={BRAND} strokeOpacity="0.16" strokeWidth="0.6" strokeDasharray="3 5"/>
+
+        {/* Sweep arm — rotating */}
+        <g style={{ transformOrigin: `${cx}px ${cy}px`, animation: "radar-sweep-rotate 4s linear infinite" }}>
+          <path
+            d={`M ${cx} ${cy} L ${cx + maxR} ${cy} A ${maxR} ${maxR} 0 0 0 ${cx + Math.cos(-Math.PI/3)*maxR} ${cy + Math.sin(-Math.PI/3)*maxR} Z`}
+            fill="url(#radar-sweep)"
+            opacity="0.85"
+          />
+          {/* Bright leading edge */}
+          <line x1={cx} y1={cy} x2={cx+maxR} y2={cy}
+            stroke={BRAND_BRGT} strokeWidth="1.2" strokeOpacity="0.95"
+            filter="url(#radar-glow)"/>
+        </g>
+
+        {/* Blips with labels */}
+        {blips.map((b, i) => {
+          const px = cx + Math.cos(b.angle) * maxR * b.r;
+          const py = cy + Math.sin(b.angle) * maxR * b.r;
+          return (
+            <g key={i}>
+              <circle cx={px} cy={py} r={b.strong ? 8 : 6}
+                fill="none" stroke={BRAND} strokeOpacity="0.55"
+                style={{ animation: `radar-ping ${2 + (i%3)*0.4}s ease-out infinite` }}/>
+              <circle cx={px} cy={py} r={b.strong ? 2.6 : 2}
+                fill={BRAND_BRGT}
+                style={{ filter: `drop-shadow(0 0 6px ${BRAND_GLOW})`, animation: "dot-pulse 1.8s ease-in-out infinite" }}/>
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Center: AICandlez icon logo */}
+      <div style={{
+        position: "absolute", left: "50%", top: "50%",
+        transform: "translate(-50%, -50%)",
+        width: size*0.30, height: size*0.30,
+        borderRadius: "50%",
+        background: `radial-gradient(circle, #051208 0%, #000 70%)`,
+        border: `1px solid ${BORDER_HI}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        boxShadow: `0 0 22px ${BRAND_GLOW}, inset 0 0 12px ${BRAND_BLOOM}`,
+        animation: "brand-pulse 3.5s ease-in-out infinite",
+      }}>
+        <img src={aicandlezIconMaster} alt=""
+          style={{ width: "76%", height: "76%", objectFit: "contain",
+            filter: `drop-shadow(0 0 8px ${BRAND_BLOOM})` }}/>
+      </div>
+
+      {/* Status label below */}
+      <div style={{
+        position: "absolute", bottom: -2, left: "50%", transform: "translateX(-50%)",
+        display: "flex", alignItems: "center", gap: 7,
+        padding: "5px 11px", borderRadius: 999,
+        background: "rgba(0,0,0,0.7)",
+        border: `1px solid ${BORDER_HI}`,
+        backdropFilter: "blur(8px)",
+      }}>
+        <div style={{
+          width: 6, height: 6, borderRadius: "50%", background: BRAND,
+          boxShadow: `0 0 8px ${BRAND}`,
+          animation: "dot-pulse 1.4s ease-in-out infinite",
+        }}/>
+        <span style={{
+          fontSize: 9, fontFamily: SANS, fontWeight: 700, color: BRAND,
+          letterSpacing: 1.6, textTransform: "uppercase",
+        }}>{status}</span>
+      </div>
+
+      {/* Inline keyframes */}
+      <style>{`
+        @keyframes radar-sweep-rotate {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes radar-ping {
+          0%   { transform: scale(0.6); opacity: 0.9; }
+          80%  { transform: scale(1.6); opacity: 0;   }
+          100% { transform: scale(1.6); opacity: 0;   }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Utility formatters
+// ═══════════════════════════════════════════════════════════════════════════
 function fmt$(n: number, dp = 2) {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: dp, maximumFractionDigits: dp })}`;
 }
@@ -61,14 +356,17 @@ function fmtPx(p: number) {
   return `$${p.toFixed(6)}`;
 }
 
-const SYM_LABEL: Record<string,string> = { BTCUSD:"Bitcoin", ETHUSD:"Ethereum", SOLUSD:"Solana" };
-const SYM_SHORT: Record<string,string> = { BTCUSD:"BTC", ETHUSD:"ETH", SOLUSD:"SOL" };
-const SYM_ACCENT: Record<string,string> = {
-  BTCUSD: "#F7931A", ETHUSD: "#627EEA", SOLUSD: "#14F195",
-  ADAUSD: "#0033AD", XRPUSD: "#23292F", DOGEUSD:"#C2A633",
+const SYM_LABEL: Record<string,string> = {
+  BTCUSD:"Bitcoin", ETHUSD:"Ethereum", SOLUSD:"Solana",
+  ADAUSD:"Cardano", AVAXUSD:"Avalanche", DOGEUSD:"Dogecoin",
+};
+const SYM_SHORT: Record<string,string> = {
+  BTCUSD:"BTC", ETHUSD:"ETH", SOLUSD:"SOL", ADAUSD:"ADA", AVAXUSD:"AVAX", DOGEUSD:"DOGE",
 };
 
-// ── Deterministic chart point generator ─────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// Deterministic chart points
+// ═══════════════════════════════════════════════════════════════════════════
 function genPts(seed: string, trend: "up"|"down"|"flat", count = 36) {
   let s = 5381;
   for (let i = 0; i < seed.length; i++) s = (((s<<5)+s) ^ seed.charCodeAt(i)) >>> 0;
@@ -93,9 +391,8 @@ function smoothPath(pts: {x:number;y:number}[]) {
   return d;
 }
 
-// ── Sparkline primitive ─────────────────────────────────────────────────────
-function Sparkline({ seed, trend, w = 80, h = 32, color = BRAND, glow = true }: {
-  seed: string; trend: "up"|"down"|"flat"; w?: number; h?: number; color?: string; glow?: boolean;
+function Sparkline({ seed, trend, w = 80, h = 32, color = BRAND }: {
+  seed: string; trend: "up"|"down"|"flat"; w?: number; h?: number; color?: string;
 }) {
   const raw = genPts(seed, trend, 28);
   const mn = Math.min(...raw), mx = Math.max(...raw), rng = mx-mn || 1;
@@ -105,7 +402,7 @@ function Sparkline({ seed, trend, w = 80, h = 32, color = BRAND, glow = true }: 
   const gid = `spark-${seed.replace(/[^a-z0-9]/gi,"")}`;
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} shapeRendering="geometricPrecision"
-      style={{ overflow: "visible", filter: glow ? `drop-shadow(0 0 6px ${color}55)` : undefined }}>
+      style={{ overflow: "visible", filter: `drop-shadow(0 0 6px ${color}55)` }}>
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%"  stopColor={color} stopOpacity="0.32"/>
@@ -120,11 +417,10 @@ function Sparkline({ seed, trend, w = 80, h = 32, color = BRAND, glow = true }: 
   );
 }
 
-// ── Portfolio Hero Chart (large green area chart) ───────────────────────────
 function HeroChart({ seed, isUp }: { seed: string; isUp: boolean }) {
-  const w = 320, h = 90;
+  const w = 320, h = 110;
   const color = isUp ? BRAND : NEG;
-  const raw = genPts(seed, isUp ? "up" : "down", 48);
+  const raw = genPts(seed, isUp ? "up" : "down", 56);
   const mn = Math.min(...raw), mx = Math.max(...raw), rng = mx-mn || 1;
   const pts = raw.map((p, i) => ({ x: (i/(raw.length-1))*w, y: h-4-((p-mn)/rng)*(h-8) }));
   const d = smoothPath(pts);
@@ -132,11 +428,11 @@ function HeroChart({ seed, isUp }: { seed: string; isUp: boolean }) {
   return (
     <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none"
       shapeRendering="geometricPrecision"
-      style={{ overflow: "visible", filter: `drop-shadow(0 6px 22px ${color}40)` }}>
+      style={{ overflow: "visible", filter: `drop-shadow(0 8px 28px ${color}38)` }}>
       <defs>
         <linearGradient id="hero-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"  stopColor={color} stopOpacity="0.38"/>
-          <stop offset="60%" stopColor={color} stopOpacity="0.08"/>
+          <stop offset="0%"  stopColor={color} stopOpacity="0.42"/>
+          <stop offset="55%" stopColor={color} stopOpacity="0.08"/>
           <stop offset="100%" stopColor={color} stopOpacity="0"/>
         </linearGradient>
         <linearGradient id="hero-line" x1="0" y1="0" x2="1" y2="0">
@@ -146,16 +442,15 @@ function HeroChart({ seed, isUp }: { seed: string; isUp: boolean }) {
         </linearGradient>
       </defs>
       <path d={`${d} L ${last.x},${h} L 0,${h} Z`} fill="url(#hero-grad)"/>
-      <path d={d} fill="none" stroke="url(#hero-line)" strokeWidth="2.4"
+      <path d={d} fill="none" stroke="url(#hero-line)" strokeWidth="2.6"
         strokeLinecap="round" strokeLinejoin="round"
         style={{ filter: `drop-shadow(0 0 6px ${color}88)` }}/>
-      <circle cx={last.x} cy={last.y} r="3" fill={color}
-        style={{ filter: `drop-shadow(0 0 8px ${color})`, animation: "dot-pulse 2s ease-in-out infinite" }}/>
+      <circle cx={last.x} cy={last.y} r="3.4" fill={color}
+        style={{ filter: `drop-shadow(0 0 10px ${color})`, animation: "dot-pulse 2s ease-in-out infinite" }}/>
     </svg>
   );
 }
 
-// ── Confidence bar (animated) ───────────────────────────────────────────────
 function ConfidenceBar({ value, color = BRAND }: { value: number; color?: string }) {
   return (
     <div style={{ height: 6, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
@@ -164,143 +459,115 @@ function ConfidenceBar({ value, color = BRAND }: { value: number; color?: string
         width: `${Math.min(100, Math.max(0, value))}%`,
         borderRadius: 999,
         background: `linear-gradient(90deg, ${BRAND_DEEP}, ${color} 60%, ${BRAND_BRGT})`,
-        boxShadow: `0 0 12px ${color}66`,
+        boxShadow: `0 0 14px ${color}88`,
         animation: "bar-in 0.9s ease-out both, bar-breathe 4.5s ease-in-out 0.9s infinite",
       }}/>
     </div>
   );
 }
 
-// ── Asset icon (gradient circle with letter) ────────────────────────────────
-function AssetIcon({ sym, size = 36 }: { sym: string; size?: number }) {
-  const short = sym.replace("USD","").replace("USDT","").slice(0,3);
-  const accent = SYM_ACCENT[sym] ?? BRAND_DEEP;
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%", flexShrink: 0,
-      background: `linear-gradient(135deg, ${accent}33, ${accent}10)`,
-      border: `1px solid ${accent}55`,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      color: accent, fontFamily: SANS, fontWeight: 800, fontSize: size*0.34,
-      letterSpacing: -0.3,
-      boxShadow: `0 0 14px ${accent}33, inset 0 0 12px ${accent}18`,
-    }}>{short[0]}</div>
-  );
-}
-
-// ── Ambient background (subtle green orbs + grid) ───────────────────────────
-function AmbientBackground() {
+// ═══════════════════════════════════════════════════════════════════════════
+// Atmospheric background — deep cinematic with light rays + ambient orbs
+// ═══════════════════════════════════════════════════════════════════════════
+function CinematicBackground() {
   return (
     <div aria-hidden style={{
       position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0,
     }}>
+      {/* Ambient orbs */}
       <div style={{
-        position: "absolute", top: -120, left: -80, width: 360, height: 360, borderRadius: "50%",
-        background: `radial-gradient(circle, ${BRAND_BLOOM} 0%, transparent 70%)`,
+        position: "absolute", top: -160, left: -100, width: 460, height: 460, borderRadius: "50%",
+        background: `radial-gradient(circle, ${BRAND_BLOOM} 0%, transparent 65%)`,
         animation: "orb-breathe 14s ease-in-out infinite",
+        filter: "blur(8px)",
       }}/>
       <div style={{
-        position: "absolute", bottom: -160, right: -100, width: 420, height: 420, borderRadius: "50%",
-        background: `radial-gradient(circle, rgba(0,200,83,0.14) 0%, transparent 70%)`,
+        position: "absolute", top: 380, right: -140, width: 520, height: 520, borderRadius: "50%",
+        background: `radial-gradient(circle, rgba(0,200,83,0.13) 0%, transparent 70%)`,
         animation: "orb-breathe 18s ease-in-out 4s infinite",
+        filter: "blur(8px)",
       }}/>
       <div style={{
-        position: "absolute", top: "40%", left: "30%", width: 240, height: 240, borderRadius: "50%",
-        background: `radial-gradient(circle, rgba(124,255,0,0.08) 0%, transparent 70%)`,
-        animation: "orb-breathe 12s ease-in-out 2s infinite",
+        position: "absolute", bottom: -200, left: "20%", width: 380, height: 380, borderRadius: "50%",
+        background: `radial-gradient(circle, rgba(124,255,0,0.10) 0%, transparent 65%)`,
+        animation: "orb-breathe 16s ease-in-out 2s infinite",
+        filter: "blur(8px)",
       }}/>
-      {/* Subtle vertical lines grid */}
+      {/* Vertical light ray (top-left → bottom-right) */}
       <div style={{
-        position: "absolute", inset: 0, opacity: 0.5,
-        backgroundImage: `linear-gradient(90deg, rgba(102,255,102,0.04) 1px, transparent 1px)`,
-        backgroundSize: "56px 100%",
+        position: "absolute", top: -100, left: "30%", width: 2, height: "70%",
+        background: `linear-gradient(180deg, transparent 0%, ${BRAND_BLOOM} 30%, transparent 100%)`,
+        transform: "rotate(18deg)", filter: "blur(2px)", opacity: 0.6,
+      }}/>
+      <div style={{
+        position: "absolute", top: 100, right: "20%", width: 2, height: "60%",
+        background: `linear-gradient(180deg, transparent 0%, ${BRAND_BLOOM} 30%, transparent 100%)`,
+        transform: "rotate(-12deg)", filter: "blur(2px)", opacity: 0.4,
+      }}/>
+      {/* Fine grid */}
+      <div style={{
+        position: "absolute", inset: 0, opacity: 0.45,
+        backgroundImage: `linear-gradient(90deg, rgba(102,255,102,0.035) 1px, transparent 1px)`,
+        backgroundSize: "64px 100%",
+      }}/>
+      {/* Vignette */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.45) 100%)",
       }}/>
     </div>
   );
 }
 
-// ── Quick action tile ───────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// Icons (small Feather-style)
+// ═══════════════════════════════════════════════════════════════════════════
+const IconScan    = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg>;
+const IconTrade   = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg>;
+const IconAuto    = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>;
+const IconDeposit = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+const IconBell    = <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>;
+const IconEye     = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
+const IconChevron = <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>;
+const IconSparkle = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>;
+const IconArrowUp = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>;
+const IconArrowDn = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Quick action tile
+// ═══════════════════════════════════════════════════════════════════════════
 function QuickAction({ icon, label, onClick, accent = BRAND }: {
   icon: React.ReactNode; label: string; onClick: () => void; accent?: string;
 }) {
   return (
-    <button onClick={onClick}
-      className="hover-elevate active-elevate"
+    <button onClick={onClick} className="hover-elevate active-elevate"
       style={{
-        flex: 1, padding: "16px 6px 12px", borderRadius: 16,
+        flex: 1, padding: "18px 6px 14px", borderRadius: 18,
         background: "rgba(255,255,255,0.025)",
         border: `1px solid ${BORDER}`,
         backdropFilter: "blur(12px) saturate(140%)",
         WebkitBackdropFilter: "blur(12px) saturate(140%)",
-        display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-        cursor: "pointer",
-        transition: "all 0.2s ease",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+        cursor: "pointer", transition: "all 0.2s ease",
       }}>
       <div style={{
-        width: 36, height: 36, borderRadius: 11,
+        width: 40, height: 40, borderRadius: 12,
         background: `linear-gradient(135deg, ${accent}28, ${accent}10)`,
         border: `1px solid ${accent}40`,
         display: "flex", alignItems: "center", justifyContent: "center",
         color: accent,
-        boxShadow: `0 0 14px ${accent}30`,
+        boxShadow: `0 0 16px ${accent}30`,
       }}>{icon}</div>
       <span style={{
-        fontSize: 11, fontFamily: SANS, fontWeight: 600, color: TEXT_SUB,
-        letterSpacing: 0.1,
+        fontSize: 11, fontFamily: SANS, fontWeight: 600, color: TEXT_SUB, letterSpacing: 0.1,
       }}>{label}</span>
     </button>
   );
 }
 
-// Icons (inline SVG, weight tuned for premium feel)
-const IconScan = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>
-    <path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
-    <path d="M7 12h10"/>
-  </svg>
-);
-const IconTrade = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/>
-  </svg>
-);
-const IconAuto = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3"/>
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-  </svg>
-);
-const IconDeposit = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-  </svg>
-);
-const IconBell = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-  </svg>
-);
-const IconEye = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-  </svg>
-);
-const IconChevron = (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="6 9 12 15 18 9"/>
-  </svg>
-);
-const IconSparkle = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>
-  </svg>
-);
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main component
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN HOME COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════
 export default function Home() {
   const [, setLocation] = useLocation();
   const { openOnboarding, status: brokerStatus, equity: alpacaEquity, buyingPower: alpacaBP } =
@@ -320,7 +587,7 @@ export default function Home() {
   const { data: tickersData } = useQuery<MobileTickersResponse>({
     queryKey: ["mobile-tickers"], queryFn: () => api.get("/mobile/tickers"), refetchInterval: 15_000, retry: false });
 
-  // ── Derived state ─────────────────────────────────────────────────────────
+  // ── Derived state ────────────────────────────────────────────────────────
   const engine   = status?.engine;
   const isLive   = engine?.mode === "live";
   const brokerConnected = brokerStatus === "paper_active" || brokerStatus === "live_active";
@@ -337,7 +604,6 @@ export default function Home() {
   const planLabel = (plan.includes("active") || plan.includes("paid") || plan.includes("live"))
     ? "Pro" : "Trial";
 
-  // ── AI insight (top signal) ───────────────────────────────────────────────
   const breakdowns: Record<string, SignalBreakdown> = signalsData?.breakdowns ?? {};
   const tickerMap: Record<string, MobileTicker> = useMemo(() => {
     const m: Record<string, MobileTicker> = {};
@@ -361,25 +627,21 @@ export default function Home() {
     };
   }, [breakdowns, tickerMap]);
 
-  // ── Top gainers (from tickers) ────────────────────────────────────────────
   const topGainers = useMemo(() => {
     const list = (tickersData?.tickers ?? [])
       .filter(t => t.changePercent24h > 0)
       .sort((a,b) => b.changePercent24h - a.changePercent24h)
       .slice(0, 3);
     if (list.length >= 3) return list;
-    // graceful fallback so the section is always populated
     return [
-      { symbol: "SOLUSD", short: "SOL", price: 172.36, changePercent24h: 6.21, up: true } as MobileTicker,
-      { symbol: "ETHUSD", short: "ETH", price: 3486.59, changePercent24h: 4.32, up: true } as MobileTicker,
-      { symbol: "ADAUSD", short: "ADA", price: 0.6421, changePercent24h: 3.18, up: true } as MobileTicker,
+      { symbol: "SOLUSD",  short: "SOL",  price: 172.36,  changePercent24h: 6.21, up: true } as MobileTicker,
+      { symbol: "ETHUSD",  short: "ETH",  price: 3486.59, changePercent24h: 4.32, up: true } as MobileTicker,
+      { symbol: "ADAUSD",  short: "ADA",  price: 0.6421,  changePercent24h: 3.18, up: true } as MobileTicker,
     ];
   }, [tickersData]);
 
-  // ── Active positions ──────────────────────────────────────────────────────
   const positions = portfolio?.positions ?? [];
 
-  // ── Render ────────────────────────────────────────────────────────────────
   const firstName = user?.firstName
     ?? user?.emailAddresses?.[0]?.emailAddress?.split("@")[0]
     ?? "Trader";
@@ -388,48 +650,74 @@ export default function Home() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
+  // Radar blips — fixed scattered positions for visual consistency
+  const radarBlips: RadarBlip[] = [
+    { sym: "BTC",  angle: -Math.PI*0.30, r: 0.62, strong: true },
+    { sym: "ETH",  angle:  Math.PI*0.15, r: 0.78 },
+    { sym: "SOL",  angle:  Math.PI*0.55, r: 0.48 },
+    { sym: "ADA",  angle: -Math.PI*0.75, r: 0.86 },
+    { sym: "AVAX", angle:  Math.PI*0.90, r: 0.72 },
+    { sym: "DOGE", angle: -Math.PI*0.05, r: 0.36 },
+  ];
+
   return (
     <div className="page-enter" style={{
       position: "relative", background: BG, minHeight: "100%",
-      paddingBottom: 32, overflow: "hidden",
+      paddingBottom: 36, overflow: "hidden",
     }}>
-      <AmbientBackground />
+      <CinematicBackground />
 
       <div style={{ position: "relative", zIndex: 1 }}>
 
-        {/* ── Header ─────────────────────────────────────────────────────── */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* PROMINENT BRAND HEADER — centered AICandlez logo with green glow  */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        <div style={{
+          position: "relative",
+          padding: "22px 20px 6px",
+          display: "flex", justifyContent: "center", alignItems: "center",
+        }}>
+          <div style={{
+            position: "absolute", inset: "10px 30% auto 30%", height: 60,
+            background: `radial-gradient(ellipse, ${BRAND_BLOOM} 0%, transparent 70%)`,
+            filter: "blur(14px)", pointerEvents: "none",
+          }}/>
+          <img src={aicandlezLogoMaster} alt="AICandlez"
+            style={{
+              height: 38, width: "auto", objectFit: "contain",
+              filter: `drop-shadow(0 0 14px ${BRAND_BLOOM}) drop-shadow(0 4px 16px rgba(0,0,0,0.6))`,
+              position: "relative", zIndex: 1,
+            }}/>
+        </div>
+
+        {/* ── Greeting row (avatar + bell) ─────────────────────────────── */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "18px 20px 14px",
-          position: "sticky", top: 0, zIndex: 10,
-          background: `linear-gradient(180deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 80%, rgba(0,0,0,0) 100%)`,
-          backdropFilter: "blur(16px) saturate(140%)",
-          WebkitBackdropFilter: "blur(16px) saturate(140%)",
+          padding: "10px 20px 18px",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {/* Avatar with neon ring */}
+          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
             <div onClick={() => setLocation("/profile")} style={{
-              position: "relative", width: 42, height: 42, borderRadius: "50%", cursor: "pointer",
+              position: "relative", width: 38, height: 38, borderRadius: "50%", cursor: "pointer",
               background: `linear-gradient(135deg, ${BRAND}38, ${BRAND_DEEP}22)`,
               border: `1.5px solid ${BORDER_HI}`,
               display: "flex", alignItems: "center", justifyContent: "center",
-              color: BRAND, fontFamily: SANS, fontWeight: 700, fontSize: 16,
-              boxShadow: `0 0 18px ${BRAND_BLOOM}, inset 0 0 14px rgba(102,255,102,0.10)`,
+              color: BRAND, fontFamily: SANS, fontWeight: 700, fontSize: 14,
+              boxShadow: `0 0 14px ${BRAND_BLOOM}`,
             }}>
               {initial}
               <div style={{
-                position: "absolute", bottom: -1, right: -1, width: 11, height: 11, borderRadius: "50%",
+                position: "absolute", bottom: -1, right: -1, width: 10, height: 10, borderRadius: "50%",
                 background: BRAND, border: `2px solid ${BG}`,
-                boxShadow: `0 0 8px ${BRAND}`,
+                boxShadow: `0 0 6px ${BRAND}`,
                 animation: "dot-pulse 2.5s ease-in-out infinite",
               }}/>
             </div>
             <div>
-              <div style={{ fontSize: 11, fontFamily: SANS, fontWeight: 500, color: TEXT_DIM, letterSpacing: 0.1 }}>
+              <div style={{ fontSize: 10, fontFamily: SANS, fontWeight: 500, color: TEXT_DIM, letterSpacing: 0.2 }}>
                 {greeting},
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 1 }}>
-                <span style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.2 }}>
+                <span style={{ fontSize: 15, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.2 }}>
                   {firstName}
                 </span>
                 <span style={{
@@ -437,15 +725,12 @@ export default function Home() {
                   background: `linear-gradient(135deg, ${BRAND}22, ${BRAND_DEEP}18)`,
                   border: `1px solid ${BORDER_HI}`,
                   fontSize: 9, fontFamily: SANS, fontWeight: 700, color: BRAND,
-                  letterSpacing: 0.8, textTransform: "uppercase",
-                }}>
-                  {planLabel}
-                </span>
+                  letterSpacing: 1, textTransform: "uppercase",
+                }}>{planLabel}</span>
               </div>
             </div>
           </div>
 
-          {/* Bell */}
           <div style={{
             position: "relative", width: 38, height: 38, borderRadius: 12,
             background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`,
@@ -460,19 +745,21 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ── Portfolio Hero Card ─────────────────────────────────────────── */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* PORTFOLIO HERO CARD — cinematic, big number, deep glow             */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <div style={{
-          position: "relative", margin: "8px 16px 0", borderRadius: 24, overflow: "hidden",
+          position: "relative", margin: "0 16px 0", borderRadius: 28, overflow: "hidden",
           background: `
-            radial-gradient(circle at 0% 0%, rgba(102,255,102,0.10) 0%, transparent 50%),
-            radial-gradient(circle at 100% 100%, rgba(0,200,83,0.08) 0%, transparent 50%),
+            radial-gradient(circle at 0% 0%, rgba(102,255,102,0.12) 0%, transparent 50%),
+            radial-gradient(circle at 100% 100%, rgba(0,200,83,0.10) 0%, transparent 50%),
             linear-gradient(160deg, ${SURFACE_2} 0%, ${SURFACE} 60%, #050A07 100%)
           `,
           border: `1px solid ${BORDER_HI}`,
-          padding: "20px 20px 18px",
-          boxShadow: `0 24px 60px rgba(0,0,0,0.7), 0 0 50px rgba(102,255,102,0.08)`,
+          padding: "22px 22px 20px",
+          boxShadow: `0 28px 80px rgba(0,0,0,0.75), 0 0 70px rgba(102,255,102,0.10)`,
         }}>
-          {/* Top edge laser */}
+          {/* Top edge sweep */}
           <div aria-hidden style={{
             position: "absolute", top: 0, left: 0, right: 0, height: 1.5,
             background: `linear-gradient(90deg, transparent, ${BRAND}88, ${BRAND_BRGT}, ${BRAND}88, transparent)`,
@@ -480,18 +767,17 @@ export default function Home() {
             animation: "edge-sweep 10s ease-in-out infinite",
           }}/>
 
-          {/* Label row */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <span style={{
                 fontSize: 10, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
-                letterSpacing: 1.5, textTransform: "uppercase",
+                letterSpacing: 2, textTransform: "uppercase",
               }}>Total Portfolio Value</span>
               <div style={{ color: TEXT_DIM, opacity: 0.7 }}>{IconEye}</div>
             </div>
             <div style={{
               display: "flex", alignItems: "center", gap: 4,
-              padding: "4px 9px", borderRadius: 8,
+              padding: "5px 10px", borderRadius: 8,
               background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`,
               cursor: "pointer",
               fontSize: 10, fontFamily: SANS, fontWeight: 600, color: TEXT_SUB,
@@ -501,46 +787,44 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Big number */}
+          {/* BIG hero number — cinematic */}
           <div style={{
-            fontSize: 38, fontFamily: SANS, fontWeight: 700, color: TEXT,
-            letterSpacing: -1, lineHeight: 1.1, marginTop: 8,
-            textShadow: `0 0 24px rgba(255,255,255,0.08)`,
+            fontSize: 48, fontFamily: SANS, fontWeight: 700, color: TEXT,
+            letterSpacing: -1.6, lineHeight: 1.05, marginTop: 12,
+            textShadow: `0 0 32px rgba(255,255,255,0.10), 0 2px 8px rgba(0,0,0,0.5)`,
+            fontVariantNumeric: "tabular-nums",
           }}>
             {fmt$(tv)}
           </div>
 
-          {/* P&L row */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 8 }}>
             <span style={{
-              fontSize: 13, fontFamily: SANS, fontWeight: 700,
+              fontSize: 15, fontFamily: SANS, fontWeight: 700,
               color: pnl >= 0 ? POS : NEG, letterSpacing: -0.1,
-              textShadow: pnl >= 0 ? `0 0 10px ${BRAND_BLOOM}` : "none",
+              textShadow: pnl >= 0 ? `0 0 12px ${BRAND_BLOOM}` : "none",
             }}>
               {pnl >= 0 ? "+" : ""}{fmt$(Math.abs(pnl))}
             </span>
             <span style={{
-              fontSize: 12, fontFamily: SANS, fontWeight: 600,
+              fontSize: 13, fontFamily: SANS, fontWeight: 600,
               color: pnl >= 0 ? POS : NEG, opacity: 0.85,
             }}>
               ({pnl >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)
             </span>
             <span style={{ fontSize: 11, fontFamily: SANS, color: TEXT_DIM, marginLeft: 2 }}>Today</span>
             <span style={{
-              marginLeft: "auto", fontSize: 9, fontFamily: SANS, fontWeight: 600,
-              color: TEXT_DIM, letterSpacing: 0.4, textTransform: "uppercase",
+              marginLeft: "auto", fontSize: 9, fontFamily: SANS, fontWeight: 700,
+              color: TEXT_DIM, letterSpacing: 1, textTransform: "uppercase",
             }}>{portfolioSourceLabel}</span>
           </div>
 
-          {/* Chart */}
-          <div style={{ marginTop: 14, marginBottom: 4 }}>
+          <div style={{ marginTop: 18, marginBottom: 6 }}>
             <HeroChart seed={`pf-${Math.floor(tv)}`} isUp={pnl >= 0}/>
           </div>
 
-          {/* Sub-stats row */}
           <div style={{
-            display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 14,
-            paddingTop: 14, borderTop: `1px solid ${BORDER}`,
+            display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 16,
+            paddingTop: 16, borderTop: `1px solid ${BORDER}`,
           }}>
             {[
               { l: "Available", v: fmtShort(cashAvail) },
@@ -548,36 +832,46 @@ export default function Home() {
               { l: "Win Rate",  v: `${(simAcc?.winRate ?? 0).toFixed(0)}%`, c: (simAcc?.winRate ?? 0) >= 55 ? POS : WARN },
             ].map((s, i) => (
               <div key={i}>
-                <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600, color: TEXT_DIM, letterSpacing: 1, textTransform: "uppercase" }}>{s.l}</div>
-                <div style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: (s as any).c ?? TEXT, marginTop: 3, letterSpacing: -0.2 }}>{s.v}</div>
+                <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM, letterSpacing: 1.3, textTransform: "uppercase" }}>{s.l}</div>
+                <div style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: (s as any).c ?? TEXT, marginTop: 4, letterSpacing: -0.2 }}>{s.v}</div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* ── Quick Actions ──────────────────────────────────────────────── */}
-        <div style={{ display: "flex", gap: 10, padding: "16px 16px 0" }}>
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* QUICK ACTIONS                                                     */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        <div style={{ display: "flex", gap: 10, padding: "18px 16px 0" }}>
           <QuickAction icon={IconScan}    label="AI Scan"     onClick={() => setLocation("/markets")} accent={BRAND}/>
           <QuickAction icon={IconTrade}   label="Open Trades" onClick={() => setLocation("/trade")}   accent={BRAND_BRGT}/>
           <QuickAction icon={IconAuto}    label="Auto Trade"  onClick={() => setLocation("/profile")} accent={BRAND_DEEP}/>
           <QuickAction icon={IconDeposit} label="Deposit"     onClick={openOnboarding} accent={BRAND}/>
         </div>
 
-        {/* ── AI Market Insight ──────────────────────────────────────────── */}
-        <SectionHeader label="AI Market Insight" onMore={() => setLocation("/markets")}/>
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* AI MARKET SCANNER — RADAR HERO + glowing BUY/SELL                 */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        <SectionHeader label="AI Market Scanner" right="Live · 247 pairs"/>
         <div style={{
-          margin: "0 16px", borderRadius: 18, overflow: "hidden",
-          background: `linear-gradient(160deg, ${SURFACE} 0%, ${BG} 100%)`,
-          border: `1px solid ${BORDER}`,
-          padding: 16,
-          boxShadow: `0 12px 32px rgba(0,0,0,0.6)`,
+          position: "relative", margin: "0 16px", borderRadius: 24, overflow: "hidden",
+          background: `
+            radial-gradient(circle at 50% 0%, rgba(102,255,102,0.12) 0%, transparent 60%),
+            linear-gradient(180deg, #06120A 0%, ${BG} 100%)
+          `,
+          border: `1px solid ${BORDER_HI}`,
+          padding: "22px 18px 20px",
+          boxShadow: `0 24px 60px rgba(0,0,0,0.65), 0 0 60px rgba(102,255,102,0.06)`,
         }}>
-          {/* Asset row */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <AssetIcon sym={topInsight.symbol} size={40}/>
+          {/* RADAR */}
+          <RadarScanner size={260} blips={radarBlips} status="AI ACTIVE · SCANNING"/>
+
+          {/* Top signal callout */}
+          <div style={{ marginTop: 26, display: "flex", alignItems: "center", gap: 12 }}>
+            <CryptoIcon sym={topInsight.symbol} size={44}/>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.2 }}>
                   {SYM_SHORT[topInsight.symbol] ?? topInsight.symbol.replace("USD","")}/USDT
                 </span>
                 <span style={{
@@ -586,7 +880,7 @@ export default function Home() {
                   border: `1px solid ${topInsight.action === "LONG" ? BORDER_HI : "rgba(255,64,96,0.30)"}`,
                   fontSize: 9, fontFamily: SANS, fontWeight: 800,
                   color: topInsight.action === "LONG" ? BRAND : NEG,
-                  letterSpacing: 0.8, textTransform: "uppercase",
+                  letterSpacing: 1, textTransform: "uppercase",
                 }}>
                   {topInsight.action === "LONG" ? "Bullish" : "Bearish"}
                 </span>
@@ -596,11 +890,11 @@ export default function Home() {
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 15, fontFamily: SANS, fontWeight: 700, color: TEXT, fontVariantNumeric: "tabular-nums" }}>
+              <div style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: TEXT, fontVariantNumeric: "tabular-nums" }}>
                 {fmtPx(topInsight.price)}
               </div>
               <div style={{
-                fontSize: 11, fontFamily: SANS, fontWeight: 600,
+                fontSize: 12, fontFamily: SANS, fontWeight: 600,
                 color: topInsight.pct >= 0 ? POS : NEG, marginTop: 2,
               }}>
                 {topInsight.pct >= 0 ? "+" : ""}{topInsight.pct.toFixed(2)}%
@@ -608,58 +902,91 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Confidence */}
-          <div style={{ marginTop: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 10, fontFamily: SANS, fontWeight: 600, color: TEXT_DIM, letterSpacing: 0.8, textTransform: "uppercase" }}>
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
+              <span style={{ fontSize: 10, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM, letterSpacing: 1.2, textTransform: "uppercase" }}>
                 AI Confidence
               </span>
-              <span style={{ fontSize: 13, fontFamily: SANS, fontWeight: 800, color: BRAND, letterSpacing: -0.1 }}>
+              <span style={{ fontSize: 14, fontFamily: SANS, fontWeight: 800, color: BRAND, letterSpacing: -0.1 }}>
                 {topInsight.confidence}%
               </span>
             </div>
             <ConfidenceBar value={topInsight.confidence}/>
           </div>
 
-          {/* Reasoning */}
           <div style={{
-            marginTop: 12, padding: "10px 12px", borderRadius: 10,
-            background: "rgba(102,255,102,0.04)",
+            marginTop: 14, padding: "11px 13px", borderRadius: 12,
+            background: "rgba(102,255,102,0.05)",
             border: `1px solid ${BORDER_HI}`,
           }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
               <div style={{ color: BRAND, marginTop: 1 }}>{IconSparkle}</div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontFamily: SANS, fontWeight: 600, color: TEXT, lineHeight: 1.4 }}>
+                <div style={{ fontSize: 12, fontFamily: SANS, fontWeight: 600, color: TEXT, lineHeight: 1.45 }}>
                   Strong {topInsight.action === "LONG" ? "buying" : "selling"} momentum detected
                 </div>
                 <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_SUB, marginTop: 3, lineHeight: 1.45 }}>
                   High probability of {topInsight.action === "LONG" ? "upward" : "downward"} movement
                 </div>
-                <div style={{ fontSize: 9, fontFamily: SANS, color: TEXT_DIM, marginTop: 6, letterSpacing: 0.4, textTransform: "uppercase" }}>
-                  2 min ago
+                <div style={{ fontSize: 9, fontFamily: SANS, color: TEXT_DIM, marginTop: 6, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 700 }}>
+                  Updated 2 min ago
                 </div>
               </div>
             </div>
           </div>
+
+          {/* GLOWING BUY / SELL CTA PAIR */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16 }}>
+            <button onClick={() => setLocation("/trade")} style={{
+              position: "relative", padding: "14px 0", borderRadius: 14, cursor: "pointer",
+              background: `linear-gradient(180deg, ${BRAND} 0%, ${BRAND_DEEP} 100%)`,
+              border: `1px solid ${BRAND_BRGT}`,
+              color: "#031309", fontFamily: SANS, fontWeight: 800, fontSize: 14,
+              letterSpacing: 0.6, textTransform: "uppercase",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+              boxShadow: `0 0 24px ${BRAND_GLOW}, 0 8px 20px rgba(0,200,83,0.35), inset 0 1px 0 rgba(255,255,255,0.25)`,
+              transition: "all 0.15s ease",
+            }} onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
+               onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}>
+              {IconArrowUp} Buy
+            </button>
+            <button onClick={() => setLocation("/trade")} style={{
+              position: "relative", padding: "14px 0", borderRadius: 14, cursor: "pointer",
+              background: `linear-gradient(180deg, #2A0C12 0%, #1A0509 100%)`,
+              border: `1px solid rgba(255,64,96,0.45)`,
+              color: NEG, fontFamily: SANS, fontWeight: 800, fontSize: 14,
+              letterSpacing: 0.6, textTransform: "uppercase",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+              boxShadow: `0 0 18px rgba(255,64,96,0.30), 0 8px 18px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)`,
+              transition: "all 0.15s ease",
+            }} onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
+               onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}>
+              {IconArrowDn} Sell
+            </button>
+          </div>
         </div>
 
-        {/* ── Top Gainers ────────────────────────────────────────────────── */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* TOP GAINERS — real crypto icons + sparklines                      */}
+        {/* ════════════════════════════════════════════════════════════════ */}
         <SectionHeader label="Top Gainers" onMore={() => setLocation("/markets")}/>
         <div style={{
-          margin: "0 16px", borderRadius: 18, overflow: "hidden",
-          background: SURFACE, border: `1px solid ${BORDER}`,
+          margin: "0 16px", borderRadius: 20, overflow: "hidden",
+          background: `linear-gradient(180deg, ${SURFACE} 0%, ${BG} 100%)`,
+          border: `1px solid ${BORDER}`,
+          boxShadow: `0 12px 32px rgba(0,0,0,0.5)`,
         }}>
           {topGainers.map((t, i) => (
             <div key={t.symbol} onClick={() => setLocation("/markets")} style={{
               display: "flex", alignItems: "center", gap: 12,
-              padding: "14px 16px",
+              padding: "15px 18px",
               borderBottom: i < topGainers.length - 1 ? `1px solid ${BORDER}` : "none",
               cursor: "pointer",
+              transition: "background 0.2s ease",
             }}>
-              <AssetIcon sym={t.symbol} size={36}/>
+              <CryptoIcon sym={t.symbol} size={38}/>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.1 }}>
+                <div style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.1 }}>
                   {(t as MobileTicker).short ?? SYM_SHORT[t.symbol] ?? t.symbol.replace("USD","")}/USDT
                 </div>
                 <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_DIM, marginTop: 2 }}>
@@ -667,8 +994,8 @@ export default function Home() {
                 </div>
               </div>
               <Sparkline seed={`gain-${t.symbol}`} trend="up" w={64} h={28}/>
-              <div style={{ textAlign: "right", minWidth: 76 }}>
-                <div style={{ fontSize: 13, fontFamily: SANS, fontWeight: 700, color: TEXT, fontVariantNumeric: "tabular-nums" }}>
+              <div style={{ textAlign: "right", minWidth: 84 }}>
+                <div style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: TEXT, fontVariantNumeric: "tabular-nums" }}>
                   {fmtPx(t.price)}
                 </div>
                 <div style={{ fontSize: 11, fontFamily: SANS, fontWeight: 600, color: POS, marginTop: 2 }}>
@@ -679,17 +1006,20 @@ export default function Home() {
           ))}
         </div>
 
-        {/* ── Active Trades ──────────────────────────────────────────────── */}
-        <SectionHeader label="Active Trades" right={`${positions.length} open`} onMore={() => setLocation("/trades")}/>
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* ACTIVE TRADES — real crypto icons + LONG/SHORT pills              */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        <SectionHeader label="Active Trades" right={`${positions.length} open`} onMore={() => setLocation("/trade")}/>
         <div style={{ margin: "0 16px" }}>
           {positions.length === 0 ? (
             <div style={{
-              padding: "20px 18px", borderRadius: 16,
+              padding: "26px 18px", borderRadius: 20,
               background: SURFACE, border: `1px dashed ${BORDER}`,
               textAlign: "center",
             }}>
-              <div style={{ fontSize: 12, fontFamily: SANS, color: TEXT_DIM }}>
-                No open positions. AI is scanning the market.
+              <div style={{ fontSize: 12, fontFamily: SANS, color: TEXT_DIM, lineHeight: 1.5 }}>
+                No open positions.<br/>
+                <span style={{ color: BRAND, fontWeight: 600 }}>AI is scanning the market.</span>
               </div>
             </div>
           ) : (
@@ -699,42 +1029,45 @@ export default function Home() {
               const roe = p.roe ?? (p.unrealizedPnLPct ?? 0);
               return (
                 <div key={i} style={{
-                  marginBottom: 10, padding: "14px 16px", borderRadius: 16,
+                  marginBottom: 10, padding: "16px 18px", borderRadius: 18,
                   background: `linear-gradient(140deg, ${SURFACE} 0%, ${BG} 100%)`,
                   border: `1px solid ${BORDER}`,
+                  boxShadow: `0 8px 22px rgba(0,0,0,0.4)`,
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 10 }}>
+                    <CryptoIcon sym={p.symbol} size={34}/>
+                    <span style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: TEXT }}>
+                      {SYM_SHORT[p.symbol] ?? p.symbol?.replace("USD","")}/USDT
+                    </span>
                     <span style={{
                       padding: "3px 9px", borderRadius: 6,
                       background: isLong ? `${BRAND}1F` : `${NEG}1F`,
                       border: `1px solid ${isLong ? BORDER_HI : "rgba(255,64,96,0.30)"}`,
                       fontSize: 9, fontFamily: SANS, fontWeight: 800,
-                      color: isLong ? BRAND : NEG, letterSpacing: 0.8, textTransform: "uppercase",
+                      color: isLong ? BRAND : NEG, letterSpacing: 1, textTransform: "uppercase",
                     }}>{isLong ? "Long" : "Short"}</span>
-                    <span style={{ fontSize: 13, fontFamily: SANS, fontWeight: 700, color: TEXT }}>
-                      {SYM_SHORT[p.symbol] ?? p.symbol?.replace("USD","")}/USDT
-                    </span>
                     <span style={{ fontSize: 10, fontFamily: SANS, color: TEXT_DIM, marginLeft: "auto" }}>
                       {p.leverage ? `Cross ${p.leverage}x` : "Cross"}
                     </span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
                     <div>
-                      <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600, color: TEXT_DIM, letterSpacing: 0.8, textTransform: "uppercase" }}>
+                      <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM, letterSpacing: 1, textTransform: "uppercase" }}>
                         Unrealized P&amp;L
                       </div>
                       <div style={{
-                        fontSize: 18, fontFamily: SANS, fontWeight: 700,
-                        color: upnl >= 0 ? POS : NEG, marginTop: 3, letterSpacing: -0.3,
+                        fontSize: 22, fontFamily: SANS, fontWeight: 700,
+                        color: upnl >= 0 ? POS : NEG, marginTop: 4, letterSpacing: -0.4,
+                        textShadow: upnl >= 0 ? `0 0 12px ${BRAND_BLOOM}` : "none",
                       }}>
                         {upnl >= 0 ? "+" : ""}{fmt$(Math.abs(upnl))}
                       </div>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600, color: TEXT_DIM, letterSpacing: 0.8, textTransform: "uppercase" }}>
+                      <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM, letterSpacing: 1, textTransform: "uppercase" }}>
                         ROE
                       </div>
-                      <div style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: upnl >= 0 ? POS : NEG, marginTop: 3 }}>
+                      <div style={{ fontSize: 15, fontFamily: SANS, fontWeight: 700, color: upnl >= 0 ? POS : NEG, marginTop: 4 }}>
                         {upnl >= 0 ? "+" : ""}{roe.toFixed(2)}%
                       </div>
                     </div>
@@ -745,22 +1078,30 @@ export default function Home() {
           )}
         </div>
 
-        {/* ── Broker connection (existing card, themed via tokens) ────────── */}
-        <div style={{ padding: "16px 16px 0" }}>
+        {/* Broker connection */}
+        <div style={{ padding: "18px 16px 0" }}>
           <BrokerStatusCard/>
         </div>
 
         <UpgradeBanner/>
 
-        {/* Subtle attribution footer */}
-        <div style={{ textAlign: "center", padding: "20px 16px 8px" }}>
-          <img src={aicandlezLogo} alt="AICandlez" style={{
-            height: 22, width: "auto", objectFit: "contain", opacity: 0.55,
-            filter: `drop-shadow(0 0 10px ${BRAND_BLOOM})`,
+        {/* Status footer (no old logo — logo is now at top) */}
+        <div style={{
+          textAlign: "center", padding: "22px 16px 8px",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        }}>
+          <div style={{
+            width: 6, height: 6, borderRadius: "50%",
+            background: isLive ? NEG : BRAND,
+            boxShadow: `0 0 8px ${isLive ? NEG : BRAND}`,
+            animation: "dot-pulse 1.8s ease-in-out infinite",
           }}/>
-          <div style={{ fontSize: 9, fontFamily: SANS, color: TEXT_DIM, marginTop: 6, letterSpacing: 1, textTransform: "uppercase" }}>
+          <span style={{
+            fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
+            letterSpacing: 1.6, textTransform: "uppercase",
+          }}>
             {isLive ? "Live Mode · Real Capital" : "Simulation · No Real Funds"}
-          </div>
+          </span>
         </div>
 
       </div>
@@ -768,27 +1109,32 @@ export default function Home() {
   );
 }
 
-// ── Section header w/ "View All" link ───────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// Section header
+// ═══════════════════════════════════════════════════════════════════════════
 function SectionHeader({ label, right, onMore }: {
   label: string; right?: string; onMore?: () => void;
 }) {
   return (
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "22px 18px 10px",
+      padding: "28px 18px 12px",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{
-          width: 3, height: 14, borderRadius: 2,
+          width: 3, height: 16, borderRadius: 2,
           background: `linear-gradient(180deg, ${BRAND}, ${BRAND_DEEP})`,
           boxShadow: `0 0 10px ${BRAND_BLOOM}`,
         }}/>
         <span style={{
-          fontSize: 13, fontFamily: SANS, fontWeight: 700, color: TEXT,
-          letterSpacing: -0.1,
+          fontSize: 15, fontFamily: SANS, fontWeight: 700, color: TEXT,
+          letterSpacing: -0.2,
         }}>{label}</span>
         {right && (
-          <span style={{ fontSize: 10, fontFamily: SANS, color: TEXT_DIM, marginLeft: 6 }}>
+          <span style={{
+            fontSize: 10, fontFamily: SANS, fontWeight: 600, color: TEXT_DIM, marginLeft: 6,
+            letterSpacing: 0.5, textTransform: "uppercase",
+          }}>
             · {right}
           </span>
         )}
