@@ -1,0 +1,137 @@
+The customer portal is heading in the right direction structurally, but visually it still feels too static and simplified compared to the institutional energy of the admin dashboard.
+
+We need the customer dashboard to inherit MUCH MORE of the cinematic/live feeling from /command.
+
+MAIN ISSUES TO FIX
+
+1. MISSING LIVE SIGNAL ROWS
+
+The portal is currently missing the large LIVE CRYPTO SIGNALS and LIVE EQUITY SIGNALS sections from the admin dashboard.
+
+Add BOTH sections back into the customer portal:
+
+* TOP CRYPTO SIGNALS
+* TOP EQUITY SIGNALS
+
+These should visually mirror the admin dashboard style:
+
+* glowing rows
+* live movement
+* circles with AI confidence %
+* BUY / SELL pills
+* momentum/trend labels
+* animated chart strips
+* live feeling
+* scrolling / updating feel
+
+The circular confidence meters are IMPORTANT.
+That is part of the platform identity now.
+
+The portal currently feels too flat/static without them.
+
+==================================================
+2. LIVE CHARTS NEED TO FEEL ALIVE
+=================================
+
+The 6 charts currently feel too basic and dead.
+
+Make them behave visually closer to the admin dashboard:
+
+* stronger glow
+* realtime movement
+* more dynamic chart rendering
+* animated sweeps
+* neon pulses
+* realtime market energy
+* institutional terminal feeling
+
+Keep:
+
+* black backgrounds
+* neon green palette
+* Bloomberg/TradingView inspiration
+* cinematic glow language
+
+The portal should feel:
+"retail users entering an institutional AI trading system."
+
+==================================================
+3. FREE PLAN EXECUTION LOCK
+===========================
+
+The FREE tier should NOT be able to enable live AI execution.
+
+Add a prominent execution control bar similar to the admin dashboard:
+
+"ENABLE LIVE AI TRADING"
+
+But for FREE users:
+
+* clicking should trigger UPGRADE modal
+* show locked/premium styling
+* visually tease premium functionality
+
+Suggested behavior:
+FREE:
+
+* button locked
+* clicking → upgrade modal
+
+$15.99:
+
+* enables up to 3 concurrent AI trades
+
+$39.99:
+
+* enables up to 12 concurrent AI trades
+
+==================================================
+4. CUSTOMER DASHBOARD SHOULD FEEL MORE PREMIUM
+==============================================
+
+Right now the structure is good.
+But it still feels:
+
+* too dashboard-template-like
+* too clean/static
+* not enough "AI institutional terminal"
+
+Need:
+
+* more glow accents
+* more animated telemetry
+* stronger neon hierarchy
+* brighter confidence indicators
+* more movement
+* more visual depth
+* stronger active/live feeling
+
+The admin dashboard FEELS alive.
+The portal should inherit that same emotional energy.
+
+==================================================
+5. KEEP CUSTOMER VS ADMIN SEPARATION
+====================================
+
+Still keep:
+
+* no Kraken for users
+* no admin left panel
+* no operator controls
+* no backend tooling
+* no execution routing controls
+
+But visually:
+the portal should feel like the PUBLIC version of the institutional engine.
+
+==================================================
+6. IMPORTANT UX GOAL
+====================
+
+The customer should immediately feel:
+
+"This AI is actively scanning markets and making intelligent decisions in realtime."
+
+That feeling is currently stronger on /command than /portal.
+
+Bring more of that visual language into the portal.
