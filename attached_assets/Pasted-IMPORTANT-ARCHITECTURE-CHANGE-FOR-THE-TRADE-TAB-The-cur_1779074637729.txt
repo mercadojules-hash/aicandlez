@@ -1,0 +1,134 @@
+IMPORTANT ARCHITECTURE CHANGE FOR THE TRADE TAB:
+
+The current Trade tab structure is no longer correct for the new premium AI concept.
+
+Right now the Trade tab contains:
+• Open Positions
+• Trade History
+
+But those sections already exist on the Home screen.
+
+We need to completely transform the Trade tab into:
+AI SIGNALS
+
+The Trade tab should now match the attached reference design almost exactly in structure, feel, hierarchy, and visual intensity.
+
+CORE DIRECTION:
+This screen should feel like:
+• a live institutional AI signal engine
+• premium fintech intelligence software
+• Bloomberg + TradingView + AI operating system
+• cinematic and addictive
+
+REQUIRED STRUCTURE:
+
+HEADER:
+• Large glowing AI Candlez logo at top
+• Deep black background
+• Atmospheric neon green lighting
+• Cinematic typography
+• subtle particle/grid background
+
+TOP NAV:
+Tabs:
+• Active Signals
+• Watchlist
+• History
+
+SIGNAL CARDS:
+Each signal card should include:
+
+• REAL crypto logos only
+(BTC, ETH, SOL, ADA, AVAX, DOGE, etc.)
+
+NO generic placeholder icons.
+
+Each card must show:
+• Asset pair
+• LONG / SHORT direction
+• Trade type
+(swing trade / position trade / scalp)
+• Current price
+• 24h %
+• animated sparkline
+• timestamp
+• AI Confidence %
+• signal badge:
+
+* STRONG BUY
+* BUY
+* STRONG SELL
+* SELL
+
+CRITICAL:
+AI CONFIDENCE must feel important visually.
+
+Use:
+• glowing confidence numbers
+• circular confidence rings/gauges
+• green/yellow/red confidence states
+• animated pulse
+
+TRADING DATA:
+Each signal card should also show:
+
+• Entry Zone
+• Take Profit
+• Stop Loss
+
+The Stop Loss section is VERY important.
+It adds realism and professional trader credibility.
+
+VISUAL DIRECTION:
+The cards should feel:
+• premium
+• glass layered
+• glowing
+• deep black
+• cinematic
+• high contrast
+• institutional
+
+Add:
+• hover glow
+• subtle movement
+• animated scan lines
+• neon edge lighting
+• bloom effects
+• premium shadows
+
+BOTTOM CTA:
+Keep an AI Signal Engine card at bottom.
+
+Possible CTA:
+• Learn More
+• Upgrade to Pro
+• Enable Auto Trading
+
+VERY IMPORTANT:
+The new AI Signals screen should become one of the flagship experiences of the app.
+
+It should immediately communicate:
+“This AI actively analyzes the market in real time.”
+
+Also:
+REMOVE duplicated Open Positions and Trade History from this tab since those are already represented elsewhere in the Home experience.
+
+The app should now separate into:
+• HOME → portfolio + overview + AI activity
+• MARKETS → scanners + opportunities
+• TRADE → execution + charting
+• SIGNALS → AI intelligence engine
+• PROFILE → account/settings/performance
+
+The attached reference image is the exact visual direction.
+Match it as closely as possible:
+• layout
+• spacing
+• glow intensity
+• hierarchy
+• typography
+• card structure
+• premium feel
+• real icon usage
+• confidence presentation

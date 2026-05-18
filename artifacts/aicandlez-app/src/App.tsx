@@ -14,7 +14,7 @@ import { TradingAccountOnboardingModal }   from "@/components/TradingAccountOnbo
 import { AlpacaAutoTrader }               from "@/components/AlpacaAutoTrader";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import Home      from "@/pages/Home";
-import Trade     from "@/pages/Trade";
+import AISignals from "@/pages/AISignals";
 import Markets   from "@/pages/Markets";
 import Profile   from "@/pages/Profile";
 import Subscribe from "@/pages/Subscribe";
@@ -139,7 +139,8 @@ function Pages() {
   return (
     <Switch>
       <Route path="/"        component={() => <Protected><Home /></Protected>} />
-      <Route path="/trade"   component={() => <Protected><Trade /></Protected>} />
+      <Route path="/trade"   component={() => <Protected><AISignals /></Protected>} />
+      <Route path="/signals" component={() => <Protected><AISignals /></Protected>} />
       <Route path="/markets"  component={() => <Protected><Markets  /></Protected>} />
       <Route path="/equities" component={() => <Protected><Equities /></Protected>} />
       <Route path="/asset/:type/:sym">
@@ -168,7 +169,6 @@ function Pages() {
             signInUrl={`${basePath}/sign-in`} fallbackRedirectUrl={`${basePath}/`} />
         </AuthPage>
       )} />
-      <Route path="/signals"   component={() => <Redirect to="/markets" />} />
       <Route path="/portfolio" component={() => <Redirect to="/trade"   />} />
       <Route path="/live"      component={() => <Redirect to="/trade"   />} />
       <Route path="/account"   component={() => <Redirect to="/profile" />} />

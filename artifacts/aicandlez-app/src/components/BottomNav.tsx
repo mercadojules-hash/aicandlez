@@ -12,13 +12,13 @@ const HomeIcon = ({ active }: { active: boolean }) => (
   </svg>
 );
 
-const TradeIcon = ({ active }: { active: boolean }) => (
+const SignalsIcon = ({ active }: { active: boolean }) => (
   <svg width="20" height="20" viewBox="0 0 22 22" fill="none" shapeRendering="geometricPrecision">
-    <polyline points="3,16 8,10 13,13 19,6"
-      stroke={active ? C : DIM} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    <polyline points="14,6 19,6 19,11"
-      stroke={active ? C : DIM} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    {active && <circle cx="19" cy="6" r="2" fill={C} opacity="0.7"/>}
+    {/* Sparkle / AI burst */}
+    <path d="M11 2 L12.6 8.6 L19 10.2 L12.6 11.8 L11 18.4 L9.4 11.8 L3 10.2 L9.4 8.6 Z"
+      stroke={active ? C : DIM} strokeWidth="1.3" strokeLinejoin="round"
+      fill={active ? `${C}1A` : "none"}/>
+    {active && <circle cx="11" cy="10.5" r="1.2" fill={C}/>}
   </svg>
 );
 
@@ -54,16 +54,22 @@ const ProfileIcon = ({ active }: { active: boolean }) => (
 
 const TABS = [
   { path:"/",         label:"Home",     Icon:HomeIcon     },
-  { path:"/trade",    label:"Trade",    Icon:TradeIcon    },
-  { path:"/markets",  label:"Crypto",   Icon:CryptoIcon   },
+  { path:"/markets",  label:"Markets",  Icon:CryptoIcon   },
+  { path:"/trade",    label:"Signals",  Icon:SignalsIcon  },
   { path:"/equities", label:"Equities", Icon:EquitiesIcon },
   { path:"/profile",  label:"Profile",  Icon:ProfileIcon  },
 ];
 
 export function BottomNav() {
   const [location] = useLocation();
-  const isActive = (p: string) =>
-    p === "/" ? location === "/" : location === p || location.startsWith(p + "/");
+  const isActive = (p: string) => {
+    if (p === "/")      return location === "/";
+    // Signals tab (path /trade) should also light up when on /signals,
+    // since both routes render the same AI Signals page.
+    if (p === "/trade") return location === "/trade" || location.startsWith("/trade/")
+                              || location === "/signals" || location.startsWith("/signals/");
+    return location === p || location.startsWith(p + "/");
+  };
 
   return (
     <nav style={{
