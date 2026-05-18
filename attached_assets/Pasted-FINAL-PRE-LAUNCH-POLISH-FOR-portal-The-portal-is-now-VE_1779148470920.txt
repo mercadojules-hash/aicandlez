@@ -1,0 +1,95 @@
+FINAL PRE-LAUNCH POLISH FOR /portal
+
+The portal is now VERY close to production quality. The institutional energy, live telemetry feeling, confidence rings, signal strips, and execution gating all feel correct.
+
+Before deployment, complete these FINAL refinements:
+
+1. HERO SECTION POLISH
+
+* Increase glow intensity slightly around the AI Candlez logo.
+* Add a very subtle animated ambient background pulse behind the logo area.
+* Make the LIVE badge pulse slightly slower and softer (more premium, less arcade).
+
+2. METRIC TILE FINALIZATION
+
+* Demo badges are good for launch safety.
+* Add tooltip hover:
+  “Demo telemetry shown until live broker connected.”
+* Ensure REAL Alpaca telemetry replaces demo values immediately after account linking.
+
+3. EXECUTION BAR
+
+* Locked free-state now looks excellent.
+* Add subtle animated shimmer sweep over:
+  “UPGRADE TO UNLOCK”
+* Starter/Pro unlock transition should animate smoothly instead of instant swap.
+
+4. LOWER LOCKED PANELS
+   The orange lock panels are MUCH better.
+   Add:
+
+* faint blur behind lock icon
+* slightly stronger edge glow
+* hover animation on “VIEW UPGRADE OPTIONS”
+
+5. SIGNAL PANELS
+   These now look production-ready.
+
+FINAL tweaks:
+
+* slightly reduce chart line thickness
+* slightly brighten confidence ring glow
+* make BUY/SELL pills pulse subtly when confidence >90%
+* ensure 4-second refresh remains smooth with no flicker
+
+6. MOBILE RESPONSIVENESS
+   CRITICAL:
+
+* confidence rings must remain circular on small screens
+* signal cards must stack cleanly
+* execution bar cannot overflow horizontally
+* top metric row should become swipeable carousel on mobile
+
+7. SECURITY HARDENING
+   Before launch verify AGAIN:
+
+* non-admin users cannot hit:
+  /command
+  /exchange
+  /debug
+  /institutional
+  Kraken routes
+  engine-control endpoints
+* customer accounts only see Alpaca telemetry and Alpaca execution
+
+8. LIVE DEPLOYMENT PREP
+   Prepare:
+
+* Replit deployment architecture
+* production env checklist
+* Namecheap DNS mapping table
+* Clerk production domains
+* Stripe live webhook setup
+* SSL verification
+* admin bootstrap for:
+  [mercadojules@gmail.com](mailto:mercadojules@gmail.com)
+
+9. PERFORMANCE
+   IMPORTANT:
+   Portal now has MANY animated surfaces.
+
+Need verification:
+
+* FPS stability
+* memory usage
+* websocket/polling load
+* no React re-render storms
+* smooth performance on lower-end laptops
+
+10. FINAL GOAL
+    The portal should feel like:
+    Bloomberg terminal × AI hedge fund × premium SaaS platform
+
+NOT crypto casino vibes.
+
+Maintain institutional elegance and restraint while preserving the neon cinematic identity.

@@ -155,77 +155,106 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
 }
 
 // ── Centered logo banner ─────────────────────────────────────────────────────
+// Official AICandlez horizontal master logo. Sits on a soft animated aura
+// — minimal, premium, never cartoonish. Bigger hero presence on desktop,
+// scales down proportionally on mobile via CSS clamp().
 function LogoBanner({ tier }: { tier: Plan }) {
   return (
     <div style={{
-      padding: "36px 24px 22px",
-      display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+      padding: "44px 24px 26px",
+      display: "flex", flexDirection: "column", alignItems: "center", gap: 14,
       position: "relative",
     }}>
+      {/* Outer breathing aura — soft, premium, slow */}
       <div style={{
         position: "absolute",
-        top: 50, left: "50%", transform: "translateX(-50%)",
-        width: 420, height: 110,
+        top: "30%", left: "50%", transform: "translate(-50%, -50%)",
+        width: "min(640px, 70vw)", height: 180,
+        background: `radial-gradient(ellipse at center, ${N.BRAND}28 0%, ${N.BRAND_GLOW} 38%, transparent 75%)`,
+        filter: "blur(36px)",
+        pointerEvents: "none",
+        animation: "aura-breathe 7s ease-in-out infinite",
+      }} />
+      {/* Tight inner halo right under the wordmark */}
+      <div style={{
+        position: "absolute",
+        top: "calc(30% + 8px)", left: "50%", transform: "translate(-50%, -50%)",
+        width: "min(360px, 50vw)", height: 60,
         background: `radial-gradient(ellipse at center, ${N.BRAND_GLOW} 0%, transparent 70%)`,
-        filter: "blur(24px)",
+        filter: "blur(14px)",
         pointerEvents: "none",
       }} />
 
       <img
         src={`${basePath}/aicandlez-logo.png`}
         alt="AICandlez"
-        style={{ height: 52, position: "relative", zIndex: 1 }}
+        style={{
+          height: "clamp(48px, 7vw, 80px)",
+          width: "auto",
+          maxWidth: "min(560px, 86vw)",
+          position: "relative", zIndex: 1,
+          filter: `drop-shadow(0 0 14px ${N.BRAND_GLOW}) drop-shadow(0 0 28px ${N.BRAND}30)`,
+        }}
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
       />
+
       <div style={{
-        fontFamily: N.FONT_MONO, fontSize: 10, letterSpacing: "0.4em",
-        color: N.BRAND, fontWeight: 600, position: "relative", zIndex: 1,
-        textShadow: `0 0 8px ${N.BRAND_GLOW}`,
-        display: "flex", alignItems: "center", gap: 12,
+        display: "flex", alignItems: "center", gap: 14,
+        position: "relative", zIndex: 1, marginTop: 2,
+        flexWrap: "wrap", justifyContent: "center",
       }}>
-        <span>AI · CANDLEZ · TRADING</span>
         <span style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          padding: "3px 9px",
-          background: `${N.LONG}10`,
-          border: `1px solid ${N.LONG}55`,
+          display: "inline-flex", alignItems: "center", gap: 7,
+          padding: "4px 12px",
+          background: `${N.LONG}0d`,
+          border: `1px solid ${N.LONG}40`,
           borderRadius: 999,
-          color: N.LONG, fontSize: 9, letterSpacing: "0.28em",
+          color: N.LONG,
+          fontFamily: N.FONT_MONO, fontSize: 9, letterSpacing: "0.28em",
+          fontWeight: 700,
           textShadow: `0 0 6px ${N.LONG_GLOW}`,
         }}>
           <span style={{
-            width: 6, height: 6, borderRadius: "50%",
+            width: 7, height: 7, borderRadius: "50%",
             background: N.LONG,
-            boxShadow: `0 0 8px ${N.LONG}, 0 0 16px ${N.LONG_GLOW}`,
-            animation: "live-pulse-portal 1.2s infinite",
+            boxShadow: `0 0 8px ${N.LONG}, 0 0 18px ${N.LONG_GLOW}`,
+            animation: "live-breathe 2.4s ease-in-out infinite",
           }} />
           LIVE
         </span>
+
+        <span style={{
+          padding: "4px 14px",
+          background: N.SURFACE_2,
+          border: `1px solid ${tier === "free" ? N.BORDER_HI : `${N.BRAND}55`}`,
+          borderRadius: 999,
+          fontFamily: N.FONT_MONO, fontSize: 10,
+          color: tier === "free" ? N.TEXT_1 : N.BRAND,
+          letterSpacing: "0.18em", fontWeight: 700,
+          boxShadow: tier === "free" ? "none" : `0 0 14px ${N.BRAND_GLOW}`,
+        }}>
+          TIER · {tier.toUpperCase()}
+        </span>
       </div>
+
       <style>{`
-        @keyframes live-pulse-portal {
-          0%,100% { opacity: 1;   transform: scale(1);    }
-          50%     { opacity: 0.4; transform: scale(1.35); }
+        @keyframes live-breathe {
+          0%,100% { opacity: 1;    transform: scale(1);    box-shadow: 0 0 8px ${N.LONG}, 0 0 14px ${N.LONG_GLOW}; }
+          50%     { opacity: 0.55; transform: scale(1.18); box-shadow: 0 0 4px ${N.LONG}, 0 0  8px ${N.LONG_GLOW}; }
+        }
+        @keyframes aura-breathe {
+          0%,100% { opacity: 0.85; transform: translate(-50%, -50%) scale(1);    }
+          50%     { opacity: 1;    transform: translate(-50%, -50%) scale(1.08); }
         }
         @keyframes neon-pulse {
           0%,100% { opacity: 1;   transform: scale(1);   }
           50%     { opacity: 0.5; transform: scale(1.2); }
         }
+        @keyframes shimmer-sweep {
+          0%   { transform: translateX(-130%); }
+          100% { transform: translateX(230%);  }
+        }
       `}</style>
-      <div style={{
-        marginTop: 6,
-        padding: "4px 14px",
-        background: N.SURFACE_2,
-        border: `1px solid ${tier === "free" ? N.BORDER_HI : `${N.BRAND}55`}`,
-        borderRadius: 999,
-        fontFamily: N.FONT_MONO, fontSize: 10,
-        color: tier === "free" ? N.TEXT_1 : N.BRAND,
-        letterSpacing: "0.18em", fontWeight: 700,
-        position: "relative", zIndex: 1,
-        boxShadow: tier === "free" ? "none" : `0 0 14px ${N.BRAND_GLOW}`,
-      }}>
-        TIER · {tier.toUpperCase()}
-      </div>
     </div>
   );
 }
@@ -260,12 +289,15 @@ function MetricTile({
       }}>
         <span>{label}</span>
         {demo && (
-          <span style={{
-            fontSize: 7, padding: "1px 5px", borderRadius: 2,
-            background: `${N.WARN}18`, color: N.WARN,
-            border: `1px solid ${N.WARN}40`,
-            letterSpacing: "0.18em", fontWeight: 700,
-          }}>DEMO</span>
+          <span
+            title="Demo telemetry shown until live broker is connected"
+            style={{
+              fontSize: 7, padding: "1px 5px", borderRadius: 2,
+              background: `${N.WARN}18`, color: N.WARN,
+              border: `1px solid ${N.WARN}40`,
+              letterSpacing: "0.18em", fontWeight: 700,
+              cursor: "help",
+            }}>DEMO</span>
         )}
       </div>
       <div style={{
@@ -372,6 +404,7 @@ function LiveExecutionBar({
         <button
           onClick={handle}
           style={{
+            position: "relative", overflow: "hidden",
             padding: "10px 22px",
             background: locked
               ? `linear-gradient(180deg, ${N.GOLD} 0%, ${N.GOLD_DEEP} 100%)`
@@ -389,9 +422,24 @@ function LiveExecutionBar({
                 ? `0 0 18px ${N.SHORT_GLOW}`
                 : `0 0 22px ${N.BRAND_GLOW}`,
             whiteSpace: "nowrap",
+            transition: "background 300ms ease, box-shadow 300ms ease, transform 200ms ease",
           }}
         >
-          {locked ? "UPGRADE TO UNLOCK" : armed ? "DISARM" : "ARM EXECUTION"}
+          <span style={{ position: "relative", zIndex: 1 }}>
+            {locked ? "UPGRADE TO UNLOCK" : armed ? "DISARM" : "ARM EXECUTION"}
+          </span>
+          {/* Shimmer sweep (locked free-tier CTA only) */}
+          {locked && (
+            <span
+              aria-hidden
+              style={{
+                position: "absolute", top: 0, bottom: 0, left: 0, width: "55%",
+                background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.45) 50%, transparent 100%)",
+                animation: "shimmer-sweep 2.6s ease-in-out infinite",
+                pointerEvents: "none",
+              }}
+            />
+          )}
         </button>
       </div>
 
@@ -613,6 +661,18 @@ function Panel({
             </div>
             <button
               onClick={onUnlock}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget;
+                el.style.transform   = "translateY(-1px)";
+                el.style.boxShadow   = `0 0 22px ${N.GOLD}, 0 0 36px ${N.GOLD_GLOW}`;
+                el.style.letterSpacing = "0.22em";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget;
+                el.style.transform   = "translateY(0)";
+                el.style.boxShadow   = `0 0 16px ${N.GOLD_GLOW}`;
+                el.style.letterSpacing = "0.18em";
+              }}
               style={{
                 marginTop: 6,
                 padding: "8px 16px",
@@ -623,6 +683,7 @@ function Panel({
                 letterSpacing: "0.18em",
                 fontFamily: N.FONT_MONO, cursor: "pointer",
                 boxShadow: `0 0 16px ${N.GOLD_GLOW}`,
+                transition: "transform 220ms ease, box-shadow 220ms ease, letter-spacing 220ms ease",
               }}
             >
               VIEW UPGRADE OPTIONS →
