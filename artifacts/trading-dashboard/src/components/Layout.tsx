@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
+import { useUserRole } from "@/hooks/useUserRole";
+
+// Admin-only routes — hidden from non-admin users in the left nav. Backend
+// enforces the same gate via requireRole(["admin","super-admin"]).
+const ADMIN_ONLY_PATHS = new Set([
+  "/command", "/exchange", "/syscheck", "/debug",
+  "/desktop", "/institutional", "/admin",
+]);
 import {
   Activity,
   AlertTriangle,
@@ -425,26 +433,45 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  const activeModuleId = MODULE_LIST.find(
+  const { isAdmin } = useUserRole();
+
+  // Non-admins never see operator/admin modules in the nav. Backend mirrors
+  // this via requireRole on the corresponding API endpoints.
+  const visibleModules = isAdmin
+    ? MODULE_LIST
+    : MODULE_LIST.filter((m) => !ADMIN_ONLY_PATHS.has(m.path));
+
+  const activeModuleId = visibleModules.find(
     m => location === m.path || (m.path !== "/dashboard" && location.startsWith(m.path))
   )?.id ?? 1;
   const isActive = (m: typeof MODULE_LIST[number]) =>
     location === m.path || (m.path !== "/dashboard" && location.startsWith(m.path));
 
-  const platformLinks = [
-    { icon: User,         label: "My Account",   href: "/account",     badgeColor: "#00aaff"                    },
-    { icon: ShieldAlert,  label: "Admin Console", href: "/admin",       badgeColor: "#cc55ff", badge: "OPERATOR" },
-    { icon: Trophy,       label: "Leaderboard",   href: "/leaderboard", badgeColor: "#ffaa00"                    },
-    { icon: Bell,         label: "Alerts",        href: "/alerts",      badgeColor: "#ff6600"                    },
-    { icon: Zap,          label: "AI Models",     href: "/ai",          badgeColor: "#cc55ff"                    },
-    { icon: DollarSign,   label: "Revenue",       href: "/admin",       badgeColor: "#ffaa00"                    },
-    { icon: AlertTriangle,label: "Risk Monitor",  href: "/risk",        badgeColor: "#ff8844"                    },
+  type PlatformLink = {
+    icon:        typeof User;
+    label:       string;
+    href:        string;
+    badgeColor:  string;
+    adminOnly:   boolean;
+    badge?:      string;
+  };
+  const allPlatformLinks: PlatformLink[] = [
+    { icon: User,         label: "My Account",    href: "/account",     badgeColor: "#00aaff", adminOnly: false                       },
+    { icon: ShieldAlert,  label: "Admin Console", href: "/admin",       badgeColor: "#cc55ff", adminOnly: true,  badge: "OPERATOR"    },
+    { icon: Trophy,       label: "Leaderboard",   href: "/leaderboard", badgeColor: "#ffaa00", adminOnly: false                       },
+    { icon: Bell,         label: "Alerts",        href: "/alerts",      badgeColor: "#ff6600", adminOnly: false                       },
+    { icon: Zap,          label: "AI Models",     href: "/ai",          badgeColor: "#cc55ff", adminOnly: false                       },
+    { icon: DollarSign,   label: "Revenue",       href: "/admin",       badgeColor: "#ffaa00", adminOnly: true                        },
+    { icon: AlertTriangle,label: "Risk Monitor",  href: "/risk",        badgeColor: "#ff8844", adminOnly: false                       },
   ];
+  const platformLinks = isAdmin
+    ? allPlatformLinks
+    : allPlatformLinks.filter((l) => !l.adminOnly);
 
   const SidebarContent = ({ onNavigate, collap }: { onNavigate?: () => void; collap: boolean }) => (
     <>
       <nav className="flex flex-col gap-px px-1.5 py-2 flex-1 overflow-y-auto">
-        {MODULE_LIST.map(mod => (
+        {visibleModules.map(mod => (
           <NavItem key={mod.id} mod={mod} active={isActive(mod)} collapsed={collap} onNavigate={onNavigate} />
         ))}
 

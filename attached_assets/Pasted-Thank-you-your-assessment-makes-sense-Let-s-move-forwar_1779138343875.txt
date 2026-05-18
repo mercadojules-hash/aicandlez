@@ -1,0 +1,131 @@
+Thank you — your assessment makes sense. Let's move forward in the cleanest and fastest way possible for launch.
+
+ANSWERS
+
+1. ADMIN LOGIN
+
+Primary super-admin email:
+[mercadojules@gmail.com](mailto:mercadojules@gmail.com)
+
+For now, only use my email as the super-admin account.
+
+Please:
+
+* role-map this account as super-admin
+* protect admin/operator routes
+* restrict Kraken visibility to super-admin only
+* restrict /command to super-admin only
+* create clear admin login instructions for production
+
+2. CUSTOMER DASHBOARD OPTION
+
+Use OPTION A:
+
+* new /portal route inside trading-dashboard
+
+Reason:
+
+* fastest launch path
+* reuse existing components/charts
+* lower deployment risk tonight
+* easier maintenance for now
+
+We can split into a dedicated customer-dashboard artifact later after launch if needed.
+
+3. ALPACA
+
+Yes — users will use Alpaca only.
+
+Kraken remains admin-only.
+
+I do have Alpaca API keys and I will provide:
+
+* ALPACA_API_KEY
+* ALPACA_SECRET_KEY
+
+We should begin with Alpaca paper/live infrastructure for customer trading.
+
+4. SOCIAL URLS
+
+Use placeholders for now.
+We can replace them after deployment.
+
+5. DEPLOYMENT PLAN
+
+Your proposed Replit deployment plan sounds good for tonight.
+
+Proceed with:
+
+* landing
+* api-server
+* trading-dashboard
+* aicandlez-app
+
+using Replit deployments.
+
+Then provide:
+
+* deployment URLs
+* exact Namecheap DNS records
+* production checklist
+* any remaining secrets needed
+
+6. SUBSCRIPTION STRUCTURE — FINAL
+
+FREE
+
+* 7-day paper trading trial only
+
+AI TRADING — $15.99/month
+
+* 3 concurrent live AI trades
+
+AI TRADING PRO — $39.99/month
+
+* 12 concurrent live AI trades
+
+Please keep this structure consistent:
+
+* website
+* app
+* billing
+* Stripe
+* upgrade flows
+* UI copy
+* marketing copy
+* onboarding
+* dashboard
+
+7. IMPORTANT ARCHITECTURE RULES
+
+ADMIN:
+
+* /command
+* Kraken + Alpaca
+* operator controls
+* institutional dashboard
+* admin-only
+
+USERS:
+
+* /portal
+* Alpaca only
+* no Kraken
+* no operator tooling
+* no backend controls
+* customer-focused dashboard
+
+8. GO LIVE PRIORITY
+
+Main goals:
+
+1. build customer dashboard
+2. lock admin gating
+3. deploy on Replit
+4. provide deployment URLs
+5. provide Namecheap DNS instructions
+6. smoke-test staging URLs
+7. finalize production deployment
+8. then finish iOS app build/submission
+
+Please proceed with the customer dashboard build and deployment staging.

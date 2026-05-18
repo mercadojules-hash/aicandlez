@@ -14,7 +14,13 @@ import {
   type OrderType,
   type ExchangeMode,
 } from "../lib/exchangeEngine.js";
-import { requireAuth } from "../middlewares/requireAuth.js";
+import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
+
+// Operator endpoints — admin/super-admin only. These control the shared
+// exchange engine (mode, kill switch, pause, sim reset, exchange selection,
+// Kraken live execution). Regular users trade through /simulation/* (paper)
+// and Alpaca-only flows; they must never touch these.
+const requireOperator = [requireAuth, requireRole(["admin", "super-admin"])];
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
@@ -23,18 +29,18 @@ import { eq } from "drizzle-orm";
 const router = Router();
 
 // ── Status ───────────────────────────────────────────────────────────────────
-router.get("/exchange/status", (_req, res) => {
+router.get("/exchange/status", ...requireOperator, (_req, res) => {
   res.json(getExchangeStatus());
 });
 
 // ── Orders list ───────────────────────────────────────────────────────────────
-router.get("/exchange/orders", (_req, res) => {
+router.get("/exchange/orders", ...requireOperator, (_req, res) => {
   const limit = parseInt(String(_req.query["limit"] ?? "50"), 10);
   res.json(getOrders(limit));
 });
 
 // ── Balances (live or sim) ────────────────────────────────────────────────────
-router.get("/exchange/balances", async (req, res) => {
+router.get("/exchange/balances", ...requireOperator, async (req, res) => {
   const status = getExchangeStatus();
   const zero = { USD: 0, BTC: 0, ETH: 0, SOL: 0 };
   if (status.mode === "live" && status.apiConfigured) {
@@ -54,7 +60,7 @@ router.get("/exchange/balances", async (req, res) => {
 });
 
 // ── Set mode ──────────────────────────────────────────────────────────────────
-router.post("/exchange/mode", requireAuth, async (req, res) => {
+router.post("/exchange/mode", ...requireOperator, async (req, res) => {
   const { mode } = req.body as { mode: ExchangeMode };
   if (mode !== "simulation" && mode !== "live") {
     res.status(400).json({ error: "mode must be 'simulation' or 'live'" });
@@ -90,7 +96,7 @@ router.post("/exchange/mode", requireAuth, async (req, res) => {
 });
 
 // ── Kill switch ───────────────────────────────────────────────────────────────
-router.post("/exchange/kill", requireAuth, (req, res) => {
+router.post("/exchange/kill", ...requireOperator, (req, res) => {
   const active    = toggleKillSwitch();
   const userId    = (req as import("express").Request & { clerkUserId?: string }).clerkUserId ?? "system";
   const ipAddress = req.ip ?? req.socket?.remoteAddress ?? null;
@@ -106,19 +112,19 @@ router.post("/exchange/kill", requireAuth, (req, res) => {
 });
 
 // ── Pause ─────────────────────────────────────────────────────────────────────
-router.post("/exchange/pause", requireAuth, (_req, res) => {
+router.post("/exchange/pause", ...requireOperator, (_req, res) => {
   const paused = togglePause();
   res.json({ paused, status: getExchangeStatus() });
 });
 
 // ── Reset simulation balances ─────────────────────────────────────────────────
-router.post("/exchange/sim/reset", requireAuth, (_req, res) => {
+router.post("/exchange/sim/reset", ...requireOperator, (_req, res) => {
   const balances = resetSimBalances();
   res.json({ balances, status: getExchangeStatus() });
 });
 
 // ── Preview order ─────────────────────────────────────────────────────────────
-router.post("/exchange/order/preview", async (req, res) => {
+router.post("/exchange/order/preview", ...requireOperator, async (req, res) => {
   const { symbol, side, orderType, amountUSD, limitPrice } = req.body as {
     symbol:     string;
     side:       OrderSide;
@@ -140,7 +146,7 @@ router.post("/exchange/order/preview", async (req, res) => {
 });
 
 // ── Execute order ─────────────────────────────────────────────────────────────
-router.post("/exchange/order/execute", requireAuth, async (req, res) => {
+router.post("/exchange/order/execute", ...requireOperator, async (req, res) => {
   const { symbol, side, orderType, amountUSD, limitPrice } = req.body as {
     symbol:     string;
     side:       OrderSide;
@@ -162,7 +168,7 @@ router.post("/exchange/order/execute", requireAuth, async (req, res) => {
 });
 
 // ── Select exchange (UI label) ─────────────────────────────────────────────────
-router.post("/exchange/select", requireAuth, (req, res) => {
+router.post("/exchange/select", ...requireOperator, (req, res) => {
   const { name } = req.body as { name: string };
   if (!name || typeof name !== "string") {
     res.status(400).json({ error: "name is required" });

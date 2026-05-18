@@ -45,6 +45,8 @@ import Leaderboard from "@/pages/Leaderboard";
 import AlertsPage from "@/pages/Alerts";
 import DesktopTerminal from "@/pages/DesktopTerminal";
 import InstitutionalTerminal from "@/pages/InstitutionalTerminal";
+import Portal from "@/pages/Portal";
+import { useUserRole } from "@/hooks/useUserRole";
 
 // ── Env ───────────────────────────────────────────────────────────────────────
 
@@ -206,12 +208,18 @@ function SignUpPage() {
 // while Clerk's session state is undetermined (neither signed-in nor signed-out).
 // ClerkLoaded then renders the correct branch based on resolved auth state.
 
+function SignedInHomeRouter() {
+  const { isAdmin, loading } = useUserRole();
+  if (loading) return <FullPageLoader />;
+  return <Redirect to={isAdmin ? "/command" : "/portal"} />;
+}
+
 function HomeRoute() {
   return (
     <>
       <ClerkLoading><FullPageLoader /></ClerkLoading>
       <ClerkLoaded>
-        <Show when="signed-in"><Redirect to="/command" /></Show>
+        <Show when="signed-in"><SignedInHomeRouter /></Show>
         <Show when="signed-out"><Landing /></Show>
       </ClerkLoaded>
     </>
@@ -226,6 +234,41 @@ function Protected({ children }: { children: React.ReactNode }) {
         <Show when="signed-in">
           <Layout>{children}</Layout>
         </Show>
+        <Show when="signed-out"><Redirect to="/sign-in" /></Show>
+      </ClerkLoaded>
+    </>
+  );
+}
+
+// AdminOnly — gates operator-grade pages (Command Center, Exchange, syscheck,
+// debug, desktop, institutional, admin). Non-admins are redirected to /portal.
+function AdminOnly({ children }: { children: React.ReactNode }) {
+  const { isAdmin, loading } = useUserRole();
+  if (loading) return <FullPageLoader />;
+  if (!isAdmin) return <Redirect to="/portal" />;
+  return <Layout>{children}</Layout>;
+}
+
+function ProtectedAdmin({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <ClerkLoading><FullPageLoader /></ClerkLoading>
+      <ClerkLoaded>
+        <Show when="signed-in"><AdminOnly>{children}</AdminOnly></Show>
+        <Show when="signed-out"><Redirect to="/sign-in" /></Show>
+      </ClerkLoaded>
+    </>
+  );
+}
+
+// PortalProtected — wraps the customer dashboard. No admin Layout shell
+// (Portal renders its own top bar). Signed-out users go to /sign-in.
+function PortalProtected({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <ClerkLoading><FullPageLoader /></ClerkLoading>
+      <ClerkLoaded>
+        <Show when="signed-in">{children}</Show>
         <Show when="signed-out"><Redirect to="/sign-in" /></Show>
       </ClerkLoaded>
     </>
@@ -301,19 +344,22 @@ function Router() {
         <Protected><Sentiment /></Protected>
       </Route>
       <Route path="/exchange">
-        <Protected><Exchange /></Protected>
+        <ProtectedAdmin><Exchange /></ProtectedAdmin>
       </Route>
       <Route path="/syscheck">
-        <Protected><SystemVerification /></Protected>
+        <ProtectedAdmin><SystemVerification /></ProtectedAdmin>
       </Route>
       <Route path="/debug">
-        <Protected><SignalDebug /></Protected>
+        <ProtectedAdmin><SignalDebug /></ProtectedAdmin>
       </Route>
       <Route path="/charts">
         <Protected><MultiChart /></Protected>
       </Route>
       <Route path="/command">
-        <Protected><CommandCenter /></Protected>
+        <ProtectedAdmin><CommandCenter /></ProtectedAdmin>
+      </Route>
+      <Route path="/portal">
+        <PortalProtected><Portal /></PortalProtected>
       </Route>
       <Route path="/dashboard">
         <Protected><Dashboard /></Protected>
@@ -325,7 +371,7 @@ function Router() {
         <Protected><Billing /></Protected>
       </Route>
       <Route path="/admin">
-        <Protected><Admin /></Protected>
+        <ProtectedAdmin><Admin /></ProtectedAdmin>
       </Route>
       <Route path="/account">
         <Protected><Account /></Protected>
@@ -337,10 +383,10 @@ function Router() {
         <Protected><AlertsPage /></Protected>
       </Route>
       <Route path="/desktop">
-        <Protected><DesktopTerminal /></Protected>
+        <ProtectedAdmin><DesktopTerminal /></ProtectedAdmin>
       </Route>
       <Route path="/institutional">
-        <Protected><InstitutionalTerminal /></Protected>
+        <ProtectedAdmin><InstitutionalTerminal /></ProtectedAdmin>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>
