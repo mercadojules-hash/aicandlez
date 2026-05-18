@@ -1,413 +1,285 @@
-# Workspace
+# AICandlez — Workspace
 
-## Overview
+Institutional AI crypto trading SaaS. pnpm workspace monorepo, TypeScript.
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+> Phase 1–4 + Phase 5 design history is archived at the end of this file.
+> Only the *current* production-active architecture lives in the top sections.
+
+---
 
 ## Stack
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
-- **Auth**: Replit-managed Clerk (httpOnly cookie on web, Bearer for mobile)
+- **Monorepo**: pnpm workspaces, Node 24, TypeScript 5.9
+- **API**: Express 5 + Drizzle ORM (PostgreSQL) + Zod (`zod/v4`, `drizzle-zod`)
+- **API codegen**: Orval (from OpenAPI in `lib/api-spec`)
+- **Auth**: Replit-managed Clerk (httpOnly cookie web, Bearer mobile)
+- **Billing**: Stripe (3-tier ladder)
+- **Build**: esbuild (CJS bundle for server), Vite (PWA + dashboard + landing)
 
-## Phase 5.1 — PWA Home: Radar Core UI + Real Icons + Brand Header (COMPLETE)
+See `pnpm-workspace` skill for workspace structure and TS project references.
 
-User feedback iteration on Phase 5 benchmark. Pushed PWA Home harder
-toward concept art (Apple keynote + Bloomberg Terminal + futuristic
-AI OS aesthetic).
+---
 
-**Assets (new):**
-- `artifacts/aicandlez-app/src/assets/aicandlez-logo-master.png` —
-  premium green horizontal master logo (from attached_assets)
-- `artifacts/aicandlez-app/src/assets/aicandlez-icon-master.png` —
-  square app icon (radar center medallion)
-- Same files mirrored into `artifacts/natura-ai/assets/`
+## Artifacts (production-active)
 
-**Brand header:**
-- Centered prominent master logo at top of `Home.tsx` with green
-  underglow + drop-shadow stack
-- Old footer logo REMOVED — only status pip remains in footer
+| Artifact              | Kind   | Path             | Role                                                |
+| --------------------- | ------ | ---------------- | --------------------------------------------------- |
+| `landing`             | web    | `/`              | Public marketing landing (signed-out)               |
+| `aicandlez-app`       | web    | `/aicandlez-app` | **Primary PWA** — institutional mobile-first        |
+| `trading-dashboard`   | web    | `/dashboard`     | Operator desktop console (19 modules + `/desktop`)  |
+| `api-server`          | api    | `/api`           | Shared Express backend                              |
+| `natura-ai`           | mobile | `/natura-ai`     | Expo wellness app — **production-frozen**           |
+| `natura-web`          | web    | `/natura-web`    | Legacy companion site                               |
+| `mockup-sandbox`      | design | `/sandbox`       | Canvas iframe variant previews                      |
 
-**Real branded crypto icons** (replaces placeholder circles):
-Inline SVG components in `Home.tsx` — `BTCIcon`, `ETHIcon`, `SOLIcon`,
-`ADAIcon`, `AVAXIcon`, `DOGEIcon` + `GenericTokenIcon` fallback +
-`CryptoIcon` symbol dispatcher. Each with brand-correct gradient bg +
-glow. Used in Top Gainers, Active Trades, AI Market Scanner callout.
+**Mobile freeze (current phase):** `natura-ai` is in production freeze.
+All forward work is on **`aicandlez-app` PWA** + **`trading-dashboard`** desktop
+institutional platform.
 
-**RadarScanner (core UI system):**
-- New `RadarScanner` component (`Home.tsx`) — concentric rings,
-  cross-hairs, rotating SVG sweep arm with `radar-sweep-rotate`
-  keyframes, asset blips with `radar-ping` expansion rings, center
-  AICandlez icon medallion with breathing glow, status badge below.
-- Becomes the visual centerpiece of the "AI Market Scanner" section.
-- Reusable for AI scanning, loading, opportunity detection, confidence
-  visualization, market analysis, signal states.
+---
 
-**Cinematic typography & atmospheric depth:**
-- Portfolio hero: 48px bold number, tabular-nums, letter-spacing
-  -1.6, text-shadow glow
-- New `CinematicBackground`: 3 ambient breathing green orbs, 2 angled
-  light rays, fine vertical grid, edge vignette (fixed z-0)
-- Portfolio hero card: layered radial gradients, animated top-edge
-  sweep, deeper shadow
+## Billing Structure (current — supersedes all earlier pricing)
 
-**Glowing BUY/SELL CTAs:**
-- Pair at bottom of AI Market Scanner: BUY (brand→deep gradient,
-  bright border, bloom + lift), SELL (deep wine, red border, soft red
-  bloom). Hover translateY micro-interaction. Routes to `/trade`.
+3-tier ladder. **No `$5.99` references exist anywhere in the codebase.**
 
-**Verification:** `aicandlez-app` typecheck CLEAN. Vite HMR hot-reload
-clean. Zero browser console errors.
+| Plan ID   | Name              | Price   | Capacity                    | Key features                                              |
+| --------- | ----------------- | ------- | --------------------------- | --------------------------------------------------------- |
+| `free`    | Paper Trading     | Free    | Simulated only              | 7-Day AI Paper Trading, signals + watchlists, no live exec |
+| `starter` | AI Trading        | $15.99  | Up to **6** AI trades       | Live AI exec (crypto), Auto Trade, analytics              |
+| `pro`     | AI Trading Pro    | $39.99  | Up to **12** AI trades      | Crypto + Equities, priority exec, advanced AI scanners    |
 
-**Key files (Phase 5.1):**
-- `artifacts/aicandlez-app/src/pages/Home.tsx` — major rewrite
-- `artifacts/aicandlez-app/src/assets/aicandlez-{logo,icon}-master.png`
+- Performance fee on **profitable closed trades only** (label = `PERFORMANCE_FEE_LABEL` from `lib/fees`)
+- Stripe billing: monthly · cancel anytime · customer portal for downgrades
 
-## Phase 5 — Premium Neon-Green Home Redesign (COMPLETE)
+**Routes:**
+- `Subscribe.tsx` — full marketing 3-tier ladder (entry from upgrade banners)
+- `Billing.tsx` — account billing & plan page with status banner, CURRENT / ACTIVE / PRO ACTIVE badges, upgrade CTAs, Manage Billing portal
+- `SubscriptionContext.tsx` — single source of truth for `plan` (`free`/`starter`/`pro`)
 
-Brand-wide cyan → neon-green pivot. Cinematic dark UI · restrained green
-glow · glassmorphism · Apple-level polish — matches the attached
-concept screenshots.
+**API:** `POST /billing/checkout`, `POST /billing/portal`, `GET /billing/subscription`
 
-**Brand palette (final):**
-- `#66FF66` primary brand · `#00C853` deep emerald · `#7CFF00` bright
-  lime · `#39FF14` vivid neon
-- Backgrounds: `#000` / `#050A07` / `#0A1410` / `#0F1F18`
-- Glass primitives: rgba(255,255,255,0.04…0.11), green border accent
-  rgba(102,255,102,0.22)
+---
+
+## Routing (current)
+
+**aicandlez-app PWA (mobile-first, primary user surface):**
+- `/` Home (radar + AI Market Scanner + Top Gainers + Active Trades)
+- `/signals`, `/crypto`, `/equities`, `/trade`, `/portfolio`
+- `/profile` → AI Settings, **Alert Preferences** (new), Connected Accounts, Broker
+- `/billing`, `/subscribe`
+
+**trading-dashboard desktop console:**
+- `/` Landing (signed-out) → `/command` (signed-in)
+- `/dashboard`, `/command`, `/market`, `/ai`, `/risk`, `/sim`, `/backtest`, `/optimizer`, `/scanner`, `/portfolio`, `/correlation`, `/journal`, `/validation`, `/sentiment`, `/exchange`, `/syscheck`, `/debug`, `/charts`
+- `/desktop` — Module 20 multi-panel power-user terminal
+- `/settings`, `/sign-in/*`, `/sign-up/*`
+
+**api-server:** `/api/exchange/*`, `/api/sentiment/*`, `/api/validation/*`, `/api/journal/*`, `/api/simulation/*`, `/api/signals/*`, `/api/candles/*`, `/api/backtest/*`, `/api/auth/*`, `/api/billing/*`, `/api/user/*`
+
+---
+
+## Authentication (Clerk, production)
+
+- Clerk app: `app_3DeE2sfuhHWTY73M9jlbRCKabFx`
+- `CLERK_SECRET_KEY` / `VITE_CLERK_PUBLISHABLE_KEY` auto-provisioned
+- `lib/db/src/schema/users.ts` — `users` table (clerkUserId, email, role: user/admin/super-admin)
+- Server: `clerkProxyMiddleware` (prod only) → `clerkMiddleware` → `requireAuth` / `requireRole`
+- Frontend: `ClerkProvider` + `ClerkQueryClientCacheInvalidator` in App shells
+- All dashboard/PWA routes redirect to `/sign-in` when unauthenticated
+- Clerk UI: dark terminal theme (#050D1A card, neon-green primary, monospace, AICandlez logo)
+
+---
+
+## AI Trading Architecture
+
+**Global trading loop** (shared signals across users):
+- `lib/tradingLoop.ts` — EMA+RSI engine, MTF funnel (5m/15m/1H), volume + sideways + 1H-trend filters
+- Default `minConfidence = 60`
+- Filters: volume confirmation ON (≥85% of 20-bar avg), sideways block (<0.15% spread), 1H trend OFF by default
+
+**User-scoped state** (per-userId isolation, no cross-tenant bleed):
+- `lib/userSimRegistry.ts` — `Map<userId, UserSimState>` lazy DB-load, instant persistence
+- All `/api/simulation/*` routes are `requireAuth`-gated → route through registry
+- Tables: `user_settings`, `sim_accounts`, `sim_positions`, `sim_trades`, `user_notifications`
+- Each user starts with $100,000 simulated balance
+
+**Exchange connections** (per-user encrypted credentials):
+- `user_exchange_connections` table — AES-256-GCM, per-user PBKDF2 key derivation
+- `CredentialVault` — `encryptBlob` / `decryptBlob`, raw keys never persisted plaintext
+- Supported: Kraken, Binance, Coinbase, Bybit, OKX, KuCoin
+- **Withdrawal permissions never requested, never tested, always `false`**
+- Live mode default OFF; requires `acknowledged: true` to enable
+- Connection test = `getTicker` + `getAccount` round-trip before any DB write
+
+**Exchange secrets (LIVE mode):** `KRAKEN_API_KEY`, `KRAKEN_API_SECRET`, `EXCHANGE_LIVE_ENABLED=true`
+
+---
+
+## AI Market Scanner (Home.tsx radar)
+
+10+ rotating intelligent states, priority-ordered decision tree:
+`Initializing market feed` → `Strong breakout activity detected` →
+`High volatility detected — proceed with caution` →
+`Momentum increasing across crypto markets` →
+`Bullish momentum strengthening` → `Bearish pressure increasing` →
+`Market sentiment: Bullish/Bearish` →
+`AI detecting institutional accumulation` →
+`Trend continuation likely` → `Risk elevated — choppy market` →
+`Volatility compression detected` → `Accumulation patterns forming` →
+`Low-confidence market conditions` → `Market conditions favorable` →
+`Equity market cooling — crypto holding steady` →
+`AI tracking emerging opportunities` → `Scanning for high-confidence setups`
+
+Each branch reads `breakdowns` (per-symbol AI state) + `tickersData` (live moves).
+
+---
+
+## Notification & Feedback Scaffolding
+
+**`artifacts/aicandlez-app/src/lib/feedback.ts`** — unified architecture layer:
+- `ALERT_DEFINITIONS` — 10 alert types (AI Signals, Auto Trade Exec, Trade Open/Close, TP/SL Hit, High-Confidence Setups, Scanner, Volatility, Portfolio)
+- `FeedbackPrefs` — localStorage object with master switches (push/sounds/haptics) + per-alert toggles
+- `useFeedbackPrefs` — React hook with cross-tab `storage` sync
+- `triggerHaptic(intensity)` — `navigator.vibrate` wrapper; OFF by default (institutional default)
+- `playNotificationCue(state)` — routes through existing `executionSounds.ts` bus
+- `shouldNotify(key)` — central gate for future push-emit code
+
+**UI:** `Profile.tsx → AlertPreferencesSection` renders all toggles between AI Settings and Connected Accounts. Child rows dim when no delivery channel is enabled.
+
+**Web Push backend** (existing, Phase 4): `public/sw.js` + `usePushNotifications` hook + `SwRegistrar` + server-side `NotificationDispatcher` with VAPID. The new feedback layer reads/writes the same `pushEnabled` flag.
+
+---
+
+## Finalized UI System (current — locked, do not redesign)
+
+**Brand:** neon-green system. `#66FF66` brand · `#00C853` deep emerald · `#7CFF00` bright lime · `#39FF14` vivid neon. Backgrounds `#000` / `#050A07` / `#0A1410` / `#0F1F18`.
 
 **Design tokens:**
-- `artifacts/natura-ai/constants/theme.ts` — full rewrite. Adds `C.brand`,
-  `C.brandDeep`, `C.brandBright`, `C.brandVivid`, `C.brandGlow/Bloom/
-  Whisper`, glass tokens, SHADOWS with bloom variants, TYPE/SPACE/RADIUS
-  scales. **Legacy aliases preserved** (`C.cyan`, `C.purple`, `C.teal`,
-  `C.green` all remapped onto the green system) so existing components
-  re-skin automatically.
-- `artifacts/aicandlez-app/src/index.css` — HSL `--primary` shifted from
-  207 (blue) → 120 100% 70% (#66FF66). New CSS vars: `--brand{,-deep,
-  -bright,-vivid,-glow,-bloom,-whisper}`, `--ink-0..3`, `--glass-1..3`.
-  Premium animation library: `brand-pulse`, `orb-breathe`,
-  `ticker-scroll`, `dot-pulse`, `bar-in`, `bar-breathe`, `scan-line`,
-  `edge-sweep`, `chart-drift`, `wave-bar`, `particle-float`, `shimmer`.
-  Utility classes: `.ac-glow{-soft,,-strong}`, `.ac-glass{,-brand}`,
-  `.ac-gradient-text`.
+- `artifacts/aicandlez-app/src/index.css` — HSL `--primary` = 120° (green), `--brand{-deep,-bright,-vivid,-glow,-bloom,-whisper}`, `--ink-0..3`, `--glass-1..3`, animation lib (`brand-pulse`, `orb-breathe`, `ticker-scroll`, `dot-pulse`, `bar-in`, `bar-breathe`, `scan-line`, `edge-sweep`, `chart-drift`, `wave-bar`, `particle-float`, `shimmer`)
+- `artifacts/natura-ai/constants/theme.ts` — green tokens (mobile, frozen)
 
-**Home rebuilds (concept-matched 1:1):**
-- `artifacts/aicandlez-app/src/pages/Home.tsx` — Vite/React PWA. Header
-  with neon-ring avatar + greeting + PRO pill + bell w/ red dot; glowing
-  portfolio hero card with `HeroChart` (gradient line + area fill);
-  4 `QuickAction` tiles (AI Scan / Open Trades / Auto Trade / Deposit);
-  AI Market Insight card with `AssetIcon`, BULLISH/BEARISH pill, animated
-  `ConfidenceBar`, reasoning + age; Top Gainers list with mini
-  Sparklines; Active Trades cards with LONG/SHORT pills + ROE;
-  `BrokerStatusCard` and `UpgradeBanner` preserved. All real-data wired
-  to existing queries (`/mobile/status`, `/portfolio`, `/signals`,
-  `/tickers`, `/account`, `/billing/subscription`).
-- `artifacts/natura-ai/app/(tabs)/index.tsx` — Expo/React Native version
-  of the same layout using `Svg/Path/Defs/LinearGradient/Stop/Circle`,
-  `Animated` ambient blobs, `useSafeAreaInsets`, Feather icons.
-  Wired to `useTrading()` (engine, account, positions, alpacaAccount)
-  and `useUser()` from `@/contexts/UserContext` (NOT Clerk — natura-ai
-  is AsyncStorage-only).
-- `artifacts/natura-ai/app/(tabs)/_layout.tsx` — tab bar
-  `tabBarActiveTintColor` → `C.brand`, inactive → `C.textDim`, border →
-  `C.borderHi`, background `#050A07`.
+**Locked surfaces — do not restructure:**
+- Home (radar centerpiece + AI Market Scanner + Top Gainers + Active Trades + portfolio hero)
+- Signals, Crypto, Equities (asset cards, ranking, confidence rings)
+- Profile structure (AI Settings → Alert Preferences → Connected Accounts → Broker)
+- Bottom navigation (green/black, status pip)
+- Brand header (centered master logo + green underglow)
+- Typography hierarchy, scroll containers, all approved cards
 
-**Verification:**
-- `aicandlez-app` typecheck PASSES clean.
-- `natura-ai` typecheck — zero errors in changed files. Pre-existing
-  errors in legacy wellness leftovers (`pose/*`, `meditation/*`,
-  `ChatBubble`, `useColors`, `data/*.json`) are out of scope.
+**Master assets:**
+- `artifacts/aicandlez-app/src/assets/aicandlez-logo-master.png`
+- `artifacts/aicandlez-app/src/assets/aicandlez-icon-master.png`
 
-**Key files (Phase 5):**
-- `artifacts/aicandlez-app/src/pages/Home.tsx` — PWA Home
-- `artifacts/aicandlez-app/src/index.css` — green tokens + animation lib
-- `artifacts/natura-ai/app/(tabs)/index.tsx` — Expo Home
-- `artifacts/natura-ai/constants/theme.ts` — green tokens
-- `artifacts/natura-ai/app/(tabs)/_layout.tsx` — tab bar reskin
+---
 
-## Phase 4 — Production Deployment Foundation (COMPLETE)
+## Trading Dashboard Modules (19 active + 20)
 
-### Push Notification Infrastructure
-- **VAPID keys** generated and stored as shared env vars (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VITE_VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`)
-- **Service worker** at `artifacts/aicandlez-app/public/sw.js` — handles push events, notification click with action buttons, OS-native display with urgency levels
-- **`usePushNotifications` hook** at `artifacts/aicandlez-app/src/hooks/usePushNotifications.ts` — Web Push subscription registration, SW auto-register on sign-in, graceful `unsupported` fallback
-- **`SwRegistrar` component** wired into `aicandlez-app/App.tsx` Shell — registers SW and subscribes to push automatically when user signs in
-- **`NotificationDispatcher`** at `artifacts/api-server/src/services/notifications/NotificationDispatcher.ts` — VAPID web push sender, expired subscription cleanup, `signalAlert` + `tradeAlert` helpers
-- **Offline push fallback** in `wsServer.ts` — if user has no active WS connection, `broadcastNotification` now triggers a push notification instead of silently dropping it
-- **`POST /api/user/notify`** — auth-gated route to dispatch test push notifications to signed-in user
-- **`web-push` + `@types/web-push`** installed on `api-server`
+1 Dashboard · 2 Market Data · 3 Indicators · 4 AI Reasoning · 5 Risk Management ·
+6 Simulation · 7 Backtesting · 8 Strategy Optimizer · 9 Asset Scanner ·
+10 Portfolio · 11 Correlation · 12 Trade Journal · 13 Validation ·
+14 Sentiment AI · 15 Exchange · 16 System Verification · 17 Signal Debug ·
+18 Multi-Asset Chart · 19 Command Center · **20 Desktop Terminal** (`/desktop`)
 
-### Desktop Terminal (Module 20)
-- New page `artifacts/trading-dashboard/src/pages/DesktopTerminal.tsx` at `/desktop`
-- Power-user multi-panel layout: live ticker bar (BTC/ETH/SOL), Signal Feed widget, Position Monitor, AI Brief, Risk Monitor, Event Log
-- Each widget has maximize/minimize toggle for focus mode
-- WebSocket hook for real-time signal delivery; polls all data sources every 30s
-- Added to `MODULE_LIST` as module 20 (`Monitor` icon, SYS group) in sidebar
-- Auth-protected route in trading-dashboard App.tsx
+Global components (App-level): `AlertsProvider` (8s poll, dedupe, sound toggle), `SettingsDrawer` (floating gear, mobile drawer / desktop popover).
 
-### Production Deployment Architecture
-- **`DEPLOYMENT.md`** — complete domain map, DNS records, SSL config, Clerk production setup, push notification setup, Render deploy, Replit deploy, database migrations, pre-deploy checklist, post-deploy verification
-- **`.env.production.example`** — all env vars for all four services (api-server, trading-dashboard, aicandlez-app, landing)
-- **`render.yaml`** — updated with AICandlez branding, 4 services (aicandlez-api, aicandlez-dashboard, aicandlez-app, aicandlez-landing), VAPID env var placeholders, all exchange API keys, security headers
-- **CORS** — already locked to `aicandlez.com`, `app.aicandlez.com`, `api.aicandlez.com`
+---
 
-### Production Readiness Audit (T005)
-- Zero remaining "AICandlez" / "apexdigital" visible text across all TypeScript/TSX source files
-- Download route: `aicandlez-production.zip` → `aicandlez-production.zip`
-- Sidebar download link: `apex-trader-operator-console-v5.zip` → `aicandlez-operator-console-v5.zip`
-- All three typechecks pass: `api-server`, `trading-dashboard`, `aicandlez-app`
+## Production Deployment
 
-**Key files (Phase 4):**
-- `artifacts/aicandlez-app/public/sw.js` — Web Push service worker
-- `artifacts/aicandlez-app/src/hooks/usePushNotifications.ts` — push subscription hook
-- `artifacts/api-server/src/services/notifications/NotificationDispatcher.ts` — VAPID push sender
-- `artifacts/api-server/src/routes/internalNotify.ts` — `POST /api/user/notify` test route
-- `artifacts/api-server/src/lib/wsServer.ts` — offline push fallback in `broadcastNotification`
-- `artifacts/trading-dashboard/src/pages/DesktopTerminal.tsx` — Module 20 power-user page
-- `DEPLOYMENT.md` — full production deployment guide
-- `.env.production.example` — production env var template
-- `render.yaml` — updated multi-service deploy config
+- `DEPLOYMENT.md` — complete domain map, DNS, SSL, Clerk prod, push setup, Render + Replit deploy, migrations, pre/post-deploy checklist
+- `render.yaml` — 4 services (aicandlez-api, aicandlez-dashboard, aicandlez-app, aicandlez-landing) with VAPID + exchange keys + security headers
+- `.env.production.example` — all env vars for all four services
+- CORS locked to `aicandlez.com`, `app.aicandlez.com`, `api.aicandlez.com`
+- Webhooks: Stripe (`STRIPE_WEBHOOK_SECRET`), Clerk
 
-## Phase 3 — Exchange Connection Management (COMPLETE)
+---
 
-Each user can connect their own exchange accounts with encrypted API key storage.
+## Production Export
 
-**New DB Table:** `user_exchange_connections`
-- `id`, `userId` (FK → users), `exchange`, `label`
-- `encrypted_blob` — AES-256-GCM encrypted JSON `{ iv, authTag, ciphertext }` — raw keys never stored in plaintext
-- `status` (active/error/revoked), `is_default`, `trading_mode` (paper/live default)
-- `permissions` JSONB `{ read, trade, withdraw: false }` — withdraw is always false
-- `last_verified_at`, `last_error`, `created_at`, `updated_at`
+**Build the production ZIP:**
+```bash
+python3 scripts/build-export-zip.py
+```
+Output: `artifacts/trading-dashboard/public/aicandlez-production.zip`
+Served at: `/aicandlez-production.zip` (download link in dashboard sidebar)
 
-**Credential Vault (upgraded):**
-- Added `encryptBlob(userId, creds)` → produces JSON string for DB storage
-- Added `decryptBlob(userId, blob)` → decrypts stored blob back to credentials (in-memory only)
-- Per-user PBKDF2 key derivation (100k iterations, SHA-256) — each user's data is keyed differently
-- Credentials never logged, never returned in API responses
+Includes: `lib/db`, `lib/api-spec`, `lib/api-client-react`, `lib/api-zod`,
+`artifacts/api-server`, `artifacts/trading-dashboard`, `artifacts/aicandlez-app`,
+`artifacts/landing`, `scripts/`, root configs, `.env.example`, `SETUP.md`, `DEPLOYMENT.md`, `render.yaml`.
 
-**New API Routes (all requireAuth — userId from Clerk session):**
-- `GET /api/user/exchanges` — list all 6 supported exchanges + per-exchange connection status/metadata (safe: no keys)
-- `POST /api/user/exchanges/connect` — validate, test connection, encrypt, persist. Rejects bad credentials before storage.
-- `POST /api/user/exchanges/:exchange/test` — re-test a stored connection, update health + permissions
-- `POST /api/user/exchanges/:exchange/default` — set as user's default exchange
-- `POST /api/user/exchanges/:exchange/mode` — switch paper/live; live requires `acknowledged: true`
-- `DELETE /api/user/exchanges/:exchange` — permanently delete encrypted credentials
+Excludes: `node_modules/`, `dist/`, `.git/`, `natura-ai`, `natura-web`, `mockup-sandbox`, `attached_assets/`, `.local/`, `.replit-artifact/`.
 
-**Connection test flow:**
-1. Validate input (required fields, format, passphrase for OKX/KuCoin)
-2. Instantiate ephemeral adapter with user's credentials (not global registry)
-3. `getTicker("BTCUSD")` — public network check
-4. `getAccount()` — private auth check → if succeeds, permissions `{ read: true, trade: true, withdraw: false }`
-5. Store ONLY on success — invalid credentials are rejected before any DB write
-
-**Safety enforcement:**
-- Live mode default: OFF (paper only by default)
-- Live mode switch requires `acknowledged: true` in request body
-- Withdrawal permissions: never tested, never requested, always set to `false`
-- Confirmation dialog required in UI before enabling live mode or disconnecting
-
-**Supported exchanges:** Kraken, Binance, Coinbase, Bybit, OKX, KuCoin
-- Each has `requiredPerms` and `warnings` metadata shown in connect wizard
-- OKX + KuCoin require passphrase (enforced at validation)
-
-**Frontend (Settings.tsx):**
-- New "EXCHANGE CONNECTIONS" section at top of `/settings` page
-- 6 exchange cards — each shows: status badge, READ/TRADE permissions, last verified timestamp, paper/live toggle
-- Connect button → `ConnectModal` with: label, API key (masked), API secret (masked), passphrase (if needed), safety warnings, withdrawal acknowledgement checkbox
-- Test / Set Default / Disconnect buttons per connected exchange
-- Global safety banner: "WITHDRAWAL PERMISSIONS ARE NEVER REQUESTED"
-
-**Key files:**
-- `lib/db/src/schema/userExchangeConnections.ts` — DB schema
-- `artifacts/api-server/src/services/vault/CredentialVault.ts` — added `encryptBlob`, `decryptBlob`
-- `artifacts/api-server/src/routes/userExchanges.ts` — all 5 auth-gated routes
-- `artifacts/trading-dashboard/src/pages/Settings.tsx` — exchange connections section
-
-## Phase 2 — User-Scoped Trading Platform (COMPLETE)
-
-Each authenticated user has a fully isolated trading environment. No data bleeds between accounts.
-
-**DB Tables (5 new):**
-- `user_settings` — per-user AI personality, risk profile, filters, notification prefs, preferences
-- `sim_accounts` — per-user simulation balance (starts at $100,000)
-- `sim_positions` — per-user open positions (indexed by userId)
-- `sim_trades` — per-user closed trade history (indexed by userId)
-- `user_notifications` — per-user alert inbox (indexed by userId + read status)
-
-**Engine Architecture:**
-- Global trading loop stays shared (market signals are identical for all users)
-- `lib/userSimRegistry.ts` — `Map<userId, UserSimState>` with lazy DB-load on first request and immediate DB persistence on every mutation
-- All simulation API routes are now `requireAuth`-gated and use `userSimRegistry` instead of the global `simulationEngine`
-- Existing `simulationEngine.ts` remains for trading loop test mode (pipeline verification only)
-
-**New API Routes (all require auth):**
-- `GET /api/user/settings` — get or create user settings (JIT provisioning)
-- `PUT /api/user/settings` — update any subset of user settings
-- `GET /api/user/notifications` — list notifications (newest first, limit 50) + unread count
-- `POST /api/user/notifications/read-all` — mark all as read
-- `POST /api/user/notifications/:id/read` — mark single notification as read
-- `GET /api/account`, `GET /api/simulation/account` — user-scoped sim account
-- `GET /api/simulation/trades` — user-scoped trade history
-- `POST /api/simulation/order` — place order in user's account
-- `POST /api/simulation/close/:positionId` — close user's position
-- `POST /api/simulation/reset` — reset user's $100k account
-
-**New Frontend:**
-- `src/pages/Settings.tsx` — full account settings page at `/settings` (auth-protected)
-  - AI Configuration: personality selector (Conservative/Balanced/Aggressive), confidence threshold
-  - Risk Management: position size, max trades/day, max active positions, stop loss, take profit, auto mode
-  - Signal Filters: volume confirmation, 1H trend alignment, preferred exchange
-  - Notifications: trade exec, signal alerts, risk alerts (all per-user toggles)
-  - Preferences: timezone, display currency
-- Settings gear icon added to UserBlock in sidebar (next to sign-out button)
-- `/settings` route added and protected
-
-**Key files:**
-- `lib/db/src/schema/userSettings.ts`, `simAccounts.ts`, `simPositions.ts`, `simTrades.ts`, `userNotifications.ts`
-- `artifacts/api-server/src/lib/userSimRegistry.ts`
-- `artifacts/api-server/src/routes/userSettings.ts`, `userNotifications.ts`
-- `artifacts/trading-dashboard/src/pages/Settings.tsx`
-
-## Authentication (Phase 1 — COMPLETE)
-
-Clerk is fully integrated. Provisioned app: `app_3DeE2sfuhHWTY73M9jlbRCKabFx`.
-
-**Routing:**
-- `/` — Public landing page (unauthenticated) → redirects signed-in users to `/command`
-- `/sign-in/*?` — Clerk sign-in (email + Google OAuth)
-- `/sign-up/*?` — Clerk sign-up
-- All dashboard routes (`/command`, `/market`, `/ai`, etc.) — protected; redirect to `/sign-in` when unauthenticated
-
-**Server:**
-- `artifacts/api-server/src/middlewares/clerkProxyMiddleware.ts` — Clerk FAPI proxy (production only)
-- `artifacts/api-server/src/middlewares/requireAuth.ts` — `requireAuth` + `requireRole` middleware
-- `artifacts/api-server/src/routes/auth.ts` — `GET /api/auth/me` (JIT user provisioning), `PUT /api/auth/profile`
-- `app.ts` mounts: `clerkProxyMiddleware` (before body parsers) → `clerkMiddleware` (after)
-
-**DB schema:** `lib/db/src/schema/users.ts` — `users` table (clerkUserId, email, role: user/admin/super-admin)
-
-**Frontend:**
-- `src/App.tsx` — `ClerkProvider` wrapping all routes, `ClerkQueryClientCacheInvalidator`
-- `src/components/Layout.tsx` — `UserBlock` shows real user name/email, sign-out button via `useUser` + `useClerk`
-- `src/pages/Landing.tsx` — branded public landing page
-- Clerk appearance: dark terminal theme (#050D1A card, #00aaff primary, monospace font, AICandlez logo)
-- `public/logo.svg` — branded SVG logo shown in Clerk UI
-- CSS: `@layer theme, base, clerk, components, utilities` (Tailwind v4 + Clerk layer)
-- `vite.config.ts`: `tailwindcss({ optimize: false })` (prevents prod CSS layer reordering)
-
-**Env vars (auto-provisioned):** `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`
-
-## Artifacts
-
-### trading-dashboard (React + Vite @ /)
-Hybrid AI crypto trading dashboard — 19 modules, all active. Kraken exchange, BTCUSD/ETHUSD/SOLUSD, 1m–1h timeframes.
-
-**Modules:**
-1. Dashboard — system shell, roadmap, health cards
-2. Market Data — live Kraken candle feed
-3. Indicators — EMA, RSI, candlestick rendering
-4. AI Reasoning — EMA+RSI signal engine, BUY/SELL/HOLD with confidence
-5. Risk Management — position sizing, kill switch, daily loss limit, trade cap
-6. Simulation — paper trading with risk gate enforcement, auto-journal logging
-7. Backtesting — historical walk-forward simulation
-8. Strategy Optimizer — grid search over EMA/RSI parameters
-9. Asset Scanner — multi-symbol opportunity ranking
-10. Portfolio — allocation & exposure tracking
-11. Correlation — BTC/ETH/SOL correlation matrix, trailing stops
-12. Trade Journal — scored trade feedback (0–100), win rate, insights
-13. Validation — walk-forward 4-window OOS 70/30, overfitting grade A–F, live lock gate
-14. Sentiment AI — news scoring –100 to +100, Fear & Greed index, AI confidence ±5–20%
-15. Exchange — Kraken integration, SIMULATION (default) / LIVE mode, kill switch, pause, risk-gated order execution, no withdrawals
-16. System Verification — full engine health check panel, 10 subsystems, auto-refresh at `/syscheck`
-17. Signal Debug — MTF funnel tracker, per-symbol indicator breakdown, test mode toggle, last-10 signal log, **signal quality filter toggles** (volume + 1H trend), **mini 5m sparkline charts** with VOL/MARKET/1H badges at `/debug`
-18. Multi-Asset Chart — BTC/ETH/SOL charts side-by-side, EMA9/21 trend lines, volume overlay, flexible asset config + custom symbol add at `/charts`
-19. Command Center — unified one-screen view: 3 mini charts + signal summary + AI brief + active trades + risk status. Fully responsive (desktop/tablet/mobile) at `/command`
-
-**Asset Scanner** (`/scanner`): Now includes **15m mini sparkline charts** (60 candles, colored by trend) on each asset card.
-
-**Signal quality filters** (v1.0.0 final):
-- **Volume confirmation** — current 5m volume must be ≥ 85% of 20-bar rolling average (default: ON)
-- **Sideways filter** — blocks trades when EMA9/EMA21 spread < 0.15% on both TFs (always active)
-- **1H trend alignment** — optional: requires 1H EMA9 to align with signal direction (default: OFF, toggleable in Signal Debug)
-- Default `minConfidence` changed from 70 to **60**
-- New API: `POST /api/engine/filters` — `{ volumeFilter: boolean, require1HTrend: boolean }`
-- New engine status fields: `volumeFilter`, `require1HTrend`, `symbolBreakdowns[*].volumeConfirmed`, `.marketCondition`, `.trend1H`
-
-**Export ZIP** (`/aicandlez-v2.zip`):
-- Served from `trading-dashboard/public/` — 303 files, ~587 KB
-- Contains: all source (`api-server/src`, `trading-dashboard/src`), all `lib/` packages, `scripts/`, root configs, `.env.example`, `SETUP.md`
-- Excludes: `node_modules/`, `dist/`, `.git/`, other artifacts (natura-ai, natura-web)
-- Download link in sidebar footer (desktop only)
-- Rebuild: `python3 scripts/build-export-zip.py` from workspace root
-
-**Global components (App-level):**
-- `AlertsProvider.tsx` — polls engine every 8s, shows toast alerts for BUY/SELL signals + trade executions. Sound toggle (Web Audio API). Deduplication via signal ID set.
-- `SettingsDrawer.tsx` — floating gear icon (fixed bottom-right), slide-up drawer on mobile / popover on desktop. Controls: maxTradesPerDay, position size, min confidence, stop loss, take profit, auto-mode toggle. Persists to localStorage + syncs with `PUT /api/settings`.
-
-**Auth note:** Dashboard path moved from `/` to `/dashboard` in MODULE_LIST (home route `/` is now the public landing page). All 19 module routes remain unchanged.
-
-**Key files:**
-- `src/pages/` — one file per module
-- `src/pages/Landing.tsx` — public landing page (unauthenticated home)
-- `src/pages/auth/SignInPage.tsx`, `SignUpPage.tsx` — Clerk auth pages
-- `src/components/Layout.tsx` — MODULE_LIST sidebar + UserBlock (real user)
-- `src/App.tsx` — ClerkProvider + all routes
-
-### api-server (Express @ /api)
-Shared backend for all trading operations.
-
-**Key routes:**
-- `/api/exchange/*` — exchange engine (status, orders, preview, execute, kill, pause, mode, balances)
-- `/api/sentiment/*` — sentiment scoring, news feed
-- `/api/validation/*` — walk-forward validation engine
-- `/api/journal/*` — trade journal & scoring
-- `/api/simulation/*` — paper trading engine
-- `/api/signals/*`, `/api/candles/*`, `/api/backtest/*`
-
-**Key lib files:**
-- `src/lib/exchangeEngine.ts` — Kraken REST + HMAC-SHA512 signing, order execution, simulation balances
-- `src/lib/sentimentEngine.ts` — deterministic 5-min bucketed headline scoring
-- `src/lib/validationEngine.ts` — walk-forward OOS, overfitting detection
-- `src/lib/riskEngine.ts` — position limits, kill switch, daily PnL tracking
-- `src/lib/backtestEngine.ts` — EMA+RSI strategy, simulateOnCandles
-
-**Exchange secrets (for LIVE mode):**
-- `KRAKEN_API_KEY` — Kraken private API key
-- `KRAKEN_API_SECRET` — Kraken private API secret (base64)
-- `EXCHANGE_LIVE_ENABLED=true` — must be explicitly set to unlock LIVE mode
+---
 
 ## Key Commands
 
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
+- `pnpm run typecheck` — full typecheck (libs build → leaf typecheck)
+- `pnpm run typecheck:libs` — composite lib build only
+- `pnpm --filter @workspace/<slug> run typecheck` — single package
+- `pnpm --filter @workspace/api-spec run codegen` — regenerate API client + Zod
+- `python3 scripts/build-export-zip.py` — build production ZIP
 
-### natura-ai (Expo/React Native @ /natura-ai)
-Mobile-first AI-powered holistic wellness app.
+**Do not** run `pnpm dev` at workspace root — use `restart_workflow <slug>`.
 
-**Features:**
-- Onboarding flow: Welcome → Disclaimer acceptance → Goal selection → Dietary preferences
-- AI Chat: Mock AI with keyword-based wellness responses for stress/sleep/digestion/energy/immunity
-- Wellness Plans: Curated multi-day plans with day-by-day activities, teas, foods, supplements
-- Remedy Guides: Step-by-step guided mode for herbal remedies
-- Recipes: Filter by goal, add ingredients to grocery list
-- Daily Routine Tracker: Checklist with morning/afternoon/evening tasks, progress bar, streaks
-- Grocery List: Accumulate ingredients from recipes/plans, check-off and clear
-- Saved Items: Bookmark remedies, plans, and recipes
-- Daily Check-In: Energy/stress/sleep scale, streak tracking
-- Profile: Stats, dietary prefs, allergies, reset onboarding
+---
 
-**Design:** Light only — warm cream (#F8F6F0), forest green primary (#3D7A45), Inter font, radius 16
-**State:** AsyncStorage only (no backend) — UserContext + WellnessContext
-**AI:** Mock keyword-based responses in `lib/ai.ts` — no API key needed
+## Environment Variables (canonical list)
 
-**Routes:** `/onboarding/*`, `/(tabs)` (Home, Ask AI, Plans, Recipes, Profile), `/remedy/[id]`, `/plan/[id]`
+**Auto-provisioned:** `DATABASE_URL`, `CLERK_SECRET_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`, `SESSION_SECRET`, `VAULT_MASTER_KEY`, `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VITE_VAPID_PUBLIC_KEY` / `VAPID_SUBJECT`
 
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+**Stripe:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `VITE_STRIPE_PUBLISHABLE_KEY`, plus `STRIPE_PRICE_STARTER_MONTHLY`, `STRIPE_PRICE_PRO_MONTHLY` (price IDs mapped per `PlanId`)
+
+**Exchanges (LIVE):** `KRAKEN_API_KEY/SECRET`, `BINANCE_API_KEY/SECRET`, `COINBASE_API_KEY/SECRET`, `CRYPTOCOM_API_KEY/SECRET`, `EXCHANGE_LIVE_ENABLED=true`
+
+**Production-only:** `CLERK_SECRET_KEY_LIVE`, `VITE_CLERK_PUBLISHABLE_KEY_LIVE`
+
+---
+
+## natura-ai (production-frozen)
+
+Mobile-first AI wellness app (Expo/React Native). AsyncStorage only — no backend.
+Onboarding → AI Chat → Wellness Plans → Recipes → Daily Routine → Grocery → Saved → Check-In → Profile.
+Light theme, warm cream `#F8F6F0`, forest green `#3D7A45`, Inter, radius 16.
+**No further dev work** while the desktop/web institutional platform is in active development.
+
+---
+
+# Archive — Implementation History
+
+*Condensed summaries of historical phases. Full detail lives in git history.*
+
+**Phase 1 — Authentication (DONE)**
+Clerk fully integrated. Public landing at `/`, sign-in/up routes, all dashboard routes protected. `users` table with role enum. `clerkProxyMiddleware` + `clerkMiddleware` + `requireAuth`/`requireRole`. JIT user provisioning via `GET /api/auth/me`.
+
+**Phase 2 — User-Scoped Trading Platform (DONE)**
+Every authenticated user gets fully isolated simulation environment. 5 new DB tables (`user_settings`, `sim_accounts`, `sim_positions`, `sim_trades`, `user_notifications`). `userSimRegistry` Map with lazy DB-load + immediate persistence. All `/api/simulation/*` + `/api/user/*` routes auth-gated. `Settings.tsx` page added at `/settings`.
+
+**Phase 3 — Exchange Connection Management (DONE)**
+Per-user encrypted exchange credentials. `user_exchange_connections` table with AES-256-GCM + per-user PBKDF2. 6 exchanges. Connection test gates writes. Live mode requires `acknowledged: true`. Withdrawal perms never requested. Settings page exchange connection cards + ConnectModal wizard.
+
+**Phase 4 — Production Deployment Foundation (DONE)**
+VAPID push infra: `sw.js`, `usePushNotifications`, `SwRegistrar`, `NotificationDispatcher`, `POST /api/user/notify`. Offline push fallback in `wsServer.ts`. Module 20 Desktop Terminal at `/desktop`. `DEPLOYMENT.md`, `.env.production.example`, `render.yaml` with 4 services. Full production-readiness audit (zero apexdigital / placeholder strings).
+
+**Phase 5 — Neon-Green Brand Pivot (DONE)**
+Cyan → neon-green system-wide. Brand palette tokens, glass primitives, animation library. Home rebuilds for both PWA (Vite/React) and Expo. Legacy aliases preserved (`C.cyan`, `C.purple`, `C.teal`, `C.green` remap onto green) so existing components re-skin automatically. Tab bar reskin on natura-ai.
+
+**Phase 5.1 — PWA Home Radar Polish (DONE)**
+Centered master logo brand header. Real branded crypto icons (BTC/ETH/SOL/ADA/AVAX/DOGE inline SVG). `RadarScanner` component (concentric rings + rotating sweep + asset blips + breathing center medallion). Cinematic typography (48px tabular-nums portfolio hero), atmospheric background (orbs + rays + grid + vignette), glowing BUY/SELL CTAs.
+
+**Phase 5.2 — Final Master Polish (DONE — current)**
+- Billing.tsx full rewrite to 3-tier ladder with status badges + upgrade/downgrade/portal CTAs
+- `lib/feedback.ts` notification + sound + haptic scaffolding (10 alert types, master switches, localStorage-backed, cross-tab synced)
+- Profile.tsx Alert Preferences section
+- Home.tsx scanner expanded with 5 new intelligent states (now 10+ rotating)
+- All approved layouts/cards/nav/typography preserved exactly as-is
+- Zero `$5.99` references in source
+
+---
+
+## User Preferences
+
+- Always brand work as **AICandlez** (never apex / apexdigital legacy names)
+- Performance-fee language always reads "on profitable trades only · never on losses"
+- Institutional tone — premium, restrained, no arcade/gambling cues
+- Mobile-first PWA is the primary user surface, desktop console is operator-only
+- Withdrawal permissions are never requested from exchanges (security promise)

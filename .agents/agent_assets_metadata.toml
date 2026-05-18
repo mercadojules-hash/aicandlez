@@ -65,3 +65,9 @@ id = "41KXx6WxYOfYOaAsMkILs"
 uri = "file://artifacts/trading-dashboard/public/apex-trader-operator-console-v5.zip"
 type = "unspecified"
 title = "apex-trader-operator-console-v5.zip"
+
+[[outputs]]
+id = "W4nVibsSwsO5xmeu8qygP"
+uri = "file://artifacts/trading-dashboard/public/aicandlez-production.zip"
+type = "unspecified"
+title = "AICandlez Production Export (v1.0)"
