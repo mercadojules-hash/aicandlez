@@ -5,6 +5,7 @@ import { useUser } from "@clerk/react";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
+import { EnableLiveCTA } from "@/components/EnableLiveCTA";
 import aicandlezLogoMaster from "../assets/aicandlez-logo-master.png";
 import aicandlezIconMaster from "../assets/aicandlez-icon-master.png";
 import {
@@ -1144,6 +1145,9 @@ export default function Home() {
         </div>
 
         <UpgradeBanner/>
+
+        {/* Enable Live AI Trading — premium upgrade CTA above footer */}
+        <EnableLiveCTA style={{ padding: "10px 16px 6px" }}/>
 
         {/* Status footer (no old logo — logo is now at top) */}
         <div style={{

@@ -1,0 +1,164 @@
+This is evolving into a REAL product now. The structure is finally right.
+
+Final refinement pass before expanding the rest of the ecosystem:
+
+1. REMOVE THE TOP-RIGHT BUY / PREVIEW BADGES
+   Remove:
+   • BUY
+   • SELL
+   • PREVIEW
+
+from the top-right corner of the signal cards.
+
+They are visually cluttering the cards and competing with the larger CTA row below.
+
+The ONLY trading actions should remain in the bottom action row:
+• BUY
+• SELL
+• AI AUTO TRADE
+
+Cleaner.
+More premium.
+More institutional.
+
+2. MAKE “AI CONFIDENCE” MUCH LARGER
+   The cards now contain a lot of information.
+
+Increase:
+• AI Confidence %
+• confidence ring size
+• label readability
+
+The confidence score is one of the most important conversion triggers in the app.
+
+Target:
+• larger
+• cleaner
+• easier to scan quickly
+
+Keep the reduced glow you already added.
+
+3. DO NOT OPEN ASSET PROFILE PAGE ON CARD CLICK
+   Signal cards should NOT navigate anywhere when tapped.
+
+Remove:
+• clickable card behavior
+• automatic navigation
+• profile-page opening
+
+The ONLY interactions should be:
+• BUY
+• SELL
+• AI AUTO TRADE
+
+This keeps the experience focused and action-driven.
+
+4. CRYPTO TAB IS STILL MISSING ACTUAL CRYPTO SIGNALS
+   Right now Active is showing mixed assets.
+
+We need:
+• Active
+• Crypto
+• Equities
+
+ALL functioning independently.
+
+CRYPTO TAB:
+Show:
+Top 10 crypto assets by highest AI confidence.
+
+Examples:
+• BTC
+• ETH
+• SOL
+• XRP
+• ADA
+• AVAX
+• DOGE
+• LINK
+• SUI
+• HBAR
+
+Same exact card design.
+
+5. EQUITIES TAB
+   The Equities tab should look EXACTLY like the current design.
+
+But:
+• equities only
+• top 20 ranked equities
+• same dense institutional layout
+• same confidence system
+• same BUY / SELL / AI AUTO TRADE row
+
+Under the equities list:
+Add a search bar:
+“Search equities…”
+
+This allows users to add favorite stocks into the feed/watchlist.
+
+6. RENAME “MARKETS” TAB TO “CRYPTO”
+   Bottom navigation:
+   Change:
+   Markets
+
+To:
+Crypto
+
+7. NEW CRYPTO PAGE
+   The new Crypto page should mirror the Equities page structure exactly.
+
+Crypto page:
+• top 20 crypto assets
+• ranked by confidence
+• same dense signal cards
+• same AI confidence system
+• same CTA structure
+• search bar at bottom:
+“Search crypto…”
+
+8. ENABLE LIVE AI TRADING BUTTON EVERYWHERE
+   Every major page should have:
+   “Enable Live AI Trading”
+
+Position:
+top area of each page.
+
+Pages:
+• Home
+• Signals
+• Crypto
+• Equities
+• Portfolio
+• Trade
+
+HOME PAGE:
+Place the button near the bottom section before the footer/navigation.
+
+This becomes the primary subscription conversion CTA.
+
+9. IMPORTANT PRODUCT DIRECTION (VERY IMPORTANT)
+   This UI direction created a major monetization opportunity.
+
+We are now introducing:
+AI trade concurrency limits.
+
+Free tier:
+• max 6 simultaneous AI trades
+
+Pro tier ($39/month):
+• 10–12 simultaneous AI trades
+• higher AI confidence alerts
+• faster execution queue
+• premium AI Auto Trade features
+
+This needs to start being reflected subtly in:
+• upgrade flows
+• CTA wording
+• AI Auto Trade onboarding
+
+The product is beginning to feel like:
+Bloomberg Terminal × AI hedge fund × retail automation.
+
+DO NOT revert to empty marketing layouts.
+The dense institutional feed direction is correct.

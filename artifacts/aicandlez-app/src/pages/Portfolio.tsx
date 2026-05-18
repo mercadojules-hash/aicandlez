@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type Portfolio as PortfolioData } from "@/lib/api";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
+import { EnableLiveCTA } from "@/components/EnableLiveCTA";
 
 function PositionRow({ pos }: { pos: PortfolioData["positions"][number] }) {
   const pnl = pos.unrealizedPnL ?? 0;
@@ -50,6 +51,7 @@ export default function Portfolio() {
   return (
     <div style={{ padding: "16px 16px 80px" }}>
       <UpgradeBanner />
+      <EnableLiveCTA style={{ padding: "0 0 14px" }}/>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 9, fontFamily: "monospace", color: "#2a4060",
           letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 4 }}>

@@ -54,7 +54,7 @@ const ProfileIcon = ({ active }: { active: boolean }) => (
 
 const TABS = [
   { path:"/",         label:"Home",     Icon:HomeIcon     },
-  { path:"/markets",  label:"Markets",  Icon:CryptoIcon   },
+  { path:"/crypto",   label:"Crypto",   Icon:CryptoIcon   },
   { path:"/trade",    label:"Signals",  Icon:SignalsIcon  },
   { path:"/equities", label:"Equities", Icon:EquitiesIcon },
   { path:"/profile",  label:"Profile",  Icon:ProfileIcon  },
@@ -68,6 +68,9 @@ export function BottomNav() {
     // since both routes render the same AI Signals page.
     if (p === "/trade") return location === "/trade" || location.startsWith("/trade/")
                               || location === "/signals" || location.startsWith("/signals/");
+    // Treat legacy /markets as Crypto for the indicator
+    if (p === "/crypto") return location === "/crypto" || location.startsWith("/crypto/")
+                              || location === "/markets" || location.startsWith("/markets/");
     return location === p || location.startsWith(p + "/");
   };
 

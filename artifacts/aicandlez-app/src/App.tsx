@@ -141,8 +141,11 @@ function Pages() {
       <Route path="/"        component={() => <Protected><Home /></Protected>} />
       <Route path="/trade"   component={() => <Protected><AISignals /></Protected>} />
       <Route path="/signals" component={() => <Protected><AISignals /></Protected>} />
-      <Route path="/markets"  component={() => <Protected><Markets  /></Protected>} />
-      <Route path="/equities" component={() => <Protected><Equities /></Protected>} />
+      {/* Crypto + Equities both deep-link into the AISignals feed with the
+          tab pre-selected. /markets is kept as an alias for backwards-compat. */}
+      <Route path="/crypto"   component={() => <Protected><AISignals /></Protected>} />
+      <Route path="/equities" component={() => <Protected><AISignals /></Protected>} />
+      <Route path="/markets"  component={() => <Redirect to="/crypto" />} />
       <Route path="/asset/:type/:sym">
         {(params) => (
           <Protected>

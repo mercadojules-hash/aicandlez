@@ -4,6 +4,8 @@ import { useLocation } from "wouter";
 import { api, type MobileSignalsResponse, type MobileTickersResponse, type SignalBreakdown } from "@/lib/api";
 import { CryptoIcon, SYM_LABEL, SYM_SHORT } from "@/components/CryptoIcon";
 import { EquityIcon, EQUITY_NAME } from "@/components/EquityIcon";
+import { EnableLiveCTA } from "@/components/EnableLiveCTA";
+import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const BG          = "#000000";
@@ -168,8 +170,8 @@ function SignalSparkline({ seed, trend, w = 110, h = 38, color }: {
 // Confidence ring — large prominent gauge, color-state, animated pulse
 // ═══════════════════════════════════════════════════════════════════════════
 function ConfidenceGauge({ value }: { value: number }) {
-  const size = 56;
-  const r = 23;
+  const size = 88;
+  const r = 36;
   const c = 2 * Math.PI * r;
   const pct = Math.max(0, Math.min(100, value));
   const color = confidenceColor(pct);
@@ -178,12 +180,12 @@ function ConfidenceGauge({ value }: { value: number }) {
     <div style={{
       position: "relative", width: size, height: size, flexShrink: 0,
     }}>
-      {/* Institutional gauge — restrained glow, no arcade bloom */}
+      {/* Institutional gauge — large, prominent, restrained glow */}
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle cx={size/2} cy={size/2} r={r}
-          fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={3.5}/>
+          fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={5}/>
         <circle cx={size/2} cy={size/2} r={r}
-          fill="none" stroke={color} strokeWidth={3.5} strokeLinecap="round"
+          fill="none" stroke={color} strokeWidth={5} strokeLinecap="round"
           strokeDasharray={`${dash} ${c}`}
           transform={`rotate(-90 ${size/2} ${size/2})`}
           opacity={0.92}
@@ -194,13 +196,13 @@ function ConfidenceGauge({ value }: { value: number }) {
         alignItems: "center", justifyContent: "center", lineHeight: 1,
       }}>
         <div style={{
-          fontSize: 15, fontFamily: SANS, fontWeight: 800, color,
-          letterSpacing: -0.4, fontVariantNumeric: "tabular-nums",
+          fontSize: 24, fontFamily: SANS, fontWeight: 800, color,
+          letterSpacing: -0.6, fontVariantNumeric: "tabular-nums",
         }}>{Math.round(pct)}%</div>
         <div style={{
-          fontSize: 7, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
-          letterSpacing: 0.8, textTransform: "uppercase", marginTop: 2,
-        }}>AI Conf</div>
+          fontSize: 8, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
+          letterSpacing: 1.0, textTransform: "uppercase", marginTop: 4,
+        }}>AI Confidence</div>
       </div>
     </div>
   );
@@ -265,12 +267,26 @@ type PreviewRow = {
 };
 
 const EQUITY_BASES: Array<{ sym: string; base: number }> = [
-  { sym: "TSLA", base: 182.50 },
   { sym: "NVDA", base: 138.40 },
-  { sym: "AAPL", base: 189.40 },
+  { sym: "TSLA", base: 182.50 },
   { sym: "META", base: 512.80 },
-  { sym: "AMZN", base: 184.60 },
+  { sym: "AAPL", base: 189.40 },
   { sym: "MSFT", base: 414.20 },
+  { sym: "AMZN", base: 184.60 },
+  { sym: "GOOGL",base: 173.40 },
+  { sym: "AMD",  base: 162.30 },
+  { sym: "PLTR", base:  24.80 },
+  { sym: "NFLX", base: 643.20 },
+  { sym: "COIN", base: 219.50 },
+  { sym: "AVGO", base: 1620.0 },
+  { sym: "ORCL", base: 142.50 },
+  { sym: "CRM",  base: 295.10 },
+  { sym: "UBER", base:  72.40 },
+  { sym: "SHOP", base:  82.30 },
+  { sym: "SMCI", base:  48.60 },
+  { sym: "MU",   base:  98.20 },
+  { sym: "INTC", base:  21.40 },
+  { sym: "DIS",  base:  98.70 },
 ];
 
 function makeEquityPreviews(): PreviewRow[] {
@@ -304,8 +320,15 @@ function makeEquityPreviews(): PreviewRow[] {
 type TabKey = "active" | "crypto" | "equities";
 
 export default function AISignals() {
-  const [, setLocation] = useLocation();
-  const [tab, setTab] = useState<TabKey>("active");
+  const [location, setLocation] = useLocation();
+  // URL-driven initial tab so /crypto and /equities deep-link into the
+  // correct section while keeping the same underlying feed + card design.
+  const initialTab: TabKey =
+    location.startsWith("/equities") ? "equities" :
+    location.startsWith("/crypto")   ? "crypto"   : "active";
+  const [tab, setTab] = useState<TabKey>(initialTab);
+  const [cryptoQuery,  setCryptoQuery]  = useState("");
+  const [equityQuery,  setEquityQuery]  = useState("");
   const openAsset = (atype: "crypto" | "equity", asym: string) => {
     setLocation(`/asset/${atype}/${asym.toUpperCase()}`);
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -367,7 +390,7 @@ export default function AISignals() {
       .slice(0, 10);
   }, [signalsQ.data, tickerBySym, equityPreviews]);
 
-  // Crypto tab = ALL crypto signals (BUY/SELL/HOLD) ranked by confidence.
+  // Crypto tab = TOP 10 crypto signals ranked by AI confidence.
   // Real data only — any breakdown missing a live ticker is excluded.
   const cryptoSignals = useMemo(() => {
     const breakdowns = signalsQ.data?.breakdowns ?? {};
@@ -376,15 +399,16 @@ export default function AISignals() {
       .sort((a, b) =>
         (b.confidence - a.confidence) ||
         a.symbol.localeCompare(b.symbol)
-      );
+      )
+      .slice(0, 10);
   }, [signalsQ.data, tickerBySym]);
 
-  // Equities tab = all 6 preview rows ranked by confidence.
+  // Equities tab = TOP 20 preview rows ranked by confidence.
   const equitySignals = useMemo(() =>
     [...equityPreviews].sort((a, b) =>
       (b.breakdown.confidence - a.breakdown.confidence) ||
       a.breakdown.symbol.localeCompare(b.breakdown.symbol)
-    ),
+    ).slice(0, 20),
     [equityPreviews]);
 
   const loading = signalsQ.isLoading || tickersQ.isLoading;
@@ -429,39 +453,8 @@ export default function AISignals() {
           </div>
         </div>
 
-        {/* Enable Live AI Trading — premium upgrade CTA */}
-        <div style={{ padding: "6px 16px 12px" }}>
-          <button
-            onClick={() => setLocation("/subscribe")}
-            style={{
-              position: "relative", overflow: "hidden", width: "100%",
-              padding: "14px 18px", borderRadius: 999, cursor: "pointer",
-              background: `linear-gradient(135deg, ${BRAND_DEEP} 0%, ${BRAND} 55%, ${BRAND_BRGT} 100%)`,
-              border: `1px solid ${BRAND_BRGT}`,
-              color: "#001b06",
-              fontSize: 13.5, fontFamily: SANS, fontWeight: 900,
-              letterSpacing: 0.6, textTransform: "uppercase",
-              boxShadow: `0 10px 32px ${BRAND_GLOW}, 0 0 0 1px rgba(255,255,255,0.18) inset, 0 1px 0 rgba(255,255,255,0.45) inset`,
-              animation: "orb-breathe 3.6s ease-in-out infinite",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-            }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <span style={{
-                width: 7, height: 7, borderRadius: "50%", background: "#001b06",
-                boxShadow: "0 0 8px rgba(0,0,0,0.4)",
-                animation: "dot-pulse 1.4s ease-in-out infinite",
-              }}/>
-              Enable Live AI Trading
-            </span>
-            <span style={{ fontSize: 16, fontWeight: 900, opacity: 0.85 }}>›</span>
-            {/* sheen sweep */}
-            <span aria-hidden style={{
-              position: "absolute", top: 0, left: "-30%", height: "100%", width: "30%",
-              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)",
-              animation: "edge-sweep 4.5s ease-in-out infinite",
-            }}/>
-          </button>
-        </div>
+        {/* Enable Live AI Trading — shared premium upgrade CTA */}
+        <EnableLiveCTA/>
 
         {/* Tab bar — Active / Crypto / Equities */}
         <div style={{
@@ -515,34 +508,79 @@ export default function AISignals() {
                 </>
           )}
 
-          {!loading && tab === "crypto" && (
-            cryptoSignals.length === 0
+          {!loading && tab === "crypto" && (() => {
+            const q = cryptoQuery.trim().toLowerCase();
+            const list = q
+              ? cryptoSignals.filter(b =>
+                  b.symbol.toLowerCase().includes(q) ||
+                  (SYM_LABEL[b.symbol] ?? "").toLowerCase().includes(q) ||
+                  (SYM_SHORT[b.symbol] ?? "").toLowerCase().includes(q))
+              : cryptoSignals;
+            return cryptoSignals.length === 0
               ? <EmptyState
                   title="No crypto data available"
                   body="The AI engine could not load crypto signals. Retrying automatically."/>
-              : cryptoSignals.map((b, i) => (
-                  <SignalCard
-                    key={b.symbol}
-                    rank={i + 1}
-                    kind="crypto"
-                    breakdown={b}
-                    ticker={tickerBySym[b.symbol]}
-                    onOpen={() => openAsset("crypto", SYM_SHORT[b.symbol] ?? b.symbol.replace("USD",""))}/>
-                ))
-          )}
+              : <>
+                  <div style={{
+                    margin: "2px 2px 10px", display: "flex", alignItems: "center",
+                    justifyContent: "space-between",
+                    fontSize: 10.5, fontFamily: SANS, fontWeight: 700,
+                    color: TEXT_DIM, letterSpacing: 1.2, textTransform: "uppercase",
+                  }}>
+                    <span>Top {list.length} Crypto Signals</span>
+                    <span style={{ color: BRAND }}>Sorted by Confidence</span>
+                  </div>
+                  {list.map((b, i) => (
+                    <SignalCard
+                      key={b.symbol}
+                      rank={i + 1}
+                      kind="crypto"
+                      breakdown={b}
+                      ticker={tickerBySym[b.symbol]}
+                      onOpen={() => openAsset("crypto", SYM_SHORT[b.symbol] ?? b.symbol.replace("USD",""))}/>
+                  ))}
+                  <SearchBar
+                    placeholder="Search crypto…"
+                    value={cryptoQuery}
+                    onChange={setCryptoQuery}/>
+                </>;
+          })()}
 
-          {!loading && tab === "equities" && (
-            equitySignals.map((row, i) => (
-              <SignalCard
-                key={row.breakdown.symbol}
-                rank={i + 1}
-                kind="equity"
-                isPreview
-                breakdown={row.breakdown}
-                ticker={row.ticker}
-                onOpen={() => openAsset("equity", row.breakdown.symbol)}/>
-            ))
-          )}
+          {!loading && tab === "equities" && (() => {
+            const q = equityQuery.trim().toLowerCase();
+            const list = q
+              ? equitySignals.filter(r =>
+                  r.breakdown.symbol.toLowerCase().includes(q) ||
+                  (EQUITY_NAME[r.breakdown.symbol] ?? "").toLowerCase().includes(q))
+              : equitySignals;
+            return (
+              <>
+                <div style={{
+                  margin: "2px 2px 10px", display: "flex", alignItems: "center",
+                  justifyContent: "space-between",
+                  fontSize: 10.5, fontFamily: SANS, fontWeight: 700,
+                  color: TEXT_DIM, letterSpacing: 1.2, textTransform: "uppercase",
+                }}>
+                  <span>Top {list.length} Equities</span>
+                  <span style={{ color: BRAND }}>Sorted by Confidence</span>
+                </div>
+                {list.map((row, i) => (
+                  <SignalCard
+                    key={row.breakdown.symbol}
+                    rank={i + 1}
+                    kind="equity"
+                    isPreview
+                    breakdown={row.breakdown}
+                    ticker={row.ticker}
+                    onOpen={() => openAsset("equity", row.breakdown.symbol)}/>
+                ))}
+                <SearchBar
+                  placeholder="Search equities…"
+                  value={equityQuery}
+                  onChange={setEquityQuery}/>
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>
@@ -552,6 +590,46 @@ export default function AISignals() {
 // ═══════════════════════════════════════════════════════════════════════════
 // Sub-components
 // ═══════════════════════════════════════════════════════════════════════════
+
+function SearchBar({ placeholder, value, onChange }: {
+  placeholder: string; value: string; onChange: (v: string) => void;
+}) {
+  return (
+    <div style={{
+      marginTop: 14, marginBottom: 6,
+      display: "flex", alignItems: "center", gap: 10,
+      padding: "11px 14px", borderRadius: 14,
+      background: "rgba(255,255,255,0.04)",
+      border: `1px solid ${BORDER_HI}`,
+      boxShadow: `0 0 18px ${BRAND_BLOOM}, inset 0 0 0 1px rgba(255,255,255,0.03)`,
+    }}>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, opacity: 0.7 }}>
+        <circle cx="7" cy="7" r="5" stroke={BRAND} strokeWidth="1.6"/>
+        <path d="M11 11l3 3" stroke={BRAND} strokeWidth="1.6" strokeLinecap="round"/>
+      </svg>
+      <input
+        type="text" value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        style={{
+          flex: 1, minWidth: 0,
+          background: "transparent", border: "none", outline: "none",
+          color: TEXT, fontSize: 13, fontFamily: SANS, fontWeight: 600,
+          letterSpacing: 0.1,
+        }}/>
+      {value && (
+        <button
+          onClick={() => onChange("")}
+          aria-label="Clear search"
+          style={{
+            background: "transparent", border: "none", cursor: "pointer",
+            color: TEXT_DIM, fontSize: 14, padding: 0, lineHeight: 1,
+          }}>×</button>
+      )}
+    </div>
+  );
+}
 
 function IconButton({ children, onClick, "aria-label": aria }: {
   children: React.ReactNode; onClick?: () => void; "aria-label": string;
@@ -617,8 +695,7 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
   const [feedback, setFeedback] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const isLong = breakdown.action.toUpperCase() === "BUY";
   const isHold = breakdown.action.toUpperCase() === "HOLD";
-  const grade = deriveGrade(breakdown.action, breakdown.confidence);
-  const gc = gradeColor(grade);
+  const gc = gradeColor(deriveGrade(breakdown.action, breakdown.confidence));
   const tradeType = deriveTradeType(breakdown);
   const levels = deriveLevels(ticker.price, breakdown.action, breakdown.confidence);
   const accent = isHold ? TEXT_SUB : (isLong ? BRAND : NEG);
@@ -678,24 +755,24 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
     }
     orderMutation.mutate(side);
   };
+  const { enabled: autoOn, setEnabled: setAutoOn } = useAIAutoTrade();
   const triggerAutoTrade = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onOpen?.();
+    if (autoOn) {
+      setFeedback({ kind: "ok", text: "AI Auto Trade already engaged — signal queued" });
+    } else {
+      setAutoOn(true);
+      setFeedback({ kind: "ok", text: "AI Auto Trade engaged — paper-trading this signal" });
+    }
+    setTimeout(() => setFeedback(null), 3200);
   };
 
   return (
     <div
-      role={onOpen ? "button" : undefined}
-      tabIndex={onOpen ? 0 : undefined}
-      onClick={onOpen}
-      onKeyDown={onOpen ? (e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); }
-      } : undefined}
       style={{
       position: "relative", overflow: "hidden",
       marginBottom: 12, borderRadius: 18, padding: "14px 14px 12px",
-      cursor: onOpen ? "pointer" : "default",
+      cursor: "default",
       background: `
         radial-gradient(circle at 0% 0%, ${isHold ? "rgba(255,255,255,0.05)" : isLong ? "rgba(102,255,102,0.10)" : "rgba(255,64,96,0.10)"} 0%, transparent 55%),
         linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 60%, ${BG} 100%)
@@ -771,29 +848,17 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
               fontSize: 10.5, fontFamily: SANS, fontWeight: 600,
               color: TEXT_DIM, letterSpacing: 0.2,
             }}>{tradeType}</span>
+            {isPreview && (
+              <span style={{
+                padding: "2px 6px", borderRadius: 4,
+                background: "rgba(124,255,0,0.10)",
+                border: "1px solid rgba(124,255,0,0.28)",
+                fontSize: 8, fontFamily: SANS, fontWeight: 800,
+                color: BRAND_BRGT, letterSpacing: 1.0,
+                whiteSpace: "nowrap",
+              }}>PREVIEW</span>
+            )}
           </div>
-        </div>
-
-        {/* Signal grade badge + optional PREVIEW indicator (stacked) */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-          <div style={{
-            padding: "5px 10px", borderRadius: 8,
-            background: gc.bg, border: `1px solid ${gc.border}`,
-            fontSize: 10, fontFamily: SANS, fontWeight: 800,
-            color: gc.fg, letterSpacing: 0.8,
-            boxShadow: `0 0 14px ${gc.bloom}`,
-            whiteSpace: "nowrap",
-          }}>{grade}</div>
-          {isPreview && (
-            <div style={{
-              padding: "2px 6px", borderRadius: 4,
-              background: "rgba(124,255,0,0.10)",
-              border: "1px solid rgba(124,255,0,0.28)",
-              fontSize: 8, fontFamily: SANS, fontWeight: 800,
-              color: BRAND_BRGT, letterSpacing: 1.2,
-              whiteSpace: "nowrap",
-            }}>PREVIEW</div>
-          )}
         </div>
       </div>
 

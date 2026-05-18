@@ -43,6 +43,33 @@ export default function Subscribe() {
         </div>
       </div>
 
+      {/* Concurrency comparison — subtle Free vs Pro hint above plan cards */}
+      <div style={{
+        marginBottom: 16, padding: "12px 14px", borderRadius: 10,
+        background: "rgba(102,255,102,0.04)",
+        border: "1px solid rgba(102,255,102,0.18)",
+      }}>
+        <div style={{
+          fontSize: 8.5, fontFamily: "monospace", color: "rgba(102,255,102,0.85)",
+          letterSpacing: "0.18em", textTransform: "uppercase" as const, marginBottom: 6,
+        }}>Concurrent AI Trades</div>
+        <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, fontFamily: "monospace", color: "#6090b0" }}>Free</div>
+            <div style={{ fontSize: 16, fontFamily: "monospace", fontWeight: 700, color: "#e8f4ff" }}>
+              up to 6
+            </div>
+          </div>
+          <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.08)" }}/>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(102,255,102,0.85)" }}>Pro</div>
+            <div style={{ fontSize: 16, fontFamily: "monospace", fontWeight: 700, color: "rgba(102,255,102,0.95)" }}>
+              up to 12
+            </div>
+          </div>
+        </div>
+      </div>
+
       {checkout.isError && (
         <div style={{ background: "#ff444415", border: "1px solid #ff444440",
           borderRadius: 8, padding: "10px 14px", marginBottom: 16,

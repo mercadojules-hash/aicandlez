@@ -4,6 +4,7 @@ import { api, type MobileStatus, type Portfolio, type SimTrade, type AlpacaPosit
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
+import { EnableLiveCTA } from "@/components/EnableLiveCTA";
 import { MetricTooltip } from "@/components/help/MetricTooltip";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
@@ -598,6 +599,7 @@ export default function Trade() {
       </div>
 
       <UpgradeBanner />
+      <EnableLiveCTA style={{ padding: "4px 12px 10px" }}/>
 
       <div style={{ padding:"0 12px" }}>
 
