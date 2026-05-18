@@ -1,0 +1,263 @@
+FINAL ADMIN FREEZE + CUSTOMER DASHBOARD LAUNCH PHASE
+
+We are now ready to move toward going live tonight.
+
+IMPORTANT:
+The current /command dashboard is FINALIZED as the ADMIN / OPERATOR dashboard.
+
+DO NOT redesign /command anymore.
+
+The /command dashboard should remain:
+
+* private admin/operator only
+* internal institutional console
+* Kraken + Alpaca capable for admin only
+* live execution control center
+* admin-grade monitoring system
+
+Admin dashboard rules:
+
+* keep current layout
+* keep institutional styling
+* keep operator controls
+* keep Kraken available only to admin/operator
+* do not consumerize this dashboard
+* do not expose Kraken to users
+
+==================================================
+NEW TASK: BUILD CUSTOMER USER DASHBOARD
+=======================================
+
+Now build the customer-facing user dashboard.
+
+This should have almost the same premium black/neon-green design language as the admin dashboard, but WITHOUT the admin/operator left-side panel and without backend/operator controls.
+
+CUSTOMER DASHBOARD PURPOSE:
+
+* user portfolio
+* AI trading activity
+* signals
+* active trades
+* trade history
+* subscription status
+* performance analytics
+* Alpaca-only live trading for users
+
+IMPORTANT EXCHANGE RULES:
+
+* Kraken is ADMIN ONLY.
+* Consumer users only get Alpaca access.
+* Users should never see Kraken.
+* Users should never switch to Kraken.
+* Admin can use Kraken and Alpaca.
+* Users use Alpaca only.
+
+==================================================
+CUSTOMER DASHBOARD LAYOUT
+=========================
+
+TOP STANDARD MENU:
+At the very top, add a clean standard menu bar with:
+
+* Sign In / Account
+* Upgrade
+* Disclaimer
+* Manage Account
+* Social Share buttons
+
+Social share buttons:
+
+* X/Twitter
+* Instagram
+* TikTok
+* Facebook
+* Discord
+* Telegram
+
+Also show:
+
+* signed-in user info
+* current membership tier
+* upgrade CTA if not upgraded
+
+CENTER BRANDING:
+Below the top menu:
+
+* centered AICandlez logo only
+* no operator telemetry above it
+
+USER METRICS ROW:
+Above the 6 charts, show customer-focused performance metrics:
+
+* Total Profit/Loss
+* Win Rate
+* Active AI Trades
+* Today’s Performance
+* Monthly Performance
+* AI Confidence Average
+* Best Performing Asset
+* Account Equity
+
+This section should feel:
+
+* personal to the user
+* motivational
+* premium
+* performance-driven
+
+6 LIVE CHARTS:
+Below the metrics row, show 6 cinematic live charts.
+
+Charts should retain:
+
+* black/neon-green styling
+* Bloomberg/TradingView feel
+* premium glow
+* real market data
+* responsive layout
+
+BELOW CHARTS:
+Include customer-facing panels such as:
+
+* Active Trades
+* Trade History
+* AI Signals
+* Top Gainers
+* Subscription Status
+* AI Auto Trade Queue
+
+Each panel should have its own independent scroll where appropriate.
+
+==================================================
+SUBSCRIPTION TIERS — FINAL STRUCTURE
+====================================
+
+We are now finalizing ONLY 3 tiers across site + app:
+
+1. FREE PAPER TRADING
+
+* 7-day free paper trading trial
+* simulated trading only
+* AI signals
+* watchlists
+* scanner access
+* no live AI trading
+* no AI Auto Trade
+
+2. AI TRADING — $15.99/month
+
+* Alpaca live trading
+* AI Auto Trade enabled
+* up to 3 concurrent live AI trades
+* crypto/equities through Alpaca
+* AI performance analytics
+* live portfolio tracking
+* alerts/notifications
+* 3% performance fee on profitable trades only
+
+3. AI TRADING PRO — $39.99/month
+
+* Alpaca live trading
+* AI Auto Trade enabled
+* up to 12 concurrent live AI trades
+* priority AI execution
+* advanced scanners
+* expanded AI confidence engine
+* enhanced analytics
+* advanced automation controls
+* 3% performance fee on profitable trades only
+
+IMPORTANT:
+Update the app and website subscription logic everywhere:
+
+* $15.99 tier = 3 concurrent live trades
+* $39.99 tier = 12 concurrent live trades
+* remove any old references to 6 trades for $15.99
+* remove any old references to $5.99
+* keep 3% performance fee language
+
+==================================================
+USER VS ADMIN ACCESS
+====================
+
+ADMIN:
+
+* /command
+* Kraken + Alpaca
+* operator controls
+* live execution testing
+* internal monitoring
+* bypass subscription gates
+
+USER:
+
+* customer dashboard
+* Alpaca only
+* subscription-gated live trading
+* AI Auto Trade based on tier
+* no Kraken
+* no admin left panel
+* no operator controls
+
+==================================================
+ADMIN LOGIN
+===========
+
+I need a clear admin login/access system.
+
+Please tell me exactly what you need from me to create/admin-map:
+
+* admin email
+* admin role
+* Clerk role/metadata setup
+* admin route protection
+* operator bypass
+* production admin login instructions
+
+Admin access must be secure and not available to regular users.
+
+==================================================
+HOSTING / GO LIVE TONIGHT
+=========================
+
+We want to go live with the site tonight if possible.
+
+Please advise and implement the fastest safe deployment path.
+
+Questions to answer:
+
+1. Can we deploy this on Replit Deployments tonight?
+2. What services need deployment?
+3. What domains/subdomains should we configure?
+4. What Namecheap DNS records are needed?
+5. What secrets/env vars do you need from me?
+6. What production checklist must be completed before live?
+
+Target domain structure:
+
+* aicandlez.com = public website / landing
+* app.aicandlez.com = customer dashboard
+* admin.aicandlez.com = admin/operator dashboard
+* api.aicandlez.com = backend API
+
+If Replit hosting is suitable for now, prepare the Replit deployment plan.
+If another server is safer, tell me clearly before we proceed.
+
+==================================================
+FINAL REQUIREMENTS
+==================
+
+Do NOT redesign the admin dashboard.
+Do NOT change the finalized mobile visual system except for tier-limit updates.
+Do NOT expose Kraken to users.
+Do NOT remove current premium design language.
+
+Main goals now:
+
+1. Freeze admin dashboard
+2. Build customer dashboard
+3. Update all tier limits to 3 and 12
+4. Confirm app/site pricing consistency
+5. Prepare live deployment
+6. Tell me exactly what you need from me
+7. Then we finish the iOS app build submission after this prompt

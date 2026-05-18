@@ -76,11 +76,11 @@ export const PLAN_FEATURES: Record<string, {
     name:           "AI Trading",
     price_monthly:  1599,   // $15.99 in cents (Stripe standard)
     price_yearly:   15990,  // $159.90/yr — 2 months free
-    description:    "Live AI Trading + AI Auto Trade. 6 concurrent AI trades. 3% performance fee on profitable closed trades only.",
+    description:    "Live AI Trading + AI Auto Trade. 3 concurrent AI trades. 3% performance fee on profitable closed trades only.",
     performanceFee: PERFORMANCE_FEE_RATE,
     features: [
       "Live AI Trading enabled",
-      "Up to 6 concurrent AI trades",
+      "Up to 3 concurrent AI trades",
       "AI Auto Trade enabled",
       "Crypto AI execution",
       "AI portfolio tracking",

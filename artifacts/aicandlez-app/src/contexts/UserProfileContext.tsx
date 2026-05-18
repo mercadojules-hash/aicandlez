@@ -22,7 +22,7 @@ const DEFAULTS: UserProfile = {
   email:         "user@aicandlez.com",
   avatarUrl:     null,
   riskLevel:     "balanced",
-  maxTrades:     6,
+  maxTrades:     3,
   stopLoss:      true,
   notifications: true,
   autoReinvest:  false,

@@ -1068,7 +1068,7 @@ export default function Profile() {
             <StepperRow
               label="Max Concurrent AI Trades"
               sub="AI will not open more than this many positions at once"
-              value={profile.maxTrades} min={1} max={6}
+              value={profile.maxTrades} min={1} max={12}
               onChange={v => updateProfile({ maxTrades: v })}
             />
             <RiskSelector

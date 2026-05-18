@@ -12,7 +12,7 @@ const AIAutoTradeContext = createContext<AIAutoTradeCtx>({
   enabled:      false,
   setEnabled:   () => {},
   positions:    0,
-  maxPositions: 6,
+  maxPositions: 3,
 });
 
 export function AIAutoTradeProvider({ children }: { children: ReactNode }) {
@@ -36,7 +36,7 @@ export function AIAutoTradeProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AIAutoTradeContext.Provider value={{ enabled, setEnabled, positions: 0, maxPositions: 6 }}>
+    <AIAutoTradeContext.Provider value={{ enabled, setEnabled, positions: 0, maxPositions: 3 }}>
       {children}
     </AIAutoTradeContext.Provider>
   );

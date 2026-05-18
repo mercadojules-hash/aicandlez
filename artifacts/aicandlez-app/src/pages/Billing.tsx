@@ -64,11 +64,11 @@ const PLANS: PlanMeta[] = [
     caption:  "Live AI execution on crypto. AI Auto Trade. Real positions.",
     price:    "$15.99",
     priceNum: "15.99",
-    capacity: "Up to 6 Concurrent AI Trades",
+    capacity: "Up to 3 Concurrent AI Trades",
     features: [
       "Live AI Trading enabled",
       "AI Auto Trade enabled",
-      "Up to 6 concurrent AI trades",
+      "Up to 3 concurrent AI trades",
       "Crypto AI execution",
       "AI portfolio tracking",
       "AI performance analytics",

@@ -48,7 +48,7 @@ const VISUAL: Record<string, {
     border:       "rgba(102,255,102,0.28)",
     borderActive: "rgba(102,255,102,0.65)",
     accent:       BRAND,
-    capacity:     "6 Concurrent AI Trades",
+    capacity:     "3 Concurrent AI Trades",
   },
   pro: {
     label: "AI Trading Pro", caption: "Expanded AI capacity. Crypto + Equities. Priority execution.",
