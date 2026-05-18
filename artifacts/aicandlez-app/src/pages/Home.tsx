@@ -616,28 +616,25 @@ export default function Home() {
       .filter(b => b.action && b.action !== "HOLD")
       .sort((a,b) => (b.confidence ?? 0) - (a.confidence ?? 0));
     const pick = candidates[0];
-    const sym = pick?.symbol ?? "BTCUSD";
-    const tk = tickerMap[sym];
+    if (!pick) return null;
+    const tk = tickerMap[pick.symbol];
+    // Normalize backend action: BUY/LONG → bullish, SELL/SHORT → bearish
+    const a = pick.action.toUpperCase();
+    const isBullish = a === "BUY" || a === "LONG";
     return {
-      symbol: sym,
-      action: (pick?.action ?? "LONG") as string,
-      confidence: pick?.confidence ?? 78,
-      price: tk?.price ?? 67842.63,
-      pct: tk?.changePercent24h ?? 2.35,
+      symbol: pick.symbol,
+      isBullish,
+      confidence: pick.confidence ?? 0,
+      price: tk?.price ?? null,
+      pct: tk?.changePercent24h ?? null,
     };
   }, [breakdowns, tickerMap]);
 
   const topGainers = useMemo(() => {
-    const list = (tickersData?.tickers ?? [])
+    return (tickersData?.tickers ?? [])
       .filter(t => t.changePercent24h > 0)
       .sort((a,b) => b.changePercent24h - a.changePercent24h)
       .slice(0, 3);
-    if (list.length >= 3) return list;
-    return [
-      { symbol: "SOLUSD",  short: "SOL",  price: 172.36,  changePercent24h: 6.21, up: true } as MobileTicker,
-      { symbol: "ETHUSD",  short: "ETH",  price: 3486.59, changePercent24h: 4.32, up: true } as MobileTicker,
-      { symbol: "ADAUSD",  short: "ADA",  price: 0.6421,  changePercent24h: 3.18, up: true } as MobileTicker,
-    ];
   }, [tickersData]);
 
   const positions = portfolio?.positions ?? [];
@@ -826,14 +823,14 @@ export default function Home() {
             display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 16,
             paddingTop: 16, borderTop: `1px solid ${BORDER}`,
           }}>
-            {[
+            {([
               { l: "Available", v: fmtShort(cashAvail) },
               { l: "Positions", v: String(positions.length) },
               { l: "Win Rate",  v: `${(simAcc?.winRate ?? 0).toFixed(0)}%`, c: (simAcc?.winRate ?? 0) >= 55 ? POS : WARN },
-            ].map((s, i) => (
+            ] as { l: string; v: string; c?: string }[]).map((s, i) => (
               <div key={i}>
                 <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM, letterSpacing: 1.3, textTransform: "uppercase" }}>{s.l}</div>
-                <div style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: (s as any).c ?? TEXT, marginTop: 4, letterSpacing: -0.2 }}>{s.v}</div>
+                <div style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: s.c ?? TEXT, marginTop: 4, letterSpacing: -0.2 }}>{s.v}</div>
               </div>
             ))}
           </div>
@@ -866,74 +863,92 @@ export default function Home() {
           {/* RADAR */}
           <RadarScanner size={260} blips={radarBlips} status="AI ACTIVE · SCANNING"/>
 
-          {/* Top signal callout */}
-          <div style={{ marginTop: 26, display: "flex", alignItems: "center", gap: 12 }}>
-            <CryptoIcon sym={topInsight.symbol} size={44}/>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.2 }}>
-                  {SYM_SHORT[topInsight.symbol] ?? topInsight.symbol.replace("USD","")}/USDT
-                </span>
-                <span style={{
-                  padding: "3px 8px", borderRadius: 6,
-                  background: topInsight.action === "LONG" ? `${BRAND}1F` : `${NEG}1F`,
-                  border: `1px solid ${topInsight.action === "LONG" ? BORDER_HI : "rgba(255,64,96,0.30)"}`,
-                  fontSize: 9, fontFamily: SANS, fontWeight: 800,
-                  color: topInsight.action === "LONG" ? BRAND : NEG,
-                  letterSpacing: 1, textTransform: "uppercase",
-                }}>
-                  {topInsight.action === "LONG" ? "Bullish" : "Bearish"}
-                </span>
+          {/* Top signal callout — only when AI has a real signal */}
+          {topInsight ? (
+            <>
+              <div style={{ marginTop: 26, display: "flex", alignItems: "center", gap: 12 }}>
+                <CryptoIcon sym={topInsight.symbol} size={44}/>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.2 }}>
+                      {SYM_SHORT[topInsight.symbol] ?? topInsight.symbol.replace("USD","")}/USDT
+                    </span>
+                    <span style={{
+                      padding: "3px 8px", borderRadius: 6,
+                      background: topInsight.isBullish ? `${BRAND}1F` : `${NEG}1F`,
+                      border: `1px solid ${topInsight.isBullish ? BORDER_HI : "rgba(255,64,96,0.30)"}`,
+                      fontSize: 9, fontFamily: SANS, fontWeight: 800,
+                      color: topInsight.isBullish ? BRAND : NEG,
+                      letterSpacing: 1, textTransform: "uppercase",
+                    }}>
+                      {topInsight.isBullish ? "Bullish" : "Bearish"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_DIM, marginTop: 2 }}>
+                    {SYM_LABEL[topInsight.symbol] ?? topInsight.symbol}
+                  </div>
+                </div>
+                {topInsight.price !== null && (
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: TEXT, fontVariantNumeric: "tabular-nums" }}>
+                      {fmtPx(topInsight.price)}
+                    </div>
+                    {topInsight.pct !== null && (
+                      <div style={{
+                        fontSize: 12, fontFamily: SANS, fontWeight: 600,
+                        color: topInsight.pct >= 0 ? POS : NEG, marginTop: 2,
+                      }}>
+                        {topInsight.pct >= 0 ? "+" : ""}{topInsight.pct.toFixed(2)}%
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_DIM, marginTop: 2 }}>
-                {SYM_LABEL[topInsight.symbol] ?? topInsight.symbol}
+
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
+                  <span style={{ fontSize: 10, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM, letterSpacing: 1.2, textTransform: "uppercase" }}>
+                    AI Confidence
+                  </span>
+                  <span style={{ fontSize: 14, fontFamily: SANS, fontWeight: 800, color: BRAND, letterSpacing: -0.1 }}>
+                    {topInsight.confidence}%
+                  </span>
+                </div>
+                <ConfidenceBar value={topInsight.confidence}/>
               </div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 16, fontFamily: SANS, fontWeight: 700, color: TEXT, fontVariantNumeric: "tabular-nums" }}>
-                {fmtPx(topInsight.price)}
-              </div>
+
               <div style={{
-                fontSize: 12, fontFamily: SANS, fontWeight: 600,
-                color: topInsight.pct >= 0 ? POS : NEG, marginTop: 2,
+                marginTop: 14, padding: "11px 13px", borderRadius: 12,
+                background: "rgba(102,255,102,0.05)",
+                border: `1px solid ${BORDER_HI}`,
               }}>
-                {topInsight.pct >= 0 ? "+" : ""}{topInsight.pct.toFixed(2)}%
-              </div>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
-              <span style={{ fontSize: 10, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM, letterSpacing: 1.2, textTransform: "uppercase" }}>
-                AI Confidence
-              </span>
-              <span style={{ fontSize: 14, fontFamily: SANS, fontWeight: 800, color: BRAND, letterSpacing: -0.1 }}>
-                {topInsight.confidence}%
-              </span>
-            </div>
-            <ConfidenceBar value={topInsight.confidence}/>
-          </div>
-
-          <div style={{
-            marginTop: 14, padding: "11px 13px", borderRadius: 12,
-            background: "rgba(102,255,102,0.05)",
-            border: `1px solid ${BORDER_HI}`,
-          }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
-              <div style={{ color: BRAND, marginTop: 1 }}>{IconSparkle}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontFamily: SANS, fontWeight: 600, color: TEXT, lineHeight: 1.45 }}>
-                  Strong {topInsight.action === "LONG" ? "buying" : "selling"} momentum detected
-                </div>
-                <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_SUB, marginTop: 3, lineHeight: 1.45 }}>
-                  High probability of {topInsight.action === "LONG" ? "upward" : "downward"} movement
-                </div>
-                <div style={{ fontSize: 9, fontFamily: SANS, color: TEXT_DIM, marginTop: 6, letterSpacing: 0.5, textTransform: "uppercase", fontWeight: 700 }}>
-                  Updated 2 min ago
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
+                  <div style={{ color: BRAND, marginTop: 1 }}>{IconSparkle}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, fontFamily: SANS, fontWeight: 600, color: TEXT, lineHeight: 1.45 }}>
+                      Strong {topInsight.isBullish ? "buying" : "selling"} momentum detected
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_SUB, marginTop: 3, lineHeight: 1.45 }}>
+                      High probability of {topInsight.isBullish ? "upward" : "downward"} movement
+                    </div>
+                  </div>
                 </div>
               </div>
+            </>
+          ) : (
+            <div style={{
+              marginTop: 24, padding: "20px 16px", textAlign: "center",
+              borderRadius: 12, background: "rgba(102,255,102,0.04)",
+              border: `1px dashed ${BORDER_HI}`,
+            }}>
+              <div style={{ fontSize: 12, fontFamily: SANS, fontWeight: 600, color: TEXT, lineHeight: 1.5 }}>
+                AI is scanning the market
+              </div>
+              <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_SUB, marginTop: 4 }}>
+                No high-confidence signals right now. Sit tight.
+              </div>
             </div>
-          </div>
+          )}
 
           {/* GLOWING BUY / SELL CTA PAIR */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16 }}>
@@ -976,7 +991,13 @@ export default function Home() {
           border: `1px solid ${BORDER}`,
           boxShadow: `0 12px 32px rgba(0,0,0,0.5)`,
         }}>
-          {topGainers.map((t, i) => (
+          {topGainers.length === 0 ? (
+            <div style={{ padding: "22px 18px", textAlign: "center" }}>
+              <div style={{ fontSize: 12, fontFamily: SANS, color: TEXT_DIM }}>
+                Loading live market data…
+              </div>
+            </div>
+          ) : topGainers.map((t, i) => (
             <div key={t.symbol} onClick={() => setLocation("/markets")} style={{
               display: "flex", alignItems: "center", gap: 12,
               padding: "15px 18px",
@@ -987,7 +1008,7 @@ export default function Home() {
               <CryptoIcon sym={t.symbol} size={38}/>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontFamily: SANS, fontWeight: 700, color: TEXT, letterSpacing: -0.1 }}>
-                  {(t as MobileTicker).short ?? SYM_SHORT[t.symbol] ?? t.symbol.replace("USD","")}/USDT
+                  {t.short ?? SYM_SHORT[t.symbol] ?? t.symbol.replace("USD","")}/USDT
                 </div>
                 <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_DIM, marginTop: 2 }}>
                   {SYM_LABEL[t.symbol] ?? t.symbol}
@@ -1023,10 +1044,11 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            positions.slice(0, 3).map((p: any, i: number) => {
+            positions.slice(0, 3).map((p, i) => {
               const isLong = (p.side ?? "long").toLowerCase() === "long";
               const upnl = p.unrealizedPnL ?? 0;
-              const roe = p.roe ?? (p.unrealizedPnLPct ?? 0);
+              const notional = (p.size ?? 0) * (p.entryPrice ?? 0);
+              const roe = notional > 0 ? (upnl / notional) * 100 : 0;
               return (
                 <div key={i} style={{
                   marginBottom: 10, padding: "16px 18px", borderRadius: 18,
@@ -1047,7 +1069,7 @@ export default function Home() {
                       color: isLong ? BRAND : NEG, letterSpacing: 1, textTransform: "uppercase",
                     }}>{isLong ? "Long" : "Short"}</span>
                     <span style={{ fontSize: 10, fontFamily: SANS, color: TEXT_DIM, marginLeft: "auto" }}>
-                      {p.leverage ? `Cross ${p.leverage}x` : "Cross"}
+                      Spot
                     </span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
