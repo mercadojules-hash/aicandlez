@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { api, type MobileSignalsResponse, type MobileTickersResponse, type SignalBreakdown } from "@/lib/api";
 import { CryptoIcon, SYM_LABEL, SYM_SHORT } from "@/components/CryptoIcon";
@@ -178,21 +178,15 @@ function ConfidenceGauge({ value }: { value: number }) {
     <div style={{
       position: "relative", width: size, height: size, flexShrink: 0,
     }}>
-      {/* Outer bloom */}
-      <div style={{
-        position: "absolute", inset: -8, borderRadius: "50%",
-        background: `radial-gradient(circle, ${color}33 0%, transparent 70%)`,
-        animation: "orb-breathe 3.2s ease-in-out infinite",
-        pointerEvents: "none",
-      }}/>
+      {/* Institutional gauge — restrained glow, no arcade bloom */}
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle cx={size/2} cy={size/2} r={r}
-          fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={4}/>
+          fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={3.5}/>
         <circle cx={size/2} cy={size/2} r={r}
-          fill="none" stroke={color} strokeWidth={4} strokeLinecap="round"
+          fill="none" stroke={color} strokeWidth={3.5} strokeLinecap="round"
           strokeDasharray={`${dash} ${c}`}
           transform={`rotate(-90 ${size/2} ${size/2})`}
-          style={{ filter: `drop-shadow(0 0 6px ${color})` }}
+          opacity={0.92}
         />
       </svg>
       <div style={{
@@ -200,9 +194,8 @@ function ConfidenceGauge({ value }: { value: number }) {
         alignItems: "center", justifyContent: "center", lineHeight: 1,
       }}>
         <div style={{
-          fontSize: 16, fontFamily: SANS, fontWeight: 800, color,
+          fontSize: 15, fontFamily: SANS, fontWeight: 800, color,
           letterSpacing: -0.4, fontVariantNumeric: "tabular-nums",
-          textShadow: `0 0 10px ${color}`,
         }}>{Math.round(pct)}%</div>
         <div style={{
           fontSize: 7, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
@@ -436,6 +429,40 @@ export default function AISignals() {
           </div>
         </div>
 
+        {/* Enable Live AI Trading — premium upgrade CTA */}
+        <div style={{ padding: "6px 16px 12px" }}>
+          <button
+            onClick={() => setLocation("/subscribe")}
+            style={{
+              position: "relative", overflow: "hidden", width: "100%",
+              padding: "14px 18px", borderRadius: 999, cursor: "pointer",
+              background: `linear-gradient(135deg, ${BRAND_DEEP} 0%, ${BRAND} 55%, ${BRAND_BRGT} 100%)`,
+              border: `1px solid ${BRAND_BRGT}`,
+              color: "#001b06",
+              fontSize: 13.5, fontFamily: SANS, fontWeight: 900,
+              letterSpacing: 0.6, textTransform: "uppercase",
+              boxShadow: `0 10px 32px ${BRAND_GLOW}, 0 0 0 1px rgba(255,255,255,0.18) inset, 0 1px 0 rgba(255,255,255,0.45) inset`,
+              animation: "orb-breathe 3.6s ease-in-out infinite",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span style={{
+                width: 7, height: 7, borderRadius: "50%", background: "#001b06",
+                boxShadow: "0 0 8px rgba(0,0,0,0.4)",
+                animation: "dot-pulse 1.4s ease-in-out infinite",
+              }}/>
+              Enable Live AI Trading
+            </span>
+            <span style={{ fontSize: 16, fontWeight: 900, opacity: 0.85 }}>›</span>
+            {/* sheen sweep */}
+            <span aria-hidden style={{
+              position: "absolute", top: 0, left: "-30%", height: "100%", width: "30%",
+              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)",
+              animation: "edge-sweep 4.5s ease-in-out infinite",
+            }}/>
+          </button>
+        </div>
+
         {/* Tab bar — Active / Crypto / Equities */}
         <div style={{
           margin: "4px 16px 12px",
@@ -585,6 +612,9 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
   kind?: "crypto" | "equity";
   isPreview?: boolean;
 }) {
+  const queryClient = useQueryClient();
+  const [pending, setPending] = useState<"BUY" | "SELL" | null>(null);
+  const [feedback, setFeedback] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const isLong = breakdown.action.toUpperCase() === "BUY";
   const isHold = breakdown.action.toUpperCase() === "HOLD";
   const grade = deriveGrade(breakdown.action, breakdown.confidence);
@@ -602,12 +632,66 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
     ? (EQUITY_NAME[breakdown.symbol] ?? breakdown.symbol)
     : (SYM_LABEL[breakdown.symbol] ?? short);
 
+  const orderMutation = useMutation<unknown, Error, "BUY" | "SELL">({
+    mutationFn: async (side) => {
+      const alpacaSymbol = kind === "crypto" ? `${short}/USD` : breakdown.symbol;
+      const res = await fetch("/api/exchange/alpaca/order", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ symbol: alpacaSymbol, side: side.toLowerCase(), notional: 1000 }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+      return body;
+    },
+    onMutate: (side) => { setPending(side); setFeedback(null); },
+    onSuccess: (_, side) => {
+      void queryClient.invalidateQueries({ queryKey: ["mobile-portfolio"] });
+      void queryClient.invalidateQueries({ queryKey: ["sim-account"] });
+      void queryClient.invalidateQueries({ queryKey: ["sim-trades"] });
+      void queryClient.invalidateQueries({ queryKey: ["alpaca-positions"] });
+      void queryClient.invalidateQueries({ queryKey: ["alpaca-orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["alpaca-account"] });
+      setFeedback({ kind: "ok", text: `${side} order submitted · added to Active Trades` });
+      setTimeout(() => setFeedback(null), 3200);
+    },
+    onError: (err) => {
+      const msg = err.message || "Order failed";
+      const friendly = /not configured|401|unauthor/i.test(msg)
+        ? "Paper broker not configured — connect in Profile"
+        : /insufficient/i.test(msg) ? "Insufficient paper buying power"
+        : /not found/i.test(msg)    ? `${short} not supported by paper broker`
+        : msg;
+      setFeedback({ kind: "err", text: friendly });
+      setTimeout(() => setFeedback(null), 4000);
+    },
+    onSettled: () => setTimeout(() => setPending(null), 650),
+  });
+
+  const placeOrder = (side: "BUY" | "SELL", e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (pending) return;
+    if (isPreview) {
+      setFeedback({ kind: "err", text: "Equity engine launching soon — use AI Auto Trade to queue" });
+      setTimeout(() => setFeedback(null), 3200);
+      return;
+    }
+    orderMutation.mutate(side);
+  };
+  const triggerAutoTrade = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onOpen?.();
+  };
+
   return (
     <div
       role={onOpen ? "button" : undefined}
       tabIndex={onOpen ? 0 : undefined}
       onClick={onOpen}
-      onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } } : undefined}
+      onKeyDown={onOpen ? (e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); }
+      } : undefined}
       style={{
       position: "relative", overflow: "hidden",
       marginBottom: 12, borderRadius: 18, padding: "14px 14px 12px",
@@ -799,6 +883,80 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
         )}
         <QualityChip label={breakdown.marketCondition || "Active"}/>
       </div>
+
+      {/* Action row: BUY / SELL / AI AUTO TRADE — AUTO TRADE is the primary AI CTA */}
+      <div style={{
+        marginTop: 12, display: "grid",
+        gridTemplateColumns: "1fr 1fr 1.7fr", gap: 6,
+      }}>
+        <button
+          onClick={(e) => placeOrder("BUY", e)}
+          disabled={!!pending || isPreview}
+          aria-disabled={!!pending || isPreview}
+          title={isPreview ? "Live equity execution launching soon" : undefined}
+          style={{
+            padding: "10px 8px", borderRadius: 10,
+            cursor: pending || isPreview ? "not-allowed" : "pointer",
+            background: `${BRAND}14`,
+            border: `1px solid ${BORDER_HI}`,
+            color: BRAND, fontFamily: SANS, fontWeight: 800,
+            fontSize: 11, letterSpacing: 0.8,
+            opacity: isPreview ? 0.35 : (pending && pending !== "BUY" ? 0.45 : 1),
+            transition: "transform 0.15s ease",
+          }}>{pending === "BUY" ? "Sending…" : "BUY"}</button>
+
+        <button
+          onClick={(e) => placeOrder("SELL", e)}
+          disabled={!!pending || isPreview}
+          aria-disabled={!!pending || isPreview}
+          title={isPreview ? "Live equity execution launching soon" : undefined}
+          style={{
+            padding: "10px 8px", borderRadius: 10,
+            cursor: pending || isPreview ? "not-allowed" : "pointer",
+            background: "rgba(255,64,96,0.10)",
+            border: "1px solid rgba(255,64,96,0.30)",
+            color: NEG, fontFamily: SANS, fontWeight: 800,
+            fontSize: 11, letterSpacing: 0.8,
+            opacity: isPreview ? 0.35 : (pending && pending !== "SELL" ? 0.45 : 1),
+            transition: "transform 0.15s ease",
+          }}>{pending === "SELL" ? "Sending…" : "SELL"}</button>
+
+        <button
+          onClick={triggerAutoTrade}
+          style={{
+            position: "relative", overflow: "hidden",
+            padding: "10px 12px", borderRadius: 10, cursor: "pointer",
+            background: `linear-gradient(135deg, ${BRAND_DEEP} 0%, ${BRAND} 55%, ${BRAND_BRGT} 100%)`,
+            border: `1px solid ${BRAND_BRGT}`,
+            color: "#001b06", fontFamily: SANS, fontWeight: 900,
+            fontSize: 11.5, letterSpacing: 0.9, textTransform: "uppercase",
+            boxShadow: `0 8px 22px ${BRAND_GLOW}, 0 0 0 1px rgba(255,255,255,0.18) inset, 0 1px 0 rgba(255,255,255,0.45) inset`,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+          }}>
+          <span style={{
+            display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+            background: "#001b06", animation: "dot-pulse 1.5s ease-in-out infinite",
+          }}/>
+          AI Auto Trade
+          <span aria-hidden style={{
+            position: "absolute", top: 0, left: "-25%", height: "100%", width: "25%",
+            background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.32) 50%, transparent 100%)",
+            animation: "edge-sweep 5s ease-in-out infinite",
+          }}/>
+        </button>
+      </div>
+
+      {/* Inline order feedback */}
+      {feedback && (
+        <div style={{
+          marginTop: 8, padding: "7px 10px", borderRadius: 8,
+          fontSize: 10.5, fontFamily: SANS, fontWeight: 700,
+          background: feedback.kind === "ok" ? `${BRAND}14` : "rgba(255,64,96,0.10)",
+          border:     feedback.kind === "ok" ? `1px solid ${BORDER_HI}` : "1px solid rgba(255,64,96,0.30)",
+          color:      feedback.kind === "ok" ? BRAND : NEG,
+          letterSpacing: 0.2,
+        }}>{feedback.text}</div>
+      )}
     </div>
   );
 }
