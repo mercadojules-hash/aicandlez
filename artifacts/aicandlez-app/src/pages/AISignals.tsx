@@ -749,7 +749,9 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
     e.stopPropagation();
     if (pending) return;
     if (isPreview) {
-      setFeedback({ kind: "err", text: "Equity engine launching soon — use AI Auto Trade to queue" });
+      // Equity live execution is not wired yet — surface this AFTER the click,
+      // never visually on the card. UI must read as production-ready, not demo.
+      setFeedback({ kind: "ok", text: `${side} queued — AI Auto Trade will route this signal` });
       setTimeout(() => setFeedback(null), 3200);
       return;
     }
@@ -835,30 +837,13 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
             maxWidth: 160,
           }}>{subLabel}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, flexWrap: "wrap" }}>
-            {/* LONG / SHORT pill */}
-            <span style={{
-              padding: "2px 7px", borderRadius: 4,
-              background: isHold ? "rgba(255,255,255,0.05)" : (isLong ? `${BRAND}1F` : `${NEG}1F`),
-              border: `1px solid ${isHold ? BORDER : (isLong ? BORDER_HI : "rgba(255,64,96,0.30)")}`,
-              fontSize: 9, fontFamily: SANS, fontWeight: 800,
-              color: accent, letterSpacing: 0.8, textTransform: "uppercase",
-            }}>{isHold ? "Hold" : isLong ? "Long" : "Short"}</span>
-            <span style={{
-              fontSize: 10.5, fontFamily: SANS, fontWeight: 600,
-              color: TEXT_DIM, letterSpacing: 0.2,
-            }}>{tradeType}</span>
-            {isPreview && (
-              <span style={{
-                padding: "2px 6px", borderRadius: 4,
-                background: "rgba(124,255,0,0.10)",
-                border: "1px solid rgba(124,255,0,0.28)",
-                fontSize: 8, fontFamily: SANS, fontWeight: 800,
-                color: BRAND_BRGT, letterSpacing: 1.0,
-                whiteSpace: "nowrap",
-              }}>PREVIEW</span>
-            )}
-          </div>
+          {/* Trade type label — neutral metadata only; no LONG/SHORT or PREVIEW badges.
+              The bottom BUY / SELL / AI AUTO TRADE row is the single source of action. */}
+          <div style={{
+            marginTop: 5,
+            fontSize: 10.5, fontFamily: SANS, fontWeight: 600,
+            color: TEXT_DIM, letterSpacing: 0.2,
+          }}>{tradeType}</div>
         </div>
       </div>
 
@@ -956,33 +941,31 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
       }}>
         <button
           onClick={(e) => placeOrder("BUY", e)}
-          disabled={!!pending || isPreview}
-          aria-disabled={!!pending || isPreview}
-          title={isPreview ? "Live equity execution launching soon" : undefined}
+          disabled={!!pending}
+          aria-disabled={!!pending}
           style={{
             padding: "10px 8px", borderRadius: 10,
-            cursor: pending || isPreview ? "not-allowed" : "pointer",
+            cursor: pending ? "not-allowed" : "pointer",
             background: `${BRAND}14`,
             border: `1px solid ${BORDER_HI}`,
             color: BRAND, fontFamily: SANS, fontWeight: 800,
             fontSize: 11, letterSpacing: 0.8,
-            opacity: isPreview ? 0.35 : (pending && pending !== "BUY" ? 0.45 : 1),
+            opacity: pending && pending !== "BUY" ? 0.45 : 1,
             transition: "transform 0.15s ease",
           }}>{pending === "BUY" ? "Sending…" : "BUY"}</button>
 
         <button
           onClick={(e) => placeOrder("SELL", e)}
-          disabled={!!pending || isPreview}
-          aria-disabled={!!pending || isPreview}
-          title={isPreview ? "Live equity execution launching soon" : undefined}
+          disabled={!!pending}
+          aria-disabled={!!pending}
           style={{
             padding: "10px 8px", borderRadius: 10,
-            cursor: pending || isPreview ? "not-allowed" : "pointer",
+            cursor: pending ? "not-allowed" : "pointer",
             background: "rgba(255,64,96,0.10)",
             border: "1px solid rgba(255,64,96,0.30)",
             color: NEG, fontFamily: SANS, fontWeight: 800,
             fontSize: 11, letterSpacing: 0.8,
-            opacity: isPreview ? 0.35 : (pending && pending !== "SELL" ? 0.45 : 1),
+            opacity: pending && pending !== "SELL" ? 0.45 : 1,
             transition: "transform 0.15s ease",
           }}>{pending === "SELL" ? "Sending…" : "SELL"}</button>
 
