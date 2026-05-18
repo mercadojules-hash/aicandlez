@@ -171,11 +171,40 @@ export default function CommandCenter() {
   const toggleEquitiesLive = () => setEquitiesLive(v => !v);
   useEffect(() => { if (isPaused) setEquitiesLive(false); }, [isPaused]);
 
-  /* ── Derived trade pools ──────────────────────────────────────────────── */
+  /* ── Derived trade pools ──────────────────────────────────────────────────
+   * Operator dashboard rule: NEVER render simulated execution.
+   *   - Active Positions  → ONLY when live engine is armed; otherwise empty.
+   *   - Closed Trade Hist → ONLY real-execution rows; sim history is hidden.
+   * If Kraken has no positions, the blotter is genuinely empty by design. */
   const tradesArr     = Array.isArray(trades) ? trades : [];
-  const openTrades    = tradesArr.filter(t => t.status?.toLowerCase() === "open");
-  const closedTrades  = tradesArr.filter(t => t.status?.toLowerCase() !== "open" || t.exitPrice != null);
-  const livePositions = liveActive ? [] : (simAccount?.positions ?? []);
+  const liveTrades    = liveActive
+    ? tradesArr.filter(t => (t.mode ?? "").toLowerCase() === "live" || (t as { source?: string }).source === "live")
+    : [];
+  // If `mode`/`source` columns aren't populated yet, fall back to ALL trades
+  // ONLY when live is armed — otherwise nothing renders.
+  const effectiveTrades = liveTrades.length > 0 || !liveActive ? liveTrades : tradesArr;
+  const openTrades    = effectiveTrades.filter(t => t.status?.toLowerCase() === "open");
+  const closedTrades  = effectiveTrades.filter(t => t.status?.toLowerCase() !== "open" || t.exitPrice != null);
+  const livePositions: SimAccount["positions"] = [];
+
+  /* ── Live-execution confidence eligibility (80% hard floor) ───────────────
+   * Compute the strongest current AI confidence per asset class from engine
+   * breakdowns. STANDBY → ARMED transition is blocked unless ≥80%.
+   * Backend `autoExecute` enforces the same floor as a hard rule. */
+  const breakdowns = engine?.symbolBreakdowns ?? {};
+  const CRYPTO_SYMS = new Set(["BTC","ETH","SOL","XRP","ADA","AVAX","DOGE","LINK","DOT","MATIC","LTC","ATOM","NEAR","ALGO","FIL","ARB","OP","INJ","SUI","APT","BCH","UNI","AAVE","ETC"]);
+  let cryptoMax = 0, equitiesMax = 0;
+  for (const [sym, b] of Object.entries(breakdowns)) {
+    const base = sym.replace(/[\/-].*$/,"").replace(/USD[TC]?$/,"").toUpperCase();
+    const conf = b?.avgConfidence ?? 0;
+    if (CRYPTO_SYMS.has(base)) cryptoMax   = Math.max(cryptoMax,   conf);
+    else                       equitiesMax = Math.max(equitiesMax, conf);
+  }
+  const LIVE_CONF_FLOOR = 80;
+  const cryptoEligible   = cryptoMax   >= LIVE_CONF_FLOOR;
+  const equitiesEligible = equitiesMax >= LIVE_CONF_FLOOR;
+  const cryptoReason   = cryptoMax   > 0 ? `MAX ${cryptoMax.toFixed(0)}% · NEED 80%`   : "AWAITING SIGNALS";
+  const equitiesReason = equitiesMax > 0 ? `MAX ${equitiesMax.toFixed(0)}% · NEED 80%` : "AWAITING SIGNALS";
 
   /* ── Render ───────────────────────────────────────────────────────────── */
   return (
@@ -240,6 +269,8 @@ export default function CommandCenter() {
               assetClass="CRYPTO"
               state={cryptoState}
               onToggle={toggleCryptoLive}
+              eligible={cryptoEligible}
+              eligibilityReason={cryptoReason}
             />
             <CryptoSignalsPanel engine={engine} />
           </div>
@@ -248,6 +279,8 @@ export default function CommandCenter() {
               assetClass="EQUITIES"
               state={equitiesState}
               onToggle={toggleEquitiesLive}
+              eligible={equitiesEligible}
+              eligibilityReason={equitiesReason}
             />
             <EquitySignalsPanel engine={engine} />
           </div>

@@ -451,6 +451,16 @@ async function isCorrelationBlocked(symbol: string): Promise<boolean> {
 // The force-test-trades endpoint bypasses ALL gates and calls placeOrder()
 // directly, intentionally skipping limits for pipeline verification.
 
+/**
+ * Hard live-execution confidence floor.
+ *
+ * Operator policy: real-money / live exchange orders MUST NEVER be placed
+ * with AI confidence below this threshold, regardless of any other gate.
+ * Simulation/test paths are unaffected — this rule only fires when the
+ * exchange engine is in LIVE mode.
+ */
+export const LIVE_EXECUTION_MIN_CONFIDENCE = 80;
+
 async function autoExecute(
   signalId:     string,
   symbol:       string,
@@ -460,7 +470,31 @@ async function autoExecute(
   shortSummary: string,
   settings:     LoopSettings,
   isTest:       boolean,
+  confidence:   number,
 ): Promise<{ executed: boolean; blockReason: string | null }> {
+
+  // ── Gate 0: live-mode 80% hard floor ───────────────────────────────────────
+  // No live order may ever be submitted below the institutional confidence
+  // threshold. Sim paths are unaffected (live mode check below).
+  try {
+    const { getExchangeStatus } = await import("./exchangeEngine.js");
+    const exMode = getExchangeStatus().mode;
+    const isLiveMode = exMode !== "simulation";
+    if (isLiveMode && !isTest && confidence < LIVE_EXECUTION_MIN_CONFIDENCE) {
+      engineStats.tradesBlocked++;
+      const msg = `Live execution blocked for ${symbol} ${side}: confidence ${confidence.toFixed(1)}% < ${LIVE_EXECUTION_MIN_CONFIDENCE}% floor`;
+      logger.warn({ symbol, side, confidence, floor: LIVE_EXECUTION_MIN_CONFIDENCE, mode: exMode }, msg);
+      await db.insert(logsTable).values({
+        id: genId(), type: "trade", level: "warn",
+        message: msg,
+        details: { symbol, side, confidence, floor: LIVE_EXECUTION_MIN_CONFIDENCE, mode: exMode },
+      });
+      auditLogger.append("system", "TRADE_REJECTED", {
+        symbol, side, confidence, floor: LIVE_EXECUTION_MIN_CONFIDENCE, gate: "live_confidence_floor",
+      }, { symbol, severity: "warn" });
+      return { executed: false, blockReason: `Below 80% live-execution threshold (${confidence.toFixed(1)}%)` };
+    }
+  } catch { /* fail-open to existing gates only on import error */ }
 
   // ── Gate 1: max concurrent open positions ──────────────────────────────────
   if (settings.maxActivePositions > 0) {
@@ -808,6 +842,7 @@ async function tick() {
           primaryDecision.shortSummary,
           settings,
           testMode,
+          mtf.avgConfidence,
         );
 
         // Update signal log with execution result

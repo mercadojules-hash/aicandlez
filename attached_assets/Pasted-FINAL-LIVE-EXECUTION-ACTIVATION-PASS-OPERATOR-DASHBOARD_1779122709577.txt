@@ -1,0 +1,130 @@
+FINAL LIVE EXECUTION ACTIVATION PASS — OPERATOR DASHBOARD
+
+The institutional dashboard polish is excellent. We are now moving into REAL LIVE EXECUTION testing mode with Kraken.
+
+There are still a few important operator-control issues that must be corrected.
+
+LIVE EXECUTION TOGGLES NEED TRUE ACTIVE/INACTIVE STATES
+The following sections:
+ENABLE LIVE AI CRYPTO TRADING
+ENABLE LIVE AI EQUITIES TRADING
+
+must visually behave like real execution controls.
+
+CURRENT ISSUE:
+The UI still feels passive/inactive and the colors are not communicating state clearly.
+
+REQUIRED BEHAVIOR:
+
+DEFAULT / OFF STATE:
+
+dark neutral background
+muted border
+no glow
+system idle
+
+WHEN ENABLED / ACTIVE:
+
+button/container turns ORANGE
+active glow animation
+strong “LIVE EXECUTION ACTIVE” feel
+institutional warning energy
+visually obvious that live execution is armed
+
+WHEN STOPPING / DISABLED:
+
+RED stop state
+red glow/pulse
+clear “execution halted” appearance
+
+Think:
+
+Bloomberg emergency controls
+institutional trading desk execution arming
+hedge fund execution console
+
+This needs to feel HIGH STAKES and visually intentional.
+
+REMOVE ALL SIMULATION EXECUTION FROM OPERATOR DASHBOARD
+I do NOT want:
+simulated execution
+fake trades
+paper positions
+sandbox active positions
+generated mock executions
+
+on MY operator dashboard.
+
+The operator dashboard should ONLY display:
+
+REAL Kraken balances
+REAL Kraken positions
+REAL Kraken open trades
+REAL realized PnL
+REAL execution status
+
+If Kraken has:
+
+no active trades
+then Active Positions should be EMPTY.
+
+Do NOT generate placeholder/simulation trades.
+
+KRAKEN MUST BE TRUE LIVE MODE
+The dashboard currently still feels semi-standby/sandbox.
+
+I need Kraken LIVE execution mode activated so I can begin testing with the real $100 Kraken balance.
+
+Requirements:
+
+real Kraken account connection
+real order placement
+real order close
+real open positions
+real balances
+real execution telemetry
+
+The operator dashboard is now a LIVE execution environment.
+
+EXECUTION SAFETY CONTROLS
+Before enabling LIVE:
+keep hard risk protections enabled
+default tiny position sizing
+require confirmation before real execution
+max 1 concurrent live trade initially
+conservative AI execution only
+
+We are testing infrastructure reliability first — not aggressive trading.
+
+UI TERMINOLOGY CLEANUP
+Replace lingering passive terminology with institutional wording:
+
+Examples:
+
+STANDBY
+LIVE
+EXECUTION ARMED
+EXECUTION HALTED
+ENGINE ACTIVE
+KRAKEN CONNECTED
+REAL BALANCE
+LIVE POSITIONS
+LIVE EXECUTION ENABLED
+
+Avoid:
+
+simulation
+paper
+sandbox
+demo
+FINAL VERIFICATION
+After changes:
+verify orange ACTIVE state works
+verify red STOP state works
+verify no simulated trades render
+verify Kraken live balances render
+verify ONLY real Kraken positions display
+verify operator dashboard is fully live-capable
+verify no mock telemetry feeds remain in active positions
+
+This is now the LIVE institutional operator environment for real execution testing.
