@@ -9,16 +9,20 @@ import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
 import { useUserProfile, type UserProfile } from "@/contexts/UserProfileContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { PageHeader } from "@/components/PageHeader";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
+// Aligned with the Signals/Crypto/Equities neon-green system.
+// Legacy cyan token `C` is kept as a name but remapped onto BRAND green so
+// the entire existing layout re-skins without restructuring.
 const BG   = "#000000";
-const CARD = "#0d151e";
+const CARD = "#0A1410";
 const E    = "rgba(255,255,255,0.07)";
-const C    = "#00e5ff";
-const G    = "#00ff88";
-const W    = "#ffffff";
-const GR   = "#8892a4";
-const DIM  = "#647385";
+const C    = "#66FF66";   // BRAND (was cyan #00e5ff)
+const G    = "#7CFF00";   // bright lime accent
+const W    = "#E8F5EC";
+const GR   = "#8A9C94";
+const DIM  = "#5A726A";
 const GOLD = "#ffd200";
 const SANS = "'SF Pro Display','Inter',system-ui,-apple-system,sans-serif";
 const MONO = "'SF Mono','JetBrains Mono','Roboto Mono',Consolas,monospace";
@@ -134,7 +138,7 @@ function EditField({ label, value, onChange, placeholder, type="text" }: {
           outline:"none", boxSizing:"border-box" as const,
           transition:"border-color 0.15s ease",
         }}
-        onFocus={e => e.target.style.borderColor = "rgba(0,229,255,0.40)"}
+        onFocus={e => e.target.style.borderColor = "rgba(102,255,102,0.40)"}
         onBlur={e  => e.target.style.borderColor = "rgba(255,255,255,0.11)"}
       />
     </div>
@@ -156,9 +160,9 @@ function AIToggle({ label, sub, value, onChange, divider=true }: {
       <button onClick={() => onChange(!value)} style={{
         flexShrink:0, cursor:"pointer",
         position:"relative", width:46, height:26, borderRadius:13,
-        background:value?"rgba(0,229,255,0.15)":"rgba(255,255,255,0.05)",
-        border:`1px solid ${value?"rgba(0,229,255,0.40)":"rgba(255,255,255,0.10)"}`,
-        boxShadow:value?"0 0 14px rgba(0,229,255,0.22)":"none",
+        background:value?"rgba(102,255,102,0.15)":"rgba(255,255,255,0.05)",
+        border:`1px solid ${value?"rgba(102,255,102,0.40)":"rgba(255,255,255,0.10)"}`,
+        boxShadow:value?"0 0 14px rgba(102,255,102,0.22)":"none",
         transition:"all 0.25s ease",
       }}>
         <div style={{
@@ -166,7 +170,7 @@ function AIToggle({ label, sub, value, onChange, divider=true }: {
           left:value?"calc(100% - 22px)":"3px",
           width:18, height:18, borderRadius:"50%",
           background:value?C:"rgba(255,255,255,0.35)",
-          boxShadow:value?"0 0 8px rgba(0,229,255,0.60)":"none",
+          boxShadow:value?"0 0 8px rgba(102,255,102,0.60)":"none",
           transition:"left 0.25s ease, background 0.25s ease, box-shadow 0.25s ease",
         }}/>
       </button>
@@ -208,7 +212,7 @@ type RiskLevel = UserProfile["riskLevel"];
 function RiskSelector({ value, onChange }: { value:RiskLevel; onChange:(v:RiskLevel)=>void }) {
   const opts: { key:RiskLevel; label:string; color:string }[] = [
     { key:"low",        label:"LOW",  color:"rgba(0,255,136,0.85)" },
-    { key:"balanced",   label:"BAL",  color:"rgba(0,229,255,0.85)" },
+    { key:"balanced",   label:"BAL",  color:"rgba(102,255,102,0.85)" },
     { key:"aggressive", label:"HIGH", color:"rgba(255,148,0,0.85)" },
   ];
   return (
@@ -242,25 +246,25 @@ function AIStatusCard({ enabled, positions, maxPositions }: {
     <div style={{
       position:"relative", overflow:"hidden",
       background:enabled
-        ?"linear-gradient(160deg,#051a28 0%,#030f1c 100%)"
-        :"linear-gradient(160deg,#0c0e20 0%,#080a1c 100%)",
-      border:`1px solid ${enabled?"rgba(0,229,255,0.30)":"rgba(255,255,255,0.08)"}`,
+        ?"linear-gradient(160deg,#06140C 0%,#030C06 100%)"
+        :"linear-gradient(160deg,#0A1410 0%,#050A07 100%)",
+      border:`1px solid ${enabled?"rgba(102,255,102,0.30)":"rgba(255,255,255,0.08)"}`,
       borderRadius:18, padding:"18px 16px",
       boxShadow:enabled
-        ?"0 0 50px rgba(0,229,255,0.10),0 12px 40px rgba(0,0,0,0.95)"
+        ?"0 0 50px rgba(102,255,102,0.10),0 12px 40px rgba(0,0,0,0.95)"
         :"0 8px 32px rgba(0,0,0,0.90)",
       transition:"all 0.40s ease", marginBottom:18,
     }}>
       <div aria-hidden style={{
         position:"absolute", top:0, left:0, right:0, height:2,
         background:enabled
-          ?"linear-gradient(90deg,transparent 5%,rgba(0,229,255,0.70) 35%,rgba(155,92,245,0.60) 65%,transparent 95%)"
-          :"linear-gradient(90deg,transparent 5%,rgba(155,92,245,0.35) 45%,transparent 95%)",
+          ?"linear-gradient(90deg,transparent 5%,rgba(102,255,102,0.70) 35%,rgba(124,255,0,0.60) 65%,transparent 95%)"
+          :"linear-gradient(90deg,transparent 5%,rgba(124,255,0,0.35) 45%,transparent 95%)",
       }}/>
       {enabled && (
         <div aria-hidden style={{
           position:"absolute", top:-60, right:-40, width:220, height:220, borderRadius:"50%",
-          background:"radial-gradient(circle,rgba(0,229,255,0.07) 0%,transparent 65%)",
+          background:"radial-gradient(circle,rgba(102,255,102,0.07) 0%,transparent 65%)",
           pointerEvents:"none",
         }}/>
       )}
@@ -276,7 +280,7 @@ function AIStatusCard({ enabled, positions, maxPositions }: {
                 transition:"all 0.30s ease",
               }}/>
               <span style={{ fontSize:7, fontFamily:SANS, fontWeight:700,
-                color:enabled?"rgba(0,229,255,0.65)":GR,
+                color:enabled?"rgba(102,255,102,0.65)":GR,
                 letterSpacing:"0.22em", textTransform:"uppercase" as const }}>
                 {enabled?"AI Portfolio Manager Online":"AI Autopilot Standby"}
               </span>
@@ -287,8 +291,8 @@ function AIStatusCard({ enabled, positions, maxPositions }: {
           </div>
           <div style={{
             padding:"5px 12px", borderRadius:20,
-            background:enabled?"rgba(0,229,255,0.08)":"rgba(255,255,255,0.04)",
-            border:`1px solid ${enabled?"rgba(0,229,255,0.25)":"rgba(255,255,255,0.10)"}`,
+            background:enabled?"rgba(102,255,102,0.08)":"rgba(255,255,255,0.04)",
+            border:`1px solid ${enabled?"rgba(102,255,102,0.25)":"rgba(255,255,255,0.10)"}`,
             fontSize:8, fontFamily:SANS, fontWeight:700,
             color:enabled?C:GR, letterSpacing:"0.08em",
           }}>{enabled?"ACTIVE":"OFF"}</div>
@@ -296,8 +300,8 @@ function AIStatusCard({ enabled, positions, maxPositions }: {
         <div style={{
           display:"flex", alignItems:"center", justifyContent:"space-between",
           padding:"10px 14px",
-          background:enabled?"rgba(0,229,255,0.06)":"rgba(255,255,255,0.03)",
-          border:`1px solid ${enabled?"rgba(0,229,255,0.14)":"rgba(255,255,255,0.06)"}`,
+          background:enabled?"rgba(102,255,102,0.06)":"rgba(255,255,255,0.03)",
+          border:`1px solid ${enabled?"rgba(102,255,102,0.14)":"rgba(255,255,255,0.06)"}`,
           borderRadius:10, marginBottom:12, transition:"all 0.30s ease",
         }}>
           <div>
@@ -324,7 +328,7 @@ function AIStatusCard({ enabled, positions, maxPositions }: {
             {[
               { label:"Assets Scanned", val:"124", color:C },
               { label:"MTF Confirmed",  val:"3",   color:G },
-              { label:"Entry Threshold",val:"65%", color:"rgba(155,92,245,0.90)" },
+              { label:"Entry Threshold",val:"65%", color:"rgba(124,255,0,0.90)" },
             ].map(({ label, val, color }) => (
               <div key={label} style={{ background:"rgba(255,255,255,0.03)",
                 border:"1px solid rgba(255,255,255,0.06)", borderRadius:9, padding:"9px 8px",
@@ -449,6 +453,9 @@ export default function Profile() {
   return (
     <div className="page-enter" style={{ background:BG, minHeight:"100%", paddingBottom:32 }}>
 
+      {/* ── Branded page header ────────────────────────────────────────────── */}
+      <PageHeader title="Profile" caption="ACCOUNT · AI · BROKER"/>
+
       {/* ── Identity card ──────────────────────────────────────────────────── */}
       <div style={{ margin:"16px 16px 14px", background:CARD, border:`1px solid ${E}`,
         borderRadius:16, padding:"20px 18px" }}>
@@ -461,12 +468,12 @@ export default function Profile() {
             {profile.avatarUrl ? (
               <img src={profile.avatarUrl} alt="avatar"
                 style={{ width:60, height:60, borderRadius:"50%",
-                  border:"1.5px solid rgba(0,229,255,0.35)", objectFit:"cover" as const }}/>
+                  border:"1.5px solid rgba(102,255,102,0.35)", objectFit:"cover" as const }}/>
             ) : (
               <div style={{
                 width:60, height:60, borderRadius:"50%",
-                background:"linear-gradient(135deg,rgba(0,229,255,0.12),rgba(155,92,245,0.12))",
-                border:"1.5px solid rgba(0,229,255,0.35)",
+                background:"linear-gradient(135deg,rgba(102,255,102,0.12),rgba(124,255,0,0.12))",
+                border:"1.5px solid rgba(102,255,102,0.35)",
                 display:"flex", alignItems:"center", justifyContent:"center",
                 fontSize:19, fontFamily:MONO, fontWeight:700, color:C,
               }}>{ini}</div>
@@ -475,7 +482,7 @@ export default function Profile() {
             <div style={{
               position:"absolute", bottom:0, right:0,
               width:20, height:20, borderRadius:"50%",
-              background:"rgba(0,229,255,0.18)", border:"1.5px solid rgba(0,229,255,0.50)",
+              background:"rgba(102,255,102,0.18)", border:"1.5px solid rgba(102,255,102,0.50)",
               display:"flex", alignItems:"center", justifyContent:"center",
               fontSize:9,
             }}>📷</div>
@@ -494,8 +501,8 @@ export default function Profile() {
               </span>
               <span style={{
                 padding:"2px 9px", flexShrink:0,
-                background:plan==="free"?"rgba(255,255,255,0.05)":"rgba(0,229,255,0.08)",
-                border:`1px solid ${plan==="free"?"rgba(255,255,255,0.14)":"rgba(0,229,255,0.22)"}`,
+                background:plan==="free"?"rgba(255,255,255,0.05)":"rgba(102,255,102,0.08)",
+                border:`1px solid ${plan==="free"?"rgba(255,255,255,0.14)":"rgba(102,255,102,0.22)"}`,
                 borderRadius:4, fontSize:8, fontFamily:SANS, fontWeight:600,
                 color:plan==="free"?"rgba(136,146,164,0.90)":C,
                 letterSpacing:"0.07em", textTransform:"uppercase" as const,
@@ -510,7 +517,7 @@ export default function Profile() {
               {aiEnabled && (
                 <div style={{ display:"flex", alignItems:"center", gap:4,
                   padding:"2px 8px",
-                  background:"rgba(0,229,255,0.07)", border:"1px solid rgba(0,229,255,0.20)",
+                  background:"rgba(102,255,102,0.07)", border:"1px solid rgba(102,255,102,0.20)",
                   borderRadius:4 }}>
                   <div style={{ width:4, height:4, borderRadius:"50%", background:C,
                     animation:"dot-pulse 1.2s ease-in-out infinite",
@@ -541,7 +548,7 @@ export default function Profile() {
             <div style={{ display:"flex", gap:10, marginTop:4 }}>
               <button onClick={saveEdit} style={{
                 flex:1, padding:"12px 0",
-                background:"rgba(0,229,255,0.12)", border:"1px solid rgba(0,229,255,0.35)",
+                background:"rgba(102,255,102,0.12)", border:"1px solid rgba(102,255,102,0.35)",
                 borderRadius:10, color:C, fontFamily:SANS, fontSize:13, fontWeight:700,
                 letterSpacing:"0.04em", cursor:"pointer",
               }}>Save Changes</button>
@@ -578,12 +585,12 @@ export default function Profile() {
 
         {/* ── Performance Intelligence ─────────────────────────────────────── */}
         <div style={{ marginBottom:18 }}>
-          <SectionHead label="Performance Intelligence" accent="rgba(155,92,245,0.65)"/>
+          <SectionHead label="Performance Intelligence" accent="rgba(124,255,0,0.65)"/>
           <MonthlyChart/>
           <div style={{ marginTop:10, background:CARD, border:`1px solid ${E}`,
             borderRadius:12, padding:"20px 8px",
             display:"grid", gridTemplateColumns:"1fr 1fr 1fr", alignItems:"start" }}>
-            <Donut value={71} color="rgba(155,92,245,0.80)" label="AI Score"/>
+            <Donut value={71} color="rgba(124,255,0,0.80)" label="AI Score"/>
             <Donut value={59} color="rgba(0,185,215,0.78)"  label="Consistency"/>
             <Donut value={57} color="rgba(0,200,100,0.76)"  label="Efficiency"/>
           </div>
@@ -591,9 +598,9 @@ export default function Profile() {
             borderRadius:12, overflow:"hidden" }}>
             {[
               { label:"Best Performing Asset",   val:"NVDA · +18.4%",  color:"rgba(0,255,136,0.88)" },
-              { label:"Avg Trade Duration",       val:"4h 22m",         color:"rgba(0,229,255,0.82)" },
+              { label:"Avg Trade Duration",       val:"4h 22m",         color:"rgba(102,255,102,0.82)" },
               { label:"Total AI Trades Executed", val:"47",             color:W },
-              { label:"Most Profitable Sector",   val:"Technology",     color:"rgba(155,92,245,0.85)" },
+              { label:"Most Profitable Sector",   val:"Technology",     color:"rgba(124,255,0,0.85)" },
               { label:"Highest Confidence Trade",  val:"NVDA · 91%",    color:GOLD },
             ].map(({ label, val, color }, i, arr) => (
               <div key={label} style={{ display:"flex", justifyContent:"space-between",
@@ -643,7 +650,7 @@ export default function Profile() {
             <div style={{ padding:"12px 16px", borderTop:"1px solid rgba(255,255,255,0.05)" }}>
               <button onClick={() => setLocation("/billing")} style={{
                 width:"100%", padding:"12px 0",
-                background:"rgba(0,229,255,0.07)", border:"1px solid rgba(0,229,255,0.22)",
+                background:"rgba(102,255,102,0.07)", border:"1px solid rgba(102,255,102,0.22)",
                 borderRadius:10, color:C, fontFamily:SANS, fontSize:12, fontWeight:600,
                 letterSpacing:"0.04em", cursor:"pointer",
               }}>Enable Live AI Trading →</button>
@@ -653,7 +660,7 @@ export default function Profile() {
 
         {/* ── AI Settings ──────────────────────────────────────────────────── */}
         <div style={{ marginBottom:18 }}>
-          <SectionHead label="AI Settings" accent="rgba(0,229,255,0.65)"/>
+          <SectionHead label="AI Settings" accent="rgba(102,255,102,0.65)"/>
           <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, padding:"0 16px" }}>
             <AIToggle
               label="Autonomous Trading"
@@ -699,8 +706,8 @@ export default function Profile() {
             />
           </div>
           <div style={{ marginTop:8, padding:"9px 14px",
-            background:"rgba(0,229,255,0.04)", border:"1px solid rgba(0,229,255,0.10)",
-            borderRadius:8, fontSize:8.5, fontFamily:SANS, color:"rgba(0,229,255,0.60)", lineHeight:1.55 }}>
+            background:"rgba(102,255,102,0.04)", border:"1px solid rgba(102,255,102,0.10)",
+            borderRadius:8, fontSize:8.5, fontFamily:SANS, color:"rgba(102,255,102,0.60)", lineHeight:1.55 }}>
             ⚡ All settings persist across sessions. Paper mode is never a restriction on AI scanning.
           </div>
         </div>
@@ -793,8 +800,8 @@ export default function Profile() {
               </div>
               <div style={{
                 width:38, height:22, borderRadius:11,
-                background: profile.notifications ? "rgba(0,229,255,0.18)" : "rgba(255,255,255,0.07)",
-                border:`1px solid ${profile.notifications ? "rgba(0,229,255,0.38)" : "rgba(255,255,255,0.12)"}`,
+                background: profile.notifications ? "rgba(102,255,102,0.18)" : "rgba(255,255,255,0.07)",
+                border:`1px solid ${profile.notifications ? "rgba(102,255,102,0.38)" : "rgba(255,255,255,0.12)"}`,
                 transition:"all 0.2s", display:"flex", alignItems:"center", padding:"2px", flexShrink:0,
               }}>
                 <div style={{

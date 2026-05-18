@@ -1,0 +1,82 @@
+The Signals / Crypto / Equities system is now 95% perfect. Do NOT redesign it again. Only apply the following refinements carefully without changing the current layout, spacing, density, or visual hierarchy.
+
+FINAL REFINEMENTS:
+
+Add branded header identity to every page
+Every page should use the same compact premium header pattern:
+[ AI Candlez “A” Logo ] + [ Page Title ]
+
+Examples:
+
+Signals page → “A logo + Signals”
+Crypto page → “A logo + Crypto”
+Equities page → “A logo + Equities”
+Profile page → “A logo + Profile”
+
+IMPORTANT:
+
+Use ONLY the green “A” icon logo (not full text logo)
+Small premium institutional style
+Keep same neon green glow language
+Header should feel consistent across the app
+DO NOT change the current Signals page layout
+The current Signals page is approved.
+Do not:
+change spacing
+redesign cards
+change hierarchy
+move buttons
+reduce density
+alter confidence rings
+
+Only add the compact “A logo + Signals” header.
+
+Fix the top tab routing bug
+Current bug:
+Top “Crypto 20” tab routes to Equities instead of Crypto.
+
+Fix:
+
+Crypto top tab MUST open the Crypto page/feed.
+Equities top tab MUST open the Equities page/feed.
+Active tab remains mixed feed.
+Synchronize top tabs with bottom navigation
+Current bottom navigation should always visually match the active top tab/page.
+
+Expected behavior:
+
+If user taps top “Crypto 20” → bottom Crypto tab becomes active.
+If user taps top “Equities 20” → bottom Equities tab becomes active.
+If user taps Active → bottom Signals tab remains active.
+
+Need single shared navigation state so top tabs and bottom nav never desync.
+
+Profile page redesign
+The Profile page still looks outdated compared to the rest of the app.
+
+Rebuild Profile page using the SAME visual system already approved in Signals/Crypto/Equities:
+
+deep black background
+neon green glow system
+premium glass cards
+compact institutional density
+same typography
+same bottom nav styling
+same border glow language
+same button style
+
+Profile page should feel like part of the same ecosystem, not an older app screen.
+
+Bottom navigation consistency
+Ensure bottom nav styling is identical across:
+Home
+Crypto
+Signals
+Equities
+Profile
+
+No mismatched spacing/colors/glows/icons.
+
+IMPORTANT:
+This is now refinement mode, NOT redesign mode.
+The current Signals/Crypto/Equities design is approved and should remain visually intact.

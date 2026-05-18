@@ -1,7 +1,9 @@
 import { Link, useLocation } from "wouter";
 
-const C   = "#00e5ff";
-const DIM = "#3a4a5a";
+// Brand-green token system — matches Signals/Crypto/Equities pages so the
+// bottom nav feels like one continuous surface across the app.
+const C   = "#66FF66";
+const DIM = "#3a4a4a";
 const BG  = "#000000";
 
 const HomeIcon = ({ active }: { active: boolean }) => (
@@ -90,7 +92,7 @@ export function BottomNav() {
         boxShadow: [
           "0 8px 32px rgba(0,0,0,0.70)",
           "0 2px 8px rgba(0,0,0,0.50)",
-          "0 0 0 0.5px rgba(0,229,255,0.06) inset",
+          "0 0 0 0.5px rgba(102,255,102,0.08) inset",
         ].join(", "),
         overflow: "hidden",
       }}>
@@ -116,7 +118,7 @@ export function BottomNav() {
                 textDecoration: "none",
                 position: "relative",
                 transition: "background 0.2s ease",
-                background: active ? "rgba(0,229,255,0.05)" : "transparent",
+                background: active ? "rgba(102,255,102,0.06)" : "transparent",
               }}>
 
               {/* Active top indicator line */}

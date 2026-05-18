@@ -5,6 +5,7 @@ import { api, type MobileSignalsResponse, type MobileTickersResponse, type Signa
 import { CryptoIcon, SYM_LABEL, SYM_SHORT } from "@/components/CryptoIcon";
 import { EquityIcon, EQUITY_NAME } from "@/components/EquityIcon";
 import { EnableLiveCTA } from "@/components/EnableLiveCTA";
+import { PageHeader } from "@/components/PageHeader";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
@@ -385,12 +386,19 @@ type TabKey = "active" | "crypto" | "equities";
 
 export default function AISignals() {
   const [location, setLocation] = useLocation();
-  // URL-driven initial tab so /crypto and /equities deep-link into the
-  // correct section while keeping the same underlying feed + card design.
-  const initialTab: TabKey =
+  // URL is the single source of truth — top tabs and bottom nav both
+  // navigate to /trade /crypto /equities, and `tab` is derived from
+  // whichever route is currently active. This guarantees the top tab,
+  // the visible feed, and the bottom-nav highlight can never desync.
+  const tab: TabKey =
     location.startsWith("/equities") ? "equities" :
     location.startsWith("/crypto")   ? "crypto"   : "active";
-  const [tab, setTab] = useState<TabKey>(initialTab);
+  const setTab = (next: TabKey) => {
+    const target = next === "crypto"   ? "/crypto"
+                 : next === "equities" ? "/equities"
+                 : "/trade";
+    if (location !== target) setLocation(target);
+  };
   const [cryptoQuery,  setCryptoQuery]  = useState("");
   const [equityQuery,  setEquityQuery]  = useState("");
   const openAsset = (atype: "crypto" | "equity", asym: string) => {
@@ -504,37 +512,26 @@ export default function AISignals() {
       <CinematicBackground/>
 
       <div style={{ position: "relative", zIndex: 1 }}>
-        {/* COMPACT HEADER — institutional, signal-first. No marketing hero. */}
-        <div style={{
-          padding: "14px 16px 8px",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-        }}>
-          <div>
-            <div style={{
-              display: "flex", alignItems: "center", gap: 7,
-              fontSize: 9, fontFamily: SANS, fontWeight: 800,
-              color: BRAND, letterSpacing: 1.6, textTransform: "uppercase",
-            }}>
-              <span style={{
-                width: 6, height: 6, borderRadius: "50%", background: BRAND,
+        {/* Branded page header — A logo + dynamic title, with live status
+            pip + action buttons mounted on the right. */}
+        <PageHeader
+          title={tab === "crypto" ? "Crypto" : tab === "equities" ? "Equities" : "Signals"}
+          caption="LIVE · SCANNING 24/7"
+          right={
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span aria-hidden style={{
+                width: 7, height: 7, borderRadius: "50%", background: BRAND,
                 boxShadow: `0 0 10px ${BRAND_GLOW}`,
                 animation: "dot-pulse 1.6s ease-in-out infinite",
+                marginRight: 2,
               }}/>
-              Live · Scanning 24/7
+              <IconButton aria-label="Filter">{IconFilter}</IconButton>
+              <IconButton aria-label="Settings" onClick={() => setLocation("/profile")}>
+                {IconSettings}
+              </IconButton>
             </div>
-            <div style={{
-              marginTop: 3, fontSize: 22, fontFamily: SANS, fontWeight: 800,
-              letterSpacing: -0.6, color: TEXT,
-              textShadow: `0 0 14px ${BRAND_BLOOM}`,
-            }}>AI Signals</div>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <IconButton aria-label="Filter">{IconFilter}</IconButton>
-            <IconButton aria-label="Settings" onClick={() => setLocation("/profile")}>
-              {IconSettings}
-            </IconButton>
-          </div>
-        </div>
+          }
+        />
 
         {/* Enable Live AI Trading — shared premium upgrade CTA */}
         <EnableLiveCTA/>
