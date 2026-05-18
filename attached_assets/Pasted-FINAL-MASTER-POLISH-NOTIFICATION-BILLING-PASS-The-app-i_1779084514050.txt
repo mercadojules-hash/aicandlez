@@ -1,0 +1,291 @@
+FINAL MASTER POLISH + NOTIFICATION + BILLING PASS
+
+The app is now 99% complete and looks incredible.
+DO NOT redesign the app.
+DO NOT change layouts, spacing, density, typography hierarchy, glow levels, navigation structure, card sizing, or overall visual style unless explicitly listed below.
+
+The current institutional neon AI aesthetic is APPROVED.
+
+This final pass is ONLY for:
+
+* final billing cleanup
+* notification system planning hooks
+* sound/haptic infrastructure hooks
+* final membership consistency
+* final polish consistency
+
+==================================================
+
+1. FINAL BILLING & PLAN PAGE FIX
+   ==================================================
+
+The Billing & Plan page still contains remnants of the old pricing structure.
+
+Update it to EXACTLY match the finalized membership system now used across the app.
+
+FINAL MEMBERSHIP STRUCTURE:
+
+---
+
+## PAPER TRADING (FREE)
+
+Title:
+“7-Day Free AI Paper Trading”
+
+Features:
+
+* Simulated trading only
+* AI Signals enabled
+* Market scanner enabled
+* Watchlists enabled
+* No live execution
+* No AI Auto Trade
+
+CTA:
+“Start 7-Day AI Paper Trading Trial”
+
+---
+
+AI TRADING
+PRICE: $15.99/month
+-------------------
+
+Features:
+
+* Live AI Trading enabled
+* AI Auto Trade enabled
+* Up to 6 concurrent AI trades
+* Crypto AI execution
+* AI portfolio tracking
+* AI performance analytics
+* Live exchange connection
+* 3% performance fee on profitable trades only
+* No fees on losing trades
+
+CTA:
+“Start AI Trading — $15.99/MO”
+
+---
+
+AI TRADING PRO
+PRICE: $39.99/month
+-------------------
+
+Features:
+
+* Up to 12 concurrent AI trades
+* Priority AI execution
+* Crypto + Equities AI trading
+* Advanced AI scanners
+* Expanded AI confidence engine
+* Enhanced analytics
+* Advanced AI automation controls
+* Priority execution layer
+* 3% performance fee on profitable trades only
+
+CTA:
+“Start AI Trading Pro — $39.99/MO”
+
+---
+
+## IMPORTANT BILLING RULES
+
+Remove ALL remaining references to:
+
+* $5.99
+* 599
+* legacy pricing
+* outdated subscription wording
+* “One Plan”
+* old billing copy
+
+If user currently has:
+
+* Paper Trading → show CURRENT PLAN
+* AI Trading → show ACTIVE
+* AI Trading Pro → show PRO ACTIVE
+
+Allow:
+
+* Upgrade from AI Trading → Pro
+* Downgrade logic
+* Manage Billing CTA for active users
+
+Verify Stripe references/products/prices now correctly map to:
+
+* Free Trial
+* $15.99 AI Trading
+* $39.99 AI Trading Pro
+
+==================================================
+2. NOTIFICATION SYSTEM PREP
+===========================
+
+DO NOT fully build push infrastructure yet.
+
+BUT prepare the architecture/hooks/components/settings structure for future implementation.
+
+Add notification preference scaffolding/settings for:
+
+* AI Signal Alerts
+* AI Auto Trade Executions
+* Trade Opened
+* Trade Closed
+* Take Profit Hit
+* Stop Loss Hit
+* High Confidence Opportunities
+* Market Scanner Alerts
+* Volatility Alerts
+* Portfolio Performance Alerts
+
+Future-ready support for:
+
+* Expo Notifications
+* Firebase/APNs
+* Push permissions
+* Background notification delivery
+* Notification badges
+* Haptic feedback
+* Sound effects
+
+==================================================
+3. PREMIUM SOUND + HAPTIC SYSTEM PREP
+=====================================
+
+DO NOT make arcade/casino effects.
+
+The feel should be:
+“institutional AI terminal”
+NOT “gambling app”.
+
+Prepare infrastructure/hooks/settings for:
+
+SUCCESS / WIN EVENTS:
+
+* subtle ascending neon tone
+* soft premium execution confirmation
+* low-frequency haptic pulse
+
+LOSS / STOP EVENTS:
+
+* soft muted red tone
+* subtle warning vibration
+
+AI SIGNAL EVENTS:
+
+* clean futuristic notification pulse
+* confidence alert sound
+
+AUTO TRADE EXECUTED:
+
+* premium execution chime
+* subtle haptic confirmation
+
+Settings toggles for:
+
+* Sounds ON/OFF
+* Haptics ON/OFF
+* Push Notifications ON/OFF
+
+==================================================
+4. AI SCANNER STATUS
+====================
+
+The AI Scanner on Home is excellent.
+
+Keep the radar scanner design EXACTLY as-is.
+
+Expand scanner state messaging rotation to intelligently show:
+
+* “Strong breakout activity detected”
+* “Momentum increasing across crypto markets”
+* “Risk elevated — choppy market conditions”
+* “Accumulation patterns forming”
+* “Bearish pressure increasing”
+* “Bullish momentum strengthening”
+* “Volatility compression detected”
+* “Scanning for high-confidence setups”
+* “Market conditions favorable”
+* “AI detecting institutional accumulation”
+
+These should dynamically rotate based on scanner state logic.
+
+==================================================
+5. HOME PAGE DATA PANELS
+========================
+
+Keep:
+
+* Top Gainers
+* Active Trades
+* Trade History
+
+Each section should remain independently scrollable.
+
+Confirmed limits:
+
+* Active Trades → max 6 visible
+* Trade History → 20+ allowed
+* Top Gainers → Top 10 AI-ranked profitable assets
+
+Top Gainers ranking should remain AI-driven:
+confidence + momentum + direction + AI weighting.
+
+==================================================
+6. FINAL VISUAL CONSISTENCY
+===========================
+
+The bottom nav is now correct.
+Keep the finalized black/neon-green style.
+
+Do NOT reintroduce:
+
+* cyan
+* bluish tint
+* white borders
+* heavy bloom
+* arcade glows
+
+Maintain:
+
+* premium green glow
+* black institutional surfaces
+* dense fintech layout
+* cinematic AI atmosphere
+
+==================================================
+7. FINAL APPROVED AREAS — DO NOT MODIFY
+=======================================
+
+Do NOT redesign:
+
+* Signals page
+* Crypto page
+* Equities page
+* Home page structure
+* Profile page structure
+* AI confidence rings
+* Asset cards
+* Navigation
+* Scanner radar
+* Trading cards
+* Typography sizing hierarchy
+
+These are finalized and approved.
+
+==================================================
+8. FINAL QA PASS
+================
+
+Before finishing:
+
+* repo-wide search for old pricing
+* confirm no $5.99 references remain
+* verify all nav routing works
+* verify Signals/Crypto/Equities tabs sync correctly
+* verify no broken state handling
+* verify Stripe mapping consistency
+* verify typecheck passes
+* verify no console errors
+
+This should be treated as the FINAL premium production polish pass before notification infrastructure and live trading expansion phases.

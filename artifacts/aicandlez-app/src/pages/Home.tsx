@@ -560,6 +560,9 @@ export default function Home() {
     if (upRatio >= 0.7 && avgMove > 1.5) {
       return { label: "Momentum increasing across crypto markets", tone: "pos" as const };
     }
+    if (buys >= sells + 2 && avgConf >= 70 && upRatio >= 0.55) {
+      return { label: "Bullish momentum strengthening", tone: "pos" as const };
+    }
     if (upRatio <= 0.3 && avgMove < -1.5) {
       return { label: "Bearish pressure increasing", tone: "neg" as const };
     }
@@ -569,11 +572,17 @@ export default function Home() {
     if (sells >= buys * 2 && active.length >= 2) {
       return { label: "Market sentiment: Bearish", tone: "neg" as const };
     }
+    if (active.length >= 2 && avgConf >= 70 && avgAbsMove <= 2 && upRatio >= 0.5) {
+      return { label: "AI detecting institutional accumulation", tone: "pos" as const };
+    }
     if (active.length >= 3 && avgConf >= 65) {
       return { label: "Trend continuation likely", tone: "pos" as const };
     }
     if (avgAbsMove >= 2.5 && Math.abs(buys - sells) <= 1) {
       return { label: "Risk elevated — choppy market", tone: "warn" as const };
+    }
+    if (avgAbsMove < 1.2 && active.length <= 1 && bdList.length >= 2) {
+      return { label: "Volatility compression detected", tone: "neutral" as const };
     }
     if (active.length === 0 && avgAbsMove < 0.8) {
       return { label: "Accumulation patterns forming", tone: "neutral" as const };
@@ -581,13 +590,16 @@ export default function Home() {
     if (avgConf < 50 && active.length <= 1) {
       return { label: "Low-confidence market conditions", tone: "neutral" as const };
     }
+    if (avgConf >= 60 && upRatio >= 0.5 && avgAbsMove >= 1) {
+      return { label: "Market conditions favorable", tone: "pos" as const };
+    }
     if (upRatio > 0.55 && avgAbsMove < 2) {
       return { label: "Equity market cooling — crypto holding steady", tone: "neutral" as const };
     }
     if (active.length >= 1) {
       return { label: "AI tracking emerging opportunities", tone: "pos" as const };
     }
-    return { label: "AI scanning — no high-confidence signals yet", tone: "neutral" as const };
+    return { label: "Scanning for high-confidence setups", tone: "neutral" as const };
   }, [breakdowns, tickersData]);
 
   const positions = portfolio?.positions ?? [];

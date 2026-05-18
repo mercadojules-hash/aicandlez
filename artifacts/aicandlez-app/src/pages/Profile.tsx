@@ -10,6 +10,7 @@ import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
 import { useUserProfile, type UserProfile } from "@/contexts/UserProfileContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { PageHeader } from "@/components/PageHeader";
+import { useFeedbackPrefs, ALERT_DEFINITIONS, type AlertKey } from "@/lib/feedback";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 // Aligned with the Signals/Crypto/Equities neon-green system.
@@ -622,6 +623,128 @@ function ExchangeRow({ name, status, statusCol, icon, iconBg, iconBorder, iconCo
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────────
+// ── Alert & Feedback Preferences (notification scaffolding) ─────────────────
+// Surfaces every alert key from `lib/feedback` as a toggle row. Master switches
+// for Sounds / Haptics / Push live in the same card. Push backend is not wired
+// here — these prefs are read by future push-registration code.
+function AlertPreferencesSection() {
+  const { prefs, update, toggleAlert } = useFeedbackPrefs();
+  const pushNotifs = usePushNotifications();
+
+  const onTogglePush = () => {
+    const next = !prefs.pushEnabled;
+    update({ pushEnabled: next });
+    if (pushNotifs.supported && pushNotifs.permission !== "denied") {
+      if (next) void pushNotifs.subscribe();
+      else      void pushNotifs.unsubscribe();
+    }
+  };
+
+  return (
+    <div style={{ marginBottom:18 }}>
+      <SectionHead label="Alert Preferences" accent="rgba(124,255,0,0.65)"/>
+      <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, overflow:"hidden" }}>
+
+        {/* Master switches */}
+        <PrefRow
+          label="Push Notifications"
+          sub={
+            !pushNotifs.supported ? "Not supported in this browser · In-app alerts only" :
+            pushNotifs.permission === "denied" ? "Blocked by browser — adjust site settings" :
+            prefs.pushEnabled ? "Enabled · Background trade + signal alerts" :
+            "Disabled · Tap to enable background alerts"
+          }
+          value={prefs.pushEnabled}
+          onChange={onTogglePush}
+          accent="rgba(124,255,0,0.65)"
+        />
+        <PrefRow
+          label="Sounds"
+          sub="Premium institutional cues on execution, profit, and signals"
+          value={prefs.soundsEnabled}
+          onChange={() => update({ soundsEnabled: !prefs.soundsEnabled })}
+          accent="rgba(102,255,102,0.55)"
+        />
+        <PrefRow
+          label="Haptics"
+          sub="Subtle vibration on mobile devices · OFF by default"
+          value={prefs.hapticsEnabled}
+          onChange={() => update({ hapticsEnabled: !prefs.hapticsEnabled })}
+          accent="rgba(102,255,102,0.55)"
+        />
+
+        <div style={{ padding:"10px 16px 6px", borderTop:"1px solid rgba(255,255,255,0.05)",
+          background:"rgba(255,255,255,0.015)" }}>
+          <div style={{ fontSize:8.5, fontFamily:SANS, fontWeight:700,
+            color:"rgba(232,245,236,0.55)", letterSpacing:"0.14em",
+            textTransform:"uppercase" as const }}>
+            Alert Types
+          </div>
+        </div>
+
+        {ALERT_DEFINITIONS.map((d, i) => (
+          <PrefRow
+            key={d.key}
+            label={d.label}
+            sub={d.sub}
+            value={prefs.alerts[d.key as AlertKey]}
+            onChange={() => toggleAlert(d.key as AlertKey)}
+            accent="rgba(102,255,102,0.55)"
+            divider={i < ALERT_DEFINITIONS.length - 1}
+            disabled={!prefs.pushEnabled && !prefs.soundsEnabled}
+          />
+        ))}
+      </div>
+      <div style={{ marginTop:8, padding:"9px 14px",
+        background:"rgba(124,255,0,0.04)", border:"1px solid rgba(124,255,0,0.10)",
+        borderRadius:8, fontSize:8.5, fontFamily:SANS, color:"rgba(124,255,0,0.60)", lineHeight:1.55 }}>
+        ⚑ Alert preferences persist locally · Background delivery requires Push Notifications enabled.
+      </div>
+    </div>
+  );
+}
+
+// Lightweight toggle row used by AlertPreferencesSection — matches AIToggle visuals
+// but supports a `disabled` dimmed state for child rows when masters are off.
+function PrefRow({ label, sub, value, onChange, accent, divider=true, disabled=false }: {
+  label: string; sub: string; value: boolean; onChange: () => void;
+  accent: string; divider?: boolean; disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onChange}
+      disabled={disabled}
+      style={{
+        width:"100%", padding:"14px 16px",
+        background:"transparent", border:"none",
+        borderBottom: divider ? "1px solid rgba(255,255,255,0.05)" : "none",
+        display:"flex", justifyContent:"space-between", alignItems:"center",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.45 : 1,
+        textAlign:"left" as const,
+      }}>
+      <div style={{ minWidth:0, paddingRight:14 }}>
+        <div style={{ fontSize:13, fontFamily:SANS, fontWeight:500, color:W }}>{label}</div>
+        <div style={{ fontSize:9.5, fontFamily:SANS, color:GR, marginTop:2, lineHeight:1.45 }}>{sub}</div>
+      </div>
+      <div style={{
+        width:38, height:22, borderRadius:11, flexShrink:0,
+        background: value ? "rgba(102,255,102,0.18)" : "rgba(255,255,255,0.07)",
+        border:`1px solid ${value ? accent : "rgba(255,255,255,0.12)"}`,
+        transition:"all 0.2s", display:"flex", alignItems:"center", padding:"2px",
+      }}>
+        <div style={{
+          width:16, height:16, borderRadius:"50%",
+          background: value ? C : "rgba(255,255,255,0.30)",
+          transform:`translateX(${value ? 16 : 0}px)`,
+          transition:"transform 0.22s",
+          boxShadow: value ? `0 0 10px ${accent}` : "none",
+        }}/>
+      </div>
+    </button>
+  );
+}
+
 export default function Profile() {
   const { signOut }        = useClerk();
   const [, setLocation]    = useLocation();
@@ -984,6 +1107,9 @@ export default function Profile() {
             ⚡ All settings persist across sessions. Paper mode is never a restriction on AI scanning.
           </div>
         </div>
+
+        {/* ── Alert & Feedback Preferences (notification scaffolding) ──────── */}
+        <AlertPreferencesSection/>
 
         {/* ── Connected Accounts ───────────────────────────────────────────── */}
         {/* BROKER */}
