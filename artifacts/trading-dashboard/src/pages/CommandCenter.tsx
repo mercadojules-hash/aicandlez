@@ -15,7 +15,7 @@
  */
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { LiveConsentModal, useLiveConsent } from "@/components/ConsentGate";
 
 // ── Operator bypass ───────────────────────────────────────────────────────────
@@ -156,39 +156,40 @@ export default function CommandCenter() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOperator, pendingLiveEx]);
 
-  // Operator default: if the engine is sitting in `simulation` mode when an
-  // operator opens the console, auto-activate KRAKEN live mode so the
-  // dashboard is real-broker by default (no manual click required).
-  const autoKrakenFired = useRef(false);
-  useEffect(() => {
-    if (!isOperator || !isRoleResolved) return;
-    if (!exchangeStatus) return; // wait for status fetch
-    if (autoKrakenFired.current) return;
-    if (mode === "simulation") {
-      autoKrakenFired.current = true;
-      switchExchangeMode("kraken", "kraken");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOperator, isRoleResolved, exchangeStatus, mode]);
+  // NOTE: We do NOT auto-arm the engine on mount. Operator must explicitly
+  // click the live-execution bar to switch the broker into live mode. The
+  // CommandBar still highlights KRAKEN as the default exchange visually so
+  // it's the obvious one-click target, but no live POST happens until
+  // the operator presses ENABLE LIVE AI CRYPTO EXECUTION.
 
   /* ── Live-trading control bars (operator) ─────────────────────────────── */
-  // Operator surface uses institutional language — no "SIMULATION" pills.
-  // CRYPTO control bar mirrors the actual exchange mode (kraken/etc).
+  // Operator surface = two states only: HALTED (red, default) ↔ ARMED (gold).
+  // No neutral STANDBY on the operator dashboard — the engine is either live
+  // or it is hard-stopped. The bar starts HALTED on every mount until the
+  // operator manually arms it.
   const cryptoState: "LIVE" | "STANDBY" | "PAUSED" =
-    isPaused ? "PAUSED" : liveActive ? "LIVE" : "STANDBY";
+    liveActive && !isPaused ? "LIVE" : "PAUSED";
 
-  // Cycle: STANDBY → LIVE → PAUSED → STANDBY
   const toggleCryptoLive = () => {
-    if (isPaused)   { togglePause(); selectSim(); return; }  // PAUSED → STANDBY
-    if (liveActive) { togglePause(); return; }               // LIVE   → PAUSED
-    selectLive("kraken");                                    // STANDBY → LIVE
+    if (liveActive && !isPaused) {
+      // ARMED → HALTED. Stop execution by pausing the engine.
+      togglePause();
+      return;
+    }
+    if (liveActive && isPaused) {
+      // HALTED (already in live mode, just paused) → resume to ARMED.
+      togglePause();
+      return;
+    }
+    // HALTED + not in live mode → arm Kraken live execution.
+    selectLive("kraken");
   };
 
-  // EQUITIES control bar is operator-local for now — wire to real alpaca/etc later.
-  const [equitiesLive, setEquitiesLive] = useState(false);
-  const equitiesState: "LIVE" | "STANDBY" | "PAUSED" = equitiesLive ? "LIVE" : "STANDBY";
-  const toggleEquitiesLive = () => setEquitiesLive(v => !v);
-  useEffect(() => { if (isPaused) setEquitiesLive(false); }, [isPaused]);
+  // EQUITIES execution is intentionally OFF for this phase — Kraken crypto
+  // is the only sanctioned live broker. The equities bar renders HALTED/red
+  // and is non-interactive.
+  const equitiesState: "LIVE" | "STANDBY" | "PAUSED" = "PAUSED";
+  const toggleEquitiesLive = () => { /* disabled — equities live not enabled */ };
 
   /* ── Derived trade pools ──────────────────────────────────────────────────
    * Operator dashboard rule: NEVER render simulated execution.

@@ -28,16 +28,29 @@ function fmtUSD(n: number, frac = 2): string {
 }
 
 export function LiveAccountPanel({ engine, exchangeStatus, liveBalance, trades }: Props) {
-  const isLive   = exchangeStatus?.mode === "kraken" || liveBalance?.source === "live";
-  const exchange = (exchangeStatus?.exchangeName ?? "KRAKEN").toUpperCase();
+  // Operator console is KRAKEN-only. The label NEVER reads "ALPACA" or
+  // anything else, regardless of what the backend's stale exchangeName says.
+  const isLive   = (exchangeStatus?.mode === "kraken")
+                   && (liveBalance?.source === "live");
+  const exchange = "KRAKEN";
 
-  // Balance: prefer live USD from balances feed, fall back to 0
-  const usd = liveBalance?.balances?.USD ?? 0;
+  // Balance: ONLY trust the broker feed when we know it's actually live
+  // (source === "live"). Otherwise show $0 — never fall back to paper /
+  // Alpaca simulation telemetry. If Kraken has $100, this shows $100.
+  const usd = isLive ? (liveBalance?.balances?.USD ?? 0) : 0;
 
   // Realized + unrealized PnL across all closed trades
   const stats = useMemo(() => {
-    const closed = trades.filter(t => t.status?.toLowerCase() !== "open");
-    const open   = trades.filter(t => t.status?.toLowerCase() === "open");
+    // Operator console is LIVE-only — filter sim/paper trades out before any
+    // PnL math so realized/unrealized/win-rate/equity-curve never include
+    // simulated rows.
+    const liveOnly = trades.filter(t => {
+      const m = (t.mode ?? "").toLowerCase();
+      const s = ((t as { source?: string }).source ?? "").toLowerCase();
+      return m === "live" || s === "live";
+    });
+    const closed = liveOnly.filter(t => t.status?.toLowerCase() !== "open");
+    const open   = liveOnly.filter(t => t.status?.toLowerCase() === "open");
 
     const realized   = closed.reduce((s, t) => s + (t.pnl ?? 0), 0);
     const unrealized = open.reduce((s, t) => {
@@ -69,10 +82,10 @@ export function LiveAccountPanel({ engine, exchangeStatus, liveBalance, trades }
       return { i, v: usd + cum };
     });
     if (!curve.length) {
-      // Synthetic resting curve so the chart isn't a flat line
-      const base = usd > 0 ? usd : 100;
+      // Flat resting line at current balance — NO synthetic motion, no fake
+      // PnL animation. Operator dashboard shows reality only.
       for (let i = 0; i < 30; i++) {
-        curve.push({ i, v: base + Math.sin(i / 4) * base * 0.012 + i * 0.04 });
+        curve.push({ i, v: usd });
       }
     }
 

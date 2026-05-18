@@ -74,9 +74,9 @@ export function LiveControlBar({
   const isLive   = state === "LIVE";
   const isPaused = state === "PAUSED";
 
-  // Eligibility only constrains the STANDBY → ARMED transition. Once live or
-  // halted, the operator must always retain the ability to act.
-  const blocked = state === "STANDBY" && !eligible;
+  // Eligibility constrains any HALTED/STANDBY → ARMED transition. Once the
+  // engine is LIVE, the operator must always retain the ability to halt it.
+  const blocked = !isLive && !eligible;
 
   // Three distinct tonal systems:
   //   LIVE    → orange/gold (ARMED, hot, attention)
@@ -95,19 +95,19 @@ export function LiveControlBar({
   const label =
     isLive
       ? `LIVE AI ${assetClass} EXECUTION · ARMED`
-      : isPaused
-      ? `LIVE AI ${assetClass} EXECUTION · HALTED`
       : blocked
       ? `LIVE AI ${assetClass} EXECUTION · LOCKED`
+      : isPaused
+      ? `LIVE AI ${assetClass} EXECUTION · HALTED`
       : `ENABLE LIVE AI ${assetClass} EXECUTION`;
 
   const subLabel =
     isLive
       ? "EXECUTION ENGINE ENGAGED · OPERATOR · LIVE ORDERS · CLICK TO HALT"
-      : isPaused
-      ? "EMERGENCY STOP ENGAGED · ORDERS BLOCKED · CLICK TO RESET"
       : blocked
       ? `BELOW EXECUTION THRESHOLD · 80% CONFIDENCE REQUIRED${eligibilityReason ? ` · ${eligibilityReason}` : ""}`
+      : isPaused
+      ? `EMERGENCY STOP ENGAGED · ORDERS BLOCKED · CLICK TO ARM${eligibilityReason ? ` · ${eligibilityReason}` : ""}`
       : `LIVE EXECUTION ELIGIBLE · PRESS TO ARM ENGINE${eligibilityReason ? ` · ${eligibilityReason}` : ""}`;
 
   const statusPillBg = isLive ? `${color}22` : isPaused ? `${color}18` : "transparent";

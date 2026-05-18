@@ -1,0 +1,105 @@
+We are much closer now, but there are still 2 critical issues remaining on the operator dashboard.
+
+1. ALPACA PAPER BALANCE IS STILL LEAKING INTO THE KRAKEN PANEL
+
+The dashboard still shows:
+
+MY LIVE ALPACA ACCOUNT
+$100,000.00
+
+even though:
+- PAPER mode was supposedly removed
+- Kraken is supposedly active
+- I only want LIVE Kraken trading
+- I only have ~$100 in Kraken
+
+This means the UI is STILL reading stale Alpaca/paper telemetry somewhere in the pipeline.
+
+IMPORTANT:
+For MY OPERATOR DASHBOARD ONLY:
+I do NOT want ANY Alpaca account rendering.
+I do NOT want ANY paper balances.
+I do NOT want ANY mock telemetry.
+I do NOT want ANY fallback fake equity.
+
+Required changes:
+- Remove the “MY LIVE ALPACA ACCOUNT” container entirely
+OR
+- Convert it into:
+  “MY LIVE KRAKEN ACCOUNT”
+
+AND it must pull:
+- real Kraken balance
+- real Kraken equity
+- real open positions
+- real live PnL
+
+If Kraken has no positions:
+show zeros or empty state ONLY.
+
+DO NOT fallback to paper money under any circumstance.
+
+Audit:
+- broker telemetry selectors
+- account hydration pipeline
+- exchange account resolver
+- frontend account source mapping
+- stale simulation state
+- Zustand/query cache persistence
+- live broker hooks
+
+Some component is still binding to the old Alpaca simulation account.
+
+2. LIVE EXECUTION BARS SHOULD DEFAULT TO RED / HALTED
+
+Right now the execution bars are still showing neutral STANDBY.
+
+I do NOT want the execution engines armed automatically.
+
+For safety:
+DEFAULT STATE MUST BE:
+
+HALTED
+- red
+- emergency-stop styling
+- inactive
+- no glow pulse beyond halt-state visuals
+
+I will manually arm execution when ready.
+
+Required behavior:
+
+CRYPTO ENGINE
+- default = HALTED (red)
+- clicking activates LIVE ARMED state (orange/gold)
+- clicking again returns to HALTED red
+
+EQUITIES ENGINE
+- remain HALTED/red
+- not active for now
+
+I ONLY want Kraken crypto live execution enabled currently.
+Equities should remain visually disabled/off.
+
+3. OPERATOR FLOW
+
+Desired final operator behavior:
+
+ON /command LOAD:
+- Kraken auto-selected
+- NO Alpaca
+- NO paper
+- NO simulation
+- REAL Kraken balance visible
+- execution bars HALTED/red by default
+- no auto-arming
+- no fake positions
+- no fake telemetry
+
+WHEN I ARM:
+- Crypto execution bar becomes GOLD/ORANGE
+- engine activates
+- ONLY executes trades >= 80% confidence
+- trades route ONLY through Kraken
+
+This needs to function like a real institutional live-trading kill-switch architecture.
