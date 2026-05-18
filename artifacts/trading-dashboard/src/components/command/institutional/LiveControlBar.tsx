@@ -4,9 +4,9 @@
  * One instance is rendered DIRECTLY above each signal section
  * (crypto / equities). Asset-class scoped.
  *
- *   States:
+ *   Operator-facing states (institutional language — no "SIMULATION"):
  *   ─────────────────────────────────────────────────────────────────────────
- *   SIMULATION  matte black · neutral border · "ARM EXECUTION"
+ *   STANDBY     matte black · neutral border · "ARM EXECUTION ENGINE"
  *   LIVE        gold/orange glow · animated pulse · sweep · "ACTIVE"
  *   PAUSED      amber border · halted · "PAUSED"
  */
@@ -14,7 +14,7 @@
 import { Zap, Pause, Activity } from "lucide-react";
 import { N } from "./theme";
 
-type State = "LIVE" | "SIMULATION" | "PAUSED";
+type State = "LIVE" | "STANDBY" | "PAUSED";
 
 interface Props {
   assetClass: "CRYPTO" | "EQUITIES";
@@ -177,7 +177,7 @@ export function LiveControlBar({ assetClass, state, onToggle }: Props) {
           </div>
         </div>
 
-        {/* RIGHT — large status pill (LIVE / PAUSED / SIMULATION) */}
+        {/* RIGHT — large status pill (LIVE / PAUSED / STANDBY) */}
         <div className="flex items-center" style={{ gap: 12, pointerEvents: "none", zIndex: 1, flexShrink: 0 }}>
           <span style={{
             width: 12, height: 12, borderRadius: 12,

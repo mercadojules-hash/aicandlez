@@ -18,6 +18,45 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { LiveConsentModal, useLiveConsent } from "@/components/ConsentGate";
 
+// ── Operator bypass ───────────────────────────────────────────────────────────
+// The /command desktop console is the institutional operator surface.
+// Admin / super-admin / operator accounts have FULL unrestricted access:
+//   • no consent modal     • no subscription gate
+//   • no onboarding gate   • no live-trading paywall
+//   • all controls unlocked at all times
+// `useOperatorRole` resolves the bypass flag from /api/auth/me (DB-backed role).
+interface MeResponse { role?: string }
+function useOperatorRole(): { isOperator: boolean; isRoleResolved: boolean } {
+  const { data, status, fetchStatus } = useQuery<MeResponse>({
+    queryKey:  ["auth-me"],
+    queryFn:   async () => {
+      const r = await fetch("/api/auth/me");
+      if (!r.ok) throw new Error(`auth/me ${r.status}`);
+      return r.json() as Promise<MeResponse>;
+    },
+    // staleTime: 0 + refetchOnMount: "always" forces a fresh role read on
+    // every mount, eliminating the stale-cache race entirely. Combined with
+    // the fetchStatus === "idle" check in `isRoleResolved`, the modal
+    // cannot render until a fresh /auth/me response confirms role identity.
+    staleTime:        0,
+    refetchOnMount:   "always",
+    retry:            2,
+  });
+  const role = (data?.role ?? "").toLowerCase();
+  // Role is only "resolved" when we have a definitive successful response AND
+  // there is no in-flight refetch. This blocks ALL race windows including:
+  //   • initial load (status !== "success")
+  //   • error states (status === "error")
+  //   • stale-cache background refetch (fetchStatus === "fetching")
+  // The consent modal must NEVER appear before role is fully settled.
+  const isRoleResolved =
+    status === "success" && data !== undefined && fetchStatus === "idle";
+  return {
+    isOperator:     role === "admin" || role === "super-admin" || role === "operator",
+    isRoleResolved,
+  };
+}
+
 import {
   CommandBar, PlatformOverview, LiveAccountPanel,
   MarketHeartbeat, PositionsRow, LiveControlBar,
@@ -38,6 +77,7 @@ const j = <T,>(url: string) =>
 
 export default function CommandCenter() {
   const qc = useQueryClient();
+  const { isOperator, isRoleResolved } = useOperatorRole();
 
   /* ── Data ─────────────────────────────────────────────────────────────── */
   const { data: engine }   = useQuery({ queryKey: ["engine-status-cmd"],   queryFn: () => j<EngineStatus>("/api/engine/status"),     ...Q_MEDIUM });
@@ -87,6 +127,11 @@ export default function CommandCenter() {
   const selectSim  = () => switchExchangeMode("sim", "simulation");
   const selectLive = (ex: string) => {
     const id = ex.toLowerCase();
+    // Operator bypass — admins skip the consent gate entirely.
+    if (isOperator) { switchExchangeMode(id, id); return; }
+    // Role must be definitively resolved before we ever open the modal.
+    // Loading / error / refetch / stale-cache states all block the modal.
+    if (!isRoleResolved) return;
     if (hasConsented) {
       switchExchangeMode(id, id);
     } else {
@@ -94,21 +139,35 @@ export default function CommandCenter() {
     }
   };
 
-  /* ── Live-trading control bars (operator) ─────────────────────────────── */
-  // CRYPTO control bar mirrors the actual exchange mode (kraken/etc).
-  const cryptoState: "LIVE" | "SIMULATION" | "PAUSED" =
-    isPaused ? "PAUSED" : liveActive ? "LIVE" : "SIMULATION";
+  // Defensive auto-close — if the modal was opened before role resolved and the
+  // user turns out to be an operator, close it immediately and proceed.
+  useEffect(() => {
+    if (isOperator && pendingLiveEx) {
+      const id = pendingLiveEx;
+      setPendingLiveEx(null);
+      switchExchangeMode(id, id);
+    }
+    // switchExchangeMode is a stable closure within this render — intentionally
+    // omitted from deps to avoid re-firing on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOperator, pendingLiveEx]);
 
-  // Cycle: SIMULATION → LIVE → PAUSED → SIMULATION
+  /* ── Live-trading control bars (operator) ─────────────────────────────── */
+  // Operator surface uses institutional language — no "SIMULATION" pills.
+  // CRYPTO control bar mirrors the actual exchange mode (kraken/etc).
+  const cryptoState: "LIVE" | "STANDBY" | "PAUSED" =
+    isPaused ? "PAUSED" : liveActive ? "LIVE" : "STANDBY";
+
+  // Cycle: STANDBY → LIVE → PAUSED → STANDBY
   const toggleCryptoLive = () => {
-    if (isPaused)   { togglePause(); selectSim(); return; }  // PAUSED → SIM
+    if (isPaused)   { togglePause(); selectSim(); return; }  // PAUSED → STANDBY
     if (liveActive) { togglePause(); return; }               // LIVE   → PAUSED
-    selectLive("kraken");                                    // SIM    → LIVE
+    selectLive("kraken");                                    // STANDBY → LIVE
   };
 
   // EQUITIES control bar is operator-local for now — wire to real alpaca/etc later.
   const [equitiesLive, setEquitiesLive] = useState(false);
-  const equitiesState: "LIVE" | "SIMULATION" | "PAUSED" = equitiesLive ? "LIVE" : "SIMULATION";
+  const equitiesState: "LIVE" | "STANDBY" | "PAUSED" = equitiesLive ? "LIVE" : "STANDBY";
   const toggleEquitiesLive = () => setEquitiesLive(v => !v);
   useEffect(() => { if (isPaused) setEquitiesLive(false); }, [isPaused]);
 
@@ -202,13 +261,16 @@ export default function CommandCenter() {
             fontFamily: N.FONT_MONO,
           }}
         >
-          <span>AICANDLEZ · OPERATOR COMMAND CENTER · v2.1</span>
-          <span>AI ENGINE · {engine?.running ? "RUNNING" : "IDLE"} · {engine?.signalsGenerated ?? 0} SIGNALS · {engine?.tradesExecuted ?? 0} EXECS · OPERATOR · UNLIMITED</span>
+          <span>AICANDLEZ · OPERATOR COMMAND CENTER · v2.1{isOperator ? " · INTERNAL ACCESS" : ""}</span>
+          <span>AI ENGINE · {engine?.running ? "RUNNING" : "IDLE"} · {engine?.signalsGenerated ?? 0} SIGNALS · {engine?.tradesExecuted ?? 0} EXECS · {isOperator ? "OPERATOR · ALL GATES BYPASSED · UNLIMITED" : "UNLIMITED"}</span>
         </footer>
       </main>
 
+      {/* Consent modal — render-gate triple-locks against operator surfaces:
+          must have a pending exchange, role must be resolved, and user must
+          NOT be an operator. Any one being false hard-blocks display. */}
       <LiveConsentModal
-        open={pendingLiveEx !== null}
+        open={pendingLiveEx !== null && isRoleResolved && !isOperator}
         onConsented={() => {
           if (pendingLiveEx) switchExchangeMode(pendingLiveEx, pendingLiveEx);
           setPendingLiveEx(null);

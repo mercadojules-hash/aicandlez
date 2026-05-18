@@ -1,0 +1,124 @@
+The desktop dashboard is looking incredible overall. We are now entering FINAL operator/admin polish mode.
+
+CRITICAL ADMIN DASHBOARD FIXES:
+
+REMOVE REGISTRATION / MEMBERSHIP MODAL FROM ADMIN DASHBOARD
+Right now, when clicking actions on my operator dashboard, it triggers the Live Trading Agreement / registration fee modal.
+
+THIS SHOULD NEVER APPEAR ON MY ADMIN / OPERATOR DASHBOARD.
+
+The operator/admin dashboard should bypass:
+
+subscription checks
+registration prompts
+onboarding gates
+live-trading paywalls
+membership modals
+
+The admin/operator account should always have:
+
+full unrestricted access
+all controls unlocked
+all panels active
+live controls immediately accessible
+
+Create a proper admin/operator bypass flag throughout the dashboard.
+
+Examples:
+
+isAdmin
+isOperator
+operatorMode
+internalAccess
+
+The modal shown in the screenshot must NEVER appear for the operator dashboard.
+
+REMOVE “SIMULATION” LABELS FROM OPERATOR DASHBOARD
+The desktop operator dashboard is MY institutional control center.
+
+I do NOT want:
+
+SIMULATION pills
+SIM MODE indicators
+paper-trading labels
+sandbox labels
+fake-user onboarding labels
+
+Those are for end users only.
+
+The operator dashboard should instead show:
+
+LIVE
+ENGINE IDLE
+STANDBY
+MONITORING
+OPERATOR
+EXECUTION READY
+AI ACTIVE
+MARKET MONITORING
+EXCHANGE CONNECTED
+
+Replace all simulation language on the operator dashboard with institutional/operator terminology.
+
+UPDATE OLD $5.99 REFERENCES
+There are STILL legacy $5.99 references inside:
+Live Trading Agreement modal
+membership agreement copy
+onboarding/legal text
+operator modal text
+
+ALL pricing must reflect FINAL pricing:
+
+Paper Trading = FREE
+AI Trading = $15.99/month
+AI Trading Pro = $39.99/month
+
+3% performance fee language remains unchanged.
+
+Do a FULL repo-wide grep again for:
+
+5.99
+$5.99
+599
+starter pricing
+old membership text
+
+Remove ALL legacy references.
+
+OPERATOR DASHBOARD SHOULD FEEL LIKE BLOOMBERG / HEDGE FUND TERMINAL
+The desktop operator dashboard is NOT the consumer UI.
+
+It should feel:
+
+institutional
+elite
+internal
+operational
+high authority
+admin-grade
+
+Keep:
+
+black/neon aesthetic
+live telemetry
+AI engine state
+market heartbeat
+signal feeds
+execution control center
+
+But remove anything that feels:
+
+consumer onboarding
+paper-trading beginner UI
+subscription wall
+user registration flow
+FINAL VALIDATION
+After fixes:
+run full repo grep for old pricing
+typecheck
+ensure operator dashboard bypass works
+ensure no modal appears for admin
+ensure no simulation badges remain on operator dashboard
+verify all routes/components inherit operator access correctly
+
+This is now the final institutional polish pass for the operator desktop dashboard.

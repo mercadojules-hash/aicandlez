@@ -20,7 +20,7 @@ const CONSENT_ITEMS = [
   },
   {
     id:    "acceptedMembershipFee",
-    label: "I understand AICandlez charges a $5.99/month membership fee covering platform access, infrastructure, and AI compute. This fee applies regardless of trading performance.",
+    label: "I understand AICandlez offers a 3-tier subscription — Paper Trading (free) · AI Trading ($15.99/mo) · AI Trading Pro ($39.99/mo) — covering platform access, infrastructure, and AI compute. The subscription fee applies regardless of trading performance.",
   },
   {
     id:    "acceptedPerformanceFee",
@@ -158,7 +158,7 @@ export function LiveConsentModal({ open, onConsented, onCancel }: LiveConsentMod
           </div>
         </div>
 
-        {/* Fee summary banner */}
+        {/* Fee summary banner — 3-tier ladder + performance fee */}
         <div style={{
           margin: "16px 24px 0",
           padding: "12px 16px",
@@ -171,13 +171,14 @@ export function LiveConsentModal({ open, onConsented, onCancel }: LiveConsentMod
         }}>
           <div style={{ textAlign: "center" }}>
             <div style={{
-              fontSize: 22, fontFamily: "monospace", fontWeight: 700,
+              fontSize: 18, fontFamily: "monospace", fontWeight: 700,
               color: "#00f0ff", textShadow: "0 0 12px #00f0ff60",
-            }}>$5.99</div>
+              lineHeight: 1.2,
+            }}>$15.99 · $39.99</div>
             <div style={{ fontSize: 8, fontFamily: "monospace", color: "#3a6080",
-              letterSpacing: "0.14em", marginTop: 3 }}>PER MONTH</div>
+              letterSpacing: "0.14em", marginTop: 3 }}>AI TRADING · PRO / MO</div>
             <div style={{ fontSize: 8, fontFamily: "monospace", color: "#2a5070",
-              letterSpacing: "0.1em", marginTop: 1 }}>MEMBERSHIP FEE</div>
+              letterSpacing: "0.1em", marginTop: 1 }}>PAPER TRADING FREE</div>
           </div>
           <div style={{ background: "#0d2035" }} />
           <div style={{ textAlign: "center" }}>

@@ -21,13 +21,15 @@ type AuthReq = Request & { clerkUserId: string };
 // ── Plan definitions (mirrors Stripe product metadata) ────────────────────────
 
 // ── Monetization model ────────────────────────────────────────────────────────
-// $5.99/month membership — covers platform access, infrastructure, AI compute.
+// 3-tier subscription ladder:
+//   • Paper Trading (free)      — signals + simulated buy/sell, no live execution
+//   • AI Trading      $15.99/mo — up to 6 concurrent AI trades, crypto live exec
+//   • AI Trading Pro  $39.99/mo — up to 12 concurrent AI trades, crypto + equities
 // PLUS 3% performance fee on PROFITABLE CLOSED trades only.
 //   • No fee on losing trades.
 //   • No fee on unrealized PnL.
-//   • Membership and performance fee are disclosed and accepted at onboarding.
+//   • Tier and performance fee are disclosed and accepted at onboarding.
 
-export const MEMBERSHIP_PRICE_USD   = 5.99;
 export const PERFORMANCE_FEE_RATE   = 0.03;
 
 export const PLAN_FEATURES: Record<string, {

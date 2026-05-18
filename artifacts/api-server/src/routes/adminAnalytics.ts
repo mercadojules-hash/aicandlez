@@ -128,10 +128,11 @@ router.get(
         WHERE consent_version = 'v1.0'
       `).then(r => r.rows) as any[];
 
-      // Estimated MRR ($5.99 starter plan)
-      // NOTE: authoritative MRR comes from Stripe; this is a DB-derived estimate
+      // Estimated MRR — DB-derived rough estimate using AI Trading ($15.99)
+      // baseline. Authoritative MRR comes from Stripe (stripeMetrics below)
+      // which mixes both starter ($15.99) and pro ($39.99) tiers.
       const activePaidUsers = parseInt((userTotals as any)?.active_subscriptions ?? "0");
-      const estimatedMrr    = activePaidUsers * 5.99;
+      const estimatedMrr    = activePaidUsers * 15.99;
 
       // Stripe-sourced subscription data (best-effort — requires Stripe sync schema)
       let stripeMetrics: Record<string, unknown> = {};
@@ -155,7 +156,7 @@ router.get(
         planDistribution:  planDist,
         consentStats:      consentStats ?? {},
         estimatedMrr,
-        membershipPricingUsd: 5.99,
+        membershipPricingUsd: { starter: 15.99, pro: 39.99 },
         stripeMetrics,
       });
     } catch (err) {
