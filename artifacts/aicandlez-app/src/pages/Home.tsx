@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
@@ -12,6 +12,7 @@ import {
   type MobileStatus, type Portfolio, type SimAccount,
   type Subscription, type SignalBreakdown, type MobileSignalsResponse,
   type MobileTickersResponse, type MobileTicker,
+  type SimTrade,
 } from "@/lib/api";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -586,6 +587,8 @@ export default function Home() {
     queryKey: ["mobile-signals"], queryFn: () => api.get("/mobile/signals"), refetchInterval: 8_000, retry: false });
   const { data: tickersData } = useQuery<MobileTickersResponse>({
     queryKey: ["mobile-tickers"], queryFn: () => api.get("/mobile/tickers"), refetchInterval: 15_000, retry: false });
+  const { data: tradesData }  = useQuery<{ trades: SimTrade[] }>({
+    queryKey: ["sim-trades"], queryFn: () => api.get("/simulation/trades"), refetchInterval: 12_000, retry: false });
 
   // ── Derived state ────────────────────────────────────────────────────────
   const engine   = status?.engine;
@@ -1127,6 +1130,14 @@ export default function Home() {
           )}
         </div>
 
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* TRADE HISTORY — cinematic AI execution log                        */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        <TradeHistorySection
+          trades={tradesData?.trades ?? []}
+          onMore={() => setLocation("/trade")}
+        />
+
         {/* Broker connection */}
         <div style={{ padding: "18px 16px 0" }}>
           <BrokerStatusCard/>
@@ -1197,6 +1208,404 @@ function SectionHeader({ label, right, onMore }: {
           View All →
         </button>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TRADE HISTORY — cinematic AI execution log
+// Glow-state cards · expandable details · AI reasoning tags · profit bars
+// ═══════════════════════════════════════════════════════════════════════════
+function TradeHistorySection({ trades, onMore }: {
+  trades: SimTrade[]; onMore: () => void;
+}) {
+  // Aggregate stats from REAL trades only — no fabrication
+  const stats = useMemo(() => {
+    if (trades.length === 0) return null;
+    const wins = trades.filter(t => t.pnl > 0).length;
+    const total = trades.length;
+    const winRate = (wins / total) * 100;
+    const netPnL = trades.reduce((sum, t) => sum + (t.pnl ?? 0), 0);
+    const bestPct = trades.reduce((m, t) => Math.max(m, t.pnlPct ?? 0), 0);
+    return { wins, total, winRate, netPnL, bestPct };
+  }, [trades]);
+
+  const recent = trades.slice(0, 5);
+
+  return (
+    <>
+      <SectionHeader
+        label="Trade History"
+        right={stats ? `${stats.total} executed · ${stats.winRate.toFixed(0)}% win` : "AI Execution Log"}
+        onMore={trades.length > 0 ? onMore : undefined}
+      />
+
+      <div style={{ margin: "0 16px" }}>
+        {/* Aggregate banner — derived strictly from real trade records */}
+        {stats && (
+          <div style={{
+            position: "relative", overflow: "hidden",
+            padding: "14px 16px", borderRadius: 18, marginBottom: 12,
+            background: `
+              radial-gradient(circle at 0% 0%, rgba(102,255,102,0.10) 0%, transparent 55%),
+              linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 60%, ${BG} 100%)
+            `,
+            border: `1px solid ${BORDER_HI}`,
+            boxShadow: `0 8px 28px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)`,
+          }}>
+            {/* sweep accent */}
+            <div style={{
+              position: "absolute", top: 0, left: 0, right: 0, height: 1,
+              background: `linear-gradient(90deg, transparent 0%, ${BRAND_GLOW} 50%, transparent 100%)`,
+              animation: "edge-sweep 6s ease-in-out infinite",
+            }}/>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: 12,
+                background: `linear-gradient(135deg, ${BRAND}22, ${BRAND_DEEP}18)`,
+                border: `1px solid ${BORDER_HI}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: BRAND, boxShadow: `0 0 14px ${BRAND_BLOOM}`,
+              }}>{IconSparkle}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
+                  letterSpacing: 1.2, textTransform: "uppercase",
+                }}>AI Realized P&amp;L</div>
+                <div style={{
+                  fontSize: 22, fontFamily: SANS, fontWeight: 800,
+                  color: stats.netPnL >= 0 ? POS : NEG,
+                  letterSpacing: -0.6, fontVariantNumeric: "tabular-nums",
+                  textShadow: `0 0 18px ${stats.netPnL >= 0 ? "rgba(102,255,102,0.35)" : "rgba(255,64,96,0.30)"}`,
+                  marginTop: 2,
+                }}>
+                  {stats.netPnL >= 0 ? "+" : ""}${Math.abs(stats.netPnL).toFixed(2)}
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{
+                  fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
+                  letterSpacing: 1.2, textTransform: "uppercase",
+                }}>Best Trade</div>
+                <div style={{
+                  fontSize: 14, fontFamily: SANS, fontWeight: 700, color: POS,
+                  marginTop: 2, fontVariantNumeric: "tabular-nums",
+                }}>+{stats.bestPct.toFixed(2)}%</div>
+              </div>
+            </div>
+            {/* mini win-rate bar */}
+            <div style={{ marginTop: 10 }}>
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                marginBottom: 5,
+              }}>
+                <span style={{
+                  fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
+                  letterSpacing: 1.1, textTransform: "uppercase",
+                }}>Win Rate · {stats.wins}/{stats.total}</span>
+                <span style={{
+                  fontSize: 11, fontFamily: SANS, fontWeight: 700, color: BRAND,
+                  fontVariantNumeric: "tabular-nums",
+                }}>{stats.winRate.toFixed(0)}%</span>
+              </div>
+              <div style={{
+                position: "relative", height: 4, borderRadius: 999,
+                background: "rgba(255,255,255,0.05)", overflow: "hidden",
+              }}>
+                <div style={{
+                  position: "absolute", inset: 0,
+                  width: `${Math.min(100, stats.winRate)}%`,
+                  background: `linear-gradient(90deg, ${BRAND_DEEP} 0%, ${BRAND} 70%, ${BRAND_BRGT} 100%)`,
+                  boxShadow: `0 0 10px ${BRAND_GLOW}`,
+                  borderRadius: 999,
+                  animation: "bar-in 1.2s ease-out",
+                }}/>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Trade cards */}
+        {recent.length === 0 ? (
+          <div style={{
+            padding: "26px 18px", textAlign: "center", borderRadius: 18,
+            background: `linear-gradient(160deg, ${SURFACE} 0%, ${BG} 100%)`,
+            border: `1px dashed ${BORDER_HI}`,
+          }}>
+            <div style={{ fontSize: 13, fontFamily: SANS, fontWeight: 700, color: TEXT, marginBottom: 4 }}>
+              No closed trades yet
+            </div>
+            <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_SUB, lineHeight: 1.5 }}>
+              The AI is scanning the market.<br/>
+              Executed trades will appear here as they close.
+            </div>
+          </div>
+        ) : (
+          recent.map((t, i) => <TradeHistoryCard key={t.id ?? i} trade={t}/>)
+        )}
+      </div>
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Single expandable trade card with glow state + AI reasoning tags
+// ─────────────────────────────────────────────────────────────────────────────
+function TradeHistoryCard({ trade }: { trade: SimTrade }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const isWin   = (trade.pnl ?? 0) >= 0;
+  const sideUp  = (trade.side ?? "").toLowerCase();
+  const isLong  = sideUp === "long" || sideUp === "buy";
+  const pnl     = trade.pnl ?? 0;
+  const pnlPct  = trade.pnlPct ?? 0;
+  // Confidence: prefer real `score` if present, else derive from magnitude
+  const confidence = typeof trade.score === "number"
+    ? Math.max(0, Math.min(100, trade.score))
+    : null;
+
+  // Glow palette — green for wins, red for losses
+  const accent = isWin ? BRAND : NEG;
+  const accentDeep = isWin ? BRAND_DEEP : "#C8132F";
+  const glowRgba = isWin ? "rgba(102,255,102,0.22)" : "rgba(255,64,96,0.22)";
+  const glowSoft = isWin ? "rgba(102,255,102,0.10)" : "rgba(255,64,96,0.10)";
+
+  // Profit bar magnitude (0-100% mapped from |pnlPct|, capped at 10%)
+  const barPct = Math.min(100, Math.abs(pnlPct) * 10);
+
+  // AI reasoning tags — derived strictly from real trade data
+  const tags: string[] = [];
+  if (confidence !== null) {
+    tags.push(confidence >= 70 ? "High Confidence" : confidence >= 50 ? "Confirmed" : "Speculative");
+  }
+  if (isWin && pnlPct >= 3) tags.push("Target Hit");
+  else if (!isWin && pnlPct <= -2) tags.push("Stop Out");
+  else if (!isWin) tags.push("Scratched");
+  else tags.push("Closed in Profit");
+  tags.push(isLong ? "Trend Long" : "Trend Short");
+
+  // Timestamp display
+  const closedDate = useMemo(() => {
+    if (!trade.closedAt) return "—";
+    const d = new Date(trade.closedAt);
+    if (Number.isNaN(d.getTime())) return trade.closedAt;
+    const now = Date.now();
+    const diff = now - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1)   return "just now";
+    if (mins < 60)  return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24)   return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 30)  return `${days}d ago`;
+    return d.toLocaleDateString();
+  }, [trade.closedAt]);
+
+  return (
+    <div
+      onClick={() => setExpanded(e => !e)}
+      style={{
+        position: "relative", overflow: "hidden", cursor: "pointer",
+        marginBottom: 10, borderRadius: 18, padding: "14px 16px",
+        background: `
+          radial-gradient(circle at 0% 0%, ${glowSoft} 0%, transparent 55%),
+          linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 55%, ${BG} 100%)
+        `,
+        border: `1px solid ${isWin ? BORDER_HI : "rgba(255,64,96,0.28)"}`,
+        boxShadow: `
+          0 10px 30px rgba(0,0,0,0.5),
+          0 0 0 1px ${glowRgba} inset,
+          0 0 22px -8px ${glowRgba}
+        `,
+        transition: "transform 0.18s ease, box-shadow 0.2s ease",
+      }}
+    >
+      {/* Left accent rail */}
+      <div style={{
+        position: "absolute", top: 0, bottom: 0, left: 0, width: 3,
+        background: `linear-gradient(180deg, ${accent} 0%, ${accentDeep} 100%)`,
+        boxShadow: `0 0 12px ${glowRgba}`,
+      }}/>
+
+      {/* Top-edge animated sweep */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: 1,
+        background: `linear-gradient(90deg, transparent 0%, ${glowRgba} 50%, transparent 100%)`,
+        animation: "edge-sweep 7s ease-in-out infinite",
+      }}/>
+
+      {/* Header row: icon + symbol + BUY/SELL + LONG/SHORT + PnL */}
+      <div style={{ display: "flex", alignItems: "center", gap: 11, position: "relative" }}>
+        <CryptoIcon sym={trade.symbol} size={40}/>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <span style={{
+              fontSize: 14, fontFamily: SANS, fontWeight: 700, color: TEXT,
+              letterSpacing: -0.1,
+            }}>
+              {SYM_SHORT[trade.symbol] ?? trade.symbol.replace("USD","")}/USDT
+            </span>
+            {/* BUY / SELL pill */}
+            <span style={{
+              padding: "2px 7px", borderRadius: 4,
+              background: isLong ? `${BRAND}1F` : `${NEG}1F`,
+              border: `1px solid ${isLong ? BORDER_HI : "rgba(255,64,96,0.30)"}`,
+              fontSize: 8.5, fontFamily: SANS, fontWeight: 800,
+              color: isLong ? BRAND : NEG,
+              letterSpacing: 0.8, textTransform: "uppercase",
+            }}>{isLong ? "Buy" : "Sell"}</span>
+            {/* LONG / SHORT pill */}
+            <span style={{
+              padding: "2px 7px", borderRadius: 4,
+              background: "rgba(255,255,255,0.04)",
+              border: `1px solid ${BORDER}`,
+              fontSize: 8.5, fontFamily: SANS, fontWeight: 700,
+              color: TEXT_SUB, letterSpacing: 0.8, textTransform: "uppercase",
+            }}>{isLong ? "Long" : "Short"}</span>
+          </div>
+          <div style={{
+            fontSize: 10.5, fontFamily: SANS, color: TEXT_DIM,
+            marginTop: 3, letterSpacing: 0.2,
+          }}>
+            {SYM_LABEL[trade.symbol] ?? trade.symbol} · {closedDate}
+          </div>
+        </div>
+
+        {/* AI confidence ring */}
+        {confidence !== null && (
+          <ConfidenceRing value={confidence} accent={accent}/>
+        )}
+
+        {/* PnL */}
+        <div style={{ textAlign: "right", minWidth: 78 }}>
+          <div style={{
+            fontSize: 16, fontFamily: SANS, fontWeight: 800,
+            color: accent, fontVariantNumeric: "tabular-nums",
+            letterSpacing: -0.3,
+            textShadow: `0 0 14px ${glowRgba}`,
+          }}>
+            {pnl >= 0 ? "+" : ""}${Math.abs(pnl).toFixed(2)}
+          </div>
+          <div style={{
+            fontSize: 11, fontFamily: SANS, fontWeight: 600, color: accent,
+            marginTop: 1, fontVariantNumeric: "tabular-nums",
+          }}>
+            {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+          </div>
+        </div>
+      </div>
+
+      {/* Animated profit/loss bar */}
+      <div style={{ marginTop: 12, position: "relative" }}>
+        <div style={{
+          height: 5, borderRadius: 999, overflow: "hidden",
+          background: "rgba(255,255,255,0.04)",
+          border: `1px solid rgba(255,255,255,0.03)`,
+        }}>
+          <div style={{
+            height: "100%", width: `${barPct}%`,
+            background: `linear-gradient(90deg, ${accentDeep} 0%, ${accent} 100%)`,
+            boxShadow: `0 0 12px ${glowRgba}`,
+            borderRadius: 999,
+            animation: "bar-in 1s ease-out",
+          }}/>
+        </div>
+      </div>
+
+      {/* AI reasoning tags */}
+      <div style={{ marginTop: 11, display: "flex", flexWrap: "wrap", gap: 5 }}>
+        {tags.map(tag => (
+          <span key={tag} style={{
+            padding: "3px 8px", borderRadius: 999,
+            background: "rgba(102,255,102,0.06)",
+            border: `1px solid rgba(102,255,102,0.16)`,
+            fontSize: 9.5, fontFamily: SANS, fontWeight: 700,
+            color: BRAND, letterSpacing: 0.4, textTransform: "uppercase",
+          }}>{tag}</span>
+        ))}
+        <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{
+            fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
+            letterSpacing: 0.8, textTransform: "uppercase",
+          }}>{expanded ? "Hide" : "Details"}</span>
+          <span style={{
+            color: TEXT_DIM, transition: "transform 0.2s ease",
+            transform: expanded ? "rotate(180deg)" : "rotate(0)",
+            display: "inline-flex",
+          }}>{IconChevron}</span>
+        </span>
+      </div>
+
+      {/* Expandable detail panel */}
+      {expanded && (
+        <div style={{
+          marginTop: 12, paddingTop: 12,
+          borderTop: `1px solid ${BORDER}`,
+          display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10,
+          animation: "bar-in 0.3s ease-out",
+        }}>
+          <DetailCell label="Entry" value={fmtPx(trade.entryPrice)}/>
+          <DetailCell label="Exit"  value={fmtPx(trade.exitPrice)} accent={accent}/>
+          <DetailCell
+            label="Move"
+            value={`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%`}
+            accent={accent}
+          />
+          {confidence !== null && (
+            <DetailCell label="AI Score" value={`${confidence.toFixed(0)} / 100`} accent={BRAND}/>
+          )}
+          <DetailCell label="Direction" value={isLong ? "Long ▲" : "Short ▼"} accent={accent}/>
+          <DetailCell label="Outcome"  value={isWin ? "Profit" : "Loss"} accent={accent}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── AI confidence ring (small circular gauge for the trade card) ────────────
+function ConfidenceRing({ value, accent }: { value: number; accent: string }) {
+  const size = 36;
+  const r = 14;
+  const c = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(100, value));
+  const dash = (pct / 100) * c;
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size/2} cy={size/2} r={r}
+          fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={3}/>
+        <circle cx={size/2} cy={size/2} r={r}
+          fill="none" stroke={accent} strokeWidth={3} strokeLinecap="round"
+          strokeDasharray={`${dash} ${c}`}
+          transform={`rotate(-90 ${size/2} ${size/2})`}
+          style={{ filter: `drop-shadow(0 0 4px ${accent})` }}
+        />
+      </svg>
+      <div style={{
+        position: "absolute", inset: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 9, fontFamily: SANS, fontWeight: 800, color: accent,
+        letterSpacing: -0.2,
+      }}>{Math.round(pct)}</div>
+    </div>
+  );
+}
+
+// ── Small labelled cell used in the expandable detail panel ─────────────────
+function DetailCell({ label, value, accent }: {
+  label: string; value: string; accent?: string;
+}) {
+  return (
+    <div>
+      <div style={{
+        fontSize: 8.5, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
+        letterSpacing: 1.1, textTransform: "uppercase", marginBottom: 3,
+      }}>{label}</div>
+      <div style={{
+        fontSize: 12, fontFamily: SANS, fontWeight: 700,
+        color: accent ?? TEXT, letterSpacing: -0.1,
+        fontVariantNumeric: "tabular-nums",
+      }}>{value}</div>
     </div>
   );
 }
