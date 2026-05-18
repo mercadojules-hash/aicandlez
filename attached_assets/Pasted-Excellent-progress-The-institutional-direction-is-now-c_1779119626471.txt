@@ -1,0 +1,107 @@
+Excellent progress. The institutional direction is now correct.
+
+Now we need to refine the dashboard hierarchy and visual behavior.
+
+==================================================
+LIVE TRADING CONTROL BARS
+=========================
+
+The “ENABLE LIVE AI TRADING” bars are currently placed incorrectly.
+
+Move them so they sit DIRECTLY ABOVE their respective sections:
+
+CRYPTO:
+[ ⚡ ENABLE LIVE AI CRYPTO TRADING ]
+directly above:
+TOP 20 CRYPTO SIGNALS
+
+EQUITIES:
+[ ⚡ ENABLE LIVE AI EQUITIES TRADING ]
+directly above:
+TOP 20 EQUITY SIGNALS
+
+These should NOT be global bars.
+
+They should belong to each trading category independently.
+
+==================================================
+CONTROL BAR DESIGN
+==================
+
+Make these bars feel much more cinematic and powerful.
+
+Current version is too subtle.
+
+New requirements:
+
+* stronger glow
+* orange/gold glow accent
+* animated pulse when LIVE
+* matte black base
+* institutional AI energy feel
+* thicker height
+* larger typography
+* stronger hover states
+* status indicator on right:
+  LIVE / PAUSED / SIMULATION
+
+When LIVE:
+
+* glowing animated orange pulse
+* subtle sweep animation across bar
+
+==================================================
+ACTIVE POSITIONS PANEL
+======================
+
+The current Active Positions section still looks too much like a table.
+
+I want it redesigned to visually match the crypto/equities signal architecture.
+
+Meaning:
+
+* taller institutional rows
+* sparkline mini charts
+* LONG/SHORT directional styling
+* confidence indicators
+* larger spacing
+* stronger card feel
+* more cinematic live workstation appearance
+
+It should visually feel like:
+“currently executing AI positions”
+
+NOT:
+“generic admin table”
+
+Use the same design language as:
+
+* Top 20 Crypto Signals
+* Top 20 Equity Signals
+
+==================================================
+OVERALL GOAL
+============
+
+The dashboard should now feel like:
+
+* Bloomberg Terminal
+* AI hedge fund command center
+* institutional execution desk
+* live AI trading operating system
+
+NOT:
+
+* admin dashboard
+* developer tool
+* generic crypto panel
+
+Keep:
+
+* matte black
+* neon green
+* institutional typography
+* left operator nav
+* command center architecture
+* confidence circles
+* LONG/SHORT visual separation

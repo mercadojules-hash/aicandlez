@@ -1,5 +1,10 @@
 /**
- * SignalsRow — Top 20 Crypto Signals (left) + Top 20 Equity Signals (right).
+ * Signal panels — Top 20 Crypto (left) + Top 20 Equity (right).
+ *
+ * Exposes:
+ *   • CryptoSignalsPanel  — single panel, used when bar+panel are stacked
+ *   • EquitySignalsPanel  — single panel
+ *   • SignalsRow          — convenience wrapper rendering both side-by-side
  *
  * Centerpiece data row. With filter=ALL, rows are grouped LONG-then-SHORT with
  * a divider for strong visual separation.
@@ -29,7 +34,6 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine }: PanelProps) 
 
   const breakdowns = engine?.symbolBreakdowns ?? {};
 
-  // Pre-classify so we can group LONG / SHORT for the ALL view
   const classified = useMemo(() => {
     const longs:  Array<{ spec: TickerSpec; breakdown?: SymBreakdown }> = [];
     const shorts: Array<{ spec: TickerSpec; breakdown?: SymBreakdown }> = [];
@@ -84,11 +88,11 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine }: PanelProps) 
         </div>
       </header>
 
-      {/* Rows — grouped LONG → SHORT for ALL view (stronger visual block separation) */}
+      {/* Rows — grouped LONG → SHORT for ALL view */}
       <div className="blotter-scroll" style={{ maxHeight: 940 }}>
         {(filter === "ALL" || filter === "LONG") && classified.longs.length > 0 && (
           <>
-            <GroupDivider label="LONG SETUPS" count={classified.longs.length} color={N.LONG} icon={<TrendingUp className="w-3 h-3" />} />
+            <GroupDivider label="LONG SETUPS"  count={classified.longs.length}  color={N.LONG}  icon={<TrendingUp   className="w-3 h-3" />} />
             {classified.longs.map(({ spec, breakdown }) => (
               <SignalRow key={spec.symbol} spec={spec} breakdown={breakdown} />
             ))}
@@ -120,17 +124,10 @@ function GroupDivider({
         fontFamily: N.FONT_MONO,
       }}
     >
-      <span style={{ color, filter: `drop-shadow(0 0 4px ${color}80)`, display: "inline-flex" }}>
-        {icon}
-      </span>
+      <span style={{ color, filter: `drop-shadow(0 0 4px ${color}80)`, display: "inline-flex" }}>{icon}</span>
       <span className="text-[9px] font-extrabold tracking-[0.28em]"
-        style={{ color, textShadow: `0 0 6px ${color}60` }}>
-        {label}
-      </span>
-      <span className="text-[8.5px] font-bold tracking-[0.18em]"
-        style={{ color: N.TEXT_3 }}>
-        · {count}
-      </span>
+        style={{ color, textShadow: `0 0 6px ${color}60` }}>{label}</span>
+      <span className="text-[8.5px] font-bold tracking-[0.18em]" style={{ color: N.TEXT_3 }}>· {count}</span>
       <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${color}40, transparent)` }} />
     </div>
   );
@@ -156,27 +153,39 @@ function FilterTab({
   );
 }
 
-/* ── EXPORT ─────────────────────────────────────────────────────────────── */
+/* ── PUBLIC EXPORTS ─────────────────────────────────────────────────────── */
+
+export function CryptoSignalsPanel({ engine }: { engine?: EngineStatus }) {
+  return (
+    <SignalsPanel
+      label="TOP 20 CRYPTO SIGNALS"
+      sub="LONG · SHORT · UNLIMITED AI EXECUTION"
+      icon={<Bitcoin className="w-3.5 h-3.5" />}
+      brand={N.BRAND}
+      tickers={CRYPTO_20}
+      engine={engine}
+    />
+  );
+}
+
+export function EquitySignalsPanel({ engine }: { engine?: EngineStatus }) {
+  return (
+    <SignalsPanel
+      label="TOP 20 EQUITY SIGNALS"
+      sub="LONG · SHORT · UNLIMITED AI EXECUTION"
+      icon={<BarChart3 className="w-3.5 h-3.5" />}
+      brand={N.BRAND_BRT}
+      tickers={EQUITIES_20}
+      engine={engine}
+    />
+  );
+}
 
 export function SignalsRow({ engine }: { engine?: EngineStatus }) {
   return (
     <section className="grid gap-2 px-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
-      <SignalsPanel
-        label="TOP 20 CRYPTO SIGNALS"
-        sub="LONG · SHORT · UNLIMITED AI EXECUTION"
-        icon={<Bitcoin className="w-3.5 h-3.5" />}
-        brand={N.BRAND}
-        tickers={CRYPTO_20}
-        engine={engine}
-      />
-      <SignalsPanel
-        label="TOP 20 EQUITY SIGNALS"
-        sub="LONG · SHORT · UNLIMITED AI EXECUTION"
-        icon={<BarChart3 className="w-3.5 h-3.5" />}
-        brand={N.BRAND_BRT}
-        tickers={EQUITIES_20}
-        engine={engine}
-      />
+      <CryptoSignalsPanel engine={engine} />
+      <EquitySignalsPanel engine={engine} />
     </section>
   );
 }

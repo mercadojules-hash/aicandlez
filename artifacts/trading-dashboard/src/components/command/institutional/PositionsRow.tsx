@@ -4,9 +4,11 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { Line, LineChart, ResponsiveContainer, YAxis } from "recharts";
 import type { Trade, SimPosition } from "../types";
 import { N } from "./theme";
 import { CRYPTO_20, EQUITIES_20 } from "./tickers";
+import { useLiveCandles } from "./useLiveCandles";
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
@@ -133,109 +135,223 @@ function ActivePanel({ positions, openTrades }: ActiveProps) {
         </div>
       }
     >
-      <div className="grid text-[8.5px] font-bold tracking-[0.14em] px-3 py-1.5"
-        style={{
-          gridTemplateColumns: "70px 56px 1fr 1fr 1fr 1fr 1fr 70px 70px",
-          color: N.TEXT_3,
-          borderBottom: `1px solid ${N.BORDER}`,
-          background: N.SURFACE_1,
-        }}
-      >
-        <div>SYMBOL</div>
-        <div>SIDE</div>
-        <div className="text-right">ENTRY</div>
-        <div className="text-right">LAST</div>
-        <div className="text-right">SL</div>
-        <div className="text-right">TP</div>
-        <div className="text-right">PNL</div>
-        <div className="text-right">CONF</div>
-        <div className="text-right pr-1">ACTION</div>
-      </div>
-
-      <div className="blotter-scroll" style={{ maxHeight: 360 }}>
+      <div className="blotter-scroll" style={{ maxHeight: 560 }}>
         {rows.length === 0 ? (
           <EmptyState label="No active positions" />
-        ) : rows.map(r => {
-          const sideColor = r.side === "LONG" ? N.LONG : N.SHORT;
-          const pnlPos    = r.pnl >= 0;
-          const tickerColor = TICKER_COLOR[r.symbol] ?? N.BRAND;
-          return (
-            <div
-              key={r.id}
-              className="grid items-center px-3 py-1.5 transition-colors"
-              style={{
-                gridTemplateColumns: "70px 56px 1fr 1fr 1fr 1fr 1fr 70px 70px",
-                borderBottom: `1px solid ${N.BORDER}`,
-                background: N.SURFACE_1,
-                fontFamily: N.FONT_MONO,
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = N.SURFACE_2)}
-              onMouseLeave={e => (e.currentTarget.style.background = N.SURFACE_1)}
-            >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span style={{
-                  width: 4, height: 14, background: tickerColor,
-                  borderRadius: 1, boxShadow: `0 0 6px ${tickerColor}80`,
-                }} />
-                <span className="text-[10px] font-bold tracking-wider truncate" style={{ color: N.TEXT_0 }}>
-                  {r.symbol.replace("USD", "")}
-                </span>
-              </div>
-              <div>
-                <span
-                  className="px-1.5 py-0.5 text-[8.5px] font-bold tracking-[0.18em]"
-                  style={{
-                    color: sideColor,
-                    background: `${sideColor}12`,
-                    border: `1px solid ${sideColor}40`,
-                    borderRadius: 3,
-                  }}
-                >
-                  {r.side}
-                </span>
-              </div>
-              <div className="text-right text-[10px] font-bold tabular-nums" style={{ color: N.TEXT_1 }}>
-                ${fmtPrice(r.entry)}
-              </div>
-              <div className="text-right text-[10px] font-bold tabular-nums" style={{ color: N.TEXT_0 }}>
-                ${fmtPrice(r.last)}
-              </div>
-              <div className="text-right text-[9.5px] tabular-nums" style={{ color: N.SHORT }}>
-                {r.sl != null ? `$${fmtPrice(r.sl)}` : "—"}
-              </div>
-              <div className="text-right text-[9.5px] tabular-nums" style={{ color: N.LONG }}>
-                {r.tp != null ? `$${fmtPrice(r.tp)}` : "—"}
-              </div>
-              <div className="text-right">
-                <div className="text-[10.5px] font-bold tabular-nums"
-                  style={{ color: pnlPos ? N.LONG : N.SHORT,
-                           textShadow: `0 0 8px ${pnlPos ? N.LONG_GLOW : N.SHORT_GLOW}` }}>
-                  {fmtUsd(r.pnl)}
-                </div>
-                <div className="text-[8px] tabular-nums" style={{ color: pnlPos ? N.LONG : N.SHORT, opacity: 0.85 }}>
-                  {pnlPos ? "+" : ""}{r.pnlPct.toFixed(2)}%
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] font-bold tabular-nums" style={{ color: r.conf >= 75 ? N.BRAND : N.WARN }}>
-                  {r.conf}%
-                </div>
-                <div className="text-[7.5px] tracking-[0.14em]" style={{ color: r.trail ? N.BRAND_BRT : N.TEXT_3 }}>
-                  {r.trail ? "TRAIL•ON" : "TRAIL•—"}
-                </div>
-                <div className="text-[7px] tracking-[0.14em]" style={{ color: N.TEXT_3 }}>
-                  {ageMs(r.age)}
-                </div>
-              </div>
-              <div className="flex justify-end gap-1">
-                <ActionBtn label="PAUSE" color={N.WARN} />
-                <ActionBtn label="CLOSE" color={N.SHORT} />
-              </div>
-            </div>
-          );
-        })}
+        ) : rows.map(r => (
+          <ActivePositionRow
+            key={r.id}
+            id={r.id}
+            symbol={r.symbol}
+            side={r.side}
+            qty={r.qty}
+            entry={r.entry}
+            sl={r.sl}
+            tp={r.tp}
+            pnl={r.pnl}
+            pnlPct={r.pnlPct}
+            ageLabel={ageMs(r.age)}
+            conf={r.conf}
+            trail={r.trail}
+          />
+        ))}
       </div>
     </Panel>
+  );
+}
+
+/* ── ACTIVE POSITION ROW (SignalRow-style 2-line layout) ─────────────────── */
+
+interface ActivePositionRowProps {
+  id:       string;
+  symbol:   string;
+  side:     "LONG" | "SHORT";
+  qty:      number;
+  entry:    number;
+  sl:       number | null;
+  tp:       number | null;
+  pnl:      number;
+  pnlPct:   number;
+  ageLabel: string;
+  conf:     number;
+  trail:    boolean;
+}
+
+function ActivePositionRow(p: ActivePositionRowProps) {
+  const { points, livePrice, summary, state } = useLiveCandles({
+    symbol: p.symbol, limit: 40, timeframe: "15m",
+  });
+
+  const last     = livePrice ?? summary.last ?? p.entry;
+  const dirColor = p.side === "LONG" ? N.LONG : N.SHORT;
+  const dirGlow  = p.side === "LONG" ? N.LONG_GLOW : N.SHORT_GLOW;
+  const pnlPos   = p.pnl >= 0;
+  const tickerCo = TICKER_COLOR[p.symbol] ?? N.BRAND;
+  const confColor = p.conf >= 78 ? N.BRAND : p.conf >= 62 ? N.BRAND_DEEP : N.WARN;
+
+  const rowBg      = `linear-gradient(90deg, ${dirColor}0F 0%, ${N.SURFACE_1} 32%)`;
+  const rowBgHover = `linear-gradient(90deg, ${dirColor}1A 0%, ${N.SURFACE_2} 38%)`;
+
+  const closes = points.map(pt => pt.close);
+  const min = closes.length ? Math.min(...closes) : 0;
+  const max = closes.length ? Math.max(...closes) : 1;
+  const pad = (max - min) * 0.18 || 1;
+
+  const RING = 52, STROKE = 4.5;
+  const radius = (RING - STROKE) / 2;
+  const circ = 2 * Math.PI * radius;
+  const dash = (p.conf / 100) * circ;
+
+  return (
+    <div
+      className="grid items-center transition-colors"
+      style={{
+        gridTemplateColumns: "260px 1fr 84px",
+        gap: 10,
+        padding: "10px 12px 10px 14px",
+        minHeight: 76,
+        borderBottom: `1px solid ${N.BORDER}`,
+        background: rowBg,
+        fontFamily: N.FONT_MONO,
+        boxShadow: `inset 5px 0 0 0 ${dirColor}, inset 5px 0 14px 0 ${dirColor}28`,
+        position: "relative",
+      }}
+      onMouseEnter={e => (e.currentTarget.style.background = rowBgHover)}
+      onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
+    >
+      {/* LEFT — header (side · ticker · trail) over (entry · last · qty) */}
+      <div className="flex flex-col" style={{ gap: 6 }}>
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] font-extrabold tracking-[0.22em] px-2 py-0.5 rounded"
+            style={{
+              color: dirColor,
+              background: `${dirColor}1c`,
+              border: `1px solid ${dirColor}70`,
+              boxShadow: `0 0 8px ${dirColor}40`,
+            }}>
+            {p.side}
+          </span>
+          <span style={{
+            width: 4, height: 14, background: tickerCo, borderRadius: 1,
+            boxShadow: `0 0 6px ${tickerCo}80`,
+          }} />
+          <span className="text-[14px] font-extrabold tracking-wide" style={{ color: N.TEXT_0 }}>
+            {p.symbol.replace("USD", "")}
+          </span>
+          {p.trail && (
+            <span className="text-[8px] font-bold tracking-[0.18em] px-1.5 py-0.5 rounded"
+              style={{
+                color: N.BRAND_BRT, background: `${N.BRAND_BRT}14`,
+                border: `1px solid ${N.BRAND_BRT}55`,
+                boxShadow: `0 0 6px ${N.BRAND_BRT}40`,
+              }}>
+              TRAIL · ON
+            </span>
+          )}
+          <span className="text-[8px] tracking-[0.18em] ml-auto" style={{ color: N.TEXT_3 }}>
+            {p.ageLabel}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <DataCell label="ENTRY" value={`$${fmtPrice(p.entry)}`} color={N.TEXT_0} />
+          <DataCell label="STOP"  value={p.sl != null ? `$${fmtPrice(p.sl)}` : "—"} color={N.SHORT} />
+          <DataCell label="TARGET" value={p.tp != null ? `$${fmtPrice(p.tp)}` : "—"} color={N.LONG} />
+        </div>
+      </div>
+
+      {/* CENTER — sparkline + last/pnl row 1, actions row 2 */}
+      <div className="flex flex-col" style={{ gap: 6, minWidth: 0 }}>
+        <div className="flex items-center gap-3" style={{ minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0, height: 34 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={points} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+                <YAxis hide domain={[min - pad, max + pad]} />
+                <Line type="monotone" dataKey="close" stroke={dirColor} strokeWidth={1.6}
+                  dot={false} isAnimationActive={false}
+                  style={{ filter: `drop-shadow(0 0 3px ${dirColor}90)` }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex flex-col items-end" style={{ minWidth: 110 }}>
+            <span className="text-[7.5px] font-bold tracking-[0.18em]" style={{ color: N.TEXT_3 }}>LAST · PNL</span>
+            <span className="text-[12px] font-extrabold tabular-nums"
+              style={{
+                color: N.TEXT_0, lineHeight: 1.05,
+                textShadow: state === "live" ? `0 0 5px ${dirGlow}` : "none",
+              }}>
+              ${fmtPrice(last)}
+            </span>
+            <span className="text-[11px] font-extrabold tabular-nums"
+              style={{
+                color: pnlPos ? N.LONG : N.SHORT,
+                textShadow: `0 0 6px ${pnlPos ? N.LONG_GLOW : N.SHORT_GLOW}`,
+              }}>
+              {fmtUsd(p.pnl)}
+              <span className="text-[9px] ml-1" style={{ opacity: 0.85 }}>
+                ({pnlPos ? "+" : ""}{p.pnlPct.toFixed(2)}%)
+              </span>
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 justify-end">
+          <span className="text-[8px] font-bold tracking-[0.18em] mr-1" style={{ color: N.TEXT_3 }}>
+            QTY {p.qty.toFixed(p.qty >= 1 ? 2 : 4)}
+          </span>
+          <ActionBtn label="PAUSE" color={N.WARN} />
+          <ActionBtn label="CLOSE" color={N.SHORT} />
+        </div>
+      </div>
+
+      {/* RIGHT — AI confidence ring */}
+      <div style={{
+        background: "#000",
+        border: `1px solid ${confColor}40`,
+        borderRadius: 4,
+        padding: "6px 6px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 2,
+        boxShadow: `inset 0 0 10px ${confColor}10, 0 0 8px ${confColor}10`,
+      }}>
+        <span className="text-[7.5px] font-bold tracking-[0.18em]" style={{ color: N.TEXT_3 }}>AI CONF</span>
+        <div style={{ position: "relative", width: RING, height: RING }}>
+          <svg width={RING} height={RING}>
+            <circle cx={RING / 2} cy={RING / 2} r={radius}
+              fill="none" stroke={N.BORDER} strokeWidth={STROKE} />
+            <circle cx={RING / 2} cy={RING / 2} r={radius}
+              fill="none" stroke={confColor} strokeWidth={STROKE}
+              strokeLinecap="round"
+              strokeDasharray={`${dash} ${circ}`}
+              transform={`rotate(-90 ${RING / 2} ${RING / 2})`}
+              style={{
+                filter: `drop-shadow(0 0 4px ${confColor}90)`,
+                transition: "stroke-dasharray 0.45s ease",
+              }} />
+          </svg>
+          <span
+            className="absolute inset-0 flex items-center justify-center text-[12px] font-extrabold tabular-nums"
+            style={{
+              color: confColor,
+              fontFamily: N.FONT_MONO,
+              textShadow: `0 0 6px ${confColor}80`,
+            }}>
+            {p.conf}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DataCell({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-[7.5px] font-bold tracking-[0.18em]" style={{ color: N.TEXT_3 }}>{label}</span>
+      <span className="text-[11px] font-extrabold tabular-nums" style={{ color, lineHeight: 1.05 }}>
+        {value}
+      </span>
+    </div>
   );
 }
 

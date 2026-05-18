@@ -20,7 +20,8 @@ import { LiveConsentModal, useLiveConsent } from "@/components/ConsentGate";
 
 import {
   CommandBar, PlatformOverview, LiveAccountPanel,
-  MarketHeartbeat, PositionsRow, LiveControlBar, SignalsRow,
+  MarketHeartbeat, PositionsRow, LiveControlBar,
+  CryptoSignalsPanel, EquitySignalsPanel,
 } from "@/components/command/institutional";
 import { N } from "@/components/command/institutional/theme";
 
@@ -169,26 +170,29 @@ export default function CommandCenter() {
           closedTrades={closedTrades}
         />
 
-        {/* Row 4 — Crypto control bar + Crypto Top 20 */}
-        <div className="px-2 mt-1">
-          <LiveControlBar
-            assetClass="CRYPTO"
-            state={cryptoState}
-            onToggle={toggleCryptoLive}
-          />
-        </div>
-
-        {/* Row 5 — Equities control bar + Equity Top 20 */}
-        <div className="px-2 mt-1">
-          <LiveControlBar
-            assetClass="EQUITIES"
-            state={equitiesState}
-            onToggle={toggleEquitiesLive}
-          />
-        </div>
-
-        {/* Row 6 — Top 20 Crypto + Top 20 Equity Signals */}
-        <SignalsRow engine={engine} />
+        {/* Row 4 — Bar+Panel pairs, side-by-side. Each control bar sits
+            DIRECTLY ABOVE its own signal panel (per asset class). */}
+        <section
+          className="grid gap-2 px-2 mt-1"
+          style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}
+        >
+          <div className="flex flex-col gap-2">
+            <LiveControlBar
+              assetClass="CRYPTO"
+              state={cryptoState}
+              onToggle={toggleCryptoLive}
+            />
+            <CryptoSignalsPanel engine={engine} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <LiveControlBar
+              assetClass="EQUITIES"
+              state={equitiesState}
+              onToggle={toggleEquitiesLive}
+            />
+            <EquitySignalsPanel engine={engine} />
+          </div>
+        </section>
 
         <footer
           className="px-3 py-2 flex items-center justify-between text-[8.5px] font-bold tracking-[0.22em]"

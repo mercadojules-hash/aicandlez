@@ -39,6 +39,12 @@ export const N = {
   WARN:      "#FFB800",
   WARN_DIM:  "#FFB80030",
 
+  /* gold / orange — live-execution accent */
+  GOLD:      "#FFA500",
+  GOLD_BRT:  "#FFC940",
+  GOLD_DEEP: "#FF7A00",
+  GOLD_GLOW: "#FFA50080",
+
   /* type */
   FONT_MONO: "'JetBrains Mono', 'Fira Code', Menlo, monospace",
 };
