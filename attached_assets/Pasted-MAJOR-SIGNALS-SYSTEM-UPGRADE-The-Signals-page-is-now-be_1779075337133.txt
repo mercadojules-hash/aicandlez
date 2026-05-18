@@ -1,0 +1,238 @@
+MAJOR SIGNALS SYSTEM UPGRADE
+
+The Signals page is now becoming one of the MOST IMPORTANT core features in the entire AICandlez ecosystem.
+
+We are evolving it from a static signal list into a full AI intelligence and execution discovery system.
+
+REFERENCE:
+Use the attached screenshots as the exact visual direction.
+
+CRITICAL STRUCTURE UPDATE:
+
+The Signals page should now contain THREE TOP TABS:
+
+1. ACTIVE SIGNALS
+2. CRYPTO
+3. EQUITIES
+
+NOT:
+• Watchlist
+• History
+
+Replace those.
+
+---
+
+## ACTIVE SIGNALS TAB
+
+This tab should show:
+• The TOP 10 BEST AI SIGNALS available right now
+• Mixed crypto + equities
+• Ranked by AI confidence + momentum strength
+
+Each signal card MUST include:
+
+• REAL asset logo/icon
+(NO placeholders)
+
+Examples:
+Crypto:
+• BTC
+• ETH
+• SOL
+• ADA
+• AVAX
+• DOGE
+
+Equities:
+• TSLA
+• NVDA
+• AAPL
+• MSFT
+• META
+• AMZN
+
+Every signal card should display:
+
+• Asset pair/name
+• LONG or SHORT
+• Trade type
+• Current price
+• 24h %
+• Animated mini chart
+• AI Confidence %
+• STRONG BUY / BUY / SELL / STRONG SELL
+• Entry Zone
+• Take Profit
+• Stop Loss
+• Timestamp
+• Market sentiment tags
+
+VERY IMPORTANT:
+The top signals should feel alive and constantly scanning.
+
+Add:
+• pulsing confidence
+• live glow
+• hover lift
+• subtle movement
+• scan animations
+• premium cinematic depth
+
+---
+
+## CRYPTO TAB
+
+This tab should display:
+• crypto-only signals
+• sortable/filterable
+• strongest AI setups first
+
+Include:
+• trending coins
+• AI confidence ranking
+• volatility indicators
+• bullish/bearish states
+
+---
+
+## EQUITIES TAB
+
+This tab should display:
+• stock/equity AI signals
+• TSLA
+• NVDA
+• AAPL
+• META
+• AMZN
+• MSFT
+etc.
+
+Same structure as crypto:
+• AI confidence
+• LONG/SHORT
+• stop loss
+• take profit
+• momentum
+• confidence gauges
+
+---
+
+## CLICKABLE ASSET EXPERIENCE
+
+THIS IS CRITICAL:
+
+EVERY asset card MUST be clickable.
+
+When clicked:
+Navigate to a FULL ASSET PROFILE PAGE.
+
+Examples:
+• /asset/BTC
+• /asset/ETH
+• /asset/TSLA
+
+---
+
+## ASSET PROFILE PAGE
+
+The asset profile page should match the premium reference screenshots EXACTLY.
+
+Required sections:
+
+HEADER:
+• asset icon
+• asset name
+• live price
+• % change
+• bullish/bearish badge
+
+CHART SECTION:
+• large cinematic live chart
+• timeframe selectors
+• technical overlays
+• glowing candles
+• AI signal markers
+
+AI INSIGHT PANEL:
+• AI reasoning
+• breakout detection
+• market sentiment
+• confidence ring/gauge
+• bullish/bearish explanation
+• momentum tags
+
+BOTTOM EXECUTION AREA:
+VERY IMPORTANT
+
+Under BUY / SELL buttons add a LARGE PREMIUM CTA:
+
+AI AUTO TRADE
+
+This button should feel:
+• massive
+• glowing
+• futuristic
+• impossible to miss
+
+Example text:
+• Enable AI Auto Trade
+• Start AI Auto Trading
+• Let AI Trade This Asset
+
+Visual direction:
+• green neon glow
+• cinematic bloom
+• premium gradient
+• hover animation
+• pulse animation
+
+The AI Auto Trade CTA should become one of the signature visual experiences of the app.
+
+---
+
+## NAVIGATION ARCHITECTURE
+
+HOME
+overview / portfolio / AI activity
+
+MARKETS
+market scanner / opportunities
+
+TRADE
+manual execution + advanced charting
+
+SIGNALS
+AI intelligence engine + top ranked opportunities
+
+PROFILE
+settings / performance / account
+
+---
+
+## VERY IMPORTANT FINAL NOTES
+
+The entire Signals experience should feel like:
+
+• institutional AI trading software
+• Bloomberg terminal meets futuristic AI
+• premium fintech operating system
+• cinematic and addictive
+
+The screenshots attached are NOT just inspiration.
+
+They are the target visual benchmark.
+
+Match:
+• spacing
+• hierarchy
+• card composition
+• typography
+• glow intensity
+• atmosphere
+• lighting
+• premium black backgrounds
+• neon green treatment
+• icon realism
+• AI confidence styling
+• execution flow

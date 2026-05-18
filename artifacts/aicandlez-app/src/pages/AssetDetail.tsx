@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
 import { ExecutionFeedback, type ExecutionFeedbackPayload } from "@/components/ExecutionFeedback";
+import { EquityIcon, EQUITY_NAME } from "@/components/EquityIcon";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -626,6 +627,136 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
     window.scrollTo({ top: 0, behavior: "auto" });
   };
 
+  // ── EQUITY HONESTY GATE ─────────────────────────────────────────────────────
+  // The AI equity signal engine is not yet wired into a real backend. To avoid
+  // fabricating live equity metrics (price, confidence, action, chart), we
+  // render an explicit "engine pending" preview view for any equity symbol.
+  // The full live detail view (with AUTO TRADE + execution) is only shown for
+  // crypto assets, which DO have a real ticker price + AI engine behind them.
+  if (type === "equity") {
+    const eqName = EQUITY_NAME[sym] ?? ASSET_DB[sym]?.name ?? sym;
+    return (
+      <div className="page-enter" style={{ background:BG, minHeight:"100%", paddingBottom:40 }}>
+        <ExecutionFeedback payload={feedback} onDismiss={() => setFeedback(null)} />
+        {/* Sticky header */}
+        <div style={{
+          position:"sticky", top:0, zIndex:10,
+          background:"rgba(0,0,0,0.95)", backdropFilter:"blur(24px)",
+          borderBottom:"1px solid rgba(255,255,255,0.06)",
+          padding:"13px 16px 11px",
+          display:"flex", alignItems:"center", gap:12,
+        }}>
+          <button onClick={() => setLocation("/signals")} style={{
+            background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.09)",
+            borderRadius:8, padding:"6px 10px", cursor:"pointer",
+            display:"flex", alignItems:"center",
+          }} aria-label="Back to signals">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M10 3L5 8l5 5" stroke="rgba(255,255,255,0.70)" strokeWidth="1.5"
+                strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <div style={{ flex:1, display:"flex", alignItems:"center", gap:10 }}>
+            <EquityIcon sym={sym} size={32}/>
+            <div>
+              <div style={{ fontSize:16, fontFamily:SANS, fontWeight:800, color:W, letterSpacing:"-0.01em" }}>{sym}</div>
+              <div style={{ fontSize:9.5, fontFamily:SANS, color:"rgba(255,255,255,0.55)" }}>{eqName}</div>
+            </div>
+          </div>
+          <div style={{
+            padding:"4px 10px",
+            background:"rgba(102,255,102,0.10)", border:"1px solid rgba(102,255,102,0.32)",
+            borderRadius:6, fontSize:9, fontFamily:SANS, fontWeight:700,
+            color:"#66FF66", letterSpacing:"0.10em",
+          }}>
+            PREVIEW
+          </div>
+        </div>
+
+        <div style={{ padding:"20px 16px 0" }}>
+          {/* Hero preview card — honest, no fabricated metrics */}
+          <div style={{
+            position:"relative", overflow:"hidden",
+            borderRadius:20, padding:"28px 20px 26px",
+            background:`
+              radial-gradient(circle at 100% 0%, rgba(102,255,102,0.18) 0%, transparent 55%),
+              linear-gradient(140deg, #0F1F18 0%, #0A1410 60%, #050A07 100%)
+            `,
+            border:"1px solid rgba(102,255,102,0.22)",
+            boxShadow:"0 12px 36px rgba(0,0,0,0.55), 0 0 30px -8px rgba(102,255,102,0.30)",
+          }}>
+            <div aria-hidden style={{
+              position:"absolute", top:0, left:0, right:0, height:2,
+              background:"linear-gradient(90deg, transparent 5%, rgba(102,255,102,0.70) 50%, transparent 95%)",
+              animation:"edge-sweep 6s ease-in-out infinite",
+            }}/>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:18 }}>
+              <EquityIcon sym={sym} size={56}/>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:22, fontFamily:SANS, fontWeight:800, color:W, letterSpacing:"-0.02em" }}>{sym}</div>
+                <div style={{ fontSize:12, fontFamily:SANS, color:"rgba(255,255,255,0.65)", marginTop:2 }}>{eqName}</div>
+              </div>
+              <div style={{
+                display:"inline-flex", alignItems:"center", gap:6,
+                padding:"5px 10px", borderRadius:999,
+                background:"rgba(102,255,102,0.12)", border:"1px solid rgba(102,255,102,0.40)",
+                fontSize:9, fontFamily:SANS, fontWeight:800, color:"#66FF66",
+                letterSpacing:1.4, textTransform:"uppercase",
+              }}>
+                <span style={{
+                  width:6, height:6, borderRadius:"50%", background:"#66FF66",
+                  boxShadow:"0 0 10px rgba(102,255,102,0.7)",
+                  animation:"dot-pulse 1.8s ease-in-out infinite",
+                }}/>
+                Engine Pending
+              </div>
+            </div>
+            <div style={{ fontSize:13.5, fontFamily:SANS, color:"rgba(255,255,255,0.78)",
+              lineHeight:1.55, letterSpacing:"-0.005em" }}>
+              AI signals for <span style={{ color:W, fontWeight:700 }}>{eqName}</span> are
+              entering final validation. Live price, confidence, and AI action will appear
+              here once the equity engine activates.
+            </div>
+            <div style={{ marginTop:14, display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+              {["Live AI Signal","Real-time Price","Confidence Score","Auto-Trade Execution"].map(s => (
+                <div key={s} style={{
+                  padding:"10px 12px", borderRadius:12,
+                  background:"rgba(255,255,255,0.03)",
+                  border:"1px solid rgba(255,255,255,0.06)",
+                  display:"flex", alignItems:"center", gap:8,
+                }}>
+                  <div style={{ width:6, height:6, borderRadius:"50%",
+                    background:"rgba(102,255,102,0.50)" }}/>
+                  <span style={{ fontSize:10.5, fontFamily:SANS, fontWeight:600,
+                    color:"rgba(255,255,255,0.68)", letterSpacing:0.1 }}>{s}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Notify CTA — non-functional but honest about what it will do */}
+          <button
+            onClick={() => setLocation("/signals")}
+            style={{
+              marginTop:16, width:"100%", padding:"16px 0",
+              background:"linear-gradient(135deg, rgba(102,255,102,0.14) 0%, rgba(0,200,83,0.08) 100%)",
+              border:"1px solid rgba(102,255,102,0.32)",
+              borderRadius:14, cursor:"pointer",
+              fontSize:13, fontFamily:SANS, fontWeight:800,
+              color:"#7CFF00", letterSpacing:"0.06em",
+              boxShadow:"0 8px 24px rgba(0,0,0,0.50), 0 0 18px rgba(102,255,102,0.12)",
+            }}>
+            EXPLORE LIVE CRYPTO SIGNALS
+          </button>
+          <div style={{ marginTop:10, fontSize:10.5, fontFamily:SANS,
+            color:"rgba(255,255,255,0.42)", textAlign:"center", lineHeight:1.45 }}>
+            Crypto AI engine is live now · Equity engine launching soon
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page-enter" style={{ background:BG, minHeight:"100%", paddingBottom:40 }}>
 
@@ -902,58 +1033,67 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
             color:"rgba(255,255,255,0.38)", letterSpacing:"0.20em",
             textTransform:"uppercase" as const, marginBottom:12 }}>Execute Trade</div>
 
-          {/* AUTO TRADE — HERO button */}
+          {/* AUTO TRADE — HERO button (neon-green brand re-skin) */}
           <button onClick={() => handleExec("auto")} style={{
             position:"relative", overflow:"hidden",
-            width:"100%", padding:"22px 0", marginBottom:10,
+            width:"100%", padding:"26px 0", marginBottom:10,
             background: autoActive
-              ? "linear-gradient(135deg, rgba(0,229,255,0.20), rgba(155,92,245,0.18))"
-              : "linear-gradient(135deg, rgba(0,229,255,0.12), rgba(155,92,245,0.08))",
-            border:`1px solid ${autoActive ? "rgba(0,229,255,0.55)" : "rgba(0,229,255,0.32)"}`,
-            borderRadius:18, cursor:"pointer",
-            display:"flex", flexDirection:"column", alignItems:"center", gap:7,
+              ? "linear-gradient(135deg, rgba(102,255,102,0.28) 0%, rgba(0,200,83,0.22) 100%)"
+              : "linear-gradient(135deg, rgba(102,255,102,0.18) 0%, rgba(0,200,83,0.10) 100%)",
+            border:`1px solid ${autoActive ? "rgba(102,255,102,0.65)" : "rgba(102,255,102,0.38)"}`,
+            borderRadius:20, cursor:"pointer",
+            display:"flex", flexDirection:"column", alignItems:"center", gap:8,
             boxShadow: autoActive
-              ? "0 0 50px rgba(0,229,255,0.22), 0 0 100px rgba(155,92,245,0.12)"
-              : "0 0 20px rgba(0,229,255,0.10)",
+              ? "0 0 60px rgba(102,255,102,0.32), 0 0 120px rgba(0,200,83,0.18), 0 16px 40px rgba(0,0,0,0.6)"
+              : "0 0 28px rgba(102,255,102,0.18), 0 12px 32px rgba(0,0,0,0.55)",
             transition:"all 0.35s ease",
             animation:"cta-breathe 4s ease-in-out infinite",
           }}>
             <div aria-hidden style={{
               position:"absolute", top:0, left:0, right:0, height:2,
               background: autoActive
-                ? "linear-gradient(90deg, transparent 5%, rgba(0,229,255,0.80) 35%, rgba(155,92,245,0.70) 65%, transparent 95%)"
-                : "linear-gradient(90deg, transparent 5%, rgba(0,229,255,0.55) 38%, rgba(155,92,245,0.45) 62%, transparent 95%)",
+                ? "linear-gradient(90deg, transparent 5%, rgba(102,255,102,0.85) 35%, rgba(124,255,0,0.70) 65%, transparent 95%)"
+                : "linear-gradient(90deg, transparent 5%, rgba(102,255,102,0.60) 38%, rgba(0,200,83,0.45) 62%, transparent 95%)",
               animation:"edge-sweep 5s ease-in-out infinite",
             }}/>
             <div aria-hidden style={{
-              position:"absolute", top:0, left:0, right:0, bottom:0, borderRadius:18,
-              background:"linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.04) 50%, transparent 70%)",
+              position:"absolute", top:0, left:0, right:0, bottom:0, borderRadius:20,
+              background:"linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.05) 50%, transparent 70%)",
               animation:"shimmer-sweep 3.5s ease-in-out infinite", pointerEvents:"none",
             }}/>
-            <div style={{ position:"relative", display:"flex", flexDirection:"column", alignItems:"center", gap:7 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            {/* Underglow bloom */}
+            <div aria-hidden style={{
+              position:"absolute", left:"50%", bottom:-20, transform:"translateX(-50%)",
+              width:"70%", height:40, borderRadius:"50%",
+              background:"radial-gradient(ellipse, rgba(102,255,102,0.40) 0%, transparent 70%)",
+              filter:"blur(14px)", pointerEvents:"none",
+              opacity: autoActive ? 1 : 0.7,
+            }}/>
+            <div style={{ position:"relative", display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                    stroke={autoActive ? C : "rgba(0,229,255,0.85)"} strokeWidth="1.7"
+                    stroke={autoActive ? "#ECFFF1" : "rgba(102,255,102,0.95)"} strokeWidth="1.8"
                     strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span style={{ fontSize:17, fontFamily:SANS, fontWeight:800,
-                  color: autoActive ? W : C, letterSpacing:"0.05em",
-                  textShadow: autoActive ? `0 0 20px ${C}80` : "none",
+                <span style={{ fontSize:19, fontFamily:SANS, fontWeight:800,
+                  color: autoActive ? "#ECFFF1" : "rgba(124,255,0,1)",
+                  letterSpacing:"0.06em",
+                  textShadow: autoActive ? "0 0 22px rgba(102,255,102,0.65)" : "0 0 16px rgba(102,255,102,0.45)",
                   transition:"all 0.30s ease" }}>
-                  {autoActive ? "AUTO TRADE ACTIVE" : "AUTO TRADE"}
+                  {autoActive ? "AI AUTO TRADE ACTIVE" : "ENABLE AI AUTO TRADE"}
                 </span>
                 {autoActive && (
-                  <div style={{ width:8, height:8, borderRadius:"50%", background:C,
-                    boxShadow:`0 0 14px ${C}`, animation:"dot-pulse 1.2s infinite" }}/>
+                  <div style={{ width:9, height:9, borderRadius:"50%", background:"#66FF66",
+                    boxShadow:"0 0 16px rgba(102,255,102,0.95)", animation:"dot-pulse 1.2s infinite" }}/>
                 )}
               </div>
-              <span style={{ fontSize:9, fontFamily:SANS,
-                color: autoActive ? "rgba(0,229,255,0.70)" : "rgba(0,229,255,0.50)",
-                letterSpacing:"0.12em", textTransform:"uppercase" as const }}>
+              <span style={{ fontSize:9.5, fontFamily:SANS,
+                color: autoActive ? "rgba(102,255,102,0.80)" : "rgba(102,255,102,0.62)",
+                letterSpacing:"0.14em", textTransform:"uppercase" as const, fontWeight:700 }}>
                 {autoActive
                   ? `AI managing ${sym} · ${conf}% confidence · Stop-loss active`
-                  : `AI-managed · ${conf}% confidence · Risk-calibrated`}
+                  : `Let AI trade ${sym} · ${conf}% confidence · Risk-calibrated`}
               </span>
             </div>
           </button>

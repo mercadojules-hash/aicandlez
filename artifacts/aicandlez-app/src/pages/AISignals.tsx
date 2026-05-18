@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { api, type MobileSignalsResponse, type MobileTickersResponse, type SignalBreakdown } from "@/lib/api";
 import { CryptoIcon, SYM_LABEL, SYM_SHORT } from "@/components/CryptoIcon";
+import { EquityIcon, EQUITY_NAME, SUPPORTED_EQUITIES } from "@/components/EquityIcon";
 import logoMaster from "@/assets/aicandlez-logo-master.png";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
@@ -257,11 +258,15 @@ function CinematicBackground() {
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN — AI Signals page
 // ═══════════════════════════════════════════════════════════════════════════
-type TabKey = "active" | "watchlist" | "history";
+type TabKey = "active" | "crypto" | "equities";
 
 export default function AISignals() {
   const [, setLocation] = useLocation();
   const [tab, setTab] = useState<TabKey>("active");
+  const openAsset = (atype: "crypto" | "equity", asym: string) => {
+    setLocation(`/asset/${atype}/${asym.toUpperCase()}`);
+    window.scrollTo({ top: 0, behavior: "auto" });
+  };
 
   // Real-data sources
   const signalsQ = useQuery<MobileSignalsResponse>({
@@ -287,6 +292,7 @@ export default function AISignals() {
 
   // Build active signals list: only actionable BUY/SELL from real engine, joined
   // with real ticker price. Anything without a price is excluded (no fakes).
+  // Active = top-N highest-conviction signals (ranked by confidence).
   const activeSignals = useMemo(() => {
     const breakdowns = signalsQ.data?.breakdowns ?? {};
     return Object.values(breakdowns)
@@ -294,23 +300,18 @@ export default function AISignals() {
         const a = b.action.toUpperCase();
         return (a === "BUY" || a === "SELL") && !!tickerBySym[b.symbol];
       })
-      .sort((a, b) => b.confidence - a.confidence);
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 10);
   }, [signalsQ.data, tickerBySym]);
 
-  // Watchlist = HOLD signals (still being monitored, no action yet)
-  const watchlist = useMemo(() => {
+  // Crypto tab = ALL crypto signals (BUY/SELL/HOLD) ranked by confidence.
+  // Real data only — any breakdown missing a live ticker is excluded.
+  const cryptoSignals = useMemo(() => {
     const breakdowns = signalsQ.data?.breakdowns ?? {};
     return Object.values(breakdowns)
-      .filter(b => b.action.toUpperCase() === "HOLD" && !!tickerBySym[b.symbol])
+      .filter(b => !!tickerBySym[b.symbol])
       .sort((a, b) => b.confidence - a.confidence);
   }, [signalsQ.data, tickerBySym]);
-
-  // History = engine's recent signal log
-  type HistoryEntry = { symbol?: string; action?: string; confidence?: number; price?: number; ts?: number };
-  const history = useMemo<HistoryEntry[]>(() => {
-    const raw = signalsQ.data?.signals ?? [];
-    return raw.slice(0, 20).map(r => (r ?? {}) as HistoryEntry);
-  }, [signalsQ.data]);
 
   const loading = signalsQ.isLoading || tickersQ.isLoading;
 
@@ -402,11 +403,11 @@ export default function AISignals() {
             label="Active Signals" badge={activeSignals.length}
             active={tab === "active"} onClick={() => setTab("active")}/>
           <TabPill
-            label="Watchlist" badge={watchlist.length}
-            active={tab === "watchlist"} onClick={() => setTab("watchlist")}/>
+            label="Crypto" badge={cryptoSignals.length}
+            active={tab === "crypto"} onClick={() => setTab("crypto")}/>
           <TabPill
-            label="History"
-            active={tab === "history"} onClick={() => setTab("history")}/>
+            label="Equities"
+            active={tab === "equities"} onClick={() => setTab("equities")}/>
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════ */}
@@ -422,29 +423,45 @@ export default function AISignals() {
               ? <EmptyState
                   title="No actionable signals right now"
                   body="The AI is continuously scanning the market. New high-confidence opportunities will appear here as they form."/>
-              : activeSignals.map(b => (
-                  <SignalCard key={b.symbol} breakdown={b} ticker={tickerBySym[b.symbol]}/>
+              : <>
+                  <div style={{
+                    margin: "2px 2px 12px", display: "flex", alignItems: "center",
+                    gap: 8, fontSize: 10.5, fontFamily: SANS, fontWeight: 700,
+                    color: TEXT_DIM, letterSpacing: 1.2, textTransform: "uppercase",
+                  }}>
+                    <span style={{
+                      width: 6, height: 6, borderRadius: "50%", background: BRAND,
+                      boxShadow: `0 0 10px ${BRAND_GLOW}`,
+                      animation: "dot-pulse 1.8s ease-in-out infinite",
+                    }}/>
+                    Top {activeSignals.length} · ranked by AI confidence
+                  </div>
+                  {activeSignals.map(b => (
+                    <SignalCard
+                      key={b.symbol}
+                      breakdown={b}
+                      ticker={tickerBySym[b.symbol]}
+                      onOpen={() => openAsset("crypto", SYM_SHORT[b.symbol] ?? b.symbol.replace("USD",""))}/>
+                  ))}
+                </>
+          )}
+
+          {!loading && tab === "crypto" && (
+            cryptoSignals.length === 0
+              ? <EmptyState
+                  title="No crypto data available"
+                  body="The AI engine could not load crypto signals. Retrying automatically."/>
+              : cryptoSignals.map(b => (
+                  <SignalCard
+                    key={b.symbol}
+                    breakdown={b}
+                    ticker={tickerBySym[b.symbol]}
+                    onOpen={() => openAsset("crypto", SYM_SHORT[b.symbol] ?? b.symbol.replace("USD",""))}/>
                 ))
           )}
 
-          {!loading && tab === "watchlist" && (
-            watchlist.length === 0
-              ? <EmptyState
-                  title="Watchlist clear"
-                  body="No assets are currently being monitored for setup formation. The AI engine will surface new candidates as conditions develop."/>
-              : watchlist.map(b => (
-                  <WatchlistCard key={b.symbol} breakdown={b} ticker={tickerBySym[b.symbol]}/>
-                ))
-          )}
-
-          {!loading && tab === "history" && (
-            history.length === 0
-              ? <EmptyState
-                  title="No signal history yet"
-                  body="Past AI-generated signals will be logged here for review."/>
-              : history.map((h, i) => (
-                  <HistoryRow key={i} entry={h} ticker={h.symbol ? tickerBySym[h.symbol] : undefined}/>
-                ))
+          {!loading && tab === "equities" && (
+            <EquitiesScaffold onOpen={(s) => openAsset("equity", s)}/>
           )}
         </div>
 
@@ -547,29 +564,37 @@ function TabPill({ label, badge, active, onClick }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // SignalCard — the marquee card matching the reference design exactly
 // ─────────────────────────────────────────────────────────────────────────────
-function SignalCard({ breakdown, ticker }: {
+function SignalCard({ breakdown, ticker, onOpen }: {
   breakdown: SignalBreakdown;
   ticker: { price: number; changePercent24h: number; up: boolean };
+  onOpen?: () => void;
 }) {
   const isLong = breakdown.action.toUpperCase() === "BUY";
+  const isHold = breakdown.action.toUpperCase() === "HOLD";
   const grade = deriveGrade(breakdown.action, breakdown.confidence);
   const gc = gradeColor(grade);
   const tradeType = deriveTradeType(breakdown);
   const levels = deriveLevels(ticker.price, breakdown.action, breakdown.confidence);
-  const accent = isLong ? BRAND : NEG;
-  const accentDeep = isLong ? BRAND_DEEP : NEG_DEEP;
-  const trendDir: "up"|"down" = isLong ? "up" : "down";
+  const accent = isHold ? TEXT_SUB : (isLong ? BRAND : NEG);
+  const accentDeep = isHold ? TEXT_DIM : (isLong ? BRAND_DEEP : NEG_DEEP);
+  const trendDir: "up"|"down" = isHold ? (ticker.up ? "up" : "down") : (isLong ? "up" : "down");
   const short = SYM_SHORT[breakdown.symbol] ?? breakdown.symbol.replace("USD","");
 
   return (
-    <div style={{
+    <div
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onClick={onOpen}
+      onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } } : undefined}
+      style={{
       position: "relative", overflow: "hidden",
       marginBottom: 12, borderRadius: 18, padding: "14px 14px 12px",
+      cursor: onOpen ? "pointer" : "default",
       background: `
-        radial-gradient(circle at 0% 0%, ${isLong ? "rgba(102,255,102,0.10)" : "rgba(255,64,96,0.10)"} 0%, transparent 55%),
+        radial-gradient(circle at 0% 0%, ${isHold ? "rgba(255,255,255,0.05)" : isLong ? "rgba(102,255,102,0.10)" : "rgba(255,64,96,0.10)"} 0%, transparent 55%),
         linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 60%, ${BG} 100%)
       `,
-      border: `1px solid ${isLong ? BORDER_HI : "rgba(255,64,96,0.28)"}`,
+      border: `1px solid ${isHold ? BORDER : (isLong ? BORDER_HI : "rgba(255,64,96,0.28)")}`,
       boxShadow: `
         0 10px 32px rgba(0,0,0,0.55),
         0 0 0 1px ${gc.bloom} inset,
@@ -615,7 +640,7 @@ function SignalCard({ breakdown, ticker }: {
               border: `1px solid ${isLong ? BORDER_HI : "rgba(255,64,96,0.30)"}`,
               fontSize: 9, fontFamily: SANS, fontWeight: 800,
               color: accent, letterSpacing: 0.8, textTransform: "uppercase",
-            }}>{isLong ? "Long" : "Short"}</span>
+            }}>{isHold ? "Hold" : isLong ? "Long" : "Short"}</span>
             <span style={{
               fontSize: 10.5, fontFamily: SANS, fontWeight: 600,
               color: TEXT_DIM, letterSpacing: 0.2,
@@ -756,126 +781,6 @@ function QualityChip({ label }: { label: string }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Watchlist card — compact monitoring card for HOLD signals
-// ─────────────────────────────────────────────────────────────────────────────
-function WatchlistCard({ breakdown, ticker }: {
-  breakdown: SignalBreakdown;
-  ticker: { price: number; changePercent24h: number; up: boolean };
-}) {
-  const short = SYM_SHORT[breakdown.symbol] ?? breakdown.symbol.replace("USD","");
-  const accent = ticker.up ? BRAND : NEG;
-  const trendDir: "up"|"down" = ticker.up ? "up" : "down";
-
-  return (
-    <div style={{
-      position: "relative", overflow: "hidden",
-      marginBottom: 10, borderRadius: 16, padding: "12px 14px",
-      background: `linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 60%, ${BG} 100%)`,
-      border: `1px solid ${BORDER}`,
-      boxShadow: `0 6px 22px rgba(0,0,0,0.45)`,
-      display: "flex", alignItems: "center", gap: 12,
-    }}>
-      <CryptoIcon sym={breakdown.symbol} size={38}/>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{
-            fontSize: 14, fontFamily: SANS, fontWeight: 700, color: TEXT,
-            letterSpacing: -0.2,
-          }}>{short}/USDT</span>
-          <span style={{
-            padding: "2px 6px", borderRadius: 4,
-            background: "rgba(255,255,255,0.05)",
-            border: `1px solid ${BORDER}`,
-            fontSize: 8.5, fontFamily: SANS, fontWeight: 700,
-            color: TEXT_SUB, letterSpacing: 0.8, textTransform: "uppercase",
-          }}>Monitoring</span>
-        </div>
-        <div style={{
-          fontSize: 10, fontFamily: SANS, color: TEXT_DIM, marginTop: 3,
-        }}>
-          {SYM_LABEL[breakdown.symbol] ?? breakdown.symbol} ·{" "}
-          {breakdown.blockReason ?? "Awaiting confirmation"}
-        </div>
-      </div>
-      <SignalSparkline seed={`watch-${breakdown.symbol}`} trend={trendDir} color={accent} w={70} h={28}/>
-      <div style={{ textAlign: "right", minWidth: 70 }}>
-        <div style={{
-          fontSize: 13, fontFamily: SANS, fontWeight: 700, color: TEXT,
-          fontVariantNumeric: "tabular-nums",
-        }}>{fmtPx(ticker.price)}</div>
-        <div style={{
-          fontSize: 11, fontFamily: SANS, fontWeight: 600, color: accent,
-          fontVariantNumeric: "tabular-nums", marginTop: 1,
-        }}>
-          {ticker.up ? "+" : ""}{ticker.changePercent24h.toFixed(2)}%
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// History row — engine's recent signal log
-// ─────────────────────────────────────────────────────────────────────────────
-function HistoryRow({ entry, ticker }: {
-  entry: { symbol?: string; action?: string; confidence?: number; price?: number; ts?: number };
-  ticker?: { price: number; changePercent24h: number; up: boolean };
-}) {
-  const symbol = entry.symbol ?? "—";
-  const action = (entry.action ?? "HOLD").toUpperCase();
-  const isLong = action === "BUY";
-  const grade = deriveGrade(action, entry.confidence ?? 0);
-  const gc = gradeColor(grade);
-  const short = SYM_SHORT[symbol] ?? symbol.replace("USD","");
-  // Only show price if it was recorded at signal time — never substitute
-  // the current ticker price for a historical entry (would misrepresent history)
-  const px = entry.price;
-  const ts = entry.ts;
-  const accent = isLong ? BRAND : action === "SELL" ? NEG : TEXT_SUB;
-
-  return (
-    <div style={{
-      position: "relative", overflow: "hidden",
-      marginBottom: 8, borderRadius: 14, padding: "10px 12px",
-      background: `linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 100%)`,
-      border: `1px solid ${BORDER}`,
-      display: "flex", alignItems: "center", gap: 10,
-    }}>
-      <div style={{
-        position: "absolute", top: 0, bottom: 0, left: 0, width: 2,
-        background: accent, opacity: 0.6,
-      }}/>
-      {entry.symbol && <CryptoIcon sym={entry.symbol} size={30}/>}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{
-            fontSize: 12.5, fontFamily: SANS, fontWeight: 700, color: TEXT,
-          }}>{short}/USDT</span>
-          <span style={{
-            padding: "1.5px 6px", borderRadius: 4,
-            background: gc.bg, border: `1px solid ${gc.border}`,
-            fontSize: 8, fontFamily: SANS, fontWeight: 800,
-            color: gc.fg, letterSpacing: 0.6,
-          }}>{grade}</span>
-        </div>
-        <div style={{
-          fontSize: 9.5, fontFamily: SANS, color: TEXT_DIM, marginTop: 2,
-        }}>
-          {ts ? fmtRelTime(ts) : "—"}
-          {entry.confidence !== undefined && ` · AI ${Math.round(entry.confidence)}%`}
-        </div>
-      </div>
-      {px !== undefined && (
-        <div style={{
-          fontSize: 12, fontFamily: SANS, fontWeight: 700, color: TEXT,
-          fontVariantNumeric: "tabular-nums",
-        }}>{fmtPx(px)}</div>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // AI Signal Engine — bottom CTA card
 // ─────────────────────────────────────────────────────────────────────────────
 function AISignalEngineCard({ onLearnMore }: { onLearnMore: () => void }) {
@@ -955,6 +860,107 @@ function EmptyState({ title, body }: { title: string; body: string }) {
         fontSize: 11.5, fontFamily: SANS, color: TEXT_SUB, lineHeight: 1.5,
         maxWidth: 280, margin: "0 auto",
       }}>{body}</div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EquitiesScaffold — honest "AI equity engine launching" state. Lists the
+// supported equities as clickable cards (which route to their AssetDetail
+// page) but does NOT fabricate prices, confidence values, or trade levels —
+// the equity AI engine is not yet wired into the backend.
+// ─────────────────────────────────────────────────────────────────────────────
+function EquitiesScaffold({ onOpen }: { onOpen: (sym: string) => void }) {
+  return (
+    <div>
+      {/* Headline status card */}
+      <div style={{
+        position: "relative", overflow: "hidden",
+        marginBottom: 14, borderRadius: 18, padding: "18px 16px",
+        background: `
+          radial-gradient(circle at 100% 0%, ${BRAND_GLOW} 0%, transparent 60%),
+          linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 60%, ${BG} 100%)
+        `,
+        border: `1px solid ${BORDER_HI}`,
+        boxShadow: `0 10px 32px rgba(0,0,0,0.55), 0 0 24px -10px ${BRAND_GLOW}`,
+      }}>
+        <div aria-hidden style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: 1,
+          background: `linear-gradient(90deg, transparent 0%, ${BRAND_GLOW} 50%, transparent 100%)`,
+          animation: "edge-sweep 6s ease-in-out infinite",
+        }}/>
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "3px 8px", borderRadius: 999,
+          background: `${BRAND}1A`, border: `1px solid ${BORDER_HI}`,
+          fontSize: 9, fontFamily: SANS, fontWeight: 800, color: BRAND,
+          letterSpacing: 1.4, textTransform: "uppercase",
+        }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: "50%", background: BRAND,
+            boxShadow: `0 0 10px ${BRAND_GLOW}`,
+            animation: "dot-pulse 1.8s ease-in-out infinite",
+          }}/>
+          Launching Soon
+        </div>
+        <div style={{
+          marginTop: 12, fontSize: 18, fontFamily: SANS, fontWeight: 800,
+          letterSpacing: -0.4, color: TEXT,
+        }}>
+          AI Equity Signal Engine
+        </div>
+        <div style={{
+          marginTop: 6, fontSize: 11.5, fontFamily: SANS,
+          color: TEXT_SUB, lineHeight: 1.55, maxWidth: 360,
+        }}>
+          Real-time AI signals for major US equities are entering final
+          validation. Tap any ticker below to preview its asset profile.
+          Live signals will activate automatically once the equity engine
+          goes online.
+        </div>
+      </div>
+
+      {/* Equity grid — supported tickers (real names, no fake prices) */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
+      }}>
+        {SUPPORTED_EQUITIES.map((s) => (
+          <div
+            key={s}
+            role="button"
+            tabIndex={0}
+            onClick={() => onOpen(s)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(s); } }}
+            style={{
+              position: "relative", overflow: "hidden",
+              padding: "14px 12px", borderRadius: 14, cursor: "pointer",
+              background: `linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 100%)`,
+              border: `1px solid ${BORDER}`,
+              boxShadow: `0 8px 24px rgba(0,0,0,0.50), 0 0 0 1px rgba(102,255,102,0.04) inset`,
+              transition: "transform 0.18s ease, box-shadow 0.2s ease",
+              display: "flex", alignItems: "center", gap: 12,
+            }}>
+            <EquityIcon sym={s} size={40}/>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: 14, fontFamily: SANS, fontWeight: 800,
+                color: TEXT, letterSpacing: -0.2, lineHeight: 1.1,
+              }}>{s}</div>
+              <div style={{
+                fontSize: 10, fontFamily: SANS, color: TEXT_DIM,
+                marginTop: 3, lineHeight: 1.2,
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              }}>{EQUITY_NAME[s]}</div>
+              <div style={{
+                marginTop: 6, fontSize: 8, fontFamily: SANS, fontWeight: 700,
+                color: BRAND, letterSpacing: 1.2,
+                textTransform: "uppercase",
+                opacity: 0.85,
+              }}>Preview · Engine pending</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
