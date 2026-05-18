@@ -20,10 +20,10 @@ gesture navigation.
 
 ```bash
 # From repo root
-cd artifacts/aicandlez-mobile
+cd artifacts/aicandelz-mobile
 
 # 1. Install deps (uses workspace pnpm)
-pnpm install --filter @workspace/aicandlez-mobile
+pnpm install --filter @workspace/aicandelz-mobile
 
 # 2. Install EAS CLI globally (or use npx)
 npm i -g eas-cli
@@ -163,7 +163,7 @@ trivial and the entire UX lives in the PWA (`artifacts/aicandlez-app`).
 If you do want to preview it on a simulator:
 
 ```bash
-cd artifacts/aicandlez-mobile
+cd artifacts/aicandelz-mobile
 pnpm install
 pnpm start            # Expo dev server
 # Then press 'i' for iOS Simulator (Xcode required)

@@ -61,7 +61,7 @@ INCLUDE_PACKAGES = [
     "artifacts/api-server",
     "artifacts/trading-dashboard",
     "artifacts/aicandlez-app",
-    "artifacts/aicandlez-mobile",
+    "artifacts/aicandelz-mobile",
     "artifacts/landing",
     # Utility scripts
     "scripts",
