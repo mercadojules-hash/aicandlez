@@ -5,7 +5,11 @@ import { api, type Subscription } from "@/lib/api";
 
 export type PaywallReason = "trial_expired" | "live_trading" | "feature_locked" | null;
 
-export type SubPlan   = "free" | "starter" | "pro" | "enterprise";
+// Internal plan keys (kept stable for DB enum compatibility):
+//   free    → Paper Trading
+//   starter → AI Trading ($15.99/mo)
+//   pro     → AI Trading Pro ($39.99/mo)
+export type SubPlan   = "free" | "starter" | "pro";
 export type SubStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid" | null;
 
 export interface SubscriptionState {
@@ -19,10 +23,13 @@ export interface SubscriptionState {
   daysUntilTrialEnd: number | null;
   trialEndsAt:       string | null;
   limits: {
-    exchanges:  number | string;
-    positions:  number | string;
-    trades:     number | string;
-    liveTrading: boolean;
+    exchanges:        number | string;
+    positions:        number | string;
+    trades:           number | string;
+    liveTrading:      boolean;
+    concurrentTrades: number;
+    aiAutoTrade:      boolean;
+    equitiesAI:       boolean;
   };
   paywallVisible: boolean;
   paywallReason:  PaywallReason;
@@ -32,10 +39,13 @@ export interface SubscriptionState {
 }
 
 const DEFAULT_LIMITS = {
-  exchanges:   1    as number | string,
-  positions:   3    as number | string,
-  trades:      5    as number | string,
-  liveTrading: false,
+  exchanges:        1 as number | string,
+  positions:        3 as number | string,
+  trades:           5 as number | string,
+  liveTrading:      false,
+  concurrentTrades: 0,
+  aiAutoTrade:      false,
+  equitiesAI:       false,
 };
 
 const DEFAULT_STATE: SubscriptionState = {

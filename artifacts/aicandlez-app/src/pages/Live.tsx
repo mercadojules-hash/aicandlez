@@ -80,7 +80,7 @@ function RequiresSubscriptionScreen() {
         </div>
         <div style={{ fontSize: 11, fontFamily: "system-ui, sans-serif", color: "#6090b0",
           lineHeight: 1.6, marginBottom: 18 }}>
-          Try AI Paper Trading Free for 7 Days. Subscribe to the Starter plan
+          Try AI Paper Trading Free for 7 Days. Subscribe to AI Trading
           to unlock live trade execution on your connected exchange.
         </div>
         <div style={{ fontSize: 24, fontFamily: "monospace", fontWeight: 800, color: "#00aaff",

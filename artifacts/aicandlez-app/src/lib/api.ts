@@ -108,7 +108,15 @@ export interface Subscription {
   isTrialing:            boolean;
   canLiveTrade:          boolean;
   daysUntilTrialEnd:     number | null;
-  limits:      { liveTrading: boolean; exchanges: number | string; positions: number | string; trades: number | string };
+  limits: {
+    liveTrading:      boolean;
+    exchanges:        number | string;
+    positions:        number | string;
+    trades:           number | string;
+    concurrentTrades?: number;
+    aiAutoTrade?:     boolean;
+    equitiesAI?:      boolean;
+  };
   features:    string[];
 }
 
@@ -119,7 +127,12 @@ export interface Plan {
   description:   string;
   features:      string[];
   performanceFee?: number;
-  limits:        { liveTrading: boolean };
+  limits: {
+    liveTrading:      boolean;
+    concurrentTrades?: number;
+    aiAutoTrade?:     boolean;
+    equitiesAI?:      boolean;
+  };
   priceIds:      { monthly?: string; yearly?: string };
 }
 

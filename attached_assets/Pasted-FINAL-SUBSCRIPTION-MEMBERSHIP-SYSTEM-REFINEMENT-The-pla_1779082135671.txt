@@ -1,0 +1,228 @@
+FINAL SUBSCRIPTION / MEMBERSHIP SYSTEM REFINEMENT
+
+The platform now looks premium enough to support a real SaaS trading business. We are updating the subscription system, upgrade flow, profile analytics, and Stripe pricing structure.
+
+IMPORTANT:
+Do NOT redesign the UI system.
+Keep the exact same:
+
+* neon green aesthetic
+* institutional density
+* glass styling
+* spacing
+* confidence ring system
+* typography
+* black backgrounds
+* bottom nav system
+
+This is refinement mode only.
+
+---
+
+1. UPDATE MEMBERSHIP STRUCTURE
+
+---
+
+Replace the current pricing system with this final structure:
+
+---
+
+## PAPER TRADING (FREE)
+
+* AI signals
+* Paper trading only
+* Market scanning
+* AI confidence engine
+* Watchlists
+* No live AI trading
+* No AI auto trade
+* Simulated buy/sell only
+
+Badge:
+FREE
+
+---
+
+## AI TRADING — $15.99/month
+
+* Live AI Trading enabled
+* Up to 6 concurrent AI trades
+* AI Auto Trade enabled
+* Crypto AI execution
+* AI portfolio tracking
+* AI performance analytics
+* Live exchange connection
+
+Badge:
+ACTIVE (if subscribed)
+
+---
+
+## AI TRADING PRO — $39.99/month
+
+* Up to 12 concurrent AI trades
+* Priority AI execution
+* Crypto + Equities AI trading
+* Advanced AI scanners
+* Expanded AI confidence engine
+* Enhanced analytics
+* Advanced AI automation controls
+
+Badge:
+UPGRADE (if user already has AI Trading)
+ACTIVE (if subscribed)
+
+---
+
+2. UPDATE PAYMENT / SUBSCRIPTION PAGE
+
+---
+
+Current subscription page needs to reflect the new structure above.
+
+Requirements:
+
+* Show all 3 plans clearly
+* Show current activated plan visually
+* Show upgrade path between plans
+* Use premium neon green glow hierarchy
+* Make ACTIVE plan visually obvious
+* AI Trading Pro should visually feel elite
+
+Example flow:
+FREE → AI Trading → AI Trading Pro
+
+Add:
+
+* current trade limit display
+* “6 Concurrent AI Trades”
+* “12 Concurrent AI Trades”
+
+AI Trading Pro should visually communicate:
+“expanded AI capacity”
+
+---
+
+3. STRIPE INTEGRATION
+
+---
+
+Update Stripe product/pricing references to match:
+
+* AI Trading → $15.99/month
+* AI Trading Pro → $39.99/month
+
+Ensure:
+
+* Stripe metadata/product IDs updated
+* upgrade flow supported
+* AI Trading users can upgrade directly to Pro
+* billing reflects active subscription tier
+
+---
+
+4. PROFILE PAGE ANALYTICS
+
+---
+
+The “Monthly AI Performance” section should NOT be static/demo.
+
+Convert it into:
+REAL USER PERFORMANCE ANALYTICS
+
+Use actual user metrics where available:
+
+* realized PnL
+* AI win rate
+* AI confidence averages
+* performance growth
+* executed trades
+* AI efficiency
+* consistency score
+
+The chart should feel:
+
+* premium
+* live
+* performance-driven
+* personal to the trader
+
+This should psychologically reinforce:
+“My AI trading account is growing.”
+
+---
+
+5. MEMBERSHIP GATING LOGIC
+
+---
+
+FREE USERS:
+
+* Can view signals
+* Can use paper trading
+* Can simulate BUY/SELL
+* Cannot enable LIVE AI Trading
+* Cannot use AI AUTO TRADE
+
+AI Trading / Pro Users:
+
+* Unlock LIVE AI Trading
+* Unlock AI AUTO TRADE
+* Unlock concurrent AI execution limits
+
+If FREE user taps:
+“AI AUTO TRADE”
+or
+“Enable Live AI Trading”
+
+Open premium upgrade modal/subscription flow.
+
+---
+
+6. PROFILE PAGE STATUS SYSTEM
+
+---
+
+Add visible account tier status:
+
+Examples:
+
+* FREE
+* AI TRADING
+* AI TRADING PRO
+
+Show:
+
+* active concurrent trade limit
+* current AI trades running
+* upgrade button if eligible
+
+Example:
+AI Trading
+ACTIVE
+4 / 6 AI Trades Running
+
+Or:
+AI Trading Pro
+ACTIVE
+9 / 12 AI Trades Running
+
+---
+
+7. IMPORTANT
+
+---
+
+Do NOT redesign Signals/Crypto/Equities pages.
+Those pages are approved.
+
+Only refine:
+
+* subscriptions
+* upgrade flows
+* Stripe integration
+* profile analytics
+* membership state logic
+* plan display system
+
+Keep the same premium institutional design language already established.

@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useClerk } from "@clerk/react";
 import { useLocation } from "wouter";
-import { api, type Portfolio, type Subscription, type SimAccount } from "@/lib/api";
+import { api, type Portfolio, type Subscription, type SimAccount, type SimTrade } from "@/lib/api";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
@@ -56,42 +56,286 @@ function Donut({ value, color, label }: { value: number; color: string; label: s
   );
 }
 
-// ── Monthly chart ─────────────────────────────────────────────────────────────────
-const MONTHS = ["NOV","DEC","JAN","FEB","MAR","APR","MAY"];
-const PERF   = [-180,420,640,510,820,580,370];
-const MAX_ABS = Math.max(...PERF.map(Math.abs));
-function MonthlyChart() {
+// ── Monthly chart (REAL user performance) ────────────────────────────────────
+// Buckets closed sim trades into the last N month-buckets and shows realized
+// PnL per bucket. Empty state shown when the user has no closed AI trades yet.
+//
+// Why month-buckets: gives the trader a felt sense of monthly compounding
+// without being noisy. The most recent bar gets the brand-green glow so the
+// chart reinforces "my AI account is growing."
+const MONTH_LABELS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+function bucketTradesByMonth(trades: { closedAt: string; pnl: number }[], bucketCount = 7) {
+  // Build N month buckets ending at the current month.
+  const now = new Date();
+  const buckets: { label: string; value: number; key: string }[] = [];
+  for (let i = bucketCount - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    buckets.push({
+      label: MONTH_LABELS[d.getMonth()]!,
+      value: 0,
+      key:   `${d.getFullYear()}-${d.getMonth()}`,
+    });
+  }
+  for (const t of trades) {
+    const d = new Date(t.closedAt);
+    if (Number.isNaN(d.getTime())) continue;
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const b = buckets.find(x => x.key === key);
+    if (b) b.value += (t.pnl ?? 0);
+  }
+  return buckets;
+}
+
+function MonthlyChart({
+  trades,
+  totalRealized,
+}: {
+  trades:        { closedAt: string; pnl: number }[];
+  totalRealized: number;
+}) {
+  const buckets = bucketTradesByMonth(trades, 7);
+  const maxAbs  = Math.max(1, ...buckets.map(b => Math.abs(b.value)));
+  const hasData = trades.length > 0;
+  const trendUp = buckets.length >= 2
+    && (buckets[buckets.length - 1]!.value > 0
+      || buckets[buckets.length - 1]!.value > buckets[buckets.length - 2]!.value);
+
   return (
-    <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:12, padding:"14px 16px" }}>
-      <div style={{ fontSize:8, fontFamily:SANS, fontWeight:600, color:"rgba(255,255,255,0.45)",
-        letterSpacing:"0.16em", marginBottom:14, textTransform:"uppercase" as const }}>
-        Monthly AI Performance (Illustrative)
+    <div style={{
+      position: "relative", overflow: "hidden",
+      background: `linear-gradient(160deg, ${CARD} 0%, #0F1F18 100%)`,
+      border: `1px solid ${E}`, borderRadius: 14, padding: "16px 16px 14px",
+      boxShadow: hasData ? `0 0 0 1px rgba(102,255,102,0.04) inset` : "none",
+    }}>
+      {/* Header row */}
+      <div style={{ display:"flex", justifyContent:"space-between",
+        alignItems:"flex-start", marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize:8, fontFamily:SANS, fontWeight:700,
+            color:"rgba(255,255,255,0.55)", letterSpacing:"0.18em",
+            textTransform:"uppercase" as const, marginBottom: 4 }}>
+            Monthly AI Performance
+          </div>
+          <div style={{ fontSize:9.5, fontFamily:SANS, color: DIM,
+            letterSpacing: 0.3 }}>
+            Realized P&amp;L · last 7 months
+          </div>
+        </div>
+        <div style={{ textAlign:"right" as const }}>
+          <div style={{
+            fontSize: 16, fontFamily: MONO, fontWeight: 800,
+            color: totalRealized >= 0 ? "rgba(0,210,100,0.95)" : "rgba(255,90,108,0.90)",
+            letterSpacing: -0.3,
+            textShadow: totalRealized > 0 ? "0 0 10px rgba(0,210,100,0.35)" : "none",
+          }}>
+            {totalRealized >= 0 ? "+" : "−"}${Math.abs(totalRealized).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </div>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 4,
+            marginTop: 3, padding: "1px 7px",
+            background: trendUp ? "rgba(102,255,102,0.10)" : "rgba(255,255,255,0.05)",
+            border: `1px solid ${trendUp ? "rgba(102,255,102,0.30)" : "rgba(255,255,255,0.10)"}`,
+            borderRadius: 4 }}>
+            <span style={{ fontSize: 8.5, fontFamily: MONO, fontWeight: 700,
+              color: trendUp ? C : GR, letterSpacing: "0.08em" }}>
+              {trendUp ? "▲ TRENDING UP" : "FLAT"}
+            </span>
+          </div>
+        </div>
       </div>
-      <div style={{ display:"flex", alignItems:"flex-end", gap:6, height:76, marginBottom:8 }}>
-        {PERF.map((v, i) => {
-          const up = v >= 0, h = Math.max(4,(Math.abs(v)/MAX_ABS)*68);
-          const col = up ? "rgba(0,210,100,0.80)" : "rgba(230,70,70,0.78)";
-          const last = i === MONTHS.length - 1;
+
+      {/* Bars */}
+      <div style={{ display:"flex", alignItems:"flex-end", gap:7, height:82, marginBottom:8,
+        position: "relative" }}>
+        {/* Zero baseline */}
+        <div aria-hidden style={{ position: "absolute", left: 0, right: 0, bottom: 40,
+          height: 1, background: "rgba(255,255,255,0.06)", pointerEvents: "none" }}/>
+        {buckets.map((b, i) => {
+          const up   = b.value >= 0;
+          const h    = Math.max(b.value === 0 ? 2 : 4, (Math.abs(b.value) / maxAbs) * 38);
+          const last = i === buckets.length - 1;
+          const col  = up ? "rgba(102,255,102,0.85)" : "rgba(255,90,108,0.82)";
           return (
-            <div key={i} style={{ flex:1, display:"flex", flexDirection:"column",
-              alignItems:"center", justifyContent:"flex-end", height:"100%" }}>
-              <div style={{ width:"100%", height:h, borderRadius:"3px 3px 0 0",
-                background:col, opacity:last?1:0.65,
-                boxShadow:last?`0 0 8px ${col}60`:"none" }}/>
+            <div key={b.key} style={{ flex:1, display:"flex", flexDirection:"column",
+              alignItems:"center", justifyContent: up ? "flex-end" : "flex-start",
+              height:"100%", position: "relative",
+              paddingTop: up ? 0 : 42, paddingBottom: up ? 42 : 0 }}>
+              <div style={{
+                width: "70%", height: h, minHeight: 2,
+                borderRadius: up ? "3px 3px 0 0" : "0 0 3px 3px",
+                background: col,
+                opacity: last ? 1 : 0.55,
+                boxShadow: last && hasData ? `0 0 12px ${col}` : "none",
+                transition: "height 0.4s ease",
+              }}/>
             </div>
           );
         })}
       </div>
-      <div style={{ display:"flex", gap:6 }}>
-        {MONTHS.map((m, i) => {
-          const last = i === MONTHS.length - 1;
+
+      {/* Month labels */}
+      <div style={{ display:"flex", gap:7 }}>
+        {buckets.map((b, i) => {
+          const last = i === buckets.length - 1;
           return (
-            <div key={m} style={{ flex:1, textAlign:"center" as const, fontSize:7, fontFamily:SANS,
-              fontWeight:last?600:400,
-              color:last?"rgba(255,255,255,0.75)":"rgba(136,146,164,0.75)" }}>{m}</div>
+            <div key={`l-${b.key}`} style={{ flex:1, textAlign:"center" as const,
+              fontSize:8, fontFamily: SANS, fontWeight: last ? 700 : 500,
+              color: last ? "rgba(232,245,236,0.85)" : "rgba(138,156,148,0.70)",
+              letterSpacing: 0.6 }}>{b.label}</div>
           );
         })}
       </div>
+
+      {/* Empty state overlay */}
+      {!hasData && (
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "linear-gradient(180deg, rgba(0,0,0,0.0) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.85) 100%)",
+          display: "flex", alignItems: "flex-end", justifyContent: "center",
+          padding: "0 16px 14px", pointerEvents: "none",
+        }}>
+          <div style={{ textAlign: "center" as const }}>
+            <div style={{ fontSize: 10.5, fontFamily: SANS, fontWeight: 700, color: C,
+              letterSpacing: 0.6, textTransform: "uppercase" as const, marginBottom: 3 }}>
+              Performance unlocks
+            </div>
+            <div style={{ fontSize: 10, fontFamily: SANS, color: GR, lineHeight: 1.45 }}>
+              Your AI performance chart will populate after your first closed trade.
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tier status card ──────────────────────────────────────────────────────────
+// Displays the user's active membership tier with live concurrent trade usage.
+// FREE tier shows an upgrade CTA. Paid tiers show "ACTIVE · X/Y AI Trades".
+function TierStatusCard({
+  plan,
+  isActive,
+  concurrentLimit,
+  currentRunning,
+  onUpgrade,
+}: {
+  plan:            string;
+  isActive:        boolean;
+  concurrentLimit: number;
+  currentRunning:  number;
+  onUpgrade:       () => void;
+}) {
+  const v = plan === "pro"
+    ? { name: "AI Trading Pro", accent: G,    glow: "rgba(124,255,0,0.32)", border: "rgba(124,255,0,0.40)", elite: true  }
+    : plan === "starter"
+      ? { name: "AI Trading",   accent: C,    glow: "rgba(102,255,102,0.28)", border: "rgba(102,255,102,0.35)", elite: false }
+      : { name: "Paper Trading (Free)", accent: "rgba(232,245,236,0.85)", glow: "rgba(255,255,255,0.05)",  border: "rgba(255,255,255,0.14)", elite: false };
+
+  const isPaid = plan !== "free";
+  const usagePct = concurrentLimit > 0
+    ? Math.min(100, (currentRunning / concurrentLimit) * 100)
+    : 0;
+
+  return (
+    <div style={{
+      position: "relative", overflow: "hidden",
+      background: v.elite
+        ? `linear-gradient(160deg, #0F1F18 0%, ${CARD} 100%)`
+        : CARD,
+      border: `1px solid ${v.border}`,
+      borderRadius: 14, padding: "14px 16px",
+      boxShadow: isPaid ? `0 14px 30px ${v.glow}` : "none",
+      marginBottom: 14,
+    }}>
+      {v.elite && (
+        <div aria-hidden style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: 1,
+          background: `linear-gradient(90deg, transparent 0%, ${G} 50%, transparent 100%)`,
+          opacity: 0.7,
+        }}/>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: 12, marginBottom: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 8.5, fontFamily: SANS, fontWeight: 700,
+            color: GR, letterSpacing: "0.16em",
+            textTransform: "uppercase" as const, marginBottom: 3 }}>
+            Membership
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 16, fontFamily: SANS, fontWeight: 800,
+              color: W, letterSpacing: -0.3 }}>{v.name}</span>
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "2px 8px",
+              background: isPaid && isActive ? "rgba(102,255,102,0.12)" : "rgba(255,255,255,0.05)",
+              border: `1px solid ${isPaid && isActive ? "rgba(102,255,102,0.40)" : "rgba(255,255,255,0.14)"}`,
+              borderRadius: 4, fontSize: 8, fontFamily: SANS, fontWeight: 700,
+              color: isPaid && isActive ? C : GR,
+              letterSpacing: "0.10em", textTransform: "uppercase" as const,
+            }}>
+              {isPaid && isActive && (
+                <span style={{ width: 4, height: 4, borderRadius: "50%",
+                  background: C, boxShadow: `0 0 6px ${C}`,
+                  animation: "dot-pulse 1.4s ease-in-out infinite" }}/>
+              )}
+              {isPaid && isActive ? "Active" : "Free"}
+            </span>
+          </div>
+        </div>
+        {plan !== "pro" && (
+          <button
+            onClick={onUpgrade}
+            style={{
+              flexShrink: 0, padding: "8px 14px", borderRadius: 999, cursor: "pointer",
+              background: plan === "free"
+                ? `linear-gradient(135deg, rgba(102,255,102,0.18) 0%, rgba(124,255,0,0.18) 100%)`
+                : `linear-gradient(135deg, rgba(124,255,0,0.20) 0%, rgba(124,255,0,0.10) 100%)`,
+              border: `1px solid ${plan === "free" ? "rgba(102,255,102,0.45)" : "rgba(124,255,0,0.50)"}`,
+              color: plan === "free" ? C : G,
+              fontFamily: SANS, fontSize: 11, fontWeight: 700,
+              letterSpacing: 0.5, textTransform: "uppercase" as const,
+              boxShadow: `0 6px 18px ${v.glow}`,
+            }}>
+            {plan === "free" ? "Upgrade" : "Upgrade to Pro"}
+          </button>
+        )}
+      </div>
+
+      {/* Concurrent AI trade usage — only meaningful for paid tiers */}
+      {isPaid && concurrentLimit > 0 && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between",
+            alignItems: "baseline", marginBottom: 6 }}>
+            <span style={{ fontSize: 10, fontFamily: SANS, fontWeight: 600,
+              color: GR, letterSpacing: 0.4 }}>
+              AI Trades Running
+            </span>
+            <span style={{ fontSize: 14, fontFamily: MONO, fontWeight: 800,
+              color: v.accent, letterSpacing: -0.2 }}>
+              {currentRunning}<span style={{ color: DIM, fontWeight: 600 }}> / {concurrentLimit}</span>
+            </span>
+          </div>
+          <div style={{ position: "relative", height: 6, borderRadius: 999,
+            background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+            <div style={{
+              position: "absolute", left: 0, top: 0, bottom: 0, width: `${usagePct}%`,
+              background: `linear-gradient(90deg, ${v.accent} 0%, ${G} 100%)`,
+              borderRadius: 999,
+              boxShadow: `0 0 10px ${v.glow}`,
+              transition: "width 0.6s ease",
+            }}/>
+          </div>
+        </div>
+      )}
+
+      {!isPaid && (
+        <div style={{ fontSize: 10.5, fontFamily: SANS, color: GR, lineHeight: 1.5 }}>
+          Live AI Trading and AI Auto Trade are <span style={{ color: W, fontWeight: 600 }}>locked</span>.
+          Upgrade to enable concurrent AI execution on your account.
+        </div>
+      )}
     </div>
   );
 }
@@ -412,13 +656,28 @@ export default function Profile() {
       retry:     false,
     });
 
+    // Closed sim trades — drives the REAL monthly performance chart.
+    const { data: simTradesData } = useQuery<{ trades: SimTrade[] }>({
+      queryKey:  ["sim-trades"],
+      queryFn:   () => api.get("/simulation/trades"),
+      staleTime: 30_000,
+      retry:     false,
+    });
+    const simTrades = simTradesData?.trades ?? [];
+
     const tv        = portfolio?.totalValue ?? simAcc?.balance ?? 100_000;
     const plan      = sub?.plan ?? "free";
+    const isActive  = sub?.isActive ?? (plan === "free");
 
     const realized  = simAcc?.realizedPnL ?? 0;
     const fees      = +(realized * 0.03).toFixed(2);
     const netProfit = realized - fees;
     const winRate   = simAcc?.winRate ?? 0;
+
+    // Per-tier concurrent AI trade capacity — single source of truth is the
+    // backend PLAN_FEATURES table, surfaced through /billing/subscription.
+    const concurrentLimit = sub?.limits?.concurrentTrades ?? 0;
+    const currentRunning  = portfolio?.positions?.length ?? 0;
 
   function openEdit() {
     setDraftName(profile.name);
@@ -571,9 +830,23 @@ export default function Profile() {
 
       <div style={{ padding:"0 16px" }}>
 
+        {/* ── Membership tier status (NEW — real plan + concurrent usage) ───── */}
+        <SectionHead label="Membership" accent={C}/>
+        <TierStatusCard
+          plan={plan}
+          isActive={isActive}
+          concurrentLimit={concurrentLimit}
+          currentRunning={currentRunning}
+          onUpgrade={() => setLocation("/subscribe")}
+        />
+
         {/* ── AI Status ────────────────────────────────────────────────────── */}
         <SectionHead label="AI Portfolio Manager" accent={C}/>
-        <AIStatusCard enabled={aiEnabled} positions={0} maxPositions={profile.maxTrades}/>
+        <AIStatusCard
+          enabled={aiEnabled}
+          positions={currentRunning}
+          maxPositions={concurrentLimit > 0 ? concurrentLimit : profile.maxTrades}
+        />
 
         {/* ── Stats 2×2 ───────────────────────────────────────────────────── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:18 }}>
@@ -586,7 +859,7 @@ export default function Profile() {
         {/* ── Performance Intelligence ─────────────────────────────────────── */}
         <div style={{ marginBottom:18 }}>
           <SectionHead label="Performance Intelligence" accent="rgba(124,255,0,0.65)"/>
-          <MonthlyChart/>
+          <MonthlyChart trades={simTrades} totalRealized={realized}/>
           <div style={{ marginTop:10, background:CARD, border:`1px solid ${E}`,
             borderRadius:12, padding:"20px 8px",
             display:"grid", gridTemplateColumns:"1fr 1fr 1fr", alignItems:"start" }}>

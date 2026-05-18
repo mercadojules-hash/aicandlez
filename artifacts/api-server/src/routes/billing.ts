@@ -38,83 +38,83 @@ export const PLAN_FEATURES: Record<string, {
   features:      string[];
   performanceFee?: number;
   limits: {
-    exchanges:  number | string;
-    positions:  number | string;
-    trades:     number | string;
-    liveTrading: boolean;
+    exchanges:        number | string;
+    positions:        number | string;
+    trades:           number | string;
+    concurrentTrades: number;            // Max simultaneous AI-managed trades
+    liveTrading:      boolean;
+    aiAutoTrade:      boolean;           // Autonomous AI execution unlocked
+    equitiesAI:       boolean;           // Stocks AI trading unlocked (Pro only)
   };
 }> = {
+  // ── PAPER TRADING (FREE) ────────────────────────────────────────────────────
+  // Signals + simulated buy/sell only. No live AI execution.
   free: {
-    name:          "Free",
+    name:          "Paper Trading",
     price_monthly: 0,
     price_yearly:  0,
-    description:   "Paper trading, 1 exchange, core signals",
+    description:   "AI signals + paper trading. No live execution.",
     features: [
+      "AI signals",
       "Paper trading only",
-      "1 exchange connection",
-      "Up to 3 active positions",
-      "5 trades/day",
-      "Core AI signals",
-      "30-day backtest history",
+      "Market scanning",
+      "AI confidence engine",
+      "Watchlists",
+      "Simulated buy/sell only",
     ],
-    limits: { exchanges: 1, positions: 3, trades: 5, liveTrading: false },
+    limits: {
+      exchanges: 1, positions: 3, trades: 5,
+      concurrentTrades: 0, liveTrading: false, aiAutoTrade: false, equitiesAI: false,
+    },
   },
+
+  // ── AI TRADING — $15.99/month ───────────────────────────────────────────────
+  // Plan key kept as `starter` for DB enum compatibility with existing users.
   starter: {
-    name:           "Starter",
-    price_monthly:  599,   // $5.99 in cents (Stripe standard)
-    price_yearly:   5990,  // $59.90/yr — 2 months free
-    description:    "Platform access + live trading. 3% performance fee on profitable closed trades only.",
+    name:           "AI Trading",
+    price_monthly:  1599,   // $15.99 in cents (Stripe standard)
+    price_yearly:   15990,  // $159.90/yr — 2 months free
+    description:    "Live AI Trading + AI Auto Trade. 6 concurrent AI trades. 3% performance fee on profitable closed trades only.",
     performanceFee: PERFORMANCE_FEE_RATE,
     features: [
-      "Live trading enabled",
-      "Up to 3 exchange connections",
-      "Up to 10 active positions",
-      "50 trades/day",
-      "Full MTF signal engine",
-      "AI confidence engine",
-      "90-day backtest history",
+      "Live AI Trading enabled",
+      "Up to 6 concurrent AI trades",
+      "AI Auto Trade enabled",
+      "Crypto AI execution",
+      "AI portfolio tracking",
+      "AI performance analytics",
+      "Live exchange connection",
       "3% performance fee on profitable trades only",
       "No fee on losing trades",
     ],
-    limits: { exchanges: 3, positions: 10, trades: 50, liveTrading: true },
+    limits: {
+      exchanges: 3, positions: 10, trades: 50,
+      concurrentTrades: 6, liveTrading: true, aiAutoTrade: true, equitiesAI: false,
+    },
   },
+
+  // ── AI TRADING PRO — $39.99/month ───────────────────────────────────────────
+  // Plan key kept as `pro` for DB enum compatibility with existing users.
   pro: {
-    name:           "Pro",
-    price_monthly:  4900,
-    price_yearly:   49000,
-    description:    "Live trading, unlimited signals, advanced analytics. 3% performance fee on profitable closed trades only.",
+    name:           "AI Trading Pro",
+    price_monthly:  3999,   // $39.99 in cents
+    price_yearly:   39990,  // $399.90/yr — 2 months free
+    description:    "Expanded AI capacity. 12 concurrent trades. Crypto + Equities. Priority execution. 3% performance fee on profitable closed trades only.",
     performanceFee: PERFORMANCE_FEE_RATE,
     features: [
-      "Live trading enabled",
-      "Up to 5 exchange connections",
-      "Up to 50 active positions",
-      "Unlimited trades/day",
-      "Full MTF signal engine",
-      "Copy trading",
-      "2-year backtest history",
-      "Priority API access",
+      "Up to 12 concurrent AI trades",
+      "Priority AI execution",
+      "Crypto + Equities AI trading",
+      "Advanced AI scanners",
+      "Expanded AI confidence engine",
+      "Enhanced analytics",
+      "Advanced AI automation controls",
       "3% performance fee on profitable trades only",
     ],
-    limits: { exchanges: 5, positions: 50, trades: "unlimited", liveTrading: true },
-  },
-  enterprise: {
-    name:           "Enterprise",
-    price_monthly:  14900,
-    price_yearly:   149000,
-    description:    "Unlimited everything, priority support, multi-account. 3% performance fee on profitable closed trades only.",
-    performanceFee: PERFORMANCE_FEE_RATE,
-    features: [
-      "Everything in Pro",
-      "Unlimited exchange connections",
-      "Unlimited active positions",
-      "Multi-account support",
-      "Priority execution queue",
-      "Dedicated support",
-      "Advanced analytics",
-      "Unlimited backtest history",
-      "3% performance fee on profitable trades only",
-    ],
-    limits: { exchanges: "unlimited", positions: "unlimited", trades: "unlimited", liveTrading: true },
+    limits: {
+      exchanges: 5, positions: 50, trades: "unlimited",
+      concurrentTrades: 12, liveTrading: true, aiAutoTrade: true, equitiesAI: true,
+    },
   },
 };
 
@@ -180,10 +180,24 @@ router.get("/billing/plans", async (_req, res): Promise<void> => {
       // stripe schema not yet initialized — return plan metadata only
     }
 
-    // Build price ID map from stripe schema
+    // Build price ID map from stripe schema.
+    //
+    // Stripe product NAMES are mapped to internal PLAN_FEATURES KEYS so the
+    // app stays decoupled from human-readable product naming in Stripe.
+    // Both the new branded names ("AI Trading", "AI Trading Pro", "Paper
+    // Trading") and the legacy names ("Starter", "Pro", "Free") are accepted.
+    const NAME_TO_KEY: Record<string, string> = {
+      "paper trading":  "free",
+      "free":           "free",
+      "ai trading":     "starter",
+      "starter":        "starter",
+      "ai trading pro": "pro",
+      "pro":            "pro",
+    };
     const priceMap: Record<string, { monthly?: string; yearly?: string }> = {};
     for (const row of priceRows) {
-      const planKey = row.product_name.toLowerCase().replace(" plan", "").trim();
+      const normalized = row.product_name.toLowerCase().replace(/\s+plan$/, "").trim();
+      const planKey    = NAME_TO_KEY[normalized] ?? normalized;
       priceMap[planKey] ??= {};
       if (row.interval === "month") priceMap[planKey].monthly = row.price_id;
       if (row.interval === "year")  priceMap[planKey].yearly  = row.price_id;
@@ -273,9 +287,52 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
 
 router.post("/billing/checkout", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
-  const { priceId } = req.body as { priceId?: string };
+  // Accept either `priceId` (direct Stripe price) or `planId` (internal plan
+  // key — `free`/`starter`/`pro`). When `planId` is supplied, we look up the
+  // active monthly price from the synced stripe schema.
+  const body = req.body as {
+    priceId?: string;
+    planId?:  string;
+    billingPeriod?: "monthly" | "yearly";
+  };
+  let priceId = body.priceId;
 
-  if (!priceId) { res.status(400).json({ error: "priceId is required" }); return; }
+  if (!priceId && body.planId) {
+    if (body.planId === "free") {
+      res.status(400).json({ error: "Free plan does not require checkout" });
+      return;
+    }
+    try {
+      const result = await db.execute(sql`
+        SELECT p.name AS product_name, pr.id AS price_id,
+               pr.recurring->>'interval' AS interval
+        FROM stripe.products p
+        JOIN stripe.prices pr ON pr.product = p.id AND pr.active = true
+        WHERE p.active = true
+      `);
+      const NAME_TO_KEY: Record<string, string> = {
+        "paper trading":  "free",
+        "free":           "free",
+        "ai trading":     "starter",
+        "starter":        "starter",
+        "ai trading pro": "pro",
+        "pro":            "pro",
+      };
+      const desiredInterval = body.billingPeriod === "yearly" ? "year" : "month";
+      for (const r of result.rows as Array<{ product_name: string; price_id: string; interval: string }>) {
+        const normalized = r.product_name.toLowerCase().replace(/\s+plan$/, "").trim();
+        const planKey    = NAME_TO_KEY[normalized] ?? normalized;
+        if (planKey === body.planId && r.interval === desiredInterval) {
+          priceId = r.price_id;
+          break;
+        }
+      }
+    } catch {
+      // stripe schema unavailable — fall through to "priceId required" error
+    }
+  }
+
+  if (!priceId) { res.status(400).json({ error: "priceId or valid planId is required (Stripe price not configured)" }); return; }
 
   try {
     // Get user email for customer creation
