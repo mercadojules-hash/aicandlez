@@ -1,12 +1,13 @@
 /**
  * SignalsRow — Top 20 Crypto Signals (left) + Top 20 Equity Signals (right).
  *
- * Centerpiece data row of the institutional dashboard. Long + short capable.
+ * Centerpiece data row. With filter=ALL, rows are grouped LONG-then-SHORT with
+ * a divider for strong visual separation.
  */
 
 import { useMemo, useState } from "react";
 import { Bitcoin, BarChart3, TrendingUp, TrendingDown } from "lucide-react";
-import type { EngineStatus } from "../types";
+import type { EngineStatus, SymBreakdown } from "../types";
 import type { TickerSpec } from "./tickers";
 import { CRYPTO_20, EQUITIES_20 } from "./tickers";
 import { SignalRow, resolveDirection } from "./SignalRow";
@@ -26,17 +27,21 @@ interface PanelProps {
 function SignalsPanel({ label, sub, icon, brand, tickers, engine }: PanelProps) {
   const [filter, setFilter] = useState<Filter>("ALL");
 
-  // We can use engine breakdowns to bias real-LONG vs real-SHORT routing
   const breakdowns = engine?.symbolBreakdowns ?? {};
 
-  const filteredCount = useMemo(() => {
-    let l = 0, s = 0;
+  // Pre-classify so we can group LONG / SHORT for the ALL view
+  const classified = useMemo(() => {
+    const longs:  Array<{ spec: TickerSpec; breakdown?: SymBreakdown }> = [];
+    const shorts: Array<{ spec: TickerSpec; breakdown?: SymBreakdown }> = [];
     for (const t of tickers) {
-      if (resolveDirection(t.symbol, breakdowns[t.symbol]) === "LONG") l++;
-      else                                                              s++;
+      const b = breakdowns[t.symbol];
+      if (resolveDirection(t.symbol, b) === "LONG") longs.push({ spec: t, breakdown: b });
+      else                                          shorts.push({ spec: t, breakdown: b });
     }
-    return { l, s };
+    return { longs, shorts };
   }, [tickers, breakdowns]);
+
+  const counts = { l: classified.longs.length, s: classified.shorts.length };
 
   return (
     <div
@@ -70,8 +75,8 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine }: PanelProps) 
 
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 text-[8.5px] font-bold tracking-[0.14em] mr-2">
-            <span style={{ color: N.LONG }}>L {filteredCount.l}</span>
-            <span style={{ color: N.SHORT }}>S {filteredCount.s}</span>
+            <span style={{ color: N.LONG }}>L {counts.l}</span>
+            <span style={{ color: N.SHORT }}>S {counts.s}</span>
           </div>
           <FilterTab label="ALL"   active={filter === "ALL"}   color={N.BRAND} onClick={() => setFilter("ALL")} />
           <FilterTab label="LONG"  active={filter === "LONG"}  color={N.LONG}  onClick={() => setFilter("LONG")} />
@@ -79,52 +84,56 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine }: PanelProps) 
         </div>
       </header>
 
-      {/* Column headers */}
-      <div
-        className="grid items-center px-3 py-1.5 text-[8.5px] font-bold tracking-[0.14em]"
-        style={{
-          gridTemplateColumns: "78px 110px 64px 1fr 1fr 1fr 1fr 60px 132px",
-          gap: 6,
-          color: N.TEXT_3,
-          borderBottom: `1px solid ${N.BORDER}`,
-          background: N.SURFACE_1,
-        }}
-      >
-        <div>TICKER</div>
-        <div>15M TREND</div>
-        <div>SIGNAL</div>
-        <div className="text-right">ENTRY</div>
-        <div className="text-right">STOP</div>
-        <div className="text-right">TARGET</div>
-        <div className="text-right">LIVE</div>
-        <div className="text-right">CONF</div>
-        <div className="text-right pr-1">ACTION</div>
-      </div>
-
-      {/* Rows */}
-      <div className="blotter-scroll" style={{ maxHeight: 660 }}>
-        {tickers.map(spec => (
-          <FilteredSignalRow key={spec.symbol} spec={spec} breakdown={breakdowns[spec.symbol]} filter={filter} />
-        ))}
+      {/* Rows — grouped LONG → SHORT for ALL view (stronger visual block separation) */}
+      <div className="blotter-scroll" style={{ maxHeight: 940 }}>
+        {(filter === "ALL" || filter === "LONG") && classified.longs.length > 0 && (
+          <>
+            <GroupDivider label="LONG SETUPS" count={classified.longs.length} color={N.LONG} icon={<TrendingUp className="w-3 h-3" />} />
+            {classified.longs.map(({ spec, breakdown }) => (
+              <SignalRow key={spec.symbol} spec={spec} breakdown={breakdown} />
+            ))}
+          </>
+        )}
+        {(filter === "ALL" || filter === "SHORT") && classified.shorts.length > 0 && (
+          <>
+            <GroupDivider label="SHORT SETUPS" count={classified.shorts.length} color={N.SHORT} icon={<TrendingDown className="w-3 h-3" />} />
+            {classified.shorts.map(({ spec, breakdown }) => (
+              <SignalRow key={spec.symbol} spec={spec} breakdown={breakdown} />
+            ))}
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-/* Wrap SignalRow so the LONG/SHORT filter uses the same shared
-   resolveDirection() that the row itself uses — guarantees the filter
-   and the displayed side never disagree. */
-function FilteredSignalRow({
-  spec, breakdown, filter,
-}: {
-  spec: TickerSpec;
-  breakdown: import("../types").SymBreakdown | undefined;
-  filter: Filter;
-}) {
-  if (filter !== "ALL" && resolveDirection(spec.symbol, breakdown) !== filter) {
-    return null;
-  }
-  return <SignalRow spec={spec} breakdown={breakdown} />;
+function GroupDivider({
+  label, count, color, icon,
+}: { label: string; count: number; color: string; icon: React.ReactNode }) {
+  return (
+    <div
+      className="flex items-center gap-2 px-3 py-1.5"
+      style={{
+        background: `linear-gradient(90deg, ${color}18 0%, #000 60%)`,
+        borderTop:    `1px solid ${color}30`,
+        borderBottom: `1px solid ${color}30`,
+        fontFamily: N.FONT_MONO,
+      }}
+    >
+      <span style={{ color, filter: `drop-shadow(0 0 4px ${color}80)`, display: "inline-flex" }}>
+        {icon}
+      </span>
+      <span className="text-[9px] font-extrabold tracking-[0.28em]"
+        style={{ color, textShadow: `0 0 6px ${color}60` }}>
+        {label}
+      </span>
+      <span className="text-[8.5px] font-bold tracking-[0.18em]"
+        style={{ color: N.TEXT_3 }}>
+        · {count}
+      </span>
+      <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${color}40, transparent)` }} />
+    </div>
+  );
 }
 
 function FilterTab({
@@ -154,7 +163,7 @@ export function SignalsRow({ engine }: { engine?: EngineStatus }) {
     <section className="grid gap-2 px-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
       <SignalsPanel
         label="TOP 20 CRYPTO SIGNALS"
-        sub="LONG · SHORT · AI EXECUTION"
+        sub="LONG · SHORT · UNLIMITED AI EXECUTION"
         icon={<Bitcoin className="w-3.5 h-3.5" />}
         brand={N.BRAND}
         tickers={CRYPTO_20}
@@ -162,7 +171,7 @@ export function SignalsRow({ engine }: { engine?: EngineStatus }) {
       />
       <SignalsPanel
         label="TOP 20 EQUITY SIGNALS"
-        sub="LONG · SHORT · AI EXECUTION"
+        sub="LONG · SHORT · UNLIMITED AI EXECUTION"
         icon={<BarChart3 className="w-3.5 h-3.5" />}
         brand={N.BRAND_BRT}
         tickers={EQUITIES_20}
@@ -171,6 +180,3 @@ export function SignalsRow({ engine }: { engine?: EngineStatus }) {
     </section>
   );
 }
-
-/* Silence unused imports if tree-shaken differently */
-void TrendingUp; void TrendingDown;

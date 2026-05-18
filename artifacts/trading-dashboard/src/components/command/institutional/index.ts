@@ -1,5 +1,8 @@
-export { CommandBar }       from "./CommandBar";
-export { MarketHeartbeat }  from "./MarketHeartbeat";
-export { PositionsRow }     from "./PositionsRow";
-export { SignalsRow }       from "./SignalsRow";
-export { N as NEON_THEME }  from "./theme";
+export { CommandBar }        from "./CommandBar";
+export { PlatformOverview }  from "./PlatformOverview";
+export { LiveAccountPanel }  from "./LiveAccountPanel";
+export { MarketHeartbeat }   from "./MarketHeartbeat";
+export { PositionsRow }      from "./PositionsRow";
+export { LiveControlBar }    from "./LiveControlBar";
+export { SignalsRow }        from "./SignalsRow";
+export { N as NEON_THEME }   from "./theme";

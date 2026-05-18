@@ -1,21 +1,26 @@
 /**
- * /command — AICandlez Institutional Trading Workstation
+ * /command — AICandlez Institutional Trading Workstation (operator console)
  *
- * Desktop-only dashboard. 3-row layout, Bloomberg / TradingView / hedge-fund
- * aesthetic, matte black + neon green.
+ * Desktop-only command center. Matte black + neon green.
  *
- *   ┌─ CommandBar ─────────────────────────────────────────────────────────┐
- *   ├─ MarketHeartbeat (BTC ETH SOL · NVDA TSLA SPY · live sparklines) ────┤
- *   ├─ Active Positions          |  Closed Positions ─────────────────────-┤
- *   └─ Top 20 Crypto Signals     |  Top 20 Equity Signals (long/short) ───┘
+ *   ┌─ CommandBar ─────────────────────────────────────────────────────────────┐
+ *   ├─ PlatformOverview  (13-metric global telemetry) ─────────────────────────┤
+ *   ├─ LiveAccountPanel  (my Kraken proof-of-performance) ─────────────────────┤
+ *   ├─ MarketHeartbeat   (BTC ETH SOL · NVDA TSLA SPY · live sparklines) ──────┤
+ *   ├─ PositionsRow      (Active · Closed hedge-fund blotter) ────────────────-┤
+ *   ├─ LiveControlBar    ENABLE LIVE AI CRYPTO TRADING ───────────────────────-┤
+ *   ├─ Top 20 Crypto Signals (grouped LONG / SHORT) ──────────────────────────-┤
+ *   ├─ LiveControlBar    ENABLE LIVE AI EQUITIES TRADING ──────────────────────┤
+ *   └─ Top 20 Equity Signals (grouped LONG / SHORT) ──────────────────────────-┘
  */
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LiveConsentModal, useLiveConsent } from "@/components/ConsentGate";
 
 import {
-  CommandBar, MarketHeartbeat, PositionsRow, SignalsRow,
+  CommandBar, PlatformOverview, LiveAccountPanel,
+  MarketHeartbeat, PositionsRow, LiveControlBar, SignalsRow,
 } from "@/components/command/institutional";
 import { N } from "@/components/command/institutional/theme";
 
@@ -23,7 +28,6 @@ import type {
   EngineStatus, AppSettings, Trade, ExchangeStatus, SimAccount, LiveBalance,
 } from "@/components/command/types";
 
-/* ── React-Query options (poll cadence) ─────────────────────────────────── */
 const Q_FAST   = { refetchInterval: 2_000, refetchOnWindowFocus: false, staleTime: 0 } as const;
 const Q_MEDIUM = { refetchInterval: 4_000, refetchOnWindowFocus: false, staleTime: 0 } as const;
 const Q_SLOW   = { refetchInterval: 10_000, refetchOnWindowFocus: false, staleTime: 0 } as const;
@@ -46,12 +50,13 @@ export default function CommandCenter() {
   const { data: simAccount }  = useQuery({ queryKey: ["sim-account-cmd"],  queryFn: () => j<SimAccount>("/api/simulation/account"),  ...Q_FAST   });
   const { data: liveBalance } = useQuery({ queryKey: ["live-balance-cmd"], queryFn: () => j<LiveBalance>("/api/exchange/balances"),  ...Q_MEDIUM });
 
-  void settings; // settings PATCH UI lives elsewhere; keep call to warm cache
+  void settings;
 
   /* ── Active exchange ──────────────────────────────────────────────────── */
   const mode       = exchangeStatus?.mode ?? "simulation";
   const liveActive = mode !== "simulation" && (exchangeStatus?.liveEnabled ?? false);
   const activeId   = liveActive ? mode : "sim";
+  const isPaused   = exchangeStatus?.paused ?? false;
 
   /* ── Consent flow ─────────────────────────────────────────────────────── */
   const { hasConsented } = useLiveConsent();
@@ -88,6 +93,24 @@ export default function CommandCenter() {
     }
   };
 
+  /* ── Live-trading control bars (operator) ─────────────────────────────── */
+  // CRYPTO control bar mirrors the actual exchange mode (kraken/etc).
+  const cryptoState: "LIVE" | "SIMULATION" | "PAUSED" =
+    isPaused ? "PAUSED" : liveActive ? "LIVE" : "SIMULATION";
+
+  // Cycle: SIMULATION → LIVE → PAUSED → SIMULATION
+  const toggleCryptoLive = () => {
+    if (isPaused)   { togglePause(); selectSim(); return; }  // PAUSED → SIM
+    if (liveActive) { togglePause(); return; }               // LIVE   → PAUSED
+    selectLive("kraken");                                    // SIM    → LIVE
+  };
+
+  // EQUITIES control bar is operator-local for now — wire to real alpaca/etc later.
+  const [equitiesLive, setEquitiesLive] = useState(false);
+  const equitiesState: "LIVE" | "SIMULATION" | "PAUSED" = equitiesLive ? "LIVE" : "SIMULATION";
+  const toggleEquitiesLive = () => setEquitiesLive(v => !v);
+  useEffect(() => { if (isPaused) setEquitiesLive(false); }, [isPaused]);
+
   /* ── Derived trade pools ──────────────────────────────────────────────── */
   const tradesArr     = Array.isArray(trades) ? trades : [];
   const openTrades    = tradesArr.filter(t => t.status?.toLowerCase() === "open");
@@ -100,11 +123,9 @@ export default function CommandCenter() {
       className="flex flex-col min-h-screen w-full"
       style={{
         background: N.BG,
-        // Subtle radial neon-green glow behind the workstation
         backgroundImage: `radial-gradient(1200px 600px at 50% -10%, ${N.BRAND}06 0%, transparent 60%), radial-gradient(800px 400px at 20% 100%, ${N.BRAND_DEEP}05 0%, transparent 55%)`,
       }}
     >
-      {/* Slim top bar */}
       <CommandBar
         engine={engine}
         exchangeStatus={exchangeStatus}
@@ -120,24 +141,55 @@ export default function CommandCenter() {
         onSelectLive={selectLive}
       />
 
-      {/* Workstation body — desktop widescreen layout */}
       <main className="flex-1 flex flex-col gap-2 py-2"
             style={{ maxWidth: 1880, width: "100%", margin: "0 auto" }}>
 
-        {/* ── Row 1: Market Heartbeat ─────────────────────────────────── */}
+        {/* Row 0 — Global platform telemetry */}
+        <div className="px-2">
+          <PlatformOverview />
+        </div>
+
+        {/* Row 1 — My live Kraken account */}
+        <div className="px-2">
+          <LiveAccountPanel
+            engine={engine}
+            exchangeStatus={exchangeStatus}
+            liveBalance={liveBalance}
+            trades={tradesArr}
+          />
+        </div>
+
+        {/* Row 2 — Market Heartbeat */}
         <MarketHeartbeat />
 
-        {/* ── Row 2: Positions ────────────────────────────────────────── */}
+        {/* Row 3 — Positions blotter */}
         <PositionsRow
           positions={livePositions}
           openTrades={openTrades}
           closedTrades={closedTrades}
         />
 
-        {/* ── Row 3: Top 20 Crypto + Top 20 Equity Signals ────────────── */}
+        {/* Row 4 — Crypto control bar + Crypto Top 20 */}
+        <div className="px-2 mt-1">
+          <LiveControlBar
+            assetClass="CRYPTO"
+            state={cryptoState}
+            onToggle={toggleCryptoLive}
+          />
+        </div>
+
+        {/* Row 5 — Equities control bar + Equity Top 20 */}
+        <div className="px-2 mt-1">
+          <LiveControlBar
+            assetClass="EQUITIES"
+            state={equitiesState}
+            onToggle={toggleEquitiesLive}
+          />
+        </div>
+
+        {/* Row 6 — Top 20 Crypto + Top 20 Equity Signals */}
         <SignalsRow engine={engine} />
 
-        {/* Footer marker */}
         <footer
           className="px-3 py-2 flex items-center justify-between text-[8.5px] font-bold tracking-[0.22em]"
           style={{
@@ -146,12 +198,11 @@ export default function CommandCenter() {
             fontFamily: N.FONT_MONO,
           }}
         >
-          <span>AICANDLEZ · INSTITUTIONAL DESK · v2.0</span>
-          <span>AI EXECUTION ENGINE · {engine?.running ? "RUNNING" : "IDLE"} · {engine?.signalsGenerated ?? 0} SIGNALS · {engine?.tradesExecuted ?? 0} EXECS</span>
+          <span>AICANDLEZ · OPERATOR COMMAND CENTER · v2.1</span>
+          <span>AI ENGINE · {engine?.running ? "RUNNING" : "IDLE"} · {engine?.signalsGenerated ?? 0} SIGNALS · {engine?.tradesExecuted ?? 0} EXECS · OPERATOR · UNLIMITED</span>
         </footer>
       </main>
 
-      {/* Live trading consent modal — gated handoff to live exchanges */}
       <LiveConsentModal
         open={pendingLiveEx !== null}
         onConsented={() => {

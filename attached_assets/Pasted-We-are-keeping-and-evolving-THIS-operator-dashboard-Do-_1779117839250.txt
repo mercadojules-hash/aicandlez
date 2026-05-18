@@ -1,0 +1,119 @@
+We are keeping and evolving THIS operator dashboard. Do NOT split into a separate desktop artifact yet.
+
+The new institutional redesign is the correct direction for the operator console.
+
+Now we need to evolve it into a true AI trading command center.
+
+TOP PRIORITY CHANGES:
+
+==================================================
+NEW TOP-LEVEL PLATFORM OVERVIEW ROW
+===================================
+
+At the VERY TOP of the dashboard (above Market Heartbeat), create a full-width institutional telemetry row showing LIVE platform metrics.
+
+This should feel like Bloomberg / hedge fund mission control.
+
+Add cards/widgets for:
+
+PLATFORM METRICS
+
+* Users Online (live)
+* Total Registered Users
+* Active AI Bots Running
+* Trades Executed Today
+* Winning Trades Today
+* Winning Trades This Week
+* Winning Trades This Month
+* Total Fees Collected
+* Total Platform PnL
+* Total Volume Traded
+* AI Win Rate %
+* Signals Generated Today
+* Average AI Confidence %
+
+MY LIVE KRAKEN ACCOUNT
+This is critical.
+
+Create a dedicated live account panel connected to my Kraken account balance.
+
+Current balance:
+
+* ~$100 USD starting test capital
+
+This panel should update LIVE as the AI wins or loses trades.
+
+Show:
+
+* account balance
+* unrealized PnL
+* realized PnL
+* win rate
+* open positions
+* total trades
+* live equity curve mini chart
+* profit today/week/month
+* AI execution status
+
+This should become the central “proof of performance” panel for the platform.
+
+==================================================
+LIVE AI TRADING CONTROL BARS
+============================
+
+Above BOTH signal sections create large glowing institutional control bars:
+
+CRYPTO SECTION:
+[ ⚡ ENABLE LIVE AI CRYPTO TRADING ]
+
+EQUITIES SECTION:
+[ ⚡ ENABLE LIVE AI EQUITIES TRADING ]
+
+Requirements:
+
+* large full-width glowing action bars
+* LIVE / PAUSED / SIMULATION state
+* clickable
+* animated glow when active
+* institutional style
+* immediate visual state changes
+
+IMPORTANT:
+This is MY operator dashboard.
+
+There should be NO trade limits on this console.
+
+I need:
+
+* unlimited live trades
+* unrestricted AI execution
+* unrestricted monitoring
+* unrestricted signal visibility
+* unrestricted position management
+
+I will begin testing LIVE Kraken execution later today.
+
+==================================================
+VISUAL REFINEMENTS
+==================
+
+Keep:
+
+* matte black institutional background
+* neon green Bloomberg styling
+* left operator nav
+* command-center architecture
+
+Add:
+
+* larger AI confidence circles
+* taller 2-line asset rows
+* confidence % in dedicated right-side boxes
+* stronger LONG vs SHORT differentiation
+* improved spacing
+* more cinematic chart movement
+* more “live hedge fund workstation” feel
+
+DO NOT build a separate user dashboard yet.
+
+We are refining the operator command center first.
