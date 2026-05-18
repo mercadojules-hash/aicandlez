@@ -1,0 +1,124 @@
+We are now past the UI phase. The remaining issue is backend Kraken account hydration/authentication.
+
+CURRENT STATE
+
+The dashboard correctly:
+
+* shows Kraken selected
+* removed paper trading
+* removed Alpaca simulation leak
+* defaults execution to HALTED/red
+* enforces 80% confidence floor
+
+BUT:
+MY LIVE KRAKEN ACCOUNT still shows $0.00.
+
+This means:
+
+* frontend is waiting for verified live broker telemetry
+* Kraken private account data is NOT successfully returning
+
+We need to fully debug Kraken authenticated account connectivity.
+
+REQUIRED ACTIONS
+
+1. VERIFY ENV VARIABLES AT RUNTIME
+
+Confirm api-server can actually read:
+
+KRAKEN_API_KEY
+KRAKEN_API_SECRET
+
+Add startup logs:
+
+* "Kraken key loaded: YES/NO"
+* "Kraken secret loaded: YES/NO"
+
+DO NOT print actual secrets.
+
+2. VERIFY PRIVATE KRAKEN AUTH
+
+Add explicit logs for:
+
+* signature generation
+* nonce creation
+* authenticated request success/failure
+* HTTP response codes
+* Kraken error arrays
+
+I need to know if:
+
+* auth is failing
+* permissions are insufficient
+* requests are malformed
+* nonce is invalid
+* signature is invalid
+
+3. TEST PRIVATE ENDPOINTS DIRECTLY
+
+Explicitly test:
+
+* Balance
+* OpenPositions
+* OpenOrders
+* TradeBalance
+
+Log raw payloads.
+
+4. VERIFY API KEY PERMISSIONS
+
+Kraken API key must support:
+
+* Query Funds
+* Query Open Orders
+* Query Closed Orders
+* Query Open Positions
+* Query Ledger Entries
+
+If permissions are missing:
+surface explicit warning in logs.
+
+5. REMOVE SILENT FAILURES
+
+Currently the dashboard silently falls back to $0.00.
+
+Instead:
+
+* if auth fails
+* if permissions fail
+* if telemetry fails
+
+show:
+"KRAKEN AUTH FAILED"
+or
+"KRAKEN ACCOUNT TELEMETRY UNAVAILABLE"
+
+in the account panel.
+
+6. VERIFY TELEMETRY PIPELINE
+
+Audit:
+
+* KrakenExchangeAdapter
+* getBalance()
+* getTradeBalance()
+* websocket hydration
+* polling refresh
+* account state reducer
+* React Query hydration
+* Zustand exchange state
+
+7. FINAL EXPECTED RESULT
+
+Once fixed:
+MY LIVE KRAKEN ACCOUNT should display:
+
+* real USD balance (~$100)
+* real equity
+* real positions
+* real PnL
+
+No placeholders.
+No fallback zeros unless broker truly returns zero.
+
+We are now debugging REAL authenticated broker connectivity only.

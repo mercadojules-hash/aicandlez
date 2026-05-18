@@ -101,6 +101,7 @@ let _simBalances: Balances = { ...PAPER_BALANCES };
 
 function isExchangeConfigured(exchange: string): boolean {
   const ex = exchange.toLowerCase().replace(/[\s._-]/g, "");
+  if (ex === "kraken")                        return !!(process.env["KRAKEN_API_KEY"]    && process.env["KRAKEN_API_SECRET"]);
   if (ex === "binance" || ex === "binanceus") return !!(process.env["BINANCE_API_KEY"]   && process.env["BINANCE_API_SECRET"]);
   if (ex === "coinbase")                      return !!(process.env["COINBASE_API_KEY"]  && process.env["COINBASE_API_SECRET"]);
   if (ex === "cryptocom" || ex === "cryptocomdotcom" || ex === "cryptodotcom") {
@@ -112,7 +113,7 @@ function isExchangeConfigured(exchange: string): boolean {
 }
 
 export function getConfiguredExchanges(): string[] {
-  return (["Binance", "Coinbase", "CryptoDotCom", "Gemini", "Alpaca"] as const)
+  return (["Kraken", "Binance", "Coinbase", "CryptoDotCom", "Gemini", "Alpaca"] as const)
     .filter(e => isExchangeConfigured(e));
 }
 
@@ -129,6 +130,25 @@ function isLiveCapable(): boolean {
 // ── Live balances ─────────────────────────────────────────────────────────────
 
 export async function fetchLiveBalances(): Promise<Balances> {
+  if (_selectedExchange === "Kraken") {
+    if (!isExchangeConfigured("Kraken")) {
+      throw new Error("Kraken API credentials are not configured (KRAKEN_API_KEY / KRAKEN_API_SECRET missing)");
+    }
+    const { KrakenAdapter, KRAKEN_CONFIG } = await import("../services/exchanges/adapters/KrakenAdapter.js");
+    const adapter = new KrakenAdapter({
+      ...KRAKEN_CONFIG,
+      apiKey:    process.env["KRAKEN_API_KEY"],
+      apiSecret: process.env["KRAKEN_API_SECRET"],
+    });
+    const account = await adapter.getAccount();
+    return {
+      USD: account.balances["USD"]?.total ?? 0,
+      BTC: account.balances["BTC"]?.total ?? 0,
+      ETH: account.balances["ETH"]?.total ?? 0,
+      SOL: account.balances["SOL"]?.total ?? 0,
+    };
+  }
+
   if (_selectedExchange === "Coinbase") {
     if (!isExchangeConfigured("Coinbase")) throw new Error("Coinbase API keys not configured");
     const adapter = new CoinbaseAdapter();

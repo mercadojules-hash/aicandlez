@@ -32,6 +32,8 @@ export function LiveAccountPanel({ engine, exchangeStatus, liveBalance, trades }
   // anything else, regardless of what the backend's stale exchangeName says.
   const isLive   = (exchangeStatus?.mode === "kraken")
                    && (liveBalance?.source === "live");
+  const isError  = liveBalance?.source === "error";
+  const errorMsg = liveBalance?.error;
   const exchange = "KRAKEN";
 
   // Balance: ONLY trust the broker feed when we know it's actually live
@@ -132,13 +134,13 @@ export function LiveAccountPanel({ engine, exchangeStatus, liveBalance, trades }
           </span>
           <span className="text-[8px] font-bold tracking-[0.18em] px-1.5 py-0.5 rounded"
             style={{
-              color: isLive ? N.LONG : N.WARN,
-              border: `1px solid ${isLive ? N.LONG : N.WARN}50`,
-              background: isLive ? `${N.LONG}12` : `${N.WARN}10`,
-              boxShadow:  isLive ? `0 0 8px ${N.LONG}40` : "none",
+              color: isLive ? N.LONG : isError ? N.SHORT : N.WARN,
+              border: `1px solid ${(isLive ? N.LONG : isError ? N.SHORT : N.WARN)}50`,
+              background: isLive ? `${N.LONG}12` : isError ? `${N.SHORT}12` : `${N.WARN}10`,
+              boxShadow:  isLive ? `0 0 8px ${N.LONG}40` : isError ? `0 0 8px ${N.SHORT}40` : "none",
               fontFamily: N.FONT_MONO,
             }}>
-            {isLive ? "● LIVE" : "○ STANDBY"}
+            {isLive ? "● LIVE" : isError ? "▲ KRAKEN AUTH FAILED" : "○ STANDBY"}
           </span>
         </div>
         <div className="flex items-center gap-2 text-[8.5px] tracking-[0.18em] font-semibold"
@@ -151,6 +153,20 @@ export function LiveAccountPanel({ engine, exchangeStatus, liveBalance, trades }
         </div>
       </div>
 
+      {isError && (
+        <div style={{
+          background: `${N.SHORT}10`,
+          border: `1px solid ${N.SHORT}40`,
+          borderRadius: 3,
+          padding: "6px 10px",
+          marginBottom: 8,
+          fontFamily: N.FONT_MONO,
+          color: N.SHORT,
+        }} className="text-[9.5px] font-bold tracking-[0.18em]">
+          ▲ KRAKEN ACCOUNT TELEMETRY UNAVAILABLE — {errorMsg ?? "auth failed"}
+        </div>
+      )}
+
       {/* Body — 3 columns: balance hero · stats grid · equity curve */}
       <div style={{ display: "grid", gridTemplateColumns: "260px 1fr 320px", gap: 14 }}>
 
@@ -158,7 +174,7 @@ export function LiveAccountPanel({ engine, exchangeStatus, liveBalance, trades }
         <div style={{
           background: "#000",
           border: `1px solid ${N.BORDER}`,
-          borderLeft: `3px solid ${isLive ? N.BRAND : N.WARN}`,
+          borderLeft: `3px solid ${isLive ? N.BRAND : isError ? N.SHORT : N.WARN}`,
           borderRadius: 3,
           padding: "8px 12px",
           display: "flex",

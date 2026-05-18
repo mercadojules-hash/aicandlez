@@ -34,18 +34,22 @@ router.get("/exchange/orders", (_req, res) => {
 });
 
 // ── Balances (live or sim) ────────────────────────────────────────────────────
-router.get("/exchange/balances", async (_req, res) => {
+router.get("/exchange/balances", async (req, res) => {
   const status = getExchangeStatus();
+  const zero = { USD: 0, BTC: 0, ETH: 0, SOL: 0 };
   if (status.mode === "live" && status.apiConfigured) {
     try {
       const balances = await fetchLiveBalances();
-      res.json({ source: "live", balances });
+      res.json({ source: "live", balances, exchange: status.exchangeName });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      res.status(502).json({ error: msg });
+      req.log.error({ err, exchange: status.exchangeName }, "fetchLiveBalances failed");
+      // 200 with explicit error source so the operator panel can render
+      // "KRAKEN AUTH FAILED" instead of silently falling back to $0.
+      res.json({ source: "error", balances: zero, exchange: status.exchangeName, error: msg });
     }
   } else {
-    res.json({ source: "simulation", balances: status.simBalances });
+    res.json({ source: "simulation", balances: status.simBalances, exchange: status.exchangeName });
   }
 });
 

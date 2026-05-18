@@ -97,6 +97,19 @@ process.on("unhandledRejection", (reason) => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 server.listen(finalPort, async () => {
   logger.info({ port: finalPort }, "API server listening");
+  // Boot diagnostics — exchange env presence (booleans only, never log secrets)
+  logger.info({
+    EXCHANGE_LIVE_ENABLED: process.env["EXCHANGE_LIVE_ENABLED"] === "true",
+    KRAKEN_API_KEY:        !!process.env["KRAKEN_API_KEY"],
+    KRAKEN_API_SECRET:     !!process.env["KRAKEN_API_SECRET"],
+    BINANCE_API_KEY:       !!process.env["BINANCE_API_KEY"],
+    COINBASE_API_KEY:      !!process.env["COINBASE_API_KEY"],
+  }, "Exchange credentials check");
+  if (!process.env["KRAKEN_API_KEY"] || !process.env["KRAKEN_API_SECRET"]) {
+    logger.warn("Kraken API credentials missing — LIVE mode will fail for Kraken");
+  } else {
+    logger.info("Kraken API credentials loaded");
+  }
   startTradingLoop();
   await initStripe();
 });

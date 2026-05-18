@@ -44,9 +44,19 @@ const router = Router();
 // If keys are not present, adapters operate in simulation mode.
 
 function bootstrapAdapters(): void {
+  // Inject env-based credentials into Kraken so the registry-resident
+  // instance can authenticate against private endpoints. Other adapters
+  // remain in simulation mode until per-user vault credentials are loaded.
+  const krakenKey    = process.env["KRAKEN_API_KEY"];
+  const krakenSecret = process.env["KRAKEN_API_SECRET"];
+  console.info({
+    KRAKEN_API_KEY:    !!krakenKey,
+    KRAKEN_API_SECRET: !!krakenSecret,
+  }, "[adapters] bootstrap — Kraken credential presence");
+
   const adapters = [
     // Live
-    new KrakenAdapter(KRAKEN_CONFIG),
+    new KrakenAdapter({ ...KRAKEN_CONFIG, apiKey: krakenKey, apiSecret: krakenSecret }),
     new AlpacaAdapter(ALPACA_CONFIG),
     new BinanceAdapter(BINANCE_CONFIG),
     new CoinbaseAdapter(COINBASE_CONFIG),

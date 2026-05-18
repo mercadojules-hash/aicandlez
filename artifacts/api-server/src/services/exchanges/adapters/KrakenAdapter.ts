@@ -139,16 +139,16 @@ export class KrakenAdapter extends BaseExchangeAdapter {
 
   async getAccount(): Promise<StandardAccount> {
     if (!this.isConfigured()) {
-      return {
-        exchange: "Kraken", balances: {}, totalEquityUSD: 0,
-        positions: [], lastUpdated: Date.now(),
-      };
+      console.warn("[Kraken] getAccount called but adapter not configured (apiKey/apiSecret missing)");
+      throw new Error("Kraken adapter not configured: apiKey/apiSecret missing");
     }
     this.checkRequestRateLimit();
+    console.info("[Kraken] getAccount → POST /0/private/Balance");
     const raw = await this.withRetry(
       () => this.krakenPrivate<Record<string, string>>("Balance"),
       3, 500, "getAccount",
     );
+    console.info({ assetCount: Object.keys(raw).length }, "[Kraken] Balance response OK");
     const balances: Record<string, AssetBalance> = {};
     let usd = 0;
     for (const [k, v] of Object.entries(raw)) {
@@ -267,6 +267,11 @@ export class KrakenAdapter extends BaseExchangeAdapter {
     const body  = new URLSearchParams({ nonce, ...params }).toString();
     const sign  = this.krakenSign(path, body, nonce);
 
+    console.info({
+      endpoint, nonce,
+      keyLen: key.length, signLen: sign.length, bodyLen: body.length,
+    }, "[Kraken] private request signed");
+
     return new Promise((resolve, reject) => {
       const req = https.request(
         {
@@ -283,13 +288,26 @@ export class KrakenAdapter extends BaseExchangeAdapter {
           res.on("end", () => {
             try {
               const parsed = JSON.parse(data) as { error: string[]; result: T };
-              if (parsed.error?.length) reject(new Error(parsed.error.join(", ")));
-              else resolve(parsed.result);
-            } catch { reject(new Error("Kraken: parse failed")); }
+              if (parsed.error?.length) {
+                console.error({
+                  endpoint, status: res.statusCode, errors: parsed.error,
+                }, "[Kraken] API returned error array");
+                reject(new Error(`Kraken ${endpoint}: ${parsed.error.join(", ")}`));
+              } else {
+                console.info({ endpoint, status: res.statusCode }, "[Kraken] private response OK");
+                resolve(parsed.result);
+              }
+            } catch (e) {
+              console.error({ endpoint, status: res.statusCode, raw: data.slice(0, 200) }, "[Kraken] parse failed");
+              reject(new Error(`Kraken ${endpoint}: parse failed (HTTP ${res.statusCode})`));
+            }
           });
         }
       );
-      req.on("error", reject);
+      req.on("error", (e) => {
+        console.error({ endpoint, err: e.message }, "[Kraken] HTTPS request error");
+        reject(e);
+      });
       req.write(body);
       req.end();
     });

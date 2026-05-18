@@ -114,13 +114,15 @@ export interface ExchangeStatus {
 }
 
 export interface LiveBalance {
-  source:   "live" | "simulation";
-  balances: {
+  source:    "live" | "simulation" | "error";
+  balances:  {
     USD: number;
     BTC: number;
     ETH: number;
     SOL: number;
   };
+  exchange?: string;
+  error?:    string;
 }
 
 export interface FeeSummary {
