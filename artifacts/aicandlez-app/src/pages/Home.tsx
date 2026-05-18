@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
-import aicandlezLogo from "@assets/AICandlez_Final_Logo_3_1778962760188.png";
+import aicandlezLogo from "../assets/aicandlez-logo.png";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
 import {
   api,

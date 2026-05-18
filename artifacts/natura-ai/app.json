@@ -15,8 +15,8 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.naturaai.app",
-      "buildNumber": "3",
+      "bundleIdentifier": "com.aicandlez.app",
+      "buildNumber": "1",
       "infoPlist": {
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
         "NSPhotoLibraryUsageDescription": "Allow AICandlez to access your photo library for your profile picture.",
@@ -24,6 +24,8 @@
       }
     },
     "android": {
+      "package": "com.aicandlez.app",
+      "versionCode": 1,
       "backgroundColor": "#000000",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
