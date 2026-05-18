@@ -44,6 +44,7 @@ import Account from "@/pages/Account";
 import Leaderboard from "@/pages/Leaderboard";
 import AlertsPage from "@/pages/Alerts";
 import DesktopTerminal from "@/pages/DesktopTerminal";
+import InstitutionalTerminal from "@/pages/InstitutionalTerminal";
 
 // ── Env ───────────────────────────────────────────────────────────────────────
 
@@ -337,6 +338,9 @@ function Router() {
       </Route>
       <Route path="/desktop">
         <Protected><DesktopTerminal /></Protected>
+      </Route>
+      <Route path="/institutional">
+        <Protected><InstitutionalTerminal /></Protected>
       </Route>
       {PENDING_PATHS.map((path) => (
         <Route key={path} path={path}>

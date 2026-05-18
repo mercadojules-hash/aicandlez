@@ -40,6 +40,7 @@ import {
   X,
   Monitor,
   Zap,
+  Crosshair,
 } from "lucide-react";
 
 export const MODULE_LIST = [
@@ -63,6 +64,7 @@ export const MODULE_LIST = [
   { id: 18, path: "/charts",      icon: BarChart2,         label: "Multi-Asset Chart",   group: "TRADE", status: "active",  sublabel: "BTC/ETH/SOL side-by-side, EMA9/21"  },
   { id: 19, path: "/command",     icon: Cpu,               label: "Command Center",      group: "SYS",   status: "active",  sublabel: "Unified one-screen trading view"    },
   { id: 20, path: "/desktop",     icon: Monitor,           label: "Desktop Terminal",    group: "SYS",   status: "active",  sublabel: "Power-user multi-panel trading view"},
+  { id: 21, path: "/institutional", icon: Crosshair,       label: "Institutional Terminal", group: "SYS", status: "active", sublabel: "Bloomberg-grade AI command center" },
 ];
 
 /* Group accent colors */

@@ -1,0 +1,264 @@
+DESKTOP / WEB PLATFORM — INSTITUTIONAL AI TERMINAL PHASE
+
+We are now beginning the AIcandlez Desktop/Web Institutional Trading Platform.
+
+This is NOT a redesign of the mobile app.
+
+The desktop platform should feel like:
+
+* Bloomberg Terminal
+* TradingView Pro
+* Institutional AI Command Center
+* Black + neon-green cinematic AI environment
+
+Use the attached reference image as the PRIMARY visual direction reference.
+
+==================================================
+DESKTOP PLATFORM CORE LAYOUT
+============================
+
+The mobile design language is APPROVED.
+
+Scale the same visual system into a widescreen desktop institutional layout.
+
+Keep:
+
+* black interiors
+* neon green highlights
+* AI confidence rings
+* dense data presentation
+* premium fintech atmosphere
+* cinematic glow
+* institutional spacing
+* compact data density
+
+DO NOT introduce:
+
+* bright cyan
+* arcade UI
+* oversized padding
+* flat SaaS cards
+* generic dashboard layouts
+
+==================================================
+MAIN DESKTOP STRUCTURE
+======================
+
+# TOP SECTION:
+
+The very top of the desktop platform should contain:
+
+1. LIVE BLOOMBERG-STYLE CHART ZONE
+
+* Multiple live charts
+* AI scanner overlays
+* Heatmaps
+* Market radar diagrams
+* Circular AI scanner charts
+* Sector rotation visuals
+* Momentum diagrams
+* Confidence distribution charts
+* Volatility maps
+* Market breadth indicators
+
+This top section should feel:
+“institutional AI command center”
+
+NOT:
+simple retail trading app.
+
+Suggested structure:
+
+* large hero chart left
+* smaller analytics widgets right
+* floating market diagrams
+* live activity indicators
+* AI scanner pulse effects
+
+==================================================
+MIDDLE SECTION
+==============
+
+Under the charts/analytics area:
+
+Create TWO large independent sections:
+
+---
+
+LEFT:
+LIVE ACTIVE TRADES
+------------------
+
+Shows:
+
+* current open positions
+* live AI executions
+* real-time PnL
+* AI confidence
+* asset
+* entry
+* TP
+* SL
+* AI reasoning tags
+* execution timestamps
+
+Show up to:
+15 active trades visible.
+
+This section MUST:
+
+* have its own independent scroll
+* remain fixed-height
+* feel like a live execution feed
+
+---
+
+RIGHT:
+TRADE HISTORY
+-------------
+
+Shows:
+
+* closed trades
+* realized profit/loss
+* execution quality
+* AI confidence at execution
+* duration
+* win/loss outcome
+* timestamps
+* AI trade classification
+
+Show:
+15+ rows visible.
+
+Must:
+
+* have its own independent scroll
+* feel like institutional execution history
+
+==================================================
+BOTTOM SECTION
+==============
+
+At the bottom:
+
+ONLY TWO MAIN SIGNAL COLUMNS
+(NOT THREE)
+
+---
+
+LEFT COLUMN:
+TOP CRYPTO SIGNALS
+------------------
+
+Show:
+Top 25+ crypto assets ranked by:
+
+* AI confidence
+* momentum
+* scanner weighting
+* volatility opportunity
+* AI scoring
+
+Same visual design language as mobile Signals page:
+
+* confidence rings
+* entry / TP / SL
+* BUY / SELL / AI AUTO TRADE
+* live sparklines
+* dense compact cards
+
+Independent scroll section.
+
+---
+
+RIGHT COLUMN:
+TOP EQUITIES / STOCK SIGNALS
+----------------------------
+
+Show:
+Top 25+ equities ranked by:
+
+* AI confidence
+* momentum
+* scanner weighting
+* institutional activity
+* AI scoring
+
+Same exact signal-card language as mobile.
+
+Independent scroll section.
+
+==================================================
+IMPORTANT DESKTOP RULES
+=======================
+
+1. EVERY major section must scroll independently:
+
+* charts section
+* active trades
+* trade history
+* crypto signals
+* equities signals
+
+2. Each section should feel:
+   alive
+   real-time
+   dense
+   institutional
+
+3. The desktop version should feel dramatically more powerful than mobile.
+
+Mobile = companion AI trader
+Desktop = institutional AI command center
+
+==================================================
+ADVANCED DESKTOP FEATURES
+=========================
+
+Future-ready layout placeholders for:
+
+* Forex
+* Commodities
+* Multi-monitor layouts
+* AI market scanner matrix
+* Correlation engine
+* AI volatility radar
+* Sector intelligence
+* AI execution terminal
+* Portfolio heatmaps
+* AI trade stream
+* Exchange routing
+* Risk engine panel
+
+==================================================
+VISUAL REFERENCES
+=================
+
+Use the attached image as the direct visual inspiration reference.
+
+The desktop platform should look like:
+“the full institutional version of that design.”
+
+==================================================
+DO NOT
+======
+
+Do NOT:
+
+* redesign branding
+* change the AI identity
+* flatten the UI
+* simplify the signal cards
+* remove neon cinematic atmosphere
+* convert it into a generic admin dashboard
+
+==================================================
+GOAL
+====
+
+The desktop platform should feel like:
+
+“An institutional AI trading terminal used by a hedge fund powered entirely by AI.”
+
+This is the next major platform phase after the now-frozen mobile production build.
