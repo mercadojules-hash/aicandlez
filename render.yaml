@@ -64,7 +64,6 @@ services:
   - type: web
     name: aicandlez-dashboard
     env: static
-    region: oregon
     plan: starter
     buildCommand: >
       pnpm install --frozen-lockfile &&
@@ -104,7 +103,6 @@ services:
   - type: web
     name: aicandlez-app
     env: static
-    region: oregon
     plan: starter
     buildCommand: >
       pnpm install --frozen-lockfile &&
@@ -139,7 +137,6 @@ services:
   - type: web
     name: aicandlez-landing
     env: static
-    region: oregon
     plan: starter
     buildCommand: >
       pnpm install --frozen-lockfile &&
