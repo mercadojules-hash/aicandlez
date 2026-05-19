@@ -4,7 +4,7 @@ services:
     name: aicandlez-api
     env: node
     region: oregon
-    plan: starter
+    plan: free
     buildCommand: >
       pnpm install --frozen-lockfile &&
       pnpm run typecheck:libs &&
@@ -154,6 +154,6 @@ services:
 
 databases:
   - name: aicandlez-db
-    plan: basic-256mb
+    plan: free
     region: oregon
     databaseName: aicandlez
