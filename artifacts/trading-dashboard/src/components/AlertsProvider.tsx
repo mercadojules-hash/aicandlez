@@ -2,6 +2,7 @@ import {
   createContext, useContext, useState, useEffect, useRef, useCallback,
 } from "react";
 import { useAuth } from "@clerk/react";
+import { useLocation } from "wouter";
 import { TrendingUp, TrendingDown, Zap, CheckCircle2, X, Volume2, VolumeX } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -225,6 +226,12 @@ interface EngineStatus {
 
 export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const { getToken, isSignedIn } = useAuth();
+
+  // Hide all operator/debug chrome (LIVE/POLL websocket pip, sound toggle,
+  // alert toasts) on the customer portal — those are operator surfaces and
+  // must never appear in the production customer experience.
+  const [pathname] = useLocation();
+  const isPortal = pathname === "/portal" || pathname.startsWith("/portal/");
 
   const [alerts,       setAlerts]       = useState<Alert[]>([]);
   const [tradeFlash,   setTradeFlash]   = useState<TradeFlash | null>(null);
@@ -493,37 +500,42 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Toast stack — fixed top-right */}
-      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none w-[320px] max-w-[calc(100vw-2rem)]">
-        <div className="pointer-events-auto flex justify-end items-center gap-2 mb-1">
-          <WsIndicator connected={wsConnected} />
-          {alerts.length > 0 && (
-            <button
-              onClick={toggleSound}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-card border border-border/40 text-muted-foreground hover:text-foreground transition-colors shadow-lg"
-            >
-              {soundEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
-              {soundEnabled ? "Sound ON" : "Sound OFF"}
-            </button>
-          )}
-        </div>
-        {alerts.map((a) => (
-          <AlertToast key={a.id} alert={a} onDismiss={() => dismiss(a.id)} />
-        ))}
-      </div>
+      {/* Operator chrome — toasts, WS pip, sound toggle. Hidden on /portal. */}
+      {!isPortal && (
+        <>
+          {/* Toast stack — fixed top-right */}
+          <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none w-[320px] max-w-[calc(100vw-2rem)]">
+            <div className="pointer-events-auto flex justify-end items-center gap-2 mb-1">
+              <WsIndicator connected={wsConnected} />
+              {alerts.length > 0 && (
+                <button
+                  onClick={toggleSound}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-card border border-border/40 text-muted-foreground hover:text-foreground transition-colors shadow-lg"
+                >
+                  {soundEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
+                  {soundEnabled ? "Sound ON" : "Sound OFF"}
+                </button>
+              )}
+            </div>
+            {alerts.map((a) => (
+              <AlertToast key={a.id} alert={a} onDismiss={() => dismiss(a.id)} />
+            ))}
+          </div>
 
-      {/* Persistent sound toggle — always visible in corner when no alerts */}
-      {alerts.length === 0 && (
-        <div className="fixed bottom-20 right-4 z-[9998] flex flex-col gap-2 items-end">
-          <WsIndicator connected={wsConnected} />
-          <button
-            onClick={toggleSound}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold bg-card/80 backdrop-blur border border-border/30 text-muted-foreground/60 hover:text-muted-foreground transition-colors shadow"
-            title={soundEnabled ? "Sound alerts ON — click to mute" : "Sound alerts OFF — click to enable"}
-          >
-            {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-          </button>
-        </div>
+          {/* Persistent sound toggle — always visible in corner when no alerts */}
+          {alerts.length === 0 && (
+            <div className="fixed bottom-20 right-4 z-[9998] flex flex-col gap-2 items-end">
+              <WsIndicator connected={wsConnected} />
+              <button
+                onClick={toggleSound}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold bg-card/80 backdrop-blur border border-border/30 text-muted-foreground/60 hover:text-muted-foreground transition-colors shadow"
+                title={soundEnabled ? "Sound alerts ON — click to mute" : "Sound alerts OFF — click to enable"}
+              >
+                {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </Ctx.Provider>
   );

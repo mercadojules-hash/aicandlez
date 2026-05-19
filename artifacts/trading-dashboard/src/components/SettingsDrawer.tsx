@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import {
   Settings2, X, Zap, ShieldAlert, DollarSign, Repeat2,
   CheckCircle2, Loader2, AlertTriangle, SlidersHorizontal,
@@ -116,6 +117,11 @@ function TradeCapSelector({ value, onChange }: {
 // ── Main drawer ───────────────────────────────────────────────────────────────
 
 export function SettingsDrawer() {
+  // Operator-only widget — never render on the customer portal.
+  // (Hook must be called before any conditional early-return below.)
+  const [pathname] = useLocation();
+  const hideForPortal = pathname === "/portal" || pathname.startsWith("/portal/");
+
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -182,6 +188,8 @@ export function SettingsDrawer() {
   }, [open]);
 
   const risk = riskLabel(settings.minConfidence ?? 80);
+
+  if (hideForPortal) return null;
 
   return (
     <>
