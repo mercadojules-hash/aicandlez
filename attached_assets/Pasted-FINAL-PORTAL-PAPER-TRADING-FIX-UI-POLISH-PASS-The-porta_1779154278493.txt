@@ -1,0 +1,225 @@
+FINAL PORTAL / PAPER-TRADING FIX + UI POLISH PASS
+
+The portal is getting close, but there are still two major issues before launch:
+
+====================================================
+
+1. PAPER TRADING IS NOT FUNCTIONAL
+   ====================================================
+
+Current issue:
+
+* Clicking BUY or SELL does nothing visually.
+* Assets are NOT being added to:
+  • LIVE TRADES
+  • TRADE HISTORY
+* No simulated execution feedback exists.
+* The user cannot tell whether a paper trade was accepted.
+
+This is a critical launch blocker.
+
+---
+
+## REQUIRED PAPER-TRADING FLOW
+
+When a BUY or SELL button is clicked:
+
+1. Immediately animate the button:
+
+   * pulse glow,
+   * loading flash,
+   * execution effect.
+
+2. Create a simulated trade object.
+
+3. Add the asset instantly to:
+   • LIVE TRADES panel
+   • TRADE HISTORY panel
+
+4. Show:
+
+   * symbol,
+   * LONG or SHORT,
+   * entry price,
+   * simulated quantity,
+   * timestamp,
+   * unrealized P/L,
+   * execution status.
+
+5. LIVE TRADES must:
+
+   * update dynamically,
+   * fluctuate subtly,
+   * show active positions,
+   * feel real-time.
+
+6. TRADE HISTORY must:
+
+   * populate completed trades,
+   * include green/red P/L,
+   * show timestamps,
+   * maintain institutional trading aesthetic.
+
+7. Add simulated execution notifications:
+   Examples:
+
+   * “AI LONG EXECUTED — ETH”
+   * “SHORT POSITION OPENED — TSLA”
+   * “TARGET HIT +2.4%”
+   * “STOP LOSS TRIGGERED”
+
+These should:
+
+* appear subtly,
+* fade naturally,
+* feel Bloomberg/hedge-fund quality,
+* NOT arcade/game style.
+
+====================================================
+2. AI INTELLIGENCE CENTER UI NEEDS REFINEMENT
+=============================================
+
+The current AI Intelligence Center is MUCH better,
+but several widgets still look:
+
+* fake,
+* decorative,
+* non-data-driven.
+
+The FIRST TWO widgets are PERFECT:
+• AI Radar
+• AI Confidence
+
+Those are the correct direction.
+
+---
+
+## AI CONFIDENCE CHANGE
+
+The AI Confidence widget is the MOST important visual.
+
+Move it to FIRST position.
+
+Make it:
+
+* larger,
+* inside a perfect 1:1 square,
+* more dominant,
+* visually premium.
+
+This should become:
+
+* the centerpiece metric,
+* the emotional trust indicator,
+* the “AI brain” of the platform.
+
+People want to instantly see:
+
+* AI confidence,
+* AI strength,
+* AI conviction.
+
+Make it feel:
+
+* institutional,
+* intelligent,
+* alive,
+* cinematic,
+* data-driven.
+
+---
+
+## ALL TOP WIDGETS RULE
+
+Every telemetry widget across the row should:
+
+• fit into balanced 1:1 square cards
+• feel modular
+• look like real quant telemetry
+• move subtly
+• feel information-dense
+• NOT feel fake or randomly generated
+
+The current fake-looking widgets should be replaced with more believable institutional telemetry.
+
+====================================================
+3. USE THE “AWESOME UI” STYLE REFERENCE
+=======================================
+
+I attached another UI inspiration image.
+
+Use it ONLY as inspiration for:
+
+* motion language,
+* telemetry density,
+* futuristic realism,
+* chart sophistication,
+* modular widget structure.
+
+DO NOT:
+
+* copy neon cyan/pink colors,
+* make it arcade-like,
+* oversaturate glow.
+
+KEEP:
+
+* AICandlez green palette,
+* black hedge-fund interiors,
+* premium SaaS aesthetic,
+* restrained motion.
+
+====================================================
+4. VISUAL GOAL
+==============
+
+The portal should feel like:
+
+* an active AI trading intelligence system,
+* a professional quant platform,
+* a living execution engine,
+* a premium institutional dashboard.
+
+The UI should feel:
+
+* intelligent,
+* expensive,
+* cinematic,
+* alive,
+* trustworthy.
+
+NOT:
+
+* game UI,
+* fake futuristic art,
+* random motion graphics,
+* decorative widgets without meaning.
+
+Every moving element should imply:
+
+* scanning,
+* ranking,
+* execution,
+* AI reasoning,
+* market intelligence.
+
+====================================================
+5. FINAL IMPORTANT DETAIL
+=========================
+
+Preserve:
+
+* performance,
+* spacing,
+* typography hierarchy,
+* readability,
+* subtle animation restraint.
+
+This must still feel:
+
+* hedge fund,
+* Bloomberg-grade,
+* institutional,
+* premium SaaS.
+
+NOT crypto casino.

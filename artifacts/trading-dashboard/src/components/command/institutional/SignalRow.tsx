@@ -9,13 +9,15 @@
  * SHORT rows have a thick red left bar + tinted red background.
  */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Line, LineChart, ResponsiveContainer, YAxis } from "recharts";
 import { Zap } from "lucide-react";
 import type { SymBreakdown } from "../types";
 import type { TickerSpec, SignalType } from "./tickers";
 import { useLiveCandles } from "./useLiveCandles";
 import { N } from "./theme";
+import { usePaperTrades } from "@/hooks/usePaperTrades";
+import { toast } from "@/hooks/use-toast";
 
 function fmt(n: number): string {
   if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -89,6 +91,33 @@ export function SignalRow({ spec, breakdown }: Props) {
 
   const dirColor   = direction === "LONG" ? N.LONG : N.SHORT;
   const dirGlow    = direction === "LONG" ? N.LONG_GLOW : N.SHORT_GLOW;
+
+  // ── Paper trade integration ─────────────────────────────────────────────
+  const { openTrade } = usePaperTrades();
+
+  const fireTrade = (side: "LONG" | "SHORT") => {
+    if (!entry || entry <= 0) {
+      toast({
+        title: "MARKET FEED WARMING UP",
+        description: `${spec.display} — waiting for live price`,
+      });
+      return;
+    }
+    const sl = side === "LONG" ? entry * 0.98  : entry * 1.02;
+    const tp = side === "LONG" ? entry * 1.045 : entry * 0.955;
+    openTrade({
+      symbol:  spec.symbol,
+      display: spec.display,
+      side,
+      entry,
+      stop:    sl,
+      target:  tp,
+    });
+    toast({
+      title: `${side === "LONG" ? "AI LONG EXECUTED" : "SHORT POSITION OPENED"} — ${spec.label}`,
+      description: `Entry $${fmt(entry)} · TP $${fmt(tp)} · SL $${fmt(sl)} · AI ${conf}%`,
+    });
+  };
   const change24hPos = change24h >= 0;
   const confColor  = conf >= 78 ? N.BRAND : conf >= 62 ? N.BRAND_DEEP : N.WARN;
 
@@ -199,9 +228,19 @@ export function SignalRow({ spec, breakdown }: Props) {
         </div>
         {/* line 2 — BUY · SELL · AI Auto-Trade aligned right */}
         <div className="flex items-center gap-1.5 justify-end">
-          <ActionPill label="BUY"  color={N.LONG}  active={direction === "LONG"} />
-          <ActionPill label="SELL" color={N.SHORT} active={direction === "SHORT"} />
-          <AutoTradeBtn confident={conf >= 78} />
+          <ActionPill
+            label="BUY"
+            color={N.LONG}
+            active={direction === "LONG"}
+            onClick={() => fireTrade("LONG")}
+          />
+          <ActionPill
+            label="SELL"
+            color={N.SHORT}
+            active={direction === "SHORT"}
+            onClick={() => fireTrade("SHORT")}
+          />
+          <AutoTradeBtn confident={conf >= 78} onClick={() => fireTrade(direction)} />
         </div>
       </div>
 
@@ -261,45 +300,81 @@ function DataCell({ label, value, color }: { label: string; value: string; color
   );
 }
 
-function ActionPill({ label, color, active }: { label: string; color: string; active: boolean }) {
+function ActionPill({
+  label, color, active, onClick,
+}: { label: string; color: string; active: boolean; onClick?: () => void }) {
+  const [flashing, setFlashing] = useState(false);
+  const handle = () => {
+    setFlashing(true);
+    onClick?.();
+    setTimeout(() => setFlashing(false), 480);
+  };
   return (
     <button
+      onClick={handle}
       className="text-[9px] font-extrabold tracking-[0.2em] px-2 py-1 rounded transition-all"
       style={{
-        color,
-        background: active ? `${color}1f` : "transparent",
-        border:     `1px solid ${active ? color + "80" : color + "30"}`,
-        boxShadow:  active ? `0 0 8px ${color}50` : "none",
+        color: flashing ? "#000" : color,
+        background: flashing ? color : active ? `${color}1f` : "transparent",
+        border:     `1px solid ${active || flashing ? color : color + "30"}`,
+        boxShadow:  flashing
+          ? `0 0 0 2px ${color}60, 0 0 18px ${color}cc`
+          : active ? `0 0 8px ${color}50` : "none",
         fontFamily: N.FONT_MONO,
+        transform: flashing ? "scale(0.96)" : "scale(1)",
       }}
-      onMouseEnter={e => { e.currentTarget.style.background = `${color}28`;
-                           e.currentTarget.style.boxShadow  = `0 0 10px ${color}60`; }}
-      onMouseLeave={e => { e.currentTarget.style.background = active ? `${color}1f` : "transparent";
-                           e.currentTarget.style.boxShadow  = active ? `0 0 8px ${color}50` : "none"; }}
+      onMouseEnter={e => {
+        if (flashing) return;
+        e.currentTarget.style.background = `${color}28`;
+        e.currentTarget.style.boxShadow  = `0 0 10px ${color}60`;
+      }}
+      onMouseLeave={e => {
+        if (flashing) return;
+        e.currentTarget.style.background = active ? `${color}1f` : "transparent";
+        e.currentTarget.style.boxShadow  = active ? `0 0 8px ${color}50` : "none";
+      }}
     >
-      {label}
+      {flashing ? "● EXEC" : label}
     </button>
   );
 }
 
-function AutoTradeBtn({ confident }: { confident: boolean }) {
+function AutoTradeBtn({ confident, onClick }: { confident: boolean; onClick?: () => void }) {
+  const [flashing, setFlashing] = useState(false);
+  const handle = () => {
+    setFlashing(true);
+    onClick?.();
+    setTimeout(() => setFlashing(false), 520);
+  };
   return (
     <button
+      onClick={handle}
       title="AI Auto Trade"
       className="flex items-center justify-center rounded transition-all"
       style={{
         width: 28, height: 28,
-        background: confident ? `${N.BRAND}1c` : "transparent",
-        border:     `1px solid ${confident ? N.BRAND + "70" : N.BRAND + "28"}`,
-        boxShadow:  confident ? `0 0 10px ${N.BRAND}50` : "none",
-        color:      confident ? N.BRAND : N.TEXT_3,
+        background: flashing
+          ? N.BRAND
+          : confident ? `${N.BRAND}1c` : "transparent",
+        border:     `1px solid ${flashing ? N.BRAND : confident ? N.BRAND + "70" : N.BRAND + "28"}`,
+        boxShadow:  flashing
+          ? `0 0 0 2px ${N.BRAND}60, 0 0 18px ${N.BRAND}cc`
+          : confident ? `0 0 10px ${N.BRAND}50` : "none",
+        color: flashing ? "#000" : confident ? N.BRAND : N.TEXT_3,
+        transform: flashing ? "scale(0.93)" : "scale(1)",
       }}
-      onMouseEnter={e => { e.currentTarget.style.background = `${N.BRAND}28`;
-                           e.currentTarget.style.boxShadow  = `0 0 12px ${N.BRAND}70`;
-                           e.currentTarget.style.color      = N.BRAND; }}
-      onMouseLeave={e => { e.currentTarget.style.background = confident ? `${N.BRAND}1c` : "transparent";
-                           e.currentTarget.style.boxShadow  = confident ? `0 0 10px ${N.BRAND}50` : "none";
-                           e.currentTarget.style.color      = confident ? N.BRAND : N.TEXT_3; }}
+      onMouseEnter={e => {
+        if (flashing) return;
+        e.currentTarget.style.background = `${N.BRAND}28`;
+        e.currentTarget.style.boxShadow  = `0 0 12px ${N.BRAND}70`;
+        e.currentTarget.style.color      = N.BRAND;
+      }}
+      onMouseLeave={e => {
+        if (flashing) return;
+        e.currentTarget.style.background = confident ? `${N.BRAND}1c` : "transparent";
+        e.currentTarget.style.boxShadow  = confident ? `0 0 10px ${N.BRAND}50` : "none";
+        e.currentTarget.style.color      = confident ? N.BRAND : N.TEXT_3;
+      }}
     >
       <Zap className="w-3.5 h-3.5" />
     </button>

@@ -19,11 +19,11 @@
 //   • Active Trades · Trade History · Subscription · AI Auto Trade Queue
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useUser, useClerk, useAuth } from "@clerk/react";
 import { useQuery } from "@tanstack/react-query";
-import { Lock, Zap } from "lucide-react";
+import { Lock, X, Zap } from "lucide-react";
 
 import { useUserRole } from "@/hooks/useUserRole";
 import {
@@ -34,6 +34,14 @@ import {
 } from "@/components/command/institutional";
 import { N } from "@/components/command/institutional/theme";
 import type { EngineStatus } from "@/components/command/types";
+import {
+  PaperTradesProvider,
+  usePaperTrades,
+  fmtMoney,
+  fmtQty,
+  fmtTime,
+} from "@/hooks/usePaperTrades";
+import { toast } from "@/hooks/use-toast";
 
 const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -1119,27 +1127,202 @@ function Row({ left, right, color = N.TEXT_0, sub }: {
   );
 }
 
-// ── Synthetic data (replaced by /api when live keys land) ────────────────────
-const ACTIVE_TRADES = [
-  { sym: "BTC/USD",  side: "LONG",  pnl: "+$248.14", up: true,  sub: "Entry 67,420.00 · 0.0150 BTC" },
-  { sym: "ETH/USD",  side: "LONG",  pnl: "+$54.92",  up: true,  sub: "Entry 3,240.50 · 0.4000 ETH" },
-  { sym: "SOL/USD",  side: "SHORT", pnl: "-$12.40",  up: false, sub: "Entry 182.10 · 2.5000 SOL" },
-];
-const TRADE_HISTORY = [
-  { sym: "BTC/USD", pnl: "+$420.00", up: true,  sub: "Closed · 18:02 · LONG" },
-  { sym: "ETH/USD", pnl: "+$112.50", up: true,  sub: "Closed · 14:38 · LONG" },
-  { sym: "AVAX/USD", pnl: "-$48.20", up: false, sub: "Closed · 11:15 · LONG" },
-  { sym: "DOGE/USD", pnl: "+$22.80", up: true,  sub: "Closed · 09:50 · LONG" },
-  { sym: "ADA/USD",  pnl: "+$8.40",  up: true,  sub: "Closed · 08:12 · LONG" },
-];
 const QUEUE = [
   { sym: "BTC/USD", side: "BUY", conf: "84%", state: "QUEUED · executes when slot frees" },
   { sym: "ETH/USD", side: "BUY", conf: "78%", state: "QUEUED · awaiting confirmation" },
   { sym: "ADA/USD", side: "BUY", conf: "71%", state: "QUEUED · capacity limit reached" },
 ];
 
+// ── Live paper-trade panels ─────────────────────────────────────────────────
+
+function ActiveTradesPanel({ onUpgrade }: { onUpgrade: () => void }) {
+  const { open, closeTrade } = usePaperTrades();
+  return (
+    <Panel title="LIVE TRADES" locked={false} onUnlock={onUpgrade}>
+      {open.length === 0 ? (
+        <div style={{
+          padding: "18px 4px", fontSize: 10, lineHeight: 1.6,
+          color: N.TEXT_2, letterSpacing: "0.10em",
+        }}>
+          No open positions. Click <b style={{ color: N.LONG }}>BUY</b> or{" "}
+          <b style={{ color: N.SHORT }}>SELL</b> on any signal above to open
+          a simulated trade. Positions appear here in real time and walk live
+          P/L until TP / SL is hit.
+        </div>
+      ) : open.map((t) => {
+        const color = t.pnl >= 0 ? N.LONG : N.SHORT;
+        return (
+          <div key={t.id} style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "8px 0",
+            borderBottom: `1px solid ${N.BORDER}`,
+            fontSize: 11,
+          }}>
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <span style={{ color: N.TEXT_0, fontWeight: 700 }}>
+                {t.display}{"  "}
+                <span style={{
+                  color: t.side === "LONG" ? N.LONG : N.SHORT,
+                  fontWeight: 800, letterSpacing: "0.16em", fontSize: 9,
+                  marginLeft: 4,
+                }}>{t.side}</span>
+              </span>
+              <span style={{ color: N.TEXT_2, fontSize: 9, marginTop: 2, letterSpacing: "0.04em" }}>
+                Entry ${t.entry.toFixed(t.entry >= 100 ? 2 : 4)} · {fmtQty(t.qty)} · {fmtTime(t.openedAt)}
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                <span style={{
+                  color, fontWeight: 800, fontVariantNumeric: "tabular-nums",
+                  textShadow: `0 0 6px ${color}40`,
+                }}>
+                  {fmtMoney(t.pnl)}
+                </span>
+                <span style={{
+                  color, fontSize: 9, fontWeight: 700,
+                  fontVariantNumeric: "tabular-nums",
+                }}>
+                  {t.pnlPct >= 0 ? "+" : ""}{t.pnlPct.toFixed(2)}%
+                </span>
+              </div>
+              <button
+                onClick={() => closeTrade(t.id, "MANUAL")}
+                title="Close position"
+                aria-label={`Close ${t.display} position`}
+                style={{
+                  width: 22, height: 22, borderRadius: 3,
+                  background: "transparent",
+                  border: `1px solid ${N.BORDER_HI}`,
+                  color: N.TEXT_2,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "all 140ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = N.SHORT;
+                  e.currentTarget.style.color       = N.SHORT;
+                  e.currentTarget.style.background  = `${N.SHORT}10`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = N.BORDER_HI;
+                  e.currentTarget.style.color       = N.TEXT_2;
+                  e.currentTarget.style.background  = "transparent";
+                }}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </Panel>
+  );
+}
+
+function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
+  const { history } = usePaperTrades();
+  // Toast on every new auto-close (TP / SL) so the feedback feels institutional.
+  const lastSeenRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (history.length === 0) return;
+    const newest = history[0];
+    if (lastSeenRef.current === newest.id) return;
+    // Skip the very first toast on mount
+    if (lastSeenRef.current !== null) {
+      if (newest.reason === "TP") {
+        toast({
+          title: `TARGET HIT ${newest.pnlPct >= 0 ? "+" : ""}${newest.pnlPct.toFixed(2)}% — ${newest.display}`,
+          description: `${newest.side} closed at $${newest.exit.toFixed(newest.exit >= 100 ? 2 : 4)} · ${fmtMoney(newest.pnl)} realized`,
+        });
+      } else if (newest.reason === "SL") {
+        toast({
+          title: `STOP LOSS TRIGGERED — ${newest.display}`,
+          description: `${newest.side} closed at $${newest.exit.toFixed(newest.exit >= 100 ? 2 : 4)} · ${fmtMoney(newest.pnl)} realized`,
+        });
+      } else {
+        toast({
+          title: `POSITION CLOSED — ${newest.display}`,
+          description: `${newest.side} · ${fmtMoney(newest.pnl)} realized`,
+        });
+      }
+    }
+    lastSeenRef.current = newest.id;
+  }, [history]);
+
+  return (
+    <Panel title="TRADE HISTORY" locked={false} onUnlock={onUpgrade}>
+      {history.length === 0 ? (
+        <div style={{
+          padding: "18px 4px", fontSize: 10, lineHeight: 1.6,
+          color: N.TEXT_2, letterSpacing: "0.10em",
+        }}>
+          Closed positions land here with realized P/L, exit reason and
+          timestamp. Open a paper trade above to populate this feed.
+        </div>
+      ) : history.map((t) => {
+        const color = t.pnl >= 0 ? N.LONG : N.SHORT;
+        const tag = t.reason === "TP" ? "TP HIT" : t.reason === "SL" ? "SL HIT" : "CLOSED";
+        const tagColor = t.reason === "TP" ? N.LONG : t.reason === "SL" ? N.SHORT : N.TEXT_2;
+        return (
+          <div key={t.id} style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "8px 0",
+            borderBottom: `1px solid ${N.BORDER}`,
+            fontSize: 11,
+          }}>
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <span style={{ color: N.TEXT_0, fontWeight: 700 }}>
+                {t.display}{"  "}
+                <span style={{
+                  color: t.side === "LONG" ? N.LONG : N.SHORT,
+                  fontWeight: 800, letterSpacing: "0.16em", fontSize: 9,
+                  marginLeft: 4,
+                }}>{t.side}</span>
+                <span style={{
+                  color: tagColor,
+                  fontWeight: 800, letterSpacing: "0.16em", fontSize: 8,
+                  marginLeft: 6,
+                  padding: "1px 5px",
+                  border: `1px solid ${tagColor}40`,
+                  borderRadius: 2,
+                }}>{tag}</span>
+              </span>
+              <span style={{ color: N.TEXT_2, fontSize: 9, marginTop: 2, letterSpacing: "0.04em" }}>
+                Exit ${t.exit.toFixed(t.exit >= 100 ? 2 : 4)} · {fmtTime(t.closedAt)}
+              </span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <span style={{
+                color, fontWeight: 800, fontVariantNumeric: "tabular-nums",
+                textShadow: `0 0 6px ${color}40`,
+              }}>
+                {fmtMoney(t.pnl)}
+              </span>
+              <span style={{
+                color, fontSize: 9, fontWeight: 700,
+                fontVariantNumeric: "tabular-nums",
+              }}>
+                {t.pnlPct >= 0 ? "+" : ""}{t.pnlPct.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </Panel>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function Portal() {
+  return (
+    <PaperTradesProvider>
+      <PortalInner />
+    </PaperTradesProvider>
+  );
+}
+
+function PortalInner() {
   const { isAdmin } = useUserRole();
   const { getToken, isSignedIn } = useAuth();
   const [tier, setTier] = useState<Plan>("free");
@@ -1257,19 +1440,9 @@ export default function Portal() {
         gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
         gap: 10,
       }}>
-        <Panel title="ACTIVE TRADES" locked={tier === "free"} onUnlock={() => setUpgradeOpen(true)}>
-          {ACTIVE_TRADES.map((t) => (
-            <Row key={t.sym} left={`${t.sym}  ${t.side}`} right={t.pnl}
-                 color={t.up ? N.LONG : N.SHORT} sub={t.sub} />
-          ))}
-        </Panel>
+        <ActiveTradesPanel onUpgrade={() => setUpgradeOpen(true)} />
 
-        <Panel title="TRADE HISTORY" locked={tier === "free"} onUnlock={() => setUpgradeOpen(true)}>
-          {TRADE_HISTORY.map((t, i) => (
-            <Row key={`${t.sym}-${i}`} left={t.sym} right={t.pnl}
-                 color={t.up ? N.LONG : N.SHORT} sub={t.sub} />
-          ))}
-        </Panel>
+        <TradeHistoryPanel onUpgrade={() => setUpgradeOpen(true)} />
 
         <Panel title="SUBSCRIPTION STATUS">
           <Row left="Current Plan"    right={tier.toUpperCase()} color={N.BRAND} />
