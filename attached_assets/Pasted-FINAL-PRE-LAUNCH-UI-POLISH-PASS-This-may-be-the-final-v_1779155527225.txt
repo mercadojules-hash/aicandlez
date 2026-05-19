@@ -1,0 +1,153 @@
+FINAL PRE-LAUNCH UI POLISH PASS
+
+This may be the final visual refinement before we push AICandlez live.
+
+The new telemetry section is MUCH closer to the correct direction, but the 6 UI containers still need final alignment/polish work so they feel unified and institutional.
+
+====================================================
+
+1. ALL 6 UI CONTAINERS MUST ALIGN PERFECTLY
+   ====================================================
+
+The entire AI Intelligence Center row needs:
+
+* perfect vertical alignment,
+* perfect horizontal spacing,
+* consistent sizing,
+* balanced centering,
+* unified visual rhythm.
+
+Right now some widgets feel slightly:
+
+* off-center,
+* compressed,
+* misaligned,
+* inconsistent in internal spacing.
+
+ALL six widgets should:
+
+* fit perfectly inside their containers,
+* feel mathematically aligned,
+* look engineered,
+* feel like one cohesive telemetry system.
+
+Think:
+Bloomberg terminal precision.
+
+====================================================
+2. AI CONFIDENCE CONTAINER
+==========================
+
+Simplify the AI Confidence widget.
+
+REMOVE:
+
+* extra labels,
+* extra telemetry text,
+* unnecessary internal UI.
+
+KEEP ONLY:
+
+* the confidence number,
+* the animated confidence ring.
+
+That container should become:
+
+* ultra-clean,
+* premium,
+* dominant,
+* minimalist,
+* elegant.
+
+The circle + number alone already looks powerful.
+
+No clutter needed.
+
+====================================================
+3. AI RADAR CONTAINER
+=====================
+
+The AI Radar itself needs to be perfectly centered.
+
+Currently it feels slightly offset inside the card.
+
+Please:
+
+* center the radar exactly,
+* vertically and horizontally,
+* with equal spacing around it.
+
+The radar should feel:
+
+* balanced,
+* intentional,
+* cinematic,
+* precise.
+
+====================================================
+4. MAINTAIN UNIFIED MOTION LANGUAGE
+===================================
+
+All six telemetry cards should animate:
+
+* subtly,
+* consistently,
+* smoothly,
+* at similar pacing.
+
+No widget should feel:
+
+* louder,
+* jittery,
+* cramped,
+* oversized,
+* disconnected from the others.
+
+Everything should move like:
+a synchronized institutional AI system.
+
+====================================================
+5. RESTORE THE AICANDLEZ USER DASHBOARD TO PREVIEW
+==================================================
+
+I lost access to the AICandlez User Dashboard preview after upgrading the membership.
+
+Please restore the User Dashboard preview back into Preview mode so I can continue testing:
+
+* paper trading,
+* trade execution,
+* user flow,
+* subscriptions,
+* live telemetry,
+* dashboard responsiveness,
+* upgrade funnels.
+
+I need the full user dashboard accessible again in Preview before launch.
+
+====================================================
+6. FINAL GOAL
+=============
+
+At this point the platform should feel:
+
+* institutional,
+* premium,
+* AI-driven,
+* cinematic,
+* intelligent,
+* trustworthy,
+* conversion-ready.
+
+The UI now needs FINAL precision polishing —
+not redesigns.
+
+This is now about:
+
+* spacing,
+* alignment,
+* restraint,
+* telemetry realism,
+* execution feel,
+* and professional finish quality.
+
+We are extremely close.
