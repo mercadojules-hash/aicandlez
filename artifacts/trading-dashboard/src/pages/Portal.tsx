@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { useUser, useClerk } from "@clerk/react";
+import { useUser, useClerk, useAuth } from "@clerk/react";
 import { useQuery } from "@tanstack/react-query";
 import { Lock, Zap } from "lucide-react";
 
@@ -256,6 +256,7 @@ function AccountModal({
 }) {
   const { user } = useUser();
   const { signOut } = useClerk();
+  const { getToken } = useAuth();
   const email = user?.primaryEmailAddress?.emailAddress ?? "—";
   const name  = user?.fullName || user?.firstName || user?.username || "Account";
 
@@ -271,9 +272,13 @@ function AccountModal({
 
   const openPortal = async () => {
     try {
+      const token = await getToken().catch(() => null);
       const res = await fetch(`${basePath}/api/billing/portal`, {
         method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
       });
       if (!res.ok) return;
       const data = (await res.json()) as { url?: string };
@@ -759,6 +764,7 @@ function LiveExecutionBar({
 // plan id and immediately redirects to the Stripe Checkout session URL — no
 // intermediate /billing page, no alternate route, no legacy handler.
 function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { getToken, isSignedIn } = useAuth();
   const [pending, setPending] = useState<"starter" | "pro" | null>(null);
   const [error,   setError]   = useState<string | null>(null);
 
@@ -769,21 +775,40 @@ function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => void })
     setPending(planId);
     setError(null);
     try {
+      if (!isSignedIn) {
+        setError("Please sign in to upgrade your plan.");
+        setPending(null);
+        return;
+      }
+      // Cross-site iframes can drop the Clerk session cookie, so we always
+      // attach a fresh Bearer token (same pattern the WebSocket + Desktop
+      // Terminal use). The api-server's clerkMiddleware accepts both.
+      const token = await getToken().catch(() => null);
       const res = await fetch(`${basePath}/api/billing/checkout`, {
         method:      "POST",
         credentials: "include",
-        headers:     { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body:        JSON.stringify({ planId }),
       });
-      const data = (await res.json()) as { url?: string; error?: string };
-      if (data.url) {
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (res.ok && data.url) {
         window.location.href = data.url;
         return;
       }
-      setError(data.error ?? "Could not start checkout. Please try again.");
+      const friendly =
+        res.status === 401 ? "Your session expired. Please sign in again to continue."
+        : res.status === 403 ? "Your account does not have permission to upgrade."
+        : res.status === 429 ? "Too many attempts — please wait a moment and try again."
+        : data.error
+          ? `Stripe checkout could not start — ${data.error}.`
+          : `Stripe checkout could not start (HTTP ${res.status}). Please try again.`;
+      setError(friendly);
       setPending(null);
     } catch {
-      setError("Network error. Please try again.");
+      setError("Network error. Check your connection and try again.");
       setPending(null);
     }
   };
@@ -1115,17 +1140,21 @@ const QUEUE = [
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function Portal() {
   const { isAdmin } = useUserRole();
+  const { getToken, isSignedIn } = useAuth();
   const [tier, setTier] = useState<Plan>("free");
   const [upgradeOpen,    setUpgradeOpen]    = useState(false);
   const [accountOpen,    setAccountOpen]    = useState(false);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
 
   useEffect(() => {
+    if (!isSignedIn) return;
     let cancelled = false;
     (async () => {
       try {
+        const token = await getToken().catch(() => null);
         const res = await fetch(`${basePath}/api/billing/subscription`, {
           credentials: "include",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (!res.ok) return;
         const data = (await res.json()) as { plan?: string };
@@ -1135,7 +1164,7 @@ export default function Portal() {
       } catch { /* keep default */ }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [isSignedIn, getToken]);
 
   // Live engine status drives the signal panels + heartbeat.
   const { data: engine } = useQuery({
@@ -1249,9 +1278,13 @@ export default function Portal() {
               <button
                 onClick={async () => {
                   try {
+                    const token = await getToken().catch(() => null);
                     const res = await fetch(`${basePath}/api/billing/portal`, {
                       method: "POST", credentials: "include",
-                      headers: { "Content-Type": "application/json" },
+                      headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                      },
                     });
                     if (!res.ok) return;
                     const data = (await res.json()) as { url?: string };

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useAuth } from "@clerk/react";
 import {
   Check, CreditCard, Loader2, Sparkles, Zap, Building2,
   ChevronRight, Star, AlertTriangle, ExternalLink,
@@ -157,6 +158,15 @@ function PlanCard({
 // ── Main Billing Page ─────────────────────────────────────────────────────────
 
 export default function Billing() {
+  const { getToken, isSignedIn } = useAuth();
+  const authHeader = async (): Promise<Record<string, string>> => {
+    try {
+      const t = await getToken();
+      return t ? { Authorization: `Bearer ${t}` } : {};
+    } catch {
+      return {};
+    }
+  };
   const [plans,        setPlans]        = useState<Plan[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [billing,      setBilling]      = useState<"monthly" | "yearly">("monthly");
@@ -180,7 +190,10 @@ export default function Billing() {
 
   async function loadPlans() {
     try {
-      const r    = await fetch("/api/billing/plans");
+      const r    = await fetch("/api/billing/plans", {
+        credentials: "include",
+        headers: await authHeader(),
+      });
       const data = await r.json() as { plans?: Plan[] };
       if (data.plans) setPlans(data.plans);
     } catch {
@@ -189,8 +202,12 @@ export default function Billing() {
   }
 
   async function loadSubscription() {
+    if (!isSignedIn) return;
     try {
-      const r    = await fetch("/api/billing/subscription");
+      const r    = await fetch("/api/billing/subscription", {
+        credentials: "include",
+        headers: await authHeader(),
+      });
       const data = await r.json() as Subscription & { error?: string };
       if (!data.error) setSubscription(data);
     } catch { /* ignore */ }
@@ -201,15 +218,20 @@ export default function Billing() {
     setError(null);
     try {
       const r    = await fetch("/api/billing/checkout", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ priceId }),
+        method:      "POST",
+        credentials: "include",
+        headers:     { "Content-Type": "application/json", ...(await authHeader()) },
+        body:        JSON.stringify({ priceId }),
       });
       const data = await r.json() as { url?: string; error?: string };
-      if (data.url) {
+      if (r.ok && data.url) {
         window.location.href = data.url;
       } else {
-        setError(data.error ?? "Failed to create checkout session");
+        const friendly =
+          r.status === 401 ? "Your session expired. Please sign in again to continue."
+          : r.status === 429 ? "Too many attempts — please wait a moment and try again."
+          : data.error ?? `Failed to create checkout session (HTTP ${r.status})`;
+        setError(friendly);
       }
     } catch {
       setError("Network error. Please try again.");
@@ -221,12 +243,19 @@ export default function Billing() {
   async function handlePortal() {
     setLoadingPlan("portal");
     try {
-      const r    = await fetch("/api/billing/portal", { method: "POST" });
+      const r    = await fetch("/api/billing/portal", {
+        method:      "POST",
+        credentials: "include",
+        headers:     { "Content-Type": "application/json", ...(await authHeader()) },
+      });
       const data = await r.json() as { url?: string; error?: string };
-      if (data.url) {
+      if (r.ok && data.url) {
         window.location.href = data.url;
       } else {
-        setError(data.error ?? "Failed to open billing portal");
+        const friendly =
+          r.status === 401 ? "Your session expired. Please sign in again to continue."
+          : data.error ?? `Failed to open billing portal (HTTP ${r.status})`;
+        setError(friendly);
       }
     } catch {
       setError("Network error. Please try again.");
