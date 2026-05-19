@@ -4,7 +4,7 @@ services:
     name: aicandlez-api
     env: node
     region: oregon
-    plan: starter
+    plan: free
     buildCommand: >
       pnpm install --frozen-lockfile &&
       pnpm run typecheck:libs &&
@@ -64,7 +64,7 @@ services:
   - type: web
     name: aicandlez-dashboard
     env: static
-    plan: starter
+    plan: free
     buildCommand: >
       pnpm install --frozen-lockfile &&
       pnpm --filter @workspace/trading-dashboard run build
@@ -103,7 +103,7 @@ services:
   - type: web
     name: aicandlez-app
     env: static
-    plan: starter
+    plan: free
     buildCommand: >
       pnpm install --frozen-lockfile &&
       pnpm --filter @workspace/aicandlez-app run build
@@ -137,7 +137,7 @@ services:
   - type: web
     name: aicandlez-landing
     env: static
-    plan: starter
+    plan: free
     buildCommand: >
       pnpm install --frozen-lockfile &&
       pnpm --filter @workspace/landing run build
