@@ -1,0 +1,35 @@
+I have to be straightforward with you here, because doing this wrong would actually hurt your launch.
+
+I can't configure your DNS records for you. DNS is managed at your domain registrar (GoDaddy, Namecheap, Cloudflare, Route 53, whoever holds aicandlez.com) — not inside the Replit workspace. There's no API or tool I can call from here that reaches into your DNS provider's zone file. Even if I tried to "configure" them in code, it would be theater — the actual records have to be added in your registrar's dashboard by you (or by me if you give me access, which I'm not asking for).
+
+Same for the certificate side: SSL issuance for clerk.aicandlez.com and accounts.aicandlez.com happens automatically inside Clerk once the CNAMEs resolve. There's nothing in the codebase to change for that.
+
+Here's what you actually need to do — it takes about 5 minutes:
+
+Open your DNS provider for aicandlez.com.
+Add the exact records Clerk gave you in the attachment you mentioned. The standard set Clerk requires is:
+CNAME clerk → frontend-api.clerk.services (or the host Clerk shows you)
+CNAME accounts → accounts.clerk.services
+CNAME clk._domainkey → dkim1.<...>.clerk.services (DKIM #1)
+CNAME clk2._domainkey → dkim2.<...>.clerk.services (DKIM #2)
+CNAME clkmail → mail.<...>.clerk.services (mail return-path)
+Use the exact target values from your Clerk dashboard's "Domains" page — the suffixes are unique per Clerk app. Don't trust generic examples (including mine).
+TTL: leave at default (Auto / 3600 is fine).
+Proxy / orange-cloud (Cloudflare users only): make sure each Clerk CNAME is DNS-only / grey-cloud. Cloudflare's proxy breaks Clerk's edge TLS handshake.
+Save. Clerk's dashboard will start polling and flip each record from "Pending" to "Verified" within minutes (sometimes up to an hour for DKIM).
+SSL issues automatically once verified — no action needed on your side.
+Once Clerk shows all five records verified, tell me and I'll do the actual workspace-side production wiring, which is the part that legitimately belongs to me:
+
+Confirm CLERK_SECRET_KEY_LIVE and VITE_CLERK_PUBLISHABLE_KEY_LIVE are set as production secrets (they are listed in your available secrets — good).
+Verify render.yaml / deploy config uses the _LIVE variants in production and the test keys in preview.
+Confirm the Clerk SDK in the dashboard, app, and landing artifacts reads the live publishable key in production builds.
+Verify the clerkProxyMiddleware (production-only, per your README) routes correctly against clerk.aicandlez.com.
+Confirm cookie domain settings allow the session cookie to be shared across app.aicandlez.com and aicandlez.com (parent-domain cookie, Secure, HttpOnly, SameSite=Lax).
+Sanity-check that no production sign-in/sign-up route hardcodes the test instance hostname.
+I will not touch the trading engine, AI Intelligence Center, telemetry, or UI/UX — agreed.
+
+Two clarifying things I need from you before the next step:
+
+Who hosts your DNS? (Cloudflare changes the Cloudflare-proxy guidance above; Route 53 / GoDaddy / Namecheap do not.)
+The Clerk attachment you mentioned didn't actually come through — the message only contained the canvas context, no file. If you paste the five DNS rows Clerk is showing you (just the Host / Type / Value columns), I can sanity-check them against the standard Clerk schema before you add them, so you don't waste a verification cycle on a typo.
+Once the records are live and Clerk shows green, ping me and I'll run the production auth wiring + cookie/session verification pass.
