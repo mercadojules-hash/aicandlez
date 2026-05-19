@@ -11,7 +11,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { Bitcoin, BarChart3, TrendingUp, TrendingDown } from "lucide-react";
+import { Bitcoin, BarChart3, TrendingUp, TrendingDown, Search } from "lucide-react";
 import type { EngineStatus, SymBreakdown } from "../types";
 import type { TickerSpec } from "./tickers";
 import { CRYPTO_20, EQUITIES_20 } from "./tickers";
@@ -21,31 +21,51 @@ import { N } from "./theme";
 type Filter = "ALL" | "LONG" | "SHORT";
 
 interface PanelProps {
-  label:    string;
-  sub:      string;
-  icon:     React.ReactNode;
-  brand:    string;
-  tickers:  TickerSpec[];
-  engine?:  EngineStatus;
+  label:             string;
+  sub:               string;
+  icon:              React.ReactNode;
+  brand:             string;
+  tickers:           TickerSpec[];
+  engine?:           EngineStatus;
+  searchPlaceholder: string;
 }
 
-function SignalsPanel({ label, sub, icon, brand, tickers, engine }: PanelProps) {
+function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlaceholder }: PanelProps) {
   const [filter, setFilter] = useState<Filter>("ALL");
+  const [query,  setQuery]  = useState("");
+  const [focused, setFocused] = useState(false);
 
   const breakdowns = engine?.symbolBreakdowns ?? {};
 
   const classified = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const matches = (t: TickerSpec) =>
+      !q ||
+      t.symbol.toLowerCase().includes(q) ||
+      t.label.toLowerCase().includes(q) ||
+      t.display.toLowerCase().includes(q) ||
+      (t.sector?.toLowerCase().includes(q) ?? false);
+
     const longs:  Array<{ spec: TickerSpec; breakdown?: SymBreakdown }> = [];
     const shorts: Array<{ spec: TickerSpec; breakdown?: SymBreakdown }> = [];
     for (const t of tickers) {
+      if (!matches(t)) continue;
       const b = breakdowns[t.symbol];
       if (resolveDirection(t.symbol, b) === "LONG") longs.push({ spec: t, breakdown: b });
       else                                          shorts.push({ spec: t, breakdown: b });
     }
     return { longs, shorts };
-  }, [tickers, breakdowns]);
+  }, [tickers, breakdowns, query]);
 
   const counts = { l: classified.longs.length, s: classified.shorts.length };
+  const totalVisible = counts.l + counts.s;
+  // Empty-state should also fire when the active filter tab hides all rows
+  // (e.g. user searches for a LONG-only symbol while the SHORT tab is active).
+  const visibleInTab =
+    filter === "LONG"  ? counts.l :
+    filter === "SHORT" ? counts.s :
+    totalVisible;
+  const emptyState = query && visibleInTab === 0;
 
   return (
     <div
@@ -88,8 +108,115 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine }: PanelProps) 
         </div>
       </header>
 
+      {/* Search bar — Bloomberg-style compact live filter */}
+      <div
+        style={{
+          padding: "8px 10px",
+          borderBottom: `1px solid ${N.BORDER}`,
+          background: N.BG,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 10px",
+            background: N.SURFACE_2,
+            border: `1px solid ${focused ? brand : N.BORDER_HI}`,
+            borderRadius: 4,
+            transition: "border-color 180ms ease, box-shadow 180ms ease",
+            boxShadow: focused
+              ? `0 0 0 1px ${brand}40, 0 0 12px ${brand}30`
+              : "none",
+          }}
+        >
+          <Search
+            className="w-3 h-3"
+            style={{
+              color: focused ? brand : N.TEXT_2,
+              filter: focused ? `drop-shadow(0 0 4px ${brand}90)` : "none",
+              transition: "color 180ms ease, filter 180ms ease",
+              flexShrink: 0,
+            }}
+          />
+          <input
+            type="search"
+            value={query}
+            placeholder={searchPlaceholder}
+            aria-label={searchPlaceholder}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            spellCheck={false}
+            autoComplete="off"
+            style={{
+              flex: 1,
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              color: N.TEXT_0,
+              fontFamily: N.FONT_MONO,
+              fontSize: 11,
+              letterSpacing: "0.06em",
+              fontWeight: 600,
+              padding: 0,
+              minWidth: 0,
+            }}
+          />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: N.TEXT_2,
+                cursor: "pointer",
+                fontSize: 11,
+                fontWeight: 800,
+                padding: "0 4px",
+                fontFamily: N.FONT_MONO,
+                letterSpacing: "0.10em",
+              }}
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          )}
+          <span
+            style={{
+              fontSize: 8.5, fontWeight: 700,
+              letterSpacing: "0.16em",
+              color: query ? brand : N.TEXT_3,
+              flexShrink: 0,
+            }}
+          >
+            {query ? `${totalVisible} MATCH` : `${tickers.length} TRACKED`}
+          </span>
+        </div>
+      </div>
+
       {/* Rows — grouped LONG → SHORT for ALL view */}
       <div className="blotter-scroll" style={{ maxHeight: 940 }}>
+        {emptyState && (
+          <div style={{
+            padding: "20px 12px",
+            textAlign: "center",
+            color: N.TEXT_2,
+            fontSize: 10,
+            letterSpacing: "0.18em",
+            fontWeight: 700,
+            fontFamily: N.FONT_MONO,
+          }}>
+            {totalVisible === 0
+              ? `NO MATCH FOR "${query.toUpperCase()}"`
+              : `NO ${filter} MATCH FOR "${query.toUpperCase()}" · ${totalVisible} IN OTHER DIRECTION`}
+          </div>
+        )}
         {(filter === "ALL" || filter === "LONG") && classified.longs.length > 0 && (
           <>
             <GroupDivider label="LONG SETUPS"  count={classified.longs.length}  color={N.LONG}  icon={<TrendingUp   className="w-3 h-3" />} />
@@ -164,6 +291,7 @@ export function CryptoSignalsPanel({ engine }: { engine?: EngineStatus }) {
       brand={N.BRAND}
       tickers={CRYPTO_20}
       engine={engine}
+      searchPlaceholder="Search Crypto Assets…"
     />
   );
 }
@@ -177,6 +305,7 @@ export function EquitySignalsPanel({ engine }: { engine?: EngineStatus }) {
       brand={N.BRAND_BRT}
       tickers={EQUITIES_20}
       engine={engine}
+      searchPlaceholder="Search Equities…"
     />
   );
 }

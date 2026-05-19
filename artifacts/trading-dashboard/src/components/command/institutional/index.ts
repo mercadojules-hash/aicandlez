@@ -2,6 +2,7 @@ export { CommandBar }        from "./CommandBar";
 export { PlatformOverview }  from "./PlatformOverview";
 export { LiveAccountPanel }  from "./LiveAccountPanel";
 export { MarketHeartbeat }   from "./MarketHeartbeat";
+export { AIWarRoom }         from "./AIWarRoom";
 export { PositionsRow }      from "./PositionsRow";
 export { LiveControlBar }    from "./LiveControlBar";
 export { SignalsRow, CryptoSignalsPanel, EquitySignalsPanel } from "./SignalsRow";

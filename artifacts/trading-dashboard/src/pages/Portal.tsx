@@ -30,6 +30,7 @@ import {
   MarketHeartbeat,
   CryptoSignalsPanel,
   EquitySignalsPanel,
+  AIWarRoom,
 } from "@/components/command/institutional";
 import { N } from "@/components/command/institutional/theme";
 import type { EngineStatus } from "@/components/command/types";
@@ -1223,8 +1224,13 @@ export default function Portal() {
         <MetricTile label="EQUITY"           value="$101,284.42" demo />
       </div>
 
-      {/* Live cross-asset heartbeat (institutional row) */}
+      {/* AI Intelligence Center — radar + diverse live telemetry */}
       <div style={{ padding: "16px 16px 0" }}>
+        <AIWarRoom />
+      </div>
+
+      {/* Live cross-asset heartbeat (institutional row) */}
+      <div style={{ padding: "12px 16px 0" }}>
         <MarketHeartbeat />
       </div>
 

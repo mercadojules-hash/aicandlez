@@ -1,0 +1,146 @@
+UI / UX ENHANCEMENT PASS — LIVE PORTAL VISUAL UPGRADE
+
+The portal is getting very close visually, but I want one more institutional UI enhancement pass before public launch.
+
+Reference direction:
+
+* Bloomberg terminal
+* TradingView
+* AI command center
+* futuristic quant dashboard
+* cinematic live trading interface
+
+I attached a UI inspiration image for chart diversity and layout energy.
+
+---
+
+1. ADD SEARCH BARS UNDER BOTH SIGNAL PANELS
+
+---
+
+Under:
+• Top 20 Crypto Signals
+• Top 20 Equity Signals
+
+add compact live-search bars.
+
+Requirements:
+
+* Crypto panel:
+  “Search Crypto Assets…”
+* Equity panel:
+  “Search Equities…”
+
+Behavior:
+
+* live filtering while typing,
+* no reload,
+* instant filtering,
+* preserve LONG/SHORT grouping.
+
+Design:
+
+* compact Bloomberg-style input,
+* subtle green glow border,
+* animated focus pulse,
+* dark neon institutional aesthetic.
+
+---
+
+2. ADD MORE CHART VARIETY ACROSS THE TOP
+
+---
+
+The current charts are good, but visually too repetitive.
+
+I want the top chart region to feel more like:
+
+* a professional AI trading war-room,
+* multi-source market telemetry,
+* dynamic intelligence dashboard.
+
+Please introduce more chart diversity across the top row.
+
+Examples:
+
+* radial AI chart,
+* hex/radar chart,
+* circular market sentiment meter,
+* animated volatility gauge,
+* mini heat-map,
+* order-flow pulse graph,
+* momentum oscillator,
+* rotating AI confidence dial,
+* dynamic ring chart,
+* spectrum scanner visualization.
+
+Keep them:
+
+* lightweight,
+* animated,
+* live-feeling,
+* neon institutional style,
+* NOT cartoonish.
+
+---
+
+3. ADD THE APP RADAR VISUAL
+
+---
+
+I want the radar visualization from the mobile app integrated into the portal.
+
+Placement:
+
+* left side of the top chart region,
+* small-medium size,
+* with several different live micro-charts extending horizontally beside it.
+
+Goal:
+
+* create a more cinematic AI intelligence center aesthetic,
+* similar to institutional hedge-fund systems,
+* where multiple telemetry systems are operating simultaneously.
+
+---
+
+4. IMPORTANT DESIGN RULES
+
+---
+
+DO NOT:
+
+* clutter the UI,
+* oversaturate with glow,
+* use overly thick lines,
+* make charts feel arcade-like.
+
+DO:
+
+* preserve the premium hedge-fund aesthetic,
+* maintain dark black interiors,
+* use subtle motion,
+* use intelligent spacing,
+* use high-end typography hierarchy,
+* keep everything feeling expensive and institutional.
+
+---
+
+5. LIVE FEEL REQUIREMENT
+
+---
+
+The dashboard should always feel:
+
+* active,
+* thinking,
+* processing,
+* alive.
+
+Even when markets are slow, subtle animations should imply:
+
+* AI analysis,
+* scanning,
+* ranking,
+* execution readiness,
+* and continuous market intelligence.
