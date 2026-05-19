@@ -75,11 +75,12 @@ function tierCapacity(plan: Plan): { cap: number; label: string } {
 // triggers — no more routing into the admin/operator screens. They open
 // portal-styled overlays that match the rest of the customer surface.
 function TopBar({
-  onAccount, onUpgrade, onDisclaimer,
+  onAccount, onUpgrade, onDisclaimer, statusPill,
 }: {
   onAccount:    () => void;
   onUpgrade:    () => void;
   onDisclaimer: () => void;
+  statusPill?:  React.ReactNode;
 }) {
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -104,6 +105,8 @@ function TopBar({
         textShadow: `0 0 10px ${N.BRAND_GLOW}`,
       }}>AICANDLEZ</span>
       <span style={{ color: N.TEXT_2 }}>· LIVE PORTAL</span>
+
+      {statusPill}
 
       <div style={{ flex: 1 }} />
 
@@ -655,15 +658,170 @@ function MetricTile({
 }
 
 // ── Live AI Execution control bar (tier-gated) ───────────────────────────────
+/**
+ * Lightweight exchange-status hook. Read-only; never mutates server state.
+ * Used by the dashboard header pill, onboarding banner, and live-mode guardrail.
+ */
+interface ExchangeStatusEntry {
+  exchange:    string;
+  connected:   boolean;
+  tradingMode?: string;
+  permissions?: { read?: boolean; trade?: boolean };
+}
+interface ExchangeStatus {
+  connectedCount: number;
+  liveCount:      number;
+  anyHealthy:     boolean;
+  lastSyncedAt:   number;
+}
+function useExchangeStatus(): ExchangeStatus {
+  const { data } = useQuery({
+    queryKey: ["portal-exchanges-status"],
+    queryFn:  async () => {
+      const r = await fetch(`${basePath}/api/user/exchanges`, { credentials: "include" });
+      if (!r.ok) return { exchanges: [] as ExchangeStatusEntry[] };
+      return r.json() as Promise<{ exchanges: ExchangeStatusEntry[] }>;
+    },
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
+    staleTime: 10_000,
+  });
+  const list = data?.exchanges ?? [];
+  const connected = list.filter(e => e.connected);
+  return {
+    connectedCount: connected.length,
+    liveCount:      connected.filter(e => e.tradingMode === "live").length,
+    anyHealthy:     connected.some(e => e.permissions?.read !== false),
+    lastSyncedAt:   Date.now(),
+  };
+}
+
+/** Header status pill — shows connection / mode state at a glance. */
+function ExchangeStatusPill({ status }: { status: ExchangeStatus }) {
+  const { connectedCount, liveCount } = status;
+  const noneConnected = connectedCount === 0;
+  const isLive        = liveCount > 0;
+  const color  = noneConnected ? N.TEXT_3 : isLive ? "#ff3355" : N.BRAND;
+  const glow   = noneConnected ? "none"    : isLive ? "0 0 8px #ff335580" : `0 0 8px ${N.BRAND_GLOW}`;
+  const label  = noneConnected
+    ? "NO EXCHANGE · SIM MODE"
+    : isLive
+      ? `LIVE · ${connectedCount} CONNECTED`
+      : `SIM · ${connectedCount} CONNECTED`;
+  return (
+    <span
+      title={
+        noneConnected
+          ? "No exchange connected — paper trading only"
+          : isLive
+            ? `${liveCount} of ${connectedCount} exchange(s) in live mode`
+            : `${connectedCount} exchange(s) connected · simulation only`
+      }
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
+        padding: "3px 9px", borderRadius: 3,
+        border: `1px solid ${color}55`,
+        background: `${color}10`,
+        color, fontSize: 9, fontWeight: 700,
+        letterSpacing: "0.16em", fontFamily: N.FONT_MONO,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span style={{
+        width: 6, height: 6, borderRadius: 99,
+        background: color, boxShadow: glow,
+      }} />
+      {label}
+    </span>
+  );
+}
+
+/** Subtle onboarding banner for first-time users with no connected exchanges. */
+function ExchangeOnboardingBanner() {
+  return (
+    <div style={{
+      margin: "12px 16px 0",
+      padding: "14px 18px",
+      borderRadius: 6,
+      border: `1px solid ${N.BRAND}45`,
+      background: `linear-gradient(180deg, ${N.BRAND}10, ${N.BRAND}04)`,
+      boxShadow: `inset 0 0 30px ${N.BRAND}10`,
+      display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap",
+      fontFamily: N.FONT_MONO,
+    }}>
+      <div style={{
+        width: 38, height: 38, borderRadius: "50%",
+        border: `1px solid ${N.BRAND}80`,
+        background: N.SURFACE_2,
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        boxShadow: `0 0 14px ${N.BRAND_GLOW}`,
+        flexShrink: 0,
+      }}>
+        <Zap size={18} color={N.BRAND} style={{ filter: `drop-shadow(0 0 6px ${N.BRAND})` }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <div style={{
+          fontSize: 11, fontWeight: 800, letterSpacing: "0.20em",
+          color: N.BRAND, textShadow: `0 0 6px ${N.BRAND_GLOW}`,
+        }}>
+          CONNECT YOUR EXCHANGE TO ENABLE LIVE AI TRADING
+        </div>
+        <div style={{ fontSize: 10, color: N.TEXT_2, marginTop: 4, lineHeight: 1.55 }}>
+          AICandlez <strong style={{ color: N.TEXT_0 }}>never holds your funds</strong> — your
+          balance stays on your exchange at all times. Credentials are AES-256 encrypted,
+          and <strong style={{ color: N.TEXT_0 }}>withdrawal permissions are never requested</strong>.
+        </div>
+        <div style={{
+          fontSize: 8, color: N.TEXT_3, letterSpacing: "0.18em", marginTop: 6,
+        }}>
+          SUPPORTED · KRAKEN · COINBASE · BINANCE · BYBIT · OKX · KUCOIN · CRYPTO.COM
+        </div>
+      </div>
+      <Link href="/settings#exchanges">
+        <a style={{
+          padding: "8px 18px",
+          background: `linear-gradient(180deg, ${N.BRAND} 0%, ${N.BRAND_DEEP} 100%)`,
+          border: `1px solid ${N.BRAND}`,
+          borderRadius: 4,
+          color: "#001a0d",
+          fontWeight: 800, fontSize: 11, letterSpacing: "0.18em",
+          fontFamily: N.FONT_MONO, textDecoration: "none",
+          boxShadow: `0 0 22px ${N.BRAND_GLOW}`,
+          whiteSpace: "nowrap",
+        }}>
+          CONNECT EXCHANGE →
+        </a>
+      </Link>
+    </div>
+  );
+}
+
 function LiveExecutionBar({
-  tier, onUpgrade,
-}: { tier: Plan; onUpgrade: () => void }) {
+  tier, onUpgrade, exchangeConnected, openSlots,
+}: {
+  tier: Plan;
+  onUpgrade: () => void;
+  exchangeConnected: boolean;
+  openSlots: number;
+}) {
   const [armed, setArmed] = useState(false);
-  const locked = tier === "free";
-  const cap    = tierCapacity(tier);
+  const tierLocked = tier === "free";
+  const cap        = tierCapacity(tier);
+
+  // Live execution requires BOTH a paid tier AND at least one validated
+  // exchange connection. The exchange gate is a hard safety stop — users
+  // cannot accidentally arm live mode without a real broker attached.
+  const exchangeLocked = !exchangeConnected;
+  const locked         = tierLocked || exchangeLocked;
+
+  // Auto-disarm if the exchange disconnects mid-session.
+  useEffect(() => {
+    if (exchangeLocked && armed) setArmed(false);
+  }, [exchangeLocked, armed]);
 
   const handle = () => {
-    if (locked) { onUpgrade(); return; }
+    if (tierLocked)     { onUpgrade(); return; }
+    if (exchangeLocked) { window.location.assign("/settings#exchanges"); return; }
     setArmed(a => !a);
   };
 
@@ -717,14 +875,22 @@ function LiveExecutionBar({
             color: locked ? N.TEXT_1 : armed ? N.LONG : N.BRAND,
             textShadow: locked ? "none" : `0 0 8px ${armed ? N.LONG_GLOW : N.BRAND_GLOW}`,
           }}>
-            {locked ? "LIVE AI EXECUTION · LOCKED" : armed ? "LIVE AI EXECUTION · ARMED" : "ENABLE LIVE AI TRADING"}
+            {tierLocked
+              ? "LIVE AI EXECUTION · LOCKED"
+              : exchangeLocked
+                ? "CONNECT EXCHANGE TO UNLOCK LIVE EXECUTION"
+                : armed
+                  ? "LIVE AI EXECUTION · ARMED"
+                  : "ENABLE LIVE AI TRADING"}
           </div>
           <div style={{ fontSize: 9, letterSpacing: "0.18em", color: N.TEXT_2, fontWeight: 600 }}>
-            {cap.label}
+            {exchangeLocked && !tierLocked
+              ? "Live trading disabled · no validated exchange connection"
+              : cap.label}
           </div>
         </div>
 
-        {/* Capacity meter */}
+        {/* Capacity meter — only meaningful once the bar is unlocked. */}
         {!locked && (
           <div style={{
             display: "flex", flexDirection: "column", alignItems: "flex-end",
@@ -735,7 +901,7 @@ function LiveExecutionBar({
               fontSize: 18, color: N.BRAND, fontWeight: 800,
               fontVariantNumeric: "tabular-nums",
               textShadow: `0 0 10px ${N.BRAND_GLOW}`,
-            }}>0 / {cap.cap}</span>
+            }}>{openSlots} / {cap.cap}</span>
           </div>
         )}
 
@@ -765,7 +931,13 @@ function LiveExecutionBar({
           }}
         >
           <span style={{ position: "relative", zIndex: 1 }}>
-            {locked ? "UPGRADE TO UNLOCK" : armed ? "DISARM" : "ARM EXECUTION"}
+            {tierLocked
+              ? "UPGRADE TO UNLOCK"
+              : exchangeLocked
+                ? "CONNECT EXCHANGE"
+                : armed
+                  ? "DISARM"
+                  : "ARM EXECUTION"}
           </span>
           {/* Shimmer sweep (locked free-tier CTA only) */}
           {locked && (
@@ -1386,6 +1558,8 @@ function PortalInner() {
 
   const cap = useMemo(() => tierCapacity(tier), [tier]);
   const { stats } = usePaperTrades();
+  const exchangeStatus = useExchangeStatus();
+  const hasExchange    = exchangeStatus.connectedCount > 0;
 
   // Live-derived metric strings (replace earlier hardcoded demo numbers).
   const equityBase = 100_000;
@@ -1414,6 +1588,7 @@ function PortalInner() {
         onAccount={() => setAccountOpen(true)}
         onUpgrade={() => setUpgradeOpen(true)}
         onDisclaimer={() => setDisclaimerOpen(true)}
+        statusPill={<ExchangeStatusPill status={exchangeStatus} />}
       />
 
       {isAdmin && (
@@ -1432,6 +1607,10 @@ function PortalInner() {
       )}
 
       <LogoBanner tier={tier} />
+
+      {/* First-time onboarding banner — auto-hides once at least one exchange
+          is connected. Reinforces non-custodial security promise inline. */}
+      {!hasExchange && <ExchangeOnboardingBanner />}
 
       {/* Metrics row — values are paper-account demo until Alpaca account
           telemetry is wired; tiles tagged with DEMO so users aren't misled. */}
@@ -1505,7 +1684,12 @@ function PortalInner() {
 
       {/* Live AI Execution control */}
       <div style={{ padding: "12px 16px 0" }}>
-        <LiveExecutionBar tier={tier} onUpgrade={() => setUpgradeOpen(true)} />
+        <LiveExecutionBar
+          tier={tier}
+          onUpgrade={() => setUpgradeOpen(true)}
+          exchangeConnected={hasExchange}
+          openSlots={stats.openCount}
+        />
       </div>
 
       {/* TOP 20 CRYPTO + TOP 20 EQUITY signal panels */}

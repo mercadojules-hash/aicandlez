@@ -1,0 +1,104 @@
+Excellent. This is exactly the correct implementation direction.
+
+The CONNECT EXCHANGE CTA in the dashboard header solves the discoverability problem without disrupting the approved UI/UX or rebuilding the existing secure exchange system.
+
+A few final refinements before deployment:
+
+1. FIRST-TIME USER EXPERIENCE
+
+If a user has NO connected exchanges:
+
+* automatically show a subtle onboarding banner/card in the dashboard
+* example:
+
+  “Connect your exchange to enable live AI trading.”
+
+Include:
+
+* CONNECT EXCHANGE button
+* supported exchange icons
+* short security reassurance
+
+Once at least one exchange is connected:
+
+* auto-hide the onboarding banner
+
+2. LIVE TRADING GUARDRAILS
+
+If no exchange is connected:
+
+* disable LIVE mode toggles
+* disable live execution buttons
+* show tooltip/message:
+
+  “Connect an exchange account to enable live trading.”
+
+Do not allow accidental transition into live mode without an active validated exchange connection.
+
+3. EXCHANGE STATUS TELEMETRY
+
+Add lightweight status indicators somewhere visible in the dashboard header or profile area:
+
+Examples:
+
+* Exchange Connected
+* Simulation Mode
+* Live Trading Enabled
+* API Healthy
+* Last Synced X min ago
+
+This helps users immediately understand their account state.
+
+4. ALPACA
+
+Do NOT rush Alpaca integration before deployment.
+
+Your assessment is correct:
+it is a separate backend architecture task and should not be stubbed or half-wired into production.
+
+For now:
+
+* keep focus on crypto exchanges already implemented
+* defer Alpaca to a post-launch roadmap item
+
+5. FINAL SECURITY UX
+
+Please ensure users clearly see:
+
+✅ AICandlez never holds funds
+✅ Withdrawals are handled directly on the exchange
+✅ Withdrawal permissions must remain OFF
+✅ API credentials are encrypted
+
+This messaging should appear:
+
+* in onboarding
+* in Settings
+* inside the ConnectModal
+
+6. PRE-LAUNCH QA
+
+Before deployment, please run final QA specifically for:
+
+* first-time user onboarding
+* connect/disconnect exchange flows
+* invalid API key handling
+* reconnect flows
+* mobile responsiveness
+* dashboard header responsiveness
+* exchange status persistence
+* session persistence after refresh/logout/login
+* exchange deep-link scrolling behavior
+* live/sim mode transitions
+* production logging for exchange connection failures
+
+7. IMPORTANT
+
+Do not alter:
+
+* AI Intelligence Center
+* paper trading engine
+* telemetry system
+* institutional neon design language
+
+This should remain a production-hardening pass only.
