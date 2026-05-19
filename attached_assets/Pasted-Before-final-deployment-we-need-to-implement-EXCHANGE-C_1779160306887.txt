@@ -1,0 +1,120 @@
+Before final deployment, we need to implement EXCHANGE CONNECTION ONBOARDING directly inside the AICandlez web dashboard.
+
+Right now, users can connect exchanges inside the mobile app, but the web dashboard currently does NOT expose an obvious “Connect Exchange” flow.
+
+This is now required before go-live.
+
+Please implement the following:
+
+1. ADD “CONNECT EXCHANGE” ENTRY POINT
+
+Add a highly visible:
+
+* “Connect Exchange”
+* “Add Exchange”
+* or “Link Exchange”
+
+button in the web dashboard UI.
+
+Recommended placement:
+
+* top-right area of the dashboard header/navbar
+* near profile/settings/account controls
+* must be visible on desktop and mobile
+
+This should match the current institutional neon UI aesthetic and should feel production-grade.
+
+2. EXCHANGE CONNECTION FLOW
+
+When clicked:
+
+Open a professional onboarding modal/page that allows users to connect:
+
+* Alpaca
+* Kraken
+* Coinbase
+* Binance
+
+Structure:
+
+* Exchange cards/grid
+* Exchange logos/icons
+* Status indicator:
+
+  * Connected
+  * Not Connected
+  * API Invalid
+  * Read Only
+  * Trading Enabled
+
+3. STEP-BY-STEP SETUP INSTRUCTIONS
+
+For each exchange, include expandable setup instructions showing users EXACTLY how to create API keys.
+
+Include:
+
+* where to log in
+* where to create API keys
+* required permissions
+* disabled permissions
+* copy/paste guidance
+
+VERY IMPORTANT:
+
+The instructions must explicitly state:
+
+✅ Enable:
+
+* Read permissions
+* Trade permissions
+
+❌ DO NOT ENABLE:
+
+* Withdrawal permissions
+
+We need this clearly visible for security and compliance reasons.
+
+4. API SECURITY UX
+
+Please implement:
+
+* masked API key display
+* secure credential storage messaging
+* “credentials encrypted” messaging
+* disconnect exchange option
+* exchange health/connection validation
+* test connection button
+
+5. USER EDUCATION / TRUST
+
+Add professional compliance messaging such as:
+
+“AICandlez never holds your funds. Your assets remain on your connected exchange account at all times.”
+
+and
+
+“To withdraw funds, use your exchange directly.”
+
+This messaging is extremely important.
+
+6. IMPORTANT
+
+Do NOT:
+
+* change the current AI Intelligence Center
+* alter the institutional neon aesthetic
+* replace the current dashboard layout
+* revert any trading telemetry work
+
+This should be an additive production feature only.
+
+7. FINAL DELIVERABLE
+
+After implementation, provide:
+
+* screenshots
+* mobile responsiveness verification
+* onboarding flow walkthrough
+* exchange connection test results
+* confirmation that credentials are encrypted and secure
+* confirmation that withdrawal permissions are never required

@@ -107,6 +107,33 @@ function TopBar({
 
       <div style={{ flex: 1 }} />
 
+      {/* Primary onboarding CTA — surfaces the exchange connection flow
+          (full ConnectModal + masked credential UI lives in Settings).
+          Brand-filled so first-time users can't miss it. */}
+      <Link href="/settings#exchanges">
+        <a
+          title="Connect Kraken, Coinbase, Binance or another exchange"
+          style={{
+            padding: "5px 12px",
+            background: `linear-gradient(180deg, ${N.BRAND}22, ${N.BRAND}10)`,
+            border: `1px solid ${N.BRAND}80`,
+            borderRadius: 3,
+            color: N.BRAND,
+            fontSize: 10, fontWeight: 800,
+            letterSpacing: "0.16em",
+            fontFamily: N.FONT_MONO,
+            textDecoration: "none",
+            textShadow: `0 0 8px ${N.BRAND_GLOW}`,
+            boxShadow: `0 0 12px ${N.BRAND_GLOW}, inset 0 0 8px ${N.BRAND}18`,
+            cursor: "pointer",
+            display: "inline-flex", alignItems: "center", gap: 6,
+            whiteSpace: "nowrap",
+          }}
+        >
+          ◆ CONNECT EXCHANGE
+        </a>
+      </Link>
+
       <NavButton onClick={onAccount}>MANAGE ACCOUNT</NavButton>
       <NavButton onClick={onUpgrade}>UPGRADE</NavButton>
       <NavButton onClick={onDisclaimer}>DISCLAIMER</NavButton>

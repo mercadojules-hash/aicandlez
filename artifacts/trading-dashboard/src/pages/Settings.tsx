@@ -951,9 +951,12 @@ export default function Settings() {
         <div className="grid gap-3">
 
           {/* ── Exchange Connections ───────────────────────────────────── */}
-          <Section title="EXCHANGE CONNECTIONS" icon={Link2} color="#00aaff" defaultOpen={true}>
-            <ExchangeConnectionsSection />
-          </Section>
+          {/* id="exchanges" lets the dashboard CONNECT EXCHANGE CTA deep-link here. */}
+          <div id="exchanges" style={{ scrollMarginTop: 80 }}>
+            <Section title="EXCHANGE CONNECTIONS" icon={Link2} color="#00aaff" defaultOpen={true}>
+              <ExchangeConnectionsSection />
+            </Section>
+          </div>
 
           {/* ── AI Configuration ──────────────────────────────────────── */}
           <Section title="AI CONFIGURATION" icon={Brain} color="#cc55ff">
