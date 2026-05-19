@@ -752,8 +752,42 @@ function LiveExecutionBar({
 }
 
 // ── Upgrade Modal ────────────────────────────────────────────────────────────
+// Single source of truth for the premium upgrade funnel. Every "upgrade" CTA on
+// /portal (UPGRADE TO UNLOCK · VIEW UPGRADE OPTIONS · START AI TRADING ·
+// Upgrade to AI Trading · Upgrade to AI Trading Pro) opens this modal. Each
+// plan card is itself a button that POSTs to /api/billing/checkout with the
+// plan id and immediately redirects to the Stripe Checkout session URL — no
+// intermediate /billing page, no alternate route, no legacy handler.
 function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [pending, setPending] = useState<"starter" | "pro" | null>(null);
+  const [error,   setError]   = useState<string | null>(null);
+
   if (!open) return null;
+
+  const startCheckout = async (planId: "starter" | "pro") => {
+    if (pending) return;
+    setPending(planId);
+    setError(null);
+    try {
+      const res = await fetch(`${basePath}/api/billing/checkout`, {
+        method:      "POST",
+        credentials: "include",
+        headers:     { "Content-Type": "application/json" },
+        body:        JSON.stringify({ planId }),
+      });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setError(data.error ?? "Could not start checkout. Please try again.");
+      setPending(null);
+    } catch {
+      setError("Network error. Please try again.");
+      setPending(null);
+    }
+  };
+
   return (
     <div
       onClick={onClose}
@@ -800,33 +834,40 @@ function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => void })
         <p style={{ fontSize: 12, color: N.TEXT_1, lineHeight: 1.6, margin: "0 0 18px" }}>
           The Free tier is paper-trading only. Upgrade to let the AI execute
           real trades through Alpaca on your behalf — with capacity that scales
-          with your tier.
+          with your tier. Select a plan to continue to secure Stripe checkout.
         </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
-          <PlanCard plan="starter" />
-          <PlanCard plan="pro" />
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+          <PlanCard plan="starter"
+                    pending={pending === "starter"}
+                    disabled={pending !== null}
+                    onSelect={() => startCheckout("starter")} />
+          <PlanCard plan="pro"
+                    pending={pending === "pro"}
+                    disabled={pending !== null}
+                    onSelect={() => startCheckout("pro")} />
         </div>
 
-        <Link href="/billing">
-          <a style={{
-            display: "block", textAlign: "center",
-            padding: "12px 16px",
-            background: `linear-gradient(180deg, ${N.BRAND} 0%, ${N.BRAND_DEEP} 100%)`,
-            border: `1px solid ${N.BRAND}`,
-            borderRadius: 4,
-            color: "#001a0d", fontWeight: 800, fontSize: 11,
-            letterSpacing: "0.18em", textDecoration: "none",
-            boxShadow: `0 0 22px ${N.BRAND_GLOW}`,
-          }}>
-            VIEW PLANS & UPGRADE →
-          </a>
-        </Link>
+        {error && (
+          <div style={{
+            fontSize: 10, letterSpacing: "0.14em",
+            color: N.SHORT, textAlign: "center",
+            margin: "0 0 10px",
+          }}>{error}</div>
+        )}
+
+        <div style={{
+          fontSize: 9, letterSpacing: "0.18em",
+          color: N.TEXT_2, textAlign: "center",
+          margin: "4px 0 0",
+        }}>
+          MONTHLY · CANCEL ANYTIME · STRIPE-SECURED CHECKOUT
+        </div>
 
         <button
           onClick={onClose}
           style={{
-            display: "block", margin: "12px auto 0",
+            display: "block", margin: "14px auto 0",
             background: "transparent", border: "none",
             color: N.TEXT_2, fontSize: 10, letterSpacing: "0.18em",
             fontFamily: N.FONT_MONO, cursor: "pointer",
@@ -838,31 +879,68 @@ function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => void })
   );
 }
 
-function PlanCard({ plan }: { plan: "starter" | "pro" }) {
+function PlanCard({
+  plan, pending = false, disabled = false, onSelect,
+}: {
+  plan:      "starter" | "pro";
+  pending?:  boolean;
+  disabled?: boolean;
+  onSelect:  () => void;
+}) {
   const data = plan === "starter"
     ? { name: "AI Trading",     price: "$15.99", cap: "3 concurrent AI trades", color: N.BRAND }
     : { name: "AI Trading Pro", price: "$39.99", cap: "12 concurrent AI trades · crypto + equities", color: N.BRAND_BRT };
+  const isDim = disabled && !pending;
   return (
-    <div style={{
-      background: N.SURFACE_2,
-      border: `1px solid ${data.color}40`,
-      borderRadius: 4,
-      padding: "12px 14px",
-      display: "flex", alignItems: "center", gap: 14,
-    }}>
+    <button
+      onClick={onSelect}
+      disabled={disabled}
+      style={{
+        background: N.SURFACE_2,
+        border: `1px solid ${data.color}${pending ? "" : "40"}`,
+        borderRadius: 4,
+        padding: "12px 14px",
+        display: "flex", alignItems: "center", gap: 14,
+        width: "100%", textAlign: "left",
+        cursor: disabled ? "default" : "pointer",
+        opacity: isDim ? 0.5 : 1,
+        fontFamily: N.FONT_MONO,
+        transition: "transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease",
+        boxShadow: pending ? `0 0 22px ${data.color}55` : "none",
+      }}
+      onMouseEnter={(e) => {
+        if (disabled) return;
+        e.currentTarget.style.transform   = "translateY(-1px)";
+        e.currentTarget.style.boxShadow   = `0 0 22px ${data.color}55`;
+        e.currentTarget.style.borderColor = data.color;
+      }}
+      onMouseLeave={(e) => {
+        if (pending) return;
+        e.currentTarget.style.transform   = "translateY(0)";
+        e.currentTarget.style.boxShadow   = "none";
+        e.currentTarget.style.borderColor = `${data.color}40`;
+      }}
+    >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           fontSize: 11, color: data.color, fontWeight: 800,
           letterSpacing: "0.18em", marginBottom: 2,
         }}>{data.name.toUpperCase()}</div>
         <div style={{ fontSize: 10, color: N.TEXT_2 }}>{data.cap}</div>
+        <div style={{
+          fontSize: 9, letterSpacing: "0.16em",
+          color: pending ? data.color : N.TEXT_2,
+          marginTop: 4, fontWeight: 700,
+        }}>
+          {pending ? "REDIRECTING TO STRIPE…" : `CHOOSE ${data.name.toUpperCase()} →`}
+        </div>
       </div>
       <div style={{
         fontSize: 18, color: N.TEXT_0, fontWeight: 800,
         fontVariantNumeric: "tabular-nums",
         textShadow: `0 0 8px ${data.color}60`,
       }}>{data.price}<span style={{ fontSize: 10, color: N.TEXT_2 }}>/mo</span></div>
-    </div>
+    </button>
   );
 }
 
@@ -1165,10 +1243,23 @@ export default function Portal() {
           <Row left="Performance Fee" right="3% (profitable trades only)" sub="Never charged on losses" />
           <div style={{ marginTop: 14 }}>
             {tier === "pro" ? (
-              // Pro users go straight to the Stripe customer portal.
-              <Link href="/billing">
-                <a style={{
-                  display: "block",
+              // Pro users go straight to the Stripe customer portal via the
+              // same /api/billing/portal endpoint the AccountModal uses — no
+              // intermediate /billing page.
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`${basePath}/api/billing/portal`, {
+                      method: "POST", credentials: "include",
+                      headers: { "Content-Type": "application/json" },
+                    });
+                    if (!res.ok) return;
+                    const data = (await res.json()) as { url?: string };
+                    if (data.url) window.location.href = data.url;
+                  } catch { /* no-op */ }
+                }}
+                style={{
+                  display: "block", width: "100%",
                   textAlign: "center",
                   padding: "10px 14px",
                   background: `linear-gradient(180deg, ${N.BRAND} 0%, ${N.BRAND_DEEP} 100%)`,
@@ -1176,12 +1267,13 @@ export default function Portal() {
                   borderRadius: 4,
                   color: "#001a0d", fontWeight: 800, fontSize: 11,
                   letterSpacing: "0.16em",
-                  textDecoration: "none",
+                  cursor: "pointer",
+                  fontFamily: N.FONT_MONO,
                   boxShadow: `0 0 18px ${N.BRAND_GLOW}`,
-                }}>
-                  MANAGE BILLING
-                </a>
-              </Link>
+                }}
+              >
+                MANAGE BILLING
+              </button>
             ) : (
               // Free + Starter both open the same unified upgrade modal that
               // every other locked CTA on /portal uses. No more split routing.
