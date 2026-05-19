@@ -1,0 +1,96 @@
+Before we proceed with final production launch, I need a COMPLETE go-live requirements report for AICandlez.
+
+Please review the entire production stack and tell me EXACTLY what is still needed from my side to fully launch publicly.
+
+I need a detailed breakdown of:
+
+1. DOMAIN + DNS REQUIREMENTS
+
+Please confirm:
+
+* what DNS records are still required
+* what should point to Replit
+* configuration required for:
+
+  * aicandlez.com
+  * app.aicandlez.com
+  * api.aicandlez.com
+* SSL status
+* propagation status
+* whether Cloudflare is recommended
+* whether anything is missing before public traffic can go live
+
+2. PRODUCTION ENVIRONMENT VARIABLES
+
+Please provide a FINAL checklist of:
+
+* required environment variables
+* optional environment variables
+* missing production secrets
+* Stripe production requirements
+* Clerk production requirements
+* webhook requirements
+* API requirements
+* mobile app environment requirements
+
+Please clearly separate:
+
+* already configured
+* missing
+* recommended but optional
+
+3. LIVE TRADING / CASHOUT FLOW
+
+I need clarity on how real users would cash out if they are using live trading accounts in the future.
+
+Please explain:
+
+* how withdrawals/cashouts should work
+* whether users need a “Withdraw” or “Cash Out” button in the dashboard
+* whether withdrawals should happen through:
+
+  * AICandlez platform
+  * exchange APIs directly
+  * Stripe
+  * external wallet transfer
+* how Kraken/Coinbase/Binance integrations normally handle withdrawals
+* security implications
+* KYC/compliance considerations
+* whether we should avoid handling direct withdrawals initially
+
+I want your recommendation for the SAFEST and MOST SCALABLE architecture for:
+
+* live trading
+* user balances
+* deposits
+* withdrawals
+* revenue collection
+* transaction tracking
+
+4. FINAL PRODUCTION RISK REVIEW
+
+Please identify:
+
+* remaining launch blockers
+* security concerns
+* scaling concerns
+* App Store review concerns
+* backend stability concerns
+* mobile auth concerns
+* Stripe/Clerk production concerns
+* logging/monitoring gaps
+
+5. FINAL RECOMMENDATION
+
+At the end, please tell me:
+
+* whether the platform is truly ready for public beta
+* whether we should soft-launch first
+* what absolutely must be completed before public launch
+* what can safely wait until post-launch iteration
+
+IMPORTANT:
+
+Do not revert any recent trading engine or telemetry work.
+
+Current production UI/UX direction is approved and should remain intact.
