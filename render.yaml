@@ -157,6 +157,6 @@ services:
 
 databases:
   - name: aicandlez-db
-    plan: starter
+    plan: free
     region: oregon
     databaseName: aicandlez
