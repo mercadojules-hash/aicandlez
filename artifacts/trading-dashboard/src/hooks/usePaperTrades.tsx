@@ -63,12 +63,43 @@ export interface ClosedPaperTrade {
   reason:     CloseReason;
 }
 
+export interface PaperStats {
+  /** Number of currently open simulated positions. */
+  openCount:      number;
+  /** Number of closed simulated positions in this session. */
+  closedCount:    number;
+  /** Open + closed combined. */
+  totalCount:     number;
+  /** Σ unrealized P/L across open positions ($). */
+  unrealizedPnl:  number;
+  /** Σ realized P/L across closed positions ($). */
+  realizedPnl:    number;
+  /** Realized + unrealized ($). Same as legacy `totalPnl`. */
+  totalPnl:       number;
+  /** Realized P/L on positions closed today (local-day boundary, $). */
+  todayPnl:       number;
+  /** Realized P/L on positions closed this calendar month ($). */
+  monthPnl:       number;
+  /** Win rate over closed positions (0–100). 0 when no closes yet. */
+  winRate:        number;
+  /** Starting equity + realized P/L + unrealized P/L. */
+  equity:         number;
+  /** Symbol of the closed position with the highest realized P/L, or null. */
+  bestSymbol:     string | null;
+  /** Realized P/L of the best closed position. */
+  bestPnl:        number;
+}
+
+/** Conventional paper-trading starting balance. */
+export const STARTING_EQUITY = 100_000;
+
 interface Ctx {
-  open:       PaperTrade[];
-  history:    ClosedPaperTrade[];
-  totalPnl:   number;
-  openTrade:  (input: OpenTradeInput) => PaperTrade;
-  closeTrade: (id: string, reason?: CloseReason) => void;
+  open:         PaperTrade[];
+  history:      ClosedPaperTrade[];
+  totalPnl:     number;
+  stats:        PaperStats;
+  openTrade:    (input: OpenTradeInput) => PaperTrade;
+  closeTrade:   (id: string, reason?: CloseReason) => void;
   clearHistory: () => void;
 }
 
@@ -233,17 +264,54 @@ export function PaperTradesProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(id);
   }, []);
 
-  const totalPnl = useMemo(
-    () => open.reduce((s, t) => s + t.pnl, 0) + history.reduce((s, t) => s + t.pnl, 0),
-    [open, history],
-  );
+  const stats = useMemo<PaperStats>(() => {
+    const unrealizedPnl = open.reduce((s, t) => s + t.pnl, 0);
+    const realizedPnl   = history.reduce((s, t) => s + t.pnl, 0);
+    const totalPnl      = unrealizedPnl + realizedPnl;
+
+    // Day / month boundaries against the local clock
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    let todayPnl = 0;
+    let monthPnl = 0;
+    let wins = 0;
+    let bestSymbol: string | null = null;
+    let bestPnl = -Infinity;
+    for (const h of history) {
+      if (h.closedAt >= startOfDay)   todayPnl += h.pnl;
+      if (h.closedAt >= startOfMonth) monthPnl += h.pnl;
+      if (h.pnl > 0) wins += 1;
+      if (h.pnl > bestPnl) { bestPnl = h.pnl; bestSymbol = h.display; }
+    }
+    const closedCount = history.length;
+    const winRate = closedCount === 0 ? 0 : (wins / closedCount) * 100;
+
+    return {
+      openCount: open.length,
+      closedCount,
+      totalCount: open.length + closedCount,
+      unrealizedPnl,
+      realizedPnl,
+      totalPnl,
+      todayPnl,
+      monthPnl,
+      winRate,
+      equity: STARTING_EQUITY + totalPnl,
+      bestSymbol,
+      bestPnl: closedCount === 0 ? 0 : bestPnl,
+    };
+  }, [open, history]);
 
   const value = useMemo<Ctx>(
     () => ({
-      open, history, totalPnl, openTrade, closeTrade,
+      open, history,
+      totalPnl: stats.totalPnl,
+      stats,
+      openTrade, closeTrade,
       clearHistory: () => setHistory([]),
     }),
-    [open, history, totalPnl, openTrade, closeTrade],
+    [open, history, stats, openTrade, closeTrade],
   );
 
   return <PaperTradesCtx.Provider value={value}>{children}</PaperTradesCtx.Provider>;
@@ -256,6 +324,13 @@ export function usePaperTrades(): Ctx {
     // crash the whole portal. Returns an inert store.
     return {
       open: [], history: [], totalPnl: 0,
+      stats: {
+        openCount: 0, closedCount: 0, totalCount: 0,
+        unrealizedPnl: 0, realizedPnl: 0, totalPnl: 0,
+        todayPnl: 0, monthPnl: 0, winRate: 0,
+        equity: STARTING_EQUITY,
+        bestSymbol: null, bestPnl: 0,
+      },
       openTrade: () => ({} as PaperTrade),
       closeTrade: () => {},
       clearHistory: () => {},

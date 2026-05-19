@@ -1358,6 +1358,23 @@ function PortalInner() {
   });
 
   const cap = useMemo(() => tierCapacity(tier), [tier]);
+  const { stats } = usePaperTrades();
+
+  // Live-derived metric strings (replace earlier hardcoded demo numbers).
+  const equityBase = 100_000;
+  const fmtPct = (n: number) =>
+    `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+  const totalPct = (stats.totalPnl / equityBase) * 100;
+  const todayPct = (stats.todayPnl / equityBase) * 100;
+  const monthPct = (stats.monthPnl / equityBase) * 100;
+  const equityStr = `$${stats.equity.toLocaleString("en-US", {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  })}`;
+  // Capacity: free tier has no live execution slots; starter=3, pro=12.
+  const capacityDisplay =
+    tier === "free" ? "—" : String(cap.cap ?? "—");
+  const hasClosed = stats.closedCount > 0;
+  const hasAnyActivity = stats.totalCount > 0;
 
   return (
     <div style={{
@@ -1397,14 +1414,56 @@ function PortalInner() {
         gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
         gap: 10,
       }}>
-        <MetricTile label="TOTAL P/L"        value="+$1,284.42"  delta="+1.28%"    positive demo />
-        <MetricTile label="WIN RATE"         value="68.4%"       delta="+2.1%"     positive demo />
-        <MetricTile label="ACTIVE AI TRADES" value={`0 / ${cap.cap || "—"}`} delta={tier.toUpperCase()} positive demo />
-        <MetricTile label="TODAY"            value="+$184.20"    delta="+0.18%"    positive demo />
-        <MetricTile label="MONTHLY"          value="+$2,940.80"  delta="+2.94%"    positive demo />
-        <MetricTile label="AI CONFIDENCE"    value="78%"         delta="STRONG"    positive demo />
-        <MetricTile label="BEST ASSET"       value="BTC/USD"     delta="+$420.00"  positive demo />
-        <MetricTile label="EQUITY"           value="$101,284.42" demo />
+        <MetricTile
+          label="TOTAL P/L"
+          value={fmtMoney(stats.totalPnl)}
+          delta={hasAnyActivity ? fmtPct(totalPct) : "—"}
+          positive={stats.totalPnl >= 0}
+          demo
+        />
+        <MetricTile
+          label="WIN RATE"
+          value={hasClosed ? `${stats.winRate.toFixed(1)}%` : "—"}
+          delta={hasClosed ? `${stats.closedCount} CLOSED` : "AWAITING CLOSE"}
+          positive={stats.winRate >= 50}
+          demo
+        />
+        <MetricTile
+          label="ACTIVE AI TRADES"
+          value={`${stats.openCount} / ${capacityDisplay}`}
+          delta={tier.toUpperCase()}
+          positive
+          demo
+        />
+        <MetricTile
+          label="TODAY"
+          value={fmtMoney(stats.todayPnl)}
+          delta={hasClosed ? fmtPct(todayPct) : "—"}
+          positive={stats.todayPnl >= 0}
+          demo
+        />
+        <MetricTile
+          label="MONTHLY"
+          value={fmtMoney(stats.monthPnl)}
+          delta={hasClosed ? fmtPct(monthPct) : "—"}
+          positive={stats.monthPnl >= 0}
+          demo
+        />
+        <MetricTile
+          label="TOTAL TRADES"
+          value={String(stats.totalCount)}
+          delta={`${stats.openCount} OPEN`}
+          positive
+          demo
+        />
+        <MetricTile
+          label="BEST ASSET"
+          value={stats.bestSymbol ?? "—"}
+          delta={stats.bestSymbol ? fmtMoney(stats.bestPnl) : "AWAITING CLOSE"}
+          positive={stats.bestPnl >= 0}
+          demo
+        />
+        <MetricTile label="EQUITY" value={equityStr} demo />
       </div>
 
       {/* AI Intelligence Center — radar + diverse live telemetry */}

@@ -1,0 +1,106 @@
+FINAL PRE-LAUNCH CRITICAL FIX — PAPER TRADING ENGINE NOT FULLY WIRED
+
+The simulated trading UI is now visually working, but the underlying portfolio/accounting engine is still partially disconnected.
+
+Current behavior observed:
+
+• BUY/SELL now creates entries in:
+
+LIVE TRADES
+TRADE HISTORY
+
+HOWEVER:
+
+• TOTAL P/L does not update
+• TODAY P/L does not update
+• MONTHLY P/L does not update
+• ACTIVE AI TRADES still shows "0 / -"
+• TOTAL TRADES does not appear connected
+• WIN RATE appears static
+• account EQUITY does not move
+• +4.50% values appear hardcoded/static rather than calculated from actual trade performance
+
+This means the UI event layer is functioning, but the portfolio telemetry/accounting engine is not fully connected to the simulated execution system.
+
+Before launch, simulated paper trading must behave like a REAL portfolio engine.
+
+Required fixes:
+
+FULL TRADE LIFECYCLE WIRING
+
+When BUY/SELL is clicked:
+• create actual simulated position object
+• include:
+
+symbol
+side
+qty
+entry price
+timestamp
+stop loss
+take profit
+unrealized P/L
+realized P/L
+status
+ACTIVE TRADES COUNTER
+
+ACTIVE AI TRADES widget must reflect:
+• actual open simulated positions
+• example:
+3 / 5
+
+REAL P/L CALCULATIONS
+
+ALL P/L values must calculate from:
+• entry price
+• current simulated/live market price
+• position size
+• side (LONG/SHORT)
+
+NOT static placeholder percentages.
+
+ACCOUNT EQUITY ENGINE
+
+Winning/losing trades must update:
+• TOTAL P/L
+• TODAY P/L
+• MONTHLY P/L
+• EQUITY
+• WIN RATE
+• TOTAL TRADES
+
+in real time.
+
+TRADE CLOSE EVENTS
+
+When TP or SL hits:
+• remove from LIVE TRADES
+• move to TRADE HISTORY
+• update account telemetry
+• update equity
+• update realized P/L
+• update win/loss stats
+
+REALISTIC PAPER TRADING LOOP
+
+Need actual simulation engine:
+• price polling
+• unrealized P/L updates
+• TP/SL triggers
+• auto-close logic
+• account telemetry refresh
+
+REMOVE HARDCODED VALUES
+
+Any placeholder:
+• +4.50%
+• fake wins
+• static totals
+• mock counters
+
+must be replaced with actual calculated values.
+
+This is the final critical backend issue before production deployment.
+
+The UI is now launch quality.
+The simulation/accounting engine now needs to behave like a real trading platform.
