@@ -860,22 +860,55 @@ export default function Portal() {
           <Row left="Billing"         right={tier === "free" ? "—" : "Monthly"} sub="Cancel anytime · Stripe portal" />
           <Row left="Performance Fee" right="3% (profitable trades only)" sub="Never charged on losses" />
           <div style={{ marginTop: 14 }}>
-            <Link href="/billing">
-              <a style={{
-                display: "block",
-                textAlign: "center",
-                padding: "10px 14px",
-                background: `linear-gradient(180deg, ${N.BRAND} 0%, ${N.BRAND_DEEP} 100%)`,
-                border: `1px solid ${N.BRAND}`,
-                borderRadius: 4,
-                color: "#001a0d", fontWeight: 800, fontSize: 11,
-                letterSpacing: "0.16em",
-                textDecoration: "none",
-                boxShadow: `0 0 18px ${N.BRAND_GLOW}`,
-              }}>
-                {tier === "pro" ? "MANAGE BILLING" : tier === "starter" ? "UPGRADE TO PRO" : "START AI TRADING"}
-              </a>
-            </Link>
+            {tier === "pro" ? (
+              // Pro users go straight to the Stripe customer portal.
+              <Link href="/billing">
+                <a style={{
+                  display: "block",
+                  textAlign: "center",
+                  padding: "10px 14px",
+                  background: `linear-gradient(180deg, ${N.BRAND} 0%, ${N.BRAND_DEEP} 100%)`,
+                  border: `1px solid ${N.BRAND}`,
+                  borderRadius: 4,
+                  color: "#001a0d", fontWeight: 800, fontSize: 11,
+                  letterSpacing: "0.16em",
+                  textDecoration: "none",
+                  boxShadow: `0 0 18px ${N.BRAND_GLOW}`,
+                }}>
+                  MANAGE BILLING
+                </a>
+              </Link>
+            ) : (
+              // Free + Starter both open the same unified upgrade modal that
+              // every other locked CTA on /portal uses. No more split routing.
+              <button
+                onClick={() => setUpgradeOpen(true)}
+                style={{
+                  display: "block", width: "100%",
+                  textAlign: "center",
+                  padding: "10px 14px",
+                  background: `linear-gradient(180deg, ${N.BRAND} 0%, ${N.BRAND_DEEP} 100%)`,
+                  border: `1px solid ${N.BRAND}`,
+                  borderRadius: 4,
+                  color: "#001a0d", fontWeight: 800, fontSize: 11,
+                  letterSpacing: "0.16em",
+                  cursor: "pointer",
+                  fontFamily: N.FONT_MONO,
+                  boxShadow: `0 0 18px ${N.BRAND_GLOW}`,
+                  transition: "transform 200ms ease, box-shadow 200ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = `0 0 26px ${N.BRAND_GLOW}, 0 0 12px ${N.BRAND}`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = `0 0 18px ${N.BRAND_GLOW}`;
+                }}
+              >
+                {tier === "starter" ? "UPGRADE TO PRO" : "START AI TRADING"}
+              </button>
+            )}
           </div>
         </Panel>
 
