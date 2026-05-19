@@ -1,0 +1,164 @@
+FINAL EXECUTION FEEDBACK + SOUND DESIGN PASS
+
+Before launch, the platform needs premium execution feedback so the AI system feels alive and responsive.
+
+====================================================
+
+1. TRADE START NOTIFICATIONS
+   ====================================================
+
+When a trade opens:
+
+* show a subtle animated notification/toast.
+
+Examples:
+
+* “AI LONG EXECUTED — BTC/USD”
+* “SHORT POSITION OPENED — TSLA”
+* “AI CONFIDENCE 92 — EXECUTION CONFIRMED”
+* “POSITION ENTERED — XRP”
+
+The notification should:
+
+* slide/fade smoothly,
+* glow subtly,
+* auto-dismiss,
+* feel institutional,
+* NOT look like a gaming popup.
+
+Placement:
+
+* top-right corner preferred,
+* stacked intelligently,
+* non-intrusive.
+
+====================================================
+2. TRADE CLOSE / WIN NOTIFICATIONS
+==================================
+
+When a trade closes:
+
+* show a premium profit/loss notification.
+
+WIN examples:
+
+* “TARGET HIT +4.8%”
+* “AI EXIT SUCCESSFUL”
+* “PROFIT LOCKED +$284”
+* “LONG CLOSED IN PROFIT”
+
+LOSS examples:
+
+* “STOP LOSS TRIGGERED”
+* “RISK LIMIT REACHED”
+* “POSITION CLOSED -1.4%”
+
+The emotional goal:
+
+* rewarding,
+* intelligent,
+* confidence-building,
+* NOT casino dopamine spam.
+
+====================================================
+3. SOUND DESIGN
+===============
+
+YES — add sound.
+
+But ONLY subtle premium sounds.
+
+GOOD SOUND STYLE:
+
+* Bloomberg terminal,
+* sci-fi institutional UI,
+* cybernetic telemetry,
+* soft execution clicks,
+* subtle AI tones,
+* premium glass-interface sounds.
+
+NOT:
+
+* slot machine sounds,
+* loud crypto casino noises,
+* arcade beeps,
+* meme coin energy.
+
+====================================================
+4. SOUND EVENTS
+===============
+
+Suggested sound mapping:
+
+TRADE OPEN:
+
+* soft execution click,
+* digital pulse,
+* subtle AI confirmation tone.
+
+PROFITABLE CLOSE:
+
+* satisfying soft ascending tone,
+* restrained success chime.
+
+LOSS / STOP:
+
+* muted low-frequency confirmation tone,
+* calm risk-management sound.
+
+NOTIFICATION ARRIVAL:
+
+* tiny soft telemetry tick.
+
+====================================================
+5. USER CONTROL
+===============
+
+Add:
+
+* Sound ON/OFF toggle
+* Notification intensity:
+  • Minimal
+  • Standard
+  • Full telemetry
+
+Default should be:
+
+* subtle,
+* premium,
+* low-volume.
+
+====================================================
+6. IMPORTANT UX RULE
+====================
+
+The sounds + notifications should reinforce:
+
+“Professional AI execution system”
+
+NOT:
+
+“crypto gambling app”
+
+Everything must feel:
+
+* intelligent,
+* controlled,
+* expensive,
+* cinematic,
+* trustworthy.
+
+====================================================
+7. EXTRA PREMIUM IDEA
+=====================
+
+When a VERY strong AI signal appears:
+(example AI Confidence 95+)
+
+Add:
+
+* a rare enhanced telemetry pulse,
+* subtle ring expansion,
+* slightly stronger execution tone.
+
+This creates emotional weight around high-confidence trades without becoming noisy.

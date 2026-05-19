@@ -44,7 +44,9 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlacehol
       t.symbol.toLowerCase().includes(q) ||
       t.label.toLowerCase().includes(q) ||
       t.display.toLowerCase().includes(q) ||
-      (t.sector?.toLowerCase().includes(q) ?? false);
+      (t.sector?.toLowerCase().includes(q) ?? false) ||
+      (t.name?.toLowerCase().includes(q) ?? false) ||
+      (t.aliases?.some((a) => a.toLowerCase().includes(q)) ?? false);
 
     const longs:  Array<{ spec: TickerSpec; breakdown?: SymBreakdown }> = [];
     const shorts: Array<{ spec: TickerSpec; breakdown?: SymBreakdown }> = [];

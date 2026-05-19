@@ -1,0 +1,133 @@
+FINAL SEARCH + AI TELEMETRY POLISH PASS
+
+One final refinement pass before launch.
+
+====================================================
+
+1. CRYPTO SEARCH BAR IS NOT RETURNING POPULAR COINS
+   ====================================================
+
+The Crypto search functionality is still incomplete.
+
+I tested multiple popular assets and they are NOT appearing correctly in the search results.
+
+Examples tested:
+
+* XLM
+* HYPE
+* XMR
+
+These should all return immediately.
+
+Please verify the search/indexing system for:
+
+* symbol matching,
+* ticker aliases,
+* fuzzy matching,
+* lowercase/uppercase handling,
+* cached asset lists,
+* filtered market feeds.
+
+The search bar needs to support:
+
+* major crypto assets,
+* popular altcoins,
+* ticker symbols,
+* partial symbol searches,
+* fast real-time filtering.
+
+Examples:
+
+* typing “XL” should surface XLM
+* typing “MON” should surface XMR/Monero if aliases exist
+* typing “HYP” should surface HYPE
+
+The search experience should feel:
+
+* instant,
+* intelligent,
+* responsive,
+* production-ready.
+
+====================================================
+2. CENTER ALL 6 TELEMETRY UI CONTAINERS
+=======================================
+
+The 6 telemetry containers still need final balancing/alignment.
+
+Please:
+
+* center ALL six perfectly,
+* ensure equal vertical alignment,
+* ensure equal padding,
+* ensure identical visual spacing,
+* make them feel mathematically aligned.
+
+Everything should feel:
+
+* cohesive,
+* institutional,
+* engineered,
+* synchronized.
+
+====================================================
+3. AI CONFIDENCE RING NEEDS TO LOOK MORE PREMIUM
+================================================
+
+The current thin ring around the AI Confidence number feels too minimal.
+
+Keep the clean layout,
+BUT redesign the ring itself so it feels:
+
+* more advanced,
+* more premium,
+* more cinematic,
+* more AI-driven.
+
+Ideas:
+
+* layered glow ring,
+* segmented telemetry ring,
+* rotating subtle accents,
+* reactive pulse,
+* gradient energy sweep,
+* thicker premium arc styling.
+
+DO NOT:
+
+* overdo glow,
+* make it arcade-like,
+* make it game UI.
+
+The ring should feel:
+
+* institutional AI,
+* hedge-fund telemetry,
+* futuristic but believable.
+
+The confidence number should remain:
+
+* large,
+* centered,
+* dominant,
+* ultra-readable.
+
+====================================================
+4. FINAL UX GOAL
+================
+
+At this point the dashboard should feel like:
+
+* a live AI execution engine,
+* a professional quant terminal,
+* an intelligent institutional platform.
+
+Every section should now communicate:
+
+* confidence,
+* precision,
+* execution quality,
+* data realism,
+* premium SaaS polish.
+
+We are now in final refinement territory before launch.

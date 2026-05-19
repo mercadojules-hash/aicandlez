@@ -17,13 +17,15 @@ import { N } from "./theme";
 
 /* ── shared inline keyframes (unified cadence) ─────────────────────────── */
 const KEYFRAMES = `
-@keyframes warroom-sweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes warroom-pulse { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
-@keyframes warroom-arc-glow { 0%,100% { filter: drop-shadow(0 0 4px ${N.BRAND}80); } 50% { filter: drop-shadow(0 0 9px ${N.BRAND}cc); } }
-@keyframes warroom-needle { 0%,100% { transform: rotate(-22deg); } 50% { transform: rotate(20deg); } }
-@keyframes warroom-blip  { 0%,100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.18); opacity: 1; } }
-@keyframes warroom-bar   { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
-@keyframes warroom-fill  { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes warroom-sweep        { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes warroom-sweep-rev    { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+@keyframes warroom-pulse        { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+@keyframes warroom-arc-glow     { 0%,100% { filter: drop-shadow(0 0 5px ${N.BRAND}90); } 50% { filter: drop-shadow(0 0 14px ${N.BRAND}); } }
+@keyframes warroom-bloom        { 0%,100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 0.65; transform: scale(1.04); } }
+@keyframes warroom-needle       { 0%,100% { transform: rotate(-22deg); } 50% { transform: rotate(20deg); } }
+@keyframes warroom-blip         { 0%,100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.18); opacity: 1; } }
+@keyframes warroom-bar          { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+@keyframes warroom-fill         { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
 @media (prefers-reduced-motion: reduce) {
   .warroom-anim, .warroom-anim * { animation: none !important; transition: none !important; }
@@ -101,6 +103,8 @@ function Tile({
  * ──────────────────────────────────────────────────────────────────────── */
 
 function ConfidenceCore() {
+  const arcGrad   = useId();
+  const bloomGrad = useId();
   const [pct, setPct] = useState(78);
   useEffect(() => {
     const id = setInterval(() => {
@@ -112,12 +116,19 @@ function ConfidenceCore() {
     return () => clearInterval(id);
   }, []);
 
-  // Ring sized to fill the body square with a small breathing margin.
+  // Multi-layer ring sized to fill the body square with breathing margin.
   const DIM    = BODY - PAD;            // 178
-  const STROKE = 8;
   const VB     = 200;                   // SVG viewBox
-  const r      = (VB - STROKE - 8) / 2; // outer radius
-  const c      = 2 * Math.PI * r;
+  const cx     = VB / 2;
+  const cy     = VB / 2;
+
+  // Layer radii (outer → inner): segmented telemetry ring, thick gradient
+  // arc (the value), faint inner accent.
+  const rSeg   = (VB / 2) - 10;          // outermost segmented ring
+  const rArc   = rSeg - 12;              // thick value arc
+  const rAcc   = rArc - 10;              // faint inner accent
+  const STROKE = 11;                     // thicker, more premium
+  const c      = 2 * Math.PI * rArc;
   const dash   = (pct / 100) * c;
 
   return (
@@ -128,6 +139,7 @@ function ConfidenceCore() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          position: "relative",
         }}
       >
         <svg
@@ -135,47 +147,107 @@ function ConfidenceCore() {
           role="img" aria-label={`AI confidence ${Math.round(pct)} percent`}
           style={{ display: "block" }}
         >
-          {/* Faint background track */}
-          <circle cx={VB / 2} cy={VB / 2} r={r}
-            fill="none" stroke={N.BORDER_HI} strokeWidth={STROKE} opacity={0.7} />
+          <defs>
+            {/* Gradient arc — deep emerald → brand → bright lime sweep */}
+            <linearGradient id={arcGrad} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%"   stopColor={N.BRAND_DEEP} />
+              <stop offset="55%"  stopColor={N.BRAND} />
+              <stop offset="100%" stopColor={N.BRAND_BRT} />
+            </linearGradient>
+            {/* Soft radial bloom behind the value */}
+            <radialGradient id={bloomGrad} cx="50%" cy="50%" r="50%">
+              <stop offset="0%"   stopColor={N.BRAND}     stopOpacity={0.28} />
+              <stop offset="70%"  stopColor={N.BRAND}     stopOpacity={0.06} />
+              <stop offset="100%" stopColor={N.BRAND}     stopOpacity={0} />
+            </radialGradient>
+          </defs>
 
-          {/* Tick ring */}
-          {Array.from({ length: 36 }).map((_, i) => {
-            const a  = (i / 36) * Math.PI * 2 - Math.PI / 2;
-            const r1 = r + STROKE / 2 + 3;
-            const r2 = r1 + (i % 9 === 0 ? 6 : 3);
-            return (
-              <line
-                key={i}
-                x1={VB / 2 + Math.cos(a) * r1} y1={VB / 2 + Math.sin(a) * r1}
-                x2={VB / 2 + Math.cos(a) * r2} y2={VB / 2 + Math.sin(a) * r2}
-                stroke={i % 9 === 0 ? N.BRAND : N.BORDER_HI}
-                strokeWidth={i % 9 === 0 ? 1.4 : 0.7}
-                strokeOpacity={i % 9 === 0 ? 0.95 : 0.55}
-              />
-            );
-          })}
+          {/* Layered glow bloom */}
+          <circle cx={cx} cy={cy} r={rArc + 4} fill={`url(#${bloomGrad})`}
+            style={{
+              transformOrigin: `${cx}px ${cy}px`,
+              animation: "warroom-bloom 6s ease-in-out infinite",
+            }}
+          />
 
-          {/* Active arc */}
+          {/* Outer segmented telemetry ring — slowly rotating */}
+          <g style={{
+            transformOrigin: `${cx}px ${cy}px`,
+            animation: "warroom-sweep 60s linear infinite",
+          }}>
+            {Array.from({ length: 48 }).map((_, i) => {
+              const a  = (i / 48) * Math.PI * 2 - Math.PI / 2;
+              const r1 = rSeg - 2;
+              const r2 = rSeg + (i % 6 === 0 ? 5 : 2);
+              const isMajor = i % 12 === 0;
+              return (
+                <line
+                  key={i}
+                  x1={cx + Math.cos(a) * r1} y1={cy + Math.sin(a) * r1}
+                  x2={cx + Math.cos(a) * r2} y2={cy + Math.sin(a) * r2}
+                  stroke={isMajor ? N.BRAND : N.BORDER_HI}
+                  strokeWidth={isMajor ? 1.6 : 0.7}
+                  strokeOpacity={isMajor ? 1 : 0.55}
+                />
+              );
+            })}
+          </g>
+
+          {/* Thin outer guide circle */}
+          <circle cx={cx} cy={cy} r={rSeg} fill="none"
+            stroke={N.BORDER_HI} strokeWidth={0.5} strokeOpacity={0.5} />
+
+          {/* Background track for value arc */}
+          <circle cx={cx} cy={cy} r={rArc}
+            fill="none" stroke={N.SURFACE_3} strokeWidth={STROKE} opacity={0.9} />
+          <circle cx={cx} cy={cy} r={rArc}
+            fill="none" stroke={N.BORDER_HI} strokeWidth={1} strokeOpacity={0.5} />
+
+          {/* Active gradient arc — premium thickness + glow */}
           <circle
-            cx={VB / 2} cy={VB / 2} r={r}
+            cx={cx} cy={cy} r={rArc}
             fill="none"
-            stroke={N.BRAND}
+            stroke={`url(#${arcGrad})`}
             strokeWidth={STROKE}
             strokeLinecap="round"
             strokeDasharray={`${dash} ${c}`}
-            transform={`rotate(-90 ${VB / 2} ${VB / 2})`}
+            transform={`rotate(-90 ${cx} ${cy})`}
             style={{
-              transition: "stroke-dasharray 900ms ease",
+              transition: "stroke-dasharray 900ms cubic-bezier(0.22, 0.61, 0.36, 1)",
               animation: "warroom-arc-glow 3s ease-in-out infinite",
             }}
           />
 
-          {/* Center number */}
+          {/* Counter-rotating accent flecks (subtle premium motion) */}
+          <g style={{
+            transformOrigin: `${cx}px ${cy}px`,
+            animation: "warroom-sweep-rev 18s linear infinite",
+          }}>
+            {[0, 90, 180, 270].map((deg) => {
+              const a = (deg * Math.PI) / 180;
+              return (
+                <circle
+                  key={deg}
+                  cx={cx + Math.cos(a) * rArc}
+                  cy={cy + Math.sin(a) * rArc}
+                  r={1.6}
+                  fill={N.TEXT_0}
+                  opacity={0.7}
+                />
+              );
+            })}
+          </g>
+
+          {/* Faint inner accent ring */}
+          <circle cx={cx} cy={cy} r={rAcc}
+            fill="none" stroke={N.BRAND} strokeWidth={0.6} strokeOpacity={0.25}
+            strokeDasharray="2 4" />
+
+          {/* Center number — large, dominant, ultra-readable */}
           <text
-            x={VB / 2} y={VB / 2 + 22}
+            x={cx} y={cy + 20}
             textAnchor="middle"
-            fontSize={74} fontWeight={800}
+            fontSize={64} fontWeight={800}
             fill={N.TEXT_0} fontFamily={N.FONT_MONO}
             style={{ letterSpacing: "0.01em" }}
           >
@@ -564,23 +636,34 @@ export function AIWarRoom() {
         </span>
       </div>
 
-      {/* Telemetry strip — six identical 1:1 square tiles */}
+      {/* Telemetry strip — six identical 1:1 square tiles, centered.
+          The inner row uses `margin: 0 auto` so it sits dead-centre on wide
+          viewports while still scrolling horizontally on narrow ones. */}
       <div
         style={{
           padding: 12,
-          display: "flex",
-          alignItems: "stretch",
-          justifyContent: "flex-start",
-          gap: 12,
           overflowX: "auto",
         }}
       >
-        <ConfidenceCore />
-        <RadarTile />
-        <SignalPipeline />
-        <RiskExposure />
-        <AIThroughput />
-        <SentimentTile />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "stretch",
+            justifyContent: "center",
+            gap: 12,
+            margin: "0 auto",
+            width: "fit-content",
+            minWidth: "100%",
+            boxSizing: "border-box",
+          }}
+        >
+          <ConfidenceCore />
+          <RadarTile />
+          <SignalPipeline />
+          <RiskExposure />
+          <AIThroughput />
+          <SentimentTile />
+        </div>
       </div>
     </section>
   );
