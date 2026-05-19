@@ -62,7 +62,16 @@ function tierCapacity(plan: Plan): { cap: number; label: string } {
 }
 
 // ── Top utility bar ──────────────────────────────────────────────────────────
-function TopBar() {
+// All three nav items (MANAGE ACCOUNT · UPGRADE · DISCLAIMER) are modal
+// triggers — no more routing into the admin/operator screens. They open
+// portal-styled overlays that match the rest of the customer surface.
+function TopBar({
+  onAccount, onUpgrade, onDisclaimer,
+}: {
+  onAccount:    () => void;
+  onUpgrade:    () => void;
+  onDisclaimer: () => void;
+}) {
   const { user } = useUser();
   const { signOut } = useClerk();
   const display =
@@ -89,9 +98,9 @@ function TopBar() {
 
       <div style={{ flex: 1 }} />
 
-      <NavLink href="/account">MANAGE ACCOUNT</NavLink>
-      <NavLink href="/billing">UPGRADE</NavLink>
-      <NavLink href="/disclaimer">DISCLAIMER</NavLink>
+      <NavButton onClick={onAccount}>MANAGE ACCOUNT</NavButton>
+      <NavButton onClick={onUpgrade}>UPGRADE</NavButton>
+      <NavButton onClick={onDisclaimer}>DISCLAIMER</NavButton>
 
       <div style={{ width: 1, height: 16, background: N.BORDER_HI }} />
 
@@ -112,15 +121,20 @@ function TopBar() {
 
       <div style={{ width: 1, height: 16, background: N.BORDER_HI }} />
 
-      <span style={{
-        padding: "4px 10px",
-        background: N.SURFACE_2,
-        border: `1px solid ${N.BORDER_HI}`,
-        borderRadius: 3,
-        color: N.TEXT_0, fontSize: 10,
-      }}>
+      <button
+        onClick={onAccount}
+        title="Manage account"
+        style={{
+          padding: "4px 10px",
+          background: N.SURFACE_2,
+          border: `1px solid ${N.BORDER_HI}`,
+          borderRadius: 3,
+          color: N.TEXT_0, fontSize: 10,
+          fontFamily: N.FONT_MONO, cursor: "pointer",
+          letterSpacing: "0.08em",
+        }}>
         {display}
-      </span>
+      </button>
 
       <button
         onClick={() => signOut()}
@@ -139,18 +153,302 @@ function TopBar() {
   );
 }
 
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+function NavButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
-    <Link href={href}>
-      <a style={{
-        color: N.TEXT_2, textDecoration: "none", fontSize: 10, fontWeight: 600,
-        letterSpacing: "0.12em", padding: "4px 0",
+    <button
+      onClick={onClick}
+      style={{
+        background: "transparent", border: "none", padding: "4px 0",
+        color: N.TEXT_2, fontSize: 10, fontWeight: 600,
+        letterSpacing: "0.12em", fontFamily: N.FONT_MONO, cursor: "pointer",
+        transition: "color 160ms ease, text-shadow 160ms ease",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.color = N.BRAND)}
-      onMouseLeave={(e) => (e.currentTarget.style.color = N.TEXT_2)}>
+      onMouseEnter={(e) => {
+        e.currentTarget.style.color      = N.BRAND;
+        e.currentTarget.style.textShadow = `0 0 8px ${N.BRAND_GLOW}`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.color      = N.TEXT_2;
+        e.currentTarget.style.textShadow = "none";
+      }}>
+      {children}
+    </button>
+  );
+}
+
+// ── Generic portal-styled modal shell (reused by Account + Disclaimer) ──────
+function PortalModal({
+  open, onClose, eyebrow, title, children, maxWidth = 500,
+}: {
+  open:     boolean;
+  onClose:  () => void;
+  eyebrow:  string;
+  title:    string;
+  maxWidth?: number;
+  children: React.ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 200,
+        background: "rgba(0,0,0,0.78)",
+        backdropFilter: "blur(6px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24, overflowY: "auto",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth, width: "100%",
+          background: N.SURFACE_1,
+          border: `1px solid ${N.BRAND_DIM}`,
+          borderRadius: 8,
+          padding: 28,
+          fontFamily: N.FONT_MONO,
+          boxShadow: `0 0 40px ${N.BRAND_GLOW}, inset 0 0 40px ${N.BRAND}10`,
+          position: "relative", overflow: "hidden",
+          maxHeight: "calc(100dvh - 48px)", overflowY: "auto",
+        }}
+      >
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: 2,
+          background: `linear-gradient(90deg, transparent, ${N.BRAND}, transparent)`,
+        }} />
+
+        <div style={{
+          fontSize: 11, fontWeight: 800, letterSpacing: "0.22em",
+          color: N.BRAND, textShadow: `0 0 8px ${N.BRAND_GLOW}`,
+          marginBottom: 8,
+        }}>{eyebrow}</div>
+        <h3 style={{
+          fontSize: 22, color: N.TEXT_0, fontWeight: 800,
+          margin: "4px 0 14px", lineHeight: 1.2,
+        }}>{title}</h3>
+
         {children}
-      </a>
-    </Link>
+
+        <button
+          onClick={onClose}
+          style={{
+            display: "block", margin: "14px auto 0",
+            background: "transparent", border: "none",
+            color: N.TEXT_2, fontSize: 10, letterSpacing: "0.18em",
+            fontFamily: N.FONT_MONO, cursor: "pointer",
+          }}>
+          CLOSE
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Account Modal — customer-facing, no admin screens ───────────────────────
+function AccountModal({
+  open, onClose, tier, onUpgrade,
+}: {
+  open:     boolean;
+  onClose:  () => void;
+  tier:     Plan;
+  onUpgrade: () => void;
+}) {
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const email = user?.primaryEmailAddress?.emailAddress ?? "—";
+  const name  = user?.fullName || user?.firstName || user?.username || "Account";
+
+  const planLabel =
+    tier === "pro"     ? "AI Trading Pro · $39.99 / mo"
+    : tier === "starter" ? "AI Trading · $15.99 / mo"
+    : "Paper Trading · Free";
+  const planColor = tier === "free" ? N.TEXT_1 : N.BRAND;
+  const capacity  =
+    tier === "pro" ? "Up to 12 concurrent AI trades" :
+    tier === "starter" ? "Up to 3 concurrent AI trades" :
+    "Simulated only";
+
+  const openPortal = async () => {
+    try {
+      const res = await fetch(`${basePath}/api/billing/portal`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { url?: string };
+      if (data.url) window.location.href = data.url;
+    } catch { /* no-op */ }
+  };
+
+  return (
+    <PortalModal
+      open={open} onClose={onClose}
+      eyebrow="MY ACCOUNT · PORTAL"
+      title={name}
+      maxWidth={500}
+    >
+      <div style={{ fontSize: 11, color: N.TEXT_2, marginBottom: 18 }}>{email}</div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
+        <AccountRow label="CURRENT PLAN"     value={planLabel}                color={planColor} />
+        <AccountRow label="CAPACITY"          value={capacity} />
+        <AccountRow label="BILLING"           value={tier === "free" ? "—" : "Monthly · Stripe"} />
+        <AccountRow label="PERFORMANCE FEE"   value="3% on profitable trades only" sub="Never charged on losses" />
+        <AccountRow label="BROKER · ALPACA"   value="Not connected"           color={N.WARN} sub="Connection wizard launches with the Alpaca live keys" />
+      </div>
+
+      {tier === "free" ? (
+        <button
+          onClick={() => { onClose(); onUpgrade(); }}
+          style={{
+            display: "block", width: "100%",
+            padding: "12px 16px",
+            background: `linear-gradient(180deg, ${N.BRAND} 0%, ${N.BRAND_DEEP} 100%)`,
+            border: `1px solid ${N.BRAND}`,
+            borderRadius: 4,
+            color: "#001a0d", fontWeight: 800, fontSize: 11,
+            letterSpacing: "0.18em",
+            fontFamily: N.FONT_MONO, cursor: "pointer",
+            boxShadow: `0 0 22px ${N.BRAND_GLOW}`,
+          }}>
+          UPGRADE TO AI TRADING →
+        </button>
+      ) : (
+        <button
+          onClick={openPortal}
+          style={{
+            display: "block", width: "100%",
+            padding: "12px 16px",
+            background: `linear-gradient(180deg, ${N.BRAND} 0%, ${N.BRAND_DEEP} 100%)`,
+            border: `1px solid ${N.BRAND}`,
+            borderRadius: 4,
+            color: "#001a0d", fontWeight: 800, fontSize: 11,
+            letterSpacing: "0.18em",
+            fontFamily: N.FONT_MONO, cursor: "pointer",
+            boxShadow: `0 0 22px ${N.BRAND_GLOW}`,
+          }}>
+          MANAGE BILLING →
+        </button>
+      )}
+
+      <button
+        onClick={() => signOut()}
+        style={{
+          display: "block", width: "100%", marginTop: 10,
+          padding: "10px 14px",
+          background: "transparent",
+          border: `1px solid ${N.BORDER_HI}`,
+          borderRadius: 4,
+          color: N.TEXT_1, fontWeight: 700, fontSize: 10,
+          letterSpacing: "0.18em",
+          fontFamily: N.FONT_MONO, cursor: "pointer",
+        }}>
+        SIGN OUT
+      </button>
+    </PortalModal>
+  );
+}
+
+function AccountRow({ label, value, sub, color = N.TEXT_0 }: {
+  label: string; value: string; sub?: string; color?: string;
+}) {
+  return (
+    <div style={{
+      display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+      gap: 12,
+      padding: "10px 12px",
+      background: N.SURFACE_2,
+      border: `1px solid ${N.BORDER}`,
+      borderRadius: 4,
+    }}>
+      <div style={{
+        fontSize: 9, color: N.TEXT_2, letterSpacing: "0.18em", fontWeight: 700,
+        paddingTop: 2,
+      }}>{label}</div>
+      <div style={{ textAlign: "right", maxWidth: "65%" }}>
+        <div style={{
+          fontSize: 12, color, fontWeight: 700,
+          textShadow: color !== N.TEXT_0 ? `0 0 6px ${color}40` : "none",
+        }}>{value}</div>
+        {sub && (
+          <div style={{ fontSize: 9, color: N.TEXT_2, marginTop: 2, lineHeight: 1.4 }}>
+            {sub}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Disclaimer Modal — full risk language, no blank page ────────────────────
+function DisclaimerModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const points = [
+    "AI trading involves substantial risk. You can lose some or all of your invested capital.",
+    "Results are not guaranteed. Algorithmic signals are based on historical data and statistical models — they do not predict the future with certainty.",
+    "Past performance does not guarantee future results. Backtests, demo telemetry, and paper-trading metrics are not indicative of live outcomes.",
+    "You are solely responsible for your trading decisions. AICandlez is software that automates execution based on your configured tier and risk parameters — final responsibility for every trade rests with you.",
+    "Paper trading differs from live trading. Spreads, slippage, fills, fees, and emotional response are materially different in real markets.",
+    "Market volatility can result in losses, including rapid losses outside trading hours, during news events, or in low-liquidity conditions.",
+    "AICandlez is not financial, legal, or tax advice. Consult a licensed professional before making investment decisions.",
+    "Performance fees are charged on profitable closed trades only — never on losses. Subscription fees are billed monthly and can be cancelled at any time.",
+  ];
+  return (
+    <PortalModal
+      open={open} onClose={onClose}
+      eyebrow="LEGAL · RISK DISCLOSURE"
+      title="Trading risk disclaimer"
+      maxWidth={600}
+    >
+      <p style={{
+        fontSize: 12, color: N.TEXT_1, lineHeight: 1.6, margin: "0 0 16px",
+      }}>
+        Please read the following carefully before enabling live AI execution.
+        By continuing to use AICandlez you acknowledge that you have read and
+        understood these terms.
+      </p>
+
+      <ul style={{
+        listStyle: "none", padding: 0, margin: 0,
+        display: "flex", flexDirection: "column", gap: 8,
+      }}>
+        {points.map((p, i) => (
+          <li key={i} style={{
+            display: "flex", gap: 10,
+            padding: "10px 12px",
+            background: N.SURFACE_2,
+            border: `1px solid ${N.BORDER}`,
+            borderRadius: 4,
+            fontSize: 11, color: N.TEXT_1, lineHeight: 1.55,
+          }}>
+            <span style={{
+              flexShrink: 0,
+              width: 18, height: 18, borderRadius: "50%",
+              background: `${N.BRAND}14`,
+              border: `1px solid ${N.BRAND}40`,
+              color: N.BRAND, fontSize: 9, fontWeight: 800,
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              boxShadow: `0 0 8px ${N.BRAND_GLOW}`,
+            }}>{i + 1}</span>
+            <span>{p}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div style={{
+        marginTop: 16,
+        padding: "10px 12px",
+        background: `${N.WARN}10`,
+        border: `1px solid ${N.WARN}40`,
+        borderRadius: 4,
+        fontSize: 10, color: N.WARN, lineHeight: 1.5,
+        letterSpacing: "0.04em",
+      }}>
+        AICandlez never requests withdrawal permissions from your connected
+        broker. We only execute the trades you've authorized within your tier
+        capacity.
+      </div>
+    </PortalModal>
   );
 }
 
@@ -740,7 +1038,9 @@ const QUEUE = [
 export default function Portal() {
   const { isAdmin } = useUserRole();
   const [tier, setTier] = useState<Plan>("free");
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeOpen,    setUpgradeOpen]    = useState(false);
+  const [accountOpen,    setAccountOpen]    = useState(false);
+  const [disclaimerOpen, setDisclaimerOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -775,7 +1075,11 @@ export default function Portal() {
       color: N.TEXT_0,
       fontFamily: N.FONT_MONO,
     }}>
-      <TopBar />
+      <TopBar
+        onAccount={() => setAccountOpen(true)}
+        onUpgrade={() => setUpgradeOpen(true)}
+        onDisclaimer={() => setDisclaimerOpen(true)}
+      />
 
       {isAdmin && (
         <div style={{
@@ -932,7 +1236,10 @@ export default function Portal() {
         AICANDLEZ · ALPACA-ROUTED LIVE EXECUTION · 3% FEE ON PROFITABLE TRADES ONLY
       </footer>
 
-      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+      <UpgradeModal    open={upgradeOpen}    onClose={() => setUpgradeOpen(false)} />
+      <AccountModal    open={accountOpen}    onClose={() => setAccountOpen(false)}
+                       tier={tier} onUpgrade={() => setUpgradeOpen(true)} />
+      <DisclaimerModal open={disclaimerOpen} onClose={() => setDisclaimerOpen(false)} />
     </div>
   );
 }
