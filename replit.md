@@ -45,8 +45,8 @@ institutional platform.
 | Plan ID   | Name              | Price   | Capacity                    | Key features                                              |
 | --------- | ----------------- | ------- | --------------------------- | --------------------------------------------------------- |
 | `free`    | Paper Trading     | Free    | Simulated only              | 7-Day AI Paper Trading, signals + watchlists, no live exec |
-| `starter` | AI Trading        | $15.99  | Up to **3** AI trades       | Live AI exec (Alpaca), Auto Trade, analytics              |
-| `pro`     | AI Trading Pro    | $39.99  | Up to **12** AI trades      | Crypto + Equities, priority exec, advanced AI scanners    |
+| `starter` | AI Trading        | $39.99  | Up to **3** AI trades       | Live AI exec (Alpaca), Auto Trade, analytics              |
+| `pro`     | AI Trading Pro    | $79.99  | Up to **12** AI trades      | Crypto + Equities, priority exec, advanced AI scanners    |
 
 - Performance fee on **profitable closed trades only** (label = `PERFORMANCE_FEE_LABEL` from `lib/fees`)
 - Stripe billing: monthly · cancel anytime · customer portal for downgrades

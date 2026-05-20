@@ -6,7 +6,7 @@ import { usersTable } from "./users";
 //
 // consent_version allows us to re-show the gate when terms change.
 // Current version: "v1.0" — covers:
-//   • Tier subscription (AI Trading $15.99/mo · AI Trading Pro $39.99/mo)
+//   • Tier subscription (AI Trading $39.99/mo · AI Trading Pro $79.99/mo)
 //   • 3% performance fee on PROFITABLE CLOSED trades only
 //   • No fee on losing trades
 //   • No fee on unrealized PnL

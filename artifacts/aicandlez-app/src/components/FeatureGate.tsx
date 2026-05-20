@@ -63,7 +63,7 @@ export function FeatureGate({ feature, description, locked, children }: FeatureG
             cursor: "pointer",
             transition: "background 0.15s",
           }}>
-          Unlock — from $15.99/mo
+          Unlock — from $39.99/mo
         </button>
       </div>
     </div>

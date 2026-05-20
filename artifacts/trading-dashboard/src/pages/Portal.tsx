@@ -300,8 +300,8 @@ function AccountModal({
   const name  = user?.fullName || user?.firstName || user?.username || "Account";
 
   const planLabel =
-    tier === "pro"     ? "AI Trading Pro · $39.99 / mo"
-    : tier === "starter" ? "AI Trading · $15.99 / mo"
+    tier === "pro"     ? "AI Trading Pro · $79.99 / mo"
+    : tier === "starter" ? "AI Trading · $39.99 / mo"
     : "Paper Trading · Free";
   const planColor = tier === "free" ? N.TEXT_1 : N.BRAND;
   const capacity  =
@@ -1121,8 +1121,8 @@ function PlanCard({
   onSelect:  () => void;
 }) {
   const data = plan === "starter"
-    ? { name: "AI Trading",     price: "$15.99", cap: "3 concurrent AI trades", color: N.BRAND }
-    : { name: "AI Trading Pro", price: "$39.99", cap: "12 concurrent AI trades · crypto + equities", color: N.BRAND_BRT };
+    ? { name: "AI Trading",     price: "$39.99", cap: "3 concurrent AI trades", color: N.BRAND }
+    : { name: "AI Trading Pro", price: "$79.99", cap: "12 concurrent AI trades · crypto + equities", color: N.BRAND_BRT };
   const isDim = disabled && !pending;
   return (
     <button

@@ -95,7 +95,7 @@ export function AppPreview() {
                   marginLeft: 8,
                 }}
               >
-                app.aicandlez.com/command
+                dashboard.aicandlez.com/command
               </span>
             </div>
 

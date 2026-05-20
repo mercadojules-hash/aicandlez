@@ -7,8 +7,8 @@ export type PaywallReason = "trial_expired" | "live_trading" | "feature_locked" 
 
 // Internal plan keys (kept stable for DB enum compatibility):
 //   free    → Paper Trading
-//   starter → AI Trading ($15.99/mo)
-//   pro     → AI Trading Pro ($39.99/mo)
+//   starter → AI Trading ($39.99/mo)
+//   pro     → AI Trading Pro ($79.99/mo)
 export type SubPlan   = "free" | "starter" | "pro";
 export type SubStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid" | null;
 

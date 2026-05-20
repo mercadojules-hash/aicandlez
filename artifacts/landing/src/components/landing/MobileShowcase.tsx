@@ -364,7 +364,7 @@ export function MobileShowcase() {
             and real-time notifications — optimized for iOS and Android.
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-            <a href="/aicandlez-app/" className="btn-primary" style={{ padding: "10px 24px", fontSize: 14 }}>
+            <a href="https://app.aicandlez.com/" className="btn-primary" style={{ padding: "10px 24px", fontSize: 14 }}>
               Open as PWA
             </a>
             <span

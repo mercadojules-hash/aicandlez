@@ -115,7 +115,7 @@ export function UpgradeBanner() {
           <div style={{ fontSize: 11, fontWeight: 600, color: "#9b5cf5", marginBottom: 2 }}>
             Paper Trading Active — Unlock Live AI Trading
           </div>
-          <div style={{ fontSize: 10, color: GR }}>AI Trading from $15.99/mo · Pro $39.99/mo</div>
+          <div style={{ fontSize: 10, color: GR }}>AI Trading from $39.99/mo · Pro $79.99/mo</div>
         </div>
         <BannerBtn color="#9b5cf5" border="rgba(155,92,245,0.38)" onClick={() => showPaywall("feature_locked")}>
           Start 7-Day Trial

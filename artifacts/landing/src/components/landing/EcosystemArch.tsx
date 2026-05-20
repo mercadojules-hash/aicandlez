@@ -5,7 +5,7 @@ const LAYERS = [
     color: "#00e5ff",
     nodes: [
       { icon: "📱", name: "Mobile PWA", sub: "aicandlez-app" },
-      { icon: "🖥️", name: "Desktop Terminal", sub: "app.aicandlez.com" },
+      { icon: "🖥️", name: "Desktop Terminal", sub: "dashboard.aicandlez.com" },
       { icon: "🌐", name: "Marketing Site", sub: "aicandlez.com" },
     ],
   },

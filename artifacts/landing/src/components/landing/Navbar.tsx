@@ -117,14 +117,40 @@ export function Navbar() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <a
-            href="/aicandlez-app/"
+            href="https://dashboard.aicandlez.com/"
+            className="hidden-mobile"
+            style={{
+              color: "#8892a4",
+              textDecoration: "none",
+              fontSize: 13,
+              fontWeight: 500,
+              letterSpacing: "0.02em",
+              padding: "10px 14px",
+              borderRadius: 8,
+              border: "1px solid rgba(255,255,255,0.08)",
+              transition: "color 0.2s, border-color 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.color = "#fff";
+              (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.2)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.color = "#8892a4";
+              (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.08)";
+            }}
+            title="Operator / Admin Dashboard"
+          >
+            Operator Console
+          </a>
+          <a
+            href="https://app.aicandlez.com/"
             className="btn-ghost"
             style={{ padding: "10px 20px", fontSize: 14 }}
           >
             Sign In
           </a>
           <a
-            href="/aicandlez-app/"
+            href="https://app.aicandlez.com/"
             className="btn-primary"
             style={{ padding: "10px 20px", fontSize: 14 }}
           >

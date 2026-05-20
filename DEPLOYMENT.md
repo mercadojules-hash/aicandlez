@@ -349,8 +349,8 @@ Set in each deployment's secret panel (NOT in code):
 - `STRIPE_SECRET_KEY` → `sk_live_…`
 - `STRIPE_WEBHOOK_SECRET` → from registered webhook
 - `VITE_STRIPE_PUBLISHABLE_KEY` → `pk_live_…`
-- `STRIPE_PRICE_STARTER_MONTHLY` → live `$15.99` price ID
-- `STRIPE_PRICE_PRO_MONTHLY` → live `$39.99` price ID
+- `STRIPE_PRICE_STARTER_MONTHLY` → live `$39.99` price ID
+- `STRIPE_PRICE_PRO_MONTHLY` → live `$79.99` price ID
 
 **Push (web):**
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VITE_VAPID_PUBLIC_KEY` /
@@ -378,7 +378,7 @@ Set in each deployment's secret panel (NOT in code):
 ### E. Stripe Production Checklist
 
 - [ ] Activate live mode in Stripe dashboard
-- [ ] Create live Products: `AI Trading ($15.99/mo)` and `AI Trading Pro ($39.99/mo)`
+- [ ] Create live Products: `AI Trading ($39.99/mo)` and `AI Trading Pro ($79.99/mo)`
 - [ ] Copy live price IDs into `STRIPE_PRICE_*` env vars
 - [ ] Add webhook endpoint:
       `https://api.aicandlez.com/api/billing/webhook`

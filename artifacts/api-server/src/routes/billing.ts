@@ -23,8 +23,8 @@ type AuthReq = Request & { clerkUserId: string };
 // ── Monetization model ────────────────────────────────────────────────────────
 // 3-tier subscription ladder:
 //   • Paper Trading (free)      — signals + simulated buy/sell, no live execution
-//   • AI Trading      $15.99/mo — up to 6 concurrent AI trades, crypto live exec
-//   • AI Trading Pro  $39.99/mo — up to 12 concurrent AI trades, crypto + equities
+//   • AI Trading      $39.99/mo — up to 3 concurrent AI trades, crypto live exec
+//   • AI Trading Pro  $79.99/mo — up to 12 concurrent AI trades, crypto + equities
 // PLUS 3% performance fee on PROFITABLE CLOSED trades only.
 //   • No fee on losing trades.
 //   • No fee on unrealized PnL.
@@ -70,12 +70,12 @@ export const PLAN_FEATURES: Record<string, {
     },
   },
 
-  // ── AI TRADING — $15.99/month ───────────────────────────────────────────────
+  // ── AI TRADING — $39.99/month ───────────────────────────────────────────────
   // Plan key kept as `starter` for DB enum compatibility with existing users.
   starter: {
     name:           "AI Trading",
-    price_monthly:  1599,   // $15.99 in cents (Stripe standard)
-    price_yearly:   15990,  // $159.90/yr — 2 months free
+    price_monthly:  3999,   // $39.99 in cents (Stripe standard)
+    price_yearly:   39990,  // $399.90/yr — 2 months free
     description:    "Live AI Trading + AI Auto Trade. 3 concurrent AI trades. 3% performance fee on profitable closed trades only.",
     performanceFee: PERFORMANCE_FEE_RATE,
     features: [
@@ -91,16 +91,16 @@ export const PLAN_FEATURES: Record<string, {
     ],
     limits: {
       exchanges: 3, positions: 10, trades: 50,
-      concurrentTrades: 6, liveTrading: true, aiAutoTrade: true, equitiesAI: false,
+      concurrentTrades: 3, liveTrading: true, aiAutoTrade: true, equitiesAI: false,
     },
   },
 
-  // ── AI TRADING PRO — $39.99/month ───────────────────────────────────────────
+  // ── AI TRADING PRO — $79.99/month ───────────────────────────────────────────
   // Plan key kept as `pro` for DB enum compatibility with existing users.
   pro: {
     name:           "AI Trading Pro",
-    price_monthly:  3999,   // $39.99 in cents
-    price_yearly:   39990,  // $399.90/yr — 2 months free
+    price_monthly:  7999,   // $79.99 in cents
+    price_yearly:   79990,  // $799.90/yr — 2 months free
     description:    "Expanded AI capacity. 12 concurrent trades. Crypto + Equities. Priority execution. 3% performance fee on profitable closed trades only.",
     performanceFee: PERFORMANCE_FEE_RATE,
     features: [
