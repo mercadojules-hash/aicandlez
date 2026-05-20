@@ -102,6 +102,9 @@ services:
   - type: web
     name: aicandlez-app
     env: static
+    # Publish path is the Vite outDir resolved from repo root.
+    # Vite config: artifacts/aicandlez-app/vite.config.ts → build.outDir = "dist"
+    # Therefore final artifact location = artifacts/aicandlez-app/dist
     buildCommand: >
       pnpm install --frozen-lockfile &&
       pnpm --filter @workspace/aicandlez-app run build
