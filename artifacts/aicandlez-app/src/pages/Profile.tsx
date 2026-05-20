@@ -227,9 +227,9 @@ function TierStatusCard({
   onUpgrade:       () => void;
 }) {
   const v = plan === "pro"
-    ? { name: "AI Trading Pro", accent: G,    glow: "rgba(124,255,0,0.32)", border: "rgba(124,255,0,0.40)", elite: true  }
+    ? { name: "AICandlez Pro", accent: G,    glow: "rgba(124,255,0,0.32)", border: "rgba(124,255,0,0.40)", elite: true  }
     : plan === "starter"
-      ? { name: "AI Trading",   accent: C,    glow: "rgba(102,255,102,0.28)", border: "rgba(102,255,102,0.35)", elite: false }
+      ? { name: "AICandlez Starter",   accent: C,    glow: "rgba(102,255,102,0.28)", border: "rgba(102,255,102,0.35)", elite: false }
       : { name: "Paper Trading (Free)", accent: "rgba(232,245,236,0.85)", glow: "rgba(255,255,255,0.05)",  border: "rgba(255,255,255,0.14)", elite: false };
 
   const isPaid = plan !== "free";

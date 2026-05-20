@@ -143,14 +143,14 @@ export function Navbar() {
             Operator Console
           </a>
           <a
-            href="https://app.aicandlez.com/"
+            href="https://app.aicandlez.com/portal"
             className="btn-ghost"
             style={{ padding: "10px 20px", fontSize: 14 }}
           >
             Sign In
           </a>
           <a
-            href="https://app.aicandlez.com/"
+            href="https://app.aicandlez.com/portal"
             className="btn-primary"
             style={{ padding: "10px 20px", fontSize: 14 }}
           >

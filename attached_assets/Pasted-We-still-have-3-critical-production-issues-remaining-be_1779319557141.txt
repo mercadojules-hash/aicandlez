@@ -1,0 +1,154 @@
+We still have 3 critical production issues remaining before deployment approval.
+
+CRITICAL ISSUE #1 — PRICING LABELS STILL WRONG
+
+The upgrade/paywall modal is STILL showing:
+
+* AI Trading
+* AI Trading Pro
+
+These must be fully replaced everywhere in the user-facing app with:
+
+* AICandlez Starter
+* AICandlez Pro
+
+Audit ALL frontend surfaces:
+
+* pricing modal
+* upgrade modal
+* onboarding cards
+* billing/settings
+* checkout CTA text
+* subscription summaries
+* Stripe display labels
+* feature comparison cards
+* tooltips
+* mobile layouts
+
+No old "AI Trading" branding should remain in the consumer-facing app.
+
+---
+
+CRITICAL ISSUE #2 — CONNECT EXCHANGE FLOW STILL WRONG
+
+Current issue:
+The Connect Exchange route still visually resembles the operator/dashboard shell.
+
+This is incorrect architecture.
+
+Requirements:
+
+The exchange onboarding flow must:
+
+* remain entirely inside the USER portal experience
+* visually match app.aicandlez.com/portal
+* NEVER expose dashboard/operator navigation
+* NEVER show operator sidebar
+* NEVER resemble CommandCenter UI
+
+Create a dedicated USER exchange onboarding experience.
+
+DESIGN REQUIREMENTS:
+
+* same cinematic neon aesthetic as portal
+* simplified onboarding cards
+* step-by-step connection flow
+* exchange logo cards
+* onboarding guidance
+* mobile responsive
+* polished SaaS UX
+
+USER FLOW:
+
+STEP 1
+Select exchange:
+
+* Kraken
+* Coinbase
+* Binance
+* Bybit
+* KuCoin
+
+STEP 2
+Generate API Keys:
+Explain:
+
+* read/trade permissions only
+* NEVER enable withdrawals
+* encrypted credentials
+* funds remain on exchange
+
+STEP 3
+Paste API credentials securely
+
+STEP 4
+Connection verification
+
+STEP 5
+Enable paper trading OR live AI automation
+
+Include:
+
+* security reassurance cards
+* tooltip guidance
+* onboarding helper text
+* connection status indicators
+
+This should feel like:
+institutional fintech onboarding
+NOT an admin dashboard.
+
+---
+
+CRITICAL ISSUE #3 — ADMIN COMMANDCENTER AUTH
+
+Need full separation between:
+
+USER APP
+app.aicandlez.com
+
+AND
+
+ADMIN OPERATOR DASHBOARD
+dashboard.aicandlez.com
+
+Requirements:
+
+dashboard.aicandlez.com must:
+
+* require admin/operator role
+* reject normal users
+* redirect non-admins to app.aicandlez.com/portal
+* protect all operator routes server-side
+* require authenticated admin session
+
+Need explicit admin login handling for:
+
+* CommandCenter
+* operator analytics
+* live execution controls
+* system controls
+* exchange management
+* telemetry
+
+NO PUBLIC ACCESS.
+
+---
+
+FINAL TASKS
+
+After fixes:
+
+* run full production verification
+* verify mobile layouts
+* verify Stripe checkout
+* verify routing isolation
+* verify onboarding UX
+* verify admin auth isolation
+
+Then:
+
+* commit
+* deploy
+* provide FINAL production readiness report
+* include any remaining known limitations

@@ -214,7 +214,7 @@ function SignUpPage() {
 //   • app.aicandlez.com       → user portal PWA (aicandlez-app)
 // Non-admins signing in to the operator console are bounced to the user PWA
 // where the portal experience (and exchange onboarding) actually lives.
-const USER_PORTAL_URL = "https://app.aicandlez.com/";
+const USER_PORTAL_URL = "https://app.aicandlez.com/portal";
 
 function CrossAppRedirect({ to }: { to: string }) {
   useEffect(() => { window.location.replace(to); }, [to]);
@@ -241,13 +241,14 @@ function HomeRoute() {
 }
 
 function Protected({ children }: { children: React.ReactNode }) {
+  // dashboard.aicandlez.com is the operator console — all routes require
+  // admin/super-admin role. Non-admin authenticated users are cross-app
+  // redirected to the consumer portal (app.aicandlez.com/portal).
   return (
     <>
       <ClerkLoading><FullPageLoader /></ClerkLoading>
       <ClerkLoaded>
-        <Show when="signed-in">
-          <Layout>{children}</Layout>
-        </Show>
+        <Show when="signed-in"><AdminOnly>{children}</AdminOnly></Show>
         <Show when="signed-out"><Redirect to="/sign-in" /></Show>
       </ClerkLoaded>
     </>

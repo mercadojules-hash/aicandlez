@@ -73,7 +73,7 @@ export const PLAN_FEATURES: Record<string, {
   // ── AI TRADING — $39.99/month ───────────────────────────────────────────────
   // Plan key kept as `starter` for DB enum compatibility with existing users.
   starter: {
-    name:           "AI Trading",
+    name:           "AICandlez Starter",
     price_monthly:  3999,   // $39.99 in cents (Stripe standard)
     price_yearly:   39990,  // $399.90/yr — 2 months free
     description:    "Live AI Trading + AI Auto Trade. 3 concurrent AI trades. 3% performance fee on profitable closed trades only.",
@@ -98,7 +98,7 @@ export const PLAN_FEATURES: Record<string, {
   // ── AI TRADING PRO — $79.99/month ───────────────────────────────────────────
   // Plan key kept as `pro` for DB enum compatibility with existing users.
   pro: {
-    name:           "AI Trading Pro",
+    name:           "AICandlez Pro",
     price_monthly:  7999,   // $79.99 in cents
     price_yearly:   79990,  // $799.90/yr — 2 months free
     description:    "Expanded AI capacity. 12 concurrent trades. Crypto + Equities. Priority execution. 3% performance fee on profitable closed trades only.",

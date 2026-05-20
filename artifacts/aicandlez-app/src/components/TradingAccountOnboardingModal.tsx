@@ -4,9 +4,9 @@ import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const SANS = "Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif";
 const MONO = "'SF Mono', 'Fira Code', 'JetBrains Mono', monospace";
-const C    = "#00e5ff";
-const G    = "#00ff88";
-const P    = "#9b5cf5";
+const C    = "#66FF66";
+const G    = "#7CFF00";
+const P    = "#00C853";
 const W    = "#ffffff";
 const GR   = "#8892a4";
 const DIM  = "#647385";
@@ -21,7 +21,7 @@ function genAccount() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
   for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return `APX-${s.slice(0,4)}-${s.slice(4)}`;
+  return `AICX-${s.slice(0,4)}-${s.slice(4)}`;
 }
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────

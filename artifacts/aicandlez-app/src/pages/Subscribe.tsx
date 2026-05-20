@@ -42,7 +42,7 @@ const VISUAL: Record<string, {
     capacity:     "Simulated only",
   },
   starter: {
-    label: "AI Trading", caption: "Live AI execution. Crypto. AI Auto Trade.",
+    label: "AICandlez Starter", caption: "Live AI execution. Crypto. AI Auto Trade.",
     badge: "ACTIVE",
     glow:         "rgba(102,255,102,0.22)",
     border:       "rgba(102,255,102,0.28)",
@@ -51,7 +51,7 @@ const VISUAL: Record<string, {
     capacity:     "3 Concurrent AI Trades",
   },
   pro: {
-    label: "AI Trading Pro", caption: "Expanded AI capacity. Crypto + Equities. Priority execution.",
+    label: "AICandlez Pro", caption: "Expanded AI capacity. Crypto + Equities. Priority execution.",
     badge: "UPGRADE",
     glow:         "rgba(124,255,0,0.36)",
     border:       "rgba(124,255,0,0.38)",
@@ -154,7 +154,7 @@ export default function Subscribe() {
                   <div style={{ fontSize: 8, fontFamily: SANS, fontWeight: 600,
                     color: active ? v.accent : reached ? GR : DIM,
                     letterSpacing: 0.6, textTransform: "uppercase" as const, whiteSpace: "nowrap" as const }}>
-                    {id === "free" ? "Free" : id === "starter" ? "AI Trading" : "Pro"}
+                    {id === "free" ? "Free" : id === "starter" ? "AICandlez Starter" : "AICandlez Pro"}
                   </div>
                 </div>
                 {i < ORDER.length - 1 && (

@@ -139,6 +139,10 @@ function Pages() {
   return (
     <Switch>
       <Route path="/"        component={() => <Protected><Home /></Protected>} />
+      {/* /portal is the canonical signed-in landing for regular users.
+          Cross-app links from dashboard.aicandlez.com and landing CTAs
+          target this path. Renders the Home (radar) surface. */}
+      <Route path="/portal"  component={() => <Protected><Home /></Protected>} />
       <Route path="/trade"   component={() => <Protected><AISignals /></Protected>} />
       <Route path="/signals" component={() => <Protected><AISignals /></Protected>} />
       {/* Crypto + Equities both deep-link into the AISignals feed with the

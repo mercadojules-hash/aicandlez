@@ -16,6 +16,7 @@ import {
   type SimTrade,
 } from "@/lib/api";
 import { CryptoIcon } from "@/components/CryptoIcon";
+import { OnboardingPanel } from "@/components/OnboardingPanel";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AICandlez — Premium Neon-Green Trading OS · Home Screen
@@ -651,6 +652,9 @@ export default function Home() {
               position: "relative", zIndex: 1,
             }}/>
         </div>
+
+        {/* First-run onboarding (dismissible · localStorage-persisted) */}
+        <OnboardingPanel />
 
         {/* ── Greeting row (avatar + bell) ─────────────────────────────── */}
         <div style={{

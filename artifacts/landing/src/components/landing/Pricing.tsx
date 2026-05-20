@@ -88,7 +88,7 @@ export function Pricing() {
                 </div>
               ))}
             </div>
-            <a href="https://app.aicandlez.com/" className="btn-ghost" style={{ width: "100%", justifyContent: "center" }}>
+            <a href="https://app.aicandlez.com/portal" className="btn-ghost" style={{ width: "100%", justifyContent: "center" }}>
               Start Paper Trading
             </a>
           </div>
@@ -162,7 +162,7 @@ export function Pricing() {
                 </div>
               ))}
             </div>
-            <a href="https://app.aicandlez.com/" className="btn-primary" style={{ width: "100%", justifyContent: "center" }}>
+            <a href="https://app.aicandlez.com/portal" className="btn-primary" style={{ width: "100%", justifyContent: "center" }}>
               Start Live Trading
             </a>
           </div>

@@ -282,7 +282,7 @@ export function Footer() {
                 PLATFORM
               </div>
               {[
-                { label: "Launch App", href: "https://app.aicandlez.com/" },
+                { label: "Launch App", href: "https://app.aicandlez.com/portal" },
                 { label: "Operator Console", href: "https://dashboard.aicandlez.com/" },
                 { label: "Features", href: "#features" },
                 { label: "How It Works", href: "#how-it-works" },
