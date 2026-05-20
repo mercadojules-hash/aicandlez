@@ -157,7 +157,12 @@ function Pages() {
       <Route path="/profile"  component={() => <Protected><Profile  /></Protected>} />
       <Route path="/subscribe"   component={() => <Protected><Subscribe /></Protected>} />
       <Route path="/consent"     component={() => <Protected><Consent /></Protected>} />
-      <Route path="/exchanges"   component={() => <Redirect to="/profile" />} />
+      <Route path="/exchanges"   component={() => <Redirect to="/settings/exchanges" />} />
+      {/* Canonical exchange-onboarding deep link. Renders Profile, which
+          auto-opens the broker-connection wizard on mount. Used by cross-app
+          links from the operator dashboard and by upgrade-flow CTAs. */}
+      <Route path="/settings/exchanges" component={() => <Protected><Profile /></Protected>} />
+      <Route path="/settings"           component={() => <Redirect to="/profile" />} />
       <Route path="/billing"     component={() => <Protected><Billing /></Protected>} />
       <Route path="/legal/:type" component={() => <Protected><LegalPage /></Protected>} />
       <Route path="/sign-in/*?" component={() => (

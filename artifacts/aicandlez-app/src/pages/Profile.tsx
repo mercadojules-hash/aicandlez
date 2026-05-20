@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useClerk } from "@clerk/react";
 import { useLocation } from "wouter";
@@ -116,7 +116,7 @@ function MonthlyChart({
           <div style={{ fontSize:8, fontFamily:SANS, fontWeight:700,
             color:"rgba(255,255,255,0.55)", letterSpacing:"0.18em",
             textTransform:"uppercase" as const, marginBottom: 4 }}>
-            Monthly AI Performance
+            Monthly AI Performance (Illustrative)
           </div>
           <div style={{ fontSize:9.5, fontFamily:SANS, color: DIM,
             letterSpacing: 0.3 }}>
@@ -747,8 +747,17 @@ function PrefRow({ label, sub, value, onChange, accent, divider=true, disabled=f
 
 export default function Profile() {
   const { signOut }        = useClerk();
-  const [, setLocation]    = useLocation();
+  const [location, setLocation] = useLocation();
   const { openOnboarding } = useBrokerConnection();
+
+  // Auto-open the broker connection wizard when the user lands on
+  // /settings/exchanges (the canonical exchange-onboarding path used by
+  // cross-app links from the operator dashboard and upgrade flows).
+  useEffect(() => {
+    if (location === "/settings/exchanges") openOnboarding();
+    // openOnboarding is a stable context callback; intentionally not in deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location]);
   const { enabled: aiEnabled, setEnabled: setAiEnabled } = useAIAutoTrade();
   const { profile, updateProfile } = useUserProfile();
   const pushNotifs = usePushNotifications();

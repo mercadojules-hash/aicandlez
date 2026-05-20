@@ -113,29 +113,30 @@ function TopBar({
       {/* Primary onboarding CTA — surfaces the exchange connection flow
           (full ConnectModal + masked credential UI lives in Settings).
           Brand-filled so first-time users can't miss it. */}
-      <Link href="/settings#exchanges">
-        <a
-          title="Connect Kraken, Coinbase, Binance or another exchange"
-          style={{
-            padding: "5px 12px",
-            background: `linear-gradient(180deg, ${N.BRAND}22, ${N.BRAND}10)`,
-            border: `1px solid ${N.BRAND}80`,
-            borderRadius: 3,
-            color: N.BRAND,
-            fontSize: 10, fontWeight: 800,
-            letterSpacing: "0.16em",
-            fontFamily: N.FONT_MONO,
-            textDecoration: "none",
-            textShadow: `0 0 8px ${N.BRAND_GLOW}`,
-            boxShadow: `0 0 12px ${N.BRAND_GLOW}, inset 0 0 8px ${N.BRAND}18`,
-            cursor: "pointer",
-            display: "inline-flex", alignItems: "center", gap: 6,
-            whiteSpace: "nowrap",
-          }}
-        >
-          ◆ CONNECT EXCHANGE
-        </a>
-      </Link>
+      {/* Cross-app link: exchange onboarding lives in the USER PORTAL app
+          (app.aicandlez.com), not in the operator dashboard. */}
+      <a
+        href="https://app.aicandlez.com/settings/exchanges"
+        title="Connect Kraken, Coinbase, Binance or another exchange"
+        style={{
+          padding: "5px 12px",
+          background: `linear-gradient(180deg, ${N.BRAND}22, ${N.BRAND}10)`,
+          border: `1px solid ${N.BRAND}80`,
+          borderRadius: 3,
+          color: N.BRAND,
+          fontSize: 10, fontWeight: 800,
+          letterSpacing: "0.16em",
+          fontFamily: N.FONT_MONO,
+          textDecoration: "none",
+          textShadow: `0 0 8px ${N.BRAND_GLOW}`,
+          boxShadow: `0 0 12px ${N.BRAND_GLOW}, inset 0 0 8px ${N.BRAND}18`,
+          cursor: "pointer",
+          display: "inline-flex", alignItems: "center", gap: 6,
+          whiteSpace: "nowrap",
+        }}
+      >
+        ◆ CONNECT EXCHANGE
+      </a>
 
       <NavButton onClick={onAccount}>MANAGE ACCOUNT</NavButton>
       <NavButton onClick={onUpgrade}>UPGRADE</NavButton>
@@ -777,8 +778,9 @@ function ExchangeOnboardingBanner() {
           SUPPORTED · KRAKEN · COINBASE · BINANCE · BYBIT · OKX · KUCOIN · CRYPTO.COM
         </div>
       </div>
-      <Link href="/settings#exchanges">
-        <a style={{
+      <a
+        href="https://app.aicandlez.com/settings/exchanges"
+        style={{
           padding: "8px 18px",
           background: `linear-gradient(180deg, ${N.BRAND} 0%, ${N.BRAND_DEEP} 100%)`,
           border: `1px solid ${N.BRAND}`,
@@ -788,10 +790,10 @@ function ExchangeOnboardingBanner() {
           fontFamily: N.FONT_MONO, textDecoration: "none",
           boxShadow: `0 0 22px ${N.BRAND_GLOW}`,
           whiteSpace: "nowrap",
-        }}>
-          CONNECT EXCHANGE →
-        </a>
-      </Link>
+        }}
+      >
+        CONNECT EXCHANGE →
+      </a>
     </div>
   );
 }
@@ -821,7 +823,7 @@ function LiveExecutionBar({
 
   const handle = () => {
     if (tierLocked)     { onUpgrade(); return; }
-    if (exchangeLocked) { window.location.assign("/settings#exchanges"); return; }
+    if (exchangeLocked) { window.location.assign("https://app.aicandlez.com/settings/exchanges"); return; }
     setArmed(a => !a);
   };
 

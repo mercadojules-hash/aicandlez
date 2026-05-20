@@ -208,10 +208,24 @@ function SignUpPage() {
 // while Clerk's session state is undetermined (neither signed-in nor signed-out).
 // ClerkLoaded then renders the correct branch based on resolved auth state.
 
+// ── Cross-app redirect helper ────────────────────────────────────────────────
+// Architecture (Option A):
+//   • dashboard.aicandlez.com → operator/admin console (this app)
+//   • app.aicandlez.com       → user portal PWA (aicandlez-app)
+// Non-admins signing in to the operator console are bounced to the user PWA
+// where the portal experience (and exchange onboarding) actually lives.
+const USER_PORTAL_URL = "https://app.aicandlez.com/";
+
+function CrossAppRedirect({ to }: { to: string }) {
+  useEffect(() => { window.location.replace(to); }, [to]);
+  return <FullPageLoader />;
+}
+
 function SignedInHomeRouter() {
   const { isAdmin, loading } = useUserRole();
   if (loading) return <FullPageLoader />;
-  return <Redirect to={isAdmin ? "/command" : "/portal"} />;
+  if (!isAdmin) return <CrossAppRedirect to={USER_PORTAL_URL} />;
+  return <Redirect to="/command" />;
 }
 
 function HomeRoute() {

@@ -1,0 +1,148 @@
+Stripe production subscriptions are now fully configured.
+
+PRODUCTION STRIPE PRODUCTS
+
+1. AICandlez Starter
+   Product ID:
+   prod_UYOnel9XsCT0Br
+
+Price ID:
+price_1TZHzWl3nFFqtg3aHq8P1mAr
+
+Tier Rules:
+
+* $39.99/month
+* Max 3 simultaneous AI trades
+* AI automation enabled
+* Exchange connectivity enabled
+
+---
+
+2. AICandlez Pro
+   Product ID:
+   prod_UYOpyiav0YI5ym
+
+Price ID:
+price_1TZI2FI3nFFqtg3aXlMxGhOP
+
+Tier Rules:
+
+* $79.99/month
+* Max 12 simultaneous AI trades
+* Advanced portfolio scaling
+* Full AI automation enabled
+
+---
+
+REQUIRED IMPLEMENTATION
+
+FREE TIER:
+
+* Paper trading only
+* Manual Buy/Sell only
+* No AI automation
+* No exchange automation
+* Show “PAPER TRADING MODE” badge
+* Max active AI trades = 0
+
+STARTER:
+
+* AI automation enabled
+* Max 3 simultaneous AI trades
+* Exchange connectivity enabled
+
+PRO:
+
+* AI automation enabled
+* Max 12 simultaneous AI trades
+* Advanced scaling enabled
+
+---
+
+CRITICAL FIXES
+
+1. CONNECT EXCHANGE BUTTON
+   Currently routes users into the operator/admin dashboard.
+
+THIS IS WRONG.
+
+Fix routing:
+Connect Exchange → /settings/exchanges
+
+Do NOT expose operator/admin systems to standard users.
+
+---
+
+2. SUBSCRIPTION STATE MANAGEMENT
+
+Subscription state must:
+
+* persist server-side
+* survive refresh/login/logout
+* sync via Stripe webhooks
+* update UI instantly after checkout
+
+Protect premium API routes server-side.
+Do NOT rely on frontend-only gating.
+
+---
+
+3. USER ONBOARDING PANEL
+
+Add onboarding UI explaining:
+
+* how paper trading works
+* how Buy/Sell works
+* where active trades appear
+* where wins/losses update
+* how AI automation unlocks after upgrade
+
+---
+
+4. UPDATE ALL PRICING REFERENCES
+
+Update pricing everywhere:
+
+* landing page
+* upgrade modal
+* dashboard
+* pricing cards
+* mobile layouts
+* subscription settings
+
+---
+
+5. FEATURE GATING
+
+FREE:
+
+* paper trading only
+
+STARTER:
+
+* max 3 AI trades
+
+PRO:
+
+* max 12 AI trades
+
+Enforce BOTH:
+
+* frontend UI
+* backend API validation
+
+---
+
+6. STRIPE WEBHOOKS
+
+Webhook endpoint already configured:
+https://api.aicandlez.com/api/stripe/webhook
+
+Use webhook syncing for:
+
+* subscription activation
+* cancellation
+* upgrades
+* downgrades
+* failed payments
+* entitlement updates

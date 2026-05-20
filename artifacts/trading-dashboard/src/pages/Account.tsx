@@ -299,12 +299,12 @@ export default function Account() {
                 <div className="text-center py-4">
                   <ArrowLeftRight className="w-6 h-6 mx-auto mb-2" style={{ color: "#2a4050" }} />
                   <p className="text-[9px] font-mono" style={{ color: "#3a5a70" }}>No exchanges connected</p>
-                  <Link href="/settings">
+                  <a href="https://app.aicandlez.com/settings/exchanges">
                     <button className="mt-2 px-3 py-1.5 rounded border font-mono text-[8px] font-bold"
                       style={{ borderColor: "#00aaff30", color: "#00aaff60" }}>
                       Connect Exchange
                     </button>
-                  </Link>
+                  </a>
                 </div>
               ) : (
                 <div className="space-y-2">
