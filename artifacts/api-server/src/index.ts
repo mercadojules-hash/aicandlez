@@ -95,7 +95,7 @@ process.on("unhandledRejection", (reason) => {
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-server.listen(finalPort, async () => {
+server.listen(finalPort, "0.0.0.0", async () => {
   logger.info({ port: finalPort }, "API server listening");
   // Boot diagnostics — exchange env presence (booleans only, never log secrets)
   logger.info({
