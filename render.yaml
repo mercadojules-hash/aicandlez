@@ -56,7 +56,7 @@ services:
       - key: CRYPTOCOM_API_SECRET
         sync: false
       - key: ALLOWED_ORIGINS
-        value: https://aicandlez.com,https://www.aicandlez.com,https://app.aicandlez.com
+        value: https://aicandlez.com,https://www.aicandlez.com,https://app.aicandlez.com,https://dashboard.aicandlez.com,https://aicandlez-dashboard.onrender.com,https://aicandlez-app.onrender.com
       - key: EXCHANGE_LIVE_ENABLED
         value: "false"
 

@@ -14,7 +14,13 @@ import { useUser } from "@clerk/react";
 //   loading     — true until both Clerk + /auth/me resolve
 // ─────────────────────────────────────────────────────────────────────────────
 
-const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+// Resolve API base URL. In production this is the cross-origin API host
+// (e.g. https://api.aicandlez.com) supplied via VITE_API_BASE_URL. In dev it
+// falls back to the same-origin Vite proxy.
+const apiBaseUrl = (
+  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ??
+  (import.meta.env.BASE_URL ?? "/")
+).replace(/\/$/, "");
 
 export type UserRole = "user" | "admin" | "super-admin";
 
@@ -46,7 +52,7 @@ export function useUserRole(): UseUserRoleResult {
 
     (async () => {
       try {
-        const res = await fetch(`${basePath}/api/auth/me`, {
+        const res = await fetch(`${apiBaseUrl}/api/auth/me`, {
           credentials: "include",
         });
         if (!res.ok) {
