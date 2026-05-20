@@ -1,0 +1,92 @@
+We need help debugging a Render deployment issue for our frontend static site service (`aicandlez-app`) in a pnpm monorepo.
+
+Current situation:
+
+✅ Backend API (`aicandlez-api`) is fully live and healthy on Render
+✅ Health endpoint works:
+https://aicandlez-api.onrender.com/api/healthz
+
+❌ ONLY the frontend static site deployment is failing.
+
+Render deployment logs repeatedly show:
+
+```txt
+Installing dependencies with npm...
+npm error Unsupported URL Type "catalog:"
+```
+
+Important details:
+
+Repository is a pnpm monorepo using workspace catalogs.
+
+Frontend app path:
+
+```txt
+artifacts/aicandlez-app
+```
+
+We already replaced all direct `"catalog:"` references inside:
+
+```txt
+artifacts/aicandlez-app/package.json
+```
+
+with actual semver versions.
+
+We also confirmed:
+
+* there is NO package-lock.json
+* frontend builds locally successfully
+* dist folder generates correctly locally
+* Root Directory has been tested both set and empty
+* Publish Directory tested as both `dist` and full path
+* pnpm install works locally
+* cache clears have already been done repeatedly on Render
+
+Current Render settings tested:
+
+Root Directory:
+
+```txt
+artifacts/aicandlez-app
+```
+
+Build Command:
+
+```bash
+npm install -g pnpm && pnpm install --no-frozen-lockfile && pnpm run build
+```
+
+Publish Directory:
+
+```txt
+dist
+```
+
+We also discovered remaining `catalog:` references still exist in:
+
+* pnpm-lock.yaml
+* pnpm-workspace.yaml
+
+Problem:
+Render still appears to auto-run npm dependency detection BEFORE our build command executes, causing npm to choke on workspace catalog references.
+
+Need help determining the cleanest production fix.
+
+Questions:
+
+1. How do we force Render to use pnpm ONLY and bypass npm auto-detection?
+2. Should we add a root packageManager field?
+3. Should we add .npmrc or render.yaml?
+4. Should frontend be extracted from the monorepo entirely?
+5. Is the workspace package:
+
+```json
+"@workspace/api-client-react": "workspace:*"
+```
+
+causing Render to traverse the monorepo?
+6. What is the best Render-compatible monorepo deployment strategy here?
+
+Goal:
+Get `https://aicandlez-app.onrender.com` deploying successfully as a static frontend while keeping the backend service untouched.

@@ -5,6 +5,7 @@
   "engines": {
     "node": ">=20"
   },
+  "packageManager": "pnpm@10.26.1",
   "scripts": {
     "dev": "pnpm --filter @workspace/trading-dashboard run dev",
     "start": "pnpm --filter @workspace/trading-dashboard run dev",
