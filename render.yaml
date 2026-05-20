@@ -67,7 +67,7 @@ services:
     buildCommand: >
       pnpm install --frozen-lockfile &&
       pnpm --filter @workspace/trading-dashboard run build
-    staticPublishPath: artifacts/trading-dashboard/dist
+    staticPublishPath: artifacts/trading-dashboard/dist/public
     autoDeploy: true
     headers:
       - path: /*
