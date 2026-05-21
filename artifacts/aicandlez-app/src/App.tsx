@@ -188,16 +188,28 @@ function AuthPage({ children }: { children: React.ReactNode }) {
 }
 
 // ── Route guard ────────────────────────────────────────────────────────────────
+// Signed-out users are redirected to /sign-in with the current path captured
+// as a `redirect_url` query param. Clerk's <SignIn> picks this up automatically
+// and routes the user back to the originally requested page after auth — so
+// deep links to /portal, /billing, /profile, etc. survive the sign-in round
+// trip instead of always dumping users on the radar Home.
 function Protected({ children }: { children: React.ReactNode }) {
   return (
     <>
       <ClerkLoading><FullPageLoader /></ClerkLoading>
       <ClerkLoaded>
         <Show when="signed-in">{children}</Show>
-        <Show when="signed-out"><Redirect to="/sign-in" /></Show>
+        <Show when="signed-out"><SignInRedirect /></Show>
       </ClerkLoaded>
     </>
   );
+}
+
+function SignInRedirect() {
+  const target = typeof window !== "undefined"
+    ? window.location.pathname + window.location.search
+    : "/";
+  return <Redirect to={`/sign-in?redirect_url=${encodeURIComponent(target)}`} />;
 }
 
 // ── /portal — desktop institutional terminal ─────────────────────────────────
@@ -295,7 +307,11 @@ function RenderLoopGuard() {
 }
 
 // ── Sub-pages — no bottom nav ──────────────────────────────────────────────────
-const SUB_PAGES = ["/sign-", "/exchanges", "/billing", "/legal", "/subscribe", "/consent"];
+// /portal is the institutional desktop terminal — it has its own header
+// + nav and must NOT render the mobile BottomNav. Without this, desktop
+// visitors saw a mobile-style bottom tab bar floating over the terminal
+// and reported "bottom mobile nav" / "mobile shell" rendering bugs.
+const SUB_PAGES = ["/sign-", "/exchanges", "/billing", "/legal", "/subscribe", "/consent", "/portal"];
 
 function Nav() {
   const [loc] = useLocation();

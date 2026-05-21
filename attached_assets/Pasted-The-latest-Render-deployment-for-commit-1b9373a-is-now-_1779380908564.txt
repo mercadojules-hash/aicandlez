@@ -1,0 +1,65 @@
+The latest Render deployment for commit 1b9373a is now LIVE and confirmed in Render Events.
+
+Infrastructure is now fully healthy:
+
+* DNS working
+* SSL working
+* Render deploy working
+* /portal route resolving
+* auth working
+
+However, https://app.aicandlez.com/portal is STILL rendering the mobile Home onboarding/radar UI instead of the desktop PortalDesktop experience.
+
+This means the issue is now strictly application-level.
+
+Current browser console confirms production is still mounting the mobile flow after successful deployment.
+
+I need you to stop focusing on infrastructure and now focus ONLY on the actual React render tree for /portal.
+
+Please verify ALL of the following directly in production code:
+
+1. Confirm PortalDesktop is actually imported into App.tsx from the correct path.
+
+2. Confirm the /portal route is explicitly:
+
+   <Route path="/portal" component={PortalDesktop} />
+
+NOT:
+
+* wrapped in responsive hooks
+* wrapped in Home
+* wrapped in useIsMobile
+* wrapped in conditional rendering
+* wrapped in mobile fallbacks
+
+3. Confirm PortalDesktop itself is not internally redirecting/rendering Home.
+
+4. Confirm no auth middleware or Protected wrapper redirects desktop users into the mobile onboarding flow.
+
+5. Confirm the production build artifact actually contains:
+
+* PortalDesktop
+* MarketHeartbeat
+* War Room
+* desktop trading shell strings
+
+6. Search production bundle output for:
+   PortalDesktop
+   MarketHeartbeat
+   War Room
+
+If those strings do not exist in the built bundle, then the wrong source tree is still being built or the component is excluded from the build graph.
+
+7. Verify there is NOT another route earlier in the router hierarchy intercepting /portal before PortalDesktop mounts.
+
+At this point:
+
+* deployment is confirmed
+* the route exists
+* the domain works
+* Render is live
+
+The remaining issue is purely:
+WHY React is still rendering the mobile Home surface on /portal after the successful deploy.
+
+Focus ONLY on restoring the original desktop customer dashboard experience.
