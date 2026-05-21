@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from "react";
+import { Component, useCallback, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import { Switch, Route, Redirect, Router as WouterRouter, useLocation } from "wouter";
 import {
   ClerkProvider, SignIn, SignUp, Show, ClerkLoading, ClerkLoaded, useClerk,
@@ -399,20 +399,25 @@ function Shell() {
 }
 
 // ── Clerk provider ─────────────────────────────────────────────────────────────
-function ClerkWithProviders() {
-  const [, setLocation] = useLocation();
-  return (
-    <ClerkProvider
-      publishableKey={clerkPubKey!}
-      proxyUrl={clerkProxyUrl}
-      appearance={{
-        cssLayerName: "clerk",
-        options: {
-          logoPlacement: "inside" as const,
-          logoLinkUrl:   basePath || "/",
-          logoImageUrl:  `${window.location.origin}${basePath}/aicandlez-logo.png`,
-        },
-        variables: {
+// CRITICAL: `appearance`, `localization`, and the router callbacks MUST be
+// stable references across renders. `ClerkProvider` from @clerk/react treats
+// changes to these props as configuration updates and re-initializes the
+// Clerk SDK — which fires the auth listener synchronously, which can trigger
+// navigation, which re-renders this component, which creates fresh prop refs,
+// which... loops forever. Symptom: tab flicker, both routes broken, no
+// console errors, [AICandlez] React mounted logs only once (App root is
+// stable but everything under ClerkProvider remounts continuously).
+// Fix: hoist all static config to module scope, useCallback the router fns.
+const CLERK_APPEARANCE = {
+  cssLayerName: "clerk" as const,
+  options: {
+    logoPlacement: "inside" as const,
+    logoLinkUrl:   basePath || "/",
+    logoImageUrl:  (typeof window !== "undefined")
+      ? `${window.location.origin}${basePath}/aicandlez-logo.png`
+      : `${basePath}/aicandlez-logo.png`,
+  },
+  variables: {
           colorPrimary:          "#66FF66",
           colorForeground:       "#EAFFEA",
           colorMutedForeground:  "#4a8a60",
@@ -425,61 +430,116 @@ function ClerkWithProviders() {
           fontFamily:            "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
           borderRadius:          "0.6rem",
         },
-        elements: {
-          rootBox:                       "w-full flex justify-center",
-          cardBox:                       "bg-[#050A07] border border-[#0F1F18] rounded-2xl w-[420px] max-w-full overflow-hidden shadow-[0_0_60px_rgba(102,255,102,0.08)]",
-          card:                          "!shadow-none !border-0 !bg-transparent !rounded-none",
-          footer:                        "!shadow-none !border-0 !bg-transparent !rounded-none",
-          headerTitle:                   "text-[#EAFFEA] font-semibold tracking-tight",
-          headerSubtitle:                "text-[#7ab895] text-xs",
-          socialButtonsBlockButtonText:  "text-[#EAFFEA] text-xs font-medium",
-          formFieldLabel:                "text-[#7ab895] text-xs font-medium",
-          footerActionLink:              "text-[#66FF66] text-xs hover:text-[#7CFF00] font-semibold",
-          footerActionText:              "text-[#4a8a60] text-xs",
-          dividerText:                   "text-[#3a6a50] text-xs",
-          identityPreviewEditButton:     "text-[#66FF66] text-xs",
-          formFieldSuccessText:          "text-[#66FF66] text-xs",
-          alertText:                     "text-[#EAFFEA] text-xs",
-          logoBox:                       "flex justify-center py-3",
-          logoImage:                     "h-8",
-          socialButtonsBlockButton:      "border-[#0F1F18] bg-[#0A1410] hover:bg-[#0F1F18] hover:border-[#1a3a25]",
-          formButtonPrimary:             "bg-[#66FF66] hover:bg-[#7CFF00] text-black text-xs font-bold tracking-wide shadow-[0_0_24px_rgba(102,255,102,0.35)]",
-          formFieldInput:                "bg-[#0A1410] border-[#0F1F18] text-[#EAFFEA] text-xs focus:border-[#66FF66]",
-          footerAction:                  "bg-[#0A1410] border-t border-[#0F1F18]",
-          dividerLine:                   "bg-[#0F1F18]",
-          alert:                         "bg-[#0A1410] border border-[#0F1F18]",
-          otpCodeFieldInput:             "bg-[#0A1410] border-[#0F1F18] text-[#EAFFEA]",
-          formFieldRow:                  "gap-3",
-          main:                          "bg-[#050A07]",
-        },
-      }}
-      localization={{
-        signIn: {
-          start: {
-            title:    "Welcome to AICandlez",
-            subtitle: "Sign in to your institutional AI trading account",
-          },
-        },
-        signUp: {
-          start: {
-            title:    "Join AICandlez",
-            subtitle: "Institutional-grade AI crypto trading",
-          },
-        },
-      }}
-      signInUrl={`${basePath}/sign-in`}
-      signUpUrl={`${basePath}/sign-up`}
-      afterSignOutUrl={`${basePath}/sign-in`}
-      routerPush={(to)    => setLocation(stripBase(to))}
-      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+  elements: {
+    rootBox:                       "w-full flex justify-center",
+    cardBox:                       "bg-[#050A07] border border-[#0F1F18] rounded-2xl w-[420px] max-w-full overflow-hidden shadow-[0_0_60px_rgba(102,255,102,0.08)]",
+    card:                          "!shadow-none !border-0 !bg-transparent !rounded-none",
+    footer:                        "!shadow-none !border-0 !bg-transparent !rounded-none",
+    headerTitle:                   "text-[#EAFFEA] font-semibold tracking-tight",
+    headerSubtitle:                "text-[#7ab895] text-xs",
+    socialButtonsBlockButtonText:  "text-[#EAFFEA] text-xs font-medium",
+    formFieldLabel:                "text-[#7ab895] text-xs font-medium",
+    footerActionLink:              "text-[#66FF66] text-xs hover:text-[#7CFF00] font-semibold",
+    footerActionText:              "text-[#4a8a60] text-xs",
+    dividerText:                   "text-[#3a6a50] text-xs",
+    identityPreviewEditButton:     "text-[#66FF66] text-xs",
+    formFieldSuccessText:          "text-[#66FF66] text-xs",
+    alertText:                     "text-[#EAFFEA] text-xs",
+    logoBox:                       "flex justify-center py-3",
+    logoImage:                     "h-8",
+    socialButtonsBlockButton:      "border-[#0F1F18] bg-[#0A1410] hover:bg-[#0F1F18] hover:border-[#1a3a25]",
+    formButtonPrimary:             "bg-[#66FF66] hover:bg-[#7CFF00] text-black text-xs font-bold tracking-wide shadow-[0_0_24px_rgba(102,255,102,0.35)]",
+    formFieldInput:                "bg-[#0A1410] border-[#0F1F18] text-[#EAFFEA] text-xs focus:border-[#66FF66]",
+    footerAction:                  "bg-[#0A1410] border-t border-[#0F1F18]",
+    dividerLine:                   "bg-[#0F1F18]",
+    alert:                         "bg-[#0A1410] border border-[#0F1F18]",
+    otpCodeFieldInput:             "bg-[#0A1410] border-[#0F1F18] text-[#EAFFEA]",
+    formFieldRow:                  "gap-3",
+    main:                          "bg-[#050A07]",
+  },
+} as const;
+
+const CLERK_LOCALIZATION = {
+  signIn: { start: {
+    title:    "Welcome to AICandlez",
+    subtitle: "Sign in to your institutional AI trading account",
+  } },
+  signUp: { start: {
+    title:    "Join AICandlez",
+    subtitle: "Institutional-grade AI crypto trading",
+  } },
+} as const;
+
+const SIGN_IN_URL  = `${basePath}/sign-in`;
+const SIGN_UP_URL  = `${basePath}/sign-up`;
+const AFTER_SIGNOUT_URL = `${basePath}/sign-in`;
+
+function ClerkWithProviders() {
+  const [, setLocation] = useLocation();
+
+  // Stable router callbacks — without useCallback these get a fresh identity
+  // on every render and trigger a Clerk SDK re-init loop. See block comment
+  // above for the full diagnosis.
+  const routerPush    = useCallback((to: string) => setLocation(stripBase(to)),                       [setLocation]);
+  const routerReplace = useCallback((to: string) => setLocation(stripBase(to), { replace: true }),    [setLocation]);
+
+  // Trip-counter — if Clerk re-instantiates this provider more than 10 times
+  // in 5s we know an unstable-prop loop is still happening somewhere.
+  const renderRef    = useRef(0);
+  const renderStart  = useRef(Date.now());
+  renderRef.current += 1;
+  if (renderRef.current % 10 === 0) {
+    const elapsed = Date.now() - renderStart.current;
+    console.warn("[ClerkWithProviders] render", renderRef.current, "in", elapsed, "ms");
+    if (renderRef.current > 30 && elapsed < 5000) {
+      console.error("[ClerkWithProviders] re-render storm — ClerkProvider unstable prop suspected");
+    }
+  }
+
+  return (
+    <ClerkProvider
+      publishableKey={clerkPubKey!}
+      proxyUrl={clerkProxyUrl}
+      appearance={CLERK_APPEARANCE}
+      localization={CLERK_LOCALIZATION}
+      signInUrl={SIGN_IN_URL}
+      signUpUrl={SIGN_UP_URL}
+      afterSignOutUrl={AFTER_SIGNOUT_URL}
+      routerPush={routerPush}
+      routerReplace={routerReplace}
     >
       <QueryClientProvider client={queryClient}>
         <CacheInvalidator />
+        <RouteTracer />
         <Shell />
       </QueryClientProvider>
     </ClerkProvider>
   );
 }
+
+// ── Route transition tracer ──────────────────────────────────────────────────
+// Logs every URL change once. If you see this fire 100s of times in seconds,
+// you have a redirect loop (e.g. <Redirect> ping-pong between two routes).
+function RouteTracer() {
+  const [loc] = useLocation();
+  const prev  = useRef<string | null>(null);
+  const count = useRef(0);
+  const start = useRef(Date.now());
+  useEffect(() => {
+    if (prev.current === loc) return;
+    count.current += 1;
+    const elapsed = Date.now() - start.current;
+    console.log("[RouteTracer]", prev.current, "→", loc, `(transition #${count.current}, +${elapsed}ms)`);
+    prev.current = loc;
+    if (count.current > 20 && elapsed < 5000) {
+      console.error("[RouteTracer] redirect-loop suspected", { transitions: count.current, elapsedMs: elapsed });
+    }
+  }, [loc]);
+  return null;
+}
+
+// Silence "useMemo unused" warning on environments where it isn't tree-shaken.
+void useMemo;
 
 // ── Root ───────────────────────────────────────────────────────────────────────
 export default function App() {
