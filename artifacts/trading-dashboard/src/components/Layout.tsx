@@ -10,6 +10,24 @@ const ADMIN_ONLY_PATHS = new Set([
   "/command", "/exchange", "/syscheck", "/debug",
   "/desktop", "/institutional", "/admin",
 ]);
+
+// Host-based separation between customer terminal and operator workstation.
+// Production hosts:
+//   admintrade.aicandlez.com → operator workstation (full module rail + telemetry)
+//   dashboard.aicandlez.com  → legacy operator host (same UI, kept during migration)
+//   trade.aicandlez.com      → customer institutional terminal (NO module rail,
+//                              NO operator telemetry, just the Portal.tsx workstation)
+// In dev (Replit preview) we default to operator UI so engineers see every module.
+function detectIsAdminHost(): boolean {
+  if (typeof window === "undefined") return true;
+  const h = window.location.hostname;
+  if (h.startsWith("admintrade.")) return true;
+  if (h.startsWith("dashboard."))  return true;
+  if (h.startsWith("trade."))      return false;
+  // Local dev / Replit preview → keep the operator rail for development.
+  return true;
+}
+const IS_ADMIN_HOST = detectIsAdminHost();
 import {
   Activity,
   AlertTriangle,
@@ -510,16 +528,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
         }}
       >
         <div className="flex items-center gap-2">
-          <button onClick={() => setMobileOpen(o => !o)}
-            className="md:hidden p-1.5 rounded border border-[#0E2235] touch-manipulation min-w-[28px] min-h-[28px] flex items-center justify-center"
-            style={{ color: "#4a6a80" }}>
-            {mobileOpen ? <X className="w-3 h-3" /> : <Menu className="w-3 h-3" />}
-          </button>
-          <button onClick={() => setCollapsed(c => !c)}
-            className="hidden md:flex p-1 rounded border border-[#0E2235] transition-colors"
-            style={{ color: "#4a6a80" }}>
-            {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
-          </button>
+          {/* Sidebar toggles only render on operator/admin hosts. The customer
+              terminal (trade.aicandlez.com) has no module rail, so these
+              would do nothing — hide them to keep the header clean. */}
+          {IS_ADMIN_HOST && (
+            <>
+              <button onClick={() => setMobileOpen(o => !o)}
+                className="md:hidden p-1.5 rounded border border-[#0E2235] touch-manipulation min-w-[28px] min-h-[28px] flex items-center justify-center"
+                style={{ color: "#4a6a80" }}>
+                {mobileOpen ? <X className="w-3 h-3" /> : <Menu className="w-3 h-3" />}
+              </button>
+              <button onClick={() => setCollapsed(c => !c)}
+                className="hidden md:flex p-1 rounded border border-[#0E2235] transition-colors"
+                style={{ color: "#4a6a80" }}>
+                {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+              </button>
+            </>
+          )}
 
           <div className="flex items-center gap-2 select-none">
             <img src={`${import.meta.env.BASE_URL}aicandlez-logo.png`} alt="AICandlez"
@@ -539,44 +564,57 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <SystemStatusBar />
       </header>
 
-      {/* Operator telemetry strip — admin/super-admin only. Live data
-          from GET /api/admin/top-telemetry, polled every 5s. Spans the
-          full width above the sidebar+main so an operator always has
-          platform vitals in view regardless of which module is open. */}
-      {isAdmin && <AdminTopTelemetryBar />}
+      {/* Operator telemetry strip — admin/super-admin only AND only on the
+          operator host. The customer terminal at trade.aicandlez.com must
+          never show platform-wide operator vitals, even if an admin signs
+          in there. Telemetry lives exclusively on admintrade. */}
+      {IS_ADMIN_HOST && isAdmin && <AdminTopTelemetryBar />}
 
       {/* Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
-        {mobileOpen && (
-          <div className="md:hidden fixed inset-0 z-30 bg-black/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+        {/* Sidebar (desktop + mobile) and overlay only render on the
+            operator/admin host. The customer institutional terminal at
+            trade.aicandlez.com must render as a clean full-width workstation
+            with no module rail and no Dashboard / Market Data / Indicators /
+            AI Reasoning / Risk Management / Simulation / Backtesting /
+            Strategy Optimizer / Asset Scanner / Portfolio / Correlation /
+            Trade Journal / Validation / Sentiment AI / Multi-Asset Chart
+            / Exchange / Command Center / Desktop Terminal / Institutional
+            Terminal / Signal Debug / System Verification navigation. */}
+        {IS_ADMIN_HOST && (
+          <>
+            {mobileOpen && (
+              <div className="md:hidden fixed inset-0 z-30 bg-black/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+            )}
+
+            {/* Desktop sidebar */}
+            <aside
+              className={`hidden md:flex ${collapsed ? "w-12" : "w-52"} shrink-0 border-r flex-col transition-all duration-200 overflow-hidden`}
+              style={{ background: "#000508", borderRightColor: "#0a1820" }}
+            >
+              <SidebarContent collap={collapsed} />
+            </aside>
+
+            {/* Mobile sidebar */}
+            <aside
+              className={`md:hidden fixed inset-y-0 left-0 z-40 w-60 flex-col transition-transform duration-200 ease-out overflow-y-auto flex
+                ${mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}`}
+              style={{ background: "#000810", borderRight: "1px solid #0A1E2E" }}
+            >
+              <div className="h-10 flex items-center gap-2 px-3 border-b shrink-0" style={{ borderBottomColor: "#0A1E2E" }}>
+                <img src={`${import.meta.env.BASE_URL}aicandlez-logo.png`} alt="AICandlez"
+                  style={{ height: 22, width: 22, objectFit: "contain", borderRadius: 3 }}/>
+                <span className="font-mono text-[11px] font-bold tracking-[0.18em]">
+                  AI<span style={{ color: "#00eeff" }}>CANDLEZ</span>
+                </span>
+                <button onClick={() => setMobileOpen(false)} className="ml-auto p-1 rounded" style={{ color: "#4a6a80" }}>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <SidebarContent collap={false} onNavigate={handleNavigate} />
+            </aside>
+          </>
         )}
-
-        {/* Desktop sidebar */}
-        <aside
-          className={`hidden md:flex ${collapsed ? "w-12" : "w-52"} shrink-0 border-r flex-col transition-all duration-200 overflow-hidden`}
-          style={{ background: "#000508", borderRightColor: "#0a1820" }}
-        >
-          <SidebarContent collap={collapsed} />
-        </aside>
-
-        {/* Mobile sidebar */}
-        <aside
-          className={`md:hidden fixed inset-y-0 left-0 z-40 w-60 flex-col transition-transform duration-200 ease-out overflow-y-auto flex
-            ${mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}`}
-          style={{ background: "#000810", borderRight: "1px solid #0A1E2E" }}
-        >
-          <div className="h-10 flex items-center gap-2 px-3 border-b shrink-0" style={{ borderBottomColor: "#0A1E2E" }}>
-            <img src={`${import.meta.env.BASE_URL}aicandlez-logo.png`} alt="AICandlez"
-              style={{ height: 22, width: 22, objectFit: "contain", borderRadius: 3 }}/>
-            <span className="font-mono text-[11px] font-bold tracking-[0.18em]">
-              AI<span style={{ color: "#00eeff" }}>CANDLEZ</span>
-            </span>
-            <button onClick={() => setMobileOpen(false)} className="ml-auto p-1 rounded" style={{ color: "#4a6a80" }}>
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          <SidebarContent collap={false} onNavigate={handleNavigate} />
-        </aside>
 
         <main className="flex-1 overflow-auto min-w-0">{children}</main>
       </div>

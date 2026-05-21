@@ -1,0 +1,161 @@
+Great progress — the architecture separation is now working correctly.
+
+LIVE VERIFIED:
+
+* https://trade.aicandlez.com/portal
+* https://admintrade.aicandlez.com
+* Clerk subdomain authorization issue is fixed
+* Desktop institutional terminal is now loading correctly
+* Mobile app routing confusion is resolved
+
+NOW we need FINAL production cleanup and Stripe verification.
+
+CRITICAL TASKS:
+
+==================================================
+
+1. REMOVE ADMIN / OPERATOR LEFT SIDEBAR
+   ==================================================
+
+On:
+https://trade.aicandlez.com/portal
+
+The LEFT ADMIN MENU SHOULD NOT EXIST for customer users.
+
+REMOVE:
+
+* Dashboard
+* Market Data
+* Indicators
+* AI Reasoning
+* Risk Management
+* Simulation
+* Backtesting
+* Strategy Optimizer
+* Asset Scanner
+* Portfolio
+* Correlation
+* Trade Journal
+* Validation
+* Sentiment AI
+* Multi-Asset Chart
+* ALL platform/admin/operator items
+
+That left rail belongs ONLY to:
+https://admintrade.aicandlez.com
+
+Customer terminal should remain:
+
+* clean institutional trading workstation
+* top telemetry
+* charts
+* signal panels
+* AI execution
+* portfolio/trading experience
+
+NO ADMIN NAVIGATION.
+
+==================================================
+2. STRIPE CHECKOUT AUDIT + REPAIR
+=================================
+
+Earlier today there was a reported Stripe issue.
+
+We MUST verify ALL production billing flows now.
+
+Audit FULL Stripe production flow:
+
+Customer upgrade flow:
+
+* AI Trading
+* AI Trading Pro
+
+Verify:
+
+* Stripe checkout session creation
+* publishable key wiring
+* secret key wiring
+* webhook events
+* subscription activation
+* customer portal
+* successful return URLs
+* failed payment handling
+* live mode vs test mode
+* production environment variables
+* subscription persistence in DB
+* membership/tier activation after payment
+
+IMPORTANT:
+The mobile app currently shows:
+
+"Your account does not have permission to upgrade."
+
+This is likely:
+
+* Clerk role issue
+* subscription permission issue
+* Stripe entitlement issue
+* OR billing gate issue
+
+Trace and fix the FULL upgrade path.
+
+==================================================
+3. ADMIN HOST REQUIREMENTS
+==========================
+
+admintrade.aicandlez.com should become:
+
+* true operator workstation
+* NO subscription limitations
+* unlimited concurrent AI trades
+* Kraken live execution only
+* no paper trading for admins
+* no upgrade/paywall prompts
+* live operator telemetry
+
+Admin top telemetry bar should show:
+
+* active users
+* total users
+* users online
+* total trades
+* trades today
+* fees collected
+* MRR
+* active subscriptions
+* AI executions
+* exchange connections
+* queue stats
+* latency
+* uptime
+* websocket status
+* platform activity metrics
+
+==================================================
+4. FINAL GOAL
+=============
+
+FINAL ARCHITECTURE:
+
+app.aicandlez.com
+→ mobile app / PWA only
+
+trade.aicandlez.com
+→ customer institutional desktop trading terminal
+
+admintrade.aicandlez.com
+→ operator/admin workstation
+
+NO CROSSOVER.
+NO MOBILE APP SHELL.
+NO ADMIN UI ON CUSTOMER TERMINAL.
+
+The customer terminal is VERY close now.
+Focus on:
+
+* removing admin rail
+* fixing Stripe production upgrade flow
+* tightening customer vs admin separation
+* verifying live billing end-to-end
+
+The attached screenshots show the current customer desktop terminal and the current mobile upgrade/paywall issue.
