@@ -45,6 +45,18 @@ import { toast } from "@/hooks/use-toast";
 
 const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
+// API base URL — in production the API lives on a different origin
+// (api.aicandlez.com) supplied via VITE_API_BASE_URL. In dev it falls back to
+// same-origin so the Vite proxy can route to the local api-server. NEVER use
+// `basePath` for API calls — that points at the static SPA host, which
+// returns index.html with status 200 for any /api/* path and causes silent
+// "(HTTP 200)" failures in checkout, billing portal, subscription, etc.
+const apiBaseUrl = (
+  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ??
+  basePath ??
+  ""
+).replace(/\/$/, "");
+
 const j = <T,>(url: string) =>
   fetch(url, { cache: "no-store", credentials: "include" }).then(
     (r) => r.json() as Promise<T>,
@@ -313,7 +325,7 @@ function AccountModal({
   const openPortal = async () => {
     try {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${basePath}/api/billing/portal`, {
+      const res = await fetch(`${apiBaseUrl}/api/billing/portal`, {
         method: "POST", credentials: "include",
         headers: {
           "Content-Type": "application/json",
@@ -679,7 +691,7 @@ function useExchangeStatus(): ExchangeStatus {
   const { data } = useQuery({
     queryKey: ["portal-exchanges-status"],
     queryFn:  async () => {
-      const r = await fetch(`${basePath}/api/user/exchanges`, { credentials: "include" });
+      const r = await fetch(`${apiBaseUrl}/api/user/exchanges`, { credentials: "include" });
       if (!r.ok) return { exchanges: [] as ExchangeStatusEntry[] };
       return r.json() as Promise<{ exchanges: ExchangeStatusEntry[] }>;
     },
@@ -994,7 +1006,7 @@ function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => void })
       // attach a fresh Bearer token (same pattern the WebSocket + Desktop
       // Terminal use). The api-server's clerkMiddleware accepts both.
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${basePath}/api/billing/checkout`, {
+      const res = await fetch(`${apiBaseUrl}/api/billing/checkout`, {
         method:      "POST",
         credentials: "include",
         headers: {
@@ -1003,15 +1015,28 @@ function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => void })
         },
         body:        JSON.stringify({ planId }),
       });
-      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      const contentType = res.headers.get("content-type") ?? "";
+      const isJson      = contentType.includes("application/json");
+      const data = isJson
+        ? ((await res.json().catch(() => ({}))) as { url?: string; error?: string })
+        : {};
       if (res.ok && data.url) {
         window.location.href = data.url;
         return;
       }
+      // Surface enough diagnostic context in the browser console that prod
+      // issues are root-cause-able without redeploying for more logs.
+      console.error("[checkout] failed", {
+        status:      res.status,
+        contentType,
+        url:         `${apiBaseUrl}/api/billing/checkout`,
+        data,
+      });
       const friendly =
         res.status === 401 ? "Your session expired. Please sign in again to continue."
         : res.status === 403 ? "Your account does not have permission to upgrade."
         : res.status === 429 ? "Too many attempts — please wait a moment and try again."
+        : !isJson           ? "Checkout endpoint mis-routed (received HTML instead of JSON). Reach out to support — this is a config issue, not a card problem."
         : data.error
           ? `Stripe checkout could not start — ${data.error}.`
           : `Stripe checkout could not start (HTTP ${res.status}). Please try again.`;
@@ -1537,7 +1562,7 @@ function PortalInner() {
     (async () => {
       try {
         const token = await getToken().catch(() => null);
-        const res = await fetch(`${basePath}/api/billing/subscription`, {
+        const res = await fetch(`${apiBaseUrl}/api/billing/subscription`, {
           credentials: "include",
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
@@ -1730,7 +1755,7 @@ function PortalInner() {
                 onClick={async () => {
                   try {
                     const token = await getToken().catch(() => null);
-                    const res = await fetch(`${basePath}/api/billing/portal`, {
+                    const res = await fetch(`${apiBaseUrl}/api/billing/portal`, {
                       method: "POST", credentials: "include",
                       headers: {
                         "Content-Type": "application/json",

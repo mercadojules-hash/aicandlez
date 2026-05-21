@@ -1,14 +1,37 @@
-const BASE = "/api";
+// API base URL — production lives on api.aicandlez.com (cross-origin) supplied
+// via VITE_API_BASE_URL. In dev it falls back to same-origin "/api". NEVER
+// rely on relative "/api" in prod — the SPA static host returns index.html
+// with status 200 for any /api/* path, which causes silent JSON parse
+// failures and misleading "HTTP 200" error messages.
+const API_BASE = (
+  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? ""
+).replace(/\/$/, "") + "/api";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers: { "Content-Type": "application/json", Accept: "application/json", ...(init?.headers ?? {}) },
     credentials: "include",
   });
+
+  const contentType = res.headers.get("content-type") ?? "";
+  const isJson      = contentType.includes("application/json");
+
   if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { error?: string };
+    const body = isJson
+      ? (await res.json().catch(() => ({}))) as { error?: string }
+      : {};
+    if (!isJson) {
+      console.error("[api] non-JSON error response", { url, status: res.status, contentType });
+      throw new Error(`API endpoint mis-routed (HTTP ${res.status}, got ${contentType || "no content-type"}). VITE_API_BASE_URL may be missing or wrong.`);
+    }
     throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+
+  if (!isJson) {
+    console.error("[api] non-JSON success response", { url, contentType });
+    throw new Error("API returned non-JSON (likely served by SPA host). VITE_API_BASE_URL may be missing or wrong.");
   }
   return res.json() as Promise<T>;
 }
