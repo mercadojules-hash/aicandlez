@@ -751,8 +751,12 @@ function ExchangeStatusPill({ status }: { status: ExchangeStatus }) {
   );
 }
 
-/** Subtle onboarding banner for first-time users with no connected exchanges. */
-function ExchangeOnboardingBanner() {
+/** Subtle onboarding banner for first-time users with no connected exchanges.
+ *  Clicking the CTA opens the in-app PortalExchangeConnectModal — it must NEVER
+ *  cross-host redirect to app.aicandlez.com. Customers stay inside dashboard
+ *  /portal during onboarding; the modal handles disclaimer + paid-tier
+ *  membership gating server-side. */
+function ExchangeOnboardingBanner({ onConnect }: { onConnect: () => void }) {
   return (
     <div style={{
       margin: "12px 16px 0",
@@ -792,8 +796,9 @@ function ExchangeOnboardingBanner() {
           SUPPORTED · KRAKEN · COINBASE · BINANCE · BYBIT · OKX · KUCOIN · CRYPTO.COM
         </div>
       </div>
-      <a
-        href="https://app.aicandlez.com/settings/exchanges"
+      <button
+        type="button"
+        onClick={onConnect}
         style={{
           padding: "8px 18px",
           background: `linear-gradient(180deg, ${N.BRAND} 0%, ${N.BRAND_DEEP} 100%)`,
@@ -801,22 +806,23 @@ function ExchangeOnboardingBanner() {
           borderRadius: 4,
           color: "#001a0d",
           fontWeight: 800, fontSize: 11, letterSpacing: "0.18em",
-          fontFamily: N.FONT_MONO, textDecoration: "none",
+          fontFamily: N.FONT_MONO, textDecoration: "none", cursor: "pointer",
           boxShadow: `0 0 22px ${N.BRAND_GLOW}`,
           whiteSpace: "nowrap",
         }}
       >
         CONNECT EXCHANGE →
-      </a>
+      </button>
     </div>
   );
 }
 
 function LiveExecutionBar({
-  tier, onUpgrade, exchangeConnected, openSlots, isAdmin = false,
+  tier, onUpgrade, onConnectExchange, exchangeConnected, openSlots, isAdmin = false,
 }: {
   tier: Plan;
   onUpgrade: () => void;
+  onConnectExchange: () => void;
   exchangeConnected: boolean;
   openSlots: number;
   isAdmin?: boolean;
@@ -841,7 +847,7 @@ function LiveExecutionBar({
 
   const handle = () => {
     if (tierLocked)     { onUpgrade(); return; }
-    if (exchangeLocked) { window.location.assign("https://app.aicandlez.com/settings/exchanges"); return; }
+    if (exchangeLocked) { onConnectExchange(); return; }
     setArmed(a => !a);
   };
 
@@ -1727,7 +1733,7 @@ function PortalInner() {
 
       {/* First-time onboarding banner — auto-hides once at least one exchange
           is connected. Reinforces non-custodial security promise inline. */}
-      {!hasExchange && <ExchangeOnboardingBanner />}
+      {!hasExchange && <ExchangeOnboardingBanner onConnect={() => setConnectExchangeOpen(true)} />}
 
       {/* Metrics row.
           Admin operators on admintrade.aicandlez.com see REAL Kraken live
@@ -1866,6 +1872,7 @@ function PortalInner() {
         <LiveExecutionBar
           tier={tier}
           onUpgrade={() => setUpgradeOpenSafe(true)}
+          onConnectExchange={() => setConnectExchangeOpen(true)}
           exchangeConnected={hasExchange}
           openSlots={stats.openCount}
           isAdmin={isAdmin}
