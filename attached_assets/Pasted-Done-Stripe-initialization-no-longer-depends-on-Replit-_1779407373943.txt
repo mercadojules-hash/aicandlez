@@ -1,0 +1,47 @@
+Done. Stripe initialization no longer depends on Replit-only env vars.
+
+What changed in artifacts/api-server/src/stripeClient.ts
+getCredentials() was the hard-fail point — it threw "Missing Replit environment variables..." whenever REPLIT_CONNECTORS_HOSTNAME + REPL_IDENTITY/WEB_REPL_RENEWAL weren't both set, which is always the case on Render. Rewritten to a two-stage resolver:
+
+1. credentialsFromEnv()           ← PRIMARY (Render & any non-Replit host)
+     STRIPE_SECRET_KEY            (required)
+     STRIPE_PUBLISHABLE_KEY       (optional; falls back to VITE_STRIPE_PUBLISHABLE_KEY)
+2. credentialsFromReplitConnector()  ← LEGACY FALLBACK (Replit workspace only)
+     returns null instead of throwing when REPLIT_* vars are absent
+
+The connector path is no longer reachable on Render because env vars take precedence and the connector function returns null (not throws) when Replit-specific vars are missing. Final fallback error message is now actionable: "Set STRIPE_SECRET_KEY (and optionally STRIPE_PUBLISHABLE_KEY) in the deployment environment."
+
+All three consumers benefit:
+
+getUncachableStripeClient() — used by /billing/checkout, /billing/portal, /billing/subscription (routes/billing.ts:135, 397, 448)
+getStripePublishableKey() — used by /billing/publishable-key (routes/billing.ts:153)
+getStripeSync() — used by webhook handler (webhookHandlers.ts:18) and startup auto-registration (index.ts:35). Webhook secret now prefers STRIPE_WEBHOOK_SECRET env first; the stripe._managed_webhooks DB lookup only runs when env is unset (so Render won't try to query a table that doesn't exist there).
+Verification
+✅ pnpm --filter @workspace/api-server run typecheck — PASS
+✅ api-server restarted, /api/healthz returns {"status":"ok","db":{"status":"ok"}} (locally STRIPE_SECRET_KEY is in workspace secrets so the env path is exercised)
+✅ Replit integration package import (stripe-replit-sync) still works — it's only the env-var lookup that changed, not the SDK
+What you do on Render
+I cannot reach Render from this environment. After this commit lands on main:
+
+Redeploy aicandlez-api (push to main triggers it, or hit "Manual Deploy" in Render).
+Verify env vars on the aicandlez-api service (Settings → Environment) — all three required:
+STRIPE_SECRET_KEY = sk_live_…
+STRIPE_PRICE_STARTER_MONTHLY = price_1TZPqFIzLCdrkUtzWyDLLMmA
+STRIPE_PRICE_PRO_MONTHLY = price_1TZPqGIzLCdrkUtzMVJLcxb1
+(optional but recommended) STRIPE_WEBHOOK_SECRET, STRIPE_PUBLISHABLE_KEY
+Verify checkout — from a signed-in customer on app.aicandlez.com:
+curl -i -X POST https://api.aicandlez.com/api/billing/checkout \
+  -H 'Cookie: __session=<your-clerk-session-cookie>' \
+  -H 'Content-Type: application/json' \
+  -d '{"planId":"starter","billingPeriod":"monthly"}'
+
+Expect 200 with { url: "https://checkout.stripe.com/c/pay/..." }. Visiting that URL loads real Stripe Checkout.
+In the UI: open Subscribe → click "Start AI Trading" (Starter) and "Go Pro" (Pro). Both should open a Stripe Checkout tab. If either returns 5xx, paste the new server log line — with the env path active you'll now see a Stripe API error (e.g. invalid price ID or wrong key mode) instead of the connector-missing error.
+Work is complete. The Stripe initialization fix is committed-ready:
+
+artifacts/api-server/src/stripeClient.ts rewritten — env vars primary, Replit connector legacy fallback only
+Typecheck PASS, api-server restarted, /api/healthz returns {status:"ok", db:ok}
+Commit message written to .local/.commit_message
+Remaining steps are on your side (I have no Render access): confirm STRIPE_SECRET_KEY/STRIPE_PRICE_STARTER_MONTHLY/STRIPE_PRICE_PRO_MONTHLY on the aicandlez-api service, redeploy, then hit POST /api/billing/checkout — you should get a real checkout.stripe.com URL instead of the connector error.
+
+Task is complete. The Stripe fix is committed and the api-server is running healthy. Remaining action is on your side: verify env vars on Render and redeploy aicandlez-api.
