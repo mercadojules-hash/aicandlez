@@ -45,7 +45,6 @@ import Leaderboard from "@/pages/Leaderboard";
 import AlertsPage from "@/pages/Alerts";
 import DesktopTerminal from "@/pages/DesktopTerminal";
 import InstitutionalTerminal from "@/pages/InstitutionalTerminal";
-import Portal from "@/pages/Portal";
 import { useUserRole } from "@/hooks/useUserRole";
 
 // ── Env ───────────────────────────────────────────────────────────────────────
@@ -255,11 +254,14 @@ function Protected({ children }: { children: React.ReactNode }) {
 }
 
 // AdminOnly — gates operator-grade pages (Command Center, Exchange, syscheck,
-// debug, desktop, institutional, admin). Non-admins are redirected to /portal.
+// debug, desktop, institutional, admin). dashboard.aicandlez.com is operator-
+// only; non-admin authenticated users are cross-app redirected to the consumer
+// PWA (app.aicandlez.com/portal). NEVER fall through to an internal /portal —
+// that route does not exist on this host.
 function AdminOnly({ children }: { children: React.ReactNode }) {
   const { isAdmin, loading } = useUserRole();
   if (loading) return <FullPageLoader />;
-  if (!isAdmin) return <Redirect to="/portal" />;
+  if (!isAdmin) return <CrossAppRedirect to={USER_PORTAL_URL} />;
   return <Layout>{children}</Layout>;
 }
 
@@ -269,20 +271,6 @@ function ProtectedAdmin({ children }: { children: React.ReactNode }) {
       <ClerkLoading><FullPageLoader /></ClerkLoading>
       <ClerkLoaded>
         <Show when="signed-in"><AdminOnly>{children}</AdminOnly></Show>
-        <Show when="signed-out"><Redirect to="/sign-in" /></Show>
-      </ClerkLoaded>
-    </>
-  );
-}
-
-// PortalProtected — wraps the customer dashboard. No admin Layout shell
-// (Portal renders its own top bar). Signed-out users go to /sign-in.
-function PortalProtected({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <ClerkLoading><FullPageLoader /></ClerkLoading>
-      <ClerkLoaded>
-        <Show when="signed-in">{children}</Show>
         <Show when="signed-out"><Redirect to="/sign-in" /></Show>
       </ClerkLoaded>
     </>
@@ -373,7 +361,8 @@ function Router() {
         <ProtectedAdmin><CommandCenter /></ProtectedAdmin>
       </Route>
       <Route path="/portal">
-        <PortalProtected><Portal /></PortalProtected>
+        {/* Portal lives on app.aicandlez.com — dashboard host bounces. */}
+        <CrossAppRedirect to={USER_PORTAL_URL} />
       </Route>
       <Route path="/dashboard">
         <Protected><Dashboard /></Protected>
