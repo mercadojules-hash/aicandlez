@@ -158,6 +158,13 @@ function Pages() {
       <Route path="/asset" component={() => <Protected><AssetDetail key="default" /></Protected>} />
       <Route path="/profile"  component={() => <Protected><Profile  /></Protected>} />
       <Route path="/subscribe"   component={() => <Protected><Subscribe /></Protected>} />
+      {/* /upgrade and /pricing are common deep-link targets from push notifications,
+          email CTAs, browser bookmarks, and the operator dashboard's cross-app
+          links. Aliasing them to <Subscribe /> avoids the catch-all redirect to
+          "/", which has caused black-screen reports when Home crashes during the
+          transition. */}
+      <Route path="/upgrade"     component={() => <Protected><Subscribe /></Protected>} />
+      <Route path="/pricing"     component={() => <Protected><Subscribe /></Protected>} />
       <Route path="/consent"     component={() => <Protected><Consent /></Protected>} />
       <Route path="/exchanges"   component={() => <Redirect to="/settings/exchanges" />} />
       {/* Canonical exchange-onboarding deep link. Renders Profile, which
