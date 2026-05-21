@@ -1,0 +1,136 @@
+Proceed with the final brand consistency pass before deployment approval.
+
+PRIORITY FIX #1 — CLERK APP NAME
+
+The PWA sign-in currently shows:
+“My Application”
+
+This must be updated everywhere to:
+“AICandlez”
+
+Need:
+
+* Clerk display name updated
+* auth screens updated
+* email templates updated if applicable
+* all auth-related branding consistent
+
+---
+
+PRIORITY FIX #2 — PWA CLERK THEME
+
+The PWA auth/sign-in experience is still using the default cyan/teal Clerk styling.
+
+This is inconsistent with the finalized AICandlez neon-green cinematic branding.
+
+Copy the Clerk appearance/theme configuration from:
+trading-dashboard
+
+into:
+aicandlez-app
+
+Need:
+
+* neon-green accents
+* black/dark terminal aesthetic
+* cinematic glow styling
+* consistent typography
+* consistent button styling
+
+The sign-in experience should feel premium and unified.
+
+---
+
+PRIORITY FIX #3 — DASHBOARD LEGACY CYAN LANDING
+
+The dashboard root still shows the older cyan/blue landing styling.
+
+Need:
+
+* full AICandlez neon-green branding consistency
+  OR
+* redirect dashboard root to the correct branded landing
+
+No legacy blue/cyan branding should remain anywhere user-facing.
+
+---
+
+ADDITIONAL VERIFICATION REQUIRED
+
+Please confirm ALL of the following are fully completed and functioning:
+
+1. USER DASHBOARD + STRIPE
+
+* Stripe subscriptions fully wired
+* Starter + Pro plans functioning
+* checkout flow verified
+* webhook syncing verified
+* subscription upgrades/downgrades verified
+
+2. PRICING CORRECTIONS
+   Verify ALL frontend surfaces now show:
+
+* AICandlez Starter
+* AICandlez Pro
+
+Verify pricing:
+
+* $39.99/month
+* $79.99/month
+
+No old:
+
+* AI Trading
+* AI Trading Pro
+  branding should remain anywhere.
+
+3. CONNECT EXCHANGE FLOW
+   Need confirmation the user-facing exchange onboarding is fully completed.
+
+Must include:
+
+* proper exchange connection instructions
+* API key setup guidance
+* “DO NOT ENABLE WITHDRAWALS” warning
+* encrypted credential/security explanation
+* exchange selection cards
+* onboarding steps
+* polished portal styling
+* NO operator/dashboard shell exposure
+
+4. LIVE TRADES + TRADE HISTORY UX
+   The Live Trades panel and Trade History panel must become scrollable after approximately 15 assets/trades.
+
+Requirements:
+
+* fixed-height containers
+* internal scrolling
+* maintain cinematic dashboard layout
+* no infinite vertical stretching
+* smooth scrolling behavior
+* mobile responsive
+
+Need this applied to:
+
+* Active Trades
+* Trade History
+* Recently Closed
+* Any large telemetry/trade tables
+
+---
+
+AFTER FIXES
+
+Please provide updated preview screenshots for:
+
+1. consumer portal
+2. exchange onboarding
+3. admin dashboard
+4. pricing/subscription screens
+5. trade history/live trades scrolling behavior
+
+Then provide final production readiness recommendation before:
+
+* deployment
+* TestFlight build
+* App Store screenshot generation

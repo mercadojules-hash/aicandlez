@@ -584,9 +584,16 @@ export default function Journal() {
               />
             )}
 
-            {open.map(trade => (
-              <TradeCard key={trade.id ?? Math.random()} trade={trade} />
-            ))}
+            {open.length > 0 && (
+              <div
+                className="space-y-3 pr-1 overflow-y-auto overscroll-contain rounded-md"
+                style={{ maxHeight: 640 }}
+              >
+                {open.map(trade => (
+                  <TradeCard key={trade.id ?? Math.random()} trade={trade} />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Trade History */}
@@ -606,9 +613,16 @@ export default function Journal() {
               />
             )}
 
-            {closed.map(trade => (
-              <TradeCard key={trade.id ?? Math.random()} trade={trade} />
-            ))}
+            {closed.length > 0 && (
+              <div
+                className="space-y-3 pr-1 overflow-y-auto overscroll-contain rounded-md"
+                style={{ maxHeight: 640 }}
+              >
+                {closed.map(trade => (
+                  <TradeCard key={trade.id ?? Math.random()} trade={trade} />
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

@@ -229,18 +229,65 @@ function ClerkWithProviders() {
       publishableKey={clerkPubKey!}
       proxyUrl={clerkProxyUrl}
       appearance={{
-        logoImageUrl: `${window.location.origin}${basePath}/aicandlez-logo.png`,
+        cssLayerName: "clerk",
+        options: {
+          logoPlacement: "inside" as const,
+          logoLinkUrl:   basePath || "/",
+          logoImageUrl:  `${window.location.origin}${basePath}/aicandlez-logo.png`,
+        },
         variables: {
-          colorBackground:      "#0d151e",
-          colorInputBackground: "#060e18",
-          colorInputText:       "#e8f4ff",
-          colorText:            "#e8f4ff",
-          colorTextSecondary:   "#3a4060",
-          colorPrimary:         "#00e5ff",
-          colorDanger:          "#ff3355",
-          colorSuccess:         "#00ff88",
-          borderRadius:         "10px",
-          fontFamily:           "Inter, -apple-system, sans-serif",
+          colorPrimary:          "#66FF66",
+          colorForeground:       "#EAFFEA",
+          colorMutedForeground:  "#4a8a60",
+          colorDanger:           "#ff4060",
+          colorSuccess:          "#66FF66",
+          colorBackground:       "#050A07",
+          colorInput:            "#0A1410",
+          colorInputForeground:  "#EAFFEA",
+          colorNeutral:          "#0F1F18",
+          fontFamily:            "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+          borderRadius:          "0.6rem",
+        },
+        elements: {
+          rootBox:                       "w-full flex justify-center",
+          cardBox:                       "bg-[#050A07] border border-[#0F1F18] rounded-2xl w-[420px] max-w-full overflow-hidden shadow-[0_0_60px_rgba(102,255,102,0.08)]",
+          card:                          "!shadow-none !border-0 !bg-transparent !rounded-none",
+          footer:                        "!shadow-none !border-0 !bg-transparent !rounded-none",
+          headerTitle:                   "text-[#EAFFEA] font-semibold tracking-tight",
+          headerSubtitle:                "text-[#7ab895] text-xs",
+          socialButtonsBlockButtonText:  "text-[#EAFFEA] text-xs font-medium",
+          formFieldLabel:                "text-[#7ab895] text-xs font-medium",
+          footerActionLink:              "text-[#66FF66] text-xs hover:text-[#7CFF00] font-semibold",
+          footerActionText:              "text-[#4a8a60] text-xs",
+          dividerText:                   "text-[#3a6a50] text-xs",
+          identityPreviewEditButton:     "text-[#66FF66] text-xs",
+          formFieldSuccessText:          "text-[#66FF66] text-xs",
+          alertText:                     "text-[#EAFFEA] text-xs",
+          logoBox:                       "flex justify-center py-3",
+          logoImage:                     "h-8",
+          socialButtonsBlockButton:      "border-[#0F1F18] bg-[#0A1410] hover:bg-[#0F1F18] hover:border-[#1a3a25]",
+          formButtonPrimary:             "bg-[#66FF66] hover:bg-[#7CFF00] text-black text-xs font-bold tracking-wide shadow-[0_0_24px_rgba(102,255,102,0.35)]",
+          formFieldInput:                "bg-[#0A1410] border-[#0F1F18] text-[#EAFFEA] text-xs focus:border-[#66FF66]",
+          footerAction:                  "bg-[#0A1410] border-t border-[#0F1F18]",
+          dividerLine:                   "bg-[#0F1F18]",
+          alert:                         "bg-[#0A1410] border border-[#0F1F18]",
+          otpCodeFieldInput:             "bg-[#0A1410] border-[#0F1F18] text-[#EAFFEA]",
+          formFieldRow:                  "gap-3",
+          main:                          "bg-[#050A07]",
+        },
+      }}
+      localization={{
+        signIn: {
+          start: {
+            title:    "Welcome to AICandlez",
+            subtitle: "Sign in to your institutional AI trading account",
+          },
+        },
+        signUp: {
+          start: {
+            title:    "Join AICandlez",
+            subtitle: "Institutional-grade AI crypto trading",
+          },
         },
       }}
       signInUrl={`${basePath}/sign-in`}
