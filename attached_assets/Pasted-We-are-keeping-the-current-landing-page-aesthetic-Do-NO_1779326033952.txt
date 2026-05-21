@@ -1,0 +1,113 @@
+We are keeping the current landing page aesthetic. Do NOT redesign or rebrand the landing page colors right now.
+
+FINAL PRE-LAUNCH TASKS:
+
+1. LANDING PAGE BUTTONS — MUST WORK
+   Verify all landing page CTAs are functional:
+
+* Sign In
+* Create Account
+* Launch App
+* Start Trading
+* Upgrade
+* Pricing buttons
+
+Expected behavior:
+
+* regular users → app.aicandlez.com/portal
+* admins/operators → dashboard.aicandlez.com/command
+
+The landing page must also support admin login access.
+
+2. ADMIN LOGIN FLOW
+   Verify:
+
+* admin account can sign in from landing page
+* admin is routed to CommandCenter/dashboard
+* non-admin users NEVER see operator shell
+* non-admins always redirect to /portal
+
+Need screenshots + route verification.
+
+3. CONNECT EXCHANGE BACKEND REVIEW (IMPORTANT)
+   Before production launch I need a full audit of the exchange onboarding + backend connection flow.
+
+Verify:
+
+Frontend:
+
+* onboarding modal works
+* onboarding steps visible
+* API key instructions visible
+* “Do NOT enable withdrawals” warning visible
+* encrypted credentials messaging visible
+* exchange selection works
+
+Backend:
+
+* API credentials stored securely
+* encryption working
+* broker onboarding endpoint healthy
+* exchange auth flow healthy
+* no operator-only routes exposed to public users
+* simulation vs live mode separation intact
+* paper trading still default for free users
+
+Need code-level verification + screenshots.
+
+4. STRIPE / PRICING FINAL AUDIT
+   Verify ALL user-facing pricing now shows:
+
+* AICandlez Starter — $39.99/month
+* AICandlez Pro — $79.99/month
+
+Remove any remaining:
+
+* “AI Trading”
+* “AI Trading Pro”
+
+Verify:
+
+* Stripe Product names
+* checkout session
+* billing page
+* upgrade modal
+* onboarding panel
+* subscription metadata
+* receipts/descriptions
+
+Need final screenshot verification.
+
+5. LIVE TRADES + TRADE HISTORY SCROLLING
+   Critical UX requirement:
+
+ALL of these must become scrollable after ~15 entries:
+
+* Live Trades
+* Trade History
+* Journal
+* Active Trades panels
+
+Requirements:
+
+* fixed container height
+* overflow auto
+* smooth scrolling
+* no page stretching
+* responsive on desktop/mobile
+
+Need screenshots proving scrolling behavior.
+
+6. FINAL GO-LIVE REPORT
+   After verification provide:
+
+* remaining blockers (if any)
+* production readiness score
+* App Store/TestFlight readiness
+* exchange onboarding readiness
+* Stripe readiness
+* admin dashboard readiness
+* recommended next action before launch
+
+DO NOT change the landing page aesthetic.
+ONLY fix functionality, routing, auth, exchange onboarding, pricing consistency, and scrolling UX.
