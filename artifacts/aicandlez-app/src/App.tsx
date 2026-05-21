@@ -200,14 +200,26 @@ function Protected({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── /portal responsive switch ─────────────────────────────────────────────────
-// Desktop (≥768px) → institutional terminal (PortalDesktop). Mobile (<768px)
-// → radar Home (the PWA mobile shell). The multi-panel desktop layout does
-// not fit narrow viewports, so we degrade gracefully instead of letting it
-// overflow horizontally.
+// ── /portal — desktop institutional terminal ─────────────────────────────────
+// HARD RULE: /portal is the customer DESKTOP trading dashboard. It must NEVER
+// fall back to the mobile <Home /> shell, even on narrow viewports. Mobile
+// users have the radar Home at "/" — the two surfaces are intentionally
+// separate experiences per product spec. Any responsive switch here was a
+// previous-iteration mistake that caused desktop visitors to see the mobile
+// shell when responsive detection misfired.
 function PortalResponsive() {
-  const isMobile = useIsMobile();
-  return isMobile ? <Home /> : <PortalDesktop />;
+  if (typeof window !== "undefined") {
+    // Temporary trace — verify the desktop branch fires in production.
+    // Remove after one deploy cycle of confirmed correct behavior.
+    // eslint-disable-next-line no-console
+    console.log("[/portal mount]", {
+      width: window.innerWidth,
+      isMobileGuess: window.matchMedia("(max-width: 767px)").matches,
+      route: window.location.pathname,
+      componentRendered: "PortalDesktop",
+    });
+  }
+  return <PortalDesktop />;
 }
 
 // ── Cache invalidation ─────────────────────────────────────────────────────────

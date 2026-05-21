@@ -1,0 +1,79 @@
+STOP prioritizing the mobile app experience right now.
+
+The immediate priority is restoring the ORIGINAL USER DESKTOP DASHBOARD experience exactly as it previously existed.
+
+Current problem:
+`https://app.aicandlez.com/portal`
+is still rendering the MOBILE shell:
+
+* onboarding cards
+* bottom mobile nav
+* mobile portfolio cards
+* mobile radar layout
+
+This is incorrect for desktop users.
+
+What I want restored:
+The ORIGINAL USER DESKTOP DASHBOARD we already had working before the recent routing/auth changes.
+
+Desktop users should see:
+
+* institutional trading workspace
+* multi-panel dashboard
+* desktop signals layout
+* AI War Room
+* advanced trading terminal UI
+* widescreen dashboard experience
+
+NOT the mobile Home component.
+
+Critical instruction:
+Desktop and mobile must now be treated as TWO SEPARATE EXPERIENCES.
+
+Desired behavior:
+
+* Mobile devices → mobile app shell
+* Desktop browsers → full desktop dashboard UI
+
+Please:
+
+1. Revert the `/portal` desktop rendering behavior back to the original desktop dashboard implementation
+2. Remove any forced mobile fallback on desktop widths
+3. Verify responsive detection logic is correct
+4. Ensure desktop widths never mount the mobile `<Home />` shell
+5. Confirm PortalDesktop (or equivalent desktop component) is the active desktop render target
+6. Verify production build is using the correct route/component after deploy
+
+Please inspect:
+
+* App.tsx route mapping
+* `/portal` render logic
+* viewport breakpoint detection
+* conditional rendering guards
+* any recent responsive/layout migrations
+
+Add temporary console tracing if needed:
+
+```tsx
+console.log({
+  width: window.innerWidth,
+  isMobile,
+  route: location.pathname,
+  componentRendered: "PortalDesktop vs Home"
+})
+```
+
+The infrastructure side is already fixed:
+
+* SSL works
+* DNS works
+* Render works
+* Clerk works
+* domain routing works
+
+This is now strictly a frontend rendering issue.
+
+Priority:
+RESTORE THE USER DESKTOP DASHBOARD EXPERIENCE FIRST.
+
+The mobile app can be cleaned up later.
