@@ -10,6 +10,8 @@ import {
   ChevronRight,
   Clock,
   Info,
+  Key,
+  Link2,
   Loader2,
   Pause,
   Play,
@@ -68,6 +70,28 @@ interface ExchangeOrder {
   timestamp:      number;
   riskChecks:     RiskGate[];
   rejectionReason?: string;
+}
+
+// Per-user encrypted exchange connection (admin's personal Kraken keys)
+interface UserExchangeConnection {
+  exchange:       string;
+  label:          string | null;
+  status:         "active" | "inactive" | "error";
+  isDefault:      boolean;
+  tradingMode:    "paper" | "live";
+  permissions:    { read: boolean; trade: boolean; withdraw: false } | null;
+  lastVerifiedAt: string | null;
+  lastError:      string | null;
+}
+interface UserExchangeEntry {
+  exchange:   string;
+  connected:  boolean;
+  connection: UserExchangeConnection | null;
+  meta: {
+    id:                 string;
+    name:               string;
+    requiresPassphrase: boolean;
+  };
 }
 
 // ── Fetch helper ─────────────────────────────────────────────────────────────
@@ -155,6 +179,15 @@ export default function Exchange() {
     refetchInterval: 5000,
   });
 
+  // Admin's per-user exchange connections (encrypted vault). Surfaces the
+  // Kraken API key onboarding flow when the operator has not yet connected.
+  const { data: userExchData } = useQuery<{ exchanges: UserExchangeEntry[] }>({
+    queryKey: ["user-exchanges"],
+    queryFn:  () => apiFetch("/api/user/exchanges"),
+    refetchInterval: 15_000,
+  });
+  const krakenConn = userExchData?.exchanges.find(e => e.exchange === "Kraken") ?? null;
+
   // ── Form state ─────────────────────────────────────────────────────────────
   const [symbol,      setSymbol]      = useState<string>("BTCUSD");
   const [side,        setSide]        = useState<"buy" | "sell">("buy");
@@ -169,6 +202,40 @@ export default function Exchange() {
   // ── LIVE confirmation modal ────────────────────────────────────────────────
   const [showLiveModal, setShowLiveModal] = useState(false);
   const [confirmText,   setConfirmText]   = useState("");
+
+  // ── Kraken connect modal (admin) ───────────────────────────────────────────
+  const [showConnectModal, setShowConnectModal] = useState(false);
+  const [kApiKey,    setKApiKey]    = useState("");
+  const [kApiSecret, setKApiSecret] = useState("");
+  const [connectErr, setConnectErr] = useState<string | null>(null);
+
+  const connectMutation = useMutation({
+    mutationFn: (vars: { apiKey: string; apiSecret: string }) =>
+      apiFetch<{ ok: boolean; connection: UserExchangeConnection | null }>(
+        "/api/user/exchanges/connect",
+        { method: "POST", body: JSON.stringify({
+          exchange: "Kraken",
+          apiKey:    vars.apiKey,
+          apiSecret: vars.apiSecret,
+          label:     "Admin Kraken",
+        }) },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["user-exchanges"] });
+      qc.invalidateQueries({ queryKey: ["exchange-status"] });
+      qc.invalidateQueries({ queryKey: ["exchange-balances"] });
+      setShowConnectModal(false);
+      setKApiKey("");
+      setKApiSecret("");
+      setConnectErr(null);
+    },
+    onError: (e: Error) => setConnectErr(e.message),
+  });
+
+  const testMutation = useMutation({
+    mutationFn: () => apiFetch("/api/user/exchanges/Kraken/test", { method: "POST" }),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ["user-exchanges"] }),
+  });
 
   // ── Auto-preview debounce ──────────────────────────────────────────────────
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -269,7 +336,7 @@ export default function Exchange() {
           </div>
           <div>
             <h1 className="text-lg font-bold leading-tight">Exchange Integration</h1>
-            <p className="text-xs text-muted-foreground">Alpaca · Paper &amp; live order execution · Risk-gated</p>
+            <p className="text-xs text-muted-foreground">Kraken · Paper &amp; live order execution · Risk-gated · Read+Trade only (no withdrawals)</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -364,9 +431,9 @@ export default function Exchange() {
         {/* ── LEFT: Status + Balances ──────────────────────────────────── */}
         <div className="flex flex-col gap-4">
 
-          {/* Connection status */}
+          {/* Connection status (platform-level Kraken via env) */}
           <div className="border border-border/40 rounded-xl bg-card/30 p-4 flex flex-col gap-3">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Connection</div>
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Platform Connection</div>
             {[
               { label: "Exchange",     value: status?.exchangeName ?? "—",                         ok: true },
               { label: "API Keys",     value: status?.apiConfigured ? "Configured" : "Not set",  ok: status?.apiConfigured ?? false },
@@ -383,9 +450,93 @@ export default function Exchange() {
             ))}
             {!status?.apiConfigured && (
               <div className="mt-1 text-[10px] text-muted-foreground bg-card/60 rounded-lg p-2 leading-relaxed">
-                Add <code className="text-primary">ALPACA_API_KEY</code> and <code className="text-primary">ALPACA_SECRET_KEY</code> to Secrets,
-                then set <code className="text-primary">EXCHANGE_LIVE_ENABLED=true</code> to unlock LIVE mode.
+                Add <code className="text-primary">KRAKEN_API_KEY</code> and <code className="text-primary">KRAKEN_API_SECRET</code> to environment secrets,
+                then set <code className="text-primary">EXCHANGE_LIVE_ENABLED=true</code> to unlock platform-wide LIVE mode.
               </div>
+            )}
+          </div>
+
+          {/* ── Admin Kraken Connection (per-user encrypted vault) ─────────── */}
+          <div className="border border-primary/30 rounded-xl bg-primary/[0.04] p-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-semibold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                <Link2 className="w-3 h-3" /> My Kraken Keys
+              </div>
+              {krakenConn?.connected && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30 font-semibold">
+                  CONNECTED
+                </span>
+              )}
+            </div>
+
+            {krakenConn?.connected && krakenConn.connection ? (
+              <>
+                <div className="text-[11px] flex flex-col gap-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Label</span>
+                    <span className="font-mono text-foreground">{krakenConn.connection.label ?? "—"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Status</span>
+                    <span className={krakenConn.connection.status === "active" ? "text-green-400 font-medium" : "text-red-400 font-medium"}>
+                      {krakenConn.connection.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Trading mode</span>
+                    <span className="font-medium text-foreground">{krakenConn.connection.tradingMode.toUpperCase()}</span>
+                  </div>
+                  {krakenConn.connection.permissions && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Permissions</span>
+                      <span className="font-medium text-foreground">
+                        {krakenConn.connection.permissions.read  ? "READ " : ""}
+                        {krakenConn.connection.permissions.trade ? "TRADE " : ""}
+                        <span className="text-red-400">NO-WITHDRAW</span>
+                      </span>
+                    </div>
+                  )}
+                  {krakenConn.connection.lastVerifiedAt && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Last verified</span>
+                      <span className="font-mono text-foreground">
+                        {new Date(krakenConn.connection.lastVerifiedAt).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  {krakenConn.connection.lastError && (
+                    <div className="mt-1 text-[10px] text-red-400 bg-red-500/10 rounded p-2 border border-red-500/20">
+                      {krakenConn.connection.lastError}
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => testMutation.mutate()}
+                    disabled={testMutation.isPending}
+                    className="flex-1 text-[11px] px-2.5 py-1.5 rounded-lg border border-border/40 hover:border-primary/40 bg-card/40 hover:bg-card/70 transition-colors text-muted-foreground hover:text-foreground disabled:opacity-40 flex items-center justify-center gap-1.5">
+                    {testMutation.isPending
+                      ? <><Loader2 className="w-3 h-3 animate-spin" /> Testing…</>
+                      : <><RefreshCw className="w-3 h-3" /> Re-test</>}
+                  </button>
+                  <button
+                    onClick={() => { setShowConnectModal(true); setConnectErr(null); }}
+                    className="flex-1 text-[11px] px-2.5 py-1.5 rounded-lg border border-border/40 hover:border-primary/40 bg-card/40 hover:bg-card/70 transition-colors text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5">
+                    <Key className="w-3 h-3" /> Rotate Keys
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-[11px] text-muted-foreground leading-relaxed">
+                  Connect your personal Kraken API keys (encrypted per-user AES-256-GCM). Read + Trade permissions only — withdrawals are never requested.
+                </div>
+                <button
+                  onClick={() => { setShowConnectModal(true); setConnectErr(null); }}
+                  className="text-xs font-semibold px-3 py-2 rounded-lg border border-primary/40 bg-primary/15 hover:bg-primary/25 text-primary transition-colors flex items-center justify-center gap-2">
+                  <Key className="w-3.5 h-3.5" /> Connect Kraken
+                </button>
+              </>
             )}
           </div>
 
@@ -747,6 +898,83 @@ export default function Exchange() {
                 {modeMutation.isPending
                   ? <><Loader2 className="w-4 h-4 animate-spin" /> Enabling…</>
                   : <><Zap className="w-4 h-4" /> Enable LIVE</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Admin Kraken connect modal ──────────────────────────────────── */}
+      {showConnectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-primary/40 bg-card shadow-2xl p-6 flex flex-col gap-4 mx-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+                <Key className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-foreground">
+                  {krakenConn?.connected ? "Rotate Kraken Keys" : "Connect Kraken"}
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Encrypted per-user (AES-256-GCM) · Read + Trade only · Withdrawals never requested
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-card/60 border border-border/30 rounded-lg p-3 text-[11px] text-muted-foreground leading-relaxed">
+              Generate a Kraken API key with <strong className="text-foreground">Query Funds</strong> +
+                <strong className="text-foreground"> Query Open/Closed Orders</strong> +
+                <strong className="text-foreground"> Create &amp; Modify Orders</strong>.
+                <span className="block mt-1 text-red-400">
+                  Do NOT enable <strong>Withdraw Funds</strong> — we never request it.
+                </span>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-xs text-muted-foreground font-medium">API Key</label>
+              <input
+                type="text"
+                value={kApiKey}
+                onChange={(e) => setKApiKey(e.target.value)}
+                placeholder="Kraken API Key"
+                autoComplete="off"
+                className="w-full px-3 py-2 rounded-lg border border-border/40 bg-background text-sm text-foreground focus:outline-none focus:border-primary/50 font-mono"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-xs text-muted-foreground font-medium">API Secret</label>
+              <input
+                type="password"
+                value={kApiSecret}
+                onChange={(e) => setKApiSecret(e.target.value)}
+                placeholder="Kraken Private Key"
+                autoComplete="off"
+                className="w-full px-3 py-2 rounded-lg border border-border/40 bg-background text-sm text-foreground focus:outline-none focus:border-primary/50 font-mono"
+              />
+            </div>
+
+            {connectErr && (
+              <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-2.5 text-xs text-red-400 flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>{connectErr}</span>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowConnectModal(false); setKApiKey(""); setKApiSecret(""); setConnectErr(null); }}
+                className="flex-1 py-2 rounded-lg border border-border/40 bg-card/40 text-sm text-muted-foreground hover:text-foreground hover:border-border/70 transition-colors">
+                Cancel
+              </button>
+              <button
+                disabled={!kApiKey || !kApiSecret || connectMutation.isPending}
+                onClick={() => connectMutation.mutate({ apiKey: kApiKey, apiSecret: kApiSecret })}
+                className="flex-1 py-2 rounded-lg border border-primary/60 bg-primary/20 text-sm font-bold text-primary hover:bg-primary/30 transition-colors disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-2">
+                {connectMutation.isPending
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Testing &amp; encrypting…</>
+                  : <><Link2 className="w-4 h-4" /> Connect</>}
               </button>
             </div>
           </div>

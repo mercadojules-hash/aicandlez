@@ -1,5 +1,6 @@
 export { CommandBar }        from "./CommandBar";
 export { PlatformOverview }  from "./PlatformOverview";
+export { OperatorTelemetryGrid } from "./OperatorTelemetryGrid";
 export { LiveAccountPanel }  from "./LiveAccountPanel";
 export { MarketHeartbeat }   from "./MarketHeartbeat";
 export { AIWarRoom }         from "./AIWarRoom";

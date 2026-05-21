@@ -64,14 +64,42 @@ export async function getStripePublishableKey(): Promise<string> {
   return publishableKey;
 }
 
-/** Fresh StripeSync instance for webhook processing and DB sync. */
+/** Fresh StripeSync instance for webhook processing and DB sync.
+ *
+ * The webhook signing secret is read from the locally-managed
+ * `stripe._managed_webhooks` table (populated by stripe-replit-sync's
+ * webhook auto-registration), with `STRIPE_WEBHOOK_SECRET` env as fallback.
+ */
 export async function getStripeSync(): Promise<StripeSync> {
   const databaseUrl = process.env["DATABASE_URL"];
   if (!databaseUrl) throw new Error("DATABASE_URL environment variable is required");
 
   const { secretKey } = await getCredentials();
+
+  // Resolve webhook secret: DB-managed > env. The managed webhook is
+  // auto-registered by stripe-replit-sync and stores its signing secret
+  // directly in `stripe._managed_webhooks.secret`.
+  let webhookSecret: string | undefined = process.env["STRIPE_WEBHOOK_SECRET"];
+  try {
+    const { Pool } = await import("pg");
+    const pool = new Pool({ connectionString: databaseUrl, max: 1 });
+    try {
+      const r = await pool.query<{ secret: string }>(
+        `SELECT secret FROM stripe._managed_webhooks
+          WHERE enabled = true OR status = 'enabled'
+          ORDER BY updated_at DESC LIMIT 1`,
+      );
+      if (r.rows[0]?.secret) webhookSecret = r.rows[0].secret;
+    } finally {
+      await pool.end();
+    }
+  } catch {
+    /* table not yet initialized — fall back to env */
+  }
+
   return new StripeSync({
-    poolConfig:       { connectionString: databaseUrl, max: 2 },
-    stripeSecretKey:  secretKey,
+    poolConfig:          { connectionString: databaseUrl, max: 2 },
+    stripeSecretKey:     secretKey,
+    stripeWebhookSecret: webhookSecret,
   });
 }

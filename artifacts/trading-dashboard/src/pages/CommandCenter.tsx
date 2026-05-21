@@ -58,7 +58,7 @@ function useOperatorRole(): { isOperator: boolean; isRoleResolved: boolean } {
 }
 
 import {
-  CommandBar, PlatformOverview, LiveAccountPanel,
+  CommandBar, PlatformOverview, OperatorTelemetryGrid, LiveAccountPanel,
   MarketHeartbeat, PositionsRow, LiveControlBar,
   CryptoSignalsPanel, EquitySignalsPanel,
 } from "@/components/command/institutional";
@@ -257,6 +257,10 @@ export default function CommandCenter() {
         <div className="px-2">
           <PlatformOverview />
         </div>
+
+        {/* Row 0b — Operator deep-layer telemetry (admin-only)
+            Latency · Funnel · Live Execution Stream · Fees · Subscriptions */}
+        {isOperator && <OperatorTelemetryGrid />}
 
         {/* Row 1 — My live Kraken account */}
         <div className="px-2">
