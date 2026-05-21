@@ -26,11 +26,9 @@ import AssetDetail from "@/pages/AssetDetail";
 
 // ── Env ────────────────────────────────────────────────────────────────────────
 const clerkPubKey   = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
-// Only use the proxy URL with live keys (pk_live_*). Test keys (pk_test_*)
-// talk directly to Clerk's shared FAPI — no proxy needed or wanted.
-const clerkProxyUrl = clerkPubKey?.startsWith("pk_live_")
-  ? (import.meta.env.VITE_CLERK_PROXY_URL as string | undefined)
-  : undefined;
+// Clerk FAPI proxy disabled — proxy/satellite domains require a paid Clerk plan.
+// Talk directly to Clerk's shared frontend API for both dev and prod.
+const clerkProxyUrl: string | undefined = undefined;
 const basePath      = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
 function stripBase(p: string) {
