@@ -1,0 +1,94 @@
+The current deployment is still rendering the consumer PWA for admin users instead of the actual operator/admin CommandCenter.
+
+Critical problems:
+
+Admin/operator users are being routed into the consumer subscription flow:
+showing “Unlock live AI trading”
+showing Starter/Pro pricing
+enforcing Stripe checkout
+simulation-only restrictions
+paper trading messaging
+
+This should NEVER happen for operator/admin accounts.
+
+Operator/admin accounts must:
+
+bypass ALL subscription gates
+bypass ALL Stripe requirements
+bypass simulation-only restrictions
+default to unlimited AI trades
+default to live execution capability
+default to Kraken live mode enabled
+never see upgrade prompts
+The real CommandCenter telemetry is missing:
+Need restored:
+live user activity
+active users online
+connected exchange accounts
+live engine telemetry
+fee/revenue telemetry
+execution stream
+AI terminal feed
+active trades monitor
+recently closed trades
+kill switch
+exchange mode controls
+live broker balances
+live open positions
+admin analytics
+The current dashboard is still basically the user-facing app.
+
+We need hard separation between:
+
+consumer PWA
+operator/admin CommandCenter
+Stripe issue:
+Stripe checkout currently errors:
+“Stripe checkout could not start (HTTP 200)”
+
+Need full diagnosis:
+
+verify Stripe env vars
+verify publishable/secret keys
+verify checkout session creation response
+verify frontend parsing
+verify webhook config
+verify production mode keys
+verify redirect URL handling
+Exchange onboarding route still broken:
+“Connect Exchange” currently leads to blank/unfinished flow.
+
+Need:
+
+working exchange onboarding UI
+Kraken API connection form
+API key validation
+encrypted credential storage
+live Kraken account telemetry
+admin live trading enabled for testing with existing $100 Kraken balance
+Operator routing:
+Need dedicated operator routes restored:
+/command
+/desktop
+/dashboard
+/exchange
+/portfolio
+/risk
+/journal
+/scanner
+/market
+/ai
+
+Operator dashboard should NOT inherit consumer upgrade logic.
+
+Very important:
+Admin/operator role should automatically receive:
+unlimited AI execution
+no subscription restrictions
+no paper-trading lock
+no upgrade banners
+live broker access enabled
+
+This is required for platform operations/testing.
+
+Need full operator/admin surface restored before launch testing continues.

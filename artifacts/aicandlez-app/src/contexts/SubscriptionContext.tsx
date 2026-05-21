@@ -2,6 +2,25 @@ import { createContext, useContext, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@clerk/react";
 import { api, type Subscription } from "@/lib/api";
+import { useUserRole } from "@/hooks/useUserRole";
+
+/**
+ * Operator (admin / super-admin) entitlements. When `useUserRole().isAdmin`
+ * is true we project this onto the subscription state so the entire consumer
+ * paywall / upgrade-banner / paper-only / limits machinery is bypassed for
+ * platform operators. The api-server still enforces real role gates on every
+ * sensitive endpoint via `requireRole(["admin","super-admin"])` — this is UI
+ * unlock only.
+ */
+const OPERATOR_LIMITS = {
+  exchanges:        "unlimited" as number | string,
+  positions:        "unlimited" as number | string,
+  trades:           "unlimited" as number | string,
+  liveTrading:      true,
+  concurrentTrades: 999,
+  aiAutoTrade:      true,
+  equitiesAI:       true,
+};
 
 export type PaywallReason = "trial_expired" | "live_trading" | "feature_locked" | null;
 
@@ -74,6 +93,7 @@ export function useSubscription() {
 
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
   const { isSignedIn } = useUser();
+  const { isAdmin }    = useUserRole();
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [paywallReason,  setPaywallReason]  = useState<PaywallReason>(null);
 
@@ -84,22 +104,38 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   } = useQuery<Subscription>({
     queryKey:  ["subscription"],
     queryFn:   () => api.get<Subscription>("/billing/subscription"),
-    enabled:   !!isSignedIn,
+    enabled:   !!isSignedIn && !isAdmin,
     staleTime: 60_000,
     retry:     1,
   });
 
-  const plan       = ((data?.plan       ?? "free") as SubPlan);
-  const planStatus = ((data?.planStatus ?? null)   as SubStatus);
-  const limits     = data?.limits ?? DEFAULT_LIMITS;
+  // ── Operator override ──────────────────────────────────────────────────────
+  // Admins / super-admins bypass the entire consumer subscription surface:
+  //   • no upgrade banners, no paywall, no paper-only restrictions
+  //   • unlimited concurrent trades, live execution enabled
+  //   • plan reads as "pro" so any `plan === "pro"` gate (FeatureGate,
+  //     UpgradeBanner, etc.) automatically unlocks without special-casing.
+  const plan: SubPlan = isAdmin
+    ? "pro"
+    : ((data?.plan ?? "free") as SubPlan);
 
-  const isTrialing  = planStatus === "trialing";
-  const isActive    = plan === "free"
+  const planStatus: SubStatus = isAdmin
+    ? "active"
+    : ((data?.planStatus ?? null) as SubStatus);
+
+  const limits = isAdmin
+    ? OPERATOR_LIMITS
+    : (data?.limits ?? DEFAULT_LIMITS);
+
+  const isTrialing  = !isAdmin && planStatus === "trialing";
+  const isActive    = isAdmin
+    || plan === "free"
     || planStatus === "active"
     || planStatus === "trialing"
     || planStatus === null;
-  const isPaid      = plan !== "free";
-  const canLiveTrade = (limits.liveTrading === true) && isActive && isPaid;
+  const isPaid       = isAdmin || plan !== "free";
+  const canLiveTrade = isAdmin
+    || ((limits.liveTrading === true) && isActive && isPaid);
 
   const trialEndsAt = (data as Record<string, unknown> | undefined)?.["trialEndsAt"] as string | null ?? null;
   let daysUntilTrialEnd: number | null = null;
@@ -109,9 +145,11 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   }
 
   const showPaywall = useCallback((reason: PaywallReason = "feature_locked") => {
+    // Operators never see the paywall — silently no-op.
+    if (isAdmin) return;
     setPaywallReason(reason);
     setPaywallVisible(true);
-  }, []);
+  }, [isAdmin]);
 
   const hidePaywall = useCallback(() => {
     setPaywallVisible(false);
