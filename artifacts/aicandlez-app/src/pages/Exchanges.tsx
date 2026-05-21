@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { api } from "@/lib/api";
+import { api, type Subscription } from "@/lib/api";
 import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 
 // ── Design tokens ───────────────────────────────────────────────────────────────
@@ -359,6 +359,7 @@ export default function Exchanges() {
   const [, setLocation]   = useLocation();
   const qc                = useQueryClient();
   const [connectTarget, setConnectTarget] = useState<ExchangeEntry | null>(null);
+  const [showMembershipGate, setShowMembershipGate] = useState(false);
 
   const { data, isLoading } = useQuery<ExchangeListResponse>({
     queryKey:        ["user-exchanges"],
@@ -366,6 +367,38 @@ export default function Exchanges() {
     refetchInterval: 30_000,
     retry:           false,
   });
+
+  // ── Membership gating ────────────────────────────────────────────────────
+  // Live exchange connectivity is a paid feature. Free users can browse the
+  // catalogue but cannot store API credentials. Backend also enforces this
+  // (requirePlan("starter") on /user/exchanges/connect — never rely on UI
+  // alone). We treat any non-"starter"/"pro" plan as locked, BUT
+  // admin/super-admin always bypass the modal so operators on a "free" plan
+  // can still onboard exchanges (matches the backend requirePlan bypass).
+  const { data: sub } = useQuery<Subscription>({
+    queryKey:  ["subscription"],
+    queryFn:   () => api.get("/billing/subscription"),
+    staleTime: 30_000,
+    retry:     false,
+  });
+  const { data: me } = useQuery<{ role?: string }>({
+    queryKey:  ["auth-me"],
+    queryFn:   () => api.get("/auth/me"),
+    staleTime: 60_000,
+    retry:     false,
+  });
+  const role       = (me?.role ?? "").toLowerCase();
+  const isOperator = role === "admin" || role === "super-admin";
+  const isPaid     = sub?.plan === "starter" || sub?.plan === "pro";
+  const canConnect = isOperator || isPaid;
+
+  const handleConnectClick = (ex: ExchangeEntry) => {
+    if (!canConnect) {
+      setShowMembershipGate(true);
+      return;
+    }
+    setConnectTarget(ex);
+  };
 
   const connectionMap = new Map<string, ApiExchange>();
   (data?.exchanges ?? []).forEach(ex => connectionMap.set(ex.exchange, ex));
@@ -380,6 +413,54 @@ export default function Exchanges() {
 
   return (
     <div className="page-enter" style={{ background: BG, minHeight: "100%", paddingBottom: 32 }}>
+
+      {/* ── Membership gate modal (free users) ──────────────────────────────── */}
+      {showMembershipGate && (
+        <div onClick={() => setShowMembershipGate(false)} style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.78)", zIndex: 220,
+          display: "flex", alignItems: "flex-end" }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "100%", background: CARD, borderRadius: "20px 20px 0 0",
+            border: "1px solid rgba(102,255,102,0.18)", borderBottom: "none",
+            padding: "28px 22px 36px", maxHeight: "82dvh", overflowY: "auto" as const,
+          }}>
+            <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 700,
+              color: "#66FF66", letterSpacing: "0.16em", marginBottom: 8 }}>
+              MEMBERSHIP REQUIRED
+            </div>
+            <div style={{ fontSize: 19, fontFamily: SANS, fontWeight: 700,
+              color: W, lineHeight: 1.25, marginBottom: 10 }}>
+              Live exchange access is a paid feature
+            </div>
+            <div style={{ fontSize: 12, fontFamily: SANS, color: GR,
+              lineHeight: 1.6, marginBottom: 22 }}>
+              Connecting a real exchange account requires an active AICandlez
+              membership. Upgrade to AI Trading or AI Trading Pro to unlock
+              live execution on Kraken, Coinbase, Binance, and more.
+              Withdrawal permissions are never requested.
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setShowMembershipGate(false)} style={{
+                flex: 1, padding: "13px 0", background: "transparent",
+                border: "1px solid rgba(255,255,255,0.10)", borderRadius: 10,
+                color: GR, fontFamily: SANS, fontSize: 13, fontWeight: 500,
+                cursor: "pointer" }}>
+                Not now
+              </button>
+              <button onClick={() => { setShowMembershipGate(false); setLocation("/subscribe"); }}
+                style={{
+                  flex: 2, padding: "13px 0",
+                  background: "rgba(102,255,102,0.14)",
+                  border: "1px solid rgba(102,255,102,0.45)",
+                  borderRadius: 10, color: "#66FF66",
+                  fontFamily: SANS, fontSize: 13, fontWeight: 700,
+                  cursor: "pointer", letterSpacing: "0.04em" }}>
+                View Membership Plans
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${E}` }}>
@@ -474,7 +555,7 @@ export default function Exchanges() {
                   </div>
 
                   {!conn?.connected ? (
-                    <button onClick={() => setConnectTarget(ex)} style={{
+                    <button onClick={() => handleConnectClick(ex)} style={{
                       padding: "7px 16px", flexShrink: 0,
                       background: ex.color + "10",
                       border: `1px solid ${ex.color}35`,

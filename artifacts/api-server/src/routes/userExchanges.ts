@@ -4,6 +4,7 @@ import { userExchangeConnectionsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { requireDisclaimer } from "../middlewares/requireDisclaimer.js";
+import { requirePlan } from "../middlewares/requirePlan.js";
 import { vault } from "../services/vault/CredentialVault.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { EXCHANGE_CATALOG, CATALOG_BY_ID, CONNECTABLE_EXCHANGE_IDS } from "../services/exchanges/catalog.js";
@@ -156,7 +157,10 @@ router.get("/user/exchanges", requireAuth, async (req, res): Promise<void> => {
 // Validate credentials, test connection, store encrypted to DB.
 // Body: { exchange, apiKey, apiSecret, passphrase?, label? }
 
-router.post("/user/exchanges/connect", requireAuth, requireDisclaimer, async (req, res): Promise<void> => {
+// PAID-ONLY: free users may NEVER POST exchange credentials. requirePlan
+// performs the admin bypass + 402 MEMBERSHIP_REQUIRED response. The
+// disclaimer gate still runs afterwards for non-admin paid users.
+router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requireDisclaimer, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
   const { exchange, apiKey, apiSecret, passphrase, label } = req.body as {
     exchange:    string;
@@ -271,7 +275,7 @@ router.post("/user/exchanges/connect", requireAuth, requireDisclaimer, async (re
 // ── POST /api/user/exchanges/:exchange/test ───────────────────────────────────
 // Re-test a stored connection. Updates permissions + health timestamp.
 
-router.post("/user/exchanges/:exchange/test", requireAuth, async (req, res): Promise<void> => {
+router.post("/user/exchanges/:exchange/test", requireAuth, requirePlan("starter"), async (req, res): Promise<void> => {
   const userId   = (req as AuthReq).clerkUserId;
   const exchange = String(req.params["exchange"]);
 
@@ -344,7 +348,7 @@ router.post("/user/exchanges/:exchange/test", requireAuth, async (req, res): Pro
 // ── POST /api/user/exchanges/:exchange/default ────────────────────────────────
 // Set one exchange as the user's default; clears default on all others.
 
-router.post("/user/exchanges/:exchange/default", requireAuth, async (req, res): Promise<void> => {
+router.post("/user/exchanges/:exchange/default", requireAuth, requirePlan("starter"), async (req, res): Promise<void> => {
   const userId   = (req as AuthReq).clerkUserId;
   const exchange = String(req.params["exchange"]);
 
@@ -394,7 +398,7 @@ router.post("/user/exchanges/:exchange/default", requireAuth, async (req, res): 
 // Set paper/live trading mode for a connection.
 // Live mode requires explicit opt-in — cannot be set without user acknowledgement.
 
-router.post("/user/exchanges/:exchange/mode", requireAuth, async (req, res): Promise<void> => {
+router.post("/user/exchanges/:exchange/mode", requireAuth, requirePlan("starter"), async (req, res): Promise<void> => {
   const userId   = (req as AuthReq).clerkUserId;
   const exchange = String(req.params["exchange"]);
   const { mode, acknowledged } = req.body as { mode: string; acknowledged?: boolean };

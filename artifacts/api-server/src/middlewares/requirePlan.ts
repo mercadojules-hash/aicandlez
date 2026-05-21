@@ -3,13 +3,32 @@ import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
-// ── requirePlan ───────────────────────────────────────────────────────────────
-//
-// Middleware factory that gates routes behind a minimum subscription plan.
+// ─────────────────────────────────────────────────────────────────────────────
+// requirePlan — gate routes behind a minimum subscription plan.
+// ─────────────────────────────────────────────────────────────────────────────
 // Usage:
-//   router.post("/simulation/order", requireAuth, requirePlan("pro"), handler)
+//   router.post("/user/exchanges/connect",
+//               requireAuth, requirePlan("starter"), requireDisclaimer, handler)
 //
-// Returns 402 Payment Required if the user's plan doesn't meet the minimum.
+// Behavior:
+//   • Admin / super-admin → bypass (operators never see paywalls)
+//   • Plan >= minimum + status active/trialing/none → next()
+//   • Otherwise → 402 Payment Required with structured payload so the
+//     frontend can show the membership-upgrade modal:
+//       { error, code: "MEMBERSHIP_REQUIRED" | "SUBSCRIPTION_INACTIVE",
+//         currentPlan, requiredPlan, upgradeUrl }
+//
+// Used to enforce the "paid-only" promise for live exchange connectivity:
+//   • POST /api/user/exchanges/connect           (store credentials)
+//   • POST /api/user/exchanges/:exchange/test    (re-validate credentials)
+//   • POST /api/user/exchanges/:exchange/mode    (paper ↔ live switch)
+//   • POST /api/user/exchanges/:exchange/default (pick default broker)
+//
+// Note: this middleware FAILS CLOSED on DB errors when a paid plan is
+// required. A previous version failed open; for credential mutations that
+// is unsafe (would leak the gate). Free-tier reads remain unaffected
+// because they don't go through this middleware.
+// ─────────────────────────────────────────────────────────────────────────────
 
 type Plan = "free" | "starter" | "pro" | "enterprise";
 
@@ -17,7 +36,6 @@ const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, enterpris
 
 export function requirePlan(minimum: Plan) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    // clerkUserId is set by requireAuth — call after requireAuth in chain
     const userId = (req as Request & { clerkUserId?: string }).clerkUserId;
     if (!userId) {
       res.status(401).json({ error: "Unauthorized" });
@@ -26,10 +44,22 @@ export function requirePlan(minimum: Plan) {
 
     try {
       const [user] = await db
-        .select({ plan: usersTable.plan, planStatus: usersTable.planStatus })
+        .select({
+          plan:       usersTable.plan,
+          planStatus: usersTable.planStatus,
+          role:       usersTable.role,
+        })
         .from(usersTable)
         .where(eq(usersTable.clerkUserId, userId))
         .limit(1);
+
+      // ── Admin bypass ──────────────────────────────────────────────────────
+      // Operators are not customers. They never see paywalls / upgrade prompts
+      // and retain full Kraken LIVE access on admintrade.aicandlez.com.
+      if (user?.role === "admin" || user?.role === "super-admin") {
+        next();
+        return;
+      }
 
       const userPlan      = (user?.plan ?? "free") as Plan;
       const userPlanRank  = PLAN_RANK[userPlan] ?? 0;
@@ -37,16 +67,15 @@ export function requirePlan(minimum: Plan) {
 
       if (userPlanRank < requiredRank) {
         res.status(402).json({
-          error:         "Plan upgrade required",
-          code:          "PLAN_REQUIRED",
+          error:         "Membership required for live exchange connectivity",
+          code:          "MEMBERSHIP_REQUIRED",
           currentPlan:   userPlan,
           requiredPlan:  minimum,
-          upgradeUrl:    "/billing",
+          upgradeUrl:    "/subscribe",
         });
         return;
       }
 
-      // Plan status guard — allow active and trialing; block past_due, canceled
       const status = user?.planStatus ?? "none";
       if (minimum !== "free" && status !== "active" && status !== "trialing" && status !== "none") {
         res.status(402).json({
@@ -60,8 +89,15 @@ export function requirePlan(minimum: Plan) {
 
       next();
     } catch (err) {
-      req.log?.error({ err }, "requirePlan: DB error");
-      next(); // fail open — don't block users on DB errors
+      req.log?.error({ err }, "requirePlan: DB error — failing closed");
+      // Fail closed for paid gates — never let a DB blip leak free access.
+      // Trade-off: this also temporarily blocks admin/super-admin operators
+      // during a DB outage, since the role lookup itself failed. That is
+      // acceptable here — credential mutations are sensitive, and an admin
+      // can retry once the DB recovers. We deliberately do NOT attempt a
+      // role inference from auth claims because clerkUserId alone does not
+      // carry role data, and any in-memory cache would skew over time.
+      res.status(503).json({ error: "Plan verification unavailable. Please try again." });
     }
   };
 }
