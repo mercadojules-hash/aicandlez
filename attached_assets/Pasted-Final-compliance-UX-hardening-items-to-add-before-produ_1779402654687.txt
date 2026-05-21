@@ -1,0 +1,103 @@
+Final compliance / UX hardening items to add before production sign-off:
+
+1. FORCE disclaimer acceptance BEFORE Stripe checkout session creation
+   Current behavior should be:
+
+FREE USER
+→ clicks Upgrade
+→ Disclaimer Modal appears
+→ must explicitly accept
+→ ONLY THEN create Stripe checkout session
+
+The disclaimer should NOT appear after payment.
+
+This protects:
+
+* legal acknowledgment tracking
+* chargeback defense
+* compliance audit trail
+
+2. Add immutable timestamp + IP logging
+   Inside `user_consents`, also persist:
+
+* accepted_at
+* ip_address
+* user_agent
+
+This becomes important for:
+
+* disputes
+* regulatory review
+* arbitration
+* fraud prevention
+
+3. Require checkbox confirmation
+   Do NOT allow:
+
+* passive dismissal
+* auto-accept
+* single-button continue
+
+Require:
+☑ “I understand trading involves substantial financial risk…”
+
+Then enable Continue button.
+
+4. Add versioned disclaimer text snapshot
+   Store the actual disclaimer body/version accepted at the time.
+
+Reason:
+future disclaimer revisions may differ from older accepted versions.
+
+Recommended:
+
+* disclaimer_version
+* disclaimer_text_snapshot
+
+5. Prevent exchange route access entirely for free users
+   Not just connect buttons.
+
+Direct route access like:
+
+* /settings/exchanges
+* /exchange/connect
+* /broker
+* /live-trading
+
+should redirect FREE users to:
+membership upgrade + disclaimer flow.
+
+6. Add “LIVE EXCHANGE ACCESS” feature tags on pricing cards
+   So users clearly understand:
+
+* paper trading = free
+* live execution = paid
+
+7. Add footer disclaimer globally on all trading pages
+   Small persistent footer:
+
+“Trading involves substantial risk and may result in loss of capital. Past performance is not indicative of future results.”
+
+8. Add admin visibility into disclaimer acceptance
+   Admin dashboard should show:
+
+* accepted disclaimer?
+* version accepted
+* accepted timestamp
+
+Useful for support/compliance.
+
+9. VERY IMPORTANT:
+   Never allow API credentials to save before:
+
+* membership verified
+* disclaimer accepted
+
+The backend must remain the source of truth.
+
+10. Add a re-consent mechanism
+    If DISCLAIMER_VERSION changes:
+
+* force re-acceptance
+* invalidate old consent version
+* block live trading until updated

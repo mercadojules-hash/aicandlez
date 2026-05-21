@@ -252,10 +252,14 @@ export function Footer() {
                 not harder — powered by machine learning and real-time market signals.
               </p>
               <div style={{ display: "flex", gap: 12 }}>
+                {/* Social channels are not live yet — render a non-interactive
+                    placeholder strip (no href="#") instead of dead anchors that
+                    would jump to the top of the page and confuse users. */}
                 {["𝕏", "📱", "💬"].map((icon, i) => (
-                  <a
+                  <span
                     key={i}
-                    href="#"
+                    aria-hidden="true"
+                    title="Coming soon"
                     style={{
                       width: 36,
                       height: 36,
@@ -266,13 +270,13 @@ export function Footer() {
                       alignItems: "center",
                       justifyContent: "center",
                       fontSize: 16,
-                      textDecoration: "none",
-                      color: "#fff",
-                      transition: "all 0.2s",
+                      color: "#647385",
+                      opacity: 0.55,
+                      cursor: "default",
                     }}
                   >
                     {icon}
-                  </a>
+                  </span>
                 ))}
               </div>
             </div>
@@ -283,7 +287,7 @@ export function Footer() {
               </div>
               {[
                 { label: "Launch App", href: "https://app.aicandlez.com/portal" },
-                { label: "Operator Console", href: "https://dashboard.aicandlez.com/" },
+                { label: "Operator Console", href: "https://admintrade.aicandlez.com/" },
                 { label: "Features", href: "#features" },
                 { label: "How It Works", href: "#how-it-works" },
                 { label: "Pricing", href: "#pricing" },

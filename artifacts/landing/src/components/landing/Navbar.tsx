@@ -47,12 +47,18 @@ export function Navbar() {
         }}
       >
         <a
-          href="#"
+          href="#top"
+          onClick={(e) => {
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+          aria-label="AICandlez — back to top"
           style={{
             display: "flex",
             alignItems: "center",
             gap: 10,
             textDecoration: "none",
+            cursor: "pointer",
           }}
         >
           <div
@@ -117,7 +123,7 @@ export function Navbar() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <a
-            href="https://dashboard.aicandlez.com/"
+            href="https://admintrade.aicandlez.com/"
             className="hidden-mobile"
             style={{
               color: "#8892a4",
@@ -216,6 +222,37 @@ export function Navbar() {
               {link.label}
             </a>
           ))}
+          {/* Sign In + Launch App CTAs — without these the mobile menu was
+              a dead end (CTA buttons in the desktop strip are hidden on
+              narrow viewports). Pricing/sign-in/sign-up etc. resolve via
+              cross-app links to app.aicandlez.com (Clerk hosts the auth UI). */}
+          <a
+            href="https://app.aicandlez.com/portal"
+            onClick={() => setMenuOpen(false)}
+            style={{
+              color: "#8892a4",
+              textDecoration: "none",
+              fontSize: 16,
+              fontWeight: 600,
+              padding: "10px 0",
+              borderBottom: "1px solid rgba(255,255,255,0.04)",
+            }}
+          >
+            Sign In
+          </a>
+          <a
+            href="https://app.aicandlez.com/portal"
+            onClick={() => setMenuOpen(false)}
+            className="btn-primary"
+            style={{
+              padding: "12px 16px",
+              fontSize: 15,
+              textAlign: "center",
+              marginTop: 4,
+            }}
+          >
+            Launch App →
+          </a>
         </div>
       )}
 

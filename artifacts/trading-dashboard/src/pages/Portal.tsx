@@ -26,6 +26,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Lock, X, Zap } from "lucide-react";
 
 import { useUserRole } from "@/hooks/useUserRole";
+import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
+import { PortalExchangeConnectModal } from "@/components/PortalExchangeConnectModal";
 import {
   MarketHeartbeat,
   CryptoSignalsPanel,
@@ -87,12 +89,13 @@ function tierCapacity(plan: Plan): { cap: number; label: string } {
 // triggers — no more routing into the admin/operator screens. They open
 // portal-styled overlays that match the rest of the customer surface.
 function TopBar({
-  onAccount, onUpgrade, onDisclaimer, statusPill,
+  onAccount, onUpgrade, onDisclaimer, onConnectExchange, statusPill,
 }: {
-  onAccount:    () => void;
-  onUpgrade:    () => void;
-  onDisclaimer: () => void;
-  statusPill?:  React.ReactNode;
+  onAccount:         () => void;
+  onUpgrade:         () => void;
+  onDisclaimer:      () => void;
+  onConnectExchange: () => void;
+  statusPill?:       React.ReactNode;
 }) {
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -122,13 +125,13 @@ function TopBar({
 
       <div style={{ flex: 1 }} />
 
-      {/* Primary onboarding CTA — surfaces the exchange connection flow
-          (full ConnectModal + masked credential UI lives in Settings).
-          Brand-filled so first-time users can't miss it. */}
-      {/* Cross-app link: exchange onboarding lives in the USER PORTAL app
-          (app.aicandlez.com), not in the operator dashboard. */}
-      <a
-        href="https://app.aicandlez.com/settings/exchanges"
+      {/* Primary onboarding CTA — opens the Connect-Exchange modal IN PLACE.
+          Closing the X must keep the user on /portal (no cross-app navigation,
+          no router push, no history mutation). Disclaimer gate runs first;
+          on accept the modal opens, on cancel nothing happens. */}
+      <button
+        type="button"
+        onClick={onConnectExchange}
         title="Connect Kraken, Coinbase, Binance or another exchange"
         style={{
           padding: "5px 12px",
@@ -139,7 +142,6 @@ function TopBar({
           fontSize: 10, fontWeight: 800,
           letterSpacing: "0.16em",
           fontFamily: N.FONT_MONO,
-          textDecoration: "none",
           textShadow: `0 0 8px ${N.BRAND_GLOW}`,
           boxShadow: `0 0 12px ${N.BRAND_GLOW}, inset 0 0 8px ${N.BRAND}18`,
           cursor: "pointer",
@@ -148,7 +150,7 @@ function TopBar({
         }}
       >
         ◆ CONNECT EXCHANGE
-      </a>
+      </button>
 
       <NavButton onClick={onAccount}>MANAGE ACCOUNT</NavButton>
       <NavButton onClick={onUpgrade}>UPGRADE</NavButton>
@@ -1559,6 +1561,8 @@ function PortalInner() {
   const [upgradeOpen,    setUpgradeOpen]    = useState(false);
   const [accountOpen,    setAccountOpen]    = useState(false);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
+  const [connectExchangeOpen, setConnectExchangeOpen] = useState(false);
+  const { gate: disclaimerGate, modal: disclaimerGateModal } = useDisclaimerGate();
 
   // Admin / super-admin bypass — admins are not customers and must never see
   // paywall UI, locked panels, "Upgrade to Pro" prompts, FeatureGate overlays,
@@ -1700,6 +1704,7 @@ function PortalInner() {
         onAccount={() => setAccountOpen(true)}
         onUpgrade={() => setUpgradeOpenSafe(true)}
         onDisclaimer={() => setDisclaimerOpen(true)}
+        onConnectExchange={() => disclaimerGate(() => setConnectExchangeOpen(true))}
         statusPill={<ExchangeStatusPill status={exchangeStatus} />}
       />
 
@@ -2016,6 +2021,11 @@ function PortalInner() {
       <AccountModal    open={accountOpen}    onClose={() => setAccountOpen(false)}
                        tier={tier} onUpgrade={() => setUpgradeOpenSafe(true)} />
       <DisclaimerModal open={disclaimerOpen} onClose={() => setDisclaimerOpen(false)} />
+      <PortalExchangeConnectModal
+        open={connectExchangeOpen}
+        onClose={() => setConnectExchangeOpen(false)}
+      />
+      {disclaimerGateModal}
     </div>
   );
 }

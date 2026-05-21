@@ -1,0 +1,106 @@
+Two new frontend routing/navigation bugs found on production.
+
+BUG #1 — Exchange modal closes into wrong page/state
+Reproduction:
+
+* User goes to:
+  `https://trade.aicandlez.com/portal`
+* User clicks:
+  `Connect Exchange`
+* User closes modal using:
+  `X`
+* Instead of returning cleanly to the live trading portal, the UI redirects/shifts into another screen/state (`/settings/exchanges` style profile/settings screen)
+
+Expected behavior:
+
+* Clicking `X` should:
+
+  * close the modal ONLY
+  * preserve current route/state
+  * keep user on:
+    `/portal`
+  * not navigate anywhere
+  * not push browser history
+  * not mount profile/settings views
+
+Please inspect:
+
+* modal close handlers
+* router pushes/navigates
+* URL state sync
+* browser history manipulation
+* exchange modal mount/unmount logic
+
+Likely issue:
+
+* modal is tied to route navigation instead of local UI state
+
+Desired behavior:
+
+```ts
+setExchangeModalOpen(false)
+```
+
+NOT:
+
+```ts
+navigate("/settings/exchanges")
+```
+
+BUG #2 — Landing page navigation links are dead
+On the public landing page:
+
+* top navigation links do not work
+* sign-in button/link routes to dead page
+* multiple header links appear non-functional
+
+Please audit ALL landing-page navigation links:
+
+* Sign In
+* Login
+* Dashboard
+* Pricing
+* Features
+* About
+* Contact
+* Get Started
+* Upgrade
+* any CTA buttons
+
+Requirements:
+
+* every nav item must have valid route/action
+* no dead routes
+* no placeholder href="#"
+* no missing React Router routes
+* no broken external URLs
+* mobile + desktop nav both tested
+
+Critical routes that MUST work:
+
+* `/sign-in`
+* `/sign-up`
+* `/portal`
+* `/dashboard`
+* `/pricing`
+* `/contact`
+
+Please verify:
+
+1. React Router route registration
+2. Vite SPA rewrites
+3. Render static routing
+4. Clerk auth routes
+5. Navbar component links
+6. Mobile hamburger menu links
+
+After fixes:
+
+* provide list of repaired routes
+* provide screenshots of:
+
+  * landing page nav working
+  * sign-in flow working
+  * exchange modal closing correctly back to `/portal`
+
+These are production-critical UX/navigation bugs.
