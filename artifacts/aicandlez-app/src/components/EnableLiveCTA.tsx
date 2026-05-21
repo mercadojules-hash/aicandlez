@@ -40,7 +40,7 @@ export function EnableLiveCTA({
             boxShadow: "0 0 8px rgba(0,0,0,0.4)",
             animation: "dot-pulse 1.4s ease-in-out infinite",
           }}/>
-          Enable Live AI Trading
+          Enable Live AI Execution
         </span>
         <span style={{ fontSize: 16, fontWeight: 900, opacity: 0.85 }}>›</span>
         <span aria-hidden style={{

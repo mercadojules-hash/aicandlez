@@ -333,7 +333,7 @@ function TierStatusCard({
 
       {!isPaid && (
         <div style={{ fontSize: 10.5, fontFamily: SANS, color: GR, lineHeight: 1.5 }}>
-          Live AI Trading and AI Auto Trade are <span style={{ color: W, fontWeight: 600 }}>locked</span>.
+          Live AI execution and AI Auto Trade are <span style={{ color: W, fontWeight: 600 }}>locked</span>.
           Upgrade to enable concurrent AI execution on your account.
         </div>
       )}
@@ -531,7 +531,7 @@ function AIStatusCard({ enabled, positions, maxPositions }: {
               </span>
             </div>
             <div style={{ fontSize:17, fontFamily:SANS, fontWeight:800, color:W, letterSpacing:"-0.02em" }}>
-              {enabled?"Autonomous Mode Active":"AI Trading Disabled"}
+              {enabled?"Autonomous Mode Active":"Auto Trade Disabled"}
             </div>
           </div>
           <div style={{
@@ -1058,7 +1058,7 @@ export default function Profile() {
                 background:"rgba(102,255,102,0.07)", border:"1px solid rgba(102,255,102,0.22)",
                 borderRadius:10, color:C, fontFamily:SANS, fontSize:12, fontWeight:600,
                 letterSpacing:"0.04em", cursor:"pointer",
-              }}>Enable Live AI Trading →</button>
+              }}>Enable Live Execution →</button>
             </div>
           </div>
         </div>
@@ -1168,7 +1168,7 @@ export default function Profile() {
             }}>
               <div>
                 <div style={{ fontSize:14, fontFamily:SANS, fontWeight:500, color:W,
-                  textAlign:"left" as const }}>AI Trading Account</div>
+                  textAlign:"left" as const }}>Live Trading Account</div>
                 <div style={{ fontSize:9, fontFamily:SANS, color:GR, marginTop:2 }}>Powered by Alpaca · Sandbox paper mode</div>
               </div>
               <span style={{ fontSize:18, color:"rgba(255,255,255,0.30)" }}>›</span>

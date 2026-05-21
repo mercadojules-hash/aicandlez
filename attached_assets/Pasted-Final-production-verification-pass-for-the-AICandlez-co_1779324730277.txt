@@ -1,0 +1,184 @@
+Final production verification pass for the AICandlez consumer portal.
+
+The Clerk branding fixes are now completed externally:
+
+* Application name updated to AICandlez
+* Auth ecosystem branding finalized
+* Neon-green Clerk theming verified
+
+Now I need a FINAL verification/build pass specifically for the USER dashboard/portal experience.
+
+---
+
+FINAL USER DASHBOARD CHECKLIST
+
+Please verify ALL of the following are fully completed and functioning correctly.
+
+1. PRICING + BRANDING VERIFICATION
+
+Verify EVERY user-facing surface now correctly shows:
+
+* AICandlez Starter
+* AICandlez Pro
+
+Verify pricing:
+
+* Starter = $39.99/month
+* Pro = $79.99/month
+
+Remove ALL remaining references to:
+
+* AI Trading
+* AI Trading Pro
+
+This includes:
+
+* portal
+* checkout
+* billing
+* subscribe page
+* upgrade modals
+* onboarding
+* locked feature prompts
+* Stripe checkout metadata
+* plan labels
+* receipts
+* account pages
+
+---
+
+2. STRIPE + SUBSCRIPTIONS
+
+Please confirm ALL Stripe flows are fully working:
+
+* Starter checkout
+* Pro checkout
+* webhook sync
+* successful subscription activation
+* upgrades/downgrades
+* billing state refresh
+* user plan persistence
+* gated features unlocking correctly
+* cancellation handling
+* failed payment handling
+
+Need final confirmation the production Price IDs are fully wired and active.
+
+---
+
+3. CONNECT EXCHANGE FLOW
+
+Need final verification that the consumer-facing exchange onboarding is fully polished and NOT exposing operator/admin UI.
+
+The exchange onboarding page should:
+
+* match the AICandlez neon-green cinematic branding
+* feel like part of the user portal
+* NOT resemble the admin dashboard
+* NOT expose operator routes
+
+Need the onboarding flow to include:
+
+* exchange selection cards
+* API key setup guidance
+* secret key guidance
+* “DO NOT ENABLE WITHDRAWALS” warning
+* encrypted credential explanation
+* onboarding steps
+* beginner-friendly instructions
+* clean mobile responsiveness
+
+Also verify:
+Connect Exchange button now routes correctly and no longer routes users into the operator dashboard.
+
+---
+
+4. USER DASHBOARD UX
+
+Need final verification of:
+
+* paper trading UX
+* buy/sell simulation flow
+* portfolio updating
+* trade telemetry
+* P/L updates
+* active trade tracking
+* recently closed trades
+* AI radar
+* AI opportunity scanner
+* market telemetry
+* simulation engine updates
+
+Also verify the onboarding/help messaging explains:
+
+* users can paper trade immediately
+* users can manually Buy/Sell assets
+* trades appear in Active Trades
+* wins/losses appear in portfolio metrics
+* live AI automation unlocks after subscription
+* exchange connectivity enables AI execution
+
+---
+
+5. SCROLLABLE TRADE PANELS
+
+Please verify ALL large trade/activity containers become internally scrollable after ~15 entries.
+
+Need this confirmed for:
+
+* Active Trades
+* Trade History
+* Recently Closed
+* Live Activity
+* telemetry feeds
+* Journal tables
+
+Requirements:
+
+* fixed-height cinematic panels
+* smooth scrolling
+* no infinite vertical stretching
+* responsive on desktop + mobile
+
+---
+
+6. ADMIN VS USER ROUTING
+
+Need final verification:
+
+ADMINS:
+
+* dashboard.aicandlez.com
+* /command
+* operator-only tools
+* exchange execution controls
+
+USERS:
+
+* app.aicandlez.com/portal
+* consumer dashboard only
+* onboarding only
+* no operator exposure
+
+Verify non-admin users can NEVER accidentally enter operator/admin areas.
+
+---
+
+7. FINAL PREVIEW REQUEST
+
+After verification:
+Please provide updated preview screenshots for:
+
+* consumer portal home
+* pricing/upgrade modal
+* exchange onboarding
+* active trades scrolling
+* trade history scrolling
+* admin dashboard
+* mobile responsiveness if available
+
+Then provide FINAL production readiness recommendation before:
+
+* production deploy
+* TestFlight build
+* App Store screenshot generation

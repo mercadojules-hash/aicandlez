@@ -76,10 +76,10 @@ export const PLAN_FEATURES: Record<string, {
     name:           "AICandlez Starter",
     price_monthly:  3999,   // $39.99 in cents (Stripe standard)
     price_yearly:   39990,  // $399.90/yr — 2 months free
-    description:    "Live AI Trading + AI Auto Trade. 3 concurrent AI trades. 3% performance fee on profitable closed trades only.",
+    description:    "Live AI execution + AI Auto Trade. 3 concurrent AI trades. 3% performance fee on profitable closed trades only.",
     performanceFee: PERFORMANCE_FEE_RATE,
     features: [
-      "Live AI Trading enabled",
+      "Live AI execution enabled",
       "Up to 3 concurrent AI trades",
       "AI Auto Trade enabled",
       "Crypto AI execution",

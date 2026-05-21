@@ -96,7 +96,7 @@ const DOCS: Record<string, Doc> = {
         body: "Cryptocurrencies are highly volatile assets. Prices can fluctuate dramatically within short time periods. The value of any cryptocurrency can decrease significantly, and you may lose some or all of your invested capital. Do not invest more than you can afford to lose.",
       },
       {
-        heading: "AI Trading System Risk",
+        heading: "AI Execution System Risk",
         body: "The AI-powered trading signals and auto-execution engine are based on historical data and statistical models. Past signal performance does not guarantee future results. AI systems can and do make errors, and market conditions can change in ways that invalidate historical patterns.",
       },
       {

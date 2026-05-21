@@ -273,7 +273,7 @@ export default function Signals() {
         <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50",
           letterSpacing: "0.08em", lineHeight: 1.6 }}>
           Signals are free to view. Try AI Paper Trading Free for 7 Days.
-          Upgrade to Unlock Live AI Trading.
+          Upgrade to Unlock Live AI Execution.
         </div>
       </div>
     </div>

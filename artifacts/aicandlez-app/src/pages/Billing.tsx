@@ -66,7 +66,7 @@ const PLANS: PlanMeta[] = [
     priceNum: "39.99",
     capacity: "Up to 3 Concurrent AI Trades",
     features: [
-      "Live AI Trading enabled",
+      "Live AI execution enabled",
       "AI Auto Trade enabled",
       "Up to 3 concurrent AI trades",
       "Crypto AI execution",
@@ -103,7 +103,7 @@ const PLANS: PlanMeta[] = [
     accent: BRAND_BRGT,
     glow:   "rgba(124,255,0,0.36)",
     border: "rgba(124,255,0,0.38)",
-    ctaStart:   "Start AI Trading Pro — $79.99/MO",
+    ctaStart:   "Start AICandlez Pro — $79.99/MO",
     ctaUpgrade: "Upgrade to Pro — $79.99/MO",
     elite:    true,
   },
@@ -174,7 +174,7 @@ export default function Billing() {
           Billing & Plan
         </div>
         <div style={{ fontSize: 11, fontFamily: SANS, color: GR, marginTop: 5, lineHeight: 1.5 }}>
-          Choose your AI Trading tier. Cancel anytime · Secured by Stripe.
+          Choose your AICandlez plan. Cancel anytime · Secured by Stripe.
         </div>
       </div>
 

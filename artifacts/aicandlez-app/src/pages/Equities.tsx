@@ -533,7 +533,7 @@ export default function Equities() {
 
         <div style={{ marginTop:16, padding:"11px 14px", background:CARD, border:`1px solid ${E}`, borderRadius:8,
           fontSize:8, fontFamily:SANS, color:GR, lineHeight:1.7 }}>
-          Tap any stock or ETF to view AI analysis and trade. Paper trading free · AI Trading from $39.99/mo + {PERFORMANCE_FEE_LABEL} performance fee.
+          Tap any stock or ETF to view AI analysis and trade. Paper trading free · AICandlez Starter from $39.99/mo + {PERFORMANCE_FEE_LABEL} performance fee.
         </div>
       </div>
 

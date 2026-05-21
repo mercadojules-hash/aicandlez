@@ -567,7 +567,7 @@ export default function Trade() {
         <div>
           <div style={{ fontSize:22, fontWeight:800, color:W,
             fontFamily:SANS, letterSpacing:"-0.02em" }}>
-            {isLive ? "Live Trading" : "AI Trading"}
+            {isLive ? "Live Trading" : "Paper Trading"}
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:5 }}>
             <div style={{
@@ -859,7 +859,7 @@ export default function Trade() {
             letterSpacing:"0.02em", cursor:"pointer",
             animation:"cta-breathe 4s ease-in-out infinite",
           }}>
-            Start AI Trading →
+            Start with AICandlez →
           </button>
         )}
       </div>

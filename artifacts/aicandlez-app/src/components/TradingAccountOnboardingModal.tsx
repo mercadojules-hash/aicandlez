@@ -144,7 +144,7 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
 
       <div style={{ fontSize:22, fontFamily:SANS, fontWeight:700, color:W,
         letterSpacing:"-0.01em", marginBottom:10, lineHeight:1.3 }}>
-        Open Your AI Trading Account
+        Open Your AICandlez Trading Account
       </div>
       <div style={{ fontSize:13, fontFamily:SANS, color:GR, lineHeight:1.8,
         marginBottom:28 }}>

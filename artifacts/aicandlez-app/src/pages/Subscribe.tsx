@@ -120,7 +120,7 @@ export default function Subscribe() {
       <div style={{ padding: "12px 16px 18px" }}>
         <div style={{ fontSize: 22, fontFamily: SANS, fontWeight: 700, color: W,
           letterSpacing: -0.4, lineHeight: 1.15, marginBottom: 6 }}>
-          Unlock Live AI Trading
+          Unlock Live AI Execution
         </div>
         <div style={{ fontSize: 12.5, fontFamily: SANS, color: GR, lineHeight: 1.5 }}>
           Free Paper Trading is included. Subscribe to enable Live AI execution
