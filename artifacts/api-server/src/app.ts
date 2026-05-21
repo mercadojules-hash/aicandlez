@@ -20,12 +20,33 @@ import { logger } from "./lib/logger.js";
 
 function buildAllowedOrigins(): string[] {
   const origins: string[] = [
-    // Production custom domains
+    // Production custom domains (3-domain split)
     "https://aicandlez.com",
     "https://www.aicandlez.com",
-    "https://app.aicandlez.com",
+    "https://app.aicandlez.com",        // mobile PWA
+    "https://trade.aicandlez.com",      // customer desktop terminal
+    "https://admintrade.aicandlez.com", // operator/admin workstation
+    "https://dashboard.aicandlez.com",  // legacy (migration)
     "https://api.aicandlez.com",
   ];
+
+  // Render service aliases (pre-DNS / preview builds)
+  origins.push(
+    "https://aicandlez-app.onrender.com",
+    "https://aicandlez-trade.onrender.com",
+    "https://aicandlez-admintrade.onrender.com",
+    "https://aicandlez-dashboard.onrender.com",
+  );
+
+  // Env-supplied extras — comma-separated list from render.yaml /
+  // operator dashboard. Lets ops add origins without redeploying code.
+  const envOrigins = process.env["ALLOWED_ORIGINS"];
+  if (envOrigins) {
+    envOrigins.split(",").forEach((o) => {
+      const trimmed = o.trim();
+      if (trimmed && !origins.includes(trimmed)) origins.push(trimmed);
+    });
+  }
 
   // Replit preview domains (dev + staging — REPLIT_DOMAINS is comma-separated)
   const replitDomains = process.env["REPLIT_DOMAINS"];

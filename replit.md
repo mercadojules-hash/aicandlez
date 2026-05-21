@@ -86,15 +86,31 @@ institutional platform.
   `/command`, `/exchange`, `/syscheck`, `/debug`, `/desktop`, `/institutional`, `/admin`
 - `/settings`, `/sign-in/*`, `/sign-up/*`
 
-**Production hosting requirement (path-based routing on `app.aicandlez.com`):**
-- `app.aicandlez.com/portal/*` MUST be served by the trading-dashboard static build.
-- `app.aicandlez.com/*` (everything else) is served by the aicandlez-app PWA build.
-- `dashboard.aicandlez.com/*` is served by the trading-dashboard static build
-  (operator/admin access — same codebase, different host).
-- Implement at CDN/DNS layer (Cloudflare Workers, Render path rules, or
-  reverse-proxy in front of both static services). Both Vite builds use
-  `BASE_PATH` from env so the trading-dashboard can ship with `BASE_PATH=/portal/`
-  for the customer host and `BASE_PATH=/` for the operator host.
+**Production hosting (3-domain split — current target architecture):**
+- `app.aicandlez.com/*` — mobile PWA only (aicandlez-app static build). No
+  desktop components, no /portal page (cross-app redirect to trade host).
+- `trade.aicandlez.com/*` — customer desktop institutional terminal
+  (trading-dashboard static build). Default landing = `/portal`. Customer
+  auth (non-admin signed-in users) lives here.
+- `admintrade.aicandlez.com/*` — operator/admin workstation (trading-dashboard
+  static build, separate Render service). Default landing = `/command`.
+  NO paper trading, NO tier gates, NO upgrade gates, unlimited execution,
+  live Kraken only. Operator role bypasses all customer-tier guards.
+- `dashboard.aicandlez.com/*` — preserved during migration; retired once
+  trade./admintrade. cutover is verified.
+- Render config: see `render.yaml` services `aicandlez-trade`,
+  `aicandlez-admintrade`, `aicandlez-dashboard`. CORS allow-list extended
+  on the api service.
+
+**AdminTopTelemetryBar (admin-only operator strip):**
+Always-on horizontal strip rendered directly under the trading-dashboard
+top header for `admin`/`super-admin` users only (gated via `useUserRole()`
+in `Layout.tsx`). 15 real-time metrics: active users now, total registered,
+total user trades, trades 24h, platform PnL, fees collected, exchange
+connections, AI executions, live subs, MRR, failed trades, system uptime,
+websocket status, queue throughput, API latency. Data: `GET /api/admin/top-telemetry`
+(`artifacts/api-server/src/routes/adminTopTelemetry.ts`), polled every 5s,
+all values DB-derived or engineStats-derived — no mocks.
 
 **api-server:** `/api/exchange/*`, `/api/sentiment/*`, `/api/validation/*`, `/api/journal/*`, `/api/simulation/*`, `/api/signals/*`, `/api/candles/*`, `/api/backtest/*`, `/api/auth/*`, `/api/billing/*`, `/api/user/*`
 

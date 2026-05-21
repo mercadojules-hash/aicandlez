@@ -54,11 +54,101 @@ services:
       - key: CRYPTOCOM_API_SECRET
         sync: false
       - key: ALLOWED_ORIGINS
-        value: https://aicandlez.com,https://www.aicandlez.com,https://app.aicandlez.com,https://dashboard.aicandlez.com,https://aicandlez-dashboard.onrender.com,https://aicandlez-app.onrender.com
+        value: https://aicandlez.com,https://www.aicandlez.com,https://app.aicandlez.com,https://trade.aicandlez.com,https://admintrade.aicandlez.com,https://dashboard.aicandlez.com,https://aicandlez-dashboard.onrender.com,https://aicandlez-trade.onrender.com,https://aicandlez-admintrade.onrender.com,https://aicandlez-app.onrender.com
       - key: EXCHANGE_LIVE_ENABLED
         value: "false"
 
-  # ── Trading Dashboard / Desktop Terminal (static) ────────────────────────────
+  # ── Customer Desktop Terminal — trade.aicandlez.com ──────────────────────────
+  # The customer-facing institutional desktop workstation. Served by the
+  # trading-dashboard build with BASE_PATH=/ so /portal is the customer
+  # default landing. Non-admin signed-in users land here. Admins who sign
+  # in here are redirected to the admin host (admintrade.aicandlez.com).
+  - type: web
+    name: aicandlez-trade
+    env: static
+    buildCommand: >
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @workspace/trading-dashboard run build
+    staticPublishPath: artifacts/trading-dashboard/dist/public
+    autoDeploy: true
+    domains:
+      - trade.aicandlez.com
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: VITE_VAPID_PUBLIC_KEY
+        sync: false
+      - key: VITE_API_BASE_URL
+        value: https://api.aicandlez.com
+      - key: VITE_WS_URL
+        value: wss://api.aicandlez.com/ws
+      - key: VITE_DEFAULT_LANDING
+        value: /portal
+
+  # ── Operator / Admin Workstation — admintrade.aicandlez.com ──────────────────
+  # Same trading-dashboard codebase, deployed as a separate Render service
+  # so the admin host can have stricter security headers / different
+  # default landing (/command). Only users with role=admin|super-admin
+  # may reach operator-only routes; non-admins hitting this host still
+  # get redirected to /portal.
+  - type: web
+    name: aicandlez-admintrade
+    env: static
+    buildCommand: >
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @workspace/trading-dashboard run build
+    staticPublishPath: artifacts/trading-dashboard/dist/public
+    autoDeploy: true
+    domains:
+      - admintrade.aicandlez.com
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: VITE_VAPID_PUBLIC_KEY
+        sync: false
+      - key: VITE_API_BASE_URL
+        value: https://api.aicandlez.com
+      - key: VITE_WS_URL
+        value: wss://api.aicandlez.com/ws
+      - key: VITE_DEFAULT_LANDING
+        value: /command
+
+  # ── Legacy dashboard.aicandlez.com (preserve during migration) ───────────────
+  # Same build; will be retired once trade./admintrade. cutover is verified.
   - type: web
     name: aicandlez-dashboard
     env: static

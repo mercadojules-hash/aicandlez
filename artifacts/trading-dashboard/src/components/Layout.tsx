@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { useUserRole } from "@/hooks/useUserRole";
+import { AdminTopTelemetryBar } from "@/components/AdminTopTelemetryBar";
 
 // Admin-only routes — hidden from non-admin users in the left nav. Backend
 // enforces the same gate via requireRole(["admin","super-admin"]).
@@ -537,6 +538,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         <SystemStatusBar />
       </header>
+
+      {/* Operator telemetry strip — admin/super-admin only. Live data
+          from GET /api/admin/top-telemetry, polled every 5s. Spans the
+          full width above the sidebar+main so an operator always has
+          platform vitals in view regardless of which module is open. */}
+      {isAdmin && <AdminTopTelemetryBar />}
 
       {/* Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden relative">

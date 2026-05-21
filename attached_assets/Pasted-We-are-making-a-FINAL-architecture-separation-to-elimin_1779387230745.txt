@@ -1,0 +1,147 @@
+We are making a FINAL architecture separation to eliminate all app/dashboard confusion permanently.
+
+NEW REQUIRED DOMAIN STRUCTURE
+
+1. Mobile App / PWA ONLY
+   https://app.aicandlez.com
+
+This domain is ONLY for:
+
+* mobile app
+* PWA
+* App Store related frontend
+* mobile onboarding
+* mobile radar
+* mobile shell
+
+NO desktop trading workstation components should ever render under app.aicandlez.com anymore.
+
+---
+
+2. CUSTOMER DESKTOP TERMINAL
+   https://trade.aicandlez.com
+
+This is the REAL institutional desktop trading platform.
+
+Use the attached screenshot as the visual reference and restore THIS exact architecture/style:
+
+* full-width institutional layout
+* AI Intelligence Center
+* Market Heartbeat
+* telemetry rows
+* signal pipeline
+* desktop workstation
+* multi-panel terminal
+* NO mobile shell
+* NO bottom mobile nav
+* NO centered mobile containers
+* NO responsive app adaptation
+
+trade.aicandlez.com should render ONLY from the trading-dashboard architecture.
+
+DO NOT reuse:
+
+* Home.tsx
+* PortalDesktop.tsx
+* mobile app layouts
+* responsive PWA wrappers
+
+trade.aicandlez.com is now the official customer desktop trading terminal.
+
+---
+
+3. ADMIN / OPERATOR TERMINAL
+   https://admintrade.aicandlez.com
+
+This is MY operator/admin console only.
+
+Admin dashboard requirements:
+
+* NO paper trading
+* NO simulated-only mode
+* NO subscription limitations
+* NO upgrade gates
+* NO tier restrictions
+* unlimited concurrent trades
+* unlimited signals
+* unlimited execution access
+
+Admin should ONLY use:
+
+* LIVE Kraken integration
+* existing Kraken account
+* existing tested $100 balance already connected
+
+Admin terminal should display:
+
+* live Kraken telemetry
+* live balances
+* live positions
+* execution status
+* live trading engine status
+
+---
+
+ADMIN TOP TELEMETRY BAR
+
+I want the admin top bar redesigned into a REAL operator telemetry strip.
+
+One single horizontal telemetry line containing:
+
+* active users right now
+* total registered users
+* total user trades
+* trades today
+* platform PnL
+* fees collected
+* active exchange connections
+* active AI executions
+* live subscriptions
+* monthly revenue
+* failed trades
+* system uptime
+* websocket status
+* queue throughput
+* API latency
+
+This should feel like a real institutional operator command center.
+
+---
+
+INFRASTRUCTURE REQUIREMENTS
+
+Please:
+
+* create Render custom domains:
+
+  * trade.aicandlez.com
+  * admintrade.aicandlez.com
+
+* update Clerk:
+
+  * allowed origins
+  * redirect URLs
+  * auth callbacks
+  * sign-in/sign-up redirects
+
+* preserve:
+
+  * app.aicandlez.com for mobile only
+
+* preserve:
+
+  * dashboard.aicandlez.com if needed internally during migration
+
+BUT:
+the FINAL public architecture should become:
+
+app.aicandlez.com
+= mobile/PWA only
+
+trade.aicandlez.com
+= customer desktop terminal
+
+admintrade.aicandlez.com
+= operator/admin workstation
+
+The screenshot attached is the correct visual direction for BOTH customer and admin desktop systems.
