@@ -23,7 +23,6 @@ import Billing   from "@/pages/Billing";
 import LegalPage from "@/pages/LegalPage";
 import Equities    from "@/pages/Equities";
 import AssetDetail from "@/pages/AssetDetail";
-import PortalDesktop from "@/pages/PortalDesktop";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // ── Env ────────────────────────────────────────────────────────────────────────
@@ -212,26 +211,33 @@ function SignInRedirect() {
   return <Redirect to={`/sign-in?redirect_url=${encodeURIComponent(target)}`} />;
 }
 
-// ── /portal — desktop institutional terminal ─────────────────────────────────
-// HARD RULE: /portal is the customer DESKTOP trading dashboard. It must NEVER
-// fall back to the mobile <Home /> shell, even on narrow viewports. Mobile
-// users have the radar Home at "/" — the two surfaces are intentionally
-// separate experiences per product spec. Any responsive switch here was a
-// previous-iteration mistake that caused desktop visitors to see the mobile
-// shell when responsive detection misfired.
-function PortalResponsive() {
-  if (typeof window !== "undefined") {
-    // Temporary trace — verify the desktop branch fires in production.
-    // Remove after one deploy cycle of confirmed correct behavior.
-    // eslint-disable-next-line no-console
-    console.log("[/portal mount]", {
-      width: window.innerWidth,
-      isMobileGuess: window.matchMedia("(max-width: 767px)").matches,
-      route: window.location.pathname,
-      componentRendered: "PortalDesktop",
-    });
-  }
-  return <PortalDesktop />;
+// ── /portal — CROSS-APP REDIRECT to trading-dashboard ────────────────────────
+// HARD RULE: /portal is NOT served from this PWA codebase. The customer
+// desktop institutional workstation is owned by the trading-dashboard build
+// (artifacts/trading-dashboard/src/pages/Portal.tsx). The previous in-app
+// `PortalDesktop` component was a mobile-shell impersonation of the desktop
+// terminal — it has been deleted. If anything in this PWA links to /portal
+// (deep link, sign-in callback, old bookmark), bounce the browser to the
+// trading-dashboard host where the real Portal.tsx lives.
+const TRADING_DASHBOARD_PORTAL_URL =
+  (import.meta.env["VITE_TRADING_DASHBOARD_URL"] as string | undefined) ??
+  "https://app.aicandlez.com/portal";
+
+function PortalCrossAppRedirect() {
+  useEffect(() => {
+    // Guard against same-URL reload loops: if the configured trading-dashboard
+    // portal URL resolves to the exact href we are already on (e.g. CDN/path
+    // routing not yet wired and both /portal handlers point at this PWA),
+    // bail out instead of hammering window.location.replace forever.
+    try {
+      const target = new URL(TRADING_DASHBOARD_PORTAL_URL, window.location.href);
+      if (target.href === window.location.href) return;
+      window.location.replace(target.href);
+    } catch {
+      window.location.replace(TRADING_DASHBOARD_PORTAL_URL);
+    }
+  }, []);
+  return <FullPageLoader />;
 }
 
 // ── Cache invalidation ─────────────────────────────────────────────────────────
@@ -333,7 +339,7 @@ function Pages() {
           path. Desktop viewports get the institutional terminal; mobile
           viewports fall back to the radar Home (PWA shell) since the
           desktop multi-panel layout does not fit narrow screens. */}
-      <Route path="/portal"  component={() => <Protected><PortalResponsive /></Protected>} />
+      <Route path="/portal"  component={PortalCrossAppRedirect} />
       <Route path="/trade"   component={() => <Protected><AISignals /></Protected>} />
       <Route path="/signals" component={() => <Protected><AISignals /></Protected>} />
       {/* Crypto + Equities both deep-link into the AISignals feed with the

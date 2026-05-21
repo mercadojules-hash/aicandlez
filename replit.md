@@ -62,17 +62,39 @@ institutional platform.
 
 ## Routing (current)
 
-**aicandlez-app PWA (mobile-first, primary user surface):**
+**aicandlez-app PWA (mobile-first, narrow-viewport customer surface):**
 - `/` Home (radar + AI Market Scanner + Top Gainers + Active Trades)
 - `/signals`, `/crypto`, `/equities`, `/trade`, `/portfolio`
-- `/profile` → AI Settings, **Alert Preferences** (new), Connected Accounts, Broker
+- `/profile` → AI Settings, **Alert Preferences**, Connected Accounts, Broker
 - `/billing`, `/subscribe`
+- `/portal` → **CROSS-APP REDIRECT** to trading-dashboard's customer terminal.
+  The mobile PWA does **NOT** render its own desktop terminal. The old
+  `PortalDesktop.tsx` has been deleted. There is no responsive switching,
+  no Home.tsx fallback, no mobile-shell impersonation of the desktop UI.
 
-**trading-dashboard desktop console:**
-- `/` Landing (signed-out) → `/command` (signed-in)
-- `/dashboard`, `/command`, `/market`, `/ai`, `/risk`, `/sim`, `/backtest`, `/optimizer`, `/scanner`, `/portfolio`, `/correlation`, `/journal`, `/validation`, `/sentiment`, `/exchange`, `/syscheck`, `/debug`, `/charts`
-- `/desktop` — Module 20 multi-panel power-user terminal
+**trading-dashboard (operator console + customer desktop terminal):**
+- `/` Landing (signed-out) → role-based: admin → `/command`, customer → `/portal`
+- `/portal` — **customer institutional desktop workstation** (Portal.tsx, 1846 LOC):
+  Market Heartbeat, Crypto + Equity Signals (top 20 each w/ confidence rings),
+  AI War Room, tier-gated live execution (free/starter/pro), Active Trades,
+  Trade History, Subscription, AI Auto Trade Queue. Signed-in `Protected`,
+  **NOT** AdminOnly — customer auth distinct from operator auth.
+- `/dashboard`, `/market`, `/ai`, `/risk`, `/sim`, `/backtest`, `/optimizer`,
+  `/scanner`, `/portfolio`, `/correlation`, `/journal`, `/validation`,
+  `/sentiment`, `/charts` — signed-in (admin or customer)
+- **Operator/admin only** (`ProtectedAdmin` → bounce to `/portal` for non-admins):
+  `/command`, `/exchange`, `/syscheck`, `/debug`, `/desktop`, `/institutional`, `/admin`
 - `/settings`, `/sign-in/*`, `/sign-up/*`
+
+**Production hosting requirement (path-based routing on `app.aicandlez.com`):**
+- `app.aicandlez.com/portal/*` MUST be served by the trading-dashboard static build.
+- `app.aicandlez.com/*` (everything else) is served by the aicandlez-app PWA build.
+- `dashboard.aicandlez.com/*` is served by the trading-dashboard static build
+  (operator/admin access — same codebase, different host).
+- Implement at CDN/DNS layer (Cloudflare Workers, Render path rules, or
+  reverse-proxy in front of both static services). Both Vite builds use
+  `BASE_PATH` from env so the trading-dashboard can ship with `BASE_PATH=/portal/`
+  for the customer host and `BASE_PATH=/` for the operator host.
 
 **api-server:** `/api/exchange/*`, `/api/sentiment/*`, `/api/validation/*`, `/api/journal/*`, `/api/simulation/*`, `/api/signals/*`, `/api/candles/*`, `/api/backtest/*`, `/api/auth/*`, `/api/billing/*`, `/api/user/*`
 

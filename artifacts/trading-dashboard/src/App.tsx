@@ -45,6 +45,7 @@ import Leaderboard from "@/pages/Leaderboard";
 import AlertsPage from "@/pages/Alerts";
 import DesktopTerminal from "@/pages/DesktopTerminal";
 import InstitutionalTerminal from "@/pages/InstitutionalTerminal";
+import Portal from "@/pages/Portal";
 import { useUserRole } from "@/hooks/useUserRole";
 
 // ── Env ───────────────────────────────────────────────────────────────────────
@@ -212,8 +213,6 @@ function SignUpPage() {
 //   • app.aicandlez.com       → user portal PWA (aicandlez-app)
 // Non-admins signing in to the operator console are bounced to the user PWA
 // where the portal experience (and exchange onboarding) actually lives.
-const USER_PORTAL_URL = "https://app.aicandlez.com/portal";
-
 function CrossAppRedirect({ to }: { to: string }) {
   useEffect(() => { window.location.replace(to); }, [to]);
   return <FullPageLoader />;
@@ -222,7 +221,9 @@ function CrossAppRedirect({ to }: { to: string }) {
 function SignedInHomeRouter() {
   const { isAdmin, loading } = useUserRole();
   if (loading) return <FullPageLoader />;
-  if (!isAdmin) return <CrossAppRedirect to={USER_PORTAL_URL} />;
+  // Non-admin (customer) → local /portal customer institutional workstation.
+  // Admin → /command operator console.
+  if (!isAdmin) return <Redirect to="/portal" />;
   return <Redirect to="/command" />;
 }
 
@@ -238,15 +239,18 @@ function HomeRoute() {
   );
 }
 
+// Protected — true signed-in guard (no role check). Used for customer-facing
+// routes on this host such as /portal (the customer institutional desktop
+// workstation). Wraps children in <Layout> so chrome (header/sidebar)
+// renders consistently. Do NOT compose AdminOnly here — that would make
+// /portal admin-only and trap non-admin customers in a redirect loop
+// (AdminOnly → /portal → Protected → AdminOnly → …).
 function Protected({ children }: { children: React.ReactNode }) {
-  // dashboard.aicandlez.com is the operator console — all routes require
-  // admin/super-admin role. Non-admin authenticated users are cross-app
-  // redirected to the consumer portal (app.aicandlez.com/portal).
   return (
     <>
       <ClerkLoading><FullPageLoader /></ClerkLoading>
       <ClerkLoaded>
-        <Show when="signed-in"><AdminOnly>{children}</AdminOnly></Show>
+        <Show when="signed-in"><Layout>{children}</Layout></Show>
         <Show when="signed-out"><Redirect to="/sign-in" /></Show>
       </ClerkLoaded>
     </>
@@ -254,14 +258,13 @@ function Protected({ children }: { children: React.ReactNode }) {
 }
 
 // AdminOnly — gates operator-grade pages (Command Center, Exchange, syscheck,
-// debug, desktop, institutional, admin). dashboard.aicandlez.com is operator-
-// only; non-admin authenticated users are cross-app redirected to the consumer
-// PWA (app.aicandlez.com/portal). NEVER fall through to an internal /portal —
-// that route does not exist on this host.
+// debug, desktop, institutional, admin). Non-admin signed-in users are bounced
+// to the LOCAL customer institutional workstation at /portal (rendered by
+// Portal.tsx on this same host — no cross-app hop, no mobile shell).
 function AdminOnly({ children }: { children: React.ReactNode }) {
   const { isAdmin, loading } = useUserRole();
   if (loading) return <FullPageLoader />;
-  if (!isAdmin) return <CrossAppRedirect to={USER_PORTAL_URL} />;
+  if (!isAdmin) return <Redirect to="/portal" />;
   return <Layout>{children}</Layout>;
 }
 
@@ -361,8 +364,10 @@ function Router() {
         <ProtectedAdmin><CommandCenter /></ProtectedAdmin>
       </Route>
       <Route path="/portal">
-        {/* Portal lives on app.aicandlez.com — dashboard host bounces. */}
-        <CrossAppRedirect to={USER_PORTAL_URL} />
+        {/* Customer desktop institutional workstation. Signed-in (any role,
+            including admin previewing) renders Portal.tsx — the real
+            multi-panel trading terminal. NOT admin-only and NOT a redirect. */}
+        <Protected><Portal /></Protected>
       </Route>
       <Route path="/dashboard">
         <Protected><Dashboard /></Protected>
