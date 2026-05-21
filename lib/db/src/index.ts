@@ -65,3 +65,4 @@ export const db: ReturnType<typeof drizzle<typeof schema>> = DATABASE_URL
   : (createMockDb() as any);
 
 export * from "./schema";
+export * from "./constants/disclaimer";

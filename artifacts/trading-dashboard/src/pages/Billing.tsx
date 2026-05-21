@@ -5,6 +5,7 @@ import {
   Check, CreditCard, Loader2, Sparkles, Zap, Building2,
   ChevronRight, Star, AlertTriangle, ExternalLink,
 } from "lucide-react";
+import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -159,6 +160,7 @@ function PlanCard({
 
 export default function Billing() {
   const { getToken, isSignedIn } = useAuth();
+  const { gate: disclaimerGate, modal: disclaimerModal } = useDisclaimerGate();
   const authHeader = async (): Promise<Record<string, string>> => {
     try {
       const t = await getToken();
@@ -214,6 +216,12 @@ export default function Billing() {
   }
 
   async function handleUpgrade(priceId: string) {
+    // Customer risk-disclaimer gate (admin/super-admin bypass automatically).
+    // disclaimerGate runs the action only after acceptance is recorded in DB.
+    disclaimerGate(() => { void doCheckout(priceId); });
+  }
+
+  async function doCheckout(priceId: string) {
     setLoadingPlan(priceId);
     setError(null);
     try {
@@ -274,6 +282,7 @@ export default function Billing() {
       className="min-h-screen p-6"
       style={{ background: "#060810", color: "#EAF2FF" }}
     >
+      {disclaimerModal}
       <div className="max-w-5xl mx-auto grid gap-6">
 
         {/* Header */}

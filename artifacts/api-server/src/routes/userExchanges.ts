@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { userExchangeConnectionsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
+import { requireDisclaimer } from "../middlewares/requireDisclaimer.js";
 import { vault } from "../services/vault/CredentialVault.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { EXCHANGE_CATALOG, CATALOG_BY_ID, CONNECTABLE_EXCHANGE_IDS } from "../services/exchanges/catalog.js";
@@ -155,7 +156,7 @@ router.get("/user/exchanges", requireAuth, async (req, res): Promise<void> => {
 // Validate credentials, test connection, store encrypted to DB.
 // Body: { exchange, apiKey, apiSecret, passphrase?, label? }
 
-router.post("/user/exchanges/connect", requireAuth, async (req, res): Promise<void> => {
+router.post("/user/exchanges/connect", requireAuth, requireDisclaimer, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
   const { exchange, apiKey, apiSecret, passphrase, label } = req.body as {
     exchange:    string;

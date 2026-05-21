@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { userSettingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { userSettingsTable, userConsentsTable, usersTable, DISCLAIMER_VERSION } from "@workspace/db";
+import { and, desc, eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import type { Request } from "express";
 
@@ -61,6 +61,44 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
   if (Object.keys(patch).length === 1) {
     res.status(400).json({ error: "No valid fields provided" });
     return;
+  }
+
+  // Risk-disclaimer gate: any attempt to enable LIVE execution or AUTONOMOUS
+  // (auto) AI trading requires the current disclaimer version to be accepted.
+  // Operator roles (admin / super-admin) bypass. Customers without acceptance
+  // get 412 + the same envelope the client gate already understands.
+  const enablesLive = patch.tradingMode === "live";
+  const enablesAuto = patch.autoMode === true;
+  if (enablesLive || enablesAuto) {
+    try {
+      const [userRow] = await db.select({ role: usersTable.role })
+        .from(usersTable)
+        .where(eq(usersTable.clerkUserId, userId))
+        .limit(1);
+      const isOperator = userRow?.role === "admin" || userRow?.role === "super-admin";
+      if (!isOperator) {
+        const [accepted] = await db.select({ version: userConsentsTable.consentVersion })
+          .from(userConsentsTable)
+          .where(and(
+            eq(userConsentsTable.userId, userId),
+            eq(userConsentsTable.consentVersion, DISCLAIMER_VERSION),
+          ))
+          .orderBy(desc(userConsentsTable.createdAt))
+          .limit(1);
+        if (!accepted) {
+          res.status(412).json({
+            error:             "Risk disclaimer must be accepted before enabling live or autonomous AI trading.",
+            needsDisclaimer:   true,
+            disclaimerVersion: DISCLAIMER_VERSION,
+          });
+          return;
+        }
+      }
+    } catch (err) {
+      req.log.error({ err }, "PUT /user/settings disclaimer gate failed");
+      res.status(500).json({ error: "Failed to verify disclaimer acceptance" });
+      return;
+    }
   }
 
   try {

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { api } from "@/lib/api";
+import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 
 // ── Design tokens ───────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -155,6 +156,8 @@ function ConnectModal({
   const [err,  setErr]  = useState("");
   const [show, setShow] = useState({ key: false, secret: false });
 
+  const { gate: disclaimerGate, modal: disclaimerModal } = useDisclaimerGate();
+
   const mut = useMutation({
     mutationFn: () => api.post("/user/exchanges/connect", {
       exchange:  ex.id,
@@ -167,6 +170,7 @@ function ConnectModal({
     onError:   (e: unknown) => setErr(e instanceof Error
       ? e.message : "Connection failed. Check your credentials and try again."),
   });
+  const submitConnect = () => disclaimerGate(() => mut.mutate());
 
   const Field = (
     label:    string,
@@ -209,6 +213,8 @@ function ConnectModal({
   );
 
   return (
+    <>
+    {disclaimerModal}
     <div onClick={onClose} style={{ position: "fixed", inset: 0,
       background: "rgba(0,0,0,0.72)", zIndex: 200,
       display: "flex", alignItems: "flex-end" }}>
@@ -280,7 +286,7 @@ function ConnectModal({
           </button>
           <button
             disabled={mut.isPending || !form.apiKey || !form.apiSecret}
-            onClick={() => { setErr(""); mut.mutate(); }}
+            onClick={() => { setErr(""); submitConnect(); }}
             style={{ flex: 2, padding: "13px 0",
               background: mut.isPending ? "rgba(0,229,255,0.05)" : "rgba(0,229,255,0.10)",
               border: "1px solid rgba(0,229,255,0.30)",
@@ -294,6 +300,7 @@ function ConnectModal({
         </div>
       </div>
     </div>
+    </>
   );
 }
 

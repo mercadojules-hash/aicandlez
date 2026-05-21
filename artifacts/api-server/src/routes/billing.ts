@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
+import { requireDisclaimer } from "../middlewares/requireDisclaimer.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import {
   getUncachableStripeClient,
@@ -287,7 +288,7 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
 // ── POST /api/billing/checkout ────────────────────────────────────────────────
 // Creates a Stripe Checkout session for the given priceId.
 
-router.post("/billing/checkout", requireAuth, async (req, res): Promise<void> => {
+router.post("/billing/checkout", requireAuth, requireDisclaimer, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
   // Diagnostic logging for production 403 triage — captures origin + auth
   // shape so the "Your account does not have permission to upgrade" path

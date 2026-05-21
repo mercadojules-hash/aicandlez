@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { api, type Subscription } from "@/lib/api";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
+import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 
 // ── Design tokens (locked to the neon-green system) ─────────────────────────────
 const BG         = "#000000";
@@ -132,6 +133,7 @@ function statusBadge(plan: PlanId, current: PlanId, sub: Subscription | undefine
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function Billing() {
   const [, setLocation] = useLocation();
+  const { gate: disclaimerGate, modal: disclaimerModal } = useDisclaimerGate();
 
   const { data: sub, isLoading } = useQuery<Subscription>({
     queryKey:  ["subscription"],
@@ -159,6 +161,7 @@ export default function Billing() {
 
   return (
     <div className="page-enter" style={{ background: BG, minHeight: "100%", paddingBottom: 36 }}>
+      {disclaimerModal}
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{ padding: "18px 20px", borderBottom: `1px solid ${E}` }}>
@@ -369,7 +372,7 @@ export default function Billing() {
 
               {plan.id !== "free" && !isCur && isUpgrade && (
                 <button
-                  onClick={() => checkout.mutate(plan.id)}
+                  onClick={() => disclaimerGate(() => checkout.mutate(plan.id))}
                   disabled={checkout.isPending}
                   style={{
                     position: "relative", overflow: "hidden",
