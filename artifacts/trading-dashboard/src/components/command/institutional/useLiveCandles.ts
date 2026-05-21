@@ -40,8 +40,34 @@ function makeWalk(anchor: number, n: number, seed: number): LivePoint[] {
   return out;
 }
 
-/** Anchor prices used when the API has no equity feed yet. */
+/**
+ * Anchor prices used by the synthetic fallback when the live candle API is
+ * empty / erroring. These are *not* live prices — the "SIM" tile badge always
+ * makes that explicit to the operator. The values are calibrated to be in the
+ * right order of magnitude so that a brief API outage doesn't make BTC/ETH
+ * look like $100 stocks (which destroys trading credibility instantly).
+ *
+ * Crypto majors mirror a recent live snapshot of /api/mobile/tickers; minors
+ * use plausible cycle ranges. Equities use approximate USD spot.
+ */
 const SYNTHETIC_ANCHORS: Record<string, number> = {
+  // ── Crypto majors (supported by /api/candles · /api/mobile/tickers) ──
+  BTCUSD:  77000,  ETHUSD: 2150,  SOLUSD:  86,    XRPUSD: 1.35,
+  DOGEUSD: 0.11,   AVAXUSD: 9.3,  LINKUSD: 9.7,   ADAUSD: 0.25,
+  // ── Crypto extended universe (heartbeat row + CRYPTO_20 search universe) ──
+  DOTUSD:  5.5,    MATICUSD: 0.55, LTCUSD:  85,   BCHUSD:  420,
+  UNIUSD:  8.4,    ATOMUSD:  6.2,  NEARUSD: 3.6,  APTUSD:  7.1,
+  ARBUSD:  0.85,   OPUSD:    1.5,  INJUSD:  19,   SUIUSD:  2.1,
+  XLMUSD:  0.28,   XMRUSD: 195,    HYPEUSD: 18,   TONUSD:  4.4,
+  TRXUSD:  0.18,   ETCUSD: 22,     ICPUSD:  8.5,  FILUSD:  4.2,
+  HBARUSD: 0.18,   AAVEUSD: 195,   MKRUSD:  1450, ALGOUSD: 0.28,
+  SANDUSD: 0.42,   MANAUSD: 0.39,  AXSUSD:  6.1,  GRTUSD:  0.21,
+  SNXUSD:  2.1,    CRVUSD:  0.62,  COMPUSD: 56,   LDOUSD:  1.5,
+  RNDRUSD: 7.4,    FTMUSD:  0.71,  FETUSD:  1.3,  RUNEUSD: 4.8,
+  KASUSD:  0.13,   PEPEUSD: 0.000010, WIFUSD: 1.9, BONKUSD: 0.000022,
+  JUPUSD:  0.89,   PYTHUSD: 0.33,  TIAUSD:  4.6,  SEIUSD:  0.42,
+  STXUSD:  1.8,
+  // ── Equity tickers (live /api/candles does not yet serve equities) ──
   NVDA: 940, TSLA: 245, AAPL: 225, MSFT: 425, META: 580, AMD: 165,
   GOOGL: 175, AMZN: 195, PLTR: 24, AVGO: 175, COIN: 245, MSTR: 1450,
   SMCI: 48, CRWD: 320, SHOP: 75, UBER: 70, NFLX: 685, DIS: 105,
