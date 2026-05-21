@@ -23,6 +23,8 @@ import Billing   from "@/pages/Billing";
 import LegalPage from "@/pages/LegalPage";
 import Equities    from "@/pages/Equities";
 import AssetDetail from "@/pages/AssetDetail";
+import PortalDesktop from "@/pages/PortalDesktop";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // ── Env ────────────────────────────────────────────────────────────────────────
 const clerkPubKey   = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
@@ -198,6 +200,16 @@ function Protected({ children }: { children: React.ReactNode }) {
   );
 }
 
+// ── /portal responsive switch ─────────────────────────────────────────────────
+// Desktop (≥768px) → institutional terminal (PortalDesktop). Mobile (<768px)
+// → radar Home (the PWA mobile shell). The multi-panel desktop layout does
+// not fit narrow viewports, so we degrade gracefully instead of letting it
+// overflow horizontally.
+function PortalResponsive() {
+  const isMobile = useIsMobile();
+  return isMobile ? <Home /> : <PortalDesktop />;
+}
+
 // ── Cache invalidation ─────────────────────────────────────────────────────────
 // IMPORTANT: `addListener` from useClerk() is NOT a stable reference across
 // renders, and `qc` is. If we put `addListener` in the deps array the effect
@@ -288,10 +300,12 @@ function Pages() {
   return (
     <Switch>
       <Route path="/"        component={() => <Protected><Home /></Protected>} />
-      {/* /portal is the canonical signed-in landing for regular users.
-          Cross-app links from dashboard.aicandlez.com and landing CTAs
-          target this path. Renders the Home (radar) surface. */}
-      <Route path="/portal"  component={() => <Protected><Home /></Protected>} />
+      {/* /portal is the customer-facing DESKTOP trading dashboard. Cross-app
+          links from dashboard.aicandlez.com and landing CTAs target this
+          path. Desktop viewports get the institutional terminal; mobile
+          viewports fall back to the radar Home (PWA shell) since the
+          desktop multi-panel layout does not fit narrow screens. */}
+      <Route path="/portal"  component={() => <Protected><PortalResponsive /></Protected>} />
       <Route path="/trade"   component={() => <Protected><AISignals /></Protected>} />
       <Route path="/signals" component={() => <Protected><AISignals /></Protected>} />
       {/* Crypto + Equities both deep-link into the AISignals feed with the
