@@ -199,21 +199,75 @@ function Protected({ children }: { children: React.ReactNode }) {
 }
 
 // ── Cache invalidation ─────────────────────────────────────────────────────────
+// IMPORTANT: `addListener` from useClerk() is NOT a stable reference across
+// renders, and `qc` is. If we put `addListener` in the deps array the effect
+// tears down + re-subscribes on every render. Some Clerk versions fire the
+// listener synchronously on subscribe with the current session, which then
+// calls `qc.clear()` → query invalidation → re-render → unstable addListener
+// → re-subscribe → loop. Symptom in prod: visible tab flicker, blank/gray
+// screen, no console errors. Fix: pin the listener to a ref and use a
+// no-deps mount-only effect.
 function CacheInvalidator() {
-  const { addListener } = useClerk();
-  const qc              = useQueryClient();
-  const prev            = useRef<string | null | undefined>(undefined);
+  const clerk = useClerk();
+  const qc    = useQueryClient();
+  const prev  = useRef<string | null | undefined>(undefined);
+  const qcRef = useRef(qc);
+  qcRef.current = qc;
+  const clerkRef = useRef(clerk);
+  clerkRef.current = clerk;
 
   useEffect(() => {
-    const unsub = addListener(({ user }) => {
+    const unsub = clerkRef.current.addListener(({ user }) => {
       const uid = user?.id ?? null;
-      if (prev.current !== undefined && prev.current !== uid) qc.clear();
+      if (prev.current !== undefined && prev.current !== uid) {
+        console.log("[CacheInvalidator] user changed", { from: prev.current, to: uid });
+        qcRef.current.clear();
+      }
       prev.current = uid;
     });
     return unsub;
-  }, [addListener, qc]);
+  }, []);
 
   return null;
+}
+
+// ── Render-loop guard — diagnostic only ──────────────────────────────────────
+// If something re-mounts the React tree at a runaway rate (e.g. SW activation
+// thrash, infinite redirect, or the addListener loop that previously existed)
+// we surface a visible diagnostic banner instead of just spinning forever.
+function RenderLoopGuard() {
+  const renderCount = useRef(0);
+  const firstRender = useRef(Date.now());
+  const [tripped, setTripped] = useState(false);
+
+  renderCount.current += 1;
+  if (renderCount.current > 200 && !tripped) {
+    const elapsed = Date.now() - firstRender.current;
+    if (elapsed < 5000) {
+      console.error("[RenderLoopGuard] runaway re-render detected", {
+        count: renderCount.current, elapsedMs: elapsed,
+      });
+      setTripped(true);
+    } else {
+      renderCount.current = 0;
+      firstRender.current = Date.now();
+    }
+  }
+
+  if (!tripped) return null;
+  return (
+    <div style={{ position: "fixed", top: 12, left: 12, right: 12, zIndex: 9999,
+      background: "#3a0a14", border: "1px solid #ff4060", borderRadius: 8,
+      padding: "10px 14px", fontFamily: SANS, fontSize: 11, color: "#ffb0b8",
+      lineHeight: 1.5 }}>
+      <b style={{ color: "#ff4060" }}>RENDER LOOP DETECTED</b> — the app is
+      re-rendering &gt;200 times in &lt;5s. Check console for
+      <code style={{ background: "#000", padding: "1px 4px", borderRadius: 3, margin: "0 4px" }}>
+        [RenderLoopGuard]
+      </code>
+      and report it.
+    </div>
+  );
 }
 
 // ── Sub-pages — no bottom nav ──────────────────────────────────────────────────
@@ -292,7 +346,28 @@ function Pages() {
 }
 
 // ── Service worker + push registration (renders nothing) ──────────────────────
+// Diagnostic escape hatch: append `?nosw=1` to the URL to skip SW registration
+// entirely. Use this when triaging a suspected SW-caching or activation-race
+// issue without needing a redeploy.
+const SW_DISABLED = (() => {
+  try {
+    if (new URLSearchParams(window.location.search).get("nosw") === "1") return true;
+    if (window.localStorage.getItem("aicandlez_disable_sw") === "1") return true;
+  } catch { /* no-op */ }
+  return false;
+})();
+
 function SwRegistrar() {
+  if (SW_DISABLED) {
+    // Best-effort kill the previously installed SW if user opted out via ?nosw=1.
+    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((r) => { void r.unregister(); });
+        if (regs.length) console.warn("[SwRegistrar] unregistered", regs.length, "SW(s) via ?nosw=1");
+      }).catch(() => {});
+    }
+    return null;
+  }
   usePushNotifications();
   return null;
 }
@@ -423,6 +498,7 @@ export default function App() {
   if (!clerkPubKey) return <MissingKeyError />;
   return (
     <CrashBoundary>
+      <RenderLoopGuard />
       <WouterRouter base={basePath}>
         <ClerkWithProviders />
       </WouterRouter>
