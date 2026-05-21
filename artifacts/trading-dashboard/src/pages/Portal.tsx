@@ -1633,6 +1633,62 @@ function PortalInner() {
   const hasClosed = stats.closedCount > 0;
   const hasAnyActivity = stats.totalCount > 0;
 
+  // ── ADMIN OPERATOR · Real Kraken live snapshot ──────────────────────────────
+  // On admintrade.aicandlez.com the workstation must reflect REAL Kraken account
+  // state (USD balance, exchange identity, live/error source), never the
+  // $100,000 paper-trade hero. We poll /api/exchange/balances (requireOperator)
+  // every 10s once admin auth resolves, and force the shared engine into LIVE
+  // mode once on mount so the very first read is real.
+  type KrakenSnap = {
+    source: "live" | "simulation" | "error";
+    exchange: string;
+    balances: { USD: number; BTC: number; ETH: number; SOL: number };
+    error?: string;
+  };
+  const [adminKraken, setAdminKraken] = useState<KrakenSnap | null>(null);
+
+  useEffect(() => {
+    if (!isAdmin || !isSignedIn) return;
+    let cancelled = false;
+
+    const authHeaders = async (): Promise<HeadersInit> => {
+      const t = await getToken().catch(() => null);
+      return t ? { Authorization: `Bearer ${t}` } : {};
+    };
+
+    const forceLive = async () => {
+      try {
+        const headers = await authHeaders();
+        await fetch(`${apiBaseUrl}/api/exchange/mode`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify({ mode: "live" }),
+        });
+      } catch { /* tolerate — read still attempts */ }
+    };
+
+    const fetchSnap = async () => {
+      try {
+        const headers = await authHeaders();
+        const res = await fetch(`${apiBaseUrl}/api/exchange/balances`, {
+          credentials: "include", headers,
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as KrakenSnap;
+        if (!cancelled) setAdminKraken(data);
+      } catch { /* keep last snapshot */ }
+    };
+
+    void forceLive().then(fetchSnap);
+    const iv = setInterval(fetchSnap, 10_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [isAdmin, isSignedIn, getToken]);
+
+  const adminUsd = adminKraken?.balances.USD ?? 0;
+  const adminLiveSource = adminKraken?.source ?? null;
+  const adminExchangeName = (adminKraken?.exchange ?? "kraken").toUpperCase();
+
   return (
     <div style={{
       minHeight: "100dvh",
@@ -1668,65 +1724,127 @@ function PortalInner() {
           is connected. Reinforces non-custodial security promise inline. */}
       {!hasExchange && <ExchangeOnboardingBanner />}
 
-      {/* Metrics row — values are paper-account demo until Alpaca account
-          telemetry is wired; tiles tagged with DEMO so users aren't misled. */}
-      <div style={{
-        padding: "12px 24px 0",
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-        gap: 10,
-      }}>
-        <MetricTile
-          label="TOTAL P/L"
-          value={fmtMoney(stats.totalPnl)}
-          delta={hasAnyActivity ? fmtPct(totalPct) : "—"}
-          positive={stats.totalPnl >= 0}
-          demo
-        />
-        <MetricTile
-          label="WIN RATE"
-          value={hasClosed ? `${stats.winRate.toFixed(1)}%` : "—"}
-          delta={hasClosed ? `${stats.closedCount} CLOSED` : "AWAITING CLOSE"}
-          positive={stats.winRate >= 50}
-          demo
-        />
-        <MetricTile
-          label="ACTIVE AI TRADES"
-          value={`${stats.openCount} / ${capacityDisplay}`}
-          delta={tier.toUpperCase()}
-          positive
-          demo
-        />
-        <MetricTile
-          label="TODAY"
-          value={fmtMoney(stats.todayPnl)}
-          delta={hasClosed ? fmtPct(todayPct) : "—"}
-          positive={stats.todayPnl >= 0}
-          demo
-        />
-        <MetricTile
-          label="MONTHLY"
-          value={fmtMoney(stats.monthPnl)}
-          delta={hasClosed ? fmtPct(monthPct) : "—"}
-          positive={stats.monthPnl >= 0}
-          demo
-        />
-        <MetricTile
-          label="TOTAL TRADES"
-          value={String(stats.totalCount)}
-          delta={`${stats.openCount} OPEN`}
-          positive
-          demo
-        />
-        <MetricTile
-          label="BEST ASSET"
-          value={stats.bestSymbol ?? "—"}
-          delta={stats.bestSymbol ? fmtMoney(stats.bestPnl) : "AWAITING CLOSE"}
-          positive={stats.bestPnl >= 0}
-          demo
-        />
-        <MetricTile label="EQUITY" value={equityStr} demo />
-      </div>
+      {/* Metrics row.
+          Admin operators on admintrade.aicandlez.com see REAL Kraken live
+          telemetry only (USD balance, exchange identity, open live slots,
+          source). Customers continue to see paper-trade tiles tagged DEMO. */}
+      {isAdmin ? (
+        <div style={{
+          padding: "12px 24px 0",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+          gap: 10,
+        }}>
+          <MetricTile
+            label="KRAKEN USD"
+            value={adminKraken
+              ? `$${adminUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : "—"}
+            delta={adminLiveSource === "live"
+              ? "LIVE"
+              : adminLiveSource === "error"
+                ? "AUTH FAILED"
+                : adminLiveSource === "simulation"
+                  ? "SIM FALLBACK"
+                  : "LOADING"}
+            positive={adminLiveSource === "live"}
+          />
+          <MetricTile
+            label="BTC"
+            value={adminKraken ? adminKraken.balances.BTC.toFixed(6) : "—"}
+            delta="LIVE"
+            positive
+          />
+          <MetricTile
+            label="ETH"
+            value={adminKraken ? adminKraken.balances.ETH.toFixed(4) : "—"}
+            delta="LIVE"
+            positive
+          />
+          <MetricTile
+            label="SOL"
+            value={adminKraken ? adminKraken.balances.SOL.toFixed(3) : "—"}
+            delta="LIVE"
+            positive
+          />
+          <MetricTile
+            label="LIVE AI TRADES"
+            value={`${stats.openCount} / ${ADMIN_CONCURRENT_CAP}`}
+            delta="OPERATOR"
+            positive
+          />
+          <MetricTile
+            label="EXCHANGE"
+            value={adminExchangeName}
+            delta="LIVE ONLY"
+            positive
+          />
+          <MetricTile
+            label="MODE"
+            value="LIVE"
+            delta="KRAKEN OPERATOR"
+            positive
+          />
+        </div>
+      ) : (
+        <div style={{
+          padding: "12px 24px 0",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+          gap: 10,
+        }}>
+          <MetricTile
+            label="TOTAL P/L"
+            value={fmtMoney(stats.totalPnl)}
+            delta={hasAnyActivity ? fmtPct(totalPct) : "—"}
+            positive={stats.totalPnl >= 0}
+            demo
+          />
+          <MetricTile
+            label="WIN RATE"
+            value={hasClosed ? `${stats.winRate.toFixed(1)}%` : "—"}
+            delta={hasClosed ? `${stats.closedCount} CLOSED` : "AWAITING CLOSE"}
+            positive={stats.winRate >= 50}
+            demo
+          />
+          <MetricTile
+            label="ACTIVE AI TRADES"
+            value={`${stats.openCount} / ${capacityDisplay}`}
+            delta={tier.toUpperCase()}
+            positive
+            demo
+          />
+          <MetricTile
+            label="TODAY"
+            value={fmtMoney(stats.todayPnl)}
+            delta={hasClosed ? fmtPct(todayPct) : "—"}
+            positive={stats.todayPnl >= 0}
+            demo
+          />
+          <MetricTile
+            label="MONTHLY"
+            value={fmtMoney(stats.monthPnl)}
+            delta={hasClosed ? fmtPct(monthPct) : "—"}
+            positive={stats.monthPnl >= 0}
+            demo
+          />
+          <MetricTile
+            label="TOTAL TRADES"
+            value={String(stats.totalCount)}
+            delta={`${stats.openCount} OPEN`}
+            positive
+            demo
+          />
+          <MetricTile
+            label="BEST ASSET"
+            value={stats.bestSymbol ?? "—"}
+            delta={stats.bestSymbol ? fmtMoney(stats.bestPnl) : "AWAITING CLOSE"}
+            positive={stats.bestPnl >= 0}
+            demo
+          />
+          <MetricTile label="EQUITY" value={equityStr} demo />
+        </div>
+      )}
 
       {/* AI Intelligence Center — radar + diverse live telemetry */}
       <div style={{ padding: "16px 16px 0" }}>
@@ -1749,6 +1867,29 @@ function PortalInner() {
         />
       </div>
 
+      {/* ── ADMIN OPERATOR LAYOUT ──────────────────────────────────────────────
+          Two-column institutional terminal: Crypto signals stacked above Live
+          Trades on the left, Equity signals stacked above Trade History on
+          the right. Same neon-green panel chrome, expanded vertical footprint,
+          no subscription/queue panels. */}
+      {isAdmin ? (
+        <div style={{
+          padding: "16px 16px 32px",
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 14,
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <CryptoSignalsPanel engine={engine} />
+            <ActiveTradesPanel onUpgrade={() => { /* no-op for admin */ }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <EquitySignalsPanel engine={engine} />
+            <TradeHistoryPanel onUpgrade={() => { /* no-op for admin */ }} />
+          </div>
+        </div>
+      ) : (
+      <>
       {/* TOP 20 CRYPTO + TOP 20 EQUITY signal panels */}
       <div style={{
         padding: "14px 16px 0",
@@ -1847,7 +1988,7 @@ function PortalInner() {
           </div>
         </Panel>
 
-        <Panel title="AI AUTO TRADE QUEUE" locked={!isAdmin && tier === "free"} onUnlock={() => setUpgradeOpenSafe(true)}>
+        <Panel title="AI AUTO TRADE QUEUE" locked={tier === "free"} onUnlock={() => setUpgradeOpenSafe(true)}>
           {QUEUE.map((q) => (
             <Row key={q.sym} left={`${q.sym}  ${q.side}`} right={q.conf}
                  color={N.BRAND} sub={q.state} />
@@ -1857,6 +1998,8 @@ function PortalInner() {
           </div>
         </Panel>
       </div>
+      </>
+      )}
 
       <footer style={{
         padding: "20px 24px",
@@ -1864,7 +2007,9 @@ function PortalInner() {
         textAlign: "center",
         color: N.TEXT_2, fontSize: 9, letterSpacing: "0.20em",
       }}>
-        AICANDLEZ · ALPACA-ROUTED LIVE EXECUTION · 3% FEE ON PROFITABLE TRADES ONLY
+        {isAdmin
+          ? "AICANDLEZ · OPERATOR WORKSTATION · KRAKEN LIVE EXECUTION · INTERNAL USE ONLY"
+          : "AICANDLEZ · ALPACA-ROUTED LIVE EXECUTION · 3% FEE ON PROFITABLE TRADES ONLY"}
       </footer>
 
       <UpgradeModal    open={upgradeOpen}    onClose={() => setUpgradeOpen(false)} />
