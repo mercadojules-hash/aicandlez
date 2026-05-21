@@ -1,0 +1,117 @@
+The latest deploy improved the architecture split, but the admin workstation is still behaving like a customer/free-tier account.
+
+We now need a TRUE administrator/operator environment on:
+
+https://admintrade.aicandlez.com/portal
+
+Current problems still visible:
+
+1. Upgrade/paywall UI still appears
+
+* “UPGRADE TO UNLOCK”
+* “LIVE AI EXECUTION LOCKED”
+* free-tier messaging
+* subscription prompts
+* upgrade buttons
+
+NONE of this should ever render for admin users or on the admintrade host.
+
+2. Paper-trading/demo telemetry still visible
+   The admin workstation should NEVER show:
+
+* SIM MODE
+* paper trading
+* DEMO labels
+* fake $100,000 balances
+* simulated stats
+
+Instead:
+
+* show REAL Kraken balance
+* show REAL Kraken positions
+* show LIVE mode only
+* show “KRAKEN LIVE”
+* current live balance should reflect the actual ~$100 Kraken balance already connected to the backend.
+
+3. Missing admin telemetry strip
+   I need a persistent top admin telemetry panel above the workstation showing:
+
+* active users
+* total registered users
+* active subscriptions
+* MRR
+* fees collected
+* trades today
+* total AI executions
+* open live positions
+* live exchange connections
+* queue throughput
+* API latency
+* uptime
+* failed trades
+* websocket status
+* daily platform PnL
+
+This should ALWAYS render on:
+
+* admintrade.aicandlez.com
+
+and NEVER render on:
+
+* trade.aicandlez.com
+
+4. Admin execution rules
+   Admin accounts must automatically receive:
+
+* unlimited feature access
+* no paywalls
+* no upgrade prompts
+* no FeatureGate restrictions
+* no locked execution panels
+* no subscription gating
+* max 30 concurrent LIVE AI trades
+* forced LIVE mode
+* forced Kraken mode
+* no simulation mode available anywhere on admin host
+
+5. Complimentary membership management
+   Need an admin management interface to:
+
+* manually grant memberships
+* upgrade users
+* assign complimentary/free memberships
+* revoke memberships
+* change tier levels
+* override Stripe subscription requirements
+
+Need this accessible from the admin workstation UI.
+
+6. Customer vs Admin separation
+   Final architecture should be:
+
+trade.aicandlez.com
+= customer institutional terminal
+= subscription/paywall allowed
+= customer onboarding
+= normal user restrictions
+
+admintrade.aicandlez.com
+= operator/admin workstation
+= no subscription prompts
+= no demo mode
+= no simulation
+= no paper trading
+= no upgrade UI
+= live Kraken operator environment only
+
+Please implement this as a true host-aware admin environment, not just hidden buttons with CSS.
+
+Need:
+
+* frontend host guards
+* backend role enforcement
+* admin-only execution policies
+* admin-only membership override tools
+* admin-only telemetry aggregation
+
+This is now the final operator workstation phase.

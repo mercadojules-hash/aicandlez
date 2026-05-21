@@ -811,22 +811,26 @@ function ExchangeOnboardingBanner() {
 }
 
 function LiveExecutionBar({
-  tier, onUpgrade, exchangeConnected, openSlots,
+  tier, onUpgrade, exchangeConnected, openSlots, isAdmin = false,
 }: {
   tier: Plan;
   onUpgrade: () => void;
   exchangeConnected: boolean;
   openSlots: number;
+  isAdmin?: boolean;
 }) {
   const [armed, setArmed] = useState(false);
-  const tierLocked = tier === "free";
-  const cap        = tierCapacity(tier);
-
-  // Live execution requires BOTH a paid tier AND at least one validated
-  // exchange connection. The exchange gate is a hard safety stop — users
-  // cannot accidentally arm live mode without a real broker attached.
-  const exchangeLocked = !exchangeConnected;
+  // Admin operators on admintrade.aicandlez.com must NEVER see a locked
+  // Live AI Execution control. They get unlimited live access with a 30-slot
+  // concurrent cap, regardless of subscription state or whether a per-user
+  // Kraken row exists in the DB — the platform's Kraken keys are server-side
+  // env-provisioned and admins operate against that shared live account.
+  const tierLocked     = !isAdmin && tier === "free";
+  const exchangeLocked = !isAdmin && !exchangeConnected;
   const locked         = tierLocked || exchangeLocked;
+  const cap            = isAdmin
+    ? { cap: 30, label: "UP TO 30 CONCURRENT LIVE TRADES · KRAKEN · ADMIN" }
+    : tierCapacity(tier);
 
   // Auto-disarm if the exchange disconnects mid-session.
   useEffect(() => {
@@ -1741,6 +1745,7 @@ function PortalInner() {
           onUpgrade={() => setUpgradeOpenSafe(true)}
           exchangeConnected={hasExchange}
           openSlots={stats.openCount}
+          isAdmin={isAdmin}
         />
       </div>
 
@@ -1842,7 +1847,7 @@ function PortalInner() {
           </div>
         </Panel>
 
-        <Panel title="AI AUTO TRADE QUEUE" locked={tier === "free"} onUnlock={() => setUpgradeOpenSafe(true)}>
+        <Panel title="AI AUTO TRADE QUEUE" locked={!isAdmin && tier === "free"} onUnlock={() => setUpgradeOpenSafe(true)}>
           {QUEUE.map((q) => (
             <Row key={q.sym} left={`${q.sym}  ${q.side}`} right={q.conf}
                  color={N.BRAND} sub={q.state} />
