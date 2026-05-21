@@ -43,7 +43,9 @@ export function SubscriptionModal() {
   const checkout = useMutation({
     mutationFn: () =>
       api.post<{ url: string }>("/billing/checkout", {
-        priceId: "price_1TXwwmIzLCdrkUtzba1Dg1Ul",
+        planId: "starter", billingPeriod: "monthly",
+        successUrl: `${window.location.origin}/aicandlez-app/profile?checkout=success`,
+        cancelUrl:  `${window.location.origin}/aicandlez-app`,
       }),
     onSuccess: ({ url }) => { window.location.href = url; },
   });

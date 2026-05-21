@@ -323,37 +323,65 @@ router.post("/billing/checkout", requireAuth, requireDisclaimer, async (req, res
       res.status(400).json({ error: "Free plan does not require checkout" });
       return;
     }
-    try {
-      const result = await db.execute(sql`
-        SELECT p.name AS product_name, pr.id AS price_id,
-               pr.recurring->>'interval' AS interval
-        FROM stripe.products p
-        JOIN stripe.prices pr ON pr.product = p.id AND pr.active = true
-        WHERE p.active = true
-      `);
-      const NAME_TO_KEY: Record<string, string> = {
-        "paper trading":  "free",
-        "free":           "free",
-        "ai trading":     "starter",
-        "starter":        "starter",
-        "ai trading pro": "pro",
-        "pro":            "pro",
-      };
-      const desiredInterval = body.billingPeriod === "yearly" ? "year" : "month";
-      for (const r of result.rows as Array<{ product_name: string; price_id: string; interval: string }>) {
-        const normalized = r.product_name.toLowerCase().replace(/\s+plan$/, "").trim();
-        const planKey    = NAME_TO_KEY[normalized] ?? normalized;
-        if (planKey === body.planId && r.interval === desiredInterval) {
-          priceId = r.price_id;
-          break;
+
+    // Resolution order:
+    //   1. Env vars STRIPE_PRICE_{STARTER,PRO}_{MONTHLY,YEARLY} — fastest, no DB
+    //      dependency, and canonical per replit.md. This is the primary path.
+    //   2. stripe.* synced schema fallback — used only when the env var is not
+    //      set, e.g. during ops/migration windows.
+    const period = body.billingPeriod === "yearly" ? "YEARLY" : "MONTHLY";
+    const envKey =
+      body.planId === "starter" ? `STRIPE_PRICE_STARTER_${period}` :
+      body.planId === "pro"     ? `STRIPE_PRICE_PRO_${period}`     :
+      null;
+    if (envKey) {
+      const fromEnv = process.env[envKey];
+      if (fromEnv && fromEnv.startsWith("price_")) priceId = fromEnv;
+    }
+
+    if (!priceId) {
+      try {
+        const result = await db.execute(sql`
+          SELECT p.name AS product_name, pr.id AS price_id,
+                 pr.recurring->>'interval' AS interval
+          FROM stripe.products p
+          JOIN stripe.prices pr ON pr.product = p.id AND pr.active = true
+          WHERE p.active = true
+        `);
+        const NAME_TO_KEY: Record<string, string> = {
+          "paper trading":  "free",
+          "free":           "free",
+          "ai trading":     "starter",
+          "starter":        "starter",
+          "ai trading pro": "pro",
+          "pro":            "pro",
+        };
+        const desiredInterval = body.billingPeriod === "yearly" ? "year" : "month";
+        for (const r of result.rows as Array<{ product_name: string; price_id: string; interval: string }>) {
+          const normalized = r.product_name.toLowerCase().replace(/\s+plan$/, "").trim();
+          const planKey    = NAME_TO_KEY[normalized] ?? normalized;
+          if (planKey === body.planId && r.interval === desiredInterval) {
+            priceId = r.price_id;
+            break;
+          }
         }
+      } catch (err) {
+        // Log the actual error so future failures are diagnosable. Prior
+        // code swallowed this silently — that's what masked the original
+        // "Stripe price not configured" complaint.
+        req.log.error({ err, planId: body.planId }, "[checkout] stripe schema lookup failed");
       }
-    } catch {
-      // stripe schema unavailable — fall through to "priceId required" error
     }
   }
 
-  if (!priceId) { res.status(400).json({ error: "priceId or valid planId is required (Stripe price not configured)" }); return; }
+  if (!priceId) {
+    req.log.warn(
+      { planId: body.planId, billingPeriod: body.billingPeriod, hadPriceIdInBody: Boolean(body.priceId) },
+      "[checkout] could not resolve priceId from env or stripe schema",
+    );
+    res.status(400).json({ error: "priceId or valid planId is required (Stripe price not configured)" });
+    return;
+  }
 
   try {
     // Get user email for customer creation

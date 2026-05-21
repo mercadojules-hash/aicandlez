@@ -1,0 +1,170 @@
+New onboarding / exchange-connect UX issues found during live testing.
+
+Current behavior is confusing and breaks the intended exchange onboarding flow.
+
+ISSUE #1 — Wrong redirect after disclaimer flow
+Current behavior:
+
+* User attempts exchange connection
+* Disclaimer appears ✅
+* User accepts disclaimer ✅
+* User receives “Congratulations / paper trading enabled” message
+* Then gets redirected into the mobile app/profile experience instead of remaining in the trading dashboard
+
+This is incorrect.
+
+Expected behavior:
+After disclaimer acceptance:
+
+* user should remain inside:
+  `https://trade.aicandlez.com/portal`
+* OR proceed directly into:
+  exchange connection onboarding
+
+The user should NEVER be redirected into the unrelated app/profile screen when attempting exchange setup.
+
+Please inspect:
+
+* disclaimer success redirects
+* onboarding redirect handlers
+* post-consent navigation
+* membership activation callbacks
+* exchange connect CTA handlers
+
+Likely issue:
+The disclaimer flow is reusing generic onboarding/app navigation instead of trading-dashboard-specific routing.
+
+Correct destination after disclaimer:
+
+```txt
+/portal
+```
+
+or:
+
+```txt
+/settings/exchanges
+```
+
+NOT:
+
+```txt
+/app/profile
+/mobile-app
+```
+
+ISSUE #2 — No actual exchange onboarding/connect flow exists
+Right now the UX only:
+
+* shows disclaimer
+* confirms paper trading
+* redirects user elsewhere
+
+BUT the user is NEVER shown:
+
+* exchange selection
+* API key forms
+* API secret forms
+* permission instructions
+* Kraken API setup steps
+* exchange credential onboarding
+
+This is the core missing functionality.
+
+The ONLY goal of this flow is:
+CONNECT USER EXCHANGE ACCOUNT.
+
+Required onboarding flow:
+
+STEP 1
+User clicks:
+`Connect Exchange`
+
+STEP 2
+Membership check
+
+* FREE → upgrade modal
+* PAID → continue
+
+STEP 3
+Disclaimer acceptance
+
+STEP 4
+Exchange selection screen:
+
+* Kraken
+* Coinbase
+* Binance
+* Alpaca
+* etc.
+
+STEP 5
+Show setup instructions for selected exchange:
+Example for Kraken:
+
+* Enable API key
+* Disable withdrawals
+* Enable trading permissions
+* Read-only balance access
+* Futures permissions if required
+* Copy/paste API Key + Secret
+
+STEP 6
+Credential form:
+
+* API Key
+* API Secret
+* optional passphrase
+
+STEP 7
+Backend validation:
+
+* verify credentials
+* verify permissions
+* test account access
+* reject invalid scopes
+
+STEP 8
+Success state:
+
+* “Kraken Connected”
+* live status indicator
+* balances detected
+* exchange active
+
+IMPORTANT:
+Users currently have NO IDEA how to actually connect an exchange.
+
+This onboarding flow must be extremely clear and guided.
+
+ISSUE #3 — Placeholder profile identity
+The UI currently shows:
+`Alex Morgan`
+
+Please replace generic demo/mock names with:
+`New User`
+
+Do a full audit for:
+
+* Alex Morgan
+* John Doe
+* Demo User
+* Placeholder names
+* Mock avatars
+* Fake emails
+
+Production should never expose template identities.
+
+FINAL REQUIREMENT:
+The exchange onboarding experience should feel:
+
+* premium
+* guided
+* institutional
+* beginner-friendly
+* secure
+
+The current flow feels disconnected because:
+
+* disclaimer works
+* but exchange setup never actually begins.
