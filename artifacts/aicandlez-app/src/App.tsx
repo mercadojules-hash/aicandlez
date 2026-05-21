@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import { Switch, Route, Redirect, Router as WouterRouter, useLocation } from "wouter";
 import {
   ClerkProvider, SignIn, SignUp, Show, ClerkLoading, ClerkLoaded, useClerk,
@@ -43,20 +43,117 @@ const queryClient = new QueryClient({
 // ── Loading / Error states ─────────────────────────────────────────────────────
 const SANS = "Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif";
 
-function FullPageLoader() {
+function FullPageLoader({ label = "Loading" }: { label?: string } = {}) {
+  // Visible-stuck diagnostic. If the spinner is up for >6s we surface a
+  // concrete escape hatch instead of leaving the user staring at a blank
+  // page indefinitely. Covers: Clerk FAPI hanging, JS chunk fetch stalls,
+  // service-worker serving deleted chunks, and any other invisible network
+  // freeze that previously presented as "blank/gray screen, console clean".
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setStuck(true), 6000);
+    return () => window.clearTimeout(t);
+  }, []);
+
   return (
     <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-      alignItems: "center", justifyContent: "center", background: "#000000", gap: 20 }}>
+      alignItems: "center", justifyContent: "center", background: "#000000", gap: 20,
+      padding: 24, textAlign: "center" }}>
       <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 600,
-        color: "rgba(136,146,164,0.35)", letterSpacing: "0.3em" }}>AICANDLEZ</div>
+        color: "rgba(136,146,164,0.45)", letterSpacing: "0.3em" }}>AICANDLEZ</div>
       <div style={{ width: 22, height: 22,
         border: "1.5px solid rgba(255,255,255,0.07)",
-        borderTopColor: "rgba(0,229,255,0.70)",
+        borderTopColor: "rgba(102,255,102,0.85)",
         borderRadius: "50%",
         animation: "ac-spin 0.7s linear infinite" }} />
+      <div style={{ fontSize: 10, fontFamily: SANS,
+        color: "rgba(102,255,102,0.55)", letterSpacing: "0.1em" }}>{label}</div>
+      {stuck && (
+        <div style={{ marginTop: 16, maxWidth: 320, fontFamily: SANS,
+          color: "rgba(232,245,236,0.80)", fontSize: 12, lineHeight: 1.55,
+          background: "#0A1410", border: "1px solid #0F1F18",
+          borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ color: "#66FF66", fontSize: 10, fontWeight: 700,
+            letterSpacing: "0.15em", marginBottom: 8 }}>STILL LOADING</div>
+          Stuck on this screen? Try a hard refresh, clear your browser cache,
+          or sign in again.
+          <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "center" }}>
+            <button onClick={() => { try { caches.keys().then(k => k.forEach(c => caches.delete(c))); } catch {} ; location.reload(); }}
+              style={{ background: "#66FF66", color: "#000", border: "none",
+                borderRadius: 6, padding: "8px 14px", fontSize: 11, fontWeight: 700,
+                fontFamily: SANS, cursor: "pointer", letterSpacing: "0.05em" }}>
+              Reload
+            </button>
+            <button onClick={() => { try { localStorage.clear(); sessionStorage.clear(); } catch {} ; location.reload(); }}
+              style={{ background: "transparent", color: "#EAFFEA",
+                border: "1px solid #1a3a25", borderRadius: 6, padding: "8px 14px",
+                fontSize: 11, fontFamily: SANS, cursor: "pointer", letterSpacing: "0.05em" }}>
+              Reset & reload
+            </button>
+          </div>
+        </div>
+      )}
       <style>{`@keyframes ac-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
+}
+
+// ── Crash boundary — last line of defense against blank-screen states ────────
+// React's default behavior when a component throws and there is no nearest
+// ErrorBoundary is to unmount the entire tree. Combined with a #root that has
+// `background: #000` from index.html, that produces the exact symptom users
+// have been reporting: blank/dark screen, clean console (because we now also
+// surface the error via componentDidCatch). With this boundary in place the
+// page can never go fully blank — we always render a visible recovery card.
+interface CrashState { error: Error | null }
+class CrashBoundary extends Component<{ children: ReactNode }, CrashState> {
+  state: CrashState = { error: null };
+  static getDerivedStateFromError(error: Error): CrashState { return { error }; }
+  componentDidCatch(error: Error, info: ErrorInfo): void {
+    console.error("[CrashBoundary] uncaught render error", error, info.componentStack);
+  }
+  override render(): ReactNode {
+    const { error } = this.state;
+    if (!error) return this.props.children;
+    return (
+      <div style={{ position: "absolute", inset: 0, display: "flex",
+        flexDirection: "column", alignItems: "center", justifyContent: "center",
+        background: "#000000", padding: 24, textAlign: "center", fontFamily: SANS }}>
+        <div style={{ fontSize: 9, fontWeight: 600,
+          color: "rgba(136,146,164,0.45)", letterSpacing: "0.3em", marginBottom: 14 }}>
+          AICANDLEZ
+        </div>
+        <div style={{ fontSize: 14, color: "#ff4060", fontWeight: 600, marginBottom: 8 }}>
+          Something went wrong
+        </div>
+        <div style={{ fontSize: 11, color: "rgba(232,245,236,0.65)", maxWidth: 340,
+          lineHeight: 1.55, marginBottom: 16 }}>
+          The app hit an unexpected error while loading. Your data is safe.
+          Try reloading — if it keeps happening, clear cache and sign in again.
+        </div>
+        <pre style={{ fontSize: 9, color: "rgba(255,64,96,0.65)",
+          background: "#0A1410", border: "1px solid #0F1F18", borderRadius: 8,
+          padding: "10px 12px", maxWidth: 360, maxHeight: 120, overflow: "auto",
+          whiteSpace: "pre-wrap", marginBottom: 16 }}>
+          {error.message || String(error)}
+        </pre>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => { try { caches.keys().then(k => k.forEach(c => caches.delete(c))); } catch {} ; location.reload(); }}
+            style={{ background: "#66FF66", color: "#000", border: "none",
+              borderRadius: 6, padding: "8px 14px", fontSize: 11, fontWeight: 700,
+              cursor: "pointer", letterSpacing: "0.05em" }}>
+            Reload
+          </button>
+          <button onClick={() => { try { localStorage.clear(); sessionStorage.clear(); } catch {} ; location.reload(); }}
+            style={{ background: "transparent", color: "#EAFFEA",
+              border: "1px solid #1a3a25", borderRadius: 6, padding: "8px 14px",
+              fontSize: 11, cursor: "pointer", letterSpacing: "0.05em" }}>
+            Reset & reload
+          </button>
+        </div>
+      </div>
+    );
+  }
 }
 
 function MissingKeyError() {
@@ -311,10 +408,24 @@ function ClerkWithProviders() {
 
 // ── Root ───────────────────────────────────────────────────────────────────────
 export default function App() {
+  // Lightweight diagnostic — confirms the React tree mounted at all. If a user
+  // reports "blank screen" and this line never appears in console, the bundle
+  // didn't execute (chunk 404, SW serving deleted asset, CSP block, etc.).
+  useEffect(() => {
+    console.log("[AICandlez] React mounted", {
+      origin:       window.location.origin,
+      path:         window.location.pathname,
+      apiBaseUrl:   import.meta.env["VITE_API_BASE_URL"] ?? "(unset — using same-origin)",
+      clerkPubKey:  clerkPubKey ? `${clerkPubKey.slice(0, 12)}…` : "(missing)",
+    });
+  }, []);
+
   if (!clerkPubKey) return <MissingKeyError />;
   return (
-    <WouterRouter base={basePath}>
-      <ClerkWithProviders />
-    </WouterRouter>
+    <CrashBoundary>
+      <WouterRouter base={basePath}>
+        <ClerkWithProviders />
+      </WouterRouter>
+    </CrashBoundary>
   );
 }

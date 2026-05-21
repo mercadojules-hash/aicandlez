@@ -1,6 +1,9 @@
 /* ── AICandlez Service Worker — Web Push + Offline ──────────────────────────── */
 
-const CACHE = "aicandlez-v1";
+// Bump on every shipped deploy that touches asset hashes so old chunks get
+// evicted on first navigation after install. Stale SW + new index.html
+// pointing at deleted chunks → blank/gray screen with no console error.
+const CACHE = "aicandlez-v3-2026-05-21";
 const SCOPE = self.registration.scope;
 const ICON  = SCOPE + "aicandlez-logo.png";
 

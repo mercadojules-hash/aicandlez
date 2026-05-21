@@ -1,6 +1,15 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import type { AlpacaHealth } from "@/lib/api";
 
+// Cross-origin API base — production lives on api.aicandlez.com via
+// VITE_API_BASE_URL. Falls back to same-origin "/api" in dev. NEVER use a
+// bare relative "/api/..." here — on app.aicandlez.com that returns the SPA
+// index.html with status 200, which then fails JSON.parse silently and
+// leaves the broker provider stuck in "idle" state.
+const API_BASE = (
+  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? ""
+).replace(/\/$/, "") + "/api";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type BrokerStatus =
   | "idle"
@@ -59,8 +68,16 @@ export function BrokerConnectionProvider({ children }: { children: ReactNode }) 
 
   async function checkHealth(currentStatus: BrokerStatus) {
     try {
-      const res = await fetch("/api/exchange/alpaca/health");
+      const res = await fetch(`${API_BASE}/exchange/alpaca/health`, {
+        credentials: "include",
+        headers:     { Accept: "application/json" },
+      });
       if (!res.ok) return;
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        console.error("[broker-health] non-JSON response", { contentType, url: `${API_BASE}/exchange/alpaca/health` });
+        return;
+      }
       const data = (await res.json()) as AlpacaHealth;
 
       if (!data.configured) {
