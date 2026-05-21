@@ -1,0 +1,164 @@
+We are now in final production polish mode for the AICandlez user dashboard. The Clerk/authentication production issue is fully resolved and the live portal is loading correctly.
+
+We need the following FINAL dashboard updates completed carefully and production-ready.
+
+========================================
+1. CONNECT EXCHANGE PAGE IS BROKEN
+========================================
+
+Issue:
+Clicking "Connect Exchange" currently routes to a black/empty page with no UI, no instructions, no settings, and no exchange onboarding workflow.
+
+Requirements:
+Build a full exchange connection/settings interface.
+
+Supported exchanges should include:
+- Kraken
+- Coinbase
+- Binance
+- Crypto.com
+- OKX
+- Bybit
+
+Requirements for the page:
+- Neon green + black AICandlez styling
+- Exchange cards/buttons
+- API key input fields
+- API secret field
+- Optional passphrase field (for exchanges requiring it)
+- "Test Connection" button
+- "Save Exchange" button
+- Exchange status indicator:
+  - Connected
+  - Disconnected
+  - Error
+- Security messaging:
+  - AES-256 encryption
+  - No withdrawal permissions required
+  - Read/trade permissions only
+
+Add:
+- exchange logos/icons
+- onboarding instructions
+- warning banner telling users NOT to enable withdrawals
+
+This page must NOT be blank anymore.
+
+========================================
+2. LIVE TRADES + TRADE HISTORY SCROLLING
+========================================
+
+Current issue:
+Too many rows expand the dashboard vertically.
+
+Requirements:
+- Live Trades container:
+  - max visible rows = 15
+  - vertical scroll after 15 rows
+  - smooth neon scrollbar styling
+
+- Trade History container:
+  - max visible rows = 15
+  - vertical scroll after 15 rows
+  - maintain fixed dashboard height
+
+Containers must remain aligned and not stretch the layout.
+
+========================================
+3. SUBSCRIPTION-TIER CONDITIONAL UI
+========================================
+
+Current issue:
+Upgrade prompts and "unlock" notices show even after users subscribe.
+
+Fix subscription logic carefully.
+
+----------------------------------------
+FREE USERS
+----------------------------------------
+
+Show:
+- upgrade prompts
+- "Start AI Trading"
+- locked notices
+- unlock messaging
+
+----------------------------------------
+AICANDLEZ STARTER USERS
+----------------------------------------
+
+Hide:
+- "Start AI Trading" notices
+- locked AI trading prompts
+
+ONLY show:
+- subtle "Upgrade to Pro" messaging
+
+Starter users already paid and should not see beginner/free lock messaging.
+
+----------------------------------------
+AICANDLEZ PRO USERS
+----------------------------------------
+
+Hide ALL upgrade notices completely.
+
+No:
+- upgrade buttons
+- unlock prompts
+- upgrade banners
+- starter prompts
+
+Pro users should see:
+- clean professional trading dashboard only
+
+========================================
+4. FINAL DASHBOARD LAYOUT CHANGE
+========================================
+
+Reorganize lower dashboard sections:
+
+LEFT SIDE:
+- Crypto Signals
+- Live Trades directly UNDER Crypto Signals
+
+RIGHT SIDE:
+- Equity Signals
+- Trade History directly UNDER Equity Signals
+
+The dashboard should feel balanced and institutional.
+
+========================================
+5. ADMIN COMMANDCENTER ACCESS
+========================================
+
+Need:
+- exact production admin/operator dashboard login route
+- exact URL path
+
+We need to test:
+- CommandCenter
+- admin telemetry
+- exchange monitoring
+- AI engine controls
+- operator controls
+
+Please provide:
+- production admin URL
+- any required admin role configuration
+- route guards/auth requirements
+
+========================================
+6. FINAL QUALITY CHECK
+========================================
+
+Verify:
+- no dead routes
+- no black pages
+- no placeholder containers
+- no broken navigation
+- no duplicate upgrade prompts
+- all scroll containers behave correctly
+- responsive layout remains intact
+- production build passes
+
+This is the FINAL user dashboard polish phase before broader testing.
