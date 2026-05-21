@@ -1,0 +1,173 @@
+Good progress. The desktop separation is finally working correctly.
+
+NOW finalize the institutional separation and admin execution behavior.
+
+==================================================
+
+1. PUSH + DEPLOY SIDEBAR REMOVAL NOW
+   ==================================================
+
+The customer terminal:
+https://trade.aicandlez.com/portal
+
+STILL shows the operator/admin sidebar.
+
+You already confirmed:
+
+* host-gating implemented
+* typecheck passes
+* architect PASS
+
+So PUSH the changes immediately and let Render redeploy.
+
+Customer terminal MUST:
+
+* render full-width institutional workstation
+* NO operator/admin sidebar
+* NO command-center navigation
+* NO admin telemetry strip
+* NO operator chrome
+* NO simulation/operator tools exposed
+
+The customer host should feel like:
+Bloomberg / TradingView institutional execution terminal.
+
+==================================================
+2. ADMIN HOST LOCKDOWN
+======================
+
+Now implement hard separation on:
+
+https://admintrade.aicandlez.com
+
+ADMIN REQUIREMENTS:
+
+NO subscription/paywall logic.
+NO upgrade prompts.
+NO paper-trading UI.
+NO simulated exchange mode.
+NO tier restrictions.
+
+Admin account should:
+
+* bypass ALL subscriptions
+* bypass ALL FeatureGate restrictions
+* bypass ALL trade limitations
+
+==================================================
+3. FORCE LIVE KRAKEN EXECUTION ON ADMIN HOST
+============================================
+
+Admin workstation should become:
+
+* Kraken live-only environment
+* REAL account balance
+* REAL positions
+* REAL telemetry
+
+The $100 already inside Kraken should display live on admintrade.
+
+Disable:
+
+* paper trading
+* simulated execution
+* fake balances
+* upgrade banners
+* subscription gating
+* AI Trading Pro upsells
+
+==================================================
+4. ADMIN EXECUTION LIMITS
+=========================
+
+Admin workstation AI should allow:
+
+* up to 30 concurrent live trades
+* unlimited execution access
+* unlimited AI usage
+* unrestricted execution controls
+
+Admins should NEVER see:
+
+* Free tier
+* Upgrade prompts
+* Locked execution
+* Stripe upgrade UI
+* Subscription limits
+
+==================================================
+5. ADMIN TOP TELEMETRY BAR
+==========================
+
+Top sticky telemetry panel on admintrade should show REAL platform metrics:
+
+* active users
+* total registered users
+* users online
+* total trades
+* trades today
+* active AI executions
+* AI throughput
+* fees collected
+* monthly recurring revenue
+* active subscriptions
+* websocket status
+* exchange connections
+* queue depth
+* latency
+* uptime
+* execution volume
+
+Single-line institutional operations bar.
+
+==================================================
+6. STRIPE ISSUE
+===============
+
+You correctly isolated the Stripe issue to:
+
+POST /api/billing/checkout
+
+Next step:
+diagnose whether:
+
+* OPTIONS preflight
+* CORS rejection
+* Clerk JWT verification
+* OR billing auth middleware
+
+is causing the 403.
+
+The customer upgrade flow MUST work on:
+https://trade.aicandlez.com
+
+The mobile app currently says:
+"Your account does not have permission to upgrade."
+
+We need:
+
+* successful checkout
+* subscription activation
+* webhook processing
+* membership persistence
+* proper entitlement activation
+
+==================================================
+7. FINAL ARCHITECTURE
+=====================
+
+app.aicandlez.com
+→ mobile app / PWA only
+
+trade.aicandlez.com
+→ customer institutional terminal
+
+admintrade.aicandlez.com
+→ operator workstation
+
+Strict separation.
+No crossover.
+No shared UI chrome.
+
+Push the sidebar-removal deployment immediately first.
+Then continue admin lockdown + Stripe repair.

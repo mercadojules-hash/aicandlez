@@ -1551,10 +1551,27 @@ export default function Portal() {
 function PortalInner() {
   const { isAdmin } = useUserRole();
   const { getToken, isSignedIn } = useAuth();
-  const [tier, setTier] = useState<Plan>("free");
+  const [dbTier, setDbTier] = useState<Plan>("free");
   const [upgradeOpen,    setUpgradeOpen]    = useState(false);
   const [accountOpen,    setAccountOpen]    = useState(false);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
+
+  // Admin / super-admin bypass — admins are not customers and must never see
+  // paywall UI, locked panels, "Upgrade to Pro" prompts, FeatureGate overlays,
+  // or any subscription gating. Their effective tier is treated as the highest
+  // customer tier ("pro") so every downstream tier check reads as unlocked.
+  // Concurrent execution cap is bumped to 30 for admins (vs the 12-slot Pro
+  // customer cap). Real authorization is still enforced server-side via
+  // requireRole in api-server; this is a UX-only flattening.
+  const tier: Plan = isAdmin ? "pro" : dbTier;
+  const ADMIN_CONCURRENT_CAP = 30;
+  // Suppress the UpgradeModal entirely for admins. We intercept setter calls
+  // by wrapping the open setter — keeps every existing call site (~7 of them)
+  // working without per-site changes.
+  const setUpgradeOpenSafe = (v: boolean) => {
+    if (isAdmin) return;
+    setUpgradeOpen(v);
+  };
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -1570,7 +1587,7 @@ function PortalInner() {
         const data = (await res.json()) as { plan?: string };
         if (cancelled || !data.plan) return;
         const p = data.plan as string;
-        setTier(p === "starter" || p === "pro" ? p : "free");
+        setDbTier(p === "starter" || p === "pro" ? p : "free");
       } catch { /* keep default */ }
     })();
     return () => { cancelled = true; };
@@ -1583,7 +1600,12 @@ function PortalInner() {
     ...Q_MEDIUM,
   });
 
-  const cap = useMemo(() => tierCapacity(tier), [tier]);
+  const cap = useMemo(() => {
+    if (isAdmin) {
+      return { cap: ADMIN_CONCURRENT_CAP, label: `UP TO ${ADMIN_CONCURRENT_CAP} CONCURRENT LIVE TRADES · ADMIN` };
+    }
+    return tierCapacity(tier);
+  }, [tier, isAdmin]);
   const { stats } = usePaperTrades();
   const exchangeStatus = useExchangeStatus();
   const hasExchange    = exchangeStatus.connectedCount > 0;
@@ -1598,9 +1620,12 @@ function PortalInner() {
   const equityStr = `$${stats.equity.toLocaleString("en-US", {
     minimumFractionDigits: 2, maximumFractionDigits: 2,
   })}`;
-  // Capacity: free tier has no live execution slots; starter=3, pro=12.
+  // Capacity: free tier has no live execution slots; starter=3, pro=12;
+  // admin = 30 (handled inside `cap` memo above).
   const capacityDisplay =
-    tier === "free" ? "—" : String(cap.cap ?? "—");
+    isAdmin ? String(ADMIN_CONCURRENT_CAP)
+    : tier === "free" ? "—"
+    : String(cap.cap ?? "—");
   const hasClosed = stats.closedCount > 0;
   const hasAnyActivity = stats.totalCount > 0;
 
@@ -1613,7 +1638,7 @@ function PortalInner() {
     }}>
       <TopBar
         onAccount={() => setAccountOpen(true)}
-        onUpgrade={() => setUpgradeOpen(true)}
+        onUpgrade={() => setUpgradeOpenSafe(true)}
         onDisclaimer={() => setDisclaimerOpen(true)}
         statusPill={<ExchangeStatusPill status={exchangeStatus} />}
       />
@@ -1713,7 +1738,7 @@ function PortalInner() {
       <div style={{ padding: "12px 16px 0" }}>
         <LiveExecutionBar
           tier={tier}
-          onUpgrade={() => setUpgradeOpen(true)}
+          onUpgrade={() => setUpgradeOpenSafe(true)}
           exchangeConnected={hasExchange}
           openSlots={stats.openCount}
         />
@@ -1737,9 +1762,9 @@ function PortalInner() {
         gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
         gap: 10,
       }}>
-        <ActiveTradesPanel onUpgrade={() => setUpgradeOpen(true)} />
+        <ActiveTradesPanel onUpgrade={() => setUpgradeOpenSafe(true)} />
 
-        <TradeHistoryPanel onUpgrade={() => setUpgradeOpen(true)} />
+        <TradeHistoryPanel onUpgrade={() => setUpgradeOpenSafe(true)} />
 
         <Panel title="SUBSCRIPTION STATUS">
           <Row left="Current Plan"    right={tier.toUpperCase()} color={N.BRAND} />
@@ -1787,7 +1812,7 @@ function PortalInner() {
               // Free + Starter both open the same unified upgrade modal that
               // every other locked CTA on /portal uses. No more split routing.
               <button
-                onClick={() => setUpgradeOpen(true)}
+                onClick={() => setUpgradeOpenSafe(true)}
                 style={{
                   display: "block", width: "100%",
                   textAlign: "center",
@@ -1817,7 +1842,7 @@ function PortalInner() {
           </div>
         </Panel>
 
-        <Panel title="AI AUTO TRADE QUEUE" locked={tier === "free"} onUnlock={() => setUpgradeOpen(true)}>
+        <Panel title="AI AUTO TRADE QUEUE" locked={tier === "free"} onUnlock={() => setUpgradeOpenSafe(true)}>
           {QUEUE.map((q) => (
             <Row key={q.sym} left={`${q.sym}  ${q.side}`} right={q.conf}
                  color={N.BRAND} sub={q.state} />
@@ -1839,7 +1864,7 @@ function PortalInner() {
 
       <UpgradeModal    open={upgradeOpen}    onClose={() => setUpgradeOpen(false)} />
       <AccountModal    open={accountOpen}    onClose={() => setAccountOpen(false)}
-                       tier={tier} onUpgrade={() => setUpgradeOpen(true)} />
+                       tier={tier} onUpgrade={() => setUpgradeOpenSafe(true)} />
       <DisclaimerModal open={disclaimerOpen} onClose={() => setDisclaimerOpen(false)} />
     </div>
   );

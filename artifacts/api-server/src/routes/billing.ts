@@ -289,6 +289,24 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
 
 router.post("/billing/checkout", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
+  // Diagnostic logging for production 403 triage — captures origin + auth
+  // shape so the "Your account does not have permission to upgrade" path
+  // (Portal.tsx:1037, res.status===403) can be root-caused from logs alone.
+  // requireAuth itself returns 401 not 403, so a 403 reaching this handler
+  // would indicate an upstream middleware (CORS / proxy / Clerk JWT) is the
+  // source — these logs surface enough context to identify which.
+  req.log.info(
+    {
+      origin:    req.headers.origin,
+      referer:   req.headers.referer,
+      host:      req.headers.host,
+      userIdLen: userId?.length ?? 0,
+      hasAuth:   Boolean(req.headers.authorization),
+      hasCookie: Boolean(req.headers.cookie),
+      planId:    (req.body as { planId?: string })?.planId,
+    },
+    "[checkout] request accepted (post-requireAuth)",
+  );
   // Accept either `priceId` (direct Stripe price) or `planId` (internal plan
   // key — `free`/`starter`/`pro`). When `planId` is supplied, we look up the
   // active monthly price from the synced stripe schema.
