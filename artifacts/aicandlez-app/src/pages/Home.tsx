@@ -526,6 +526,19 @@ export default function Home() {
       .map(x => x.t);
   }, [tickersData, breakdowns]);
 
+  // ── Crypto Signals preview — top 4 actionable signals, sorted by AI confidence
+  //    Lives above the Live Trades section as a compact AI shortlist.
+  const cryptoSignalRows = useMemo(() => {
+    return Object.entries(breakdowns)
+      .map(([sym, b]) => ({ sym, ...b }))
+      .filter(b => {
+        const a = (b.action ?? "").toUpperCase();
+        return a === "LONG" || a === "SHORT" || a === "BUY" || a === "SELL";
+      })
+      .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+      .slice(0, 4);
+  }, [breakdowns]);
+
   // ── AI Market Scanner intelligence message ─────────────────────────────────
   // Rotates dynamically based on live signal density, volatility, AI confidence,
   // bullish/bearish ratios, momentum, and volume trends.
@@ -1051,6 +1064,42 @@ export default function Home() {
         </div>
 
         {/* ════════════════════════════════════════════════════════════════ */}
+        {/* CRYPTO SIGNALS — compact AI shortlist (light-touch preview block) */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        <SectionHeader label="Crypto Signals" right="AI Live" onMore={() => setLocation("/crypto")}/>
+        <div style={{
+          margin: "0 16px", borderRadius: 18, overflow: "hidden",
+          background: `linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 60%, ${BG} 100%)`,
+          border: `1px solid ${BORDER_HI}`,
+          boxShadow: `0 8px 22px rgba(0,0,0,0.4)`,
+        }}>
+          {cryptoSignalRows.length === 0 ? (
+            <div style={{ padding: "22px 18px", textAlign: "center" }}>
+              <div style={{ fontSize: 11, fontFamily: SANS, color: TEXT_DIM, lineHeight: 1.5 }}>
+                Scanning for high-confidence setups.
+              </div>
+            </div>
+          ) : (
+            cryptoSignalRows.map((s, i) => (
+              <SignalsPreviewRow
+                key={s.sym}
+                icon={<CryptoIcon sym={s.sym} size={28}/>}
+                label={`${SYM_SHORT[s.sym] ?? s.sym?.replace("USD","")}/USDT`}
+                sub={(() => {
+                  const a = (s.action ?? "").toUpperCase();
+                  return a === "LONG" || a === "BUY" ? "Bullish momentum"
+                       : a === "SHORT" || a === "SELL" ? "Bearish pressure"
+                       : "AI tracking";
+                })()}
+                action={(s.action ?? "").toUpperCase()}
+                confidence={s.confidence ?? 0}
+                last={i === cryptoSignalRows.length - 1}
+              />
+            ))
+          )}
+        </div>
+
+        {/* ════════════════════════════════════════════════════════════════ */}
         {/* ACTIVE TRADES — real crypto icons + LONG/SHORT pills              */}
         {/* ════════════════════════════════════════════════════════════════ */}
         <SectionHeader label="Live Trades" right={`${positions.length} open`} onMore={() => setLocation("/trade")}/>
@@ -1128,6 +1177,29 @@ export default function Home() {
               );
             })
           )}
+        </div>
+
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* EQUITY SIGNALS — compact AI shortlist (light-touch preview block) */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        <SectionHeader label="Equity Signals" right="AI Live" onMore={() => setLocation("/equities")}/>
+        <div style={{
+          margin: "0 16px", borderRadius: 18, overflow: "hidden",
+          background: `linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 60%, ${BG} 100%)`,
+          border: `1px solid ${BORDER_HI}`,
+          boxShadow: `0 8px 22px rgba(0,0,0,0.4)`,
+        }}>
+          {EQUITY_PREVIEW.map((e, i) => (
+            <SignalsPreviewRow
+              key={e.sym}
+              icon={<TickerBadge sym={e.sym}/>}
+              label={e.sym}
+              sub={e.name}
+              action={e.action}
+              confidence={e.confidence}
+              last={i === EQUITY_PREVIEW.length - 1}
+            />
+          ))}
         </div>
 
         {/* ════════════════════════════════════════════════════════════════ */}
@@ -1214,6 +1286,82 @@ function SectionHeader({ label, right, onMore }: {
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SIGNALS PREVIEW — shared compact row used by Crypto + Equity preview blocks
+// Premium institutional row: icon · label · subtle context · action pill · %
+// ═══════════════════════════════════════════════════════════════════════════
+function SignalsPreviewRow({
+  icon, label, sub, action, confidence, last,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  sub: string;
+  action: string;
+  confidence: number;
+  last: boolean;
+}) {
+  const a = (action ?? "").toUpperCase();
+  const isLong  = a === "LONG"  || a === "BUY";
+  const isShort = a === "SHORT" || a === "SELL";
+  const color   = isLong ? BRAND : isShort ? NEG : TEXT_DIM;
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 12,
+      padding: "12px 14px",
+      borderBottom: last ? "none" : `1px solid ${BORDER}`,
+    }}>
+      <div style={{ flex: "0 0 auto" }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 13, fontFamily: SANS, fontWeight: 700, color: TEXT,
+          letterSpacing: -0.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+        }}>{label}</div>
+        <div style={{
+          fontSize: 10, fontFamily: SANS, color: TEXT_DIM, marginTop: 2,
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+        }}>{sub}</div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{
+          padding: "3px 8px", borderRadius: 5,
+          background: `${color}1F`,
+          border: `1px solid ${isLong ? BORDER_HI : isShort ? "rgba(255,64,96,0.30)" : BORDER}`,
+          fontSize: 9, fontFamily: SANS, fontWeight: 800,
+          color, letterSpacing: 1, textTransform: "uppercase",
+        }}>{a}</span>
+        <span style={{
+          fontSize: 13, fontFamily: SANS, fontWeight: 700, color,
+          minWidth: 38, textAlign: "right", fontVariantNumeric: "tabular-nums",
+        }}>{Math.round(confidence)}%</span>
+      </div>
+    </div>
+  );
+}
+
+// Compact equity ticker badge (no SVG icon set — uses a stylized monogram).
+function TickerBadge({ sym }: { sym: string }) {
+  return (
+    <div style={{
+      width: 28, height: 28, borderRadius: 8,
+      background: `linear-gradient(135deg, ${BRAND}22 0%, ${BRAND_DEEP}18 100%)`,
+      border: `1px solid ${BORDER_HI}`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: 9, fontFamily: SANS, fontWeight: 800,
+      color: BRAND, letterSpacing: 0.4,
+      boxShadow: `0 0 10px ${BRAND_BLOOM}`,
+    }}>{sym.slice(0, 4)}</div>
+  );
+}
+
+// Curated equity AI shortlist — matches the static map in Equities.tsx so the
+// preview is consistent with the full page. Keep in sync if you edit Equities.
+const EQUITY_PREVIEW: { sym: string; name: string; action: string; confidence: number }[] = [
+  { sym: "NVDA", name: "NVIDIA",    action: "LONG", confidence: 91 },
+  { sym: "META", name: "Meta",      action: "LONG", confidence: 86 },
+  { sym: "TSLA", name: "Tesla",     action: "LONG", confidence: 82 },
+  { sym: "MSFT", name: "Microsoft", action: "LONG", confidence: 74 },
+];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TRADE HISTORY — cinematic AI execution log

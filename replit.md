@@ -159,7 +159,7 @@ Each branch reads `breakdowns` (per-symbol AI state) + `tickersData` (live moves
 - `artifacts/natura-ai/constants/theme.ts` — green tokens (mobile, frozen)
 
 **Locked surfaces — do not restructure:**
-- Home (radar centerpiece + AI Market Scanner + Top Gainers + Active Trades + portfolio hero)
+- Home (radar centerpiece + AI Market Scanner + Top Gainers + Crypto Signals preview + Live Trades + Equity Signals preview + Trade History + portfolio hero) — single-column mobile-first stack, no 2-column grid
 - Signals, Crypto, Equities (asset cards, ranking, confidence rings)
 - Profile structure (AI Settings → Alert Preferences → Connected Accounts → Broker)
 - Bottom navigation (green/black, status pip)
@@ -273,6 +273,19 @@ Centered master logo brand header. Real branded crypto icons (BTC/ETH/SOL/ADA/AV
 - Home.tsx scanner expanded with 5 new intelligent states (now 10+ rotating)
 - All approved layouts/cards/nav/typography preserved exactly as-is
 - Zero `$5.99` references in source
+
+**Phase 5.3 — Dashboard Polish (DONE — current)**
+- `.neon-scroll` class added to `index.css` (opt-in green scrollbar for fixed-height containers)
+- Home.tsx: "Active Trades" → renamed "Live Trades", slice cap raised 6→15, neon scrollbar
+- Home.tsx: Trade History slice tightened 24→15, neon scrollbar
+- Home.tsx: **Compact Crypto Signals preview block** above Live Trades — pulls top 4 actionable signals from existing `/mobile/signals` `breakdowns` data, sorted by confidence
+- Home.tsx: **Compact Equity Signals preview block** above Trade History — curated 4-row shortlist matching `Equities.tsx` static map (NVDA · META · TSLA · MSFT)
+- Shared `SignalsPreviewRow` + `TickerBadge` helpers (single-column, mobile-first, no layout grid)
+- `UpgradeBanner.tsx` rewritten for tier-conditional UI:
+  - FREE → full upgrade prompt ("Start AI Trading")
+  - STARTER → single subtle "Upgrade to Pro" line, no locked/unlock language
+  - PRO → returns `null` (billing-state past_due/canceled still trump tier rule)
+- `FeatureGate.tsx` — Pro tier bypasses lock overlay entirely; legacy cyan `#00e5ff` → brand `#66FF66`; starter sees "Upgrade to Pro" CTA label
 
 ---
 
