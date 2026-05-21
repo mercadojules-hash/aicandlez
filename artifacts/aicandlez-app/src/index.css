@@ -273,6 +273,22 @@ body {
 /* ── Scrollbars hidden ────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 0; height: 0; }
 
+/* ── Neon scrollbar — opt-in for fixed-height scroll containers ──────────── */
+.neon-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102,255,102,0.35) rgba(255,255,255,0.04);
+}
+.neon-scroll::-webkit-scrollbar         { width: 6px; height: 6px; }
+.neon-scroll::-webkit-scrollbar-track   { background: rgba(255,255,255,0.04); border-radius: 999px; }
+.neon-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(102,255,102,0.55) 0%, rgba(0,200,83,0.45) 100%);
+  border-radius: 999px;
+  box-shadow: 0 0 6px rgba(102,255,102,0.45);
+}
+.neon-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(124,255,0,0.75) 0%, rgba(102,255,102,0.65) 100%);
+}
+
 /* ── Tap highlight ────────────────────────────────────────────────────────── */
 button, a { -webkit-tap-highlight-color: transparent; }
 

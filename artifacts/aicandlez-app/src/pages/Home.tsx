@@ -1053,14 +1053,14 @@ export default function Home() {
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* ACTIVE TRADES — real crypto icons + LONG/SHORT pills              */}
         {/* ════════════════════════════════════════════════════════════════ */}
-        <SectionHeader label="Active Trades" right={`${positions.length} open`} onMore={() => setLocation("/trade")}/>
-        <div style={{
+        <SectionHeader label="Live Trades" right={`${positions.length} open`} onMore={() => setLocation("/trade")}/>
+        <div className="neon-scroll" style={{
           margin: "0 16px",
           maxHeight: 460,
           overflowY: "auto",
           WebkitOverflowScrolling: "touch",
           overscrollBehavior: "contain",
-          paddingRight: 2,
+          paddingRight: 6,
         }}>
           {positions.length === 0 ? (
             <div style={{
@@ -1074,7 +1074,7 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            positions.slice(0, 6).map((p, i) => {
+            positions.slice(0, 15).map((p, i) => {
               const isLong = (p.side ?? "long").toLowerCase() === "long";
               const upnl = p.unrealizedPnL ?? 0;
               const notional = (p.size ?? 0) * (p.entryPrice ?? 0);
@@ -1233,7 +1233,7 @@ function TradeHistorySection({ trades, onMore }: {
     return { wins, total, winRate, netPnL, bestPct };
   }, [trades]);
 
-  const recent = trades.slice(0, 24);
+  const recent = trades.slice(0, 15);
 
   return (
     <>
@@ -1243,13 +1243,13 @@ function TradeHistorySection({ trades, onMore }: {
         onMore={trades.length > 0 ? onMore : undefined}
       />
 
-      <div style={{
+      <div className="neon-scroll" style={{
         margin: "0 16px",
         maxHeight: 520,
         overflowY: "auto",
         WebkitOverflowScrolling: "touch",
         overscrollBehavior: "contain",
-        paddingRight: 2,
+        paddingRight: 6,
       }}>
         {/* Aggregate banner — derived strictly from real trade records */}
         {stats && (

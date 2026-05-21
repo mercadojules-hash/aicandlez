@@ -1,9 +1,9 @@
 import { useSubscription } from "@/contexts/SubscriptionContext";
 
-const SANS = "Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif";
-const C    = "#00e5ff";
-const W    = "#ffffff";
-const GR   = "#8892a4";
+const SANS  = "Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif";
+const BRAND = "#66FF66";
+const W     = "#ffffff";
+const GR    = "#8892a4";
 
 interface FeatureGateProps {
   feature:      string;
@@ -13,7 +13,10 @@ interface FeatureGateProps {
 }
 
 export function FeatureGate({ feature, description, locked, children }: FeatureGateProps) {
-  const { isPaid, isActive, showPaywall } = useSubscription();
+  const { plan, isPaid, isActive, showPaywall } = useSubscription();
+
+  // Pro tier never sees a lock overlay — they have everything.
+  if (plan === "pro" && isActive) return <>{children}</>;
 
   const isLocked = locked !== undefined ? locked : (!isPaid || !isActive);
 
@@ -54,16 +57,16 @@ export function FeatureGate({ feature, description, locked, children }: FeatureG
           style={{
             marginTop: 6,
             padding: "9px 24px",
-            background: "rgba(0,229,255,0.10)",
-            border: `1px solid rgba(0,229,255,0.32)`,
+            background: "rgba(102,255,102,0.10)",
+            border: `1px solid rgba(102,255,102,0.32)`,
             borderRadius: 8,
-            color: C,
+            color: BRAND,
             fontSize: 12, fontFamily: SANS, fontWeight: 600,
             letterSpacing: "0.04em",
             cursor: "pointer",
             transition: "background 0.15s",
           }}>
-          Unlock — from $39.99/mo
+          {plan === "starter" ? "Upgrade to Pro" : "Unlock — from $39.99/mo"}
         </button>
       </div>
     </div>
