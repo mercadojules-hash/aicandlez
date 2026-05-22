@@ -791,6 +791,140 @@ function ExchangeConnectionsHealth() {
   );
 }
 
+// ── Alpaca Reconnect Banner ─────────────────────────────────────────────────
+// Surfaces an inline "Reconnect Alpaca" CTA whenever the per-user Alpaca
+// connection row is marked status="error" with an OAuth-refresh-failure
+// `lastError` by the background AlpacaTokenRefresher. Reopens the same
+// one-click OAuth popup used by OnboardingFlow. Clears automatically as
+// soon as the next /api/user/exchanges poll reports status back to "active".
+const API_BASE_RECONNECT = (
+  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? ""
+).replace(/\/$/, "") + "/api";
+
+interface ApiExchangesResp {
+  exchanges: Array<{
+    exchange:    string;
+    connected:   boolean;
+    connection?: { status?: string; lastError?: string | null } | null;
+  }>;
+}
+interface ApiAlpacaOauthCfg { enabled: boolean; authorizeUrl?: string }
+
+function AlpacaReconnectBanner() {
+  const qc = useQueryClient();
+  const { data: exData } = useQuery<ApiExchangesResp>({
+    queryKey: ["profile-exchanges-health"],
+    queryFn:  () => fetch(`${API_BASE_RECONNECT}/user/exchanges`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : { exchanges: [] }),
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    staleTime: 10_000,
+  });
+  const { data: oauthCfg } = useQuery<ApiAlpacaOauthCfg>({
+    queryKey: ["profile-alpaca-oauth-config"],
+    queryFn:  () => fetch(`${API_BASE_RECONNECT}/user/exchanges/alpaca/oauth/config`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : { enabled: false }),
+    staleTime: 60_000,
+  });
+  const [popupErr, setPopupErr] = useState<string | null>(null);
+
+  const row = (exData?.exchanges ?? []).find(e => e.exchange === "Alpaca" && e.connected);
+  const status    = row?.connection?.status ?? null;
+  const lastError = row?.connection?.lastError ?? null;
+  const isOauthError =
+    status === "error" &&
+    !!lastError &&
+    (lastError.toLowerCase().includes("oauth")
+      || lastError.toLowerCase().includes("refresh")
+      || lastError.toLowerCase().includes("token"));
+
+  if (!isOauthError) return null;
+
+  const oauthEnabled = oauthCfg?.enabled === true && !!oauthCfg?.authorizeUrl;
+
+  const onReconnect = () => {
+    setPopupErr(null);
+    if (!oauthEnabled || !oauthCfg?.authorizeUrl) {
+      // Fall back to the onboarding flow so the user can re-enter Alpaca keys
+      // manually when the in-app OAuth handshake isn't available.
+      window.dispatchEvent(new Event("aicandlez:open-onboarding"));
+      return;
+    }
+    const popup = window.open(
+      oauthCfg.authorizeUrl,
+      "aicandlez-alpaca-oauth",
+      "width=520,height=720,menubar=no,toolbar=no",
+    );
+    if (!popup) {
+      setPopupErr("Popup blocked — please allow popups for AICandlez and try again.");
+      return;
+    }
+    const onMessage = (e: MessageEvent) => {
+      const data = e.data as { source?: string; ok?: boolean; error?: string } | null;
+      if (!data || data.source !== "aicandlez:alpaca-oauth") return;
+      window.removeEventListener("message", onMessage);
+      if (data.ok) {
+        qc.invalidateQueries({ queryKey: ["profile-exchanges-health"] });
+        qc.invalidateQueries({ queryKey: ["onboarding-exchanges"] });
+        qc.invalidateQueries({ queryKey: ["user-exchanges"] });
+        qc.invalidateQueries({ queryKey: ["exchange-connections"] });
+      } else {
+        setPopupErr(data.error ?? "Alpaca did not authorize the connection.");
+      }
+    };
+    window.addEventListener("message", onMessage);
+  };
+
+  return (
+    <div style={{
+      marginBottom: 10, padding: "12px 14px", borderRadius: 12,
+      background: "rgba(255,176,32,0.08)",
+      border: "1px solid rgba(255,176,32,0.45)",
+      boxShadow: "0 0 16px rgba(255,176,32,0.16) inset",
+    }}>
+      <div style={{
+        fontFamily: MONO, fontSize: 9.5, fontWeight: 800,
+        letterSpacing: "0.18em", color: "#FFB020", marginBottom: 6,
+      }}>
+        ⚠ ALPACA NEEDS TO BE RECONNECTED
+      </div>
+      <div style={{ fontSize: 12, fontFamily: SANS, color: W, lineHeight: 1.5, marginBottom: 8 }}>
+        Your Alpaca authorization expired or was revoked, so live AI trades can
+        no longer reach your brokerage account.
+      </div>
+      <div style={{
+        fontFamily: MONO, fontSize: 10, color: "rgba(255,176,32,0.80)",
+        lineHeight: 1.5, marginBottom: 10, wordBreak: "break-word",
+      }}>
+        {lastError}
+      </div>
+      <button
+        type="button"
+        onClick={onReconnect}
+        style={{
+          display: "inline-block", padding: "9px 14px", borderRadius: 8,
+          background: "linear-gradient(135deg,#00C853 0%,#66FF66 55%,#7CFF00 100%)",
+          border: "1px solid #66FF66", color: "#001b06",
+          fontFamily: MONO, fontSize: 10.5, fontWeight: 800,
+          letterSpacing: "0.16em", textTransform: "uppercase" as const,
+          cursor: "pointer",
+          boxShadow: "0 6px 18px rgba(102,255,102,0.30)",
+        }}
+      >
+        {oauthEnabled ? "Reconnect Alpaca →" : "Re-enter Alpaca Keys →"}
+      </button>
+      {popupErr && (
+        <div style={{
+          marginTop: 8, fontSize: 11, fontFamily: SANS,
+          color: "rgba(255,120,140,0.95)", lineHeight: 1.45,
+        }}>
+          {popupErr}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────────
 // ── Alert & Feedback Preferences (notification scaffolding) ─────────────────
 // Surfaces every alert key from `lib/feedback` as a toggle row. Master switches
@@ -1479,6 +1613,7 @@ export default function Profile() {
         {/* BROKER */}
         <div style={{ marginBottom:14 }}>
           <SectionHead label="Broker Connection" accent="rgba(0,255,136,0.55)"/>
+          <AlpacaReconnectBanner/>
           <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, overflow:"hidden" }}>
             <ExchangeRow
               name={alpacaConn

@@ -70,8 +70,28 @@ const EXCHANGES = [
 
 type Step = "done" | "choose" | "alpaca_cta" | "connect" | "intro";
 
-interface ApiExchangeRow { exchange: string; connected: boolean }
+interface ApiExchangeRow {
+  exchange:  string;
+  connected: boolean;
+  connection?: { status?: string; lastError?: string | null } | null;
+}
 interface ApiExchanges   { exchanges: ApiExchangeRow[] }
+
+// True when the Alpaca row is in OAuth-refresh-failed state — the background
+// AlpacaTokenRefresher marks status="error" with lastError prefixed by
+// "Alpaca OAuth refresh failed:" once the refresh_token is revoked/expired.
+export function isAlpacaOauthErrored(rows: ApiExchangeRow[] | undefined): { errored: boolean; lastError: string | null } {
+  const row = (rows ?? []).find(r => r.exchange === "Alpaca" && r.connected);
+  const status    = row?.connection?.status ?? null;
+  const lastError = row?.connection?.lastError ?? null;
+  if (status !== "error") return { errored: false, lastError: null };
+  if (!lastError) return { errored: false, lastError: null };
+  const hint = lastError.toLowerCase();
+  if (!hint.includes("oauth") && !hint.includes("refresh") && !hint.includes("token")) {
+    return { errored: false, lastError: null };
+  }
+  return { errored: true, lastError };
+}
 
 export function OnboardingFlow() {
   const { isSignedIn } = useAuth();
@@ -105,6 +125,7 @@ export function OnboardingFlow() {
   const alpacaOauthEnabled = oauthCfg.data?.enabled === true;
   const [oauthError, setOauthError] = useState("");
   const connectedCount = (exchanges.data?.exchanges ?? []).filter(e => e.connected).length;
+  const alpacaErrored  = isAlpacaOauthErrored(exchanges.data?.exchanges);
   const introSeen = typeof window !== "undefined" && localStorage.getItem(LS_INTRO_SEEN) === "1";
 
   // Trigger on ?checkout=success
@@ -128,9 +149,12 @@ export function OnboardingFlow() {
     if (bypassResolved) return;
     if (exchanges.isLoading) return;
     setBypassResolved(true);
+    // When an OAuth-errored Alpaca connection exists, stay on the choose
+    // screen so the reconnect banner is visible — never bypass to intro/done.
+    if (alpacaErrored.errored) return;
     if (connectedCount > 0 && introSeen) { setStep("done"); return; }
     if (connectedCount > 0 && !introSeen) { setStep("intro"); return; }
-  }, [step, bypassResolved, exchanges.isLoading, connectedCount, introSeen]);
+  }, [step, bypassResolved, exchanges.isLoading, connectedCount, introSeen, alpacaErrored.errored]);
 
   // External imperative trigger
   useEffect(() => {
@@ -212,6 +236,9 @@ export function OnboardingFlow() {
           <ChooseContent
             oauthEnabled={alpacaOauthEnabled}
             oauthError={oauthError}
+            alpacaErrored={alpacaErrored.errored}
+            alpacaErrorMsg={alpacaErrored.lastError}
+            onReconnectAlpaca={() => { if (alpacaOauthEnabled) startAlpacaOauth(); }}
             onPickAlpaca={() => {
               if (alpacaOauthEnabled) { startAlpacaOauth(); return; }
               setStep("alpaca_cta");
@@ -288,12 +315,62 @@ function FullScreenShell({ children, onClose }: { children: React.ReactNode; onC
 }
 
 // ─── Step 1: Choose path (PWA stacked cards) ────────────────────────────────
-function ChooseContent({ oauthEnabled, oauthError, onPickAlpaca, onPickExisting }: {
+function ChooseContent({ oauthEnabled, oauthError, alpacaErrored, alpacaErrorMsg, onReconnectAlpaca, onPickAlpaca, onPickExisting }: {
   oauthEnabled: boolean; oauthError: string;
+  alpacaErrored?: boolean; alpacaErrorMsg?: string | null;
+  onReconnectAlpaca?: () => void;
   onPickAlpaca: () => void; onPickExisting: () => void;
 }) {
   return (
     <>
+      {alpacaErrored && (
+        <div style={{
+          marginBottom: 18, padding: "14px 16px", borderRadius: 12,
+          background: "rgba(255,176,32,0.08)",
+          border: "1px solid rgba(255,176,32,0.45)",
+          boxShadow: "0 0 18px rgba(255,176,32,0.18) inset",
+        }}>
+          <div style={{
+            fontFamily: MONO, fontSize: 10, fontWeight: 800,
+            letterSpacing: "0.18em", color: "#FFB020", marginBottom: 6,
+          }}>
+            ⚠ ALPACA NEEDS TO BE RECONNECTED
+          </div>
+          <div style={{ fontSize: 12.5, color: TEXT_1, lineHeight: 1.55, marginBottom: 10 }}>
+            Your Alpaca authorization expired or was revoked, so live AI trades can no longer
+            reach your brokerage account. Reconnect in one click to resume execution.
+          </div>
+          {alpacaErrorMsg && (
+            <div style={{
+              fontFamily: MONO, fontSize: 10.5, color: "rgba(255,176,32,0.85)",
+              lineHeight: 1.5, marginBottom: 10, wordBreak: "break-word",
+            }}>
+              {alpacaErrorMsg}
+            </div>
+          )}
+          {oauthEnabled && onReconnectAlpaca ? (
+            <button
+              type="button"
+              onClick={onReconnectAlpaca}
+              style={{
+                display: "inline-block", padding: "10px 16px", borderRadius: 8,
+                background: `linear-gradient(135deg, ${BRAND_DEEP} 0%, ${BRAND} 55%, ${BRAND_BRGT} 100%)`,
+                border: `1px solid ${BRAND}`, color: "#001b06",
+                fontFamily: MONO, fontSize: 11, fontWeight: 800,
+                letterSpacing: "0.18em", textTransform: "uppercase",
+                cursor: "pointer",
+                boxShadow: `0 8px 22px rgba(102,255,102,0.30)`,
+              }}
+            >
+              Reconnect Alpaca →
+            </button>
+          ) : (
+            <div style={{ fontSize: 11, color: TEXT_2, fontFamily: MONO, letterSpacing: "0.10em" }}>
+              ONE-CLICK RECONNECT TEMPORARILY UNAVAILABLE — RE-ENTER ALPACA KEYS BELOW
+            </div>
+          )}
+        </div>
+      )}
       <div style={{ marginBottom: 26, paddingRight: 44 }}>
         <div style={{
           fontFamily: MONO, fontSize: 10, fontWeight: 800,

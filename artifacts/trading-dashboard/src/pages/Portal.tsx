@@ -809,12 +809,15 @@ interface ExchangeStatusEntry {
   connected:   boolean;
   tradingMode?: string;
   permissions?: { read?: boolean; trade?: boolean };
+  connection?: { status?: string; lastError?: string | null } | null;
 }
 interface ExchangeStatus {
   connectedCount: number;
   liveCount:      number;
   anyHealthy:     boolean;
   lastSyncedAt:   number;
+  alpacaOauthErrored: boolean;
+  alpacaLastError:    string | null;
 }
 function useExchangeStatus(): ExchangeStatus {
   const { data } = useQuery({
@@ -830,12 +833,130 @@ function useExchangeStatus(): ExchangeStatus {
   });
   const list = data?.exchanges ?? [];
   const connected = list.filter(e => e.connected);
+  const alpaca = connected.find(e => e.exchange === "Alpaca");
+  const alpacaErr = alpaca?.connection?.lastError ?? null;
+  const alpacaErrHint = alpacaErr?.toLowerCase() ?? "";
+  const alpacaOauthErrored =
+    alpaca?.connection?.status === "error" &&
+    !!alpacaErr &&
+    (alpacaErrHint.includes("oauth")
+      || alpacaErrHint.includes("refresh")
+      || alpacaErrHint.includes("token"));
   return {
     connectedCount: connected.length,
     liveCount:      connected.filter(e => e.tradingMode === "live").length,
     anyHealthy:     connected.some(e => e.permissions?.read !== false),
     lastSyncedAt:   Date.now(),
+    alpacaOauthErrored,
+    alpacaLastError: alpacaOauthErrored ? alpacaErr : null,
   };
+}
+
+// ── Alpaca OAuth reconnect banner ──────────────────────────────────────────
+// Shows whenever the background AlpacaTokenRefresher has marked the user's
+// Alpaca connection status="error" with an OAuth-refresh-style `lastError`.
+// CTA opens the same one-click OAuth popup OnboardingFlow uses. Banner clears
+// the moment the next /api/user/exchanges poll reports status back to active.
+interface AlpacaOauthCfgResp { enabled: boolean; authorizeUrl?: string }
+function AlpacaReconnectBanner({ lastError }: { lastError: string | null }) {
+  const qc = useQueryClient();
+  const { data: cfg } = useQuery<AlpacaOauthCfgResp>({
+    queryKey: ["portal-alpaca-oauth-config"],
+    queryFn: async () => {
+      const r = await fetch(`${apiBaseUrl}/api/user/exchanges/alpaca/oauth/config`, { credentials: "include" });
+      if (!r.ok) return { enabled: false };
+      return r.json() as Promise<AlpacaOauthCfgResp>;
+    },
+    staleTime: 60_000,
+  });
+  const [popupErr, setPopupErr] = useState<string | null>(null);
+  const oauthEnabled = cfg?.enabled === true && !!cfg?.authorizeUrl;
+
+  const onReconnect = () => {
+    setPopupErr(null);
+    if (!oauthEnabled || !cfg?.authorizeUrl) {
+      setPopupErr("One-click reconnect unavailable — please re-enter your Alpaca keys via Connect Exchange.");
+      return;
+    }
+    const popup = window.open(
+      cfg.authorizeUrl,
+      "aicandlez-alpaca-oauth",
+      "width=520,height=720,menubar=no,toolbar=no",
+    );
+    if (!popup) {
+      setPopupErr("Popup blocked — please allow popups for AICandlez and try again.");
+      return;
+    }
+    const onMessage = (e: MessageEvent) => {
+      const data = e.data as { source?: string; ok?: boolean; error?: string } | null;
+      if (!data || data.source !== "aicandlez:alpaca-oauth") return;
+      window.removeEventListener("message", onMessage);
+      if (data.ok) {
+        qc.invalidateQueries({ queryKey: ["portal-exchanges-status"] });
+        qc.invalidateQueries({ queryKey: ["portal-user-exchange-balances"] });
+      } else {
+        setPopupErr(data.error ?? "Alpaca did not authorize the connection.");
+      }
+    };
+    window.addEventListener("message", onMessage);
+  };
+
+  const WARN = "#FFB020";
+  return (
+    <div style={{
+      margin: "12px 16px 0",
+      padding: "12px 16px",
+      borderRadius: 6,
+      border: `1px solid ${WARN}55`,
+      background: `linear-gradient(180deg, ${WARN}14, ${WARN}06)`,
+      boxShadow: `inset 0 0 24px ${WARN}10`,
+      fontFamily: N.FONT_MONO,
+      display: "flex", flexDirection: "column", gap: 8,
+    }}>
+      <div style={{
+        fontSize: 10, fontWeight: 800, letterSpacing: "0.20em",
+        color: WARN, textShadow: `0 0 6px ${WARN}66`,
+      }}>
+        ⚠ ALPACA NEEDS TO BE RECONNECTED · LIVE EXECUTION PAUSED
+      </div>
+      <div style={{ fontSize: 10.5, color: N.TEXT_2, lineHeight: 1.55 }}>
+        Your Alpaca authorization expired or was revoked, so AI trades can no
+        longer reach your brokerage account. Reconnect in one click to resume
+        live execution.
+      </div>
+      {lastError && (
+        <div style={{
+          fontSize: 10, color: N.TEXT_3, lineHeight: 1.5,
+          padding: "6px 10px", borderRadius: 4,
+          background: "rgba(0,0,0,0.30)", border: `1px solid ${WARN}25`,
+          wordBreak: "break-word",
+        }}>
+          {lastError}
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={onReconnect}
+          style={{
+            padding: "6px 16px",
+            background: `${WARN}20`,
+            border: `1px solid ${WARN}`,
+            borderRadius: 3,
+            color: WARN,
+            fontWeight: 800, fontSize: 10, letterSpacing: "0.18em",
+            fontFamily: N.FONT_MONO, cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {oauthEnabled ? "RECONNECT ALPACA →" : "RE-ENTER ALPACA KEYS →"}
+        </button>
+        {popupErr && (
+          <span style={{ fontSize: 10, color: "#ff8088", lineHeight: 1.45 }}>{popupErr}</span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ── Live balance hook (customer per-user exchange balances) ──────────────────
@@ -2353,6 +2474,14 @@ function PortalInner() {
           row in user_exchange_connections), so this customer onboarding
           prompt is suppressed for them — otherwise it would always render. */}
       {!isAdmin && !hasExchange && <ExchangeOnboardingBanner onConnect={() => disclaimerGate(() => setConnectExchangeOpen(true))} />}
+
+      {/* Alpaca OAuth re-authorize banner — surfaced when the background
+          AlpacaTokenRefresher has marked the user's Alpaca row as
+          status="error" with an OAuth-refresh failure. Banner clears once
+          the next /api/user/exchanges poll reports status back to active. */}
+      {!isAdmin && exchangeStatus.alpacaOauthErrored && (
+        <AlpacaReconnectBanner lastError={exchangeStatus.alpacaLastError} />
+      )}
 
       {/* Unhealthy connection warning — non-blocking, dismissible. Surfaces
           any per-connection `ok:false` reported by /api/user/exchanges/balances
