@@ -571,6 +571,13 @@ export default function Home() {
     queryKey: ["mobile-tickers"], queryFn: () => api.get("/mobile/tickers"), refetchInterval: 15_000, retry: false });
   const { data: tradesData }  = useQuery<{ trades: SimTrade[] }>({
     queryKey: ["sim-trades"], queryFn: () => api.get("/simulation/trades"), refetchInterval: 12_000, retry: false });
+  const { data: notifData } = useQuery<{ notifications: unknown[]; unread: number }>({
+    queryKey: ["pwa-notifications"],
+    queryFn:  () => api.get("/user/notifications"),
+    refetchInterval: 15_000,
+    retry:    false,
+  });
+  const unreadNotifications = notifData?.unread ?? 0;
 
   // Live balances across any per-user connected exchanges (Kraken/Coinbase/
   // Binance/etc — distinct from the Alpaca broker which goes through
@@ -872,17 +879,21 @@ export default function Home() {
             </div>
           </div>
 
-          <div style={{
-            position: "relative", width: 38, height: 38, borderRadius: 12,
-            background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`,
-            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-            color: TEXT_SUB,
-          }}>
+          <div
+            onClick={() => setLocation("/notifications")}
+            style={{
+              position: "relative", width: 38, height: 38, borderRadius: 12,
+              background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`,
+              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+              color: TEXT_SUB,
+            }}>
             {IconBell}
-            <div style={{
-              position: "absolute", top: 8, right: 8, width: 7, height: 7, borderRadius: "50%",
-              background: NEG, boxShadow: `0 0 8px ${NEG}`,
-            }}/>
+            {unreadNotifications > 0 && (
+              <div style={{
+                position: "absolute", top: 8, right: 8, width: 7, height: 7, borderRadius: "50%",
+                background: NEG, boxShadow: `0 0 8px ${NEG}`,
+              }}/>
+            )}
           </div>
         </div>
 

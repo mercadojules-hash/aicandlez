@@ -24,6 +24,7 @@ import Billing   from "@/pages/Billing";
 import LegalPage from "@/pages/LegalPage";
 import Equities    from "@/pages/Equities";
 import AssetDetail from "@/pages/AssetDetail";
+import Notifications from "@/pages/Notifications";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // ── Env ────────────────────────────────────────────────────────────────────────
@@ -373,6 +374,7 @@ function Pages() {
       <Route path="/settings/exchanges" component={() => <Protected><Profile /></Protected>} />
       <Route path="/settings"           component={() => <Redirect to="/profile" />} />
       <Route path="/billing"     component={() => <Protected><Billing /></Protected>} />
+      <Route path="/notifications" component={() => <Protected><Notifications /></Protected>} />
       <Route path="/legal/:type" component={() => <Protected><LegalPage /></Protected>} />
       <Route path="/sign-in/*?" component={() => (
         <AuthPage>
