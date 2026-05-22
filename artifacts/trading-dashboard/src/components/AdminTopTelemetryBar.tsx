@@ -11,11 +11,21 @@
  * `null` for a field, the cell renders an em-dash so mock/missing data
  * is visually distinct from live values.
  *
+ * Also surfaces a Back-Fill health indicator (GET /api/admin/backfill-status):
+ * when the most-recent nightly broker order-ID back-fill run had
+ * `ok === false` or any `errored > 0`, a red, pulsing "BACK-FILL" tile
+ * appears. Clicking it opens a modal with the captured error and the
+ * per-side rollup so the operator doesn't have to navigate to the
+ * /syscheck panel just to triage. The indicator clears automatically
+ * the next time a healthy run lands.
+ *
  * Admin-only at render time (Layout gates on `useUserRole().isAdmin`);
  * backend mirrors this with requireRole(["admin","super-admin"]).
  */
 
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { AlertTriangle, X, CheckCircle2 } from "lucide-react";
 
 interface TopTelemetry {
   activeUsersNow:            number;
@@ -35,6 +45,32 @@ interface TopTelemetry {
   apiLatencyMs:              number;
   engineRunning:             boolean;
   timestamp:                 number;
+}
+
+// ── Back-fill status (mirror artifacts/api-server/src/lib/backfillScheduler.ts) ──
+
+interface BackfillSideSummary {
+  totalCandidates: number;
+  matched:         number;
+  unmatched:       number;
+  ambiguous:       number;
+  errored:         number;
+}
+interface BackfillRunRecord {
+  startedAt:  number;
+  finishedAt: number;
+  durationMs: number;
+  ok:         boolean;
+  closeSide:  BackfillSideSummary | null;
+  openSide:   BackfillSideSummary | null;
+  error:      string | null;
+}
+interface BackfillStatus {
+  enabled:   boolean;
+  inFlight:  boolean;
+  nextRunAt: number | null;
+  lastRun:   BackfillRunRecord | null;
+  history:   BackfillRunRecord[];
 }
 
 // Resolve API base URL. In production trade./admintrade. is served by a
@@ -69,6 +105,16 @@ function fmtUptime(sec: number): string {
   return `${m}m`;
 }
 
+function ago(ts: number | null | undefined): string {
+  if (!ts) return "never";
+  const ms = Date.now() - ts;
+  if (ms < 0)          return "just now";
+  if (ms < 60_000)     return `${Math.round(ms / 1000)}s ago`;
+  if (ms < 3_600_000)  return `${Math.round(ms / 60_000)}m ago`;
+  if (ms < 86_400_000) return `${Math.round(ms / 3_600_000)}h ago`;
+  return `${Math.round(ms / 86_400_000)}d ago`;
+}
+
 function Cell({
   label, value, tone = "neutral",
 }: {
@@ -97,6 +143,120 @@ function Cell({
   );
 }
 
+/** Compute whether the latest back-fill run is unhealthy. */
+function backfillIsUnhealthy(s: BackfillStatus | undefined): boolean {
+  const last = s?.lastRun;
+  if (!last) return false;
+  if (last.ok === false) return true;
+  if ((last.closeSide?.errored ?? 0) > 0) return true;
+  if ((last.openSide?.errored  ?? 0) > 0) return true;
+  return false;
+}
+
+function BackfillFailureModal({
+  status, onClose,
+}: {
+  status: BackfillStatus;
+  onClose: () => void;
+}) {
+  const last = status.lastRun;
+  const closeErr = last?.closeSide?.errored ?? 0;
+  const openErr  = last?.openSide?.errored  ?? 0;
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: "rgba(0, 5, 10, 0.78)", backdropFilter: "blur(4px)" }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Back-fill failure details"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xl rounded-xl border bg-card p-5 flex flex-col gap-4"
+        style={{ borderColor: "#ff335555", boxShadow: "0 0 32px #ff335530" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" style={{ color: "#ff5566" }} />
+          <div className="flex-1">
+            <div className="text-sm font-semibold" style={{ color: "#ff8899" }}>
+              Nightly back-fill {last?.ok === false ? "FAILED" : "completed with errors"}
+            </div>
+            <div className="text-[11px] font-mono mt-0.5" style={{ color: "#7ab8cc" }}>
+              {last ? `Last run ${ago(last.startedAt)} · duration ${last.durationMs}ms` : "No runs recorded"}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded hover:bg-muted/30 transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        {last?.error && (
+          <div
+            className="rounded-lg px-3 py-2 text-xs font-mono break-all"
+            style={{ background: "#ff335515", border: "1px solid #ff335540", color: "#ffb0b8" }}
+          >
+            {last.error}
+          </div>
+        )}
+
+        {last && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="rounded-lg border border-border/40 bg-muted/10 p-3">
+              <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground/70 mb-1.5">
+                Close side
+              </div>
+              {last.closeSide ? (
+                <div className="text-xs font-mono space-y-0.5">
+                  <div>Matched   <span className="text-emerald-400">{last.closeSide.matched}</span></div>
+                  <div>Unmatched <span className="text-amber-300">{last.closeSide.unmatched}</span></div>
+                  <div>Ambiguous <span className="text-amber-300">{last.closeSide.ambiguous}</span></div>
+                  <div>Errored   <span style={{ color: closeErr > 0 ? "#ff5566" : "#9fb8c8" }}>{last.closeSide.errored}</span></div>
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground/60">No data captured.</div>
+              )}
+            </div>
+            <div className="rounded-lg border border-border/40 bg-muted/10 p-3">
+              <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground/70 mb-1.5">
+                Open side
+              </div>
+              {last.openSide ? (
+                <div className="text-xs font-mono space-y-0.5">
+                  <div>Matched   <span className="text-emerald-400">{last.openSide.matched}</span></div>
+                  <div>Unmatched <span className="text-amber-300">{last.openSide.unmatched}</span></div>
+                  <div>Ambiguous <span className="text-amber-300">{last.openSide.ambiguous}</span></div>
+                  <div>Errored   <span style={{ color: openErr > 0 ? "#ff5566" : "#9fb8c8" }}>{last.openSide.errored}</span></div>
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground/60">No data captured.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <div className="text-[10px] font-mono text-muted-foreground/60 flex items-center gap-1.5">
+            <CheckCircle2 className="w-3 h-3" />
+            Indicator clears automatically when the next healthy run lands.
+          </div>
+          <a
+            href="/syscheck"
+            className="text-[11px] font-mono px-2.5 py-1 rounded-lg border border-border/40 bg-card hover:border-border text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Open full panel →
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AdminTopTelemetryBar() {
   const { data, isError } = useQuery<TopTelemetry>({
     queryKey: ["adminTopTelemetry"],
@@ -112,6 +272,24 @@ export function AdminTopTelemetryBar() {
     staleTime: 2_000,
     retry: 1,
   });
+
+  const { data: backfill } = useQuery<BackfillStatus>({
+    queryKey: ["adminTopTelemetry:backfill"],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/api/admin/backfill-status`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json() as Promise<BackfillStatus>;
+    },
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    staleTime: 10_000,
+    retry: 1,
+  });
+
+  const [showBackfillModal, setShowBackfillModal] = useState(false);
+  const backfillBad = backfillIsUnhealthy(backfill);
 
   const dash = "—";
   const v = (n: number | undefined, fmt: (x: number) => string): string =>
@@ -129,50 +307,88 @@ export function AdminTopTelemetryBar() {
   const failedTone  = (data?.failedTrades ?? 0) > 0 ? "warn" : "neutral";
 
   return (
-    <div
-      className="h-10 shrink-0 border-b flex items-center overflow-x-auto whitespace-nowrap sticky top-10 z-40"
-      style={{
-        background:        "linear-gradient(180deg, #000508 0%, #000a14 100%)",
-        borderBottomColor: "#0D2035",
-        boxShadow:         "0 1px 0 #00eeff08, 0 2px 8px #00000060",
-      }}
-      role="status"
-      aria-label="Operator telemetry"
-    >
-      {/* Leading status dot + label */}
-      <div className="flex items-center gap-2 px-3 shrink-0 border-r"
-           style={{ borderRightColor: "#0d1e2e" }}>
-        <span
-          className="w-1.5 h-1.5 rounded-full"
-          style={{
-            background:  isError ? "#ff3355" : data?.engineRunning ? "#00ff8a" : "#ffaa00",
-            boxShadow:   isError ? "0 0 6px #ff335580" : "0 0 6px #00ff8a80",
-          }}
-        />
-        <span className="text-[9px] font-bold font-mono uppercase tracking-[0.18em]"
-              style={{ color: isError ? "#ff5566" : "#7ab8cc" }}>
-          {isError ? "Telemetry offline" : "Operator · Live"}
-        </span>
+    <>
+      <div
+        className="h-10 shrink-0 border-b flex items-center overflow-x-auto whitespace-nowrap sticky top-10 z-40"
+        style={{
+          background:        "linear-gradient(180deg, #000508 0%, #000a14 100%)",
+          borderBottomColor: "#0D2035",
+          boxShadow:         "0 1px 0 #00eeff08, 0 2px 8px #00000060",
+        }}
+        role="status"
+        aria-label="Operator telemetry"
+      >
+        {/* Leading status dot + label */}
+        <div className="flex items-center gap-2 px-3 shrink-0 border-r"
+             style={{ borderRightColor: "#0d1e2e" }}>
+          <span
+            className="w-1.5 h-1.5 rounded-full"
+            style={{
+              background:  isError ? "#ff3355" : data?.engineRunning ? "#00ff8a" : "#ffaa00",
+              boxShadow:   isError ? "0 0 6px #ff335580" : "0 0 6px #00ff8a80",
+            }}
+          />
+          <span className="text-[9px] font-bold font-mono uppercase tracking-[0.18em]"
+                style={{ color: isError ? "#ff5566" : "#7ab8cc" }}>
+            {isError ? "Telemetry offline" : "Operator · Live"}
+          </span>
+        </div>
+
+        {/* Back-fill failure indicator — only renders when unhealthy. */}
+        {backfillBad && backfill && (
+          <button
+            type="button"
+            onClick={() => setShowBackfillModal(true)}
+            className="flex items-center gap-2 px-3 py-1.5 shrink-0 border-r transition-colors"
+            style={{
+              borderRightColor: "#0d1e2e",
+              background:       "#ff335518",
+            }}
+            title="Nightly back-fill is unhealthy — click for details"
+            aria-label="Back-fill failure — open details"
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full animate-pulse"
+              style={{ background: "#ff3355", boxShadow: "0 0 8px #ff3355cc" }}
+            />
+            <div className="flex flex-col gap-0.5 leading-none text-left">
+              <div className="text-[12px] font-bold font-mono tabular-nums"
+                   style={{ color: "#ff5566" }}>
+                {backfill.lastRun?.ok === false
+                  ? "FAILED"
+                  : `${(backfill.lastRun?.closeSide?.errored ?? 0) + (backfill.lastRun?.openSide?.errored ?? 0)} err`}
+              </div>
+              <div className="text-[8px] font-mono uppercase tracking-[0.12em] font-medium"
+                   style={{ color: "#ff99a8" }}>
+                Back-Fill
+              </div>
+            </div>
+          </button>
+        )}
+
+        <Cell label="Active Now"    value={v(data?.activeUsersNow,            fmtInt)}  tone="accent"   />
+        <Cell label="Total Users"   value={v(data?.totalRegisteredUsers,      fmtInt)}                  />
+        <Cell label="Total Trades"  value={v(data?.totalUserTrades,           fmtInt)}                  />
+        <Cell label="Trades 24h"    value={v(data?.tradesToday,               fmtInt)}                  />
+        <Cell label="Platform PnL"  value={v(data?.platformPnlUsd,            fmtUsd)}  tone={pnlTone}  />
+        <Cell label="Fees"          value={v(data?.feesCollectedUsd,          fmtUsd)}  tone="warn"     />
+        <Cell label="Connections"   value={v(data?.activeExchangeConnections, fmtInt)}  tone="accent"   />
+        <Cell label="AI Execs"      value={v(data?.activeAiExecutions,        fmtInt)}                  />
+        <Cell label="Live Subs"     value={v(data?.liveSubscriptions,         fmtInt)}  tone="positive" />
+        <Cell label="MRR"           value={v(data?.monthlyRevenueUsd,         fmtUsd)}  tone="warn"     />
+        <Cell label="Failed"        value={v(data?.failedTrades,              fmtInt)}  tone={failedTone}/>
+        <Cell label="Uptime"        value={v(data?.systemUptimeSec,           fmtUptime)}               />
+        <Cell label="WS"            value={data?.websocketStatus
+                                             ? data.websocketStatus.toUpperCase()
+                                             : dash} tone={wsTone}                                     />
+        <Cell label="Queue/min"     value={v(data?.queueThroughputPerMin,     n => n.toFixed(1))}       />
+        <Cell label="API Latency"   value={v(data?.apiLatencyMs,              n => `${Math.round(n)}ms`)}
+                                                                                        tone={latencyTone}/>
       </div>
 
-      <Cell label="Active Now"    value={v(data?.activeUsersNow,            fmtInt)}  tone="accent"   />
-      <Cell label="Total Users"   value={v(data?.totalRegisteredUsers,      fmtInt)}                  />
-      <Cell label="Total Trades"  value={v(data?.totalUserTrades,           fmtInt)}                  />
-      <Cell label="Trades 24h"    value={v(data?.tradesToday,               fmtInt)}                  />
-      <Cell label="Platform PnL"  value={v(data?.platformPnlUsd,            fmtUsd)}  tone={pnlTone}  />
-      <Cell label="Fees"          value={v(data?.feesCollectedUsd,          fmtUsd)}  tone="warn"     />
-      <Cell label="Connections"   value={v(data?.activeExchangeConnections, fmtInt)}  tone="accent"   />
-      <Cell label="AI Execs"      value={v(data?.activeAiExecutions,        fmtInt)}                  />
-      <Cell label="Live Subs"     value={v(data?.liveSubscriptions,         fmtInt)}  tone="positive" />
-      <Cell label="MRR"           value={v(data?.monthlyRevenueUsd,         fmtUsd)}  tone="warn"     />
-      <Cell label="Failed"        value={v(data?.failedTrades,              fmtInt)}  tone={failedTone}/>
-      <Cell label="Uptime"        value={v(data?.systemUptimeSec,           fmtUptime)}               />
-      <Cell label="WS"            value={data?.websocketStatus
-                                           ? data.websocketStatus.toUpperCase()
-                                           : dash} tone={wsTone}                                     />
-      <Cell label="Queue/min"     value={v(data?.queueThroughputPerMin,     n => n.toFixed(1))}       />
-      <Cell label="API Latency"   value={v(data?.apiLatencyMs,              n => `${Math.round(n)}ms`)}
-                                                                                      tone={latencyTone}/>
-    </div>
+      {showBackfillModal && backfill && (
+        <BackfillFailureModal status={backfill} onClose={() => setShowBackfillModal(false)} />
+      )}
+    </>
   );
 }
