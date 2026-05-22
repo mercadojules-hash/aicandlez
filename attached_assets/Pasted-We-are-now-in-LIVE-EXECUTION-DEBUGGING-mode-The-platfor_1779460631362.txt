@@ -1,0 +1,217 @@
+We are now in LIVE EXECUTION DEBUGGING mode.
+
+The platform is:
+
+* connected to Kraken
+* showing real $100 balance
+* LIVE mode active
+* ARM EXECUTION active
+* Kraken LIVE badge visible
+
+However:
+
+NO AI trades are executing after pressing:
+“LIVE AI TRADING”
+
+Even after waiting 10+ minutes:
+
+* no active trades
+* no execution stream
+* no fills
+* no open positions
+* no rejected orders visible
+* no signal activity visible
+
+This means the issue is now inside the execution engine itself — NOT deployment/auth/UI.
+
+====================================================
+IMMEDIATE GOAL
+==============
+
+Once:
+
+* LIVE MODE = ACTIVE
+* ARM EXECUTION = ACTIVE
+* Kraken connection = LIVE
+
+…the AI engine should begin:
+
+* generating signals
+* evaluating setups
+* sending eligible orders
+* displaying execution telemetry
+
+We need full visibility into WHY execution is not occurring.
+
+====================================================
+PRIORITY #1
+LIVE EXECUTION DIAGNOSTICS
+==========================
+
+Build a visible:
+LIVE EXECUTION STREAM
+
+This should show REAL-TIME events such as:
+
+* SIGNAL DETECTED
+* SIGNAL REJECTED
+* SIGNAL ACCEPTED
+* MTF BLOCKED
+* CONFIDENCE TOO LOW
+* POSITION SIZE TOO SMALL
+* ORDER MINIMUM FAILED
+* EXECUTION SENT
+* ORDER FILLED
+* ORDER REJECTED
+* WEBSOCKET DISCONNECTED
+* RISK ENGINE BLOCKED
+* DUPLICATE EXECUTION BLOCKED
+* EXCHANGE LATENCY WARNING
+
+Need:
+
+* timestamps
+* symbol
+* confidence %
+* rejection reason
+* execution mode
+* exchange used
+* AI model used
+* MTF status
+* risk score
+
+This MUST update live.
+
+====================================================
+PRIORITY #2
+VERIFY EXECUTION LOOP IS RUNNING
+================================
+
+Need to verify:
+
+* scheduler loop active
+* websocket connected
+* AI polling active
+* execution interval firing
+* signal engine active
+* execution queue active
+
+Add visible telemetry:
+
+* ENGINE HEARTBEAT
+* LAST AI TICK
+* SIGNALS GENERATED / MIN
+* EXECUTION LOOP STATUS
+* QUEUE DEPTH
+* LAST EXECUTION ATTEMPT
+* LAST REJECTION REASON
+
+====================================================
+PRIORITY #3
+TRACE LIVE VS SIM EXECUTOR
+==========================
+
+Need definitive confirmation that:
+
+LIVE MODE
+actually routes into:
+REAL Kraken execution adapter
+
+Verify:
+
+* executionMode
+* liveTradingEnabled
+* exchange adapter attached
+* execution router path
+* order submit path
+* no hidden SIM fallback
+
+====================================================
+PRIORITY #4
+CHECK ORDER MINIMUMS + POSITION SIZING
+======================================
+
+Very likely issue:
+Kraken minimum order requirements are blocking execution.
+
+With only ~$100:
+
+* risk sizing may calculate too small
+* order notional may fail
+* fees/slippage protection may reject
+
+Need visible logs for:
+
+* computed position size
+* notional amount
+* minimum required amount
+* leverage
+* rejected sizing reason
+
+====================================================
+PRIORITY #5
+SAFE TEST MODE
+==============
+
+For ADMIN ONLY:
+
+Temporarily lower thresholds enough to guarantee at least ONE controlled test trade.
+
+Examples:
+
+* lower AI confidence threshold
+* temporarily allow smaller positions
+* reduce MTF strictness
+* enable “test execution mode”
+
+BUT:
+
+* DO NOT disable risk engine
+* DO NOT bypass safety systems
+* DO NOT allow infinite loops
+* DO NOT spam orders
+
+Goal:
+One successful real Kraken execution.
+
+====================================================
+PRIORITY #6
+COMMAND CENTER INTEGRATION
+==========================
+
+Pipe ALL execution telemetry into:
+COMMAND CENTER
+
+Need:
+
+* scrolling execution feed
+* active AI decisions
+* rejected trade feed
+* live exchange telemetry
+* order lifecycle tracking
+* heartbeat monitor
+* websocket health
+* broker latency
+
+The operator must NEVER be blind during live execution.
+
+====================================================
+IMPORTANT
+=========
+
+DO NOT focus on cosmetic UI first.
+
+This is now:
+REAL MONEY EXECUTION DEBUGGING.
+
+Priority is:
+
+1. reliable execution
+2. execution visibility
+3. safe trade routing
+4. telemetry
+5. THEN visual polish
+
+We need to get:
+ONE successful live Kraken trade
+through the full AI execution pipeline safely.
