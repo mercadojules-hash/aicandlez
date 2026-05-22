@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useUser } from "@clerk/react";
+import { useUser, useAuth } from "@clerk/react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // useUserRole
@@ -34,6 +34,7 @@ interface UseUserRoleResult {
 
 export function useUserRole(): UseUserRoleResult {
   const { isLoaded, isSignedIn, user } = useUser();
+  const { getToken } = useAuth();
   const [role,    setRole]    = useState<UserRole | null>(null);
   const [email,   setEmail]   = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -64,9 +65,19 @@ export function useUserRole(): UseUserRoleResult {
     (async () => {
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
+          // Cross-subdomain (e.g. admintrade.aicandlez.com → api.aicandlez.com)
+          // can lose the Clerk __session cookie under Safari ITP / SameSite=Lax
+          // / Storage Partitioning. Always send the Bearer token as a fallback
+          // so authenticated requests succeed regardless of cookie behaviour.
+          // Without this fallback the API 401s, the hook downgrades to "user",
+          // and super-admins get bounced to the customer portal branch.
+          const token = await getToken().catch(() => null);
           const res = await fetch(`${apiBaseUrl}/api/auth/me`, {
             credentials: "include",
-            headers:     { Accept: "application/json" },
+            headers: {
+              Accept: "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
           });
 
           if (res.status === 401) {
@@ -113,7 +124,7 @@ export function useUserRole(): UseUserRoleResult {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, user?.id]);
+  }, [isLoaded, isSignedIn, user?.id, getToken]);
 
   const isSuperAdmin = role === "super-admin";
   const isAdmin      = role === "admin" || isSuperAdmin;

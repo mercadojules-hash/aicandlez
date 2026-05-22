@@ -28,7 +28,6 @@ import { Lock, X, Zap } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 import { PortalExchangeConnectModal } from "@/components/PortalExchangeConnectModal";
-import { RuntimeDebugOverlay } from "@/components/RuntimeDebugOverlay";
 import {
   MarketHeartbeat,
   CryptoSignalsPanel,
@@ -1933,7 +1932,6 @@ function PortalInner() {
       color: N.TEXT_0,
       fontFamily: N.FONT_MONO,
     }}>
-      <RuntimeDebugOverlay />
       <TopBar
         onAccount={() => setAccountOpen(true)}
         onUpgrade={() => setUpgradeOpenSafe(true)}

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { api, type Subscription } from "@/lib/api";
 import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
+import { useUserRole } from "@/hooks/useUserRole";
 
 // ── Design tokens ───────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -375,14 +376,11 @@ export default function Exchanges() {
     staleTime: 30_000,
     retry:     false,
   });
-  const { data: me } = useQuery<{ role?: string }>({
-    queryKey:  ["auth-me"],
-    queryFn:   () => api.get("/auth/me"),
-    staleTime: 60_000,
-    retry:     false,
-  });
-  const role       = (me?.role ?? "").toLowerCase();
-  const isOperator = role === "admin" || role === "super-admin";
+  // Role is resolved via `useUserRole()` — the single Bearer-capable source of
+  // truth. Avoid duplicate /auth/me queries that bypass the Bearer fallback
+  // (cookie-only fetches silently 401 on Safari ITP cross-subdomain and would
+  // demote operators to a paid-gate state on this page).
+  const { isAdmin: isOperator } = useUserRole();
   const isPaid     = sub?.plan === "starter" || sub?.plan === "pro";
   const canConnect = isOperator || isPaid;
 

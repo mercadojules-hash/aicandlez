@@ -16,7 +16,13 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/react";
 import { LiveConsentModal, useLiveConsent } from "@/components/ConsentGate";
+
+const apiBaseUrl = (
+  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ??
+  (import.meta.env.BASE_URL ?? "/")
+).replace(/\/$/, "");
 
 // ── Operator bypass ───────────────────────────────────────────────────────────
 // The /command desktop console is the institutional operator surface.
@@ -27,10 +33,19 @@ import { LiveConsentModal, useLiveConsent } from "@/components/ConsentGate";
 // `useOperatorRole` resolves the bypass flag from /api/auth/me (DB-backed role).
 interface MeResponse { role?: string }
 function useOperatorRole(): { isOperator: boolean; isRoleResolved: boolean } {
+  const { getToken } = useAuth();
   const { data, status, fetchStatus } = useQuery<MeResponse>({
     queryKey:  ["auth-me"],
     queryFn:   async () => {
-      const r = await fetch("/api/auth/me");
+      // Cross-subdomain Bearer fallback — see useUserRole.ts for rationale.
+      const token = await getToken().catch(() => null);
+      const r = await fetch(`${apiBaseUrl}/api/auth/me`, {
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!r.ok) throw new Error(`auth/me ${r.status}`);
       return r.json() as Promise<MeResponse>;
     },
