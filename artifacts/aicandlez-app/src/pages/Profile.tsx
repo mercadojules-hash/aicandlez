@@ -1045,15 +1045,56 @@ export default function Profile() {
   });
   const alpacaConn = exchangesData?.exchanges?.find(e => e.exchange === "Alpaca" && e.connected) ?? null;
 
+  // In-app confirm modal + toast state for the Alpaca disconnect flow.
+  // Replaces native window.confirm/alert so the UX matches the institutional
+  // tone of the rest of the PWA and surfaces the server's { revoked, revokeError }
+  // payload distinctly (full revoke vs local-only delete).
+  const [alpacaConfirmOpen, setAlpacaConfirmOpen] = useState(false);
+  type AlpacaToast = {
+    tone: "success" | "warn" | "error";
+    title: string;
+    detail: string;
+  };
+  const [alpacaToast, setAlpacaToast] = useState<AlpacaToast | null>(null);
+  useEffect(() => {
+    if (!alpacaToast) return;
+    const t = window.setTimeout(() => setAlpacaToast(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [alpacaToast]);
+
   const disconnectAlpaca = useMutation({
     mutationFn: () => api.delete<{ ok: boolean; revoked?: boolean; revokeError?: string }>("/user/exchanges/Alpaca"),
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Match the connect-flow invalidation set so every surface that watches
       // exchange state refreshes in lockstep.
       qc.invalidateQueries({ queryKey: ["onboarding-exchanges"] });
       qc.invalidateQueries({ queryKey: ["user-exchanges"] });
       qc.invalidateQueries({ queryKey: ["exchange-connections"] });
       qc.invalidateQueries({ queryKey: ["user-exchanges-balances"] });
+      setAlpacaConfirmOpen(false);
+      if (data?.revoked) {
+        setAlpacaToast({
+          tone: "success",
+          title: "Alpaca disconnected",
+          detail: "OAuth grant revoked · encrypted credentials removed.",
+        });
+      } else {
+        setAlpacaToast({
+          tone: "warn",
+          title: "Disconnected locally",
+          detail: data?.revokeError
+            ? `Revoke failed at Alpaca — re-check from your Alpaca account. (${data.revokeError})`
+            : "Revoke failed at Alpaca — re-check from your Alpaca account.",
+        });
+      }
+    },
+    onError: (err) => {
+      setAlpacaConfirmOpen(false);
+      setAlpacaToast({
+        tone: "error",
+        title: "Disconnect failed",
+        detail: (err as Error).message || "Please try again in a moment.",
+      });
     },
   });
 
@@ -1435,10 +1476,7 @@ export default function Profile() {
                 <button
                   onClick={() => {
                     if (disconnectAlpaca.isPending) return;
-                    if (!window.confirm("Disconnect Alpaca? This revokes the OAuth grant and permanently deletes your stored credentials. You can reconnect any time.")) return;
-                    disconnectAlpaca.mutate(undefined, {
-                      onError: (err) => window.alert(`Disconnect failed: ${(err as Error).message}`),
-                    });
+                    setAlpacaConfirmOpen(true);
                   }}
                   disabled={disconnectAlpaca.isPending}
                   style={{
@@ -1617,9 +1655,134 @@ export default function Profile() {
         </div>
       </div>
 
+      {/* ── Alpaca disconnect: in-app confirm modal ───────────────────────── */}
+      {alpacaConfirmOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="alpaca-disconnect-title"
+          onClick={() => { if (!disconnectAlpaca.isPending) setAlpacaConfirmOpen(false); }}
+          style={{
+            position:"fixed", inset:0, zIndex:9000,
+            background:"rgba(0,0,0,0.72)", backdropFilter:"blur(6px)",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            padding:"24px", animation:"alpaca-fade 0.18s ease-out both",
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width:"100%", maxWidth:360, background:CARD,
+              border:"1px solid rgba(255,68,85,0.32)", borderRadius:16,
+              boxShadow:"0 24px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)",
+              padding:"22px 22px 18px",
+              animation:"alpaca-pop 0.22s cubic-bezier(0.2,0.9,0.3,1.2) both",
+            }}>
+            <div id="alpaca-disconnect-title" style={{
+              fontFamily:SANS, fontSize:14, fontWeight:700, color:W, letterSpacing:"0.02em",
+              marginBottom:8,
+            }}>
+              Disconnect Alpaca?
+            </div>
+            <div style={{
+              fontFamily:SANS, fontSize:11.5, color:GR, lineHeight:1.55, marginBottom:18,
+            }}>
+              This revokes the OAuth grant at Alpaca and permanently deletes your
+              stored credentials from AICandlez. You can reconnect any time.
+            </div>
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button
+                onClick={() => setAlpacaConfirmOpen(false)}
+                disabled={disconnectAlpaca.isPending}
+                style={{
+                  padding:"9px 16px", background:"transparent",
+                  border:`1px solid ${E}`, borderRadius:8, color:W,
+                  fontFamily:SANS, fontSize:10.5, fontWeight:600, letterSpacing:"0.06em",
+                  cursor: disconnectAlpaca.isPending ? "not-allowed" : "pointer",
+                  opacity: disconnectAlpaca.isPending ? 0.5 : 1,
+                }}>
+                CANCEL
+              </button>
+              <button
+                onClick={() => disconnectAlpaca.mutate()}
+                disabled={disconnectAlpaca.isPending}
+                style={{
+                  padding:"9px 16px",
+                  background:"rgba(255,68,85,0.14)",
+                  border:"1px solid rgba(255,68,85,0.55)",
+                  borderRadius:8, color:"#FF6478",
+                  fontFamily:SANS, fontSize:10.5, fontWeight:700, letterSpacing:"0.06em",
+                  cursor: disconnectAlpaca.isPending ? "wait" : "pointer",
+                  opacity: disconnectAlpaca.isPending ? 0.7 : 1,
+                }}>
+                {disconnectAlpaca.isPending ? "DISCONNECTING…" : "DISCONNECT"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Alpaca disconnect: in-app toast ───────────────────────────────── */}
+      {alpacaToast && (() => {
+        const accent =
+          alpacaToast.tone === "success" ? "rgba(102,255,102,0.85)" :
+          alpacaToast.tone === "warn"    ? "rgba(255,210,0,0.85)"   :
+                                           "rgba(255,100,120,0.90)";
+        const accentBg =
+          alpacaToast.tone === "success" ? "rgba(102,255,102,0.10)" :
+          alpacaToast.tone === "warn"    ? "rgba(255,210,0,0.10)"   :
+                                           "rgba(255,68,85,0.12)";
+        return (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              position:"fixed", left:"50%", bottom:88, transform:"translateX(-50%)",
+              zIndex:9100, width:"min(360px, calc(100% - 32px))",
+              background:CARD, border:`1px solid ${accent}`,
+              borderLeft:`3px solid ${accent}`, borderRadius:12,
+              padding:"12px 14px", display:"flex", alignItems:"flex-start", gap:12,
+              boxShadow:"0 18px 40px rgba(0,0,0,0.55)",
+              animation:"alpaca-toast-in 0.28s cubic-bezier(0.2,0.9,0.3,1.2) both",
+            }}>
+            <div style={{
+              width:24, height:24, borderRadius:6, background:accentBg,
+              border:`1px solid ${accent}`, color:accent, flexShrink:0,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontFamily:MONO, fontSize:12, fontWeight:700,
+            }}>
+              {alpacaToast.tone === "success" ? "✓" : alpacaToast.tone === "warn" ? "!" : "×"}
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{
+                fontFamily:SANS, fontSize:11.5, fontWeight:700, color:W,
+                letterSpacing:"0.02em", marginBottom:2,
+              }}>
+                {alpacaToast.title}
+              </div>
+              <div style={{ fontFamily:SANS, fontSize:10.5, color:GR, lineHeight:1.45 }}>
+                {alpacaToast.detail}
+              </div>
+            </div>
+            <button
+              onClick={() => setAlpacaToast(null)}
+              aria-label="Dismiss"
+              style={{
+                background:"transparent", border:"none", color:DIM,
+                fontSize:16, lineHeight:1, cursor:"pointer", padding:"0 2px",
+                flexShrink:0,
+              }}>
+              ×
+            </button>
+          </div>
+        );
+      })()}
+
       <style>{`
         @keyframes dot-pulse   { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.40;transform:scale(0.80)} }
         @keyframes page-in     { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes alpaca-fade { from{opacity:0} to{opacity:1} }
+        @keyframes alpaca-pop  { from{opacity:0;transform:translateY(8px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+        @keyframes alpaca-toast-in { from{opacity:0;transform:translate(-50%, 12px)} to{opacity:1;transform:translate(-50%, 0)} }
         .page-enter            { animation: page-in 0.35s ease-out both; }
         input::placeholder     { color: rgba(136,146,164,0.45); }
         input                  { -webkit-tap-highlight-color: transparent; }
