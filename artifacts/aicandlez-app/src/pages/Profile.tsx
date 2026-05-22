@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useClerk } from "@clerk/react";
 import { useLocation } from "wouter";
 import { api, type Portfolio, type Subscription, type SimAccount, type SimTrade } from "@/lib/api";
@@ -633,6 +633,44 @@ function ExchangeRow({ name, status, statusCol, icon, iconBg, iconBorder, iconCo
 function AlertPreferencesSection() {
   const { prefs, update, toggleAlert } = useFeedbackPrefs();
   const pushNotifs = usePushNotifications();
+  const queryClient = useQueryClient();
+
+  // ── Server-readable preference for the "Live Trade Filled" alert ──────────
+  // The localStorage `liveTradeFilled` toggle controls in-app UI only; the
+  // actual server-side push dispatch in `liveUserExecution.emitFillNotification`
+  // reads `notificationsLiveFills` from the user_settings row. We mirror the
+  // toggle into both so the preference persists across devices/sessions and
+  // is honored by the backend even when the PWA isn't open.
+  const settingsQuery = useQuery<{ notificationsLiveFills?: boolean }>({
+    queryKey: ["/user/settings"],
+    queryFn:  () => api.get("/user/settings"),
+  });
+  const liveFillsServer = settingsQuery.data?.notificationsLiveFills;
+  // Keep the local pref in sync once the server value loads (server is source
+  // of truth for this specific toggle).
+  useEffect(() => {
+    if (typeof liveFillsServer === "boolean" &&
+        prefs.alerts.liveTradeFilled !== liveFillsServer) {
+      update({ alerts: { liveTradeFilled: liveFillsServer } as Partial<Record<AlertKey, boolean>> as Record<AlertKey, boolean> });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveFillsServer]);
+
+  const liveFillsMutation = useMutation({
+    mutationFn: (next: boolean) =>
+      api.put("/user/settings", { notificationsLiveFills: next }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["/user/settings"] });
+    },
+  });
+
+  const onToggleAlert = (key: AlertKey) => {
+    toggleAlert(key);
+    if (key === "liveTradeFilled") {
+      const next = !prefs.alerts.liveTradeFilled;
+      liveFillsMutation.mutate(next);
+    }
+  };
 
   const onTogglePush = () => {
     const next = !prefs.pushEnabled;
@@ -691,7 +729,7 @@ function AlertPreferencesSection() {
             label={d.label}
             sub={d.sub}
             value={prefs.alerts[d.key as AlertKey]}
-            onChange={() => toggleAlert(d.key as AlertKey)}
+            onChange={() => onToggleAlert(d.key as AlertKey)}
             accent="rgba(102,255,102,0.55)"
             divider={i < ALERT_DEFINITIONS.length - 1}
             disabled={!prefs.pushEnabled && !prefs.soundsEnabled}

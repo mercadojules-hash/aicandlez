@@ -29,6 +29,7 @@ export const userSettingsTable = pgTable("user_settings", {
   notificationsTradeExec:  boolean("notifications_trade_exec").notNull().default(true),
   notificationsSignals:    boolean("notifications_signals").notNull().default(false),
   notificationsRiskAlerts: boolean("notifications_risk_alerts").notNull().default(true),
+  notificationsLiveFills:  boolean("notifications_live_fills").notNull().default(true),
 
   timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
   currency: varchar("currency", { length: 10 }).notNull().default("USD"),

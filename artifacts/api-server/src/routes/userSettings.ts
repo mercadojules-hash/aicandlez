@@ -50,6 +50,7 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
     "volumeFilter", "require1HTrend",
     "preferredExchange",
     "notificationsTradeExec", "notificationsSignals", "notificationsRiskAlerts",
+    "notificationsLiveFills",
     "timezone", "currency",
   ]);
 

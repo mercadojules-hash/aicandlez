@@ -2,6 +2,7 @@ import { db } from "@workspace/db";
 import {
   userExchangeConnectionsTable,
   userNotificationsTable,
+  userSettingsTable,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { vault } from "../services/vault/CredentialVault.js";
@@ -109,6 +110,28 @@ async function emitFillNotification(
   const qtyStr   = quantity.toLocaleString(undefined, { maximumFractionDigits: 8 });
   const title    = `${side} ${symbol} filled on ${exchange}${dryRun ? " (dry-run)" : ""}`;
   const message  = `${side} ${qtyStr} ${symbol} @ $${priceStr} on ${exchange}`;
+
+  // Customer can mute live-fill push alerts in Profile → Alert Preferences
+  // ("Live Trade Filled"). We ALWAYS persist the in-app notification row so
+  // the fill remains visible in the notification feed/history — only the
+  // background push to the device is suppressed when the toggle is off.
+  let pushAllowed = true;
+  try {
+    const [settingsRow] = await db
+      .select({ notificationsLiveFills: userSettingsTable.notificationsLiveFills })
+      .from(userSettingsTable)
+      .where(eq(userSettingsTable.userId, userId))
+      .limit(1);
+    if (settingsRow && settingsRow.notificationsLiveFills === false) {
+      pushAllowed = false;
+    }
+  } catch (err) {
+    logger.warn(
+      { userId, err: err instanceof Error ? err.message : String(err) },
+      "liveUserExecution: failed to load notificationsLiveFills preference; defaulting to enabled",
+    );
+  }
+
   try {
     await db.insert(userNotificationsTable).values({
       userId,
@@ -124,6 +147,7 @@ async function emitFillNotification(
       "liveUserExecution: failed to persist live_trade_filled notification row",
     );
   }
+  if (!pushAllowed) return;
   // Fire-and-forget push to existing customer subscriptions
   void NotificationDispatcher.sendToUser(userId, {
     title,

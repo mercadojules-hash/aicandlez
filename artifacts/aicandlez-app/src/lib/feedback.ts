@@ -26,6 +26,7 @@ import { playExecutionSound, type FeedbackState } from "@/lib/executionSounds";
 export const ALERT_DEFINITIONS = [
   { key: "aiSignalAlerts",         label: "AI Signal Alerts",          sub: "New BUY/SELL signals from the AI scanner" },
   { key: "autoTradeExecuted",      label: "AI Auto Trade Executions",  sub: "Autonomous trades opened or closed" },
+  { key: "liveTradeFilled",        label: "Live Trade Filled",         sub: "Real-money AI fill confirmations from your exchange" },
   { key: "tradeOpened",            label: "Trade Opened",              sub: "A new position is opened" },
   { key: "tradeClosed",            label: "Trade Closed",              sub: "A position is closed (win or loss)" },
   { key: "takeProfitHit",          label: "Take Profit Hit",           sub: "Position closed at target" },
