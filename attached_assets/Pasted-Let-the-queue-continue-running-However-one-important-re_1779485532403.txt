@@ -1,0 +1,112 @@
+Let the queue continue running.
+
+However, one important regression was introduced:
+
+Paper Trading was removed from:
+https://trade.aicandlez.com/portal
+
+I ONLY wanted paper trading removed from:
+https://admintrade.aicandlez.com/portal
+
+====================================================
+REQUIRED PLATFORM BEHAVIOR
+==========================
+
+ADMIN PORTAL
+(admintrade.aicandlez.com)
+
+* NO paper trading
+* NO simulation mode
+* operator-only real execution environment
+* real telemetry only
+* real balances only
+* real exchange routing only
+
+====================================================
+
+CUSTOMER PORTAL
+(trade.aicandlez.com)
+
+Subscribers should have BOTH options:
+
+1. PAPER TRADING
+2. LIVE TRADING (real money)
+
+Non-subscribers:
+
+* paper trading ONLY
+* no live execution access
+
+====================================================
+SUBSCRIBER LOGIC
+================
+
+FREE / NON-SUBSCRIBER USERS:
+
+* simulation/paper mode only
+* simulated balances
+* simulated AI trades
+* no live broker execution
+* no live exchange routing
+
+PAID SUBSCRIBERS:
+
+* can choose:
+
+  * PAPER MODE
+  * LIVE MODE
+* can switch between modes
+* live mode uses connected exchange
+* paper mode remains available for testing/training
+
+====================================================
+IMPORTANT
+=========
+
+Do NOT remove simulation architecture from the customer platform.
+
+Paper trading is still a critical feature for:
+
+* onboarding
+* user confidence
+* AI testing
+* training
+* demos
+* free-tier growth
+* conversion funnel
+
+The ONLY place where paper/sim should disappear is:
+admintrade.aicandlez.com
+
+====================================================
+ACTION ITEMS
+============
+
+1. Restore paper trading controls/UI on:
+   https://trade.aicandlez.com/portal
+
+2. Keep paper trading removed from:
+   https://admintrade.aicandlez.com/portal
+
+3. Add clear mode toggle for subscribers:
+
+* PAPER
+* LIVE
+
+4. Ensure:
+
+* execution routing changes correctly per mode
+* balances hydrate correctly per mode
+* trade history tags mode correctly
+* telemetry tags mode correctly
+
+5. Free users remain simulation-only.
+
+====================================================
+The customer platform must support BOTH:
+
+* simulation trading
+* live trading
+
+The operator/admin platform should remain:
+real-execution only.
