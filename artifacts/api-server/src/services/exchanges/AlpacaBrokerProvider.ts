@@ -33,6 +33,7 @@ import { logger } from "../../lib/logger.js";
 const AUTHORIZE_URL = "https://app.alpaca.markets/oauth/authorize";
 const TOKEN_HOST    = "api.alpaca.markets";
 const TOKEN_PATH    = "/oauth/token";
+const REVOKE_PATH   = "/oauth/revoke";
 const DEFAULT_SCOPE = "account:write trading";
 
 export interface AlpacaOAuthTokenResponse {
@@ -191,6 +192,70 @@ class AlpacaBrokerProvider {
           } catch {
             reject(new Error(`Alpaca OAuth (${label}): non-JSON response — ${raw.slice(0, 200)}`));
           }
+        });
+      });
+      req.on("error", reject);
+      req.write(body);
+      req.end();
+    });
+  }
+
+  /**
+   * Revoke an OAuth token at Alpaca. Pass the refresh_token when available
+   * (revoking the refresh token cascades to all access tokens issued from it);
+   * fall back to the access_token otherwise. Resolves on success or on Alpaca
+   * 4xx responses that indicate the token is already invalid/unknown (idempotent
+   * "already revoked" semantics). Rejects on network failure or unexpected 5xx.
+   */
+  revokeToken(token: string): Promise<void> {
+    if (!this.isEnabled()) {
+      return Promise.reject(new Error("AlpacaBrokerProvider is not configured"));
+    }
+    if (!token) {
+      // Nothing to revoke — treat as a no-op so the caller can still delete
+      // the local row without surfacing an error to the user.
+      return Promise.resolve();
+    }
+    const body = new URLSearchParams({
+      token,
+      client_id:     this.clientId!,
+      client_secret: this.clientSecret!,
+    }).toString();
+
+    return new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: TOKEN_HOST,
+        path:     REVOKE_PATH,
+        method:   "POST",
+        headers: {
+          "Content-Type":   "application/x-www-form-urlencoded",
+          "Content-Length": String(Buffer.byteLength(body)),
+          "Accept":         "application/json",
+        },
+      }, res => {
+        let raw = "";
+        res.on("data", c => { raw += c; });
+        res.on("end", () => {
+          const status = res.statusCode ?? 0;
+          // RFC 7009 success path: 2xx. Treat *only* RFC-defined idempotent
+          // failures (HTTP 400 with `invalid_token` / `unsupported_token_type`)
+          // as success — those mean the token is already gone, so the user's
+          // intent is satisfied. Auth/config failures (401, 403, 404) and
+          // unrecognized 4xx bodies must surface as errors so we don't emit a
+          // false-positive CREDENTIAL_REVOKED audit entry when the provider
+          // is misconfigured.
+          if (status >= 200 && status < 300) { resolve(); return; }
+          if (status === 400) {
+            let errCode = "";
+            try { errCode = String((JSON.parse(raw) as Record<string, unknown>)["error"] ?? ""); } catch { /* non-JSON */ }
+            if (errCode === "invalid_token" || errCode === "unsupported_token_type") {
+              logger.info({ status, errCode }, "AlpacaBrokerProvider: revoke — token already invalid (idempotent success)");
+              resolve();
+              return;
+            }
+          }
+          logger.warn({ status, body: raw.slice(0, 200) }, "AlpacaBrokerProvider: revoke failed");
+          reject(new Error(`Alpaca token revoke failed (HTTP ${status})`));
         });
       });
       req.on("error", reject);

@@ -22,7 +22,8 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/react";
-import { X, Loader2, ShieldCheck, AlertTriangle, Check } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { X, Loader2, ShieldCheck, AlertTriangle, Check, Link2Off } from "lucide-react";
 
 const N = {
   BG_OVERLAY: "rgba(0,0,0,0.86)",
@@ -73,12 +74,44 @@ interface Props {
   onConnected?: () => void;
 }
 
+type ConnectedRow = {
+  exchange: string;
+  connected: boolean;
+  connection: { tradingMode: string; status: string; label: string | null } | null;
+};
+
 export function PortalExchangeConnectModal({ open, onClose, preselectedExchange, onConnected }: Props) {
   const { getToken } = useAuth();
+  const qc           = useQueryClient();
   const initialPick = preselectedExchange
     ? (EXCHANGES.find(e => e.id === preselectedExchange) ?? EXCHANGES[0])
     : EXCHANGES[0];
   const [picked,     setPicked]     = useState<Exchange>(initialPick);
+  const [disconnecting,    setDisconnecting]    = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [disconnectError,   setDisconnectError]   = useState<string | null>(null);
+  const [disconnectDone,    setDisconnectDone]    = useState(false);
+
+  // Live connection status so the modal can flip its CTA from "Connect" to
+  // "Disconnect" when the picked exchange (typically Alpaca preselected from
+  // the Profile / Connected Accounts surface) is already linked. Mirrors the
+  // PWA Profile disconnect flow and the dashboard Settings.tsx delete handler.
+  const { data: exchangesData } = useQuery<{ exchanges: ConnectedRow[] }>({
+    queryKey:  ["user-exchanges"],
+    queryFn:   async () => {
+      const token = await getToken().catch(() => null);
+      const r = await fetch("/api/user/exchanges", {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
+    enabled:   open,
+    staleTime: 15_000,
+    retry:     false,
+  });
+  const pickedConn = exchangesData?.exchanges?.find(e => e.exchange === picked.id && e.connected) ?? null;
   // `useState(initialPick)` only fires on mount, so a later `preselectedExchange`
   // change (e.g., re-entering the connect step with a different lock) would
   // be silently ignored. Sync via effect.
@@ -103,13 +136,47 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
   const reset = () => {
     setPicked(EXCHANGES[0]); setLabel(""); setApiKey(""); setApiSecret("");
     setPassphrase(""); setError(null); setSuccess(false); setSubmitting(false);
+    setConfirmDisconnect(false); setDisconnecting(false);
+    setDisconnectError(null); setDisconnectDone(false);
   };
 
   // Close button MUST stay local — never navigate, never push history.
   const handleClose = () => {
-    if (submitting) return;
+    if (submitting || disconnecting) return;
     reset();
     onClose();
+  };
+
+  const handleDisconnect = async () => {
+    if (disconnecting || !pickedConn) return;
+    setDisconnecting(true);
+    setDisconnectError(null);
+    try {
+      const token = await getToken().catch(() => null);
+      const r = await fetch(`/api/user/exchanges/${picked.id}`, {
+        method:      "DELETE",
+        credentials: "include",
+        headers:     token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await r.json().catch(() => ({} as { error?: string; revokeError?: string }));
+      if (!r.ok) {
+        throw new Error((data as { error?: string }).error
+          ?? `Disconnect failed (HTTP ${r.status}).`);
+      }
+      // Mirror the connect-flow invalidation set so every surface that watches
+      // exchange state (Portal status pills, Profile, OnboardingFlow) refreshes
+      // in lockstep with the disconnect.
+      qc.invalidateQueries({ queryKey: ["user-exchanges"] });
+      qc.invalidateQueries({ queryKey: ["exchange-connections"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-exchanges"] });
+      qc.invalidateQueries({ queryKey: ["portal-exchanges-status"] });
+      setDisconnectDone(true);
+      setTimeout(() => { reset(); onClose(); }, 1500);
+    } catch (e) {
+      setDisconnectError(e instanceof Error ? e.message : "Disconnect failed.");
+    } finally {
+      setDisconnecting(false);
+    }
   };
 
   const canSubmit =
@@ -239,8 +306,136 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
           </button>
         </div>
 
-        {/* Success state */}
-        {success ? (
+        {/* ── Disconnect success state ───────────────────────────────────── */}
+        {disconnectDone ? (
+          <div style={{
+            padding: "32px 16px", textAlign: "center",
+            background: "rgba(255,100,120,0.05)",
+            border: `1px solid rgba(255,100,120,0.45)`,
+            borderRadius: 12,
+          }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: "50%",
+              background: "rgba(255,100,120,0.14)", border: "2px solid rgba(255,100,120,0.85)",
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              marginBottom: 14,
+            }}>
+              <Link2Off size={26} color="rgba(255,150,165,0.95)" strokeWidth={2.4} />
+            </div>
+            <div style={{
+              fontFamily: N.FONT_MONO, fontSize: 14, fontWeight: 900,
+              color: "rgba(255,150,165,0.95)", letterSpacing: "0.18em",
+            }}>
+              {picked.name.toUpperCase()} DISCONNECTED
+            </div>
+            <div style={{ fontSize: 12, color: N.TEXT_1, marginTop: 8, lineHeight: 1.5 }}>
+              OAuth grant revoked · stored credentials deleted
+            </div>
+          </div>
+        ) :
+        /* ── Disconnect panel (renders when picked exchange already connected) ─ */
+        pickedConn ? (
+          <div>
+            <div style={{
+              padding: "14px 14px",
+              background: "rgba(102,255,102,0.04)",
+              border: `1px solid ${N.BRAND}28`,
+              borderRadius: 10,
+              marginBottom: 14,
+            }}>
+              <div style={{
+                fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 700,
+                letterSpacing: "0.16em", color: N.BRAND, marginBottom: 6,
+              }}>
+                ◆ ALREADY CONNECTED
+              </div>
+              <div style={{ fontSize: 13, color: N.TEXT_0, fontWeight: 700, marginBottom: 4 }}>
+                {picked.name} · {(pickedConn.connection?.tradingMode ?? "paper").toUpperCase()}
+              </div>
+              <div style={{ fontSize: 11, color: N.TEXT_1, lineHeight: 1.5 }}>
+                Disconnecting revokes the OAuth grant at {picked.name} and
+                permanently deletes your encrypted credentials from AICandlez.
+                You can reconnect at any time.
+              </div>
+            </div>
+
+            {disconnectError && (
+              <div style={{
+                display: "flex", gap: 9, alignItems: "flex-start",
+                padding: "10px 12px",
+                background: "rgba(255,51,85,0.07)",
+                border: "1px solid rgba(255,51,85,0.28)",
+                borderRadius: 10,
+                marginBottom: 12,
+                fontSize: 11, color: N.ERROR,
+              }}>
+                <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span>{disconnectError}</span>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                onClick={handleClose}
+                disabled={disconnecting}
+                style={{
+                  padding: "12px 16px",
+                  background: "rgba(255,255,255,0.04)",
+                  border: `1px solid ${N.BORDER}`,
+                  borderRadius: 10,
+                  color: N.TEXT_1,
+                  fontFamily: N.FONT_MONO, fontSize: 11, fontWeight: 700,
+                  letterSpacing: "0.14em", textTransform: "uppercase",
+                  cursor: disconnecting ? "wait" : "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              {!confirmDisconnect ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDisconnect(true)}
+                  disabled={disconnecting}
+                  style={{
+                    flex: 1, padding: "12px 16px", borderRadius: 10,
+                    background: "rgba(255,68,85,0.10)",
+                    border: "1px solid rgba(255,68,85,0.50)",
+                    color: "#FF6478",
+                    fontFamily: N.FONT_MONO, fontSize: 11.5, fontWeight: 800,
+                    letterSpacing: "0.16em", textTransform: "uppercase",
+                    cursor: "pointer",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  }}
+                >
+                  <Link2Off size={13} /> Disconnect {picked.name}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  disabled={disconnecting}
+                  style={{
+                    flex: 1, padding: "12px 16px", borderRadius: 10,
+                    background: "linear-gradient(135deg, #7a1020 0%, #c11a32 55%, #ff445a 100%)",
+                    border: "1px solid rgba(255,68,85,0.85)",
+                    color: "#FFE8EC",
+                    fontFamily: N.FONT_MONO, fontSize: 11.5, fontWeight: 800,
+                    letterSpacing: "0.16em", textTransform: "uppercase",
+                    cursor: disconnecting ? "wait" : "pointer",
+                    boxShadow: "0 10px 28px rgba(255,68,85,0.30), 0 1px 0 rgba(255,255,255,0.30) inset",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  }}
+                >
+                  {disconnecting && <Loader2 size={13} className="animate-spin" />}
+                  {disconnecting ? "Disconnecting…" : "Confirm Disconnect"}
+                </button>
+              )}
+            </div>
+          </div>
+        ) :
+        /* ── Connect success state ─────────────────────────────────────── */
+        success ? (
           <div style={{
             padding: "32px 16px", textAlign: "center",
             background: "rgba(102,255,102,0.05)",

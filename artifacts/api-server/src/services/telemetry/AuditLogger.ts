@@ -36,6 +36,7 @@ export type AuditEventType =
   | "CREDENTIAL_STORED"
   | "CREDENTIAL_RETRIEVED"
   | "CREDENTIAL_DELETED"
+  | "CREDENTIAL_REVOKED"
   | "USER_LOGIN"
   | "USER_LOGOUT"
   | "AUTH_FAILURE"
@@ -193,7 +194,7 @@ class AuditLoggerStore {
     ];
     const warn: AuditEventType[] = [
       "TRADE_REJECTED", "EXCHANGE_DISCONNECTED", "MODE_CHANGED",
-      "CREDENTIAL_DELETED", "SUBSCRIPTION_EXPIRED", "AUTH_FAILURE",
+      "CREDENTIAL_DELETED", "CREDENTIAL_REVOKED", "SUBSCRIPTION_EXPIRED", "AUTH_FAILURE",
       "KILL_SWITCH_OFF",
     ];
     if (critical.includes(type)) return "critical";

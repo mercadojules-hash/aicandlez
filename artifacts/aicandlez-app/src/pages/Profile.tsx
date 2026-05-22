@@ -790,6 +790,7 @@ export default function Profile() {
   const { signOut }        = useClerk();
   const [location, setLocation] = useLocation();
   const { openOnboarding } = useBrokerConnection();
+  const qc                 = useQueryClient();
 
   // Auto-open the broker connection wizard when the user lands on
   // /settings/exchanges (the canonical exchange-onboarding path used by
@@ -810,6 +811,34 @@ export default function Profile() {
   const [draftEmail,   setDraftEmail]   = useState("");
 
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // ── Connected exchanges (drives the Broker Connection card disconnect CTA) ─
+  // Live-fetched so the Disconnect button only renders when there's actually
+  // something to disconnect — matches the dashboard Settings flow.
+  type ConnectedExchange = {
+    exchange: string;
+    connected: boolean;
+    connection: { tradingMode: string; status: string; label: string | null } | null;
+  };
+  const { data: exchangesData } = useQuery<{ exchanges: ConnectedExchange[] }>({
+    queryKey:  ["user-exchanges"],
+    queryFn:   () => api.get("/user/exchanges"),
+    staleTime: 30_000,
+    retry:     false,
+  });
+  const alpacaConn = exchangesData?.exchanges?.find(e => e.exchange === "Alpaca" && e.connected) ?? null;
+
+  const disconnectAlpaca = useMutation({
+    mutationFn: () => api.delete<{ ok: boolean; revoked?: boolean; revokeError?: string }>("/user/exchanges/Alpaca"),
+    onSuccess: () => {
+      // Match the connect-flow invalidation set so every surface that watches
+      // exchange state refreshes in lockstep.
+      qc.invalidateQueries({ queryKey: ["onboarding-exchanges"] });
+      qc.invalidateQueries({ queryKey: ["user-exchanges"] });
+      qc.invalidateQueries({ queryKey: ["exchange-connections"] });
+      qc.invalidateQueries({ queryKey: ["user-exchanges-balances"] });
+    },
+  });
 
   const { data: portfolio } = useQuery<Portfolio>({
     queryKey:  ["mobile-portfolio"],
@@ -1167,10 +1196,48 @@ export default function Profile() {
           <SectionHead label="Broker Connection" accent="rgba(0,255,136,0.55)"/>
           <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, overflow:"hidden" }}>
             <ExchangeRow
-              name="Alpaca (Paper Account)" status="PAPER · CONNECTED" statusCol="rgba(102,255,102,0.95)"
+              name={alpacaConn
+                ? (alpacaConn.connection?.tradingMode === "live" ? "Alpaca (Live Account)" : "Alpaca (Paper Account)")
+                : "Alpaca (Not Connected)"}
+              status={alpacaConn
+                ? `${(alpacaConn.connection?.tradingMode ?? "paper").toUpperCase()} · CONNECTED`
+                : "NOT CONNECTED"}
+              statusCol={alpacaConn ? "rgba(102,255,102,0.95)" : "rgba(255,255,255,0.45)"}
               icon="A"
               iconBg="rgba(102,255,102,0.10)" iconBorder="rgba(102,255,102,0.45)" iconColor="rgba(102,255,102,0.95)"
             />
+            {alpacaConn && (
+              <div style={{
+                padding:"12px 16px",
+                borderTop:"1px solid rgba(255,255,255,0.06)",
+                display:"flex", justifyContent:"space-between", alignItems:"center", gap:12,
+              }}>
+                <div style={{ fontSize:9, fontFamily:SANS, color:DIM, lineHeight:1.5, flex:1 }}>
+                  Revokes the OAuth grant at Alpaca and deletes your encrypted credentials from AICandlez.
+                </div>
+                <button
+                  onClick={() => {
+                    if (disconnectAlpaca.isPending) return;
+                    if (!window.confirm("Disconnect Alpaca? This revokes the OAuth grant and permanently deletes your stored credentials. You can reconnect any time.")) return;
+                    disconnectAlpaca.mutate(undefined, {
+                      onError: (err) => window.alert(`Disconnect failed: ${(err as Error).message}`),
+                    });
+                  }}
+                  disabled={disconnectAlpaca.isPending}
+                  style={{
+                    padding:"8px 14px",
+                    background:"rgba(255,68,85,0.08)",
+                    border:"1px solid rgba(255,68,85,0.40)",
+                    borderRadius:8, color:"#FF6478",
+                    fontFamily:SANS, fontSize:10, fontWeight:700, letterSpacing:"0.06em",
+                    cursor: disconnectAlpaca.isPending ? "wait" : "pointer",
+                    opacity: disconnectAlpaca.isPending ? 0.6 : 1,
+                    whiteSpace:"nowrap",
+                  }}>
+                  {disconnectAlpaca.isPending ? "DISCONNECTING…" : "DISCONNECT"}
+                </button>
+              </div>
+            )}
           </div>
           <div style={{ marginTop:6, fontSize:8.5, fontFamily:SANS, color:DIM, lineHeight:1.6, padding:"0 4px" }}>
             Withdrawal permissions are never requested. Read + Trade permissions only.

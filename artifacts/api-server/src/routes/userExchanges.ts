@@ -8,6 +8,7 @@ import { requirePlan } from "../middlewares/requirePlan.js";
 import { vault } from "../services/vault/CredentialVault.js";
 import { ensureFreshAlpacaCreds } from "../services/exchanges/AlpacaTokenRefresher.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
+import { alpacaBrokerProvider } from "../services/exchanges/AlpacaBrokerProvider.js";
 import { EXCHANGE_CATALOG, CATALOG_BY_ID, CONNECTABLE_EXCHANGE_IDS } from "../services/exchanges/catalog.js";
 // Live adapters
 import { KrakenAdapter }         from "../services/exchanges/adapters/KrakenAdapter.js";
@@ -589,24 +590,62 @@ router.delete("/user/exchanges/:exchange", requireAuth, async (req, res): Promis
     return;
   }
 
-  const result = await db
-    .delete(userExchangeConnectionsTable)
+  // Look up the row first so we can (a) tell the caller it didn't exist with a
+  // 404, and (b) attempt remote-side OAuth revocation BEFORE we drop the only
+  // copy of the refresh token we have. Local deletion still proceeds even if
+  // remote revoke fails — the user's intent is to disconnect, and we never
+  // want a third-party hiccup to leave stale credentials sitting in our DB.
+  const [row] = await db
+    .select()
+    .from(userExchangeConnectionsTable)
     .where(
       and(
         eq(userExchangeConnectionsTable.userId, userId),
         eq(userExchangeConnectionsTable.exchange, exchange),
       )
     )
-    .returning({ id: userExchangeConnectionsTable.id });
+    .limit(1);
 
-  if (result.length === 0) {
+  if (!row) {
     res.status(404).json({ error: `No connection found for ${exchange}` });
     return;
   }
 
-  auditLogger.append(userId, "CREDENTIAL_DELETED", { exchange }, { exchange });
-  req.log.info({ userId, exchange }, "userExchanges: connection deleted");
-  res.json({ ok: true, exchange });
+  // ── Alpaca: revoke OAuth grant at the issuer before deleting locally ──────
+  // Best-effort. Only attempts when:
+  //   • the connection is Alpaca,
+  //   • the OAuth provider is configured (env vars present),
+  //   • we have a usable refresh_token or access_token in the encrypted blob.
+  let revoked = false;
+  let revokeError: string | undefined;
+  if (exchange === "Alpaca" && alpacaBrokerProvider.isEnabled()) {
+    const creds = vault.decryptBlob(userId, row.encryptedBlob);
+    const token = creds?.oauthRefreshToken || creds?.oauthAccessToken;
+    if (token) {
+      try {
+        await alpacaBrokerProvider.revokeToken(token);
+        revoked = true;
+        auditLogger.append(userId, "CREDENTIAL_REVOKED", { exchange, method: "oauth" }, { exchange });
+        req.log.info({ userId, exchange }, "userExchanges: OAuth token revoked at issuer");
+      } catch (err) {
+        revokeError = (err as Error).message;
+        req.log.warn({ userId, exchange, err: revokeError }, "userExchanges: OAuth revoke failed — proceeding with local delete");
+      }
+    }
+  }
+
+  await db
+    .delete(userExchangeConnectionsTable)
+    .where(
+      and(
+        eq(userExchangeConnectionsTable.userId, userId),
+        eq(userExchangeConnectionsTable.exchange, exchange),
+      )
+    );
+
+  auditLogger.append(userId, "CREDENTIAL_DELETED", { exchange, revoked }, { exchange });
+  req.log.info({ userId, exchange, revoked }, "userExchanges: connection deleted");
+  res.json({ ok: true, exchange, revoked, ...(revokeError ? { revokeError } : {}) });
 });
 
 export default router;
