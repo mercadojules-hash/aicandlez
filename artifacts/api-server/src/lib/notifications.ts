@@ -64,11 +64,25 @@ export async function sendTradeExecutedSMS(
 }
 
 // ── Operator alert channel ────────────────────────────────────────────────────
-// Same logger-backed transport the exchange-outage emails ride on
-// (`ExchangeHealthMonitor.notifyExchangeOutage` → `outage email queued`).
-// When a real SMTP/Resend/SendGrid client lands, both this and the
-// outage email stub should swap the `logger.info(...)` for the real
-// transport call so operators get a single unified channel.
+// Operator-visible incidents (back-fill scheduler failures, exchange outages
+// once that path is wired in) flow through `sendOperatorAlert`. In production
+// we want an actual email to land in the on-call inbox the moment something
+// blows up off-hours — relying on someone happening to open the admin console
+// is not a notification strategy.
+//
+// Transport: Resend HTTP API (no extra dep — just `fetch`).
+//
+// Required env vars to actually deliver email:
+//   RESEND_API_KEY            — Resend API key (re_...)
+//   OPERATOR_ALERT_EMAIL_FROM — verified sender (e.g. "alerts@aicandlez.com")
+//   OPERATOR_ALERT_EMAIL_TO   — comma-separated recipient list
+//
+// If any of the three are missing we fall back to the previous
+// logger-only behaviour so dev / preview environments stay quiet and
+// no boot-time crash is introduced. The structured "operator-alert
+// queued" log line is always emitted regardless of transport result
+// so the alert is observable in log aggregators even when email
+// delivery itself fails.
 
 export interface OperatorAlertPayload {
   subject:  string;
@@ -78,7 +92,61 @@ export interface OperatorAlertPayload {
   context?: Record<string, unknown>;
 }
 
+interface OperatorEmailConfig {
+  apiKey: string;
+  from:   string;
+  to:     string[];
+}
+
+function operatorEmailConfigured(): OperatorEmailConfig | null {
+  const apiKey = process.env["RESEND_API_KEY"];
+  const from   = process.env["OPERATOR_ALERT_EMAIL_FROM"];
+  const toRaw  = process.env["OPERATOR_ALERT_EMAIL_TO"];
+  if (!apiKey || !from || !toRaw) return null;
+  const to = toRaw.split(",").map(s => s.trim()).filter(Boolean);
+  if (to.length === 0) return null;
+  return { apiKey, from, to };
+}
+
+async function deliverOperatorEmail(
+  cfg:     OperatorEmailConfig,
+  payload: OperatorAlertPayload,
+): Promise<{ ok: boolean; status?: number; id?: string; error?: string }> {
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method:  "POST",
+      headers: {
+        "Authorization": `Bearer ${cfg.apiKey}`,
+        "Content-Type":  "application/json",
+      },
+      body: JSON.stringify({
+        from:    cfg.from,
+        to:      cfg.to,
+        subject: payload.subject,
+        text:    payload.body,
+        headers: {
+          // Lets receiving MTAs collapse retried pages on the same
+          // signature (e.g. the same persistent back-fill failure
+          // re-paged after the 7-day escalation window) into a
+          // single thread instead of N separate inbox items.
+          "X-Entity-Ref-ID": payload.dedupeKey,
+        },
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => ({})) as { id?: string };
+      return { ok: true, status: res.status, id: data.id };
+    }
+    const text = await res.text().catch(() => "");
+    return { ok: false, status: res.status, error: text.slice(0, 500) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function sendOperatorAlert(payload: OperatorAlertPayload): Promise<void> {
+  // Always log first so the alert is captured even if email delivery
+  // fails or the transport is intentionally not configured.
   logger.info(
     {
       subject:   payload.subject,
@@ -88,4 +156,30 @@ export async function sendOperatorAlert(payload: OperatorAlertPayload): Promise<
     },
     "operator-alert queued",
   );
+
+  const cfg = operatorEmailConfigured();
+  if (!cfg) {
+    logger.debug(
+      { dedupeKey: payload.dedupeKey },
+      "operator-alert email skipped — RESEND_API_KEY / OPERATOR_ALERT_EMAIL_FROM / OPERATOR_ALERT_EMAIL_TO not all set",
+    );
+    return;
+  }
+
+  const result = await deliverOperatorEmail(cfg, payload);
+  if (result.ok) {
+    logger.info(
+      { dedupeKey: payload.dedupeKey, id: result.id, recipients: cfg.to.length },
+      "operator-alert email delivered",
+    );
+  } else {
+    // Don't throw — the caller's structured log + the "queued" line above
+    // remain the source of truth. Surface delivery failure at warn so it
+    // shows up alongside other transport problems without masking the
+    // underlying incident the alert was about.
+    logger.warn(
+      { dedupeKey: payload.dedupeKey, status: result.status, error: result.error },
+      "operator-alert email delivery FAILED",
+    );
+  }
 }
