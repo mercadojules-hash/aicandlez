@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { api, type Subscription } from "@/lib/api";
+import { api, type Subscription, type SimAccount } from "@/lib/api";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 
@@ -141,6 +141,16 @@ export default function Billing() {
     staleTime: 60_000,
   });
 
+  const { data: simAcc } = useQuery<SimAccount>({
+    queryKey:  ["sim-account"],
+    queryFn:   () => api.get("/account"),
+    staleTime: 30_000,
+  });
+
+  const totalRealized = simAcc?.totalRealized ?? simAcc?.realizedPnL ?? 0;
+  const totalFeesPaid = simAcc?.totalFeesPaid ?? 0;
+  const realizedPos   = totalRealized >= 0;
+
   const checkout = useMutation({
     mutationFn: (planId: PlanId) =>
       api.post<{ url: string }>("/billing/checkout", {
@@ -220,6 +230,50 @@ export default function Billing() {
             )}
           </div>
         )}
+
+        {/* ── Lifetime account stats ─────────────────────────────────────── */}
+        <div style={{
+          display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14,
+        }}>
+          <div style={{
+            background: CARD, border: `1px solid ${E}`, borderRadius: 10,
+            padding: "12px 14px",
+          }}>
+            <div style={{
+              fontSize: 9, fontFamily: SANS, fontWeight: 700, color: GR,
+              letterSpacing: "0.12em", textTransform: "uppercase" as const, marginBottom: 4,
+            }}>Total Realized PnL</div>
+            <div style={{
+              fontSize: 18, fontFamily: MONO, fontWeight: 700,
+              color: realizedPos ? BRAND : "#ff4466", letterSpacing: -0.2,
+            }}>
+              {realizedPos ? "+" : ""}${totalRealized.toFixed(2)}
+            </div>
+          </div>
+          <div
+            title="Lifetime broker commission paid across every closed live trade"
+            style={{
+              background: CARD, border: `1px solid ${E}`, borderRadius: 10,
+              padding: "12px 14px",
+            }}>
+            <div style={{
+              fontSize: 9, fontFamily: SANS, fontWeight: 700, color: GR,
+              letterSpacing: "0.12em", textTransform: "uppercase" as const, marginBottom: 4,
+            }}>Lifetime Fees Paid</div>
+            <div style={{
+              fontSize: 18, fontFamily: MONO, fontWeight: 700,
+              color: totalFeesPaid > 0 ? W : DIM, letterSpacing: -0.2,
+            }}>
+              −${totalFeesPaid.toFixed(2)}
+            </div>
+            <div style={{
+              fontSize: 8.5, fontFamily: SANS, color: DIM, marginTop: 3,
+              letterSpacing: 0.3,
+            }}>
+              Broker commissions · paper trades excluded
+            </div>
+          </div>
+        </div>
 
         {checkout.isError && (
           <div style={{ background: "rgba(255,51,85,0.07)",

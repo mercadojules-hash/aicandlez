@@ -176,11 +176,12 @@ export interface AuthMe {
 }
 
 export interface SimAccount {
-  balance:      number;
-  totalTrades:  number;
-  winRate:      number;
-  realizedPnL:  number;
-  feesPaid:     number;
+  balance:        number;
+  totalTrades:    number;
+  winRate:        number;
+  realizedPnL:    number;
+  totalRealized?: number;
+  totalFeesPaid?: number;
 }
 
 export interface SimTrade {

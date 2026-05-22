@@ -271,6 +271,21 @@ export async function getUserAccountSummary(userId: string) {
   const totalPnL        = equity - state.account.startingBalance;
   const totalPnLPct     = (totalPnL / state.account.startingBalance) * 100;
 
+  // Lifetime broker commission paid across every closed leg (entry + exit fees
+  // on sim_trades for this user). Stays at 0 for paper-only users since paper
+  // fills never persist a fee value.
+  const feeRows = await db
+    .select({
+      entryFee: simTradesTable.entryFee,
+      exitFee:  simTradesTable.exitFee,
+    })
+    .from(simTradesTable)
+    .where(eq(simTradesTable.userId, userId));
+  const totalFeesPaid = feeRows.reduce(
+    (s, r) => s + (r.entryFee ?? 0) + (r.exitFee ?? 0),
+    0,
+  );
+
   return {
     balance:       parseFloat(state.account.cashBalance.toFixed(2)),
     startBalance:  state.account.startingBalance,
@@ -281,6 +296,7 @@ export async function getUserAccountSummary(userId: string) {
     positionCount: state.positions.length,
     totalTrades:   state.account.totalTrades,
     totalRealized: parseFloat(state.account.totalRealized.toFixed(2)),
+    totalFeesPaid: parseFloat(totalFeesPaid.toFixed(2)),
     positions:     enriched.map((p) => ({
       ...p,
       unrealizedPnL:    p.unrealizedPnL    != null ? parseFloat(p.unrealizedPnL.toFixed(2))    : undefined,

@@ -335,6 +335,32 @@ function AccountModal({
     tier === "starter" ? "Up to 3 concurrent AI trades" :
     "Simulated only";
 
+  // Lifetime account stats — surfaces totalRealized PnL and totalFeesPaid
+  // (broker commissions on every closed live leg) so the customer can audit
+  // their equity drift against broker statements. Paper-only users see $0.
+  type AccountSummary = {
+    totalRealized?: number;
+    totalFeesPaid?: number;
+  };
+  const accountQuery = useQuery<AccountSummary>({
+    queryKey: ["/api/account"],
+    enabled:  open,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/account`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to load account");
+      return res.json();
+    },
+  });
+  const totalRealized = accountQuery.data?.totalRealized ?? 0;
+  const totalFeesPaid = accountQuery.data?.totalFeesPaid ?? 0;
+  const realizedSign  = totalRealized >= 0 ? "+" : "";
+  const realizedColor = totalRealized >= 0 ? N.LONG : N.SHORT;
+
   const openPortal = async () => {
     try {
       const token = await getToken().catch(() => null);
@@ -453,6 +479,18 @@ function AccountModal({
         <AccountRow label="CAPACITY"          value={capacity} />
         <AccountRow label="BILLING"           value={tier === "free" ? "—" : "Monthly · Stripe"} />
         <AccountRow label="PERFORMANCE FEE"   value="3% on profitable trades only" sub="Never charged on losses" />
+        <AccountRow
+          label="TOTAL REALIZED PNL"
+          value={`${realizedSign}${fmtMoney(totalRealized)}`}
+          color={realizedColor}
+          sub="Lifetime closed-trade PnL across paper + live"
+        />
+        <AccountRow
+          label="LIFETIME BROKER FEES"
+          value={`−${fmtMoney(totalFeesPaid)}`}
+          color={totalFeesPaid > 0 ? N.TEXT_0 : N.TEXT_2}
+          sub="Sum of entry + exit commissions on every closed live leg"
+        />
         <AccountRow label="BROKER · ALPACA"   value="Not connected"           color={N.WARN} sub="Connection wizard launches with the Alpaca live keys" />
       </div>
 

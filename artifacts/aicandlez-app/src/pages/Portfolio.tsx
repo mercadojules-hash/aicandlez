@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, type Portfolio as PortfolioData } from "@/lib/api";
+import { api, type Portfolio as PortfolioData, type SimAccount } from "@/lib/api";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
 import { EnableLiveCTA } from "@/components/EnableLiveCTA";
 
@@ -43,10 +43,21 @@ export default function Portfolio() {
     refetchInterval: 10_000,
   });
 
+  const { data: simAcc } = useQuery<SimAccount>({
+    queryKey:        ["sim-account"],
+    queryFn:         () => api.get("/account"),
+    refetchInterval: 30_000,
+    staleTime:       15_000,
+  });
+
   const totalValue = data?.totalValue ?? 100000;
   const openPnL    = data?.openPnL    ?? 0;
   const pnlPositive = openPnL >= 0;
   const positions  = data?.positions ?? [];
+
+  const totalRealized = simAcc?.totalRealized ?? simAcc?.realizedPnL ?? 0;
+  const feesPaid      = simAcc?.totalFeesPaid ?? 0;
+  const realizedPos   = totalRealized >= 0;
 
   return (
     <div style={{ padding: "16px 16px 80px" }}>
@@ -86,6 +97,35 @@ export default function Portfolio() {
         }}>
           {pnlPositive ? "+" : ""}${openPnL.toFixed(2)} unrealized PnL
         </div>
+        <div style={{
+          marginTop: 14, paddingTop: 10,
+          borderTop: "1px solid #0d2035",
+          display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
+        }}>
+          <div>
+            <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50",
+              letterSpacing: "0.14em" }}>TOTAL REALIZED PNL</div>
+            <div style={{
+              fontSize: 14, fontFamily: "monospace", fontWeight: 700, marginTop: 3,
+              color: realizedPos ? "#00ff8a" : "#ff4466",
+            }}>
+              {realizedPos ? "+" : ""}${totalRealized.toFixed(2)}
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div
+              title="Lifetime broker commission paid across every closed live trade"
+              style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50",
+                letterSpacing: "0.14em" }}>FEES PAID</div>
+            <div style={{
+              fontSize: 14, fontFamily: "monospace", fontWeight: 700, marginTop: 3,
+              color: feesPaid > 0 ? "#e8f4ff" : "#3a6080",
+            }}>
+              −${feesPaid.toFixed(2)}
+            </div>
+          </div>
+        </div>
+
         <div style={{ marginTop: 10, display: "flex", gap: 16 }}>
           <div>
             <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50" }}>EXCHANGE</div>
