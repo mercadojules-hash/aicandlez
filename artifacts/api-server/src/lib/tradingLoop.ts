@@ -822,6 +822,9 @@ async function autoExecute(
     notifType: "trade",
     tag:       `trade-${symbol}-${Date.now()}`,
     url:       "/aicandlez-app/trade",
+    // Per-user alert mute gating is applied inside sendToUser, so this
+    // broadcast respects each recipient's "Trade Opened" toggle.
+    alertKey:  "tradeOpened",
     data:      { symbol, side, price: pos.entryPrice, sizeUSD, mode: tradeMode },
   }).catch(() => {});
 

@@ -13,7 +13,7 @@
 
 import webpush from "web-push";
 import { db } from "@workspace/db";
-import { userPushTokensTable } from "@workspace/db";
+import { userPushTokensTable, userSettingsTable, isAlertEnabled, type AlertKey, type AlertPrefs } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../../lib/logger.js";
 
@@ -45,6 +45,40 @@ export interface PushPayload {
   url?:        string;
   tag?:        string;
   data?:       Record<string, unknown>;
+  /**
+   * Customer-facing alert taxonomy key. If provided, the dispatcher consults
+   * `user_settings.alertPrefs[alertKey]` before sending any push to that
+   * user — letting customers mute any alert from anywhere, not just live
+   * fills. Omit for ungated system pushes (e.g. operator-only diagnostics).
+   */
+  alertKey?:   AlertKey;
+}
+
+/**
+ * Returns whether a push tagged with `alertKey` should be delivered to
+ * `userId`, based on the user_settings.alertPrefs JSON blob. Missing keys
+ * fall back to the per-key `defaultOn` in ALERT_DEFINITIONS. On DB error
+ * we fail OPEN (deliver) so a transient lookup failure never silently
+ * black-holes critical trade alerts.
+ */
+export async function shouldDeliverAlertToUser(
+  userId:   string,
+  alertKey: AlertKey,
+): Promise<boolean> {
+  try {
+    const [row] = await db
+      .select({ alertPrefs: userSettingsTable.alertPrefs })
+      .from(userSettingsTable)
+      .where(eq(userSettingsTable.userId, userId))
+      .limit(1);
+    return isAlertEnabled((row?.alertPrefs ?? null) as AlertPrefs | null, alertKey);
+  } catch (err) {
+    logger.warn(
+      { err, userId, alertKey },
+      "NotificationDispatcher: alertPrefs lookup failed; defaulting to deliver",
+    );
+    return true;
+  }
 }
 
 interface DispatchResult {
@@ -63,6 +97,14 @@ export const NotificationDispatcher = {
    */
   async sendToUser(userId: string, payload: PushPayload): Promise<DispatchResult> {
     const result: DispatchResult = { userId, sent: 0, failed: 0, cleaned: 0 };
+
+    if (payload.alertKey) {
+      const allowed = await shouldDeliverAlertToUser(userId, payload.alertKey);
+      if (!allowed) {
+        logger.debug({ userId, alertKey: payload.alertKey }, "NotificationDispatcher: muted by user pref");
+        return result;
+      }
+    }
 
     let tokens;
     try {

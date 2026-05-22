@@ -138,6 +138,7 @@ async function emitFillNotification(
     notifType: "trade",
     tag:       `live-fill-${symbol}`,
     url:       "/aicandlez-app/portfolio",
+    alertKey:  "liveTradeFilled",
     data:      { symbol, side, exchange, fillPrice, quantity, exchangeOrderId, dryRun, kind: "live_trade_filled" },
   }).catch((err) => {
     logger.warn(
@@ -192,12 +193,21 @@ export async function emitLiveCloseNotification(params: {
       "liveUserExecution: failed to persist live_trade_closed notification row",
     );
   }
+  // Map the broker close reason onto the customer-facing alert taxonomy so
+  // TP/SL mutes are honored independently of the generic "Trade Closed"
+  // toggle. Anything else (manual close, trailing stop, AI exit, risk kill)
+  // counts as a generic Trade Closed alert.
+  const reasonAlertKey =
+    closeReason === "TAKE_PROFIT" ? "takeProfitHit" :
+    closeReason === "STOP_LOSS"   ? "stopLossHit"   :
+                                    "tradeClosed";
   void NotificationDispatcher.sendToUser(userId, {
     title,
     body:      message,
     notifType: "trade",
     tag:       `live-close-${symbol}`,
     url:       "/aicandlez-app/portfolio",
+    alertKey:  reasonAlertKey,
     data:      {
       symbol, side, exchange, exitPrice, quantity,
       realizedPnL, realizedPnLPct, closeReason,

@@ -1,5 +1,6 @@
-import { pgTable, varchar, real, integer, boolean, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, varchar, real, integer, boolean, timestamp, uuid, jsonb } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
+import type { AlertPrefs } from "../constants/alertKeys";
 
 export const userSettingsTable = pgTable("user_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -33,6 +34,13 @@ export const userSettingsTable = pgTable("user_settings", {
 
   exchangeOutageEmailEnabled: boolean("exchange_outage_email_enabled").notNull().default(true),
   exchangeOutagePushEnabled:  boolean("exchange_outage_push_enabled").notNull().default(true),
+
+  // Server-authoritative per-alert mute/unmute toggles. Mirrors the
+  // ALERT_DEFINITIONS taxonomy in `lib/db/src/constants/alertKeys.ts`.
+  // Missing keys fall back to per-key `defaultOn`; an empty object means
+  // "all defaults". Read by NotificationDispatcher before any push send so
+  // mutes sync across devices and the server actually honors them.
+  alertPrefs: jsonb("alert_prefs").$type<AlertPrefs>().notNull().default({}),
 
   timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
   currency: varchar("currency", { length: 10 }).notNull().default("USD"),

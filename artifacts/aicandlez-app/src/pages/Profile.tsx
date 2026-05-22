@@ -828,41 +828,68 @@ function AlertPreferencesSection() {
   const queryClient = useQueryClient();
   const outage     = useExchangeOutagePrefs();
 
-  // ── Server-readable preference for the "Live Trade Filled" alert ──────────
-  // The localStorage `liveTradeFilled` toggle controls in-app UI only; the
-  // actual server-side push dispatch in `liveUserExecution.emitFillNotification`
-  // reads `notificationsLiveFills` from the user_settings row. We mirror the
-  // toggle into both so the preference persists across devices/sessions and
-  // is honored by the backend even when the PWA isn't open.
-  const settingsQuery = useQuery<{ notificationsLiveFills?: boolean }>({
+  // ── Server-authoritative per-alert mute/unmute toggles ────────────────────
+  // EVERY ALERT_DEFINITIONS key is mirrored into `user_settings.alertPrefs`
+  // on the server, so a customer can mute any alert from anywhere — phone,
+  // tablet, desktop — and the backend push dispatcher honors it before
+  // sending. Local storage is kept in sync purely so the toggles feel
+  // instant when offline. Server is the source of truth on load.
+  const settingsQuery = useQuery<{
+    alertPrefs?:            Partial<Record<AlertKey, boolean>>;
+    notificationsLiveFills?: boolean;  // legacy column — superseded by alertPrefs.liveTradeFilled
+  }>({
     queryKey: ["/user/settings"],
     queryFn:  () => api.get("/user/settings"),
   });
-  const liveFillsServer = settingsQuery.data?.notificationsLiveFills;
-  // Keep the local pref in sync once the server value loads (server is source
-  // of truth for this specific toggle).
-  useEffect(() => {
-    if (typeof liveFillsServer === "boolean" &&
-        prefs.alerts.liveTradeFilled !== liveFillsServer) {
-      update({ alerts: { liveTradeFilled: liveFillsServer } as Partial<Record<AlertKey, boolean>> as Record<AlertKey, boolean> });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveFillsServer]);
 
-  const liveFillsMutation = useMutation({
-    mutationFn: (next: boolean) =>
-      api.put("/user/settings", { notificationsLiveFills: next }),
+  // Seed local state from server once it loads. Server values take precedence
+  // over any locally-cached toggles so mutes propagate across devices.
+  const serverAlertPrefs = settingsQuery.data?.alertPrefs;
+  const liveFillsLegacy  = settingsQuery.data?.notificationsLiveFills;
+  useEffect(() => {
+    if (!serverAlertPrefs && typeof liveFillsLegacy !== "boolean") return;
+    const patch: Partial<Record<AlertKey, boolean>> = {};
+    if (serverAlertPrefs) {
+      for (const [k, v] of Object.entries(serverAlertPrefs)) {
+        if (typeof v === "boolean") patch[k as AlertKey] = v;
+      }
+    }
+    // Honor the legacy column for users who never re-saved after the
+    // alertPrefs rollout — only used when alertPrefs has no liveTradeFilled.
+    if (typeof liveFillsLegacy === "boolean"
+        && typeof patch.liveTradeFilled !== "boolean") {
+      patch.liveTradeFilled = liveFillsLegacy;
+    }
+    if (Object.keys(patch).length === 0) return;
+    // Only update if there's an actual divergence — avoids render loops.
+    const diverges = Object.entries(patch).some(
+      ([k, v]) => prefs.alerts[k as AlertKey] !== v,
+    );
+    if (diverges) update({ alerts: { ...prefs.alerts, ...patch } });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverAlertPrefs, liveFillsLegacy]);
+
+  // PUT a single-key patch to the server. The route merges with the existing
+  // alertPrefs blob, so toggling one key never wipes the others.
+  const alertPrefMutation = useMutation({
+    mutationFn: (patch: { key: AlertKey; value: boolean }) => {
+      const body: Record<string, unknown> = {
+        alertPrefs: { [patch.key]: patch.value },
+      };
+      // Keep the legacy boolean column in sync for any downstream caller
+      // still reading it (defense-in-depth during the alertPrefs rollout).
+      if (patch.key === "liveTradeFilled") body.notificationsLiveFills = patch.value;
+      return api.put("/user/settings", body);
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["/user/settings"] });
     },
   });
 
   const onToggleAlert = (key: AlertKey) => {
+    const next = !prefs.alerts[key];
     toggleAlert(key);
-    if (key === "liveTradeFilled") {
-      const next = !prefs.alerts.liveTradeFilled;
-      liveFillsMutation.mutate(next);
-    }
+    alertPrefMutation.mutate({ key, value: next });
   };
 
   const onTogglePush = () => {

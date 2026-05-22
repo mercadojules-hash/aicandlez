@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { userSettingsTable, userConsentsTable, usersTable, DISCLAIMER_VERSION } from "@workspace/db";
+import { userSettingsTable, userConsentsTable, usersTable, DISCLAIMER_VERSION, ALERT_KEYS, type AlertKey, type AlertPrefs } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import type { Request } from "express";
@@ -52,12 +52,30 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
     "notificationsTradeExec", "notificationsSignals", "notificationsRiskAlerts",
     "notificationsLiveFills",
     "exchangeOutageEmailEnabled", "exchangeOutagePushEnabled",
+    "alertPrefs",
     "timezone", "currency",
   ]);
 
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   for (const [k, v] of Object.entries(body)) {
-    if (allowed.has(k)) patch[k] = v;
+    if (!allowed.has(k)) continue;
+    if (k === "alertPrefs") {
+      // Sanitize: only persist known AlertKeys with boolean values, and
+      // merge with the existing row so partial patches don't wipe other
+      // keys. We always merge (not replace) so a phone toggling one alert
+      // doesn't reset every other alert to default on another device.
+      if (!v || typeof v !== "object") continue;
+      const incoming = v as Record<string, unknown>;
+      const cleaned: AlertPrefs = {};
+      for (const key of ALERT_KEYS) {
+        const val = incoming[key];
+        if (typeof val === "boolean") cleaned[key as AlertKey] = val;
+      }
+      patch.alertPrefs = cleaned;        // resolved below after merge with current
+      patch.__mergeAlertPrefs = true;    // sentinel handled before update
+    } else {
+      patch[k] = v;
+    }
   }
 
   if (Object.keys(patch).length === 1) {
@@ -104,7 +122,12 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
   }
 
   try {
-    await getOrCreateSettings(userId);
+    const current = await getOrCreateSettings(userId);
+    if (patch.__mergeAlertPrefs) {
+      delete patch.__mergeAlertPrefs;
+      const existing = (current.alertPrefs ?? {}) as AlertPrefs;
+      patch.alertPrefs = { ...existing, ...(patch.alertPrefs as AlertPrefs) };
+    }
     const [updated] = await db
       .update(userSettingsTable)
       .set(patch)
