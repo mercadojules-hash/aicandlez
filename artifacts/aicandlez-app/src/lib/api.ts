@@ -198,6 +198,7 @@ export interface SimTrade {
   exchangeCloseOrderId?: string;
   entryFee?:             number;
   exitFee?:              number;
+  netFees?:              number;
 }
 
 export interface MobileTicker {

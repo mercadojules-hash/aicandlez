@@ -236,40 +236,46 @@ export function TradeDetailSheet({ trade, onClose }: TradeDetailSheetProps) {
         )}
         <Row label="Closed at" value={fmtTimestamp(trade.closedAt)}/>
 
-        {/* Fees — live trades carry real broker commissions; paper trades have none. */}
-        <SectionLabel>Fees</SectionLabel>
-        {isLive ? (
-          (() => {
-            const entryFee = trade.entryFee;
-            const exitFee  = trade.exitFee;
-            const haveAny  = typeof entryFee === "number" || typeof exitFee === "number";
-            const totalFee = (entryFee ?? 0) + (exitFee ?? 0);
-            return (
-              <>
-                <Row
-                  label="Opening commission"
-                  value={typeof entryFee === "number" ? `$${entryFee.toFixed(2)}` : "—"}
-                  mono
-                />
-                <Row
-                  label="Closing commission"
-                  value={typeof exitFee === "number" ? `$${exitFee.toFixed(2)}` : "—"}
-                  mono
-                />
-                {haveAny && (
+        {/* Fees — live trades only. Paper trades hide this section entirely. */}
+        {isLive && (() => {
+          const entryFee = trade.entryFee;
+          const exitFee  = trade.exitFee;
+          const haveAny  = typeof entryFee === "number" || typeof exitFee === "number";
+          const totalFee = typeof trade.netFees === "number"
+            ? trade.netFees
+            : (entryFee ?? 0) + (exitFee ?? 0);
+          const gross    = trade.pnl ?? 0;
+          const net      = gross - totalFee;
+          const grossStr = `${gross >= 0 ? "+" : "−"}$${Math.abs(gross).toFixed(2)}`;
+          const netStr   = `${net   >= 0 ? "+" : "−"}$${Math.abs(net).toFixed(2)}`;
+          return (
+            <>
+              <SectionLabel>Fees</SectionLabel>
+              <Row
+                label="Opening commission"
+                value={typeof entryFee === "number" ? `$${entryFee.toFixed(2)}` : "—"}
+                mono
+              />
+              <Row
+                label="Closing commission"
+                value={typeof exitFee === "number" ? `$${exitFee.toFixed(2)}` : "—"}
+                mono
+              />
+              {haveAny && (
+                <>
                   <Row
                     label="Total broker fees"
-                    value={`$${totalFee.toFixed(2)}`}
+                    value={`−$${totalFee.toFixed(2)}`}
                     mono
                     accent={NEG}
                   />
-                )}
-              </>
-            );
-          })()
-        ) : (
-          <Row label="Broker fees" value="None — paper trade" accent={TEXT_SUB}/>
-        )}
+                  <Row label="Gross P&L"          value={grossStr} mono accent={gross >= 0 ? POS : NEG}/>
+                  <Row label="Net P&L after fees" value={netStr}   mono accent={net   >= 0 ? POS : NEG}/>
+                </>
+              )}
+            </>
+          );
+        })()}
 
         {/* Broker section — live only */}
         {isLive ? (

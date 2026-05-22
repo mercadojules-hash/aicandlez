@@ -67,6 +67,7 @@ export interface UserSimTrade {
   exchangeCloseOrderId?: string;
   entryFee?: number;
   exitFee?: number;
+  netFees?: number;
 }
 
 interface UserSimAccount {
@@ -162,7 +163,14 @@ async function loadFromDB(userId: string): Promise<UserSimState> {
       exchange:        p.exchange ?? undefined,
       exchangeOrderId: p.exchangeOrderId ?? undefined,
     })),
-    tradeHistory: dbTrades.map((t) => ({
+    tradeHistory: dbTrades.map((t) => {
+      const entryFee = t.entryFee ?? undefined;
+      const exitFee  = t.exitFee  ?? undefined;
+      const netFees  =
+        entryFee !== undefined || exitFee !== undefined
+          ? parseFloat(((entryFee ?? 0) + (exitFee ?? 0)).toFixed(4))
+          : undefined;
+      return ({
       id:              t.id,
       userId:          t.userId,
       symbol:          t.symbol,
@@ -180,9 +188,11 @@ async function loadFromDB(userId: string): Promise<UserSimState> {
       exchange:             t.exchange ?? undefined,
       exchangeOrderId:      t.exchangeOrderId ?? undefined,
       exchangeCloseOrderId: t.exchangeCloseOrderId ?? undefined,
-      entryFee:             t.entryFee ?? undefined,
-      exitFee:              t.exitFee ?? undefined,
-    })),
+      entryFee,
+      exitFee,
+      netFees,
+      });
+    }),
     idSeq: 0,
   };
 
@@ -511,6 +521,10 @@ export async function closeUserPosition(
     exchangeCloseOrderId: exchangeCloseOrderId,
     entryFee:             entryFee ?? undefined,
     exitFee:              exitFee ?? undefined,
+    netFees:
+      entryFee != null || exitFee != null
+        ? parseFloat(((entryFee ?? 0) + (exitFee ?? 0)).toFixed(4))
+        : undefined,
   };
 
   state.account.cashBalance  += closedSizeUSD + realizedPnL;
