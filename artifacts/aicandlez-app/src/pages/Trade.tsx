@@ -388,6 +388,26 @@ function TradeRow({ trade }: { trade: SimTrade }) {
           <span style={{ fontFamily:MONO }}>${trade.exitPrice.toLocaleString("en-US",{maximumFractionDigits:0})}</span>
           {" · "}
           <span style={{ color:DIM }}>{trade.closedAt}</span>
+          {trade.exchange && (
+            <>
+              {" · "}
+              <span
+                title={trade.exchangeOrderId ? `Order ${trade.exchangeOrderId}` : undefined}
+                style={{
+                  display:"inline-block",
+                  padding:"1px 5px",
+                  marginLeft:2,
+                  border:`1px solid ${G}55`,
+                  background:`${G}10`,
+                  color:G, fontFamily:MONO, fontWeight:700,
+                  fontSize:7.5, letterSpacing:"0.10em",
+                  borderRadius:3, textTransform:"uppercase" as const,
+                }}
+              >
+                LIVE · {trade.exchange}
+              </span>
+            </>
+          )}
         </div>
       </div>
       <div style={{ flexShrink:0, marginRight:10, opacity:0.65 }}>

@@ -1798,6 +1798,28 @@ function TradeHistoryCard({ trade }: { trade: SimTrade }) {
             marginTop: 3, letterSpacing: 0.2,
           }}>
             {SYM_LABEL[trade.symbol] ?? trade.symbol} · {closedDate}
+            {trade.exchange && (
+              <>
+                {" · "}
+                <span
+                  title={trade.exchangeOrderId ? `Order ${trade.exchangeOrderId}` : undefined}
+                  style={{
+                    display: "inline-block",
+                    padding: "1px 6px",
+                    marginLeft: 2,
+                    border: `1px solid ${BRAND}55`,
+                    background: `${BRAND}14`,
+                    color: BRAND,
+                    fontFamily: SANS, fontWeight: 800,
+                    fontSize: 8.5, letterSpacing: 0.8,
+                    textTransform: "uppercase",
+                    borderRadius: 3,
+                  }}
+                >
+                  Live · {trade.exchange}
+                </span>
+              </>
+            )}
           </div>
         </div>
 

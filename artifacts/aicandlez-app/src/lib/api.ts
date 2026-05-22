@@ -181,15 +181,17 @@ export interface SimAccount {
 }
 
 export interface SimTrade {
-  id:         string;
-  symbol:     string;
-  side:       string;
-  pnl:        number;
-  pnlPct:     number;
-  score?:     number;
-  closedAt:   string;
-  entryPrice: number;
-  exitPrice:  number;
+  id:               string;
+  symbol:           string;
+  side:             string;
+  pnl:              number;
+  pnlPct:           number;
+  score?:           number;
+  closedAt:         string;
+  entryPrice:       number;
+  exitPrice:        number;
+  exchange?:        string;
+  exchangeOrderId?: string;
 }
 
 export interface MobileTicker {
