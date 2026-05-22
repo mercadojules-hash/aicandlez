@@ -1,7 +1,22 @@
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, AlertTriangle, TrendingUp, Info, Zap } from "lucide-react";
 
 const Q_OPTS = { refetchOnWindowFocus: false, retry: false } as const;
+
+const UNREAD_ONLY_STORAGE_KEY = "aicandlez_notifications_unread_only_v1";
+
+function loadUnreadOnly(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(UNREAD_ONLY_STORAGE_KEY) === "1";
+  } catch { return false; }
+}
+
+function saveUnreadOnly(v: boolean) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(UNREAD_ONLY_STORAGE_KEY, v ? "1" : "0"); } catch { /* quota */ }
+}
 
 interface Notification {
   id: string;
@@ -25,6 +40,22 @@ function getMeta(type: string) {
 
 export default function Alerts() {
   const qc = useQueryClient();
+  const [unreadOnly, setUnreadOnlyState] = useState<boolean>(() => loadUnreadOnly());
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === UNREAD_ONLY_STORAGE_KEY) {
+        setUnreadOnlyState(e.newValue === "1");
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const setUnreadOnly = (v: boolean) => {
+    setUnreadOnlyState(v);
+    saveUnreadOnly(v);
+  };
 
   const { data, isLoading } = useQuery<{ notifications: Notification[]; unreadCount: number }>({
     queryKey:        ["notifications-page"],
@@ -43,8 +74,13 @@ export default function Alerts() {
     onSuccess:  () => qc.invalidateQueries({ queryKey: ["notifications-page"] }),
   });
 
-  const notifications = data?.notifications ?? [];
+  const allNotifications = data?.notifications ?? [];
   const unread = data?.unreadCount ?? 0;
+
+  const notifications = useMemo(
+    () => unreadOnly ? allNotifications.filter(n => !n.read) : allNotifications,
+    [allNotifications, unreadOnly],
+  );
 
   return (
     <div style={{ padding: "24px 28px", fontFamily: "monospace", color: "#EAF2FF", background: "#000508", minHeight: "100vh" }}>
@@ -96,6 +132,32 @@ export default function Alerts() {
         )}
       </div>
 
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        <button
+          onClick={() => setUnreadOnly(!unreadOnly)}
+          aria-pressed={unreadOnly}
+          aria-label={unreadOnly ? "Showing unread only, click to show all" : "Show unread only"}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            padding: "7px 14px", borderRadius: 3,
+            background: unreadOnly ? "#00aaff14" : "#00060c",
+            border: `1px solid ${unreadOnly ? "#00aaff55" : "#0d1e2e"}`,
+            color: unreadOnly ? "#00aaff" : "#7a9eb8",
+            cursor: "pointer", fontSize: 9, fontFamily: "monospace",
+            fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase",
+          }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: "50%",
+            background: unreadOnly ? "#00aaff" : "#2a4050",
+            boxShadow: unreadOnly ? "0 0 6px #00aaff" : "none",
+          }}/>
+          UNREAD ONLY
+          <span style={{ color: unreadOnly ? "#00aaff" : "#3a5a70", letterSpacing: 0 }}>
+            {unread > 99 ? "99+" : unread}
+          </span>
+        </button>
+      </div>
+
       {isLoading ? (
         <div style={{ padding: "48px 32px", textAlign: "center", border: "1px solid #0d1e2e", borderRadius: 3 }}>
           <div style={{ fontSize: 10, color: "#2a4050", letterSpacing: "0.15em" }}>CONNECTING…</div>
@@ -105,9 +167,13 @@ export default function Alerts() {
           <div style={{ margin: "0 auto 14px", display: "flex", justifyContent: "center", color: "#1e3a50" }}>
             <Bell size={22} />
           </div>
-          <div style={{ fontSize: 12, color: "#3a5a70" }}>No alerts</div>
+          <div style={{ fontSize: 12, color: "#3a5a70" }}>
+            {unreadOnly ? "No unread alerts" : "No alerts"}
+          </div>
           <div style={{ fontSize: 9, color: "#2a4050", marginTop: 5 }}>
-            Trade executions, signal events and risk notifications will appear here
+            {unreadOnly
+              ? "You're all caught up. Click UNREAD ONLY again to see everything."
+              : "Trade executions, signal events and risk notifications will appear here"}
           </div>
         </div>
       ) : (
