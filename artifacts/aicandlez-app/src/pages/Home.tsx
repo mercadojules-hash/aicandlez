@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
@@ -58,6 +58,123 @@ const WARN = "#FFB94A";
 // ═══════════════════════════════════════════════════════════════════════════
 // RADAR SCANNER — core UI system for AI scanning / signals / confidence
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXCHANGE WARNING CARD
+// Surfaces per-connection failures returned by /api/user/exchanges/balances
+// (auth failure, network timeout, revoked key, etc). Dismissible per
+// error-set: dismissal is keyed on a fingerprint of the failing exchanges
+// and their error strings so the card reappears the moment a new failure
+// occurs and disappears the moment a retry succeeds.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function ExchangeWarningCard({
+  failing,
+  onReconnect,
+}: {
+  failing: Array<{ exchange: string; error?: string }>;
+  onReconnect: () => void;
+}) {
+  const fingerprint = failing.map(f => `${f.exchange}::${f.error ?? ""}`).sort().join("|");
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  // Reset dismissal whenever the underlying failure set changes so a new
+  // problem (e.g. a *different* exchange now failing) re-surfaces the card.
+  useEffect(() => {
+    if (dismissed && dismissed !== fingerprint) setDismissed(null);
+  }, [fingerprint, dismissed]);
+  if (failing.length === 0 || dismissed === fingerprint) return null;
+  const WARN_COLOR = "#FFB020";
+  const WARN_DIM   = "rgba(255,176,32,0.14)";
+  return (
+    <div style={{
+      margin: "0 16px 14px",
+      padding: "14px 16px",
+      borderRadius: 18,
+      border: `1px solid rgba(255,176,32,0.45)`,
+      background: `linear-gradient(160deg, ${WARN_DIM}, rgba(255,176,32,0.04) 60%, rgba(10,20,16,0.85) 100%)`,
+      boxShadow: `0 14px 36px rgba(0,0,0,0.55), inset 0 0 30px rgba(255,176,32,0.08)`,
+      fontFamily: SANS,
+      display: "flex", flexDirection: "column", gap: 10,
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0,
+        }}>
+          <span style={{
+            width: 26, height: 26, borderRadius: 8,
+            background: "rgba(255,176,32,0.18)",
+            border: `1px solid rgba(255,176,32,0.6)`,
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            color: WARN_COLOR, fontWeight: 800, fontSize: 14, lineHeight: 1,
+            flexShrink: 0,
+          }}>!</span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 800, color: WARN_COLOR,
+              letterSpacing: 1, textTransform: "uppercase",
+            }}>
+              Exchange connection issue
+            </div>
+            <div style={{
+              fontSize: 10, color: TEXT_DIM, marginTop: 2,
+            }}>
+              Showing simulated balances until your exchange responds.
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setDismissed(fingerprint)}
+          aria-label="Dismiss warning"
+          style={{
+            background: "transparent", border: "none", color: TEXT_DIM,
+            fontSize: 16, lineHeight: 1, cursor: "pointer", padding: 4,
+          }}
+        >✕</button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {failing.map(f => (
+          <div key={f.exchange} style={{
+            padding: "8px 10px", borderRadius: 10,
+            background: "rgba(0,0,0,0.35)",
+            border: `1px solid rgba(255,176,32,0.22)`,
+            display: "flex", alignItems: "flex-start", gap: 8,
+          }}>
+            <span style={{
+              fontSize: 11, fontWeight: 800, color: TEXT,
+              letterSpacing: 0.6, minWidth: 70,
+            }}>{f.exchange}</span>
+            <span style={{
+              flex: 1, fontSize: 10.5, color: TEXT_SUB, lineHeight: 1.5,
+              wordBreak: "break-word",
+            }}>
+              {f.error ?? "Connection failed — exchange did not respond."}
+            </span>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={onReconnect}
+        style={{
+          alignSelf: "stretch",
+          padding: "10px 14px",
+          background: `linear-gradient(180deg, ${WARN_COLOR}, #cc8a10)`,
+          border: `1px solid ${WARN_COLOR}`,
+          borderRadius: 10,
+          color: "#1a1100",
+          fontFamily: SANS, fontWeight: 800, fontSize: 12, letterSpacing: 1.2,
+          textTransform: "uppercase", cursor: "pointer",
+          boxShadow: `0 0 18px rgba(255,176,32,0.35)`,
+        }}
+      >
+        Reconnect Exchange →
+      </button>
+    </div>
+  );
+}
 
 type RadarBlip = { sym: string; angle: number; r: number; strong?: boolean };
 
@@ -465,6 +582,7 @@ export default function Home() {
       ok:             boolean;
       totalEquityUSD: number;
       balances:       Record<string, { free: number; locked: number; total: number }>;
+      error?:         string;
     }>;
     totalEquityUSD: number;
   }>({
@@ -476,6 +594,12 @@ export default function Home() {
     retry: false,
   });
   const liveExchangeOk = (liveExchangeBalances?.connections ?? []).filter(c => c.ok);
+  // Connections the API flagged as unhealthy (auth failed, network timeout,
+  // revoked key, etc). Surfaced to the user in a dismissible inline card so
+  // they aren't silently dropped to simulated balances.
+  const liveExchangeFailing = (liveExchangeBalances?.connections ?? [])
+    .filter(c => !c.ok)
+    .map(c => ({ exchange: c.exchange, error: c.error }));
   const liveExchangeEquity = liveExchangeOk.length > 0 ? liveExchangeBalances!.totalEquityUSD : 0;
   const liveExchangeUsdFree = liveExchangeOk.reduce(
     (s, c) => s + (c.balances?.["USD"]?.free ?? c.balances?.["USDT"]?.free ?? c.balances?.["USDC"]?.free ?? 0), 0,
@@ -761,6 +885,16 @@ export default function Home() {
             }}/>
           </div>
         </div>
+
+        {/* Unhealthy exchange connection warning — non-blocking, dismissible.
+            Renders only when /api/user/exchanges/balances reports ok:false
+            for at least one connection so users aren't silently dropped to
+            simulated balances without notice. Reconnect deep-links to the
+            Connected Accounts section on the Profile page. */}
+        <ExchangeWarningCard
+          failing={liveExchangeFailing}
+          onReconnect={() => setLocation("/profile")}
+        />
 
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* PORTFOLIO HERO CARD — cinematic, big number, deep glow             */}

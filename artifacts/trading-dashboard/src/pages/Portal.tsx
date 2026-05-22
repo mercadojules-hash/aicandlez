@@ -907,6 +907,105 @@ function ExchangeStatusPill({
   );
 }
 
+/** Warning banner — surfaces connections returning ok:false from
+ *  /api/user/exchanges/balances (auth failures, network timeouts, revoked
+ *  keys, etc). Dismissible per error-set: once the underlying error changes
+ *  or new failures appear the banner returns. CTA opens the in-app
+ *  PortalExchangeConnectModal so the user can re-enter credentials. */
+function ExchangeWarningBanner({
+  failing,
+  onReconnect,
+}: {
+  failing: Array<{ exchange: string; error?: string }>;
+  onReconnect: () => void;
+}) {
+  const fingerprint = failing
+    .map(f => `${f.exchange}::${f.error ?? ""}`)
+    .sort()
+    .join("|");
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  // Reset dismissal whenever the underlying failure set changes.
+  useEffect(() => {
+    if (dismissed && dismissed !== fingerprint) setDismissed(null);
+  }, [fingerprint, dismissed]);
+  if (failing.length === 0 || dismissed === fingerprint) return null;
+  const WARN = "#FFB020";
+  return (
+    <div style={{
+      margin: "12px 16px 0",
+      padding: "12px 16px",
+      borderRadius: 6,
+      border: `1px solid ${WARN}55`,
+      background: `linear-gradient(180deg, ${WARN}14, ${WARN}06)`,
+      boxShadow: `inset 0 0 24px ${WARN}10`,
+      fontFamily: N.FONT_MONO,
+      display: "flex", flexDirection: "column", gap: 8,
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+      }}>
+        <div style={{
+          fontSize: 10, fontWeight: 800, letterSpacing: "0.20em",
+          color: WARN, textShadow: `0 0 6px ${WARN}66`,
+        }}>
+          ⚠ EXCHANGE CONNECTION UNHEALTHY · LIVE DATA UNAVAILABLE
+        </div>
+        <button
+          type="button"
+          onClick={() => setDismissed(fingerprint)}
+          title="Dismiss until error changes"
+          style={{
+            background: "transparent", border: "none", color: N.TEXT_3,
+            fontSize: 14, lineHeight: 1, cursor: "pointer", padding: 4,
+          }}
+        >
+          ✕
+        </button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {failing.map(f => (
+          <div key={f.exchange} style={{
+            display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+            padding: "8px 10px", borderRadius: 4,
+            background: "rgba(0,0,0,0.30)", border: `1px solid ${WARN}25`,
+          }}>
+            <span style={{
+              fontSize: 10, fontWeight: 800, letterSpacing: "0.16em",
+              color: N.TEXT_0, minWidth: 86,
+            }}>{f.exchange.toUpperCase()}</span>
+            <span style={{
+              flex: 1, minWidth: 200,
+              fontSize: 10, color: N.TEXT_2, lineHeight: 1.5,
+              fontFamily: N.FONT_MONO, wordBreak: "break-word",
+            }}>
+              {f.error ?? "Connection failed — exchange did not respond."}
+            </span>
+            <button
+              type="button"
+              onClick={onReconnect}
+              style={{
+                padding: "5px 12px",
+                background: `${WARN}20`,
+                border: `1px solid ${WARN}`,
+                borderRadius: 3,
+                color: WARN,
+                fontWeight: 800, fontSize: 9, letterSpacing: "0.18em",
+                fontFamily: N.FONT_MONO, cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              RECONNECT →
+            </button>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 9, color: N.TEXT_3, letterSpacing: "0.14em" }}>
+        FALLBACK · SIMULATED BALANCES SHOWN UNTIL THE CONNECTION RECOVERS
+      </div>
+    </div>
+  );
+}
+
 /** Subtle onboarding banner for first-time users with no connected exchanges.
  *  Clicking the CTA opens the in-app PortalExchangeConnectModal — it must NEVER
  *  cross-host redirect to app.aicandlez.com. Customers stay inside dashboard
@@ -2134,6 +2233,19 @@ function PortalInner() {
           row in user_exchange_connections), so this customer onboarding
           prompt is suppressed for them — otherwise it would always render. */}
       {!isAdmin && !hasExchange && <ExchangeOnboardingBanner onConnect={() => disclaimerGate(() => setConnectExchangeOpen(true))} />}
+
+      {/* Unhealthy connection warning — non-blocking, dismissible. Surfaces
+          any per-connection `ok:false` reported by /api/user/exchanges/balances
+          (auth failure, revoked key, exchange timeout) so users aren't silently
+          dropped to simulated balances without notice. */}
+      {!isAdmin && liveBalances.ready && (
+        <ExchangeWarningBanner
+          failing={liveBalances.connections
+            .filter(c => !c.ok)
+            .map(c => ({ exchange: c.exchange, error: c.error }))}
+          onReconnect={() => disclaimerGate(() => setConnectExchangeOpen(true))}
+        />
+      )}
 
       {/* Metrics row.
           Admin operators on admintrade.aicandlez.com see REAL Kraken live
