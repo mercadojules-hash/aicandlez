@@ -2219,6 +2219,9 @@ type AdminPosition = {
   entry_time:   number | null;
   mode?:        string | null;
   source?:      string | null;
+  exchange?:                  string | null;
+  entry_fee_broker?:          number | string | null;
+  entry_fee_broker_currency?: string | null;
 };
 
 type AdminClosed = AdminPosition & {
@@ -2228,6 +2231,10 @@ type AdminClosed = AdminPosition & {
   close_reason?:     string | null;
   exit_time:         number | null;
   net_fees?:         number | string | null;
+  entry_fee?:                 number | string | null;
+  exit_fee?:                  number | string | null;
+  exit_fee_broker?:           number | string | null;
+  exit_fee_broker_currency?:  string | null;
 };
 
 const toNum = (v: unknown): number => {
@@ -2235,6 +2242,51 @@ const toNum = (v: unknown): number => {
   const n = typeof v === "number" ? v : parseFloat(String(v));
   return Number.isFinite(n) ? n : 0;
 };
+
+// USD-stable settlement currencies — broker fees quoted in these are treated
+// as USD-equivalent for net-PnL math. Native-asset fees (BTC, BNB, etc.) are
+// still surfaced verbatim in the row tooltip but USD totals fall back to the
+// catalog estimate so receipt math matches account equity. Mirrors the PWA
+// `TradeDetailSheet.tsx` logic exactly.
+const USD_STABLE_FEE_CCY = new Set([
+  "USD","USDT","USDC","BUSD","DAI","TUSD","USDP","FDUSD","ZUSD",
+]);
+
+// Resolve effective per-leg fee in USD: prefer broker-reported when the broker
+// quoted it in a USD-stable currency, else fall back to the catalog estimate.
+// Returns the native broker amount/currency separately so the UI can label
+// "charged by broker" + show native units in a tooltip when applicable.
+function resolveFeeLeg(
+  brokerRaw:    number | string | null | undefined,
+  brokerCcy:    string | null | undefined,
+  estimateRaw:  number | string | null | undefined,
+): {
+  /** Effective USD value to use in PnL math (0 when neither source). */
+  usd:           number;
+  /** True when the broker reported a fee (regardless of currency). */
+  fromBroker:    boolean;
+  /** True when the broker fee is in a USD-stable currency. */
+  brokerIsUsd:   boolean;
+  /** Raw broker amount in the broker's quoted currency (when available). */
+  brokerAmount?: number;
+  /** Broker-quoted currency (when available). */
+  brokerCcy?:    string;
+  /** Catalog estimate USD (when available). */
+  estimate?:     number;
+} {
+  const broker   = brokerRaw   != null ? toNum(brokerRaw)   : undefined;
+  const estimate = estimateRaw != null ? toNum(estimateRaw) : undefined;
+  const ccy      = brokerCcy ?? undefined;
+  const fromBroker  = typeof broker === "number";
+  const brokerIsUsd = fromBroker && (!ccy || USD_STABLE_FEE_CCY.has(ccy.toUpperCase()));
+  const usd = brokerIsUsd ? broker! : (estimate ?? 0);
+  return {
+    usd, fromBroker, brokerIsUsd,
+    brokerAmount: broker,
+    brokerCcy:    ccy,
+    estimate,
+  };
+}
 
 function AdminLiveTradesPanel() {
   const { getToken } = useAuth();
@@ -2273,6 +2325,22 @@ function AdminLiveTradesPanel() {
         const size  = toNum(t.size_usd);
         const when  = t.entry_time ? fmtTime(Number(t.entry_time)) : "—";
         const longSide = side === "LONG" || side === "BUY";
+        // Entry-leg commission — show only when this position was opened
+        // against a real broker (live execution). Mirrors the PWA receipt:
+        // prefer the broker-reported fee when present, otherwise omit
+        // (catalog entry estimates aren't carried on open positions).
+        const entryLeg = resolveFeeLeg(
+          t.entry_fee_broker, t.entry_fee_broker_currency, null,
+        );
+        const showEntryFee = !!t.exchange && entryLeg.fromBroker;
+        const entryFeeLabel = entryLeg.brokerIsUsd
+          ? `−$${(entryLeg.brokerAmount ?? 0).toFixed(2)} OPEN FEE`
+          : `−${(entryLeg.brokerAmount ?? 0).toFixed(
+              (entryLeg.brokerAmount ?? 0) < 1 ? 6 : 4,
+            )} ${entryLeg.brokerCcy ?? ""} OPEN FEE`;
+        const entryFeeTitle = `Opening commission charged by broker${
+          entryLeg.brokerCcy && !entryLeg.brokerIsUsd ? ` (${entryLeg.brokerCcy})` : ""
+        }`;
         return (
           <div key={String(t.id)} style={{
             display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -2301,6 +2369,19 @@ function AdminLiveTradesPanel() {
                 {t.user_email ? ` · ${t.user_email}` : ""}
               </span>
             </div>
+            {showEntryFee && (
+              <span
+                title={entryFeeTitle}
+                style={{
+                  color: N.TEXT_2, fontSize: 8, fontWeight: 700,
+                  letterSpacing: "0.10em",
+                  fontVariantNumeric: "tabular-nums", textTransform: "uppercase",
+                  flexShrink: 0, marginLeft: 8,
+                }}
+              >
+                {entryFeeLabel}
+              </span>
+            )}
           </div>
         );
       })}
@@ -2346,7 +2427,45 @@ function AdminTradeHistoryPanel() {
         const exit  = toNum(t.exit_price);
         const when  = t.exit_time ? fmtTime(Number(t.exit_time)) : "—";
         const reason = (t.close_reason ?? "").toString().toUpperCase();
-        const fees  = t.net_fees != null ? toNum(t.net_fees) : 0;
+        // Prefer broker-reported commissions over the catalog estimate, in
+        // lock-step with `TradeDetailSheet.tsx` on the PWA. USD-stable broker
+        // fees feed PnL math directly; native-asset fees (BTC, BNB, …) are
+        // surfaced in the row tooltip but USD totals fall back to the
+        // catalog estimate so the dashboard matches account equity.
+        const entryLeg = resolveFeeLeg(
+          t.entry_fee_broker, t.entry_fee_broker_currency, t.entry_fee,
+        );
+        const exitLeg  = resolveFeeLeg(
+          t.exit_fee_broker,  t.exit_fee_broker_currency,  t.exit_fee,
+        );
+        const fees =
+          (entryLeg.fromBroker || entryLeg.estimate != null
+            || exitLeg.fromBroker  || exitLeg.estimate  != null)
+            ? entryLeg.usd + exitLeg.usd
+            : (t.net_fees != null ? toNum(t.net_fees) : 0);
+        const anyBroker = entryLeg.fromBroker || exitLeg.fromBroker;
+        const feeLabel  = anyBroker ? "BROKER FEES" : "FEES (EST.)";
+        // Tooltip surfaces both per-leg breakdown + native-currency amounts
+        // when the broker quoted a non-USD fee, matching the PWA receipt.
+        const fmtLegTitle = (legName: string, leg: ReturnType<typeof resolveFeeLeg>): string | null => {
+          if (leg.fromBroker) {
+            const ccy = leg.brokerCcy && !leg.brokerIsUsd ? ` ${leg.brokerCcy}` : "";
+            const dp  = leg.brokerIsUsd ? 2 : ((leg.brokerAmount ?? 0) < 1 ? 6 : 4);
+            const sym = leg.brokerIsUsd ? "$" : "";
+            return `${legName}: ${sym}${(leg.brokerAmount ?? 0).toFixed(dp)}${ccy} · charged by broker`;
+          }
+          if (leg.estimate != null) {
+            return `${legName}: $${leg.estimate.toFixed(2)} (est.)`;
+          }
+          return null;
+        };
+        const tooltipLines: string[] = [];
+        const openTip  = fmtLegTitle("Opening commission", entryLeg);
+        const closeTip = fmtLegTitle("Closing commission", exitLeg);
+        if (openTip)  tooltipLines.push(openTip);
+        if (closeTip) tooltipLines.push(closeTip);
+        tooltipLines.push(`Net of fees: ${fmtMoney(pnl - fees)}`);
+        const feeTooltip = tooltipLines.join("\n");
         const color = pnl >= 0 ? N.LONG : N.SHORT;
         const tag = reason === "TP" ? "TP HIT" : reason === "SL" ? "SL HIT" : "CLOSED";
         const tagColor = reason === "TP" ? N.LONG : reason === "SL" ? N.SHORT : N.TEXT_2;
@@ -2395,14 +2514,15 @@ function AdminTradeHistoryPanel() {
               </span>
               {fees > 0 && (
                 <span
-                  title={`Net of broker fees: ${fmtMoney(pnl - fees)}`}
+                  title={feeTooltip}
                   style={{
-                    color: N.TEXT_2, fontSize: 8, fontWeight: 700,
+                    color: anyBroker ? N.BRAND_DIM : N.TEXT_2,
+                    fontSize: 8, fontWeight: 700,
                     marginTop: 2, letterSpacing: "0.10em",
                     fontVariantNumeric: "tabular-nums", textTransform: "uppercase",
                   }}
                 >
-                  −${fees.toFixed(2)} FEES
+                  −${fees.toFixed(2)} {feeLabel}
                 </span>
               )}
             </div>

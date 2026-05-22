@@ -41,6 +41,9 @@ router.get("/admin/positions", ...requireOperator, async (req, res): Promise<voi
           t.take_profit                                   AS take_profit,
           t.mode                                          AS mode,
           EXTRACT(EPOCH FROM t.timestamp)::bigint * 1000  AS entry_time,
+          NULL::text                                      AS exchange,
+          NULL::real                                      AS entry_fee_broker,
+          NULL::text                                      AS entry_fee_broker_currency,
           'global'::text                                  AS source
         FROM trades t
         WHERE t.status = 'open'
@@ -59,6 +62,9 @@ router.get("/admin/positions", ...requireOperator, async (req, res): Promise<voi
           p.take_profit                                   AS take_profit,
           'simulation'::text                              AS mode,
           p.entry_time                                    AS entry_time,
+          p.exchange                                      AS exchange,
+          p.entry_fee_broker                              AS entry_fee_broker,
+          p.entry_fee_broker_currency                     AS entry_fee_broker_currency,
           'sim'::text                                     AS source
         FROM sim_positions p
         LEFT JOIN users u ON u.clerk_user_id = p.user_id
@@ -105,6 +111,13 @@ router.get("/admin/closed-trades", ...requireOperator, async (req, res): Promise
           t.reason                                          AS close_reason,
           EXTRACT(EPOCH FROM t.closed_at)::bigint * 1000    AS exit_time,
           NULL::real                                        AS net_fees,
+          NULL::text                                        AS exchange,
+          NULL::real                                        AS entry_fee,
+          NULL::real                                        AS exit_fee,
+          NULL::real                                        AS entry_fee_broker,
+          NULL::text                                        AS entry_fee_broker_currency,
+          NULL::real                                        AS exit_fee_broker,
+          NULL::text                                        AS exit_fee_broker_currency,
           'global'::text                                    AS source
         FROM trades t
         WHERE t.status = 'closed'
@@ -126,6 +139,13 @@ router.get("/admin/closed-trades", ...requireOperator, async (req, res): Promise
           tr.close_reason                                   AS close_reason,
           tr.exit_time                                      AS exit_time,
           (COALESCE(tr.entry_fee, 0) + COALESCE(tr.exit_fee, 0)) AS net_fees,
+          tr.exchange                                       AS exchange,
+          tr.entry_fee                                      AS entry_fee,
+          tr.exit_fee                                       AS exit_fee,
+          tr.entry_fee_broker                               AS entry_fee_broker,
+          tr.entry_fee_broker_currency                      AS entry_fee_broker_currency,
+          tr.exit_fee_broker                                AS exit_fee_broker,
+          tr.exit_fee_broker_currency                       AS exit_fee_broker_currency,
           'sim'::text                                       AS source
         FROM sim_trades tr
         LEFT JOIN users u ON u.clerk_user_id = tr.user_id
