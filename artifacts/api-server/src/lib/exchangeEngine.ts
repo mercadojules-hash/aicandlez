@@ -89,7 +89,15 @@ const TAKER_FEE = 0.0; // Alpaca charges 0% fee for crypto
 let _mode:             ExchangeMode = "simulation";
 let _killSwitch:       boolean      = false;
 let _paused:           boolean      = false;
-let _selectedExchange: string       = "Alpaca";
+// _selectedExchange picks the active live-broker the engine routes through
+// for /exchange/balances + /exchange/mode + execution. Default is determined
+// by `pickPreferredExchange()` at module init — see below. Historically this
+// was hard-coded to "Alpaca", which on the production admin terminal meant
+// `getExchangeStatus()` reported `exchangeName: "Alpaca"` + `apiConfigured:
+// false` (Alpaca keys absent), so the header pill rendered "ALPACA STANDBY"
+// and the operator USD tile rendered "—" — even though KRAKEN_API_KEY +
+// KRAKEN_API_SECRET were configured and Kraken had a real ~$100 balance.
+let _selectedExchange: string       = "Alpaca"; // overwritten by init below
 const _orders:         ExchangeOrder[] = [];
 
 // Simulated portfolio for paper trading
@@ -117,6 +125,44 @@ export function getConfiguredExchanges(): string[] {
     .filter(e => isExchangeConfigured(e));
 }
 
+/**
+ * Pick the preferred live exchange at boot, in priority order:
+ *   Kraken → Coinbase → CryptoDotCom → Binance → Gemini → Alpaca.
+ *
+ * Kraken leads because the production admin terminal
+ * (admintrade.aicandlez.com) runs against real Kraken capital — this is
+ * documented in `replit.md` ("Exchange secrets (LIVE mode): KRAKEN_API_KEY,
+ * KRAKEN_API_SECRET, EXCHANGE_LIVE_ENABLED=true") and is the only exchange
+ * with a configured live USD balance for the operator hero. Alpaca is
+ * intentionally last — it is the *recommended* on-ramp for new customers
+ * (per the T1-T6 onboarding plan) but is rarely configured on the shared
+ * engine.
+ *
+ * Falls back to "Alpaca" only when literally nothing is configured (sim
+ * environments / local dev with no exchange keys); in that case the engine
+ * still works in simulation mode but `apiConfigured` will be false, which is
+ * the correct truthful signal.
+ */
+function pickPreferredExchange(): string {
+  const priority = ["Kraken", "Coinbase", "CryptoDotCom", "Binance", "Gemini", "Alpaca"];
+  for (const ex of priority) {
+    if (isExchangeConfigured(ex)) return ex;
+  }
+  return "Alpaca";
+}
+
+// Boot-time selection. Runs once at module load. Logging is via console.info
+// (this module is shared between Express request paths and worker code, so
+// we don't have `req.log` here — the singleton logger from `lib/logger.ts`
+// would create a circular import. Replit's workflow log captures stdout.)
+_selectedExchange = pickPreferredExchange();
+console.info(
+  `[exchangeEngine] boot: selectedExchange=${_selectedExchange} ` +
+  `liveEnabled=${process.env["EXCHANGE_LIVE_ENABLED"] === "true"} ` +
+  `configured=[${getConfiguredExchanges().join(",") || "none"}] ` +
+  `apiConfigured=${isExchangeConfigured(_selectedExchange)}`,
+);
+
 function isApiConfigured(): boolean {
   return isExchangeConfigured(_selectedExchange);
 }
@@ -130,6 +176,7 @@ function isLiveCapable(): boolean {
 // ── Live balances ─────────────────────────────────────────────────────────────
 
 export async function fetchLiveBalances(): Promise<Balances> {
+  console.info(`[exchangeEngine] fetchLiveBalances: selectedExchange=${_selectedExchange}`);
   if (_selectedExchange === "Kraken") {
     if (!isExchangeConfigured("Kraken")) {
       throw new Error("Kraken API credentials are not configured (KRAKEN_API_KEY / KRAKEN_API_SECRET missing)");
@@ -140,13 +187,19 @@ export async function fetchLiveBalances(): Promise<Balances> {
       apiKey:    process.env["KRAKEN_API_KEY"],
       apiSecret: process.env["KRAKEN_API_SECRET"],
     });
-    const account = await adapter.getAccount();
-    return {
-      USD: account.balances["USD"]?.total ?? 0,
-      BTC: account.balances["BTC"]?.total ?? 0,
-      ETH: account.balances["ETH"]?.total ?? 0,
-      SOL: account.balances["SOL"]?.total ?? 0,
-    };
+    try {
+      const account = await adapter.getAccount();
+      const usd = account.balances["USD"]?.total ?? 0;
+      const btc = account.balances["BTC"]?.total ?? 0;
+      const eth = account.balances["ETH"]?.total ?? 0;
+      const sol = account.balances["SOL"]?.total ?? 0;
+      console.info(`[exchangeEngine] Kraken account OK: USD=${usd} BTC=${btc} ETH=${eth} SOL=${sol}`);
+      return { USD: usd, BTC: btc, ETH: eth, SOL: sol };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[exchangeEngine] Kraken getAccount FAILED: ${msg}`);
+      throw err;
+    }
   }
 
   if (_selectedExchange === "Coinbase") {
@@ -386,11 +439,29 @@ export function getOrders(limit = 50): ExchangeOrder[] {
 export function setMode(mode: ExchangeMode, exchange?: string): { ok: boolean; reason?: string } {
   if (mode === "live") {
     if (!isLiveEnabled()) return { ok: false, reason: "EXCHANGE_LIVE_ENABLED is not set to 'true'" };
-    const ex = exchange ?? _selectedExchange;
-    if (!isExchangeConfigured(ex)) return { ok: false, reason: `${ex} API credentials are not configured` };
     if (_killSwitch) return { ok: false, reason: "Exchange kill switch is active — disable it first" };
+
+    // Safety net: if caller passed an explicit exchange, honor it; otherwise
+    // if the currently-selected exchange is not actually configured (e.g.
+    // someone set _selectedExchange to "Alpaca" but only Kraken keys exist),
+    // auto-switch to whichever exchange IS configured before going live.
+    // Without this, an admin POST /exchange/mode live with default selection
+    // would 400 with "Alpaca API credentials are not configured" and the
+    // engine would silently stay in simulation.
+    const requested = exchange ?? _selectedExchange;
+    if (!isExchangeConfigured(requested)) {
+      const fallback = pickPreferredExchange();
+      if (!isExchangeConfigured(fallback)) {
+        return { ok: false, reason: `${requested} API credentials are not configured (no live exchange has credentials)` };
+      }
+      console.info(`[exchangeEngine] setMode live: ${requested} not configured, auto-switching to ${fallback}`);
+      _selectedExchange = fallback;
+    } else if (exchange && exchange !== _selectedExchange) {
+      _selectedExchange = exchange;
+    }
   }
   _mode = mode;
+  console.info(`[exchangeEngine] setMode → mode=${_mode} exchange=${_selectedExchange} apiConfigured=${isApiConfigured()}`);
   return { ok: true };
 }
 
