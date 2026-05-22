@@ -258,6 +258,16 @@ export default function Notifications() {
     return c;
   }, [allRows]);
 
+  const unreadCounts = useMemo(() => {
+    const c: Record<FilterKey, number> = { all: 0, trades: 0, signals: 0, system: 0 };
+    for (const n of allRows) {
+      if (n.read) continue;
+      c.all++;
+      c[bucketOf(n.type)]++;
+    }
+    return c;
+  }, [allRows]);
+
   const rows = useMemo(
     () => (filter === "all" ? allRows : allRows.filter(n => bucketOf(n.type) === filter)),
     [allRows, filter],
@@ -298,13 +308,20 @@ export default function Notifications() {
         overflowX: "auto", WebkitOverflowScrolling: "touch",
       }}>
         {FILTERS.map(f => {
-          const active = filter === f.key;
-          const count  = counts[f.key];
+          const active     = filter === f.key;
+          const count      = counts[f.key];
+          const unreadHere = unreadCounts[f.key];
           return (
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
+              aria-label={
+                unreadHere > 0
+                  ? `${f.label}, ${count} total, ${unreadHere} unread`
+                  : `${f.label}, ${count} total`
+              }
               style={{
+                position: "relative",
                 display: "inline-flex", alignItems: "center", gap: 6,
                 padding: "7px 12px", borderRadius: 999,
                 background: active
@@ -322,6 +339,23 @@ export default function Notifications() {
                 fontFamily: MONO, fontSize: 9, fontWeight: 700,
                 color: active ? BRAND : TEXT_DIM, letterSpacing: 0,
               }}>{count}</span>
+              {unreadHere > 0 && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    minWidth: 16, height: 16, padding: "0 5px",
+                    borderRadius: 999,
+                    background: `linear-gradient(135deg, ${BRAND}, ${BRAND_DEEP})`,
+                    border: `1px solid ${BRAND}`,
+                    color: "#001A05",
+                    fontFamily: MONO, fontSize: 9, fontWeight: 800,
+                    letterSpacing: 0, lineHeight: 1,
+                    boxShadow: `0 0 8px ${BRAND_BLOOM}`,
+                  }}>
+                  {unreadHere > 99 ? "99+" : unreadHere}
+                </span>
+              )}
             </button>
           );
         })}
