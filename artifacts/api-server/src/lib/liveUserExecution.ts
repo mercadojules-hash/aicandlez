@@ -6,6 +6,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { vault } from "../services/vault/CredentialVault.js";
 import type { ExchangeCredentials } from "../services/vault/CredentialVault.js";
+import { ensureFreshAlpacaCreds } from "../services/exchanges/AlpacaTokenRefresher.js";
 import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
 // Live + beta adapters (mirrors makeAdapter() in routes/userExchanges.ts)
 import { KrakenAdapter }       from "../services/exchanges/adapters/KrakenAdapter.js";
@@ -224,7 +225,7 @@ export async function placeLiveAutoOrderForUser(
   }
 
   // 2. Decrypt credentials
-  const creds = vault.decryptBlob(userId, row.encryptedBlob);
+  let creds = vault.decryptBlob(userId, row.encryptedBlob);
   if (!creds) {
     const msg = `Could not decrypt stored credentials for ${row.exchange} — please reconnect`;
     await emitFailureNotification(userId, symbol, side, msg, row.exchange);
@@ -236,6 +237,17 @@ export async function placeLiveAutoOrderForUser(
         .where(eq(userExchangeConnectionsTable.id, row.id));
     } catch { /* non-fatal */ }
     return { success: false, userId, exchange: row.exchange, errorCode: "decrypt_failed", error: msg };
+  }
+
+  // 2b. Refresh Alpaca OAuth token if it's about to expire. Failures here
+  // mark the row errored and surface as exchange_reject so the user gets
+  // a notification + the UI can prompt re-auth.
+  try {
+    creds = await ensureFreshAlpacaCreds(userId, row, creds);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await emitFailureNotification(userId, symbol, side, msg, row.exchange);
+    return { success: false, userId, exchange: row.exchange, errorCode: "exchange_reject", error: msg };
   }
 
   // 3. Reference price → base quantity

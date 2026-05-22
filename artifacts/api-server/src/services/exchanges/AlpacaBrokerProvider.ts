@@ -134,7 +134,33 @@ class AlpacaBrokerProvider {
       client_secret: this.clientSecret!,
       redirect_uri:  this.redirectUri!,
     }).toString();
+    return this.postToken(body, "token exchange");
+  }
 
+  /**
+   * Refresh an OAuth access token using a previously-issued refresh token.
+   * Used by `AlpacaTokenRefresher` so customers' live trading keeps working
+   * past `oauthExpiresAt` without forcing them back through the consent
+   * popup. Alpaca's refresh endpoint mirrors the standard OAuth2 contract:
+   * POST `/oauth/token` with `grant_type=refresh_token`.
+   */
+  refresh(refreshToken: string): Promise<AlpacaOAuthTokenResponse> {
+    if (!this.isEnabled()) {
+      return Promise.reject(new Error("AlpacaBrokerProvider is not configured"));
+    }
+    if (!refreshToken) {
+      return Promise.reject(new Error("Missing refresh_token"));
+    }
+    const body = new URLSearchParams({
+      grant_type:    "refresh_token",
+      refresh_token: refreshToken,
+      client_id:     this.clientId!,
+      client_secret: this.clientSecret!,
+    }).toString();
+    return this.postToken(body, "token refresh");
+  }
+
+  private postToken(body: string, label: string): Promise<AlpacaOAuthTokenResponse> {
     return new Promise((resolve, reject) => {
       const req = https.request({
         hostname: TOKEN_HOST,
@@ -153,17 +179,17 @@ class AlpacaBrokerProvider {
             const parsed = JSON.parse(raw) as Record<string, unknown>;
             if (res.statusCode && res.statusCode >= 400) {
               const errMsg = String(parsed["error_description"] ?? parsed["error"] ?? `HTTP ${res.statusCode}`);
-              logger.warn({ status: res.statusCode, error: parsed["error"] }, "AlpacaBrokerProvider: token exchange failed");
+              logger.warn({ status: res.statusCode, error: parsed["error"], op: label }, `AlpacaBrokerProvider: ${label} failed`);
               reject(new Error(errMsg));
               return;
             }
             if (typeof parsed["access_token"] !== "string") {
-              reject(new Error("Alpaca OAuth response missing access_token"));
+              reject(new Error(`Alpaca OAuth (${label}) response missing access_token`));
               return;
             }
             resolve(parsed as unknown as AlpacaOAuthTokenResponse);
           } catch {
-            reject(new Error(`Alpaca OAuth: non-JSON response — ${raw.slice(0, 200)}`));
+            reject(new Error(`Alpaca OAuth (${label}): non-JSON response — ${raw.slice(0, 200)}`));
           }
         });
       });

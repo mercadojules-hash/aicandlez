@@ -6,6 +6,7 @@ import { requireAuth } from "../middlewares/requireAuth.js";
 import { requireDisclaimer } from "../middlewares/requireDisclaimer.js";
 import { requirePlan } from "../middlewares/requirePlan.js";
 import { vault } from "../services/vault/CredentialVault.js";
+import { ensureFreshAlpacaCreds } from "../services/exchanges/AlpacaTokenRefresher.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { EXCHANGE_CATALOG, CATALOG_BY_ID, CONNECTABLE_EXCHANGE_IDS } from "../services/exchanges/catalog.js";
 // Live adapters
@@ -314,8 +315,13 @@ async function loadBalanceForRow(
     balances:       {},
     lastUpdated:    0,
   };
-  const creds = vault.decryptBlob(userId, row.encryptedBlob);
+  let creds = vault.decryptBlob(userId, row.encryptedBlob);
   if (!creds) return { ...base, error: "Failed to decrypt stored credentials" };
+  try {
+    creds = await ensureFreshAlpacaCreds(userId, row, creds);
+  } catch (err) {
+    return { ...base, error: (err as Error).message };
+  }
   try {
     const adapter = makeAdapter(row.exchange, creds);
     const account = await adapter.getAccount();
@@ -415,9 +421,15 @@ router.post("/user/exchanges/:exchange/test", requireAuth, requirePlan("starter"
     return;
   }
 
-  const creds = vault.decryptBlob(userId, row.encryptedBlob);
+  let creds = vault.decryptBlob(userId, row.encryptedBlob);
   if (!creds) {
     res.status(500).json({ ok: false, error: "Failed to decrypt stored credentials" });
+    return;
+  }
+  try {
+    creds = await ensureFreshAlpacaCreds(userId, row, creds);
+  } catch (err) {
+    res.json({ ok: false, error: (err as Error).message });
     return;
   }
 

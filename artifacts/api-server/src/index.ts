@@ -10,6 +10,7 @@ import { logger } from "./lib/logger.js";
 import { validateEnv } from "./lib/validateEnv.js";
 import { startTradingLoop } from "./lib/tradingLoop.js";
 import { createWsServer } from "./lib/wsServer.js";
+import { startAlpacaTokenRefresher } from "./services/exchanges/AlpacaTokenRefresher.js";
 
 // ── Environment validation ─────────────────────────────────────────────────────
 validateEnv();
@@ -111,6 +112,7 @@ server.listen(finalPort, "0.0.0.0", async () => {
     logger.info("Kraken API credentials loaded");
   }
   startTradingLoop();
+  startAlpacaTokenRefresher();
   await initStripe();
 });
 
