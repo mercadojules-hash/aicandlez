@@ -31,6 +31,9 @@ export const userSettingsTable = pgTable("user_settings", {
   notificationsRiskAlerts: boolean("notifications_risk_alerts").notNull().default(true),
   notificationsLiveFills:  boolean("notifications_live_fills").notNull().default(true),
 
+  exchangeOutageEmailEnabled: boolean("exchange_outage_email_enabled").notNull().default(true),
+  exchangeOutagePushEnabled:  boolean("exchange_outage_push_enabled").notNull().default(true),
+
   timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
   currency: varchar("currency", { length: 10 }).notNull().default("USD"),
 

@@ -51,6 +51,7 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
     "preferredExchange",
     "notificationsTradeExec", "notificationsSignals", "notificationsRiskAlerts",
     "notificationsLiveFills",
+    "exchangeOutageEmailEnabled", "exchangeOutagePushEnabled",
     "timezone", "currency",
   ]);
 

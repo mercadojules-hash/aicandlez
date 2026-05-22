@@ -11,6 +11,7 @@ import { useUserProfile, type UserProfile } from "@/contexts/UserProfileContext"
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { PageHeader } from "@/components/PageHeader";
 import { useFeedbackPrefs, ALERT_DEFINITIONS, type AlertKey } from "@/lib/feedback";
+import { useQueryClient } from "@tanstack/react-query";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 // Aligned with the Signals/Crypto/Equities neon-green system.
@@ -795,10 +796,37 @@ function ExchangeConnectionsHealth() {
 // Surfaces every alert key from `lib/feedback` as a toggle row. Master switches
 // for Sounds / Haptics / Push live in the same card. Push backend is not wired
 // here — these prefs are read by future push-registration code.
+// Server-backed outage prefs — mute exchange outage email or push from the server.
+// Defaults to ON for both channels (matches pre-pref behaviour). DB column lives
+// on `user_settings.exchange_outage_{email,push}_enabled` and the API
+// surface is `GET/PUT /user/settings`.
+interface UserSettingsRow {
+  exchangeOutageEmailEnabled: boolean;
+  exchangeOutagePushEnabled:  boolean;
+}
+function useExchangeOutagePrefs() {
+  const qc = useQueryClient();
+  const { data } = useQuery<UserSettingsRow>({
+    queryKey:  ["user-settings"],
+    queryFn:   () => api.get<UserSettingsRow>("/user/settings"),
+    staleTime: 60_000,
+  });
+  const emailEnabled = data?.exchangeOutageEmailEnabled ?? true;
+  const pushEnabled  = data?.exchangeOutagePushEnabled  ?? true;
+  const setPref = async (patch: Partial<UserSettingsRow>) => {
+    qc.setQueryData<UserSettingsRow>(["user-settings"], prev =>
+      prev ? { ...prev, ...patch } : { exchangeOutageEmailEnabled: true, exchangeOutagePushEnabled: true, ...patch });
+    try { await api.put("/user/settings", patch); }
+    catch { qc.invalidateQueries({ queryKey: ["user-settings"] }); }
+  };
+  return { emailEnabled, pushEnabled, setPref };
+}
+
 function AlertPreferencesSection() {
   const { prefs, update, toggleAlert } = useFeedbackPrefs();
   const pushNotifs = usePushNotifications();
   const queryClient = useQueryClient();
+  const outage     = useExchangeOutagePrefs();
 
   // ── Server-readable preference for the "Live Trade Filled" alert ──────────
   // The localStorage `liveTradeFilled` toggle controls in-app UI only; the
@@ -900,6 +928,30 @@ function AlertPreferencesSection() {
             disabled={!prefs.pushEnabled && !prefs.soundsEnabled}
           />
         ))}
+
+        <div style={{ padding:"10px 16px 6px", borderTop:"1px solid rgba(255,255,255,0.05)",
+          background:"rgba(255,255,255,0.015)" }}>
+          <div style={{ fontSize:8.5, fontFamily:SANS, fontWeight:700,
+            color:"rgba(232,245,236,0.55)", letterSpacing:"0.14em",
+            textTransform:"uppercase" as const }}>
+            Exchange Outage Notifications
+          </div>
+        </div>
+        <PrefRow
+          label="Outage Emails"
+          sub="Email me when an exchange connection goes down or recovers"
+          value={outage.emailEnabled}
+          onChange={() => void outage.setPref({ exchangeOutageEmailEnabled: !outage.emailEnabled })}
+          accent="rgba(102,255,102,0.55)"
+        />
+        <PrefRow
+          label="Outage Push"
+          sub="Push notification when an exchange connection goes down or recovers"
+          value={outage.pushEnabled}
+          onChange={() => void outage.setPref({ exchangeOutagePushEnabled: !outage.pushEnabled })}
+          accent="rgba(102,255,102,0.55)"
+          divider={false}
+        />
       </div>
       <div style={{ marginTop:8, padding:"9px 14px",
         background:"rgba(124,255,0,0.04)", border:"1px solid rgba(124,255,0,0.10)",
