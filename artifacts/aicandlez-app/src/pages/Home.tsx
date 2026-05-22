@@ -986,13 +986,14 @@ export default function Home() {
           </div>
 
           <div style={{
-            display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 16,
+            display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginTop: 16,
             paddingTop: 16, borderTop: `1px solid ${BORDER}`,
           }}>
             {([
               { l: "Available", v: fmtShort(cashAvail) },
               { l: "Positions", v: String(positions.length) },
               { l: "Win Rate",  v: `${(simAcc?.winRate ?? 0).toFixed(0)}%`, c: (simAcc?.winRate ?? 0) >= 55 ? POS : WARN },
+              { l: "Fees Paid", v: `$${(simAcc?.totalFeesPaid ?? 0).toFixed(2)}`, c: (simAcc?.totalFeesPaid ?? 0) > 0 ? TEXT : TEXT_DIM },
             ] as { l: string; v: string; c?: string }[]).map((s, i) => (
               <div key={i}>
                 <div style={{ fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM, letterSpacing: 1.3, textTransform: "uppercase" }}>{s.l}</div>
