@@ -6,6 +6,7 @@ import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
 import { EnableLiveCTA } from "@/components/EnableLiveCTA";
 import { MetricTooltip } from "@/components/help/MetricTooltip";
+import { TradeDetailSheet } from "@/components/TradeDetailSheet";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -359,17 +360,23 @@ function PositionCard({ pos, tick, sparkPoints }: { pos: Portfolio["positions"][
 }
 
 // ── Trade history row ─────────────────────────────────────────────────────────────
-function TradeRow({ trade }: { trade: SimTrade }) {
+function TradeRow({ trade, onOpen }: { trade: SimTrade; onOpen: (t: SimTrade) => void }) {
   const up      = trade.pnl >= 0;
   const pnlCol  = up ? G : R;
   const scoreCol = trade.score !== undefined
     ? (trade.score >= 70 ? G : trade.score >= 50 ? O : R) : GR;
   return (
-    <div style={{
-      display:"flex", alignItems:"center",
-      padding:"10px 16px",
-      borderBottom:`1px solid ${ESUB}`,
-    }}>
+    <div
+      onClick={() => onOpen(trade)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(trade); } }}
+      style={{
+        display:"flex", alignItems:"center",
+        padding:"10px 16px",
+        borderBottom:`1px solid ${ESUB}`,
+        cursor: "pointer",
+      }}>
       <div style={{
         width:2.5, height:36, flexShrink:0, marginRight:12, borderRadius:2,
         background:`linear-gradient(180deg, ${pnlCol}, ${pnlCol}44)`,
@@ -480,6 +487,7 @@ export default function Trade() {
   const qc = useQueryClient();
   const { openOnboarding, status: brokerStatus } = useBrokerConnection();
   const tick = useLiveTimer();
+  const [openTrade, setOpenTrade] = useState<SimTrade | null>(null);
 
   const isAlpacaActive = brokerStatus === "paper_active" || brokerStatus === "live_active";
 
@@ -862,7 +870,7 @@ export default function Trade() {
                   No closed trades yet — your AI trade history will appear here.
                 </div>
               ) : (
-                history.map(t => <TradeRow key={t.id} trade={t}/>)
+                history.map(t => <TradeRow key={t.id} trade={t} onOpen={setOpenTrade}/>)
               )}
             </div>
             {/* Bottom fade */}
@@ -924,6 +932,8 @@ export default function Trade() {
           background: rgba(0,229,255,0.22); border-radius: 2px;
         }
       `}</style>
+
+      <TradeDetailSheet trade={openTrade} onClose={() => setOpenTrade(null)}/>
     </div>
   );
 }

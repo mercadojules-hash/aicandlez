@@ -26,6 +26,12 @@ export const simTradesTable = pgTable("sim_trades", {
   // live position was flattened. NULL for paper trades and for any legacy
   // live trades closed before close-side submission was wired in.
   exchangeCloseOrderId: text("exchange_close_order_id"),
+  // Broker commission charged on each fill (live trades only — NULL for paper).
+  // Stored in USD. Computed at close time from the exchange catalog's taker
+  // fee rate; surfaced in the customer's trade receipt for audit parity with
+  // the broker's own statement.
+  entryFee:        real("entry_fee"),
+  exitFee:         real("exit_fee"),
   createdAt:      timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   index("sim_trades_user_idx").on(t.userId),

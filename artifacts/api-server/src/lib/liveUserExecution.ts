@@ -8,6 +8,7 @@ import { and, eq } from "drizzle-orm";
 import { vault } from "../services/vault/CredentialVault.js";
 import { ensureFreshAlpacaCreds } from "../services/exchanges/AlpacaTokenRefresher.js";
 import { makeAdapter } from "../services/exchanges/adapterFactory.js";
+import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
 import { getTicker } from "./marketData.js";
 import { logger } from "./logger.js";
 import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";

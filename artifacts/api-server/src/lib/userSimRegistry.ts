@@ -12,6 +12,18 @@ import {
   isDryRunEnabled,
   placeLiveCloseOrderForUser,
 } from "./liveUserExecution.js";
+import { CATALOG_BY_ID } from "../services/exchanges/catalog.js";
+
+// Compute a fill commission for a live trade leg using the exchange catalog's
+// default taker fee rate. Returns null for paper fills (no broker, no fee).
+function computeFillFee(exchange: string | undefined, notionalUSD: number): number | null {
+  if (!exchange) return null;
+  const meta = CATALOG_BY_ID[exchange];
+  if (!meta) return null;
+  // `takerFeePct` is expressed as a percent (e.g. 0.26 = 0.26%).
+  const fee = (notionalUSD * meta.takerFeePct) / 100;
+  return parseFloat(fee.toFixed(4));
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,6 +65,8 @@ export interface UserSimTrade {
   exchange?: string;
   exchangeOrderId?: string;
   exchangeCloseOrderId?: string;
+  entryFee?: number;
+  exitFee?: number;
 }
 
 interface UserSimAccount {
@@ -166,6 +180,8 @@ async function loadFromDB(userId: string): Promise<UserSimState> {
       exchange:             t.exchange ?? undefined,
       exchangeOrderId:      t.exchangeOrderId ?? undefined,
       exchangeCloseOrderId: t.exchangeCloseOrderId ?? undefined,
+      entryFee:             t.entryFee ?? undefined,
+      exitFee:              t.exitFee ?? undefined,
     })),
     idSeq: 0,
   };
@@ -452,6 +468,11 @@ export async function closeUserPosition(
   const exitTime       = Date.now();
   const tradeId        = newId(state);
 
+  // Broker commission for both legs (live trades only — null for paper)
+  const exitNotional = exitPrice * pos.quantity;
+  const entryFee = computeFillFee(pos.exchange, pos.sizeUSD);
+  const exitFee  = computeFillFee(pos.exchange, exitNotional);
+
   const trade: UserSimTrade = {
     id:              tradeId,
     userId,
@@ -470,6 +491,8 @@ export async function closeUserPosition(
     exchange:             pos.exchange,
     exchangeOrderId:      pos.exchangeOrderId,
     exchangeCloseOrderId: exchangeCloseOrderId,
+    entryFee:             entryFee ?? undefined,
+    exitFee:              exitFee ?? undefined,
   };
 
   state.account.cashBalance  += pos.sizeUSD + realizedPnL;
@@ -497,6 +520,8 @@ export async function closeUserPosition(
       exchange:             trade.exchange ?? null,
       exchangeOrderId:      trade.exchangeOrderId ?? null,
       exchangeCloseOrderId: trade.exchangeCloseOrderId ?? null,
+      entryFee:             trade.entryFee ?? null,
+      exitFee:              trade.exitFee ?? null,
     }),
     db.delete(simPositionsTable).where(eq(simPositionsTable.id, positionId)),
     persistAccount(state),

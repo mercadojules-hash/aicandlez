@@ -17,6 +17,7 @@ import {
 } from "@/lib/api";
 import { CryptoIcon } from "@/components/CryptoIcon";
 import { OnboardingPanel } from "@/components/OnboardingPanel";
+import { TradeDetailSheet } from "@/components/TradeDetailSheet";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AICandlez — Premium Neon-Green Trading OS · Home Screen
@@ -1553,6 +1554,8 @@ const EQUITY_PREVIEW: { sym: string; name: string; action: string; confidence: n
 function TradeHistorySection({ trades, onMore }: {
   trades: SimTrade[]; onMore: () => void;
 }) {
+  const [openTrade, setOpenTrade] = useState<SimTrade | null>(null);
+
   // Aggregate stats from REAL trades only — no fabrication
   const stats = useMemo(() => {
     if (trades.length === 0) return null;
@@ -1682,9 +1685,13 @@ function TradeHistorySection({ trades, onMore }: {
             </div>
           </div>
         ) : (
-          recent.map((t, i) => <TradeHistoryCard key={t.id ?? i} trade={t}/>)
+          recent.map((t, i) => (
+            <TradeHistoryCard key={t.id ?? i} trade={t} onOpen={setOpenTrade}/>
+          ))
         )}
       </div>
+
+      <TradeDetailSheet trade={openTrade} onClose={() => setOpenTrade(null)}/>
     </>
   );
 }
@@ -1692,9 +1699,7 @@ function TradeHistorySection({ trades, onMore }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // Single expandable trade card with glow state + AI reasoning tags
 // ─────────────────────────────────────────────────────────────────────────────
-function TradeHistoryCard({ trade }: { trade: SimTrade }) {
-  const [expanded, setExpanded] = useState(false);
-
+function TradeHistoryCard({ trade, onOpen }: { trade: SimTrade; onOpen: (t: SimTrade) => void }) {
   const isWin   = (trade.pnl ?? 0) >= 0;
   const sideUp  = (trade.side ?? "").toLowerCase();
   const isLong  = sideUp === "long" || sideUp === "buy";
@@ -1744,7 +1749,10 @@ function TradeHistoryCard({ trade }: { trade: SimTrade }) {
 
   return (
     <div
-      onClick={() => setExpanded(e => !e)}
+      onClick={() => onOpen(trade)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(trade); } }}
       style={{
         position: "relative", overflow: "hidden", cursor: "pointer",
         marginBottom: 10, borderRadius: 18, padding: "14px 16px",
@@ -1895,39 +1903,15 @@ function TradeHistoryCard({ trade }: { trade: SimTrade }) {
         ))}
         <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{
-            fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
+            fontSize: 9, fontFamily: SANS, fontWeight: 700, color: BRAND,
             letterSpacing: 0.8, textTransform: "uppercase",
-          }}>{expanded ? "Hide" : "Details"}</span>
+          }}>View Receipt</span>
           <span style={{
-            color: TEXT_DIM, transition: "transform 0.2s ease",
-            transform: expanded ? "rotate(180deg)" : "rotate(0)",
-            display: "inline-flex",
+            color: BRAND, display: "inline-flex",
+            transform: "rotate(-90deg)",
           }}>{IconChevron}</span>
         </span>
       </div>
-
-      {/* Expandable detail panel */}
-      {expanded && (
-        <div style={{
-          marginTop: 12, paddingTop: 12,
-          borderTop: `1px solid ${BORDER}`,
-          display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10,
-          animation: "bar-in 0.3s ease-out",
-        }}>
-          <DetailCell label="Entry" value={fmtPx(trade.entryPrice)}/>
-          <DetailCell label="Exit"  value={fmtPx(trade.exitPrice)} accent={accent}/>
-          <DetailCell
-            label="Move"
-            value={`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%`}
-            accent={accent}
-          />
-          {confidence !== null && (
-            <DetailCell label="AI Score" value={`${confidence.toFixed(0)} / 100`} accent={BRAND}/>
-          )}
-          <DetailCell label="Direction" value={isLong ? "Long ▲" : "Short ▼"} accent={accent}/>
-          <DetailCell label="Outcome"  value={isWin ? "Profit" : "Loss"} accent={accent}/>
-        </div>
-      )}
     </div>
   );
 }
