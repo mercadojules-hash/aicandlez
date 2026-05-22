@@ -1,0 +1,64 @@
+# Weekly broker-fee drift smoke test.
+#
+# Runs `adapterFeeParsingTestnet.test.ts` against each exchange's public
+# sandbox (Binance Spot Testnet, Gemini Sandbox, Phemex Testnet) so a
+# silent field rename — or a promo tier that pays fees in a different
+# asset — gets caught long before it lands on a paying customer's trade
+# receipt as `source: "estimate"`.
+#
+# Per-exchange testnet credentials live in GitHub Actions secrets and are
+# expected to be funded with a few dollars of testnet quote currency. The
+# job is non-blocking for PRs: it only runs on the weekly schedule and on
+# manual dispatch.
+#
+# On failure, the job pings the operator command center via
+# COMMAND_CENTER_ALERT_WEBHOOK so the on-call operator sees the drift
+# without having to read the Actions tab.
+
+name: Exchange testnet fee parsing
+
+on:
+  schedule:
+    # 09:00 UTC every Monday — quiet hour across major exchange ops windows.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+jobs:
+  testnet-fees:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RUN_EXCHANGE_TESTNET:        "1"
+      BINANCE_TESTNET_API_KEY:     ${{ secrets.BINANCE_TESTNET_API_KEY }}
+      BINANCE_TESTNET_API_SECRET:  ${{ secrets.BINANCE_TESTNET_API_SECRET }}
+      GEMINI_SANDBOX_API_KEY:      ${{ secrets.GEMINI_SANDBOX_API_KEY }}
+      GEMINI_SANDBOX_API_SECRET:   ${{ secrets.GEMINI_SANDBOX_API_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run exchange testnet fee parsing
+        id: testnet
+        run: |
+          pnpm --filter @workspace/api-server run test -- adapterFeeParsingTestnet
+
+      - name: Notify operator command center on failure
+        if: failure() && env.COMMAND_CENTER_ALERT_WEBHOOK != ''
+        env:
+          COMMAND_CENTER_ALERT_WEBHOOK: ${{ secrets.COMMAND_CENTER_ALERT_WEBHOOK }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -fsS -X POST "$COMMAND_CENTER_ALERT_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "{\"severity\":\"high\",\"source\":\"exchange-testnet-fees\",\"message\":\"Broker-fee parsing regressed against an exchange sandbox\",\"runUrl\":\"$RUN_URL\"}"
