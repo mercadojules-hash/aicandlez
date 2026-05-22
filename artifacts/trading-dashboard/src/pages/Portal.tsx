@@ -2939,6 +2939,110 @@ function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
   );
 }
 
+// ── Monthly Fees Trend (desktop port of PWA FeesMonthlyChart, Task #95) ─────
+// Renders the same 6-month broker-commission bar chart shown on the mobile
+// Portfolio page, restyled with the institutional theme tokens. Bars use the
+// neon brand green with a soft glow; inactive months render as a flat dim
+// scaffold bar. Empty state mirrors the PWA copy.
+const PORTAL_FEES_MONTH_LABELS = [
+  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+];
+function portalFeesShortLabel(key: string): string {
+  const [, m] = key.split("-");
+  const idx = (parseInt(m ?? "0", 10) - 1);
+  return PORTAL_FEES_MONTH_LABELS[idx] ?? key;
+}
+function PortalFeesTrend({
+  data,
+}: {
+  data: { months: { month: string; feesPaid: number; tradeCount: number }[]; totalFeesPaid: number } | undefined;
+}) {
+  const buckets = data?.months ?? [];
+  const hasAny  = buckets.some(b => b.feesPaid > 0);
+  const peak    = Math.max(0, ...buckets.map(b => b.feesPaid));
+
+  if (!hasAny) {
+    return (
+      <div style={{
+        padding: "14px 16px",
+        border: `1px solid ${N.BRAND}22`,
+        borderRadius: 6,
+        background: `${N.BRAND}05`,
+        fontFamily: N.FONT_MONO, fontSize: 10, color: N.TEXT_3,
+        letterSpacing: "0.16em", textTransform: "uppercase", textAlign: "center",
+      }}>
+        NO LIVE FEES YET · LAST 6 MONTHS
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      padding: "14px 16px",
+      border: `1px solid ${N.BRAND}33`,
+      borderRadius: 6,
+      background: `${N.BRAND}06`,
+      fontFamily: N.FONT_MONO,
+    }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "baseline",
+        marginBottom: 10,
+      }}>
+        <span style={{ fontSize: 10, color: N.TEXT_2,
+          letterSpacing: "0.16em", textTransform: "uppercase" }}>
+          FEES · LAST 6 MONTHS
+        </span>
+        <span style={{ fontSize: 10, color: N.TEXT_1, letterSpacing: "0.08em" }}>
+          PEAK ${peak.toFixed(2)}
+        </span>
+      </div>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${buckets.length}, 1fr)`,
+        alignItems: "end",
+        gap: 8,
+        height: 72,
+      }}>
+        {buckets.map(b => {
+          const h = peak > 0 ? Math.max(2, Math.round((b.feesPaid / peak) * 64)) : 2;
+          const active = b.feesPaid > 0;
+          return (
+            <div
+              key={b.month}
+              style={{
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end",
+                height: "100%",
+              }}
+              title={`${portalFeesShortLabel(b.month)} ${b.month.slice(0,4)} · $${b.feesPaid.toFixed(2)} · ${b.tradeCount} trade${b.tradeCount === 1 ? "" : "s"}`}
+            >
+              <div style={{
+                width: "100%", height: h, borderRadius: 2,
+                background: active ? N.BRAND : `${N.TEXT_3}55`,
+                boxShadow: active ? `0 0 8px ${N.BRAND_GLOW}` : "none",
+              }} />
+            </div>
+          );
+        })}
+      </div>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${buckets.length}, 1fr)`,
+        gap: 8, marginTop: 8,
+      }}>
+        {buckets.map(b => (
+          <div key={`${b.month}-l`} style={{
+            fontSize: 9, color: N.TEXT_2,
+            textAlign: "center", letterSpacing: "0.12em",
+          }}>
+            {portalFeesShortLabel(b.month)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function Portal() {
   // PortalInner itself no longer reads from `usePaperTrades` — all of its
@@ -3147,6 +3251,30 @@ function PortalInner() {
     },
   });
   const totalFeesPaid = accountFeesQuery.data?.totalFeesPaid ?? 0;
+
+  // Monthly broker-commission trend (last 6 months) — mirrors the PWA
+  // Portfolio FeesMonthlyChart (Task #95) so desktop customers can see
+  // whether commission is climbing or shrinking over time. Same endpoint,
+  // same shape, same empty-state semantics.
+  type MonthlyFeesBucket = { month: string; feesPaid: number; tradeCount: number };
+  type MonthlyFeesResp   = { months: MonthlyFeesBucket[]; totalFeesPaid: number };
+  const monthlyFeesQuery = useQuery<MonthlyFeesResp>({
+    queryKey: ["/api/account/fees/monthly", "portal"],
+    enabled:  (isSignedIn ?? false) && !isAdmin,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/account/fees/monthly?months=6`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to load monthly fees");
+      return res.json();
+    },
+  });
+  const monthlyFees = monthlyFeesQuery.data;
 
   // ── ADMIN OPERATOR · Real Kraken live snapshot ──────────────────────────────
   // On admintrade.aicandlez.com the workstation must reflect REAL Kraken account
@@ -3430,6 +3558,16 @@ function PortalInner() {
             positive={false}
             demo
           />
+        </div>
+      )}
+
+      {/* Monthly broker-fee trend — desktop mirror of the PWA Portfolio
+          FeesMonthlyChart. Customer-only; admin terminal uses real Kraken
+          tiles instead. Sits directly under the metrics row so it reads as
+          a companion to the lifetime FEES PAID tile above. */}
+      {!isAdmin && (
+        <div style={{ padding: "12px 24px 0" }}>
+          <PortalFeesTrend data={monthlyFees} />
         </div>
       )}
 
