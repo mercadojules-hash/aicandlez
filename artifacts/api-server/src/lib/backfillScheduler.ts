@@ -22,6 +22,7 @@
 //     same channels as other operator-visible incidents.
 
 import { logger } from "./logger.js";
+import { sendOperatorAlert } from "./notifications.js";
 import {
   runCloseOrderIdBackfill,
   type BackfillSummary as CloseSummary,
@@ -36,6 +37,19 @@ import {
 const FIRST_RUN_DELAY_MS    = 5 * 60_000;        // 5 min after boot
 const RUN_INTERVAL_MS       = 24 * 60 * 60_000;  // nightly
 const HISTORY_CAP           = 10;                // remember last 10 runs
+
+// Operator-alert throttle. Strategy: "alert once until healthy, with
+// a long escalation re-page". Once we've notified for a given failure
+// signature (e.g. "error:Kraken API 500" or "errored:close=3,open=0"),
+// suppress repeats of the same signature until either (a) a healthy
+// run lands and clears the throttle, or (b) the escalation interval
+// elapses so the failure can't be silently lost forever. A *different*
+// failure signature pages immediately even mid-window so operators
+// still see new problems.
+//
+// Re-page interval is intentionally well above the 24h run cadence so
+// a persistently failing nightly run does not spam every night.
+const ALERT_REPAGE_MS       = 7 * 24 * 60 * 60_000;  // 7 days
 
 // ── Public types ─────────────────────────────────────────────────────────
 
@@ -57,6 +71,10 @@ let nextRunAt:   number | null            = null;
 let inFlight                              = false;
 let timer:       NodeJS.Timeout | null    = null;
 let started                               = false;
+
+// Throttle state for operator failure alerts.
+let lastAlertSignature: string | null = null;
+let lastAlertAt:        number        = 0;
 
 // ── Public API ───────────────────────────────────────────────────────────
 
@@ -144,7 +162,96 @@ export async function runBackfillsNow(trigger: "scheduled" | "manual" = "manual"
   lastRun = record;
   history.unshift(record);
   if (history.length > HISTORY_CAP) history.length = HISTORY_CAP;
+
+  // Operator alert on failure. We page when the run threw OR when any
+  // per-side rollup reports `errored > 0`, since both shapes leave gap
+  // rows behind that need a human to look. Successful runs clear the
+  // throttle so a fresh failure pages on the next nightly cycle.
+  try {
+    await maybeAlertOperators(record, trigger);
+  } catch (err) {
+    logger.warn({ err }, "[backfill-scheduler] operator-alert dispatch failed");
+  }
+
   return record;
+}
+
+function failureSignature(rec: BackfillRunRecord): string | null {
+  if (!rec.ok && rec.error) return `error:${rec.error}`;
+  const closeErr = rec.closeSide?.errored ?? 0;
+  const openErr  = rec.openSide?.errored  ?? 0;
+  if (closeErr > 0 || openErr > 0) return `errored:close=${closeErr},open=${openErr}`;
+  return null;
+}
+
+async function maybeAlertOperators(
+  rec:     BackfillRunRecord,
+  trigger: "scheduled" | "manual",
+): Promise<void> {
+  const signature = failureSignature(rec);
+  if (!signature) {
+    // Healthy run — reset throttle so the next failure fires immediately.
+    lastAlertSignature = null;
+    lastAlertAt        = 0;
+    return;
+  }
+
+  const now            = Date.now();
+  const sameAsLast     = signature === lastAlertSignature;
+  const withinRepageWindow = now - lastAlertAt < ALERT_REPAGE_MS;
+  // Persistent same-signature failure: stay quiet until either a
+  // healthy run clears the throttle or the escalation window elapses.
+  // This is what stops the nightly scheduler from paging every 24h
+  // when the same failure mode persists.
+  if (sameAsLast && withinRepageWindow) {
+    logger.debug(
+      { signature, lastAlertAt, trigger },
+      "[backfill-scheduler] operator alert suppressed (same failure signature, still within re-page window)",
+    );
+    return;
+  }
+
+  const closeErr = rec.closeSide?.errored ?? 0;
+  const openErr  = rec.openSide?.errored  ?? 0;
+  const subject  = rec.error
+    ? "Nightly broker order-id back-fill FAILED"
+    : `Nightly broker order-id back-fill completed with errors (close=${closeErr}, open=${openErr})`;
+  const lines: string[] = [
+    `Trigger:  ${trigger}`,
+    `Started:  ${new Date(rec.startedAt).toISOString()}`,
+    `Finished: ${new Date(rec.finishedAt).toISOString()}`,
+    `Duration: ${rec.durationMs}ms`,
+  ];
+  if (rec.error) lines.push(`Error:    ${rec.error}`);
+  if (rec.closeSide) {
+    lines.push(
+      `Close side: matched=${rec.closeSide.matched} unmatched=${rec.closeSide.unmatched} ` +
+      `ambiguous=${rec.closeSide.ambiguous} errored=${rec.closeSide.errored}`,
+    );
+  }
+  if (rec.openSide) {
+    lines.push(
+      `Open side:  matched=${rec.openSide.matched} unmatched=${rec.openSide.unmatched} ` +
+      `ambiguous=${rec.openSide.ambiguous} errored=${rec.openSide.errored}`,
+    );
+  }
+
+  await sendOperatorAlert({
+    subject,
+    body:      lines.join("\n"),
+    dedupeKey: `backfill-scheduler:${signature}`,
+    context:   {
+      source:    "backfill-scheduler",
+      trigger,
+      ok:        rec.ok,
+      error:     rec.error,
+      closeSide: rec.closeSide,
+      openSide:  rec.openSide,
+    },
+  });
+
+  lastAlertSignature = signature;
+  lastAlertAt        = now;
 }
 
 /**

@@ -62,3 +62,30 @@ export async function sendTradeExecutedSMS(
     logger.warn({ symbol, side, price, err }, "SMS failed — network error");
   }
 }
+
+// ── Operator alert channel ────────────────────────────────────────────────────
+// Same logger-backed transport the exchange-outage emails ride on
+// (`ExchangeHealthMonitor.notifyExchangeOutage` → `outage email queued`).
+// When a real SMTP/Resend/SendGrid client lands, both this and the
+// outage email stub should swap the `logger.info(...)` for the real
+// transport call so operators get a single unified channel.
+
+export interface OperatorAlertPayload {
+  subject:  string;
+  body:     string;
+  /** Stable key used by callers to throttle / de-dupe repeat alerts. */
+  dedupeKey: string;
+  context?: Record<string, unknown>;
+}
+
+export async function sendOperatorAlert(payload: OperatorAlertPayload): Promise<void> {
+  logger.info(
+    {
+      subject:   payload.subject,
+      body:      payload.body,
+      dedupeKey: payload.dedupeKey,
+      ...(payload.context ?? {}),
+    },
+    "operator-alert queued",
+  );
+}
