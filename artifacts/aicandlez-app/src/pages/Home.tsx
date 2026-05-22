@@ -455,19 +455,57 @@ export default function Home() {
   const { data: tradesData }  = useQuery<{ trades: SimTrade[] }>({
     queryKey: ["sim-trades"], queryFn: () => api.get("/simulation/trades"), refetchInterval: 12_000, retry: false });
 
+  // Live balances across any per-user connected exchanges (Kraken/Coinbase/
+  // Binance/etc — distinct from the Alpaca broker which goes through
+  // BrokerConnectionContext). Refetches on focus + every 30s. Falls back to
+  // sim when no okConnections exist.
+  const { data: liveExchangeBalances } = useQuery<{
+    connections: Array<{
+      exchange:       string;
+      ok:             boolean;
+      totalEquityUSD: number;
+      balances:       Record<string, { free: number; locked: number; total: number }>;
+    }>;
+    totalEquityUSD: number;
+  }>({
+    queryKey: ["user-exchanges-balances"],
+    queryFn: () => api.get("/user/exchanges/balances"),
+    refetchInterval:      30_000,
+    refetchOnWindowFocus: true,
+    staleTime:            10_000,
+    retry: false,
+  });
+  const liveExchangeOk = (liveExchangeBalances?.connections ?? []).filter(c => c.ok);
+  const liveExchangeEquity = liveExchangeOk.length > 0 ? liveExchangeBalances!.totalEquityUSD : 0;
+  const liveExchangeUsdFree = liveExchangeOk.reduce(
+    (s, c) => s + (c.balances?.["USD"]?.free ?? c.balances?.["USDT"]?.free ?? c.balances?.["USDC"]?.free ?? 0), 0,
+  );
+  const liveExchangePrimary = liveExchangeOk[0]?.exchange ?? null;
+
   // ── Derived state ────────────────────────────────────────────────────────
   const engine   = status?.engine;
   const isLive   = engine?.mode === "live";
   const brokerConnected = brokerStatus === "paper_active" || brokerStatus === "live_active";
-  const tv       = brokerConnected
-    ? (alpacaEquity > 0 ? alpacaEquity : (portfolio?.totalValue ?? 100_000))
-    : (portfolio?.totalValue ?? 100_000);
+  const exchangeConnected = liveExchangeOk.length > 0;
+  // Real-money priority: connected exchange balances first (Kraken etc),
+  // then Alpaca, then simulated portfolio.
+  const tv       = exchangeConnected
+    ? liveExchangeEquity
+    : brokerConnected
+      ? (alpacaEquity > 0 ? alpacaEquity : (portfolio?.totalValue ?? 100_000))
+      : (portfolio?.totalValue ?? 100_000);
   const pnl      = portfolio?.openPnL     ?? 0;
   const pnlPct   = tv > 0 ? (pnl/tv*100) : 0;
-  const cashAvail = brokerConnected && alpacaBP > 0 ? alpacaBP : tv * 0.855;
-  const portfolioSourceLabel = brokerConnected
-    ? (brokerStatus === "live_active" ? "Alpaca · Live" : "Alpaca · Paper")
-    : "AI Sim Allocation";
+  const cashAvail = exchangeConnected && liveExchangeUsdFree > 0
+    ? liveExchangeUsdFree
+    : brokerConnected && alpacaBP > 0
+      ? alpacaBP
+      : tv * 0.855;
+  const portfolioSourceLabel = exchangeConnected && liveExchangePrimary
+    ? `${liveExchangePrimary} · Live`
+    : brokerConnected
+      ? (brokerStatus === "live_active" ? "Alpaca · Live" : "Alpaca · Paper")
+      : "AI Sim Allocation";
   const plan = (sub?.plan ?? "free").toLowerCase();
   const planLabel = (plan.includes("active") || plan.includes("paid") || plan.includes("live"))
     ? "Pro" : "Trial";

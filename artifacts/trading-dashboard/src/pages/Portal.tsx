@@ -718,6 +718,82 @@ function useExchangeStatus(): ExchangeStatus {
   };
 }
 
+// ── Live balance hook (customer per-user exchange balances) ──────────────────
+// Fetches /api/user/exchanges/balances every 30s + on focus once the user has
+// at least one connection. Returns aggregated USD equity plus the most-recent
+// per-connection USD free balance (used as "buying power" on the hero tile).
+// Falls back to nulls when no live data is available so the Portal can keep
+// rendering the simulated hero.
+interface LiveBalancesView {
+  ready:           boolean;
+  hasOk:           boolean;
+  totalEquityUSD:  number | null;
+  buyingPowerUSD:  number | null;
+  primaryExchange: string | null;
+  connections:     Array<{
+    exchange:       string;
+    ok:             boolean;
+    totalEquityUSD: number;
+    usdFree:        number;
+    error?:         string;
+  }>;
+}
+function useLiveExchangeBalances(enabled: boolean): LiveBalancesView {
+  const { data } = useQuery({
+    queryKey: ["portal-user-exchange-balances"],
+    enabled,
+    queryFn: async () => {
+      const r = await fetch(`${apiBaseUrl}/api/user/exchanges/balances`, {
+        credentials: "include", cache: "no-store",
+      });
+      if (!r.ok) return null;
+      return r.json() as Promise<{
+        connections: Array<{
+          exchange:       string;
+          ok:             boolean;
+          totalEquityUSD: number;
+          balances:       Record<string, { free: number; locked: number; total: number }>;
+          error?:         string;
+        }>;
+        totalEquityUSD: number;
+        fetchedAt:      number;
+      }>;
+    },
+    refetchInterval:      30_000,
+    refetchOnWindowFocus: true,
+    staleTime:            10_000,
+  });
+
+  if (!data) {
+    return {
+      ready: false, hasOk: false,
+      totalEquityUSD: null, buyingPowerUSD: null, primaryExchange: null,
+      connections: [],
+    };
+  }
+  const connections = data.connections.map(c => ({
+    exchange:       c.exchange,
+    ok:             c.ok,
+    totalEquityUSD: c.totalEquityUSD,
+    usdFree:        c.balances?.["USD"]?.free
+                  ?? c.balances?.["USDT"]?.free
+                  ?? c.balances?.["USDC"]?.free
+                  ?? 0,
+    ...(c.error ? { error: c.error } : {}),
+  }));
+  const okOnes = connections.filter(c => c.ok);
+  const primary = okOnes[0] ?? null;
+  const buyingPowerUSD = okOnes.reduce((s, c) => s + (Number.isFinite(c.usdFree) ? c.usdFree : 0), 0);
+  return {
+    ready:           true,
+    hasOk:           okOnes.length > 0,
+    totalEquityUSD:  okOnes.length > 0 ? data.totalEquityUSD : null,
+    buyingPowerUSD:  okOnes.length > 0 ? buyingPowerUSD : null,
+    primaryExchange: primary?.exchange ?? null,
+    connections,
+  };
+}
+
 /** Header status pill — shows connection / mode state at a glance.
  *  Admin override: when running on the institutional terminal (isAdmin), the
  *  pill reflects the server-side Kraken live-broker telemetry instead of the
@@ -1922,6 +1998,7 @@ function PortalInner() {
   const { stats } = usePaperTrades();
   const exchangeStatus = useExchangeStatus();
   const hasExchange    = exchangeStatus.connectedCount > 0;
+  const liveBalances   = useLiveExchangeBalances(hasExchange);
 
   // Live-derived metric strings (replace earlier hardcoded demo numbers).
   const equityBase = 100_000;
@@ -2170,7 +2247,20 @@ function PortalInner() {
             positive={stats.bestPnl >= 0}
             demo
           />
-          <MetricTile label="EQUITY" value={equityStr} demo />
+          {liveBalances.hasOk && liveBalances.totalEquityUSD !== null ? (
+            <MetricTile
+              label={`${(liveBalances.primaryExchange ?? "EXCHANGE").toUpperCase()} EQUITY`}
+              value={`$${liveBalances.totalEquityUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              delta={
+                liveBalances.buyingPowerUSD !== null
+                  ? `LIVE · BP $${liveBalances.buyingPowerUSD.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+                  : "LIVE"
+              }
+              positive
+            />
+          ) : (
+            <MetricTile label="EQUITY" value={equityStr} demo />
+          )}
         </div>
       )}
 

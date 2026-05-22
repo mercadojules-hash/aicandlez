@@ -266,6 +266,119 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
   }
 });
 
+// ── GET /api/user/exchanges/balances ──────────────────────────────────────────
+// Returns live balance snapshots for every connection the authenticated user
+// owns. One round-trip; per-connection failures degrade gracefully so a single
+// dead exchange doesn't sink the whole response. Never returns raw credentials.
+//
+// Response shape:
+//   { connections: [
+//       { exchange, label, tradingMode, ok, totalEquityUSD, balances, error? },
+//       …
+//     ],
+//     totalEquityUSD: number,        // sum across ok=true connections
+//     fetchedAt: number,
+//   }
+//
+// Empty `connections: []` is the "no live connection" signal the Portal/PWA
+// use to fall back to the simulated balance hero.
+type BalanceConnection = {
+  exchange:       string;
+  label:          string | null;
+  tradingMode:    string;
+  ok:             boolean;
+  totalEquityUSD: number;
+  balances:       Record<string, { free: number; locked: number; total: number }>;
+  lastUpdated:    number;
+  error?:         string;
+};
+
+async function loadBalanceForRow(
+  userId: string,
+  row: typeof userExchangeConnectionsTable.$inferSelect,
+): Promise<BalanceConnection> {
+  const base: BalanceConnection = {
+    exchange:       row.exchange,
+    label:          row.label,
+    tradingMode:    row.tradingMode,
+    ok:             false,
+    totalEquityUSD: 0,
+    balances:       {},
+    lastUpdated:    0,
+  };
+  const creds = vault.decryptBlob(userId, row.encryptedBlob);
+  if (!creds) return { ...base, error: "Failed to decrypt stored credentials" };
+  try {
+    const adapter = makeAdapter(row.exchange, creds);
+    const account = await adapter.getAccount();
+    return {
+      ...base,
+      ok:             true,
+      totalEquityUSD: account.totalEquityUSD,
+      balances:       account.balances,
+      lastUpdated:    account.lastUpdated,
+    };
+  } catch (err) {
+    return { ...base, error: (err as Error).message };
+  }
+}
+
+router.get("/user/exchanges/balances", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
+  try {
+    const rows = await db
+      .select()
+      .from(userExchangeConnectionsTable)
+      .where(eq(userExchangeConnectionsTable.userId, userId));
+
+    const connections = await Promise.all(rows.map(r => loadBalanceForRow(userId, r)));
+    const totalEquityUSD = connections
+      .filter(c => c.ok)
+      .reduce((sum, c) => sum + (Number.isFinite(c.totalEquityUSD) ? c.totalEquityUSD : 0), 0);
+
+    res.json({ connections, totalEquityUSD, fetchedAt: Date.now() });
+  } catch (err) {
+    req.log.error({ err }, "GET /user/exchanges/balances failed");
+    res.status(500).json({ error: "Failed to load exchange balances" });
+  }
+});
+
+// ── GET /api/user/exchanges/:exchange/balances ────────────────────────────────
+// Live balance snapshot for one specific connection.
+
+router.get("/user/exchanges/:exchange/balances", requireAuth, async (req, res): Promise<void> => {
+  const userId   = (req as AuthReq).clerkUserId;
+  const exchange = String(req.params["exchange"]);
+
+  if (!CONNECTABLE_EXCHANGE_IDS.has(exchange)) {
+    res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
+    return;
+  }
+
+  const [row] = await db
+    .select()
+    .from(userExchangeConnectionsTable)
+    .where(
+      and(
+        eq(userExchangeConnectionsTable.userId, userId),
+        eq(userExchangeConnectionsTable.exchange, exchange),
+      )
+    )
+    .limit(1);
+
+  if (!row) {
+    res.status(404).json({ error: `No connection found for ${exchange}` });
+    return;
+  }
+
+  const snapshot = await loadBalanceForRow(userId, row);
+  if (!snapshot.ok) {
+    res.status(502).json({ ...snapshot, fetchedAt: Date.now() });
+    return;
+  }
+  res.json({ ...snapshot, fetchedAt: Date.now() });
+});
+
 // ── POST /api/user/exchanges/:exchange/test ───────────────────────────────────
 // Re-test a stored connection. Updates permissions + health timestamp.
 
