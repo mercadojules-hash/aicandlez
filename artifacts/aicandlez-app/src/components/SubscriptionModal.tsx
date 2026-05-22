@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { useSubscription, type PaywallReason } from "@/contexts/SubscriptionContext";
+import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 import { api } from "@/lib/api";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
@@ -39,6 +40,7 @@ const REASON_COPY: Record<NonNullable<PaywallReason>, { title: string; sub: stri
 
 export function SubscriptionModal() {
   const { paywallVisible, paywallReason, hidePaywall } = useSubscription();
+  const { gate: disclaimerGate, modal: disclaimerModal } = useDisclaimerGate();
 
   const checkout = useMutation({
     mutationFn: () =>
@@ -50,7 +52,7 @@ export function SubscriptionModal() {
     onSuccess: ({ url }) => { window.location.href = url; },
   });
 
-  if (!paywallVisible) return null;
+  if (!paywallVisible) return <>{disclaimerModal}</>;
 
   const copy = REASON_COPY[paywallReason ?? "feature_locked"];
 
@@ -173,7 +175,7 @@ export function SubscriptionModal() {
           {/* CTA */}
           <button
             disabled={checkout.isPending}
-            onClick={() => checkout.mutate()}
+            onClick={() => disclaimerGate(() => checkout.mutate())}
             style={{
               width: "100%", padding: "15px 0",
               background: checkout.isPending ? "rgba(0,229,255,0.06)" : "rgba(0,229,255,0.12)",
@@ -213,6 +215,7 @@ export function SubscriptionModal() {
           </div>
         </div>
       </div>
+      {disclaimerModal}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { api, type Plan, type Subscription } from "@/lib/api";
+import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 import { PageHeader } from "@/components/PageHeader";
 
 interface PlansResponse { plans: Plan[] }
@@ -67,6 +68,7 @@ const ORDER = ["free", "starter", "pro"];
 
 export default function Subscribe() {
   const [, setLocation] = useLocation();
+  const { gate: disclaimerGate, modal: disclaimerModal } = useDisclaimerGate();
 
   const { data: plansData, isLoading: plansLoading } = useQuery<PlansResponse>({
     queryKey: ["plans"],
@@ -337,7 +339,7 @@ export default function Subscribe() {
 
               {plan.id !== "free" && !active && (
                 <button
-                  onClick={() => checkout.mutate(plan.id)}
+                  onClick={() => disclaimerGate(() => checkout.mutate(plan.id))}
                   disabled={checkout.isPending}
                   title={!plan.priceIds.monthly
                     ? "Stripe price not yet synced — backend will resolve by planId."
@@ -388,6 +390,7 @@ export default function Subscribe() {
             letterSpacing: 0.4, padding: 0,
           }}>← Back to Profile</button>
       </div>
+      {disclaimerModal}
     </div>
   );
 }

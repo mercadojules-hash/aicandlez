@@ -997,7 +997,20 @@ function LiveExecutionBar({
 // plan card is itself a button that POSTs to /api/billing/checkout with the
 // plan id and immediately redirects to the Stripe Checkout session URL — no
 // intermediate /billing page, no alternate route, no legacy handler.
-function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function UpgradeModal({ open, onClose, gate }: {
+  open:    boolean;
+  onClose: () => void;
+  /**
+   * Disclaimer-gate wrapper from `useDisclaimerGate`. Wraps the actual
+   * checkout fetch so the modal flow is:
+   *   click plan → gate(startCheckout) → if needsAcceptance: open disclaimer
+   *   modal → on accept POST /api/user/disclaimer → run startCheckout →
+   *   POST /api/billing/checkout → redirect to Stripe URL.
+   * Without this, the backend `requireDisclaimer` middleware returns
+   * "Risk disclaimer acceptance required." and the user sees no modal.
+   */
+  gate:    (action: () => void) => void;
+}) {
   const { getToken, isSignedIn } = useAuth();
   const [pending, setPending] = useState<"starter" | "pro" | null>(null);
   const [error,   setError]   = useState<string | null>(null);
@@ -1113,11 +1126,11 @@ function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => void })
           <PlanCard plan="starter"
                     pending={pending === "starter"}
                     disabled={pending !== null}
-                    onSelect={() => startCheckout("starter")} />
+                    onSelect={() => gate(() => { void startCheckout("starter"); })} />
           <PlanCard plan="pro"
                     pending={pending === "pro"}
                     disabled={pending !== null}
-                    onSelect={() => startCheckout("pro")} />
+                    onSelect={() => gate(() => { void startCheckout("pro"); })} />
         </div>
 
         {error && (
@@ -1733,7 +1746,7 @@ function PortalInner() {
 
       {/* First-time onboarding banner — auto-hides once at least one exchange
           is connected. Reinforces non-custodial security promise inline. */}
-      {!hasExchange && <ExchangeOnboardingBanner onConnect={() => setConnectExchangeOpen(true)} />}
+      {!hasExchange && <ExchangeOnboardingBanner onConnect={() => disclaimerGate(() => setConnectExchangeOpen(true))} />}
 
       {/* Metrics row.
           Admin operators on admintrade.aicandlez.com see REAL Kraken live
@@ -1872,7 +1885,7 @@ function PortalInner() {
         <LiveExecutionBar
           tier={tier}
           onUpgrade={() => setUpgradeOpenSafe(true)}
-          onConnectExchange={() => setConnectExchangeOpen(true)}
+          onConnectExchange={() => disclaimerGate(() => setConnectExchangeOpen(true))}
           exchangeConnected={hasExchange}
           openSlots={stats.openCount}
           isAdmin={isAdmin}
@@ -2024,7 +2037,8 @@ function PortalInner() {
           : "AICANDLEZ · ALPACA-ROUTED LIVE EXECUTION · 3% FEE ON PROFITABLE TRADES ONLY"}
       </footer>
 
-      <UpgradeModal    open={upgradeOpen}    onClose={() => setUpgradeOpen(false)} />
+      <UpgradeModal    open={upgradeOpen}    onClose={() => setUpgradeOpen(false)}
+                       gate={disclaimerGate} />
       <AccountModal    open={accountOpen}    onClose={() => setAccountOpen(false)}
                        tier={tier} onUpgrade={() => setUpgradeOpenSafe(true)} />
       <DisclaimerModal open={disclaimerOpen} onClose={() => setDisclaimerOpen(false)} />
