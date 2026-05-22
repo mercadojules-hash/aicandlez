@@ -1976,6 +1976,186 @@ function Row({ left, right, color = N.TEXT_0, sub }: {
   );
 }
 
+// ── Exchange Connections Health panel (customer terminal) ────────────────────
+// Mirrors the per-exchange health pills the PWA Profile page already shows so
+// desktop customers get the same at-a-glance signal. Polls the same balances
+// feed (`/api/user/exchanges/balances`) every 30s and reads the connection
+// list (`/api/user/exchanges`) on a slow cadence. We deliberately reuse the
+// PWA's react-query keys (`user-exchanges` / `user-exchanges-balances`) so
+// invalidations triggered here also refresh the PWA Profile health card and
+// vice-versa — health stays in lockstep across surfaces.
+interface PortalExchangeListEntry {
+  exchange:   string;
+  connected:  boolean;
+  connection: {
+    id: string; exchange: string; label: string | null;
+    tradingMode: string; lastVerifiedAt?: string | null; lastError?: string | null;
+  } | null;
+  meta: { id: string; name: string; logo?: string; color?: string } | null;
+}
+interface PortalBalanceConn {
+  exchange:       string;
+  label:          string | null;
+  tradingMode:    string;
+  ok:             boolean;
+  totalEquityUSD: number;
+  error?:         string;
+}
+
+function ExchangeConnectionsHealthPanel() {
+  const qc = useQueryClient();
+  // NOTE: queryKeys here intentionally match `artifacts/aicandlez-app/src/pages/Profile.tsx`
+  // (`ExchangeConnectionsHealth`) so invalidating one surface refreshes both.
+  const { data: listData, isLoading: listLoading } = useQuery<{ exchanges: PortalExchangeListEntry[] }>({
+    queryKey: ["user-exchanges"],
+    queryFn:  () => j<{ exchanges: PortalExchangeListEntry[] }>(`${apiBaseUrl}/api/user/exchanges`),
+    retry:    false,
+    staleTime: 60_000,
+  });
+  const { data: balData, isFetching: balFetching, dataUpdatedAt } = useQuery<{
+    connections: PortalBalanceConn[]; totalEquityUSD: number; fetchedAt: number;
+  }>({
+    queryKey: ["user-exchanges-balances"],
+    queryFn:  () => j<{ connections: PortalBalanceConn[]; totalEquityUSD: number; fetchedAt: number }>(
+      `${apiBaseUrl}/api/user/exchanges/balances`,
+    ),
+    retry:    false,
+    refetchInterval:      30_000,
+    refetchOnWindowFocus: true,
+    staleTime:            10_000,
+  });
+
+  const connected = useMemo(
+    () => (listData?.exchanges ?? []).filter(e => e.connected && e.connection),
+    [listData],
+  );
+  const byExchange = useMemo(() => {
+    const m: Record<string, PortalBalanceConn> = {};
+    for (const c of balData?.connections ?? []) m[c.exchange] = c;
+    return m;
+  }, [balData]);
+
+  const handleTest = () => {
+    // Invalidate the shared keys so every consumer (this panel, PWA Profile,
+    // and any future surface using `user-exchanges-balances`) refetches.
+    void qc.invalidateQueries({ queryKey: ["user-exchanges-balances"] });
+    void qc.invalidateQueries({ queryKey: ["user-exchanges"] });
+  };
+
+  if (listLoading) {
+    return (
+      <div style={{ padding: "12px 0", color: N.TEXT_2, fontSize: 10, letterSpacing: "0.14em" }}>
+        LOADING EXCHANGE CONNECTIONS…
+      </div>
+    );
+  }
+  if (connected.length === 0) {
+    return (
+      <div style={{ padding: "12px 0", color: N.TEXT_2, fontSize: 10, letterSpacing: "0.14em", lineHeight: 1.6 }}>
+        NO EXCHANGES CONNECTED · CONNECT ONE TO ENABLE REAL-MONEY EXECUTION
+      </div>
+    );
+  }
+
+  const verifiedAt = dataUpdatedAt
+    ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {connected.map(row => {
+        const bal        = byExchange[row.exchange];
+        const storedErr  = row.connection?.lastError ?? null;
+        const hasBalance = bal !== undefined;
+        const healthy    = hasBalance && bal!.ok;
+        const failing    = hasBalance && !bal!.ok;
+        const pending    = !hasBalance && balFetching;
+        // GREEN healthy · RED failing · AMBER pending or stored error · GREY unknown
+        const pillCol    = healthy ? N.BRAND
+                         : failing ? "#ff3355"
+                         : (pending || storedErr) ? N.WARN
+                         : N.TEXT_3;
+        const pillLabel  = healthy ? "HEALTHY"
+                         : failing ? "DEGRADED"
+                         : pending ? "CHECKING"
+                         : storedErr ? "ATTENTION"
+                         : "UNKNOWN";
+        const errText    = bal?.error ?? storedErr ?? null;
+        const name       = row.meta?.name ?? row.exchange;
+        const mode       = (row.connection?.tradingMode ?? "paper").toUpperCase();
+
+        return (
+          <div key={row.exchange} style={{
+            padding: "10px 12px",
+            border: `1px solid ${N.BORDER}`,
+            borderRadius: 4,
+            background: "rgba(0,0,0,0.30)",
+            display: "flex", flexDirection: "column", gap: 8,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{
+                  fontSize: 11, color: N.TEXT_0, fontWeight: 800, letterSpacing: "0.12em",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {name.toUpperCase()}
+                </span>
+                <span style={{ fontSize: 9, color: N.TEXT_2, letterSpacing: "0.16em" }}>
+                  {mode} · {verifiedAt ? `CHECKED ${verifiedAt}` : "AWAITING CHECK"}
+                </span>
+              </div>
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "3px 9px", borderRadius: 3,
+                border: `1px solid ${pillCol}55`, background: `${pillCol}10`,
+                color: pillCol, fontSize: 9, fontWeight: 800, letterSpacing: "0.18em",
+                fontFamily: N.FONT_MONO, whiteSpace: "nowrap",
+              }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: "50%", background: pillCol,
+                  boxShadow: `0 0 8px ${pillCol}, 0 0 16px ${pillCol}60`,
+                  animation: pending ? "dot-pulse 1.4s ease-in-out infinite" : undefined,
+                }} />
+                {pillLabel}
+              </span>
+            </div>
+
+            {errText && (
+              <div style={{
+                padding: "7px 10px", borderRadius: 3,
+                background: "rgba(255,51,85,0.08)",
+                border: "1px solid rgba(255,51,85,0.30)",
+                color: "#ffb8c0", fontSize: 10, lineHeight: 1.45,
+                fontFamily: N.FONT_MONO, wordBreak: "break-word",
+              }}>
+                {errText}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={handleTest}
+                disabled={balFetching}
+                style={{
+                  padding: "5px 12px", borderRadius: 3,
+                  background: `${N.BRAND}10`, border: `1px solid ${N.BRAND}55`,
+                  color: N.BRAND, fontFamily: N.FONT_MONO, fontWeight: 800,
+                  fontSize: 9, letterSpacing: "0.18em",
+                  cursor: balFetching ? "wait" : "pointer",
+                  opacity: balFetching ? 0.55 : 1,
+                }}
+              >
+                {balFetching ? "TESTING…" : "TEST CONNECTION"}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const QUEUE = [
   { sym: "BTC/USD", side: "BUY", conf: "84%", state: "QUEUED · executes when slot frees" },
   { sym: "ETH/USD", side: "BUY", conf: "78%", state: "QUEUED · awaiting confirmation" },
@@ -2861,6 +3041,10 @@ function PortalInner() {
               </button>
             )}
           </div>
+        </Panel>
+
+        <Panel title="EXCHANGE CONNECTIONS · HEALTH">
+          <ExchangeConnectionsHealthPanel />
         </Panel>
 
         <Panel title="AI AUTO TRADE QUEUE" locked={tier === "free"} onUnlock={() => setUpgradeOpenSafe(true)}>
