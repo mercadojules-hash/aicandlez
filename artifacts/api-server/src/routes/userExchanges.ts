@@ -532,12 +532,76 @@ router.post("/user/exchanges/:exchange/mode", requireAuth, requirePlan("starter"
   res.json({ ok: true, exchange, tradingMode: mode });
 });
 
+// ── GET /api/user/exchanges/:exchange/open-orders ─────────────────────────────
+// Returns the currently-open orders sitting at the broker for the given
+// connection. Drives the "X open orders" count in the disconnect modal so the
+// user can decide whether to cancel them before revoking the OAuth grant.
+//
+// Currently only Alpaca is wired up — other adapters return an empty list.
+
+router.get("/user/exchanges/:exchange/open-orders", requireAuth, async (req, res): Promise<void> => {
+  const userId   = (req as AuthReq).clerkUserId;
+  const exchange = String(req.params["exchange"]);
+
+  if (!CONNECTABLE_EXCHANGE_IDS.has(exchange)) {
+    res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
+    return;
+  }
+
+  const [row] = await db
+    .select()
+    .from(userExchangeConnectionsTable)
+    .where(
+      and(
+        eq(userExchangeConnectionsTable.userId, userId),
+        eq(userExchangeConnectionsTable.exchange, exchange),
+      )
+    )
+    .limit(1);
+
+  if (!row) {
+    res.status(404).json({ error: `No connection found for ${exchange}` });
+    return;
+  }
+
+  if (exchange !== "Alpaca") {
+    res.json({ exchange, supported: false, count: 0, orders: [] });
+    return;
+  }
+
+  let creds = vault.decryptBlob(userId, row.encryptedBlob);
+  if (!creds) {
+    res.status(500).json({ error: "Failed to decrypt stored credentials" });
+    return;
+  }
+  try {
+    creds = await ensureFreshAlpacaCreds(userId, row, creds);
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message, count: 0, orders: [] });
+    return;
+  }
+
+  try {
+    const adapter = makeAdapter(exchange, creds) as AlpacaAdapter;
+    const orders = await adapter.listOpenOrders();
+    res.json({ exchange, supported: true, count: orders.length, orders });
+  } catch (err) {
+    req.log.warn({ userId, exchange, err: (err as Error).message }, "userExchanges: listOpenOrders failed");
+    res.status(502).json({ error: (err as Error).message, count: 0, orders: [] });
+  }
+});
+
 // ── DELETE /api/user/exchanges/:exchange ──────────────────────────────────────
 // Permanently remove a user's exchange connection and encrypted credentials.
+// Optional body: { cancelOpenOrders?: boolean } — when true, attempts to cancel
+// all open broker-side orders BEFORE revoking the OAuth grant. Per-order
+// outcomes are audit-logged individually and summarised on the final
+// CREDENTIAL_REVOKED entry.
 
 router.delete("/user/exchanges/:exchange", requireAuth, async (req, res): Promise<void> => {
   const userId   = (req as AuthReq).clerkUserId;
   const exchange = String(req.params["exchange"]);
+  const cancelOpenOrders = Boolean((req.body as { cancelOpenOrders?: boolean } | undefined)?.cancelOpenOrders);
 
   if (!CONNECTABLE_EXCHANGE_IDS.has(exchange)) {
     res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
@@ -565,21 +629,78 @@ router.delete("/user/exchanges/:exchange", requireAuth, async (req, res): Promis
     return;
   }
 
-  // ── Alpaca: revoke OAuth grant at the issuer before deleting locally ──────
+  // ── Alpaca: optionally cancel open orders, then revoke OAuth grant ────────
   // Best-effort. Only attempts when:
   //   • the connection is Alpaca,
   //   • the OAuth provider is configured (env vars present),
   //   • we have a usable refresh_token or access_token in the encrypted blob.
   let revoked = false;
   let revokeError: string | undefined;
+  let cancelSummary: {
+    requested: boolean;
+    attempted: number;
+    succeeded: number;
+    failed:    number;
+    error?:    string;
+  } = { requested: cancelOpenOrders, attempted: 0, succeeded: 0, failed: 0 };
+
   if (exchange === "Alpaca" && alpacaBrokerProvider.isEnabled()) {
-    const creds = vault.decryptBlob(userId, row.encryptedBlob);
+    let creds = vault.decryptBlob(userId, row.encryptedBlob);
+
+    // 1) Cancel open orders first, while we still have a valid access token.
+    //    Per-order audit entries + a summary on the final CREDENTIAL_REVOKED.
+    if (cancelOpenOrders && creds) {
+      try {
+        const freshCreds = await ensureFreshAlpacaCreds(userId, row, creds);
+        creds = freshCreds;
+        const adapter = makeAdapter(exchange, freshCreds) as AlpacaAdapter;
+        const results = await adapter.cancelAllOpenOrders();
+        cancelSummary = {
+          requested: true,
+          attempted: results.length,
+          succeeded: results.filter(r => r.ok).length,
+          failed:    results.filter(r => !r.ok).length,
+        };
+        for (const r of results) {
+          auditLogger.append(
+            userId,
+            "ORDER_CANCELLED",
+            {
+              exchange, exchangeOrderId: r.exchangeOrderId,
+              symbol: r.symbol, side: r.side, qty: r.qty,
+              ok: r.ok, reason: r.reason, trigger: "disconnect",
+            },
+            { exchange, symbol: r.symbol },
+          );
+        }
+        req.log.info(
+          { userId, exchange, ...cancelSummary },
+          "userExchanges: cancelled open orders ahead of disconnect",
+        );
+      } catch (err) {
+        cancelSummary = {
+          requested: true, attempted: 0, succeeded: 0, failed: 0,
+          error: (err as Error).message,
+        };
+        req.log.warn(
+          { userId, exchange, err: cancelSummary.error },
+          "userExchanges: cancel-open-orders failed — proceeding with revoke",
+        );
+      }
+    }
+
+    // 2) Revoke the OAuth grant at the issuer.
     const token = creds?.oauthRefreshToken || creds?.oauthAccessToken;
     if (token) {
       try {
         await alpacaBrokerProvider.revokeToken(token);
         revoked = true;
-        auditLogger.append(userId, "CREDENTIAL_REVOKED", { exchange, method: "oauth" }, { exchange });
+        auditLogger.append(
+          userId,
+          "CREDENTIAL_REVOKED",
+          { exchange, method: "oauth", cancelledOrders: cancelSummary },
+          { exchange },
+        );
         req.log.info({ userId, exchange }, "userExchanges: OAuth token revoked at issuer");
       } catch (err) {
         revokeError = (err as Error).message;
@@ -597,9 +718,20 @@ router.delete("/user/exchanges/:exchange", requireAuth, async (req, res): Promis
       )
     );
 
-  auditLogger.append(userId, "CREDENTIAL_DELETED", { exchange, revoked }, { exchange });
-  req.log.info({ userId, exchange, revoked }, "userExchanges: connection deleted");
-  res.json({ ok: true, exchange, revoked, ...(revokeError ? { revokeError } : {}) });
+  auditLogger.append(
+    userId,
+    "CREDENTIAL_DELETED",
+    { exchange, revoked, cancelledOrders: cancelSummary },
+    { exchange },
+  );
+  req.log.info({ userId, exchange, revoked, cancelledOrders: cancelSummary }, "userExchanges: connection deleted");
+  res.json({
+    ok: true,
+    exchange,
+    revoked,
+    cancelledOrders: cancelSummary,
+    ...(revokeError ? { revokeError } : {}),
+  });
 });
 
 export default router;

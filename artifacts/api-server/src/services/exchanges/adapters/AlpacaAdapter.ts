@@ -252,6 +252,55 @@ export class AlpacaAdapter extends BaseExchangeAdapter {
     }
   }
 
+  /**
+   * List currently-open orders on Alpaca. Used by the disconnect flow so the
+   * user can be shown an accurate count before revoking their OAuth grant.
+   * Returns an empty array when the adapter is unconfigured.
+   */
+  async listOpenOrders(): Promise<AlpacaOpenOrder[]> {
+    if (!this.isConfigured()) return [];
+    this.checkRequestRateLimit();
+    try {
+      const data = await this.tradingGet<AlpacaOrder[]>("/v2/orders?status=open&limit=500&direction=desc");
+      if (!Array.isArray(data)) return [];
+      return data.map(o => ({
+        id:           o.id,
+        clientId:     o.client_order_id,
+        symbol:       this.denormaliseSymbol(o.symbol),
+        nativeSymbol: o.symbol,
+        side:         o.side,
+        type:         o.type,
+        qty:          parseFloat(o.qty ?? "0"),
+        status:       o.status,
+      }));
+    } catch (err) {
+      throw new Error(`Alpaca: failed to list open orders — ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * Cancel every open order on the user's Alpaca account. Issues per-order
+   * DELETE calls so we can capture an individual ok/reason for the audit log.
+   * Resolves with a list of cancellation outcomes.
+   */
+  async cancelAllOpenOrders(): Promise<AlpacaCancelResult[]> {
+    const open = await this.listOpenOrders();
+    const results: AlpacaCancelResult[] = [];
+    for (const o of open) {
+      this.checkOrderRateLimit();
+      try {
+        await this.tradingDelete(`/v2/orders/${o.id}`);
+        results.push({ exchangeOrderId: o.id, symbol: o.symbol, side: o.side, qty: o.qty, ok: true });
+      } catch (err) {
+        results.push({
+          exchangeOrderId: o.id, symbol: o.symbol, side: o.side, qty: o.qty,
+          ok: false, reason: (err as Error).message,
+        });
+      }
+    }
+    return results;
+  }
+
   async getOrder(exchangeOrderId: string, _symbol: string): Promise<StandardOrder | null> {
     if (!this.isConfigured()) return null;
     try {
@@ -375,6 +424,24 @@ interface AlpacaOrder {
   id: string; client_order_id?: string; symbol: string;
   side: string; type: string; qty?: string; status: string;
   filled_qty?: string; filled_avg_price?: string;
+}
+export interface AlpacaOpenOrder {
+  id:           string;
+  clientId?:    string;
+  symbol:       string;
+  nativeSymbol: string;
+  side:         string;
+  type:         string;
+  qty:          number;
+  status:       string;
+}
+export interface AlpacaCancelResult {
+  exchangeOrderId: string;
+  symbol:          string;
+  side:            string;
+  qty:             number;
+  ok:              boolean;
+  reason?:         string;
 }
 interface AlpacaOrderRequest {
   symbol: string; qty: string; side: string; type: string;

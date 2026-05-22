@@ -1205,16 +1205,29 @@ export default function Profile() {
   });
   const alpacaConn = exchangesData?.exchanges?.find(e => e.exchange === "Alpaca" && e.connected) ?? null;
 
-  // In-app confirm modal + toast state for the Alpaca disconnect flow.
-  // Replaces native window.confirm/alert so the UX matches the institutional
-  // tone of the rest of the PWA and surfaces the server's { revoked, revokeError }
-  // payload distinctly (full revoke vs local-only delete).
-  const [alpacaConfirmOpen, setAlpacaConfirmOpen] = useState(false);
+  // ── Alpaca disconnect modal + toast state ──────────────────────────────────
+  // Combined flow:
+  //   • Modal (Task #31) shows the count of open orders at Alpaca and offers
+  //     "Cancel N orders & Disconnect" vs "Disconnect anyway".
+  //   • Toast (Task #28) surfaces the server's { revoked, revokeError,
+  //     cancelledOrders } payload distinctly — full revoke vs local-only
+  //     delete — and folds in the cancellation summary when one was requested.
+  type OpenOrdersResp = {
+    exchange: string; supported: boolean; count: number;
+    orders: Array<{ id: string; symbol: string; side: string; type: string; qty: number; status: string }>;
+  };
+  type DisconnectResp = {
+    ok: boolean;
+    revoked?: boolean;
+    revokeError?: string;
+    cancelledOrders?: { requested: boolean; attempted: number; succeeded: number; failed: number; error?: string };
+  };
   type AlpacaToast = {
     tone: "success" | "warn" | "error";
     title: string;
     detail: string;
   };
+  const [disconnectModalOpen, setDisconnectModalOpen] = useState(false);
   const [alpacaToast, setAlpacaToast] = useState<AlpacaToast | null>(null);
   useEffect(() => {
     if (!alpacaToast) return;
@@ -1222,8 +1235,17 @@ export default function Profile() {
     return () => window.clearTimeout(t);
   }, [alpacaToast]);
 
+  const openOrdersQuery = useQuery<OpenOrdersResp>({
+    queryKey:  ["alpaca-open-orders"],
+    queryFn:   () => api.get("/user/exchanges/Alpaca/open-orders"),
+    enabled:   disconnectModalOpen && !!alpacaConn,
+    staleTime: 5_000,
+    retry:     false,
+  });
+
   const disconnectAlpaca = useMutation({
-    mutationFn: () => api.delete<{ ok: boolean; revoked?: boolean; revokeError?: string }>("/user/exchanges/Alpaca"),
+    mutationFn: (opts: { cancelOpenOrders: boolean }) =>
+      api.delete<DisconnectResp>("/user/exchanges/Alpaca", { cancelOpenOrders: opts.cancelOpenOrders }),
     onSuccess: (data) => {
       // Match the connect-flow invalidation set so every surface that watches
       // exchange state refreshes in lockstep.
@@ -1231,25 +1253,35 @@ export default function Profile() {
       qc.invalidateQueries({ queryKey: ["user-exchanges"] });
       qc.invalidateQueries({ queryKey: ["exchange-connections"] });
       qc.invalidateQueries({ queryKey: ["user-exchanges-balances"] });
-      setAlpacaConfirmOpen(false);
+      qc.removeQueries({ queryKey: ["alpaca-open-orders"] });
+      setDisconnectModalOpen(false);
+
+      const co = data?.cancelledOrders;
+      const cancelSegment = co?.requested && co.attempted > 0
+        ? (co.failed > 0
+            ? ` Cancelled ${co.succeeded}/${co.attempted} open orders (${co.failed} failed).`
+            : ` Cancelled ${co.succeeded} open order${co.succeeded === 1 ? "" : "s"} at Alpaca.`)
+        : "";
+
       if (data?.revoked) {
         setAlpacaToast({
           tone: "success",
           title: "Alpaca disconnected",
-          detail: "OAuth grant revoked · encrypted credentials removed.",
+          detail: `OAuth grant revoked · encrypted credentials removed.${cancelSegment}`,
         });
       } else {
         setAlpacaToast({
           tone: "warn",
           title: "Disconnected locally",
-          detail: data?.revokeError
+          detail: (data?.revokeError
             ? `Revoke failed at Alpaca — re-check from your Alpaca account. (${data.revokeError})`
-            : "Revoke failed at Alpaca — re-check from your Alpaca account.",
+            : "Revoke failed at Alpaca — re-check from your Alpaca account.")
+            + cancelSegment,
         });
       }
     },
     onError: (err) => {
-      setAlpacaConfirmOpen(false);
+      setDisconnectModalOpen(false);
       setAlpacaToast({
         tone: "error",
         title: "Disconnect failed",
@@ -1637,7 +1669,7 @@ export default function Profile() {
                 <button
                   onClick={() => {
                     if (disconnectAlpaca.isPending) return;
-                    setAlpacaConfirmOpen(true);
+                    setDisconnectModalOpen(true);
                   }}
                   disabled={disconnectAlpaca.isPending}
                   style={{
@@ -1816,71 +1848,152 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* ── Alpaca disconnect: in-app confirm modal ───────────────────────── */}
-      {alpacaConfirmOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="alpaca-disconnect-title"
-          onClick={() => { if (!disconnectAlpaca.isPending) setAlpacaConfirmOpen(false); }}
-          style={{
-            position:"fixed", inset:0, zIndex:9000,
-            background:"rgba(0,0,0,0.72)", backdropFilter:"blur(6px)",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            padding:"24px", animation:"alpaca-fade 0.18s ease-out both",
-          }}>
+      {/* ── Alpaca disconnect modal ────────────────────────────────────────── */}
+      {disconnectModalOpen && (() => {
+        const orders   = openOrdersQuery.data;
+        const loading  = openOrdersQuery.isLoading;
+        const fetchErr = openOrdersQuery.error as Error | undefined;
+        const count    = orders?.count ?? 0;
+        const pending  = disconnectAlpaca.isPending;
+        const mutErr   = disconnectAlpaca.error as Error | undefined;
+        const close    = () => { if (!pending) setDisconnectModalOpen(false); };
+        return (
           <div
-            onClick={(e) => e.stopPropagation()}
+            onClick={close}
             style={{
-              width:"100%", maxWidth:360, background:CARD,
-              border:"1px solid rgba(255,68,85,0.32)", borderRadius:16,
-              boxShadow:"0 24px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)",
-              padding:"22px 22px 18px",
-              animation:"alpaca-pop 0.22s cubic-bezier(0.2,0.9,0.3,1.2) both",
+              position:"fixed", inset:0, background:"rgba(0,0,0,0.78)",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              zIndex:200, padding:18, backdropFilter:"blur(6px)",
             }}>
-            <div id="alpaca-disconnect-title" style={{
-              fontFamily:SANS, fontSize:14, fontWeight:700, color:W, letterSpacing:"0.02em",
-              marginBottom:8,
-            }}>
-              Disconnect Alpaca?
-            </div>
-            <div style={{
-              fontFamily:SANS, fontSize:11.5, color:GR, lineHeight:1.55, marginBottom:18,
-            }}>
-              This revokes the OAuth grant at Alpaca and permanently deletes your
-              stored credentials from AICandlez. You can reconnect any time.
-            </div>
-            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
-              <button
-                onClick={() => setAlpacaConfirmOpen(false)}
-                disabled={disconnectAlpaca.isPending}
-                style={{
-                  padding:"9px 16px", background:"transparent",
-                  border:`1px solid ${E}`, borderRadius:8, color:W,
-                  fontFamily:SANS, fontSize:10.5, fontWeight:600, letterSpacing:"0.06em",
-                  cursor: disconnectAlpaca.isPending ? "not-allowed" : "pointer",
-                  opacity: disconnectAlpaca.isPending ? 0.5 : 1,
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background:CARD, border:`1px solid rgba(255,68,85,0.30)`,
+                borderRadius:16, padding:20, maxWidth:380, width:"100%",
+                boxShadow:"0 18px 60px rgba(0,0,0,0.6)",
+              }}>
+              <div style={{
+                fontSize:11, fontFamily:SANS, fontWeight:700, letterSpacing:"0.16em",
+                color:"#FF6478", textTransform:"uppercase" as const, marginBottom:10,
+              }}>Disconnect Alpaca</div>
+              <div style={{ fontSize:13, fontFamily:SANS, color:W, lineHeight:1.5, marginBottom:14 }}>
+                Revokes the OAuth grant at Alpaca and permanently deletes your
+                encrypted credentials. You can reconnect any time.
+              </div>
+
+              {/* Open orders status */}
+              <div style={{
+                background:"rgba(255,255,255,0.03)", border:`1px solid ${E}`,
+                borderRadius:10, padding:"12px 14px", marginBottom:14,
+              }}>
+                {loading && (
+                  <div style={{ fontSize:11, fontFamily:SANS, color:GR }}>
+                    Checking for open orders at Alpaca…
+                  </div>
+                )}
+                {!loading && fetchErr && (
+                  <div style={{ fontSize:11, fontFamily:SANS, color:"#FFB57A", lineHeight:1.5 }}>
+                    Could not reach Alpaca to count open orders ({fetchErr.message}).
+                    You can still disconnect — any open orders will remain at the broker.
+                  </div>
+                )}
+                {!loading && !fetchErr && count === 0 && (
+                  <div style={{ fontSize:11, fontFamily:SANS, color:GR, lineHeight:1.5 }}>
+                    No open orders at Alpaca. Safe to disconnect.
+                  </div>
+                )}
+                {!loading && !fetchErr && count > 0 && (
+                  <>
+                    <div style={{
+                      fontSize:12, fontFamily:SANS, color:GOLD, fontWeight:700, marginBottom:6,
+                    }}>
+                      {count} open order{count === 1 ? "" : "s"} at Alpaca
+                    </div>
+                    <div style={{ fontSize:10, fontFamily:SANS, color:DIM, lineHeight:1.5, marginBottom:8 }}>
+                      These will remain live at the broker after disconnect unless
+                      you cancel them first.
+                    </div>
+                    <div style={{ maxHeight:120, overflowY:"auto" as const }}>
+                      {orders!.orders.slice(0, 8).map(o => (
+                        <div key={o.id} style={{
+                          fontSize:10, fontFamily:MONO, color:W, lineHeight:1.7,
+                          display:"flex", justifyContent:"space-between", gap:8,
+                        }}>
+                          <span>{o.symbol} · {o.side.toUpperCase()} · {o.type}</span>
+                          <span style={{ color:GR }}>{o.qty}</span>
+                        </div>
+                      ))}
+                      {orders!.orders.length > 8 && (
+                        <div style={{ fontSize:9, fontFamily:SANS, color:DIM, marginTop:4 }}>
+                          + {orders!.orders.length - 8} more…
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {mutErr && (
+                <div style={{
+                  fontSize:11, fontFamily:SANS, color:"#FF6478", marginBottom:12, lineHeight:1.4,
                 }}>
-                CANCEL
-              </button>
-              <button
-                onClick={() => disconnectAlpaca.mutate()}
-                disabled={disconnectAlpaca.isPending}
-                style={{
-                  padding:"9px 16px",
-                  background:"rgba(255,68,85,0.14)",
-                  border:"1px solid rgba(255,68,85,0.55)",
-                  borderRadius:8, color:"#FF6478",
-                  fontFamily:SANS, fontSize:10.5, fontWeight:700, letterSpacing:"0.06em",
-                  cursor: disconnectAlpaca.isPending ? "wait" : "pointer",
-                  opacity: disconnectAlpaca.isPending ? 0.7 : 1,
-                }}>
-                {disconnectAlpaca.isPending ? "DISCONNECTING…" : "DISCONNECT"}
-              </button>
+                  Disconnect failed: {mutErr.message}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div style={{ display:"flex", flexDirection:"column" as const, gap:8 }}>
+                {count > 0 && (
+                  <button
+                    onClick={() => disconnectAlpaca.mutate({ cancelOpenOrders: true })}
+                    disabled={pending || loading}
+                    style={{
+                      padding:"11px 14px",
+                      background:"rgba(102,255,102,0.10)",
+                      border:"1px solid rgba(102,255,102,0.50)",
+                      borderRadius:8, color:C,
+                      fontFamily:SANS, fontSize:11, fontWeight:700, letterSpacing:"0.08em",
+                      cursor: pending ? "wait" : "pointer",
+                      opacity: pending || loading ? 0.6 : 1,
+                      textTransform:"uppercase" as const,
+                    }}>
+                    {pending ? "WORKING…" : `Cancel ${count} Order${count === 1 ? "" : "s"} & Disconnect`}
+                  </button>
+                )}
+                <button
+                  onClick={() => disconnectAlpaca.mutate({ cancelOpenOrders: false })}
+                  disabled={pending}
+                  style={{
+                    padding:"11px 14px",
+                    background:"rgba(255,68,85,0.08)",
+                    border:"1px solid rgba(255,68,85,0.40)",
+                    borderRadius:8, color:"#FF6478",
+                    fontFamily:SANS, fontSize:11, fontWeight:700, letterSpacing:"0.08em",
+                    cursor: pending ? "wait" : "pointer",
+                    opacity: pending ? 0.6 : 1,
+                    textTransform:"uppercase" as const,
+                  }}>
+                  {pending ? "DISCONNECTING…" : count > 0 ? "Disconnect Anyway" : "Disconnect"}
+                </button>
+                <button
+                  onClick={close}
+                  disabled={pending}
+                  style={{
+                    padding:"10px 14px",
+                    background:"transparent",
+                    border:`1px solid ${E}`,
+                    borderRadius:8, color:GR,
+                    fontFamily:SANS, fontSize:11, fontWeight:600, letterSpacing:"0.08em",
+                    cursor: pending ? "not-allowed" : "pointer",
+                    textTransform:"uppercase" as const,
+                  }}>
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Alpaca disconnect: in-app toast ───────────────────────────────── */}
       {alpacaToast && (() => {
