@@ -110,9 +110,23 @@ let _state: SafeTestModeState = {
   activatedBy:                  null,
 };
 
+// One-shot listener registered when STM is activated with
+// `disableAfterFirstLiveFill: true`. Held at module scope so we can detach
+// it on manual deactivation or TTL expiry without leaving zombie handlers
+// across multiple STM cycles.
+let _autoDisableListener: ((ev: ExecStreamEvent) => void) | null = null;
+
+function _detachAutoDisable(): void {
+  if (_autoDisableListener) {
+    executionStreamBus.off("event", _autoDisableListener);
+    _autoDisableListener = null;
+  }
+}
+
 export function getSafeTestMode(): SafeTestModeState {
   // Lazy expiry — refresh on read.
   if (_state.active && _state.expiresAt && Date.now() >= _state.expiresAt) {
+    _detachAutoDisable();
     executionStreamBus.emitEvent({
       type:     "safe_test_mode_expired",
       severity: "info",
@@ -133,7 +147,11 @@ export function activateSafeTestMode(opts: {
   minOrderUsdOverride:         number | null;
   reason:                      string;
   activatedBy:                 string;
+  disableAfterFirstLiveFill?:  boolean;
 }): SafeTestModeState {
+  // Detach any previous one-shot listener before re-activating.
+  _detachAutoDisable();
+
   _state = {
     active:                       true,
     expiresAt:                    Date.now() + opts.durationMs,
@@ -145,19 +163,45 @@ export function activateSafeTestMode(opts: {
   executionStreamBus.emitEvent({
     type:     "safe_test_mode_activated",
     severity: "warn",
-    message:  `Safe Test Mode ACTIVE — confidence floor=${opts.liveConfidenceFloorOverride ?? "default"}, min order=$${opts.minOrderUsdOverride ?? "default"}, duration ${Math.round(opts.durationMs / 60_000)}min`,
+    message:  `Safe Test Mode ACTIVE — confidence floor=${opts.liveConfidenceFloorOverride ?? "default"}, min order=$${opts.minOrderUsdOverride ?? "default"}, duration ${Math.round(opts.durationMs / 60_000)}min${opts.disableAfterFirstLiveFill ? " · auto-disable on first live fill" : ""}`,
     details: {
       durationMs:                   opts.durationMs,
       liveConfidenceFloorOverride:  opts.liveConfidenceFloorOverride,
       minOrderUsdOverride:          opts.minOrderUsdOverride,
       reason:                       opts.reason,
       activatedBy:                  opts.activatedBy,
+      disableAfterFirstLiveFill:    !!opts.disableAfterFirstLiveFill,
     },
   });
+
+  // Register one-shot auto-disable: on the FIRST order_filled tagged
+  // mode === 'live', clear STM and restore default thresholds. Sim/test
+  // fills are ignored so paper trades cannot accidentally end the window.
+  if (opts.disableAfterFirstLiveFill) {
+    _autoDisableListener = (ev: ExecStreamEvent) => {
+      if (ev.type === "order_filled" && ev.mode === "live" && _state.active) {
+        _detachAutoDisable();
+        executionStreamBus.emitEvent({
+          type:     "safe_test_mode_expired",
+          severity: "info",
+          message:  `Safe Test Mode auto-disabled after first live fill (${ev.symbol ?? "?"} ${ev.side ?? "?"} $${ev.sizeUSD ?? "?"}) — thresholds restored to defaults`,
+          details:  { triggerOrderId: ev.id, symbol: ev.symbol, side: ev.side, sizeUSD: ev.sizeUSD },
+        });
+        _state = {
+          active: false, expiresAt: null,
+          liveConfidenceFloorOverride: null, minOrderUsdOverride: null,
+          reason: null, activatedBy: null,
+        };
+      }
+    };
+    executionStreamBus.on("event", _autoDisableListener);
+  }
+
   return _state;
 }
 
 export function deactivateSafeTestMode(): SafeTestModeState {
+  _detachAutoDisable();
   if (_state.active) {
     executionStreamBus.emitEvent({
       type:     "safe_test_mode_expired",

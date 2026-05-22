@@ -106,6 +106,7 @@ export default function EngineHeartbeat() {
   const [stmSize, setStmSize]         = useState(25);
   const [stmMinutes, setStmMinutes]   = useState(15);
   const [stmReason, setStmReason]     = useState("Live execution pipeline verification");
+  const [stmAutoDisable, setStmAutoDisable] = useState(true);
 
   const { data, isLoading } = useQuery<HeartbeatResponse>({
     queryKey: ["admin-engine-heartbeat"],
@@ -134,6 +135,7 @@ export default function EngineHeartbeat() {
           liveConfidenceFloorOverride:  stmFloor,
           minOrderUsdOverride:          stmSize,
           reason:                       stmReason,
+          disableAfterFirstLiveFill:    stmAutoDisable,
         }),
       });
       if (!r.ok) throw new Error(`activate ${r.status}`);
@@ -313,6 +315,33 @@ export default function EngineHeartbeat() {
                   Failed to activate. Check admin permissions.
                 </div>
               )}
+              <label style={{
+                gridColumn: "1 / -1",
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "8px 10px",
+                background: stmAutoDisable ? "rgba(102,255,102,0.08)" : "rgba(0,0,0,0.3)",
+                border: `1px solid ${stmAutoDisable ? "#66FF66" : N.BORDER}`,
+                borderRadius: 3,
+                cursor: "pointer",
+                fontFamily: N.FONT_MONO,
+              }}>
+                <input
+                  type="checkbox"
+                  checked={stmAutoDisable}
+                  onChange={(e) => setStmAutoDisable(e.currentTarget.checked)}
+                  style={{ width: 14, height: 14, accentColor: "#66FF66", cursor: "pointer" }}
+                />
+                <span style={{
+                  fontSize: 10, fontWeight: 900, letterSpacing: "0.16em",
+                  color: stmAutoDisable ? "#66FF66" : N.TEXT_2,
+                  textShadow: stmAutoDisable ? "0 0 6px rgba(102,255,102,0.45)" : undefined,
+                }}>
+                  AUTO-DISABLE AFTER FIRST LIVE FILL
+                </span>
+                <span style={{ fontSize: 9, color: N.TEXT_3, fontWeight: 700, marginLeft: "auto" }}>
+                  Recommended for single-trade validation runs
+                </span>
+              </label>
             </div>
           )}
         </div>

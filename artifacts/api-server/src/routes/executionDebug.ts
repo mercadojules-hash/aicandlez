@@ -137,6 +137,7 @@ router.post(
       liveConfidenceFloorOverride?:  number | null;
       minOrderUsdOverride?:          number | null;
       reason?:                       string;
+      disableAfterFirstLiveFill?:    boolean;
     };
 
     if (body.activate === false) {
@@ -164,10 +165,12 @@ router.post(
     const reason  = String(body.reason ?? "Operator verification of live execution pipeline");
     const actor   = (req as { user?: { id?: string } }).user?.id ?? "system";
 
+    const disableAfterFirstLiveFill = body.disableAfterFirstLiveFill === true;
+
     auditLogger.append(
       actor,
       "ADMIN_ACTION",
-      { action: "SAFE_TEST_MODE_ACTIVATED", actor, durationMinutes, liveConfidenceFloorOverride: floor, minOrderUsdOverride: minOrder, reason },
+      { action: "SAFE_TEST_MODE_ACTIVATED", actor, durationMinutes, liveConfidenceFloorOverride: floor, minOrderUsdOverride: minOrder, reason, disableAfterFirstLiveFill },
       { severity: "warn" },
     );
 
@@ -177,6 +180,7 @@ router.post(
       minOrderUsdOverride:          minOrder,
       reason,
       activatedBy:                  actor,
+      disableAfterFirstLiveFill,
     });
 
     res.json({ ok: true, state });
