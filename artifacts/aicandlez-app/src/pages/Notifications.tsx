@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
@@ -172,6 +172,23 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "system",  label: "System"  },
 ];
 
+const FILTER_STORAGE_KEY = "aicandlez_notifications_filter_v1";
+const FILTER_KEYS: FilterKey[] = ["all", "trades", "signals", "system"];
+
+function loadFilter(): FilterKey {
+  if (typeof window === "undefined") return "all";
+  try {
+    const raw = window.localStorage.getItem(FILTER_STORAGE_KEY);
+    if (raw && (FILTER_KEYS as string[]).includes(raw)) return raw as FilterKey;
+  } catch { /* unavailable */ }
+  return "all";
+}
+
+function saveFilter(f: FilterKey) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(FILTER_STORAGE_KEY, f); } catch { /* quota */ }
+}
+
 function bucketOf(type: string): Exclude<FilterKey, "all"> {
   const t = type.toLowerCase();
   if (t.includes("trade") || t.includes("position") || t.includes("order") || t.includes("fill") || t.includes("tp") || t.includes("sl")) {
@@ -193,7 +210,26 @@ const EMPTY_COPY: Record<FilterKey, { title: string; body: string }> = {
 export default function Notifications() {
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
-  const [filter, setFilter] = useState<FilterKey>("all");
+  const [filter, setFilterState] = useState<FilterKey>(() => loadFilter());
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== FILTER_STORAGE_KEY) return;
+      const next = e.newValue;
+      if (next && (FILTER_KEYS as string[]).includes(next)) {
+        setFilterState(next as FilterKey);
+      } else if (next === null) {
+        setFilterState("all");
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const setFilter = (f: FilterKey) => {
+    setFilterState(f);
+    saveFilter(f);
+  };
 
   const { data, isLoading, isError, error, refetch } = useQuery<{ notifications: NotificationRow[]; unread: number }>({
     queryKey:        ["pwa-notifications"],
