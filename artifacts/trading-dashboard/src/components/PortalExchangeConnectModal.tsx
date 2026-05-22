@@ -291,16 +291,16 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
                     onClick={() => { setPicked(ex); setError(null); }}
                     disabled={submitting}
                     style={{
-                      padding: "9px 10px",
+                      padding: "12px 10px",
                       borderRadius: 8,
                       background: isSel ? `rgba(102,255,102,0.10)` : "rgba(255,255,255,0.03)",
                       border: `1px solid ${isSel ? N.BRAND : N.BORDER}`,
                       color: isSel ? N.BRAND : N.TEXT_0,
-                      fontFamily: N.FONT_MONO, fontSize: 12.5, fontWeight: 800,
-                      letterSpacing: "0.10em",
+                      fontFamily: N.FONT_MONO, fontSize: 14, fontWeight: 900,
+                      letterSpacing: "0.14em",
                       cursor: submitting ? "not-allowed" : "pointer",
-                      boxShadow: isSel ? `0 0 16px ${N.BRAND_GLOW}, 0 0 0 1px ${N.BRAND}55 inset` : "none",
-                      textShadow: isSel ? `0 0 8px ${N.BRAND_GLOW}` : "none",
+                      boxShadow: isSel ? `0 0 20px ${N.BRAND_GLOW}, 0 0 0 1px ${N.BRAND}55 inset` : "none",
+                      textShadow: isSel ? `0 0 10px ${N.BRAND_GLOW}` : "none",
                       transition: "all 120ms ease",
                     }}
                   >

@@ -78,6 +78,8 @@ import {
   CryptoSignalsPanel, EquitySignalsPanel,
 } from "@/components/command/institutional";
 import { N } from "@/components/command/institutional/theme";
+import EngineHeartbeat from "@/components/EngineHeartbeat";
+import LiveExecutionStream from "@/components/LiveExecutionStream";
 
 import type {
   EngineStatus, AppSettings, Trade, ExchangeStatus, SimAccount, LiveBalance,
@@ -276,6 +278,17 @@ export default function CommandCenter() {
         {/* Row 0b — Operator deep-layer telemetry (admin-only)
             Latency · Funnel · Live Execution Stream · Fees · Subscriptions */}
         {isOperator && <OperatorTelemetryGrid />}
+
+        {/* Row 0c — Live Execution Debugging (admin-only)
+            Engine heartbeat + Safe Test Mode controls + real-time execution
+            stream from executionStreamBus. The operator must NEVER be blind
+            during live execution. */}
+        {isOperator && (
+          <section className="px-2 grid gap-2" style={{ gridTemplateColumns: "minmax(420px, 1fr) minmax(0, 2fr)" }}>
+            <EngineHeartbeat />
+            <LiveExecutionStream />
+          </section>
+        )}
 
         {/* Row 1 — My live Kraken account */}
         <div className="px-2">

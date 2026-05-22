@@ -39,6 +39,7 @@ import adminTradesRouter from "./adminTrades.js";
 import userConsentRouter from "./userConsent.js";
 import pushTokensRouter from "./pushTokens.js";
 import internalNotifyRouter from "./internalNotify.js";
+import executionDebugRouter from "./executionDebug.js";
 
 const router: IRouter = Router();
 
@@ -57,6 +58,7 @@ router.use(adminTradesRouter);
 router.use(userConsentRouter);
 router.use(pushTokensRouter);
 router.use(internalNotifyRouter);
+router.use(executionDebugRouter);
 router.use(signalsRouter);
 router.use(tradesRouter);
 router.use(portfolioRouter);

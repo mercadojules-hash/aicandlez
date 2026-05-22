@@ -15,6 +15,7 @@ import { sendTradeExecutedSMS } from "./notifications.js";
 import { broadcastSignal, broadcastTrade } from "./wsServer.js";
 import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
+import { executionStreamBus, getSafeTestMode } from "./executionStreamBus.js";
 import { logger } from "./logger.js";
 
 function genId() { return crypto.randomUUID(); }
@@ -473,26 +474,45 @@ async function autoExecute(
   confidence:   number,
 ): Promise<{ executed: boolean; blockReason: string | null }> {
 
-  // ── Gate 0: live-mode 80% hard floor ───────────────────────────────────────
+  // ── Gate 0: live-mode confidence floor (safe-test-mode aware) ──────────────
   // No live order may ever be submitted below the institutional confidence
-  // threshold. Sim paths are unaffected (live mode check below).
+  // threshold. Safe Test Mode (admin-only, time-boxed) may temporarily lower
+  // the floor — never below the 40% floor enforced by the SafeTestMode API.
+  // Sim paths are unaffected (live mode check below).
+  let exModeForStream: "simulation" | "live" | "test" = "simulation";
   try {
     const { getExchangeStatus } = await import("./exchangeEngine.js");
     const exMode = getExchangeStatus().mode;
     const isLiveMode = exMode !== "simulation";
-    if (isLiveMode && !isTest && confidence < LIVE_EXECUTION_MIN_CONFIDENCE) {
+    exModeForStream = isTest ? "test" : (isLiveMode ? "live" : "simulation");
+    const stm = getSafeTestMode();
+    const effectiveFloor =
+      isLiveMode && stm.active && stm.liveConfidenceFloorOverride !== null
+        ? stm.liveConfidenceFloorOverride
+        : LIVE_EXECUTION_MIN_CONFIDENCE;
+    if (isLiveMode && !isTest && confidence < effectiveFloor) {
       engineStats.tradesBlocked++;
-      const msg = `Live execution blocked for ${symbol} ${side}: confidence ${confidence.toFixed(1)}% < ${LIVE_EXECUTION_MIN_CONFIDENCE}% floor`;
-      logger.warn({ symbol, side, confidence, floor: LIVE_EXECUTION_MIN_CONFIDENCE, mode: exMode }, msg);
+      const msg = `Live execution blocked for ${symbol} ${side}: confidence ${confidence.toFixed(1)}% < ${effectiveFloor}% floor${stm.active ? " (safe-test-mode active)" : ""}`;
+      logger.warn({ symbol, side, confidence, floor: effectiveFloor, mode: exMode, safeTestMode: stm.active }, msg);
       await db.insert(logsTable).values({
         id: genId(), type: "trade", level: "warn",
         message: msg,
-        details: { symbol, side, confidence, floor: LIVE_EXECUTION_MIN_CONFIDENCE, mode: exMode },
+        details: { symbol, side, confidence, floor: effectiveFloor, mode: exMode, safeTestMode: stm.active },
       });
       auditLogger.append("system", "TRADE_REJECTED", {
-        symbol, side, confidence, floor: LIVE_EXECUTION_MIN_CONFIDENCE, gate: "live_confidence_floor",
+        symbol, side, confidence, floor: effectiveFloor, gate: "live_confidence_floor", safeTestMode: stm.active,
       }, { symbol, severity: "warn" });
-      return { executed: false, blockReason: `Below 80% live-execution threshold (${confidence.toFixed(1)}%)` };
+      executionStreamBus.emitEvent({
+        type:     "live_floor_blocked",
+        severity: "warn",
+        symbol, side, confidence,
+        gate:     "live_confidence_floor",
+        mode:     "live",
+        reason:   `confidence ${confidence.toFixed(1)}% < ${effectiveFloor}% floor`,
+        message:  msg,
+        details:  { floor: effectiveFloor, safeTestModeActive: stm.active },
+      });
+      return { executed: false, blockReason: `Below ${effectiveFloor}% live-execution threshold (${confidence.toFixed(1)}%)` };
     }
   } catch { /* fail-open to existing gates only on import error */ }
 
@@ -509,6 +529,11 @@ async function autoExecute(
         message: msg,
         details: { symbol, side, openCount, maxActivePositions: settings.maxActivePositions },
       });
+      executionStreamBus.emitEvent({
+        type: "max_positions_blocked", severity: "warn",
+        symbol, side, gate: "max_active_positions", mode: exModeForStream,
+        reason: `${openCount}/${settings.maxActivePositions} open`, message: msg,
+      });
       return { executed: false, blockReason: `Max active positions (${settings.maxActivePositions})` };
     }
   }
@@ -521,6 +546,11 @@ async function autoExecute(
       const msg = `Auto-trade blocked for ${symbol}: daily limit (${settings.maxTradesPerDay}) reached`;
       logger.info({ symbol, side, todayCount }, msg);
       await db.insert(logsTable).values({ id: genId(), type: "trade", level: "warn", message: msg, details: { symbol, side } });
+      executionStreamBus.emitEvent({
+        type: "daily_limit_blocked", severity: "warn",
+        symbol, side, gate: "daily_trade_limit", mode: exModeForStream,
+        reason: `${todayCount}/${settings.maxTradesPerDay} today`, message: msg,
+      });
       return { executed: false, blockReason: "Daily limit" };
     }
   }
@@ -532,11 +562,19 @@ async function autoExecute(
     engineStats.correlationBlocks++;
     const msg = `Auto-trade blocked for ${symbol} ${side}: high correlation with existing position`;
     await db.insert(logsTable).values({ id: genId(), type: "trade", level: "warn", message: msg, details: { symbol, side } });
+    executionStreamBus.emitEvent({
+      type: "correlation_blocked", severity: "warn",
+      symbol, side, gate: "correlation_filter", mode: exModeForStream,
+      reason: "high correlation with open position", message: msg,
+    });
     return { executed: false, blockReason: "Correlation filter" };
   }
 
-  // ── Gate 4: risk engine ────────────────────────────────────────────────────
-  const sizeUSD   = settings.allocation;
+  // ── Gate 4: risk engine (safe-test-mode size override aware) ────────────────
+  const stmForSize = getSafeTestMode();
+  const sizeUSD   = stmForSize.active && stmForSize.minOrderUsdOverride !== null
+    ? stmForSize.minOrderUsdOverride
+    : settings.allocation;
   const riskCheck = validateTrade(sizeUSD);
   if (!riskCheck.allowed) {
     engineStats.tradesBlocked++;
@@ -549,10 +587,22 @@ async function autoExecute(
     auditLogger.append("system", "TRADE_REJECTED", {
       symbol, side, sizeUSD, violations: riskCheck.violations, gate: "risk_engine",
     }, { symbol, severity: "warn" });
+    executionStreamBus.emitEvent({
+      type: "risk_engine_blocked", severity: "warn",
+      symbol, side, sizeUSD, gate: "risk_engine", mode: exModeForStream,
+      reason: riskCheck.violations.join("; "),
+      message: `Risk engine blocked ${symbol} ${side} $${sizeUSD}: ${riskCheck.violations.join("; ")}`,
+      details: { violations: riskCheck.violations, safeTestModeSize: stmForSize.active },
+    });
     return { executed: false, blockReason: `Risk engine: ${riskCheck.violations.join("; ")}` };
   }
 
   // ── Gate 5: place order ────────────────────────────────────────────────────
+  executionStreamBus.emitEvent({
+    type: "execution_sent", severity: "info",
+    symbol, side, sizeUSD, confidence, price, mode: exModeForStream,
+    message: `Order sent: ${symbol} ${side} $${sizeUSD} @ ${price}`,
+  });
   const result = await placeOrder({ symbol, side, sizeUSD });
   if (!result.success) {
     engineStats.tradesBlocked++;
@@ -565,6 +615,12 @@ async function autoExecute(
     auditLogger.append("system", "TRADE_REJECTED", {
       symbol, side, error: result.error, gate: "simulation_engine",
     }, { symbol, severity: "warn" });
+    executionStreamBus.emitEvent({
+      type: "order_rejected", severity: "error",
+      symbol, side, sizeUSD, gate: "execution_engine", mode: exModeForStream,
+      reason: result.error ?? "unknown",
+      message: `Order REJECTED ${symbol} ${side} $${sizeUSD}: ${result.error}`,
+    });
     return { executed: false, blockReason: `Sim engine: ${result.error}` };
   }
 
@@ -597,6 +653,13 @@ async function autoExecute(
 
   const tag = isTest ? "[TEST MODE]" : "[AUTO]";
   logger.info({ symbol, side, sizeUSD, entryPrice: pos.entryPrice, shortSummary, tradeMode }, `${tag} Trade executed`);
+  executionStreamBus.emitEvent({
+    type: "order_filled", severity: "success",
+    symbol, side, sizeUSD, price: pos.entryPrice, confidence,
+    mode: exModeForStream,
+    message: `${tag} ${symbol} ${side} FILLED $${sizeUSD} @ ${pos.entryPrice}`,
+    details: { signalId, shortSummary, stopLoss, takeProfit },
+  });
 
   auditLogger.append("system", "TRADE_EXECUTED", {
     symbol, side, sizeUSD,
@@ -687,6 +750,16 @@ async function runTrailingStops() {
 
 async function tick() {
   engineStats.lastTickAt = Date.now();
+  executionStreamBus.emitEvent({
+    type:     "loop_tick",
+    severity: "info",
+    message:  `Engine tick — signals=${engineStats.signalsGenerated} execs=${engineStats.tradesExecuted} blocked=${engineStats.tradesBlocked}`,
+    details:  {
+      signalsGenerated: engineStats.signalsGenerated,
+      tradesExecuted:   engineStats.tradesExecuted,
+      tradesBlocked:    engineStats.tradesBlocked,
+    },
+  });
 
   let settings: LoopSettings;
   try {

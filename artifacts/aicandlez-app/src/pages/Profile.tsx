@@ -1127,9 +1127,9 @@ export default function Profile() {
           <SectionHead label="Broker Connection" accent="rgba(0,255,136,0.55)"/>
           <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, overflow:"hidden" }}>
             <ExchangeRow
-              name="Alpaca (Paper Account)" status="PAPER · CONNECTED" statusCol="rgba(0,225,120,0.85)"
+              name="Alpaca (Paper Account)" status="PAPER · CONNECTED" statusCol="rgba(102,255,102,0.95)"
               icon="A"
-              iconBg="rgba(0,200,230,0.10)" iconBorder="rgba(0,200,230,0.30)" iconColor="rgba(0,220,255,0.90)"
+              iconBg="rgba(102,255,102,0.10)" iconBorder="rgba(102,255,102,0.45)" iconColor="rgba(102,255,102,0.95)"
             />
           </div>
           <div style={{ marginTop:6, fontSize:8.5, fontFamily:SANS, color:DIM, lineHeight:1.6, padding:"0 4px" }}>
