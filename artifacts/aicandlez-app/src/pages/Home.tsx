@@ -825,7 +825,7 @@ export default function Home() {
           <QuickAction icon={IconScan}    label="AI Scan"     onClick={() => setLocation("/markets")} accent={BRAND}/>
           <QuickAction icon={IconTrade}   label="Open Trades" onClick={() => setLocation("/trade")}   accent={BRAND_BRGT}/>
           <QuickAction icon={IconAuto}    label="Auto Trade"  onClick={() => setLocation("/profile")} accent={BRAND_DEEP}/>
-          <QuickAction icon={IconDeposit} label="Deposit"     onClick={openOnboarding} accent={BRAND}/>
+          <QuickAction icon={IconDeposit} label="Fund Account" onClick={openOnboarding} accent={BRAND}/>
         </div>
 
         {/* ════════════════════════════════════════════════════════════════ */}

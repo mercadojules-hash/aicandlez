@@ -313,12 +313,14 @@ export default function Account() {
                     return (
                       <div key={ex.exchange}
                         className="flex items-center gap-3 px-3 py-2.5 rounded border"
-                        style={{ background: `${color}08`, borderColor: `${color}25` }}>
-                        <div className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{ background: color, boxShadow: `0 0 5px ${color}` }} />
+                        style={{ background: `${color}10`, borderColor: `${color}45`,
+                          boxShadow: `0 0 14px ${color}25, 0 0 0 1px ${color}20 inset` }}>
+                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ background: color, boxShadow: `0 0 8px ${color}, 0 0 14px ${color}80` }} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold font-mono capitalize" style={{ color }}>
+                            <span className="text-[13px] font-extrabold font-mono capitalize tracking-wide"
+                              style={{ color, textShadow: `0 0 8px ${color}55` }}>
                               {ex.exchange}
                             </span>
                             {ex.isDefault && (

@@ -527,10 +527,18 @@ function ExchangeCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           <div
-            className="w-2 h-2 rounded-full shrink-0"
-            style={{ background: statusColor, boxShadow: isConnected ? `0 0 6px ${statusColor}` : "none" }}
+            className="w-2.5 h-2.5 rounded-full shrink-0"
+            style={{ background: statusColor,
+              boxShadow: isConnected ? `0 0 10px ${statusColor}, 0 0 18px ${statusColor}80` : "none" }}
           />
-          <span className="font-mono text-[11px] font-bold" style={{ color: isConnected ? "#EAF2FF" : "#7ab8cc" }}>
+          <span
+            className="font-mono text-[14px] font-extrabold tracking-wide"
+            style={{
+              color: isConnected ? "#66FF66" : isError ? "#ff4455" : "#EAF2FF",
+              textShadow: isConnected ? `0 0 10px ${statusColor}55` : "none",
+              letterSpacing: "0.04em",
+            }}
+          >
             {entry.exchange}
           </span>
           {entry.meta?.status === "coming_soon" && (
@@ -558,7 +566,13 @@ function ExchangeCard({
             </span>
           )}
         </div>
-        <span className="font-mono text-[8px]" style={{ color: statusColor }}>{statusLabel}</span>
+        <span
+          className="font-mono text-[11px] font-extrabold tracking-widest"
+          style={{
+            color: statusColor,
+            textShadow: isConnected ? `0 0 8px ${statusColor}66` : "none",
+          }}
+        >{statusLabel}</span>
       </div>
 
       {/* Connection details */}

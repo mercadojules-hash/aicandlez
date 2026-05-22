@@ -303,11 +303,11 @@ function ConnectModal({
 function StatusChip({ conn }: { conn: ApiExchange | undefined }) {
   if (!conn?.connected) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <div style={{ width: 5, height: 5, borderRadius: "50%",
-          background: "rgba(255,255,255,0.15)" }}/>
-        <span style={{ fontSize: 8, fontFamily: SANS,
-          color: "rgba(136,146,164,0.55)", letterSpacing: "0.08em" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ width: 6, height: 6, borderRadius: "50%",
+          background: "rgba(255,255,255,0.18)" }}/>
+        <span style={{ fontSize: 10, fontFamily: SANS, fontWeight: 700,
+          color: "rgba(136,146,164,0.70)", letterSpacing: "0.12em" }}>
           NOT CONNECTED
         </span>
       </div>
@@ -315,14 +315,18 @@ function StatusChip({ conn }: { conn: ApiExchange | undefined }) {
   }
   const active = conn.status === "active";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-      <div style={{ width: 5, height: 5, borderRadius: "50%",
-        background: active ? "rgba(0,210,100,0.90)" : "rgba(255,170,0,0.80)",
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ width: 7, height: 7, borderRadius: "50%",
+        background: active ? "rgba(102,255,102,1)" : "rgba(255,170,0,0.85)",
+        boxShadow: active
+          ? "0 0 10px rgba(102,255,102,0.85), 0 0 18px rgba(102,255,102,0.45)"
+          : "0 0 6px rgba(255,170,0,0.55)",
         animation: active ? "dot-pulse 2.5s ease-in-out infinite" : "none" }}/>
-      <span style={{ fontSize: 8, fontFamily: SANS,
-        color: active ? "rgba(0,210,100,0.80)" : "rgba(255,170,0,0.80)",
-        letterSpacing: "0.08em", textTransform: "uppercase" as const }}>
-        {conn.status}
+      <span style={{ fontSize: 11, fontFamily: SANS, fontWeight: 800,
+        color: active ? "#66FF66" : "rgba(255,170,0,0.95)",
+        letterSpacing: "0.14em", textTransform: "uppercase" as const,
+        textShadow: active ? "0 0 8px rgba(102,255,102,0.55)" : "none" }}>
+        {active ? "CONNECTED" : conn.status}
       </span>
       {conn.isDefault && (
         <span style={{ marginLeft: 2, padding: "1px 6px",

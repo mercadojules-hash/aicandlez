@@ -257,14 +257,15 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
               <Check size={28} color={N.BRAND} strokeWidth={3} />
             </div>
             <div style={{
-              fontFamily: N.FONT_MONO, fontSize: 11, fontWeight: 800,
-              color: N.BRAND, letterSpacing: "0.14em",
-              textShadow: `0 0 10px ${N.BRAND_GLOW}`,
+              fontFamily: N.FONT_MONO, fontSize: 14, fontWeight: 900,
+              color: N.BRAND, letterSpacing: "0.18em",
+              textShadow: `0 0 14px ${N.BRAND_GLOW}, 0 0 28px ${N.BRAND_GLOW}`,
             }}>
               EXCHANGE CONNECTED
             </div>
-            <div style={{ fontSize: 12, color: N.TEXT_1, marginTop: 6 }}>
-              {picked.name} ready for trading
+            <div style={{ fontSize: 14, color: N.TEXT_0, marginTop: 8, fontWeight: 700,
+              letterSpacing: 0.2 }}>
+              {picked.name} <span style={{ color: N.TEXT_1, fontWeight: 500 }}>ready for trading</span>
             </div>
           </div>
         ) : (
@@ -295,10 +296,11 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
                       background: isSel ? `rgba(102,255,102,0.10)` : "rgba(255,255,255,0.03)",
                       border: `1px solid ${isSel ? N.BRAND : N.BORDER}`,
                       color: isSel ? N.BRAND : N.TEXT_0,
-                      fontFamily: N.FONT_MONO, fontSize: 10.5, fontWeight: 700,
-                      letterSpacing: "0.08em",
+                      fontFamily: N.FONT_MONO, fontSize: 12.5, fontWeight: 800,
+                      letterSpacing: "0.10em",
                       cursor: submitting ? "not-allowed" : "pointer",
-                      boxShadow: isSel ? `0 0 12px ${N.BRAND_GLOW}` : "none",
+                      boxShadow: isSel ? `0 0 16px ${N.BRAND_GLOW}, 0 0 0 1px ${N.BRAND}55 inset` : "none",
+                      textShadow: isSel ? `0 0 8px ${N.BRAND_GLOW}` : "none",
                       transition: "all 120ms ease",
                     }}
                   >

@@ -610,13 +610,14 @@ function ExchangeRow({ name, status, statusCol, icon, iconBg, iconBorder, iconCo
           display:"flex", alignItems:"center", justifyContent:"center",
           fontSize:14, fontFamily:MONO, fontWeight:800, color:iconColor,
         }}>{icon}</div>
-        <span style={{ fontSize:13, fontFamily:SANS, fontWeight:500, color:W }}>{name}</span>
+        <span style={{ fontSize:15, fontFamily:SANS, fontWeight:700, color:W,
+          letterSpacing:-0.1 }}>{name}</span>
       </div>
-      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-        <div style={{ width:5, height:5, borderRadius:"50%", background:statusCol,
-          boxShadow:`0 0 6px ${statusCol}80` }}/>
-        <span style={{ fontSize:9, fontFamily:SANS, fontWeight:600, color:statusCol,
-          letterSpacing:"0.06em" }}>{status}</span>
+      <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+        <div style={{ width:7, height:7, borderRadius:"50%", background:statusCol,
+          boxShadow:`0 0 10px ${statusCol}, 0 0 18px ${statusCol}80` }}/>
+        <span style={{ fontSize:11, fontFamily:SANS, fontWeight:800, color:statusCol,
+          letterSpacing:"0.14em", textShadow:`0 0 8px ${statusCol}60` }}>{status}</span>
       </div>
     </div>
   );
