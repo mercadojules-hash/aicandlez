@@ -11,6 +11,7 @@ import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { alpacaBrokerProvider } from "../services/exchanges/AlpacaBrokerProvider.js";
 import { EXCHANGE_CATALOG, CATALOG_BY_ID, CONNECTABLE_EXCHANGE_IDS } from "../services/exchanges/catalog.js";
 import { makeAdapter } from "../services/exchanges/adapterFactory.js";
+import type { AlpacaAdapter } from "../services/exchanges/adapters/AlpacaAdapter.js";
 import type { ExchangeCredentials } from "../services/vault/CredentialVault.js";
 import type { Request } from "express";
 

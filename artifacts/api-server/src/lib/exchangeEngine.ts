@@ -6,6 +6,7 @@ import { KrakenAdapter, KRAKEN_CONFIG }   from "../services/exchanges/adapters/K
 import { BinanceAdapter, BINANCE_CONFIG } from "../services/exchanges/adapters/BinanceAdapter.js";
 import { CryptoDotComAdapter, CRYPTOCOM_CONFIG } from "../services/exchanges/adapters/CryptoDotComAdapter.js";
 import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
+import { executionStreamBus } from "./executionStreamBus.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -495,21 +496,62 @@ export interface LiveAutoOrderResult {
   quantity?:       number;
 }
 
+export interface LiveAutoOrderResultExtended extends LiveAutoOrderResult {
+  /** Gate that produced a rejection (only populated on success=false). */
+  rejectionGate?: string;
+  /** Raw broker response payload, captured for operator diagnostics. */
+  rawResponse?:   unknown;
+  /** Wall-clock latency of adapter.placeOrder in ms. */
+  latencyMs?:     number;
+}
+
+/**
+ * Operator-path live order execution (process-env credentials).
+ *
+ * Every rejection path emits a structured `order_rejected` event to the
+ * executionStreamBus with a `gate` discriminator, so the /command Live
+ * Execution Stream surfaces exactly *why* a live order didn't fire. On
+ * success the function emits `order_acknowledged` (when the adapter
+ * returns) and `order_filled` (with raw broker response captured), then
+ * returns the structured result so the caller can persist + emit
+ * `position_persisted` after the DB write.
+ *
+ * Rejection gates (stable identifiers — operator dashboard filters on these):
+ *   live_mode_off · kill_switch · paused · not_capable · adapter_init ·
+ *   ticker_fetch · invalid_price · qty_zero · broker_reject
+ */
 export async function placeLiveAutoOrder(req: {
   symbol:  string;
   side:    "BUY" | "SELL";
   sizeUSD: number;
-}): Promise<LiveAutoOrderResult> {
-  if (_mode !== "live") return { success: false, error: "Exchange engine not in live mode" };
-  if (_killSwitch)      return { success: false, error: "Exchange kill switch is active" };
-  if (_paused)          return { success: false, error: "Exchange is paused" };
-  if (!isLiveCapable()) return { success: false, error: "Live mode not configured (missing API credentials or EXCHANGE_LIVE_ENABLED!=true)" };
+}): Promise<LiveAutoOrderResultExtended> {
+  const reject = (gate: string, error: string, details?: Record<string, unknown>): LiveAutoOrderResultExtended => {
+    executionStreamBus.emitEvent({
+      type:     "order_rejected",
+      severity: gate === "broker_reject" ? "error" : "warn",
+      symbol:   req.symbol,
+      side:     req.side,
+      sizeUSD:  req.sizeUSD,
+      gate,
+      mode:     "live",
+      exchange: _selectedExchange,
+      reason:   error,
+      message:  `LIVE order REJECTED ${req.symbol} ${req.side} $${req.sizeUSD} @ ${gate}: ${error}`,
+      details:  { ...details, gate, exchange: _selectedExchange },
+    });
+    return { success: false, error, rejectionGate: gate };
+  };
+
+  if (_mode !== "live")  return reject("live_mode_off", "Exchange engine not in live mode");
+  if (_killSwitch)       return reject("kill_switch",   "Exchange kill switch is active");
+  if (_paused)           return reject("paused",        "Exchange is paused");
+  if (!isLiveCapable())  return reject("not_capable",   "Live mode not configured (missing API credentials or EXCHANGE_LIVE_ENABLED!=true)");
 
   let adapter: BaseExchangeAdapter;
   try {
     adapter = getLiveAdapter(_selectedExchange);
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+    return reject("adapter_init", err instanceof Error ? err.message : String(err));
   }
 
   // Fetch live price for qty conversion. The adapter is also responsible
@@ -519,33 +561,70 @@ export async function placeLiveAutoOrder(req: {
     const ticker = await getTicker(req.symbol);
     referencePrice = ticker.price;
   } catch (err) {
-    return { success: false, error: `Failed to fetch reference price for ${req.symbol}: ${err instanceof Error ? err.message : String(err)}` };
+    return reject("ticker_fetch", `Failed to fetch reference price for ${req.symbol}: ${err instanceof Error ? err.message : String(err)}`);
   }
-  if (!(referencePrice > 0)) return { success: false, error: `Invalid reference price (${referencePrice}) for ${req.symbol}` };
+  if (!(referencePrice > 0)) return reject("invalid_price", `Invalid reference price (${referencePrice}) for ${req.symbol}`);
 
   const quoteSide: "buy" | "sell" = req.side === "BUY" ? "buy" : "sell";
   const qtyBase = parseFloat((req.sizeUSD / referencePrice).toFixed(8));
-  if (qtyBase <= 0) return { success: false, error: "Computed base quantity is zero" };
+  if (qtyBase <= 0) return reject("qty_zero", "Computed base quantity is zero", { referencePrice, sizeUSD: req.sizeUSD });
 
+  const clientId = `loop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const t0 = Date.now();
+  let order: Awaited<ReturnType<BaseExchangeAdapter["placeOrder"]>>;
   try {
-    const order = await adapter.placeOrder({
+    order = await adapter.placeOrder({
       symbol:   req.symbol,
       side:     quoteSide,
       type:     "market",
       qty:      qtyBase,
-      clientId: `loop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      clientId,
     });
-    const fill = order.avgFillPrice > 0 ? order.avgFillPrice : referencePrice;
-    return {
-      success:         true,
-      exchange:        _selectedExchange,
-      exchangeOrderId: order.exchangeOrderId || order.id,
-      fillPrice:       parseFloat(fill.toFixed(2)),
-      quantity:        order.filledQty > 0 ? order.filledQty : qtyBase,
-    };
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+    const latencyMs = Date.now() - t0;
+    return reject(
+      "broker_reject",
+      err instanceof Error ? err.message : String(err),
+      { latencyMs, clientId, qtyBase, referencePrice },
+    );
   }
+
+  const latencyMs = Date.now() - t0;
+  const fill = order.avgFillPrice > 0 ? order.avgFillPrice : referencePrice;
+  const filledQty = order.filledQty > 0 ? order.filledQty : qtyBase;
+  const exchangeOrderId = order.exchangeOrderId || order.id;
+
+  // Broker acknowledged the order (returned a payload).
+  executionStreamBus.emitEvent({
+    type:     "order_acknowledged",
+    severity: "info",
+    symbol:   req.symbol, side: req.side, sizeUSD: req.sizeUSD, price: fill,
+    mode:     "live",
+    exchange: _selectedExchange,
+    message:  `LIVE order ACK ${req.symbol} ${req.side} qty=${filledQty} @ $${fill.toFixed(2)} (${latencyMs}ms) — id=${exchangeOrderId}`,
+    details:  { exchangeOrderId, clientId, latencyMs, qtyBase, filledQty, fill, rawResponse: order },
+  });
+
+  // Filled (market order; treated as immediate fill).
+  executionStreamBus.emitEvent({
+    type:     "order_filled",
+    severity: "success",
+    symbol:   req.symbol, side: req.side, sizeUSD: req.sizeUSD, price: fill,
+    mode:     "live",
+    exchange: _selectedExchange,
+    message:  `LIVE FILLED ${req.symbol} ${req.side} $${req.sizeUSD} @ $${fill.toFixed(2)} on ${_selectedExchange} (id=${exchangeOrderId})`,
+    details:  { exchangeOrderId, filledQty, fillPrice: fill, latencyMs },
+  });
+
+  return {
+    success:         true,
+    exchange:        _selectedExchange,
+    exchangeOrderId,
+    fillPrice:       parseFloat(fill.toFixed(2)),
+    quantity:        filledQty,
+    rawResponse:     order,
+    latencyMs,
+  };
 }
 
 // ── Public getters / setters ──────────────────────────────────────────────────
