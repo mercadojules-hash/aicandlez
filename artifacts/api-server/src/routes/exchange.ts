@@ -22,9 +22,6 @@ import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 // and Alpaca-only flows; they must never touch these.
 const requireOperator = [requireAuth, requireRole(["admin", "super-admin"])];
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
-import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -43,20 +40,36 @@ router.get("/exchange/orders", ...requireOperator, (_req, res) => {
 router.get("/exchange/balances", ...requireOperator, async (req, res) => {
   const status = getExchangeStatus();
   const zero = { USD: 0, BTC: 0, ETH: 0, SOL: 0 };
-  if (status.mode === "live" && status.apiConfigured) {
+  // OPERATOR POLICY — the admin terminal must NEVER surface the $100K paper
+  // hero. If the engine is in live mode + API keys present, we read live.
+  // Otherwise: if API keys ARE configured, attempt a live read anyway (the
+  // engine may not yet have been flipped to live for this process) — and on
+  // any failure return source="error" with zero balances. We only emit
+  // source="simulation" when no API keys exist at all, and even then with
+  // zero balances so the UI displays "—" instead of $100K.
+  const tryLive = async () => {
+    const balances = await fetchLiveBalances();
+    return { source: "live" as const, balances, exchange: status.exchangeName };
+  };
+  if (status.apiConfigured) {
     try {
-      const balances = await fetchLiveBalances();
-      res.json({ source: "live", balances, exchange: status.exchangeName });
+      const payload = await tryLive();
+      res.json(payload);
+      return;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       req.log.error({ err, exchange: status.exchangeName }, "fetchLiveBalances failed");
-      // 200 with explicit error source so the operator panel can render
-      // "KRAKEN AUTH FAILED" instead of silently falling back to $0.
       res.json({ source: "error", balances: zero, exchange: status.exchangeName, error: msg });
+      return;
     }
-  } else {
-    res.json({ source: "simulation", balances: status.simBalances, exchange: status.exchangeName });
   }
+  // No live keys configured — explicit standby state, NOT the sim hero.
+  res.json({
+    source:   "standby",
+    balances: zero,
+    exchange: status.exchangeName,
+    error:    "Exchange API keys not configured",
+  });
 });
 
 // ── Set mode ──────────────────────────────────────────────────────────────────
@@ -66,27 +79,15 @@ router.post("/exchange/mode", ...requireOperator, async (req, res) => {
     res.status(400).json({ error: "mode must be 'simulation' or 'live'" });
     return;
   }
-  // Gate live mode behind Starter plan or higher
-  if (mode === "live") {
-    const userId = (req as import("express").Request & { clerkUserId?: string }).clerkUserId ?? "";
-    try {
-      const [user] = await db
-        .select({ plan: usersTable.plan, planStatus: usersTable.planStatus })
-        .from(usersTable)
-        .where(eq(usersTable.clerkUserId, userId))
-        .limit(1);
-      const planOk   = user?.plan === "starter" || user?.plan === "pro" || user?.plan === "enterprise";
-      const statusOk = !user?.planStatus || user.planStatus === "active" || user.planStatus === "trialing";
-      if (!planOk || !statusOk) {
-        res.status(402).json({
-          error:      "Live trading requires a Starter plan or higher",
-          code:       "PLAN_REQUIRED",
-          upgradeUrl: "/billing",
-        });
-        return;
-      }
-    } catch { /* fail open on DB errors */ }
-  }
+  // NOTE — no plan gate here. The route is already protected by
+  // `requireOperator` (admin + super-admin only). Customers on starter/pro
+  // never call this endpoint directly; their live-execution gating happens
+  // upstream in the customer billing/consent flow, not on the shared
+  // institutional engine that this route controls. A previous plan check
+  // here was the root cause of the "$100,000.00 SIM FALLBACK" hero on the
+  // admin Portal: admins typically have plan="free"/null in the users row
+  // (no Stripe subscription), so the check 402'd, the engine never flipped
+  // to live, and /exchange/balances kept returning simulation balances.
   const result = setMode(mode);
   if (!result.ok) {
     res.status(400).json({ error: result.reason });

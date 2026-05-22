@@ -1,0 +1,277 @@
+Replit — we’re making strong progress, but now we need to elevate the institutional/operator experience and prepare for real users coming in today. Please handle the following as a coordinated UI + live telemetry upgrade.
+
+PRIORITY 1 — LIVE KRAKEN BALANCE + REAL EXECUTION
+
+The admin dashboard is still showing:
+
+$100,000.00
+SIM FALLBACK
+
+inside the Kraken balance card.
+
+This must be replaced with the REAL Kraken account balance (~$100 USD currently in the account).
+
+REQUIRED
+Remove ALL remaining simulation fallback logic from the ADMIN dashboard when Kraken is connected.
+Hydrate REAL:
+USD cash balance
+crypto balances
+open positions
+live equity
+The card should clearly indicate:
+KRAKEN LIVE
+LIVE CAPITAL
+REAL EXECUTION
+If Kraken API polling succeeds:
+NEVER show SIM
+NEVER fallback to $100,000
+AI trading engine must route trades to Kraken LIVE mode.
+VERIFY
+
+I need:
+
+exchange polling logs
+authenticated Kraken balance response
+live execution confirmation
+proof that AI routing is NOT using simulation engine anymore
+
+The admin dashboard is now institutional-grade visually — the backend/live execution layer must match it.
+
+PRIORITY 2 — TOP TELEMETRY BAR (MAKE IT BIGGER + MORE USEFUL)
+
+The top telemetry bar is finally appearing correctly, but:
+
+font is too small
+spacing is cramped
+difficult to read quickly
+
+We are expecting real users signing up today.
+
+IMPROVE THE TOP BAR
+
+Increase:
+
+font size
+panel height
+spacing/padding
+glow emphasis
+metric readability
+
+The top telemetry bar should feel like:
+
+Bloomberg terminal
+institutional exchange monitoring
+AI operations center
+ADD / IMPROVE LIVE METRICS
+
+Make these more prominent:
+
+Active Users
+Total Users
+Live Subs
+AI Executions
+Trades Today
+Platform PnL
+Fees
+Queue Depth
+API Latency
+Uptime
+Active Exchanges
+Win Rate
+Signals Today
+Active Bots
+Engine Status
+
+Add:
+
+green/yellow/red status indicators
+animated pulse for LIVE systems
+subtle telemetry movement
+live counters
+rolling updates
+
+Do NOT make it feel static.
+
+PRIORITY 3 — COMMAND CENTER OVERHAUL
+
+The current Command Center structure is good architecturally, but visually it does NOT yet match the quality of the main dashboard.
+
+The main dashboard now feels:
+
+cinematic
+premium
+alive
+institutional
+AI-driven
+
+The Command Center still feels:
+
+too flat
+too grid-like
+too empty
+not enough visual hierarchy
+lacks “live execution desk” energy
+
+We need the SAME FEEL as the main dashboard.
+
+COMMAND CENTER REQUIREMENTS
+EXECUTION STREAM
+
+The “Live Execution Stream” should become a large cinematic terminal feed.
+
+Requirements:
+
+scrolling live activity
+glowing rows
+execution animations
+BUY / SELL indicators
+exchange source badges
+AI confidence %
+timestamps
+execution latency
+status colors
+smooth auto-scroll
+
+Should resemble:
+
+hedge fund execution desk
+HFT terminal
+institutional order router
+ACTIVE USERS PANEL
+
+This is extremely important now.
+
+I need:
+
+currently online users
+users trading live
+users paper trading
+active subscriptions
+connected exchanges
+recent signups
+user activity pulses
+geographic indicators later-ready
+live activity indicators
+
+Even if only simulated right now, structure it for scale.
+
+This should eventually support:
+
+100 users
+1,000 users
+10,000+ users
+
+Design for scale NOW.
+
+AI ENGINE HEALTH
+
+Turn this into a true operational monitoring panel.
+
+Include:
+
+AI status
+signal generation rate
+active models
+model uptime
+confidence averages
+execution throughput
+queue backlog
+failover state
+websocket health
+API health
+exchange connectivity
+
+Use:
+
+animated indicators
+health meters
+neon progress bars
+pulse indicators
+EXCHANGE HEALTH PANEL
+
+Current exchange area is too empty.
+
+I want:
+
+Kraken
+Coinbase
+Robinhood
+Binance
+Crypto.com
+Alpaca
+
+Each should show:
+
+connection status
+latency
+websocket status
+last sync
+balance status
+API health
+LIVE indicator
+
+Remove:
+
+empty dead space
+placeholder feel
+OPEN POSITIONS / CLOSED TRADES
+
+Need:
+
+internal scrolling
+fixed-height institutional panels
+no infinite page growth
+glowing rows
+trade confidence
+exchange source
+execution source
+live PnL coloring
+AI rationale tags
+
+Keep the same institutional style as the main dashboard.
+
+DESIGN DIRECTION
+
+The Command Center should feel like:
+
+BlackRock AI desk
+Citadel execution monitor
+Bloomberg + TradingView hybrid
+AI hedge fund control room
+institutional crypto command terminal
+
+The MAIN dashboard already has this feel.
+
+Bring the Command Center UP to that level.
+
+FINAL IMPORTANT REQUIREMENTS
+PERFORMANCE
+
+Do NOT:
+
+over-glow
+create lag
+create giant re-renders
+freeze scrolling
+
+Need:
+
+lightweight animations
+smooth telemetry
+efficient polling
+virtualized lists where needed
+DELIVERABLES
+
+I need:
+
+Kraken LIVE balance working
+Real AI execution routing
+Improved top telemetry bar
+Command Center visual overhaul
+Better live execution stream
+Active users monitoring
+Institutional-level polish
+Same cinematic feel as the main dashboard
+
+Please implement in phases if needed, but PRIORITY #1 is:
+KRAKEN LIVE BALANCE + REAL EXECUTION.

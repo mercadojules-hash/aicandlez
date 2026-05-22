@@ -718,8 +718,81 @@ function useExchangeStatus(): ExchangeStatus {
   };
 }
 
-/** Header status pill — shows connection / mode state at a glance. */
-function ExchangeStatusPill({ status }: { status: ExchangeStatus }) {
+/** Header status pill — shows connection / mode state at a glance.
+ *  Admin override: when running on the institutional terminal (isAdmin), the
+ *  pill reflects the server-side Kraken live-broker telemetry instead of the
+ *  per-user `user_exchange_connections` table. Admins use server-env Kraken
+ *  keys, so they never appear in the per-user table — without this override
+ *  the pill would always read "NO EXCHANGE · SIM MODE" for operators. */
+function ExchangeStatusPill({
+  status,
+  adminOverride,
+}: {
+  status: ExchangeStatus;
+  adminOverride?: { source: "live" | "error" | "standby" | "simulation" | null; exchange: string };
+}) {
+  // Admin operator path — institutional live-broker pill. We render the
+  // admin pill even on first paint (source === null → "CONNECTING") so the
+  // operator never briefly sees the customer "NO EXCHANGE · SIM MODE"
+  // fallback while the first /exchange/balances poll is in flight.
+  if (adminOverride) {
+    const ex = adminOverride.exchange;
+    const isLive    = adminOverride.source === "live";
+    const isError   = adminOverride.source === "error";
+    const isLoading = adminOverride.source === null;
+    const color = isLive
+      ? N.BRAND
+      : isError
+        ? "#ff3355"
+        : isLoading
+          ? N.TEXT_3
+          : N.WARN;
+    const glow  = isLive
+      ? `0 0 10px ${N.BRAND_GLOW}`
+      : isError
+        ? "0 0 10px #ff335580"
+        : isLoading
+          ? "none"
+          : `0 0 8px ${N.WARN}60`;
+    const label = isLive
+      ? `${ex} LIVE · REAL CAPITAL`
+      : isError
+        ? `${ex} AUTH FAILED`
+        : isLoading
+          ? `${ex} CONNECTING…`
+          : `${ex} STANDBY`;
+    return (
+      <span
+        title={
+          isLive
+            ? `${ex} broker round-trip OK · live execution armed`
+            : isError
+              ? `${ex} API auth failed — keys present but rejected`
+              : isLoading
+                ? `${ex} initial broker handshake in flight`
+                : `${ex} keys not configured — operator standby`
+        }
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "3px 9px", borderRadius: 3,
+          border: `1px solid ${color}55`,
+          background: `${color}10`,
+          color, fontSize: 9, fontWeight: 700,
+          letterSpacing: "0.16em", fontFamily: N.FONT_MONO,
+          whiteSpace: "nowrap",
+        }}
+      >
+        <span style={{
+          width: 6, height: 6, borderRadius: 99,
+          background: color, boxShadow: glow,
+          animation: isLive ? "dot-pulse 1.6s ease-in-out infinite" : undefined,
+        }} />
+        {label}
+      </span>
+    );
+  }
+
+  // Customer path — per-user exchange connections.
   const { connectedCount, liveCount } = status;
   const noneConnected = connectedCount === 0;
   const isLive        = liveCount > 0;
@@ -1876,7 +1949,12 @@ function PortalInner() {
   // every 10s once admin auth resolves, and force the shared engine into LIVE
   // mode once on mount so the very first read is real.
   type KrakenSnap = {
-    source: "live" | "simulation" | "error";
+    // "live"       — real broker round-trip succeeded, balances are real
+    // "error"      — keys present but auth/network failed (banner stays red)
+    // "standby"    — no live keys configured server-side
+    // "simulation" — legacy server response, treated identically to standby
+    //                (we NEVER surface the $100K sim hero on the admin Portal)
+    source: "live" | "simulation" | "error" | "standby";
     exchange: string;
     balances: { USD: number; BTC: number; ETH: number; SOL: number };
     error?: string;
@@ -1921,9 +1999,20 @@ function PortalInner() {
     return () => { cancelled = true; clearInterval(iv); };
   }, [isAdmin, isSignedIn, getToken]);
 
-  const adminUsd = adminKraken?.balances.USD ?? 0;
   const adminLiveSource = adminKraken?.source ?? null;
+  const adminIsLive       = adminLiveSource === "live";
+  // Only display a USD figure when the read genuinely came back live. Any
+  // other state (loading / standby / error / legacy "simulation") renders
+  // "—" so the institutional terminal never surfaces a fake hero balance.
+  const adminUsd          = adminIsLive ? (adminKraken?.balances.USD ?? 0) : null;
   const adminExchangeName = (adminKraken?.exchange ?? "kraken").toUpperCase();
+  const adminLiveBadge = adminIsLive
+    ? `${adminExchangeName} LIVE`
+    : adminLiveSource === "error"
+      ? `${adminExchangeName} AUTH FAILED`
+      : adminLiveSource === "standby" || adminLiveSource === "simulation"
+        ? `${adminExchangeName} STANDBY`
+        : "CONNECTING…";
 
   return (
     <div style={{
@@ -1937,7 +2026,12 @@ function PortalInner() {
         onUpgrade={() => setUpgradeOpenSafe(true)}
         onDisclaimer={() => setDisclaimerOpen(true)}
         onConnectExchange={() => disclaimerGate(() => setConnectExchangeOpen(true))}
-        statusPill={<ExchangeStatusPill status={exchangeStatus} />}
+        statusPill={
+          <ExchangeStatusPill
+            status={exchangeStatus}
+            adminOverride={isAdmin ? { source: adminLiveSource, exchange: adminExchangeName } : undefined}
+          />
+        }
         isAdmin={isAdmin}
       />
 
@@ -1976,36 +2070,30 @@ function PortalInner() {
           gap: 10,
         }}>
           <MetricTile
-            label="KRAKEN USD"
-            value={adminKraken
+            label={`${adminExchangeName} USD`}
+            value={adminUsd !== null
               ? `$${adminUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
               : "—"}
-            delta={adminLiveSource === "live"
-              ? "LIVE"
-              : adminLiveSource === "error"
-                ? "AUTH FAILED"
-                : adminLiveSource === "simulation"
-                  ? "SIM FALLBACK"
-                  : "LOADING"}
-            positive={adminLiveSource === "live"}
+            delta={adminLiveBadge}
+            positive={adminIsLive}
           />
           <MetricTile
             label="BTC"
-            value={adminKraken ? adminKraken.balances.BTC.toFixed(6) : "—"}
-            delta="LIVE"
-            positive
+            value={adminIsLive && adminKraken ? adminKraken.balances.BTC.toFixed(6) : "—"}
+            delta={adminIsLive ? "LIVE" : "—"}
+            positive={adminIsLive}
           />
           <MetricTile
             label="ETH"
-            value={adminKraken ? adminKraken.balances.ETH.toFixed(4) : "—"}
-            delta="LIVE"
-            positive
+            value={adminIsLive && adminKraken ? adminKraken.balances.ETH.toFixed(4) : "—"}
+            delta={adminIsLive ? "LIVE" : "—"}
+            positive={adminIsLive}
           />
           <MetricTile
             label="SOL"
-            value={adminKraken ? adminKraken.balances.SOL.toFixed(3) : "—"}
-            delta="LIVE"
-            positive
+            value={adminIsLive && adminKraken ? adminKraken.balances.SOL.toFixed(3) : "—"}
+            delta={adminIsLive ? "LIVE" : "—"}
+            positive={adminIsLive}
           />
           <MetricTile
             label="LIVE AI TRADES"
