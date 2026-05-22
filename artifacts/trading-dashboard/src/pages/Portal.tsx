@@ -2533,24 +2533,146 @@ function AdminTradeHistoryPanel() {
   );
 }
 
+// ── Customer LIVE panels (signed-in user's own server-side trades) ──────────
+// These panels render the user's real `/api/simulation/*` data — open paper +
+// live positions, then closed trade history with broker-reported fees. The
+// fee math reuses `resolveFeeLeg` so a customer reading this panel sees the
+// same commission figures shown on the PWA receipt and the operator console.
+//
+// Side normalization: the server uses BUY/SELL on positions and SELL/BUY
+// closures, while the existing UI vocabulary is LONG/SHORT. We translate
+// BUY → LONG, SELL → SHORT at the boundary so rows match every other panel.
+
+type CustomerPosition = {
+  id:                       string;
+  symbol:                   string;
+  side:                     "BUY" | "SELL";
+  quantity:                 number;
+  entryPrice:               number;
+  entryTime:                number;
+  sizeUSD:                  number;
+  unrealizedPnL?:           number;
+  unrealizedPnLPct?:        number;
+  exchange?:                string | null;
+  entryFeeBroker?:          number | string | null;
+  entryFeeBrokerCurrency?:  string | null;
+};
+
+type CustomerAccount = {
+  positions: CustomerPosition[];
+};
+
+type CustomerTrade = {
+  id:                       string;
+  symbol:                   string;
+  side:                     "BUY" | "SELL";
+  entryPrice:               number;
+  exitPrice:                number;
+  exitTime:                 number;
+  realizedPnL:              number;
+  realizedPnLPct:           number;
+  closeReason?:             string | null;
+  exchange?:                string | null;
+  entryFee?:                number | string | null;
+  exitFee?:                 number | string | null;
+  netFees?:                 number | string | null;
+  entryFeeBroker?:          number | string | null;
+  entryFeeBrokerCurrency?:  string | null;
+  exitFeeBroker?:           number | string | null;
+  exitFeeBrokerCurrency?:   string | null;
+};
+
+function displaySymbol(sym: string): string {
+  const s = String(sym ?? "").toUpperCase();
+  if (s.endsWith("USD") && s.length > 3) return `${s.slice(0, -3)}/USD`;
+  if (s.endsWith("USDT") && s.length > 4) return `${s.slice(0, -4)}/USDT`;
+  return s;
+}
+
 function ActiveTradesPanel({ onUpgrade }: { onUpgrade: () => void }) {
-  const { open, closeTrade } = usePaperTrades();
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["customer-simulation-account"],
+    queryFn:  async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/simulation/account`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("simulation/account failed");
+      return res.json() as Promise<CustomerAccount>;
+    },
+    refetchInterval: 4_000,
+    refetchOnWindowFocus: false,
+    staleTime: 0,
+  });
+
+  const closeMutation = useMutation({
+    mutationFn: async (positionId: string) => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(
+        `${apiBaseUrl}/api/simulation/close/${encodeURIComponent(positionId)}`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ closeReason: "MANUAL" }),
+        },
+      );
+      if (!res.ok) throw new Error("simulation/close failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["customer-simulation-account"] });
+      void qc.invalidateQueries({ queryKey: ["customer-simulation-trades"] });
+    },
+  });
+
+  const positions = data?.positions ?? [];
+
   return (
     <Panel title="LIVE TRADES" height={420} locked={false} onUnlock={onUpgrade}>
-      {open.length === 0 ? (
+      {positions.length === 0 ? (
         <div style={{
           padding: "18px 4px", fontSize: 10, lineHeight: 1.6,
           color: N.TEXT_2, letterSpacing: "0.10em",
         }}>
-          No open positions. Click <b style={{ color: N.LONG }}>BUY</b> or{" "}
-          <b style={{ color: N.SHORT }}>SELL</b> on any signal above to open
-          a simulated trade. Positions appear here in real time and walk live
-          P/L until TP / SL is hit.
+          {isLoading
+            ? "Loading your open positions…"
+            : <>No open positions. Click <b style={{ color: N.LONG }}>BUY</b> or{" "}
+              <b style={{ color: N.SHORT }}>SELL</b> on any signal above to open
+              a trade. Positions appear here in real time with live P/L until
+              TP / SL is hit.</>}
         </div>
-      ) : open.map((t) => {
-        const color = t.pnl >= 0 ? N.LONG : N.SHORT;
+      ) : positions.map((p) => {
+        const longSide = p.side === "BUY";
+        const pnl      = toNum(p.unrealizedPnL);
+        const pnlPct   = toNum(p.unrealizedPnLPct);
+        const color    = pnl >= 0 ? N.LONG : N.SHORT;
+        const display  = displaySymbol(p.symbol);
+        const entry    = toNum(p.entryPrice);
+        const isLive   = !!p.exchange;
+        // Entry-leg broker commission — only present on live positions where
+        // the exchange surfaced a per-order fee. Matches the AdminLiveTrades
+        // panel logic above.
+        const entryLeg = resolveFeeLeg(
+          p.entryFeeBroker, p.entryFeeBrokerCurrency, null,
+        );
+        const showEntryFee = isLive && entryLeg.fromBroker;
+        const entryFeeLabel = entryLeg.brokerIsUsd
+          ? `−$${(entryLeg.brokerAmount ?? 0).toFixed(2)} OPEN FEE`
+          : `−${(entryLeg.brokerAmount ?? 0).toFixed(
+              (entryLeg.brokerAmount ?? 0) < 1 ? 6 : 4,
+            )} ${entryLeg.brokerCcy ?? ""} OPEN FEE`;
+        const entryFeeTitle = `Opening commission charged by broker${
+          entryLeg.brokerCcy && !entryLeg.brokerIsUsd ? ` (${entryLeg.brokerCcy})` : ""
+        }`;
         return (
-          <div key={t.id} style={{
+          <div key={p.id} style={{
             display: "flex", justifyContent: "space-between", alignItems: "center",
             padding: "8px 0",
             borderBottom: `1px solid ${N.BORDER}`,
@@ -2558,16 +2680,37 @@ function ActiveTradesPanel({ onUpgrade }: { onUpgrade: () => void }) {
           }}>
             <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
               <span style={{ color: N.TEXT_0, fontWeight: 700 }}>
-                {t.display}{"  "}
+                {display}{"  "}
                 <span style={{
-                  color: t.side === "LONG" ? N.LONG : N.SHORT,
+                  color: longSide ? N.LONG : N.SHORT,
                   fontWeight: 800, letterSpacing: "0.16em", fontSize: 9,
                   marginLeft: 4,
-                }}>{t.side}</span>
+                }}>{longSide ? "LONG" : "SHORT"}</span>
+                {isLive && (
+                  <span style={{
+                    color: N.BRAND, fontWeight: 800, letterSpacing: "0.16em",
+                    fontSize: 8, marginLeft: 6,
+                    padding: "1px 5px",
+                    border: `1px solid ${N.BRAND}55`,
+                    borderRadius: 2,
+                  }}>LIVE</span>
+                )}
               </span>
               <span style={{ color: N.TEXT_2, fontSize: 9, marginTop: 2, letterSpacing: "0.04em" }}>
-                Entry ${t.entry.toFixed(t.entry >= 100 ? 2 : 4)} · {fmtQty(t.qty)} · {fmtTime(t.openedAt)}
+                Entry ${entry.toFixed(entry >= 100 ? 2 : 4)} · {fmtQty(toNum(p.quantity))} · {fmtTime(Number(p.entryTime))}
               </span>
+              {showEntryFee && (
+                <span
+                  title={entryFeeTitle}
+                  style={{
+                    color: N.BRAND_DIM, fontSize: 8, fontWeight: 700,
+                    marginTop: 2, letterSpacing: "0.10em",
+                    fontVariantNumeric: "tabular-nums", textTransform: "uppercase",
+                  }}
+                >
+                  {entryFeeLabel}
+                </span>
+              )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
@@ -2575,26 +2718,28 @@ function ActiveTradesPanel({ onUpgrade }: { onUpgrade: () => void }) {
                   color, fontWeight: 800, fontVariantNumeric: "tabular-nums",
                   textShadow: `0 0 6px ${color}40`,
                 }}>
-                  {fmtMoney(t.pnl)}
+                  {fmtMoney(pnl)}
                 </span>
                 <span style={{
                   color, fontSize: 9, fontWeight: 700,
                   fontVariantNumeric: "tabular-nums",
                 }}>
-                  {t.pnlPct >= 0 ? "+" : ""}{t.pnlPct.toFixed(2)}%
+                  {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
                 </span>
               </div>
               <button
-                onClick={() => closeTrade(t.id, "MANUAL")}
+                onClick={() => closeMutation.mutate(p.id)}
+                disabled={closeMutation.isPending}
                 title="Close position"
-                aria-label={`Close ${t.display} position`}
+                aria-label={`Close ${display} position`}
                 style={{
                   width: 22, height: 22, borderRadius: 3,
                   background: "transparent",
                   border: `1px solid ${N.BORDER_HI}`,
                   color: N.TEXT_2,
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer",
+                  cursor: closeMutation.isPending ? "wait" : "pointer",
+                  opacity: closeMutation.isPending ? 0.5 : 1,
                   transition: "all 140ms ease",
                 }}
                 onMouseEnter={(e) => {
@@ -2619,29 +2764,54 @@ function ActiveTradesPanel({ onUpgrade }: { onUpgrade: () => void }) {
 }
 
 function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
-  const { history } = usePaperTrades();
+  const { getToken } = useAuth();
+  const { data, isLoading } = useQuery({
+    queryKey: ["customer-simulation-trades"],
+    queryFn:  async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/simulation/trades`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("simulation/trades failed");
+      return res.json() as Promise<{ trades: CustomerTrade[] }>;
+    },
+    refetchInterval: 6_000,
+    refetchOnWindowFocus: false,
+    staleTime: 0,
+  });
+
+  const history = data?.trades ?? [];
+
   // Toast on every new auto-close (TP / SL) so the feedback feels institutional.
   const lastSeenRef = useRef<string | null>(null);
   useEffect(() => {
     if (history.length === 0) return;
     const newest = history[0];
+    if (!newest) return;
     if (lastSeenRef.current === newest.id) return;
-    // Skip the very first toast on mount
     if (lastSeenRef.current !== null) {
-      if (newest.reason === "TP") {
+      const display = displaySymbol(newest.symbol);
+      const longSide = newest.side === "BUY";
+      const sideLabel = longSide ? "LONG" : "SHORT";
+      const pnl    = toNum(newest.realizedPnL);
+      const pnlPct = toNum(newest.realizedPnLPct);
+      const exit   = toNum(newest.exitPrice);
+      const reason = String(newest.closeReason ?? "").toUpperCase();
+      if (reason.startsWith("TP")) {
         toast({
-          title: `TARGET HIT ${newest.pnlPct >= 0 ? "+" : ""}${newest.pnlPct.toFixed(2)}% — ${newest.display}`,
-          description: `${newest.side} closed at $${newest.exit.toFixed(newest.exit >= 100 ? 2 : 4)} · ${fmtMoney(newest.pnl)} realized`,
+          title: `TARGET HIT ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}% — ${display}`,
+          description: `${sideLabel} closed at $${exit.toFixed(exit >= 100 ? 2 : 4)} · ${fmtMoney(pnl)} realized`,
         });
-      } else if (newest.reason === "SL") {
+      } else if (reason.startsWith("SL")) {
         toast({
-          title: `STOP LOSS TRIGGERED — ${newest.display}`,
-          description: `${newest.side} closed at $${newest.exit.toFixed(newest.exit >= 100 ? 2 : 4)} · ${fmtMoney(newest.pnl)} realized`,
+          title: `STOP LOSS TRIGGERED — ${display}`,
+          description: `${sideLabel} closed at $${exit.toFixed(exit >= 100 ? 2 : 4)} · ${fmtMoney(pnl)} realized`,
         });
       } else {
         toast({
-          title: `POSITION CLOSED — ${newest.display}`,
-          description: `${newest.side} · ${fmtMoney(newest.pnl)} realized`,
+          title: `POSITION CLOSED — ${display}`,
+          description: `${sideLabel} · ${fmtMoney(pnl)} realized`,
         });
       }
     }
@@ -2655,13 +2825,59 @@ function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
           padding: "18px 4px", fontSize: 10, lineHeight: 1.6,
           color: N.TEXT_2, letterSpacing: "0.10em",
         }}>
-          Closed positions land here with realized P/L, exit reason and
-          timestamp. Open a paper trade above to populate this feed.
+          {isLoading
+            ? "Loading your trade history…"
+            : "Closed positions land here with realized P/L, exit reason and timestamp. Open a trade above to populate this feed."}
         </div>
       ) : history.map((t) => {
-        const color = t.pnl >= 0 ? N.LONG : N.SHORT;
-        const tag = t.reason === "TP" ? "TP HIT" : t.reason === "SL" ? "SL HIT" : "CLOSED";
-        const tagColor = t.reason === "TP" ? N.LONG : t.reason === "SL" ? N.SHORT : N.TEXT_2;
+        const pnl    = toNum(t.realizedPnL);
+        const pnlPct = toNum(t.realizedPnLPct);
+        const exit   = toNum(t.exitPrice);
+        const color  = pnl >= 0 ? N.LONG : N.SHORT;
+        const reason = String(t.closeReason ?? "").toUpperCase();
+        const tag    = reason.startsWith("TP") ? "TP HIT"
+                     : reason.startsWith("SL") ? "SL HIT" : "CLOSED";
+        const tagColor = reason.startsWith("TP") ? N.LONG
+                       : reason.startsWith("SL") ? N.SHORT : N.TEXT_2;
+        const longSide = t.side === "BUY";
+        const display  = displaySymbol(t.symbol);
+
+        // Reuse the same broker-vs-estimate resolver as the operator panel
+        // and the PWA receipt so this row's fee number matches every other
+        // surface that displays the same trade.
+        const entryLeg = resolveFeeLeg(
+          t.entryFeeBroker, t.entryFeeBrokerCurrency, t.entryFee,
+        );
+        const exitLeg  = resolveFeeLeg(
+          t.exitFeeBroker,  t.exitFeeBrokerCurrency,  t.exitFee,
+        );
+        const fees =
+          (entryLeg.fromBroker || entryLeg.estimate != null
+            || exitLeg.fromBroker  || exitLeg.estimate  != null)
+            ? entryLeg.usd + exitLeg.usd
+            : (t.netFees != null ? toNum(t.netFees) : 0);
+        const anyBroker = entryLeg.fromBroker || exitLeg.fromBroker;
+        const feeLabel  = anyBroker ? "BROKER FEES" : "FEES (EST.)";
+        const fmtLegTitle = (legName: string, leg: ReturnType<typeof resolveFeeLeg>): string | null => {
+          if (leg.fromBroker) {
+            const ccy = leg.brokerCcy && !leg.brokerIsUsd ? ` ${leg.brokerCcy}` : "";
+            const dp  = leg.brokerIsUsd ? 2 : ((leg.brokerAmount ?? 0) < 1 ? 6 : 4);
+            const sym = leg.brokerIsUsd ? "$" : "";
+            return `${legName}: ${sym}${(leg.brokerAmount ?? 0).toFixed(dp)}${ccy} · charged by broker`;
+          }
+          if (leg.estimate != null) {
+            return `${legName}: $${leg.estimate.toFixed(2)} (est.)`;
+          }
+          return null;
+        };
+        const tooltipLines: string[] = [];
+        const openTip  = fmtLegTitle("Opening commission", entryLeg);
+        const closeTip = fmtLegTitle("Closing commission", exitLeg);
+        if (openTip)  tooltipLines.push(openTip);
+        if (closeTip) tooltipLines.push(closeTip);
+        tooltipLines.push(`Net of fees: ${fmtMoney(pnl - fees)}`);
+        const feeTooltip = tooltipLines.join("\n");
+
         return (
           <div key={t.id} style={{
             display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -2671,12 +2887,12 @@ function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
           }}>
             <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
               <span style={{ color: N.TEXT_0, fontWeight: 700 }}>
-                {t.display}{"  "}
+                {display}{"  "}
                 <span style={{
-                  color: t.side === "LONG" ? N.LONG : N.SHORT,
+                  color: longSide ? N.LONG : N.SHORT,
                   fontWeight: 800, letterSpacing: "0.16em", fontSize: 9,
                   marginLeft: 4,
-                }}>{t.side}</span>
+                }}>{longSide ? "LONG" : "SHORT"}</span>
                 <span style={{
                   color: tagColor,
                   fontWeight: 800, letterSpacing: "0.16em", fontSize: 8,
@@ -2687,7 +2903,7 @@ function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
                 }}>{tag}</span>
               </span>
               <span style={{ color: N.TEXT_2, fontSize: 9, marginTop: 2, letterSpacing: "0.04em" }}>
-                Exit ${t.exit.toFixed(t.exit >= 100 ? 2 : 4)} · {fmtTime(t.closedAt)}
+                Exit ${exit.toFixed(exit >= 100 ? 2 : 4)} · {fmtTime(Number(t.exitTime))}
               </span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
@@ -2695,14 +2911,27 @@ function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
                 color, fontWeight: 800, fontVariantNumeric: "tabular-nums",
                 textShadow: `0 0 6px ${color}40`,
               }}>
-                {fmtMoney(t.pnl)}
+                {fmtMoney(pnl)}
               </span>
               <span style={{
                 color, fontSize: 9, fontWeight: 700,
                 fontVariantNumeric: "tabular-nums",
               }}>
-                {t.pnlPct >= 0 ? "+" : ""}{t.pnlPct.toFixed(2)}%
+                {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
               </span>
+              {fees > 0 && (
+                <span
+                  title={feeTooltip}
+                  style={{
+                    color: anyBroker ? N.BRAND_DIM : N.TEXT_2,
+                    fontSize: 8, fontWeight: 700,
+                    marginTop: 2, letterSpacing: "0.10em",
+                    fontVariantNumeric: "tabular-nums", textTransform: "uppercase",
+                  }}
+                >
+                  −${fees.toFixed(2)} {feeLabel}
+                </span>
+              )}
             </div>
           </div>
         );
