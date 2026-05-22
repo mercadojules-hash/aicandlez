@@ -1,0 +1,305 @@
+We are now entering PHASE 2: OPERATIONAL INTELLIGENCE + EXECUTION SAFETY.
+
+The platform has crossed the point where it is only a UI project.
+
+Current production state:
+
+* live Kraken capital connected
+* admin/operator branch working
+* real exchange hydration active
+* execution architecture functioning
+* multi-exchange abstraction functioning
+* onboarding + subscription pipeline working
+* command center framework exists
+* live execution infrastructure exists
+
+The next priority is:
+RELIABILITY + OPERATOR INTELLIGENCE.
+
+IMPORTANT:
+Do NOT treat this as random feature additions.
+This is now institutional-grade execution architecture.
+
+====================================================
+PRIORITY #1 — EXECUTION SAFETY LAYER
+====================================
+
+1. OPEN POSITION RECONCILIATION ENGINE
+
+Build startup reconciliation.
+
+On api-server restart:
+
+FOR EACH LIVE USER:
+
+* fetch open positions from exchange
+* fetch balances
+* fetch open orders
+* rebuild local execution state
+* rebuild AI monitoring state
+* resume stop-loss / trailing management
+* resume AI execution safely
+
+Critical:
+
+* no duplicate orders
+* no orphaned positions
+* no stale local state
+* no unmanaged trades after restart
+
+Add:
+
+* reconciliation logs
+* startup recovery telemetry
+* recovery success/failure counts
+
+---
+
+2. DUPLICATE ORDER PREVENTION
+
+Implement:
+
+* trade fingerprinting
+* position existence checks
+* execution cooldowns
+* pending-order locking
+* duplicate execution rejection
+
+Need safeguards against:
+
+* repeated BUY loops
+* websocket reconnect duplicate trades
+* API retry duplication
+* restart replay duplication
+
+---
+
+3. PERSISTENT KILL SWITCH
+
+Current kill switch is visual only.
+
+Need:
+
+* DB-persisted kill switch state
+* restart persistence
+* operator override
+* emergency execution halt
+* global AI pause
+* per-user AI pause
+
+If server restarts:
+KILL SWITCH MUST REMAIN ACTIVE.
+
+---
+
+4. AI SAFETY CONTROLS
+
+Add configurable:
+
+* max daily loss
+* max concurrent trades
+* max exposure %
+* per-asset exposure
+* volatility breaker
+* AI confidence threshold
+* emergency stop
+* max trades per hour
+* exchange disconnect failsafe
+
+====================================================
+PRIORITY #2 — OPERATOR INTELLIGENCE
+===================================
+
+5. LIVE EXECUTION STREAM
+
+Current execution stream is visually empty.
+
+Transform into:
+real-time scrolling execution terminal.
+
+Include:
+
+* BUY / SELL events
+* stop moved
+* TP hit
+* SL hit
+* AI confidence
+* execution latency
+* exchange routing
+* user execution events
+* rejected orders
+* reconciliation events
+* websocket reconnects
+
+Need:
+
+* smooth scrolling
+* neon terminal feel
+* institutional execution aesthetic
+* timestamp precision
+
+---
+
+6. USER ACTIVITY INTELLIGENCE
+
+Expand Command Center.
+
+Add:
+
+* online users
+* active AI users
+* live vs paper users
+* exchange-connected users
+* new signups
+* active live positions
+* total platform exposure
+* total user volume
+* user PnL aggregation
+* fee revenue
+* MRR
+* conversion %
+* live execution count
+
+---
+
+7. EXCHANGE HEALTH MONITORING
+
+Need:
+
+* websocket latency
+* reconnect counts
+* exchange API health
+* failed order count
+* heartbeat status
+* exchange outage detection
+* live execution latency
+* broker authentication health
+
+Add:
+
+* green/yellow/red health states
+* pulse indicators
+* operator alerts
+
+====================================================
+PRIORITY #3 — AI INTELLIGENCE LAYER
+===================================
+
+8. AI REASONING VISIBILITY
+
+When AI executes:
+show WHY.
+
+Example:
+BTC LONG
+Confidence: 92%
+
+Reason:
+
+* EMA crossover
+* RSI recovery
+* bullish regime
+* positive correlation
+* volume expansion
+
+This should exist in:
+
+* execution stream
+* open positions
+* trade journal
+* AI telemetry
+
+---
+
+9. AI PERFORMANCE ATTRIBUTION
+
+Add:
+
+* best signals
+* worst signals
+* win rate by market regime
+* AI model comparison
+* exchange comparison
+* strategy attribution
+* performance heatmaps
+
+====================================================
+PRIORITY #4 — COMMAND CENTER REDESIGN
+=====================================
+
+The Command Center should become the flagship institutional operator terminal.
+
+Current structure is correct.
+Now elevate the experience.
+
+Need:
+
+* larger typography
+* better spacing hierarchy
+* cinematic telemetry
+* scrolling execution feed
+* AI engine health meters
+* user activity monitoring
+* exchange health board
+* active positions stream
+* closed trades stream
+* execution heatmaps
+* operator alerts
+* live platform risk map
+* animated telemetry counters
+* smoother glow hierarchy
+* Bloomberg/institutional aesthetic
+
+IMPORTANT:
+Maintain:
+
+* black interior panels
+* neon green execution styling
+* high-contrast readability
+* operator-console aesthetic
+
+Make it feel like:
+Bloomberg Terminal + AI Execution Center + Institutional Trading Infrastructure.
+
+====================================================
+PRIORITY #5 — TOP TELEMETRY BAR UPGRADE
+=======================================
+
+Current telemetry bar is too small.
+
+Upgrade:
+
+* larger fonts
+* brighter indicators
+* animated counters
+* better spacing
+* easier readability
+* stronger hierarchy
+
+Add:
+
+* active live users
+* AI executions/min
+* active positions
+* total platform volume
+* websocket health
+* API latency
+* live exchange count
+* active brokers
+* reconciliation events
+* uptime %
+
+====================================================
+IMPORTANT DEVELOPMENT RULES
+===========================
+
+1. Reliability over visuals
+2. Never lose live exchange state
+3. Never duplicate live orders
+4. Frontend redeploys must not break execution
+5. Reconciliation must recover all open positions
+6. Operator telemetry must remain real-time
+7. Preserve institutional visual language already established
+
+PHASE 2 is now:
+Institutional-grade operational infrastructure.
