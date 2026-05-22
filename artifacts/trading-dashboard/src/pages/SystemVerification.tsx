@@ -4,6 +4,7 @@ import {
   Brain, GitMerge, TrendingUp, ShieldX, Network, Timer, BookOpen,
   ShieldCheck, BarChart2, Clock, Wifi, WifiOff, Cpu,
 } from "lucide-react";
+import { BackfillStatusPanel } from "@/components/BackfillStatusPanel";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -245,6 +246,9 @@ export default function SystemVerification() {
           Loading verification data…
         </div>
       )}
+
+      {/* ── Nightly broker back-fill summary (admin-only route already) ── */}
+      <BackfillStatusPanel />
 
       {/* ── Grid ── */}
       {!isLoading && c && (
