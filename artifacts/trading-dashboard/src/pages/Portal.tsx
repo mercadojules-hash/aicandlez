@@ -2956,11 +2956,14 @@ function portalFeesShortLabel(key: string): string {
 function PortalFeesTrend({
   data,
 }: {
-  data: { months: { month: string; feesPaid: number; tradeCount: number }[]; totalFeesPaid: number } | undefined;
+  data: { months: { month: string; feesPaid: number; tradeCount: number; realizedPnL: number }[]; totalFeesPaid: number } | undefined;
 }) {
   const buckets = data?.months ?? [];
-  const hasAny  = buckets.some(b => b.feesPaid > 0);
-  const peak    = Math.max(0, ...buckets.map(b => b.feesPaid));
+  const hasAny  = buckets.some(b => b.feesPaid > 0 || b.realizedPnL !== 0);
+  const peak    = Math.max(
+    0,
+    ...buckets.map(b => Math.max(b.feesPaid, Math.abs(b.realizedPnL))),
+  );
 
   if (!hasAny) {
     return (
@@ -2991,7 +2994,7 @@ function PortalFeesTrend({
       }}>
         <span style={{ fontSize: 10, color: N.TEXT_2,
           letterSpacing: "0.16em", textTransform: "uppercase" }}>
-          FEES · LAST 6 MONTHS
+          FEES vs PROFIT · LAST 6 MONTHS
         </span>
         <span style={{ fontSize: 10, color: N.TEXT_1, letterSpacing: "0.08em" }}>
           PEAK ${peak.toFixed(2)}
@@ -3005,8 +3008,16 @@ function PortalFeesTrend({
         height: 72,
       }}>
         {buckets.map(b => {
-          const h = peak > 0 ? Math.max(2, Math.round((b.feesPaid / peak) * 64)) : 2;
-          const active = b.feesPaid > 0;
+          const profit  = b.realizedPnL;
+          const profitH = peak > 0 ? Math.max(profit > 0 ? 2 : 0, Math.round((Math.max(profit, 0) / peak) * 64)) : 0;
+          const feeH    = peak > 0 ? Math.max(b.feesPaid > 0 ? 2 : 0, Math.round((b.feesPaid / peak) * 64)) : 0;
+          const overrun = b.feesPaid > 0 && b.feesPaid >= Math.max(profit, 0);
+          const ratio   = profit > 0 ? (b.feesPaid / profit) * 100 : null;
+          const ratioLabel = ratio !== null
+            ? ` · fees ${ratio.toFixed(1)}% of profit`
+            : (profit < 0 ? " · losing month" : "");
+          const profitColor = profit >= 0 ? N.BRAND : `${N.TEXT_3}88`;
+          const feeColor    = overrun ? "#ff7a3d" : `${N.TEXT_2}aa`;
           return (
             <div
               key={b.month}
@@ -3014,13 +3025,35 @@ function PortalFeesTrend({
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end",
                 height: "100%",
               }}
-              title={`${portalFeesShortLabel(b.month)} ${b.month.slice(0,4)} · $${b.feesPaid.toFixed(2)} · ${b.tradeCount} trade${b.tradeCount === 1 ? "" : "s"}`}
+              title={
+                `${portalFeesShortLabel(b.month)} ${b.month.slice(0,4)} · ` +
+                `$${b.feesPaid.toFixed(2)} fees on ` +
+                `${profit >= 0 ? "$" : "−$"}${Math.abs(profit).toFixed(2)} profit · ` +
+                `${b.tradeCount} trade${b.tradeCount === 1 ? "" : "s"}${ratioLabel}`
+              }
             >
               <div style={{
-                width: "100%", height: h, borderRadius: 2,
-                background: active ? N.BRAND : `${N.TEXT_3}55`,
-                boxShadow: active ? `0 0 8px ${N.BRAND_GLOW}` : "none",
-              }} />
+                display: "flex", alignItems: "flex-end", justifyContent: "center",
+                gap: 3, width: "100%", height: "100%",
+              }}>
+                {profitH > 0 && (
+                  <div style={{
+                    width: "45%", height: profitH, borderRadius: 2,
+                    background: profitColor,
+                    boxShadow: profit > 0 ? `0 0 8px ${N.BRAND_GLOW}` : "none",
+                  }} />
+                )}
+                {feeH > 0 && (
+                  <div style={{
+                    width: "45%", height: feeH, borderRadius: 2,
+                    background: feeColor,
+                    boxShadow: overrun ? "0 0 8px rgba(255,122,61,0.5)" : "none",
+                  }} />
+                )}
+                {profitH === 0 && feeH === 0 && (
+                  <div style={{ width: "100%", height: 2, borderRadius: 2, background: `${N.TEXT_3}55` }} />
+                )}
+              </div>
             </div>
           );
         })}
@@ -3038,6 +3071,15 @@ function PortalFeesTrend({
             {portalFeesShortLabel(b.month)}
           </div>
         ))}
+      </div>
+      <div style={{
+        display: "flex", justifyContent: "center", gap: 16,
+        marginTop: 10, fontSize: 9, color: N.TEXT_2,
+        letterSpacing: "0.12em", textTransform: "uppercase",
+      }}>
+        <span><span style={{ color: N.BRAND }}>■</span> PROFIT</span>
+        <span><span style={{ color: N.TEXT_2 }}>■</span> FEES</span>
+        <span><span style={{ color: "#ff7a3d" }}>■</span> FEES &gt; PROFIT</span>
       </div>
     </div>
   );
@@ -3256,7 +3298,7 @@ function PortalInner() {
   // Portfolio FeesMonthlyChart (Task #95) so desktop customers can see
   // whether commission is climbing or shrinking over time. Same endpoint,
   // same shape, same empty-state semantics.
-  type MonthlyFeesBucket = { month: string; feesPaid: number; tradeCount: number };
+  type MonthlyFeesBucket = { month: string; feesPaid: number; tradeCount: number; realizedPnL: number };
   type MonthlyFeesResp   = { months: MonthlyFeesBucket[]; totalFeesPaid: number };
   const monthlyFeesQuery = useQuery<MonthlyFeesResp>({
     queryKey: ["/api/account/fees/monthly", "portal"],

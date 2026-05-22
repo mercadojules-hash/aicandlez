@@ -184,9 +184,10 @@ export interface SimAccount {
 }
 
 export interface MonthlyFeeBucket {
-  month:      string;
-  feesPaid:   number;
-  tradeCount: number;
+  month:       string;
+  feesPaid:    number;
+  tradeCount:  number;
+  realizedPnL: number;
 }
 
 export interface MonthlyFeesResponse {

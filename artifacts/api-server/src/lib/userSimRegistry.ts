@@ -273,6 +273,8 @@ export interface MonthlyFeeBucket {
   feesPaid: number;
   /** Number of closed trades that landed in this month */
   tradeCount: number;
+  /** Sum of gross realized P&L (pre-fee) across closed trades in this month */
+  realizedPnL: number;
 }
 
 export async function getUserMonthlyFees(
@@ -290,7 +292,7 @@ export async function getUserMonthlyFees(
     const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
     const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
     indexByKey.set(key, buckets.length);
-    buckets.push({ month: key, feesPaid: 0, tradeCount: 0 });
+    buckets.push({ month: key, feesPaid: 0, tradeCount: 0, realizedPnL: 0 });
   }
 
   const windowStart = Date.UTC(
@@ -301,9 +303,10 @@ export async function getUserMonthlyFees(
 
   const rows = await db
     .select({
-      exitTime: simTradesTable.exitTime,
-      entryFee: simTradesTable.entryFee,
-      exitFee:  simTradesTable.exitFee,
+      exitTime:    simTradesTable.exitTime,
+      entryFee:    simTradesTable.entryFee,
+      exitFee:     simTradesTable.exitFee,
+      realizedPnL: simTradesTable.realizedPnL,
     })
     .from(simTradesTable)
     .where(eq(simTradesTable.userId, userId));
@@ -317,10 +320,12 @@ export async function getUserMonthlyFees(
     const fee = (r.entryFee ?? 0) + (r.exitFee ?? 0);
     if (fee > 0) buckets[idx]!.feesPaid += fee;
     buckets[idx]!.tradeCount += 1;
+    buckets[idx]!.realizedPnL += r.realizedPnL ?? 0;
   }
 
   for (const b of buckets) {
-    b.feesPaid = parseFloat(b.feesPaid.toFixed(2));
+    b.feesPaid    = parseFloat(b.feesPaid.toFixed(2));
+    b.realizedPnL = parseFloat(b.realizedPnL.toFixed(2));
   }
   return buckets;
 }
