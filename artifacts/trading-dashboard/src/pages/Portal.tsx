@@ -793,7 +793,7 @@ function ExchangeOnboardingBanner({ onConnect }: { onConnect: () => void }) {
         <div style={{
           fontSize: 8, color: N.TEXT_3, letterSpacing: "0.18em", marginTop: 6,
         }}>
-          SUPPORTED · KRAKEN · COINBASE · BINANCE · BYBIT · OKX · KUCOIN · CRYPTO.COM
+          SUPPORTED · ALPACA · KRAKEN · COINBASE · CRYPTO.COM · BINANCE
         </div>
       </div>
       <button

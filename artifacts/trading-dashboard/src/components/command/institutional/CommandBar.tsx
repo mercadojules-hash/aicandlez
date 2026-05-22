@@ -14,16 +14,14 @@ interface Exchange {
   id: string; label: string; color: string; disabled?: boolean; soon?: boolean; isSim?: boolean;
 }
 
-// Operator console = LIVE-ONLY crypto execution.
-// No paper / simulation / Alpaca tabs are exposed on this surface.
+// Operator console = LIVE-ONLY execution. Order matches the onboarding
+// catalog (Alpaca first). No paper / simulation tabs on this surface.
 const EXCHANGES: Exchange[] = [
+  { id: "alpaca",    label: "ALPACA",     color: "#ffbe00" },
   { id: "kraken",    label: "KRAKEN",     color: N.GOLD },
   { id: "coinbase",  label: "COINBASE",   color: "#2775ca" },
-  { id: "binance",   label: "BINANCE",    color: "#f0b90b" },
   { id: "cryptocom", label: "CRYPTO.COM", color: "#1199fa" },
-  { id: "bybit",     label: "BYBIT",      color: "#f7a600", disabled: true, soon: true },
-  { id: "kucoin",    label: "KUCOIN",     color: "#24ae8f", disabled: true, soon: true },
-  { id: "okx",       label: "OKX",        color: "#b0b0b0", disabled: true, soon: true },
+  { id: "binance",   label: "BINANCE",    color: "#f0b90b" },
 ];
 
 function fmtUsd(n: number | null | undefined): string {

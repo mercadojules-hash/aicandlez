@@ -418,7 +418,8 @@ function ConnectModal({
           </div>
         </div>
 
-        {/* Passphrase (OKX, KuCoin) */}
+        {/* Passphrase — reserved for any future exchange adapter that requires it.
+            Current live tier (Alpaca, Kraken, Coinbase, Crypto.com, Binance) does not. */}
         {needsPassphrase && (
           <div>
             <label className="font-mono text-[9px] font-medium tracking-wider block mb-1" style={{ color: "#4a6a80" }}>

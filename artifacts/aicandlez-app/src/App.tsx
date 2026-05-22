@@ -6,6 +6,7 @@ import {
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { BottomNav } from "@/components/BottomNav";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
+import { OnboardingFlow } from "@/components/OnboardingFlow";
 import { SubscriptionModal }    from "@/components/SubscriptionModal";
 import { BrokerConnectionProvider }        from "@/contexts/BrokerConnectionContext";
 import { AIAutoTradeProvider }             from "@/contexts/AIAutoTradeContext";
@@ -437,6 +438,7 @@ function Shell() {
         </div>
         <SubscriptionModal />
         <TradingAccountOnboardingModal />
+        <OnboardingFlow />
         <AlpacaAutoTrader />
         <SwRegistrar />
       </SubscriptionProvider>

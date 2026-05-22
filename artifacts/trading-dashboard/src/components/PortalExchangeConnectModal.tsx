@@ -20,7 +20,7 @@
  *     replit.md). The connect endpoint refuses to enable withdrawal capability.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/react";
 import { X, Loader2, ShieldCheck, AlertTriangle, Check } from "lucide-react";
 
@@ -47,23 +47,49 @@ interface Exchange {
   logo:             string;
   needsPassphrase?: boolean;
 }
+// Supported live-trading exchanges. Order matches the onboarding catalog
+// (Alpaca first = primary recommendation for US users). OKX / KuCoin / Bybit /
+// Robinhood are deliberately omitted for US-compliance reasons — see
+// artifacts/api-server/src/services/exchanges/catalog.ts header comment.
 const EXCHANGES: Exchange[] = [
-  { id: "kraken",   name: "Kraken",         logo: "K" },
-  { id: "binance",  name: "Binance",        logo: "B" },
-  { id: "coinbase", name: "Coinbase",       logo: "C", needsPassphrase: true },
-  { id: "bybit",    name: "Bybit",          logo: "Y" },
-  { id: "okx",      name: "OKX",            logo: "O", needsPassphrase: true },
-  { id: "kucoin",   name: "KuCoin",         logo: "U", needsPassphrase: true },
+  { id: "Alpaca",       name: "Alpaca",      logo: "A" },
+  { id: "Kraken",       name: "Kraken",      logo: "K" },
+  { id: "Coinbase",     name: "Coinbase",    logo: "C" },
+  { id: "CryptoDotCom", name: "Crypto.com",  logo: "ᶜ" },
+  { id: "Binance",      name: "Binance",     logo: "B" },
 ];
 
 interface Props {
   open:    boolean;
   onClose: () => void;
+  /**
+   * Optional ID (matches backend catalog: "Alpaca" | "Kraken" | "Coinbase" |
+   * "CryptoDotCom" | "Binance") to lock the exchange picker to a single
+   * choice. Used by OnboardingFlow when the user picks the "Create / Fund
+   * Alpaca" path so they can't switch away mid-flow.
+   */
+  preselectedExchange?: string;
+  /** Fires after a successful connect. OnboardingFlow uses it to advance state. */
+  onConnected?: () => void;
 }
 
-export function PortalExchangeConnectModal({ open, onClose }: Props) {
+export function PortalExchangeConnectModal({ open, onClose, preselectedExchange, onConnected }: Props) {
   const { getToken } = useAuth();
-  const [picked,     setPicked]     = useState<Exchange>(EXCHANGES[0]);
+  const initialPick = preselectedExchange
+    ? (EXCHANGES.find(e => e.id === preselectedExchange) ?? EXCHANGES[0])
+    : EXCHANGES[0];
+  const [picked,     setPicked]     = useState<Exchange>(initialPick);
+  // `useState(initialPick)` only fires on mount, so a later `preselectedExchange`
+  // change (e.g., re-entering the connect step with a different lock) would
+  // be silently ignored. Sync via effect.
+  useEffect(() => {
+    if (!preselectedExchange) return;
+    const next = EXCHANGES.find(e => e.id === preselectedExchange);
+    if (next && next.id !== picked.id) setPicked(next);
+    // We intentionally don't depend on `picked` to avoid fighting user changes
+    // after the lock — when a preselection arrives, we honor it once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselectedExchange]);
   const [label,      setLabel]      = useState("");
   const [apiKey,     setApiKey]     = useState("");
   const [apiSecret,  setApiSecret]  = useState("");
@@ -119,6 +145,7 @@ export function PortalExchangeConnectModal({ open, onClose }: Props) {
           ?? `Connection failed (HTTP ${r.status}). Check your credentials and try again.`);
       }
       setSuccess(true);
+      onConnected?.();
       setTimeout(() => { reset(); onClose(); }, 1500);
     } catch (e) {
       setError(e instanceof Error

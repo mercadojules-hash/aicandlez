@@ -45,19 +45,13 @@ export interface ExchangeCatalogEntry {
 
 export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
   // ── Tier 1 — Live (fully implemented) ──────────────────────────────────────
+  //
+  // Order here = display order in onboarding UIs. Alpaca is listed first
+  // because it is the primary recommended path for new live users (US-friendly,
+  // instant brokerage onboarding via alpaca.markets). Robinhood, OKX, KuCoin,
+  // and Bybit were intentionally removed for US-compliance reasons; do not
+  // re-add without a live, vetted adapter and a fresh compliance review.
 
-  {
-    id: "Kraken", name: "Kraken", url: "https://www.kraken.com", logo: "kraken",
-    requiresPassphrase: false,
-    requiredPerms: "Query Funds, Query Open Orders & Trades, Create & Modify Orders",
-    warnings: [
-      "Do NOT enable withdrawal permissions.",
-      "Restrict key to read + trade access only.",
-    ],
-    takerFeePct: 0.26, makerFeePct: 0.16,
-    rateLimit: { ordersPerSecond: 1, requestsPerMinute: 60 },
-    status: "live", features: ["spot", "futures", "perps"], adapterAvailable: true,
-  },
   {
     id: "Alpaca", name: "Alpaca", url: "https://alpaca.markets", logo: "alpaca",
     requiresPassphrase: false,
@@ -71,15 +65,15 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
     status: "live", features: ["spot"], adapterAvailable: true,
   },
   {
-    id: "Binance", name: "Binance", url: "https://www.binance.com", logo: "binance",
+    id: "Kraken", name: "Kraken", url: "https://www.kraken.com", logo: "kraken",
     requiresPassphrase: false,
-    requiredPerms: "Enable Reading, Enable Spot & Margin Trading",
+    requiredPerms: "Query Funds, Query Open Orders & Trades, Create & Modify Orders",
     warnings: [
-      "Do NOT enable withdrawals.",
-      "Do NOT enable futures or margin unless explicitly required.",
+      "Do NOT enable withdrawal permissions.",
+      "Restrict key to read + trade access only.",
     ],
-    takerFeePct: 0.10, makerFeePct: 0.10,
-    rateLimit: { ordersPerSecond: 10, requestsPerMinute: 1200 },
+    takerFeePct: 0.26, makerFeePct: 0.16,
+    rateLimit: { ordersPerSecond: 1, requestsPerMinute: 60 },
     status: "live", features: ["spot", "futures", "perps"], adapterAvailable: true,
   },
   {
@@ -95,40 +89,28 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
     status: "live", features: ["spot"], adapterAvailable: true,
   },
   {
-    id: "Bybit", name: "Bybit", url: "https://www.bybit.com", logo: "bybit",
+    id: "CryptoDotCom", name: "Crypto.com", url: "https://crypto.com/exchange", logo: "cryptocom",
     requiresPassphrase: false,
-    requiredPerms: "Read, Trade (Unified Trading Account)",
+    requiredPerms: "Read, Trade (Exchange API — not App API)",
     warnings: [
-      "Do NOT enable withdraw permissions.",
-      "Restrict key to Unified Trading Account only.",
+      "Do NOT enable withdrawal permissions.",
+      "Use Exchange API keys, not the Crypto.com App API.",
     ],
-    takerFeePct: 0.10, makerFeePct: 0.10,
-    rateLimit: { ordersPerSecond: 10, requestsPerMinute: 600 },
+    takerFeePct: 0.075, makerFeePct: 0.075,
+    rateLimit: { ordersPerSecond: 15, requestsPerMinute: 900 },
     status: "live", features: ["spot", "perps"], adapterAvailable: true,
   },
   {
-    id: "OKX", name: "OKX", url: "https://www.okx.com", logo: "okx",
-    requiresPassphrase: true,
-    requiredPerms: "Read, Trade",
+    id: "Binance", name: "Binance", url: "https://www.binance.com", logo: "binance",
+    requiresPassphrase: false,
+    requiredPerms: "Enable Reading, Enable Spot & Margin Trading",
     warnings: [
-      "Do NOT enable withdraw permissions.",
-      "Passphrase is required — set when creating the API key.",
-    ],
-    takerFeePct: 0.10, makerFeePct: 0.08,
-    rateLimit: { ordersPerSecond: 20, requestsPerMinute: 600 },
-    status: "live", features: ["spot", "futures", "perps"], adapterAvailable: true,
-  },
-  {
-    id: "KuCoin", name: "KuCoin", url: "https://www.kucoin.com", logo: "kucoin",
-    requiresPassphrase: true,
-    requiredPerms: "General, Trade",
-    warnings: [
-      "Do NOT enable withdrawal permission.",
-      "Passphrase must match what you set when creating the key.",
+      "Do NOT enable withdrawals.",
+      "Do NOT enable futures or margin unless explicitly required.",
     ],
     takerFeePct: 0.10, makerFeePct: 0.10,
-    rateLimit: { ordersPerSecond: 5, requestsPerMinute: 300 },
-    status: "live", features: ["spot", "futures"], adapterAvailable: true,
+    rateLimit: { ordersPerSecond: 10, requestsPerMinute: 1200 },
+    status: "live", features: ["spot", "futures", "perps"], adapterAvailable: true,
   },
 
   // ── Tier 2 — Beta (implemented, not yet battle-tested) ─────────────────────
@@ -169,18 +151,6 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
     takerFeePct: 0.10, makerFeePct: 0.10,
     rateLimit: { ordersPerSecond: 20, requestsPerMinute: 1200 },
     status: "beta", features: ["spot", "futures"], adapterAvailable: true,
-  },
-  {
-    id: "CryptoDotCom", name: "Crypto.com Exchange", url: "https://crypto.com/exchange", logo: "cryptocom",
-    requiresPassphrase: false,
-    requiredPerms: "Read, Trade (Exchange API — not App API)",
-    warnings: [
-      "Do NOT enable withdrawal permissions.",
-      "Use Exchange API keys, not the Crypto.com App API.",
-    ],
-    takerFeePct: 0.075, makerFeePct: 0.075,
-    rateLimit: { ordersPerSecond: 15, requestsPerMinute: 900 },
-    status: "beta", features: ["spot", "perps"], adapterAvailable: true,
   },
   {
     id: "HTX", name: "HTX (Huobi)", url: "https://www.htx.com", logo: "htx",

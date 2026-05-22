@@ -51,14 +51,14 @@ function pctColor(n: number) {
   return n > 0 ? "#00ff8a" : n < 0 ? "#ff3355" : "#9FB3C8";
 }
 
+// Keys match backend catalog IDs (case-sensitive PascalCase). OKX/KuCoin/Bybit
+// removed for US compliance — see `artifacts/api-server/src/services/exchanges/catalog.ts`.
 const EXCHANGE_COLORS: Record<string, string> = {
-  kraken:    "#5741d9",
-  binance:   "#f0b90b",
-  coinbase:  "#2775ca",
-  bybit:     "#f7a600",
-  okx:       "#b0b0b0",
-  kucoin:    "#24ae8f",
-  cryptocom: "#1199fa",
+  Alpaca:       "#ffbe00",
+  Kraken:       "#5741d9",
+  Coinbase:     "#2775ca",
+  CryptoDotCom: "#1199fa",
+  Binance:      "#f0b90b",
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────

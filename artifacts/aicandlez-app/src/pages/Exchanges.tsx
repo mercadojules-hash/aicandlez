@@ -21,26 +21,20 @@ type ExchangeEntry = {
   apiGuide?: string;
 };
 
+// IDs MUST match the backend catalog exactly — CONNECTABLE_EXCHANGE_IDS uses
+// case-sensitive lookup. Order = display order (Alpaca primary). OKX/KuCoin/
+// Bybit/Robinhood deliberately removed for US-compliance.
 const ALL_EXCHANGES: ExchangeEntry[] = [
-  { id: "alpaca",    name: "Alpaca",     logo: "A",  active: true,  color: "#ffbe00",
+  { id: "Alpaca",       name: "Alpaca",     logo: "A", active: true, color: "#ffbe00",
     needsPassphrase: false, apiGuide: "Dashboard → Paper Trading → API Keys → Generate Key" },
-  { id: "coinbase",  name: "Coinbase",   logo: "C",  active: true,  color: "#0052ff",
+  { id: "Kraken",       name: "Kraken",     logo: "K", active: true, color: "#7c4dff",
+    needsPassphrase: false, apiGuide: "Settings → API → Create API Key" },
+  { id: "Coinbase",     name: "Coinbase",   logo: "C", active: true, color: "#0052ff",
     needsPassphrase: false, apiGuide: "Profile → API → New API Key" },
-  { id: "binance",   name: "Binance",    logo: "B",  active: true,  color: "#f0b90b",
+  { id: "CryptoDotCom", name: "Crypto.com", logo: "ᶜ", active: true, color: "#1a6fdf",
+    needsPassphrase: false, apiGuide: "Settings → API Keys → Create Key (Exchange API)" },
+  { id: "Binance",      name: "Binance",    logo: "B", active: true, color: "#f0b90b",
     needsPassphrase: false, apiGuide: "Account → API Management → Create API" },
-  { id: "cryptocom", name: "Crypto.com", logo: "ᶜ",  active: true,  color: "#1a6fdf",
-    needsPassphrase: false, apiGuide: "Settings → API Keys → Create Key" },
-  { id: "gemini",    name: "Gemini",     logo: "G",  active: true,  color: "#00dcfa",
-    needsPassphrase: false, apiGuide: "Settings → API → Create New Key" },
-  { id: "robinhood", name: "Robinhood",  logo: "R",  active: true,  color: "#00c805",
-    needsPassphrase: false, apiGuide: "Account → API Credentials" },
-  { id: "bybit",     name: "Bybit",      logo: "By", active: false, color: "#ff6b35", needsPassphrase: false },
-  { id: "okx",       name: "OKX",        logo: "O",  active: false, color: "#d0d0d0", needsPassphrase: true  },
-  { id: "kucoin",    name: "KuCoin",     logo: "Ku", active: false, color: "#00a651", needsPassphrase: true  },
-  { id: "gate",      name: "Gate.io",    logo: "Ga", active: false, color: "#00aeff", needsPassphrase: false },
-  { id: "bitget",    name: "Bitget",     logo: "Bt", active: false, color: "#00f0aa", needsPassphrase: false },
-  { id: "mexc",      name: "MEXC",       logo: "M",  active: false, color: "#28a0f0", needsPassphrase: false },
-  { id: "uphold",    name: "Uphold",     logo: "U",  active: false, color: "#00c7d8", needsPassphrase: false },
 ];
 
 interface ApiExchange {
@@ -533,22 +527,30 @@ export default function Exchanges() {
           {active.map(ex => {
             const conn = connectionMap.get(ex.id);
             return (
-              <div key={ex.id} style={{ background: CARD,
-                border: `1px solid ${conn?.connected ? ex.color + "28" : E}`,
-                borderRadius: 12, padding: "14px 16px",
-                transition: "border-color 0.2s ease" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 42, height: 42, borderRadius: 10,
-                    background: ex.color + "12", border: `1px solid ${ex.color}25`,
+              <div key={ex.id} style={{
+                background: conn?.connected
+                  ? `linear-gradient(160deg, ${ex.color}10 0%, ${CARD} 65%)`
+                  : CARD,
+                border: `1.5px solid ${conn?.connected ? ex.color + "66" : E}`,
+                borderRadius: 14, padding: "16px 18px",
+                boxShadow: conn?.connected
+                  ? `0 0 24px ${ex.color}28, 0 0 0 1px ${ex.color}22 inset`
+                  : "none",
+                transition: "all 0.2s ease" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 11,
+                    background: conn?.connected ? ex.color + "1f" : ex.color + "12",
+                    border: `1px solid ${ex.color}${conn?.connected ? "55" : "25"}`,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 15, fontFamily: MONO, fontWeight: 700,
-                    color: ex.color, flexShrink: 0 }}>
+                    fontSize: 17, fontFamily: MONO, fontWeight: 800,
+                    color: ex.color, flexShrink: 0,
+                    boxShadow: conn?.connected ? `0 0 14px ${ex.color}40` : "none" }}>
                     {ex.logo}
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontFamily: SANS, fontWeight: 600,
-                      color: W, marginBottom: 4 }}>
+                    <div style={{ fontSize: 16, fontFamily: SANS, fontWeight: 800,
+                      color: W, marginBottom: 4, letterSpacing: -0.2 }}>
                       {ex.name}
                     </div>
                     <StatusChip conn={conn}/>
@@ -556,25 +558,28 @@ export default function Exchanges() {
 
                   {!conn?.connected ? (
                     <button onClick={() => handleConnectClick(ex)} style={{
-                      padding: "7px 16px", flexShrink: 0,
+                      padding: "8px 18px", flexShrink: 0,
                       background: ex.color + "10",
                       border: `1px solid ${ex.color}35`,
                       borderRadius: 8, color: ex.color,
-                      fontFamily: SANS, fontSize: 10, fontWeight: 600,
+                      fontFamily: SANS, fontSize: 11, fontWeight: 700,
+                      letterSpacing: 0.2,
                       cursor: "pointer", transition: "all 0.15s ease" }}>
                       Connect
                     </button>
                   ) : (
-                    <div style={{ flexShrink: 0, padding: "5px 11px",
+                    <div style={{ flexShrink: 0, padding: "6px 13px",
                       background: conn.tradingMode === "live"
-                        ? "rgba(0,210,100,0.08)" : "rgba(255,170,0,0.08)",
+                        ? "rgba(0,210,100,0.14)" : "rgba(255,170,0,0.10)",
                       border: `1px solid ${conn.tradingMode === "live"
-                        ? "rgba(0,210,100,0.22)" : "rgba(255,170,0,0.22)"}`,
-                      borderRadius: 6, fontSize: 8, fontFamily: SANS, fontWeight: 600,
+                        ? "rgba(0,210,100,0.50)" : "rgba(255,170,0,0.28)"}`,
+                      borderRadius: 7, fontSize: 9.5, fontFamily: MONO, fontWeight: 800,
                       color: conn.tradingMode === "live"
-                        ? "rgba(0,210,100,0.88)" : "rgba(255,170,0,0.88)",
-                      letterSpacing: "0.05em" }}>
-                      {conn.tradingMode === "live" ? "Live" : "Paper"}
+                        ? "rgba(0,255,120,0.96)" : "rgba(255,170,0,0.92)",
+                      letterSpacing: "0.16em", textTransform: "uppercase" as const,
+                      boxShadow: conn.tradingMode === "live"
+                        ? `0 0 12px rgba(0,210,100,0.40)` : "none" }}>
+                      {conn.tradingMode === "live" ? "LIVE" : "PAPER"}
                     </div>
                   )}
                 </div>

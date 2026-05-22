@@ -4,16 +4,14 @@ import { api, type LiveEligibility } from "@/lib/api";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
 const ACTIVE_EXCHANGES = [
-  { id: "alpaca",   name: "Alpaca",   logo: "A", active: true  },
-  { id: "coinbase", name: "Coinbase", logo: "C", active: true  },
-  { id: "binance",  name: "Binance",  logo: "B", active: true  },
-  { id: "cryptocom",name: "Crypto.com",logo: "ᶜ",active: true  },
-  { id: "gemini",   name: "Gemini",   logo: "G", active: true  },
+  { id: "Alpaca",       name: "Alpaca",     logo: "A", active: true },
+  { id: "Kraken",       name: "Kraken",     logo: "K", active: true },
+  { id: "Coinbase",     name: "Coinbase",   logo: "C", active: true },
+  { id: "CryptoDotCom", name: "Crypto.com", logo: "ᶜ", active: true },
+  { id: "Binance",      name: "Binance",    logo: "B", active: true },
 ];
 
-const COMING_SOON = [
-  "Bybit", "OKX", "KuCoin", "Gate.io", "Bitget", "MEXC", "Robinhood", "Uphold",
-];
+const COMING_SOON: string[] = [];
 
 function GlowButton({
   children, onClick, disabled, variant = "primary",

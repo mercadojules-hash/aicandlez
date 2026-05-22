@@ -16,6 +16,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout, MODULE_LIST } from "@/components/Layout";
 import { AlertsProvider } from "@/components/AlertsProvider";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
+import { OnboardingFlow } from "@/components/OnboardingFlow";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import MarketData from "@/pages/MarketData";
@@ -440,6 +441,7 @@ function ClerkProviderWithRoutes() {
         <TooltipProvider>
           <AlertsProvider>
             <Router />
+            <OnboardingFlow />
             <SettingsDrawer />
             <Toaster />
           </AlertsProvider>
