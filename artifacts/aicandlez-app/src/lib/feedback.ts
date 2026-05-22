@@ -15,29 +15,23 @@
  * Push backend (VAPID/Expo/FCM) is intentionally NOT implemented here. The
  * `pushEnabled` flag and the per-alert toggles are read by future push
  * registration code so the user's preferences carry through unchanged.
+ *
+ * The alert taxonomy itself (keys, labels, defaults) is the single source of
+ * truth in `@workspace/db/constants/alertKeys` — the server reads the same
+ * module when gating push dispatch, so toggles in the UI cannot drift from
+ * what the server actually honors.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { playExecutionSound, type FeedbackState } from "@/lib/executionSounds";
+import {
+  ALERT_DEFINITIONS,
+  defaultAlertPrefs,
+  type AlertKey,
+} from "@workspace/db/constants/alertKeys";
 
-// ── Alert taxonomy ──────────────────────────────────────────────────────────
-// Every alert the app can emit lives here, so a future push backend can iterate
-// AlertKeys and a settings UI can render toggles automatically.
-export const ALERT_DEFINITIONS = [
-  { key: "aiSignalAlerts",         label: "AI Signal Alerts",          sub: "New BUY/SELL signals from the AI scanner" },
-  { key: "autoTradeExecuted",      label: "AI Auto Trade Executions",  sub: "Autonomous trades opened or closed" },
-  { key: "liveTradeFilled",        label: "Live Trade Filled",         sub: "Real-money AI fill confirmations from your exchange" },
-  { key: "tradeOpened",            label: "Trade Opened",              sub: "A new position is opened" },
-  { key: "tradeClosed",            label: "Trade Closed",              sub: "A position is closed (win or loss)" },
-  { key: "takeProfitHit",          label: "Take Profit Hit",           sub: "Position closed at target" },
-  { key: "stopLossHit",            label: "Stop Loss Hit",             sub: "Position closed at stop" },
-  { key: "highConfidenceSignals",  label: "High Confidence Setups",    sub: "Confidence ≥ 80% opportunities" },
-  { key: "marketScannerAlerts",    label: "Market Scanner Alerts",     sub: "Major scanner state changes" },
-  { key: "volatilityAlerts",       label: "Volatility Alerts",         sub: "Sudden volatility spikes" },
-  { key: "portfolioAlerts",        label: "Portfolio Performance",     sub: "Daily P&L summary + milestones" },
-] as const;
-
-export type AlertKey = (typeof ALERT_DEFINITIONS)[number]["key"];
+export { ALERT_DEFINITIONS };
+export type { AlertKey };
 
 export interface FeedbackPrefs {
   // Master switches
@@ -50,26 +44,11 @@ export interface FeedbackPrefs {
 
 const STORAGE_KEY = "aicandlez_feedback_prefs_v1";
 
-function defaultAlerts(): Record<AlertKey, boolean> {
-  const out = {} as Record<AlertKey, boolean>;
-  for (const d of ALERT_DEFINITIONS) {
-    // Sensible defaults — high-signal alerts on, noisy ones off.
-    out[d.key] =
-      d.key === "tradeOpened" ||
-      d.key === "tradeClosed" ||
-      d.key === "takeProfitHit" ||
-      d.key === "stopLossHit" ||
-      d.key === "highConfidenceSignals" ||
-      d.key === "autoTradeExecuted";
-  }
-  return out;
-}
-
 export const DEFAULT_PREFS: FeedbackPrefs = {
   pushEnabled:    false,
   soundsEnabled:  true,
   hapticsEnabled: false, // OFF by default — institutional default
-  alerts:         defaultAlerts(),
+  alerts:         defaultAlertPrefs(),
 };
 
 function loadPrefs(): FeedbackPrefs {
@@ -81,7 +60,7 @@ function loadPrefs(): FeedbackPrefs {
     return {
       ...DEFAULT_PREFS,
       ...parsed,
-      alerts: { ...defaultAlerts(), ...(parsed.alerts ?? {}) },
+      alerts: { ...defaultAlertPrefs(), ...(parsed.alerts ?? {}) },
     };
   } catch {
     return DEFAULT_PREFS;

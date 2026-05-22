@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
-    "./constants/disclaimer": "./src/constants/disclaimer.ts"
+    "./constants/disclaimer": "./src/constants/disclaimer.ts",
+    "./constants/alertKeys": "./src/constants/alertKeys.ts"
   },
   "scripts": {
     "push": "drizzle-kit push --config ./drizzle.config.ts",
