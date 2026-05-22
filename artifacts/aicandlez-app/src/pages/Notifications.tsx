@@ -174,6 +174,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 const FILTER_STORAGE_KEY = "aicandlez_notifications_filter_v1";
 const FILTER_KEYS: FilterKey[] = ["all", "trades", "signals", "system"];
+const UNREAD_ONLY_STORAGE_KEY = "aicandlez_notifications_unread_only_v1";
 
 function loadFilter(): FilterKey {
   if (typeof window === "undefined") return "all";
@@ -187,6 +188,18 @@ function loadFilter(): FilterKey {
 function saveFilter(f: FilterKey) {
   if (typeof window === "undefined") return;
   try { window.localStorage.setItem(FILTER_STORAGE_KEY, f); } catch { /* quota */ }
+}
+
+function loadUnreadOnly(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(UNREAD_ONLY_STORAGE_KEY) === "1";
+  } catch { return false; }
+}
+
+function saveUnreadOnly(v: boolean) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(UNREAD_ONLY_STORAGE_KEY, v ? "1" : "0"); } catch { /* quota */ }
 }
 
 function bucketOf(type: string): Exclude<FilterKey, "all"> {
@@ -211,15 +224,19 @@ export default function Notifications() {
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
   const [filter, setFilterState] = useState<FilterKey>(() => loadFilter());
+  const [unreadOnly, setUnreadOnlyState] = useState<boolean>(() => loadUnreadOnly());
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key !== FILTER_STORAGE_KEY) return;
-      const next = e.newValue;
-      if (next && (FILTER_KEYS as string[]).includes(next)) {
-        setFilterState(next as FilterKey);
-      } else if (next === null) {
-        setFilterState("all");
+      if (e.key === FILTER_STORAGE_KEY) {
+        const next = e.newValue;
+        if (next && (FILTER_KEYS as string[]).includes(next)) {
+          setFilterState(next as FilterKey);
+        } else if (next === null) {
+          setFilterState("all");
+        }
+      } else if (e.key === UNREAD_ONLY_STORAGE_KEY) {
+        setUnreadOnlyState(e.newValue === "1");
       }
     };
     window.addEventListener("storage", onStorage);
@@ -229,6 +246,11 @@ export default function Notifications() {
   const setFilter = (f: FilterKey) => {
     setFilterState(f);
     saveFilter(f);
+  };
+
+  const setUnreadOnly = (v: boolean) => {
+    setUnreadOnlyState(v);
+    saveUnreadOnly(v);
   };
 
   const { data, isLoading, isError, error, refetch } = useQuery<{ notifications: NotificationRow[]; unread: number }>({
@@ -268,10 +290,11 @@ export default function Notifications() {
     return c;
   }, [allRows]);
 
-  const rows = useMemo(
-    () => (filter === "all" ? allRows : allRows.filter(n => bucketOf(n.type) === filter)),
-    [allRows, filter],
-  );
+  const rows = useMemo(() => {
+    let r = filter === "all" ? allRows : allRows.filter(n => bucketOf(n.type) === filter);
+    if (unreadOnly) r = r.filter(n => !n.read);
+    return r;
+  }, [allRows, filter, unreadOnly]);
 
   const openRow = (n: NotificationRow) => {
     if (!n.read) markOne.mutate(n.id);
@@ -359,6 +382,37 @@ export default function Notifications() {
             </button>
           );
         })}
+
+        <button
+          onClick={() => setUnreadOnly(!unreadOnly)}
+          aria-pressed={unreadOnly}
+          aria-label={unreadOnly ? "Showing unread only, tap to show all" : "Show unread only"}
+          style={{
+            position: "relative",
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "7px 12px", borderRadius: 999,
+            background: unreadOnly
+              ? `linear-gradient(135deg, ${BRAND}26, ${BRAND_DEEP}18)`
+              : SURFACE,
+            border: `1px solid ${unreadOnly ? BORDER_HI : BORDER}`,
+            color: unreadOnly ? BRAND : TEXT_SUB,
+            fontFamily: SANS, fontWeight: 700, fontSize: 10,
+            letterSpacing: 1.2, textTransform: "uppercase",
+            cursor: "pointer", flexShrink: 0,
+            boxShadow: unreadOnly ? `0 0 12px ${BRAND_BLOOM}` : "none",
+            marginLeft: 4,
+          }}>
+          <span style={{
+            width: 7, height: 7, borderRadius: "50%",
+            background: unreadOnly ? BRAND : TEXT_DIM,
+            boxShadow: unreadOnly ? `0 0 6px ${BRAND}` : "none",
+          }}/>
+          Unread
+          <span style={{
+            fontFamily: MONO, fontSize: 9, fontWeight: 700,
+            color: unreadOnly ? BRAND : TEXT_DIM, letterSpacing: 0,
+          }}>{unreadCounts[filter] > 99 ? "99+" : unreadCounts[filter]}</span>
+        </button>
       </div>
 
       <div style={{ padding: "8px 14px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -397,12 +451,14 @@ export default function Notifications() {
             <div style={{
               fontFamily: SANS, fontWeight: 700, fontSize: 12, color: TEXT_SUB,
               letterSpacing: 0.2,
-            }}>{EMPTY_COPY[filter].title}</div>
+            }}>{unreadOnly ? "No unread notifications" : EMPTY_COPY[filter].title}</div>
             <div style={{
               marginTop: 6, fontFamily: SANS, fontSize: 10, color: TEXT_DIM,
               letterSpacing: 0.3,
             }}>
-              {EMPTY_COPY[filter].body}
+              {unreadOnly
+                ? "You're all caught up. Tap Unread again to see everything."
+                : EMPTY_COPY[filter].body}
             </div>
           </div>
         ) : (
