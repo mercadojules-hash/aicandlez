@@ -24,6 +24,7 @@ import { BloFinAdapter }       from "../services/exchanges/adapters/BloFinAdapte
 import { BingXAdapter }        from "../services/exchanges/adapters/BingXAdapter.js";
 import { getTicker } from "./marketData.js";
 import { logger } from "./logger.js";
+import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
 
 // ── Per-user live execution bridge ────────────────────────────────────────────
 //
@@ -91,6 +92,51 @@ function makeAdapter(exchange: string, creds: ExchangeCredentials): BaseExchange
     case "BingX":        return new BingXAdapter(cfg);
     default: throw new Error(`No adapter for exchange: ${exchange}`);
   }
+}
+
+async function emitFillNotification(
+  userId:   string,
+  symbol:   string,
+  side:     "BUY" | "SELL",
+  exchange: string,
+  fillPrice: number,
+  quantity:  number,
+  exchangeOrderId: string,
+  dryRun:   boolean,
+): Promise<void> {
+  const priceStr = fillPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const qtyStr   = quantity.toLocaleString(undefined, { maximumFractionDigits: 8 });
+  const title    = `${side} ${symbol} filled on ${exchange}${dryRun ? " (dry-run)" : ""}`;
+  const message  = `${side} ${qtyStr} ${symbol} @ $${priceStr} on ${exchange}`;
+  try {
+    await db.insert(userNotificationsTable).values({
+      userId,
+      type:    "live_trade_filled",
+      title,
+      message,
+      data:    { symbol, side, exchange, fillPrice, quantity, exchangeOrderId, dryRun },
+      read:    false,
+    });
+  } catch (err) {
+    logger.warn(
+      { userId, symbol, side, err: err instanceof Error ? err.message : String(err) },
+      "liveUserExecution: failed to persist live_trade_filled notification row",
+    );
+  }
+  // Fire-and-forget push to existing customer subscriptions
+  void NotificationDispatcher.sendToUser(userId, {
+    title,
+    body:      message,
+    notifType: "trade",
+    tag:       `live-fill-${symbol}`,
+    url:       "/aicandlez-app/portfolio",
+    data:      { symbol, side, exchange, fillPrice, quantity, exchangeOrderId, dryRun, kind: "live_trade_filled" },
+  }).catch((err) => {
+    logger.warn(
+      { userId, symbol, err: err instanceof Error ? err.message : String(err) },
+      "liveUserExecution: push dispatch failed for live_trade_filled",
+    );
+  });
 }
 
 async function emitFailureNotification(
@@ -221,7 +267,7 @@ export async function placeLiveAutoOrderForUser(
       { userId, exchange: row.exchange, symbol, side, sizeUSD, qtyBase, referencePrice },
       "liveUserExecution: DRY-RUN — adapter call skipped",
     );
-    return {
+    const dryResult: LiveUserOrderResult = {
       success:         true,
       userId,
       exchange:        row.exchange,
@@ -230,6 +276,11 @@ export async function placeLiveAutoOrderForUser(
       quantity:        qtyBase,
       dryRun:          true,
     };
+    await emitFillNotification(
+      userId, symbol, side, row.exchange,
+      dryResult.fillPrice!, dryResult.quantity!, dryResult.exchangeOrderId!, true,
+    );
+    return dryResult;
   }
 
   // 5. Build adapter + place order
@@ -265,6 +316,10 @@ export async function placeLiveAutoOrderForUser(
       { userId, exchange: row.exchange, symbol, side, sizeUSD,
         fillPrice: result.fillPrice, exchangeOrderId: result.exchangeOrderId },
       "liveUserExecution: order filled",
+    );
+    await emitFillNotification(
+      userId, symbol, side, row.exchange,
+      result.fillPrice!, result.quantity!, result.exchangeOrderId ?? "", false,
     );
     return result;
   } catch (err) {
