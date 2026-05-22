@@ -43,6 +43,14 @@ const SCAN_INTERVAL_MS  = 5 * 60 * 1000;      // 5 min
 
 let scheduler: NodeJS.Timeout | null = null;
 
+// In-flight refresh dedupe. Two live orders for the same connection that
+// both trip the refresh buffer must not race two `/oauth/token` calls —
+// Alpaca may invalidate the older refresh_token when the second exchange
+// succeeds, knocking a previously-healthy customer into an "errored"
+// state. Keyed by row id so concurrent callers for the same connection
+// share one refresh promise; non-overlapping rows still run in parallel.
+const inFlightRefreshes = new Map<string, Promise<ExchangeCredentials>>();
+
 /**
  * Returns true when the row needs a refresh: Alpaca exchange, OAuth-issued
  * (refresh_token present), and either no expiry recorded or expiring inside
@@ -145,7 +153,13 @@ export async function ensureFreshAlpacaCreds(
   creds: ExchangeCredentials,
 ): Promise<ExchangeCredentials> {
   if (!needsRefresh(row, creds)) return creds;
-  return refreshRow(userId, row, creds);
+  const existing = inFlightRefreshes.get(row.id);
+  if (existing) return existing;
+  const p = refreshRow(userId, row, creds).finally(() => {
+    inFlightRefreshes.delete(row.id);
+  });
+  inFlightRefreshes.set(row.id, p);
+  return p;
 }
 
 /**
