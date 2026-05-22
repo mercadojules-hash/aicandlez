@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useClerk } from "@clerk/react";
 import { useLocation } from "wouter";
@@ -625,6 +625,171 @@ function ExchangeRow({ name, status, statusCol, icon, iconBg, iconBorder, iconCo
   );
 }
 
+// ── Exchange connection health (live polling of /user/exchanges/balances) ─────
+// Lists every user-connected exchange with a green/amber/red health pill,
+// surfaces the raw error string for any failing connection, and exposes a
+// per-row "Test connection" affordance that re-polls the same endpoint Home
+// and Portal already consume. Driven by react-query — invalidating the
+// `user-exchanges-balances` key here refreshes every consumer in lockstep.
+
+interface ExchangeListEntry {
+  exchange:  string;
+  connected: boolean;
+  connection: { id: string; exchange: string; label: string | null; tradingMode: string; lastVerifiedAt?: string | null; lastError?: string | null } | null;
+  meta:      { id: string; name: string; logo?: string; color?: string } | null;
+}
+interface BalanceConn {
+  exchange:       string;
+  label:          string | null;
+  tradingMode:    string;
+  ok:             boolean;
+  totalEquityUSD: number;
+  error?:         string;
+}
+
+function ExchangeConnectionsHealth() {
+  const qc = useQueryClient();
+  const { data: listData, isLoading: listLoading } = useQuery<{ exchanges: ExchangeListEntry[] }>({
+    queryKey: ["user-exchanges"],
+    queryFn:  () => api.get("/user/exchanges"),
+    retry:    false,
+    staleTime: 60_000,
+  });
+  const { data: balData, isFetching: balFetching, dataUpdatedAt } = useQuery<{
+    connections: BalanceConn[]; totalEquityUSD: number; fetchedAt: number;
+  }>({
+    queryKey: ["user-exchanges-balances"],
+    queryFn:  () => api.get("/user/exchanges/balances"),
+    retry:    false,
+    refetchInterval:      30_000,
+    refetchOnWindowFocus: true,
+    staleTime:            10_000,
+  });
+
+  const connected = useMemo(
+    () => (listData?.exchanges ?? []).filter(e => e.connected && e.connection),
+    [listData],
+  );
+  const balanceByExchange = useMemo(() => {
+    const m: Record<string, BalanceConn> = {};
+    for (const c of balData?.connections ?? []) m[c.exchange] = c;
+    return m;
+  }, [balData]);
+
+  const handleTest = () => {
+    void qc.invalidateQueries({ queryKey: ["user-exchanges-balances"] });
+  };
+
+  if (listLoading) {
+    return (
+      <div style={{ padding:"14px 16px", fontSize:11, fontFamily:SANS, color:DIM }}>
+        Loading exchange connections…
+      </div>
+    );
+  }
+  if (connected.length === 0) {
+    return (
+      <div style={{ padding:"14px 16px", fontSize:11, fontFamily:SANS, color:DIM, lineHeight:1.6 }}>
+        No exchanges connected yet. Connect one from Live Trading Account to enable real-money execution.
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {connected.map((row, i) => {
+        const bal = balanceByExchange[row.exchange];
+        const meta = row.meta;
+        const name = meta?.name ?? row.exchange;
+        const iconCh = (meta?.logo ?? name).toString().charAt(0).toUpperCase();
+        // Health resolution:
+        //   GREEN  — balances endpoint returned ok:true for this row
+        //   RED    — balances endpoint returned ok:false (auth fail / network / revoked key)
+        //   AMBER  — balances response hasn't arrived yet for a freshly listed row,
+        //            OR a stored lastError exists on the connection itself
+        const hasBalance = bal !== undefined;
+        const storedErr  = row.connection?.lastError ?? null;
+        const healthy    = hasBalance && bal!.ok;
+        const failing    = hasBalance && !bal!.ok;
+        const pending    = !hasBalance && balFetching;
+        const pillCol    = healthy ? "#66FF66" : failing ? "#FF5860" : storedErr ? "#FFB020" : pending ? "#FFB020" : "#8A9C94";
+        const pillLabel  = healthy ? "HEALTHY" : failing ? "DEGRADED" : pending ? "CHECKING" : storedErr ? "ATTENTION" : "UNKNOWN";
+        const errText    = bal?.error ?? storedErr ?? null;
+        const verifiedAt = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }) : null;
+        const iconColor  = meta?.color ?? C;
+
+        return (
+          <div key={row.exchange} style={{
+            padding:"14px 16px",
+            borderBottom: i < connected.length-1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+            display:"flex", flexDirection:"column", gap:10,
+          }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12, minWidth:0 }}>
+                <div style={{
+                  width:38, height:38, borderRadius:10, flexShrink:0,
+                  background:`${iconColor}1A`, border:`1px solid ${iconColor}55`,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:16, fontFamily:MONO, fontWeight:800, color:iconColor,
+                  boxShadow:`0 0 14px ${iconColor}30`,
+                }}>{iconCh}</div>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontSize:15, fontFamily:SANS, fontWeight:800, color:"#FFFFFF",
+                    letterSpacing:-0.25, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                    {name}
+                  </div>
+                  <div style={{ fontSize:9, fontFamily:SANS, color:GR, marginTop:2,
+                    letterSpacing:"0.10em", textTransform:"uppercase" as const }}>
+                    {(row.connection?.tradingMode ?? "paper")} ·
+                    {" "}{verifiedAt ? `Checked ${verifiedAt}` : "Awaiting check"}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0,
+                padding:"5px 10px", borderRadius:999,
+                background:`${pillCol}14`, border:`1px solid ${pillCol}55`,
+              }}>
+                <div style={{ width:7, height:7, borderRadius:"50%", background:pillCol,
+                  boxShadow:`0 0 8px ${pillCol}, 0 0 16px ${pillCol}80`,
+                  animation: pending ? "dot-pulse 1.4s ease-in-out infinite" : "dot-pulse 2.5s ease-in-out infinite" }}/>
+                <span style={{ fontSize:9.5, fontFamily:SANS, fontWeight:800, color:pillCol,
+                  letterSpacing:"0.16em" }}>{pillLabel}</span>
+              </div>
+            </div>
+
+            {errText && (
+              <div style={{
+                padding:"8px 10px", borderRadius:8,
+                background:"rgba(255,88,96,0.06)", border:"1px solid rgba(255,88,96,0.28)",
+                fontSize:10.5, fontFamily:MONO, color:"#FFB8BC", lineHeight:1.45,
+                wordBreak:"break-word",
+              }}>
+                {errText}
+              </div>
+            )}
+
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"flex-end" }}>
+              <button
+                type="button"
+                onClick={handleTest}
+                disabled={balFetching}
+                style={{
+                  padding:"6px 12px", borderRadius:8, cursor: balFetching ? "wait" : "pointer",
+                  background:`${C}10`, border:`1px solid ${C}45`,
+                  color:C, fontSize:10, fontFamily:SANS, fontWeight:700,
+                  letterSpacing:"0.12em", textTransform:"uppercase" as const,
+                  opacity: balFetching ? 0.6 : 1,
+                }}>
+                {balFetching ? "Testing…" : "Test connection"}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────────
 // ── Alert & Feedback Preferences (notification scaffolding) ─────────────────
 // Surfaces every alert key from `lib/feedback` as a toggle row. Master switches
@@ -1241,6 +1406,17 @@ export default function Profile() {
           </div>
           <div style={{ marginTop:6, fontSize:8.5, fontFamily:SANS, color:DIM, lineHeight:1.6, padding:"0 4px" }}>
             Withdrawal permissions are never requested. Read + Trade permissions only.
+          </div>
+        </div>
+
+        {/* EXCHANGE CONNECTIONS — live health */}
+        <div style={{ marginBottom:14 }}>
+          <SectionHead label="Exchange Connections" accent="rgba(102,255,102,0.55)"/>
+          <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, overflow:"hidden" }}>
+            <ExchangeConnectionsHealth/>
+          </div>
+          <div style={{ marginTop:6, fontSize:8.5, fontFamily:SANS, color:DIM, lineHeight:1.6, padding:"0 4px" }}>
+            Health is polled every 30s from the same balances feed used by Home and Portal.
           </div>
         </div>
 
