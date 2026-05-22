@@ -35,6 +35,16 @@ export interface ExchangeCredentials {
   apiSecret:   string;
   passphrase?: string;    // required by OKX, KuCoin
   label?:      string;    // user-friendly label e.g. "Main Kraken account"
+  /**
+   * OAuth 2.0 access token (Alpaca OAuth-issued). Present when the
+   * connection was provisioned via the in-app `AlpacaBrokerProvider`
+   * one-click flow instead of pasted API keys. The adapter uses Bearer
+   * auth when this is set and ignores `apiKey` / `apiSecret`.
+   */
+  oauthAccessToken?: string;
+  oauthRefreshToken?: string;
+  oauthExpiresAt?:   number;   // unix ms
+  oauthScope?:       string;
 }
 
 interface VaultEntry {
@@ -125,7 +135,15 @@ class CredentialVault {
     const key      = this.deriveKey(userId);
     const iv       = crypto.randomBytes(12);
     const cipher   = crypto.createCipheriv("aes-256-gcm", key, iv);
-    const plain    = JSON.stringify({ apiKey: creds.apiKey, apiSecret: creds.apiSecret, passphrase: creds.passphrase });
+    const plain    = JSON.stringify({
+      apiKey:             creds.apiKey,
+      apiSecret:          creds.apiSecret,
+      passphrase:         creds.passphrase,
+      oauthAccessToken:   creds.oauthAccessToken,
+      oauthRefreshToken:  creds.oauthRefreshToken,
+      oauthExpiresAt:     creds.oauthExpiresAt,
+      oauthScope:         creds.oauthScope,
+    });
     const encrypted = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
     const authTag  = cipher.getAuthTag();
     return JSON.stringify({
@@ -151,7 +169,13 @@ class CredentialVault {
       const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
       decipher.setAuthTag(authTag);
       const plain = decipher.update(ct).toString("utf8") + decipher.final("utf8");
-      return JSON.parse(plain) as ExchangeCredentials;
+      const parsed = JSON.parse(plain) as Partial<ExchangeCredentials>;
+      // Older blobs may only have apiKey/apiSecret — OAuth fields just resolve to undefined.
+      return {
+        apiKey:    parsed.apiKey    ?? "",
+        apiSecret: parsed.apiSecret ?? "",
+        ...parsed,
+      } as ExchangeCredentials;
     } catch {
       logger.error({ userId }, "CredentialVault: decryptBlob failed — possible key mismatch or tampering");
       return null;

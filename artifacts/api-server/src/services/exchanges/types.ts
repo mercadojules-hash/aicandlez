@@ -112,6 +112,12 @@ export interface AdapterConfig {
   apiKey?:      string;
   apiSecret?:   string;
   passphrase?:  string;   // OKX, KuCoin
+  /**
+   * OAuth 2.0 access token. When present, the adapter authenticates via
+   * `Authorization: Bearer <token>` instead of static API key/secret headers.
+   * Used by the in-app Alpaca account-opening flow (`AlpacaBrokerProvider`).
+   */
+  oauthAccessToken?: string;
   testnet?:     boolean;
   takerFeePct:  number;   // default taker fee
   makerFeePct:  number;

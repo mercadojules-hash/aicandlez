@@ -281,10 +281,17 @@ export class AlpacaAdapter extends BaseExchangeAdapter {
   // ── HTTP helpers ────────────────────────────────────────────────────────────
 
   private isConfigured(): boolean {
-    return !!(this.config.apiKey && this.config.apiSecret);
+    return !!(this.config.oauthAccessToken || (this.config.apiKey && this.config.apiSecret));
   }
 
   private authHeaders(): Record<string, string> {
+    // OAuth (in-app one-click connect) takes precedence over static API keys.
+    if (this.config.oauthAccessToken) {
+      return {
+        "Authorization": `Bearer ${this.config.oauthAccessToken}`,
+        "Content-Type":  "application/json",
+      };
+    }
     return {
       "APCA-API-KEY-ID":     this.config.apiKey!,
       "APCA-API-SECRET-KEY": this.config.apiSecret!,

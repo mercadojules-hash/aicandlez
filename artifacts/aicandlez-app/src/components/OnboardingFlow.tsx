@@ -53,6 +53,12 @@ const ALPACA_PROVIDER: OnboardingProvider = {
   externalUrl: "https://alpaca.markets/signup",
 };
 
+// Server-driven enablement of the in-app Alpaca OAuth handshake. Mirrors
+// trading-dashboard/OnboardingFlow.tsx — see that file for the full flow
+// description. When `enabled === false` (env vars unset), the CTA falls back
+// to the existing alpaca.markets external CTA.
+interface AlpacaOauthConfig { enabled: boolean; authorizeUrl?: string; scope?: string }
+
 // IDs MUST match the backend catalog (case-sensitive).
 const EXCHANGES = [
   { id: "Alpaca",       name: "Alpaca",     logo: "A" },
@@ -89,6 +95,15 @@ export function OnboardingFlow() {
     enabled:  isSignedIn === true && step !== "done",
     staleTime: 5_000,
   });
+  const oauthCfg = useQuery<AlpacaOauthConfig>({
+    queryKey: ["alpaca-oauth-config"],
+    queryFn:  () => fetch("/api/user/exchanges/alpaca/oauth/config", { credentials: "include" })
+      .then(r => r.ok ? r.json() : { enabled: false }),
+    enabled:  isSignedIn === true && step !== "done",
+    staleTime: 60_000,
+  });
+  const alpacaOauthEnabled = oauthCfg.data?.enabled === true;
+  const [oauthError, setOauthError] = useState("");
   const connectedCount = (exchanges.data?.exchanges ?? []).filter(e => e.connected).length;
   const introSeen = typeof window !== "undefined" && localStorage.getItem(LS_INTRO_SEEN) === "1";
 
@@ -144,6 +159,38 @@ export function OnboardingFlow() {
       : "Connection failed. Check your credentials and try again."),
   });
 
+  // ── One-click Alpaca OAuth popup ─────────────────────────────────────────
+  // Server route postMessages the result back. Success → advance to "intro";
+  // failure → surface a non-blocking inline error so the user can retry or
+  // fall through to the pasted-keys path.
+  const startAlpacaOauth = () => {
+    if (!alpacaOauthEnabled || !oauthCfg.data?.authorizeUrl) return;
+    setOauthError("");
+    const popup = window.open(
+      oauthCfg.data.authorizeUrl,
+      "aicandlez-alpaca-oauth",
+      "width=520,height=720,menubar=no,toolbar=no",
+    );
+    if (!popup) {
+      setOauthError("Popup blocked — please allow popups for AICandlez and try again.");
+      return;
+    }
+    const onMessage = (e: MessageEvent) => {
+      const data = e.data as { source?: string; ok?: boolean; error?: string } | null;
+      if (!data || data.source !== "aicandlez:alpaca-oauth") return;
+      window.removeEventListener("message", onMessage);
+      if (data.ok) {
+        queryClient.invalidateQueries({ queryKey: ["onboarding-exchanges"] });
+        queryClient.invalidateQueries({ queryKey: ["user-exchanges"] });
+        queryClient.invalidateQueries({ queryKey: ["exchange-connections"] });
+        setStep("intro");
+      } else {
+        setOauthError(data.error ?? "Alpaca did not authorize the connection.");
+      }
+    };
+    window.addEventListener("message", onMessage);
+  };
+
   const close = () => setStep("done");
   const dismissIntro = () => {
     try { localStorage.setItem(LS_INTRO_SEEN, "1"); } catch { /* localStorage may be disabled */ }
@@ -163,7 +210,12 @@ export function OnboardingFlow() {
       <FullScreenShell onClose={close}>
         {step === "choose" && (
           <ChooseContent
-            onPickAlpaca={() => setStep("alpaca_cta")}
+            oauthEnabled={alpacaOauthEnabled}
+            oauthError={oauthError}
+            onPickAlpaca={() => {
+              if (alpacaOauthEnabled) { startAlpacaOauth(); return; }
+              setStep("alpaca_cta");
+            }}
             onPickExisting={() => { setPicked(EXCHANGES[1]); setStep("connect"); }}
           />
         )}
@@ -236,7 +288,8 @@ function FullScreenShell({ children, onClose }: { children: React.ReactNode; onC
 }
 
 // ─── Step 1: Choose path (PWA stacked cards) ────────────────────────────────
-function ChooseContent({ onPickAlpaca, onPickExisting }: {
+function ChooseContent({ oauthEnabled, oauthError, onPickAlpaca, onPickExisting }: {
+  oauthEnabled: boolean; oauthError: string;
   onPickAlpaca: () => void; onPickExisting: () => void;
 }) {
   return (
@@ -281,27 +334,41 @@ function ChooseContent({ onPickAlpaca, onPickExisting }: {
           fontFamily: MONO, fontSize: 9, fontWeight: 800,
           letterSpacing: "0.16em", marginBottom: 10,
         }}>
-          RECOMMENDED FOR BEGINNERS
+          {oauthEnabled ? "ONE-CLICK · RECOMMENDED" : "RECOMMENDED FOR BEGINNERS"}
         </div>
         <div style={{
           fontSize: 18, fontWeight: 800, color: TEXT_0,
           letterSpacing: -0.3, marginBottom: 6, lineHeight: 1.25,
         }}>
-          Create / Fund Alpaca Brokerage Account
+          {oauthEnabled
+            ? "Connect Alpaca Brokerage in One Click"
+            : "Create / Fund Alpaca Brokerage Account"}
         </div>
         <div style={{ fontSize: 13, color: TEXT_1, lineHeight: 1.55 }}>
-          Open a regulated US brokerage account at Alpaca, deposit funds into
-          your Alpaca account, then connect it back here. Best path if you
-          don&apos;t already have exchange API keys.
+          {oauthEnabled
+            ? "Sign in to Alpaca (or sign up in seconds) and authorize AICandlez to trade on your behalf. No API keys to copy. Your funds stay at Alpaca."
+            : "Open a regulated US brokerage account at Alpaca, deposit funds into your Alpaca account, then connect it back here. Best path if you don't already have exchange API keys."}
         </div>
         <div style={{
           marginTop: 14, color: BRAND,
           fontFamily: MONO, fontSize: 11, fontWeight: 800,
           letterSpacing: "0.18em",
         }}>
-          GET STARTED →
+          {oauthEnabled ? "CONNECT WITH ALPACA →" : "GET STARTED →"}
         </div>
       </button>
+
+      {oauthError && (
+        <div style={{
+          marginBottom: 14, padding: "12px 14px", borderRadius: 12,
+          background: "rgba(255,80,100,0.08)",
+          border: "1px solid rgba(255,80,100,0.30)",
+          color: "rgba(255,120,140,0.95)",
+          fontSize: 12.5, lineHeight: 1.5,
+        }}>
+          {oauthError}
+        </div>
+      )}
 
       {/* SECONDARY */}
       <button

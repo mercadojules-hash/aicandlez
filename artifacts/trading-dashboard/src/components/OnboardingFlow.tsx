@@ -59,6 +59,14 @@ const ALPACA_PROVIDER: OnboardingProvider = {
   externalUrl: "https://alpaca.markets/signup",
 };
 
+// Server-driven config for the in-app Alpaca OAuth handshake (Phase 6 —
+// AlpacaBrokerProvider). When `enabled === true`, the CTA in step 2 swaps
+// from "open alpaca.markets in a new tab" to a one-click OAuth popup that
+// stores tokens via the existing CredentialVault. When disabled (env vars
+// missing in dev / older deploys), we fall back to the proven external CTA
+// without any UI churn.
+interface AlpacaOauthConfig { enabled: boolean; authorizeUrl?: string; scope?: string }
+
 const LS_INTRO_SEEN = "acl_first_live_intro_seen_v1";
 
 const N = {
@@ -88,6 +96,7 @@ export function OnboardingFlow() {
   const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>("done");
   const [preselect, setPreselect] = useState<string | undefined>(undefined);
+  const [oauthError, setOauthError] = useState<string>("");
   // Once we've made a bypass routing decision for this open-event, latch it so
   // we don't re-evaluate when React Query stops fetching (or clears data) the
   // moment `step === "done"` disables the queries — that race could otherwise
@@ -110,6 +119,14 @@ export function OnboardingFlow() {
     enabled:  isSignedIn === true && step !== "done",
     staleTime: 5_000,
   });
+  const oauthCfg = useQuery<AlpacaOauthConfig>({
+    queryKey: ["alpaca-oauth-config"],
+    queryFn:  () => fetch("/api/user/exchanges/alpaca/oauth/config", { credentials: "include" })
+      .then(r => r.ok ? r.json() : { enabled: false }),
+    enabled:  isSignedIn === true && step !== "done",
+    staleTime: 60_000,
+  });
+  const alpacaOauthEnabled = oauthCfg.data?.enabled === true;
 
   const hasLiveSub = !!sub.data && (sub.data.plan === "starter" || sub.data.plan === "pro");
   const connectedCount = (exchanges.data?.exchanges ?? []).filter(e => e.connected).length;
@@ -149,6 +166,39 @@ export function OnboardingFlow() {
     return () => window.removeEventListener("aicandlez:open-onboarding", handler);
   }, []);
 
+  // ── One-click Alpaca OAuth popup ─────────────────────────────────────────
+  // Opens the Alpaca-hosted consent screen in a popup. The
+  // `/api/user/exchanges/alpaca/oauth/callback` server route posts the result
+  // back via `window.postMessage`. On success, we advance straight to the
+  // "intro" step — same terminal state as the pasted-keys path.
+  const startAlpacaOauth = () => {
+    if (!alpacaOauthEnabled || !oauthCfg.data?.authorizeUrl) return;
+    setOauthError("");
+    const popup = window.open(
+      oauthCfg.data.authorizeUrl,
+      "aicandlez-alpaca-oauth",
+      "width=520,height=720,menubar=no,toolbar=no",
+    );
+    if (!popup) {
+      setOauthError("Popup blocked — please allow popups for AICandlez and try again.");
+      return;
+    }
+    const onMessage = (e: MessageEvent) => {
+      const data = e.data as { source?: string; ok?: boolean; error?: string } | null;
+      if (!data || data.source !== "aicandlez:alpaca-oauth") return;
+      window.removeEventListener("message", onMessage);
+      if (data.ok) {
+        queryClient.invalidateQueries({ queryKey: ["onboarding-exchanges"] });
+        queryClient.invalidateQueries({ queryKey: ["user-exchanges"] });
+        queryClient.invalidateQueries({ queryKey: ["exchange-connections"] });
+        setStep("intro");
+      } else {
+        setOauthError(data.error ?? "Alpaca did not authorize the connection.");
+      }
+    };
+    window.addEventListener("message", onMessage);
+  };
+
   const close = () => setStep("done");
   const advanceFromConnect = () => {
     // Refresh every surface that renders connection state.
@@ -169,8 +219,15 @@ export function OnboardingFlow() {
     <>
       {step === "choose"     && <ChooseStep
         hasLiveSub={hasLiveSub}
+        oauthEnabled={alpacaOauthEnabled}
+        oauthError={oauthError}
         onClose={close}
-        onPickAlpaca={() => setStep("alpaca_cta")}
+        onPickAlpaca={() => {
+          // When the in-app OAuth provider is configured, skip the external
+          // CTA explainer entirely — one click is the whole point.
+          if (alpacaOauthEnabled) { startAlpacaOauth(); return; }
+          setStep("alpaca_cta");
+        }}
         onPickExisting={() => { setPreselect(undefined); setStep("connect"); }}
       />}
       {step === "alpaca_cta" && <AlpacaCtaStep
@@ -253,8 +310,9 @@ function ModalShell({ children, onClose, maxWidth = 560 }: {
 }
 
 // ─── Step 1: Choose path ─────────────────────────────────────────────────────
-function ChooseStep({ hasLiveSub, onClose, onPickAlpaca, onPickExisting }: {
-  hasLiveSub: boolean; onClose: () => void;
+function ChooseStep({ hasLiveSub, oauthEnabled, oauthError, onClose, onPickAlpaca, onPickExisting }: {
+  hasLiveSub: boolean; oauthEnabled: boolean; oauthError: string;
+  onClose: () => void;
   onPickAlpaca: () => void; onPickExisting: () => void;
 }) {
   return (
@@ -305,19 +363,21 @@ function ChooseStep({ hasLiveSub, onClose, onPickAlpaca, onPickExisting }: {
             fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 800,
             letterSpacing: "0.16em",
           }}>
-            RECOMMENDED FOR BEGINNERS
+            {oauthEnabled ? "ONE-CLICK · RECOMMENDED" : "RECOMMENDED FOR BEGINNERS"}
           </div>
         </div>
         <div style={{
           fontSize: 17, fontWeight: 800, color: N.TEXT_0,
           letterSpacing: -0.3, marginBottom: 4,
         }}>
-          Create / Fund Alpaca Brokerage Account
+          {oauthEnabled
+            ? "Connect Alpaca Brokerage in One Click"
+            : "Create / Fund Alpaca Brokerage Account"}
         </div>
         <div style={{ fontSize: 12.5, color: N.TEXT_1, lineHeight: 1.55 }}>
-          Open a regulated US brokerage account at Alpaca, deposit funds
-          directly into your Alpaca account, then connect it back to AICandlez.
-          Best path if you don&apos;t already have exchange API keys.
+          {oauthEnabled
+            ? "Sign in to Alpaca (or sign up in seconds) and authorize AICandlez to place trades on your behalf. No API keys to copy. Your funds stay at Alpaca."
+            : "Open a regulated US brokerage account at Alpaca, deposit funds directly into your Alpaca account, then connect it back to AICandlez. Best path if you don't already have exchange API keys."}
         </div>
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 6,
@@ -325,9 +385,21 @@ function ChooseStep({ hasLiveSub, onClose, onPickAlpaca, onPickExisting }: {
           fontFamily: N.FONT_MONO, fontSize: 11, fontWeight: 800,
           letterSpacing: "0.16em",
         }}>
-          GET STARTED <ArrowRight size={13} strokeWidth={2.4} />
+          {oauthEnabled ? "CONNECT WITH ALPACA" : "GET STARTED"} <ArrowRight size={13} strokeWidth={2.4} />
         </div>
       </button>
+
+      {oauthError && (
+        <div style={{
+          marginTop: 10, marginBottom: 4, padding: "10px 12px", borderRadius: 10,
+          background: "rgba(255,80,100,0.08)",
+          border: "1px solid rgba(255,80,100,0.30)",
+          color: "rgba(255,120,140,0.95)",
+          fontSize: 12, lineHeight: 1.5,
+        }}>
+          {oauthError}
+        </div>
+      )}
 
       {/* SECONDARY: Connect existing */}
       <button
@@ -382,6 +454,10 @@ function ChooseStep({ hasLiveSub, onClose, onPickAlpaca, onPickExisting }: {
 }
 
 // ─── Step 2: Alpaca external CTA ─────────────────────────────────────────────
+// Only reached when the OAuth provider is *not* configured — the ChooseStep
+// short-circuits straight to `startAlpacaOauth()` otherwise. This step keeps
+// the legacy "create your Alpaca account on alpaca.markets, then come back
+// and paste API keys" path alive as the fallback.
 function AlpacaCtaStep({ onClose, onBack, onContinue }: {
   onClose: () => void; onBack: () => void; onContinue: () => void;
 }) {

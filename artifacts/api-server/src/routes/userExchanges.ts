@@ -48,7 +48,15 @@ type AuthReq = Request & { clerkUserId: string };
 // AdapterConfig. No global registry modification — instance is ephemeral.
 
 function makeAdapter(exchange: string, creds: ExchangeCredentials): BaseExchangeAdapter {
-  const cfg = { apiKey: creds.apiKey, apiSecret: creds.apiSecret, passphrase: creds.passphrase };
+  const cfg = {
+    apiKey:            creds.apiKey,
+    apiSecret:         creds.apiSecret,
+    passphrase:        creds.passphrase,
+    oauthAccessToken:  creds.oauthAccessToken,
+    oauthRefreshToken: creds.oauthRefreshToken,
+    oauthExpiresAt:    creds.oauthExpiresAt,
+    oauthScope:        creds.oauthScope,
+  };
   switch (exchange) {
     // Live
     case "Kraken":       return new KrakenAdapter(cfg);
