@@ -8,6 +8,13 @@ import { runAIDecision, type AIDecisionResult } from "./aiReasoning.js";
 import { computeRSI, computeEMA, computeMACD } from "./indicators.js";
 import { placeOrder, getAccountSummary } from "./simulationEngine.js";
 import { placeLiveAutoOrder } from "./exchangeEngine.js";
+import {
+  listLiveExecutionUsers,
+  placeLiveAutoOrderForUser,
+  isDryRunEnabled,
+  type LiveUserOrderResult,
+} from "./liveUserExecution.js";
+import { registerLiveUserFill } from "./userSimRegistry.js";
 import { validateTrade } from "./riskEngine.js";
 import { checkTrailingStops } from "./trailingStopEngine.js";
 import { computeCorrelationMatrix } from "./correlationEngine.js";
@@ -626,29 +633,109 @@ async function autoExecute(
   let liveExchangeOrderId: string | undefined;
 
   if (isLiveExec) {
-    const live = await placeLiveAutoOrder({ symbol, side, sizeUSD });
-    if (!live.success) {
+    // ── Resolve live-execution targets ────────────────────────────────────
+    // Customers with a default+active+live `user_exchange_connections` row
+    // get an order routed through THEIR own connected exchange. The
+    // operator process-env path (admintrade.aicandlez.com) is ALWAYS
+    // attempted in parallel so the platform-level audit trail + risk view
+    // is preserved. If neither path succeeds, the trade is rejected.
+    const liveUsers = await listLiveExecutionUsers();
+
+    const [operatorResult, userResults] = await Promise.all([
+      placeLiveAutoOrder({ symbol, side, sizeUSD }).catch((err): Awaited<ReturnType<typeof placeLiveAutoOrder>> => ({
+        success: false,
+        error:   err instanceof Error ? err.message : String(err),
+      })),
+      Promise.all(
+        liveUsers.map((u) =>
+          placeLiveAutoOrderForUser({ userId: u.userId, symbol, side, sizeUSD }).catch(
+            (err): LiveUserOrderResult => ({
+              success:   false,
+              userId:    u.userId,
+              exchange:  u.exchange,
+              errorCode: "exchange_reject",
+              error:     err instanceof Error ? err.message : String(err),
+            }),
+          ),
+        ),
+      ),
+    ]);
+
+    // Mirror each per-user fill into the user's sim registry (cache + DB)
+    // so the position appears immediately in the customer's portal.
+    const userSuccesses = userResults.filter((r) => r.success);
+    for (const r of userSuccesses) {
+      try {
+        const userEntry = r.fillPrice ?? price;
+        const userQty   = r.quantity  ?? sizeUSD / userEntry;
+        const userSL    = side === "BUY" ? userEntry * (1 - settings.stopLossPercent   / 100) : userEntry * (1 + settings.stopLossPercent   / 100);
+        const userTP    = side === "BUY" ? userEntry * (1 + settings.takeProfitPercent / 100) : userEntry * (1 - settings.takeProfitPercent / 100);
+        await registerLiveUserFill({
+          userId:          r.userId,
+          symbol,
+          side,
+          quantity:        userQty,
+          entryPrice:      userEntry,
+          sizeUSD,
+          signalId,
+          stopLoss:        parseFloat(userSL.toFixed(2)),
+          takeProfit:      parseFloat(userTP.toFixed(2)),
+          exchange:        r.exchange ?? "unknown",
+          exchangeOrderId: r.exchangeOrderId ?? `LIVE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        });
+      } catch (e) {
+        logger.warn(
+          { userId: r.userId, exchange: r.exchange, err: e instanceof Error ? e.message : String(e) },
+          "Live fan-out: failed to mirror fill into sim registry",
+        );
+      }
+    }
+
+    if (userResults.length > 0) {
+      const failed = userResults.length - userSuccesses.length;
+      logger.info(
+        { symbol, side, totalUsers: userResults.length, succeeded: userSuccesses.length, failed, dryRun: isDryRunEnabled() },
+        "Live fan-out completed",
+      );
+    }
+
+    // If neither the operator path nor any per-user fan-out succeeded,
+    // treat as a hard rejection (matches the original single-path semantics).
+    if (!operatorResult.success && userSuccesses.length === 0) {
+      const reason = operatorResult.error ?? (liveUsers.length > 0
+        ? `All ${liveUsers.length} customer fan-outs failed`
+        : "Live mode active but no execution target available");
       engineStats.tradesBlocked++;
-      logger.warn({ symbol, side, error: live.error }, "Live auto-trade rejected by exchange bridge");
+      logger.warn({ symbol, side, error: reason, liveUsers: liveUsers.length }, "Live auto-trade rejected by exchange bridge");
       await db.insert(logsTable).values({
         id: genId(), type: "trade", level: "critical",
-        message: `Live auto-trade failed for ${symbol} ${side}: ${live.error}`,
-        details: { symbol, side, error: live.error, mode: "live" },
+        message: `Live auto-trade failed for ${symbol} ${side}: ${reason}`,
+        details: { symbol, side, error: reason, mode: "live", liveUsers: liveUsers.length },
       });
       auditLogger.append("system", "TRADE_REJECTED", {
-        symbol, side, error: live.error, gate: "live_exchange_bridge",
+        symbol, side, error: reason, gate: "live_exchange_bridge",
       }, { symbol, severity: "critical" });
       executionStreamBus.emitEvent({
         type: "order_rejected", severity: "error",
         symbol, side, sizeUSD, gate: "live_exchange_bridge", mode: "live",
-        reason: live.error ?? "unknown",
-        message: `Live order REJECTED ${symbol} ${side} $${sizeUSD}: ${live.error}`,
+        reason,
+        message: `Live order REJECTED ${symbol} ${side} $${sizeUSD}: ${reason}`,
       });
-      return { executed: false, blockReason: `Live bridge: ${live.error}` };
+      return { executed: false, blockReason: `Live bridge: ${reason}` };
     }
-    pos = { id: live.exchangeOrderId ?? genId(), entryPrice: live.fillPrice ?? price };
-    liveExchange        = live.exchange;
-    liveExchangeOrderId = live.exchangeOrderId;
+
+    // Anchor the global audit row to the operator fill when present;
+    // otherwise to the first successful per-user fill.
+    if (operatorResult.success) {
+      pos = { id: operatorResult.exchangeOrderId ?? genId(), entryPrice: operatorResult.fillPrice ?? price };
+      liveExchange        = operatorResult.exchange;
+      liveExchangeOrderId = operatorResult.exchangeOrderId;
+    } else {
+      const first = userSuccesses[0]!;
+      pos = { id: first.exchangeOrderId ?? genId(), entryPrice: first.fillPrice ?? price };
+      liveExchange        = first.exchange;
+      liveExchangeOrderId = first.exchangeOrderId;
+    }
   } else {
     const result = await placeOrder({ symbol, side, sizeUSD });
     if (!result.success) {

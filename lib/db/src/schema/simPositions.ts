@@ -15,6 +15,10 @@ export const simPositionsTable = pgTable("sim_positions", {
   signalId:   text("signal_id"),
   stopLoss:   real("stop_loss"),
   takeProfit: real("take_profit"),
+  // Populated when this position was opened against a live broker account
+  // (per-user `user_exchange_connections`). NULL for paper/sim fills.
+  exchange:        text("exchange"),
+  exchangeOrderId: text("exchange_order_id"),
   createdAt:  timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   index("sim_positions_user_idx").on(t.userId),

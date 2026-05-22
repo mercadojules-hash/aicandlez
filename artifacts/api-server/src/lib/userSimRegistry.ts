@@ -26,6 +26,8 @@ export interface UserSimPosition {
   unrealizedPnL?: number;
   unrealizedPnLPct?: number;
   marketValue?: number;
+  exchange?: string;
+  exchangeOrderId?: string;
 }
 
 export interface UserSimTrade {
@@ -43,6 +45,8 @@ export interface UserSimTrade {
   realizedPnLPct: number;
   durationMs: number;
   closeReason: string;
+  exchange?: string;
+  exchangeOrderId?: string;
 }
 
 interface UserSimAccount {
@@ -124,33 +128,37 @@ async function loadFromDB(userId: string): Promise<UserSimState> {
       totalTrades:     dbAccount!.totalTrades,
     },
     positions: dbPositions.map((p) => ({
-      id:         p.id,
-      userId:     p.userId,
-      symbol:     p.symbol,
-      side:       p.side as "BUY" | "SELL",
-      quantity:   p.quantity,
-      entryPrice: p.entryPrice,
-      entryTime:  p.entryTime,
-      sizeUSD:    p.sizeUSD,
-      signalId:   p.signalId ?? undefined,
-      stopLoss:   p.stopLoss ?? undefined,
-      takeProfit: p.takeProfit ?? undefined,
+      id:              p.id,
+      userId:          p.userId,
+      symbol:          p.symbol,
+      side:            p.side as "BUY" | "SELL",
+      quantity:        p.quantity,
+      entryPrice:      p.entryPrice,
+      entryTime:       p.entryTime,
+      sizeUSD:         p.sizeUSD,
+      signalId:        p.signalId ?? undefined,
+      stopLoss:        p.stopLoss ?? undefined,
+      takeProfit:      p.takeProfit ?? undefined,
+      exchange:        p.exchange ?? undefined,
+      exchangeOrderId: p.exchangeOrderId ?? undefined,
     })),
     tradeHistory: dbTrades.map((t) => ({
-      id:             t.id,
-      userId:         t.userId,
-      symbol:         t.symbol,
-      side:           t.side as "BUY" | "SELL",
-      quantity:       t.quantity,
-      entryPrice:     t.entryPrice,
-      exitPrice:      t.exitPrice,
-      entryTime:      t.entryTime,
-      exitTime:       t.exitTime,
-      sizeUSD:        t.sizeUSD,
-      realizedPnL:    t.realizedPnL,
-      realizedPnLPct: t.realizedPnLPct,
-      durationMs:     t.durationMs,
-      closeReason:    t.closeReason ?? "MANUAL",
+      id:              t.id,
+      userId:          t.userId,
+      symbol:          t.symbol,
+      side:            t.side as "BUY" | "SELL",
+      quantity:        t.quantity,
+      entryPrice:      t.entryPrice,
+      exitPrice:       t.exitPrice,
+      entryTime:       t.entryTime,
+      exitTime:        t.exitTime,
+      sizeUSD:         t.sizeUSD,
+      realizedPnL:     t.realizedPnL,
+      realizedPnLPct:  t.realizedPnLPct,
+      durationMs:      t.durationMs,
+      closeReason:     t.closeReason ?? "MANUAL",
+      exchange:        t.exchange ?? undefined,
+      exchangeOrderId: t.exchangeOrderId ?? undefined,
     })),
     idSeq: 0,
   };
@@ -311,6 +319,68 @@ export async function placeUserOrder(userId: string, req: UserOrderRequest): Pro
   return { success: true, position };
 }
 
+/**
+ * Mirror a live exchange fill (executed against the customer's own broker
+ * via `placeLiveAutoOrderForUser`) into the user's sim state so the position
+ * appears in their portal. Cash balance is intentionally NOT debited — live
+ * trades use real broker funds, not paper cash. On close, PnL flows through
+ * `closeUserPosition` like any other position.
+ */
+export async function registerLiveUserFill(params: {
+  userId:          string;
+  symbol:          string;
+  side:            "BUY" | "SELL";
+  quantity:        number;
+  entryPrice:      number;
+  sizeUSD:         number;
+  signalId?:       string;
+  stopLoss?:       number;
+  takeProfit?:     number;
+  exchange:        string;
+  exchangeOrderId: string;
+}): Promise<UserSimPosition> {
+  const state    = await getOrLoad(params.userId);
+  const position: UserSimPosition = {
+    id:              params.exchangeOrderId,
+    userId:          params.userId,
+    symbol:          normalizeSymbol(params.symbol),
+    side:            params.side,
+    quantity:        parseFloat(params.quantity.toFixed(8)),
+    entryPrice:      parseFloat(params.entryPrice.toFixed(2)),
+    entryTime:       Date.now(),
+    sizeUSD:         parseFloat(params.sizeUSD.toFixed(2)),
+    signalId:        params.signalId,
+    stopLoss:        params.stopLoss,
+    takeProfit:      params.takeProfit,
+    exchange:        params.exchange,
+    exchangeOrderId: params.exchangeOrderId,
+  };
+
+  state.positions.push(position);
+
+  await db.insert(simPositionsTable).values({
+    id:              position.id,
+    userId:          position.userId,
+    symbol:          position.symbol,
+    side:            position.side,
+    quantity:        position.quantity,
+    entryPrice:      position.entryPrice,
+    entryTime:       position.entryTime,
+    sizeUSD:         position.sizeUSD,
+    signalId:        position.signalId ?? null,
+    stopLoss:        position.stopLoss ?? null,
+    takeProfit:      position.takeProfit ?? null,
+    exchange:        position.exchange ?? null,
+    exchangeOrderId: position.exchangeOrderId ?? null,
+  });
+
+  logger.info(
+    { userId: params.userId, symbol: position.symbol, side: position.side, exchange: position.exchange, exchangeOrderId: position.exchangeOrderId },
+    "UserSimRegistry: live fill mirrored",
+  );
+  return position;
+}
+
 export async function closeUserPosition(
   userId: string,
   positionId: string,
@@ -342,20 +412,22 @@ export async function closeUserPosition(
   const tradeId        = newId(state);
 
   const trade: UserSimTrade = {
-    id:             tradeId,
+    id:              tradeId,
     userId,
-    symbol:         pos.symbol,
-    side:           pos.side,
-    quantity:       pos.quantity,
-    entryPrice:     pos.entryPrice,
-    exitPrice:      parseFloat(exitPrice.toFixed(2)),
-    entryTime:      pos.entryTime,
+    symbol:          pos.symbol,
+    side:            pos.side,
+    quantity:        pos.quantity,
+    entryPrice:      pos.entryPrice,
+    exitPrice:       parseFloat(exitPrice.toFixed(2)),
+    entryTime:       pos.entryTime,
     exitTime,
-    sizeUSD:        pos.sizeUSD,
-    realizedPnL:    parseFloat(realizedPnL.toFixed(2)),
-    realizedPnLPct: parseFloat(realizedPnLPct.toFixed(3)),
-    durationMs:     exitTime - pos.entryTime,
+    sizeUSD:         pos.sizeUSD,
+    realizedPnL:     parseFloat(realizedPnL.toFixed(2)),
+    realizedPnLPct:  parseFloat(realizedPnLPct.toFixed(3)),
+    durationMs:      exitTime - pos.entryTime,
     closeReason,
+    exchange:        pos.exchange,
+    exchangeOrderId: pos.exchangeOrderId,
   };
 
   state.account.cashBalance  += pos.sizeUSD + realizedPnL;
@@ -366,20 +438,22 @@ export async function closeUserPosition(
 
   await Promise.all([
     db.insert(simTradesTable).values({
-      id:             trade.id,
+      id:              trade.id,
       userId,
-      symbol:         trade.symbol,
-      side:           trade.side,
-      quantity:       trade.quantity,
-      entryPrice:     trade.entryPrice,
-      exitPrice:      trade.exitPrice,
-      entryTime:      trade.entryTime,
-      exitTime:       trade.exitTime,
-      sizeUSD:        trade.sizeUSD,
-      realizedPnL:    trade.realizedPnL,
-      realizedPnLPct: trade.realizedPnLPct,
-      durationMs:     trade.durationMs,
-      closeReason:    trade.closeReason,
+      symbol:          trade.symbol,
+      side:            trade.side,
+      quantity:        trade.quantity,
+      entryPrice:      trade.entryPrice,
+      exitPrice:       trade.exitPrice,
+      entryTime:       trade.entryTime,
+      exitTime:        trade.exitTime,
+      sizeUSD:         trade.sizeUSD,
+      realizedPnL:     trade.realizedPnL,
+      realizedPnLPct:  trade.realizedPnLPct,
+      durationMs:      trade.durationMs,
+      closeReason:     trade.closeReason,
+      exchange:        trade.exchange ?? null,
+      exchangeOrderId: trade.exchangeOrderId ?? null,
     }),
     db.delete(simPositionsTable).where(eq(simPositionsTable.id, positionId)),
     persistAccount(state),

@@ -18,6 +18,10 @@ export const simTradesTable = pgTable("sim_trades", {
   realizedPnLPct: real("realized_pnl_pct").notNull(),
   durationMs:     bigint("duration_ms", { mode: "number" }).notNull(),
   closeReason:    text("close_reason").default("MANUAL"),
+  // Populated when this trade was executed against a live broker account
+  // (per-user `user_exchange_connections`). NULL for paper/sim fills.
+  exchange:        text("exchange"),
+  exchangeOrderId: text("exchange_order_id"),
   createdAt:      timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   index("sim_trades_user_idx").on(t.userId),
