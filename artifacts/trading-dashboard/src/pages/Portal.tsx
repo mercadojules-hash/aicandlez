@@ -3033,6 +3033,28 @@ function PortalInner() {
   const hasClosed = stats.closedCount > 0;
   const hasAnyActivity = stats.totalCount > 0;
 
+  // Lifetime broker commission paid across every closed live leg. Mirrors the
+  // mobile PWA Portfolio "Fees paid" stat (Task #82) so equity reconciliation
+  // reads the same on every surface. Pulls from /api/account → simAccount
+  // .totalFeesPaid; paper-only users see "—".
+  const accountFeesQuery = useQuery<{ totalFeesPaid?: number }>({
+    queryKey: ["/api/account", "portal-fees"],
+    enabled:  isSignedIn ?? false,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/account`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to load account");
+      return res.json();
+    },
+  });
+  const totalFeesPaid = accountFeesQuery.data?.totalFeesPaid ?? 0;
+
   // ── ADMIN OPERATOR · Real Kraken live snapshot ──────────────────────────────
   // On admintrade.aicandlez.com the workstation must reflect REAL Kraken account
   // state (USD balance, exchange identity, live/error source), never the
@@ -3296,6 +3318,19 @@ function PortalInner() {
           ) : (
             <MetricTile label="EQUITY" value={equityStr} demo />
           )}
+          {/* Lifetime broker commission across every closed live leg —
+              mirrors the PWA Portfolio "Fees paid" stat. Dimmed em-dash
+              for paper-only customers. fmtMoney already injects a +/- sign
+              so we format the unsigned value manually to render "−$x.xx". */}
+          <MetricTile
+            label="FEES PAID"
+            value={totalFeesPaid > 0
+              ? `−$${totalFeesPaid.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : "—"}
+            delta={totalFeesPaid > 0 ? "LIFETIME BROKER" : "NO LIVE FEES YET"}
+            positive={false}
+            demo
+          />
         </div>
       )}
 
