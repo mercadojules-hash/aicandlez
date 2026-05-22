@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
@@ -162,9 +163,37 @@ function LiveCloseCard({ d }: { d: LiveCloseData }) {
   );
 }
 
+type FilterKey = "all" | "trades" | "signals" | "system";
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: "all",     label: "All"     },
+  { key: "trades",  label: "Trades"  },
+  { key: "signals", label: "Signals" },
+  { key: "system",  label: "System"  },
+];
+
+function bucketOf(type: string): Exclude<FilterKey, "all"> {
+  const t = type.toLowerCase();
+  if (t.includes("trade") || t.includes("position") || t.includes("order") || t.includes("fill") || t.includes("tp") || t.includes("sl")) {
+    return "trades";
+  }
+  if (t.includes("signal") || t.includes("scanner") || t.includes("setup") || t.includes("breakout") || t.includes("alert")) {
+    return "signals";
+  }
+  return "system";
+}
+
+const EMPTY_COPY: Record<FilterKey, { title: string; body: string }> = {
+  all:     { title: "No notifications yet",       body: "Trade fills, AI exits and risk alerts will appear here." },
+  trades:  { title: "No trade activity yet",      body: "Live fills, AI exits and TP/SL hits will land here." },
+  signals: { title: "No signal alerts yet",       body: "High-confidence setups from the AI scanner will appear here." },
+  system:  { title: "No system messages",         body: "Connection, billing and platform notices will appear here." },
+};
+
 export default function Notifications() {
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
+  const [filter, setFilter] = useState<FilterKey>("all");
 
   const { data, isLoading, isError, error, refetch } = useQuery<{ notifications: NotificationRow[]; unread: number }>({
     queryKey:        ["pwa-notifications"],
@@ -184,8 +213,19 @@ export default function Notifications() {
     onSuccess:  () => qc.invalidateQueries({ queryKey: ["pwa-notifications"] }),
   });
 
-  const rows   = data?.notifications ?? [];
-  const unread = data?.unread ?? 0;
+  const allRows = data?.notifications ?? [];
+  const unread  = data?.unread ?? 0;
+
+  const counts = useMemo(() => {
+    const c: Record<FilterKey, number> = { all: allRows.length, trades: 0, signals: 0, system: 0 };
+    for (const n of allRows) c[bucketOf(n.type)]++;
+    return c;
+  }, [allRows]);
+
+  const rows = useMemo(
+    () => (filter === "all" ? allRows : allRows.filter(n => bucketOf(n.type) === filter)),
+    [allRows, filter],
+  );
 
   const openRow = (n: NotificationRow) => {
     if (!n.read) markOne.mutate(n.id);
@@ -217,7 +257,41 @@ export default function Notifications() {
         ) : undefined}
       />
 
-      <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{
+        padding: "12px 14px 4px", display: "flex", gap: 8,
+        overflowX: "auto", WebkitOverflowScrolling: "touch",
+      }}>
+        {FILTERS.map(f => {
+          const active = filter === f.key;
+          const count  = counts[f.key];
+          return (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "7px 12px", borderRadius: 999,
+                background: active
+                  ? `linear-gradient(135deg, ${BRAND}26, ${BRAND_DEEP}18)`
+                  : SURFACE,
+                border: `1px solid ${active ? BORDER_HI : BORDER}`,
+                color: active ? BRAND : TEXT_SUB,
+                fontFamily: SANS, fontWeight: 700, fontSize: 10,
+                letterSpacing: 1.2, textTransform: "uppercase",
+                cursor: "pointer", flexShrink: 0,
+                boxShadow: active ? `0 0 12px ${BRAND_BLOOM}` : "none",
+              }}>
+              {f.label}
+              <span style={{
+                fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                color: active ? BRAND : TEXT_DIM, letterSpacing: 0,
+              }}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ padding: "8px 14px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
         {isLoading ? (
           <div style={{
             padding: "48px 16px", textAlign: "center",
@@ -253,12 +327,12 @@ export default function Notifications() {
             <div style={{
               fontFamily: SANS, fontWeight: 700, fontSize: 12, color: TEXT_SUB,
               letterSpacing: 0.2,
-            }}>No notifications yet</div>
+            }}>{EMPTY_COPY[filter].title}</div>
             <div style={{
               marginTop: 6, fontFamily: SANS, fontSize: 10, color: TEXT_DIM,
               letterSpacing: 0.3,
             }}>
-              Trade fills, AI exits and risk alerts will appear here.
+              {EMPTY_COPY[filter].body}
             </div>
           </div>
         ) : (

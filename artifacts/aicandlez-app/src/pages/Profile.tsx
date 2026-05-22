@@ -11,7 +11,6 @@ import { useUserProfile, type UserProfile } from "@/contexts/UserProfileContext"
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { PageHeader } from "@/components/PageHeader";
 import { useFeedbackPrefs, ALERT_DEFINITIONS, type AlertKey } from "@/lib/feedback";
-import { useQueryClient } from "@tanstack/react-query";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 // Aligned with the Signals/Crypto/Equities neon-green system.
