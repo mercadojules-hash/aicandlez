@@ -1,0 +1,73 @@
+We successfully armed LIVE Kraken mode and the execution slots are incrementing (3 / 30), however the actual live execution lifecycle is not hydrating through the platform.
+
+Current observed behavior:
+
+* KRAKEN LIVE · REAL CAPITAL shows correctly
+* $100 Kraken balance hydrates correctly
+* LIVE mode arms correctly
+* execution slots increment
+* NO live positions appear
+* NO trade history appears
+* NO balance updates occur
+* NO realized/unrealized P/L updates
+* NO dashboard hydration after execution attempts
+
+This means the execution lifecycle bridge is still incomplete.
+
+We need full end-to-end LIVE EXECUTION HYDRATION.
+
+Investigate and fix the following path completely:
+
+SIGNAL DETECTED
+→ EXECUTION SENT
+→ KRAKEN ORDER SUBMITTED
+→ ORDER FILLED / REJECTED
+→ POSITION PERSISTED
+→ LIVE POSITION HYDRATED
+→ TRADE HISTORY HYDRATED
+→ BALANCE UPDATED
+→ REALIZED / UNREALIZED PNL UPDATED
+→ EXECUTION STREAM EVENT EMITTED
+
+Things to verify immediately:
+
+1. Is tradingLoop.executeAutoTrade() actually routing through exchangeEngine.executeOrder() in LIVE mode, or still falling back to simulationEngine.placeOrder()?
+
+2. Does KrakenAdapter.placeOrder() actually execute a real market order and return fill data?
+
+3. Are live fills persisted into the same tables powering:
+
+* Active Trades
+* Live Trades
+* Trade History
+* PNL metrics
+* execution telemetry
+
+4. If live execution uses different tables than simulation:
+
+* unify hydration
+  OR
+* create live_positions + live_trades hydration adapters
+
+5. Add explicit logs for:
+
+* EXECUTION_SENT
+* ORDER_ACKNOWLEDGED
+* ORDER_FILLED
+* ORDER_REJECTED
+* POSITION_PERSISTED
+* DASHBOARD_HYDRATED
+
+6. Add operator console verification:
+
+* show raw Kraken response payload
+* show exchange order id
+* show fill quantity
+* show fill price
+* show persistence success/failure
+
+7. Verify no silent rejection path exists.
+
+At the moment the system LOOKS armed visually, but the live execution lifecycle is not completing through persistence + dashboard hydration.
+
+We are now in execution bridge validation phase, not UI work.
