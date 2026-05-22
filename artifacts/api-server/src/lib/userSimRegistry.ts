@@ -496,10 +496,13 @@ export async function closeUserPosition(
   const exitTime       = Date.now();
   const tradeId        = newId(state);
 
-  // Broker commission for both legs (live trades only — null for paper)
-  const exitNotional = exitPrice * pos.quantity;
-  const entryFee = computeFillFee(pos.exchange, pos.sizeUSD);
+  // Broker commission for both legs (live trades only — null for paper).
+  // Fees are pro-rated against the closed portion so partial closes only
+  // charge for the quantity actually filled.
+  const exitNotional = exitPrice * closedQty;
+  const entryFee = computeFillFee(pos.exchange, closedSizeUSD);
   const exitFee  = computeFillFee(pos.exchange, exitNotional);
+  const netFees  = (entryFee ?? 0) + (exitFee ?? 0);
 
   const trade: UserSimTrade = {
     id:              tradeId,
@@ -523,12 +526,15 @@ export async function closeUserPosition(
     exitFee:              exitFee ?? undefined,
     netFees:
       entryFee != null || exitFee != null
-        ? parseFloat(((entryFee ?? 0) + (exitFee ?? 0)).toFixed(4))
+        ? parseFloat(netFees.toFixed(4))
         : undefined,
   };
 
-  state.account.cashBalance  += closedSizeUSD + realizedPnL;
-  state.account.totalRealized += realizedPnL;
+  // Live trades pay broker commission on both legs — deduct from cash and
+  // realized PnL so account equity reconciles to the receipt's Net P&L.
+  // Paper trades have null fees (no broker) and behave exactly as before.
+  state.account.cashBalance  += closedSizeUSD + realizedPnL - netFees;
+  state.account.totalRealized += realizedPnL - netFees;
   state.account.totalTrades  += 1;
   if (isPartial) {
     pos.quantity = parseFloat((pos.quantity - closedQty).toFixed(8));
