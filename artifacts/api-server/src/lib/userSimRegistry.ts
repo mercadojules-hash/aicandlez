@@ -422,6 +422,7 @@ export async function closeUserPosition(
   // price so realized PnL matches the actual exchange execution.
   let exchangeCloseOrderId: string | undefined;
   let brokerFillPrice: number | undefined;
+  let brokerFilledQty: number | undefined;
   const isLive = !!(pos.exchange && pos.exchangeOrderId);
   if (isLive) {
     const closeRes = await placeLiveCloseOrderForUser({
@@ -445,6 +446,10 @@ export async function closeUserPosition(
     if (closeRes.fillPrice && closeRes.fillPrice > 0) {
       brokerFillPrice = closeRes.fillPrice;
     }
+    if (closeRes.quantity && closeRes.quantity > 0) {
+      // Clamp to position quantity in case the broker over-reports
+      brokerFilledQty = Math.min(closeRes.quantity, pos.quantity);
+    }
   }
 
   let exitPrice: number;
@@ -459,12 +464,25 @@ export async function closeUserPosition(
     }
   }
 
+  // Partial-fill aware close. When the broker reported a filled quantity
+  // smaller than the position quantity (Kraken-style partials, or close
+  // orders that the exchange only partially executed), we close only the
+  // filled portion: realized PnL is computed on the filled qty, sizeUSD
+  // is pro-rated, the position stays open with the remaining qty/size,
+  // and the user can retry. When brokerFilledQty matches pos.quantity
+  // (or this is a non-live close), behaviour is the standard full close.
+  const closedQty = brokerFilledQty !== undefined ? brokerFilledQty : pos.quantity;
+  const isPartial = closedQty < pos.quantity - 1e-12;
+  const closedSizeUSD = isPartial
+    ? parseFloat(((pos.sizeUSD * closedQty) / pos.quantity).toFixed(2))
+    : pos.sizeUSD;
+
   const realizedPnL =
     pos.side === "BUY"
-      ? (exitPrice - pos.entryPrice) * pos.quantity
-      : (pos.entryPrice - exitPrice) * pos.quantity;
+      ? (exitPrice - pos.entryPrice) * closedQty
+      : (pos.entryPrice - exitPrice) * closedQty;
 
-  const realizedPnLPct = (realizedPnL / pos.sizeUSD) * 100;
+  const realizedPnLPct = closedSizeUSD > 0 ? (realizedPnL / closedSizeUSD) * 100 : 0;
   const exitTime       = Date.now();
   const tradeId        = newId(state);
 
@@ -478,16 +496,16 @@ export async function closeUserPosition(
     userId,
     symbol:          pos.symbol,
     side:            pos.side,
-    quantity:        pos.quantity,
+    quantity:        parseFloat(closedQty.toFixed(8)),
     entryPrice:      pos.entryPrice,
     exitPrice:       parseFloat(exitPrice.toFixed(2)),
     entryTime:       pos.entryTime,
     exitTime,
-    sizeUSD:         pos.sizeUSD,
+    sizeUSD:         closedSizeUSD,
     realizedPnL:     parseFloat(realizedPnL.toFixed(2)),
     realizedPnLPct:  parseFloat(realizedPnLPct.toFixed(3)),
     durationMs:      exitTime - pos.entryTime,
-    closeReason,
+    closeReason:     isPartial ? `${closeReason}_PARTIAL` : closeReason,
     exchange:             pos.exchange,
     exchangeOrderId:      pos.exchangeOrderId,
     exchangeCloseOrderId: exchangeCloseOrderId,
@@ -495,11 +513,22 @@ export async function closeUserPosition(
     exitFee:              exitFee ?? undefined,
   };
 
-  state.account.cashBalance  += pos.sizeUSD + realizedPnL;
+  state.account.cashBalance  += closedSizeUSD + realizedPnL;
   state.account.totalRealized += realizedPnL;
   state.account.totalTrades  += 1;
-  state.positions.splice(idx, 1);
+  if (isPartial) {
+    pos.quantity = parseFloat((pos.quantity - closedQty).toFixed(8));
+    pos.sizeUSD  = parseFloat((pos.sizeUSD - closedSizeUSD).toFixed(2));
+  } else {
+    state.positions.splice(idx, 1);
+  }
   state.tradeHistory.unshift(trade);
+
+  const positionMutation = isPartial
+    ? db.update(simPositionsTable)
+        .set({ quantity: pos.quantity, sizeUSD: pos.sizeUSD })
+        .where(eq(simPositionsTable.id, positionId))
+    : db.delete(simPositionsTable).where(eq(simPositionsTable.id, positionId));
 
   await Promise.all([
     db.insert(simTradesTable).values({
@@ -523,7 +552,7 @@ export async function closeUserPosition(
       entryFee:             trade.entryFee ?? null,
       exitFee:              trade.exitFee ?? null,
     }),
-    db.delete(simPositionsTable).where(eq(simPositionsTable.id, positionId)),
+    positionMutation,
     persistAccount(state),
   ]);
 

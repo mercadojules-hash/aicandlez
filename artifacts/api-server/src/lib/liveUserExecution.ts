@@ -9,6 +9,7 @@ import { vault } from "../services/vault/CredentialVault.js";
 import { ensureFreshAlpacaCreds } from "../services/exchanges/AlpacaTokenRefresher.js";
 import { makeAdapter } from "../services/exchanges/adapterFactory.js";
 import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
+import type { StandardOrder } from "../services/exchanges/types.js";
 import { getTicker } from "./marketData.js";
 import { logger } from "./logger.js";
 import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
@@ -80,6 +81,49 @@ export function isDryRunEnabled(): boolean {
   return process.env["LIVE_TRADE_DRY_RUN"] === "true";
 }
 
+// Poll adapter.getOrder() until the order is in a terminal state (filled,
+// cancelled, rejected) or until the timeout elapses. Returns the latest
+// known order snapshot plus a `timedOut` flag the caller uses to decide
+// how to surface partial / unfilled close orders.
+//
+// Some exchanges (notably Kraken) acknowledge a market order with
+// status="open" and avgFillPrice=0 on the initial placeOrder response,
+// even though the order fills moments later. Without polling, realized
+// PnL falls back to the live ticker which can drift from the true fill.
+async function pollOrderUntilFilled(
+  adapter: BaseExchangeAdapter,
+  exchangeOrderId: string,
+  symbol: string,
+  opts: {
+    timeoutMs?:  number;
+    intervalMs?: number;
+    logCtx?:     Record<string, unknown>;
+  } = {},
+): Promise<{ order: StandardOrder | null; timedOut: boolean }> {
+  const timeoutMs  = opts.timeoutMs  ?? 5000;
+  const intervalMs = opts.intervalMs ?? 500;
+  const deadline   = Date.now() + timeoutMs;
+  let last: StandardOrder | null = null;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+    try {
+      const o = await adapter.getOrder(exchangeOrderId, symbol);
+      if (o) {
+        last = o;
+        if (o.status === "filled" || o.status === "cancelled" || o.status === "rejected") {
+          return { order: o, timedOut: false };
+        }
+      }
+    } catch (err) {
+      logger.warn(
+        { ...(opts.logCtx ?? {}), exchangeOrderId, err: err instanceof Error ? err.message : String(err) },
+        "liveUserExecution: getOrder poll attempt failed",
+      );
+    }
+  }
+  return { order: last, timedOut: true };
+}
+
 async function emitFillNotification(
   userId:   string,
   symbol:   string,
@@ -89,11 +133,13 @@ async function emitFillNotification(
   quantity:  number,
   exchangeOrderId: string,
   dryRun:   boolean,
+  extra?: { note?: string; data?: Record<string, unknown> },
 ): Promise<void> {
   const priceStr = fillPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const qtyStr   = quantity.toLocaleString(undefined, { maximumFractionDigits: 8 });
-  const title    = `${side} ${symbol} filled on ${exchange}${dryRun ? " (dry-run)" : ""}`;
-  const message  = `${side} ${qtyStr} ${symbol} @ $${priceStr} on ${exchange}`;
+  const noteSuffix = extra?.note ? ` · ${extra.note}` : "";
+  const title    = `${side} ${symbol} filled on ${exchange}${dryRun ? " (dry-run)" : ""}${noteSuffix}`;
+  const message  = `${side} ${qtyStr} ${symbol} @ $${priceStr} on ${exchange}${noteSuffix}`;
 
   // Customer can mute live-fill push alerts in Profile → Alert Preferences
   // ("Live Trade Filled"). We ALWAYS persist the in-app notification row so
@@ -116,13 +162,17 @@ async function emitFillNotification(
     );
   }
 
+  const notifData: Record<string, unknown> = {
+    symbol, side, exchange, fillPrice, quantity, exchangeOrderId, dryRun,
+    ...(extra?.data ?? {}),
+  };
   try {
     await db.insert(userNotificationsTable).values({
       userId,
       type:    "live_trade_filled",
       title,
       message,
-      data:    { symbol, side, exchange, fillPrice, quantity, exchangeOrderId, dryRun },
+      data:    notifData,
       read:    false,
     });
   } catch (err) {
@@ -140,7 +190,7 @@ async function emitFillNotification(
     tag:       `live-fill-${symbol}`,
     url:       "/aicandlez-app/portfolio",
     alertKey:  "liveTradeFilled",
-    data:      { symbol, side, exchange, fillPrice, quantity, exchangeOrderId, dryRun, kind: "live_trade_filled" },
+    data:      { ...notifData, kind: "live_trade_filled" },
   }).catch((err) => {
     logger.warn(
       { userId, symbol, err: err instanceof Error ? err.message : String(err) },
@@ -532,13 +582,52 @@ export async function placeLiveCloseOrderForUser(
   }
 
   try {
-    const order = await adapter.placeOrder({
+    let order = await adapter.placeOrder({
       symbol,
       side:     closeSide === "BUY" ? "buy" : "sell",
       type:     "market",
       qty:      parseFloat(quantity.toFixed(8)),
       clientId: `close-u-${userId.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     });
+
+    // Poll for the true execution. Many exchanges (e.g. Kraken) return
+    // status="open" with avgFillPrice=0 on the initial market-order ack,
+    // even though the fill lands moments later. Without this poll the
+    // close path falls back to the ticker price and realized PnL drifts
+    // from the actual broker execution.
+    const idForPoll = order.exchangeOrderId || order.id;
+    let timedOut = false;
+    const isTerminal = (s: StandardOrder["status"]) =>
+      s === "filled" || s === "cancelled" || s === "rejected";
+    if (idForPoll && !isTerminal(order.status)) {
+      const poll = await pollOrderUntilFilled(adapter, idForPoll, symbol, {
+        timeoutMs:  5000,
+        intervalMs: 500,
+        logCtx:     { userId, exchange: row.exchange, symbol, closeSide },
+      });
+      if (poll.order) order = poll.order;
+      timedOut = poll.timedOut && !isTerminal(order.status);
+    }
+
+    const requestedQty = order.requestedQty > 0 ? order.requestedQty : quantity;
+    const unfilled     = !(order.filledQty > 0);
+    const partial      = order.filledQty > 0 && order.filledQty < requestedQty - 1e-12;
+
+    // Hard failures: rejected, cancelled, or timed out with no fill at all.
+    // Surface as live_trade_failed so the position stays open and the caller
+    // (closeUserPosition) can retry on the next pass.
+    if (order.status === "rejected" || order.status === "cancelled" || (timedOut && unfilled)) {
+      const reasonMsg = timedOut
+        ? `Close order ${idForPoll} did not fill within 5s on ${row.exchange} (status=${order.status})`
+        : `Close order ${idForPoll} ${order.status} on ${row.exchange}`;
+      logger.warn(
+        { userId, exchange: row.exchange, symbol, closeSide,
+          status: order.status, timedOut, filledQty: order.filledQty, requestedQty },
+        "liveUserExecution: close order not filled",
+      );
+      await emitFailureNotification(userId, symbol, closeSide, reasonMsg, row.exchange);
+      return { success: false, userId, exchange: row.exchange, errorCode: "exchange_reject", error: reasonMsg };
+    }
 
     const fill = order.avgFillPrice > 0 ? order.avgFillPrice : 0;
     const result: LiveUserCloseResult = {
@@ -550,14 +639,25 @@ export async function placeLiveCloseOrderForUser(
       quantity:             order.filledQty > 0 ? order.filledQty : quantity,
     };
 
+    const note = timedOut
+      ? "partial fill — poll timed out"
+      : partial
+        ? "partial fill"
+        : undefined;
+
     logger.info(
       { userId, exchange: row.exchange, symbol, closeSide,
-        fillPrice: result.fillPrice, exchangeCloseOrderId: result.exchangeCloseOrderId },
+        fillPrice: result.fillPrice, exchangeCloseOrderId: result.exchangeCloseOrderId,
+        status: order.status, partial, timedOut,
+        filledQty: order.filledQty, requestedQty },
       "liveUserExecution: close order filled",
     );
     await emitFillNotification(
       userId, symbol, closeSide, row.exchange,
       result.fillPrice!, result.quantity!, result.exchangeCloseOrderId ?? "", false,
+      note
+        ? { note, data: { partial, timedOut, requestedQty, status: order.status } }
+        : undefined,
     );
     return result;
   } catch (err) {
