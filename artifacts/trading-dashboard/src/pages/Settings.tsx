@@ -120,7 +120,7 @@ const RISK_LEVELS = [
   { value: "high",     label: "High",     desc: "≤4% stop loss, larger positions",   color: "#ff6600" },
 ];
 
-const EXCHANGES = ["Alpaca", "Binance", "Coinbase"];
+const EXCHANGES = ["Alpaca", "Kraken", "Coinbase", "CryptoDotCom", "Binance"];
 const TIMEZONES = ["UTC", "US/Eastern", "US/Pacific", "Europe/London", "Asia/Tokyo", "Asia/Singapore"];
 const CURRENCIES = ["USD", "EUR", "GBP", "JPY"];
 

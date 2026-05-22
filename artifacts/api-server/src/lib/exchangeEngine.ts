@@ -1,7 +1,11 @@
 import { validateTrade, getStatus as getRiskStatus } from "./riskEngine.js";
 import { getTicker }      from "./marketData.js";
 import { CoinbaseAdapter } from "../services/exchanges/adapters/CoinbaseAdapter.js";
-import { AlpacaAdapter }   from "../services/exchanges/adapters/AlpacaAdapter.js";
+import { AlpacaAdapter, ALPACA_CONFIG }   from "../services/exchanges/adapters/AlpacaAdapter.js";
+import { KrakenAdapter, KRAKEN_CONFIG }   from "../services/exchanges/adapters/KrakenAdapter.js";
+import { BinanceAdapter, BINANCE_CONFIG } from "../services/exchanges/adapters/BinanceAdapter.js";
+import { CryptoDotComAdapter, CRYPTOCOM_CONFIG } from "../services/exchanges/adapters/CryptoDotComAdapter.js";
+import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -390,8 +394,13 @@ export async function executeOrder(
     return order;
   }
 
-  // ── LIVE execution via Alpaca ──────────────────────────────────────────────
-  const liveAdapter = new AlpacaAdapter();
+  // ── LIVE execution via per-exchange adapter registry ──────────────────────
+  // Routes the order through whichever adapter is currently selected
+  // (Kraken, Coinbase, Alpaca, Binance, Crypto.com), instantiated with the
+  // operator's process-env credentials. Before this registry existed, this
+  // branch was hardcoded to `new AlpacaAdapter()` — meaning a Kraken
+  // selection on the operator console would silently route to Alpaca.
+  const liveAdapter = getLiveAdapter(_selectedExchange);
   const result = await liveAdapter.placeOrder({
     symbol,
     side:      side as "buy" | "sell",
@@ -404,9 +413,139 @@ export async function executeOrder(
   order.exchangeOrderId = result.exchangeOrderId;
   order.status          = result.status === "filled" ? "filled" : "open";
   if (orderType === "market") order.status = "filled";
+  if (result.avgFillPrice > 0) order.fillPrice = parseFloat(result.avgFillPrice.toFixed(2));
 
   _orders.unshift(order);
   return order;
+}
+
+// ── Live adapter registry ─────────────────────────────────────────────────────
+//
+// Returns a `BaseExchangeAdapter` instance for the given exchange name,
+// constructed with the operator's process-env credentials. Throws if the
+// exchange is unsupported or its credentials are missing. The instance is
+// short-lived and intended to be used for a single call — adapters are
+// stateless across calls and creating one is cheap.
+//
+// Per the live-execution bridge architecture, this is the ONLY place where
+// the engine picks which real exchange to send a live order to. Per-user
+// customer credentials (from `user_exchange_connections`) are NOT consulted
+// here — process-env keys are operator credentials only. Customer-scoped
+// live execution is a follow-up scope.
+export function getLiveAdapter(exchange: string): BaseExchangeAdapter {
+  const ex = exchange.toLowerCase().replace(/[\s._-]/g, "");
+  if (ex === "kraken") {
+    if (!isExchangeConfigured("Kraken")) {
+      throw new Error("Kraken API credentials are not configured (KRAKEN_API_KEY / KRAKEN_API_SECRET missing)");
+    }
+    return new KrakenAdapter({
+      ...KRAKEN_CONFIG,
+      apiKey:    process.env["KRAKEN_API_KEY"],
+      apiSecret: process.env["KRAKEN_API_SECRET"],
+    });
+  }
+  if (ex === "coinbase") {
+    if (!isExchangeConfigured("Coinbase")) throw new Error("Coinbase API credentials are not configured (COINBASE_API_KEY / COINBASE_API_SECRET missing)");
+    return new CoinbaseAdapter();
+  }
+  if (ex === "alpaca") {
+    if (!isExchangeConfigured("Alpaca")) throw new Error("Alpaca API credentials are not configured (ALPACA_API_KEY / ALPACA_SECRET_KEY missing)");
+    return new AlpacaAdapter({ ...ALPACA_CONFIG });
+  }
+  if (ex === "binance" || ex === "binanceus") {
+    if (!isExchangeConfigured("Binance")) throw new Error("Binance API credentials are not configured (BINANCE_API_KEY / BINANCE_API_SECRET missing)");
+    return new BinanceAdapter({
+      ...BINANCE_CONFIG,
+      apiKey:    process.env["BINANCE_API_KEY"],
+      apiSecret: process.env["BINANCE_API_SECRET"],
+    });
+  }
+  if (ex === "cryptocom" || ex === "cryptocomdotcom" || ex === "cryptodotcom") {
+    if (!isExchangeConfigured("CryptoDotCom")) throw new Error("Crypto.com API credentials are not configured (CRYPTOCOM_API_KEY / CRYPTOCOM_API_SECRET missing)");
+    return new CryptoDotComAdapter({
+      ...CRYPTOCOM_CONFIG,
+      apiKey:    process.env["CRYPTOCOM_API_KEY"],
+      apiSecret: process.env["CRYPTOCOM_API_SECRET"],
+    });
+  }
+  throw new Error(`No live adapter available for exchange: ${exchange}`);
+}
+
+export const LIVE_BRIDGE_EXCHANGES = ["Kraken", "Coinbase", "Alpaca", "Binance", "CryptoDotCom"] as const;
+
+// ── Auto-trade live bridge ────────────────────────────────────────────────────
+//
+// Used by the global trading loop (`tradingLoop.autoExecute`) when exchange
+// mode is "live" and the trade is not a sim/test path. Returns a normalized
+// result the loop can splice into its existing success path (DB insert +
+// audit + execution-stream emit) WITHOUT touching `_simBalances` or the
+// in-memory sim positions list — the live and sim paths stay fully isolated.
+//
+// All upstream gates (confidence floor, MTF, volume, sideways, 1H trend,
+// max positions, daily limit, correlation, risk engine, kill switch) run
+// BEFORE this function is invoked. The only checks here are operational:
+// live-capable + not-paused. The trading-loop callsite is the dedupe
+// boundary; this function does NOT enforce a separate dedupe window.
+export interface LiveAutoOrderResult {
+  success:         boolean;
+  error?:          string;
+  exchange?:       string;
+  exchangeOrderId?: string;
+  fillPrice?:      number;
+  quantity?:       number;
+}
+
+export async function placeLiveAutoOrder(req: {
+  symbol:  string;
+  side:    "BUY" | "SELL";
+  sizeUSD: number;
+}): Promise<LiveAutoOrderResult> {
+  if (_mode !== "live") return { success: false, error: "Exchange engine not in live mode" };
+  if (_killSwitch)      return { success: false, error: "Exchange kill switch is active" };
+  if (_paused)          return { success: false, error: "Exchange is paused" };
+  if (!isLiveCapable()) return { success: false, error: "Live mode not configured (missing API credentials or EXCHANGE_LIVE_ENABLED!=true)" };
+
+  let adapter: BaseExchangeAdapter;
+  try {
+    adapter = getLiveAdapter(_selectedExchange);
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // Fetch live price for qty conversion. The adapter is also responsible
+  // for symbol normalisation — we pass the engine-native symbol ("BTCUSD").
+  let referencePrice: number;
+  try {
+    const ticker = await getTicker(req.symbol);
+    referencePrice = ticker.price;
+  } catch (err) {
+    return { success: false, error: `Failed to fetch reference price for ${req.symbol}: ${err instanceof Error ? err.message : String(err)}` };
+  }
+  if (!(referencePrice > 0)) return { success: false, error: `Invalid reference price (${referencePrice}) for ${req.symbol}` };
+
+  const quoteSide: "buy" | "sell" = req.side === "BUY" ? "buy" : "sell";
+  const qtyBase = parseFloat((req.sizeUSD / referencePrice).toFixed(8));
+  if (qtyBase <= 0) return { success: false, error: "Computed base quantity is zero" };
+
+  try {
+    const order = await adapter.placeOrder({
+      symbol:   req.symbol,
+      side:     quoteSide,
+      type:     "market",
+      qty:      qtyBase,
+      clientId: `loop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    });
+    const fill = order.avgFillPrice > 0 ? order.avgFillPrice : referencePrice;
+    return {
+      success:         true,
+      exchange:        _selectedExchange,
+      exchangeOrderId: order.exchangeOrderId || order.id,
+      fillPrice:       parseFloat(fill.toFixed(2)),
+      quantity:        order.filledQty > 0 ? order.filledQty : qtyBase,
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 // ── Public getters / setters ──────────────────────────────────────────────────

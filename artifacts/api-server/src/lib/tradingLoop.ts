@@ -7,6 +7,7 @@ import { getCandles, SUPPORTED_SYMBOLS, type Candle } from "./marketData.js";
 import { runAIDecision, type AIDecisionResult } from "./aiReasoning.js";
 import { computeRSI, computeEMA, computeMACD } from "./indicators.js";
 import { placeOrder, getAccountSummary } from "./simulationEngine.js";
+import { placeLiveAutoOrder } from "./exchangeEngine.js";
 import { validateTrade } from "./riskEngine.js";
 import { checkTrailingStops } from "./trailingStopEngine.js";
 import { computeCorrelationMatrix } from "./correlationEngine.js";
@@ -608,37 +609,74 @@ async function autoExecute(
   }
 
   // ── Gate 5: place order ────────────────────────────────────────────────────
+  // Routes to the live exchange adapter registry when exchange mode is
+  // "live" and this is not a sim/test signal; otherwise stays on the
+  // in-memory simulation engine. Sim and live paths are fully isolated —
+  // a live fill never touches `_simBalances` or sim positions, and a sim
+  // fill never reaches the exchange adapter network layer.
+  const isLiveExec = exModeForStream === "live";
   executionStreamBus.emitEvent({
     type: "execution_sent", severity: "info",
     symbol, side, sizeUSD, confidence, price, mode: exModeForStream,
     message: `Order sent: ${symbol} ${side} $${sizeUSD} @ ${price}`,
   });
-  const result = await placeOrder({ symbol, side, sizeUSD });
-  if (!result.success) {
-    engineStats.tradesBlocked++;
-    logger.warn({ symbol, side, error: result.error }, "Auto-trade rejected by simulation engine");
-    await db.insert(logsTable).values({
-      id: genId(), type: "trade", level: "warn",
-      message: `Auto-trade failed for ${symbol} ${side}: ${result.error}`,
-      details: { symbol, side, error: result.error },
-    });
-    auditLogger.append("system", "TRADE_REJECTED", {
-      symbol, side, error: result.error, gate: "simulation_engine",
-    }, { symbol, severity: "warn" });
-    executionStreamBus.emitEvent({
-      type: "order_rejected", severity: "error",
-      symbol, side, sizeUSD, gate: "execution_engine", mode: exModeForStream,
-      reason: result.error ?? "unknown",
-      message: `Order REJECTED ${symbol} ${side} $${sizeUSD}: ${result.error}`,
-    });
-    return { executed: false, blockReason: `Sim engine: ${result.error}` };
+
+  let pos: { id: string; entryPrice: number };
+  let liveExchange:        string | undefined;
+  let liveExchangeOrderId: string | undefined;
+
+  if (isLiveExec) {
+    const live = await placeLiveAutoOrder({ symbol, side, sizeUSD });
+    if (!live.success) {
+      engineStats.tradesBlocked++;
+      logger.warn({ symbol, side, error: live.error }, "Live auto-trade rejected by exchange bridge");
+      await db.insert(logsTable).values({
+        id: genId(), type: "trade", level: "critical",
+        message: `Live auto-trade failed for ${symbol} ${side}: ${live.error}`,
+        details: { symbol, side, error: live.error, mode: "live" },
+      });
+      auditLogger.append("system", "TRADE_REJECTED", {
+        symbol, side, error: live.error, gate: "live_exchange_bridge",
+      }, { symbol, severity: "critical" });
+      executionStreamBus.emitEvent({
+        type: "order_rejected", severity: "error",
+        symbol, side, sizeUSD, gate: "live_exchange_bridge", mode: "live",
+        reason: live.error ?? "unknown",
+        message: `Live order REJECTED ${symbol} ${side} $${sizeUSD}: ${live.error}`,
+      });
+      return { executed: false, blockReason: `Live bridge: ${live.error}` };
+    }
+    pos = { id: live.exchangeOrderId ?? genId(), entryPrice: live.fillPrice ?? price };
+    liveExchange        = live.exchange;
+    liveExchangeOrderId = live.exchangeOrderId;
+  } else {
+    const result = await placeOrder({ symbol, side, sizeUSD });
+    if (!result.success) {
+      engineStats.tradesBlocked++;
+      logger.warn({ symbol, side, error: result.error }, "Auto-trade rejected by simulation engine");
+      await db.insert(logsTable).values({
+        id: genId(), type: "trade", level: "warn",
+        message: `Auto-trade failed for ${symbol} ${side}: ${result.error}`,
+        details: { symbol, side, error: result.error },
+      });
+      auditLogger.append("system", "TRADE_REJECTED", {
+        symbol, side, error: result.error, gate: "simulation_engine",
+      }, { symbol, severity: "warn" });
+      executionStreamBus.emitEvent({
+        type: "order_rejected", severity: "error",
+        symbol, side, sizeUSD, gate: "execution_engine", mode: exModeForStream,
+        reason: result.error ?? "unknown",
+        message: `Order REJECTED ${symbol} ${side} $${sizeUSD}: ${result.error}`,
+      });
+      return { executed: false, blockReason: `Sim engine: ${result.error}` };
+    }
+    pos = result.position!;
   }
 
   // ── Execution confirmed ────────────────────────────────────────────────────
-  const pos        = result.position!;
-  const stopLoss   = side === "BUY" ? price * (1 - settings.stopLossPercent / 100) : price * (1 + settings.stopLossPercent / 100);
-  const takeProfit = side === "BUY" ? price * (1 + settings.takeProfitPercent / 100) : price * (1 - settings.takeProfitPercent / 100);
-  const tradeMode  = isTest ? "test" : "auto";
+  const stopLoss   = side === "BUY" ? pos.entryPrice * (1 - settings.stopLossPercent / 100) : pos.entryPrice * (1 + settings.stopLossPercent / 100);
+  const takeProfit = side === "BUY" ? pos.entryPrice * (1 + settings.takeProfitPercent / 100) : pos.entryPrice * (1 - settings.takeProfitPercent / 100);
+  const tradeMode  = isTest ? "test" : (isLiveExec ? "live" : "auto");
 
   await db.insert(tradesTable).values({
     id:         genId(),
