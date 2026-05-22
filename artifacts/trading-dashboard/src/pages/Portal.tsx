@@ -44,7 +44,6 @@ import {
 import type { EngineStatus } from "@/components/command/types";
 import {
   PaperTradesProvider,
-  usePaperTrades,
   fmtMoney,
   fmtQty,
   fmtTime,
@@ -2942,6 +2941,13 @@ function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function Portal() {
+  // PortalInner itself no longer reads from `usePaperTrades` — all of its
+  // metric tiles, Active Trades, and Trade History panels are wired to the
+  // server-side `/api/simulation/*` endpoints. The provider is kept as an
+  // intentional compatibility shim because the shared `SignalRow` component
+  // (rendered inside CryptoSignalsPanel / EquitySignalsPanel below) still
+  // calls `openTrade()` from BUY / SELL CTAs. Delete this wrapper once
+  // SignalRow is migrated to post to `/api/simulation/order` directly.
   return (
     <PaperTradesProvider>
       <PortalInner />
@@ -3009,13 +3015,100 @@ function PortalInner() {
     }
     return tierCapacity(tier);
   }, [tier, isAdmin]);
-  const { stats } = usePaperTrades();
   const exchangeStatus = useExchangeStatus();
   const hasExchange    = exchangeStatus.connectedCount > 0;
   const liveBalances   = useLiveExchangeBalances(hasExchange);
 
+  // Server-derived stats — shares the cache key with ActiveTradesPanel /
+  // TradeHistoryPanel so the metric tiles, open-position list, and closed
+  // trade history all read from the same `/api/simulation/*` snapshot the
+  // PWA receipt and account screen render. No client-only simulator state.
+  const simAccountQuery = useQuery<CustomerAccount & {
+    equity?: number;
+    startBalance?: number;
+    totalPnL?: number;
+    totalPnLPct?: number;
+    unrealizedPnL?: number;
+  }>({
+    queryKey: ["customer-simulation-account"],
+    enabled: isSignedIn ?? false,
+    queryFn: async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/simulation/account`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("simulation/account failed");
+      return res.json();
+    },
+    refetchInterval: 4_000,
+    refetchOnWindowFocus: false,
+    staleTime: 0,
+  });
+  const simTradesQuery = useQuery<{ trades: CustomerTrade[] }>({
+    queryKey: ["customer-simulation-trades"],
+    enabled: isSignedIn ?? false,
+    queryFn: async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/simulation/trades`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("simulation/trades failed");
+      return res.json();
+    },
+    refetchInterval: 6_000,
+    refetchOnWindowFocus: false,
+    staleTime: 0,
+  });
+
+  const stats = useMemo(() => {
+    const acct      = simAccountQuery.data;
+    const positions = acct?.positions ?? [];
+    const trades    = simTradesQuery.data?.trades ?? [];
+
+    const startBalance = toNum(acct?.startBalance ?? 100_000);
+    const equity       = acct?.equity != null ? toNum(acct.equity) : startBalance;
+    const totalPnl     = acct?.totalPnL != null ? toNum(acct.totalPnL) : equity - startBalance;
+
+    const now = new Date();
+    const startOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    let todayPnl = 0;
+    let monthPnl = 0;
+    let wins = 0;
+    let bestSymbol: string | null = null;
+    let bestPnl = -Infinity;
+    for (const t of trades) {
+      const ts  = Number(t.exitTime ?? 0);
+      const pnl = toNum(t.realizedPnL);
+      if (ts >= startOfDay)   todayPnl += pnl;
+      if (ts >= startOfMonth) monthPnl += pnl;
+      if (pnl > 0) wins += 1;
+      if (pnl > bestPnl) { bestPnl = pnl; bestSymbol = displaySymbol(t.symbol); }
+    }
+    const closedCount = trades.length;
+    const openCount   = positions.length;
+    const winRate     = closedCount === 0 ? 0 : (wins / closedCount) * 100;
+
+    return {
+      openCount,
+      closedCount,
+      totalCount: openCount + closedCount,
+      totalPnl,
+      todayPnl,
+      monthPnl,
+      winRate,
+      equity,
+      startBalance,
+      bestSymbol,
+      bestPnl: closedCount === 0 ? 0 : bestPnl,
+    };
+  }, [simAccountQuery.data, simTradesQuery.data]);
+
   // Live-derived metric strings (replace earlier hardcoded demo numbers).
-  const equityBase = 100_000;
+  const equityBase = stats.startBalance || 100_000;
   const fmtPct = (n: number) =>
     `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
   const totalPct = (stats.totalPnl / equityBase) * 100;
@@ -3304,20 +3397,26 @@ function PortalInner() {
             positive={stats.bestPnl >= 0}
             demo
           />
-          {liveBalances.hasOk && liveBalances.totalEquityUSD !== null ? (
-            <MetricTile
-              label={`${(liveBalances.primaryExchange ?? "EXCHANGE").toUpperCase()} EQUITY`}
-              value={`$${liveBalances.totalEquityUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              delta={
-                liveBalances.buyingPowerUSD !== null
-                  ? `LIVE · BP $${liveBalances.buyingPowerUSD.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
-                  : "LIVE"
-              }
-              positive
-            />
-          ) : (
-            <MetricTile label="EQUITY" value={equityStr} demo />
-          )}
+          {/* EQUITY tile always reads the server-side simulation account so
+              the customer Portal header reconciles 1:1 with the PWA account
+              screen and trade receipt. When a live exchange is connected we
+              surface the broker-reported equity / buying power as a delta
+              line below the canonical value instead of replacing it. */}
+          <MetricTile
+            label="EQUITY"
+            value={equityStr}
+            delta={
+              liveBalances.hasOk && liveBalances.totalEquityUSD !== null
+                ? `${(liveBalances.primaryExchange ?? "EXCHANGE").toUpperCase()} $${liveBalances.totalEquityUSD.toLocaleString("en-US", { maximumFractionDigits: 0 })}${
+                    liveBalances.buyingPowerUSD !== null
+                      ? ` · BP $${liveBalances.buyingPowerUSD.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+                      : ""
+                  }`
+                : undefined
+            }
+            positive={stats.totalPnl >= 0}
+            demo
+          />
           {/* Lifetime broker commission across every closed live leg —
               mirrors the PWA Portfolio "Fees paid" stat. Dimmed em-dash
               for paper-only customers. fmtMoney already injects a +/- sign
