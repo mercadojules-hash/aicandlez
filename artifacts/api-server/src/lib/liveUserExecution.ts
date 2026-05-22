@@ -140,6 +140,72 @@ async function emitFillNotification(
   });
 }
 
+export async function emitLiveCloseNotification(params: {
+  userId:           string;
+  symbol:           string;
+  side:             "BUY" | "SELL";
+  exchange:         string;
+  exitPrice:        number;
+  quantity:         number;
+  realizedPnL:      number;
+  realizedPnLPct:   number;
+  closeReason:      string;
+  exchangeOrderId?: string;
+  dryRun?:          boolean;
+}): Promise<void> {
+  const {
+    userId, symbol, side, exchange, exitPrice, quantity,
+    realizedPnL, realizedPnLPct, closeReason, exchangeOrderId, dryRun,
+  } = params;
+  const priceStr  = exitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const qtyStr    = quantity.toLocaleString(undefined, { maximumFractionDigits: 8 });
+  const pnlSign   = realizedPnL >= 0 ? "+" : "−";
+  const pnlAbs    = Math.abs(realizedPnL).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const pnlPctStr = `${realizedPnL >= 0 ? "+" : "−"}${Math.abs(realizedPnLPct).toFixed(2)}%`;
+  const reasonTag = closeReason.toUpperCase();
+  const title     = `${side} ${symbol} closed on ${exchange} · ${reasonTag}${dryRun ? " (dry-run)" : ""}`;
+  const message   = `Exited ${qtyStr} ${symbol} @ $${priceStr} · PnL ${pnlSign}$${pnlAbs} (${pnlPctStr})`;
+  try {
+    await db.insert(userNotificationsTable).values({
+      userId,
+      type:    "live_trade_closed",
+      title,
+      message,
+      data:    {
+        symbol, side, exchange, exitPrice, quantity,
+        realizedPnL, realizedPnLPct, closeReason,
+        exchangeOrderId: exchangeOrderId ?? null,
+        dryRun: !!dryRun,
+      },
+      read:    false,
+    });
+  } catch (err) {
+    logger.warn(
+      { userId, symbol, side, err: err instanceof Error ? err.message : String(err) },
+      "liveUserExecution: failed to persist live_trade_closed notification row",
+    );
+  }
+  void NotificationDispatcher.sendToUser(userId, {
+    title,
+    body:      message,
+    notifType: "trade",
+    tag:       `live-close-${symbol}`,
+    url:       "/aicandlez-app/portfolio",
+    data:      {
+      symbol, side, exchange, exitPrice, quantity,
+      realizedPnL, realizedPnLPct, closeReason,
+      exchangeOrderId: exchangeOrderId ?? null,
+      dryRun: !!dryRun,
+      kind: "live_trade_closed",
+    },
+  }).catch((err) => {
+    logger.warn(
+      { userId, symbol, err: err instanceof Error ? err.message : String(err) },
+      "liveUserExecution: push dispatch failed for live_trade_closed",
+    );
+  });
+}
+
 async function emitFailureNotification(
   userId: string,
   symbol: string,

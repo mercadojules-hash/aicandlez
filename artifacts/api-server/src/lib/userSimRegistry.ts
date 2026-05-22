@@ -7,6 +7,7 @@ import {
 import { eq, desc } from "drizzle-orm";
 import { getTicker, SUPPORTED_SYMBOLS } from "./marketData.js";
 import { logger } from "./logger.js";
+import { emitLiveCloseNotification, isDryRunEnabled } from "./liveUserExecution.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -460,6 +461,25 @@ export async function closeUserPosition(
   ]);
 
   logger.info({ userId, positionId, realizedPnL: trade.realizedPnL, closeReason }, "UserSimRegistry: position closed");
+
+  // Live position? Mirror the close into the user's notification feed +
+  // push channel — symmetric counterpart to emitFillNotification on open.
+  if (trade.exchange) {
+    void emitLiveCloseNotification({
+      userId,
+      symbol:          trade.symbol,
+      side:            trade.side,
+      exchange:        trade.exchange,
+      exitPrice:       trade.exitPrice,
+      quantity:        trade.quantity,
+      realizedPnL:     trade.realizedPnL,
+      realizedPnLPct:  trade.realizedPnLPct,
+      closeReason,
+      exchangeOrderId: trade.exchangeOrderId,
+      dryRun:          isDryRunEnabled(),
+    });
+  }
+
   return { success: true, trade };
 }
 
