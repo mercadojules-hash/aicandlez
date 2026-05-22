@@ -112,18 +112,6 @@ export default function Portfolio() {
               {realizedPos ? "+" : ""}${totalRealized.toFixed(2)}
             </div>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div
-              title="Lifetime broker commission paid across every closed live trade"
-              style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50",
-                letterSpacing: "0.14em" }}>FEES PAID</div>
-            <div style={{
-              fontSize: 14, fontFamily: "monospace", fontWeight: 700, marginTop: 3,
-              color: feesPaid > 0 ? "#e8f4ff" : "#3a6080",
-            }}>
-              −${feesPaid.toFixed(2)}
-            </div>
-          </div>
         </div>
 
         <div style={{ marginTop: 10, display: "flex", gap: 16 }}>
@@ -138,6 +126,15 @@ export default function Portfolio() {
             <div style={{ fontSize: 11, fontFamily: "monospace",
               color: data?.mode === "live" ? "#00ff8a" : "#ffaa00", fontWeight: 700, marginTop: 2 }}>
               {data?.mode?.toUpperCase() ?? "PAPER"}
+            </div>
+          </div>
+          <div title="Lifetime broker commission paid across every closed live trade">
+            <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50" }}>FEES PAID</div>
+            <div style={{
+              fontSize: 11, fontFamily: "monospace", fontWeight: 700, marginTop: 2,
+              color: feesPaid > 0 ? "#e8f4ff" : "#3a6080",
+            }}>
+              {feesPaid > 0 ? `−$${feesPaid.toFixed(2)}` : "—"}
             </div>
           </div>
         </div>
