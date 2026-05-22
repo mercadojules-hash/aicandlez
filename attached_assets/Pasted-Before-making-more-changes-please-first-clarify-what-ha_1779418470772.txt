@@ -1,0 +1,61 @@
+Before making more changes, please first clarify what happened with the admin dashboard changes you said were completed earlier today.
+
+We were told the admin dashboard would show:
+
+* no upgrade/paywall UI
+* no subscription prompts
+* no paper trading
+* no simulation mode
+* Kraken LIVE only
+* real Kraken balance
+* 30 concurrent admin trade limit
+* admin telemetry top bar
+* operator workstation footer/layout
+
+But visually, `https://admintrade.aicandlez.com/portal` still appears to show the old customer/free-tier style UI.
+
+Please confirm clearly:
+
+1. Were those admin dashboard changes actually implemented in code?
+2. What exact files were changed?
+3. What commit SHA contains those admin dashboard changes?
+4. Was that commit pushed to GitHub main?
+5. Did Render deploy that exact commit for `aicandlez-admintrade`?
+6. Is `admintrade.aicandlez.com/portal` actually rendering the updated admin branch, or is it still rendering the customer branch because my production account role is not recognized as admin/super-admin?
+
+If you cannot prove the earlier admin changes are active, then stop trying to bundle everything and redo it step-by-step.
+
+NEXT FOCUSED TASK — ONLY TWO VISUAL FIXES:
+
+1. Remove ALL upgrade/subscription/paywall references from the admin dashboard:
+
+* remove “Upgrade”
+* remove “Subscribe”
+* remove “Start AI Trading”
+* remove “Unlock”
+* remove “Free tier”
+* remove plan limits
+* remove subscription status panels
+* remove membership upsell UI
+
+Admin users should never see customer billing or paywall UI.
+
+2. Remove simulation/paper-trading references from the admin dashboard and replace them with Kraken LIVE:
+
+* no SIM MODE
+* no paper trading
+* no fake $100,000 balance
+* no demo labels
+* show Kraken LIVE
+* show real Kraken balance, including the approximately $100 already in the connected Kraken account
+* show live Kraken exchange status
+
+Do ONLY these two visible admin dashboard fixes first.
+
+After they are complete:
+
+* show a Replit preview screenshot
+* confirm the exact commit SHA
+* push to GitHub main
+* verify Render deployed it
+* then I will visually confirm before we move to the next admin features.

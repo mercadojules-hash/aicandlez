@@ -90,12 +90,16 @@ function tierCapacity(plan: Plan): { cap: number; label: string } {
 // portal-styled overlays that match the rest of the customer surface.
 function TopBar({
   onAccount, onUpgrade, onDisclaimer, onConnectExchange, statusPill,
+  isAdmin = false,
 }: {
   onAccount:         () => void;
   onUpgrade:         () => void;
   onDisclaimer:      () => void;
   onConnectExchange: () => void;
   statusPill?:       React.ReactNode;
+  // Admin operators never see the UPGRADE nav item — paywall UI is hidden
+  // entirely on admintrade.aicandlez.com.
+  isAdmin?:          boolean;
 }) {
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -119,7 +123,7 @@ function TopBar({
         color: N.BRAND, fontWeight: 800,
         textShadow: `0 0 10px ${N.BRAND_GLOW}`,
       }}>AICANDLEZ</span>
-      <span style={{ color: N.TEXT_2 }}>· LIVE PORTAL</span>
+      <span style={{ color: N.TEXT_2 }}>· {isAdmin ? "OPERATOR · LIVE" : "LIVE PORTAL"}</span>
 
       {statusPill}
 
@@ -153,7 +157,8 @@ function TopBar({
       </button>
 
       <NavButton onClick={onAccount}>MANAGE ACCOUNT</NavButton>
-      <NavButton onClick={onUpgrade}>UPGRADE</NavButton>
+      {/* UPGRADE nav is customer-only — admins never see paywall CTAs. */}
+      {!isAdmin && <NavButton onClick={onUpgrade}>UPGRADE</NavButton>}
       <NavButton onClick={onDisclaimer}>DISCLAIMER</NavButton>
 
       <div style={{ width: 1, height: 16, background: N.BORDER_HI }} />
@@ -515,7 +520,7 @@ function DisclaimerModal({ open, onClose }: { open: boolean; onClose: () => void
 // Official AICandlez horizontal master logo. Sits on a soft animated aura
 // — minimal, premium, never cartoonish. Bigger hero presence on desktop,
 // scales down proportionally on mobile via CSS clamp().
-function LogoBanner({ tier }: { tier: Plan }) {
+function LogoBanner({ tier, isAdmin = false }: { tier: Plan; isAdmin?: boolean }) {
   return (
     <div style={{
       padding: "44px 24px 26px",
@@ -580,17 +585,19 @@ function LogoBanner({ tier }: { tier: Plan }) {
           LIVE
         </span>
 
+        {/* Admins never see a customer "TIER · PRO" tag — instead an explicit
+            operator pill that reads as institutional ops, not paywall. */}
         <span style={{
           padding: "4px 14px",
           background: N.SURFACE_2,
-          border: `1px solid ${tier === "free" ? N.BORDER_HI : `${N.BRAND}55`}`,
+          border: `1px solid ${isAdmin || tier !== "free" ? `${N.BRAND}55` : N.BORDER_HI}`,
           borderRadius: 999,
           fontFamily: N.FONT_MONO, fontSize: 10,
-          color: tier === "free" ? N.TEXT_1 : N.BRAND,
+          color: isAdmin || tier !== "free" ? N.BRAND : N.TEXT_1,
           letterSpacing: "0.18em", fontWeight: 700,
-          boxShadow: tier === "free" ? "none" : `0 0 14px ${N.BRAND_GLOW}`,
+          boxShadow: isAdmin || tier !== "free" ? `0 0 14px ${N.BRAND_GLOW}` : "none",
         }}>
-          TIER · {tier.toUpperCase()}
+          {isAdmin ? "ADMIN · OPERATOR" : `TIER · ${tier.toUpperCase()}`}
         </span>
       </div>
 
@@ -1395,6 +1402,203 @@ const QUEUE = [
 
 // ── Live paper-trade panels ─────────────────────────────────────────────────
 
+// ── Admin LIVE panels (Kraken-sourced, no paper trade data) ─────────────────
+// These two panels back the admin /portal layout. They pull from the
+// cross-tenant operator endpoints `/api/admin/positions` and
+// `/api/admin/closed-trades`, NOT from usePaperTrades(). The customer
+// `ActiveTradesPanel` / `TradeHistoryPanel` below remain unchanged for the
+// customer surface — admin and customer surfaces are now data-isolated.
+
+type AdminPosition = {
+  id:           string | number;
+  user_email?:  string | null;
+  symbol:       string;
+  side:         string;
+  size_usd:     number | string | null;
+  entry_price:  number | string | null;
+  entry_time:   number | null;
+  mode?:        string | null;
+  source?:      string | null;
+};
+
+type AdminClosed = AdminPosition & {
+  exit_price:        number | string | null;
+  realized_pnl:      number | string | null;
+  realized_pnl_pct:  number | string | null;
+  close_reason?:     string | null;
+  exit_time:         number | null;
+};
+
+const toNum = (v: unknown): number => {
+  if (v == null) return 0;
+  const n = typeof v === "number" ? v : parseFloat(String(v));
+  return Number.isFinite(n) ? n : 0;
+};
+
+function AdminLiveTradesPanel() {
+  const { getToken } = useAuth();
+  const { data } = useQuery({
+    queryKey: ["admin-positions"],
+    queryFn:  async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/admin/positions?limit=50`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("admin/positions failed");
+      return res.json() as Promise<{ positions: AdminPosition[] }>;
+    },
+    refetchInterval: 5_000,
+    refetchOnWindowFocus: false,
+    staleTime: 0,
+  });
+
+  const positions = data?.positions ?? [];
+
+  return (
+    <Panel title="LIVE TRADES · KRAKEN" height={420} locked={false}>
+      {positions.length === 0 ? (
+        <div style={{
+          padding: "18px 4px", fontSize: 10, lineHeight: 1.6,
+          color: N.TEXT_2, letterSpacing: "0.10em",
+        }}>
+          No open live positions. Kraken executor is armed and listening — open
+          positions will surface here in real time across the platform.
+        </div>
+      ) : positions.map((t) => {
+        const side  = String(t.side ?? "").toUpperCase();
+        const sym   = String(t.symbol ?? "—");
+        const entry = toNum(t.entry_price);
+        const size  = toNum(t.size_usd);
+        const when  = t.entry_time ? fmtTime(Number(t.entry_time)) : "—";
+        const longSide = side === "LONG" || side === "BUY";
+        return (
+          <div key={String(t.id)} style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "8px 0",
+            borderBottom: `1px solid ${N.BORDER}`,
+            fontSize: 11,
+          }}>
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <span style={{ color: N.TEXT_0, fontWeight: 700 }}>
+                {sym}{"  "}
+                <span style={{
+                  color: longSide ? N.LONG : N.SHORT,
+                  fontWeight: 800, letterSpacing: "0.16em", fontSize: 9,
+                  marginLeft: 4,
+                }}>{longSide ? "LONG" : "SHORT"}</span>
+                <span style={{
+                  color: N.BRAND, fontWeight: 800, letterSpacing: "0.16em",
+                  fontSize: 8, marginLeft: 6,
+                  padding: "1px 5px",
+                  border: `1px solid ${N.BRAND}55`,
+                  borderRadius: 2,
+                }}>LIVE</span>
+              </span>
+              <span style={{ color: N.TEXT_2, fontSize: 9, marginTop: 2, letterSpacing: "0.04em" }}>
+                Entry ${entry.toFixed(entry >= 100 ? 2 : 4)} · ${size.toLocaleString()} · {when}
+                {t.user_email ? ` · ${t.user_email}` : ""}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </Panel>
+  );
+}
+
+function AdminTradeHistoryPanel() {
+  const { getToken } = useAuth();
+  const { data } = useQuery({
+    queryKey: ["admin-closed-trades"],
+    queryFn:  async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/admin/closed-trades?limit=50`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("admin/closed-trades failed");
+      return res.json() as Promise<{ trades: AdminClosed[] }>;
+    },
+    refetchInterval: 8_000,
+    refetchOnWindowFocus: false,
+    staleTime: 0,
+  });
+
+  const trades = data?.trades ?? [];
+
+  return (
+    <Panel title="TRADE HISTORY · KRAKEN" height={420} locked={false}>
+      {trades.length === 0 ? (
+        <div style={{
+          padding: "18px 4px", fontSize: 10, lineHeight: 1.6,
+          color: N.TEXT_2, letterSpacing: "0.10em",
+        }}>
+          Closed live trades will surface here with realized P/L, exit price
+          and timestamp. Operator console only — no paper-trade data.
+        </div>
+      ) : trades.map((t) => {
+        const side  = String(t.side ?? "").toUpperCase();
+        const sym   = String(t.symbol ?? "—");
+        const pnl   = toNum(t.realized_pnl);
+        const pnlP  = toNum(t.realized_pnl_pct);
+        const exit  = toNum(t.exit_price);
+        const when  = t.exit_time ? fmtTime(Number(t.exit_time)) : "—";
+        const reason = (t.close_reason ?? "").toString().toUpperCase();
+        const color = pnl >= 0 ? N.LONG : N.SHORT;
+        const tag = reason === "TP" ? "TP HIT" : reason === "SL" ? "SL HIT" : "CLOSED";
+        const tagColor = reason === "TP" ? N.LONG : reason === "SL" ? N.SHORT : N.TEXT_2;
+        const longSide = side === "LONG" || side === "BUY";
+        return (
+          <div key={String(t.id)} style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "8px 0",
+            borderBottom: `1px solid ${N.BORDER}`,
+            fontSize: 11,
+          }}>
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <span style={{ color: N.TEXT_0, fontWeight: 700 }}>
+                {sym}{"  "}
+                <span style={{
+                  color: longSide ? N.LONG : N.SHORT,
+                  fontWeight: 800, letterSpacing: "0.16em", fontSize: 9,
+                  marginLeft: 4,
+                }}>{longSide ? "LONG" : "SHORT"}</span>
+                <span style={{
+                  color: tagColor,
+                  fontWeight: 800, letterSpacing: "0.16em", fontSize: 8,
+                  marginLeft: 6,
+                  padding: "1px 5px",
+                  border: `1px solid ${tagColor}40`,
+                  borderRadius: 2,
+                }}>{tag}</span>
+              </span>
+              <span style={{ color: N.TEXT_2, fontSize: 9, marginTop: 2, letterSpacing: "0.04em" }}>
+                Exit ${exit.toFixed(exit >= 100 ? 2 : 4)} · {when}
+                {t.user_email ? ` · ${t.user_email}` : ""}
+              </span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <span style={{
+                color, fontWeight: 800, fontVariantNumeric: "tabular-nums",
+                textShadow: `0 0 6px ${color}40`,
+              }}>
+                {fmtMoney(pnl)}
+              </span>
+              <span style={{
+                color, fontSize: 9, fontWeight: 700,
+                fontVariantNumeric: "tabular-nums",
+              }}>
+                {pnlP >= 0 ? "+" : ""}{pnlP.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </Panel>
+  );
+}
+
 function ActiveTradesPanel({ onUpgrade }: { onUpgrade: () => void }) {
   const { open, closeTrade } = usePaperTrades();
   return (
@@ -1734,6 +1938,7 @@ function PortalInner() {
         onDisclaimer={() => setDisclaimerOpen(true)}
         onConnectExchange={() => disclaimerGate(() => setConnectExchangeOpen(true))}
         statusPill={<ExchangeStatusPill status={exchangeStatus} />}
+        isAdmin={isAdmin}
       />
 
       {isAdmin && (
@@ -1751,11 +1956,13 @@ function PortalInner() {
         </div>
       )}
 
-      <LogoBanner tier={tier} />
+      <LogoBanner tier={tier} isAdmin={isAdmin} />
 
       {/* First-time onboarding banner — auto-hides once at least one exchange
-          is connected. Reinforces non-custodial security promise inline. */}
-      {!hasExchange && <ExchangeOnboardingBanner onConnect={() => disclaimerGate(() => setConnectExchangeOpen(true))} />}
+          is connected. Admins use server-side env Kraken keys (no per-user
+          row in user_exchange_connections), so this customer onboarding
+          prompt is suppressed for them — otherwise it would always render. */}
+      {!isAdmin && !hasExchange && <ExchangeOnboardingBanner onConnect={() => disclaimerGate(() => setConnectExchangeOpen(true))} />}
 
       {/* Metrics row.
           Admin operators on admintrade.aicandlez.com see REAL Kraken live
@@ -1915,11 +2122,13 @@ function PortalInner() {
         }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <CryptoSignalsPanel engine={engine} />
-            <ActiveTradesPanel onUpgrade={() => { /* no-op for admin */ }} />
+            {/* Admin layout uses live Kraken-sourced panels — never the
+                paper-trade simulator. See AdminLiveTradesPanel above. */}
+            <AdminLiveTradesPanel />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <EquitySignalsPanel engine={engine} />
-            <TradeHistoryPanel onUpgrade={() => { /* no-op for admin */ }} />
+            <AdminTradeHistoryPanel />
           </div>
         </div>
       ) : (
