@@ -22,7 +22,7 @@ import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
-import type { DisclaimerAcks } from "@workspace/db";
+import type { DisclaimerAcks } from "@workspace/db/constants/disclaimer";
 
 interface DisclaimerStatus {
   needsAcceptance: boolean;

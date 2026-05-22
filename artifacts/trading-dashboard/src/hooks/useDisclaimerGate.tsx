@@ -10,7 +10,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@clerk/react";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
-import type { DisclaimerAcks } from "@workspace/db";
+import type { DisclaimerAcks } from "@workspace/db/constants/disclaimer";
 
 interface DisclaimerStatus {
   needsAcceptance: boolean;

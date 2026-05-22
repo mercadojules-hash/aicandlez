@@ -14,7 +14,7 @@
  */
 
 import { useState } from "react";
-import { DISCLAIMER_ACKS, type DisclaimerAcks } from "@workspace/db";
+import { DISCLAIMER_ACKS, type DisclaimerAcks } from "@workspace/db/constants/disclaimer";
 
 // Design tokens — locked to PWA neon-green system
 const BG_OVERLAY = "rgba(0,0,0,0.88)";

@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 import { AlertTriangle, Check, Loader2 } from "lucide-react";
-import { DISCLAIMER_ACKS, type DisclaimerAcks } from "@workspace/db";
+import { DISCLAIMER_ACKS, type DisclaimerAcks } from "@workspace/db/constants/disclaimer";
 
 interface Props {
   open:       boolean;
