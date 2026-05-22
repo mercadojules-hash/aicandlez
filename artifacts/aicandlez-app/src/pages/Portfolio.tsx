@@ -1,7 +1,90 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, type Portfolio as PortfolioData, type SimAccount } from "@/lib/api";
+import { api, type Portfolio as PortfolioData, type SimAccount, type MonthlyFeesResponse } from "@/lib/api";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
 import { EnableLiveCTA } from "@/components/EnableLiveCTA";
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function shortMonthLabel(key: string): string {
+  const [, m] = key.split("-");
+  const idx = (parseInt(m ?? "0", 10) - 1);
+  return MONTH_LABELS[idx] ?? key;
+}
+
+function FeesMonthlyChart({ data }: { data: MonthlyFeesResponse | undefined }) {
+  const buckets = data?.months ?? [];
+  const hasAny  = buckets.some(b => b.feesPaid > 0);
+  const peak    = Math.max(0, ...buckets.map(b => b.feesPaid));
+
+  if (!hasAny) {
+    return (
+      <div style={{
+        marginTop: 12, padding: "10px 12px",
+        borderTop: "1px solid #0a1a28",
+        fontSize: 9, fontFamily: "monospace", color: "#1e3a50",
+        letterSpacing: "0.14em", textTransform: "uppercase", textAlign: "center",
+      }}>
+        NO LIVE FEES YET · LAST 6 MONTHS
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #0a1a28" }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "baseline",
+        marginBottom: 8,
+      }}>
+        <span style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50",
+          letterSpacing: "0.14em", textTransform: "uppercase" }}>
+          FEES · LAST 6 MONTHS
+        </span>
+        <span style={{ fontSize: 9, fontFamily: "monospace", color: "#3a6080" }}>
+          peak ${peak.toFixed(2)}
+        </span>
+      </div>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${buckets.length}, 1fr)`,
+        alignItems: "end",
+        gap: 6,
+        height: 56,
+      }}>
+        {buckets.map(b => {
+          const h = peak > 0 ? Math.max(2, Math.round((b.feesPaid / peak) * 48)) : 2;
+          const active = b.feesPaid > 0;
+          return (
+            <div key={b.month} style={{
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end",
+              height: "100%",
+            }} title={`${shortMonthLabel(b.month)} ${b.month.slice(0,4)} · $${b.feesPaid.toFixed(2)} · ${b.tradeCount} trade${b.tradeCount === 1 ? "" : "s"}`}>
+              <div style={{
+                width: "100%", height: h, borderRadius: 2,
+                background: active ? "#00ff8a" : "#0d2035",
+                boxShadow: active ? "0 0 6px rgba(0,255,138,0.35)" : "none",
+              }} />
+            </div>
+          );
+        })}
+      </div>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${buckets.length}, 1fr)`,
+        gap: 6, marginTop: 6,
+      }}>
+        {buckets.map(b => (
+          <div key={`${b.month}-l`} style={{
+            fontSize: 8, fontFamily: "monospace", color: "#2a4060",
+            textAlign: "center", letterSpacing: "0.05em",
+          }}>
+            {shortMonthLabel(b.month).toUpperCase()}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function PositionRow({ pos }: { pos: PortfolioData["positions"][number] }) {
   const pnl = pos.unrealizedPnL ?? 0;
@@ -48,6 +131,13 @@ export default function Portfolio() {
     queryFn:         () => api.get("/account"),
     refetchInterval: 30_000,
     staleTime:       15_000,
+  });
+
+  const { data: monthlyFees } = useQuery<MonthlyFeesResponse>({
+    queryKey:        ["sim-account-fees-monthly"],
+    queryFn:         () => api.get("/account/fees/monthly?months=6"),
+    refetchInterval: 60_000,
+    staleTime:       30_000,
   });
 
   const totalValue = data?.totalValue ?? 100000;
@@ -138,6 +228,8 @@ export default function Portfolio() {
             </div>
           </div>
         </div>
+
+        <FeesMonthlyChart data={monthlyFees} />
       </div>
 
       {/* Balances */}

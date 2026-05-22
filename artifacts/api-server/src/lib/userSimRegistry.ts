@@ -262,6 +262,69 @@ async function enrichPositions(positions: UserSimPosition[]): Promise<UserSimPos
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+// Monthly aggregated broker commission for the last `months` calendar months
+// (most recent month last). Buckets are derived from each closed trade's
+// `exitTime` (ms epoch). Paper-only users see all-zero buckets because paper
+// fills never persist a fee value.
+export interface MonthlyFeeBucket {
+  /** YYYY-MM key, e.g. "2026-04" */
+  month: string;
+  /** Total entry + exit broker commission across closed trades in this month */
+  feesPaid: number;
+  /** Number of closed trades that landed in this month */
+  tradeCount: number;
+}
+
+export async function getUserMonthlyFees(
+  userId: string,
+  months: number = 6,
+): Promise<MonthlyFeeBucket[]> {
+  const safeMonths = Math.max(1, Math.min(months, 24));
+
+  // Build the trailing bucket window anchored to the current month so users
+  // always see a fixed number of columns (zero-filled where no activity).
+  const now = new Date();
+  const buckets: MonthlyFeeBucket[] = [];
+  const indexByKey = new Map<string, number>();
+  for (let i = safeMonths - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    indexByKey.set(key, buckets.length);
+    buckets.push({ month: key, feesPaid: 0, tradeCount: 0 });
+  }
+
+  const windowStart = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth() - (safeMonths - 1),
+    1,
+  );
+
+  const rows = await db
+    .select({
+      exitTime: simTradesTable.exitTime,
+      entryFee: simTradesTable.entryFee,
+      exitFee:  simTradesTable.exitFee,
+    })
+    .from(simTradesTable)
+    .where(eq(simTradesTable.userId, userId));
+
+  for (const r of rows) {
+    if (r.exitTime < windowStart) continue;
+    const d = new Date(r.exitTime);
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const idx = indexByKey.get(key);
+    if (idx === undefined) continue;
+    const fee = (r.entryFee ?? 0) + (r.exitFee ?? 0);
+    if (fee > 0) buckets[idx]!.feesPaid += fee;
+    buckets[idx]!.tradeCount += 1;
+  }
+
+  for (const b of buckets) {
+    b.feesPaid = parseFloat(b.feesPaid.toFixed(2));
+  }
+  return buckets;
+}
+
 export async function getUserAccountSummary(userId: string) {
   const state   = await getOrLoad(userId);
   const enriched = await enrichPositions(state.positions);

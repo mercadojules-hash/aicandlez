@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import {
   getUserAccountSummary,
+  getUserMonthlyFees,
   getUserTradeHistory,
   placeUserOrder,
   closeUserPosition,
@@ -22,6 +23,24 @@ router.get("/account", requireAuth, async (req, res): Promise<void> => {
     res.json(data);
   } catch (err) {
     req.log.error({ err, userId }, "GET /account failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// GET /account/fees/monthly — last N months of broker commission, bucketed by exitTime.
+// Drives the Portfolio page fee-trend sparkline beneath the lifetime "Fees paid" stat.
+router.get("/account/fees/monthly", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
+  const monthsRaw = Number(req.query["months"] ?? 6);
+  const months    = Number.isFinite(monthsRaw) ? Math.trunc(monthsRaw) : 6;
+  try {
+    const buckets = await getUserMonthlyFees(userId, months);
+    const totalFeesPaid = parseFloat(
+      buckets.reduce((s, b) => s + b.feesPaid, 0).toFixed(2),
+    );
+    res.json({ months: buckets, totalFeesPaid });
+  } catch (err) {
+    req.log.error({ err, userId }, "GET /account/fees/monthly failed");
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
