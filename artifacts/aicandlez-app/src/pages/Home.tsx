@@ -1870,6 +1870,18 @@ function TradeHistoryCard({ trade, onOpen }: { trade: SimTrade; onOpen: (t: SimT
           }}>
             {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
           </div>
+          {typeof trade.netFees === "number" && trade.netFees > 0 && (
+            <div
+              title={`Net P&L after broker fees: ${(pnl - trade.netFees) >= 0 ? "+" : "-"}$${Math.abs(pnl - trade.netFees).toFixed(2)}`}
+              style={{
+                fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
+                marginTop: 3, letterSpacing: 0.4,
+                fontVariantNumeric: "tabular-nums", textTransform: "uppercase",
+              }}
+            >
+              −${trade.netFees.toFixed(2)} fees
+            </div>
+          )}
         </div>
       </div>
 

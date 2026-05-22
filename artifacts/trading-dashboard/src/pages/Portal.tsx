@@ -2189,6 +2189,7 @@ type AdminClosed = AdminPosition & {
   realized_pnl_pct:  number | string | null;
   close_reason?:     string | null;
   exit_time:         number | null;
+  net_fees?:         number | string | null;
 };
 
 const toNum = (v: unknown): number => {
@@ -2307,6 +2308,7 @@ function AdminTradeHistoryPanel() {
         const exit  = toNum(t.exit_price);
         const when  = t.exit_time ? fmtTime(Number(t.exit_time)) : "—";
         const reason = (t.close_reason ?? "").toString().toUpperCase();
+        const fees  = t.net_fees != null ? toNum(t.net_fees) : 0;
         const color = pnl >= 0 ? N.LONG : N.SHORT;
         const tag = reason === "TP" ? "TP HIT" : reason === "SL" ? "SL HIT" : "CLOSED";
         const tagColor = reason === "TP" ? N.LONG : reason === "SL" ? N.SHORT : N.TEXT_2;
@@ -2353,6 +2355,18 @@ function AdminTradeHistoryPanel() {
               }}>
                 {pnlP >= 0 ? "+" : ""}{pnlP.toFixed(2)}%
               </span>
+              {fees > 0 && (
+                <span
+                  title={`Net of broker fees: ${fmtMoney(pnl - fees)}`}
+                  style={{
+                    color: N.TEXT_2, fontSize: 8, fontWeight: 700,
+                    marginTop: 2, letterSpacing: "0.10em",
+                    fontVariantNumeric: "tabular-nums", textTransform: "uppercase",
+                  }}
+                >
+                  −${fees.toFixed(2)} FEES
+                </span>
+              )}
             </div>
           </div>
         );

@@ -104,6 +104,7 @@ router.get("/admin/closed-trades", ...requireOperator, async (req, res): Promise
           t.mode                                            AS mode,
           t.reason                                          AS close_reason,
           EXTRACT(EPOCH FROM t.closed_at)::bigint * 1000    AS exit_time,
+          NULL::real                                        AS net_fees,
           'global'::text                                    AS source
         FROM trades t
         WHERE t.status = 'closed'
@@ -124,6 +125,7 @@ router.get("/admin/closed-trades", ...requireOperator, async (req, res): Promise
           'simulation'::text                                AS mode,
           tr.close_reason                                   AS close_reason,
           tr.exit_time                                      AS exit_time,
+          (COALESCE(tr.entry_fee, 0) + COALESCE(tr.exit_fee, 0)) AS net_fees,
           'sim'::text                                       AS source
         FROM sim_trades tr
         LEFT JOIN users u ON u.clerk_user_id = tr.user_id
