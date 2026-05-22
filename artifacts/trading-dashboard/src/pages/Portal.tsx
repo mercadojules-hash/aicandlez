@@ -1276,10 +1276,19 @@ function Panel({
           }}>LOCKED</span>
         )}
       </div>
-      <div style={{
-        flex: 1, padding: 14, height,
+      <div className="neon-scroll" style={{
+        // Fixed-height scroll viewport. `height` (default 280) is enforced as
+        // BOTH the minimum and maximum so the panel never stretches when the
+        // child list (e.g. LIVE TRADES at 30+ rows) grows — keeps the
+        // institutional terminal layout stable. `flex: "0 0 auto"` defeats
+        // the previous `flex: 1` that defeated `height` on its own.
+        flex: "0 0 auto",
+        padding: 14,
+        height,
+        maxHeight: height,
         overflowY: "auto", overflowX: "hidden",
         position: "relative",
+        scrollBehavior: "smooth",
       }}>
         <div
           aria-hidden={locked || undefined}
@@ -1389,7 +1398,7 @@ const QUEUE = [
 function ActiveTradesPanel({ onUpgrade }: { onUpgrade: () => void }) {
   const { open, closeTrade } = usePaperTrades();
   return (
-    <Panel title="LIVE TRADES" locked={false} onUnlock={onUpgrade}>
+    <Panel title="LIVE TRADES" height={420} locked={false} onUnlock={onUpgrade}>
       {open.length === 0 ? (
         <div style={{
           padding: "18px 4px", fontSize: 10, lineHeight: 1.6,
@@ -1502,7 +1511,7 @@ function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
   }, [history]);
 
   return (
-    <Panel title="TRADE HISTORY" locked={false} onUnlock={onUpgrade}>
+    <Panel title="TRADE HISTORY" height={420} locked={false} onUnlock={onUpgrade}>
       {history.length === 0 ? (
         <div style={{
           padding: "18px 4px", fontSize: 10, lineHeight: 1.6,

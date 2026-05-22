@@ -127,6 +127,30 @@
 .feed-scroll::-webkit-scrollbar-thumb { background: #1a2e3e; border-radius: 2px; }
 .feed-scroll::-webkit-scrollbar-thumb:hover { background: #00f0ff35; }
 
+/* ── Neon-green scrollbar (institutional Portal panels) ──────────────────── */
+/* Opt-in via className="neon-scroll" on fixed-height scroll viewports such
+   as Portal's LIVE TRADES and TRADE HISTORY panels. Matches the brand-green
+   system; smooth scrolling is applied inline on each container. */
+.neon-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102, 255, 102, 0.32) rgba(0, 0, 0, 0.6);
+}
+.neon-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.neon-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.6);
+  border-left: 1px solid rgba(102, 255, 102, 0.08);
+}
+.neon-scroll::-webkit-scrollbar-thumb {
+  background: rgba(102, 255, 102, 0.28);
+  border-radius: 3px;
+  box-shadow: 0 0 6px rgba(102, 255, 102, 0.22);
+}
+.neon-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 255, 102, 0.55);
+  box-shadow: 0 0 10px rgba(102, 255, 102, 0.45);
+}
+.neon-scroll::-webkit-scrollbar-corner { background: transparent; }
+
 /* ════════════════════════════════════════════════════════════════════════════
    KEYFRAMES
 ════════════════════════════════════════════════════════════════════════════ */
