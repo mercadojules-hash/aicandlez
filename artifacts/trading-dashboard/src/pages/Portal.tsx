@@ -22,7 +22,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useUser, useClerk, useAuth } from "@clerk/react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock, X, Zap } from "lucide-react";
 
 import { useUserRole } from "@/hooks/useUserRole";
@@ -345,6 +345,58 @@ function AccountModal({
     } catch { /* no-op */ }
   };
 
+  // ── Live Trade Filled alert toggle ──────────────────────────────────────────
+  // Mirrors the mobile PWA Profile screen. Reads/writes the same
+  // `notificationsLiveFills` field on user_settings, so toggling on either
+  // surface is reflected on the other (server is source of truth, query is
+  // invalidated on each mutation and re-fetched whenever the modal opens).
+  const queryClient = useQueryClient();
+  const settingsQuery = useQuery<{ notificationsLiveFills?: boolean }>({
+    queryKey: ["/api/user/settings"],
+    enabled:  open,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/user/settings`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to load settings");
+      return res.json();
+    },
+  });
+  const liveFillsEnabled = settingsQuery.data?.notificationsLiveFills ?? true;
+
+  const liveFillsMutation = useMutation({
+    mutationFn: async (next: boolean) => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/user/settings`, {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ notificationsLiveFills: next }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onMutate: async (next: boolean) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/user/settings"] });
+      const prev = queryClient.getQueryData<{ notificationsLiveFills?: boolean }>(["/api/user/settings"]);
+      queryClient.setQueryData(["/api/user/settings"], { ...(prev ?? {}), notificationsLiveFills: next });
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["/api/user/settings"], ctx.prev);
+      toast({ title: "Could not save preference", description: "Please try again." });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["/api/user/settings"] });
+    },
+  });
+
   return (
     <PortalModal
       open={open} onClose={onClose}
@@ -360,6 +412,13 @@ function AccountModal({
         <AccountRow label="BILLING"           value={tier === "free" ? "—" : "Monthly · Stripe"} />
         <AccountRow label="PERFORMANCE FEE"   value="3% on profitable trades only" sub="Never charged on losses" />
         <AccountRow label="BROKER · ALPACA"   value="Not connected"           color={N.WARN} sub="Connection wizard launches with the Alpaca live keys" />
+        <AlertToggleRow
+          label="LIVE TRADE FILLED"
+          sub="Push + in-app alert whenever a real-money AI order fills on your exchange"
+          value={liveFillsEnabled}
+          loading={settingsQuery.isLoading || liveFillsMutation.isPending}
+          onChange={(next) => liveFillsMutation.mutate(next)}
+        />
       </div>
 
       {tier === "free" ? (
@@ -441,6 +500,67 @@ function AccountRow({ label, value, sub, color = N.TEXT_0 }: {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Alert toggle row — used inside AccountModal for notification prefs ──────
+function AlertToggleRow({ label, sub, value, loading, onChange }: {
+  label:    string;
+  sub?:     string;
+  value:    boolean;
+  loading?: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  const track = value ? `${N.BRAND}55` : "rgba(255,255,255,0.10)";
+  const knob  = value ? N.BRAND : N.TEXT_2;
+  return (
+    <div style={{
+      display: "flex", justifyContent: "space-between", alignItems: "center",
+      gap: 12,
+      padding: "10px 12px",
+      background: N.SURFACE_2,
+      border: `1px solid ${N.BORDER}`,
+      borderRadius: 4,
+      opacity: loading ? 0.7 : 1,
+    }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{
+          fontSize: 9, color: N.TEXT_2, letterSpacing: "0.18em", fontWeight: 700,
+        }}>{label}</div>
+        {sub && (
+          <div style={{ fontSize: 10, color: N.TEXT_1, marginTop: 4, lineHeight: 1.4 }}>
+            {sub}
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={value}
+        aria-label={label}
+        disabled={loading}
+        onClick={() => onChange(!value)}
+        style={{
+          flexShrink: 0,
+          position: "relative",
+          width: 40, height: 22,
+          background: track,
+          border: `1px solid ${value ? N.BRAND : N.BORDER_HI}`,
+          borderRadius: 999,
+          cursor: loading ? "wait" : "pointer",
+          boxShadow: value ? `0 0 10px ${N.BRAND_GLOW}` : "none",
+          transition: "background 160ms ease, box-shadow 160ms ease",
+          padding: 0,
+        }}>
+        <span style={{
+          position: "absolute", top: 2, left: value ? 20 : 2,
+          width: 16, height: 16, borderRadius: "50%",
+          background: knob,
+          transition: "left 160ms ease, background 160ms ease",
+          boxShadow: value ? `0 0 6px ${N.BRAND_GLOW}` : "none",
+        }} />
+      </button>
     </div>
   );
 }
