@@ -6,24 +6,8 @@ import {
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { vault } from "../services/vault/CredentialVault.js";
-import type { ExchangeCredentials } from "../services/vault/CredentialVault.js";
 import { ensureFreshAlpacaCreds } from "../services/exchanges/AlpacaTokenRefresher.js";
-import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
-// Live + beta adapters (mirrors makeAdapter() in routes/userExchanges.ts)
-import { KrakenAdapter }       from "../services/exchanges/adapters/KrakenAdapter.js";
-import { AlpacaAdapter }       from "../services/exchanges/adapters/AlpacaAdapter.js";
-import { BinanceAdapter }      from "../services/exchanges/adapters/BinanceAdapter.js";
-import { CoinbaseAdapter }     from "../services/exchanges/adapters/CoinbaseAdapter.js";
-import { GateIOAdapter }       from "../services/exchanges/adapters/GateIOAdapter.js";
-import { BitgetAdapter }       from "../services/exchanges/adapters/BitgetAdapter.js";
-import { MEXCAdapter }         from "../services/exchanges/adapters/MEXCAdapter.js";
-import { CryptoDotComAdapter } from "../services/exchanges/adapters/CryptoDotComAdapter.js";
-import { HTXAdapter }          from "../services/exchanges/adapters/HTXAdapter.js";
-import { GeminiAdapter }       from "../services/exchanges/adapters/GeminiAdapter.js";
-import { BitstampAdapter }     from "../services/exchanges/adapters/BitstampAdapter.js";
-import { PhemexAdapter }       from "../services/exchanges/adapters/PhemexAdapter.js";
-import { BloFinAdapter }       from "../services/exchanges/adapters/BloFinAdapter.js";
-import { BingXAdapter }        from "../services/exchanges/adapters/BingXAdapter.js";
+import { makeAdapter } from "../services/exchanges/adapterFactory.js";
 import { getTicker } from "./marketData.js";
 import { logger } from "./logger.js";
 import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
@@ -93,27 +77,6 @@ export interface LiveUserCloseResult {
 
 export function isDryRunEnabled(): boolean {
   return process.env["LIVE_TRADE_DRY_RUN"] === "true";
-}
-
-function makeAdapter(exchange: string, creds: ExchangeCredentials): BaseExchangeAdapter {
-  const cfg = { apiKey: creds.apiKey, apiSecret: creds.apiSecret, passphrase: creds.passphrase };
-  switch (exchange) {
-    case "Kraken":       return new KrakenAdapter(cfg);
-    case "Alpaca":       return new AlpacaAdapter(cfg);
-    case "Binance":      return new BinanceAdapter(cfg);
-    case "Coinbase":     return new CoinbaseAdapter(cfg);
-    case "GateIO":       return new GateIOAdapter(cfg);
-    case "Bitget":       return new BitgetAdapter(cfg);
-    case "MEXC":         return new MEXCAdapter(cfg);
-    case "CryptoDotCom": return new CryptoDotComAdapter(cfg);
-    case "HTX":          return new HTXAdapter(cfg);
-    case "Gemini":       return new GeminiAdapter(cfg);
-    case "Bitstamp":     return new BitstampAdapter(cfg);
-    case "Phemex":       return new PhemexAdapter(cfg);
-    case "BloFin":       return new BloFinAdapter(cfg);
-    case "BingX":        return new BingXAdapter(cfg);
-    default: throw new Error(`No adapter for exchange: ${exchange}`);
-  }
 }
 
 async function emitFillNotification(

@@ -10,23 +10,7 @@ import { ensureFreshAlpacaCreds } from "../services/exchanges/AlpacaTokenRefresh
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { alpacaBrokerProvider } from "../services/exchanges/AlpacaBrokerProvider.js";
 import { EXCHANGE_CATALOG, CATALOG_BY_ID, CONNECTABLE_EXCHANGE_IDS } from "../services/exchanges/catalog.js";
-// Live adapters
-import { KrakenAdapter }         from "../services/exchanges/adapters/KrakenAdapter.js";
-import { AlpacaAdapter }         from "../services/exchanges/adapters/AlpacaAdapter.js";
-import { BinanceAdapter }        from "../services/exchanges/adapters/BinanceAdapter.js";
-import { CoinbaseAdapter }       from "../services/exchanges/adapters/CoinbaseAdapter.js";
-// Beta adapters
-import { GateIOAdapter }         from "../services/exchanges/adapters/GateIOAdapter.js";
-import { BitgetAdapter }         from "../services/exchanges/adapters/BitgetAdapter.js";
-import { MEXCAdapter }           from "../services/exchanges/adapters/MEXCAdapter.js";
-import { CryptoDotComAdapter }   from "../services/exchanges/adapters/CryptoDotComAdapter.js";
-import { HTXAdapter }            from "../services/exchanges/adapters/HTXAdapter.js";
-import { GeminiAdapter }         from "../services/exchanges/adapters/GeminiAdapter.js";
-import { BitstampAdapter }       from "../services/exchanges/adapters/BitstampAdapter.js";
-import { PhemexAdapter }         from "../services/exchanges/adapters/PhemexAdapter.js";
-import { BloFinAdapter }         from "../services/exchanges/adapters/BloFinAdapter.js";
-import { BingXAdapter }          from "../services/exchanges/adapters/BingXAdapter.js";
-import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
+import { makeAdapter } from "../services/exchanges/adapterFactory.js";
 import type { ExchangeCredentials } from "../services/vault/CredentialVault.js";
 import type { Request } from "express";
 
@@ -46,39 +30,9 @@ type AuthReq = Request & { clerkUserId: string };
 // EXCHANGE_CATALOG:         ordered list (preserves tier order for UI)
 
 // ── Adapter factory ───────────────────────────────────────────────────────────
-// Creates a temp adapter instance with user-supplied credentials injected via
-// AdapterConfig. No global registry modification — instance is ephemeral.
-
-function makeAdapter(exchange: string, creds: ExchangeCredentials): BaseExchangeAdapter {
-  const cfg = {
-    apiKey:            creds.apiKey,
-    apiSecret:         creds.apiSecret,
-    passphrase:        creds.passphrase,
-    oauthAccessToken:  creds.oauthAccessToken,
-    oauthRefreshToken: creds.oauthRefreshToken,
-    oauthExpiresAt:    creds.oauthExpiresAt,
-    oauthScope:        creds.oauthScope,
-  };
-  switch (exchange) {
-    // Live
-    case "Kraken":       return new KrakenAdapter(cfg);
-    case "Alpaca":       return new AlpacaAdapter(cfg);
-    case "Binance":      return new BinanceAdapter(cfg);
-    case "Coinbase":     return new CoinbaseAdapter(cfg);
-    // Beta
-    case "GateIO":       return new GateIOAdapter(cfg);
-    case "Bitget":       return new BitgetAdapter(cfg);
-    case "MEXC":         return new MEXCAdapter(cfg);
-    case "CryptoDotCom": return new CryptoDotComAdapter(cfg);
-    case "HTX":          return new HTXAdapter(cfg);
-    case "Gemini":       return new GeminiAdapter(cfg);
-    case "Bitstamp":     return new BitstampAdapter(cfg);
-    case "Phemex":       return new PhemexAdapter(cfg);
-    case "BloFin":       return new BloFinAdapter(cfg);
-    case "BingX":        return new BingXAdapter(cfg);
-    default: throw new Error(`No adapter for exchange: ${exchange}`);
-  }
-}
+// The exchange-name → adapter-class map lives in
+// `services/exchanges/adapterFactory.ts` (single source of truth). Adding a
+// new exchange = edit that one file.
 
 // ── Connection test helper ────────────────────────────────────────────────────
 // 1. Test public endpoint (confirms network / exchange reachable)
