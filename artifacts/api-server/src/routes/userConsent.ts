@@ -150,8 +150,13 @@ router.get("/user/disclaimer", requireAuth, async (req, res): Promise<void> => {
       acceptedAt:      latest?.createdAt ?? null,
     });
   } catch (err) {
-    req.log.error({ err }, "GET /user/disclaimer failed");
-    res.status(500).json({ error: "Failed to check disclaimer status" });
+    const e = err as { code?: string; message?: string };
+    req.log.error({ err, pgCode: e?.code, pgMsg: e?.message, userId }, "GET /user/disclaimer failed");
+    res.status(500).json({
+      error:  "Failed to check disclaimer status",
+      code:   e?.code ?? "UNKNOWN",
+      detail: e?.message ?? "no error message",
+    });
   }
 });
 
@@ -218,8 +223,16 @@ router.post("/user/disclaimer", requireAuth, async (req, res): Promise<void> => 
       acceptedAt:        new Date().toISOString(),
     });
   } catch (err) {
-    req.log.error({ err }, "POST /user/disclaimer failed");
-    res.status(500).json({ error: "Failed to record disclaimer acceptance" });
+    const e = err as { code?: string; message?: string };
+    req.log.error({ err, pgCode: e?.code, pgMsg: e?.message, userId }, "POST /user/disclaimer failed");
+    res.status(500).json({
+      error:  "Failed to record disclaimer acceptance",
+      code:   e?.code ?? "UNKNOWN",
+      detail: e?.message ?? "no error message",
+      hint:   e?.code === "42703"
+        ? "user_consents is missing a disclaimer-v1.0 column — run drizzle-kit push against the production DB."
+        : undefined,
+    });
   }
 });
 

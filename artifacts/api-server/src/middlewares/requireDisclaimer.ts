@@ -74,7 +74,29 @@ export const requireDisclaimer = async (
 
     next();
   } catch (err) {
-    req.log.error({ err }, "requireDisclaimer middleware failed");
-    res.status(500).json({ error: "Failed to verify disclaimer status" });
+    // Surface Postgres error codes/messages so production failures are
+    // diagnosable from Render logs and the browser network panel.
+    // Common codes:
+    //   42P01 — relation does not exist (user_consents table missing on prod)
+    //   42703 — column does not exist (disclaimer-v1.0 columns missing)
+    //   28P01 — invalid_password (DB credentials wrong)
+    //   ECONNREFUSED — DB unreachable
+    const e        = err as { code?: string; message?: string; routine?: string };
+    const pgCode   = e?.code;
+    const pgMsg    = e?.message;
+    req.log.error(
+      { err, pgCode, pgMsg, userId, routine: e?.routine },
+      "requireDisclaimer middleware failed",
+    );
+    res.status(500).json({
+      error:   "Failed to verify disclaimer status",
+      code:    pgCode ?? "UNKNOWN",
+      detail:  pgMsg ?? "no error message",
+      hint:    pgCode === "42P01"
+        ? "user_consents table missing on this database — run drizzle-kit push against the production DB."
+        : pgCode === "42703"
+          ? "user_consents is missing a column required by disclaimer-v1.0 — run drizzle-kit push against the production DB."
+          : undefined,
+    });
   }
 };
