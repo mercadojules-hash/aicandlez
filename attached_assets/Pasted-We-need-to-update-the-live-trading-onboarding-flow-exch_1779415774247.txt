@@ -1,0 +1,123 @@
+We need to update the live trading onboarding flow, exchange list, and exchange UI visibility throughout the dashboard and onboarding system.
+
+IMPORTANT:
+Robinhood IS already connected in backend support logic. It simply is NOT showing on the frontend exchange list/UI. Add it visibly everywhere exchange options are shown.
+
+EXCHANGE LIST UPDATE (replace current list everywhere):
+SUPPORTED EXCHANGES:
+
+* Alpaca
+* Kraken
+* Coinbase
+* Robinhood
+* Crypto.com
+* Binance
+
+REMOVE completely:
+
+* OKX
+* KuCoin
+* Bybit
+
+Reason:
+Those exchanges are either unavailable or heavily restricted for United States users.
+
+FRONTEND / UX CHANGES:
+The exchange names are currently too small and difficult to read.
+
+Update the exchange cards/buttons/modals so:
+
+* exchange names are MUCH larger
+* brighter
+* easier to identify quickly
+* visually highlighted when connected/selected
+* active exchange should glow or have a strong green highlight
+* connected exchange should clearly display ACTIVE / CONNECTED state
+
+For example:
+CONNECTED: ROBINHOOD
+CONNECTED: KRAKEN
+
+should be very obvious and prominent.
+
+ONBOARDING FLOW REQUIREMENTS:
+After:
+
+1. disclaimer acceptance
+2. successful Stripe subscription purchase
+
+The user must immediately see TWO onboarding options:
+
+OPTION A:
+CONNECT EXISTING EXCHANGE
+
+Supported:
+
+* Robinhood
+* Kraken
+* Coinbase
+* Crypto.com
+* Binance
+* Alpaca
+
+This flow should:
+
+* guide users through API setup
+* explain permissions required
+* explain withdrawals should remain disabled
+* validate API credentials
+* fetch live balances
+* redirect user to:
+  https://trade.aicandlez.com/portal
+
+OPTION B:
+CREATE / FUND ALPACA ACCOUNT
+
+This should:
+
+* explain that funds stay in Alpaca
+* explain AICandlez never holds user money
+* allow users to create or connect an Alpaca account
+* allow them to deposit funds directly into Alpaca
+* connect Alpaca API keys
+* redirect to:
+  https://trade.aicandlez.com/portal
+
+LIVE PORTAL REQUIREMENTS:
+Once connected:
+
+* replace simulation paper balance with REAL balance
+* show live equity
+* show live buying power
+* show live positions
+* show live P/L
+
+FIRST-TIME LIVE USER MODAL:
+Add a clean onboarding popup explaining:
+
+* users can manually buy/sell assets
+* users can allow AI to trade automatically
+* AI Trading plan = up to 3 concurrent AI trades
+* AI Trading Pro = up to 12 concurrent AI trades
+* users can pause/stop AI anytime
+* users always maintain custody of their own funds
+* AICandlez never holds customer money
+
+COMPLIANCE / WORDING:
+DO NOT say:
+“deposit money into AICandlez”
+
+ALWAYS say:
+
+* “Deposit funds into your Alpaca brokerage account”
+  or
+* “Connect your existing exchange account”
+
+The goal is:
+
+* cleaner onboarding
+* easier exchange setup
+* more obvious connected exchange status
+* clearer compliance language
+* easier onboarding for non-technical users
+* improved live trading conversion flow
