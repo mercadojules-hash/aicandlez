@@ -549,8 +549,10 @@ export default function Exchanges() {
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 16, fontFamily: SANS, fontWeight: 800,
-                      color: W, marginBottom: 4, letterSpacing: -0.2 }}>
+                    <div style={{ fontSize: 19, fontFamily: SANS, fontWeight: 800,
+                      color: conn?.connected ? "#FFFFFF" : W, marginBottom: 5,
+                      letterSpacing: -0.3,
+                      textShadow: conn?.connected ? `0 0 14px ${ex.color}90` : "none" }}>
                       {ex.name}
                     </div>
                     <StatusChip conn={conn}/>

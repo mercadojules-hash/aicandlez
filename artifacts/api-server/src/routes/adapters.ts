@@ -5,9 +5,6 @@ import { KrakenAdapter, KRAKEN_CONFIG }        from "../services/exchanges/adapt
 import { AlpacaAdapter, ALPACA_CONFIG }        from "../services/exchanges/adapters/AlpacaAdapter.js";
 import { BinanceAdapter, BINANCE_CONFIG }      from "../services/exchanges/adapters/BinanceAdapter.js";
 import { CoinbaseAdapter, COINBASE_CONFIG }    from "../services/exchanges/adapters/CoinbaseAdapter.js";
-import { BybitAdapter, BYBIT_CONFIG }          from "../services/exchanges/adapters/BybitAdapter.js";
-import { OKXAdapter, OKX_CONFIG }              from "../services/exchanges/adapters/OKXAdapter.js";
-import { KuCoinAdapter, KUCOIN_CONFIG }        from "../services/exchanges/adapters/KuCoinAdapter.js";
 // Beta adapters
 import { GateIOAdapter, GATEIO_CONFIG }        from "../services/exchanges/adapters/GateIOAdapter.js";
 import { BitgetAdapter, BITGET_CONFIG }        from "../services/exchanges/adapters/BitgetAdapter.js";
@@ -60,9 +57,6 @@ function bootstrapAdapters(): void {
     new AlpacaAdapter(ALPACA_CONFIG),
     new BinanceAdapter(BINANCE_CONFIG),
     new CoinbaseAdapter(COINBASE_CONFIG),
-    new BybitAdapter(BYBIT_CONFIG),
-    new OKXAdapter(OKX_CONFIG),
-    new KuCoinAdapter(KUCOIN_CONFIG),
     // Beta — registered for health monitoring and switchability
     new GateIOAdapter(GATEIO_CONFIG),
     new BitgetAdapter(BITGET_CONFIG),

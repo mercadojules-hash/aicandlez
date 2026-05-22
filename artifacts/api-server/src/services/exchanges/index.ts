@@ -8,9 +8,6 @@ export * from "./catalog.js";
 export * from "./adapters/KrakenAdapter.js";
 export * from "./adapters/BinanceAdapter.js";
 export * from "./adapters/CoinbaseAdapter.js";
-export * from "./adapters/BybitAdapter.js";
-export * from "./adapters/OKXAdapter.js";
-export * from "./adapters/KuCoinAdapter.js";
 
 // ── Beta adapters (fully implemented, not yet battle-tested) ──────────────────
 export * from "./adapters/GateIOAdapter.js";

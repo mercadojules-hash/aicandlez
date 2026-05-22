@@ -123,9 +123,6 @@ const EXCHANGE_ID_TO_ADAPTER: Record<string, string> = {
   binanceus:  "Binance",
   cryptocom:  "CryptoDotCom",
   gemini:     "Gemini",
-  bybit:      "Bybit",
-  okx:        "OKX",
-  kucoin:     "KuCoin",
   alpaca:     "Alpaca",
 };
 

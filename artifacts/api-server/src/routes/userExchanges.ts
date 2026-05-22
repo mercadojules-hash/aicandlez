@@ -13,9 +13,6 @@ import { KrakenAdapter }         from "../services/exchanges/adapters/KrakenAdap
 import { AlpacaAdapter }         from "../services/exchanges/adapters/AlpacaAdapter.js";
 import { BinanceAdapter }        from "../services/exchanges/adapters/BinanceAdapter.js";
 import { CoinbaseAdapter }       from "../services/exchanges/adapters/CoinbaseAdapter.js";
-import { BybitAdapter }          from "../services/exchanges/adapters/BybitAdapter.js";
-import { OKXAdapter }            from "../services/exchanges/adapters/OKXAdapter.js";
-import { KuCoinAdapter }         from "../services/exchanges/adapters/KuCoinAdapter.js";
 // Beta adapters
 import { GateIOAdapter }         from "../services/exchanges/adapters/GateIOAdapter.js";
 import { BitgetAdapter }         from "../services/exchanges/adapters/BitgetAdapter.js";
@@ -58,9 +55,6 @@ function makeAdapter(exchange: string, creds: ExchangeCredentials): BaseExchange
     case "Alpaca":       return new AlpacaAdapter(cfg);
     case "Binance":      return new BinanceAdapter(cfg);
     case "Coinbase":     return new CoinbaseAdapter(cfg);
-    case "Bybit":        return new BybitAdapter(cfg);
-    case "OKX":          return new OKXAdapter(cfg);
-    case "KuCoin":       return new KuCoinAdapter(cfg);
     // Beta
     case "GateIO":       return new GateIOAdapter(cfg);
     case "Bitget":       return new BitgetAdapter(cfg);

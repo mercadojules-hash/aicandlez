@@ -463,8 +463,11 @@ export default function Exchange() {
                 <Link2 className="w-3 h-3" /> My Kraken Keys
               </div>
               {krakenConn?.connected && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30 font-semibold">
-                  CONNECTED
+                <span
+                  className="text-[11px] px-2.5 py-1 rounded-full bg-green-500/25 text-green-200 border border-green-400/60 font-bold tracking-[0.18em]"
+                  style={{ boxShadow: "0 0 14px rgba(102,255,102,0.45), 0 0 0 1px rgba(102,255,102,0.25) inset" }}
+                >
+                  ● CONNECTED
                 </span>
               )}
             </div>
