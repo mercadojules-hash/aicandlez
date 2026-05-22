@@ -186,7 +186,7 @@ export class BingXAdapter extends BaseExchangeAdapter {
         status: o.status === "FILLED" ? "filled" : o.status === "CANCELED" ? "cancelled" : "open",
         requestedQty: parseFloat(o.origQty ?? "0"), filledQty: qty,
         avgFillPrice: fill, quoteQty: qty * fill,
-        fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USDT", ratePct: this.config.takerFeePct },
+        fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
         createdAt: o.time ?? Date.now(), updatedAt: o.updateTime ?? Date.now(),
       };
     } catch { return null; }

@@ -682,6 +682,8 @@ async function autoExecute(
           takeProfit:      parseFloat(userTP.toFixed(2)),
           exchange:        r.exchange ?? "unknown",
           exchangeOrderId: r.exchangeOrderId ?? `LIVE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          entryFeeBroker:         r.brokerFee,
+          entryFeeBrokerCurrency: r.brokerFeeCurrency,
         });
       } catch (e) {
         logger.warn(

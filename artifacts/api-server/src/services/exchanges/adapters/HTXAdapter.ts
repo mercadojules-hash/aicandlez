@@ -192,7 +192,9 @@ export class HTXAdapter extends BaseExchangeAdapter {
         status: o.state === "filled" ? "filled" : o.state === "canceled" ? "cancelled" : "open",
         requestedQty: parseFloat(o.amount ?? "0"), filledQty: filled,
         avgFillPrice: fill, quoteQty: filled * fill,
-        fee: { amount: parseFloat(o["field-fees"] ?? "0"), currency: "USDT", ratePct: this.config.takerFeePct },
+        fee: o["field-fees"] !== undefined && o["field-fees"] !== null
+          ? { amount: parseFloat(o["field-fees"]), currency: "USDT", ratePct: this.config.takerFeePct, source: "broker" }
+          : { amount: this.computeFee(filled * fill, true), currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
         createdAt: o["created-at"] ?? Date.now(), updatedAt: Date.now(),
       };
     } catch { return null; }

@@ -155,7 +155,7 @@ export class MEXCAdapter extends BaseExchangeAdapter {
       status: data.status === "FILLED" ? "filled" : "open",
       requestedQty: req.qty, filledQty: qty,
       avgFillPrice: fill, quoteQty: qty * fill,
-      fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USDT", ratePct: this.config.takerFeePct },
+      fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
       createdAt: data.transactTime ?? Date.now(),
       updatedAt: data.transactTime ?? Date.now(),
     };
@@ -191,7 +191,7 @@ export class MEXCAdapter extends BaseExchangeAdapter {
         status: data.status === "FILLED" ? "filled" : data.status === "CANCELED" ? "cancelled" : "open",
         requestedQty: parseFloat(data.origQty ?? "0"), filledQty: qty,
         avgFillPrice: fill, quoteQty: qty * fill,
-        fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USDT", ratePct: this.config.takerFeePct },
+        fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
         createdAt: data.transactTime ?? Date.now(), updatedAt: data.transactTime ?? Date.now(),
       };
     } catch { return null; }

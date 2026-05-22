@@ -238,27 +238,77 @@ export function TradeDetailSheet({ trade, onClose }: TradeDetailSheetProps) {
 
         {/* Fees — live trades only. Paper trades hide this section entirely. */}
         {isLive && (() => {
-          const entryFee = trade.entryFee;
-          const exitFee  = trade.exitFee;
-          const haveAny  = typeof entryFee === "number" || typeof exitFee === "number";
-          const totalFee = typeof trade.netFees === "number"
-            ? trade.netFees
-            : (entryFee ?? 0) + (exitFee ?? 0);
+          // Prefer the broker-reported commission when the exchange surfaced
+          // one — it matches the customer's exchange statement to the cent
+          // (maker discounts, tiered volume, stablecoin pair rates, etc).
+          // Fall back to the catalog estimate when the broker didn't return
+          // a per-order fee figure (e.g. Alpaca, Coinbase, Kraken pre-poll).
+          // Match the server: broker fee is only the source of truth for
+          // USD cash math when the broker charged in a USD-stable asset.
+          // Native-asset fees (BNB, BTC, etc.) are still shown to the user
+          // verbatim, but the USD totals fall back to the catalog estimate
+          // so receipt math matches account equity.
+          const USD_STABLE = new Set([
+            "USD","USDT","USDC","BUSD","DAI","TUSD","USDP","FDUSD","ZUSD",
+          ]);
+          const entryEstimate = trade.entryFee;
+          const exitEstimate  = trade.exitFee;
+          const entryBroker   = trade.entryFeeBroker;
+          const exitBroker    = trade.exitFeeBroker;
+          const entryBrokerCcy = trade.entryFeeBrokerCurrency;
+          const exitBrokerCcy  = trade.exitFeeBrokerCurrency;
+          const entryFromBroker = typeof entryBroker === "number";
+          const exitFromBroker  = typeof exitBroker  === "number";
+          const entryBrokerIsUsd = entryFromBroker
+            && (!entryBrokerCcy || USD_STABLE.has(entryBrokerCcy.toUpperCase()));
+          const exitBrokerIsUsd  = exitFromBroker
+            && (!exitBrokerCcy  || USD_STABLE.has(exitBrokerCcy.toUpperCase()));
+          // Per-leg display value (native unit when broker reported it,
+          // otherwise USD estimate). USD totals use the USD-equivalent only.
+          const fmtFee = (
+            broker: number | undefined,
+            currency: string | undefined,
+            estimate: number | undefined,
+          ) => {
+            if (typeof broker === "number") {
+              const isUsd = !currency || USD_STABLE.has(currency.toUpperCase());
+              if (isUsd) return `$${broker.toFixed(2)}`;
+              const dp = broker < 1 ? 6 : 4;
+              return `${broker.toFixed(dp)} ${currency}`;
+            }
+            return typeof estimate === "number" ? `$${estimate.toFixed(2)}` : "—";
+          };
+          const usdEntry = entryBrokerIsUsd ? entryBroker! : (entryEstimate ?? 0);
+          const usdExit  = exitBrokerIsUsd  ? exitBroker!  : (exitEstimate  ?? 0);
+          const haveAny = typeof entryEstimate === "number"
+            || typeof exitEstimate === "number"
+            || entryFromBroker || exitFromBroker;
+          const totalFee = usdEntry + usdExit;
           const gross    = trade.pnl ?? 0;
           const net      = gross - totalFee;
           const grossStr = `${gross >= 0 ? "+" : "−"}$${Math.abs(gross).toFixed(2)}`;
           const netStr   = `${net   >= 0 ? "+" : "−"}$${Math.abs(net).toFixed(2)}`;
+          const feeLabel = (
+            base: string,
+            isBroker: boolean,
+            currency: string | undefined,
+          ) => {
+            if (!isBroker) return `${base} (est.)`;
+            return currency && !USD_STABLE.has(currency.toUpperCase())
+              ? `${base} · charged by broker (${currency})`
+              : `${base} · charged by broker`;
+          };
           return (
             <>
               <SectionLabel>Fees</SectionLabel>
               <Row
-                label="Opening commission"
-                value={typeof entryFee === "number" ? `$${entryFee.toFixed(2)}` : "—"}
+                label={feeLabel("Opening commission", entryFromBroker, entryBrokerCcy)}
+                value={fmtFee(entryBroker, entryBrokerCcy, entryEstimate)}
                 mono
               />
               <Row
-                label="Closing commission"
-                value={typeof exitFee === "number" ? `$${exitFee.toFixed(2)}` : "—"}
+                label={feeLabel("Closing commission", exitFromBroker, exitBrokerCcy)}
+                value={fmtFee(exitBroker, exitBrokerCcy, exitEstimate)}
                 mono
               />
               {haveAny && (

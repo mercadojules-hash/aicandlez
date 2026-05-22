@@ -52,6 +52,12 @@ export interface LiveUserOrderResult {
   exchangeOrderId?: string;
   fillPrice?:      number;
   quantity?:       number;
+  // Broker-reported entry-leg commission, in `brokerFeeCurrency`, when the
+  // exchange's order/fill payload included a real fee figure. Only set when
+  // `order.fee.source === "broker"` on the underlying StandardOrder — left
+  // undefined on dry-run, paper, and brokers that don't surface a fee.
+  brokerFee?:         number;
+  brokerFeeCurrency?: string;
   dryRun?:         boolean;
   errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "price_unavailable" | "exchange_reject";
   error?:          string;
@@ -72,6 +78,9 @@ export interface LiveUserCloseResult {
   exchangeCloseOrderId?: string;
   fillPrice?:           number;
   quantity?:            number;
+  // Broker-reported close-leg commission (see LiveUserOrderResult.brokerFee).
+  brokerFee?:           number;
+  brokerFeeCurrency?:   string;
   dryRun?:              boolean;
   errorCode?:           "no_connection" | "decrypt_failed" | "unsupported" | "exchange_mismatch" | "exchange_reject";
   error?:               string;
@@ -486,6 +495,16 @@ export async function placeLiveAutoOrderForUser(
     }
 
     const fill = order.avgFillPrice > 0 ? order.avgFillPrice : referencePrice;
+    // Prefer the broker-reported commission when the adapter actually
+    // populated `fee.source === "broker"`. Estimates (catalog rate * notional)
+    // are intentionally NOT forwarded as brokerFee — closeUserPosition will
+    // fall back to its own catalog estimate if brokerFee is undefined.
+    // Accept 0 and negative (maker rebate) amounts as legitimate broker
+    // values — only gate on a finite number with source === "broker".
+    const brokerFeeOpen =
+      order.fee && order.fee.source === "broker" && Number.isFinite(order.fee.amount)
+        ? { amount: parseFloat(order.fee.amount.toFixed(8)), currency: order.fee.currency }
+        : undefined;
     const result: LiveUserOrderResult = {
       success:         true,
       userId,
@@ -493,6 +512,8 @@ export async function placeLiveAutoOrderForUser(
       exchangeOrderId: order.exchangeOrderId || order.id,
       fillPrice:       parseFloat(fill.toFixed(2)),
       quantity:        order.filledQty > 0 ? order.filledQty : qtyBase,
+      brokerFee:         brokerFeeOpen?.amount,
+      brokerFeeCurrency: brokerFeeOpen?.currency,
     };
 
     const note = timedOut
@@ -678,6 +699,11 @@ export async function placeLiveCloseOrderForUser(
     }
 
     const fill = order.avgFillPrice > 0 ? order.avgFillPrice : 0;
+    // See open-side path: only forward broker-sourced fees.
+    const brokerFeeClose =
+      order.fee && order.fee.source === "broker" && Number.isFinite(order.fee.amount)
+        ? { amount: parseFloat(order.fee.amount.toFixed(8)), currency: order.fee.currency }
+        : undefined;
     const result: LiveUserCloseResult = {
       success:              true,
       userId,
@@ -685,6 +711,8 @@ export async function placeLiveCloseOrderForUser(
       exchangeCloseOrderId: order.exchangeOrderId || order.id,
       fillPrice:            parseFloat(fill.toFixed(2)),
       quantity:             order.filledQty > 0 ? order.filledQty : quantity,
+      brokerFee:            brokerFeeClose?.amount,
+      brokerFeeCurrency:    brokerFeeClose?.currency,
     };
 
     const note = timedOut

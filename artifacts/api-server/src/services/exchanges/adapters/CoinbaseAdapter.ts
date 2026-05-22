@@ -189,7 +189,7 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
       requestedPrice:  req.limitPrice,
       avgFillPrice:    fill,
       quoteQty:        qty * fill,
-      fee:             { amount: fee, currency: "USD", ratePct: this.config.takerFeePct },
+      fee:             { amount: fee, currency: "USD", ratePct: this.config.takerFeePct, source: "estimate" },
       createdAt:       Date.now(), updatedAt: Date.now(),
       rawResponse:     data,
     };
@@ -230,7 +230,7 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
         status: data.order.status === "FILLED" ? "filled" : "open",
         requestedQty: parseFloat(data.order.order_configuration?.market_market_ioc?.quote_size ?? "0"),
         filledQty: qty, avgFillPrice: fill, quoteQty: qty * fill,
-        fee: { amount: 0, currency: "USD", ratePct: this.config.takerFeePct },
+        fee: { amount: 0, currency: "USD", ratePct: this.config.takerFeePct, source: "estimate" },
         createdAt: Date.now(), updatedAt: Date.now(),
       };
     } catch { return null; }

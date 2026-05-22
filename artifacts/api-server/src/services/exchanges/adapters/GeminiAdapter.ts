@@ -233,7 +233,7 @@ export class GeminiAdapter extends BaseExchangeAdapter {
       status: o.is_live ? "open" : o.is_cancelled ? "cancelled" : "filled",
       requestedQty: parseFloat(o.original_amount ?? "0"), filledQty: qty,
       avgFillPrice: fill, quoteQty: qty * fill,
-      fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USD", ratePct: this.config.takerFeePct },
+      fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USD", ratePct: this.config.takerFeePct, source: "estimate" },
       createdAt: o.timestampms ?? Date.now(), updatedAt: Date.now(),
     };
   }

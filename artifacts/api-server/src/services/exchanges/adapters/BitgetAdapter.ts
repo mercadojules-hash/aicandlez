@@ -184,7 +184,9 @@ export class BitgetAdapter extends BaseExchangeAdapter {
         requestedQty: parseFloat(o.size), filledQty: parseFloat(o.baseVolume ?? "0"),
         avgFillPrice: parseFloat(o.priceAvg ?? "0"),
         quoteQty: parseFloat(o.quoteVolume ?? "0"),
-        fee: { amount: parseFloat(o.feeDetail?.feeCost ?? "0"), currency: "USDT", ratePct: this.config.takerFeePct },
+        fee: o.feeDetail?.feeCost !== undefined && o.feeDetail?.feeCost !== null
+          ? { amount: parseFloat(o.feeDetail.feeCost), currency: o.feeDetail.feeCoin ?? "USDT", ratePct: this.config.takerFeePct, source: "broker" }
+          : { amount: this.computeFee(parseFloat(o.quoteVolume ?? "0"), true), currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
         createdAt: parseInt(o.cTime ?? "0") || Date.now(),
         updatedAt: parseInt(o.uTime ?? "0") || Date.now(),
       };
@@ -276,6 +278,6 @@ interface BitgetBalance  { coin: string; available: string; frozen?: string; }
 interface BitgetOrderDetail {
   orderId: string; side: string; orderType: string; status: string;
   size: string; priceAvg?: string; baseVolume?: string; quoteVolume?: string;
-  feeDetail?: { feeCost: string }; cTime?: string; uTime?: string;
+  feeDetail?: { feeCost: string; feeCoin?: string }; cTime?: string; uTime?: string;
 }
 

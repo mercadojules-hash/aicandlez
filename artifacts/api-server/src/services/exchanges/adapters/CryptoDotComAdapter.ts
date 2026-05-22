@@ -186,7 +186,9 @@ export class CryptoDotComAdapter extends BaseExchangeAdapter {
         status: o.status === "FILLED" ? "filled" : o.status === "CANCELED" ? "cancelled" : "open",
         requestedQty: o.quantity, filledQty: o.cumulative_quantity,
         avgFillPrice: o.avg_price ?? 0, quoteQty: o.cumulative_value ?? 0,
-        fee: { amount: o.fee_currency_amount ?? 0, currency: o.fee_currency ?? "USDT", ratePct: this.config.takerFeePct },
+        fee: o.fee_currency_amount !== undefined && o.fee_currency_amount !== null
+          ? { amount: o.fee_currency_amount, currency: o.fee_currency ?? "USDT", ratePct: this.config.takerFeePct, source: "broker" }
+          : { amount: this.computeFee(o.cumulative_value ?? 0, true), currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
         createdAt: o.create_time, updatedAt: o.update_time,
       };
     } catch { return null; }

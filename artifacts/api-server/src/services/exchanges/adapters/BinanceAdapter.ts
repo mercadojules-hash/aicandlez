@@ -277,7 +277,18 @@ export class BinanceAdapter extends BaseExchangeAdapter {
   private normaliseOrder(raw: BinanceOrderResponse, symbol: string): StandardOrder {
     const fill = parseFloat(raw.price || raw.fills?.[0]?.price || "0");
     const qty  = parseFloat(raw.executedQty || "0");
-    const fee  = raw.fills?.reduce((s, f) => s + parseFloat(f.commission), 0) ?? this.computeFee(qty * fill, true);
+    // Only treat the commission as broker-sourced when Binance actually
+    // returned per-fill commissions. Use the first fill's commissionAsset
+    // as the fee currency (BNB, USDT, etc.) instead of hardcoding USDT —
+    // that asset materially changes how the amount maps to USD.
+    const brokerFills = raw.fills && raw.fills.length > 0;
+    const fee  = brokerFills
+      ? raw.fills!.reduce((s, f) => s + parseFloat(f.commission || "0"), 0)
+      : this.computeFee(qty * fill, true);
+    const feeSource: "broker" | "estimate" = brokerFills ? "broker" : "estimate";
+    const feeCurrency = brokerFills
+      ? (raw.fills![0]!.commissionAsset || "USDT")
+      : "USDT";
     const statusMap: Record<string, StandardOrder["status"]> = {
       NEW: "open", PARTIALLY_FILLED: "partial", FILLED: "filled",
       CANCELED: "cancelled", REJECTED: "rejected",
@@ -296,7 +307,7 @@ export class BinanceAdapter extends BaseExchangeAdapter {
       requestedPrice:  raw.price ? parseFloat(raw.price) : undefined,
       avgFillPrice:    fill,
       quoteQty:        qty * fill,
-      fee:             { amount: fee, currency: "USDT", ratePct: this.config.takerFeePct },
+      fee:             { amount: fee, currency: feeCurrency, ratePct: this.config.takerFeePct, source: feeSource },
       createdAt:       raw.transactTime ?? Date.now(),
       updatedAt:       Date.now(),
       rawResponse:     raw,
@@ -323,7 +334,7 @@ export function simulatedOrder(
     requestedQty: req.qty, filledQty: req.qty,
     requestedPrice: req.limitPrice, avgFillPrice: req.limitPrice ?? 0,
     quoteQty: req.qty * (req.limitPrice ?? 0),
-    fee: { amount: 0, currency: "USD", ratePct: config.takerFeePct },
+    fee: { amount: 0, currency: "USD", ratePct: config.takerFeePct, source: "estimate" },
     createdAt: Date.now(), updatedAt: Date.now(),
   };
 }

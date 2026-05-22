@@ -279,7 +279,9 @@ export class GateIOAdapter extends BaseExchangeAdapter {
       status: raw.status === "closed" ? "filled" : raw.status === "cancelled" ? "cancelled" : "open",
       requestedQty: qty, filledQty: parseFloat(raw.filled_total ?? "0") / (fill || 1),
       avgFillPrice: fill, quoteQty: parseFloat(raw.filled_total ?? "0"),
-      fee:      { amount: parseFloat(raw.fee ?? "0"), currency: "USDT", ratePct: this.config.takerFeePct },
+      fee:      raw.fee !== undefined && raw.fee !== null
+        ? { amount: parseFloat(raw.fee), currency: raw.fee_currency ?? "USDT", ratePct: this.config.takerFeePct, source: "broker" }
+        : { amount: this.computeFee(parseFloat(raw.filled_total ?? "0"), true), currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
       createdAt: parseInt(raw.create_time_ms ?? "0") || Date.now(),
       updatedAt: parseInt(raw.update_time_ms ?? "0") || Date.now(),
     };
@@ -309,6 +311,7 @@ interface GateOrder {
   amount?:        string;
   price?:         string;
   fill_price?:    string;
+  fee_currency?:  string;
   filled_total?:  string;
   fee?:           string;
   create_time_ms?: string;

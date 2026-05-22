@@ -32,6 +32,15 @@ export const simTradesTable = pgTable("sim_trades", {
   // the broker's own statement.
   entryFee:        real("entry_fee"),
   exitFee:         real("exit_fee"),
+  // Broker-reported commissions captured straight from the exchange's order
+  // / fill response (when available). Stored alongside the catalog estimate
+  // above so the customer receipt can prefer the real charge and fall back
+  // to the estimate when the adapter didn't surface one. `*Currency` is the
+  // settlement currency the broker quoted the fee in (USD, USDT, etc.).
+  entryFeeBroker:         real("entry_fee_broker"),
+  entryFeeBrokerCurrency: text("entry_fee_broker_currency"),
+  exitFeeBroker:          real("exit_fee_broker"),
+  exitFeeBrokerCurrency:  text("exit_fee_broker_currency"),
   createdAt:      timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   index("sim_trades_user_idx").on(t.userId),

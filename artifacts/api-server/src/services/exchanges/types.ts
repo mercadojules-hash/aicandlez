@@ -26,6 +26,11 @@ export interface StandardOrder {
     amount:   number;
     currency: string;
     ratePct:  number;
+    // "broker"   — amount came straight from the exchange's order/fill payload
+    // "estimate" — amount was derived from the catalog taker rate (computeFee)
+    // Receipts prefer broker-sourced amounts when present; estimates are a
+    // fallback for brokers that don't surface a per-order commission field.
+    source?:  "broker" | "estimate";
   };
   createdAt:  number;              // unix ms
   updatedAt:  number;

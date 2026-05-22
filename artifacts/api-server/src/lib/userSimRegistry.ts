@@ -45,6 +45,11 @@ export interface UserSimPosition {
   marketValue?: number;
   exchange?: string;
   exchangeOrderId?: string;
+  // Broker-reported entry-leg commission carried from the open fill so the
+  // close-side receipt can prefer it over the catalog estimate. Undefined
+  // for paper fills and for brokers that don't surface a per-order fee.
+  entryFeeBroker?: number;
+  entryFeeBrokerCurrency?: string;
 }
 
 export interface UserSimTrade {
@@ -65,9 +70,17 @@ export interface UserSimTrade {
   exchange?: string;
   exchangeOrderId?: string;
   exchangeCloseOrderId?: string;
+  // Catalog-estimated fees (existing): computed from CATALOG_BY_ID taker rate.
   entryFee?: number;
   exitFee?: number;
   netFees?: number;
+  // Broker-reported fees (new): straight from the exchange's order payload.
+  // Persisted alongside the estimate so the receipt can prefer the real
+  // figure when present and gracefully fall back to the estimate otherwise.
+  entryFeeBroker?: number;
+  entryFeeBrokerCurrency?: string;
+  exitFeeBroker?: number;
+  exitFeeBrokerCurrency?: string;
 }
 
 interface UserSimAccount {
@@ -162,6 +175,8 @@ async function loadFromDB(userId: string): Promise<UserSimState> {
       takeProfit:      p.takeProfit ?? undefined,
       exchange:        p.exchange ?? undefined,
       exchangeOrderId: p.exchangeOrderId ?? undefined,
+      entryFeeBroker:         p.entryFeeBroker ?? undefined,
+      entryFeeBrokerCurrency: p.entryFeeBrokerCurrency ?? undefined,
     })),
     tradeHistory: dbTrades.map((t) => {
       const entryFee = t.entryFee ?? undefined;
@@ -191,6 +206,10 @@ async function loadFromDB(userId: string): Promise<UserSimState> {
       entryFee,
       exitFee,
       netFees,
+      entryFeeBroker:         t.entryFeeBroker ?? undefined,
+      entryFeeBrokerCurrency: t.entryFeeBrokerCurrency ?? undefined,
+      exitFeeBroker:          t.exitFeeBroker ?? undefined,
+      exitFeeBrokerCurrency:  t.exitFeeBrokerCurrency ?? undefined,
       });
     }),
     idSeq: 0,
@@ -371,6 +390,11 @@ export async function registerLiveUserFill(params: {
   takeProfit?:     number;
   exchange:        string;
   exchangeOrderId: string;
+  // Broker-reported entry-leg commission (when the adapter parsed it from
+  // the exchange's order/fill response). Persisted so closeUserPosition can
+  // prefer it over the catalog estimate on the close-side receipt.
+  entryFeeBroker?:         number;
+  entryFeeBrokerCurrency?: string;
 }): Promise<UserSimPosition> {
   const state    = await getOrLoad(params.userId);
   const position: UserSimPosition = {
@@ -387,6 +411,8 @@ export async function registerLiveUserFill(params: {
     takeProfit:      params.takeProfit,
     exchange:        params.exchange,
     exchangeOrderId: params.exchangeOrderId,
+    entryFeeBroker:         params.entryFeeBroker,
+    entryFeeBrokerCurrency: params.entryFeeBrokerCurrency,
   };
 
   state.positions.push(position);
@@ -405,6 +431,8 @@ export async function registerLiveUserFill(params: {
     takeProfit:      position.takeProfit ?? null,
     exchange:        position.exchange ?? null,
     exchangeOrderId: position.exchangeOrderId ?? null,
+    entryFeeBroker:         position.entryFeeBroker ?? null,
+    entryFeeBrokerCurrency: position.entryFeeBrokerCurrency ?? null,
   });
 
   logger.info(
@@ -433,6 +461,8 @@ export async function closeUserPosition(
   let exchangeCloseOrderId: string | undefined;
   let brokerFillPrice: number | undefined;
   let brokerFilledQty: number | undefined;
+  let brokerExitFee: number | undefined;
+  let brokerExitFeeCurrency: string | undefined;
   const isLive = !!(pos.exchange && pos.exchangeOrderId);
   if (isLive) {
     const closeRes = await placeLiveCloseOrderForUser({
@@ -459,6 +489,13 @@ export async function closeUserPosition(
     if (closeRes.quantity && closeRes.quantity > 0) {
       // Clamp to position quantity in case the broker over-reports
       brokerFilledQty = Math.min(closeRes.quantity, pos.quantity);
+    }
+    // Accept 0 / negative (maker rebate) broker fees — only require that
+    // the broker returned a finite numeric value. Catalog estimate is only
+    // used when the adapter didn't report a fee at all.
+    if (Number.isFinite(closeRes.brokerFee)) {
+      brokerExitFee         = closeRes.brokerFee;
+      brokerExitFeeCurrency = closeRes.brokerFeeCurrency;
     }
   }
 
@@ -498,11 +535,32 @@ export async function closeUserPosition(
 
   // Broker commission for both legs (live trades only — null for paper).
   // Fees are pro-rated against the closed portion so partial closes only
-  // charge for the quantity actually filled.
+  // charge for the quantity actually filled. Estimates always recorded;
+  // broker-reported amounts (when present) are stored alongside the
+  // estimate and preferred for cash accounting + receipt totals.
   const exitNotional = exitPrice * closedQty;
   const entryFee = computeFillFee(pos.exchange, closedSizeUSD);
   const exitFee  = computeFillFee(pos.exchange, exitNotional);
-  const netFees  = (entryFee ?? 0) + (exitFee ?? 0);
+  // Pro-rate the broker-reported entry fee against the closed portion in
+  // case of a partial close — the carried entryFeeBroker reflects the full
+  // open-leg charge for the original quantity.
+  const entryFeeBrokerProRated =
+    pos.entryFeeBroker !== undefined && pos.quantity > 0
+      ? parseFloat(((pos.entryFeeBroker * closedQty) / pos.quantity).toFixed(8))
+      : undefined;
+  // Only treat a broker-reported fee as USD-equivalent for cash accounting
+  // when the broker charged it in a USD-stable asset. Fees paid in a native
+  // asset (BNB, BTC, ETH, exchange token) need an FX conversion we don't do
+  // here — keep them on the receipt but fall back to the catalog estimate
+  // for the cash/PnL math so account equity stays consistent.
+  const USD_STABLE = new Set(["USD", "USDT", "USDC", "BUSD", "DAI", "TUSD", "USDP", "FDUSD", "ZUSD"]);
+  const entryBrokerIsUsd = entryFeeBrokerProRated !== undefined
+    && (pos.entryFeeBrokerCurrency === undefined || USD_STABLE.has(pos.entryFeeBrokerCurrency.toUpperCase()));
+  const exitBrokerIsUsd  = brokerExitFee !== undefined
+    && (brokerExitFeeCurrency === undefined || USD_STABLE.has(brokerExitFeeCurrency.toUpperCase()));
+  const effectiveEntryFee = entryBrokerIsUsd ? entryFeeBrokerProRated! : (entryFee ?? 0);
+  const effectiveExitFee  = exitBrokerIsUsd  ? brokerExitFee!          : (exitFee  ?? 0);
+  const netFees  = effectiveEntryFee + effectiveExitFee;
 
   const trade: UserSimTrade = {
     id:              tradeId,
@@ -525,9 +583,13 @@ export async function closeUserPosition(
     entryFee:             entryFee ?? undefined,
     exitFee:              exitFee ?? undefined,
     netFees:
-      entryFee != null || exitFee != null
+      entryFee != null || exitFee != null || entryFeeBrokerProRated != null || brokerExitFee != null
         ? parseFloat(netFees.toFixed(4))
         : undefined,
+    entryFeeBroker:         entryFeeBrokerProRated,
+    entryFeeBrokerCurrency: entryFeeBrokerProRated !== undefined ? pos.entryFeeBrokerCurrency : undefined,
+    exitFeeBroker:          brokerExitFee,
+    exitFeeBrokerCurrency:  brokerExitFee !== undefined ? brokerExitFeeCurrency : undefined,
   };
 
   // Live trades pay broker commission on both legs — deduct from cash and
@@ -539,6 +601,16 @@ export async function closeUserPosition(
   if (isPartial) {
     pos.quantity = parseFloat((pos.quantity - closedQty).toFixed(8));
     pos.sizeUSD  = parseFloat((pos.sizeUSD - closedSizeUSD).toFixed(2));
+    // Carry forward only the unallocated portion of the broker-reported
+    // entry fee — otherwise a follow-up partial close would re-charge the
+    // already-consumed slice and cumulative entry fees would exceed what
+    // the broker actually billed.
+    if (pos.entryFeeBroker !== undefined && entryFeeBrokerProRated !== undefined) {
+      // Preserve sign — a maker rebate (negative fee) must continue to
+      // accrue against subsequent partial closes, not be clamped away.
+      const remaining = pos.entryFeeBroker - entryFeeBrokerProRated;
+      pos.entryFeeBroker = parseFloat(remaining.toFixed(8));
+    }
   } else {
     state.positions.splice(idx, 1);
   }
@@ -546,7 +618,11 @@ export async function closeUserPosition(
 
   const positionMutation = isPartial
     ? db.update(simPositionsTable)
-        .set({ quantity: pos.quantity, sizeUSD: pos.sizeUSD })
+        .set({
+          quantity: pos.quantity,
+          sizeUSD:  pos.sizeUSD,
+          entryFeeBroker: pos.entryFeeBroker ?? null,
+        })
         .where(eq(simPositionsTable.id, positionId))
     : db.delete(simPositionsTable).where(eq(simPositionsTable.id, positionId));
 
@@ -571,6 +647,10 @@ export async function closeUserPosition(
       exchangeCloseOrderId: trade.exchangeCloseOrderId ?? null,
       entryFee:             trade.entryFee ?? null,
       exitFee:              trade.exitFee ?? null,
+      entryFeeBroker:         trade.entryFeeBroker ?? null,
+      entryFeeBrokerCurrency: trade.entryFeeBrokerCurrency ?? null,
+      exitFeeBroker:          trade.exitFeeBroker ?? null,
+      exitFeeBrokerCurrency:  trade.exitFeeBrokerCurrency ?? null,
     }),
     positionMutation,
     persistAccount(state),

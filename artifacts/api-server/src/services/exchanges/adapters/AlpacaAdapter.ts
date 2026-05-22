@@ -199,7 +199,7 @@ export class AlpacaAdapter extends BaseExchangeAdapter {
         requestedQty: req.qty, filledQty: req.qty,
         requestedPrice: req.limitPrice, avgFillPrice: req.limitPrice ?? 0,
         quoteQty: req.qty * (req.limitPrice ?? 0),
-        fee: { amount: 0, currency: "USD", ratePct: 0 },
+        fee: { amount: 0, currency: "USD", ratePct: 0, source: "broker" },
         createdAt: Date.now(), updatedAt: Date.now(),
       };
     }
@@ -235,7 +235,7 @@ export class AlpacaAdapter extends BaseExchangeAdapter {
       requestedPrice:  req.limitPrice,
       avgFillPrice:    fill,
       quoteQty:        qty * fill,
-      fee:             { amount: 0, currency: "USD", ratePct: 0 },
+      fee:             { amount: 0, currency: "USD", ratePct: 0, source: "broker" },
       createdAt:       Date.now(),
       updatedAt:       Date.now(),
       rawResponse:     data,
@@ -320,7 +320,7 @@ export class AlpacaAdapter extends BaseExchangeAdapter {
         filledQty:       qty,
         avgFillPrice:    fill,
         quoteQty:        qty * fill,
-        fee:             { amount: 0, currency: "USD", ratePct: 0 },
+        fee:             { amount: 0, currency: "USD", ratePct: 0, source: "broker" },
         createdAt:       Date.now(),
         updatedAt:       Date.now(),
       };

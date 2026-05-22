@@ -19,6 +19,12 @@ export const simPositionsTable = pgTable("sim_positions", {
   // (per-user `user_exchange_connections`). NULL for paper/sim fills.
   exchange:        text("exchange"),
   exchangeOrderId: text("exchange_order_id"),
+  // Broker-reported entry-leg commission (when the exchange's order/fill
+  // response includes it). Carried on the position so the close-side
+  // receipt can prefer it over the catalog estimate. NULL for paper fills
+  // and for brokers that don't surface a per-order fee.
+  entryFeeBroker:         real("entry_fee_broker"),
+  entryFeeBrokerCurrency: text("entry_fee_broker_currency"),
   createdAt:  timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   index("sim_positions_user_idx").on(t.userId),

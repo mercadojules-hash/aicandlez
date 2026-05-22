@@ -214,7 +214,7 @@ export class KrakenAdapter extends BaseExchangeAdapter {
       requestedPrice:  req.limitPrice,
       avgFillPrice:    fillPrice,
       quoteQty,
-      fee:             { amount: fee, currency: "USD", ratePct: this.config.takerFeePct },
+      fee:             { amount: fee, currency: "USD", ratePct: this.config.takerFeePct, source: "estimate" },
       createdAt:       Date.now(),
       updatedAt:       Date.now(),
     };
@@ -351,7 +351,9 @@ export class KrakenAdapter extends BaseExchangeAdapter {
       filledQty:      qty,
       avgFillPrice:   fill,
       quoteQty:       qty * fill,
-      fee: { amount: parseFloat(raw.fee ?? "0"), currency: "USD", ratePct: this.config.takerFeePct },
+      fee: raw.fee !== undefined && raw.fee !== null
+        ? { amount: parseFloat(raw.fee), currency: "USD", ratePct: this.config.takerFeePct, source: "broker" }
+        : { amount: this.computeFee(qty * fill, true), currency: "USD", ratePct: this.config.takerFeePct, source: "estimate" },
       createdAt: raw.opentm ? raw.opentm * 1000 : Date.now(),
       updatedAt: Date.now(),
       rawResponse: raw,

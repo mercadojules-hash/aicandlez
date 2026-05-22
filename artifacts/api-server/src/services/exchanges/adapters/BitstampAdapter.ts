@@ -230,7 +230,7 @@ export class BitstampAdapter extends BaseExchangeAdapter {
       status: o.status === "Finished" ? "filled" : o.status === "Canceled" ? "cancelled" : "open",
       requestedQty: qty, filledQty: qty,
       avgFillPrice: fill, quoteQty: qty * fill,
-      fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USD", ratePct: this.config.takerFeePct },
+      fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USD", ratePct: this.config.takerFeePct, source: "estimate" },
       createdAt: o.datetime ? new Date(o.datetime).getTime() : Date.now(), updatedAt: Date.now(),
     };
   }

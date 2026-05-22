@@ -190,7 +190,7 @@ export class PhemexAdapter extends BaseExchangeAdapter {
         status: o.ordStatus === "Filled" ? "filled" : o.ordStatus === "Canceled" ? "cancelled" : "open",
         requestedQty: parseFloat(o.orderQty ?? "0"), filledQty: qty,
         avgFillPrice: fill, quoteQty: qty * fill,
-        fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USDT", ratePct: this.config.takerFeePct },
+        fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
         createdAt: Date.now(), updatedAt: Date.now(),
       };
     } catch { return null; }

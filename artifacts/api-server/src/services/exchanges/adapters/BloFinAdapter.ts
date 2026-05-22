@@ -188,7 +188,9 @@ export class BloFinAdapter extends BaseExchangeAdapter {
         status: o.state === "filled" ? "filled" : o.state === "canceled" ? "cancelled" : "open",
         requestedQty: parseFloat(o.sz ?? "0"), filledQty: qty,
         avgFillPrice: fill, quoteQty: qty * fill,
-        fee: { amount: parseFloat(o.fee ?? "0"), currency: "USDT", ratePct: this.config.takerFeePct },
+        fee: o.fee !== undefined && o.fee !== null
+          ? { amount: parseFloat(o.fee), currency: o.feeCcy ?? "USDT", ratePct: this.config.takerFeePct, source: "broker" }
+          : { amount: this.computeFee(qty * fill, true), currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
         createdAt: parseInt(o.cTime ?? "0") || Date.now(),
         updatedAt: parseInt(o.uTime ?? "0") || Date.now(),
       };
@@ -274,5 +276,5 @@ interface BloFinTicker  {
 interface BloFinBalance  { currency: string; available: string; frozen?: string; }
 interface BloFinOrderInfo {
   ordId: string; side: string; ordType: string; state: string;
-  sz?: string; avgPx?: string; accFillSz?: string; fee?: string; cTime?: string; uTime?: string;
+  sz?: string; avgPx?: string; accFillSz?: string; fee?: string; feeCcy?: string; cTime?: string; uTime?: string;
 }

@@ -199,6 +199,12 @@ export interface SimTrade {
   entryFee?:             number;
   exitFee?:              number;
   netFees?:              number;
+  // Broker-reported commissions (when the exchange surfaced them) —
+  // preferred over the catalog estimates above on the trade receipt.
+  entryFeeBroker?:         number;
+  entryFeeBrokerCurrency?: string;
+  exitFeeBroker?:          number;
+  exitFeeBrokerCurrency?:  string;
 }
 
 export interface MobileTicker {
