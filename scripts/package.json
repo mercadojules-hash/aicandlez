@@ -3,10 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./backfill-close-order-ids": "./src/backfill-close-order-ids.ts",
+    "./backfill-open-order-ids": "./src/backfill-open-order-ids.ts"
+  },
   "scripts": {
     "hello": "tsx ./src/hello.ts",
-    "backfill-close-order-ids": "tsx ./src/backfill-close-order-ids.ts",
-    "backfill-open-order-ids": "tsx ./src/backfill-open-order-ids.ts",
+    "backfill-close-order-ids": "tsx ./src/backfill-close-order-ids-cli.ts",
+    "backfill-open-order-ids": "tsx ./src/backfill-open-order-ids-cli.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

@@ -331,9 +331,19 @@ function isCandidate(trade: SimTrade, order: BrokerOrder): boolean {
 
 // ── Main ──────────────────────────────────────────────────────────────────
 
-interface PerExchangeStats { matched: number; unmatched: number; ambiguous: number; skipped: number; errored: number; }
+export interface PerExchangeStats { matched: number; unmatched: number; ambiguous: number; skipped: number; errored: number; }
 
-async function main(): Promise<void> {
+export interface BackfillSummary {
+  totalCandidates: number;
+  matched:         number;
+  unmatched:       number;
+  ambiguous:       number;
+  skipped:         number;
+  errored:         number;
+  perExchange:     Record<string, PerExchangeStats>;
+}
+
+export async function runOpenOrderIdBackfill(): Promise<BackfillSummary> {
   console.log("[backfill-open] starting open-order-id reconciliation");
 
   const candidates = await db
@@ -346,8 +356,10 @@ async function main(): Promise<void> {
 
   console.log(`[backfill-open] ${candidates.length} candidate sim_trades rows (NULL open id, exchange set)`);
   if (candidates.length === 0) {
-    await pool?.end();
-    return;
+    return {
+      totalCandidates: 0, matched: 0, unmatched: 0, ambiguous: 0,
+      skipped: 0, errored: 0, perExchange: {},
+    };
   }
 
   // Group by (userId, exchange)
@@ -497,15 +509,24 @@ async function main(): Promise<void> {
   console.log(`  ambiguous        : ${totalAmbiguous}`);
   console.log(`  skipped          : ${totalSkipped}`);
   console.log(`  errored          : ${totalErrored}`);
+  const perExchangeObj: Record<string, PerExchangeStats> = {};
   for (const [ex, s] of perExchange) {
     console.log(`  [${ex}] matched=${s.matched} unmatched=${s.unmatched} ambiguous=${s.ambiguous} skipped=${s.skipped} errored=${s.errored}`);
+    perExchangeObj[ex] = s;
   }
 
-  await pool?.end();
+  return {
+    totalCandidates: candidates.length,
+    matched:         totalMatched,
+    unmatched:       totalUnmatched,
+    ambiguous:       totalAmbiguous,
+    skipped:         totalSkipped,
+    errored:         totalErrored,
+    perExchange:     perExchangeObj,
+  };
 }
 
-main().catch(err => {
-  console.error("[backfill-open] fatal:", err);
-  void pool?.end();
-  process.exit(1);
-});
+// No top-level side effects: the CLI wrapper lives in
+// `backfill-open-order-ids-cli.ts` so importing this module from the
+// api-server (where it powers the nightly scheduler) cannot trigger an
+// accidental run or tear down the shared DB pool.
