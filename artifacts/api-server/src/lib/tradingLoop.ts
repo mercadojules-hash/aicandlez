@@ -302,6 +302,16 @@ async function persistSignal(
       confidence: decision.confidence,
       reason:     decision.shortSummary,
     });
+    executionStreamBus.emitEvent({
+      type:       "signal_detected",
+      severity:   "info",
+      symbol:     decision.symbol,
+      side:       decision.decision as "BUY" | "SELL",
+      confidence: decision.confidence,
+      price:      decision.price,
+      message:    `Signal ${decision.decision} ${decision.symbol} ${timeframe} · conf ${decision.confidence.toFixed(1)}%${mtfConfirmed ? " · MTF✓" : ""}`,
+      details:    { timeframe, mtfConfirmed, shortSummary: decision.shortSummary },
+    });
   }
 
   return id;
@@ -791,9 +801,28 @@ async function tick() {
       if (mtf.mtfConfirmed) {
         engineStats.mtfConfirmedCount++;
         engineStats.funnelPassedMTF++;
+        executionStreamBus.emitEvent({
+          type:       "mtf_confirmed",
+          severity:   "success",
+          symbol,
+          side:       mtf.agreedAction === "HOLD" ? undefined : mtf.agreedAction as "BUY" | "SELL",
+          confidence: mtf.avgConfidence,
+          message:    `MTF confirmed ${symbol} ${mtf.agreedAction} · avg ${mtf.avgConfidence.toFixed(1)}%`,
+        });
       } else {
         engineStats.mtfBlockCount++;
         engineStats.funnelBlockedMTF++;
+        if (mtf.fast.decision !== "HOLD" || mtf.slow.decision !== "HOLD") {
+          executionStreamBus.emitEvent({
+            type:       "mtf_blocked",
+            severity:   "warn",
+            symbol,
+            confidence: mtf.avgConfidence,
+            gate:       "mtf_agreement",
+            reason:     mtf.blockReason || "timeframes disagree",
+            message:    `MTF blocked ${symbol}: fast=${mtf.fast.decision}(${mtf.fast.confidence.toFixed(0)}%) slow=${mtf.slow.decision}(${mtf.slow.confidence.toFixed(0)}%) — ${mtf.blockReason || "disagree"}`,
+          });
+        }
       }
 
       // Update per-symbol breakdown
@@ -903,6 +932,25 @@ async function tick() {
         executedAs:   null,
         timestamp:    Date.now(),
       });
+
+      // Pre-autoExecute rejection emit — surfaces gate failures that happen
+      // BEFORE autoExecute is even called (conf, sideways, volume, 1H trend,
+      // auto-mode off). The autoExecute path has its own emits for the gates
+      // it owns (positions, daily limit, risk, correlation, exchange).
+      if (!shouldTrade && signalBlockReason && effectiveAction !== "HOLD") {
+        const isConfBlock =
+          signalBlockReason.startsWith("Low confidence");
+        executionStreamBus.emitEvent({
+          type:       isConfBlock ? "confidence_too_low" : "signal_rejected",
+          severity:   "warn",
+          symbol,
+          side:       effectiveAction as "BUY" | "SELL",
+          confidence: mtf.avgConfidence,
+          gate:       isConfBlock ? "confidence_floor" : "pre_execute_gate",
+          reason:     signalBlockReason,
+          message:    `Signal rejected ${symbol} ${effectiveAction}: ${signalBlockReason}`,
+        });
+      }
 
       if (shouldTrade) {
         const primaryDecision = mtf.fast;

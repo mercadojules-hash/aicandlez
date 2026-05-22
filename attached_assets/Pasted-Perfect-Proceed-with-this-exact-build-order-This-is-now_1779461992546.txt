@@ -1,0 +1,247 @@
+Perfect. Proceed with this exact build order.
+
+This is now the correct phase:
+LIVE EXECUTION OBSERVABILITY + OPERATOR TELEMETRY.
+
+The architecture direction is strong:
+
+* atomic
+* additive
+* low-risk
+* ship-as-you-go
+* no dangerous rewrites to live Kraken execution
+
+====================================================
+APPROVED BUILD ORDER
+====================
+
+1. executionStreamBus.ts
+   ====================================================
+
+Build:
+central in-memory execution event bus.
+
+Requirements:
+
+* ring buffer
+* max 1,000 events
+* EventEmitter-based
+* timestamped events
+* lightweight
+* additive-only
+* zero execution-side logic changes
+
+This becomes:
+THE central instrumentation surface.
+
+Every execution/rejection/safety event should flow through this.
+
+====================================================
+2. Instrument tradingLoop.ts::autoExecute
+=========================================
+
+Instrument ALL rejection + execution gates.
+
+Need explicit emit events for:
+
+* SIGNAL_DETECTED
+* SIGNAL_REJECTED
+* CONFIDENCE_TOO_LOW
+* MTF_BLOCKED
+* POSITION_SIZE_TOO_SMALL
+* RISK_BLOCKED
+* ORDER_MINIMUM_FAILED
+* EXECUTION_SENT
+* ORDER_FILLED
+* ORDER_REJECTED
+* EXCHANGE_ERROR
+* DUPLICATE_BLOCKED
+* SAFETY_BLOCKED
+
+IMPORTANT:
+Do NOT change core execution logic yet.
+
+Instrumentation only.
+
+This phase is about:
+visibility.
+
+====================================================
+3. /api/admin/execution-stream
+==============================
+
+Build:
+admin-only telemetry endpoint.
+
+Requirements:
+
+* polling support
+* cursor support
+* ring buffer replay
+* lightweight payloads
+* newest-first ordering
+* event filtering ready for future
+
+Must support:
+real-time Command Center stream.
+
+====================================================
+4. /api/admin/engine-telemetry
+==============================
+
+Need:
+
+* engineStats
+* lastTick
+* tickAge
+* loopHealth
+* websocket health
+* queue depth
+* active executions
+* execution mode
+* liveTradingEnabled
+* exchange selected
+* heartbeat
+* rejection counters
+* execution counters
+* signal throughput
+
+This becomes:
+the platform heartbeat endpoint.
+
+====================================================
+5. /api/admin/safe-test-mode
+============================
+
+Admin-only.
+
+Purpose:
+controlled live execution testing.
+
+Need:
+
+* temporary reduced confidence threshold
+* auto-expiry
+* visible countdown
+* sticky warning banner
+* audit logging
+
+IMPORTANT:
+
+* NO disabling safety systems
+* NO bypassing risk engine
+* NO infinite execution
+* NO permanent lowering of thresholds
+
+Goal:
+one controlled live Kraken execution for validation.
+
+====================================================
+6. LiveExecutionStream.tsx
+==========================
+
+Institutional scrolling execution feed.
+
+Need:
+
+* neon terminal feel
+* timestamps
+* symbol
+* confidence
+* rejection reason
+* exchange
+* execution lifecycle
+* color-coded states
+* fixed-height scroll
+* newest-first
+* auto-scroll option
+
+Examples:
+GREEN:
+EXECUTION FILLED
+SIGNAL ACCEPTED
+
+YELLOW:
+MTF BLOCKED
+WAITING CONFIRMATION
+
+RED:
+ORDER REJECTED
+RISK BLOCKED
+
+====================================================
+7. EngineHeartbeat.tsx
+======================
+
+Need visible:
+
+* ENGINE STATUS
+* LAST AI TICK
+* LOOP HEALTH
+* QUEUE DEPTH
+* WEBSOCKET STATUS
+* LATENCY
+* SIGNALS/MIN
+* EXECUTIONS/MIN
+* LIVE VS SIM
+* ACTIVE EXCHANGE
+
+This should feel:
+Bloomberg terminal / institutional telemetry.
+
+====================================================
+8. Mount in CommandCenter
+=========================
+
+The Command Center is now evolving into:
+the operator nerve center.
+
+Need:
+
+* execution feed
+* AI heartbeat
+* exchange health
+* queue telemetry
+* rejection telemetry
+* execution lifecycle visibility
+
+====================================================
+IMPORTANT
+=========
+
+DO NOT:
+
+* refactor execution engine
+* rewrite routing
+* change live Kraken logic
+* alter order flow
+* modify risk architecture
+
+This phase is:
+OBSERVABILITY ONLY.
+
+We need:
+
+* visibility
+* diagnostics
+* telemetry
+* execution transparency
+
+before scaling users.
+
+====================================================
+PRIMARY SUCCESS CONDITION
+=========================
+
+Once this phase is complete, I should be able to SEE:
+
+* why trades are rejected
+* when signals fire
+* why orders fail
+* whether the AI loop is healthy
+* whether websocket feeds are alive
+* whether Kraken is responding
+* why executions are blocked
+* full order lifecycle
+
+The operator should NEVER be blind again during live execution.
