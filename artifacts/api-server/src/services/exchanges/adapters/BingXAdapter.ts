@@ -178,6 +178,20 @@ export class BingXAdapter extends BaseExchangeAdapter {
       if (!o) return null;
       const fill = parseFloat(o.price ?? "0");
       const qty  = parseFloat(o.executedQty ?? "0");
+      const hasBroker = o.fee != null && o.fee !== "";
+      const fee = hasBroker
+        ? {
+            amount:   parseFloat(o.fee!),
+            currency: o.feeAsset ?? "USDT",
+            ratePct:  this.config.takerFeePct,
+            source:   "broker" as const,
+          }
+        : {
+            amount:   (qty * fill) * this.config.takerFeePct / 100,
+            currency: "USDT",
+            ratePct:  this.config.takerFeePct,
+            source:   "estimate" as const,
+          };
       return {
         id: String(o.orderId), exchangeOrderId: String(o.orderId), exchange: "BingX",
         symbol, nativeSymbol: pair,
@@ -186,7 +200,7 @@ export class BingXAdapter extends BaseExchangeAdapter {
         status: o.status === "FILLED" ? "filled" : o.status === "CANCELED" ? "cancelled" : "open",
         requestedQty: parseFloat(o.origQty ?? "0"), filledQty: qty,
         avgFillPrice: fill, quoteQty: qty * fill,
-        fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
+        fee,
         createdAt: o.time ?? Date.now(), updatedAt: o.updateTime ?? Date.now(),
       };
     } catch { return null; }
@@ -297,4 +311,5 @@ interface BingXBalance  { asset: string; free: string; locked: string; }
 interface BingXOrderInfo {
   orderId: number; side: string; type: string; status: string;
   origQty?: string; executedQty?: string; price?: string; time?: number; updateTime?: number;
+  fee?: string; feeAsset?: string;
 }

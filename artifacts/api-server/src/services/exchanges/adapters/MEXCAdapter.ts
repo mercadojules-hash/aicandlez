@@ -155,7 +155,7 @@ export class MEXCAdapter extends BaseExchangeAdapter {
       status: data.status === "FILLED" ? "filled" : "open",
       requestedQty: req.qty, filledQty: qty,
       avgFillPrice: fill, quoteQty: qty * fill,
-      fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
+      fee: this.feeFromFills(data.fills, qty * fill),
       createdAt: data.transactTime ?? Date.now(),
       updatedAt: data.transactTime ?? Date.now(),
     };
@@ -191,7 +191,7 @@ export class MEXCAdapter extends BaseExchangeAdapter {
         status: data.status === "FILLED" ? "filled" : data.status === "CANCELED" ? "cancelled" : "open",
         requestedQty: parseFloat(data.origQty ?? "0"), filledQty: qty,
         avgFillPrice: fill, quoteQty: qty * fill,
-        fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
+        fee: this.feeFromFills(data.fills, qty * fill),
         createdAt: data.transactTime ?? Date.now(), updatedAt: data.transactTime ?? Date.now(),
       };
     } catch { return null; }
@@ -200,6 +200,27 @@ export class MEXCAdapter extends BaseExchangeAdapter {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   private isConfigured(): boolean { return !!(this.config.apiKey && this.config.apiSecret); }
+
+  /**
+   * Sum broker-reported commissions across `fills[]` (MEXC v3 FULL response).
+   * Falls back to a catalog-rate estimate when the broker did not report any.
+   */
+  private feeFromFills(
+    fills: MEXCFill[] | undefined,
+    notional: number,
+  ): StandardOrder["fee"] {
+    if (fills && fills.length > 0 && fills.some(f => f.commission != null)) {
+      const total = fills.reduce((s, f) => s + parseFloat(f.commission ?? "0"), 0);
+      const currency = fills.find(f => f.commissionAsset)?.commissionAsset ?? "USDT";
+      return { amount: total, currency, ratePct: this.config.takerFeePct, source: "broker" };
+    }
+    return {
+      amount:   notional * this.config.takerFeePct / 100,
+      currency: "USDT",
+      ratePct:  this.config.takerFeePct,
+      source:   "estimate",
+    };
+  }
 
   private sign(query: string): string {
     return crypto.createHmac("sha256", this.config.apiSecret!).update(query).digest("hex");
@@ -287,7 +308,9 @@ interface MEXCTicker {
 }
 type MEXCKline = [number, string, string, string, string, string, ...unknown[]];
 interface MEXCAccount { balances: { asset: string; free: string; locked: string }[]; }
+interface MEXCFill { price?: string; qty?: string; commission?: string; commissionAsset?: string; }
 interface MEXCOrderResp {
   orderId: number; symbol: string; status: string; side?: string; type?: string;
   price?: string; origQty?: string; executedQty?: string; transactTime?: number;
+  fills?: MEXCFill[];
 }

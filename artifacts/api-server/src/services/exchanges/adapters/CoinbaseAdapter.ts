@@ -219,6 +219,20 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
       if (!data.order) return null;
       const fill = parseFloat(data.order.average_filled_price ?? "0");
       const qty  = parseFloat(data.order.filled_size ?? "0");
+      const hasBroker = data.order.total_fees != null && data.order.total_fees !== "";
+      const fee = hasBroker
+        ? {
+            amount:   parseFloat(data.order.total_fees!),
+            currency: "USD",
+            ratePct:  this.config.takerFeePct,
+            source:   "broker" as const,
+          }
+        : {
+            amount:   (qty * fill) * this.config.takerFeePct / 100,
+            currency: "USD",
+            ratePct:  this.config.takerFeePct,
+            source:   "estimate" as const,
+          };
       return {
         id: data.order.client_order_id ?? exchangeOrderId,
         exchangeOrderId,
@@ -230,7 +244,7 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
         status: data.order.status === "FILLED" ? "filled" : "open",
         requestedQty: parseFloat(data.order.order_configuration?.market_market_ioc?.quote_size ?? "0"),
         filledQty: qty, avgFillPrice: fill, quoteQty: qty * fill,
-        fee: { amount: 0, currency: "USD", ratePct: this.config.takerFeePct, source: "estimate" },
+        fee,
         createdAt: Date.now(), updatedAt: Date.now(),
       };
     } catch { return null; }
@@ -408,7 +422,7 @@ interface CbLevel { price: string; size: string }
 interface CbAccount { currency: string; available_balance: { value: string }; hold: { value: string } }
 interface CbOrder {
   client_order_id?: string; product_id: string; side: string; status: string;
-  average_filled_price?: string; filled_size?: string;
+  average_filled_price?: string; filled_size?: string; total_fees?: string;
   order_configuration?: { market_market_ioc?: { quote_size?: string } };
 }
 interface CbOrderResponse {

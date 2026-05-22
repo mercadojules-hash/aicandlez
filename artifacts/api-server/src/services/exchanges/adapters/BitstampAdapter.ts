@@ -223,6 +223,21 @@ export class BitstampAdapter extends BaseExchangeAdapter {
     const fill = parseFloat(o.price ?? "0");
     const qty  = parseFloat(o.amount ?? "0");
     const side = o.type === 0 ? "buy" : "sell";
+    const txs  = o.transactions ?? [];
+    const hasBroker = txs.length > 0 && txs.some(t => t.fee != null && t.fee !== "");
+    const fee = hasBroker
+      ? {
+          amount:   txs.reduce((s, t) => s + parseFloat(t.fee ?? "0"), 0),
+          currency: "USD",
+          ratePct:  this.config.takerFeePct,
+          source:   "broker" as const,
+        }
+      : {
+          amount:   (qty * fill) * this.config.takerFeePct / 100,
+          currency: "USD",
+          ratePct:  this.config.takerFeePct,
+          source:   "estimate" as const,
+        };
     return {
       id: String(o.id), exchangeOrderId: String(o.id), exchange: "Bitstamp",
       symbol, nativeSymbol: nativeSym,
@@ -230,7 +245,7 @@ export class BitstampAdapter extends BaseExchangeAdapter {
       status: o.status === "Finished" ? "filled" : o.status === "Canceled" ? "cancelled" : "open",
       requestedQty: qty, filledQty: qty,
       avgFillPrice: fill, quoteQty: qty * fill,
-      fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USD", ratePct: this.config.takerFeePct, source: "estimate" },
+      fee,
       createdAt: o.datetime ? new Date(o.datetime).getTime() : Date.now(), updatedAt: Date.now(),
     };
   }
@@ -239,4 +254,8 @@ export class BitstampAdapter extends BaseExchangeAdapter {
 // ── Bitstamp API types ────────────────────────────────────────────────────────
 interface BitstampTicker { last: string; bid: string; ask: string; volume: string; open: string; timestamp: string; }
 interface BitstampOHLCResp { data?: { ohlc?: { timestamp: string; open: string; high: string; low: string; close: string; volume: string }[] } }
-interface BitstampOrder { id: number | string; type: number; price?: string; amount?: string; status?: string; datetime?: string; }
+interface BitstampTransaction { tid?: string | number; price?: string; fee?: string; datetime?: string; type?: number; }
+interface BitstampOrder {
+  id: number | string; type: number; price?: string; amount?: string; status?: string; datetime?: string;
+  transactions?: BitstampTransaction[];
+}

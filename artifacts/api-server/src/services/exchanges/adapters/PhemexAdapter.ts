@@ -182,6 +182,20 @@ export class PhemexAdapter extends BaseExchangeAdapter {
       if (!o) return null;
       const fill = (o.avgPriceEp ?? 0) / 1e8;
       const qty  = parseFloat(o.cumQty ?? "0");
+      const hasBroker = o.cumFeeEv != null;
+      const fee = hasBroker
+        ? {
+            amount:   o.cumFeeEv! / 1e8,
+            currency: "USDT",
+            ratePct:  this.config.takerFeePct,
+            source:   "broker" as const,
+          }
+        : {
+            amount:   (qty * fill) * this.config.takerFeePct / 100,
+            currency: "USDT",
+            ratePct:  this.config.takerFeePct,
+            source:   "estimate" as const,
+          };
       return {
         id: o.orderID, exchangeOrderId: o.orderID, exchange: "Phemex",
         symbol, nativeSymbol: pair,
@@ -190,7 +204,7 @@ export class PhemexAdapter extends BaseExchangeAdapter {
         status: o.ordStatus === "Filled" ? "filled" : o.ordStatus === "Canceled" ? "cancelled" : "open",
         requestedQty: parseFloat(o.orderQty ?? "0"), filledQty: qty,
         avgFillPrice: fill, quoteQty: qty * fill,
-        fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
+        fee,
         createdAt: Date.now(), updatedAt: Date.now(),
       };
     } catch { return null; }
@@ -309,5 +323,5 @@ interface PhemexAccountResp { data?: { currency: string; userBalance: string; lo
 interface PhemexOrderResp  { data?: { orderID: string } }
 interface PhemexOrderInfo  {
   orderID: string; side: string; ordType: string; ordStatus: string;
-  orderQty?: string; cumQty?: string; avgPriceEp?: number;
+  orderQty?: string; cumQty?: string; avgPriceEp?: number; cumFeeEv?: number;
 }

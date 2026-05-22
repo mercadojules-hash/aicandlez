@@ -225,6 +225,20 @@ export class GeminiAdapter extends BaseExchangeAdapter {
   private normaliseOrder(o: GeminiOrder, symbol: string, nativeSym: string): StandardOrder {
     const fill = parseFloat(o.avg_execution_price ?? "0");
     const qty  = parseFloat(o.executed_amount ?? "0");
+    const hasBroker = o.fee_amount != null && o.fee_amount !== "";
+    const fee = hasBroker
+      ? {
+          amount:   parseFloat(o.fee_amount!),
+          currency: o.fee_currency ?? "USD",
+          ratePct:  this.config.takerFeePct,
+          source:   "broker" as const,
+        }
+      : {
+          amount:   (qty * fill) * this.config.takerFeePct / 100,
+          currency: "USD",
+          ratePct:  this.config.takerFeePct,
+          source:   "estimate" as const,
+        };
     return {
       id: String(o.order_id), exchangeOrderId: String(o.order_id), exchange: "Gemini",
       symbol, nativeSymbol: nativeSym,
@@ -233,7 +247,7 @@ export class GeminiAdapter extends BaseExchangeAdapter {
       status: o.is_live ? "open" : o.is_cancelled ? "cancelled" : "filled",
       requestedQty: parseFloat(o.original_amount ?? "0"), filledQty: qty,
       avgFillPrice: fill, quoteQty: qty * fill,
-      fee: { amount: (qty * fill) * this.config.takerFeePct / 100, currency: "USD", ratePct: this.config.takerFeePct, source: "estimate" },
+      fee,
       createdAt: o.timestampms ?? Date.now(), updatedAt: Date.now(),
     };
   }
@@ -247,4 +261,5 @@ interface GeminiBalance { currency: string; amount: string; available: string; }
 interface GeminiOrder  {
   order_id: number; side: string; type: string; is_live: boolean; is_cancelled: boolean;
   original_amount?: string; executed_amount?: string; avg_execution_price?: string; timestampms?: number;
+  fee_amount?: string; fee_currency?: string;
 }
