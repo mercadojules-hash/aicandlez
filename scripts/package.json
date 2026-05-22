@@ -6,6 +6,7 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "backfill-close-order-ids": "tsx ./src/backfill-close-order-ids.ts",
+    "backfill-open-order-ids": "tsx ./src/backfill-open-order-ids.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
