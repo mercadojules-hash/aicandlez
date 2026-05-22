@@ -35,6 +35,12 @@ import {
   AIWarRoom,
 } from "@/components/command/institutional";
 import { N } from "@/components/command/institutional/theme";
+import {
+  ALERT_DEFINITIONS,
+  ALERT_KEYS,
+  type AlertKey,
+  type AlertPrefs,
+} from "@workspace/db/schema";
 import type { EngineStatus } from "@/components/command/types";
 import {
   PaperTradesProvider,
@@ -345,13 +351,19 @@ function AccountModal({
     } catch { /* no-op */ }
   };
 
-  // ── Live Trade Filled alert toggle ──────────────────────────────────────────
-  // Mirrors the mobile PWA Profile screen. Reads/writes the same
-  // `notificationsLiveFills` field on user_settings, so toggling on either
-  // surface is reflected on the other (server is source of truth, query is
-  // invalidated on each mutation and re-fetched whenever the modal opens).
+  // ── Alert preferences (server-authoritative) ────────────────────────────────
+  // Mirrors the mobile PWA Profile screen. Every ALERT_DEFINITIONS key is
+  // mirrored into `user_settings.alertPrefs` server-side, so a customer can
+  // mute any alert from anywhere — phone, tablet, desktop terminal — and the
+  // backend push dispatcher honors it before sending. The query is keyed
+  // identically to the PWA (`["/user/settings"]`) inside the same Clerk
+  // session, so toggling on one surface invalidates the other.
+  type UserSettingsPayload = {
+    alertPrefs?:             AlertPrefs;
+    notificationsLiveFills?: boolean;
+  };
   const queryClient = useQueryClient();
-  const settingsQuery = useQuery<{ notificationsLiveFills?: boolean }>({
+  const settingsQuery = useQuery<UserSettingsPayload>({
     queryKey: ["/api/user/settings"],
     enabled:  open,
     refetchOnWindowFocus: false,
@@ -365,11 +377,30 @@ function AccountModal({
       return res.json();
     },
   });
-  const liveFillsEnabled = settingsQuery.data?.notificationsLiveFills ?? true;
 
-  const liveFillsMutation = useMutation({
-    mutationFn: async (next: boolean) => {
+  // Resolve a key's effective value: prefer server `alertPrefs[key]`, fall
+  // back to the per-key `defaultOn` from ALERT_DEFINITIONS, and honor the
+  // legacy `notificationsLiveFills` column for `liveTradeFilled` when no
+  // alertPrefs row exists yet (rollout defense-in-depth).
+  const resolveAlert = (key: AlertKey): boolean => {
+    const stored = settingsQuery.data?.alertPrefs?.[key];
+    if (typeof stored === "boolean") return stored;
+    if (key === "liveTradeFilled"
+        && typeof settingsQuery.data?.notificationsLiveFills === "boolean") {
+      return settingsQuery.data.notificationsLiveFills;
+    }
+    return ALERT_DEFINITIONS.find((d) => d.key === key)?.defaultOn ?? true;
+  };
+
+  const alertPrefMutation = useMutation({
+    mutationFn: async (patch: { key: AlertKey; value: boolean }) => {
       const token = await getToken().catch(() => null);
+      const body: Record<string, unknown> = {
+        alertPrefs: { [patch.key]: patch.value },
+      };
+      // Keep the legacy boolean column in sync for any downstream caller
+      // still reading it (defense-in-depth during the alertPrefs rollout).
+      if (patch.key === "liveTradeFilled") body.notificationsLiveFills = patch.value;
       const res = await fetch(`${apiBaseUrl}/api/user/settings`, {
         method: "PUT",
         credentials: "include",
@@ -377,15 +408,23 @@ function AccountModal({
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ notificationsLiveFills: next }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Failed to save");
       return res.json();
     },
-    onMutate: async (next: boolean) => {
+    onMutate: async (patch: { key: AlertKey; value: boolean }) => {
       await queryClient.cancelQueries({ queryKey: ["/api/user/settings"] });
-      const prev = queryClient.getQueryData<{ notificationsLiveFills?: boolean }>(["/api/user/settings"]);
-      queryClient.setQueryData(["/api/user/settings"], { ...(prev ?? {}), notificationsLiveFills: next });
+      const prev = queryClient.getQueryData<UserSettingsPayload>(["/api/user/settings"]);
+      const nextPrefs: AlertPrefs = { ...(prev?.alertPrefs ?? {}), [patch.key]: patch.value };
+      const nextLegacy = patch.key === "liveTradeFilled"
+        ? patch.value
+        : prev?.notificationsLiveFills;
+      queryClient.setQueryData<UserSettingsPayload>(["/api/user/settings"], {
+        ...(prev ?? {}),
+        alertPrefs: nextPrefs,
+        notificationsLiveFills: nextLegacy,
+      });
       return { prev };
     },
     onError: (_e, _v, ctx) => {
@@ -396,6 +435,9 @@ function AccountModal({
       void queryClient.invalidateQueries({ queryKey: ["/api/user/settings"] });
     },
   });
+
+  // Sanity guard — surface a typecheck failure if the shared taxonomy drifts.
+  void ALERT_KEYS;
 
   return (
     <PortalModal
@@ -412,14 +454,16 @@ function AccountModal({
         <AccountRow label="BILLING"           value={tier === "free" ? "—" : "Monthly · Stripe"} />
         <AccountRow label="PERFORMANCE FEE"   value="3% on profitable trades only" sub="Never charged on losses" />
         <AccountRow label="BROKER · ALPACA"   value="Not connected"           color={N.WARN} sub="Connection wizard launches with the Alpaca live keys" />
-        <AlertToggleRow
-          label="LIVE TRADE FILLED"
-          sub="Push + in-app alert whenever a real-money AI order fills on your exchange"
-          value={liveFillsEnabled}
-          loading={settingsQuery.isLoading || liveFillsMutation.isPending}
-          onChange={(next) => liveFillsMutation.mutate(next)}
-        />
       </div>
+
+      <AlertPreferencesPanel
+        loading={settingsQuery.isLoading}
+        pendingKey={alertPrefMutation.isPending
+          ? (alertPrefMutation.variables?.key ?? null)
+          : null}
+        resolve={resolveAlert}
+        onToggle={(key, next) => alertPrefMutation.mutate({ key, value: next })}
+      />
 
       {tier === "free" ? (
         <button
@@ -561,6 +605,55 @@ function AlertToggleRow({ label, sub, value, loading, onChange }: {
           boxShadow: value ? `0 0 6px ${N.BRAND_GLOW}` : "none",
         }} />
       </button>
+    </div>
+  );
+}
+
+// ── Alert preferences panel — full ALERT_DEFINITIONS taxonomy ───────────────
+// Renders inside AccountModal. Mirrors the PWA Profile screen so a customer
+// can mute every alert type from the desktop terminal as well as their phone.
+// All toggles write to `user_settings.alertPrefs[<key>]` via PUT /user/settings.
+function AlertPreferencesPanel({
+  loading, pendingKey, resolve, onToggle,
+}: {
+  loading:    boolean;
+  pendingKey: AlertKey | null;
+  resolve:    (key: AlertKey) => boolean;
+  onToggle:   (key: AlertKey, next: boolean) => void;
+}) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{
+        fontSize: 9, color: N.TEXT_2, letterSpacing: "0.22em", fontWeight: 700,
+        padding: "0 2px 8px",
+      }}>
+        NOTIFICATION PREFERENCES
+      </div>
+      <div style={{
+        display: "flex", flexDirection: "column", gap: 6,
+        opacity: loading ? 0.55 : 1,
+      }}>
+        {ALERT_DEFINITIONS.map((d) => (
+          <AlertToggleRow
+            key={d.key}
+            label={d.label.toUpperCase()}
+            sub={d.sub}
+            value={resolve(d.key)}
+            loading={loading || pendingKey === d.key}
+            onChange={(next) => onToggle(d.key, next)}
+          />
+        ))}
+      </div>
+      <div style={{
+        marginTop: 8, padding: "8px 10px",
+        background: "rgba(102,255,102,0.04)",
+        border: `1px solid ${N.BORDER}`,
+        borderRadius: 4,
+        fontSize: 9, color: N.TEXT_2, lineHeight: 1.5,
+        letterSpacing: "0.04em",
+      }}>
+        Preferences sync with the mobile app · Server-side push dispatcher honors every toggle before sending.
+      </div>
     </div>
   );
 }
