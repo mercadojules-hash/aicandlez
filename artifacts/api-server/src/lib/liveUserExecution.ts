@@ -440,13 +440,50 @@ export async function placeLiveAutoOrderForUser(
   }
 
   try {
-    const order = await adapter.placeOrder({
+    let order = await adapter.placeOrder({
       symbol,
       side:     side === "BUY" ? "buy" : "sell",
       type:     "market",
       qty:      qtyBase,
       clientId: `loop-u-${userId.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     });
+
+    // Poll for the true execution. Many exchanges (e.g. Kraken) return
+    // status="open" with avgFillPrice=0 on the initial market-order ack,
+    // even though the fill lands moments later. Without this poll the
+    // open path falls back to the ticker price and the recorded entry
+    // price for the live position drifts from the actual broker fill.
+    const idForPoll = order.exchangeOrderId || order.id;
+    let timedOut = false;
+    const isTerminal = (s: StandardOrder["status"]) =>
+      s === "filled" || s === "cancelled" || s === "rejected";
+    if (idForPoll && !isTerminal(order.status)) {
+      const poll = await pollOrderUntilFilled(adapter, idForPoll, symbol, {
+        timeoutMs:  5000,
+        intervalMs: 500,
+        logCtx:     { userId, exchange: row.exchange, symbol, side },
+      });
+      if (poll.order) order = poll.order;
+      timedOut = poll.timedOut && !isTerminal(order.status);
+    }
+
+    const requestedQty = order.requestedQty > 0 ? order.requestedQty : qtyBase;
+    const unfilled     = !(order.filledQty > 0);
+    const partial      = order.filledQty > 0 && order.filledQty < requestedQty - 1e-12;
+
+    // Hard failures: rejected, cancelled, or timed out with no fill at all.
+    if (order.status === "rejected" || order.status === "cancelled" || (timedOut && unfilled)) {
+      const reasonMsg = timedOut
+        ? `Open order ${idForPoll} did not fill within 5s on ${row.exchange} (status=${order.status})`
+        : `Open order ${idForPoll} ${order.status} on ${row.exchange}`;
+      logger.warn(
+        { userId, exchange: row.exchange, symbol, side,
+          status: order.status, timedOut, filledQty: order.filledQty, requestedQty },
+        "liveUserExecution: open order not filled",
+      );
+      await emitFailureNotification(userId, symbol, side, reasonMsg, row.exchange);
+      return { success: false, userId, exchange: row.exchange, errorCode: "exchange_reject", error: reasonMsg };
+    }
 
     const fill = order.avgFillPrice > 0 ? order.avgFillPrice : referencePrice;
     const result: LiveUserOrderResult = {
@@ -458,14 +495,25 @@ export async function placeLiveAutoOrderForUser(
       quantity:        order.filledQty > 0 ? order.filledQty : qtyBase,
     };
 
+    const note = timedOut
+      ? "partial fill — poll timed out"
+      : partial
+        ? "partial fill"
+        : undefined;
+
     logger.info(
       { userId, exchange: row.exchange, symbol, side, sizeUSD,
-        fillPrice: result.fillPrice, exchangeOrderId: result.exchangeOrderId },
+        fillPrice: result.fillPrice, exchangeOrderId: result.exchangeOrderId,
+        status: order.status, partial, timedOut,
+        filledQty: order.filledQty, requestedQty },
       "liveUserExecution: order filled",
     );
     await emitFillNotification(
       userId, symbol, side, row.exchange,
       result.fillPrice!, result.quantity!, result.exchangeOrderId ?? "", false,
+      note
+        ? { note, data: { partial, timedOut, requestedQty, status: order.status } }
+        : undefined,
     );
     return result;
   } catch (err) {
