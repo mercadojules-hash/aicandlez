@@ -22,6 +22,10 @@ export const simTradesTable = pgTable("sim_trades", {
   // (per-user `user_exchange_connections`). NULL for paper/sim fills.
   exchange:        text("exchange"),
   exchangeOrderId: text("exchange_order_id"),
+  // Broker reference for the close-side market order submitted when this
+  // live position was flattened. NULL for paper trades and for any legacy
+  // live trades closed before close-side submission was wired in.
+  exchangeCloseOrderId: text("exchange_close_order_id"),
   createdAt:      timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   index("sim_trades_user_idx").on(t.userId),

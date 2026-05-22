@@ -71,6 +71,26 @@ export interface LiveUserOrderResult {
   error?:          string;
 }
 
+export interface LiveUserCloseRequest {
+  userId:    string;
+  symbol:    string;          // engine-native ("BTCUSD")
+  openSide:  "BUY" | "SELL";  // side of the *opening* fill — close uses the opposite
+  quantity:  number;          // base-asset qty already known from the open
+  exchange:  string;          // exchange the open fill landed on (must match user's current default)
+}
+
+export interface LiveUserCloseResult {
+  success:              boolean;
+  userId:               string;
+  exchange?:            string;
+  exchangeCloseOrderId?: string;
+  fillPrice?:           number;
+  quantity?:            number;
+  dryRun?:              boolean;
+  errorCode?:           "no_connection" | "decrypt_failed" | "unsupported" | "exchange_mismatch" | "exchange_reject";
+  error?:               string;
+}
+
 export function isDryRunEnabled(): boolean {
   return process.env["LIVE_TRADE_DRY_RUN"] === "true";
 }
@@ -428,6 +448,148 @@ export async function placeLiveAutoOrderForUser(
     const msg = err instanceof Error ? err.message : String(err);
     logger.warn({ userId, exchange: row.exchange, symbol, side, err: msg }, "liveUserExecution: adapter placeOrder failed");
     await emitFailureNotification(userId, symbol, side, `Exchange rejected order: ${msg}`, row.exchange);
+    return { success: false, userId, exchange: row.exchange, errorCode: "exchange_reject", error: msg };
+  }
+}
+
+/**
+ * Place a real broker-side close (flatten) order for a customer's existing
+ * live position. Submits a market order on the opposite side of the open
+ * fill, on the same exchange the open landed on. Returns a distinct
+ * close-side `exchangeCloseOrderId` so trade history can surface both
+ * the open and close references.
+ *
+ * Failure modes mirror `placeLiveAutoOrderForUser` plus `exchange_mismatch`
+ * when the user's current default live connection no longer matches the
+ * exchange that opened the position (defensive — should be rare).
+ *
+ * Dry-run path: when LIVE_TRADE_DRY_RUN === "true", returns a synthetic
+ * `DRYRUN-CLOSE-…` reference and skips the adapter call.
+ */
+export async function placeLiveCloseOrderForUser(
+  req: LiveUserCloseRequest,
+): Promise<LiveUserCloseResult> {
+  const { userId, symbol, openSide, quantity, exchange } = req;
+  const closeSide: "BUY" | "SELL" = openSide === "BUY" ? "SELL" : "BUY";
+
+  if (!(quantity > 0)) {
+    return {
+      success: false, userId, exchange,
+      errorCode: "exchange_reject",
+      error: `Invalid close quantity (${quantity})`,
+    };
+  }
+
+  // 1. Resolve default live connection
+  const [row] = await db
+    .select()
+    .from(userExchangeConnectionsTable)
+    .where(
+      and(
+        eq(userExchangeConnectionsTable.userId,      userId),
+        eq(userExchangeConnectionsTable.isDefault,   true),
+        eq(userExchangeConnectionsTable.status,      "active"),
+        eq(userExchangeConnectionsTable.tradingMode, "live"),
+      ),
+    )
+    .limit(1);
+
+  if (!row) {
+    const msg = "No default live exchange connection configured for close";
+    await emitFailureNotification(userId, symbol, closeSide, msg, exchange);
+    return { success: false, userId, exchange, errorCode: "no_connection", error: msg };
+  }
+
+  if (row.exchange !== exchange) {
+    const msg = `Default live connection is ${row.exchange} but position opened on ${exchange}`;
+    await emitFailureNotification(userId, symbol, closeSide, msg, exchange);
+    return { success: false, userId, exchange, errorCode: "exchange_mismatch", error: msg };
+  }
+
+  // 2. Decrypt credentials
+  const creds = vault.decryptBlob(userId, row.encryptedBlob);
+  if (!creds) {
+    const msg = `Could not decrypt stored credentials for ${row.exchange} — please reconnect`;
+    await emitFailureNotification(userId, symbol, closeSide, msg, row.exchange);
+    try {
+      await db
+        .update(userExchangeConnectionsTable)
+        .set({ status: "error", lastError: "Decryption failed", updatedAt: new Date() })
+        .where(eq(userExchangeConnectionsTable.id, row.id));
+    } catch { /* non-fatal */ }
+    return { success: false, userId, exchange: row.exchange, errorCode: "decrypt_failed", error: msg };
+  }
+
+  // 3. Dry-run short-circuit
+  if (isDryRunEnabled()) {
+    let referencePrice = 0;
+    try {
+      const ticker = await getTicker(symbol);
+      referencePrice = ticker.price;
+    } catch { /* best-effort for dry-run only */ }
+    const dryResult: LiveUserCloseResult = {
+      success:              true,
+      userId,
+      exchange:             row.exchange,
+      exchangeCloseOrderId: `DRYRUN-CLOSE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      fillPrice:            parseFloat(referencePrice.toFixed(2)),
+      quantity,
+      dryRun:               true,
+    };
+    logger.info(
+      { userId, exchange: row.exchange, symbol, closeSide, quantity, referencePrice },
+      "liveUserExecution: DRY-RUN close — adapter call skipped",
+    );
+    await emitFillNotification(
+      userId, symbol, closeSide, row.exchange,
+      dryResult.fillPrice!, quantity, dryResult.exchangeCloseOrderId!, true,
+    );
+    return dryResult;
+  }
+
+  // 4. Build adapter + submit market close
+  let adapter: BaseExchangeAdapter;
+  try {
+    adapter = makeAdapter(row.exchange, creds);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await emitFailureNotification(userId, symbol, closeSide, msg, row.exchange);
+    return { success: false, userId, exchange: row.exchange, errorCode: "unsupported", error: msg };
+  }
+
+  try {
+    const order = await adapter.placeOrder({
+      symbol,
+      side:     closeSide === "BUY" ? "buy" : "sell",
+      type:     "market",
+      qty:      parseFloat(quantity.toFixed(8)),
+      clientId: `close-u-${userId.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    });
+
+    const fill = order.avgFillPrice > 0 ? order.avgFillPrice : 0;
+    const result: LiveUserCloseResult = {
+      success:              true,
+      userId,
+      exchange:             row.exchange,
+      exchangeCloseOrderId: order.exchangeOrderId || order.id,
+      fillPrice:            parseFloat(fill.toFixed(2)),
+      quantity:             order.filledQty > 0 ? order.filledQty : quantity,
+    };
+
+    logger.info(
+      { userId, exchange: row.exchange, symbol, closeSide,
+        fillPrice: result.fillPrice, exchangeCloseOrderId: result.exchangeCloseOrderId },
+      "liveUserExecution: close order filled",
+    );
+    await emitFillNotification(
+      userId, symbol, closeSide, row.exchange,
+      result.fillPrice!, result.quantity!, result.exchangeCloseOrderId ?? "", false,
+    );
+    return result;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn({ userId, exchange: row.exchange, symbol, closeSide, err: msg }, "liveUserExecution: adapter close placeOrder failed");
+    await emitFailureNotification(userId, symbol, closeSide, `Exchange rejected close order: ${msg}`, row.exchange);
     return { success: false, userId, exchange: row.exchange, errorCode: "exchange_reject", error: msg };
   }
 }

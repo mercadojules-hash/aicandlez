@@ -7,7 +7,11 @@ import {
 import { eq, desc } from "drizzle-orm";
 import { getTicker, SUPPORTED_SYMBOLS } from "./marketData.js";
 import { logger } from "./logger.js";
-import { emitLiveCloseNotification, isDryRunEnabled } from "./liveUserExecution.js";
+import {
+  emitLiveCloseNotification,
+  isDryRunEnabled,
+  placeLiveCloseOrderForUser,
+} from "./liveUserExecution.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -48,6 +52,7 @@ export interface UserSimTrade {
   closeReason: string;
   exchange?: string;
   exchangeOrderId?: string;
+  exchangeCloseOrderId?: string;
 }
 
 interface UserSimAccount {
@@ -158,8 +163,9 @@ async function loadFromDB(userId: string): Promise<UserSimState> {
       realizedPnLPct:  t.realizedPnLPct,
       durationMs:      t.durationMs,
       closeReason:     t.closeReason ?? "MANUAL",
-      exchange:        t.exchange ?? undefined,
-      exchangeOrderId: t.exchangeOrderId ?? undefined,
+      exchange:             t.exchange ?? undefined,
+      exchangeOrderId:      t.exchangeOrderId ?? undefined,
+      exchangeCloseOrderId: t.exchangeCloseOrderId ?? undefined,
     })),
     idSeq: 0,
   };
@@ -395,12 +401,46 @@ export async function closeUserPosition(
 
   const pos = state.positions[idx]!;
 
+  // For live positions, submit a real broker-side close order first.
+  // Use the broker's fill price (when available) as the canonical exit
+  // price so realized PnL matches the actual exchange execution.
+  let exchangeCloseOrderId: string | undefined;
+  let brokerFillPrice: number | undefined;
+  const isLive = !!(pos.exchange && pos.exchangeOrderId);
+  if (isLive) {
+    const closeRes = await placeLiveCloseOrderForUser({
+      userId,
+      symbol:   pos.symbol,
+      openSide: pos.side,
+      quantity: pos.quantity,
+      exchange: pos.exchange!,
+    });
+    if (!closeRes.success) {
+      logger.warn(
+        { userId, positionId, exchange: pos.exchange, error: closeRes.error, errorCode: closeRes.errorCode },
+        "UserSimRegistry: live close order rejected — position remains open",
+      );
+      return {
+        success: false,
+        error:   `Live close order rejected on ${pos.exchange}: ${closeRes.error ?? "unknown"}`,
+      };
+    }
+    exchangeCloseOrderId = closeRes.exchangeCloseOrderId;
+    if (closeRes.fillPrice && closeRes.fillPrice > 0) {
+      brokerFillPrice = closeRes.fillPrice;
+    }
+  }
+
   let exitPrice: number;
-  try {
-    const ticker = await getTicker(pos.symbol);
-    exitPrice = ticker.price;
-  } catch (e) {
-    return { success: false, error: `Failed to fetch price: ${e instanceof Error ? e.message : String(e)}` };
+  if (brokerFillPrice !== undefined) {
+    exitPrice = brokerFillPrice;
+  } else {
+    try {
+      const ticker = await getTicker(pos.symbol);
+      exitPrice = ticker.price;
+    } catch (e) {
+      return { success: false, error: `Failed to fetch price: ${e instanceof Error ? e.message : String(e)}` };
+    }
   }
 
   const realizedPnL =
@@ -427,8 +467,9 @@ export async function closeUserPosition(
     realizedPnLPct:  parseFloat(realizedPnLPct.toFixed(3)),
     durationMs:      exitTime - pos.entryTime,
     closeReason,
-    exchange:        pos.exchange,
-    exchangeOrderId: pos.exchangeOrderId,
+    exchange:             pos.exchange,
+    exchangeOrderId:      pos.exchangeOrderId,
+    exchangeCloseOrderId: exchangeCloseOrderId,
   };
 
   state.account.cashBalance  += pos.sizeUSD + realizedPnL;
@@ -453,8 +494,9 @@ export async function closeUserPosition(
       realizedPnLPct:  trade.realizedPnLPct,
       durationMs:      trade.durationMs,
       closeReason:     trade.closeReason,
-      exchange:        trade.exchange ?? null,
-      exchangeOrderId: trade.exchangeOrderId ?? null,
+      exchange:             trade.exchange ?? null,
+      exchangeOrderId:      trade.exchangeOrderId ?? null,
+      exchangeCloseOrderId: trade.exchangeCloseOrderId ?? null,
     }),
     db.delete(simPositionsTable).where(eq(simPositionsTable.id, positionId)),
     persistAccount(state),

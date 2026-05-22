@@ -190,8 +190,9 @@ export interface SimTrade {
   closedAt:         string;
   entryPrice:       number;
   exitPrice:        number;
-  exchange?:        string;
-  exchangeOrderId?: string;
+  exchange?:             string;
+  exchangeOrderId?:      string;
+  exchangeCloseOrderId?: string;
 }
 
 export interface MobileTicker {

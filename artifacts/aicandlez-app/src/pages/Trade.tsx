@@ -392,7 +392,14 @@ function TradeRow({ trade }: { trade: SimTrade }) {
             <>
               {" · "}
               <span
-                title={trade.exchangeOrderId ? `Order ${trade.exchangeOrderId}` : undefined}
+                title={
+                  trade.exchangeOrderId || trade.exchangeCloseOrderId
+                    ? [
+                        trade.exchangeOrderId      ? `Open order: ${trade.exchangeOrderId}`        : null,
+                        trade.exchangeCloseOrderId ? `Close order: ${trade.exchangeCloseOrderId}` : null,
+                      ].filter(Boolean).join("\n")
+                    : undefined
+                }
                 style={{
                   display:"inline-block",
                   padding:"1px 5px",
