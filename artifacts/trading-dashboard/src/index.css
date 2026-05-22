@@ -202,6 +202,13 @@
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
+/* Connected-exchange status dot pulse — used by Account.tsx + Settings.tsx
+   ExchangeCard. Mirrors the keyframe in aicandlez-app/src/index.css. */
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: 0.6; transform: scale(0.88); }
+}
+
 @keyframes pnl-glow-green {
   0%, 100% { text-shadow: 0 0 8px #00ff8a60, 0 0 20px #00ff8a30; }
   50%       { text-shadow: 0 0 18px #00ff8aaa, 0 0 40px #00ff8a55, 0 0 60px #00ff8a20; }

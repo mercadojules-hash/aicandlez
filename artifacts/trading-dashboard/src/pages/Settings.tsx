@@ -525,18 +525,19 @@ function ExchangeCard({
     >
       {/* Top row */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <div
-            className="w-2.5 h-2.5 rounded-full shrink-0"
+            className="w-3 h-3 rounded-full shrink-0"
             style={{ background: statusColor,
-              boxShadow: isConnected ? `0 0 10px ${statusColor}, 0 0 18px ${statusColor}80` : "none" }}
+              boxShadow: isConnected ? `0 0 12px ${statusColor}, 0 0 22px ${statusColor}aa` : "none",
+              animation: isConnected ? "dot-pulse 2.5s ease-in-out infinite" : "none" }}
           />
           <span
-            className="font-mono text-[14px] font-extrabold tracking-wide"
+            className="text-[17px] font-extrabold tracking-tight"
             style={{
-              color: isConnected ? "#66FF66" : isError ? "#ff4455" : "#EAF2FF",
-              textShadow: isConnected ? `0 0 10px ${statusColor}55` : "none",
-              letterSpacing: "0.04em",
+              color: isConnected ? "#FFFFFF" : isError ? "#ff4455" : "#EAF2FF",
+              textShadow: isConnected ? `0 0 14px ${statusColor}aa, 0 0 4px ${statusColor}` : "none",
+              letterSpacing: "-0.01em",
             }}
           >
             {entry.exchange}

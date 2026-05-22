@@ -1,0 +1,123 @@
+We are now at the final live-execution validation step.
+
+The observability layer is complete:
+
+* execution stream
+* heartbeat telemetry
+* signal lifecycle instrumentation
+* rejection telemetry
+* safe-test-mode
+* Command Center integration
+
+Before unrestricted live trading begins, I need ONE controlled Kraken execution test.
+
+====================================================
+GOAL
+====
+
+Trigger:
+ONE safe real Kraken trade
+
+while fully observing:
+
+* signal lifecycle
+* execution path
+* order submission
+* order fill
+* post-trade state
+
+====================================================
+STEP 1 — SAFE TEST MODE
+=======================
+
+Use the new:
+POST /api/admin/execution/safe-test-mode
+
+Temporarily:
+
+* lower confidence threshold enough to allow ONE high-probability setup
+* keep ALL safety systems active
+* keep risk engine active
+* keep duplicate prevention active
+* keep exposure controls active
+
+DO NOT:
+
+* spam orders
+* disable safeguards
+* bypass risk controls
+* force infinite execution
+
+Goal:
+One controlled execution only.
+
+====================================================
+STEP 2 — VERIFY LIVE EXECUTION STREAM
+=====================================
+
+I need to visibly see:
+
+* SIGNAL_DETECTED
+* MTF_CONFIRMED
+* EXECUTION_SENT
+* ORDER_FILLED
+
+OR
+
+if rejected:
+
+* exact rejection reason
+
+Need full telemetry visibility in Command Center.
+
+====================================================
+STEP 3 — VERIFY ORDER ROUTING
+=============================
+
+Confirm:
+
+* order routed to Kraken LIVE
+* no simulation path used
+* no fallback executor used
+* no paper-trading logic triggered
+
+====================================================
+STEP 4 — VERIFY POST-TRADE STATE
+================================
+
+After execution:
+
+* position appears in active trades
+* Kraken balance updates
+* execution stream updates
+* telemetry updates
+* no duplicate execution fires
+* no execution loop spam occurs
+
+====================================================
+STEP 5 — VERIFY ENGINE HEALTH
+=============================
+
+Watch:
+
+* queue depth
+* websocket health
+* tick heartbeat
+* latency
+* rejection counters
+* execution counters
+
+Need to confirm:
+engine remains stable during live execution.
+
+====================================================
+IMPORTANT
+=========
+
+This is now:
+controlled live execution validation.
+
+NOT cosmetic UI work.
+
+The objective is:
+prove the full real-money AI execution pipeline works safely end-to-end on Kraken.

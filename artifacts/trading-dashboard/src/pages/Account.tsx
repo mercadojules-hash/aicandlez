@@ -309,18 +309,19 @@ export default function Account() {
               ) : (
                 <div className="space-y-2">
                   {connectedExchanges.map(ex => {
-                    const color = EXCHANGE_COLORS[ex.exchange.toLowerCase()] ?? "#4a6a80";
+                    const color = EXCHANGE_COLORS[ex.exchange] ?? "#4a6a80";
                     return (
                       <div key={ex.exchange}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded border"
-                        style={{ background: `${color}10`, borderColor: `${color}45`,
-                          boxShadow: `0 0 14px ${color}25, 0 0 0 1px ${color}20 inset` }}>
-                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                          style={{ background: color, boxShadow: `0 0 8px ${color}, 0 0 14px ${color}80` }} />
+                        className="flex items-center gap-3 px-3.5 py-3 rounded border"
+                        style={{ background: `${color}14`, borderColor: `${color}66`,
+                          boxShadow: `0 0 20px ${color}30, 0 0 0 1px ${color}28 inset` }}>
+                        <div className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ background: color, boxShadow: `0 0 10px ${color}, 0 0 18px ${color}cc`,
+                            animation: "dot-pulse 2.5s ease-in-out infinite" }} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-[13px] font-extrabold font-mono capitalize tracking-wide"
-                              style={{ color, textShadow: `0 0 8px ${color}55` }}>
+                            <span className="text-[15.5px] font-extrabold capitalize tracking-tight"
+                              style={{ color: "#FFFFFF", textShadow: `0 0 12px ${color}aa, 0 0 4px ${color}` }}>
                               {ex.exchange}
                             </span>
                             {ex.isDefault && (

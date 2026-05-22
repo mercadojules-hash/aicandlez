@@ -602,22 +602,24 @@ function ExchangeRow({ name, status, statusCol, icon, iconBg, iconBorder, iconCo
 }) {
   return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
-      padding:"12px 16px", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+      padding:"14px 16px", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
         <div style={{
-          width:34, height:34, borderRadius:9, flexShrink:0,
+          width:38, height:38, borderRadius:10, flexShrink:0,
           background:iconBg, border:`1px solid ${iconBorder}`,
           display:"flex", alignItems:"center", justifyContent:"center",
-          fontSize:14, fontFamily:MONO, fontWeight:800, color:iconColor,
+          fontSize:16, fontFamily:MONO, fontWeight:800, color:iconColor,
+          boxShadow:`0 0 14px ${iconColor}30`,
         }}>{icon}</div>
-        <span style={{ fontSize:15, fontFamily:SANS, fontWeight:700, color:W,
-          letterSpacing:-0.1 }}>{name}</span>
+        <span style={{ fontSize:17, fontFamily:SANS, fontWeight:800, color:"#FFFFFF",
+          letterSpacing:-0.25, textShadow:`0 0 12px ${iconColor}40` }}>{name}</span>
       </div>
-      <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-        <div style={{ width:7, height:7, borderRadius:"50%", background:statusCol,
-          boxShadow:`0 0 10px ${statusCol}, 0 0 18px ${statusCol}80` }}/>
-        <span style={{ fontSize:11, fontFamily:SANS, fontWeight:800, color:statusCol,
-          letterSpacing:"0.14em", textShadow:`0 0 8px ${statusCol}60` }}>{status}</span>
+      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+        <div style={{ width:8, height:8, borderRadius:"50%", background:statusCol,
+          boxShadow:`0 0 12px ${statusCol}, 0 0 22px ${statusCol}90`,
+          animation:"dot-pulse 2.5s ease-in-out infinite" }}/>
+        <span style={{ fontSize:12, fontFamily:SANS, fontWeight:800, color:statusCol,
+          letterSpacing:"0.16em", textShadow:`0 0 10px ${statusCol}80` }}>{status}</span>
       </div>
     </div>
   );
