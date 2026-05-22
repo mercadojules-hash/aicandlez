@@ -86,16 +86,59 @@ institutional platform.
   `/command`, `/exchange`, `/syscheck`, `/debug`, `/desktop`, `/institutional`, `/admin`
 - `/settings`, `/sign-in/*`, `/sign-up/*`
 
+## Architectural separation — CUSTOMER PORTAL vs ADMIN PORTAL (LOCKED INVARIANT)
+
+These are intentionally **two different systems** that happen to share the
+`trading-dashboard` artifact codebase. Future tasks MUST NOT merge them
+back together. Every change to `/portal` must be gated by role and
+preserve both worlds.
+
+### CUSTOMER PORTAL — `trade.aicandlez.com/portal` (non-admin signed-in users)
+Purpose: **hybrid onboarding + trading platform**
+- PAPER mode (always available, default for free users)
+- LIVE mode (paid subscribers only, real exchange routing)
+- Onboarding flows (`?checkout=success` trigger, OnboardingFlow component)
+- Upgrade funnels, tier gates, UpgradeBanner, FeatureGate
+- Training environment + AI experimentation surface
+- Conversion funnel (free → starter → pro)
+- `PaperTradesProvider` mounted, gated `!isAdmin`
+- PAPER/LIVE segmented toggle in Portal header (subscribers only)
+- Free users locked to PAPER with inline "Upgrade to unlock LIVE" CTA
+
+### ADMIN PORTAL — `admintrade.aicandlez.com/portal` (admin / super-admin role)
+Purpose: **institutional operator terminal**
+- **Real-only.** No paper, no simulation, no `PaperTradesProvider`
+- No onboarding friction, no upgrade prompts, no tier gates
+- Live telemetry, exchange diagnostics, execution observability
+- Operator analytics, real balances only, real execution only
+- Operator role bypasses every customer-tier guard
+- Default landing = `/command`; `/portal` here is the operator workstation
+  variant (no consumer affordances)
+
+### Rules for future task agents
+1. Anything that removes paper trading, simulation, onboarding, or upgrade
+   funnels from the codebase MUST be scoped by role/domain — never wholesale.
+2. Anything that adds onboarding, upgrade prompts, tier gates, or paper
+   affordances MUST be hidden when `useUserRole()` returns `admin` /
+   `super-admin`.
+3. Customer-side changes that touch `/portal` must verify the admin path
+   is untouched (and vice versa).
+4. Telemetry and trade history must tag rows with mode (`PAPER` / `LIVE`)
+   so the two worlds never co-mingle in metrics.
+
+---
+
 **Production hosting (3-domain split — current target architecture):**
 - `app.aicandlez.com/*` — mobile PWA only (aicandlez-app static build). No
   desktop components, no /portal page (cross-app redirect to trade host).
-- `trade.aicandlez.com/*` — customer desktop institutional terminal
-  (trading-dashboard static build). Default landing = `/portal`. Customer
+- `trade.aicandlez.com/*` — **customer portal** (hybrid, see above).
+  trading-dashboard static build. Default landing = `/portal`. Customer
   auth (non-admin signed-in users) lives here.
-- `admintrade.aicandlez.com/*` — operator/admin workstation (trading-dashboard
-  static build, separate Render service). Default landing = `/command`.
-  NO paper trading, NO tier gates, NO upgrade gates, unlimited execution,
-  live Kraken only. Operator role bypasses all customer-tier guards.
+- `admintrade.aicandlez.com/*` — **admin/operator portal** (real-only, see
+  above). trading-dashboard static build, separate Render service. Default
+  landing = `/command`. NO paper trading, NO tier gates, NO upgrade gates,
+  unlimited execution, live Kraken only. Operator role bypasses all
+  customer-tier guards.
 - `dashboard.aicandlez.com/*` — preserved during migration; retired once
   trade./admintrade. cutover is verified.
 - Render config: see `render.yaml` services `aicandlez-trade`,
