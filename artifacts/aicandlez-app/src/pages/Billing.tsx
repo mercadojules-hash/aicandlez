@@ -147,7 +147,7 @@ export default function Billing() {
     staleTime: 30_000,
   });
 
-  const totalRealized = simAcc?.totalRealized ?? simAcc?.realizedPnL ?? 0;
+  const totalRealized = simAcc?.totalRealized ?? (simAcc as { realizedPnL?: number } | undefined)?.realizedPnL ?? 0;
   const totalFeesPaid = simAcc?.totalFeesPaid ?? 0;
   const realizedPos   = totalRealized >= 0;
 

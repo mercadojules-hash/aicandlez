@@ -55,7 +55,7 @@ export default function Portfolio() {
   const pnlPositive = openPnL >= 0;
   const positions  = data?.positions ?? [];
 
-  const totalRealized = simAcc?.totalRealized ?? simAcc?.realizedPnL ?? 0;
+  const totalRealized = simAcc?.totalRealized ?? (simAcc as { realizedPnL?: number } | undefined)?.realizedPnL ?? 0;
   const feesPaid      = simAcc?.totalFeesPaid ?? 0;
   const realizedPos   = totalRealized >= 0;
 

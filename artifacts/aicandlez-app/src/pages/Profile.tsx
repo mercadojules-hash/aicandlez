@@ -1321,7 +1321,7 @@ export default function Profile() {
     const plan      = sub?.plan ?? "free";
     const isActive  = sub?.isActive ?? (plan === "free");
 
-    const realized  = simAcc?.realizedPnL ?? 0;
+    const realized  = simAcc?.totalRealized ?? (simAcc as { realizedPnL?: number } | undefined)?.realizedPnL ?? 0;
     const fees      = +(realized * 0.03).toFixed(2);
     const netProfit = realized - fees;
     const winRate   = simAcc?.winRate ?? 0;

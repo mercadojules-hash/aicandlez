@@ -179,7 +179,6 @@ export interface SimAccount {
   balance:        number;
   totalTrades:    number;
   winRate:        number;
-  realizedPnL:    number;
   totalRealized?: number;
   totalFeesPaid?: number;
 }
