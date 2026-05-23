@@ -20,6 +20,7 @@
 import { db, userSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../../lib/logger.js";
+import { sendOperatorAlert } from "../../lib/notifications.js";
 import { NotificationDispatcher } from "../notifications/NotificationDispatcher.js";
 
 export interface OutageNotificationPrefs {
@@ -81,11 +82,25 @@ export async function notifyExchangeOutage(evt: ExchangeOutageEvent): Promise<vo
   }
 
   if (prefs.email) {
-    // TODO: route through the real email transport once it exists.
-    logger.info(
-      { userId: evt.userId, exchange: evt.exchange, transition: evt.transition, title },
-      "ExchangeHealthMonitor: outage email queued",
-    );
+    try {
+      await sendOperatorAlert({
+        subject:   title,
+        body,
+        // Stable per (user, exchange, transition) so repeated pages on
+        // the same outage event collapse in the on-call inbox while a
+        // recovery transition still cuts through as a distinct thread.
+        dedupeKey: `exchange-outage:${evt.userId}:${evt.exchange}:${evt.transition}`,
+        context:   {
+          userId:     evt.userId,
+          exchange:   evt.exchange,
+          transition: evt.transition,
+          reason:     evt.reason ?? null,
+          at:         (evt.at ?? new Date()).toISOString(),
+        },
+      });
+    } catch (err) {
+      logger.warn({ err, userId: evt.userId, exchange: evt.exchange }, "ExchangeHealthMonitor: operator alert dispatch failed");
+    }
   } else {
     logger.debug({ userId: evt.userId, exchange: evt.exchange }, "ExchangeHealthMonitor: email suppressed by user pref");
   }
