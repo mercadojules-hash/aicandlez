@@ -207,7 +207,13 @@ app.use(
 app.use("/api",                  apiLimiter);
 app.use("/api/billing/checkout", strictLimiter);
 app.use("/api/billing/portal",   strictLimiter);
-app.use("/api/auth",             strictLimiter);
+// NOTE: do NOT apply strictLimiter to /api/auth — the only route on that
+// router is /api/auth/me, which dozens of components poll via useUserRole()
+// on every page mount. At 20 req/min per shared proxy IP, the limiter blew
+// up instantly → useUserRole never resolved → SignalRow saw isAdmin=false
+// → admin BUY clicks fell through to firePaperSim (local paper trade)
+// instead of routing to /api/exchange/order/execute. Real sign-in/sign-up
+// throttling is handled by Clerk middleware upstream.
 
 app.use("/api", router);
 
