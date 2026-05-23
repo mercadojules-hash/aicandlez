@@ -15,7 +15,8 @@ import { Bitcoin, BarChart3, TrendingUp, TrendingDown, Search } from "lucide-rea
 import type { EngineStatus, SymBreakdown } from "../types";
 import type { TickerSpec } from "./tickers";
 import { CRYPTO_20, EQUITIES_20 } from "./tickers";
-import { SignalRow, resolveDirection } from "./SignalRow";
+import { SignalRow } from "./SignalRow";
+import { resolveDirection } from "./signalUtils";
 import { N } from "./theme";
 
 type Filter = "ALL" | "LONG" | "SHORT";

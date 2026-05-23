@@ -4160,8 +4160,8 @@ function PortalInner() {
           color: N.BRAND, display: "flex", alignItems: "center", gap: 12,
         }}>
           <span>▲ ADMIN VIEW — VIEWING CUSTOMER PORTAL</span>
-          <Link href="/command">
-            <a style={{ color: N.BRAND, textDecoration: "underline" }}>OPEN COMMAND CENTER →</a>
+          <Link href="/command" style={{ color: N.BRAND, textDecoration: "underline" }}>
+            OPEN COMMAND CENTER →
           </Link>
         </div>
       )}

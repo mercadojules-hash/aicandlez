@@ -39,26 +39,7 @@ function fmt(n: number): string {
   return n.toFixed(6);
 }
 
-/* deterministic per-symbol values so the grid is stable across renders */
-export function hashSymbol(sym: string): number {
-  let h = 0;
-  for (let i = 0; i < sym.length; i++) h = (h * 33 + sym.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-
-/**
- * Shared direction resolver — used both by SignalRow and by the filter logic
- * in SignalsRow so a row's displayed LONG/SHORT is always identical to the
- * filter classification.
- */
-export function resolveDirection(
-  symbol: string,
-  breakdown?: SymBreakdown,
-): "LONG" | "SHORT" {
-  if (breakdown?.agreedAction === "BUY")  return "LONG";
-  if (breakdown?.agreedAction === "SELL") return "SHORT";
-  return (hashSymbol(symbol) % 100) > 55 ? "LONG" : "SHORT";
-}
+import { hashSymbol, resolveDirection } from "./signalUtils";
 
 const TYPES: SignalType[] = ["SCALP", "SWING", "MOMENTUM", "BREAKOUT", "REVERSAL", "TREND"];
 
@@ -967,6 +948,8 @@ function ActionPill({
 }: { label: string; color: string; active: boolean; onClick?: () => void }) {
   const [flashing, setFlashing] = useState(false);
   const handle = () => {
+    // eslint-disable-next-line no-alert
+    window.alert("[BUY-TRACE] ActionPill RAW CLICK reached React: " + label);
     console.error("[BUY-TRACE] ActionPill CLICK", { label, active });
     setFlashing(true);
     onClick?.();
