@@ -7,6 +7,10 @@ import type {
 } from "../types.js";
 import { emptyAccount, simulatedOrder } from "./BinanceAdapter.js";
 
+// Bitget demo trading is gated behind this header on the prod host. See
+// https://www.bitget.com/api-doc/common/intro — "Demo Trading" section.
+const DEMO_HEADER = "PAPTRADING";
+
 // ── BitgetAdapter ─────────────────────────────────────────────────────────────
 //
 // Bitget REST v2 adapter.
@@ -141,20 +145,45 @@ export class BitgetAdapter extends BaseExchangeAdapter {
 
   async placeOrder(req: PlaceOrderRequest): Promise<StandardOrder> {
     this.checkOrderRateLimit();
-    if (!this.isConfigured()) return simulatedOrder("Bitget", req, this.normaliseSymbol(req.symbol), this.config);
+    const pair = this.normaliseSymbol(req.symbol);
+    if (!this.isConfigured()) return simulatedOrder("Bitget", req, pair, this.config);
+    const clientOid = req.clientId ?? `BG-${Date.now()}-${String(this.orderSeq++).padStart(4,"0")}`;
     const body = JSON.stringify({
-      symbol:   this.normaliseSymbol(req.symbol),
+      symbol:   pair,
       side:     req.side,
       orderType: req.type === "market" ? "market" : "limit",
       size:     req.qty.toFixed(8),
       price:    req.limitPrice?.toFixed(8),
-      clientOid: req.clientId ?? `BG-${Date.now()}-${String(this.orderSeq++).padStart(4,"0")}`,
+      clientOid,
     });
-    await this.withRetry(
-      () => this.signedPost<BitgetResp<{ orderId: string }>>("/api/v2/spot/trade/place-order", body),
+    const resp = await this.withRetry(
+      () => this.signedPost<BitgetResp<{ orderId?: string; clientOid?: string }>>("/api/v2/spot/trade/place-order", body),
       3, 500, "placeOrder",
     );
-    return simulatedOrder("Bitget", req, this.normaliseSymbol(req.symbol), this.config);
+    const exchangeOrderId = resp.data?.orderId;
+    if (!exchangeOrderId) {
+      // Surfacing this loudly is the whole point of the weekly drift suite —
+      // if Bitget changes the field name or starts returning the id under a
+      // different key, the test must fail rather than silently fall back to
+      // a simulated id that the broker-fee assertion cannot reach.
+      throw new Error(`Bitget placeOrder: missing orderId in response (code=${resp.code} msg=${resp.msg})`);
+    }
+    // Round-trip through getOrder so the StandardOrder carries the broker fee
+    // (place-order itself does not return commission). Fall back to a partial
+    // open-order shape if the lookup races the fill — drift checks then
+    // re-poll via getOrder using exchangeOrderId.
+    const queried = await this.getOrder(exchangeOrderId, req.symbol);
+    if (queried) return queried;
+    return {
+      id: exchangeOrderId, exchangeOrderId, exchange: "Bitget",
+      symbol: req.symbol, nativeSymbol: pair,
+      side: req.side, type: req.type, status: "open",
+      requestedQty: req.qty, filledQty: 0,
+      requestedPrice: req.limitPrice, avgFillPrice: 0,
+      quoteQty: 0,
+      fee: { amount: 0, currency: "USDT", ratePct: this.config.takerFeePct, source: "estimate" },
+      createdAt: Date.now(), updatedAt: Date.now(),
+    };
   }
 
   async cancelOrder(req: CancelOrderRequest): Promise<{ ok: boolean; reason?: string }> {
@@ -212,7 +241,7 @@ export class BitgetAdapter extends BaseExchangeAdapter {
     const pp  = this.config.passphrase
       ? crypto.createHmac("sha256", this.config.apiSecret!).update(this.config.passphrase).digest("base64")
       : "";
-    return {
+    const headers: Record<string, string> = {
       "ACCESS-KEY":        this.config.apiKey!,
       "ACCESS-SIGN":       sig,
       "ACCESS-TIMESTAMP":  ts,
@@ -220,6 +249,8 @@ export class BitgetAdapter extends BaseExchangeAdapter {
       "Content-Type":      "application/json",
       "locale":            "en-US",
     };
+    if (this.config.demoMode) headers[DEMO_HEADER] = "1";
+    return headers;
   }
 
   private get<T>(path: string): Promise<T> {

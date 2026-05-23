@@ -84,6 +84,7 @@ import { GeminiAdapter }       from "../adapters/GeminiAdapter.js";
 import { GateIOAdapter }       from "../adapters/GateIOAdapter.js";
 import { CryptoDotComAdapter } from "../adapters/CryptoDotComAdapter.js";
 import { BingXAdapter }        from "../adapters/BingXAdapter.js";
+import { BitgetAdapter }       from "../adapters/BitgetAdapter.js";
 import { HyperliquidAdapter }  from "../adapters/HyperliquidAdapter.js";
 import { dYdXAdapter }         from "../adapters/dYdXAdapter.js";
 import { PhemexAdapter }       from "../adapters/PhemexAdapter.js";
@@ -181,11 +182,46 @@ describe.skipIf(!ENABLED || !GEMINI_KEY || !GEMINI_SECRET)(
 // enabling it is captured in the matrix at the top of this file.
 // ──────────────────────────────────────────────────────────────────────────────
 
-describe.skip("Bitget Demo Trading — broker fee end-to-end (BLOCKED: see matrix)", () => {
-  it("placeholder — needs demo-header support + real exchange order id from placeOrder", () => {
-    expect(true).toBe(true);
-  });
-});
+// ──────────────────────────────────────────────────────────────────────────────
+// Bitget Demo Trading
+//
+// Bitget has no separate sandbox host; demo trading is the production REST
+// host gated by a `PAPTRADING: 1` header (plumbed via `AdapterConfig.demoMode`).
+// `BitgetAdapter.placeOrder` now parses the real `data.orderId` from
+// `/api/v2/spot/trade/place-order` and immediately round-trips through
+// `getOrder`, which maps `feeDetail.feeCost` / `feeDetail.feeCoin` →
+// `source: "broker"`.
+//
+// Credentials must be Bitget *demo trading* keys (created under "Demo
+// Trading" → "API Management" in the Bitget UI), not live production keys.
+// ──────────────────────────────────────────────────────────────────────────────
+
+const BITGET_KEY        = process.env["BITGET_DEMO_API_KEY"];
+const BITGET_SECRET     = process.env["BITGET_DEMO_API_SECRET"];
+const BITGET_PASSPHRASE = process.env["BITGET_DEMO_PASSPHRASE"];
+
+describe.skipIf(!ENABLED || !BITGET_KEY || !BITGET_SECRET || !BITGET_PASSPHRASE)(
+  "Bitget Demo Trading — broker fee end-to-end",
+  () => {
+    it("places + queries a tiny BTCUSDT market order and reports broker fee", async () => {
+      const adapter = new BitgetAdapter({
+        ...baseCfg("Bitget", BITGET_KEY, BITGET_SECRET),
+        testnet:    false,
+        demoMode:   true,
+        passphrase: BITGET_PASSPHRASE,
+      });
+
+      const placed = await adapter.placeOrder({
+        symbol: "BTCUSD", side: "buy", type: "market", qty: 0.0002,
+      });
+      assertBrokerFee(placed, "Bitget placeOrder");
+
+      await sleep(1_000);
+      const queried = await adapter.getOrder(placed.exchangeOrderId, "BTCUSD");
+      assertBrokerFee(queried, "Bitget getOrder");
+    }, 45_000);
+  },
+);
 
 const BINGX_KEY    = process.env["BINGX_VST_API_KEY"];
 const BINGX_SECRET = process.env["BINGX_VST_API_SECRET"];

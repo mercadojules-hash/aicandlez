@@ -124,6 +124,16 @@ export interface AdapterConfig {
    */
   oauthAccessToken?: string;
   testnet?:     boolean;
+  /**
+   * Bitget-only: route requests through Bitget's "demo trading" surface, which
+   * shares the production REST host (`api.bitget.com`) but is gated by a
+   * `PAPTRADING: 1` header on every authenticated call. Has no effect on other
+   * adapters today. Mutually exclusive with `testnet` in practice — Bitget has
+   * no separate sandbox host, so the weekly drift suite opts into demo mode
+   * instead of flipping `testnet` (which would still aim at prod with no
+   * paper-trading isolation).
+   */
+  demoMode?:    boolean;
   takerFeePct:  number;   // default taker fee
   makerFeePct:  number;
   rateLimit: {
