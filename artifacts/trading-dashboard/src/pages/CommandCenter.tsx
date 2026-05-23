@@ -85,6 +85,65 @@ import type {
   EngineStatus, AppSettings, Trade, ExchangeStatus, SimAccount, LiveBalance,
 } from "@/components/command/types";
 
+// Row shape returned by GET /api/admin/closed-trades (operator-only).
+// Mirrors `AdminClosed` in Portal.tsx — snake_case, broker-fee fields
+// possibly null for legacy global-engine rows.
+interface AdminClosedRow {
+  id:                          string;
+  symbol:                      string;
+  side:                        string;
+  size_usd?:                   number | string | null;
+  entry_price?:                number | string | null;
+  exit_price?:                 number | string | null;
+  realized_pnl?:               number | string | null;
+  realized_pnl_pct?:           number | string | null;
+  mode?:                       string | null;
+  close_reason?:               string | null;
+  exit_time?:                  number | string | null;
+  net_fees?:                   number | string | null;
+  exchange?:                   string | null;
+  entry_fee?:                  number | string | null;
+  exit_fee?:                   number | string | null;
+  entry_fee_broker?:           number | string | null;
+  entry_fee_broker_currency?:  string | null;
+  exit_fee_broker?:            number | string | null;
+  exit_fee_broker_currency?:   string | null;
+}
+
+function adminClosedRowToTrade(r: AdminClosedRow): Trade {
+  const num = (v: number | string | null | undefined): number | null => {
+    if (v == null) return null;
+    const n = typeof v === "number" ? v : parseFloat(String(v));
+    return Number.isFinite(n) ? n : null;
+  };
+  const exitMs = r.exit_time != null ? Number(r.exit_time) : NaN;
+  return {
+    id:         String(r.id),
+    symbol:     String(r.symbol ?? ""),
+    side:       String(r.side ?? ""),
+    amount:     num(r.size_usd) ?? 0,
+    price:      num(r.entry_price) ?? 0,
+    exitPrice:  num(r.exit_price),
+    pnl:        num(r.realized_pnl),
+    pnlPercent: num(r.realized_pnl_pct),
+    status:     "closed",
+    mode:       String(r.mode ?? "live"),
+    signalId:   null,
+    stopLoss:   null,
+    takeProfit: null,
+    reason:     r.close_reason ?? null,
+    timestamp:  Number.isFinite(exitMs) ? new Date(exitMs).toISOString() : new Date().toISOString(),
+    closedAt:   Number.isFinite(exitMs) ? new Date(exitMs).toISOString() : null,
+    exchange:                r.exchange ?? null,
+    entryFee:                r.entry_fee ?? null,
+    exitFee:                 r.exit_fee ?? null,
+    entryFeeBroker:          r.entry_fee_broker ?? null,
+    entryFeeBrokerCurrency:  r.entry_fee_broker_currency ?? null,
+    exitFeeBroker:           r.exit_fee_broker ?? null,
+    exitFeeBrokerCurrency:   r.exit_fee_broker_currency ?? null,
+  };
+}
+
 const Q_FAST   = { refetchInterval: 2_000, refetchOnWindowFocus: false, staleTime: 0 } as const;
 const Q_MEDIUM = { refetchInterval: 4_000, refetchOnWindowFocus: false, staleTime: 0 } as const;
 const Q_SLOW   = { refetchInterval: 10_000, refetchOnWindowFocus: false, staleTime: 0 } as const;
@@ -100,6 +159,17 @@ export default function CommandCenter() {
   const { data: engine }   = useQuery({ queryKey: ["engine-status-cmd"],   queryFn: () => j<EngineStatus>("/api/engine/status"),     ...Q_MEDIUM });
   const { data: settings } = useQuery({ queryKey: ["settings-cmd"],        queryFn: () => j<AppSettings>("/api/settings"),           ...Q_SLOW   });
   const { data: trades }   = useQuery({ queryKey: ["trades-cmd"],          queryFn: () => j<Trade[]>("/api/trades"),                 ...Q_FAST   });
+  // Operator-only cross-tenant closed-trade feed. Carries broker-reported
+  // commission fields (entry_fee_broker, exit_fee_broker, …) so the /command
+  // trade-history blotter mirrors the customer receipt + AdminTradeHistoryPanel
+  // on /portal. NULL for the global-engine legacy rows; we fall back to the
+  // catalog estimate fields in ClosedPanel.
+  const { data: adminClosed } = useQuery<{ trades: AdminClosedRow[] }>({
+    queryKey: ["admin-closed-trades-cmd"],
+    queryFn:  () => j<{ trades: AdminClosedRow[] }>("/api/admin/closed-trades?limit=80"),
+    enabled:  isOperator,
+    ...Q_MEDIUM,
+  });
   const { data: exchangeStatus, refetch: refetchExchange } = useQuery({
     queryKey: ["exchange-status-cmd"],
     queryFn:  () => j<ExchangeStatus>("/api/exchange/status"),
@@ -221,7 +291,15 @@ export default function CommandCenter() {
   // ONLY when live is armed — otherwise nothing renders.
   const effectiveTrades = liveTrades.length > 0 || !liveActive ? liveTrades : tradesArr;
   const openTrades    = effectiveTrades.filter(t => t.status?.toLowerCase() === "open");
-  const closedTrades  = effectiveTrades.filter(t => t.status?.toLowerCase() !== "open" || t.exitPrice != null);
+  // Closed-trade blotter: prefer the operator-only cross-tenant feed so
+  // broker-reported commissions surface in the /command audit view (matches
+  // /portal AdminTradeHistoryPanel + customer trade receipt). Fall back to
+  // the engine-global /api/trades pool when the admin feed is unavailable
+  // (e.g. role not yet resolved, or non-operator viewer).
+  const adminClosedRows = adminClosed?.trades ?? [];
+  const closedTrades: Trade[] = adminClosedRows.length > 0
+    ? adminClosedRows.map(adminClosedRowToTrade)
+    : effectiveTrades.filter(t => t.status?.toLowerCase() !== "open" || t.exitPrice != null);
   const livePositions: SimAccount["positions"] = [];
 
   /* ── Live-execution confidence eligibility (80% hard floor) ───────────────

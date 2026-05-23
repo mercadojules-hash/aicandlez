@@ -9,6 +9,10 @@ import type { Trade, SimPosition } from "../types";
 import { N } from "./theme";
 import { CRYPTO_20, EQUITIES_20 } from "./tickers";
 import { useLiveCandles } from "./useLiveCandles";
+import {
+  resolveFeeLeg, extractBaseAsset, feeVariancePct, FEE_VARIANCE_THRESHOLD_PCT,
+  type FeeLeg,
+} from "@/lib/brokerFees";
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
@@ -371,6 +375,21 @@ function ClosedPanel({ closedTrades }: { closedTrades: Trade[] }) {
   const wr    = total ? (wins / total) * 100 : 0;
   const sum   = sorted.reduce((acc, t) => acc + (t.pnl ?? 0), 0);
 
+  // Cross-tenant audit: count rows where the broker's reported commission
+  // drifted >FEE_VARIANCE_THRESHOLD_PCT from the catalog estimate so the
+  // operator gets a single banner number for adapter-regression triage.
+  const variantRows = sorted.reduce((acc, t) => {
+    const base  = extractBaseAsset(t.symbol);
+    const exit  = t.exitPrice ?? undefined;
+    const entry = resolveFeeLeg(t.entryFeeBroker, t.entryFeeBrokerCurrency, t.entryFee, exit, base);
+    const exitL = resolveFeeLeg(t.exitFeeBroker,  t.exitFeeBrokerCurrency,  t.exitFee,  exit, base);
+    const v1 = feeVariancePct(entry);
+    const v2 = feeVariancePct(exitL);
+    const hot = (v1 != null && Math.abs(v1) > FEE_VARIANCE_THRESHOLD_PCT)
+             || (v2 != null && Math.abs(v2) > FEE_VARIANCE_THRESHOLD_PCT);
+    return acc + (hot ? 1 : 0);
+  }, 0);
+
   return (
     <Panel
       label="CLOSED POSITIONS"
@@ -380,12 +399,25 @@ function ClosedPanel({ closedTrades }: { closedTrades: Trade[] }) {
         <div className="flex gap-3 text-[8.5px] font-bold tracking-[0.16em]" style={{ color: N.TEXT_2 }}>
           <span>WIN&nbsp;<span style={{ color: N.LONG }}>{wr.toFixed(1)}%</span></span>
           <span>NET&nbsp;<span style={{ color: sum >= 0 ? N.LONG : N.SHORT }}>{fmtUsd(sum)}</span></span>
+          {variantRows > 0 && (
+            <span
+              title={`${variantRows} row(s) where broker commission drifted >${FEE_VARIANCE_THRESHOLD_PCT}% from the catalog estimate — possible adapter regression.`}
+              style={{
+                color: N.WARN,
+                padding: "0 6px",
+                border: `1px solid ${N.WARN}55`,
+                borderRadius: 2,
+              }}
+            >
+              FEE Δ {variantRows}
+            </span>
+          )}
         </div>
       }
     >
       <div className="grid text-[8.5px] font-bold tracking-[0.14em] px-3 py-1.5"
         style={{
-          gridTemplateColumns: "70px 56px 1fr 1fr 1fr 1fr 90px",
+          gridTemplateColumns: "70px 56px 1fr 1fr 1fr 90px 90px",
           color: N.TEXT_3,
           borderBottom: `1px solid ${N.BORDER}`,
           background: N.SURFACE_1,
@@ -395,7 +427,7 @@ function ClosedPanel({ closedTrades }: { closedTrades: Trade[] }) {
         <div className="text-right">ENTRY</div>
         <div className="text-right">EXIT</div>
         <div className="text-right">PNL</div>
-        <div className="text-right">R-MULT</div>
+        <div className="text-right">FEES</div>
         <div className="text-right pr-1">REASON</div>
       </div>
 
@@ -408,25 +440,79 @@ function ClosedPanel({ closedTrades }: { closedTrades: Trade[] }) {
           const pnl   = t.pnl ?? 0;
           const pct   = t.pnlPercent ?? 0;
           const pnlOk = pnl > 0;
-          const rmult = pct ? (pct / 2).toFixed(2) : "—"; // approx R based on 2% risk
           const tickerColor = TICKER_COLOR[t.symbol] ?? N.BRAND;
           const ts = new Date(t.closedAt ?? t.timestamp);
           const tsLabel = ts.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
           const reason = t.reason
             ? t.reason.length > 18 ? t.reason.slice(0, 18) + "…" : t.reason
             : pnlOk ? "TP HIT" : "SL HIT";
+
+          // Broker-vs-estimate fee resolution — mirrors customer trade
+          // receipt + AdminTradeHistoryPanel on /portal so the same trade
+          // shows the same commission everywhere it appears.
+          const exitPx   = t.exitPrice ?? undefined;
+          const baseAsset = extractBaseAsset(t.symbol);
+          const entryLeg = resolveFeeLeg(
+            t.entryFeeBroker, t.entryFeeBrokerCurrency, t.entryFee,
+            exitPx, baseAsset,
+          );
+          const exitLeg  = resolveFeeLeg(
+            t.exitFeeBroker,  t.exitFeeBrokerCurrency,  t.exitFee,
+            exitPx, baseAsset,
+          );
+          const fees = entryLeg.usd + exitLeg.usd;
+          const bothActual   = entryLeg.displayFromBroker && exitLeg.displayFromBroker;
+          const anyBroker    = entryLeg.fromBroker || exitLeg.fromBroker;
+          const feePillLabel = bothActual ? "ACTUAL" : "EST.";
+          // Variance — flag when the broker drifts >threshold from the
+          // catalog estimate so operators can spot adapter regressions.
+          const v1 = feeVariancePct(entryLeg);
+          const v2 = feeVariancePct(exitLeg);
+          const maxVarPct = Math.max(
+            v1 != null ? Math.abs(v1) : 0,
+            v2 != null ? Math.abs(v2) : 0,
+          );
+          const hotVariance = maxVarPct > FEE_VARIANCE_THRESHOLD_PCT;
+          const feeColor = hotVariance ? N.WARN : (anyBroker ? N.BRAND : N.TEXT_2);
+
+          const fmtLegTitle = (legName: string, leg: FeeLeg): string | null => {
+            if (leg.fromBroker) {
+              const ccy = leg.brokerCcy && !leg.brokerIsUsd ? ` ${leg.brokerCcy}` : "";
+              const dp  = leg.brokerIsUsd ? 2 : ((leg.brokerAmount ?? 0) < 1 ? 6 : 4);
+              const sym = leg.brokerIsUsd ? "$" : "";
+              let line  = `${legName}: ${sym}${(leg.brokerAmount ?? 0).toFixed(dp)}${ccy} · charged by broker`;
+              const v   = feeVariancePct(leg);
+              if (v != null && Math.abs(v) > FEE_VARIANCE_THRESHOLD_PCT && leg.estimate != null) {
+                line += `  ⚠  drift ${v >= 0 ? "+" : ""}${v.toFixed(1)}% vs $${leg.estimate.toFixed(2)} est.`;
+              }
+              return line;
+            }
+            if (leg.estimate != null) {
+              return `${legName}: $${leg.estimate.toFixed(2)} (est. — broker did not report)`;
+            }
+            return null;
+          };
+          const tooltipLines: string[] = [];
+          const openTip  = fmtLegTitle("Opening commission", entryLeg);
+          const closeTip = fmtLegTitle("Closing commission", exitLeg);
+          if (openTip)  tooltipLines.push(openTip);
+          if (closeTip) tooltipLines.push(closeTip);
+          if (fees > 0) tooltipLines.push(`Net of fees: ${fmtUsd(pnl - fees)}`);
+          if (t.exchange) tooltipLines.push(`Exchange: ${String(t.exchange).toUpperCase()}`);
+          const feeTooltip = tooltipLines.join("\n");
+
           return (
             <div
               key={t.id}
               className="grid items-center px-3 py-1.5 transition-colors"
               style={{
-                gridTemplateColumns: "70px 56px 1fr 1fr 1fr 1fr 90px",
+                gridTemplateColumns: "70px 56px 1fr 1fr 1fr 90px 90px",
                 borderBottom: `1px solid ${N.BORDER}`,
-                background: N.SURFACE_1,
+                background: hotVariance ? `${N.WARN}0A` : N.SURFACE_1,
                 fontFamily: N.FONT_MONO,
               }}
               onMouseEnter={e => (e.currentTarget.style.background = N.SURFACE_2)}
-              onMouseLeave={e => (e.currentTarget.style.background = N.SURFACE_1)}
+              onMouseLeave={e => (e.currentTarget.style.background = hotVariance ? `${N.WARN}0A` : N.SURFACE_1)}
             >
               <div className="flex items-center gap-1.5 min-w-0">
                 <span style={{ width: 4, height: 14, background: tickerColor, borderRadius: 1, opacity: 0.7 }} />
@@ -459,9 +545,41 @@ function ClosedPanel({ closedTrades }: { closedTrades: Trade[] }) {
                   {pnlOk ? "+" : ""}{pct.toFixed(2)}%
                 </div>
               </div>
-              <div className="text-right text-[9px] tabular-nums font-bold"
-                   style={{ color: pnlOk ? N.LONG : N.SHORT, opacity: 0.85 }}>
-                {rmult !== "—" ? `${pnlOk ? "+" : ""}${rmult}R` : "—"}
+              <div
+                className="text-right"
+                title={feeTooltip || undefined}
+                style={{ cursor: feeTooltip ? "help" : "default" }}
+              >
+                {(fees > 0 || anyBroker) ? (
+                  <>
+                    <div className="text-[10px] tabular-nums font-bold"
+                         style={{ color: feeColor }}>
+                      −${fees.toFixed(2)}
+                    </div>
+                    <div className="flex items-center justify-end gap-1 mt-0.5">
+                      <span style={{
+                        padding: "0 4px",
+                        fontSize: 7, fontWeight: 800, letterSpacing: "0.10em",
+                        color: bothActual ? N.BRAND : N.TEXT_3,
+                        border: `1px solid ${bothActual ? N.BRAND : N.TEXT_3}55`,
+                        borderRadius: 2,
+                      }}>{feePillLabel}</span>
+                      {hotVariance && (
+                        <span style={{
+                          padding: "0 4px",
+                          fontSize: 7, fontWeight: 800, letterSpacing: "0.10em",
+                          color: N.WARN,
+                          border: `1px solid ${N.WARN}80`,
+                          borderRadius: 2,
+                        }}>
+                          Δ{maxVarPct >= 0 ? "+" : ""}{maxVarPct.toFixed(0)}%
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-[9px] tabular-nums" style={{ color: N.TEXT_3 }}>—</div>
+                )}
               </div>
               <div className="text-right">
                 <div className="text-[9px] tracking-[0.1em] font-bold" style={{ color: pnlOk ? N.LONG : N.SHORT }}>

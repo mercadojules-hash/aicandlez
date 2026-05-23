@@ -98,6 +98,18 @@ export interface Trade {
   reason:      string | null;
   timestamp:   string;
   closedAt:    string | null;
+  // ── Broker-reported commission fields ─────────────────────────────────────
+  // Populated when the closed trade originated from a live broker fill
+  // (sourced via /api/admin/closed-trades). NULL for legacy global-engine
+  // rows; ClosedPanel falls back to the catalog `entryFee`/`exitFee`
+  // estimates so the operator console mirrors the customer trade receipt.
+  exchange?:                 string | null;
+  entryFee?:                 number | string | null;
+  exitFee?:                  number | string | null;
+  entryFeeBroker?:           number | string | null;
+  entryFeeBrokerCurrency?:   string | null;
+  exitFeeBroker?:            number | string | null;
+  exitFeeBrokerCurrency?:    string | null;
 }
 
 export interface ExchangeStatus {
