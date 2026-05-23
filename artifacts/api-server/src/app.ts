@@ -84,14 +84,31 @@ const corsOptions: cors.CorsOptions = {
 
 // ── Rate limiters ─────────────────────────────────────────────────────────────
 
-// General API: 300 requests per minute per IP
+// General API: high-throughput limiter.
+// NOTE: behind Replit/Render reverse proxies the client IP is shared across
+// every browser tab/session, so a low per-IP cap throttles the entire app
+// (auth/me, engine/status polling, candle streams, etc.) and silently breaks
+// downstream features like ARM Execution (which depends on auth + exchanges
+// queries succeeding). Keep this generous and exempt high-frequency, read-only
+// polling endpoints + auth/health from the bucket entirely.
+const POLLING_EXEMPT = [
+  "/api/stripe/webhook",
+  "/api/healthz",
+  "/api/auth/me",
+  "/api/engine/status",
+  "/api/candles",
+  "/api/mobile/",
+  "/api/simulation/account",
+  "/api/simulation/trades",
+  "/api/user/exchanges",
+];
 const apiLimiter = rateLimit({
   windowMs:        60 * 1000,
-  max:             300,
+  max:             3000,
   standardHeaders: true,
   legacyHeaders:   false,
   handler:         (_req, res) => res.status(429).json({ error: "Too many requests. Please slow down." }),
-  skip:            (req) => req.path.startsWith("/api/stripe/webhook"),
+  skip:            (req) => POLLING_EXEMPT.some((p) => req.path.startsWith(p)),
 });
 
 // Sensitive routes: 20 requests per minute per IP (auth, billing)
