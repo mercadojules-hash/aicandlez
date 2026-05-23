@@ -9,15 +9,25 @@
  * SHORT rows have a thick red left bar + tinted red background.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Line, LineChart, ResponsiveContainer, YAxis } from "recharts";
 import { Zap } from "lucide-react";
+import { useAuth } from "@clerk/react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { SymBreakdown } from "../types";
 import type { TickerSpec, SignalType } from "./tickers";
 import { useLiveCandles } from "./useLiveCandles";
 import { N } from "./theme";
 import { usePaperTrades } from "@/hooks/usePaperTrades";
+import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { toast } from "@/hooks/use-toast";
+
+// Cross-origin API base — production lives on api.aicandlez.com via
+// VITE_API_BASE_URL. Same-origin "/api" fallback for dev (shared proxy).
+const apiBaseUrl: string = (
+  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? ""
+).replace(/\/$/, "");
 
 function fmt(n: number): string {
   if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -92,8 +102,93 @@ export function SignalRow({ spec, breakdown }: Props) {
   const dirColor   = direction === "LONG" ? N.LONG : N.SHORT;
   const dirGlow    = direction === "LONG" ? N.LONG_GLOW : N.SHORT_GLOW;
 
-  // ── Paper trade integration ─────────────────────────────────────────────
-  const { openTrade } = usePaperTrades();
+  // ── Paper trade integration + LIVE order routing ───────────────────────
+  const { openTrade }     = usePaperTrades();
+  const { canLiveTrade }  = useSubscription();
+  const { status: brokerStatus } = useBrokerConnection();
+  const { getToken }      = useAuth();
+  const qc                = useQueryClient();
+  const liveFallbackToastedRef = useRef(false);
+
+  const canRouteLive = canLiveTrade && brokerStatus === "live_active";
+
+  /** Mirror a paper open into the server-side sim. */
+  const mirrorPaperToServer = async (
+    sym: string, side: "BUY" | "SELL",
+  ): Promise<void> => {
+    try {
+      const token = await getToken().catch(() => null);
+      await fetch(`${apiBaseUrl}/api/simulation/order`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ symbol: sym, side, sizeUSD: 100 }),
+      });
+    } catch { /* best-effort mirror */ }
+  };
+
+  /** Submit a real-money order through the user's connected exchange. */
+  const submitLive = async (
+    sym: string, side: "BUY" | "SELL", sizeUSD: number,
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    fillPrice?: number;
+    exchange?: string;
+    exchangeOrderId?: string;
+    dryRun?: boolean;
+  }> => {
+    try {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/user/live-order`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ symbol: sym, side, sizeUSD }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        return { ok: false, error: (body as { error?: string }).error ?? `HTTP ${res.status}` };
+      }
+      const body = (await res.json().catch(() => ({}))) as {
+        fillPrice?: number;
+        exchange?: string;
+        exchangeOrderId?: string;
+        dryRun?: boolean;
+      };
+      return {
+        ok: true,
+        fillPrice:       body.fillPrice,
+        exchange:        body.exchange,
+        exchangeOrderId: body.exchangeOrderId,
+        dryRun:          body.dryRun,
+      };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  };
+
+  const firePaper = (side: "LONG" | "SHORT", slPx: number, tpPx: number) => {
+    openTrade({
+      symbol:  spec.symbol,
+      display: spec.display,
+      side,
+      entry,
+      stop:    slPx,
+      target:  tpPx,
+    });
+    void mirrorPaperToServer(spec.symbol, side === "LONG" ? "BUY" : "SELL");
+    toast({
+      title: `${side === "LONG" ? "AI LONG EXECUTED" : "SHORT POSITION OPENED"} — ${spec.label}`,
+      description: `Entry $${fmt(entry)} · TP $${fmt(tpPx)} · SL $${fmt(slPx)} · AI ${conf}%`,
+    });
+  };
 
   const fireTrade = (side: "LONG" | "SHORT") => {
     if (!entry || entry <= 0) {
@@ -105,18 +200,50 @@ export function SignalRow({ spec, breakdown }: Props) {
     }
     const sl = side === "LONG" ? entry * 0.98  : entry * 1.02;
     const tp = side === "LONG" ? entry * 1.045 : entry * 0.955;
-    openTrade({
-      symbol:  spec.symbol,
-      display: spec.display,
-      side,
-      entry,
-      stop:    sl,
-      target:  tp,
-    });
-    toast({
-      title: `${side === "LONG" ? "AI LONG EXECUTED" : "SHORT POSITION OPENED"} — ${spec.label}`,
-      description: `Entry $${fmt(entry)} · TP $${fmt(tp)} · SL $${fmt(sl)} · AI ${conf}%`,
-    });
+
+    // LIVE routing — when the customer has a paid plan + live-active broker.
+    // Free / paper / disconnected users continue on the paper path.
+    if (canRouteLive) {
+      toast({
+        title: `LIVE ORDER SUBMITTED — ${spec.label}`,
+        description: `${side} · routing to your connected exchange · AI ${conf}%`,
+      });
+      void submitLive(spec.symbol, side === "LONG" ? "BUY" : "SELL", 100).then(r => {
+        if (!r.ok) {
+          if (!liveFallbackToastedRef.current) {
+            liveFallbackToastedRef.current = true;
+            toast({
+              title: "LIVE ORDER FAILED — FELL BACK TO PAPER",
+              description: r.error ?? "Live exchange rejected the order",
+            });
+          }
+          firePaper(side, sl, tp);
+          return;
+        }
+        // Real-time fill confirmation — broker fill price, exchange, order id.
+        const exch = (r.exchange ?? "exchange").toUpperCase();
+        const orderIdShort = r.exchangeOrderId
+          ? `#${r.exchangeOrderId.slice(-8)}`
+          : "";
+        const priceStr = r.fillPrice && r.fillPrice > 0
+          ? `$${fmt(r.fillPrice)}`
+          : "market";
+        toast({
+          title: `FILLED @ ${priceStr} — ${spec.label}${r.dryRun ? " (DRY RUN)" : ""}`,
+          description: [side, exch, orderIdShort].filter(Boolean).join(" · "),
+        });
+        // Refresh portfolio + active-trades panels immediately so the new
+        // LIVE row appears without waiting for the next poll.
+        void qc.invalidateQueries({ queryKey: ["mobile-portfolio"] });
+        void qc.invalidateQueries({ queryKey: ["sim-account"] });
+        void qc.invalidateQueries({ queryKey: ["sim-trades"] });
+        void qc.invalidateQueries({ queryKey: ["alpaca-positions"] });
+        void qc.invalidateQueries({ queryKey: ["user-exchanges-balances"] });
+      });
+      return;
+    }
+
+    firePaper(side, sl, tp);
   };
   const change24hPos = change24h >= 0;
   const confColor  = conf >= 78 ? N.BRAND : conf >= 62 ? N.BRAND_DEEP : N.WARN;
