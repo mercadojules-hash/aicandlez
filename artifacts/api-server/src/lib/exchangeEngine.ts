@@ -547,6 +547,24 @@ export async function placeLiveAutoOrder(req: {
   if (_paused)           return reject("paused",        "Exchange is paused");
   if (!isLiveCapable())  return reject("not_capable",   "Live mode not configured (missing API credentials or EXCHANGE_LIVE_ENABLED!=true)");
 
+  // ── DISARM gate (BUY-only) ────────────────────────────────────────────────
+  // Operator DISARM blocks NEW entries only. SELLs always flow so existing
+  // Kraken positions can still reconcile / close via trailing-stop, TP/SL,
+  // or manual close. Dynamic import to avoid the routes/engine ↔ lib/exchangeEngine
+  // import cycle. Decorative-flag-only state until this gate landed; now
+  // enforced wherever the loop drives BUYs through the operator path.
+  if (req.side === "BUY") {
+    try {
+      const { isOperatorArmed } = await import("../routes/engine.js");
+      if (!isOperatorArmed()) {
+        return reject("disarmed", "Operator DISARMED — new BUY entries blocked (existing positions can still close)");
+      }
+    } catch {
+      /* arm-state introspection unavailable — fail safe by allowing through
+         to existing gates; never silently arm. */
+    }
+  }
+
   let adapter: BaseExchangeAdapter;
   try {
     adapter = getLiveAdapter(_selectedExchange);
@@ -708,6 +726,7 @@ export interface LiveExchangeState {
   filledToday:         number;                       // filled today (UTC date)
   lastFillAt:          number | null;
   realizedTodayUSD:    number;                       // Σ realized P/L from closed slices today (simplified)
+  unrealizedTotalUSD:  number;                       // Σ positions[].unrealizedUSD (top-level convenience)
   queue: {
     concurrency:  number;
     processing:   number;
@@ -868,6 +887,7 @@ export async function getLiveExchangeState(): Promise<LiveExchangeState> {
     filledToday,
     lastFillAt:          lastFill?.timestamp ?? null,
     realizedTodayUSD:    parseFloat(realizedToday.toFixed(2)),
+    unrealizedTotalUSD:  parseFloat(positions.reduce((s, p) => s + p.unrealizedUSD, 0).toFixed(2)),
     queue:               queueStats,
     ...(error ? { error } : {}),
   };
