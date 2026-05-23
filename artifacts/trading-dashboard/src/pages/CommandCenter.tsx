@@ -39,7 +39,7 @@ function useOperatorRole(): { isOperator: boolean; isRoleResolved: boolean } {
     queryFn:   async () => {
       // Cross-subdomain Bearer fallback — see useUserRole.ts for rationale.
       const token = await getToken().catch(() => null);
-      const r = await fetch(`${apiBaseUrl}/api/auth/me`, {
+      const r = await authFetch(`${apiBaseUrl}/api/auth/me`, {
         credentials: "include",
         headers: {
           Accept: "application/json",
@@ -81,6 +81,7 @@ import { N } from "@/components/command/institutional/theme";
 import EngineHeartbeat from "@/components/EngineHeartbeat";
 import LiveExecutionStream from "@/components/LiveExecutionStream";
 
+import { authFetch } from "../lib/authFetch";
 import type {
   EngineStatus, AppSettings, Trade, ExchangeStatus, SimAccount, LiveBalance,
 } from "@/components/command/types";

@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { N } from "@/components/command/institutional/theme";
 
+import { authFetch } from "../lib/authFetch";
 type Severity = "info" | "success" | "warn" | "error";
 
 interface ExecStreamEvent {
@@ -75,7 +76,7 @@ export default function LiveExecutionStream() {
   const { data, isLoading, isError } = useQuery<StreamResponse>({
     queryKey:           ["admin-execution-stream"],
     queryFn:            async () => {
-      const r = await fetch(`/api/admin/execution/stream?limit=300`, {
+      const r = await authFetch(`/api/admin/execution/stream?limit=300`, {
         cache: "no-store",
         credentials: "include",
       });

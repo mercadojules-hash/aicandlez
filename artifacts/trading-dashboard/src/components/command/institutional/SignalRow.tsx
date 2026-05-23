@@ -24,6 +24,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePortalMode } from "@/contexts/PortalModeContext";
 import { useUserRole } from "@/hooks/useUserRole";
 
+import { authFetch } from "../../../lib/authFetch";
 // API base URL — mirrors Portal.tsx resolution so production cross-origin
 // API calls (api.aicandlez.com) work when SignalRow is rendered from any
 // host. In dev it falls back to same-origin so the shared proxy handles it.
@@ -112,7 +113,7 @@ function useLiveOrderCap(enabled: boolean): LiveOrderCapInfo {
     staleTime: 60_000,
     queryFn: async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/billing/subscription`, {
+      const res = await authFetch(`${apiBaseUrl}/api/billing/subscription`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -177,7 +178,7 @@ function useLiveOrderSize(): [number, (n: number) => void] {
     (async () => {
       try {
         const token = await getToken().catch(() => null);
-        const res = await fetch(`${apiBaseUrl}/api/user/settings`, {
+        const res = await authFetch(`${apiBaseUrl}/api/user/settings`, {
           credentials: "include",
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
@@ -204,7 +205,7 @@ function useLiveOrderSize(): [number, (n: number) => void] {
     (async () => {
       try {
         const token = await getToken().catch(() => null);
-        await fetch(`${apiBaseUrl}/api/user/settings`, {
+        await authFetch(`${apiBaseUrl}/api/user/settings`, {
           method: "PUT",
           credentials: "include",
           headers: {
@@ -305,7 +306,7 @@ export function SignalRow({ spec, breakdown }: Props) {
       const token = await getToken().catch(() => null);
       // Conservative fixed notional matches the live-order endpoint default.
       // Server route /api/simulation/order expects { symbol, side, sizeUSD }.
-      await fetch(`${apiBaseUrl}/api/simulation/order`, {
+      await authFetch(`${apiBaseUrl}/api/simulation/order`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -330,7 +331,7 @@ export function SignalRow({ spec, breakdown }: Props) {
   }> => {
     try {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/user/live-order`, {
+      const res = await authFetch(`${apiBaseUrl}/api/user/live-order`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -526,7 +527,7 @@ export function SignalRow({ spec, breakdown }: Props) {
       void (async () => {
         try {
           const token = await getToken().catch(() => null);
-          const res = await fetch(`${apiBaseUrl}/api/exchange/order/execute`, {
+          const res = await authFetch(`${apiBaseUrl}/api/exchange/order/execute`, {
             method: "POST",
             credentials: "include",
             headers: {

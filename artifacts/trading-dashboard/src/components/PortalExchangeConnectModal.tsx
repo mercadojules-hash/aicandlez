@@ -25,6 +25,7 @@ import { useAuth } from "@clerk/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X, Loader2, ShieldCheck, AlertTriangle, Check, Link2Off, FlaskConical } from "lucide-react";
 
+import { authFetch } from "../lib/authFetch";
 const N = {
   BG_OVERLAY: "rgba(0,0,0,0.86)",
   CARD:       "#0A1410",
@@ -108,7 +109,7 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
     queryKey:  ["user-exchanges"],
     queryFn:   async () => {
       const token = await getToken().catch(() => null);
-      const r = await fetch("/api/user/exchanges", {
+      const r = await authFetch("/api/user/exchanges", {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -170,7 +171,7 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
     setDisconnectError(null);
     try {
       const token = await getToken().catch(() => null);
-      const r = await fetch(`/api/user/exchanges/${picked.id}`, {
+      const r = await authFetch(`/api/user/exchanges/${picked.id}`, {
         method:      "DELETE",
         credentials: "include",
         headers:     token ? { Authorization: `Bearer ${token}` } : {},
@@ -208,7 +209,7 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
     setError(null);
     try {
       const token = await getToken().catch(() => null);
-      const r = await fetch("/api/user/exchanges/connect", {
+      const r = await authFetch("/api/user/exchanges/connect", {
         method:      "POST",
         credentials: "include",
         headers: {

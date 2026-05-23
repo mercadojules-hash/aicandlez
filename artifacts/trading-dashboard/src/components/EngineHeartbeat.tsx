@@ -16,6 +16,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { N } from "@/components/command/institutional/theme";
 
+import { authFetch } from "../lib/authFetch";
 interface SafeTestModeState {
   active:                       boolean;
   expiresAt:                    number | null;
@@ -111,7 +112,7 @@ export default function EngineHeartbeat() {
   const { data, isLoading } = useQuery<HeartbeatResponse>({
     queryKey: ["admin-engine-heartbeat"],
     queryFn:  async () => {
-      const r = await fetch(`/api/admin/execution/heartbeat`, {
+      const r = await authFetch(`/api/admin/execution/heartbeat`, {
         cache: "no-store",
         credentials: "include",
       });
@@ -125,7 +126,7 @@ export default function EngineHeartbeat() {
 
   const activateMut = useMutation({
     mutationFn: async () => {
-      const r = await fetch(`/api/admin/execution/safe-test-mode`, {
+      const r = await authFetch(`/api/admin/execution/safe-test-mode`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -150,7 +151,7 @@ export default function EngineHeartbeat() {
 
   const deactivateMut = useMutation({
     mutationFn: async () => {
-      const r = await fetch(`/api/admin/execution/safe-test-mode`, {
+      const r = await authFetch(`/api/admin/execution/safe-test-mode`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

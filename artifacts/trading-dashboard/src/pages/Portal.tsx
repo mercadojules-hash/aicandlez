@@ -51,6 +51,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { PortalModeProvider, usePortalMode, useStoredPortalMode, exchangeSupportsSandbox, type PortalMode } from "@/contexts/PortalModeContext";
 
+import { authFetch } from "../lib/authFetch";
 const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
 // API base URL — in production the API lives on a different origin
@@ -66,7 +67,7 @@ const apiBaseUrl = (
 ).replace(/\/$/, "");
 
 const j = <T,>(url: string) =>
-  fetch(url, { cache: "no-store", credentials: "include" }).then(
+  authFetch(url, { cache: "no-store", credentials: "include" }).then(
     (r) => r.json() as Promise<T>,
   );
 
@@ -348,7 +349,7 @@ function AccountModal({
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/account`, {
+      const res = await authFetch(`${apiBaseUrl}/api/account`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -364,7 +365,7 @@ function AccountModal({
   const openPortal = async () => {
     try {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/billing/portal`, {
+      const res = await authFetch(`${apiBaseUrl}/api/billing/portal`, {
         method: "POST", credentials: "include",
         headers: {
           "Content-Type": "application/json",
@@ -395,7 +396,7 @@ function AccountModal({
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/user/settings`, {
+      const res = await authFetch(`${apiBaseUrl}/api/user/settings`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -427,7 +428,7 @@ function AccountModal({
       // Keep the legacy boolean column in sync for any downstream caller
       // still reading it (defense-in-depth during the alertPrefs rollout).
       if (patch.key === "liveTradeFilled") body.notificationsLiveFills = patch.value;
-      const res = await fetch(`${apiBaseUrl}/api/user/settings`, {
+      const res = await authFetch(`${apiBaseUrl}/api/user/settings`, {
         method: "PUT",
         credentials: "include",
         headers: {
@@ -956,7 +957,7 @@ function useExchangeStatus(): ExchangeStatus {
   const { data } = useQuery({
     queryKey: ["portal-exchanges-status"],
     queryFn:  async () => {
-      const r = await fetch(`${apiBaseUrl}/api/user/exchanges`, { credentials: "include" });
+      const r = await authFetch(`${apiBaseUrl}/api/user/exchanges`, { credentials: "include" });
       if (!r.ok) return { exchanges: [] as ExchangeStatusEntry[] };
       return r.json() as Promise<{ exchanges: ExchangeStatusEntry[] }>;
     },
@@ -1001,7 +1002,7 @@ function AlpacaReconnectBanner({ lastError }: { lastError: string | null }) {
   const { data: cfg } = useQuery<AlpacaOauthCfgResp>({
     queryKey: ["portal-alpaca-oauth-config"],
     queryFn: async () => {
-      const r = await fetch(`${apiBaseUrl}/api/user/exchanges/alpaca/oauth/config`, { credentials: "include" });
+      const r = await authFetch(`${apiBaseUrl}/api/user/exchanges/alpaca/oauth/config`, { credentials: "include" });
       if (!r.ok) return { enabled: false };
       return r.json() as Promise<AlpacaOauthCfgResp>;
     },
@@ -1122,7 +1123,7 @@ function useLiveExchangeBalances(enabled: boolean): LiveBalancesView {
     queryKey: ["portal-user-exchange-balances"],
     enabled,
     queryFn: async () => {
-      const r = await fetch(`${apiBaseUrl}/api/user/exchanges/balances`, {
+      const r = await authFetch(`${apiBaseUrl}/api/user/exchanges/balances`, {
         credentials: "include", cache: "no-store",
       });
       if (!r.ok) return null;
@@ -1495,7 +1496,7 @@ function LiveExecutionBar({
     try {
       const token = await getToken().catch(() => null);
       const path = armed ? "/api/engine/disarm" : "/api/engine/arm";
-      const res = await fetch(path, {
+      const res = await authFetch(path, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -1711,7 +1712,7 @@ function UpgradeModal({ open, onClose, gate }: {
       // attach a fresh Bearer token (same pattern the WebSocket + Desktop
       // Terminal use). The api-server's clerkMiddleware accepts both.
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/billing/checkout`, {
+      const res = await authFetch(`${apiBaseUrl}/api/billing/checkout`, {
         method:      "POST",
         credentials: "include",
         headers: {
@@ -2368,7 +2369,7 @@ function AdminLiveTradesPanel() {
     queryKey: ["admin-positions"],
     queryFn:  async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/admin/positions?limit=50`, {
+      const res = await authFetch(`${apiBaseUrl}/api/admin/positions?limit=50`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -2469,7 +2470,7 @@ function AdminTradeHistoryPanel() {
     queryKey: ["admin-closed-trades"],
     queryFn:  async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/admin/closed-trades?limit=50`, {
+      const res = await authFetch(`${apiBaseUrl}/api/admin/closed-trades?limit=50`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -2694,7 +2695,7 @@ function ActiveTradesPanel({ onUpgrade }: { onUpgrade: () => void }) {
     queryKey: ["customer-simulation-account"],
     queryFn:  async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/simulation/account`, {
+      const res = await authFetch(`${apiBaseUrl}/api/simulation/account`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -2709,7 +2710,7 @@ function ActiveTradesPanel({ onUpgrade }: { onUpgrade: () => void }) {
   const closeMutation = useMutation({
     mutationFn: async (positionId: string) => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(
+      const res = await authFetch(
         `${apiBaseUrl}/api/simulation/close/${encodeURIComponent(positionId)}`,
         {
           method: "POST",
@@ -2880,7 +2881,7 @@ function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
     queryKey: ["customer-simulation-trades"],
     queryFn:  async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/simulation/trades`, {
+      const res = await authFetch(`${apiBaseUrl}/api/simulation/trades`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -3164,7 +3165,7 @@ function PortalAIConfidencePanel() {
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/user/settings`, {
+      const res = await authFetch(`${apiBaseUrl}/api/user/settings`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -3185,7 +3186,7 @@ function PortalAIConfidencePanel() {
   const mutation = useMutation({
     mutationFn: async (v: number) => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/user/settings`, {
+      const res = await authFetch(`${apiBaseUrl}/api/user/settings`, {
         method: "PUT",
         credentials: "include",
         headers: {
@@ -3773,7 +3774,7 @@ function PortalInner() {
     (async () => {
       try {
         const token = await getToken().catch(() => null);
-        const res = await fetch(`${apiBaseUrl}/api/billing/subscription`, {
+        const res = await authFetch(`${apiBaseUrl}/api/billing/subscription`, {
           credentials: "include",
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
@@ -3819,7 +3820,7 @@ function PortalInner() {
     enabled: isSignedIn ?? false,
     queryFn: async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/simulation/account`, {
+      const res = await authFetch(`${apiBaseUrl}/api/simulation/account`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -3835,7 +3836,7 @@ function PortalInner() {
     enabled: isSignedIn ?? false,
     queryFn: async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/simulation/trades`, {
+      const res = await authFetch(`${apiBaseUrl}/api/simulation/trades`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -3939,7 +3940,7 @@ function PortalInner() {
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/account`, {
+      const res = await authFetch(`${apiBaseUrl}/api/account`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -3963,7 +3964,7 @@ function PortalInner() {
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/account/fees/monthly?months=6`, {
+      const res = await authFetch(`${apiBaseUrl}/api/account/fees/monthly?months=6`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -3986,7 +3987,7 @@ function PortalInner() {
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/admin/fees/monthly?months=6`, {
+      const res = await authFetch(`${apiBaseUrl}/api/admin/fees/monthly?months=6`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -4008,7 +4009,7 @@ function PortalInner() {
     staleTime: 30_000,
     queryFn: async () => {
       const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/admin/fees/month/${feesDrillMonth}`, {
+      const res = await authFetch(`${apiBaseUrl}/api/admin/fees/month/${feesDrillMonth}`, {
         credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -4088,7 +4089,7 @@ function PortalInner() {
     const forceLive = async () => {
       try {
         const headers = await authHeaders();
-        await fetch(`${apiBaseUrl}/api/exchange/mode`, {
+        await authFetch(`${apiBaseUrl}/api/exchange/mode`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json", ...headers },
@@ -4100,7 +4101,7 @@ function PortalInner() {
     const fetchSnap = async () => {
       try {
         const headers = await authHeaders();
-        const res = await fetch(`${apiBaseUrl}/api/exchange/balances`, {
+        const res = await authFetch(`${apiBaseUrl}/api/exchange/balances`, {
           credentials: "include", headers,
         });
         if (!res.ok) return;
@@ -4469,7 +4470,7 @@ function PortalInner() {
                 onClick={async () => {
                   try {
                     const token = await getToken().catch(() => null);
-                    const res = await fetch(`${apiBaseUrl}/api/billing/portal`, {
+                    const res = await authFetch(`${apiBaseUrl}/api/billing/portal`, {
                       method: "POST", credentials: "include",
                       headers: {
                         "Content-Type": "application/json",

@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@clerk/react";
+import { authFetch } from "../lib/authFetch";
 import {
   Activity, AlertTriangle, Bell, BellOff, ChevronDown, ChevronUp,
   Cpu, Maximize2, Minimize2, Radio, RefreshCw, Shield,
@@ -417,7 +418,7 @@ export default function DesktopTerminal() {
   // Fetch helpers
   const fetchWithAuth = useCallback(async (path: string) => {
     if (!token) return null;
-    const r = await fetch(`${BASE}${path}`, {
+    const r = await authFetch(`${BASE}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
       credentials: "include",
     });

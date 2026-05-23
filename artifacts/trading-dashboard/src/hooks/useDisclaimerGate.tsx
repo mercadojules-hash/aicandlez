@@ -12,6 +12,7 @@ import { useAuth } from "@clerk/react";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
 import type { DisclaimerAcks } from "@workspace/db/constants/disclaimer";
 
+import { authFetch } from "../lib/authFetch";
 interface DisclaimerStatus {
   needsAcceptance: boolean;
   bypass:          boolean;
@@ -39,7 +40,7 @@ export function useDisclaimerGate() {
   const fetchStatus = useCallback(async () => {
     if (!isSignedIn) { setStatus(null); return; }
     try {
-      const r = await fetch("/api/user/disclaimer", {
+      const r = await authFetch("/api/user/disclaimer", {
         credentials: "include",
         headers:     await authHeader(),
       });
@@ -65,7 +66,7 @@ export function useDisclaimerGate() {
     setSubmitting(true);
     setError(null);
     try {
-      const r = await fetch("/api/user/disclaimer", {
+      const r = await authFetch("/api/user/disclaimer", {
         method:      "POST",
         credentials: "include",
         headers:     { "Content-Type": "application/json", ...(await authHeader()) },

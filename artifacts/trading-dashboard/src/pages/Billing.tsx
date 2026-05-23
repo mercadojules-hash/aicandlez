@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 
+import { authFetch } from "../lib/authFetch";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface PlanLimit { exchanges: number | string; positions: number | string; trades: number | string; liveTrading: boolean }
@@ -192,7 +193,7 @@ export default function Billing() {
 
   async function loadPlans() {
     try {
-      const r    = await fetch("/api/billing/plans", {
+      const r    = await authFetch("/api/billing/plans", {
         credentials: "include",
         headers: await authHeader(),
       });
@@ -206,7 +207,7 @@ export default function Billing() {
   async function loadSubscription() {
     if (!isSignedIn) return;
     try {
-      const r    = await fetch("/api/billing/subscription", {
+      const r    = await authFetch("/api/billing/subscription", {
         credentials: "include",
         headers: await authHeader(),
       });
@@ -225,7 +226,7 @@ export default function Billing() {
     setLoadingPlan(priceId);
     setError(null);
     try {
-      const r    = await fetch("/api/billing/checkout", {
+      const r    = await authFetch("/api/billing/checkout", {
         method:      "POST",
         credentials: "include",
         headers:     { "Content-Type": "application/json", ...(await authHeader()) },
@@ -251,7 +252,7 @@ export default function Billing() {
   async function handlePortal() {
     setLoadingPlan("portal");
     try {
-      const r    = await fetch("/api/billing/portal", {
+      const r    = await authFetch("/api/billing/portal", {
         method:      "POST",
         credentials: "include",
         headers:     { "Content-Type": "application/json", ...(await authHeader()) },

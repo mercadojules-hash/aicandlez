@@ -41,6 +41,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X, ExternalLink, ShieldCheck, Sparkles, Lock, ArrowRight, Check, Cpu, Hand } from "lucide-react";
 import { PortalExchangeConnectModal } from "./PortalExchangeConnectModal";
 
+import { authFetch } from "../lib/authFetch";
 // ── Provider extension surface ───────────────────────────────────────────────
 //
 // Today: external CTA → user opens alpaca.markets, returns, pastes API keys.
@@ -107,21 +108,21 @@ export function OnboardingFlow() {
   // network cost for every signed-in /portal visit).
   const sub = useQuery<ApiSubscription>({
     queryKey: ["onboarding-sub"],
-    queryFn:  () => fetch("/api/billing/subscription", { credentials: "include" })
+    queryFn:  () => authFetch("/api/billing/subscription", { credentials: "include" })
       .then(r => r.ok ? r.json() : { plan: "free", status: null }),
     enabled:  isSignedIn === true && step !== "done",
     staleTime: 30_000,
   });
   const exchanges = useQuery<ApiExchanges>({
     queryKey: ["onboarding-exchanges"],
-    queryFn:  () => fetch("/api/user/exchanges", { credentials: "include" })
+    queryFn:  () => authFetch("/api/user/exchanges", { credentials: "include" })
       .then(r => r.ok ? r.json() : { exchanges: [] }),
     enabled:  isSignedIn === true && step !== "done",
     staleTime: 5_000,
   });
   const oauthCfg = useQuery<AlpacaOauthConfig>({
     queryKey: ["alpaca-oauth-config"],
-    queryFn:  () => fetch("/api/user/exchanges/alpaca/oauth/config", { credentials: "include" })
+    queryFn:  () => authFetch("/api/user/exchanges/alpaca/oauth/config", { credentials: "include" })
       .then(r => r.ok ? r.json() : { enabled: false }),
     enabled:  isSignedIn === true && step !== "done",
     staleTime: 60_000,

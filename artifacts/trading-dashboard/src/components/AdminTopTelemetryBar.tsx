@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AlertTriangle, X, CheckCircle2, Mail, MailX } from "lucide-react";
 
+import { authFetch } from "../lib/authFetch";
 interface TopTelemetry {
   activeUsersNow:            number;
   totalRegisteredUsers:      number;
@@ -263,7 +264,7 @@ export function AdminTopTelemetryBar() {
   const { data, isError } = useQuery<TopTelemetry>({
     queryKey: ["adminTopTelemetry"],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/api/admin/top-telemetry`, {
+      const res = await authFetch(`${API_BASE}/api/admin/top-telemetry`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -278,7 +279,7 @@ export function AdminTopTelemetryBar() {
   const { data: backfill } = useQuery<BackfillStatus>({
     queryKey: ["adminTopTelemetry:backfill"],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/api/admin/backfill-status`, {
+      const res = await authFetch(`${API_BASE}/api/admin/backfill-status`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -301,7 +302,7 @@ export function AdminTopTelemetryBar() {
     if (emailTestState === "sending") return;
     setEmailTestState("sending");
     try {
-      const res = await fetch(`${API_BASE}/api/admin/operator-email-test`, {
+      const res = await authFetch(`${API_BASE}/api/admin/operator-email-test`, {
         method:      "POST",
         credentials: "include",
       });

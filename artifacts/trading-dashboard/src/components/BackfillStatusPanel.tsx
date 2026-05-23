@@ -18,6 +18,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, PlayCircle, CheckCircle2, XCircle, Clock } from "lucide-react";
 
+import { authFetch } from "../lib/authFetch";
 // ── Types (mirror artifacts/api-server/src/lib/backfillScheduler.ts) ─────
 
 interface PerExchangeStats {
@@ -146,7 +147,7 @@ export function BackfillStatusPanel() {
   const { data, isLoading, isFetching, refetch, isError } = useQuery<BackfillStatus>({
     queryKey: ["admin-backfill-status"],
     queryFn:  async () => {
-      const r = await fetch(`${API_BASE}/api/admin/backfill-status`, {
+      const r = await authFetch(`${API_BASE}/api/admin/backfill-status`, {
         credentials: "include",
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -157,7 +158,7 @@ export function BackfillStatusPanel() {
 
   const runNow = useMutation({
     mutationFn: async () => {
-      const r = await fetch(`${API_BASE}/api/admin/backfill-status/run`, {
+      const r = await authFetch(`${API_BASE}/api/admin/backfill-status/run`, {
         method: "POST",
         credentials: "include",
       });
