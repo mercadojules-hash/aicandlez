@@ -49,7 +49,7 @@ import {
   fmtTime,
 } from "@/hooks/usePaperTrades";
 import { toast } from "@/hooks/use-toast";
-import { PortalModeProvider, usePortalMode, useStoredPortalMode, type PortalMode } from "@/contexts/PortalModeContext";
+import { PortalModeProvider, usePortalMode, useStoredPortalMode, exchangeSupportsSandbox, type PortalMode } from "@/contexts/PortalModeContext";
 
 const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -949,6 +949,8 @@ interface ExchangeStatus {
   lastSyncedAt:   number;
   alpacaOauthErrored: boolean;
   alpacaLastError:    string | null;
+  /** ID of the user's default connected exchange (e.g. "Binance"), or null. */
+  defaultExchange:    string | null;
 }
 function useExchangeStatus(): ExchangeStatus {
   const { data } = useQuery({
@@ -964,6 +966,10 @@ function useExchangeStatus(): ExchangeStatus {
   });
   const list = data?.exchanges ?? [];
   const connected = list.filter(e => e.connected);
+  const defaultExchange =
+    (list.find(e => (e as { isDefault?: boolean }).isDefault)?.exchange)
+    ?? connected[0]?.exchange
+    ?? null;
   const alpaca = connected.find(e => e.exchange === "Alpaca");
   const alpacaErr = alpaca?.connection?.lastError ?? null;
   const alpacaErrHint = alpacaErr?.toLowerCase() ?? "";
@@ -980,6 +986,7 @@ function useExchangeStatus(): ExchangeStatus {
     lastSyncedAt:   Date.now(),
     alpacaOauthErrored,
     alpacaLastError: alpacaOauthErrored ? alpacaErr : null,
+    defaultExchange,
   };
 }
 
@@ -3771,10 +3778,13 @@ function PortalInner() {
       )}
 
       {!isAdmin && (
-        <PortalModeToggle
-          onUpgrade={() => setUpgradeOpenSafe(true)}
-          onConnectExchange={() => disclaimerGate(() => setConnectExchangeOpen(true))}
-        />
+        <>
+          <PortalModeToggle
+            onUpgrade={() => setUpgradeOpenSafe(true)}
+            onConnectExchange={() => disclaimerGate(() => setConnectExchangeOpen(true))}
+          />
+          <PaperSandboxToggle defaultExchange={exchangeStatus.defaultExchange} />
+        </>
       )}
 
       <LogoBanner tier={tier} isAdmin={isAdmin} />
@@ -4299,6 +4309,76 @@ function PortalModeToggle({
           {liveLockReason.toUpperCase()} →
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * PaperSandboxToggle — sub-toggle shown directly under PortalModeToggle when
+ * the user is in PAPER mode. Lets paid OR free users opt into routing paper
+ * orders through their connected exchange's PUBLIC TESTNET / SANDBOX (via the
+ * adapter `testnet: true` host switch) instead of the internal simulator.
+ *
+ * When the user's default exchange has no sandbox we still render the toggle
+ * but disable it with a clear "<exchange> has no public sandbox — internal
+ * simulator only" note, so the user understands the fallback.
+ */
+function PaperSandboxToggle({ defaultExchange }: { defaultExchange: string | null }) {
+  const {
+    mode,
+    paperSandboxEnabled,
+    setPaperSandboxEnabled,
+  } = usePortalMode();
+
+  if (mode !== "PAPER") return null;
+
+  const supported = exchangeSupportsSandbox(defaultExchange);
+  const exchLabel = defaultExchange ?? "no exchange connected";
+
+  return (
+    <div
+      role="group"
+      aria-label="Paper-mode sandbox routing"
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        gap: 12, padding: "6px 24px 0",
+        fontFamily: N.FONT_MONO,
+      }}
+    >
+      <span style={{
+        fontSize: 9, letterSpacing: "0.22em", color: N.TEXT_2, fontWeight: 700,
+      }}>
+        PAPER ROUTING
+      </span>
+
+      <label style={{
+        display: "inline-flex", alignItems: "center", gap: 8,
+        cursor: supported ? "pointer" : "not-allowed",
+        opacity: supported ? 1 : 0.55,
+      }}>
+        <input
+          type="checkbox"
+          checked={supported && paperSandboxEnabled}
+          disabled={!supported}
+          onChange={(e) => setPaperSandboxEnabled(e.target.checked)}
+          style={{ accentColor: N.BRAND, width: 12, height: 12 }}
+        />
+        <span style={{
+          fontSize: 10, letterSpacing: "0.18em", fontWeight: 700,
+          color: supported && paperSandboxEnabled ? N.BRAND : N.TEXT_1,
+          textShadow: supported && paperSandboxEnabled ? `0 0 6px ${N.BRAND}80` : undefined,
+        }}>
+          USE EXCHANGE SANDBOX
+        </span>
+      </label>
+
+      <span style={{
+        fontSize: 9, letterSpacing: "0.12em", color: N.TEXT_2, fontWeight: 600,
+      }}>
+        {supported
+          ? `${exchLabel.toUpperCase()} TESTNET${paperSandboxEnabled ? " · ACTIVE" : ""}`
+          : `${exchLabel.toUpperCase()} HAS NO PUBLIC SANDBOX — INTERNAL SIMULATOR ONLY`}
+      </span>
     </div>
   );
 }

@@ -50,6 +50,10 @@ export interface UserSimPosition {
   // for paper fills and for brokers that don't surface a per-order fee.
   entryFeeBroker?: number;
   entryFeeBrokerCurrency?: string;
+  // True when the position was opened against the exchange's public
+  // sandbox/testnet. Authoritative for the close-side routing decision
+  // (see closeUserPosition below).
+  sandbox?: boolean;
 }
 
 export interface UserSimTrade {
@@ -177,6 +181,7 @@ async function loadFromDB(userId: string): Promise<UserSimState> {
       exchangeOrderId: p.exchangeOrderId ?? undefined,
       entryFeeBroker:         p.entryFeeBroker ?? undefined,
       entryFeeBrokerCurrency: p.entryFeeBrokerCurrency ?? undefined,
+      sandbox:                p.sandbox === true,
     })),
     tradeHistory: dbTrades.map((t) => {
       const entryFee = t.entryFee ?? undefined;
@@ -479,6 +484,8 @@ export async function registerLiveUserFill(params: {
   // prefer it over the catalog estimate on the close-side receipt.
   entryFeeBroker?:         number;
   entryFeeBrokerCurrency?: string;
+  /** Open was routed via the exchange's public sandbox (paper-mode sandbox). */
+  sandbox?: boolean;
 }): Promise<UserSimPosition> {
   const state    = await getOrLoad(params.userId);
   const position: UserSimPosition = {
@@ -497,6 +504,7 @@ export async function registerLiveUserFill(params: {
     exchangeOrderId: params.exchangeOrderId,
     entryFeeBroker:         params.entryFeeBroker,
     entryFeeBrokerCurrency: params.entryFeeBrokerCurrency,
+    sandbox:                params.sandbox === true,
   };
 
   state.positions.push(position);
@@ -517,6 +525,7 @@ export async function registerLiveUserFill(params: {
     exchangeOrderId: position.exchangeOrderId ?? null,
     entryFeeBroker:         position.entryFeeBroker ?? null,
     entryFeeBrokerCurrency: position.entryFeeBrokerCurrency ?? null,
+    sandbox:                position.sandbox === true,
   });
 
   logger.info(
@@ -549,12 +558,19 @@ export async function closeUserPosition(
   let brokerExitFeeCurrency: string | undefined;
   const isLive = !!(pos.exchange && pos.exchangeOrderId);
   if (isLive) {
+    // Mirror the open-side sandbox decision on the close. The authoritative
+    // source is the per-position `sandbox` flag persisted at open-time —
+    // NEVER the user's current `paperSandboxEnabled` setting, which can
+    // toggle between open and close and would route a sandbox-opened
+    // position to production (real money close on a fake position).
+    const useSandbox = pos.sandbox === true;
     const closeRes = await placeLiveCloseOrderForUser({
       userId,
       symbol:   pos.symbol,
       openSide: pos.side,
       quantity: pos.quantity,
       exchange: pos.exchange!,
+      useSandbox,
     });
     if (!closeRes.success) {
       logger.warn(

@@ -39,6 +39,7 @@ type AdapterCtor = new (cfg: {
   oauthRefreshToken?: string;
   oauthExpiresAt?:    number;
   oauthScope?:        string;
+  testnet?:           boolean;
 }) => BaseExchangeAdapter;
 
 // ── The one and only adapter map ─────────────────────────────────────────────
@@ -65,13 +66,41 @@ const ADAPTER_MAP: Record<string, AdapterCtor> = {
 
 export const SUPPORTED_ADAPTER_EXCHANGES = Object.keys(ADAPTER_MAP);
 
+// Exchanges whose adapter (a) is registered in ADAPTER_MAP above AND (b) has a
+// verified public sandbox the `testnet: true` host switch resolves cleanly
+// (see adapterTestnetSwitch.test.ts). Paper-mode in the customer portal can
+// opt to route real orders through these sandboxes for closer-to-live behavior
+// with zero capital risk. Any exchange NOT in this list (including Hyperliquid
+// and dYdX, which have testnet hosts but no registered adapter yet) must fall
+// back to the internal simulator.
+export const SANDBOX_SUPPORTED_EXCHANGES: ReadonlySet<string> = new Set([
+  "Binance",
+  "Gemini",
+  "GateIO",
+  "Phemex",
+]);
+
 export function hasAdapter(exchange: string): boolean {
   return Object.prototype.hasOwnProperty.call(ADAPTER_MAP, exchange);
+}
+
+export function hasSandbox(exchange: string): boolean {
+  return SANDBOX_SUPPORTED_EXCHANGES.has(exchange);
+}
+
+export interface MakeAdapterOptions {
+  /**
+   * When true, construct the adapter with `testnet: true` so it resolves its
+   * REST host to the verified public sandbox. Throws if the exchange has no
+   * public sandbox (caller is expected to gate with `hasSandbox()` first).
+   */
+  testnet?: boolean;
 }
 
 export function makeAdapter(
   exchange: string,
   creds: ExchangeCredentials,
+  opts: MakeAdapterOptions = {},
 ): BaseExchangeAdapter {
   const Ctor = ADAPTER_MAP[exchange];
   if (!Ctor) throw new Error(`No adapter for exchange: ${exchange}`);
@@ -83,5 +112,6 @@ export function makeAdapter(
     oauthRefreshToken: creds.oauthRefreshToken,
     oauthExpiresAt:    creds.oauthExpiresAt,
     oauthScope:        creds.oauthScope,
+    testnet:           opts.testnet === true ? true : undefined,
   });
 }

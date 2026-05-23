@@ -7,7 +7,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { vault } from "../services/vault/CredentialVault.js";
 import { ensureFreshAlpacaCreds } from "../services/exchanges/AlpacaTokenRefresher.js";
-import { makeAdapter } from "../services/exchanges/adapterFactory.js";
+import { hasSandbox, makeAdapter } from "../services/exchanges/adapterFactory.js";
 import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
 import type { StandardOrder } from "../services/exchanges/types.js";
 import { getTicker } from "./marketData.js";
@@ -43,6 +43,15 @@ export interface LiveUserOrderRequest {
   symbol:  string;          // engine-native ("BTCUSD")
   side:    "BUY" | "SELL";
   sizeUSD: number;
+  /**
+   * Route the order through the exchange's public sandbox / testnet instead
+   * of production. Used by the customer portal's PAPER mode "use exchange
+   * sandbox" option for exchanges where one is available. Caller is
+   * responsible for verifying the exchange has a sandbox via
+   * `hasSandbox(exchange)` — when the user's connected exchange has none,
+   * the caller must fall back to the internal simulator and never set this.
+   */
+  useSandbox?: boolean;
 }
 
 export interface LiveUserOrderResult {
@@ -59,7 +68,9 @@ export interface LiveUserOrderResult {
   brokerFee?:         number;
   brokerFeeCurrency?: string;
   dryRun?:         boolean;
-  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "price_unavailable" | "exchange_reject";
+  /** True when the order was routed through the exchange's public sandbox. */
+  sandbox?:        boolean;
+  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject";
   error?:          string;
 }
 
@@ -69,6 +80,8 @@ export interface LiveUserCloseRequest {
   openSide:  "BUY" | "SELL";  // side of the *opening* fill — close uses the opposite
   quantity:  number;          // base-asset qty already known from the open
   exchange:  string;          // exchange the open fill landed on (must match user's current default)
+  /** Route close through the exchange's public sandbox (mirrors the open side). */
+  useSandbox?: boolean;
 }
 
 export interface LiveUserCloseResult {
@@ -82,7 +95,7 @@ export interface LiveUserCloseResult {
   brokerFee?:           number;
   brokerFeeCurrency?:   string;
   dryRun?:              boolean;
-  errorCode?:           "no_connection" | "decrypt_failed" | "unsupported" | "exchange_mismatch" | "exchange_reject";
+  errorCode?:           "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "exchange_mismatch" | "exchange_reject";
   error?:               string;
 }
 
@@ -345,7 +358,7 @@ export async function listLiveExecutionUsers(): Promise<Array<{ userId: string; 
 export async function placeLiveAutoOrderForUser(
   req: LiveUserOrderRequest,
 ): Promise<LiveUserOrderResult> {
-  const { userId, symbol, side, sizeUSD } = req;
+  const { userId, symbol, side, sizeUSD, useSandbox = false } = req;
 
   // 1. Resolve default live connection
   const [row] = await db
@@ -439,9 +452,18 @@ export async function placeLiveAutoOrderForUser(
   }
 
   // 5. Build adapter + place order
+  // When `useSandbox` is true, the caller wants paper-mode behavior routed
+  // through the exchange's public sandbox. Refuse loudly if the exchange has
+  // no sandbox — the caller is supposed to fall back to the internal
+  // simulator on its side rather than ever silently hitting production with
+  // a "sandbox" expectation.
+  if (useSandbox && !hasSandbox(row.exchange)) {
+    const msg = `${row.exchange} has no public sandbox — paper-mode order falls back to internal simulator`;
+    return { success: false, userId, exchange: row.exchange, errorCode: "no_sandbox", error: msg };
+  }
   let adapter: BaseExchangeAdapter;
   try {
-    adapter = makeAdapter(row.exchange, creds);
+    adapter = makeAdapter(row.exchange, creds, { testnet: useSandbox });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await emitFailureNotification(userId, symbol, side, msg, row.exchange);
@@ -562,7 +584,7 @@ export async function placeLiveAutoOrderForUser(
 export async function placeLiveCloseOrderForUser(
   req: LiveUserCloseRequest,
 ): Promise<LiveUserCloseResult> {
-  const { userId, symbol, openSide, quantity, exchange } = req;
+  const { userId, symbol, openSide, quantity, exchange, useSandbox = false } = req;
   const closeSide: "BUY" | "SELL" = openSide === "BUY" ? "SELL" : "BUY";
 
   if (!(quantity > 0)) {
@@ -641,9 +663,15 @@ export async function placeLiveCloseOrderForUser(
   }
 
   // 4. Build adapter + submit market close
+  // Mirror the open-side sandbox choice so paper-sandbox positions close on
+  // the same testnet they were opened against.
+  if (useSandbox && !hasSandbox(row.exchange)) {
+    const msg = `${row.exchange} has no public sandbox — paper-mode close cannot be routed`;
+    return { success: false, userId, exchange: row.exchange, errorCode: "no_sandbox", error: msg };
+  }
   let adapter: BaseExchangeAdapter;
   try {
-    adapter = makeAdapter(row.exchange, creds);
+    adapter = makeAdapter(row.exchange, creds, { testnet: useSandbox });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await emitFailureNotification(userId, symbol, closeSide, msg, row.exchange);

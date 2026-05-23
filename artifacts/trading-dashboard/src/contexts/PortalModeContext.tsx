@@ -25,6 +25,34 @@ export type PortalMode = "PAPER" | "LIVE";
 export type PortalTier = "free" | "starter" | "pro";
 
 const STORAGE_KEY = "acl_portal_mode_v1";
+const SANDBOX_STORAGE_KEY = "acl_portal_paper_sandbox_v1";
+
+/**
+ * Exchanges with a public testnet / sandbox host that the adapter factory
+ * can switch into via `{ testnet: true }`. Must stay in sync with
+ * `SANDBOX_SUPPORTED_EXCHANGES` in
+ * `artifacts/api-server/src/services/exchanges/adapterFactory.ts`.
+ */
+export const SANDBOX_SUPPORTED_EXCHANGES = new Set<string>([
+  "Binance",
+  "Gemini",
+  "GateIO",
+  "Phemex",
+]);
+
+export function exchangeSupportsSandbox(exchange: string | null | undefined): boolean {
+  return !!exchange && SANDBOX_SUPPORTED_EXCHANGES.has(exchange);
+}
+
+function readSandboxStored(): boolean {
+  try { return localStorage.getItem(SANDBOX_STORAGE_KEY) === "1"; }
+  catch { return false; }
+}
+
+function writeSandboxStored(on: boolean) {
+  try { localStorage.setItem(SANDBOX_STORAGE_KEY, on ? "1" : "0"); }
+  catch { /* tolerate quota errors */ }
+}
 
 function readStored(): PortalMode | null {
   try {
@@ -48,6 +76,9 @@ interface PortalModeContextValue {
   hasExchange:      boolean;            // at least one active exchange connection
   liveLockReason:   string | null;      // human-readable reason live is locked, if locked
   tier:             PortalTier;
+  /** PAPER-mode opt-in: route orders through exchange's public sandbox. */
+  paperSandboxEnabled: boolean;
+  setPaperSandboxEnabled: (on: boolean) => void;
 }
 
 const PortalModeContext = createContext<PortalModeContextValue | null>(null);
@@ -67,6 +98,23 @@ export function PortalModeProvider({ tier, hasExchange, children }: ProviderProp
     if (!canUseLive) return "PAPER";
     return stored ?? "PAPER";
   });
+
+  const [paperSandboxEnabled, setPaperSandboxState] = useState<boolean>(() => readSandboxStored());
+
+  const setPaperSandboxEnabled = useCallback((on: boolean) => {
+    setPaperSandboxState(on);
+    writeSandboxStored(on);
+  }, []);
+
+  // Cross-tab sync for the sandbox preference.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== SANDBOX_STORAGE_KEY) return;
+      setPaperSandboxState(e.newValue === "1");
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   // When tier downgrades to free mid-session, snap back to PAPER and clear LIVE.
   useEffect(() => {
@@ -108,7 +156,9 @@ export function PortalModeProvider({ tier, hasExchange, children }: ProviderProp
     hasExchange,
     liveLockReason,
     tier,
-  }), [mode, setMode, canUseLive, hasExchange, liveLockReason, tier]);
+    paperSandboxEnabled,
+    setPaperSandboxEnabled,
+  }), [mode, setMode, canUseLive, hasExchange, liveLockReason, tier, paperSandboxEnabled, setPaperSandboxEnabled]);
 
   return (
     <PortalModeContext.Provider value={value}>
@@ -134,6 +184,8 @@ export function usePortalMode(): PortalModeContextValue & { isCustomerPortal: bo
     hasExchange:    false,
     liveLockReason: null,
     tier:           "free",
+    paperSandboxEnabled:    false,
+    setPaperSandboxEnabled: () => {},
     isCustomerPortal: false,
   };
 }

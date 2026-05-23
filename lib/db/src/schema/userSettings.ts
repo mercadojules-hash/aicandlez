@@ -27,6 +27,14 @@ export const userSettingsTable = pgTable("user_settings", {
 
   preferredExchange:  varchar("preferred_exchange", { length: 50 }).notNull().default("Kraken"),
 
+  // When ON, paper-mode BUY/SELL on the customer Portal routes real orders
+  // through the connected exchange's public sandbox / testnet (via the
+  // adapter `testnet: true` host switch) instead of the internal simulator.
+  // Only honored for exchanges in `SANDBOX_SUPPORTED_EXCHANGES`; unsupported
+  // exchanges silently fall back to the internal simulator. Off by default
+  // so existing PAPER behavior is preserved.
+  paperSandboxEnabled: boolean("paper_sandbox_enabled").notNull().default(false),
+
   notificationsTradeExec:  boolean("notifications_trade_exec").notNull().default(true),
   notificationsSignals:    boolean("notifications_signals").notNull().default(false),
   notificationsRiskAlerts: boolean("notifications_risk_alerts").notNull().default(true),

@@ -196,7 +196,7 @@ export function SignalRow({ spec, breakdown }: Props) {
 
   /** Submit a real-money order through the user's connected exchange. */
   const submitLive = async (
-    sym: string, side: "BUY" | "SELL", sizeUSD: number,
+    sym: string, side: "BUY" | "SELL", sizeUSD: number, useSandbox: boolean = false,
   ): Promise<{
     ok: boolean;
     error?: string;
@@ -214,7 +214,7 @@ export function SignalRow({ spec, breakdown }: Props) {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ symbol: sym, side, sizeUSD }),
+        body: JSON.stringify({ symbol: sym, side, sizeUSD, useSandbox }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -238,7 +238,10 @@ export function SignalRow({ spec, breakdown }: Props) {
     }
   };
 
-  const firePaper = (side: "LONG" | "SHORT", sl: number, tp: number) => {
+  const sandboxFallbackToastedRef = useRef(false);
+
+  /** Fire a paper trade through the internal simulator (legacy default path). */
+  const firePaperSim = (side: "LONG" | "SHORT", sl: number, tp: number) => {
     openTrade({
       symbol:  spec.symbol,
       display: spec.display,
@@ -251,6 +254,56 @@ export function SignalRow({ spec, breakdown }: Props) {
     toast({
       title: `${side === "LONG" ? "PAPER LONG EXECUTED" : "PAPER SHORT OPENED"} — ${spec.label}`,
       description: `Entry $${fmt(entry)} · TP $${fmt(tp)} · SL $${fmt(sl)} · AI ${conf}% · SIMULATED`,
+    });
+  };
+
+  /**
+   * Route a PAPER trade. When the customer has opted into sandbox routing
+   * AND a connected exchange supports it, submit through the live-order
+   * endpoint with `useSandbox: true` so the order hits the exchange's public
+   * testnet. Any failure (`no_sandbox`, `no_connection`, etc.) falls back
+   * to the internal simulator with a single explanatory toast per row.
+   */
+  const firePaper = (side: "LONG" | "SHORT", sl: number, tp: number) => {
+    const wantSandbox = portalMode.isCustomerPortal && portalMode.paperSandboxEnabled;
+    if (!wantSandbox) {
+      firePaperSim(side, sl, tp);
+      return;
+    }
+
+    // Optimistic feedback so the row feels responsive while the testnet
+    // round-trip completes. The internal-sim fallback will overwrite this
+    // with a clearer toast if sandbox is unavailable.
+    toast({
+      title: `PAPER SANDBOX SUBMITTED — ${spec.label}`,
+      description: `${side} · routing to your exchange's public testnet · AI ${conf}%`,
+    });
+
+    void submitLive(spec.symbol, side === "LONG" ? "BUY" : "SELL", liveSize, true).then(r => {
+      if (!r.ok) {
+        if (!sandboxFallbackToastedRef.current) {
+          sandboxFallbackToastedRef.current = true;
+          toast({
+            title: "SANDBOX UNAVAILABLE — USING INTERNAL SIMULATOR",
+            description: r.error ?? "Exchange sandbox is not reachable",
+          });
+        }
+        firePaperSim(side, sl, tp);
+        return;
+      }
+      const exch = (r.exchange ?? "exchange").toUpperCase();
+      const orderIdShort = r.exchangeOrderId
+        ? `#${r.exchangeOrderId.slice(-8)}`
+        : "";
+      const priceStr = r.fillPrice && r.fillPrice > 0
+        ? `$${fmt(r.fillPrice)}`
+        : "market";
+      toast({
+        title: `SANDBOX FILLED @ ${priceStr} — ${spec.label}`,
+        description: [side, `${exch} TESTNET`, orderIdShort].filter(Boolean).join(" · "),
+      });
+      void qc.invalidateQueries({ queryKey: ["customer-simulation-account"] });
+      void qc.invalidateQueries({ queryKey: ["customer-simulation-trades"] });
     });
   };
 

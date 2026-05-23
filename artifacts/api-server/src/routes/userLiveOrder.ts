@@ -14,9 +14,11 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth.js";
-import { requirePlan } from "../middlewares/requirePlan.js";
 import { placeLiveAutoOrderForUser } from "../lib/liveUserExecution.js";
 import { registerLiveUserFill } from "../lib/userSimRegistry.js";
+
+type Plan = "free" | "starter" | "pro" | "enterprise";
+const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, enterprise: 3 };
 
 const router: IRouter = Router();
 
@@ -31,7 +33,7 @@ const TIER_MAX_SIZE_USD: Record<string, number> = {
 };
 const DEFAULT_SIZE_USD = 100;
 
-function parseBody(raw: unknown): { symbol: string; side: "BUY" | "SELL"; sizeUSD?: number } | null {
+function parseBody(raw: unknown): { symbol: string; side: "BUY" | "SELL"; sizeUSD?: number; useSandbox: boolean } | null {
   if (!raw || typeof raw !== "object") return null;
   const b = raw as Record<string, unknown>;
   const symbol = typeof b.symbol === "string" ? b.symbol.trim() : "";
@@ -44,13 +46,13 @@ function parseBody(raw: unknown): { symbol: string; side: "BUY" | "SELL"; sizeUS
     if (!Number.isFinite(n) || n <= 0 || n > 100_000) return null;
     sizeUSD = n;
   }
-  return { symbol, side, sizeUSD };
+  const useSandbox = b.useSandbox === true;
+  return { symbol, side, sizeUSD, useSandbox };
 }
 
 router.post(
   "/user/live-order",
   requireAuth,
-  requirePlan("starter"),
   async (req, res): Promise<void> => {
     const parsed = parseBody(req.body);
     if (!parsed) {
@@ -69,43 +71,66 @@ router.post(
     // sizeUSD. We enforce the tier cap server-side regardless — the client
     // hint is advisory. Default to $100 when the client omits the field
     // (legacy callers / paranoid fallback).
+    //
+    // Sandbox / testnet flow: when `useSandbox` is true, the order routes
+    // through the exchange's public testnet (no real money). We still
+    // require an exchange that supports a sandbox host (`hasSandbox`) and
+    // an authenticated user — but we bypass the plan paywall and the
+    // per-tier sizeUSD ceiling, since sandbox is the paper-trading path.
+    // The 100_000 schema cap in parseBody remains the absolute ceiling.
     const requestedSize = parsed.sizeUSD ?? DEFAULT_SIZE_USD;
-    let tierCap = TIER_MAX_SIZE_USD.starter ?? 500;
+    let userPlan: Plan = "free";
+    let isOperator = false;
     try {
       const [u] = await db
         .select({ plan: usersTable.plan, role: usersTable.role })
         .from(usersTable)
         .where(eq(usersTable.clerkUserId, userId))
         .limit(1);
-      if (u?.role === "admin" || u?.role === "super-admin") {
-        tierCap = 100_000;
-      } else {
-        tierCap = TIER_MAX_SIZE_USD[u?.plan ?? "free"] ?? 0;
-      }
+      isOperator = u?.role === "admin" || u?.role === "super-admin";
+      userPlan   = (u?.plan ?? "free") as Plan;
     } catch (err) {
       req.log.warn(
         { userId, err: err instanceof Error ? err.message : String(err) },
-        "userLiveOrder: tier lookup failed — falling back to starter cap",
+        "userLiveOrder: tier lookup failed — falling back to free plan",
       );
     }
 
-    if (requestedSize > tierCap) {
-      res.status(409).json({
-        ok:        false,
-        errorCode: "SIZE_EXCEEDS_TIER_CAP",
-        error:     `Order size $${requestedSize} exceeds your plan's per-trade cap of $${tierCap}`,
-        tierCap,
-      });
-      return;
+    if (!parsed.useSandbox) {
+      // Real-money path → enforce plan gate + tier cap.
+      if (!isOperator && (PLAN_RANK[userPlan] ?? 0) < PLAN_RANK.starter) {
+        res.status(402).json({
+          ok:           false,
+          errorCode:    "MEMBERSHIP_REQUIRED",
+          error:        "Live exchange execution requires a paid plan",
+          currentPlan:  userPlan,
+          requiredPlan: "starter",
+          upgradeUrl:   "/subscribe",
+        });
+        return;
+      }
+      const tierCap = isOperator
+        ? 100_000
+        : (TIER_MAX_SIZE_USD[userPlan] ?? 0);
+      if (requestedSize > tierCap) {
+        res.status(409).json({
+          ok:        false,
+          errorCode: "SIZE_EXCEEDS_TIER_CAP",
+          error:     `Order size $${requestedSize} exceeds your plan's per-trade cap of $${tierCap}`,
+          tierCap,
+        });
+        return;
+      }
     }
     const sizeUSD = requestedSize;
 
     try {
       const result = await placeLiveAutoOrderForUser({
         userId,
-        symbol:  parsed.symbol,
-        side:    parsed.side,
+        symbol:     parsed.symbol,
+        side:       parsed.side,
         sizeUSD,
+        useSandbox: parsed.useSandbox,
       });
 
       if (!result.success) {
@@ -152,6 +177,7 @@ router.post(
                                     ?? `LIVE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             entryFeeBroker:         result.brokerFee,
             entryFeeBrokerCurrency: result.brokerFeeCurrency,
+            sandbox:                parsed.useSandbox,
           });
         }
       } catch (mirrorErr) {
