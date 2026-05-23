@@ -147,7 +147,42 @@ router.post("/exchange/order/preview", ...requireOperator, async (req, res) => {
 });
 
 // ── Execute order ─────────────────────────────────────────────────────────────
-router.post("/exchange/order/execute", ...requireOperator, async (req, res) => {
+// ── [BUY-TRACE PRE-AUTH] ────────────────────────────────────────────────────
+// Runs BEFORE requireAuth so we can see exactly what arrives on the wire
+// when the operator BUY click 401s. Logs:
+//   • method + path
+//   • presence + length of Authorization header
+//   • cookie header presence
+//   • clerk auth state extracted by @clerk/express (what getAuth sees)
+// If `auth.userId` is present here but requireAuth still 401s, the bug is
+// in requireAuth. If `auth.userId` is null here, the bug is upstream
+// (clerkMiddleware misconfigured for this host / token rejected).
+router.post("/exchange/order/execute", async (req, _res, next) => {
+  // eslint-disable-next-line no-console
+  const { getAuth } = await import("@clerk/express");
+  const auth = getAuth(req);
+  const authHeader = req.header("authorization") ?? "";
+  // eslint-disable-next-line no-console
+  console.error("[BUY-TRACE PRE-AUTH]", {
+    marker:           req.header("x-buy-trace") ?? null,
+    method:           req.method,
+    path:             req.originalUrl,
+    host:             req.header("host"),
+    xForwardedHost:   req.header("x-forwarded-host"),
+    xForwardedProto:  req.header("x-forwarded-proto"),
+    origin:           req.header("origin") ?? null,
+    referer:          req.header("referer") ?? null,
+    hasAuthHeader:    authHeader.startsWith("Bearer "),
+    authHeaderLen:    authHeader.length,
+    authTokenPrefix:  authHeader.startsWith("Bearer ") ? authHeader.slice(7, 25) + "…" : null,
+    hasCookie:        !!req.header("cookie"),
+    cookieHasSession: (req.header("cookie") ?? "").includes("__session"),
+    clerkAuthUserId:  auth?.userId ?? null,
+    clerkSessionId:   auth?.sessionId ?? null,
+    clerkSessionClaimsUserId: (auth?.sessionClaims as { userId?: string } | undefined)?.userId ?? null,
+  });
+  next();
+}, ...requireOperator, async (req, res) => {
   // Loud console.error so the line is impossible to miss in workflow logs
   // even if pino formatting hides structured fields. Mirrors req.log calls.
   // eslint-disable-next-line no-console
