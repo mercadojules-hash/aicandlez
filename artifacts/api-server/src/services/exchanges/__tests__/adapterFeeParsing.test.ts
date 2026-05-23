@@ -141,6 +141,21 @@ describe("BloFinAdapter fee parsing", () => {
     expect(order?.fee.amount).toBeCloseTo(0.5, 6);
     expect(order?.fee.currency).toBe("USDT");
   });
+
+  it("falls back to estimate when fee/feeCcy missing", async () => {
+    const adapter = new BloFinAdapter(cfg("BloFin"));
+    vi.spyOn(adapter as unknown as { signedGet: () => Promise<unknown> }, "signedGet")
+      .mockResolvedValue({
+        code: "0", msg: "",
+        data: [{
+          ordId: "1234", instId: "BTC-USDT", side: "buy", ordType: "market",
+          state: "filled", sz: "0.01", accFillSz: "0.01", avgPx: "50000",
+          cTime: "1700000000000", uTime: "1700000000000",
+        }],
+      });
+    const order = await adapter.getOrder("1234", "BTCUSD");
+    expect(order?.fee.source).toBe("estimate");
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -164,6 +179,21 @@ describe("BitgetAdapter fee parsing", () => {
     expect(order?.fee.source).toBe("broker");
     expect(order?.fee.amount).toBeCloseTo(-0.55, 6);
     expect(order?.fee.currency).toBe("USDT");
+  });
+
+  it("falls back to estimate when feeDetail missing", async () => {
+    const adapter = new BitgetAdapter(cfg("Bitget"));
+    vi.spyOn(adapter as unknown as { signedGet: () => Promise<unknown> }, "signedGet")
+      .mockResolvedValue({
+        code: "00000", msg: "success",
+        data: {
+          orderId: "999", side: "buy", orderType: "market", status: "full_fill",
+          size: "0.01", baseVolume: "0.01", priceAvg: "50000", quoteVolume: "500",
+          cTime: "1700000000000", uTime: "1700000000000",
+        },
+      });
+    const order = await adapter.getOrder("999", "BTCUSD");
+    expect(order?.fee.source).toBe("estimate");
   });
 });
 
@@ -189,6 +219,22 @@ describe("HTXAdapter fee parsing", () => {
     expect(order?.fee.amount).toBeCloseTo(0.5, 6);
     expect(order?.fee.currency).toBe("USDT");
   });
+
+  it("falls back to estimate when field-fees missing", async () => {
+    const adapter = new HTXAdapter(cfg("HTX"));
+    vi.spyOn(adapter as unknown as { signedGet: () => Promise<unknown> }, "signedGet")
+      .mockResolvedValue({
+        status: "ok",
+        data: {
+          id: 555, symbol: "btcusdt", type: "buy-market", state: "filled",
+          amount: "0.01", price: "0",
+          "field-amount": "0.01", "field-cash-amount": "500",
+          "created-at": 1700000000000,
+        },
+      });
+    const order = await adapter.getOrder("555", "BTCUSD");
+    expect(order?.fee.source).toBe("estimate");
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -209,6 +255,19 @@ describe("GateIOAdapter fee parsing", () => {
     expect(order?.fee.source).toBe("broker");
     expect(order?.fee.amount).toBeCloseTo(0.5, 6);
     expect(order?.fee.currency).toBe("USDT");
+  });
+
+  it("falls back to estimate when fee missing", async () => {
+    const adapter = new GateIOAdapter(cfg("GateIO"));
+    vi.spyOn(adapter as unknown as { signedGet: () => Promise<unknown> }, "signedGet")
+      .mockResolvedValue({
+        id: "abc123", currency_pair: "BTC_USDT", side: "buy", type: "market",
+        status: "closed", amount: "0.01", fill_price: "50000", price: "0",
+        filled_total: "500",
+        create_time_ms: "1700000000000", update_time_ms: "1700000000000",
+      });
+    const order = await adapter.getOrder("abc123", "BTCUSD");
+    expect(order?.fee.source).toBe("estimate");
   });
 });
 
@@ -236,6 +295,24 @@ describe("CryptoDotComAdapter fee parsing", () => {
     expect(order?.fee.source).toBe("broker");
     expect(order?.fee.amount).toBeCloseTo(0.5, 6);
     expect(order?.fee.currency).toBe("USDT");
+  });
+
+  it("falls back to estimate when fee_currency_amount missing", async () => {
+    const adapter = new CryptoDotComAdapter(cfg("CryptoDotCom"));
+    vi.spyOn(adapter as unknown as { privatePost: () => Promise<unknown> }, "privatePost")
+      .mockResolvedValue({
+        id: 1, method: "private/get-order-detail", code: 0,
+        result: {
+          order_info: {
+            order_id: 777, instrument_name: "BTC_USDT", side: "BUY", type: "MARKET",
+            status: "FILLED", quantity: 0.01, cumulative_quantity: 0.01,
+            avg_price: 50000, cumulative_value: 500,
+            create_time: 1700000000000, update_time: 1700000000000,
+          },
+        },
+      });
+    const order = await adapter.getOrder("777", "BTCUSD");
+    expect(order?.fee.source).toBe("estimate");
   });
 });
 
@@ -295,6 +372,21 @@ describe("CoinbaseAdapter fee parsing", () => {
     expect(order?.fee.amount).toBeCloseTo(3.0, 4);
     expect(order?.fee.currency).toBe("USD");
   });
+
+  it("falls back to estimate when total_fees missing", async () => {
+    const adapter = new CoinbaseAdapter(cfg("Coinbase"));
+    vi.spyOn(adapter as unknown as { signedGet: () => Promise<unknown> }, "signedGet")
+      .mockResolvedValue({
+        order: {
+          client_order_id: "cb-client", product_id: "BTC-USD",
+          side: "BUY", status: "FILLED",
+          average_filled_price: "50000", filled_size: "0.01",
+          order_configuration: { market_market_ioc: { quote_size: "500" } },
+        },
+      });
+    const order = await adapter.getOrder("cb1", "BTCUSD");
+    expect(order?.fee.source).toBe("estimate");
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -318,6 +410,20 @@ describe("BingXAdapter fee parsing", () => {
     expect(order?.fee.amount).toBeCloseTo(-0.5, 6);
     expect(order?.fee.currency).toBe("USDT");
   });
+
+  it("falls back to estimate when fee missing", async () => {
+    const adapter = new BingXAdapter(cfg("BingX"));
+    vi.spyOn(adapter as unknown as { signedGet: () => Promise<unknown> }, "signedGet")
+      .mockResolvedValue({
+        code: 0, data: {
+          orderId: 42, side: "BUY", type: "MARKET", status: "FILLED",
+          origQty: "0.01", executedQty: "0.01", price: "50000",
+          time: 1700000000000, updateTime: 1700000000000,
+        },
+      });
+    const order = await adapter.getOrder("42", "BTCUSD");
+    expect(order?.fee.source).toBe("estimate");
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -339,6 +445,17 @@ describe("BitstampAdapter fee parsing", () => {
     expect(order?.fee.source).toBe("broker");
     expect(order?.fee.amount).toBeCloseTo(2.5, 6);
     expect(order?.fee.currency).toBe("USD");
+  });
+
+  it("falls back to estimate when transactions[] missing fees", async () => {
+    const adapter = new BitstampAdapter(cfg("Bitstamp"));
+    vi.spyOn(adapter as unknown as { signedPost: () => Promise<unknown> }, "signedPost")
+      .mockResolvedValue({
+        id: "bs1", type: 0, price: "50000", amount: "0.01", status: "Finished",
+        transactions: [],
+      });
+    const order = await adapter.getOrder("bs1", "BTCUSD");
+    expect(order?.fee.source).toBe("estimate");
   });
 });
 
@@ -362,6 +479,19 @@ describe("PhemexAdapter fee parsing", () => {
     expect(order?.fee.amount).toBeCloseTo(0.375, 6);
     expect(order?.fee.currency).toBe("USDT");
   });
+
+  it("falls back to estimate when cumFeeEv missing", async () => {
+    const adapter = new PhemexAdapter(cfg("Phemex"));
+    vi.spyOn(adapter as unknown as { signedGet: () => Promise<unknown> }, "signedGet")
+      .mockResolvedValue({
+        data: {
+          orderID: "px1", side: "Buy", ordType: "Market", ordStatus: "Filled",
+          orderQty: "0.01", cumQty: "0.01", avgPriceEp: 5_000_000_000_000,
+        },
+      });
+    const order = await adapter.getOrder("px1", "BTCUSD");
+    expect(order?.fee.source).toBe("estimate");
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -383,5 +513,18 @@ describe("GeminiAdapter fee parsing", () => {
     expect(order.fee.source).toBe("broker");
     expect(order.fee.amount).toBeCloseTo(1.75, 6);
     expect(order.fee.currency).toBe("USD");
+  });
+
+  it("falls back to estimate when fee_amount missing", async () => {
+    const adapter = new GeminiAdapter(cfg("Gemini"));
+    vi.spyOn(adapter as unknown as { signedPost: () => Promise<unknown> }, "signedPost")
+      .mockResolvedValue({
+        order_id: 999, symbol: "btcusd", side: "buy", type: "exchange market",
+        is_live: false, is_cancelled: false,
+        original_amount: "0.01", executed_amount: "0.01", avg_execution_price: "50000",
+        timestampms: 1700000000000,
+      });
+    const order = await adapter.placeOrder({ symbol: "BTCUSD", side: "buy", type: "market", qty: 0.01 });
+    expect(order.fee.source).toBe("estimate");
   });
 });
