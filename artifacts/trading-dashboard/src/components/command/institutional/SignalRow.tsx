@@ -510,6 +510,8 @@ export function SignalRow({ spec, breakdown }: Props) {
     // execution path (`/api/exchange/order/execute`). Path A surgical bridge
     // so super-admin can manually fire a real Kraken order from a signal row
     // for live-test validation. Customer-portal trees never reach this branch.
+    // eslint-disable-next-line no-alert
+    window.alert("[BUY-TRACE] BEFORE OPERATOR BRANCH — isOperatorRole=" + isOperatorRole + " isCustomerPortal=" + portalMode.isCustomerPortal + " willEnter=" + (isOperatorRole || !portalMode.isCustomerPortal));
     if (isOperatorRole || !portalMode.isCustomerPortal) {
       console.error("[BUY-TRACE] BRANCH = OPERATOR (Kraken env path)");
       if (operatorOrderInFlightRef.current) {
@@ -536,6 +538,8 @@ export function SignalRow({ spec, breakdown }: Props) {
             amountUSD: liveSize,
           };
           console.error("[BUY-TRACE] BEFORE FETCH", { url, payload, hasToken: !!token });
+          // eslint-disable-next-line no-alert
+          window.alert("[BUY-TRACE] BEFORE FETCH\nurl=" + url + "\npayload=" + JSON.stringify(payload) + "\nhasToken=" + !!token);
           const res = await authFetch(url, {
             method: "POST",
             credentials: "include",
@@ -546,6 +550,8 @@ export function SignalRow({ spec, breakdown }: Props) {
             body: JSON.stringify(payload),
           });
           console.error("[BUY-TRACE] AFTER FETCH", { status: res.status, ok: res.ok });
+          // eslint-disable-next-line no-alert
+          window.alert("[BUY-TRACE] AFTER FETCH status=" + res.status + " ok=" + res.ok);
           if (!res.ok) {
             const body = await res.json().catch(() => ({} as { error?: string }));
             console.error("[BUY-TRACE] REJECTED body", body);
@@ -566,6 +572,9 @@ export function SignalRow({ spec, breakdown }: Props) {
           });
         } catch (err) {
           console.error("[BUY-TRACE] FETCH THREW", err);
+          console.error("[BUY-TRACE] FETCH THREW stack:", err instanceof Error ? err.stack : "(no stack)");
+          // eslint-disable-next-line no-alert
+          window.alert("[BUY-TRACE] FETCH EXCEPTION: " + (err instanceof Error ? err.message + " | " + (err.stack ?? "") : String(err)));
           toast({
             title: `OPERATOR ORDER ERROR — ${spec.label}`,
             description: err instanceof Error ? err.message : String(err),
