@@ -148,6 +148,14 @@ router.post("/exchange/order/preview", ...requireOperator, async (req, res) => {
 
 // ── Execute order ─────────────────────────────────────────────────────────────
 router.post("/exchange/order/execute", ...requireOperator, async (req, res) => {
+  // Loud console.error so the line is impossible to miss in workflow logs
+  // even if pino formatting hides structured fields. Mirrors req.log calls.
+  // eslint-disable-next-line no-console
+  console.error("[BUY-TRACE SERVER] HIT /api/exchange/order/execute", {
+    marker: req.header("x-buy-trace") ?? null,
+    userId: (req as unknown as { auth?: { userId?: string } }).auth?.userId ?? null,
+    body: req.body,
+  });
   const { symbol, side, orderType, amountUSD, limitPrice } = req.body as {
     symbol:     string;
     side:       OrderSide;
@@ -155,21 +163,23 @@ router.post("/exchange/order/execute", ...requireOperator, async (req, res) => {
     amountUSD:  number;
     limitPrice?: number;
   };
-  // ── [BUY-TRACE] server entry ────────────────────────────────────────────────
-  // Tagged so the operator can grep alongside the browser-side `[BUY-TRACE]`
-  // markers in SignalRow.fireTrade. Remove once the first real Kraken fill is
-  // confirmed end-to-end.
   req.log.info(
-    { tag: "BUY-TRACE", phase: "route-entry", symbol, side, orderType, amountUSD, limitPrice },
+    { tag: "BUY-TRACE", phase: "route-entry", marker: req.header("x-buy-trace") ?? null, symbol, side, orderType, amountUSD, limitPrice },
     "[BUY-TRACE] /api/exchange/order/execute ENTRY",
   );
   if (!symbol || !side || !orderType || !amountUSD) {
+    // eslint-disable-next-line no-console
+    console.error("[BUY-TRACE SERVER] VALIDATION FAIL", { symbol, side, orderType, amountUSD });
     req.log.warn({ tag: "BUY-TRACE", phase: "validation-fail" }, "[BUY-TRACE] payload invalid");
     res.status(400).json({ error: "symbol, side, orderType, amountUSD are required" });
     return;
   }
   try {
+    // eslint-disable-next-line no-console
+    console.error("[BUY-TRACE SERVER] CALLING executeOrder", { symbol, side, orderType, amountUSD, limitPrice });
     const order = await executeOrder(symbol, side, orderType, amountUSD, limitPrice);
+    // eslint-disable-next-line no-console
+    console.error("[BUY-TRACE SERVER] executeOrder OK", order);
     req.log.info(
       { tag: "BUY-TRACE", phase: "executor-success", order },
       "[BUY-TRACE] executeOrder returned",
@@ -177,8 +187,11 @@ router.post("/exchange/order/execute", ...requireOperator, async (req, res) => {
     res.json(order);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Execution failed";
+    const stack = err instanceof Error ? err.stack : "(no stack)";
+    // eslint-disable-next-line no-console
+    console.error("[BUY-TRACE SERVER] executeOrder THREW", { msg, stack, raw: err });
     req.log.error(
-      { tag: "BUY-TRACE", phase: "executor-throw", err: msg },
+      { tag: "BUY-TRACE", phase: "executor-throw", err: msg, stack },
       "[BUY-TRACE] executeOrder threw",
     );
     res.status(502).json({ error: msg });

@@ -129,6 +129,14 @@ export function useLiveCandles({
         });
     };
 
+    if (import.meta.env.DEV) {
+      const synth = makeWalk(anchor, limit, Math.random() * 6);
+      baseRef.current = synth;
+      setPoints(synth);
+      setLivePrice(synth[synth.length - 1].close);
+      setState("synthetic");
+      return () => { cancelled = true; };
+    }
     fetchOnce();
     const id = setInterval(fetchOnce, pollMs);
     return () => { cancelled = true; clearInterval(id); };

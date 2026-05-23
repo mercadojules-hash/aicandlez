@@ -537,7 +537,7 @@ export function SignalRow({ spec, breakdown }: Props) {
             orderType: "market",
             amountUSD: liveSize,
           };
-          console.error("[BUY-TRACE] BEFORE FETCH", { url, payload, hasToken: !!token });
+          console.error("[BUY-TRACE] EXECUTION FETCH START", { url, payload, tokenPresent: !!token });
           // eslint-disable-next-line no-alert
           window.alert("[BUY-TRACE] BEFORE FETCH\nurl=" + url + "\npayload=" + JSON.stringify(payload) + "\nhasToken=" + !!token);
           const res = await authFetch(url, {
@@ -545,11 +545,12 @@ export function SignalRow({ spec, breakdown }: Props) {
             credentials: "include",
             headers: {
               "Content-Type": "application/json",
+              "X-BUY-TRACE": "operator-live-order",
               ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
             body: JSON.stringify(payload),
           });
-          console.error("[BUY-TRACE] AFTER FETCH", { status: res.status, ok: res.ok });
+          console.error("[BUY-TRACE] EXECUTION FETCH RESPONSE", { status: res.status, ok: res.ok });
           // eslint-disable-next-line no-alert
           window.alert("[BUY-TRACE] AFTER FETCH status=" + res.status + " ok=" + res.ok);
           if (!res.ok) {
