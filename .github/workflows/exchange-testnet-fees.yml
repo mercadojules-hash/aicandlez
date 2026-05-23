@@ -9,9 +9,10 @@
 #   - Binance Spot Testnet   (BINANCE_TESTNET_*)
 #   - Gemini Sandbox         (GEMINI_SANDBOX_*)
 #   - Gate.io Spot Testnet   (GATEIO_TESTNET_*)
+#   - Phemex Testnet         (PHEMEX_TESTNET_*)
 #
 # Documented coverage gaps for Bitget, BingX, HTX, Crypto.com,
-# Kraken Spot, Phemex, and Coinbase Advanced Trade live as
+# Kraken Spot, and Coinbase Advanced Trade live as
 # `describe.skip` placeholders inside `adapterFeeParsingTestnet.test.ts`
 # (see the broker coverage matrix at the top of that file). Secrets for
 # those brokers are intentionally NOT wired here — that prevents the
@@ -50,6 +51,8 @@ jobs:
       GEMINI_SANDBOX_API_SECRET:   ${{ secrets.GEMINI_SANDBOX_API_SECRET }}
       GATEIO_TESTNET_API_KEY:      ${{ secrets.GATEIO_TESTNET_API_KEY }}
       GATEIO_TESTNET_API_SECRET:   ${{ secrets.GATEIO_TESTNET_API_SECRET }}
+      PHEMEX_TESTNET_API_KEY:      ${{ secrets.PHEMEX_TESTNET_API_KEY }}
+      PHEMEX_TESTNET_API_SECRET:   ${{ secrets.PHEMEX_TESTNET_API_SECRET }}
 
     steps:
       - uses: actions/checkout@v4

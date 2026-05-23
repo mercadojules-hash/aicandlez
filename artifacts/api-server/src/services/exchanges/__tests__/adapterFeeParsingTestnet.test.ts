@@ -32,6 +32,7 @@
 //   ✓ Gate.io Spot Testnet    → api-testnet.gateapi.io
 //   ✓ Crypto.com Exchange UAT → uat-api.3ona.co
 //   ✓ BingX VST               → open-api-vst.bingx.com
+//   ✓ Phemex Testnet          → testnet-api.phemex.com
 //
 // Wired but credential-gated (skip-if-missing; assert place→broker-fee
 // against the public sandbox the adapter already opts into via
@@ -69,11 +70,6 @@
 //       No public REST sandbox for Kraken Spot — `demo-futures.kraken.com`
 //       only covers Kraken Futures (different adapter surface).
 //
-//   ⚠ Phemex Testnet
-//       `testnet-api.phemex.com` exists and the adapter already wires it,
-//       but `placeOrder` returns `simulatedOrder(...)` unconditionally so
-//       the place→query roundtrip can never resolve a real broker fee.
-//
 //   ⚠ Coinbase Advanced Trade
 //       No public sandbox. Catching fee-shape drift here will require a
 //       hard-gated live tiny-order + auto-refund probe; intentionally
@@ -89,6 +85,7 @@ import { CryptoDotComAdapter } from "../adapters/CryptoDotComAdapter.js";
 import { BingXAdapter }        from "../adapters/BingXAdapter.js";
 import { HyperliquidAdapter }  from "../adapters/HyperliquidAdapter.js";
 import { dYdXAdapter }         from "../adapters/dYdXAdapter.js";
+import { PhemexAdapter }       from "../adapters/PhemexAdapter.js";
 
 import type { AdapterConfig, StandardOrder } from "../types.js";
 
@@ -360,11 +357,36 @@ describe.skipIf(!ENABLED || !DYDX_KEY || !DYDX_SECRET)(
 // same place+getOrder pattern used above.
 // ──────────────────────────────────────────────────────────────────────────────
 
-describe.skip("Phemex Testnet — broker fee end-to-end (BLOCKED: synthetic order id)", () => {
-  it("placeholder — PhemexAdapter.placeOrder discards the real exchange order id", () => {
-    expect(true).toBe(true);
-  });
-});
+// ──────────────────────────────────────────────────────────────────────────────
+// Phemex Testnet
+//
+// `PhemexAdapter.placeOrder` now preserves the real `data.orderID` returned
+// by `/spot/orders` and immediately round-trips through `getOrder`, which
+// queries `/spot/orders/active` first and falls back to `/api-data/spot/order`
+// for filled market orders — the final `StandardOrder.fee` is sourced from
+// `cumFeeEv` (`source: "broker"`).
+// ──────────────────────────────────────────────────────────────────────────────
+
+const PHEMEX_KEY    = process.env["PHEMEX_TESTNET_API_KEY"];
+const PHEMEX_SECRET = process.env["PHEMEX_TESTNET_API_SECRET"];
+
+describe.skipIf(!ENABLED || !PHEMEX_KEY || !PHEMEX_SECRET)(
+  "Phemex Testnet — broker fee end-to-end",
+  () => {
+    it("places + queries a tiny sBTCUSDT market order and reports broker fee", async () => {
+      const adapter = new PhemexAdapter(baseCfg("Phemex", PHEMEX_KEY, PHEMEX_SECRET));
+
+      const placed = await adapter.placeOrder({
+        symbol: "BTCUSD", side: "buy", type: "market", qty: 0.0002,
+      });
+      assertBrokerFee(placed, "Phemex placeOrder");
+
+      await sleep(1_000);
+      const queried = await adapter.getOrder(placed.exchangeOrderId, "BTCUSD");
+      assertBrokerFee(queried, "Phemex getOrder");
+    }, 45_000);
+  },
+);
 
 describe.skip("Coinbase Advanced Trade — broker fee end-to-end (BLOCKED: no sandbox)", () => {
   it("placeholder — needs hard-gated live tiny-order + auto-refund probe", () => {

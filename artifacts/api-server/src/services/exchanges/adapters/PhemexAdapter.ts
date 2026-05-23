@@ -158,8 +158,18 @@ export class PhemexAdapter extends BaseExchangeAdapter {
       () => this.signedPost<PhemexOrderResp>("/spot/orders", body),
       3, 500, "placeOrder",
     );
-    void data;
-    return simulatedOrder("Phemex", req, this.normaliseSymbol(req.symbol), this.config);
+    // Preserve the real exchange order id so the weekly drift suite can
+    // round-trip place → getOrder and resolve a broker-sourced fee.
+    const orderId = data.data?.orderID;
+    if (!orderId) {
+      return simulatedOrder("Phemex", req, this.normaliseSymbol(req.symbol), this.config);
+    }
+    const queried = await this.getOrder(orderId, req.symbol);
+    if (queried) return queried;
+    const fallback = simulatedOrder("Phemex", req, this.normaliseSymbol(req.symbol), this.config);
+    fallback.id              = orderId;
+    fallback.exchangeOrderId = orderId;
+    return fallback;
   }
 
   async cancelOrder(req: CancelOrderRequest): Promise<{ ok: boolean; reason?: string }> {
@@ -178,11 +188,20 @@ export class PhemexAdapter extends BaseExchangeAdapter {
     if (!this.isConfigured()) return null;
     try {
       const pair = this.normaliseSymbol(symbol);
-      const data = await this.withRetry(
-        () => this.signedGet<{ data: PhemexOrderInfo }>(`/spot/orders/active?symbol=${pair}&orderID=${exchangeOrderId}`),
+      // Try active orders first; market orders fill immediately so fall
+      // back to the history endpoint when nothing comes back.
+      const active = await this.withRetry(
+        () => this.signedGet<PhemexOrderQueryResp>(`/spot/orders/active?symbol=${pair}&orderID=${exchangeOrderId}`),
         3, 300, "getOrder",
       );
-      const o = data.data;
+      let o = pickOrder(active, exchangeOrderId);
+      if (!o) {
+        const history = await this.withRetry(
+          () => this.signedGet<PhemexOrderQueryResp>(`/api-data/spot/order?symbol=${pair}&orderID=${exchangeOrderId}`),
+          3, 300, "getOrder",
+        );
+        o = pickOrder(history, exchangeOrderId);
+      }
       if (!o) return null;
       const fill = (o.avgPriceEp ?? 0) / 1e8;
       const qty  = parseFloat(o.cumQty ?? "0");
@@ -328,4 +347,21 @@ interface PhemexOrderResp  { data?: { orderID: string } }
 interface PhemexOrderInfo  {
   orderID: string; side: string; ordType: string; ordStatus: string;
   orderQty?: string; cumQty?: string; avgPriceEp?: number; cumFeeEv?: number;
+}
+// Phemex query endpoints return either a single object or `{ rows: [...] }`
+// depending on whether you hit the active or history surface; pickOrder
+// normalises both shapes (and tolerates either being absent).
+interface PhemexOrderQueryResp {
+  data?: PhemexOrderInfo | { rows?: PhemexOrderInfo[] };
+}
+
+function pickOrder(resp: PhemexOrderQueryResp, orderId: string): PhemexOrderInfo | null {
+  const d = resp.data;
+  if (!d) return null;
+  if ("rows" in d && Array.isArray((d as { rows?: PhemexOrderInfo[] }).rows)) {
+    const rows = (d as { rows: PhemexOrderInfo[] }).rows;
+    return rows.find(r => r.orderID === orderId) ?? rows[0] ?? null;
+  }
+  const single = d as PhemexOrderInfo;
+  return single.orderID ? single : null;
 }
