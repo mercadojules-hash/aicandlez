@@ -151,9 +151,15 @@ interface AuditOpts {
   payload:   Record<string, unknown>;
 }
 
-async function writeAudit(opts: AuditOpts): Promise<string> {
+// Drizzle tx and db both expose insert/update/delete/select with the same
+// shape, but TS sees them as distinct types. We only call those four
+// methods through the executor, so a structural type is enough and lets a
+// transaction `tx` slot in wherever a top-level `db` would.
+type DbExecutor = Pick<typeof db, "insert" | "update" | "delete" | "select">;
+
+async function writeAudit(opts: AuditOpts, executor: DbExecutor = db): Promise<string> {
   const id = randomUUID();
-  await db.insert(userAdminActionsTable).values({
+  await executor.insert(userAdminActionsTable).values({
     id,
     actorAdminId: opts.actorId,
     targetUserId: opts.targetId,
@@ -195,9 +201,9 @@ async function upsertStatus(args: {
   actorId:  string;
   status:   AdminStatus;
   reason:   string | null;
-}) {
+}, executor: DbExecutor = db) {
   const now = new Date();
-  await db
+  await executor
     .insert(userAdminStatusTable)
     .values({
       userId:       args.userId,
@@ -493,31 +499,14 @@ router.post("/admin/users/:id/emergency_disable", ...requireSuperAdmin, async (r
     }).from(userExchangeConnectionsTable)
       .where(eq(userExchangeConnectionsTable.userId, ctx.targetId));
 
-    // Composite sequence — apply each leg in the order the contract names
-    // them so behavior matches the spec even though `disabled` strictly
-    // supersedes `force_paper` + `suspended`. Each transition is reflected
-    // in the steps[] array on the audit payload so operators can audit the
-    // composite leg-by-leg.
+    // Stripe is an external call — execute BEFORE the local DB transaction
+    // so a Stripe failure cannot abort the local lockout (the safety-first
+    // posture: a user we've decided to emergency-disable MUST be locked
+    // out locally even if Stripe is down). The local DB mutations + audit
+    // row are then committed inside a single transaction below, guaranteeing
+    // either every leg + the immutable audit row commits, or none of it does.
     const steps: Array<{ step: string; ok: boolean; details?: unknown; error?: string }> = [];
 
-    // 1. force_paper — block live execution while we tear down
-    await upsertStatus({ userId: ctx.targetId, actorId: ctx.actorId, status: "force_paper", reason });
-    steps.push({ step: "force_paper", ok: true });
-
-    // 2. suspended — block paper execution too
-    await upsertStatus({ userId: ctx.targetId, actorId: ctx.actorId, status: "suspended", reason });
-    steps.push({ step: "suspended", ok: true });
-
-    // 3. revoke_exchange — wipe stored exchange credentials
-    const deleted = await db.delete(userExchangeConnectionsTable)
-      .where(eq(userExchangeConnectionsTable.userId, ctx.targetId))
-      .returning({ id: userExchangeConnectionsTable.id });
-    steps.push({ step: "revoke_exchange", ok: true, details: { deletedCount: deleted.length } });
-
-    // 4. cancel_subscription — Stripe period-end via shared helper. We do
-    //    NOT roll back local mutations on Stripe failure (the user is
-    //    already locked out, which is the correct safety posture); the
-    //    error is captured on the same audit row for follow-up.
     let stripeOutcome: { stripeSubscriptionId: string | null; stripeStatus: string | null; error?: string } = {
       stripeSubscriptionId: stripeBefore?.stripeSubscriptionId ?? null,
       stripeStatus:         null,
@@ -529,50 +518,81 @@ router.post("/admin/users/:id/emergency_disable", ...requireSuperAdmin, async (r
           dayIdempotencyKey({ action: "emergency_disable", target: ctx.targetId, actor: ctx.actorId }),
         );
         stripeOutcome = { stripeSubscriptionId: updated.id, stripeStatus: updated.status };
-        steps.push({ step: "cancel_subscription", ok: true, details: stripeOutcome });
       } catch (stripeErr) {
         stripeOutcome = {
           stripeSubscriptionId: stripeBefore.stripeSubscriptionId,
           stripeStatus:         null,
           error:                (stripeErr as Error).message,
         };
-        steps.push({ step: "cancel_subscription", ok: false, error: stripeOutcome.error });
       }
-    } else {
-      steps.push({ step: "cancel_subscription", ok: true, details: "no_subscription_on_file" });
     }
 
-    // 5. disabled — final hard lock (blocks auth bootstrap too)
-    await upsertStatus({ userId: ctx.targetId, actorId: ctx.actorId, status: "disabled", reason });
-    steps.push({ step: "disabled", ok: true });
+    // Local transaction — all local mutations + the audit row commit
+    // atomically. If anything in this block throws, Drizzle aborts the
+    // transaction and NO local state is left in a partially-mutated state
+    // without a matching audit row. The Stripe outcome (already executed)
+    // is captured inside the audit payload so an external failure is
+    // forensically visible.
+    const txResult = await db.transaction(async (tx) => {
+      // 1. force_paper — block live execution while we tear down
+      await upsertStatus({ userId: ctx.targetId, actorId: ctx.actorId, status: "force_paper", reason }, tx);
+      steps.push({ step: "force_paper", ok: true });
 
-    const statusAfter = await loadStatusRow(ctx.targetId);
-    await writeAudit({
-      actorId:  ctx.actorId,
-      targetId: ctx.targetId,
-      action:   "emergency_disable",
-      payload:  {
-        note,
-        reason,
-        before: {
-          status:    statusBefore,
-          stripe:    stripeBefore ? { stripeSubscriptionId: stripeBefore.stripeSubscriptionId, planStatus: stripeBefore.planStatus } : null,
-          exchanges: exchangeBefore,
+      // 2. suspended — block paper execution too
+      await upsertStatus({ userId: ctx.targetId, actorId: ctx.actorId, status: "suspended", reason }, tx);
+      steps.push({ step: "suspended", ok: true });
+
+      // 3. revoke_exchange — wipe stored exchange credentials
+      const deletedRows = await tx.delete(userExchangeConnectionsTable)
+        .where(eq(userExchangeConnectionsTable.userId, ctx.targetId))
+        .returning({ id: userExchangeConnectionsTable.id });
+      steps.push({ step: "revoke_exchange", ok: true, details: { deletedCount: deletedRows.length } });
+
+      // 4. cancel_subscription leg — outcome already computed pre-tx
+      steps.push(stripeBefore?.stripeSubscriptionId
+        ? (stripeOutcome.error
+            ? { step: "cancel_subscription", ok: false, error: stripeOutcome.error }
+            : { step: "cancel_subscription", ok: true, details: stripeOutcome })
+        : { step: "cancel_subscription", ok: true, details: "no_subscription_on_file" });
+
+      // 5. disabled — final hard lock (blocks auth bootstrap too)
+      await upsertStatus({ userId: ctx.targetId, actorId: ctx.actorId, status: "disabled", reason }, tx);
+      steps.push({ step: "disabled", ok: true });
+
+      const statusAfter = await tx
+        .select().from(userAdminStatusTable)
+        .where(eq(userAdminStatusTable.userId, ctx.targetId)).limit(1);
+
+      await writeAudit({
+        actorId:  ctx.actorId,
+        targetId: ctx.targetId,
+        action:   "emergency_disable",
+        payload:  {
+          note,
+          reason,
+          before: {
+            status:    statusBefore,
+            stripe:    stripeBefore ? { stripeSubscriptionId: stripeBefore.stripeSubscriptionId, planStatus: stripeBefore.planStatus } : null,
+            exchanges: exchangeBefore,
+          },
+          after: {
+            status:           statusAfter[0] ?? null,
+            exchangesDeleted: deletedRows.length,
+            stripe:           stripeOutcome,
+            steps,
+          },
         },
-        after: {
-          status:           statusAfter,
-          exchangesDeleted: deleted.length,
-          stripe:           stripeOutcome,
-          steps,
-        },
-      },
+      }, tx);
+
+      return { deletedCount: deletedRows.length };
     });
 
     res.json({
       ok:               true,
       status:           "disabled",
-      exchangesDeleted: deleted.length,
+      exchangesDeleted: txResult.deletedCount,
       stripe:           stripeOutcome,
+      steps,
     });
   } catch (err) {
     req.log.error({ err }, "admin emergency_disable failed");

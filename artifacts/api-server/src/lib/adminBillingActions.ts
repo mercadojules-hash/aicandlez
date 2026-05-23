@@ -78,13 +78,34 @@ export async function grantComplimentaryDays(
   return shape(sub);
 }
 
-/** Extend the current period by N days (operationally equivalent to
- *  `grantComplimentaryDays`; kept distinct so audit labels and idempotency
- *  keys read clearly). */
+/** Extend the END of the current paid period by N days. Unlike
+ *  `grantComplimentaryDays` (which always pushes `trial_end` from *now*
+ *  and is a goodwill grant for a paused / unpaid customer), this reads
+ *  the subscription's existing `current_period_end` (falling back to
+ *  `trial_end`, then `now`) and pushes from there. Stacking multiple
+ *  extensions for an active subscription therefore grows the runway by
+ *  exactly N days each call instead of resetting to `now + N`. */
 export async function extendSubscriptionByDays(
   subscriptionId: string,
   days: number,
   idempotencyKey: string,
 ): Promise<StripeSubscriptionOutcome> {
-  return grantComplimentaryDays(subscriptionId, days, idempotencyKey);
+  const stripe = await getUncachableStripeClient();
+  const existing = await stripe.subscriptions.retrieve(subscriptionId) as unknown as {
+    current_period_end?: number | null;
+    trial_end?:          number | null;
+  };
+  const nowUnix  = Math.floor(Date.now() / 1000);
+  const base     = Math.max(
+    existing.current_period_end ?? 0,
+    existing.trial_end          ?? 0,
+    nowUnix,
+  );
+  const trialEndUnix = base + days * 86_400;
+  const sub = await stripe.subscriptions.update(
+    subscriptionId,
+    { trial_end: trialEndUnix, proration_behavior: "none" },
+    { idempotencyKey },
+  );
+  return shape(sub);
 }

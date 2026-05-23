@@ -43,12 +43,22 @@ function popOrDefault(kind: QueuedResult["kind"], fallback: unknown): unknown {
   return item!.rows;
 }
 
-const dbMock = {
+const dbMock: {
+  select:  ReturnType<typeof vi.fn>;
+  insert:  ReturnType<typeof vi.fn>;
+  update:  ReturnType<typeof vi.fn>;
+  delete:  ReturnType<typeof vi.fn>;
+  execute: ReturnType<typeof vi.fn>;
+  transaction: ReturnType<typeof vi.fn>;
+} = {
   select: vi.fn(() => chainable(popOrDefault("select", []))),
   insert: vi.fn(() => chainable(popOrDefault("insert", []))),
   update: vi.fn(() => chainable(popOrDefault("update", []))),
   delete: vi.fn(() => chainable(popOrDefault("delete", []))),
   execute: vi.fn(async () => ({ rows: popOrDefault("execute", []) as unknown[] })),
+  // Passthrough — pretend the transaction commits and reuses the same mock
+  // executor. Tests that want to simulate a rollback can override per-test.
+  transaction: vi.fn(async (cb: (tx: unknown) => Promise<unknown>) => cb(dbMock)),
 };
 
 vi.mock("@workspace/db", () => ({
@@ -70,12 +80,21 @@ vi.mock("../../middlewares/requireAuth.js", () => ({
   requireRole: () => (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
-const stripeMock = {
+const stripeMock: {
+  subscriptions: {
+    update:   ReturnType<typeof vi.fn>;
+    cancel:   ReturnType<typeof vi.fn>;
+    retrieve: ReturnType<typeof vi.fn>;
+  };
+} = {
   subscriptions: {
     update: vi.fn(async (id: string, _params: unknown, _opts: unknown) => ({
       id, status: "active", cancel_at: null, trial_end: 9_999_999_999,
     })),
     cancel: vi.fn(async (id: string) => ({ id, status: "canceled", cancel_at: null })),
+    retrieve: vi.fn(async (id: string) => ({
+      id, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86_400, trial_end: null,
+    })),
   },
 };
 vi.mock("../../stripeClient.js", () => ({
@@ -126,6 +145,7 @@ beforeEach(() => {
   opQueue = [];
   dbMock.select.mockClear(); dbMock.insert.mockClear();
   dbMock.update.mockClear(); dbMock.delete.mockClear();
+  dbMock.transaction.mockClear();
   stripeMock.subscriptions.update.mockClear();
   stripeMock.subscriptions.cancel.mockClear();
   invalidateTradeLimitCache.mockClear();
@@ -217,11 +237,17 @@ describe("subscription actions", () => {
     expect(res.statusCode).toBe(409);
   });
 
-  it("extends subscription by pushing trial_end forward", async () => {
+  it("extends subscription by pushing the period end forward", async () => {
     opQueue.push({ kind: "select", rows: [{
       stripeCustomerId: "cus_1", stripeSubscriptionId: "sub_1",
       trialEndsAt: null, plan: "starter", planStatus: "active",
     }] });
+    // extendSubscriptionByDays reads the current sub to base the new
+    // trial_end on (current_period_end). Stub that retrieve.
+    const periodEnd = Math.floor(Date.now() / 1000) + 7 * 86_400;
+    stripeMock.subscriptions.retrieve = vi.fn(async () => ({
+      id: "sub_1", current_period_end: periodEnd, trial_end: null,
+    })) as unknown as typeof stripeMock.subscriptions.retrieve;
     const handler = getHandler("/admin/users/:id/extend_subscription");
     const req = makeReq({ params: { id: "u1" }, body: { note: "goodwill extend", days: 14 } });
     const res = makeRes();
@@ -229,7 +255,10 @@ describe("subscription actions", () => {
     expect(res.statusCode).toBe(200);
     const updateCall = stripeMock.subscriptions.update.mock.calls[0]!;
     expect(updateCall[0]).toBe("sub_1");
-    expect((updateCall[1] as { trial_end: number; proration_behavior: string }).proration_behavior).toBe("none");
+    const params = updateCall[1] as { trial_end: number; proration_behavior: string };
+    expect(params.proration_behavior).toBe("none");
+    // Base from period_end + 14 days, NOT now + 14 days.
+    expect(params.trial_end).toBe(periodEnd + 14 * 86_400);
   });
 });
 
