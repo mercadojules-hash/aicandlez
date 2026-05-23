@@ -1,0 +1,303 @@
+NEXT PHASE: MULTI-USER BROKERAGE INFRASTRUCTURE + OPERATOR CONTROL SYSTEM
+
+IMPORTANT:
+The live Kraken operator execution bridge is now functioning and considered a protected subsystem.
+
+DO NOT destabilize:
+
+* operator live execution
+* Kraken execution routing
+* auth middleware
+* execution queue
+* telemetry reconciliation
+* operator/live separation architecture
+
+This next phase is focused on:
+MULTI-USER MANAGEMENT
+PUBLIC CUSTOMER INFRASTRUCTURE
+BROKERAGE-GRADE ADMINISTRATION
+
+====================================================
+ARCHITECTURAL RULES (CRITICAL)
+==============================
+
+The platform permanently operates as TWO WORLDS:
+
+1. OPERATOR / ADMIN WORLD
+
+* institutional operator console
+* Kraken live execution
+* privileged telemetry
+* internal controls
+* admin-only infrastructure
+
+2. CUSTOMER WORLD
+   https://trade.aicandlez.com/portal
+
+Customer portal MUST return to:
+
+* PAPER TRADING ONLY
+* simulated execution only
+* NO direct Kraken execution
+* NO live exchange order routing
+* NO operator controls
+
+The public portal should function as:
+AI paper-trading experience + onboarding funnel.
+
+Live Kraken execution remains:
+STRICTLY operator/admin controlled.
+
+====================================================
+PHASE 1 — USER ADMINISTRATION SYSTEM
+====================================
+
+Add a NEW LEFT SIDEBAR SECTION:
+
+ALL USERS
+
+This opens a full institutional-grade operator console.
+
+NOT:
+
+* a basic table
+* generic SaaS admin UI
+
+It should feel like:
+
+* brokerage operator terminal
+* hedge fund CRM
+* AI execution surveillance system
+* institutional administration center
+
+====================================================
+
+1. SERVER-SIDE USER TRADE LIMIT ENGINE
+   ====================================================
+
+Need rolling 24-hour trade enforcement.
+
+DEFAULT:
+
+* standard users = 50 AI trades / rolling 24h
+
+Operator override levels:
+
+* 100 trades
+* 200 trades
+* unlimited (future-ready)
+
+REQUIREMENTS:
+
+* persisted in DB
+* enforced SERVER-SIDE
+* NEVER frontend-only
+* checked BEFORE execution
+
+Need:
+
+* rolling 24h counter
+* remaining trades counter
+* reset timer
+* rejection logging
+* anti-loop protection
+* abuse prevention
+
+UI badges:
+
+* 50 TRADE LIMIT
+* 100 TRADE LIMIT
+* 200 TRADE LIMIT
+* UNLIMITED
+
+Display:
+
+* trades used
+* trades remaining
+* last reset
+* enforcement status
+
+====================================================
+2. OPERATOR USER MANAGEMENT CONTROLS
+====================================
+
+Need admin/operator ability to:
+
+* activate user
+* suspend user
+* disable AI trading
+* cancel subscription
+* complimentary subscription
+* manually extend subscription
+* override trade limits
+* force paper-only mode
+* revoke exchange access
+* emergency disable account
+
+Need:
+
+* operator notes
+* audit trail
+* timestamps
+* acting admin identity
+* immutable action history
+
+====================================================
+3. USER ACTIVITY INTELLIGENCE
+=============================
+
+Per-user telemetry:
+
+* username
+* email
+* subscription tier
+* active exchange
+* live/paper mode
+* online/offline
+* websocket status
+* exchange health
+* signup date
+* account equity
+* total trades
+* trades today
+* wins
+* losses
+* win rate
+* realized PnL
+* unrealized PnL
+* fees generated
+* active positions
+* AI enabled/disabled
+* last activity
+
+====================================================
+4. PLATFORM PROFIT + FEE ANALYTICS
+==================================
+
+Operator visibility into:
+
+* top traders
+* most profitable users
+* highest volume users
+* users in drawdown
+* active platform exposure
+* live capital deployed
+* fee leaderboard
+* platform fee revenue
+* total execution volume
+
+Need:
+
+* sortable telemetry
+* live updating metrics
+* search/filter
+* execution indicators
+* exposure heatmaps if possible
+
+====================================================
+5. USER DETAIL PANEL
+====================
+
+Clicking a user opens:
+cinematic institutional side panel or modal.
+
+Include:
+
+* live positions
+* closed trades
+* execution history
+* AI decisions
+* exchange connection health
+* API errors
+* latency
+* reconciliation events
+* risk metrics
+* exposure
+* trade frequency
+* AI confidence averages
+
+====================================================
+6. CUSTOMER PORTAL REVERSION
+============================
+
+Restore PAPER TRADING ONLY on:
+https://trade.aicandlez.com/portal
+
+Public users should:
+
+* simulate trades
+* experience AI trading UX
+* view telemetry
+* learn the platform
+* upgrade subscriptions
+
+Public portal MUST NOT:
+
+* execute live Kraken trades
+* access operator routes
+* access admin telemetry
+* interact with privileged execution infrastructure
+
+====================================================
+7. EMAIL INFRASTRUCTURE
+=======================
+
+Need full transactional email infrastructure:
+
+* signup emails
+* onboarding emails
+* password reset
+* subscription lifecycle
+* trial expiration
+* billing alerts
+* execution alerts
+* AI trading notifications
+* suspension notices
+* operator notifications
+
+Need:
+
+* provider recommendation
+* secure architecture
+* template system
+* resend/retry logic
+* queue-safe delivery
+
+====================================================
+8. VISUAL DESIGN
+================
+
+Maintain:
+
+* black institutional aesthetic
+* cinematic neon telemetry
+* Bloomberg-inspired readability
+* glowing live states
+* fixed-height scrolling tables
+* operator-grade typography
+* real-time activity feel
+
+====================================================
+BUILD ORDER (IMPORTANT)
+=======================
+
+PRIORITY:
+
+1. DB schema + server enforcement
+2. Trade-limit engine
+3. Customer portal paper-trading isolation
+4. User telemetry infrastructure
+5. Operator controls
+6. Email infrastructure
+7. Cinematic UI polish
+
+DO NOT break:
+
+* Kraken live execution
+* auth middleware
+* execution queue
+* operator architecture
+* telemetry system
+
+This platform is now evolving into:
+MULTI-USER AI BROKERAGE INFRASTRUCTURE.
