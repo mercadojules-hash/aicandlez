@@ -16,7 +16,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { engineStats } from "../lib/tradingLoop.js";
-import { isOperatorEmailConfigured, sendOperatorAlert } from "../lib/notifications.js";
+import { getLastOperatorEmailSuccessAt, isOperatorEmailConfigured, sendOperatorAlert } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -166,6 +166,10 @@ router.get(
         // True iff RESEND_API_KEY + OPERATOR_ALERT_EMAIL_FROM +
         // OPERATOR_ALERT_EMAIL_TO are all set. No secret values leaked.
         operatorEmailConfigured: isOperatorEmailConfigured(),
+        // 17. last successful operator-email delivery timestamp (ms epoch).
+        // null until the first 2xx from Resend lands — surfaced so the
+        // operator can see how stale the transport is at a glance.
+        lastOperatorEmailSuccessAt: getLastOperatorEmailSuccessAt(),
         timestamp:                Date.now(),
       });
     } catch (err) {

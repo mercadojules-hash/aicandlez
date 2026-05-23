@@ -43,9 +43,10 @@ interface TopTelemetry {
   websocketStatus:           "online" | "offline";
   queueThroughputPerMin:     number;
   apiLatencyMs:              number;
-  engineRunning:             boolean;
-  operatorEmailConfigured:   boolean;
-  timestamp:                 number;
+  engineRunning:              boolean;
+  operatorEmailConfigured:    boolean;
+  lastOperatorEmailSuccessAt: number | null;
+  timestamp:                  number;
 }
 
 // ── Back-fill status (mirror artifacts/api-server/src/lib/backfillScheduler.ts) ──
@@ -310,7 +311,9 @@ export function AdminTopTelemetryBar() {
     }
     setTimeout(() => setEmailTestState("idle"), 6_000);
   };
-  const emailConfigured = data?.operatorEmailConfigured === true;
+  const emailConfigured  = data?.operatorEmailConfigured === true;
+  const lastEmailOkAt    = data?.lastOperatorEmailSuccessAt ?? null;
+  const lastEmailOkLabel = lastEmailOkAt ? ago(lastEmailOkAt) : "never";
 
   const dash = "—";
   const v = (n: number | undefined, fmt: (x: number) => string): string =>
@@ -398,7 +401,7 @@ export function AdminTopTelemetryBar() {
           }}
           title={
             emailConfigured
-              ? "Operator email transport configured (RESEND_API_KEY + FROM + TO set)"
+              ? `Operator email transport configured (RESEND_API_KEY + FROM + TO set). Last successful delivery: ${lastEmailOkLabel}.`
               : "Operator email NOT configured — alerts log only. Set RESEND_API_KEY, OPERATOR_ALERT_EMAIL_FROM, OPERATOR_ALERT_EMAIL_TO."
           }
         >
@@ -419,6 +422,26 @@ export function AdminTopTelemetryBar() {
               Operator Email
             </div>
           </div>
+          {emailConfigured && (
+            <div
+              className="flex flex-col gap-0.5 leading-none pl-2 ml-1 border-l"
+              style={{ borderLeftColor: "#0d1e2e" }}
+              title={`Last successful operator-email delivery: ${lastEmailOkLabel}`}
+            >
+              <div
+                className="text-[11px] font-bold font-mono tabular-nums"
+                style={{ color: lastEmailOkAt ? "#7ad9a8" : "#ffaa00" }}
+              >
+                {lastEmailOkLabel}
+              </div>
+              <div
+                className="text-[8px] font-mono uppercase tracking-[0.12em] font-medium"
+                style={{ color: "#5a7a90" }}
+              >
+                Last Delivery
+              </div>
+            </div>
+          )}
           <button
             type="button"
             onClick={triggerEmailTest}

@@ -12,6 +12,7 @@ import { startTradingLoop } from "./lib/tradingLoop.js";
 import { createWsServer } from "./lib/wsServer.js";
 import { startAlpacaTokenRefresher } from "./services/exchanges/AlpacaTokenRefresher.js";
 import { startBackfillScheduler } from "./lib/backfillScheduler.js";
+import { logOperatorEmailBootStatus, startOperatorEmailHealthMonitor } from "./lib/notifications.js";
 
 // ── Environment validation ─────────────────────────────────────────────────────
 validateEnv();
@@ -112,6 +113,8 @@ server.listen(finalPort, "0.0.0.0", async () => {
   } else {
     logger.info("Kraken API credentials loaded");
   }
+  logOperatorEmailBootStatus();
+  startOperatorEmailHealthMonitor();
   startTradingLoop();
   startAlpacaTokenRefresher();
   startBackfillScheduler();
