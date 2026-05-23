@@ -3066,11 +3066,11 @@ function derivePortalFeesInsight(
 }
 
 function PortalFeesTrend({
-  data,
-  winRate,
-}: {
-  data: { months: { month: string; feesPaid: number; tradeCount: number; realizedPnL: number }[]; totalFeesPaid: number } | undefined;
-  winRate: number | undefined;
+  data, winRate, onSelectMonth,
+  }: {
+    data: { months: { month: string; feesPaid: number; tradeCount: number; realizedPnL: number }[]; totalFeesPaid: number } | undefined;
+    winRate: number | undefined;
+    onSelectMonth: (month: string) => void;
 }) {
   const buckets = data?.months ?? [];
   const insight = derivePortalFeesInsight(buckets, winRate);
@@ -3133,14 +3133,26 @@ function PortalFeesTrend({
             : (profit < 0 ? " · losing month" : "");
           const profitColor = profit >= 0 ? N.BRAND : `${N.TEXT_3}88`;
           const feeColor    = overrun ? "#ff7a3d" : `${N.TEXT_2}aa`;
+          const clickable = b.tradeCount > 0;
           return (
             <div
               key={b.month}
+              role={clickable ? "button" : undefined}
+              tabIndex={clickable ? 0 : -1}
+              onClick={() => { if (clickable) onSelectMonth(b.month); }}
+              onKeyDown={(e) => {
+                if (clickable && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  onSelectMonth(b.month);
+                }
+              }}
               style={{
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end",
                 height: "100%",
+                cursor: clickable ? "pointer" : "default",
               }}
               title={
+                (clickable ? "Click to see trades · " : "") +
                 `${portalFeesShortLabel(b.month)} ${b.month.slice(0,4)} · ` +
                 `$${b.feesPaid.toFixed(2)} fees on ` +
                 `${profit >= 0 ? "$" : "−$"}${Math.abs(profit).toFixed(2)} profit · ` +
@@ -3222,6 +3234,190 @@ function PortalFeesTrend({
   );
 }
 
+// ── Month drill-down modal (desktop mirror of PWA FeesMonthModal) ──────────
+// Opens when the user clicks a bar on PortalFeesTrend. Lists every closed
+// trade whose exitTime falls inside the YYYY-MM bucket, sorted by
+// entryFee+exitFee descending so the costliest fee offenders surface first.
+function portalCustomerTradeFeeImpact(t: CustomerTrade): number {
+  const toN = (v: number | string | null | undefined): number => {
+    if (v === null || v === undefined) return 0;
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  // Prefer broker-reported commissions when present, fall back to catalog.
+  const entry = toN(t.entryFeeBroker) || toN(t.entryFee);
+  const exit  = toN(t.exitFeeBroker)  || toN(t.exitFee);
+  return entry + exit;
+}
+
+function portalTradeMonthKey(t: CustomerTrade): string | null {
+  const ms = Number(t.exitTime ?? 0);
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const d = new Date(ms);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+function PortalFeesMonthModal({
+  month, trades, onClose,
+}: {
+  month: string;
+  trades: CustomerTrade[];
+  onClose: () => void;
+}) {
+  const monthTrades = useMemo(() => {
+    return trades
+      .filter(t => portalTradeMonthKey(t) === month)
+      .map(t => ({ t, impact: portalCustomerTradeFeeImpact(t) }))
+      .sort((a, b) => b.impact - a.impact);
+  }, [month, trades]);
+
+  const totalFees     = monthTrades.reduce((s, x) => s + x.impact, 0);
+  const totalRealized = monthTrades.reduce((s, x) => s + Number(x.t.realizedPnL ?? 0), 0);
+  const label = `${portalFeesShortLabel(month)} ${month.slice(0, 4)}`;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Fee breakdown for ${label}`}
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1000,
+        background: "rgba(0,0,0,0.74)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        fontFamily: N.FONT_MONO,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%", maxWidth: 640,
+          background: "#050D1A",
+          border: `1px solid ${N.BRAND}40`,
+          borderRadius: 8,
+          padding: "18px 20px 22px",
+          maxHeight: "84vh", overflowY: "auto",
+          boxShadow: `0 0 40px ${N.BRAND_GLOW}, inset 0 0 20px ${N.BRAND}08`,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 9, color: N.TEXT_2, letterSpacing: "0.18em", textTransform: "uppercase" }}>
+              MONTHLY FEE BREAKDOWN
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: N.BRAND, marginTop: 4,
+              letterSpacing: "0.06em", textShadow: `0 0 8px ${N.BRAND_GLOW}` }}>
+              {label}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              background: "transparent", border: `1px solid ${N.BORDER_HI}`,
+              color: N.TEXT_2, width: 36, height: 36, borderRadius: 6,
+              fontFamily: N.FONT_MONO, fontSize: 16, cursor: "pointer",
+            }}
+          >×</button>
+        </div>
+
+        <div style={{
+          display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12,
+          padding: "12px 0 14px", borderBottom: `1px solid ${N.BORDER_HI}`, marginBottom: 12,
+        }}>
+          <div>
+            <div style={{ fontSize: 9, color: N.TEXT_2, letterSpacing: "0.14em" }}>TRADES</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: N.TEXT_1, marginTop: 4 }}>
+              {monthTrades.length}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, color: N.TEXT_2, letterSpacing: "0.14em" }}>FEES</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#ff7a3d", marginTop: 4 }}>
+              −${totalFees.toFixed(2)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, color: N.TEXT_2, letterSpacing: "0.14em" }}>REALIZED PNL</div>
+            <div style={{
+              fontSize: 16, fontWeight: 700, marginTop: 4,
+              color: totalRealized >= 0 ? N.BRAND : "#ff4466",
+            }}>
+              {totalRealized >= 0 ? "+" : ""}${totalRealized.toFixed(2)}
+            </div>
+          </div>
+        </div>
+
+        <div style={{
+          fontSize: 9, color: N.TEXT_2,
+          letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 8,
+        }}>
+          COSTLIEST FIRST · ENTRY + EXIT FEE
+        </div>
+
+        {monthTrades.length === 0 ? (
+          <div style={{
+            padding: "32px 0", textAlign: "center",
+            fontSize: 10, color: N.TEXT_3,
+            letterSpacing: "0.14em", textTransform: "uppercase",
+          }}>
+            NO CLOSED TRADES THIS MONTH
+          </div>
+        ) : (
+          monthTrades.map(({ t, impact }) => {
+            const pnl = Number(t.realizedPnL ?? 0);
+            const up  = pnl >= 0;
+            return (
+              <div key={t.id} style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "10px 0", borderBottom: `1px solid ${N.BORDER_HI}66`,
+              }}>
+                <div style={{
+                  width: 3, alignSelf: "stretch", borderRadius: 2,
+                  background: up ? N.BRAND : "#ff4466",
+                  boxShadow: up ? `0 0 6px ${N.BRAND_GLOW}` : "0 0 6px rgba(255,68,102,0.4)",
+                }}/>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: N.TEXT_1 }}>
+                    {displaySymbol(t.symbol)}
+                    <span style={{ color: up ? N.BRAND : "#ff4466", fontWeight: 600, marginLeft: 8, fontSize: 10 }}>
+                      {t.side}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 10, color: N.TEXT_2, marginTop: 3 }}>
+                    ${Number(t.entryPrice).toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                    <span style={{ color: N.TEXT_3 }}> → </span>
+                    ${Number(t.exitPrice).toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                    {t.exchange && (
+                      <span style={{ color: N.TEXT_3 }}> · {String(t.exchange).toUpperCase()}</span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ff7a3d" }}>
+                    −${impact.toFixed(2)}
+                  </div>
+                  <div style={{
+                    fontSize: 10, marginTop: 2,
+                    color: up ? N.BRAND : "#ff4466", opacity: 0.85,
+                  }}>
+                    {up ? "+" : ""}${pnl.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function Portal() {
   // PaperTradesProvider and PortalModeProvider are both mounted only on the
@@ -3239,6 +3435,8 @@ function PortalInner() {
   const [accountOpen,    setAccountOpen]    = useState(false);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [connectExchangeOpen, setConnectExchangeOpen] = useState(false);
+  // Drill-down month for the PortalFeesTrend bar-click modal (Task #106).
+  const [feesDrillMonth, setFeesDrillMonth] = useState<string | null>(null);
   const { gate: disclaimerGate, modal: disclaimerGateModal } = useDisclaimerGate();
 
   // Admin / super-admin bypass — admins are not customers and must never see
@@ -3762,8 +3960,23 @@ function PortalInner() {
           a companion to the lifetime FEES PAID tile above. */}
       {!isAdmin && (
         <div style={{ padding: "12px 24px 0" }}>
-          <PortalFeesTrend data={monthlyFees} winRate={stats.winRate} />
+          <PortalFeesTrend
+              data={monthlyFees}
+              winRate={stats.winRate}
+              onSelectMonth={(m) => setFeesDrillMonth(m)}
+            />
         </div>
+      )}
+
+      {/* Month drill-down modal — opens when the user clicks a bar on
+          PortalFeesTrend. Reuses the same simTradesQuery already mounted
+          on this page, so no additional fetch is needed. */}
+      {!isAdmin && feesDrillMonth && (
+        <PortalFeesMonthModal
+          month={feesDrillMonth}
+          trades={simTradesQuery.data?.trades ?? []}
+          onClose={() => setFeesDrillMonth(null)}
+        />
       )}
 
       {/* AI Intelligence Center — radar + diverse live telemetry */}

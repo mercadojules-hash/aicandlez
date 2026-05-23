@@ -1,5 +1,6 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, type Portfolio as PortfolioData, type SimAccount, type MonthlyFeesResponse } from "@/lib/api";
+import { api, type Portfolio as PortfolioData, type SimAccount, type MonthlyFeesResponse, type SimTrade } from "@/lib/api";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
 import { EnableLiveCTA } from "@/components/EnableLiveCTA";
 
@@ -44,9 +45,9 @@ function deriveFeesInsight(
   const tradesLabel = worst.b.tradeCount === 1
     ? "1 trade" : `${worst.b.tradeCount} trades`;
   if (worst.losing) {
-    return `Your ${monthName} paid $${worst.b.feesPaid.toFixed(2)} in fees across ${tradesLabel} on a losing month — consider widening signal confidence above ${suggestThreshold} to trade less.`;
+    return `Your ${monthName} paid ${worst.b.feesPaid.toFixed(2)} in fees across ${tradesLabel} on a losing month — consider widening signal confidence above ${suggestThreshold} to trade less.`;
   }
-  return `Your ${monthName} fees consumed ${worst.ratio.toFixed(0)}% of profit ($${avgTradeFee.toFixed(2)} avg per trade) — consider widening signal confidence above ${suggestThreshold} to trade less.`;
+  return `Your ${monthName} fees consumed ${worst.ratio.toFixed(0)}% of profit (${avgTradeFee.toFixed(2)} avg per trade) — consider widening signal confidence above ${suggestThreshold} to trade less.`;
 }
 
 type MonthlyFeeBucketLite = { month: string; feesPaid: number; tradeCount: number; realizedPnL: number };
@@ -77,7 +78,13 @@ function FeesInsightCallout({ insight }: { insight: string | null }) {
   );
 }
 
-function FeesMonthlyChart({ data, winRate }: { data: MonthlyFeesResponse | undefined; winRate: number | undefined }) {
+function FeesMonthlyChart({
+  data, winRate, onSelectMonth,
+}: {
+  data: MonthlyFeesResponse | undefined;
+  winRate: number | undefined;
+  onSelectMonth: (month: string) => void;
+}) {
   const buckets = data?.months ?? [];
   const insight = deriveFeesInsight(buckets, winRate);
   const hasAny  = buckets.some(b => b.feesPaid > 0 || b.realizedPnL !== 0);
@@ -133,16 +140,32 @@ function FeesMonthlyChart({ data, winRate }: { data: MonthlyFeesResponse | undef
             : (profit < 0 ? " · losing month" : "");
           const profitColor = profit >= 0 ? "#00ff8a" : "#3a6080";
           const feeColor    = overrun ? "#ff7a3d" : "#3a6080";
+          const clickable = b.tradeCount > 0;
           return (
-            <div key={b.month} style={{
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end",
-              height: "100%",
-            }} title={
-              `${shortMonthLabel(b.month)} ${b.month.slice(0,4)} · ` +
-              `$${b.feesPaid.toFixed(2)} fees on ` +
-              `${profit >= 0 ? "$" : "−$"}${Math.abs(profit).toFixed(2)} profit · ` +
-              `${b.tradeCount} trade${b.tradeCount === 1 ? "" : "s"}${ratioLabel}`
-            }>
+            <div
+              key={b.month}
+              role={clickable ? "button" : undefined}
+              tabIndex={clickable ? 0 : -1}
+              onClick={() => { if (clickable) onSelectMonth(b.month); }}
+              onKeyDown={(e) => {
+                if (clickable && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  onSelectMonth(b.month);
+                }
+              }}
+              style={{
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end",
+                height: "100%",
+                cursor: clickable ? "pointer" : "default",
+              }}
+              title={
+                (clickable ? "Tap to see trades · " : "") +
+                `${shortMonthLabel(b.month)} ${b.month.slice(0,4)} · ` +
+                `$${b.feesPaid.toFixed(2)} fees on ` +
+                `${profit >= 0 ? "$" : "−$"}${Math.abs(profit).toFixed(2)} profit · ` +
+                `${b.tradeCount} trade${b.tradeCount === 1 ? "" : "s"}${ratioLabel}`
+              }
+            >
               <div style={{
                 display: "flex", alignItems: "flex-end", justifyContent: "center",
                 gap: 2, width: "100%", height: "100%",
@@ -193,6 +216,175 @@ function FeesMonthlyChart({ data, winRate }: { data: MonthlyFeesResponse | undef
         ))}
       </div>
       <FeesInsightCallout insight={insight} />
+    </div>
+  );
+}
+
+// ── Month drill-down modal ─────────────────────────────────────────────────────
+// Opens when a user taps a bar on FeesMonthlyChart. Lists every closed trade
+// from that YYYY-MM bucket, sorted by entryFee+exitFee descending so the
+// costliest fee offenders are on top. Surfaces total fees + realized PnL for
+// the month so users can see at a glance whether fees ate the profits.
+function tradeFeeImpact(t: SimTrade): number {
+  // Prefer broker-reported commissions when present (more accurate than the
+  // catalog estimates), otherwise fall back to catalog entry+exit fees.
+  const entry = t.entryFeeBroker ?? t.entryFee ?? 0;
+  const exit  = t.exitFeeBroker  ?? t.exitFee  ?? 0;
+  return entry + exit;
+}
+
+function FeesMonthModal({
+  month, trades, onClose,
+}: {
+  month: string;
+  trades: SimTrade[];
+  onClose: () => void;
+}) {
+  const monthTrades = useMemo(() => {
+    const yyyymm = month;
+    return trades
+      .filter(t => typeof t.closedAt === "string" && t.closedAt.startsWith(yyyymm))
+      .map(t => ({ t, impact: tradeFeeImpact(t) }))
+      .sort((a, b) => b.impact - a.impact);
+  }, [month, trades]);
+
+  const totalFees     = monthTrades.reduce((s, x) => s + x.impact, 0);
+  const totalRealized = monthTrades.reduce((s, x) => s + (x.t.pnl ?? 0), 0);
+  const label = `${shortMonthLabel(month)} ${month.slice(0, 4)}`;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Fee breakdown for ${label}`}
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1000,
+        background: "rgba(0,0,0,0.72)",
+        display: "flex", alignItems: "flex-end", justifyContent: "center",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%", maxWidth: 520,
+          background: "#050d18",
+          border: "1px solid #0d2035",
+          borderTopLeftRadius: 14, borderTopRightRadius: 14,
+          padding: "14px 14px 22px",
+          maxHeight: "82vh", overflowY: "auto",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <div>
+            <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50",
+              letterSpacing: "0.18em", textTransform: "uppercase" }}>
+              MONTHLY FEE BREAKDOWN
+            </div>
+            <div style={{ fontSize: 17, fontFamily: "monospace", fontWeight: 700,
+              color: "#e8f4ff", marginTop: 2, letterSpacing: "0.04em" }}>
+              {label}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              background: "transparent", border: "1px solid #0d2035",
+              color: "#3a6080", width: 34, height: 34, borderRadius: 8,
+              fontFamily: "monospace", fontSize: 14, cursor: "pointer",
+            }}
+          >×</button>
+        </div>
+
+        <div style={{
+          display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8,
+          padding: "10px 0 14px", borderBottom: "1px solid #0d2035", marginBottom: 8,
+        }}>
+          <div>
+            <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50", letterSpacing: "0.14em" }}>TRADES</div>
+            <div style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700, color: "#e8f4ff", marginTop: 3 }}>
+              {monthTrades.length}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50", letterSpacing: "0.14em" }}>FEES</div>
+            <div style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700, color: "#ff7a3d", marginTop: 3 }}>
+              −${totalFees.toFixed(2)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 8, fontFamily: "monospace", color: "#1e3a50", letterSpacing: "0.14em" }}>REALIZED PNL</div>
+            <div style={{
+              fontSize: 13, fontFamily: "monospace", fontWeight: 700, marginTop: 3,
+              color: totalRealized >= 0 ? "#00ff8a" : "#ff4466",
+            }}>
+              {totalRealized >= 0 ? "+" : ""}${totalRealized.toFixed(2)}
+            </div>
+          </div>
+        </div>
+
+        <div style={{
+          fontSize: 8, fontFamily: "monospace", color: "#2a4060",
+          letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6,
+        }}>
+          COSTLIEST FIRST · ENTRY + EXIT FEE
+        </div>
+
+        {monthTrades.length === 0 ? (
+          <div style={{
+            padding: "28px 0", textAlign: "center",
+            fontFamily: "monospace", fontSize: 10, color: "#1e3a50",
+            letterSpacing: "0.14em", textTransform: "uppercase",
+          }}>
+            NO CLOSED TRADES THIS MONTH
+          </div>
+        ) : (
+          monthTrades.map(({ t, impact }) => {
+            const up = (t.pnl ?? 0) >= 0;
+            return (
+              <div key={t.id} style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 0", borderBottom: "1px solid #0a1a28",
+              }}>
+                <div style={{
+                  width: 2.5, alignSelf: "stretch", borderRadius: 2,
+                  background: up ? "#00ff8a" : "#ff4466",
+                  boxShadow: up ? "0 0 5px rgba(0,255,138,0.35)" : "0 0 5px rgba(255,68,102,0.35)",
+                }}/>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: "#e8f4ff" }}>
+                    {t.symbol.replace("USD", "")}
+                    <span style={{ color: up ? "#00ff8a" : "#ff4466", fontWeight: 600, marginLeft: 6, fontSize: 9 }}>
+                      {t.side}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 9, fontFamily: "monospace", color: "#2a4060", marginTop: 2 }}>
+                    ${t.entryPrice.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                    <span style={{ color: "#1e3a50" }}> → </span>
+                    ${t.exitPrice.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                    {t.exchange && <span style={{ color: "#1e3a50" }}> · {t.exchange.toUpperCase()}</span>}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: "#ff7a3d" }}>
+                    −${impact.toFixed(2)}
+                  </div>
+                  <div style={{
+                    fontSize: 9, fontFamily: "monospace", marginTop: 2,
+                    color: up ? "#00ff8a" : "#ff4466", opacity: 0.85,
+                  }}>
+                    {up ? "+" : ""}${(t.pnl ?? 0).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
@@ -249,6 +441,16 @@ export default function Portfolio() {
     queryFn:         () => api.get("/account/fees/monthly?months=6"),
     refetchInterval: 60_000,
     staleTime:       30_000,
+  });
+
+  // Closed trades feed — only fetched when the user actually drills into a
+  // month, so the Portfolio default render stays as light as before.
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const { data: tradesData } = useQuery<{ trades: SimTrade[] }>({
+    queryKey: ["sim-trades", "fees-drilldown"],
+    queryFn:  () => api.get("/simulation/trades"),
+    enabled:  selectedMonth !== null,
+    staleTime: 15_000,
   });
 
   const totalValue = data?.totalValue ?? 100000;
@@ -340,7 +542,11 @@ export default function Portfolio() {
           </div>
         </div>
 
-        <FeesMonthlyChart data={monthlyFees} winRate={simAcc?.winRate} />
+        <FeesMonthlyChart
+          data={monthlyFees}
+          winRate={simAcc?.winRate}
+          onSelectMonth={(m) => setSelectedMonth(m)}
+        />
       </div>
 
       {/* Balances */}
@@ -385,6 +591,14 @@ export default function Portfolio() {
 
         {positions.map(pos => <PositionRow key={pos.id} pos={pos} />)}
       </div>
+
+      {selectedMonth && (
+        <FeesMonthModal
+          month={selectedMonth}
+          trades={tradesData?.trades ?? []}
+          onClose={() => setSelectedMonth(null)}
+        />
+      )}
     </div>
   );
 }
