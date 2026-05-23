@@ -3421,6 +3421,24 @@ function portalTradeMonthKey(t: CustomerTrade): string | null {
   return `${y}-${m}`;
 }
 
+function portalCsvCell(v: unknown): string {
+  const s = v === null || v === undefined ? "" : String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function portalDownloadCsv(filename: string, rows: string[][]): void {
+  const csv = rows.map(r => r.map(portalCsvCell).join(",")).join("\r\n");
+  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function PortalFeesMonthModal({
   month, trades, onClose,
 }: {
@@ -3438,6 +3456,39 @@ function PortalFeesMonthModal({
   const totalFees     = monthTrades.reduce((s, x) => s + x.impact, 0);
   const totalRealized = monthTrades.reduce((s, x) => s + Number(x.t.realizedPnL ?? 0), 0);
   const label = `${portalFeesShortLabel(month)} ${month.slice(0, 4)}`;
+
+  const exportCsv = () => {
+    const toN = (v: number | string | null | undefined): number => {
+      if (v === null || v === undefined) return 0;
+      const n = typeof v === "number" ? v : Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const header = [
+      "symbol", "side", "entry_price", "exit_price", "exit_time",
+      "broker", "entry_fee", "exit_fee", "total_fee", "realized_pnl",
+    ];
+    const rows: string[][] = [header];
+    for (const { t, impact } of monthTrades) {
+      const entry = toN(t.entryFeeBroker) || toN(t.entryFee);
+      const exit  = toN(t.exitFeeBroker)  || toN(t.exitFee);
+      const exitMs = Number(t.exitTime ?? 0);
+      const exitIso = Number.isFinite(exitMs) && exitMs > 0
+        ? new Date(exitMs).toISOString() : "";
+      rows.push([
+        displaySymbol(t.symbol),
+        t.side,
+        String(t.entryPrice),
+        String(t.exitPrice),
+        exitIso,
+        (t.exchange ?? "").toString().toUpperCase(),
+        entry.toFixed(4),
+        exit.toFixed(4),
+        impact.toFixed(4),
+        toN(t.realizedPnL).toFixed(4),
+      ]);
+    }
+    portalDownloadCsv(`aicandlez-fees-${month}.csv`, rows);
+  };
 
   return (
     <div
@@ -3476,16 +3527,36 @@ function PortalFeesMonthModal({
               {label}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              background: "transparent", border: `1px solid ${N.BORDER_HI}`,
-              color: N.TEXT_2, width: 36, height: 36, borderRadius: 6,
-              fontFamily: N.FONT_MONO, fontSize: 16, cursor: "pointer",
-            }}
-          >×</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={monthTrades.length === 0}
+              aria-label="Export CSV"
+              title="Download month's fee breakdown as CSV"
+              style={{
+                background: `linear-gradient(180deg, ${N.BRAND}22, ${N.BRAND}10)`,
+                border: `1px solid ${N.BRAND}66`,
+                color: monthTrades.length === 0 ? N.TEXT_3 : N.BRAND,
+                padding: "0 12px", height: 36, borderRadius: 6,
+                fontFamily: N.FONT_MONO, fontSize: 10, fontWeight: 800,
+                letterSpacing: "0.16em",
+                textShadow: monthTrades.length === 0 ? "none" : `0 0 8px ${N.BRAND_GLOW}`,
+                cursor: monthTrades.length === 0 ? "not-allowed" : "pointer",
+                opacity: monthTrades.length === 0 ? 0.4 : 1,
+              }}
+            >EXPORT CSV</button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                background: "transparent", border: `1px solid ${N.BORDER_HI}`,
+                color: N.TEXT_2, width: 36, height: 36, borderRadius: 6,
+                fontFamily: N.FONT_MONO, fontSize: 16, cursor: "pointer",
+              }}
+            >×</button>
+          </div>
         </div>
 
         <div style={{

@@ -256,6 +256,24 @@ function tradeFeeImpact(t: SimTrade): number {
   return entry + exit;
 }
 
+function csvCell(v: unknown): string {
+  const s = v === null || v === undefined ? "" : String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function downloadCsv(filename: string, rows: string[][]): void {
+  const csv = rows.map(r => r.map(csvCell).join(",")).join("\r\n");
+  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function FeesMonthModal({
   month, trades, onClose,
 }: {
@@ -274,6 +292,31 @@ function FeesMonthModal({
   const totalFees     = monthTrades.reduce((s, x) => s + x.impact, 0);
   const totalRealized = monthTrades.reduce((s, x) => s + (x.t.pnl ?? 0), 0);
   const label = `${shortMonthLabel(month)} ${month.slice(0, 4)}`;
+
+  const exportCsv = () => {
+    const header = [
+      "symbol", "side", "entry_price", "exit_price", "exit_time",
+      "broker", "entry_fee", "exit_fee", "total_fee", "realized_pnl",
+    ];
+    const rows: string[][] = [header];
+    for (const { t, impact } of monthTrades) {
+      const entry = t.entryFeeBroker ?? t.entryFee ?? 0;
+      const exit  = t.exitFeeBroker  ?? t.exitFee  ?? 0;
+      rows.push([
+        t.symbol,
+        t.side,
+        String(t.entryPrice),
+        String(t.exitPrice),
+        t.closedAt ?? "",
+        (t.exchange ?? "").toUpperCase(),
+        entry.toFixed(4),
+        exit.toFixed(4),
+        impact.toFixed(4),
+        (t.pnl ?? 0).toFixed(4),
+      ]);
+    }
+    downloadCsv(`aicandlez-fees-${month}.csv`, rows);
+  };
 
   return (
     <div
@@ -311,16 +354,35 @@ function FeesMonthModal({
               {label}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              background: "transparent", border: "1px solid #0d2035",
-              color: "#3a6080", width: 34, height: 34, borderRadius: 8,
-              fontFamily: "monospace", fontSize: 14, cursor: "pointer",
-            }}
-          >×</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={monthTrades.length === 0}
+              aria-label="Export CSV"
+              title="Download month's fee breakdown as CSV"
+              style={{
+                background: "rgba(0,255,138,0.08)",
+                border: "1px solid rgba(0,255,138,0.4)",
+                color: monthTrades.length === 0 ? "#1e3a50" : "#00ff8a",
+                padding: "0 10px", height: 34, borderRadius: 8,
+                fontFamily: "monospace", fontSize: 10, fontWeight: 700,
+                letterSpacing: "0.14em",
+                cursor: monthTrades.length === 0 ? "not-allowed" : "pointer",
+                opacity: monthTrades.length === 0 ? 0.4 : 1,
+              }}
+            >EXPORT CSV</button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                background: "transparent", border: "1px solid #0d2035",
+                color: "#3a6080", width: 34, height: 34, borderRadius: 8,
+                fontFamily: "monospace", fontSize: 14, cursor: "pointer",
+              }}
+            >×</button>
+          </div>
         </div>
 
         <div style={{
