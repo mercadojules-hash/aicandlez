@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { api, type Portfolio as PortfolioData, type SimAccount, type MonthlyFeesResponse, type SimTrade } from "@/lib/api";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
 import { EnableLiveCTA } from "@/components/EnableLiveCTA";
@@ -53,16 +54,31 @@ function deriveFeesInsight(
 type MonthlyFeeBucketLite = { month: string; feesPaid: number; tradeCount: number; realizedPnL: number };
 
 function FeesInsightCallout({ insight }: { insight: string | null }) {
+  const [, setLocation] = useLocation();
   if (!insight) return null;
+  // Deep-link target: /profile → Min Confidence Threshold row inside the AI
+  // Settings card (anchor `#ai-confidence-threshold`). Task #117.
+  const jumpToThreshold = () => setLocation("/profile#ai-confidence-threshold");
   return (
-    <div style={{
-      marginTop: 10,
-      padding: "10px 12px",
-      borderRadius: 6,
-      border: "1px solid rgba(255,122,61,0.35)",
-      background: "rgba(255,122,61,0.06)",
-      display: "flex", gap: 8, alignItems: "flex-start",
-    }}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={jumpToThreshold}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          jumpToThreshold();
+        }
+      }}
+      style={{
+        marginTop: 10,
+        padding: "10px 12px",
+        borderRadius: 6,
+        border: "1px solid rgba(255,122,61,0.35)",
+        background: "rgba(255,122,61,0.06)",
+        display: "flex", gap: 8, alignItems: "flex-start",
+        cursor: "pointer",
+      }}>
       <span style={{
         fontSize: 8, fontFamily: "monospace", color: "#ff7a3d",
         letterSpacing: "0.16em", textTransform: "uppercase",
@@ -72,8 +88,15 @@ function FeesInsightCallout({ insight }: { insight: string | null }) {
       }}>AI TAKE</span>
       <span style={{
         fontSize: 11, fontFamily: "monospace", color: "#e8c4a8",
-        lineHeight: 1.45,
-      }}>{insight}</span>
+        lineHeight: 1.45, flex: 1,
+      }}>
+        {insight}
+        {" "}
+        <span style={{
+          color: "#ff7a3d", fontWeight: 700, whiteSpace: "nowrap",
+          textDecoration: "underline", textUnderlineOffset: 2,
+        }}>Adjust →</span>
+      </span>
     </div>
   );
 }

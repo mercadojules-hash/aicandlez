@@ -876,6 +876,23 @@ export default function Settings() {
     if (data) setDraft(data);
   }, [data]);
 
+  // Hash-anchor scroll for deep-links into this page (Task #117). Used by
+  // the Portal AI TAKE callout → /settings#min-confidence to drop the user
+  // straight onto the confidence-threshold control. Runs once `data` is
+  // available so the target node has actually rendered.
+  useEffect(() => {
+    if (!data) return;
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    if (!hash) return;
+    const id = hash.slice(1);
+    if (!id) return;
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [data]);
+
   const set = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
     setDraft(d => ({ ...d, [key]: value }));
   };
@@ -1003,12 +1020,16 @@ export default function Settings() {
                 ))}
               </div>
             </div>
-            <NumberInput
-              label="MIN CONFIDENCE THRESHOLD (%)"
-              value={merged.minConfidence ?? 60}
-              onChange={v => set("minConfidence", v)}
-              min={20} max={95} step={5} suffix="%"
-            />
+            {/* id="min-confidence" is the deep-link target from the Portal
+                AI TAKE callout (Task #117) — see PortalFeesTrend insight. */}
+            <div id="min-confidence" style={{ scrollMarginTop: 80 }}>
+              <NumberInput
+                label="MIN CONFIDENCE THRESHOLD (%)"
+                value={merged.minConfidence ?? 60}
+                onChange={v => set("minConfidence", v)}
+                min={20} max={95} step={5} suffix="%"
+              />
+            </div>
           </Section>
 
           {/* ── Risk Management ───────────────────────────────────────── */}

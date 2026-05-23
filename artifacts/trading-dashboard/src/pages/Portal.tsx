@@ -3072,6 +3072,143 @@ function derivePortalFeesInsight(
   return `Your ${monthName} fees consumed ${worst.ratio.toFixed(0)}% of profit ($${avgTradeFee.toFixed(2)} avg per trade) — consider widening signal confidence above ${suggestThreshold} to trade less.`;
 }
 
+// ── AI Confidence Threshold panel (customer terminal) ─────────────────────────
+// Deep-link target for Task #117. Sits inside /portal so the AI TAKE callout
+// can drop the operator straight onto the min-confidence slider without
+// leaving the terminal. Reads/writes `minConfidence` on the same
+// /api/user/settings endpoint the mobile PWA uses — engine reloads user
+// settings on every loop tick so the change applies immediately.
+function PortalAIConfidencePanel() {
+  const { getToken } = useAuth();
+  const queryClient  = useQueryClient();
+  const { data } = useQuery<{ minConfidence?: number }>({
+    queryKey: ["/api/user/settings"],
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/user/settings`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to load settings");
+      return res.json();
+    },
+  });
+
+  const current = Math.round(data?.minConfidence ?? 60);
+  const [draft, setDraft] = useState<number | null>(null);
+  const value = draft ?? current;
+
+  const tier =
+    value >= 75 ? { label:"SAFE",       color:"#00ff8a" } :
+    value >= 60 ? { label:"BALANCED",   color:"#66FF66" } :
+                  { label:"AGGRESSIVE", color:"#ff9400" };
+
+  const mutation = useMutation({
+    mutationFn: async (v: number) => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/user/settings`, {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ minConfidence: v }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onMutate: async (v: number) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/user/settings"] });
+      const prev = queryClient.getQueryData<{ minConfidence?: number }>(["/api/user/settings"]);
+      queryClient.setQueryData(["/api/user/settings"], { ...(prev ?? {}), minConfidence: v });
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["/api/user/settings"], ctx.prev);
+      toast({ title: "Could not save threshold", description: "Please try again." });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["/api/user/settings"] });
+    },
+  });
+
+  const commit = (v: number) => {
+    setDraft(v);
+    mutation.mutate(v);
+  };
+
+  return (
+    <div
+      id="ai-confidence-threshold"
+      style={{
+        scrollMarginTop: 80,
+        border: `1px solid ${N.BORDER}`,
+        background: N.SURFACE_1,
+        borderRadius: 4,
+        padding: "14px 16px",
+      }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        marginBottom: 8,
+      }}>
+        <div>
+          <div style={{
+            fontSize: 10, letterSpacing: "0.18em", color: N.BRAND,
+            fontWeight: 700, textTransform: "uppercase",
+          }}>
+            AI SETTINGS · MIN CONFIDENCE THRESHOLD
+          </div>
+          <div style={{ fontSize: 10, color: N.TEXT_2, marginTop: 4 }}>
+            Engine only trades signals above this confidence — raise it to trade less.
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{
+            fontSize: 9, fontWeight: 700, letterSpacing: "0.12em",
+            color: tier.color, padding: "2px 8px", borderRadius: 3,
+            border: `1px solid ${tier.color}55`,
+            background: `${tier.color}10`,
+          }}>{tier.label}</span>
+          <span style={{
+            fontSize: 20, fontWeight: 700, color: N.BRAND,
+            fontFamily: "ui-monospace, monospace", minWidth: 64, textAlign: "right",
+          }}>{value}%</span>
+        </div>
+      </div>
+      <input
+        type="range" min={35} max={95} step={5}
+        value={value}
+        onChange={e => commit(parseInt(e.target.value, 10))}
+        style={{ width: "100%", accentColor: N.BRAND }}
+      />
+      <div style={{
+        display: "flex", justifyContent: "space-between",
+        fontSize: 9, color: N.TEXT_2, letterSpacing: "0.12em", marginTop: 2,
+      }}>
+        <span>AGGRESSIVE · 35%</span>
+        <span>SAFE · 95%</span>
+      </div>
+    </div>
+  );
+}
+
+// Same-page scroll for the AI TAKE deep-link (Task #117). The customer
+// terminal mounts the PortalAIConfidencePanel under id="ai-confidence-threshold"
+// further down the page, so we use scrollIntoView rather than navigating away.
+function scrollToAIConfidenceThreshold() {
+  if (typeof document === "undefined") return;
+  const el = document.getElementById("ai-confidence-threshold");
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Update the URL hash so refresh / back keeps the anchor.
+    if (typeof window !== "undefined" && window.location.hash !== "#ai-confidence-threshold") {
+      try { window.history.replaceState(null, "", "#ai-confidence-threshold"); } catch {}
+    }
+  }
+}
+
 function PortalFeesTrend({
   data, winRate, onSelectMonth,
   }: {
@@ -3216,14 +3353,25 @@ function PortalFeesTrend({
         <span><span style={{ color: "#ff7a3d" }}>■</span> FEES &gt; PROFIT</span>
       </div>
       {insight && (
-        <div style={{
-          marginTop: 12,
-          padding: "10px 12px",
-          borderRadius: 4,
-          border: "1px solid rgba(255,122,61,0.35)",
-          background: "rgba(255,122,61,0.06)",
-          display: "flex", gap: 10, alignItems: "flex-start",
-        }}>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => scrollToAIConfidenceThreshold()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              scrollToAIConfidenceThreshold();
+            }
+          }}
+          style={{
+            marginTop: 12,
+            padding: "10px 12px",
+            borderRadius: 4,
+            border: "1px solid rgba(255,122,61,0.35)",
+            background: "rgba(255,122,61,0.06)",
+            display: "flex", gap: 10, alignItems: "flex-start",
+            cursor: "pointer",
+          }}>
           <span style={{
             fontSize: 9, color: "#ff7a3d",
             letterSpacing: "0.18em", textTransform: "uppercase",
@@ -3233,8 +3381,15 @@ function PortalFeesTrend({
           }}>AI TAKE</span>
           <span style={{
             fontSize: 11, color: "#f4c89f",
-            lineHeight: 1.5, letterSpacing: "0.02em",
-          }}>{insight}</span>
+            lineHeight: 1.5, letterSpacing: "0.02em", flex: 1,
+          }}>
+            {insight}
+            {" "}
+            <span style={{
+              color: "#ff7a3d", fontWeight: 700, whiteSpace: "nowrap",
+              textDecoration: "underline", textUnderlineOffset: 2,
+            }}>Adjust →</span>
+          </span>
         </div>
       )}
     </div>
@@ -3987,6 +4142,14 @@ function PortalInner() {
           trades={simTradesQuery.data?.trades ?? []}
           onClose={() => setFeesDrillMonth(null)}
         />
+      )}
+
+      {/* AI Settings · Min Confidence Threshold — customer-only, deep-link
+          target for the AI TAKE callout on PortalFeesTrend (Task #117). */}
+      {!isAdmin && (
+        <div style={{ padding: "12px 16px 0" }}>
+          <PortalAIConfidencePanel />
+        </div>
       )}
 
       {/* AI Intelligence Center — radar + diverse live telemetry */}

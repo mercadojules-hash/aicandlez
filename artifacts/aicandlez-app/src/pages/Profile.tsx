@@ -483,6 +483,80 @@ function RiskSelector({ value, onChange }: { value:RiskLevel; onChange:(v:RiskLe
   );
 }
 
+// ── Min Confidence Threshold row ──────────────────────────────────────────────────
+// Deep-link target for Task #117 (Portfolio AI TAKE callout → "Adjust →").
+// Reads/writes `minConfidence` on `user_settings` via the shared
+// /user/settings PUT path. The trading engine reloads user settings on every
+// loop tick, so a slider change is reflected immediately.
+function MinConfidenceRow() {
+  const qc = useQueryClient();
+  const { data } = useQuery<{ minConfidence?: number }>({
+    queryKey:  ["/user/settings"],
+    queryFn:   () => api.get("/user/settings"),
+    staleTime: 30_000,
+  });
+  const current = Math.round(data?.minConfidence ?? 60);
+  const [draft, setDraft] = useState<number | null>(null);
+  const value = draft ?? current;
+
+  const tier =
+    value >= 75 ? { label:"SAFE",  color:"rgba(0,255,136,0.85)" } :
+    value >= 60 ? { label:"BAL",   color:"rgba(102,255,102,0.85)" } :
+                  { label:"AGGR",  color:"rgba(255,148,0,0.85)" };
+
+  const commit = (v: number) => {
+    setDraft(v);
+    // Optimistic local + server PUT. Engine picks it up on next loop tick.
+    qc.setQueryData<{ minConfidence?: number }>(["/user/settings"], prev =>
+      prev ? { ...prev, minConfidence: v } : { minConfidence: v });
+    api.put("/user/settings", { minConfidence: v }).catch(() => {
+      qc.invalidateQueries({ queryKey: ["/user/settings"] });
+    });
+  };
+
+  return (
+    <div
+      id="ai-confidence-threshold"
+      style={{
+        display:"flex", flexDirection:"column",
+        padding:"13px 0", borderBottom:"1px solid rgba(255,255,255,0.05)",
+        scrollMarginTop: 80,
+      }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:13, fontFamily:SANS, fontWeight:500, color:W }}>
+            Min Confidence Threshold
+          </div>
+          <div style={{ fontSize:9, fontFamily:SANS, color:GR, marginTop:2 }}>
+            Engine only trades signals above this confidence
+          </div>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+          <span style={{ fontSize:8, fontFamily:SANS, fontWeight:700,
+            color:tier.color, letterSpacing:"0.06em" }}>{tier.label}</span>
+          <span style={{ fontSize:16, fontFamily:MONO, fontWeight:700, color:C,
+            minWidth:46, textAlign:"right" as const }}>{value}%</span>
+        </div>
+      </div>
+      <input
+        type="range" min={35} max={95} step={5}
+        value={value}
+        onChange={e => commit(parseInt(e.target.value, 10))}
+        style={{
+          marginTop: 10,
+          width: "100%",
+          accentColor: "#66FF66",
+        }}
+      />
+      <div style={{ display:"flex", justifyContent:"space-between",
+        fontSize:8, fontFamily:SANS, color:GR, letterSpacing:"0.10em", marginTop:2 }}>
+        <span>AGGRESSIVE</span>
+        <span>SAFE</span>
+      </div>
+    </div>
+  );
+}
+
 // ── AI Status card ────────────────────────────────────────────────────────────────
 function AIStatusCard({ enabled, positions, maxPositions }: {
   enabled:boolean; positions:number; maxPositions:number;
@@ -1177,6 +1251,23 @@ export default function Profile() {
     // openOnboarding is a stable context callback; intentionally not in deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
+
+  // Hash-anchor scroll for deep-links into this page (Task #117). Wouter's
+  // useLocation does not surface window.location.hash, so we read it directly.
+  // Used by the Portfolio AI TAKE callout → /profile#ai-settings to drop the
+  // user straight onto the confidence/risk threshold control.
+  useEffect(() => {
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    if (!hash) return;
+    const id = hash.slice(1);
+    if (!id) return;
+    // Defer to allow the section to mount before scrolling.
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+    return () => window.clearTimeout(t);
+  }, [location]);
   const { enabled: aiEnabled, setEnabled: setAiEnabled } = useAIAutoTrade();
   const { profile, updateProfile } = useUserProfile();
   const pushNotifs = usePushNotifications();
@@ -1584,7 +1675,10 @@ export default function Profile() {
         </div>
 
         {/* ── AI Settings ──────────────────────────────────────────────────── */}
-        <div style={{ marginBottom:18 }}>
+        {/* id="ai-settings" is the deep-link target from Portfolio AI TAKE
+            callout (Task #117) — scrolled into view by the hash effect above.
+            The min-confidence row inside also carries its own anchor. */}
+        <div id="ai-settings" style={{ marginBottom:18, scrollMarginTop: 80 }}>
           <SectionHead label="AI Settings" accent="rgba(102,255,102,0.65)"/>
           <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, padding:"0 16px" }}>
             <AIToggle
@@ -1594,6 +1688,11 @@ export default function Profile() {
               onChange={setAiEnabled}
               divider={true}
             />
+            {/* Min Confidence Threshold — the actual control the Portfolio
+                AI TAKE callout deep-links into (Task #117). Writes via the
+                shared /user/settings endpoint, so engine sees the change on
+                its next loop tick. */}
+            <MinConfidenceRow/>
             <StepperRow
               label="Max Concurrent AI Trades"
               sub="AI will not open more than this many positions at once"
