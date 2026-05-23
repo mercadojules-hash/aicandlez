@@ -25,8 +25,8 @@ auth.aicandlez.com       → Clerk auth proxy (optional)
 >   (admin → `/command`, customer → `/portal`) in a single hop. Sending
 >   everyone to `/command` causes a visible flash of admin chrome before
 >   `AdminOnly` bounces non-admins.
-> - Landing CTAs target `https://app.aicandlez.com` (PWA root) — never
->   `app.aicandlez.com/portal`, which double-bounces through the PWA's
+> - Landing CTAs target `https://trade.aicandlez.com` (customer desktop
+>   portal) — never `app.aicandlez.com/portal`, which double-bounces through the PWA's
 >   cross-app redirect.
 
 ---

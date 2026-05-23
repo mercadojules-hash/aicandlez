@@ -228,7 +228,11 @@ function SignInRedirect() {
 // either a bare origin (`https://trade.aicandlez.com`) or a full
 // `/portal` URL and normalize to the latter.
 const TRADING_DASHBOARD_PORTAL_URL = (() => {
-  const env = (import.meta.env["VITE_TRADING_DASHBOARD_URL"] as string | undefined)?.trim();
+  // Task #162 spec-compliant primary env name is `VITE_PORTAL_URL`;
+  // `VITE_TRADING_DASHBOARD_URL` is kept as a backward-compatible alias.
+  const env =
+    (import.meta.env["VITE_PORTAL_URL"] as string | undefined)?.trim() ||
+    (import.meta.env["VITE_TRADING_DASHBOARD_URL"] as string | undefined)?.trim();
   if (env) {
     // Strip trailing slashes and append `/portal` if not already present.
     const trimmed = env.replace(/\/+$/, "");

@@ -63,7 +63,7 @@ services:
       # CLI, webhooks). MUST live on the API service (not the PWA), since
       # api-server is the one that constructs success/cancel URLs.
       - key: CUSTOMER_APP_BASE_URL
-        value: https://app.aicandlez.com
+        value: https://trade.aicandlez.com
 
   # ── Customer Desktop Terminal — trade.aicandlez.com ──────────────────────────
   # The customer-facing institutional desktop workstation. Served by the
@@ -231,6 +231,10 @@ services:
       # Cross-app target for PWA /portal redirect — MUST point at the
       # trading-dashboard customer host, NEVER back at this PWA's own host
       # (would self-loop into FullPageLoader). Phase A of Task #162.
+      # Task #162: primary env is VITE_PORTAL_URL; VITE_TRADING_DASHBOARD_URL
+      # is kept as a backward-compatible alias read by the PWA fallback chain.
+      - key: VITE_PORTAL_URL
+        value: https://trade.aicandlez.com/portal
       - key: VITE_TRADING_DASHBOARD_URL
         value: https://trade.aicandlez.com
 

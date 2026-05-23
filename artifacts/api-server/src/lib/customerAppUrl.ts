@@ -53,9 +53,13 @@ export function resolveCustomerAppBaseUrl(
 ): string {
   if (origin) {
     const trimmed = stripTrailingSlash(origin);
+    // Robust parse — a malformed Origin must NOT throw out of this helper
+    // and break checkout. Fall through to the env chain instead.
+    let hostname = "";
+    try { hostname = new URL(trimmed).hostname; } catch { /* ignore */ }
     if (
       CUSTOMER_APP_ORIGIN_ALLOW.has(trimmed) ||
-      REPLIT_PREVIEW_HOST.test(new URL(trimmed).hostname) ||
+      (hostname && REPLIT_PREVIEW_HOST.test(hostname)) ||
       LOCALHOST.test(trimmed)
     ) {
       return trimmed;
