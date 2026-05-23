@@ -13,4 +13,7 @@ export * from "./performanceFees";
 export * from "./userConsents";
 export * from "./userPushTokens";
 export * from "./auditLog";
+export * from "./userTradeLimits";
+export * from "./userAdminStatus";
+export * from "./userAdminActions";
 export * from "../constants/alertKeys";

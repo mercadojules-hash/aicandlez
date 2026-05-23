@@ -13,6 +13,8 @@ import type { StandardOrder } from "../services/exchanges/types.js";
 import { getTicker } from "./marketData.js";
 import { logger } from "./logger.js";
 import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
+import { getTradeLimitVerdict, invalidateTradeLimitCache } from "./tradeLimitEngine.js";
+import { getUserStatusVerdict } from "./userStatusGuard.js";
 
 // ── Per-user live execution bridge ────────────────────────────────────────────
 //
@@ -70,7 +72,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject";
+  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked";
   error?:          string;
 }
 
@@ -360,6 +362,28 @@ export async function placeLiveAutoOrderForUser(
 ): Promise<LiveUserOrderResult> {
   const { userId, symbol, side, sizeUSD, useSandbox = false } = req;
 
+  // 0a. Admin-status guard — blocks suspended / disabled / force_paper users.
+  // Sandbox routing still respects status (force_paper allows sandbox; that
+  // path will not reach here because callers route sandbox through the
+  // internal simulator, but `suspended` and `disabled` always block).
+  const statusVerdict = await getUserStatusVerdict(userId);
+  if (!statusVerdict.allowLive) {
+    const msg = statusVerdict.reason ?? `Account ${statusVerdict.status} — live execution blocked`;
+    await emitFailureNotification(userId, symbol, side, msg);
+    return { success: false, userId, errorCode: "user_status_blocked", error: msg };
+  }
+
+  // 0b. Trade-limit guard — rolling 24h cap. Operators in the no-userId
+  // path (`placeLiveAutoOrder` in exchangeEngine) skip this gate entirely.
+  // Sandbox/testnet opens are real broker orders against the user's
+  // exchange and still count toward the cap.
+  const limitVerdict = await getTradeLimitVerdict(userId);
+  if (limitVerdict.blocked) {
+    const msg = `Trade limit reached (${limitVerdict.used24h}/${limitVerdict.capTier} in 24h) — try again after ${new Date(limitVerdict.windowResetsAt).toISOString()}`;
+    await emitFailureNotification(userId, symbol, side, msg);
+    return { success: false, userId, errorCode: "trade_limit_exhausted", error: msg };
+  }
+
   // 1. Resolve default live connection
   const [row] = await db
     .select()
@@ -448,6 +472,7 @@ export async function placeLiveAutoOrderForUser(
       userId, symbol, side, row.exchange,
       dryResult.fillPrice!, dryResult.quantity!, dryResult.exchangeOrderId!, true,
     );
+    invalidateTradeLimitCache(userId);
     return dryResult;
   }
 
@@ -558,6 +583,7 @@ export async function placeLiveAutoOrderForUser(
         ? { note, data: { partial, timedOut, requestedQty, status: order.status } }
         : undefined,
     );
+    invalidateTradeLimitCache(userId);
     return result;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
