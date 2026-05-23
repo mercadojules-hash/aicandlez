@@ -86,8 +86,10 @@ export default function Subscribe() {
     mutationFn: (planId: string) =>
       api.post<{ url: string }>("/billing/checkout", {
         planId, billingPeriod: "monthly",
-        successUrl: `${window.location.origin}/aicandlez-app/profile?checkout=success`,
-        cancelUrl:  `${window.location.origin}/aicandlez-app/subscribe`,
+        // BASE_URL-derived so the return path resolves correctly in dev
+        // (`/aicandlez-app/`) and prod (`/` on app.aicandlez.com). Task #162 Phase B.
+        successUrl: `${window.location.origin}${(import.meta.env.BASE_URL ?? "/").replace(/\/$/, "")}/profile?checkout=success`,
+        cancelUrl:  `${window.location.origin}${(import.meta.env.BASE_URL ?? "/").replace(/\/$/, "")}/subscribe`,
       }),
     onSuccess: ({ url }) => { window.location.href = url; },
   });

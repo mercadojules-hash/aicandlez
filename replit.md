@@ -353,6 +353,7 @@ is milestone reference only.
 - **Task #158** — Read-only telemetry surface: `adminUserTelemetry` (per-user + leaderboards), `adminTopTelemetry` (platform), `operatorTelemetry`.
 - **Task #159** — 10 operator action endpoints in `adminUserActions.ts` + immutable audit + Stripe billing actions + `executionStreamBus` events.
 - **Task #160 (umbrella, in progress)** — Phased operator administration; Phases 1–6 backend complete (DB schemas, audit, trade-limit engine, isolation, telemetry, actions); Phase A telemetry contract audit complete with `tradesToday` + `equityUsd` added to list payload; Phase E UI deferred until live env stabilization.
+- **Task #162** — Launch routing + auth unification: PWA `/portal` no longer self-loops (default cross-app target = `trade.aicandlez.com`, env `VITE_TRADING_DASHBOARD_URL`); Stripe checkout return URLs in `aicandlez-app` (Billing, Subscribe, SubscriptionModal, Account) now derive from `import.meta.env.BASE_URL` so they work on both dev (`/aicandlez-app/`) and prod (`/` on app.aicandlez.com); trading-dashboard `SignIn`/`SignUp` `fallbackRedirectUrl` lands at root so `SignedInHomeRouter` role-dispatches in one hop instead of bouncing customers through `/command → AdminOnly → /portal`; landing CTAs route to PWA root (`APP_HOME_URL`) via new `artifacts/landing/src/lib/appUrls.ts` helper instead of `app.aicandlez.com/portal` (double-bounce). DEPLOYMENT.md routing matrix updated to 4-host model (app + trade + admintrade + api).
 
 ---
 

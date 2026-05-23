@@ -221,9 +221,21 @@ function SignInRedirect() {
 // terminal — it has been deleted. If anything in this PWA links to /portal
 // (deep link, sign-in callback, old bookmark), bounce the browser to the
 // trading-dashboard host where the real Portal.tsx lives.
-const TRADING_DASHBOARD_PORTAL_URL =
-  (import.meta.env["VITE_TRADING_DASHBOARD_URL"] as string | undefined) ??
-  "https://app.aicandlez.com/portal";
+// Resolve the cross-app target for /portal. We must default to the
+// trading-dashboard host (trade.aicandlez.com) — NOT this PWA's own host —
+// or the redirect loops back into the same SPA and the user is stranded on
+// FullPageLoader. If `VITE_TRADING_DASHBOARD_URL` is provided we accept
+// either a bare origin (`https://trade.aicandlez.com`) or a full
+// `/portal` URL and normalize to the latter.
+const TRADING_DASHBOARD_PORTAL_URL = (() => {
+  const env = (import.meta.env["VITE_TRADING_DASHBOARD_URL"] as string | undefined)?.trim();
+  if (env) {
+    // Strip trailing slashes and append `/portal` if not already present.
+    const trimmed = env.replace(/\/+$/, "");
+    return /\/portal\/?$/.test(trimmed) ? trimmed : `${trimmed}/portal`;
+  }
+  return "https://trade.aicandlez.com/portal";
+})();
 
 function PortalCrossAppRedirect() {
   useEffect(() => {

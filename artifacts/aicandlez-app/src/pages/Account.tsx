@@ -49,7 +49,8 @@ export default function Account() {
 
   const portal = useMutation({
     mutationFn: () => api.post<{ url: string }>("/billing/portal", {
-      returnUrl: `${window.location.origin}/aicandlez-app/account`,
+      // BASE_URL-derived for correct return in dev + prod. Task #162 Phase B.
+      returnUrl: `${window.location.origin}${(import.meta.env.BASE_URL ?? "/").replace(/\/$/, "")}/account`,
     }),
     onSuccess: ({ url }) => { window.location.href = url; },
   });

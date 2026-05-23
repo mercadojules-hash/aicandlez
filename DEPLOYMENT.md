@@ -6,11 +6,28 @@
 
 ```
 aicandlez.com            → Landing (static Vite — artifacts/landing)
-app.aicandlez.com        → Operator console / desktop terminal (artifacts/trading-dashboard)
-app.aicandlez.com/…pwa   → Mobile PWA (artifacts/aicandlez-app)
+app.aicandlez.com        → Mobile PWA (artifacts/aicandlez-app, served at root)
+trade.aicandlez.com      → Customer desktop portal (artifacts/trading-dashboard)
+admintrade.aicandlez.com → Operator / admin console (artifacts/trading-dashboard, separate service)
 api.aicandlez.com        → Express API + WebSocket (artifacts/api-server)
 auth.aicandlez.com       → Clerk auth proxy (optional)
 ```
+
+> **Task #162 launch routing invariants** (do not regress):
+> - `app.aicandlez.com` serves the PWA at the **root** (BASE_URL `/`).
+>   Stripe return URLs are derived from `import.meta.env.BASE_URL`, not
+>   hardcoded `/aicandlez-app/...` (that path 404s in production).
+> - PWA `/portal` is a **cross-app redirect** to `trade.aicandlez.com/portal`
+>   (env: `VITE_TRADING_DASHBOARD_URL`). The default MUST point at the
+>   trading-dashboard host — pointing it at the PWA's own host self-loops.
+> - `trade.aicandlez.com` Clerk `fallbackRedirectUrl` is the artifact root,
+>   not `/command`. Root → `HomeRoute` → `SignedInHomeRouter` role-dispatches
+>   (admin → `/command`, customer → `/portal`) in a single hop. Sending
+>   everyone to `/command` causes a visible flash of admin chrome before
+>   `AdminOnly` bounces non-admins.
+> - Landing CTAs target `https://app.aicandlez.com` (PWA root) — never
+>   `app.aicandlez.com/portal`, which double-bounces through the PWA's
+>   cross-app redirect.
 
 ---
 
@@ -26,9 +43,11 @@ www        CNAME    aicandlez.com
 
 ### Subdomains
 ```
-app        CNAME    <replit-deploy-url>   ; trading dashboard + PWA
-api        CNAME    <api-server-url>      ; REST + WebSocket
-auth       CNAME    <clerk-proxy-url>     ; optional Clerk proxy
+app          CNAME    <pwa-deploy-url>          ; mobile PWA (aicandlez-app)
+trade        CNAME    <trade-deploy-url>        ; customer desktop portal
+admintrade   CNAME    <admintrade-deploy-url>   ; operator/admin console
+api          CNAME    <api-server-url>          ; REST + WebSocket
+auth         CNAME    <clerk-proxy-url>         ; optional Clerk proxy
 ```
 
 ### Email / Verification
@@ -58,7 +77,7 @@ CLERK_SECRET_KEY=sk_live_...
 CLERK_PUBLISHABLE_KEY=pk_live_...
 
 # CORS
-ALLOWED_ORIGINS=https://aicandlez.com,https://www.aicandlez.com,https://app.aicandlez.com
+ALLOWED_ORIGINS=https://aicandlez.com,https://www.aicandlez.com,https://app.aicandlez.com,https://trade.aicandlez.com,https://admintrade.aicandlez.com
 
 # Session
 SESSION_SECRET=<64-char-random-hex>
@@ -89,26 +108,40 @@ STRIPE_PRICE_ID_ANNUAL=price_...
 EXCHANGE_LIVE_ENABLED=true
 ```
 
-### Trading Dashboard / Operator Console (app.aicandlez.com)
+### Customer Desktop Portal (trade.aicandlez.com)
 ```env
 VITE_CLERK_PUBLISHABLE_KEY=pk_live_...
 VITE_CLERK_PROXY_URL=https://auth.aicandlez.com
 VITE_API_BASE_URL=https://api.aicandlez.com
 VITE_WS_URL=wss://api.aicandlez.com/ws
 VITE_VAPID_PUBLIC_KEY=<same as VAPID_PUBLIC_KEY above>
+VITE_DEFAULT_LANDING=/portal
 ```
 
-### Mobile PWA (aicandlez-app, served under app.aicandlez.com)
+### Operator / Admin Console (admintrade.aicandlez.com)
+```env
+VITE_CLERK_PUBLISHABLE_KEY=pk_live_...
+VITE_CLERK_PROXY_URL=https://auth.aicandlez.com
+VITE_API_BASE_URL=https://api.aicandlez.com
+VITE_WS_URL=wss://api.aicandlez.com/ws
+VITE_VAPID_PUBLIC_KEY=<same as VAPID_PUBLIC_KEY above>
+VITE_DEFAULT_LANDING=/command
+```
+
+### Mobile PWA (app.aicandlez.com, served at root)
 ```env
 VITE_CLERK_PUBLISHABLE_KEY=pk_live_...
 VITE_API_BASE_URL=https://api.aicandlez.com
 VITE_VAPID_PUBLIC_KEY=<same as VAPID_PUBLIC_KEY above>
+# Cross-app target for PWA /portal redirect — Task #162 Phase A.
+# MUST point at the trading-dashboard customer host, not back at the PWA.
+VITE_TRADING_DASHBOARD_URL=https://trade.aicandlez.com
 ```
 
 ### Landing (aicandlez.com)
 ```env
 VITE_APP_URL=https://app.aicandlez.com
-VITE_PWA_URL=https://app.aicandlez.com/aicandlez-app/
+VITE_TRADE_URL=https://trade.aicandlez.com
 ```
 
 ---
@@ -126,20 +159,34 @@ Add these in Clerk Dashboard → Domains:
 https://aicandlez.com
 https://www.aicandlez.com
 https://app.aicandlez.com
+https://trade.aicandlez.com
+https://admintrade.aicandlez.com
 https://api.aicandlez.com
 ```
 
-### 3c. Redirect URLs
+### 3c. Redirect URLs (post-auth)
+Each artifact owns its own post-auth landing — Clerk-side defaults should
+match these per-host. Do NOT hardcode `/command` globally; non-admins
+authenticated on `trade.aicandlez.com` should land on `/portal`, which the
+artifact's own `SignedInHomeRouter` handles when redirected to root.
 ```
-Sign-in success:   https://app.aicandlez.com/command
-Sign-up success:   https://app.aicandlez.com/command
-After sign-out:    https://aicandlez.com/
+Mobile PWA (app.aicandlez.com)       → /        (PWA Home, role-agnostic)
+Customer Portal (trade.aicandlez.com) → /        (SignedInHomeRouter → /portal)
+Admin Console (admintrade.aicandlez.com) → /command
+After sign-out:                       → https://aicandlez.com/
 ```
 
-### 3d. Cross-subdomain sessions
-- Configure `domain: .aicandlez.com` in Clerk session settings
-- This allows `app.aicandlez.com` and `api.aicandlez.com` to share one session cookie
-- Enables "sign in once, access all surfaces" (mobile, desktop, API)
+### 3d. Cross-subdomain sessions (LOCKED INVARIANT)
+- Configure `domain: .aicandlez.com` in Clerk session settings.
+- This allows `app.aicandlez.com`, `trade.aicandlez.com`,
+  `admintrade.aicandlez.com`, and `api.aicandlez.com` to share one session
+  cookie. Enables "sign in once, access all surfaces".
+- All four web hosts MUST use the same Clerk publishable key
+  (`VITE_CLERK_PUBLISHABLE_KEY` = `pk_live_...`). Mixing dev/prod keys
+  across subdomains splits the session.
+- The Clerk proxy (`VITE_CLERK_PROXY_URL=https://auth.aicandlez.com`) is
+  optional but recommended; the cookie domain alone is sufficient for
+  session sharing.
 
 ### 3e. OAuth providers (optional)
 - Google OAuth: configure callback as `https://app.aicandlez.com/sign-in/sso-callback`

@@ -217,6 +217,11 @@ services:
         sync: false
       - key: VITE_API_BASE_URL
         value: https://api.aicandlez.com
+      # Cross-app target for PWA /portal redirect — MUST point at the
+      # trading-dashboard customer host, NEVER back at this PWA's own host
+      # (would self-loop into FullPageLoader). Phase A of Task #162.
+      - key: VITE_TRADING_DASHBOARD_URL
+        value: https://trade.aicandlez.com
 
   # ── Marketing Landing (static) ───────────────────────────────────────────────
   - type: web
@@ -238,6 +243,10 @@ services:
     envVars:
       - key: VITE_APP_URL
         value: https://app.aicandlez.com
+      # Optional: lets landing CTAs deep-link to the customer desktop terminal.
+      # Falls back to https://trade.aicandlez.com if unset. Task #162 Phase D.
+      - key: VITE_TRADE_URL
+        value: https://trade.aicandlez.com
 
 databases:
   - name: aicandlez-db

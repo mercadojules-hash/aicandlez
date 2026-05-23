@@ -194,7 +194,11 @@ function SignInPage() {
         routing="path"
         path={`${basePath}/sign-in`}
         signUpUrl={`${basePath}/sign-up`}
-        fallbackRedirectUrl={`${basePath}/command`}
+        // Land at root so HomeRoute → SignedInHomeRouter dispatches based on
+        // role (admin → /command, customer → /portal). Sending everyone to
+        // /command first caused a visible flash of admin chrome before
+        // AdminOnly bounced non-admins to /portal. Task #162 Phase C.
+        fallbackRedirectUrl={`${basePath}/`}
       />
     </div>
   );
@@ -207,7 +211,9 @@ function SignUpPage() {
         routing="path"
         path={`${basePath}/sign-up`}
         signInUrl={`${basePath}/sign-in`}
-        fallbackRedirectUrl={`${basePath}/command`}
+        // Root → HomeRoute role-dispatch. Same rationale as SignIn above.
+        // Task #162 Phase C.
+        fallbackRedirectUrl={`${basePath}/`}
       />
     </div>
   );

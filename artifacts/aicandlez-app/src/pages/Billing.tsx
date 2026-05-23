@@ -155,8 +155,11 @@ export default function Billing() {
     mutationFn: (planId: PlanId) =>
       api.post<{ url: string }>("/billing/checkout", {
         planId, billingPeriod: "monthly",
-        successUrl: `${window.location.origin}/aicandlez-app/profile?checkout=success`,
-        cancelUrl:  `${window.location.origin}/aicandlez-app/billing`,
+        // Use BASE_URL so the return path is correct in both dev (mounted at
+        // `/aicandlez-app/`) and production (mounted at `/` on app.aicandlez.com).
+        // Hardcoding `/aicandlez-app/...` here 404s in prod. Task #162 Phase B.
+        successUrl: `${window.location.origin}${(import.meta.env.BASE_URL ?? "/").replace(/\/$/, "")}/profile?checkout=success`,
+        cancelUrl:  `${window.location.origin}${(import.meta.env.BASE_URL ?? "/").replace(/\/$/, "")}/billing`,
       }),
     onSuccess: ({ url }) => { window.location.href = url; },
   });

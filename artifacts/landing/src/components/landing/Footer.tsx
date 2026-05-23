@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { APP_HOME_URL } from "../../lib/appUrls";
 
 function Modal({
   title,
@@ -286,7 +287,7 @@ export function Footer() {
                 PLATFORM
               </div>
               {[
-                { label: "Launch App", href: "https://app.aicandlez.com/portal" },
+                { label: "Launch App", href: APP_HOME_URL },
                 { label: "Operator Console", href: "https://admintrade.aicandlez.com/" },
                 { label: "Features", href: "#features" },
                 { label: "How It Works", href: "#how-it-works" },

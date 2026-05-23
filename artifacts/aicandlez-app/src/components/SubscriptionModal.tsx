@@ -46,8 +46,9 @@ export function SubscriptionModal() {
     mutationFn: () =>
       api.post<{ url: string }>("/billing/checkout", {
         planId: "starter", billingPeriod: "monthly",
-        successUrl: `${window.location.origin}/aicandlez-app/profile?checkout=success`,
-        cancelUrl:  `${window.location.origin}/aicandlez-app`,
+        // BASE_URL-derived for correct return in dev + prod. Task #162 Phase B.
+        successUrl: `${window.location.origin}${(import.meta.env.BASE_URL ?? "/").replace(/\/$/, "")}/profile?checkout=success`,
+        cancelUrl:  `${window.location.origin}${(import.meta.env.BASE_URL ?? "/").replace(/\/$/, "") || "/"}`,
       }),
     onSuccess: ({ url }) => { window.location.href = url; },
   });
