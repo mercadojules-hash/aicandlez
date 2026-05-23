@@ -160,7 +160,7 @@ export class PhemexAdapter extends BaseExchangeAdapter {
     );
     // Preserve the real exchange order id so the weekly drift suite can
     // round-trip place → getOrder and resolve a broker-sourced fee.
-    const orderId = data.data?.orderID;
+    const orderId = data.data?.orderID ?? data.data?.clOrdID ?? req.clientId;
     if (!orderId) {
       return simulatedOrder("Phemex", req, this.normaliseSymbol(req.symbol), this.config);
     }
@@ -343,7 +343,7 @@ type PhemexCandleRow = [number, number, string, string, string, string, string, 
 interface PhemexCandleResp { data?: { rows?: PhemexCandleRow[] } }
 interface PhemexBookResp   { result?: { book?: { bids?: [string, string][]; asks?: [string, string][] } } }
 interface PhemexAccountResp { data?: { currency: string; userBalance: string; lockedTradingBalance?: string }[] }
-interface PhemexOrderResp  { data?: { orderID: string } }
+interface PhemexOrderResp  { data?: { orderID?: string; clOrdID?: string } }
 interface PhemexOrderInfo  {
   orderID: string; side: string; ordType: string; ordStatus: string;
   orderQty?: string; cumQty?: string; avgPriceEp?: number; cumFeeEv?: number;

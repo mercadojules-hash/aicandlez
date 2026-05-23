@@ -19,6 +19,7 @@
 //   BINGX_VST_API_KEY=...           BINGX_VST_API_SECRET=... \
 //   HYPERLIQUID_TESTNET_API_KEY=... HYPERLIQUID_TESTNET_API_SECRET=... \
 //   DYDX_TESTNET_API_KEY=...        DYDX_TESTNET_API_SECRET=... \
+//   PHEMEX_TESTNET_API_KEY=...      PHEMEX_TESTNET_API_SECRET=... \
 //     pnpm --filter @workspace/api-server run test -- adapterFeeParsingTestnet
 //
 // Each per-exchange block additionally skips when its own testnet keys
