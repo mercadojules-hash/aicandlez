@@ -24,15 +24,14 @@ const NEG = "#FF4060";
 
 // Map exchange slug → user-facing label + order-history URL.
 // Used to deep-link the broker's own confirmation/history view.
+// OKX / KuCoin / Bybit / Robinhood deliberately omitted — see
+// artifacts/api-server/src/services/exchanges/catalog.ts header comment.
 const EXCHANGE_META: Record<string, { label: string; url?: string }> = {
   alpaca:    { label: "Alpaca",         url: "https://app.alpaca.markets/brokerage/dashboard/orders" },
   kraken:    { label: "Kraken",         url: "https://www.kraken.com/u/history/trades" },
-  binance:   { label: "Binance",        url: "https://www.binance.com/en/my/orders/exchange/tradeorder" },
   coinbase:  { label: "Coinbase",       url: "https://accounts.coinbase.com/profile" },
-  bybit:     { label: "Bybit",          url: "https://www.bybit.com/user/assets/order" },
-  okx:       { label: "OKX",            url: "https://www.okx.com/account/spot-order-history" },
-  kucoin:    { label: "KuCoin",         url: "https://www.kucoin.com/order/trade" },
   cryptocom: { label: "Crypto.com",     url: "https://crypto.com/exchange/trade/spot" },
+  binance:   { label: "Binance",        url: "https://www.binance.com/en/my/orders/exchange/tradeorder" },
 };
 
 function exchangeMeta(raw?: string) {
