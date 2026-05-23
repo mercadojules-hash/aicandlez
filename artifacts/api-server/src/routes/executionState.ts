@@ -27,6 +27,7 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod/v4";
 import { engineStats } from "../lib/tradingLoop.js";
 import { executionStreamBus } from "../lib/executionStreamBus.js";
+import { requireAuth } from "../middlewares/requireAuth.js";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
@@ -143,7 +144,10 @@ function deriveStreamState(args: {
   return { state: "armed", lastExecAt, lastSignalAt, reason: null };
 }
 
-router.get("/execution/state", async (req: Request, res: Response) => {
+// Auth-gated: response includes engine counters that should not be public.
+// Both signed-in customers and admins consume this — admins get true engine
+// state, customers get the kill-switch-respecting projection.
+router.get("/execution/state", requireAuth, async (req: Request, res: Response) => {
   const now            = Date.now();
   const engineRunning  = engineStats.running;
   const role           = await resolveRole(req);
