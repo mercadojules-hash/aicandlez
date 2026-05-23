@@ -20,6 +20,7 @@ import { usePaperTrades } from "@/hooks/usePaperTrades";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@clerk/react";
 import { useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePortalMode } from "@/contexts/PortalModeContext";
 
 // API base URL — mirrors Portal.tsx resolution so production cross-origin
@@ -165,6 +166,7 @@ export function SignalRow({ spec, breakdown }: Props) {
   const { openTrade } = usePaperTrades();
   const portalMode    = usePortalMode();
   const { getToken }  = useAuth();
+  const qc            = useQueryClient();
   const liveFallbackToastedRef = useRef(false);
   const [liveSize, setLiveSize] = useLiveOrderSize();
   const showSizePicker =
@@ -195,7 +197,14 @@ export function SignalRow({ spec, breakdown }: Props) {
   /** Submit a real-money order through the user's connected exchange. */
   const submitLive = async (
     sym: string, side: "BUY" | "SELL", sizeUSD: number,
-  ): Promise<{ ok: boolean; error?: string }> => {
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    fillPrice?: number;
+    exchange?: string;
+    exchangeOrderId?: string;
+    dryRun?: boolean;
+  }> => {
     try {
       const token = await getToken().catch(() => null);
       const res = await fetch(`${apiBaseUrl}/api/user/live-order`, {
@@ -211,7 +220,19 @@ export function SignalRow({ spec, breakdown }: Props) {
         const body = await res.json().catch(() => ({}));
         return { ok: false, error: (body as { error?: string }).error ?? `HTTP ${res.status}` };
       }
-      return { ok: true };
+      const body = (await res.json().catch(() => ({}))) as {
+        fillPrice?: number;
+        exchange?: string;
+        exchangeOrderId?: string;
+        dryRun?: boolean;
+      };
+      return {
+        ok: true,
+        fillPrice:       body.fillPrice,
+        exchange:        body.exchange,
+        exchangeOrderId: body.exchangeOrderId,
+        dryRun:          body.dryRun,
+      };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
@@ -270,7 +291,25 @@ export function SignalRow({ spec, breakdown }: Props) {
             });
           }
           firePaper(side, sl, tp);
+          return;
         }
+        // Real-time fill confirmation. Surface broker fill price, exchange,
+        // and order id so the customer has closure on the real-money action.
+        const exch = (r.exchange ?? "exchange").toUpperCase();
+        const orderIdShort = r.exchangeOrderId
+          ? `#${r.exchangeOrderId.slice(-8)}`
+          : "";
+        const priceStr = r.fillPrice && r.fillPrice > 0
+          ? `$${fmt(r.fillPrice)}`
+          : "market";
+        toast({
+          title: `FILLED @ ${priceStr} — ${spec.label}${r.dryRun ? " (DRY RUN)" : ""}`,
+          description: [side, exch, orderIdShort].filter(Boolean).join(" · "),
+        });
+        // Refresh customer portal panels immediately so the new LIVE row
+        // appears without waiting for the 4s poll.
+        void qc.invalidateQueries({ queryKey: ["customer-simulation-account"] });
+        void qc.invalidateQueries({ queryKey: ["customer-simulation-trades"] });
       });
       return;
     }
