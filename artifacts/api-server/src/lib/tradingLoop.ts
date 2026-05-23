@@ -639,7 +639,14 @@ async function autoExecute(
     // operator process-env path (admintrade.aicandlez.com) is ALWAYS
     // attempted in parallel so the platform-level audit trail + risk view
     // is preserved. If neither path succeeds, the trade is rejected.
-    const liveUsers = await listLiveExecutionUsers();
+    // Customer fan-out is gated by the customer-portal kill switch
+    // (Task #157). When disabled (default), customer rows are skipped
+    // entirely so we don't spam per-user rejection logs every signal.
+    // Operator env-key path always runs.
+    const { isCustomerLiveExecutionEnabled } = await import("./liveUserExecution.js");
+    const liveUsers = isCustomerLiveExecutionEnabled()
+      ? await listLiveExecutionUsers()
+      : [];
 
     const [operatorResult, userResults] = await Promise.all([
       placeLiveAutoOrder({ symbol, side, sizeUSD }).catch((err): Awaited<ReturnType<typeof placeLiveAutoOrder>> => ({

@@ -14,7 +14,7 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth.js";
-import { placeLiveAutoOrderForUser } from "../lib/liveUserExecution.js";
+import { placeLiveAutoOrderForUser, isCustomerLiveExecutionEnabled } from "../lib/liveUserExecution.js";
 import { registerLiveUserFill } from "../lib/userSimRegistry.js";
 import { TIER_MAX_SIZE_USD, type TierPlan } from "../lib/tierLimits.js";
 
@@ -86,6 +86,24 @@ router.post(
         { userId, err: err instanceof Error ? err.message : String(err) },
         "userLiveOrder: tier lookup failed — falling back to free plan",
       );
+    }
+
+    // Customer-portal live-execution kill switch (Task #157). Non-admin
+    // callers are hard-rejected unless the global flag is explicitly
+    // re-enabled via env. Same gate as `placeLiveAutoOrderForUser` —
+    // duplicated here so we don't even hit the tier-cap branch from a
+    // leaked client. Sandbox calls are blocked too (still hit broker net).
+    if (!isOperator && !isCustomerLiveExecutionEnabled()) {
+      req.log.warn(
+        { userId, symbol: parsed.symbol, side: parsed.side },
+        "userLiveOrder: rejected — customer_live_execution_disabled",
+      );
+      res.status(403).json({
+        ok:        false,
+        errorCode: "customer_live_execution_disabled",
+        error:     "Live execution is operated by AICandlez and is not available from the customer portal.",
+      });
+      return;
     }
 
     if (!parsed.useSandbox) {

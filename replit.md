@@ -94,16 +94,28 @@ back together. Every change to `/portal` must be gated by role and
 preserve both worlds.
 
 ### CUSTOMER PORTAL — `trade.aicandlez.com/portal` (non-admin signed-in users)
-Purpose: **hybrid onboarding + trading platform**
-- PAPER mode (always available, default for free users)
-- LIVE mode (paid subscribers only, real exchange routing)
+Purpose: **paper-only onboarding + AI evaluation platform** (Task #157)
+- PAPER mode ONLY — no LIVE affordances exposed to customers
+- Real-money execution is operated by AICandlez through the admin terminal
+  (`admintrade.aicandlez.com`) using server-side env Kraken keys. Customers
+  do **not** route their own orders to broker networks from the portal.
+- Server-side kill switch: `customer_live_execution_disabled` is enforced
+  in `placeLiveAutoOrderForUser`, `POST /api/user/live-order`, and the
+  `tradingLoop` customer fan-out branch. Default off; only flips when
+  `CUSTOMER_LIVE_EXECUTION_ENABLED=true`. Admin / super-admin role bypasses.
 - Onboarding flows (`?checkout=success` trigger, OnboardingFlow component)
-- Upgrade funnels, tier gates, UpgradeBanner, FeatureGate
+- Upgrade funnels, tier gates, UpgradeBanner, FeatureGate (paid tiers
+  unlock paper capacity + AI features — not live execution)
 - Training environment + AI experimentation surface
 - Conversion funnel (free → starter → pro)
 - `PaperTradesProvider` mounted, gated `!isAdmin`
-- PAPER/LIVE segmented toggle in Portal header (subscribers only)
-- Free users locked to PAPER with inline "Upgrade to unlock LIVE" CTA
+- **No PAPER/LIVE segmented toggle in Portal header** — replaced by a
+  static "PAPER MODE" informational banner explaining that live execution
+  is operated by AICandlez.
+- **No `LiveExecutionBar` / ARM LIVE control** rendered for non-admins.
+- `user_exchange_connections` data + ConnectModal remain available for
+  forward compatibility but are not load-bearing for the current customer
+  experience.
 
 ### ADMIN PORTAL — `admintrade.aicandlez.com/portal` (admin / super-admin role)
 Purpose: **institutional operator terminal**

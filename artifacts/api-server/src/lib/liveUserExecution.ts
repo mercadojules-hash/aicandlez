@@ -3,6 +3,7 @@ import {
   userExchangeConnectionsTable,
   userNotificationsTable,
   userSettingsTable,
+  usersTable,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { vault } from "../services/vault/CredentialVault.js";
@@ -75,8 +76,48 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked";
+  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled";
   error?:          string;
+}
+
+/**
+ * Customer-portal live-execution kill switch (Task #157).
+ *
+ * The customer portal at `trade.aicandlez.com/portal` is paper-only. Real-
+ * money execution is reserved for the operator terminal at
+ * `admintrade.aicandlez.com` and routed through the server-side env Kraken
+ * keys via `exchangeEngine.placeLiveAutoOrder` (no userId path).
+ *
+ * This flag governs the *per-user* execution path
+ * (`placeLiveAutoOrderForUser` + `POST /api/user/live-order` + the customer
+ * fan-out branch of `tradingLoop`). When false (the default), non-admin
+ * callers are hard-rejected with `customer_live_execution_disabled` even if
+ * an `user_exchange_connections` row exists or a stale UI affordance leaks
+ * through. Admins / super-admins bypass the gate so operator tooling that
+ * happens to authenticate as a real user is unaffected.
+ *
+ * Flip via env to re-enable a future customer live-execution rollout —
+ * intentionally undocumented in customer-facing surfaces.
+ */
+export function isCustomerLiveExecutionEnabled(): boolean {
+  return process.env["CUSTOMER_LIVE_EXECUTION_ENABLED"] === "true";
+}
+
+async function isOperatorRole(userId: string): Promise<boolean> {
+  try {
+    const [u] = await db
+      .select({ role: usersTable.role })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, userId))
+      .limit(1);
+    return u?.role === "admin" || u?.role === "super-admin";
+  } catch (err) {
+    logger.warn(
+      { userId, err: err instanceof Error ? err.message : String(err) },
+      "liveUserExecution: role lookup failed — assuming non-operator (fail-closed for live)",
+    );
+    return false;
+  }
 }
 
 export interface LiveUserCloseRequest {
@@ -100,7 +141,7 @@ export interface LiveUserCloseResult {
   brokerFee?:           number;
   brokerFeeCurrency?:   string;
   dryRun?:              boolean;
-  errorCode?:           "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "exchange_mismatch" | "exchange_reject";
+  errorCode?:           "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "exchange_mismatch" | "exchange_reject" | "customer_live_execution_disabled";
   error?:               string;
 }
 
@@ -364,6 +405,40 @@ export async function placeLiveAutoOrderForUser(
   req: LiveUserOrderRequest,
 ): Promise<LiveUserOrderResult> {
   const { userId, symbol, side, sizeUSD, useSandbox = false } = req;
+
+  // 0PRE. Customer-portal live-execution kill switch (Task #157).
+  // The customer portal is paper-only; non-admin live execution is hard-
+  // rejected unless explicitly re-enabled via env. Admins/super-admins
+  // bypass — they may exist as authenticated users on the operator
+  // terminal. Sandbox/testnet calls are also blocked when the flag is off
+  // because they still hit the broker network layer via per-user creds.
+  if (!isCustomerLiveExecutionEnabled()) {
+    const operator = await isOperatorRole(userId);
+    if (!operator) {
+      const msg = "Live execution is operated by AICandlez and is not available from the customer portal.";
+      executionStreamBus.emitEvent({
+        type:     "order_rejected",
+        severity: "warn",
+        symbol, side, mode: "live",
+        gate:     "customer_live_execution_disabled",
+        reason:   "customer_live_execution_disabled",
+        message:  msg,
+        details:  { userId, useSandbox },
+      });
+      try {
+        await db.insert(logsTable).values({
+          id:      crypto.randomUUID(),
+          type:    "trade",
+          level:   "warn",
+          message: `[customer_live_execution_disabled] ${msg}`,
+          details: { userId, symbol, side, useSandbox, errorCode: "customer_live_execution_disabled" },
+        });
+      } catch (err) {
+        logger.warn({ err, userId }, "liveUserExecution: customer-disabled log insert failed");
+      }
+      return { success: false, userId, errorCode: "customer_live_execution_disabled", error: msg };
+    }
+  }
 
   // 0a. Admin-status guard — blocks suspended / disabled / force_paper users.
   // Sandbox routing still respects status (force_paper allows sandbox; that
@@ -666,6 +741,39 @@ export async function placeLiveCloseOrderForUser(
 ): Promise<LiveUserCloseResult> {
   const { userId, symbol, openSide, quantity, exchange, useSandbox = false } = req;
   const closeSide: "BUY" | "SELL" = openSide === "BUY" ? "SELL" : "BUY";
+
+  // 0PRE. Customer-portal live-execution kill switch (Task #157).
+  // Symmetric with `placeLiveAutoOrderForUser` — a customer should not be
+  // able to execute a real broker close any more than they can execute a
+  // real broker open. Admins/super-admins bypass. Sandbox is also blocked
+  // (still hits broker network via per-user creds).
+  if (!isCustomerLiveExecutionEnabled()) {
+    const operator = await isOperatorRole(userId);
+    if (!operator) {
+      const msg = "Live execution is operated by AICandlez and is not available from the customer portal.";
+      executionStreamBus.emitEvent({
+        type:     "order_rejected",
+        severity: "warn",
+        symbol, side: closeSide, mode: "live",
+        gate:     "customer_live_execution_disabled",
+        reason:   "customer_live_execution_disabled",
+        message:  msg,
+        details:  { userId, useSandbox, leg: "close" },
+      });
+      try {
+        await db.insert(logsTable).values({
+          id:      crypto.randomUUID(),
+          type:    "trade",
+          level:   "warn",
+          message: `[customer_live_execution_disabled] close ${msg}`,
+          details: { userId, symbol, side: closeSide, leg: "close", useSandbox, errorCode: "customer_live_execution_disabled" },
+        });
+      } catch (err) {
+        logger.warn({ err, userId }, "liveUserExecution(close): customer-disabled log insert failed");
+      }
+      return { success: false, userId, exchange, errorCode: "customer_live_execution_disabled", error: msg };
+    }
+  }
 
   if (!(quantity > 0)) {
     return {

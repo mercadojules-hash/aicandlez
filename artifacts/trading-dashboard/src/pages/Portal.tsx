@@ -3853,7 +3853,20 @@ function PortalInner() {
   // Admins on /admintrade never see PortalModeProvider, so they always get the
   // simulation-backed view as before (their LIVE telemetry lives elsewhere).
   const storedMode = useStoredPortalMode();
-  const effectiveMode: PortalMode = !isAdmin && tier !== "free" && hasExchange ? storedMode : "PAPER";
+  // Customer portal is paper-only (Task #157). Force PAPER for all non-admin
+  // sessions regardless of stale localStorage `acl_portal_mode_v1=LIVE`
+  // values from before the revert — eliminates hidden LIVE client paths
+  // that might still try to call /api/user/live-order from SignalRow etc.
+  // Admins still derive their mode from the operator branch (no provider
+  // mounted), so this never affects them.
+  // Cast through unknown so downstream `effectiveMode === "LIVE"` branches
+  // remain type-valid for the day we flip the kill switch back on.
+  const effectiveMode: PortalMode = "PAPER" as PortalMode;
+  // Reference storedMode + isAdmin so the imports/hook stay live for the
+  // future re-enable path; intentionally not honored while customer live
+  // is disabled.
+  void storedMode;
+  void isAdmin;
 
   const stats = useMemo(() => {
     const acct      = simAccountQuery.data;
@@ -4208,14 +4221,40 @@ function PortalInner() {
         </div>
       )}
 
+      {/* Customer portal is paper-only (Task #157). The PAPER/LIVE toggle,
+          sandbox sub-toggle, and per-user live-execution affordances have
+          been removed for non-admin users. Real-money execution is operated
+          by AICandlez through the admin terminal at admintrade.aicandlez.com
+          and is server-side gated by `customer_live_execution_disabled` even
+          if a stale UI affordance leaks through. The admin branch (above)
+          keeps PortalModeProvider absent and uses the operator workstation
+          variant directly. */}
       {!isAdmin && (
-        <>
-          <PortalModeToggle
-            onUpgrade={() => setUpgradeOpenSafe(true)}
-            onConnectExchange={() => disclaimerGate(() => setConnectExchangeOpen(true))}
-          />
-          <PaperSandboxToggle defaultExchange={exchangeStatus.defaultExchange} />
-        </>
+        <div
+          role="note"
+          style={{
+            margin: "10px 24px 0",
+            padding: "10px 14px",
+            background: `${N.BRAND}0E`,
+            border: `1px solid ${N.BRAND}33`,
+            borderRadius: 4,
+            fontFamily: N.FONT_MONO,
+            fontSize: 10,
+            letterSpacing: "0.14em",
+            color: N.TEXT_1,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <span style={{ color: N.BRAND, fontWeight: 800, letterSpacing: "0.22em" }}>
+            PAPER MODE
+          </span>
+          <span style={{ color: N.TEXT_2 }}>
+            Live execution is operated by AICandlez. Your portal runs simulated trades against
+            real market data so you can evaluate the AI before any real money is at risk.
+          </span>
+        </div>
       )}
 
       <LogoBanner tier={tier} isAdmin={isAdmin} />
@@ -4487,17 +4526,21 @@ function PortalInner() {
         <MarketHeartbeat />
       </div>
 
-      {/* Live AI Execution control */}
-      <div style={{ padding: "12px 16px 0" }}>
-        <LiveExecutionBar
-          tier={tier}
-          onUpgrade={() => setUpgradeOpenSafe(true)}
-          onConnectExchange={() => disclaimerGate(() => setConnectExchangeOpen(true))}
-          exchangeConnected={hasExchange}
-          openSlots={stats.openCount}
-          isAdmin={isAdmin}
-        />
-      </div>
+      {/* Live AI Execution control — admin-only (Task #157). The customer
+          portal is paper-only; the ARM LIVE / per-user live-execution UI is
+          reserved for the operator terminal at admintrade.aicandlez.com. */}
+      {isAdmin && (
+        <div style={{ padding: "12px 16px 0" }}>
+          <LiveExecutionBar
+            tier={tier}
+            onUpgrade={() => setUpgradeOpenSafe(true)}
+            onConnectExchange={() => disclaimerGate(() => setConnectExchangeOpen(true))}
+            exchangeConnected={hasExchange}
+            openSlots={stats.openCount}
+            isAdmin={isAdmin}
+          />
+        </div>
+      )}
 
       {/* ── ADMIN OPERATOR LAYOUT ──────────────────────────────────────────────
           Two-column institutional terminal: Crypto signals stacked above Live
