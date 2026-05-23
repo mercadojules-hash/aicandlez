@@ -437,7 +437,7 @@ export function SignalRow({ spec, breakdown }: Props) {
     // Hard instrumentation for the live BUY path. Use a unique [BUY-TRACE]
     // prefix so the user can grep browser console + server log together.
     // Remove these once the first real Kraken fill is confirmed end-to-end.
-    console.warn("[BUY-TRACE] fireTrade ENTRY", {
+    console.error("[BUY-TRACE] fireTrade ENTRY", {
       symbol: spec.symbol,
       side,
       entry,
@@ -449,7 +449,7 @@ export function SignalRow({ spec, breakdown }: Props) {
       paperSandbox: portalMode.paperSandboxEnabled,
     });
     if (!entry || entry <= 0) {
-      console.warn("[BUY-TRACE] fireTrade EXIT — entry<=0 (market feed warming up)");
+      console.error("[BUY-TRACE] fireTrade EXIT — entry<=0 (market feed warming up)");
       toast({
         title: "MARKET FEED WARMING UP",
         description: `${spec.display} — waiting for live price`,
@@ -528,9 +528,9 @@ export function SignalRow({ spec, breakdown }: Props) {
     // so super-admin can manually fire a real Kraken order from a signal row
     // for live-test validation. Customer-portal trees never reach this branch.
     if (isOperatorRole || !portalMode.isCustomerPortal) {
-      console.warn("[BUY-TRACE] BRANCH = OPERATOR (Kraken env path)");
+      console.error("[BUY-TRACE] BRANCH = OPERATOR (Kraken env path)");
       if (operatorOrderInFlightRef.current) {
-        console.warn("[BUY-TRACE] OPERATOR EXIT — order already in flight");
+        console.error("[BUY-TRACE] OPERATOR EXIT — order already in flight");
         toast({
           title: `OPERATOR ORDER IN FLIGHT — ${spec.label}`,
           description: `Wait for the previous ${side} on ${spec.symbol} to settle before sending another.`,
@@ -552,7 +552,7 @@ export function SignalRow({ spec, breakdown }: Props) {
             orderType: "market",
             amountUSD: liveSize,
           };
-          console.warn("[BUY-TRACE] BEFORE FETCH", { url, payload, hasToken: !!token });
+          console.error("[BUY-TRACE] BEFORE FETCH", { url, payload, hasToken: !!token });
           const res = await authFetch(url, {
             method: "POST",
             credentials: "include",
@@ -562,10 +562,10 @@ export function SignalRow({ spec, breakdown }: Props) {
             },
             body: JSON.stringify(payload),
           });
-          console.warn("[BUY-TRACE] AFTER FETCH", { status: res.status, ok: res.ok });
+          console.error("[BUY-TRACE] AFTER FETCH", { status: res.status, ok: res.ok });
           if (!res.ok) {
             const body = await res.json().catch(() => ({} as { error?: string }));
-            console.warn("[BUY-TRACE] REJECTED body", body);
+            console.error("[BUY-TRACE] REJECTED body", body);
             toast({
               title: `OPERATOR ORDER REJECTED — ${spec.label}`,
               description: (body as { error?: string }).error ?? `HTTP ${res.status}`,
@@ -575,7 +575,7 @@ export function SignalRow({ spec, breakdown }: Props) {
           const body = (await res.json().catch(() => ({}))) as {
             id?: string; status?: string; fillPrice?: number; avgPrice?: number;
           };
-          console.warn("[BUY-TRACE] FILLED body", body);
+          console.error("[BUY-TRACE] FILLED body", body);
           const fill = body.fillPrice ?? body.avgPrice;
           toast({
             title: `OPERATOR FILLED — ${spec.label}${fill ? ` @ $${fmt(fill)}` : ""}`,
@@ -593,7 +593,7 @@ export function SignalRow({ spec, breakdown }: Props) {
       })();
       return;
     }
-    console.warn("[BUY-TRACE] FELL THROUGH past operator branch — going to firePaper/firePaperSim");
+    console.error("[BUY-TRACE] FELL THROUGH past operator branch — going to firePaper/firePaperSim");
 
     firePaper(side, sl, tp);
   };
@@ -967,6 +967,7 @@ function ActionPill({
 }: { label: string; color: string; active: boolean; onClick?: () => void }) {
   const [flashing, setFlashing] = useState(false);
   const handle = () => {
+    console.error("[BUY-TRACE] ActionPill CLICK", { label, active });
     setFlashing(true);
     onClick?.();
     setTimeout(() => setFlashing(false), 480);
