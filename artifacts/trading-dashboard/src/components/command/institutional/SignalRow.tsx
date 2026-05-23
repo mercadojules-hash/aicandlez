@@ -9,7 +9,7 @@
  * SHORT rows have a thick red left bar + tinted red background.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Line, LineChart, ResponsiveContainer, YAxis } from "recharts";
 import { Zap } from "lucide-react";
 import type { SymBreakdown } from "../types";
@@ -58,6 +58,62 @@ export function resolveDirection(
 }
 
 const TYPES: SignalType[] = ["SCALP", "SWING", "MOMENTUM", "BREAKOUT", "REVERSAL", "TREND"];
+
+// ── Per-trade LIVE order size picker ─────────────────────────────────────
+// Persisted in localStorage so the customer's preferred notional carries
+// across page loads and rows. Server enforces a per-tier cap independently
+// of the chosen value here.
+const LIVE_SIZE_STORAGE_KEY = "acl_live_order_size_v1";
+const LIVE_SIZE_PRESETS = [50, 100, 250, 500] as const;
+const LIVE_SIZE_MIN = 1;
+const LIVE_SIZE_MAX = 100_000;
+
+function readStoredLiveSize(): number {
+  if (typeof window === "undefined") return 100;
+  try {
+    const raw = window.localStorage.getItem(LIVE_SIZE_STORAGE_KEY);
+    if (!raw) return 100;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < LIVE_SIZE_MIN || n > LIVE_SIZE_MAX) return 100;
+    return n;
+  } catch {
+    return 100;
+  }
+}
+
+function writeStoredLiveSize(n: number) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(LIVE_SIZE_STORAGE_KEY, String(n)); } catch { /* noop */ }
+}
+
+/**
+ * useLiveOrderSize — single source of truth for the customer's preferred
+ * per-trade LIVE notional. Synced across all SignalRow instances via a
+ * `storage` event listener plus a same-tab custom event.
+ */
+const LIVE_SIZE_EVENT = "acl-live-size-change";
+function useLiveOrderSize(): [number, (n: number) => void] {
+  const [size, setSizeState] = useState<number>(() => readStoredLiveSize());
+  useEffect(() => {
+    const sync = () => setSizeState(readStoredLiveSize());
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === LIVE_SIZE_STORAGE_KEY) sync();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(LIVE_SIZE_EVENT, sync);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(LIVE_SIZE_EVENT, sync);
+    };
+  }, []);
+  const setSize = (n: number) => {
+    const clamped = Math.max(LIVE_SIZE_MIN, Math.min(LIVE_SIZE_MAX, Math.round(n)));
+    writeStoredLiveSize(clamped);
+    setSizeState(clamped);
+    try { window.dispatchEvent(new Event(LIVE_SIZE_EVENT)); } catch { /* noop */ }
+  };
+  return [size, setSize];
+}
 
 interface Props {
   spec:       TickerSpec;
@@ -110,6 +166,11 @@ export function SignalRow({ spec, breakdown }: Props) {
   const portalMode    = usePortalMode();
   const { getToken }  = useAuth();
   const liveFallbackToastedRef = useRef(false);
+  const [liveSize, setLiveSize] = useLiveOrderSize();
+  const showSizePicker =
+    portalMode.isCustomerPortal &&
+    portalMode.mode === "LIVE" &&
+    portalMode.canUseLive;
 
   /** Mirror a paper open into the server-side sim so dashboard panels see it. */
   const mirrorPaperToServer = async (
@@ -133,7 +194,7 @@ export function SignalRow({ spec, breakdown }: Props) {
 
   /** Submit a real-money order through the user's connected exchange. */
   const submitLive = async (
-    sym: string, side: "BUY" | "SELL",
+    sym: string, side: "BUY" | "SELL", sizeUSD: number,
   ): Promise<{ ok: boolean; error?: string }> => {
     try {
       const token = await getToken().catch(() => null);
@@ -144,7 +205,7 @@ export function SignalRow({ spec, breakdown }: Props) {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ symbol: sym, side }),
+        body: JSON.stringify({ symbol: sym, side, sizeUSD }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -194,9 +255,9 @@ export function SignalRow({ spec, breakdown }: Props) {
     ) {
       toast({
         title: `LIVE ORDER SUBMITTED — ${spec.label}`,
-        description: `${side} · routing to your connected exchange · $100 notional · AI ${conf}%`,
+        description: `${side} · routing to your connected exchange · $${liveSize} notional · AI ${conf}%`,
       });
-      void submitLive(spec.symbol, side === "LONG" ? "BUY" : "SELL").then(r => {
+      void submitLive(spec.symbol, side === "LONG" ? "BUY" : "SELL", liveSize).then(r => {
         if (!r.ok) {
           // Real exchange rejected (no connection, decrypt failed, etc.).
           // Mirror the order into PAPER so the user still sees feedback, and
@@ -349,8 +410,11 @@ export function SignalRow({ spec, breakdown }: Props) {
             </span>
           </div>
         </div>
-        {/* line 2 — BUY · SELL · AI Auto-Trade aligned right */}
+        {/* line 2 — [size picker (LIVE only)] · BUY · SELL · AI Auto-Trade */}
         <div className="flex items-center gap-1.5 justify-end">
+          {showSizePicker && (
+            <SizePicker size={liveSize} onChange={setLiveSize} />
+          )}
           <ActionPill
             label="BUY"
             color={N.LONG}
@@ -419,6 +483,126 @@ function DataCell({ label, value, color }: { label: string; value: string; color
         style={{ color, lineHeight: 1.05 }}>
         {value}
       </span>
+    </div>
+  );
+}
+
+function SizePicker({
+  size, onChange,
+}: { size: number; onChange: (n: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const [customDraft, setCustomDraft] = useState<string>(String(size));
+  const isPreset = (LIVE_SIZE_PRESETS as readonly number[]).includes(size);
+  useEffect(() => { setCustomDraft(String(size)); }, [size]);
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        title="LIVE order notional"
+        className="text-[9px] font-extrabold tracking-[0.16em] px-2 py-1 rounded transition-all"
+        style={{
+          color: N.BRAND,
+          background: `${N.BRAND}1c`,
+          border: `1px solid ${N.BRAND}70`,
+          boxShadow: `0 0 6px ${N.BRAND}40`,
+          fontFamily: N.FONT_MONO,
+        }}
+      >
+        ${size}
+      </button>
+      {open && (
+        <>
+          <div
+            onClick={() => setOpen(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 40 }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% + 4px)",
+              right: 0,
+              zIndex: 50,
+              background: "#050A07",
+              border: `1px solid ${N.BRAND}55`,
+              boxShadow: `0 0 18px ${N.BRAND}30, 0 8px 24px rgba(0,0,0,0.6)`,
+              borderRadius: 6,
+              padding: 8,
+              minWidth: 168,
+              fontFamily: N.FONT_MONO,
+            }}
+          >
+            <div className="text-[8.5px] font-bold tracking-[0.2em] mb-1.5"
+              style={{ color: N.TEXT_3 }}>LIVE ORDER SIZE</div>
+            <div className="grid grid-cols-2 gap-1 mb-2">
+              {LIVE_SIZE_PRESETS.map(p => {
+                const active = size === p;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => { onChange(p); setOpen(false); }}
+                    className="text-[10px] font-extrabold tabular-nums py-1 rounded transition-all"
+                    style={{
+                      color: active ? "#000" : N.BRAND,
+                      background: active ? N.BRAND : `${N.BRAND}14`,
+                      border: `1px solid ${N.BRAND}${active ? "" : "55"}`,
+                      fontFamily: N.FONT_MONO,
+                    }}
+                  >
+                    ${p}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="text-[8px] font-bold tracking-[0.2em] mb-1"
+              style={{ color: N.TEXT_3 }}>CUSTOM ($)</div>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min={LIVE_SIZE_MIN}
+                max={LIVE_SIZE_MAX}
+                value={customDraft}
+                onChange={e => setCustomDraft(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    const n = Number(customDraft);
+                    if (Number.isFinite(n) && n >= LIVE_SIZE_MIN) {
+                      onChange(n);
+                      setOpen(false);
+                    }
+                  }
+                }}
+                className="text-[11px] font-extrabold tabular-nums px-1.5 py-1 rounded w-full"
+                style={{
+                  color: N.TEXT_0,
+                  background: "#000",
+                  border: `1px solid ${isPreset ? N.BORDER : N.BRAND + "70"}`,
+                  fontFamily: N.FONT_MONO,
+                  outline: "none",
+                }}
+              />
+              <button
+                onClick={() => {
+                  const n = Number(customDraft);
+                  if (Number.isFinite(n) && n >= LIVE_SIZE_MIN) {
+                    onChange(n);
+                    setOpen(false);
+                  }
+                }}
+                className="text-[9px] font-extrabold tracking-[0.18em] px-2 py-1 rounded"
+                style={{
+                  color: "#000",
+                  background: N.BRAND,
+                  border: `1px solid ${N.BRAND}`,
+                  fontFamily: N.FONT_MONO,
+                }}
+              >SET</button>
+            </div>
+            <div className="text-[8px] mt-2" style={{ color: N.TEXT_3, lineHeight: 1.4 }}>
+              Server enforces your plan's per-trade cap.
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

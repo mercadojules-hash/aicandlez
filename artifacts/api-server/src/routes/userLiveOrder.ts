@@ -11,12 +11,25 @@
  */
 
 import { Router, type IRouter } from "express";
+import { eq } from "drizzle-orm";
+import { db, usersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { requirePlan } from "../middlewares/requirePlan.js";
 import { placeLiveAutoOrderForUser } from "../lib/liveUserExecution.js";
 import { registerLiveUserFill } from "../lib/userSimRegistry.js";
 
 const router: IRouter = Router();
+
+// Per-tier risk policy cap on a single manual-LIVE order. Operators (admin /
+// super-admin) bypass these caps entirely; the hard ceiling for any path
+// remains the 100_000 schema validation in parseBody.
+const TIER_MAX_SIZE_USD: Record<string, number> = {
+  free:       0,
+  starter:    500,
+  pro:        2500,
+  enterprise: 100_000,
+};
+const DEFAULT_SIZE_USD = 100;
 
 function parseBody(raw: unknown): { symbol: string; side: "BUY" | "SELL"; sizeUSD?: number } | null {
   if (!raw || typeof raw !== "object") return null;
@@ -51,11 +64,41 @@ router.post(
       return;
     }
 
-    // Conservative default per-order notional. The autonomous loop sizes by
-    // engine risk policy; for manual customer-clicked orders we use a fixed
-    // $100 notional unless an explicit size is provided. Keeps surprise
-    // exposure tightly bounded for first manual-LIVE usage.
-    const sizeUSD = parsed.sizeUSD ?? 100;
+    // Per-tier risk cap. Customers may pick their own per-trade size in the
+    // Portal SignalRow size picker; the request body carries the chosen
+    // sizeUSD. We enforce the tier cap server-side regardless — the client
+    // hint is advisory. Default to $100 when the client omits the field
+    // (legacy callers / paranoid fallback).
+    const requestedSize = parsed.sizeUSD ?? DEFAULT_SIZE_USD;
+    let tierCap = TIER_MAX_SIZE_USD.starter ?? 500;
+    try {
+      const [u] = await db
+        .select({ plan: usersTable.plan, role: usersTable.role })
+        .from(usersTable)
+        .where(eq(usersTable.clerkUserId, userId))
+        .limit(1);
+      if (u?.role === "admin" || u?.role === "super-admin") {
+        tierCap = 100_000;
+      } else {
+        tierCap = TIER_MAX_SIZE_USD[u?.plan ?? "free"] ?? 0;
+      }
+    } catch (err) {
+      req.log.warn(
+        { userId, err: err instanceof Error ? err.message : String(err) },
+        "userLiveOrder: tier lookup failed — falling back to starter cap",
+      );
+    }
+
+    if (requestedSize > tierCap) {
+      res.status(409).json({
+        ok:        false,
+        errorCode: "SIZE_EXCEEDS_TIER_CAP",
+        error:     `Order size $${requestedSize} exceeds your plan's per-trade cap of $${tierCap}`,
+        tierCap,
+      });
+      return;
+    }
+    const sizeUSD = requestedSize;
 
     try {
       const result = await placeLiveAutoOrderForUser({
