@@ -49,8 +49,15 @@ import {
   type AdminStatus,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
-import { getUncachableStripeClient } from "../stripeClient.js";
+import {
+  cancelSubscriptionAtPeriodEnd,
+  cancelSubscriptionImmediately,
+  grantComplimentaryDays,
+  extendSubscriptionByDays,
+  type StripeSubscriptionOutcome,
+} from "../lib/adminBillingActions.js";
 import { invalidateTradeLimitCache } from "../lib/tradeLimitEngine.js";
+import { executionStreamBus, type ExecStreamType } from "../lib/executionStreamBus.js";
 import { __invalidateAdminUserTelemetryCache } from "./adminUserTelemetry.js";
 
 const router = Router();
@@ -156,6 +163,21 @@ async function writeAudit(opts: AuditOpts): Promise<string> {
   // Telemetry cache key includes the audit table snapshot, so any operator
   // action must invalidate the read-side cache to avoid a stale 5s window.
   try { __invalidateAdminUserTelemetryCache(); } catch { /* test stub */ }
+  // Mirror to the operator execution stream so the live operator console
+  // surfaces the action in realtime alongside engine events. Revocations
+  // get their own type so the UI can render a distinct notification card.
+  const streamType: ExecStreamType =
+    opts.action === "revoke_exchange" ? "admin_exchange_access_revoked" : "admin_action_applied";
+  const severity = opts.action === "emergency_disable" || opts.action === "revoke_exchange"
+    ? "warn" : "info";
+  try {
+    executionStreamBus.emitEvent({
+      type:    streamType,
+      severity,
+      message: `Admin ${opts.actorId} → ${opts.targetId}: ${opts.action}`,
+      details: { auditId: id, actorId: opts.actorId, targetUserId: opts.targetId, action: opts.action, payload: opts.payload },
+    });
+  } catch { /* never let a stream emit fail an operator action */ }
   return id;
 }
 
@@ -309,28 +331,27 @@ router.post("/admin/users/:id/cancel_subscription", ...requireOperator, async (r
       res.status(409).json({ error: "User has no active Stripe subscription" });
       return;
     }
-    const stripe = await getUncachableStripeClient();
+    const idempotencyKey = dayIdempotencyKey({
+      action: cancelAtPeriodEnd ? "cancel_sub" : "cancel_sub_now",
+      target: ctx.targetId, actor: ctx.actorId,
+    });
     const result = cancelAtPeriodEnd
-      ? await stripe.subscriptions.update(before.stripeSubscriptionId,
-          { cancel_at_period_end: true },
-          { idempotencyKey: dayIdempotencyKey({ action: "cancel_sub", target: ctx.targetId, actor: ctx.actorId }) })
-      : await stripe.subscriptions.cancel(before.stripeSubscriptionId, {},
-          { idempotencyKey: dayIdempotencyKey({ action: "cancel_sub_now", target: ctx.targetId, actor: ctx.actorId }) });
+      ? await cancelSubscriptionAtPeriodEnd(before.stripeSubscriptionId, idempotencyKey)
+      : await cancelSubscriptionImmediately(before.stripeSubscriptionId, idempotencyKey);
     await writeAudit({
       actorId:  ctx.actorId,
       targetId: ctx.targetId,
-      action:   "comp_subscription",   // shared bucket with comp/extend; payload.kind disambiguates
+      action:   "cancel_subscription",
       payload:  {
         note,
-        kind:                "cancel_subscription",
         cancelAtPeriodEnd,
         before:              { stripeSubscriptionId: before.stripeSubscriptionId, planStatus: before.planStatus },
         stripeSubscriptionId: result.id,
         stripeStatus:        result.status,
-        cancelAt:            result.cancel_at ?? null,
+        cancelAt:            result.cancelAt,
       },
     });
-    res.json({ ok: true, stripeStatus: result.status, cancelAt: result.cancel_at ?? null });
+    res.json({ ok: true, stripeStatus: result.status, cancelAt: result.cancelAt });
   } catch (err) {
     req.log.error({ err }, "admin cancel_subscription failed");
     res.status(502).json({ error: `Stripe cancellation failed: ${(err as Error).message}` });
@@ -352,27 +373,24 @@ router.post("/admin/users/:id/complimentary_subscription", ...requireOperator, a
       res.status(409).json({ error: "User has no Stripe subscription to comp" });
       return;
     }
-    const stripe = await getUncachableStripeClient();
-    const trialEndUnix = Math.floor(Date.now() / 1000) + days * 86_400;
-    const updated = await stripe.subscriptions.update(before.stripeSubscriptionId, {
-      trial_end:           trialEndUnix,
-      proration_behavior:  "none",
-    }, { idempotencyKey: dayIdempotencyKey({ action: `comp_sub_${days}d`, target: ctx.targetId, actor: ctx.actorId }) });
+    const updated = await grantComplimentaryDays(
+      before.stripeSubscriptionId, days,
+      dayIdempotencyKey({ action: `comp_sub_${days}d`, target: ctx.targetId, actor: ctx.actorId }),
+    );
     await writeAudit({
       actorId:  ctx.actorId,
       targetId: ctx.targetId,
-      action:   "comp_subscription",
+      action:   "complimentary_subscription",
       payload:  {
         note,
-        kind:                "complimentary_subscription",
         days,
         before:              { stripeSubscriptionId: before.stripeSubscriptionId, planStatus: before.planStatus, trialEndsAt: before.trialEndsAt },
         stripeSubscriptionId: updated.id,
         stripeStatus:        updated.status,
-        trialEnd:            updated.trial_end ?? null,
+        trialEnd:            updated.trialEnd,
       },
     });
-    res.json({ ok: true, trialEnd: updated.trial_end ?? null, stripeStatus: updated.status });
+    res.json({ ok: true, trialEnd: updated.trialEnd, stripeStatus: updated.status });
   } catch (err) {
     req.log.error({ err }, "admin complimentary_subscription failed");
     res.status(502).json({ error: `Stripe comp grant failed: ${(err as Error).message}` });
@@ -394,29 +412,24 @@ router.post("/admin/users/:id/extend_subscription", ...requireOperator, async (r
       res.status(409).json({ error: "User has no Stripe subscription to extend" });
       return;
     }
-    const stripe   = await getUncachableStripeClient();
-    // Push trial_end forward — Stripe-native way to defer the next charge
-    // without touching the customer's invoice cycle directly.
-    const trialEndUnix = Math.floor(Date.now() / 1000) + days * 86_400;
-    const updated = await stripe.subscriptions.update(before.stripeSubscriptionId, {
-      trial_end:           trialEndUnix,
-      proration_behavior:  "none",
-    }, { idempotencyKey: dayIdempotencyKey({ action: `extend_sub_${days}d`, target: ctx.targetId, actor: ctx.actorId }) });
+    const updated = await extendSubscriptionByDays(
+      before.stripeSubscriptionId, days,
+      dayIdempotencyKey({ action: `extend_sub_${days}d`, target: ctx.targetId, actor: ctx.actorId }),
+    );
     await writeAudit({
       actorId:  ctx.actorId,
       targetId: ctx.targetId,
-      action:   "extend_trial",
+      action:   "extend_subscription",
       payload:  {
         note,
-        kind:                "extend_subscription",
         days,
         before:              { stripeSubscriptionId: before.stripeSubscriptionId, planStatus: before.planStatus, trialEndsAt: before.trialEndsAt },
         stripeSubscriptionId: updated.id,
         stripeStatus:        updated.status,
-        trialEnd:            updated.trial_end ?? null,
+        trialEnd:            updated.trialEnd,
       },
     });
-    res.json({ ok: true, trialEnd: updated.trial_end ?? null, stripeStatus: updated.status });
+    res.json({ ok: true, trialEnd: updated.trialEnd, stripeStatus: updated.status });
   } catch (err) {
     req.log.error({ err }, "admin extend_subscription failed");
     res.status(502).json({ error: `Stripe extension failed: ${(err as Error).message}` });
@@ -480,37 +493,58 @@ router.post("/admin/users/:id/emergency_disable", ...requireSuperAdmin, async (r
     }).from(userExchangeConnectionsTable)
       .where(eq(userExchangeConnectionsTable.userId, ctx.targetId));
 
-    // 1. Suspend + force paper (status="disabled" covers both — blocks all execution & auth)
-    await upsertStatus({ userId: ctx.targetId, actorId: ctx.actorId, status: "disabled", reason });
+    // Composite sequence — apply each leg in the order the contract names
+    // them so behavior matches the spec even though `disabled` strictly
+    // supersedes `force_paper` + `suspended`. Each transition is reflected
+    // in the steps[] array on the audit payload so operators can audit the
+    // composite leg-by-leg.
+    const steps: Array<{ step: string; ok: boolean; details?: unknown; error?: string }> = [];
 
-    // 2. Wipe stored exchange credentials
+    // 1. force_paper — block live execution while we tear down
+    await upsertStatus({ userId: ctx.targetId, actorId: ctx.actorId, status: "force_paper", reason });
+    steps.push({ step: "force_paper", ok: true });
+
+    // 2. suspended — block paper execution too
+    await upsertStatus({ userId: ctx.targetId, actorId: ctx.actorId, status: "suspended", reason });
+    steps.push({ step: "suspended", ok: true });
+
+    // 3. revoke_exchange — wipe stored exchange credentials
     const deleted = await db.delete(userExchangeConnectionsTable)
       .where(eq(userExchangeConnectionsTable.userId, ctx.targetId))
       .returning({ id: userExchangeConnectionsTable.id });
+    steps.push({ step: "revoke_exchange", ok: true, details: { deletedCount: deleted.length } });
 
-    // 3. Cancel Stripe subscription at period end (do not refund — operator handles)
+    // 4. cancel_subscription — Stripe period-end via shared helper. We do
+    //    NOT roll back local mutations on Stripe failure (the user is
+    //    already locked out, which is the correct safety posture); the
+    //    error is captured on the same audit row for follow-up.
     let stripeOutcome: { stripeSubscriptionId: string | null; stripeStatus: string | null; error?: string } = {
       stripeSubscriptionId: stripeBefore?.stripeSubscriptionId ?? null,
       stripeStatus:         null,
     };
     if (stripeBefore?.stripeSubscriptionId) {
       try {
-        const stripe = await getUncachableStripeClient();
-        const updated = await stripe.subscriptions.update(stripeBefore.stripeSubscriptionId,
-          { cancel_at_period_end: true },
-          { idempotencyKey: dayIdempotencyKey({ action: "emergency_disable", target: ctx.targetId, actor: ctx.actorId }) });
+        const updated: StripeSubscriptionOutcome = await cancelSubscriptionAtPeriodEnd(
+          stripeBefore.stripeSubscriptionId,
+          dayIdempotencyKey({ action: "emergency_disable", target: ctx.targetId, actor: ctx.actorId }),
+        );
         stripeOutcome = { stripeSubscriptionId: updated.id, stripeStatus: updated.status };
+        steps.push({ step: "cancel_subscription", ok: true, details: stripeOutcome });
       } catch (stripeErr) {
-        // Do NOT roll back local mutations — the user is already locked
-        // out, which is the right safety posture. Record the Stripe
-        // failure in the audit row for follow-up.
         stripeOutcome = {
           stripeSubscriptionId: stripeBefore.stripeSubscriptionId,
           stripeStatus:         null,
           error:                (stripeErr as Error).message,
         };
+        steps.push({ step: "cancel_subscription", ok: false, error: stripeOutcome.error });
       }
+    } else {
+      steps.push({ step: "cancel_subscription", ok: true, details: "no_subscription_on_file" });
     }
+
+    // 5. disabled — final hard lock (blocks auth bootstrap too)
+    await upsertStatus({ userId: ctx.targetId, actorId: ctx.actorId, status: "disabled", reason });
+    steps.push({ step: "disabled", ok: true });
 
     const statusAfter = await loadStatusRow(ctx.targetId);
     await writeAudit({
@@ -529,6 +563,7 @@ router.post("/admin/users/:id/emergency_disable", ...requireSuperAdmin, async (r
           status:           statusAfter,
           exchangesDeleted: deleted.length,
           stripe:           stripeOutcome,
+          steps,
         },
       },
     });

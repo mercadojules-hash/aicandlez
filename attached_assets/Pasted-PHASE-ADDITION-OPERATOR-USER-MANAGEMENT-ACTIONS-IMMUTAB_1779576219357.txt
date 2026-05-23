@@ -1,0 +1,187 @@
+PHASE ADDITION — OPERATOR USER MANAGEMENT ACTIONS + IMMUTABLE AUDIT SYSTEM
+
+This subsystem is REQUIRED for the multi-user brokerage architecture.
+
+====================================================
+OPERATOR USER MANAGEMENT ACTIONS
+================================
+
+Need full server-side operator control endpoints for acting on individual users.
+
+Operator/admin actions must include:
+
+* activate user
+* suspend user
+* disable AI trading
+* cancel subscription
+* complimentary subscription
+* manually extend subscription
+* override trade limit
+
+  * 100 trades / rolling 24h
+  * 200 trades / rolling 24h
+  * unlimited trades
+* force paper-only mode
+* revoke exchange access
+* emergency disable account
+
+====================================================
+TRADE LIMIT ENGINE
+==================
+
+NEW DEFAULT:
+
+* standard users = 100 AI trades per rolling 24 hours
+
+Operator override levels:
+
+* 200 trades / rolling 24h
+* unlimited trades
+
+REQUIREMENTS:
+
+* server enforced
+* persisted in DB
+* rolling 24h logic
+* checked BEFORE execution
+* abuse prevention
+* anti-loop protection
+* execution rejection logging
+
+Need telemetry:
+
+* trades used
+* trades remaining
+* reset timer
+* limit status
+* enforcement state
+
+UI badges:
+
+* 100 TRADE LIMIT
+* 200 TRADE LIMIT
+* UNLIMITED
+
+====================================================
+CRITICAL REQUIREMENTS
+=====================
+
+ALL actions must be:
+
+* operator-only
+* admin/super-admin gated
+* server-enforced
+* persisted in DB
+* immutable audit logged
+
+NO frontend-only state mutations.
+
+====================================================
+IMMUTABLE AUDIT SYSTEM
+======================
+
+Every operator action MUST create an immutable audit row.
+
+Audit record must contain:
+
+* action type
+* target user ID
+* acting admin ID
+* acting admin role
+* timestamp
+* operator note
+* before snapshot
+* after snapshot
+* IP if available
+* session metadata if available
+
+Examples:
+
+* user suspended
+* trade limit upgraded
+* complimentary subscription granted
+* emergency disable activated
+* exchange access revoked
+
+====================================================
+BEFORE / AFTER SNAPSHOTS
+========================
+
+Need full snapshot preservation for forensic visibility.
+
+Examples:
+
+before:
+{
+aiEnabled: true,
+tradeLimit: 100,
+subscription: "starter"
+}
+
+after:
+{
+aiEnabled: false,
+tradeLimit: 200,
+subscription: "complimentary"
+}
+
+====================================================
+AUDIT RULES
+===========
+
+Audit entries must:
+
+* NEVER be editable
+* NEVER be deletable from UI
+* survive user deletion/deactivation
+* support operator investigations later
+
+Need:
+
+* chronological timeline
+* filtering
+* operator attribution
+* searchable history
+
+====================================================
+UI REQUIREMENTS
+===============
+
+Inside ALL USERS detail panel:
+
+Need:
+
+* ACTION CENTER
+* operator controls
+* risk controls
+* account state controls
+* audit timeline viewer
+
+Should feel like:
+
+* brokerage surveillance tooling
+* institutional compliance system
+* operator command console
+
+====================================================
+IMPORTANT
+=========
+
+DO NOT destabilize:
+
+* Kraken execution bridge
+* operator execution routing
+* auth middleware
+* execution queue
+* live telemetry
+
+Build additive-only.
+
+Priority:
+
+1. DB schema
+2. immutable audit infrastructure
+3. server endpoints
+4. operator enforcement
+5. UI controls
+6. audit timeline UI

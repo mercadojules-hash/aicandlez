@@ -30,7 +30,9 @@ export type ExecStreamType =
   | "exchange_latency_warning"
   | "websocket_disconnected"
   | "safe_test_mode_activated"
-  | "safe_test_mode_expired";
+  | "safe_test_mode_expired"
+  | "admin_action_applied"
+  | "admin_exchange_access_revoked";
 
 export interface ExecStreamEvent {
   id:          string;

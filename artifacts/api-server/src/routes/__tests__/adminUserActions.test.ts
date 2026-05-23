@@ -273,10 +273,13 @@ describe("emergency_disable (super-admin composite)", () => {
       { cancel_at_period_end: true },
       expect.objectContaining({ idempotencyKey: expect.any(String) }),
     );
-    // exactly one audit row (composite)
-    const auditInserts = dbMock.insert.mock.calls.length;
-    // 1 for status upsert + 1 for audit row = 2 inserts
-    expect(auditInserts).toBe(2);
+    // Composite sequence: force_paper + suspended + disabled = 3 status
+    // upserts, plus exactly 1 audit row. Single audit row carries the
+    // legs[] sequence in payload.after.steps.
+    const totalInserts = dbMock.insert.mock.calls.length;
+    expect(totalInserts).toBe(4);
+    const auditBody = res.body as { steps?: unknown };
+    expect(Array.isArray((auditBody as { steps: unknown[] }).steps ?? [])).toBe(true);
   });
 
   it("does not roll back local mutations if Stripe fails — records error in audit", async () => {
