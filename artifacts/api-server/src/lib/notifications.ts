@@ -98,6 +98,17 @@ interface OperatorEmailConfig {
   to:     string[];
 }
 
+/**
+ * Public, side-effect-free check for whether the operator email transport
+ * is fully configured. Used by the admin telemetry endpoint so the
+ * operator console can render a green/red "Operator email" pill without
+ * having to send a real email. Returns only a boolean — never leaks any
+ * env var values.
+ */
+export function isOperatorEmailConfigured(): boolean {
+  return operatorEmailConfigured() !== null;
+}
+
 function operatorEmailConfigured(): OperatorEmailConfig | null {
   const apiKey = process.env["RESEND_API_KEY"];
   const from   = process.env["OPERATOR_ALERT_EMAIL_FROM"];

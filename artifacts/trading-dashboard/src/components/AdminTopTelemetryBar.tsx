@@ -25,7 +25,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { AlertTriangle, X, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, X, CheckCircle2, Mail, MailX } from "lucide-react";
 
 interface TopTelemetry {
   activeUsersNow:            number;
@@ -44,6 +44,7 @@ interface TopTelemetry {
   queueThroughputPerMin:     number;
   apiLatencyMs:              number;
   engineRunning:             boolean;
+  operatorEmailConfigured:   boolean;
   timestamp:                 number;
 }
 
@@ -291,6 +292,26 @@ export function AdminTopTelemetryBar() {
   const [showBackfillModal, setShowBackfillModal] = useState(false);
   const backfillBad = backfillIsUnhealthy(backfill);
 
+  // Operator email transport test state. Kept ultra-light — no toast lib
+  // dependency, just inline status text the operator sees for ~6s.
+  const [emailTestState, setEmailTestState] =
+    useState<"idle" | "sending" | "sent" | "error">("idle");
+  const triggerEmailTest = async () => {
+    if (emailTestState === "sending") return;
+    setEmailTestState("sending");
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/operator-email-test`, {
+        method:      "POST",
+        credentials: "include",
+      });
+      setEmailTestState(res.ok ? "sent" : "error");
+    } catch {
+      setEmailTestState("error");
+    }
+    setTimeout(() => setEmailTestState("idle"), 6_000);
+  };
+  const emailConfigured = data?.operatorEmailConfigured === true;
+
   const dash = "—";
   const v = (n: number | undefined, fmt: (x: number) => string): string =>
     typeof n === "number" && Number.isFinite(n) ? fmt(n) : dash;
@@ -365,6 +386,63 @@ export function AdminTopTelemetryBar() {
             </div>
           </button>
         )}
+
+        {/* Operator email transport pill — green when all three env vars
+            are set, red otherwise. Click to fire a real test alert through
+            sendOperatorAlert (dedupeKey: operator-email-test). */}
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 shrink-0 border-r"
+          style={{
+            borderRightColor: "#0d1e2e",
+            background:       emailConfigured ? "#00ff8a10" : "#ff335518",
+          }}
+          title={
+            emailConfigured
+              ? "Operator email transport configured (RESEND_API_KEY + FROM + TO set)"
+              : "Operator email NOT configured — alerts log only. Set RESEND_API_KEY, OPERATOR_ALERT_EMAIL_FROM, OPERATOR_ALERT_EMAIL_TO."
+          }
+        >
+          {emailConfigured
+            ? <Mail  className="w-3 h-3 shrink-0" style={{ color: "#00ff8a" }} />
+            : <MailX className="w-3 h-3 shrink-0" style={{ color: "#ff5566" }} />}
+          <div className="flex flex-col gap-0.5 leading-none">
+            <div
+              className="text-[11px] font-bold font-mono tabular-nums"
+              style={{ color: emailConfigured ? "#00ff8a" : "#ff5566" }}
+            >
+              {emailConfigured ? "CONFIGURED" : "NOT CONFIGURED"}
+            </div>
+            <div
+              className="text-[8px] font-mono uppercase tracking-[0.12em] font-medium"
+              style={{ color: emailConfigured ? "#7ad9a8" : "#ff99a8" }}
+            >
+              Operator Email
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={triggerEmailTest}
+            disabled={emailTestState === "sending"}
+            className="text-[9px] font-mono uppercase tracking-[0.12em] px-1.5 py-0.5 rounded border ml-1 transition-colors disabled:opacity-50"
+            style={{
+              borderColor:
+                emailTestState === "error" ? "#ff3355" :
+                emailTestState === "sent"  ? "#00ff8a" :
+                                             "#0d1e2e",
+              color:
+                emailTestState === "error" ? "#ff5566" :
+                emailTestState === "sent"  ? "#00ff8a" :
+                                             "#7ab8cc",
+            }}
+            aria-label="Send test operator alert"
+            title="Fire a test operator alert (sendOperatorAlert, dedupeKey: operator-email-test). Check server logs and on-call inbox."
+          >
+            {emailTestState === "sending" ? "Sending…" :
+             emailTestState === "sent"    ? "Sent ✓"   :
+             emailTestState === "error"   ? "Failed"   :
+                                            "Test"}
+          </button>
+        </div>
 
         <Cell label="Active Now"    value={v(data?.activeUsersNow,            fmtInt)}  tone="accent"   />
         <Cell label="Total Users"   value={v(data?.totalRegisteredUsers,      fmtInt)}                  />

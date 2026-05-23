@@ -16,6 +16,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { engineStats } from "../lib/tradingLoop.js";
+import { isOperatorEmailConfigured, sendOperatorAlert } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -161,11 +162,45 @@ router.get(
         apiLatencyMs,
 
         engineRunning,
+        // 16. operator email transport configured
+        // True iff RESEND_API_KEY + OPERATOR_ALERT_EMAIL_FROM +
+        // OPERATOR_ALERT_EMAIL_TO are all set. No secret values leaked.
+        operatorEmailConfigured: isOperatorEmailConfigured(),
         timestamp:                Date.now(),
       });
     } catch (err) {
       req.log.error({ err }, "GET /admin/top-telemetry failed");
       res.status(500).json({ error: "Failed to load top telemetry" });
+    }
+  },
+);
+
+/**
+ * POST /api/admin/operator-email-test
+ *
+ * Fires a `sendOperatorAlert` with a dedicated dedupe key so the operator
+ * can prove end-to-end delivery from the admin console. Returns whether
+ * the transport is configured — actual delivery success/failure is
+ * surfaced in server logs (we don't expose Resend response bodies).
+ */
+router.post(
+  "/admin/operator-email-test",
+  requireAuth,
+  requireRole(["admin", "super-admin"]),
+  async (req, res): Promise<void> => {
+    const configured = isOperatorEmailConfigured();
+    try {
+      await sendOperatorAlert({
+        subject:   "[AICandlez] Operator email test",
+        body:      "This is a manual test alert fired from the admin telemetry bar. " +
+                   "If you received this email, the operator alert transport is wired correctly.",
+        dedupeKey: "operator-email-test",
+        context:   { triggeredBy: "admin-top-telemetry", at: new Date().toISOString() },
+      });
+      res.json({ ok: true, configured });
+    } catch (err) {
+      req.log.error({ err }, "POST /admin/operator-email-test failed");
+      res.status(500).json({ ok: false, configured, error: "Failed to send test alert" });
     }
   },
 );
