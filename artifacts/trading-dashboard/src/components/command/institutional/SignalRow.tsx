@@ -18,6 +18,16 @@ import { useLiveCandles } from "./useLiveCandles";
 import { N } from "./theme";
 import { usePaperTrades } from "@/hooks/usePaperTrades";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@clerk/react";
+import { useRef } from "react";
+import { usePortalMode } from "@/contexts/PortalModeContext";
+
+// API base URL — mirrors Portal.tsx resolution so production cross-origin
+// API calls (api.aicandlez.com) work when SignalRow is rendered from any
+// host. In dev it falls back to same-origin so the shared proxy handles it.
+const apiBaseUrl: string = (
+  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? ""
+).replace(/\/$/, "");
 
 function fmt(n: number): string {
   if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -92,8 +102,75 @@ export function SignalRow({ spec, breakdown }: Props) {
   const dirColor   = direction === "LONG" ? N.LONG : N.SHORT;
   const dirGlow    = direction === "LONG" ? N.LONG_GLOW : N.SHORT_GLOW;
 
-  // ── Paper trade integration ─────────────────────────────────────────────
+  // ── Trade execution — PAPER vs LIVE routing ─────────────────────────────
+  // The customer Portal mounts `PortalModeProvider`; outside the Portal tree
+  // (admin /command, signal previews, etc.) `usePortalMode` returns an inert
+  // PAPER default so this row continues to behave like before.
   const { openTrade } = usePaperTrades();
+  const portalMode    = usePortalMode();
+  const { getToken }  = useAuth();
+  const liveFallbackToastedRef = useRef(false);
+
+  /** Mirror a paper open into the server-side sim so dashboard panels see it. */
+  const mirrorPaperToServer = async (
+    sym: string, side: "BUY" | "SELL",
+  ) => {
+    try {
+      const token = await getToken().catch(() => null);
+      // Conservative fixed notional matches the live-order endpoint default.
+      // Server route /api/simulation/order expects { symbol, side, sizeUSD }.
+      await fetch(`${apiBaseUrl}/api/simulation/order`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ symbol: sym, side, sizeUSD: 100 }),
+      });
+    } catch { /* paper mirror is best-effort */ }
+  };
+
+  /** Submit a real-money order through the user's connected exchange. */
+  const submitLive = async (
+    sym: string, side: "BUY" | "SELL",
+  ): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/user/live-order`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ symbol: sym, side }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        return { ok: false, error: (body as { error?: string }).error ?? `HTTP ${res.status}` };
+      }
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  };
+
+  const firePaper = (side: "LONG" | "SHORT", sl: number, tp: number) => {
+    openTrade({
+      symbol:  spec.symbol,
+      display: spec.display,
+      side,
+      entry,
+      stop:    sl,
+      target:  tp,
+    });
+    void mirrorPaperToServer(spec.symbol, side === "LONG" ? "BUY" : "SELL");
+    toast({
+      title: `${side === "LONG" ? "PAPER LONG EXECUTED" : "PAPER SHORT OPENED"} — ${spec.label}`,
+      description: `Entry $${fmt(entry)} · TP $${fmt(tp)} · SL $${fmt(sl)} · AI ${conf}% · SIMULATED`,
+    });
+  };
 
   const fireTrade = (side: "LONG" | "SHORT") => {
     if (!entry || entry <= 0) {
@@ -105,18 +182,64 @@ export function SignalRow({ spec, breakdown }: Props) {
     }
     const sl = side === "LONG" ? entry * 0.98  : entry * 1.02;
     const tp = side === "LONG" ? entry * 1.045 : entry * 0.955;
-    openTrade({
-      symbol:  spec.symbol,
-      display: spec.display,
-      side,
-      entry,
-      stop:    sl,
-      target:  tp,
-    });
-    toast({
-      title: `${side === "LONG" ? "AI LONG EXECUTED" : "SHORT POSITION OPENED"} — ${spec.label}`,
-      description: `Entry $${fmt(entry)} · TP $${fmt(tp)} · SL $${fmt(sl)} · AI ${conf}%`,
-    });
+
+    // LIVE routing — only when the customer Portal mode toggle is engaged
+    // AND the tier permits live exec AND a validated exchange is connected.
+    // If any condition fails we fall back to PAPER and toast once per row.
+    if (
+      portalMode.isCustomerPortal &&
+      portalMode.mode === "LIVE" &&
+      portalMode.canUseLive &&
+      portalMode.hasExchange
+    ) {
+      toast({
+        title: `LIVE ORDER SUBMITTED — ${spec.label}`,
+        description: `${side} · routing to your connected exchange · $100 notional · AI ${conf}%`,
+      });
+      void submitLive(spec.symbol, side === "LONG" ? "BUY" : "SELL").then(r => {
+        if (!r.ok) {
+          // Real exchange rejected (no connection, decrypt failed, etc.).
+          // Mirror the order into PAPER so the user still sees feedback, and
+          // surface a one-shot toast explaining why.
+          if (!liveFallbackToastedRef.current) {
+            liveFallbackToastedRef.current = true;
+            toast({
+              title: "LIVE ORDER FAILED — FELL BACK TO PAPER",
+              description: r.error ?? "Live exchange rejected the order",
+            });
+          }
+          firePaper(side, sl, tp);
+        }
+      });
+      return;
+    }
+
+    // LIVE requested but blocked (no tier / no exchange) → PAPER + toast.
+    if (
+      portalMode.isCustomerPortal &&
+      portalMode.mode === "LIVE" &&
+      (!portalMode.canUseLive || !portalMode.hasExchange) &&
+      !liveFallbackToastedRef.current
+    ) {
+      liveFallbackToastedRef.current = true;
+      toast({
+        title: "LIVE LOCKED — USING PAPER",
+        description: portalMode.liveLockReason ?? "Live trading is currently unavailable",
+      });
+    }
+
+    // Admin / non-customer-portal trees (CommandCenter, /admintrade /portal):
+    // real-only by invariant — never fire a paper trade here. Operators use
+    // the dedicated LIVE AI EXECUTION arm-control, not this row's BUY/SELL.
+    if (!portalMode.isCustomerPortal) {
+      toast({
+        title: `OPERATOR — REAL-ONLY SURFACE`,
+        description: `${spec.label}: enable LIVE AI EXECUTION above to route real orders. SignalRow does not fire paper trades on the admin portal.`,
+      });
+      return;
+    }
+
+    firePaper(side, sl, tp);
   };
   const change24hPos = change24h >= 0;
   const confColor  = conf >= 78 ? N.BRAND : conf >= 62 ? N.BRAND_DEEP : N.WARN;

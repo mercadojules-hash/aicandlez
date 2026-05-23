@@ -49,6 +49,7 @@ import {
   fmtTime,
 } from "@/hooks/usePaperTrades";
 import { toast } from "@/hooks/use-toast";
+import { PortalModeProvider, usePortalMode, useStoredPortalMode, type PortalMode } from "@/contexts/PortalModeContext";
 
 const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -2728,15 +2729,14 @@ function ActiveTradesPanel({ onUpgrade }: { onUpgrade: () => void }) {
                   fontWeight: 800, letterSpacing: "0.16em", fontSize: 9,
                   marginLeft: 4,
                 }}>{longSide ? "LONG" : "SHORT"}</span>
-                {isLive && (
-                  <span style={{
-                    color: N.BRAND, fontWeight: 800, letterSpacing: "0.16em",
-                    fontSize: 8, marginLeft: 6,
-                    padding: "1px 5px",
-                    border: `1px solid ${N.BRAND}55`,
-                    borderRadius: 2,
-                  }}>LIVE</span>
-                )}
+                <span style={{
+                  color: isLive ? N.BRAND : N.TEXT_2,
+                  fontWeight: 800, letterSpacing: "0.16em",
+                  fontSize: 8, marginLeft: 6,
+                  padding: "1px 5px",
+                  border: `1px solid ${(isLive ? N.BRAND : N.TEXT_2)}55`,
+                  borderRadius: 2,
+                }}>{isLive ? "LIVE" : "PAPER"}</span>
               </span>
               <span style={{ color: N.TEXT_2, fontSize: 9, marginTop: 2, letterSpacing: "0.04em" }}>
                 Entry ${entry.toFixed(entry >= 100 ? 2 : 4)} · {fmtQty(toNum(p.quantity))} · {fmtTime(Number(p.entryTime))}
@@ -2952,6 +2952,20 @@ function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
                   border: `1px solid ${tagColor}40`,
                   borderRadius: 2,
                 }}>{tag}</span>
+                {(() => {
+                  const isLive = !!t.exchange;
+                  const chipColor = isLive ? N.BRAND : N.TEXT_2;
+                  return (
+                    <span style={{
+                      color: chipColor,
+                      fontWeight: 800, letterSpacing: "0.16em", fontSize: 8,
+                      marginLeft: 6,
+                      padding: "1px 5px",
+                      border: `1px solid ${chipColor}55`,
+                      borderRadius: 2,
+                    }}>{isLive ? "LIVE" : "PAPER"}</span>
+                  );
+                })()}
               </span>
               <span style={{ color: N.TEXT_2, fontSize: 9, marginTop: 2, letterSpacing: "0.04em" }}>
                 Exit ${exit.toFixed(exit >= 100 ? 2 : 4)} · {fmtTime(Number(t.exitTime))}
@@ -3152,18 +3166,11 @@ function PortalFeesTrend({
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function Portal() {
-  // PortalInner itself no longer reads from `usePaperTrades` — all of its
-  // metric tiles, Active Trades, and Trade History panels are wired to the
-  // server-side `/api/simulation/*` endpoints. The provider is kept as an
-  // intentional compatibility shim because the shared `SignalRow` component
-  // (rendered inside CryptoSignalsPanel / EquitySignalsPanel below) still
-  // calls `openTrade()` from BUY / SELL CTAs. Delete this wrapper once
-  // SignalRow is migrated to post to `/api/simulation/order` directly.
-  return (
-    <PaperTradesProvider>
-      <PortalInner />
-    </PaperTradesProvider>
-  );
+  // PaperTradesProvider and PortalModeProvider are both mounted only on the
+  // customer portal path (gated inside PortalInner by `!isAdmin`). Admin
+  // operators on admintrade.aicandlez.com get neither — their /portal is
+  // real-execution-only with no paper-trade store and no PAPER/LIVE toggle.
+  return <PortalInner />;
 }
 
 function PortalInner() {
@@ -3273,14 +3280,30 @@ function PortalInner() {
     staleTime: 0,
   });
 
+  // Mode-driven account hydration: PAPER tiles read from /api/simulation/account,
+  // LIVE tiles read from the per-user exchange balances (`useLiveExchangeBalances`).
+  // Admins on /admintrade never see PortalModeProvider, so they always get the
+  // simulation-backed view as before (their LIVE telemetry lives elsewhere).
+  const storedMode = useStoredPortalMode();
+  const effectiveMode: PortalMode = !isAdmin && tier !== "free" && hasExchange ? storedMode : "PAPER";
+
   const stats = useMemo(() => {
     const acct      = simAccountQuery.data;
     const positions = acct?.positions ?? [];
     const trades    = simTradesQuery.data?.trades ?? [];
 
     const startBalance = toNum(acct?.startBalance ?? 100_000);
-    const equity       = acct?.equity != null ? toNum(acct.equity) : startBalance;
-    const totalPnl     = acct?.totalPnL != null ? toNum(acct.totalPnL) : equity - startBalance;
+    const simEquity    = acct?.equity != null ? toNum(acct.equity) : startBalance;
+    const simTotalPnl  = acct?.totalPnL != null ? toNum(acct.totalPnL) : simEquity - startBalance;
+
+    // In LIVE mode, replace equity/totalPnL with live exchange balances when
+    // available. PnL deltas (today/month/winRate) stay computed from the
+    // simulation trade ledger — those are tagged PAPER/LIVE in the chips and
+    // will graduate to a true LIVE ledger when the broker-fee schema fields
+    // are restored (tracked as a tech-debt follow-up).
+    const useLive  = effectiveMode === "LIVE" && liveBalances.hasOk && liveBalances.totalEquityUSD !== null;
+    const equity   = useLive ? (liveBalances.totalEquityUSD as number) : simEquity;
+    const totalPnl = useLive ? (equity - startBalance) : simTotalPnl;
 
     const now = new Date();
     const startOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -3316,7 +3339,7 @@ function PortalInner() {
       bestSymbol,
       bestPnl: closedCount === 0 ? 0 : bestPnl,
     };
-  }, [simAccountQuery.data, simTradesQuery.data]);
+  }, [simAccountQuery.data, simTradesQuery.data, effectiveMode, liveBalances.hasOk, liveBalances.totalEquityUSD]);
 
   // Live-derived metric strings (replace earlier hardcoded demo numbers).
   const equityBase = stats.startBalance || 100_000;
@@ -3455,7 +3478,7 @@ function PortalInner() {
         ? `${adminExchangeName} STANDBY`
         : "CONNECTING…";
 
-  return (
+  const body = (
     <div style={{
       minHeight: "100dvh",
       background: N.BG,
@@ -3489,6 +3512,13 @@ function PortalInner() {
             <a style={{ color: N.BRAND, textDecoration: "underline" }}>OPEN COMMAND CENTER →</a>
           </Link>
         </div>
+      )}
+
+      {!isAdmin && (
+        <PortalModeToggle
+          onUpgrade={() => setUpgradeOpenSafe(true)}
+          onConnectExchange={() => disclaimerGate(() => setConnectExchangeOpen(true))}
+        />
       )}
 
       <LogoBanner tier={tier} isAdmin={isAdmin} />
@@ -3863,4 +3893,178 @@ function PortalInner() {
       {disclaimerGateModal}
     </div>
   );
+
+  // Admin operators on admintrade.aicandlez.com: real-only, no PAPER store,
+  // no PAPER/LIVE toggle, no per-tier gates. They get the raw body.
+  if (isAdmin) return body;
+
+  // Customer portal: mount PaperTradesProvider (BUY/SELL paper exec store)
+  // and PortalModeProvider (PAPER/LIVE toggle + tier/exchange-gated live).
+  return (
+    <PaperTradesProvider>
+      <PortalModeProvider tier={dbTier} hasExchange={hasExchange}>
+        {body}
+      </PortalModeProvider>
+    </PaperTradesProvider>
+  );
 }
+
+/**
+ * PortalModeToggle — segmented PAPER / LIVE control rendered between the
+ * TopBar and LogoBanner on the customer portal. Free tier sees a static
+ * PAPER pill + inline "Upgrade to unlock LIVE" link. Subscribers see a
+ * real toggle; LIVE is disabled when no exchange is connected (with a
+ * "Connect an exchange" CTA in place of the lock copy).
+ */
+function PortalModeToggle({
+  onConnectExchange,
+}: {
+  onUpgrade:          () => void;
+  onConnectExchange:  () => void;
+}) {
+  const { mode, setMode, canUseLive, hasExchange, liveLockReason } = usePortalMode();
+  const liveLocked = !canUseLive || !hasExchange;
+
+  // Free tier: NO toggle. Static PAPER pill + inline /subscribe link, per
+  // task spec ("free users locked to PAPER with 'Upgrade to unlock LIVE' CTA").
+  if (!canUseLive) {
+    return (
+      <div
+        role="group"
+        aria-label="Portal trading mode"
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: 14, padding: "10px 24px 0",
+          fontFamily: N.FONT_MONO,
+        }}
+      >
+        <span style={{
+          fontSize: 9, letterSpacing: "0.22em", color: N.TEXT_2, fontWeight: 700,
+        }}>
+          MODE
+        </span>
+        <span style={{
+          display: "inline-flex", alignItems: "center",
+          padding: "6px 18px",
+          border: `1px solid ${N.BRAND}55`,
+          borderRadius: 4,
+          background: `${N.BRAND}1f`,
+          color: N.BRAND,
+          fontSize: 10, fontWeight: 800, letterSpacing: "0.22em",
+          textShadow: `0 0 8px ${N.BRAND}80`,
+        }}>
+          PAPER MODE
+        </span>
+        <Link
+          href="/subscribe"
+          style={{
+            fontSize: 9, letterSpacing: "0.18em", fontWeight: 700,
+            color: N.GOLD,
+            textShadow: `0 0 6px ${N.GOLD_GLOW}`,
+            fontFamily: N.FONT_MONO,
+            textDecoration: "none",
+          }}
+        >
+          UPGRADE TO UNLOCK LIVE →
+        </Link>
+      </div>
+    );
+  }
+
+  // Paid tier: segmented toggle.
+  return (
+    <div
+      role="group"
+      aria-label="Portal trading mode"
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        gap: 14, padding: "10px 24px 0",
+        fontFamily: N.FONT_MONO,
+      }}
+    >
+      <span style={{
+        fontSize: 9, letterSpacing: "0.22em", color: N.TEXT_2, fontWeight: 700,
+      }}>
+        MODE
+      </span>
+
+      <div style={{
+        display: "inline-flex",
+        border: `1px solid ${N.BORDER_HI}`,
+        borderRadius: 4,
+        overflow: "hidden",
+        background: N.SURFACE_1,
+        boxShadow: `inset 0 0 14px ${N.BRAND}08`,
+      }}>
+        <ModeSeg
+          label="PAPER"
+          active={mode === "PAPER"}
+          onClick={() => setMode("PAPER")}
+        />
+        <ModeSeg
+          label="LIVE"
+          active={mode === "LIVE"}
+          disabled={liveLocked}
+          tone="live"
+          onClick={() => {
+            if (!hasExchange)       { onConnectExchange(); return; }
+            setMode("LIVE");
+          }}
+        />
+      </div>
+
+      {liveLockReason && (
+        <button
+          type="button"
+          onClick={onConnectExchange}
+          style={{
+            background: "transparent", border: "none", padding: 0,
+            fontSize: 9, letterSpacing: "0.18em", fontWeight: 700,
+            color: N.GOLD, cursor: "pointer",
+            textShadow: `0 0 6px ${N.GOLD_GLOW}`,
+            fontFamily: N.FONT_MONO,
+          }}
+        >
+          {liveLockReason.toUpperCase()} →
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ModeSeg({
+  label, active, disabled, tone, onClick,
+}: {
+  label:     string;
+  active:    boolean;
+  disabled?: boolean;
+  tone?:     "live";
+  onClick:   () => void;
+}) {
+  const color = tone === "live"
+    ? (active ? N.LONG : disabled ? N.TEXT_3 : N.BRAND)
+    : (active ? N.BRAND : N.TEXT_2);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      style={{
+        padding: "6px 18px",
+        fontSize: 10, fontWeight: 800, letterSpacing: "0.22em",
+        fontFamily: N.FONT_MONO,
+        background: active ? `${color}1f` : "transparent",
+        color, border: "none", cursor: "pointer",
+        borderRight: tone === "live" ? "none" : `1px solid ${N.BORDER_HI}`,
+        textShadow: active ? `0 0 8px ${color}80` : "none",
+        opacity: disabled && !active ? 0.55 : 1,
+        transition: "background 140ms ease",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+// Re-export mode type so consumers (SignalRow) get a single source of truth.
+export type { PortalMode };
