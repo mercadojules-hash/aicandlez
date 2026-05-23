@@ -217,4 +217,28 @@ app.use("/api/billing/portal",   strictLimiter);
 
 app.use("/api", router);
 
+// ── [AUTH-DIAG] one-time startup prefix dump (safe, 8 chars only) ────────────
+// Surfaces whether CLERK_SECRET_KEY / CLERK_PUBLISHABLE_KEY are from the same
+// Clerk instance (both pk_test_/sk_test_ OR both pk_live_/sk_live_). Remove
+// after auth is confirmed working end-to-end.
+{
+  const sk = process.env.CLERK_SECRET_KEY ?? "";
+  const pk = process.env.CLERK_PUBLISHABLE_KEY ?? "";
+  const vpk = process.env.VITE_CLERK_PUBLISHABLE_KEY ?? "";
+  logger.info(
+    {
+      tag: "AUTH-DIAG",
+      CLERK_SECRET_KEY:           sk ? `${sk.slice(0, 8)}… len=${sk.length}` : "MISSING",
+      CLERK_PUBLISHABLE_KEY:      pk ? `${pk.slice(0, 8)}… len=${pk.length}` : "MISSING",
+      VITE_CLERK_PUBLISHABLE_KEY: vpk ? `${vpk.slice(0, 8)}… len=${vpk.length}` : "MISSING",
+      aligned:
+        (sk.startsWith("sk_test_") && pk.startsWith("pk_test_"))
+        || (sk.startsWith("sk_live_") && pk.startsWith("pk_live_"))
+          ? "YES"
+          : "NO — JWT VERIFICATION WILL FAIL",
+    },
+    "[AUTH-DIAG] Clerk key alignment at startup",
+  );
+}
+
 export default app;
