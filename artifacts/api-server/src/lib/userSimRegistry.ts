@@ -85,6 +85,9 @@ export interface UserSimTrade {
   entryFeeBrokerCurrency?: string;
   exitFeeBroker?: number;
   exitFeeBrokerCurrency?: string;
+  // True when this trade was opened against the exchange's public
+  // sandbox/testnet (mirrors the open-side `sim_positions.sandbox` flag).
+  sandbox?: boolean;
 }
 
 interface UserSimAccount {
@@ -215,6 +218,7 @@ async function loadFromDB(userId: string): Promise<UserSimState> {
       entryFeeBrokerCurrency: t.entryFeeBrokerCurrency ?? undefined,
       exitFeeBroker:          t.exitFeeBroker ?? undefined,
       exitFeeBrokerCurrency:  t.exitFeeBrokerCurrency ?? undefined,
+      sandbox:                t.sandbox === true,
       });
     }),
     idSeq: 0,
@@ -690,6 +694,7 @@ export async function closeUserPosition(
     entryFeeBrokerCurrency: entryFeeBrokerProRated !== undefined ? pos.entryFeeBrokerCurrency : undefined,
     exitFeeBroker:          brokerExitFee,
     exitFeeBrokerCurrency:  brokerExitFee !== undefined ? brokerExitFeeCurrency : undefined,
+    sandbox:                pos.sandbox === true,
   };
 
   // Live trades pay broker commission on both legs — deduct from cash and
@@ -751,6 +756,7 @@ export async function closeUserPosition(
       entryFeeBrokerCurrency: trade.entryFeeBrokerCurrency ?? null,
       exitFeeBroker:          trade.exitFeeBroker ?? null,
       exitFeeBrokerCurrency:  trade.exitFeeBrokerCurrency ?? null,
+      sandbox:                trade.sandbox === true,
     }),
     positionMutation,
     persistAccount(state),

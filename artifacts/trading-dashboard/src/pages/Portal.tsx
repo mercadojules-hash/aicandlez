@@ -2606,6 +2606,7 @@ type CustomerPosition = {
   exchange?:                string | null;
   entryFeeBroker?:          number | string | null;
   entryFeeBrokerCurrency?:  string | null;
+  sandbox?:                 boolean | null;
 };
 
 type CustomerAccount = {
@@ -2630,6 +2631,7 @@ type CustomerTrade = {
   entryFeeBrokerCurrency?:  string | null;
   exitFeeBroker?:           number | string | null;
   exitFeeBrokerCurrency?:   string | null;
+  sandbox?:                 boolean | null;
 };
 
 function displaySymbol(sym: string): string {
@@ -2706,6 +2708,7 @@ function ActiveTradesPanel({ onUpgrade }: { onUpgrade: () => void }) {
         const display  = displaySymbol(p.symbol);
         const entry    = toNum(p.entryPrice);
         const isLive   = !!p.exchange;
+        const isSandbox = p.sandbox === true;
         // Entry-leg broker commission — only present on live positions where
         // the exchange surfaced a per-order fee. Matches the AdminLiveTrades
         // panel logic above.
@@ -2744,6 +2747,19 @@ function ActiveTradesPanel({ onUpgrade }: { onUpgrade: () => void }) {
                   border: `1px solid ${(isLive ? N.BRAND : N.TEXT_2)}55`,
                   borderRadius: 2,
                 }}>{isLive ? "LIVE" : "PAPER"}</span>
+                {isSandbox && (
+                  <span
+                    title={`Routed through ${(p.exchange ?? "exchange").toString().toUpperCase()} public testnet — no real funds at risk`}
+                    style={{
+                      color: N.WARN,
+                      fontWeight: 800, letterSpacing: "0.16em",
+                      fontSize: 8, marginLeft: 6,
+                      padding: "1px 5px",
+                      border: `1px solid ${N.WARN}66`,
+                      borderRadius: 2,
+                      background: `${N.WARN}12`,
+                    }}>SANDBOX</span>
+                )}
               </span>
               <span style={{ color: N.TEXT_2, fontSize: 9, marginTop: 2, letterSpacing: "0.04em" }}>
                 Entry ${entry.toFixed(entry >= 100 ? 2 : 4)} · {fmtQty(toNum(p.quantity))} · {fmtTime(Number(p.entryTime))}
@@ -2961,16 +2977,32 @@ function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
                 }}>{tag}</span>
                 {(() => {
                   const isLive = !!t.exchange;
+                  const isSandbox = t.sandbox === true;
                   const chipColor = isLive ? N.BRAND : N.TEXT_2;
                   return (
-                    <span style={{
-                      color: chipColor,
-                      fontWeight: 800, letterSpacing: "0.16em", fontSize: 8,
-                      marginLeft: 6,
-                      padding: "1px 5px",
-                      border: `1px solid ${chipColor}55`,
-                      borderRadius: 2,
-                    }}>{isLive ? "LIVE" : "PAPER"}</span>
+                    <>
+                      <span style={{
+                        color: chipColor,
+                        fontWeight: 800, letterSpacing: "0.16em", fontSize: 8,
+                        marginLeft: 6,
+                        padding: "1px 5px",
+                        border: `1px solid ${chipColor}55`,
+                        borderRadius: 2,
+                      }}>{isLive ? "LIVE" : "PAPER"}</span>
+                      {isSandbox && (
+                        <span
+                          title={`Routed through ${(t.exchange ?? "exchange").toString().toUpperCase()} public testnet — no real funds at risk`}
+                          style={{
+                            color: N.WARN,
+                            fontWeight: 800, letterSpacing: "0.16em", fontSize: 8,
+                            marginLeft: 6,
+                            padding: "1px 5px",
+                            border: `1px solid ${N.WARN}66`,
+                            borderRadius: 2,
+                            background: `${N.WARN}12`,
+                          }}>SANDBOX</span>
+                      )}
+                    </>
                   );
                 })()}
               </span>

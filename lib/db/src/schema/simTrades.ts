@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, real, bigint, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, real, bigint, boolean, timestamp, index } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 
 export const simTradesTable = pgTable("sim_trades", {
@@ -41,6 +41,11 @@ export const simTradesTable = pgTable("sim_trades", {
   entryFeeBrokerCurrency: text("entry_fee_broker_currency"),
   exitFeeBroker:          real("exit_fee_broker"),
   exitFeeBrokerCurrency:  text("exit_fee_broker_currency"),
+  // True when this trade was opened against the connected exchange's
+  // public sandbox/testnet (paper-mode sandbox routing). Mirrors the
+  // open-side `sim_positions.sandbox` flag so closed trades can carry the
+  // TESTNET pill in the Portal trade-history feed.
+  sandbox:                boolean("sandbox").notNull().default(false),
   createdAt:      timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   index("sim_trades_user_idx").on(t.userId),
