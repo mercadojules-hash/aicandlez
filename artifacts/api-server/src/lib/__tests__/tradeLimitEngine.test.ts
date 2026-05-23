@@ -1,6 +1,24 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { buildVerdict } from "../tradeLimitEngine.js";
-import { UNLIMITED_TRADE_LIMIT_CAP } from "@workspace/db";
+import { UNLIMITED_TRADE_LIMIT_CAP, DEFAULT_TRADE_LIMIT_CAP } from "@workspace/db";
+
+// ── DB mock for the override-expiry suite ────────────────────────────────────
+// `resolveCap` runs `db.select(...).from(userTradeLimitsTable).where(...).limit(1)`.
+// We mock the chain to return a controllable row per test.
+let mockLimitRow: { capTier: number; overrideExpiresAt: Date | null } | null = null;
+
+vi.mock("@workspace/db", async () => {
+  const actual = await vi.importActual<typeof import("@workspace/db")>("@workspace/db");
+  const chain = {
+    from: () => chain,
+    where: () => chain,
+    limit: async () => (mockLimitRow ? [mockLimitRow] : []),
+  };
+  return {
+    ...actual,
+    db: { select: () => chain },
+  };
+});
 
 describe("tradeLimitEngine.buildVerdict", () => {
   const NOW = 1_700_000_000_000;
@@ -71,5 +89,47 @@ describe("tradeLimitEngine.buildVerdict", () => {
     const b = buildVerdict({ userId: "u1", used24h: 150, capTier: 200, oldestOpenEpochMs: NOW, nowMs: NOW });
     expect(b.blocked).toBe(false);
     expect(b.remaining).toBe(50);
+  });
+});
+
+describe("tradeLimitEngine override expiry (resolveCap)", () => {
+  beforeEach(async () => {
+    mockLimitRow = null;
+    const mod = await import("../tradeLimitEngine.js");
+    mod.__resetTradeLimitCacheForTests();
+  });
+
+  it("honors an unexpired override cap", async () => {
+    mockLimitRow = {
+      capTier:           200,
+      overrideExpiresAt: new Date(Date.now() + 60 * 60 * 1000), // +1h
+    };
+    const { getTradeLimitVerdict } = await import("../tradeLimitEngine.js");
+    const v = await getTradeLimitVerdict("u-override-unexpired");
+    expect(v.capTier).toBe(200);
+  });
+
+  it("falls back to default cap when override is expired", async () => {
+    mockLimitRow = {
+      capTier:           200,
+      overrideExpiresAt: new Date(Date.now() - 60 * 60 * 1000), // -1h
+    };
+    const { getTradeLimitVerdict } = await import("../tradeLimitEngine.js");
+    const v = await getTradeLimitVerdict("u-override-expired");
+    expect(v.capTier).toBe(DEFAULT_TRADE_LIMIT_CAP);
+  });
+
+  it("treats a null overrideExpiresAt as a permanent (non-expiring) cap", async () => {
+    mockLimitRow = { capTier: 100, overrideExpiresAt: null };
+    const { getTradeLimitVerdict } = await import("../tradeLimitEngine.js");
+    const v = await getTradeLimitVerdict("u-permanent");
+    expect(v.capTier).toBe(100);
+  });
+
+  it("returns default cap when no row exists for the user", async () => {
+    mockLimitRow = null;
+    const { getTradeLimitVerdict } = await import("../tradeLimitEngine.js");
+    const v = await getTradeLimitVerdict("u-no-row");
+    expect(v.capTier).toBe(DEFAULT_TRADE_LIMIT_CAP);
   });
 });

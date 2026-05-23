@@ -400,6 +400,18 @@ export async function placeUserOrder(userId: string, req: UserOrderRequest): Pro
   const symbol  = normalizeSymbol(req.symbol);
   const { side, sizeUSD } = req;
 
+  // Status gate — `suspended` and `disabled` block paper opens too.
+  // `force_paper` is allowed (it's the *only* mode those users get).
+  // `active` is the default fall-through.
+  const { getUserStatusVerdict } = await import("./userStatusGuard.js");
+  const statusVerdict = await getUserStatusVerdict(userId);
+  if (!statusVerdict.allowPaper) {
+    return {
+      success: false,
+      error:   statusVerdict.reason ?? `Account ${statusVerdict.status} — paper trading blocked`,
+    };
+  }
+
   if (!SUPPORTED_SYMBOLS.includes(symbol)) {
     return { success: false, error: `Unsupported symbol: ${symbol}` };
   }

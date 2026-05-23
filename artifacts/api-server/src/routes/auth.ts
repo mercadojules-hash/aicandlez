@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, userTradeLimitsTable, DEFAULT_TRADE_LIMIT_CAP } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
@@ -73,6 +73,21 @@ router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
       role: targetRole ?? "user",
     })
     .returning();
+
+  // Persist the default trade-limit row for every new user. Idempotent —
+  // duplicate provisioning races (rare) are absorbed by the unique
+  // constraint via onConflictDoNothing.
+  try {
+    await db
+      .insert(userTradeLimitsTable)
+      .values({
+        userId:  clerkUserId,
+        capTier: DEFAULT_TRADE_LIMIT_CAP,
+      })
+      .onConflictDoNothing();
+  } catch (err) {
+    req.log.warn({ err, clerkUserId }, "Default trade-limit row provisioning failed");
+  }
 
   req.log.info(
     { clerkUserId, email, role: created?.role },

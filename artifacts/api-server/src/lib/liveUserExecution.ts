@@ -15,6 +15,9 @@ import { logger } from "./logger.js";
 import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
 import { getTradeLimitVerdict, invalidateTradeLimitCache } from "./tradeLimitEngine.js";
 import { getUserStatusVerdict } from "./userStatusGuard.js";
+import { executionStreamBus } from "./executionStreamBus.js";
+import { logsTable } from "@workspace/db";
+import crypto from "crypto";
 
 // ── Per-user live execution bridge ────────────────────────────────────────────
 //
@@ -370,6 +373,26 @@ export async function placeLiveAutoOrderForUser(
   if (!statusVerdict.allowLive) {
     const msg = statusVerdict.reason ?? `Account ${statusVerdict.status} — live execution blocked`;
     await emitFailureNotification(userId, symbol, side, msg);
+    executionStreamBus.emitEvent({
+      type:     "order_rejected",
+      severity: "warn",
+      symbol, side, mode: "live",
+      gate:     "user_status_blocked",
+      reason:   "user_status_blocked",
+      message:  msg,
+      details:  { userId, status: statusVerdict.status },
+    });
+    try {
+      await db.insert(logsTable).values({
+        id:      crypto.randomUUID(),
+        type:    "trade",
+        level:   "warn",
+        message: `[user_status_blocked] ${msg}`,
+        details: { userId, symbol, side, status: statusVerdict.status, errorCode: "user_status_blocked" },
+      });
+    } catch (err) {
+      logger.warn({ err, userId }, "liveUserExecution: status-block log insert failed");
+    }
     return { success: false, userId, errorCode: "user_status_blocked", error: msg };
   }
 
@@ -381,6 +404,37 @@ export async function placeLiveAutoOrderForUser(
   if (limitVerdict.blocked) {
     const msg = `Trade limit reached (${limitVerdict.used24h}/${limitVerdict.capTier} in 24h) — try again after ${new Date(limitVerdict.windowResetsAt).toISOString()}`;
     await emitFailureNotification(userId, symbol, side, msg);
+    executionStreamBus.emitEvent({
+      type:     "order_rejected",
+      severity: "warn",
+      symbol, side, mode: "live",
+      gate:     "trade_limit_exhausted",
+      reason:   "trade_limit_exhausted",
+      message:  msg,
+      details:  {
+        userId,
+        used24h:        limitVerdict.used24h,
+        capTier:        limitVerdict.capTier,
+        windowResetsAt: limitVerdict.windowResetsAt,
+      },
+    });
+    try {
+      await db.insert(logsTable).values({
+        id:      crypto.randomUUID(),
+        type:    "trade",
+        level:   "warn",
+        message: `[trade_limit_exhausted] ${msg}`,
+        details: {
+          userId, symbol, side,
+          used24h:        limitVerdict.used24h,
+          capTier:        limitVerdict.capTier,
+          windowResetsAt: limitVerdict.windowResetsAt,
+          errorCode:      "trade_limit_exhausted",
+        },
+      });
+    } catch (err) {
+      logger.warn({ err, userId }, "liveUserExecution: trade-limit log insert failed");
+    }
     return { success: false, userId, errorCode: "trade_limit_exhausted", error: msg };
   }
 
