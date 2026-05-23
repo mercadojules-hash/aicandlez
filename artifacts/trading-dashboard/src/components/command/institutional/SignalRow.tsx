@@ -418,6 +418,8 @@ export function SignalRow({ spec, breakdown }: Props) {
     // Hard instrumentation for the live BUY path. Use a unique [BUY-TRACE]
     // prefix so the user can grep browser console + server log together.
     // Remove these once the first real Kraken fill is confirmed end-to-end.
+    // eslint-disable-next-line no-alert
+    window.alert("[BUY-TRACE] fireTrade ENTRY reached. side=" + side + " entry=" + entry + " isOperatorRole=" + isOperatorRole + " isCustomerPortal=" + portalMode.isCustomerPortal + " mode=" + portalMode.mode);
     console.error("[BUY-TRACE] fireTrade ENTRY", {
       symbol: spec.symbol,
       side,
@@ -948,11 +950,22 @@ function ActionPill({
 }: { label: string; color: string; active: boolean; onClick?: () => void }) {
   const [flashing, setFlashing] = useState(false);
   const handle = () => {
-    // eslint-disable-next-line no-alert
-    window.alert("[BUY-TRACE] ActionPill RAW CLICK reached React: " + label);
-    console.error("[BUY-TRACE] ActionPill CLICK", { label, active });
+    console.error("[BUY-TRACE] ActionPill CLICK", { label, active, hasOnClick: typeof onClick });
     setFlashing(true);
-    onClick?.();
+    try {
+      if (!onClick) {
+        // eslint-disable-next-line no-alert
+        window.alert("[BUY-TRACE] FATAL — ActionPill onClick prop is UNDEFINED for " + label);
+      } else {
+        onClick();
+        // eslint-disable-next-line no-alert
+        window.alert("[BUY-TRACE] ActionPill onClick() RETURNED CLEANLY for " + label + " — if fireTrade alerts did not fire, the wrapper arrow never reached fireTrade.");
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-alert
+      window.alert("[BUY-TRACE] EXCEPTION inside onClick for " + label + ": " + (err instanceof Error ? err.message + " | " + (err.stack ?? "") : String(err)));
+      console.error("[BUY-TRACE] EXCEPTION in onClick", err);
+    }
     setTimeout(() => setFlashing(false), 480);
   };
   return (
