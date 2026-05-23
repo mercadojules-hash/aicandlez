@@ -41,7 +41,12 @@ export const GATEIO_CONFIG: AdapterConfig = {
 };
 
 export class GateIOAdapter extends BaseExchangeAdapter {
-  private readonly BASE = "api.gateio.ws";
+  // Gate.io has no public spot sandbox we can target — opt-in testnet
+  // construction must fail rather than silently route to prod.
+  private readonly BASE = this.resolveHost({
+    prod:    "api.gateio.ws",
+    testnet: null,
+  });
   private orderSeq = 1;
 
   constructor(config: Partial<AdapterConfig> = {}) {

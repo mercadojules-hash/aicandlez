@@ -55,18 +55,6 @@ function baseCfg(exchange: string, key?: string, secret?: string): AdapterConfig
   };
 }
 
-/**
- * Each adapter currently hard-codes its REST hostname in a private
- * readonly `BASE` field. Until the adapters grow a first-class testnet
- * config switch, we rebind that field on the instance so the live
- * code path hits the sandbox host instead of production.
- */
-function pointAtHost(adapter: object, host: string): void {
-  Object.defineProperty(adapter, "BASE", {
-    value: host, writable: true, configurable: true, enumerable: false,
-  });
-}
-
 function assertBrokerFee(order: StandardOrder | null | undefined, label: string): void {
   expect(order, `${label}: exchange returned no order`).toBeTruthy();
   expect(order!.fee.source, `${label}: fee.source`).toBe("broker");
@@ -94,7 +82,6 @@ describe.skipIf(!ENABLED || !BINANCE_KEY || !BINANCE_SECRET)(
   () => {
     it("places a tiny BTCUSDT market order and reports broker fee from fills[]", async () => {
       const adapter = new BinanceAdapter(baseCfg("Binance", BINANCE_KEY, BINANCE_SECRET));
-      pointAtHost(adapter, "testnet.binance.vision");
 
       // Testnet min-notional is ~10 USDT; 0.0002 BTC ≈ $12-15 worth.
       // The end-to-end broker-fee surface on Binance Spot is the FULL
@@ -122,7 +109,6 @@ describe.skipIf(!ENABLED || !GEMINI_KEY || !GEMINI_SECRET)(
   () => {
     it("places + queries a tiny BTCUSD market order and reports broker fee", async () => {
       const adapter = new GeminiAdapter(baseCfg("Gemini", GEMINI_KEY, GEMINI_SECRET));
-      pointAtHost(adapter, "api.sandbox.gemini.com");
 
       const placed = await adapter.placeOrder({
         symbol: "BTCUSD", side: "buy", type: "market", qty: 0.0002,

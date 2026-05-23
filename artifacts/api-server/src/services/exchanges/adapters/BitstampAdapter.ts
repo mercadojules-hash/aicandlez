@@ -37,7 +37,11 @@ export const BITSTAMP_CONFIG: AdapterConfig = {
 };
 
 export class BitstampAdapter extends BaseExchangeAdapter {
-  private readonly BASE = "www.bitstamp.net";
+  // Bitstamp has no public sandbox — testnet must fail loudly.
+  private readonly BASE = this.resolveHost({
+    prod:    "www.bitstamp.net",
+    testnet: null,
+  });
   private nonce = Date.now();
 
   constructor(config: Partial<AdapterConfig> = {}) {

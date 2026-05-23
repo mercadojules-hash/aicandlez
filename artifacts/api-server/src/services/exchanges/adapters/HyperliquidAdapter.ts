@@ -47,7 +47,11 @@ export const HYPERLIQUID_CONFIG: AdapterConfig = {
 };
 
 export class HyperliquidAdapter extends BaseExchangeAdapter {
-  private readonly BASE = "api.hyperliquid.xyz";
+  // Hyperliquid testnet → api.hyperliquid-testnet.xyz (verified public sandbox).
+  private readonly BASE = this.resolveHost({
+    prod:    "api.hyperliquid.xyz",
+    testnet: "api.hyperliquid-testnet.xyz",
+  });
 
   constructor(config: Partial<AdapterConfig> = {}) {
     super({ ...HYPERLIQUID_CONFIG, ...config });

@@ -48,7 +48,11 @@ export const BINANCE_CONFIG: AdapterConfig = {
 };
 
 export class BinanceAdapter extends BaseExchangeAdapter {
-  private readonly BASE = "api.binance.com";
+  // Binance Spot Testnet → testnet.binance.vision (verified public sandbox).
+  private readonly BASE = this.resolveHost({
+    prod:    "api.binance.com",
+    testnet: "testnet.binance.vision",
+  });
   private orderSeq = 1;
 
   constructor(config: Partial<AdapterConfig> = {}) {

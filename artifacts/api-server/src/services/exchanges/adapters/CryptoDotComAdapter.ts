@@ -41,7 +41,11 @@ export const CRYPTOCOM_CONFIG: AdapterConfig = {
 };
 
 export class CryptoDotComAdapter extends BaseExchangeAdapter {
-  private readonly BASE = "api.crypto.com";
+  // Crypto.com has no public sandbox we can target — testnet must fail loudly.
+  private readonly BASE = this.resolveHost({
+    prod:    "api.crypto.com",
+    testnet: null,
+  });
   private readonly VER  = "/v2";
   private id = 1;
 

@@ -40,6 +40,12 @@ export const KRAKEN_CONFIG: AdapterConfig = {
 };
 
 export class KrakenAdapter extends BaseExchangeAdapter {
+  // Kraken Spot has no public sandbox (futures-only sandbox exists but is
+  // out of scope for this adapter) — testnet construction must fail loudly.
+  private readonly BASE = this.resolveHost({
+    prod:    "api.kraken.com",
+    testnet: null,
+  });
   private orderSeq = 1;
 
   constructor(config: Partial<AdapterConfig> = {}) {
@@ -275,7 +281,7 @@ export class KrakenAdapter extends BaseExchangeAdapter {
     return new Promise((resolve, reject) => {
       const req = https.request(
         {
-          hostname: "api.kraken.com", path, method: "POST",
+          hostname: this.BASE, path, method: "POST",
           headers: {
             "API-Key": key, "API-Sign": sign,
             "Content-Type": "application/x-www-form-urlencoded",
@@ -315,7 +321,7 @@ export class KrakenAdapter extends BaseExchangeAdapter {
 
   private krakenPublic<T>(endpoint: string): Promise<T> {
     return new Promise((resolve, reject) => {
-      https.get(`https://api.kraken.com/0/public/${endpoint}`, res => {
+      https.get(`https://${this.BASE}/0/public/${endpoint}`, res => {
         let data = "";
         res.on("data", c => { data += c; });
         res.on("end", () => {

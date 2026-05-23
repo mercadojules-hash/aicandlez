@@ -41,7 +41,11 @@ export const HTX_CONFIG: AdapterConfig = {
 };
 
 export class HTXAdapter extends BaseExchangeAdapter {
-  private readonly BASE    = "api.huobi.pro";
+  // HTX (Huobi) has no public sandbox we can target — testnet must fail loudly.
+  private readonly BASE    = this.resolveHost({
+    prod:    "api.huobi.pro",
+    testnet: null,
+  });
   private readonly DOMAIN  = "api.huobi.pro";
   private accountId: string | null = null;
 

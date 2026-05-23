@@ -41,7 +41,11 @@ export const GEMINI_CONFIG: AdapterConfig = {
 };
 
 export class GeminiAdapter extends BaseExchangeAdapter {
-  private readonly BASE = "api.gemini.com";
+  // Gemini Sandbox → api.sandbox.gemini.com (verified public sandbox).
+  private readonly BASE = this.resolveHost({
+    prod:    "api.gemini.com",
+    testnet: "api.sandbox.gemini.com",
+  });
   private nonce = Date.now();
 
   constructor(config: Partial<AdapterConfig> = {}) {

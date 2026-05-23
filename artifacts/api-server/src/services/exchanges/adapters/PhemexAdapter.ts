@@ -43,7 +43,11 @@ export const PHEMEX_CONFIG: AdapterConfig = {
 };
 
 export class PhemexAdapter extends BaseExchangeAdapter {
-  private readonly BASE = "api.phemex.com";
+  // Phemex testnet → testnet-api.phemex.com (verified public sandbox).
+  private readonly BASE = this.resolveHost({
+    prod:    "api.phemex.com",
+    testnet: "testnet-api.phemex.com",
+  });
 
   constructor(config: Partial<AdapterConfig> = {}) {
     super({ ...PHEMEX_CONFIG, ...config });

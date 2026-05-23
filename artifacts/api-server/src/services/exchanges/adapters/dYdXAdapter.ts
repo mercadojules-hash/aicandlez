@@ -46,7 +46,11 @@ export const DYDX_CONFIG: AdapterConfig = {
 };
 
 export class dYdXAdapter extends BaseExchangeAdapter {
-  private readonly BASE = "indexer.dydx.trade";
+  // dYdX v4 testnet indexer → indexer.v4testnet.dydx.exchange (verified).
+  private readonly BASE = this.resolveHost({
+    prod:    "indexer.dydx.trade",
+    testnet: "indexer.v4testnet.dydx.exchange",
+  });
 
   constructor(config: Partial<AdapterConfig> = {}) {
     super({ ...DYDX_CONFIG, ...config });

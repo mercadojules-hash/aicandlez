@@ -55,6 +55,25 @@ export abstract class BaseExchangeAdapter extends EventEmitter {
     this.config = config;
   }
 
+  // ── Host resolution ────────────────────────────────────────────────────────
+  //
+  // Adapters declare their REST host as a `{ prod, testnet }` pair and call
+  // this helper from a field initializer. When `config.testnet` is true and
+  // the adapter has no public sandbox (testnet === null), construction fails
+  // loudly instead of silently routing traffic to production.
+  protected resolveHost(hosts: { prod: string; testnet: string | null }): string {
+    if (this.config.testnet) {
+      if (!hosts.testnet) {
+        throw new Error(
+          `${this.config.exchange} adapter has no public sandbox; ` +
+          `cannot construct with testnet: true`,
+        );
+      }
+      return hosts.testnet;
+    }
+    return hosts.prod;
+  }
+
   // ── Identity ───────────────────────────────────────────────────────────────
 
   get exchange(): string { return this.config.exchange; }

@@ -41,7 +41,11 @@ export const BINGX_CONFIG: AdapterConfig = {
 };
 
 export class BingXAdapter extends BaseExchangeAdapter {
-  private readonly BASE = "open-api.bingx.com";
+  // BingX has no public sandbox we can target — testnet must fail loudly.
+  private readonly BASE = this.resolveHost({
+    prod:    "open-api.bingx.com",
+    testnet: null,
+  });
   private orderSeq = 1;
 
   constructor(config: Partial<AdapterConfig> = {}) {

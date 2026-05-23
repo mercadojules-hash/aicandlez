@@ -41,7 +41,11 @@ export const MEXC_CONFIG: AdapterConfig = {
 };
 
 export class MEXCAdapter extends BaseExchangeAdapter {
-  private readonly BASE = "api.mexc.com";
+  // MEXC has no public sandbox we can target — testnet must fail loudly.
+  private readonly BASE = this.resolveHost({
+    prod:    "api.mexc.com",
+    testnet: null,
+  });
   private orderSeq = 1;
 
   constructor(config: Partial<AdapterConfig> = {}) {

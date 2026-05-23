@@ -43,7 +43,11 @@ export const BITGET_CONFIG: AdapterConfig = {
 };
 
 export class BitgetAdapter extends BaseExchangeAdapter {
-  private readonly BASE = "api.bitget.com";
+  // Bitget has no public sandbox we can target — testnet must fail loudly.
+  private readonly BASE = this.resolveHost({
+    prod:    "api.bitget.com",
+    testnet: null,
+  });
   private orderSeq = 1;
 
   constructor(config: Partial<AdapterConfig> = {}) {
