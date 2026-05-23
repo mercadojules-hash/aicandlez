@@ -12,9 +12,11 @@
 // Skipped by default. To run locally or in CI:
 //
 //   RUN_EXCHANGE_TESTNET=1 \
-//   BINANCE_TESTNET_API_KEY=...    BINANCE_TESTNET_API_SECRET=... \
-//   GEMINI_SANDBOX_API_KEY=...     GEMINI_SANDBOX_API_SECRET=... \
-//   GATEIO_TESTNET_API_KEY=...     GATEIO_TESTNET_API_SECRET=... \
+//   BINANCE_TESTNET_API_KEY=...     BINANCE_TESTNET_API_SECRET=... \
+//   GEMINI_SANDBOX_API_KEY=...      GEMINI_SANDBOX_API_SECRET=... \
+//   GATEIO_TESTNET_API_KEY=...      GATEIO_TESTNET_API_SECRET=... \
+//   HYPERLIQUID_TESTNET_API_KEY=... HYPERLIQUID_TESTNET_API_SECRET=... \
+//   DYDX_TESTNET_API_KEY=...        DYDX_TESTNET_API_SECRET=... \
 //     pnpm --filter @workspace/api-server run test -- adapterFeeParsingTestnet
 //
 // Each per-exchange block additionally skips when its own testnet keys
@@ -26,6 +28,17 @@
 //   ✓ Binance Spot Testnet    → testnet.binance.vision
 //   ✓ Gemini Sandbox          → api.sandbox.gemini.com
 //   ✓ Gate.io Spot Testnet    → api-testnet.gateapi.io
+//
+// Wired but credential-gated (skip-if-missing; assert place→broker-fee
+// against the public sandbox the adapter already opts into via
+// `AdapterConfig.testnet`). These blocks will currently THROW on a real
+// run because `placeOrder` requires wallet signing that's not yet
+// implemented — the throw is the desired signal that the adapter needs
+// finishing before drift coverage is real:
+//   ⚠ Hyperliquid Testnet     → api.hyperliquid-testnet.xyz
+//                                (needs EIP-712 wallet signing in placeOrder)
+//   ⚠ dYdX v4 Testnet         → indexer.v4testnet.dydx.exchange
+//                                (needs cosmos wallet signing in placeOrder)
 //
 // Documented coverage gaps (intentionally `describe.skip` until each
 // blocker below is resolved — gap surfaces in the CI test summary so
@@ -77,9 +90,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { BinanceAdapter } from "../adapters/BinanceAdapter.js";
-import { GeminiAdapter }  from "../adapters/GeminiAdapter.js";
-import { GateIOAdapter }  from "../adapters/GateIOAdapter.js";
+import { BinanceAdapter }     from "../adapters/BinanceAdapter.js";
+import { GeminiAdapter }      from "../adapters/GeminiAdapter.js";
+import { GateIOAdapter }      from "../adapters/GateIOAdapter.js";
+import { HyperliquidAdapter } from "../adapters/HyperliquidAdapter.js";
+import { dYdXAdapter }        from "../adapters/dYdXAdapter.js";
 
 import type { AdapterConfig, StandardOrder } from "../types.js";
 
@@ -228,6 +243,88 @@ describe.skip("Kraken Spot Demo — broker fee end-to-end (BLOCKED: no public sp
     expect(true).toBe(true);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Hyperliquid Testnet
+//
+// The adapter wires `api.hyperliquid-testnet.xyz` via `AdapterConfig.testnet`,
+// so a credentialled run aims at the public sandbox — never prod. The
+// `placeOrder` path currently throws because EIP-712 wallet signing is
+// not yet implemented; once it lands, this block starts asserting the
+// `fee.source === "broker"` invariant against real testnet fills. Until
+// then, a credentialled run produces a hard, named failure so the gap
+// is impossible to forget.
+// ──────────────────────────────────────────────────────────────────────────────
+
+const HYPERLIQUID_KEY    = process.env["HYPERLIQUID_TESTNET_API_KEY"];
+const HYPERLIQUID_SECRET = process.env["HYPERLIQUID_TESTNET_API_SECRET"];
+
+describe.skipIf(!ENABLED || !HYPERLIQUID_KEY || !HYPERLIQUID_SECRET)(
+  "Hyperliquid Testnet — broker fee end-to-end",
+  () => {
+    it("places a tiny BTC-PERP market order and reports broker fee", async () => {
+      const adapter = new HyperliquidAdapter(
+        baseCfg("Hyperliquid", HYPERLIQUID_KEY, HYPERLIQUID_SECRET),
+      );
+
+      const placed = await adapter.placeOrder({
+        symbol: "BTCUSD", side: "buy", type: "market", qty: 0.0002,
+      });
+      assertBrokerFee(placed, "Hyperliquid placeOrder");
+
+      await sleep(1_000);
+      const queried = await adapter.getOrder(placed.exchangeOrderId, "BTCUSD");
+      assertBrokerFee(queried, "Hyperliquid getOrder");
+    }, 45_000);
+  },
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
+// dYdX v4 Testnet
+//
+// The adapter wires `indexer.v4testnet.dydx.exchange` via `AdapterConfig.testnet`,
+// so a credentialled run aims at the public sandbox. `placeOrder` currently
+// throws pending cosmos wallet signing; same deal as Hyperliquid — the
+// block lights up the moment signing lands.
+// ──────────────────────────────────────────────────────────────────────────────
+
+const DYDX_KEY    = process.env["DYDX_TESTNET_API_KEY"];
+const DYDX_SECRET = process.env["DYDX_TESTNET_API_SECRET"];
+
+describe.skipIf(!ENABLED || !DYDX_KEY || !DYDX_SECRET)(
+  "dYdX v4 Testnet — broker fee end-to-end",
+  () => {
+    it("places a tiny BTC-USD market order and reports broker fee", async () => {
+      const adapter = new dYdXAdapter(baseCfg("dYdX", DYDX_KEY, DYDX_SECRET));
+
+      const placed = await adapter.placeOrder({
+        symbol: "BTCUSD", side: "buy", type: "market", qty: 0.0002,
+      });
+      assertBrokerFee(placed, "dYdX placeOrder");
+
+      await sleep(1_000);
+      const queried = await adapter.getOrder(placed.exchangeOrderId, "BTCUSD");
+      assertBrokerFee(queried, "dYdX getOrder");
+    }, 45_000);
+  },
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Phemex Testnet — intentionally excluded.
+//
+// `testnet-api.phemex.com` is wired in the adapter and `getOrder` already
+// resolves a real broker fee from `cumFeeEv`, BUT `PhemexAdapter.placeOrder`
+// returns `simulatedOrder(...)` regardless of the underlying `/spot/orders`
+// response — the real exchange order id is discarded on line ~161, so the
+// place→query roundtrip can never bridge to a real fee. Promoting this to
+// `describe.skipIf` would always assert against `source: "estimate"` and
+// fail every run, which is noisy, not informative.
+//
+// Unblock: have `placeOrder` parse `data.data.orderID` from the Phemex
+// response and return it on the `StandardOrder`, then convert this block
+// to `describe.skipIf(!ENABLED || !PHEMEX_KEY || !PHEMEX_SECRET)` with the
+// same place+getOrder pattern used above.
+// ──────────────────────────────────────────────────────────────────────────────
 
 describe.skip("Phemex Testnet — broker fee end-to-end (BLOCKED: synthetic order id)", () => {
   it("placeholder — PhemexAdapter.placeOrder discards the real exchange order id", () => {
