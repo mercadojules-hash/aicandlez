@@ -134,7 +134,13 @@ interface Summary {
   avgPnLPct: number;
 }
 
-function calcSummary(trades: Trade[]): Summary {
+function calcSummary(tradesInput: Trade[]): Summary {
+  // Defensive: tolerate non-array payloads (e.g. transient telemetry reshape).
+  // Preserve diagnostics — never silently swallow malformed shapes.
+  const trades = Array.isArray(tradesInput) ? tradesInput : [];
+  if (!Array.isArray(tradesInput) && import.meta.env.DEV) {
+    console.warn("[journal] calcSummary: trades not an array, normalized to []", tradesInput);
+  }
   const closed  = trades.filter(t => t.status === "closed");
   const open    = trades.filter(t => t.status === "open");
   const wins    = closed.filter(t => safeNum(t.pnl) >= 0);
@@ -165,7 +171,12 @@ function getLivePrice(t: Trade): number {
   return safeNum(t.price);
 }
 
-function calcAccount(trades: Trade[]) {
+function calcAccount(tradesInput: Trade[]) {
+  // Defensive: tolerate non-array payloads (e.g. transient telemetry reshape).
+  const trades = Array.isArray(tradesInput) ? tradesInput : [];
+  if (!Array.isArray(tradesInput) && import.meta.env.DEV) {
+    console.warn("[journal] calcAccount: trades not an array, normalized to []", tradesInput);
+  }
   const openTrades   = trades.filter(t => t?.status === "open");
   const closedTrades = trades.filter(t => t?.status === "closed");
 

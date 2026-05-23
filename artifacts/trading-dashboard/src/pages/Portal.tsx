@@ -33,7 +33,9 @@ import {
   CryptoSignalsPanel,
   EquitySignalsPanel,
   AIWarRoom,
+  LiveControlBar,
 } from "@/components/command/institutional";
+import { useExecutionState, type StreamState } from "@/hooks/useExecutionState";
 import { N } from "@/components/command/institutional/theme";
 import {
   ALERT_DEFINITIONS,
@@ -3751,6 +3753,22 @@ function PortalInner() {
   const [feesDrillMonth, setFeesDrillMonth] = useState<string | null>(null);
   const { gate: disclaimerGate, modal: disclaimerGateModal } = useDisclaimerGate();
 
+  // Canonical execution state (server-derived) — drives the read-only
+  // LIVE AI CRYPTO/EQUITIES EXECUTION bars mounted above each signals
+  // panel. Single source of truth so customer portal, admin portal, and
+  // /command cannot drift out of sync. The bars are display-only here;
+  // operator arm/halt controls live exclusively on /command.
+  const execStateQuery = useExecutionState();
+  const mapStreamState = (s: StreamState | undefined): "ARMED" | "EXECUTING" | "HALTED" => {
+    if (s === "executing") return "EXECUTING";
+    if (s === "armed")     return "ARMED";
+    return "HALTED";
+  };
+  const cryptoBarState   = mapStreamState(execStateQuery.data?.crypto.state);
+  const equitiesBarState = mapStreamState(execStateQuery.data?.equities.state);
+  const cryptoBarReason   = execStateQuery.data?.crypto.reason   ?? undefined;
+  const equitiesBarReason = execStateQuery.data?.equities.reason ?? undefined;
+
   // Admin / super-admin bypass — admins are not customers and must never see
   // paywall UI, locked panels, "Upgrade to Pro" prompts, FeatureGate overlays,
   // or any subscription gating. Their effective tier is treated as the highest
@@ -4555,21 +4573,52 @@ function PortalInner() {
           gap: 14,
         }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <LiveControlBar
+              assetClass="CRYPTO"
+              state={cryptoBarState}
+              eligibilityReason={cryptoBarReason}
+            />
             <CryptoSignalsPanel engine={engine} />
             {/* Admin layout uses live Kraken-sourced panels — never the
                 paper-trade simulator. See AdminLiveTradesPanel above. */}
             <AdminLiveTradesPanel />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <LiveControlBar
+              assetClass="EQUITIES"
+              state={equitiesBarState}
+              eligibilityReason={equitiesBarReason}
+            />
             <EquitySignalsPanel engine={engine} />
             <AdminTradeHistoryPanel />
           </div>
         </div>
       ) : (
       <>
-      {/* TOP 20 CRYPTO + TOP 20 EQUITY signal panels */}
+      {/* Canonical LIVE AI EXECUTION bars (server-derived, read-only on
+          customer surface) — sit directly above their signals panel so the
+          customer sees the same state /command operators see. */}
       <div style={{
         padding: "14px 16px 0",
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 10,
+      }}>
+        <LiveControlBar
+          assetClass="CRYPTO"
+          state={cryptoBarState}
+          eligibilityReason={cryptoBarReason}
+        />
+        <LiveControlBar
+          assetClass="EQUITIES"
+          state={equitiesBarState}
+          eligibilityReason={equitiesBarReason}
+        />
+      </div>
+
+      {/* TOP 20 CRYPTO + TOP 20 EQUITY signal panels */}
+      <div style={{
+        padding: "10px 16px 0",
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
         gap: 10,

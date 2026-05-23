@@ -129,7 +129,8 @@ export default function InstitutionalTerminal() {
     [breakdowns],
   );
   const positions = portfolio.data?.positions ?? [];
-  const history   = trades.data ?? [];
+  // Defensive: tolerate non-array shapes from /api/simulation/trades.
+  const history   = Array.isArray(trades.data) ? trades.data : [];
 
   return (
     <div style={{
@@ -616,7 +617,12 @@ function ActiveTradeRow({ p }: { p: Position }) {
   );
 }
 
-function TradeHistoryPanel({ trades }: { trades: SimTrade[] }) {
+function TradeHistoryPanel({ trades: tradesInput }: { trades: SimTrade[] }) {
+  // Defensive: tolerate non-array payloads from /api/simulation/trades.
+  const trades = Array.isArray(tradesInput) ? tradesInput : [];
+  if (!Array.isArray(tradesInput) && import.meta.env.DEV) {
+    console.warn("[institutional-terminal] TradeHistoryPanel: trades not an array", tradesInput);
+  }
   const wins   = trades.filter(t => t.pnl > 0).length;
   const losses = trades.filter(t => t.pnl < 0).length;
   const wr     = trades.length ? Math.round((wins / trades.length) * 100) : 0;

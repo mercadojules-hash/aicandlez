@@ -46,7 +46,8 @@ export function LiveAccountPanel({ engine, exchangeStatus, liveBalance, trades }
     // Operator console is LIVE-only — filter sim/paper trades out before any
     // PnL math so realized/unrealized/win-rate/equity-curve never include
     // simulated rows.
-    const liveOnly = trades.filter(t => {
+    const safeTrades = Array.isArray(trades) ? trades : [];
+    const liveOnly = safeTrades.filter(t => {
       const m = (t.mode ?? "").toLowerCase();
       const s = ((t as { source?: string }).source ?? "").toLowerCase();
       return m === "live" || s === "live";

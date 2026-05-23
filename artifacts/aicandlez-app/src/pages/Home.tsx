@@ -1552,10 +1552,17 @@ const EQUITY_PREVIEW: { sym: string; name: string; action: string; confidence: n
 // TRADE HISTORY — cinematic AI execution log
 // Glow-state cards · expandable details · AI reasoning tags · profit bars
 // ═══════════════════════════════════════════════════════════════════════════
-function TradeHistorySection({ trades, onMore }: {
+function TradeHistorySection({ trades: tradesInput, onMore }: {
   trades: SimTrade[]; onMore: () => void;
 }) {
   const [openTrade, setOpenTrade] = useState<SimTrade | null>(null);
+
+  // Defensive: tolerate non-array payloads (e.g. server returning {trades:[]}
+  // vs raw array, or transient telemetry reshape). Preserves diagnostics.
+  const trades = Array.isArray(tradesInput) ? tradesInput : [];
+  if (!Array.isArray(tradesInput) && import.meta.env.DEV) {
+    console.warn("[home] TradeHistorySection: trades not an array", tradesInput);
+  }
 
   // Aggregate stats from REAL trades only — no fabrication
   const stats = useMemo(() => {

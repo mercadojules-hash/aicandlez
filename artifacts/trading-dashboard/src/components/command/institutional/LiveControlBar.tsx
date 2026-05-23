@@ -14,21 +14,30 @@
  * high-stakes, visually intentional, communicates state instantly.
  */
 
-import { Zap, OctagonAlert, Activity, Ban } from "lucide-react";
+import { Zap, OctagonAlert, Activity, Ban, ShieldCheck } from "lucide-react";
 import { N } from "./theme";
 
-type State = "LIVE" | "STANDBY" | "PAUSED";
+// Visual vocabulary used across customer portal, admin portal, and
+// /command. New canonical states (HALTED/ARMED/EXECUTING) drive the bars
+// when fed from useExecutionState. Legacy operator states (LIVE/STANDBY/
+// PAUSED) remain supported for back-compat with the existing /command
+// arm-switch interaction.
+type State = "LIVE" | "STANDBY" | "PAUSED" | "ARMED" | "EXECUTING" | "HALTED";
 
 const PILL_LABEL: Record<State, string> = {
-  LIVE:    "ARMED",
-  STANDBY: "STANDBY",
-  PAUSED:  "HALTED",
+  LIVE:      "EXECUTING",
+  EXECUTING: "EXECUTING",
+  ARMED:     "ARMED",
+  STANDBY:   "STANDBY",
+  PAUSED:    "HALTED",
+  HALTED:    "HALTED",
 };
 
 interface Props {
   assetClass: "CRYPTO" | "EQUITIES";
   state:      State;
-  onToggle:   () => void;
+  /** Omit to render a read-only status bar (no click affordance). */
+  onToggle?:  () => void;
   /**
    * Confidence-threshold eligibility (hard rule: 80%+ to arm live execution).
    * When `eligible === false` AND state is STANDBY, the toggle is disabled
@@ -71,44 +80,61 @@ export function LiveControlBar({
   eligible = true,
   eligibilityReason,
 }: Props) {
-  const isLive   = state === "LIVE";
-  const isPaused = state === "PAUSED";
+  // Visual buckets: LIVE/EXECUTING share the gold pulsing treatment;
+  // PAUSED/HALTED share the red emergency-stop treatment; ARMED is the
+  // new neon-green ready state surfaced by useExecutionState.
+  const isExecuting = state === "LIVE" || state === "EXECUTING";
+  const isHalted    = state === "PAUSED" || state === "HALTED";
+  const isArmedRdy  = state === "ARMED";
+  // Back-compat shims so the existing animation/branch code keeps working.
+  const isLive   = isExecuting;
+  const isPaused = isHalted;
+
+  const readOnly = typeof onToggle !== "function";
 
   // Eligibility constrains any HALTED/STANDBY → ARMED transition. Once the
-  // engine is LIVE, the operator must always retain the ability to halt it.
-  const blocked = !isLive && !eligible;
+  // engine is EXECUTING, the operator must always retain the ability to halt
+  // it. ARMED is already eligibility-cleared upstream by the server hook.
+  const blocked = !isExecuting && !isArmedRdy && !eligible;
 
-  // Three distinct tonal systems:
-  //   LIVE    → orange/gold (ARMED, hot, attention)
-  //   PAUSED  → red          (HALTED, emergency stop)
-  //   STANDBY → muted neutral (idle, system safe)
+  // Four tonal systems:
+  //   EXECUTING → orange/gold (hot, actively firing orders)
+  //   ARMED     → neon green   (ready, awaiting signal)
+  //   HALTED    → red          (emergency stop / kill switch)
+  //   STANDBY   → muted neutral (idle, system safe — back-compat)
   const color =
-    isLive   ? N.GOLD       :
-    isPaused ? N.DANGER     :
-               N.TEXT_2;
+    isExecuting ? N.GOLD       :
+    isArmedRdy  ? N.BRAND      :
+    isHalted    ? N.DANGER     :
+                  N.TEXT_2;
 
   const colorBrt =
-    isLive   ? N.GOLD_BRT   :
-    isPaused ? N.DANGER_BRT :
-               N.TEXT_1;
+    isExecuting ? N.GOLD_BRT   :
+    isArmedRdy  ? N.BRAND_BRT  :
+    isHalted    ? N.DANGER_BRT :
+                  N.TEXT_1;
 
   const label =
-    isLive
+    isExecuting
+      ? `LIVE AI ${assetClass} EXECUTION · EXECUTING`
+      : isArmedRdy
       ? `LIVE AI ${assetClass} EXECUTION · ARMED`
       : blocked
       ? `LIVE AI ${assetClass} EXECUTION · LOCKED`
-      : isPaused
+      : isHalted
       ? `LIVE AI ${assetClass} EXECUTION · HALTED`
       : `ENABLE LIVE AI ${assetClass} EXECUTION`;
 
   const subLabel =
-    isLive
-      ? "EXECUTION ENGINE ENGAGED · OPERATOR · LIVE ORDERS · CLICK TO HALT"
+    isExecuting
+      ? `EXECUTION ENGINE ENGAGED · LIVE ORDERS FIRING${readOnly ? "" : " · CLICK TO HALT"}`
+      : isArmedRdy
+      ? `ENGINE ARMED · AWAITING NEXT SIGNAL${readOnly ? "" : " · CLICK TO HALT"}`
       : blocked
       ? `BELOW EXECUTION THRESHOLD · 80% CONFIDENCE REQUIRED${eligibilityReason ? ` · ${eligibilityReason}` : ""}`
-      : isPaused
-      ? `EMERGENCY STOP ENGAGED · ORDERS BLOCKED · CLICK TO ARM${eligibilityReason ? ` · ${eligibilityReason}` : ""}`
-      : `LIVE EXECUTION ELIGIBLE · PRESS TO ARM ENGINE${eligibilityReason ? ` · ${eligibilityReason}` : ""}`;
+      : isHalted
+      ? `EMERGENCY STOP ENGAGED · ORDERS BLOCKED${readOnly ? "" : " · CLICK TO ARM"}${eligibilityReason ? ` · ${eligibilityReason}` : ""}`
+      : `LIVE EXECUTION ELIGIBLE${readOnly ? "" : " · PRESS TO ARM ENGINE"}${eligibilityReason ? ` · ${eligibilityReason}` : ""}`;
 
   const statusPillBg = isLive ? `${color}22` : isPaused ? `${color}18` : "transparent";
 
@@ -116,9 +142,9 @@ export function LiveControlBar({
     <>
       <style>{KEYFRAMES}</style>
       <button
-        onClick={blocked ? undefined : onToggle}
+        onClick={blocked || readOnly ? undefined : onToggle}
         disabled={blocked}
-        aria-disabled={blocked}
+        aria-disabled={blocked || readOnly}
         className="w-full text-left"
         style={{
           // CSS vars consumed by keyframes
@@ -127,12 +153,14 @@ export function LiveControlBar({
           ["--lbcB1" as string]: `${color}66`,
           ["--lbcB2" as string]: color,
           position: "relative",
-          background: isLive
+          background: isExecuting
             ? `linear-gradient(90deg, #000 0%, ${N.GOLD_DEEP}1f 50%, #000 100%)`
-            : isPaused
+            : isArmedRdy
+            ? `linear-gradient(90deg, #000 0%, ${color}14 50%, #000 100%)`
+            : isHalted
             ? `linear-gradient(90deg, #000 0%, ${color}10 50%, #000 100%)`
             : "linear-gradient(90deg, #000 0%, #050905 50%, #000 100%)",
-          border: `1.5px solid ${color}${isLive ? "" : isPaused ? "66" : "33"}`,
+          border: `1.5px solid ${color}${isExecuting ? "" : isArmedRdy ? "88" : isHalted ? "66" : "33"}`,
           borderRadius: 6,
           padding: "18px 22px",
           minHeight: 78,
@@ -140,35 +168,38 @@ export function LiveControlBar({
           alignItems: "center",
           justifyContent: "space-between",
           gap: 16,
-          cursor: blocked ? "not-allowed" : "pointer",
+          cursor: blocked ? "not-allowed" : readOnly ? "default" : "pointer",
           opacity: blocked ? 0.55 : 1,
           overflow: "hidden",
-          boxShadow: isLive
+          boxShadow: isExecuting
             ? `0 0 32px ${color}55, inset 0 0 24px ${color}1c`
-            : isPaused
+            : isArmedRdy
+            ? `0 0 22px ${color}50, inset 0 0 16px ${color}1c`
+            : isHalted
             ? `0 0 18px ${color}50, inset 0 0 14px ${color}28`
             : "none",
           animation:
-            isLive   ? "live-bar-pulse 2.4s ease-in-out infinite" :
-            isPaused ? "halt-bar-pulse 1.4s ease-in-out infinite" :
-                       "none",
+            isExecuting ? "live-bar-pulse 2.4s ease-in-out infinite" :
+            isArmedRdy  ? "live-bar-pulse 3.6s ease-in-out infinite" :
+            isHalted    ? "halt-bar-pulse 1.4s ease-in-out infinite" :
+                          "none",
           transition: "border-color 200ms ease, box-shadow 200ms ease",
         }}
         onMouseEnter={(e) => {
-          if (!isLive && !isPaused && !blocked) {
+          if (!isExecuting && !isHalted && !isArmedRdy && !blocked && !readOnly) {
             e.currentTarget.style.boxShadow = `0 0 22px ${color}50, inset 0 0 18px ${color}18`;
             e.currentTarget.style.borderColor = color;
           }
         }}
         onMouseLeave={(e) => {
-          if (!isLive && !isPaused) {
+          if (!isExecuting && !isHalted && !isArmedRdy) {
             e.currentTarget.style.boxShadow = "none";
             e.currentTarget.style.borderColor = `${color}33`;
           }
         }}
       >
-        {/* LIVE sweep highlight — diagonal moving gleam */}
-        {isLive && (
+        {/* Sweep highlight — diagonal moving gleam during EXECUTING only. */}
+        {isExecuting && (
           <span
             aria-hidden
             style={{
@@ -188,16 +219,22 @@ export function LiveControlBar({
         <div className="flex items-center" style={{ gap: 16, pointerEvents: "none", zIndex: 1 }}>
           <span style={{
             width: 50, height: 50, borderRadius: 6,
-            background: isLive ? `${color}22` : isPaused ? `${color}18` : "#050905",
-            border: `1.5px solid ${color}${isLive ? "" : isPaused ? "70" : "40"}`,
+            background: isExecuting ? `${color}22` : isArmedRdy ? `${color}1a` : isHalted ? `${color}18` : "#050905",
+            border: `1.5px solid ${color}${isExecuting ? "" : isArmedRdy ? "88" : isHalted ? "70" : "40"}`,
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: isLive ? `0 0 18px ${color}70, inset 0 0 12px ${color}40` : "none",
+            boxShadow: isExecuting
+              ? `0 0 18px ${color}70, inset 0 0 12px ${color}40`
+              : isArmedRdy
+              ? `0 0 14px ${color}60, inset 0 0 10px ${color}30`
+              : "none",
             flexShrink: 0,
           }}>
-            {isPaused
+            {isHalted
               ? <OctagonAlert size={24} style={{ color, filter: `drop-shadow(0 0 6px ${color})` }} />
-              : isLive
+              : isExecuting
               ? <Activity     size={24} style={{ color: colorBrt, animation: "neon-pulse 1.1s infinite", filter: `drop-shadow(0 0 6px ${color})` }} />
+              : isArmedRdy
+              ? <ShieldCheck  size={24} style={{ color: colorBrt, filter: `drop-shadow(0 0 6px ${color})` }} />
               : blocked
               ? <Ban          size={24} style={{ color: N.TEXT_3 }} />
               : <Zap          size={24} style={{ color }} />}
@@ -208,10 +245,12 @@ export function LiveControlBar({
               fontSize: 17,
               fontWeight: 800,
               letterSpacing: "0.24em",
-              color: isLive ? colorBrt : color,
+              color: isExecuting || isArmedRdy ? colorBrt : color,
               fontFamily: N.FONT_MONO,
-              textShadow: isLive
+              textShadow: isExecuting
                 ? `0 0 12px ${color}, 0 0 22px ${color}80`
+                : isArmedRdy
+                ? `0 0 10px ${color}, 0 0 18px ${color}66`
                 : "none",
               lineHeight: 1.15,
               whiteSpace: "nowrap",
@@ -223,7 +262,7 @@ export function LiveControlBar({
               fontSize: 9,
               fontWeight: 700,
               letterSpacing: "0.22em",
-              color: isLive ? `${N.GOLD_BRT}cc` : N.TEXT_3,
+              color: isExecuting ? `${N.GOLD_BRT}cc` : isArmedRdy ? `${N.BRAND_BRT}cc` : N.TEXT_3,
               fontFamily: N.FONT_MONO,
               whiteSpace: "nowrap",
             }}>
@@ -232,29 +271,34 @@ export function LiveControlBar({
           </div>
         </div>
 
-        {/* RIGHT — large status pill (LIVE / PAUSED / STANDBY) */}
+        {/* RIGHT — large status pill (EXECUTING / ARMED / HALTED / STANDBY) */}
         <div className="flex items-center" style={{ gap: 12, pointerEvents: "none", zIndex: 1, flexShrink: 0 }}>
           <span style={{
             width: 12, height: 12, borderRadius: 12,
             background: color,
             boxShadow: `0 0 10px ${color}, 0 0 22px ${color}`,
             animation:
-              isLive   ? "live-bar-dot 1.2s ease-in-out infinite" :
-              isPaused ? "halt-bar-dot 1.1s ease-in-out infinite" :
-                         "none",
+              isExecuting ? "live-bar-dot 1.2s ease-in-out infinite" :
+              isArmedRdy  ? "live-bar-dot 2.0s ease-in-out infinite" :
+              isHalted    ? "halt-bar-dot 1.1s ease-in-out infinite" :
+                            "none",
           }} />
           <span style={{
             padding: "8px 14px",
             borderRadius: 4,
-            background: statusPillBg,
-            border: `1.5px solid ${color}${isLive ? "" : isPaused ? "66" : "40"}`,
+            background: isExecuting ? `${color}22` : isArmedRdy ? `${color}1a` : isHalted ? `${color}18` : "transparent",
+            border: `1.5px solid ${color}${isExecuting ? "" : isArmedRdy ? "88" : isHalted ? "66" : "40"}`,
             fontSize: 14,
             fontWeight: 800,
             letterSpacing: "0.32em",
-            color: isLive ? colorBrt : color,
+            color: isExecuting || isArmedRdy ? colorBrt : color,
             fontFamily: N.FONT_MONO,
-            textShadow: isLive ? `0 0 10px ${color}` : "none",
-            boxShadow: isLive ? `0 0 14px ${color}55, inset 0 0 8px ${color}30` : "none",
+            textShadow: isExecuting || isArmedRdy ? `0 0 10px ${color}` : "none",
+            boxShadow: isExecuting
+              ? `0 0 14px ${color}55, inset 0 0 8px ${color}30`
+              : isArmedRdy
+              ? `0 0 10px ${color}45, inset 0 0 6px ${color}22`
+              : "none",
           }}>
             {PILL_LABEL[state]}
           </span>
