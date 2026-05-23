@@ -1462,6 +1462,8 @@ function LiveExecutionBar({
   isAdmin?: boolean;
 }) {
   const [armed, setArmed] = useState(false);
+  const [arming, setArming] = useState(false);
+  const { getToken } = useAuth();
   // Admin operators on admintrade.aicandlez.com must NEVER see a locked
   // Live AI Execution control. They get unlimited live access with a 30-slot
   // concurrent cap, regardless of subscription state or whether a per-user
@@ -1479,10 +1481,54 @@ function LiveExecutionBar({
     if (exchangeLocked && armed) setArmed(false);
   }, [exchangeLocked, armed]);
 
-  const handle = () => {
+  const handle = async () => {
     if (tierLocked)     { onUpgrade(); return; }
     if (exchangeLocked) { onConnectExchange(); return; }
-    setArmed(a => !a);
+    if (arming) return;
+    // Path A: operator/admin uses the server-side /engine/arm preflight
+    // (real Kraken ticker round-trip + EXCHANGE_LIVE_ENABLED + credentials
+    // check). Only flip the UI to ARMED on confirmed server success.
+    // Customer ARM remains local-state pending Path B (per-user persisted
+    // engine_armed flag). Non-admins keep the original optimistic toggle.
+    if (!isAdmin) { setArmed(a => !a); return; }
+    setArming(true);
+    try {
+      const token = await getToken().catch(() => null);
+      const path = armed ? "/api/engine/disarm" : "/api/engine/arm";
+      const res = await fetch(path, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const body = await res.json().catch(() => ({} as { armed?: boolean; error?: string; preflightPrice?: number }));
+      if (!res.ok || body.armed === undefined) {
+        toast({
+          title: armed ? "DISARM FAILED" : "ARM PREFLIGHT FAILED",
+          description: (body as { error?: string }).error ?? `HTTP ${res.status}`,
+        });
+        return;
+      }
+      setArmed(!!body.armed);
+      const pp = (body as { preflightPrice?: number }).preflightPrice;
+      toast({
+        title: body.armed
+          ? `LIVE EXECUTION ARMED — KRAKEN`
+          : `LIVE EXECUTION DISARMED`,
+        description: body.armed
+          ? `Operator credentials verified${pp ? ` · BTC ref $${pp.toFixed(0)}` : ""}`
+          : `Engine will stop routing new live orders for this operator session`,
+      });
+    } catch (err) {
+      toast({
+        title: "ARM REQUEST ERROR",
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setArming(false);
+    }
   };
 
   const ringColor = locked ? N.TEXT_3 : armed ? N.LONG : N.BRAND;

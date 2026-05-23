@@ -1,0 +1,39 @@
+Go with Path A now.
+
+Goal:
+Unblock the first real Kraken live-order test today with the smallest safe surgical fix. Do not start the larger ARM refactor yet.
+
+Please implement Path A:
+
+1. Wire the ARM button to a real backend action instead of local React-only state.
+
+* Current issue: Portal.tsx only runs setArmed(a => !a), which changes the UI glow but does not notify the server, DB, engine, or execution layer.
+* Add/route a real API call so ARM/DISARM creates or updates the caller’s Kraken live connection state as active/live/default where needed.
+* ARM should return a real success/failure response and the UI should only show ARMED when the server confirms.
+
+2. For super-admin/operator testing only:
+
+* Bypass the current SignalRow admin short-circuit that blocks BUY on the operator/admin surface.
+* Route operator manual BUY through the existing real-only Kraken operator execution path, such as /api/exchange/order/execute or the existing operator-env Kraken adapter path.
+* Keep this scoped to super-admin/operator live-test use only. Do not weaken customer safeguards.
+
+3. Verify Kraken connection persistence.
+
+* user_exchange_connections is currently empty even though the UI says Kraken connected.
+* Make sure the live Kraken connection state needed for execution exists/persists correctly, or make the operator-env Kraken execution path explicitly independent of user_exchange_connections for this first admin live test.
+
+4. Run a validate-only or minimum-size Kraken round-trip first.
+
+* Use minimum practical sizing, ideally around $10 or the smallest Kraken-supported amount.
+* Confirm no duplicate orders, no zero-size orders, no dry-run flag, and no silent failure.
+
+5. After Path A passes:
+
+* Leave Path B as a follow-up task.
+* Path B should include proper persisted per-user engine_armed state, audit logs, React Query invalidation, schema fix for acknowledged, and real connect persistence.
+
+Important:
+Do not merge the customer and operator domains.
+Operator/admin remains real-only.
+Customer platform remains isolated.
+This is a surgical live-test unblock, not the full ARM architecture refactor.

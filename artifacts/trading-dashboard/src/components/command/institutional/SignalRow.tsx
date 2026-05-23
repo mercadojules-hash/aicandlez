@@ -420,6 +420,7 @@ export function SignalRow({ spec, breakdown }: Props) {
     });
   };
 
+  const operatorOrderInFlightRef = useRef(false);
   const fireTrade = (side: "LONG" | "SHORT") => {
     if (!entry || entry <= 0) {
       toast({
@@ -495,13 +496,65 @@ export function SignalRow({ spec, breakdown }: Props) {
     }
 
     // Admin / non-customer-portal trees (CommandCenter, /admintrade /portal):
-    // real-only by invariant — never fire a paper trade here. Operators use
-    // the dedicated LIVE AI EXECUTION arm-control, not this row's BUY/SELL.
+    // real-only by invariant — route directly through the operator-env Kraken
+    // execution path (`/api/exchange/order/execute`). Path A surgical bridge
+    // so super-admin can manually fire a real Kraken order from a signal row
+    // for live-test validation. Customer-portal trees never reach this branch.
     if (!portalMode.isCustomerPortal) {
+      if (operatorOrderInFlightRef.current) {
+        toast({
+          title: `OPERATOR ORDER IN FLIGHT — ${spec.label}`,
+          description: `Wait for the previous ${side} on ${spec.symbol} to settle before sending another.`,
+        });
+        return;
+      }
+      operatorOrderInFlightRef.current = true;
       toast({
-        title: `OPERATOR — REAL-ONLY SURFACE`,
-        description: `${spec.label}: enable LIVE AI EXECUTION above to route real orders. SignalRow does not fire paper trades on the admin portal.`,
+        title: `OPERATOR LIVE ORDER SUBMITTED — ${spec.label}`,
+        description: `${side} · routing to KRAKEN (operator env) · $${liveSize} notional · AI ${conf}%`,
       });
+      void (async () => {
+        try {
+          const token = await getToken().catch(() => null);
+          const res = await fetch(`${apiBaseUrl}/api/exchange/order/execute`, {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              symbol:    spec.symbol,
+              side:      side === "LONG" ? "buy" : "sell",
+              orderType: "market",
+              amountUSD: liveSize,
+            }),
+          });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({} as { error?: string }));
+            toast({
+              title: `OPERATOR ORDER REJECTED — ${spec.label}`,
+              description: (body as { error?: string }).error ?? `HTTP ${res.status}`,
+            });
+            return;
+          }
+          const body = (await res.json().catch(() => ({}))) as {
+            id?: string; status?: string; fillPrice?: number; avgPrice?: number;
+          };
+          const fill = body.fillPrice ?? body.avgPrice;
+          toast({
+            title: `OPERATOR FILLED — ${spec.label}${fill ? ` @ $${fmt(fill)}` : ""}`,
+            description: [side, "KRAKEN", body.status, body.id ? `#${body.id.slice(-8)}` : ""].filter(Boolean).join(" · "),
+          });
+        } catch (err) {
+          toast({
+            title: `OPERATOR ORDER ERROR — ${spec.label}`,
+            description: err instanceof Error ? err.message : String(err),
+          });
+        } finally {
+          operatorOrderInFlightRef.current = false;
+        }
+      })();
       return;
     }
 

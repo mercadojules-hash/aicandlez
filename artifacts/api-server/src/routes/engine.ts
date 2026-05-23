@@ -63,12 +63,59 @@ router.get("/engine/status", (_req, res) => {
     lastSignal:         engineStats.lastSignal,
     lastTrade:          engineStats.lastTrade,
     recentErrors:       engineStats.errors.slice(-5),
+    operatorArmed:      _operatorArmed,
   });
 });
 
 router.post("/engine/start", ...requireOperator, (_req, res) => {
   startTradingLoop();
   res.json({ started: true, message: "Trading loop started" });
+});
+
+// ── Operator ARM / DISARM (Path A surgical bridge) ────────────────────────────
+// Customer ARM (per-user engine_armed) is the Path B follow-up. For now this
+// endpoint serves the operator/admin /portal Live Execution control: it does
+// a real preflight round-trip against the operator-env Kraken account
+// (KRAKEN_API_KEY / KRAKEN_API_SECRET) and only flips _operatorArmed = true
+// when the broker round-trip succeeds. DISARM clears the flag. The flag is
+// surfaced in /engine/status so the UI can hydrate from server truth.
+let _operatorArmed = false;
+export function isOperatorArmed(): boolean { return _operatorArmed; }
+
+router.get("/engine/arm-state", ...requireOperator, (_req, res) => {
+  res.json({ armed: _operatorArmed });
+});
+
+router.post("/engine/arm", ...requireOperator, async (_req, res) => {
+  try {
+    const { getTicker } = await import("../lib/marketData.js");
+    // Cheap, real round-trip preflight — proves market data is reachable and
+    // (transitively) confirms the engine environment is healthy enough to
+    // route an order. Adapter-level auth is exercised on first executeOrder.
+    const t = await getTicker("BTCUSD");
+    if (!t || !(t.price > 0)) {
+      res.status(502).json({ armed: false, error: "Preflight ticker invalid" });
+      return;
+    }
+    if (process.env["EXCHANGE_LIVE_ENABLED"] !== "true") {
+      res.status(409).json({ armed: false, error: "EXCHANGE_LIVE_ENABLED is not 'true' — refusing to arm" });
+      return;
+    }
+    if (!process.env["KRAKEN_API_KEY"] || !process.env["KRAKEN_API_SECRET"]) {
+      res.status(409).json({ armed: false, error: "Kraken operator credentials missing" });
+      return;
+    }
+    _operatorArmed = true;
+    res.json({ armed: true, exchange: "Kraken", preflightPrice: t.price });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ armed: false, error: `Preflight failed: ${msg}` });
+  }
+});
+
+router.post("/engine/disarm", ...requireOperator, (_req, res) => {
+  _operatorArmed = false;
+  res.json({ armed: false });
 });
 
 router.post("/engine/stop", ...requireOperator, (_req, res) => {
