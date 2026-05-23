@@ -22,6 +22,7 @@ import { useAuth } from "@clerk/react";
 import { useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePortalMode } from "@/contexts/PortalModeContext";
+import { useUserRole } from "@/hooks/useUserRole";
 
 // API base URL — mirrors Portal.tsx resolution so production cross-origin
 // API calls (api.aicandlez.com) work when SignalRow is rendered from any
@@ -267,6 +268,15 @@ export function SignalRow({ spec, breakdown }: Props) {
   // PAPER default so this row continues to behave like before.
   const { openTrade } = usePaperTrades();
   const portalMode    = usePortalMode();
+  // Role gate (Path A bridge): the operator/Kraken branch in fireTrade must
+  // be entered for ANY admin or super-admin, regardless of whether the
+  // surrounding tree mounted PortalModeProvider. In dev preview and on
+  // trade.aicandlez.com the provider IS mounted for admins too, which made
+  // `!portalMode.isCustomerPortal` false → admin BUY silently fell through
+  // to firePaperSim (pure local paper trade, no POST). Gating on the actual
+  // role fixes that and keeps the customer-portal branch untouched for
+  // non-admin users.
+  const { isAdmin: isOperatorRole } = useUserRole();
   const { getToken }  = useAuth();
   const qc            = useQueryClient();
   const liveFallbackToastedRef = useRef(false);
@@ -500,7 +510,7 @@ export function SignalRow({ spec, breakdown }: Props) {
     // execution path (`/api/exchange/order/execute`). Path A surgical bridge
     // so super-admin can manually fire a real Kraken order from a signal row
     // for live-test validation. Customer-portal trees never reach this branch.
-    if (!portalMode.isCustomerPortal) {
+    if (isOperatorRole || !portalMode.isCustomerPortal) {
       if (operatorOrderInFlightRef.current) {
         toast({
           title: `OPERATOR ORDER IN FLIGHT — ${spec.label}`,
