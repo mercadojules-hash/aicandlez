@@ -16,21 +16,13 @@ import { db, usersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { placeLiveAutoOrderForUser } from "../lib/liveUserExecution.js";
 import { registerLiveUserFill } from "../lib/userSimRegistry.js";
+import { TIER_MAX_SIZE_USD, type TierPlan } from "../lib/tierLimits.js";
 
-type Plan = "free" | "starter" | "pro" | "enterprise";
+type Plan = TierPlan;
 const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, enterprise: 3 };
 
 const router: IRouter = Router();
 
-// Per-tier risk policy cap on a single manual-LIVE order. Operators (admin /
-// super-admin) bypass these caps entirely; the hard ceiling for any path
-// remains the 100_000 schema validation in parseBody.
-const TIER_MAX_SIZE_USD: Record<string, number> = {
-  free:       0,
-  starter:    500,
-  pro:        2500,
-  enterprise: 100_000,
-};
 const DEFAULT_SIZE_USD = 100;
 
 function parseBody(raw: unknown): { symbol: string; side: "BUY" | "SELL"; sizeUSD?: number; useSandbox: boolean } | null {

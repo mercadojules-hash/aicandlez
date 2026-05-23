@@ -20,7 +20,7 @@ import { usePaperTrades } from "@/hooks/usePaperTrades";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@clerk/react";
 import { useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePortalMode } from "@/contexts/PortalModeContext";
 
 // API base URL — mirrors Portal.tsx resolution so production cross-origin
@@ -85,6 +85,61 @@ function readStoredLiveSize(): number {
 function writeStoredLiveSize(n: number) {
   if (typeof window === "undefined") return;
   try { window.localStorage.setItem(LIVE_SIZE_STORAGE_KEY, String(n)); } catch { /* noop */ }
+}
+
+/**
+ * useLiveOrderCap — fetches the authenticated user's per-trade LIVE cap
+ * from `/api/billing/subscription`. Shared/deduped via react-query so
+ * dozens of SignalRow instances only fire one network request.
+ *
+ * Returns a generous fallback (`LIVE_SIZE_MAX`) until the response lands,
+ * so the picker never blocks the user during the initial load. The server
+ * cap is the source of truth — this hook only enables a friendlier client
+ * experience by preempting `SIZE_EXCEEDS_TIER_CAP` rejections.
+ */
+interface LiveOrderCapInfo {
+  capUSD:         number;
+  nextTierCapUSD: number | null;
+  nextTier:       "starter" | "pro" | null;
+  plan:           string;
+}
+function useLiveOrderCap(enabled: boolean): LiveOrderCapInfo {
+  const { getToken } = useAuth();
+  const { data } = useQuery<LiveOrderCapInfo>({
+    queryKey: ["billing-subscription-cap"],
+    enabled,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/billing/subscription`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`subscription HTTP ${res.status}`);
+      const body = (await res.json()) as {
+        plan?:                    string;
+        liveOrderCapUSD?:         number;
+        nextTierLiveOrderCapUSD?: number | null;
+        nextTier?:                "starter" | "pro" | null;
+      };
+      return {
+        capUSD:         typeof body.liveOrderCapUSD === "number"
+                          ? body.liveOrderCapUSD
+                          : LIVE_SIZE_MAX,
+        nextTierCapUSD: typeof body.nextTierLiveOrderCapUSD === "number"
+                          ? body.nextTierLiveOrderCapUSD
+                          : null,
+        nextTier:       body.nextTier ?? null,
+        plan:           body.plan ?? "free",
+      };
+    },
+  });
+  return data ?? {
+    capUSD:         LIVE_SIZE_MAX,
+    nextTierCapUSD: null,
+    nextTier:       null,
+    plan:           "free",
+  };
 }
 
 /**
@@ -220,6 +275,17 @@ export function SignalRow({ spec, breakdown }: Props) {
     portalMode.isCustomerPortal &&
     portalMode.mode === "LIVE" &&
     portalMode.canUseLive;
+  const capInfo = useLiveOrderCap(showSizePicker);
+
+  // If the stored preferred size now exceeds the user's cap (e.g. after a
+  // downgrade), clamp it down silently so the BUY/SELL toast doesn't mislead
+  // the customer with a notional they can't actually submit.
+  useEffect(() => {
+    if (!showSizePicker) return;
+    if (capInfo.capUSD > 0 && liveSize > capInfo.capUSD) {
+      setLiveSize(capInfo.capUSD);
+    }
+  }, [showSizePicker, capInfo.capUSD, liveSize, setLiveSize]);
 
   /** Mirror a paper open into the server-side sim so dashboard panels see it. */
   const mirrorPaperToServer = async (
@@ -552,7 +618,13 @@ export function SignalRow({ spec, breakdown }: Props) {
         {/* line 2 — [size picker (LIVE only)] · BUY · SELL · AI Auto-Trade */}
         <div className="flex items-center gap-1.5 justify-end">
           {showSizePicker && (
-            <SizePicker size={liveSize} onChange={setLiveSize} />
+            <SizePicker
+              size={liveSize}
+              onChange={setLiveSize}
+              capUSD={capInfo.capUSD}
+              nextTierCapUSD={capInfo.nextTierCapUSD}
+              nextTier={capInfo.nextTier}
+            />
           )}
           <ActionPill
             label="BUY"
@@ -627,12 +699,38 @@ function DataCell({ label, value, color }: { label: string; value: string; color
 }
 
 function SizePicker({
-  size, onChange,
-}: { size: number; onChange: (n: number) => void }) {
+  size, onChange, capUSD, nextTierCapUSD, nextTier,
+}: {
+  size:           number;
+  onChange:       (n: number) => void;
+  capUSD:         number;
+  nextTierCapUSD: number | null;
+  nextTier:       "starter" | "pro" | null;
+}) {
   const [open, setOpen] = useState(false);
   const [customDraft, setCustomDraft] = useState<string>(String(size));
   const isPreset = (LIVE_SIZE_PRESETS as readonly number[]).includes(size);
   useEffect(() => { setCustomDraft(String(size)); }, [size]);
+
+  // Clamp helper that respects both the per-tier cap and the absolute schema
+  // ceiling. A cap of 0 means LIVE is not permitted on this tier — fall back
+  // to the absolute max so the picker still functions for operators / when
+  // the cap hasn't loaded yet.
+  const effectiveCap = capUSD > 0 ? Math.min(capUSD, LIVE_SIZE_MAX) : LIVE_SIZE_MAX;
+  const commitCustom = () => {
+    const n = Number(customDraft);
+    if (!Number.isFinite(n) || n < LIVE_SIZE_MIN) return;
+    const clamped = Math.min(n, effectiveCap);
+    onChange(clamped);
+    setCustomDraft(String(clamped));
+    setOpen(false);
+  };
+  const upgradeCtaLabel =
+    nextTier === "pro"
+      ? `Upgrade to Pro to raise this cap${nextTierCapUSD ? ` ($${nextTierCapUSD.toLocaleString()})` : ""}`
+      : nextTier === "starter"
+        ? `Upgrade to Starter to unlock LIVE${nextTierCapUSD ? ` ($${nextTierCapUSD.toLocaleString()} cap)` : ""}`
+        : null;
   return (
     <div style={{ position: "relative" }}>
       <button
@@ -670,21 +768,43 @@ function SizePicker({
               fontFamily: N.FONT_MONO,
             }}
           >
-            <div className="text-[8.5px] font-bold tracking-[0.2em] mb-1.5"
-              style={{ color: N.TEXT_3 }}>LIVE ORDER SIZE</div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[8.5px] font-bold tracking-[0.2em]"
+                style={{ color: N.TEXT_3 }}>LIVE ORDER SIZE</span>
+              {capUSD > 0 && (
+                <span className="text-[8.5px] font-extrabold tabular-nums"
+                  style={{ color: N.BRAND, fontFamily: N.FONT_MONO }}>
+                  CAP ${capUSD.toLocaleString()}
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-1 mb-2">
               {LIVE_SIZE_PRESETS.map(p => {
-                const active = size === p;
+                const active   = size === p;
+                const disabled = capUSD > 0 && p > capUSD;
                 return (
                   <button
                     key={p}
-                    onClick={() => { onChange(p); setOpen(false); }}
+                    disabled={disabled}
+                    title={disabled ? `Over your $${capUSD.toLocaleString()} cap` : undefined}
+                    onClick={() => {
+                      if (disabled) return;
+                      onChange(p);
+                      setOpen(false);
+                    }}
                     className="text-[10px] font-extrabold tabular-nums py-1 rounded transition-all"
                     style={{
-                      color: active ? "#000" : N.BRAND,
-                      background: active ? N.BRAND : `${N.BRAND}14`,
-                      border: `1px solid ${N.BRAND}${active ? "" : "55"}`,
+                      color: disabled
+                        ? N.TEXT_3
+                        : active ? "#000" : N.BRAND,
+                      background: disabled
+                        ? "transparent"
+                        : active ? N.BRAND : `${N.BRAND}14`,
+                      border: `1px solid ${disabled ? N.BORDER : N.BRAND}${active && !disabled ? "" : "55"}`,
                       fontFamily: N.FONT_MONO,
+                      opacity: disabled ? 0.45 : 1,
+                      cursor: disabled ? "not-allowed" : "pointer",
+                      textDecoration: disabled ? "line-through" : "none",
                     }}
                   >
                     ${p}
@@ -693,23 +813,17 @@ function SizePicker({
               })}
             </div>
             <div className="text-[8px] font-bold tracking-[0.2em] mb-1"
-              style={{ color: N.TEXT_3 }}>CUSTOM ($)</div>
+              style={{ color: N.TEXT_3 }}>
+              CUSTOM ($){capUSD > 0 ? ` · max ${capUSD.toLocaleString()}` : ""}
+            </div>
             <div className="flex items-center gap-1">
               <input
                 type="number"
                 min={LIVE_SIZE_MIN}
-                max={LIVE_SIZE_MAX}
+                max={effectiveCap}
                 value={customDraft}
                 onChange={e => setCustomDraft(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter") {
-                    const n = Number(customDraft);
-                    if (Number.isFinite(n) && n >= LIVE_SIZE_MIN) {
-                      onChange(n);
-                      setOpen(false);
-                    }
-                  }
-                }}
+                onKeyDown={e => { if (e.key === "Enter") commitCustom(); }}
                 className="text-[11px] font-extrabold tabular-nums px-1.5 py-1 rounded w-full"
                 style={{
                   color: N.TEXT_0,
@@ -720,13 +834,7 @@ function SizePicker({
                 }}
               />
               <button
-                onClick={() => {
-                  const n = Number(customDraft);
-                  if (Number.isFinite(n) && n >= LIVE_SIZE_MIN) {
-                    onChange(n);
-                    setOpen(false);
-                  }
-                }}
+                onClick={commitCustom}
                 className="text-[9px] font-extrabold tracking-[0.18em] px-2 py-1 rounded"
                 style={{
                   color: "#000",
@@ -736,9 +844,27 @@ function SizePicker({
                 }}
               >SET</button>
             </div>
-            <div className="text-[8px] mt-2" style={{ color: N.TEXT_3, lineHeight: 1.4 }}>
-              Server enforces your plan's per-trade cap.
-            </div>
+            {upgradeCtaLabel ? (
+              <a
+                href="/subscribe"
+                onClick={() => setOpen(false)}
+                className="block text-[8.5px] font-bold tracking-[0.14em] mt-2 px-2 py-1.5 rounded text-center"
+                style={{
+                  color: N.BRAND,
+                  background: `${N.BRAND}14`,
+                  border: `1px dashed ${N.BRAND}70`,
+                  fontFamily: N.FONT_MONO,
+                  textDecoration: "none",
+                  lineHeight: 1.35,
+                }}
+              >
+                {upgradeCtaLabel}
+              </a>
+            ) : (
+              <div className="text-[8px] mt-2" style={{ color: N.TEXT_3, lineHeight: 1.4 }}>
+                Server enforces your plan's per-trade cap.
+              </div>
+            )}
           </div>
         </>
       )}

@@ -4,6 +4,7 @@ import { usersTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { requireDisclaimer } from "../middlewares/requireDisclaimer.js";
+import { TIER_MAX_SIZE_USD, type TierPlan } from "../lib/tierLimits.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import {
   getUncachableStripeClient,
@@ -258,6 +259,21 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
     const planLimits = PLAN_FEATURES[planStr]?.limits ?? PLAN_FEATURES["free"]!.limits;
     const canLiveTrade = planLimits.liveTrading && isActive && isPaid;
 
+    // Per-trade LIVE order USD cap (mirrors server-side enforcement in
+    // routes/userLiveOrder.ts via shared `lib/tierLimits.ts`). Surfacing
+    // this lets the client (SignalRow size picker) preempt the
+    // SIZE_EXCEEDS_TIER_CAP rejection by greying out over-cap presets
+    // and clamping the custom input.
+    const liveOrderCapUSD =
+      TIER_MAX_SIZE_USD[planStr as TierPlan] ?? TIER_MAX_SIZE_USD.free;
+    const nextTier: TierPlan | null =
+      planStr === "free"    ? "starter" :
+      planStr === "starter" ? "pro"     :
+      null;
+    const nextTierLiveOrderCapUSD = nextTier
+      ? TIER_MAX_SIZE_USD[nextTier]
+      : null;
+
     const trialEnd         = user.trialEndsAt ? new Date(user.trialEndsAt) : null;
     const daysUntilTrialEnd = trialEnd
       ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86_400_000))
@@ -276,6 +292,9 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
       isTrialing,
       canLiveTrade,
       daysUntilTrialEnd,
+      liveOrderCapUSD,
+      nextTierLiveOrderCapUSD,
+      nextTier,
       limits:               planLimits,
       features:             PLAN_FEATURES[planStr]?.features ?? PLAN_FEATURES["free"]!.features,
     });
