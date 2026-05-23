@@ -3824,6 +3824,90 @@ function PortalInner() {
   });
   const monthlyFees = monthlyFeesQuery.data;
 
+  // Admin-scoped monthly broker-fee trend — platform-wide aggregation across
+  // every user's closed sim_trades. Mirrors the customer endpoint shape so
+  // PortalFeesTrend / PortalFeesMonthModal can render either feed. Only fetched
+  // for admin/super-admin users (the customer monthlyFeesQuery covers the
+  // rest); endpoint itself is requireOperator-gated server-side.
+  const adminMonthlyFeesQuery = useQuery<MonthlyFeesResp>({
+    queryKey: ["/api/admin/fees/monthly", "portal-admin"],
+    enabled:  (isSignedIn ?? false) && isAdmin,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/admin/fees/monthly?months=6`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to load admin monthly fees");
+      return res.json();
+    },
+  });
+  const adminMonthlyFees = adminMonthlyFeesQuery.data;
+
+  // Admin month-drill trades — loaded on demand when an operator taps a bar on
+  // the admin fees-trend chart. Returns every closed sim_trades row whose
+  // exit_time falls inside the YYYY-MM bucket, already sorted by entry+exit
+  // fee descending (costliest first) so PortalFeesMonthModal can render as-is.
+  type AdminMonthTradesResp = { month: string; trades: Array<Record<string, unknown>> };
+  const adminFeesMonthQuery = useQuery<AdminMonthTradesResp>({
+    queryKey: ["/api/admin/fees/month", feesDrillMonth, "portal-admin"],
+    enabled:  (isSignedIn ?? false) && isAdmin && !!feesDrillMonth,
+    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const token = await getToken().catch(() => null);
+      const res = await fetch(`${apiBaseUrl}/api/admin/fees/month/${feesDrillMonth}`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to load admin month fees");
+      return res.json();
+    },
+  });
+  // Map the raw snake_case rows to the CustomerTrade shape consumed by
+  // PortalFeesMonthModal. The fields used by the modal are: id, symbol, side,
+  // entryPrice, exitPrice, exitTime, realizedPnL, exchange, entryFee, exitFee,
+  // entryFeeBroker, exitFeeBroker — everything else is optional.
+  const adminFeesMonthTrades: CustomerTrade[] = useMemo(() => {
+    const rows = adminFeesMonthQuery.data?.trades ?? [];
+    return rows.map((r: Record<string, unknown>) => ({
+      id:                       String(r["id"] ?? ""),
+      symbol:                   String(r["symbol"] ?? ""),
+      side:                     (String(r["side"] ?? "BUY").toUpperCase() === "SELL" ? "SELL" : "BUY") as "BUY" | "SELL",
+      entryPrice:               Number(r["entry_price"] ?? 0),
+      exitPrice:                Number(r["exit_price"] ?? 0),
+      exitTime:                 Number(r["exit_time"] ?? 0),
+      realizedPnL:              Number(r["realized_pnl"] ?? 0),
+      realizedPnLPct:           Number(r["realized_pnl_pct"] ?? 0),
+      closeReason:              (r["close_reason"] as string | null) ?? null,
+      exchange:                 (r["exchange"] as string | null) ?? null,
+      entryFee:                 (r["entry_fee"]                as number | null) ?? null,
+      exitFee:                  (r["exit_fee"]                 as number | null) ?? null,
+      entryFeeBroker:           (r["entry_fee_broker"]         as number | null) ?? null,
+      entryFeeBrokerCurrency:   (r["entry_fee_broker_currency"] as string | null) ?? null,
+      exitFeeBroker:            (r["exit_fee_broker"]          as number | null) ?? null,
+      exitFeeBrokerCurrency:    (r["exit_fee_broker_currency"]  as string | null) ?? null,
+    }));
+  }, [adminFeesMonthQuery.data]);
+
+  // Platform-wide win-rate seed for the admin fees-trend "AI take" insight.
+  // Derived from the aggregated months payload so we don't fan out an extra
+  // closed-trades fetch on every admin Portal mount.
+  const adminWinRate = useMemo(() => {
+    if (!adminMonthlyFees) return undefined;
+    let trades = 0;
+    let wins   = 0;
+    for (const b of adminMonthlyFees.months) {
+      trades += b.tradeCount;
+      if (b.realizedPnL > 0) wins += b.tradeCount; // coarse proxy at month grain
+    }
+    if (trades === 0) return undefined;
+    return (wins / trades) * 100;
+  }, [adminMonthlyFees]);
+
   // ── ADMIN OPERATOR · Real Kraken live snapshot ──────────────────────────────
   // On admintrade.aicandlez.com the workstation must reflect REAL Kraken account
   // state (USD balance, exchange identity, live/error source), never the
@@ -4120,26 +4204,27 @@ function PortalInner() {
       )}
 
       {/* Monthly broker-fee trend — desktop mirror of the PWA Portfolio
-          FeesMonthlyChart. Customer-only; admin terminal uses real Kraken
-          tiles instead. Sits directly under the metrics row so it reads as
-          a companion to the lifetime FEES PAID tile above. */}
-      {!isAdmin && (
-        <div style={{ padding: "12px 24px 0" }}>
-          <PortalFeesTrend
-              data={monthlyFees}
-              winRate={stats.winRate}
-              onSelectMonth={(m) => setFeesDrillMonth(m)}
-            />
-        </div>
-      )}
+          FeesMonthlyChart. Customer build pulls per-user /account/fees/monthly;
+          admin build pulls platform-wide /admin/fees/monthly (every user's
+          closed sim_trades aggregated). Both feeds render through the same
+          PortalFeesTrend component and drill into PortalFeesMonthModal. */}
+      <div style={{ padding: "12px 24px 0" }}>
+        <PortalFeesTrend
+          data={isAdmin ? adminMonthlyFees : monthlyFees}
+          winRate={isAdmin ? adminWinRate : stats.winRate}
+          onSelectMonth={(m) => setFeesDrillMonth(m)}
+        />
+      </div>
 
-      {/* Month drill-down modal — opens when the user clicks a bar on
-          PortalFeesTrend. Reuses the same simTradesQuery already mounted
-          on this page, so no additional fetch is needed. */}
-      {!isAdmin && feesDrillMonth && (
+      {/* Month drill-down modal — opens when the user (or admin operator)
+          clicks a bar on PortalFeesTrend. Customer build reuses the already-
+          mounted simTradesQuery; admin build fetches the platform-wide
+          drill-down from /admin/fees/month/:month so operators see every
+          user's costliest trades for that month sorted fee-desc. */}
+      {feesDrillMonth && (
         <PortalFeesMonthModal
           month={feesDrillMonth}
-          trades={simTradesQuery.data?.trades ?? []}
+          trades={isAdmin ? adminFeesMonthTrades : (simTradesQuery.data?.trades ?? [])}
           onClose={() => setFeesDrillMonth(null)}
         />
       )}
