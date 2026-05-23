@@ -91,10 +91,16 @@ function writeStoredLiveSize(n: number) {
  * useLiveOrderSize — single source of truth for the customer's preferred
  * per-trade LIVE notional. Synced across all SignalRow instances via a
  * `storage` event listener plus a same-tab custom event.
+ *
+ * On mount, hydrates from `GET /api/user/settings.preferredLiveOrderSizeUsd`
+ * (falling back to localStorage if the request fails or returns no value),
+ * so the preference travels across devices/browsers. Changes are persisted
+ * through `PUT /api/user/settings` in addition to localStorage (best-effort).
  */
 const LIVE_SIZE_EVENT = "acl-live-size-change";
 function useLiveOrderSize(): [number, (n: number) => void] {
   const [size, setSizeState] = useState<number>(() => readStoredLiveSize());
+  const { getToken } = useAuth();
   useEffect(() => {
     const sync = () => setSizeState(readStoredLiveSize());
     const onStorage = (e: StorageEvent) => {
@@ -107,11 +113,52 @@ function useLiveOrderSize(): [number, (n: number) => void] {
       window.removeEventListener(LIVE_SIZE_EVENT, sync);
     };
   }, []);
+
+  // Hydrate from server once on mount. If the server-stored value differs
+  // from what's in localStorage, the server wins (it travels with the user).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getToken().catch(() => null);
+        const res = await fetch(`${apiBaseUrl}/api/user/settings`, {
+          credentials: "include",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) return;
+        const data: { preferredLiveOrderSizeUsd?: unknown } = await res.json();
+        const n = Number(data?.preferredLiveOrderSizeUsd);
+        if (!Number.isFinite(n) || n < LIVE_SIZE_MIN || n > LIVE_SIZE_MAX) return;
+        if (cancelled) return;
+        writeStoredLiveSize(n);
+        setSizeState(n);
+        try { window.dispatchEvent(new Event(LIVE_SIZE_EVENT)); } catch { /* noop */ }
+      } catch { /* offline / unauth → keep localStorage value */ }
+    })();
+    return () => { cancelled = true; };
+  }, [getToken]);
+
   const setSize = (n: number) => {
     const clamped = Math.max(LIVE_SIZE_MIN, Math.min(LIVE_SIZE_MAX, Math.round(n)));
     writeStoredLiveSize(clamped);
     setSizeState(clamped);
     try { window.dispatchEvent(new Event(LIVE_SIZE_EVENT)); } catch { /* noop */ }
+    // Best-effort server persist; per-tier cap is enforced at order time,
+    // not at preference time, so we save whatever the user picked.
+    (async () => {
+      try {
+        const token = await getToken().catch(() => null);
+        await fetch(`${apiBaseUrl}/api/user/settings`, {
+          method: "PUT",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ preferredLiveOrderSizeUsd: clamped }),
+        });
+      } catch { /* offline / unauth → localStorage still has it */ }
+    })();
   };
   return [size, setSize];
 }

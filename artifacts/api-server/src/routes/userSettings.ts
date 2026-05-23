@@ -49,6 +49,7 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
     "autoMode", "tradingMode",
     "volumeFilter", "require1HTrend",
     "preferredExchange",
+    "preferredLiveOrderSizeUsd",
     "paperSandboxEnabled",
     "notificationsTradeExec", "notificationsSignals", "notificationsRiskAlerts",
     "notificationsLiveFills",

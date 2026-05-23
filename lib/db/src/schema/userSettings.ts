@@ -27,6 +27,12 @@ export const userSettingsTable = pgTable("user_settings", {
 
   preferredExchange:  varchar("preferred_exchange", { length: 50 }).notNull().default("Kraken"),
 
+  // Customer's preferred per-trade LIVE notional, picked in the Portal
+  // SignalRow size picker. Persisted server-side so the preference carries
+  // across browsers/devices. Per-tier cap is still enforced independently
+  // by /api/user/live-order; this value is advisory storage only.
+  preferredLiveOrderSizeUsd: real("preferred_live_order_size_usd").notNull().default(100),
+
   // When ON, paper-mode BUY/SELL on the customer Portal routes real orders
   // through the connected exchange's public sandbox / testnet (via the
   // adapter `testnet: true` host switch) instead of the internal simulator.
