@@ -3032,12 +3032,48 @@ function portalFeesShortLabel(key: string): string {
   const idx = (parseInt(m ?? "0", 10) - 1);
   return PORTAL_FEES_MONTH_LABELS[idx] ?? key;
 }
+// Mirrors deriveFeesInsight from the mobile Portfolio page (Task #105).
+// Deterministic one-line callout sourced from the same bucket data the chart
+// already renders, plus the user's lifetime win rate. No free-form LLM.
+function derivePortalFeesInsight(
+  buckets: { month: string; feesPaid: number; tradeCount: number; realizedPnL: number }[],
+  winRate: number | undefined,
+): string | null {
+  if (!buckets || buckets.length === 0) return null;
+  const scored: { b: typeof buckets[number]; ratio: number; losing: boolean }[] = [];
+  for (const b of buckets) {
+    if (b.feesPaid <= 0) continue;
+    if (b.realizedPnL > 0) {
+      const ratio = (b.feesPaid / b.realizedPnL) * 100;
+      if (ratio >= 50) scored.push({ b, ratio, losing: false });
+    } else {
+      scored.push({ b, ratio: Infinity, losing: true });
+    }
+  }
+  if (scored.length === 0) return null;
+  scored.sort((a, z) => z.ratio - a.ratio);
+  const worst = scored[0];
+  const monthName = portalFeesShortLabel(worst.b.month);
+  const suggestThreshold = (winRate ?? 0) < 55 ? 75 : 70;
+  const avgTradeFee = worst.b.tradeCount > 0
+    ? worst.b.feesPaid / worst.b.tradeCount : 0;
+  const tradesLabel = worst.b.tradeCount === 1
+    ? "1 trade" : `${worst.b.tradeCount} trades`;
+  if (worst.losing) {
+    return `Your ${monthName} paid $${worst.b.feesPaid.toFixed(2)} in fees across ${tradesLabel} on a losing month — consider widening signal confidence above ${suggestThreshold} to trade less.`;
+  }
+  return `Your ${monthName} fees consumed ${worst.ratio.toFixed(0)}% of profit ($${avgTradeFee.toFixed(2)} avg per trade) — consider widening signal confidence above ${suggestThreshold} to trade less.`;
+}
+
 function PortalFeesTrend({
   data,
+  winRate,
 }: {
   data: { months: { month: string; feesPaid: number; tradeCount: number; realizedPnL: number }[]; totalFeesPaid: number } | undefined;
+  winRate: number | undefined;
 }) {
   const buckets = data?.months ?? [];
+  const insight = derivePortalFeesInsight(buckets, winRate);
   const hasAny  = buckets.some(b => b.feesPaid > 0 || b.realizedPnL !== 0);
   const peak    = Math.max(
     0,
@@ -3160,6 +3196,28 @@ function PortalFeesTrend({
         <span><span style={{ color: N.TEXT_2 }}>■</span> FEES</span>
         <span><span style={{ color: "#ff7a3d" }}>■</span> FEES &gt; PROFIT</span>
       </div>
+      {insight && (
+        <div style={{
+          marginTop: 12,
+          padding: "10px 12px",
+          borderRadius: 4,
+          border: "1px solid rgba(255,122,61,0.35)",
+          background: "rgba(255,122,61,0.06)",
+          display: "flex", gap: 10, alignItems: "flex-start",
+        }}>
+          <span style={{
+            fontSize: 9, color: "#ff7a3d",
+            letterSpacing: "0.18em", textTransform: "uppercase",
+            padding: "2px 6px", borderRadius: 3,
+            border: "1px solid rgba(255,122,61,0.45)",
+            flexShrink: 0, marginTop: 1, fontWeight: 700,
+          }}>AI TAKE</span>
+          <span style={{
+            fontSize: 11, color: "#f4c89f",
+            lineHeight: 1.5, letterSpacing: "0.02em",
+          }}>{insight}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -3704,7 +3762,7 @@ function PortalInner() {
           a companion to the lifetime FEES PAID tile above. */}
       {!isAdmin && (
         <div style={{ padding: "12px 24px 0" }}>
-          <PortalFeesTrend data={monthlyFees} />
+          <PortalFeesTrend data={monthlyFees} winRate={stats.winRate} />
         </div>
       )}
 

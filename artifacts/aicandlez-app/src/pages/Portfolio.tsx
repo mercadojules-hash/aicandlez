@@ -12,8 +12,74 @@ function shortMonthLabel(key: string): string {
   return MONTH_LABELS[idx] ?? key;
 }
 
-function FeesMonthlyChart({ data }: { data: MonthlyFeesResponse | undefined }) {
+// Derives a one-line actionable insight when commissions ate ≥50% of profit
+// in any visible month (or any month had fees on a losing/flat result).
+// Deterministic: pulls from the same engine bucket data the chart renders,
+// plus the lifetime winRate stat. No free-form LLM.
+function deriveFeesInsight(
+  buckets: MonthlyFeeBucketLite[],
+  winRate: number | undefined,
+): string | null {
+  if (!buckets || buckets.length === 0) return null;
+  type Scored = { b: MonthlyFeeBucketLite; ratio: number; losing: boolean };
+  const scored: Scored[] = [];
+  for (const b of buckets) {
+    if (b.feesPaid <= 0) continue;
+    if (b.realizedPnL > 0) {
+      const ratio = (b.feesPaid / b.realizedPnL) * 100;
+      if (ratio >= 50) scored.push({ b, ratio, losing: false });
+    } else {
+      scored.push({ b, ratio: Infinity, losing: true });
+    }
+  }
+  if (scored.length === 0) return null;
+  scored.sort((a, z) => z.ratio - a.ratio);
+  const worst = scored[0];
+  const monthName = shortMonthLabel(worst.b.month);
+  // Engine default minConfidence = 60 (lib/tradingLoop.ts). When a user's
+  // realized win rate is weak we nudge higher; otherwise a one-step nudge.
+  const suggestThreshold = (winRate ?? 0) < 55 ? 75 : 70;
+  const avgTradeFee = worst.b.tradeCount > 0
+    ? worst.b.feesPaid / worst.b.tradeCount : 0;
+  const tradesLabel = worst.b.tradeCount === 1
+    ? "1 trade" : `${worst.b.tradeCount} trades`;
+  if (worst.losing) {
+    return `Your ${monthName} paid $${worst.b.feesPaid.toFixed(2)} in fees across ${tradesLabel} on a losing month — consider widening signal confidence above ${suggestThreshold} to trade less.`;
+  }
+  return `Your ${monthName} fees consumed ${worst.ratio.toFixed(0)}% of profit ($${avgTradeFee.toFixed(2)} avg per trade) — consider widening signal confidence above ${suggestThreshold} to trade less.`;
+}
+
+type MonthlyFeeBucketLite = { month: string; feesPaid: number; tradeCount: number; realizedPnL: number };
+
+function FeesInsightCallout({ insight }: { insight: string | null }) {
+  if (!insight) return null;
+  return (
+    <div style={{
+      marginTop: 10,
+      padding: "10px 12px",
+      borderRadius: 6,
+      border: "1px solid rgba(255,122,61,0.35)",
+      background: "rgba(255,122,61,0.06)",
+      display: "flex", gap: 8, alignItems: "flex-start",
+    }}>
+      <span style={{
+        fontSize: 8, fontFamily: "monospace", color: "#ff7a3d",
+        letterSpacing: "0.16em", textTransform: "uppercase",
+        padding: "2px 6px", borderRadius: 3,
+        border: "1px solid rgba(255,122,61,0.4)",
+        flexShrink: 0, marginTop: 1,
+      }}>AI TAKE</span>
+      <span style={{
+        fontSize: 11, fontFamily: "monospace", color: "#e8c4a8",
+        lineHeight: 1.45,
+      }}>{insight}</span>
+    </div>
+  );
+}
+
+function FeesMonthlyChart({ data, winRate }: { data: MonthlyFeesResponse | undefined; winRate: number | undefined }) {
   const buckets = data?.months ?? [];
+  const insight = deriveFeesInsight(buckets, winRate);
   const hasAny  = buckets.some(b => b.feesPaid > 0 || b.realizedPnL !== 0);
   const peak    = Math.max(
     0,
@@ -126,6 +192,7 @@ function FeesMonthlyChart({ data }: { data: MonthlyFeesResponse | undefined }) {
           </div>
         ))}
       </div>
+      <FeesInsightCallout insight={insight} />
     </div>
   );
 }
@@ -273,7 +340,7 @@ export default function Portfolio() {
           </div>
         </div>
 
-        <FeesMonthlyChart data={monthlyFees} />
+        <FeesMonthlyChart data={monthlyFees} winRate={simAcc?.winRate} />
       </div>
 
       {/* Balances */}
