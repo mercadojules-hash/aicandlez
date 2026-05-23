@@ -26,10 +26,27 @@
 declare global {
   interface Window {
     Clerk?: {
+      loaded?: boolean;
       session?: {
         getToken: (opts?: { template?: string }) => Promise<string | null>;
       } | null;
+      load?: () => Promise<void>;
     };
+  }
+}
+
+// Wait (up to ~3s) for Clerk JS to finish loading and rehydrate its
+// session. During app boot there is a window where `window.Clerk` exists
+// but `Clerk.loaded === false` and `Clerk.session === null` — calling
+// `getToken()` then returns null, authFetch falls back to cookie-only,
+// and cross-subdomain requests 401. Polling briefly here closes that race
+// without forcing every caller to be hook-aware.
+async function waitForClerk(timeoutMs = 3000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (window.Clerk?.loaded && window.Clerk?.session) return;
+    if (window.Clerk?.loaded && !window.Clerk?.session) return; // genuinely signed-out
+    await new Promise((r) => setTimeout(r, 50));
   }
 }
 
@@ -39,6 +56,7 @@ export async function authFetch(
 ): Promise<Response> {
   let token: string | null = null;
   try {
+    await waitForClerk();
     token = (await window.Clerk?.session?.getToken?.()) ?? null;
   } catch {
     token = null;

@@ -433,7 +433,23 @@ export function SignalRow({ spec, breakdown }: Props) {
 
   const operatorOrderInFlightRef = useRef(false);
   const fireTrade = (side: "LONG" | "SHORT") => {
+    // ── [BUY-TRACE] entry ───────────────────────────────────────────────────
+    // Hard instrumentation for the live BUY path. Use a unique [BUY-TRACE]
+    // prefix so the user can grep browser console + server log together.
+    // Remove these once the first real Kraken fill is confirmed end-to-end.
+    console.warn("[BUY-TRACE] fireTrade ENTRY", {
+      symbol: spec.symbol,
+      side,
+      entry,
+      isOperatorRole,
+      isCustomerPortal: portalMode.isCustomerPortal,
+      mode: portalMode.mode,
+      canUseLive: portalMode.canUseLive,
+      hasExchange: portalMode.hasExchange,
+      paperSandbox: portalMode.paperSandboxEnabled,
+    });
     if (!entry || entry <= 0) {
+      console.warn("[BUY-TRACE] fireTrade EXIT — entry<=0 (market feed warming up)");
       toast({
         title: "MARKET FEED WARMING UP",
         description: `${spec.display} — waiting for live price`,
@@ -512,7 +528,9 @@ export function SignalRow({ spec, breakdown }: Props) {
     // so super-admin can manually fire a real Kraken order from a signal row
     // for live-test validation. Customer-portal trees never reach this branch.
     if (isOperatorRole || !portalMode.isCustomerPortal) {
+      console.warn("[BUY-TRACE] BRANCH = OPERATOR (Kraken env path)");
       if (operatorOrderInFlightRef.current) {
+        console.warn("[BUY-TRACE] OPERATOR EXIT — order already in flight");
         toast({
           title: `OPERATOR ORDER IN FLIGHT — ${spec.label}`,
           description: `Wait for the previous ${side} on ${spec.symbol} to settle before sending another.`,
@@ -527,22 +545,27 @@ export function SignalRow({ spec, breakdown }: Props) {
       void (async () => {
         try {
           const token = await getToken().catch(() => null);
-          const res = await authFetch(`${apiBaseUrl}/api/exchange/order/execute`, {
+          const url = `${apiBaseUrl}/api/exchange/order/execute`;
+          const payload = {
+            symbol:    spec.symbol,
+            side:      side === "LONG" ? "buy" : "sell",
+            orderType: "market",
+            amountUSD: liveSize,
+          };
+          console.warn("[BUY-TRACE] BEFORE FETCH", { url, payload, hasToken: !!token });
+          const res = await authFetch(url, {
             method: "POST",
             credentials: "include",
             headers: {
               "Content-Type": "application/json",
               ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
-            body: JSON.stringify({
-              symbol:    spec.symbol,
-              side:      side === "LONG" ? "buy" : "sell",
-              orderType: "market",
-              amountUSD: liveSize,
-            }),
+            body: JSON.stringify(payload),
           });
+          console.warn("[BUY-TRACE] AFTER FETCH", { status: res.status, ok: res.ok });
           if (!res.ok) {
             const body = await res.json().catch(() => ({} as { error?: string }));
+            console.warn("[BUY-TRACE] REJECTED body", body);
             toast({
               title: `OPERATOR ORDER REJECTED — ${spec.label}`,
               description: (body as { error?: string }).error ?? `HTTP ${res.status}`,
@@ -552,12 +575,14 @@ export function SignalRow({ spec, breakdown }: Props) {
           const body = (await res.json().catch(() => ({}))) as {
             id?: string; status?: string; fillPrice?: number; avgPrice?: number;
           };
+          console.warn("[BUY-TRACE] FILLED body", body);
           const fill = body.fillPrice ?? body.avgPrice;
           toast({
             title: `OPERATOR FILLED — ${spec.label}${fill ? ` @ $${fmt(fill)}` : ""}`,
             description: [side, "KRAKEN", body.status, body.id ? `#${body.id.slice(-8)}` : ""].filter(Boolean).join(" · "),
           });
         } catch (err) {
+          console.error("[BUY-TRACE] FETCH THREW", err);
           toast({
             title: `OPERATOR ORDER ERROR — ${spec.label}`,
             description: err instanceof Error ? err.message : String(err),
@@ -568,6 +593,7 @@ export function SignalRow({ spec, breakdown }: Props) {
       })();
       return;
     }
+    console.warn("[BUY-TRACE] FELL THROUGH past operator branch — going to firePaper/firePaperSim");
 
     firePaper(side, sl, tp);
   };

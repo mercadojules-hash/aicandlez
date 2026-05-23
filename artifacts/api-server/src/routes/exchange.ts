@@ -155,15 +155,32 @@ router.post("/exchange/order/execute", ...requireOperator, async (req, res) => {
     amountUSD:  number;
     limitPrice?: number;
   };
+  // ── [BUY-TRACE] server entry ────────────────────────────────────────────────
+  // Tagged so the operator can grep alongside the browser-side `[BUY-TRACE]`
+  // markers in SignalRow.fireTrade. Remove once the first real Kraken fill is
+  // confirmed end-to-end.
+  req.log.info(
+    { tag: "BUY-TRACE", phase: "route-entry", symbol, side, orderType, amountUSD, limitPrice },
+    "[BUY-TRACE] /api/exchange/order/execute ENTRY",
+  );
   if (!symbol || !side || !orderType || !amountUSD) {
+    req.log.warn({ tag: "BUY-TRACE", phase: "validation-fail" }, "[BUY-TRACE] payload invalid");
     res.status(400).json({ error: "symbol, side, orderType, amountUSD are required" });
     return;
   }
   try {
     const order = await executeOrder(symbol, side, orderType, amountUSD, limitPrice);
+    req.log.info(
+      { tag: "BUY-TRACE", phase: "executor-success", order },
+      "[BUY-TRACE] executeOrder returned",
+    );
     res.json(order);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Execution failed";
+    req.log.error(
+      { tag: "BUY-TRACE", phase: "executor-throw", err: msg },
+      "[BUY-TRACE] executeOrder threw",
+    );
     res.status(502).json({ error: msg });
   }
 });
