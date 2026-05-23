@@ -175,6 +175,21 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
           BOOL_OR(trading_mode = 'live' AND status = 'active')  AS has_live_exchange
         FROM user_exchange_connections
         GROUP BY user_id
+      ),
+      -- Mirrors tradeLimitEngine.getTradeLimitVerdict: count opens in the
+      -- last 24h across both currently-open positions AND already-closed
+      -- trades where exchange IS NOT NULL. Done in SQL so the list call
+      -- delivers engine-equivalent telemetry in one round-trip instead of
+      -- N+1 engine invocations per row.
+      live_opens_24h AS (
+        SELECT user_id, COUNT(*)::int AS used_24h FROM (
+          SELECT user_id, entry_time FROM sim_positions
+          WHERE exchange IS NOT NULL AND entry_time >= ${Date.now() - 24 * 60 * 60 * 1000}
+          UNION ALL
+          SELECT user_id, entry_time FROM sim_trades
+          WHERE exchange IS NOT NULL AND entry_time >= ${Date.now() - 24 * 60 * 60 * 1000}
+        ) o
+        GROUP BY user_id
       )
       SELECT
         u.clerk_user_id                                         AS clerk_user_id,
@@ -209,6 +224,8 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         COALESCE(conn.exchange_error, 0)                         AS exchange_error,
         COALESCE(conn.has_live_exchange, false)                  AS has_live_exchange,
         COALESCE(tl.cap_tier, 50)                                AS trade_cap_tier,
+        tl.override_expires_at                                   AS trade_cap_override_expires_at,
+        COALESCE(o24.used_24h, 0)                                AS used_24h,
         GREATEST(
           COALESCE(agg.last_trade_ms, 0),
           COALESCE(EXTRACT(EPOCH FROM u.created_at)::bigint * 1000, 0)
@@ -220,6 +237,7 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
       LEFT JOIN pos_agg              pos    ON pos.user_id    = u.clerk_user_id
       LEFT JOIN conn_agg             conn   ON conn.user_id   = u.clerk_user_id
       LEFT JOIN user_trade_limits    tl     ON tl.user_id     = u.clerk_user_id
+      LEFT JOIN live_opens_24h       o24    ON o24.user_id    = u.clerk_user_id
       WHERE (${search}::text IS NULL OR LOWER(u.email) LIKE ${search})
         AND (${planArg}::text IS NULL OR LOWER(u.plan) = ${planArg})
         AND (${statArg}::text IS NULL OR COALESCE(status.status, 'active') = ${statArg})
@@ -282,6 +300,27 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         exchangeError:       Number(r["exchange_error"] ?? 0),
         hasLiveExchange:     Boolean(r["has_live_exchange"]),
         tradeCapTier:        Number(r["trade_cap_tier"] ?? 50),
+        // Trade-limit engine-equivalent telemetry, derived in-SQL so the
+        // list endpoint never N+1s the engine per row.
+        tradeLimit: (() => {
+          const cap = Number(r["trade_cap_tier"] ?? 50);
+          const used = Number(r["used_24h"] ?? 0);
+          const override = r["trade_cap_override_expires_at"];
+          const effectiveCap = cap === -1 ? -1
+            : (override && new Date(String(override)).getTime() < now) ? 50
+            : cap;
+          const remaining = effectiveCap === -1
+            ? Number.POSITIVE_INFINITY
+            : Math.max(0, effectiveCap - used);
+          const blocked = effectiveCap !== -1 && used >= effectiveCap;
+          return {
+            used24h:   used,
+            capTier:   effectiveCap,
+            remaining: remaining === Number.POSITIVE_INFINITY ? null : remaining,
+            blocked,
+            reason:    blocked ? "trade_limit_exhausted" as const : "ok" as const,
+          };
+        })(),
         lastActivityAt:      last > 0 ? last : null,
         onlineNow:           last > 0 && (now - last) < 10 * 60 * 1000,
       };
@@ -315,34 +354,45 @@ router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<voi
   if (cached !== null) { res.json(cached); return; }
 
   try {
-    const [userRow] = await db.execute(sql`
+    // Single consolidated user/header query — pulls user + admin_status +
+    // settings + sim_account + fee aggregate in one round-trip. Cuts the
+    // detail endpoint's cache-miss query count from 9 → 6.
+    const [headerRow] = await db.execute(sql`
       SELECT
         u.clerk_user_id, u.email, u.role, u.plan, u.plan_status,
         u.stripe_customer_id, u.stripe_subscription_id, u.billing_email,
         u.trial_ends_at, u.created_at, u.updated_at,
         COALESCE(status.status, 'active') AS admin_status,
         status.reason                    AS admin_status_reason,
-        status.since                     AS admin_status_since
+        status.since                     AS admin_status_since,
+        row_to_json(s.*)                 AS settings_json,
+        row_to_json(a.*)                 AS sim_account_json,
+        COALESCE(pf.fee_records, 0)      AS fee_records,
+        COALESCE(pf.fees_total, 0)       AS fees_total,
+        COALESCE(pf.profitable_pnl, 0)   AS profitable_pnl
       FROM users u
       LEFT JOIN user_admin_status status ON status.user_id = u.clerk_user_id
+      LEFT JOIN user_settings    s      ON s.user_id      = u.clerk_user_id
+      LEFT JOIN sim_accounts     a      ON a.user_id      = u.clerk_user_id
+      LEFT JOIN (
+        SELECT user_id,
+               COUNT(*)::int                       AS fee_records,
+               COALESCE(SUM(fee_amount_usd), 0)::float AS fees_total,
+               COALESCE(SUM(realized_pnl), 0)::float   AS profitable_pnl
+        FROM performance_fees
+        WHERE user_id = ${userId}
+        GROUP BY user_id
+      ) pf ON pf.user_id = u.clerk_user_id
       WHERE u.clerk_user_id = ${userId}
       LIMIT 1
     `).then(r => r.rows as Array<Record<string, unknown>>);
 
-    if (!userRow) { res.status(404).json({ error: "User not found" }); return; }
+    if (!headerRow) { res.status(404).json({ error: "User not found" }); return; }
 
-    // Fan-out the per-user reads in parallel. Each query is small and
-    // bounded — none of them scan the full platform.
+    // Fan-out the multi-row reads in parallel — each is user_id-indexed.
     const [
-      settingsRows, accountRows, positionsRows, closedRows,
-      connectionsRows, auditRows, feesRows, eventRows,
+      positionsRows, closedRows, connectionsRows, auditRows, eventRows,
     ] = await Promise.all([
-      db.execute(sql`
-        SELECT * FROM user_settings WHERE user_id = ${userId} LIMIT 1
-      `).then(r => r.rows as Array<Record<string, unknown>>),
-      db.execute(sql`
-        SELECT * FROM sim_accounts WHERE user_id = ${userId} LIMIT 1
-      `).then(r => r.rows as Array<Record<string, unknown>>),
       db.execute(sql`
         SELECT * FROM sim_positions
         WHERE user_id = ${userId}
@@ -371,14 +421,6 @@ router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<voi
         ORDER BY created_at DESC
         LIMIT 50
       `).then(r => r.rows as Array<Record<string, unknown>>),
-      db.execute(sql`
-        SELECT
-          COUNT(*)::int                                        AS fee_records,
-          COALESCE(SUM(fee_amount_usd), 0)::float              AS fees_total,
-          COALESCE(SUM(realized_pnl), 0)::float                AS profitable_pnl
-        FROM performance_fees
-        WHERE user_id = ${userId}
-      `).then(r => r.rows as Array<{ fee_records: number; fees_total: number; profitable_pnl: number }>),
       // Execution / API event stream from the immutable audit log. Covers
       // AI decisions, exchange API errors, latency markers, and any other
       // typed event the engine recorded for this user. Capped at 200 rows
@@ -439,31 +481,31 @@ router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<voi
     const openLive    = positions.filter(p => p["exchange"] != null).length;
 
     // Frequency = trades / day over the user's lifetime (since created_at).
-    const createdMs    = userRow["created_at"] instanceof Date
-      ? userRow["created_at"].getTime()
-      : Number(userRow["created_at"] ?? Date.now());
+    const createdMs    = headerRow["created_at"] instanceof Date
+      ? headerRow["created_at"].getTime()
+      : Number(headerRow["created_at"] ?? Date.now());
     const lifetimeDays = Math.max(1, (Date.now() - createdMs) / (24 * 60 * 60 * 1000));
     const tradesPerDay = tradesCount / lifetimeDays;
 
     const payload = {
       user: {
-        clerkUserId:        userRow["clerk_user_id"],
-        email:              userRow["email"],
-        role:               userRow["role"],
-        plan:               userRow["plan"],
-        planStatus:         userRow["plan_status"],
-        stripeCustomerId:   userRow["stripe_customer_id"] ?? null,
-        stripeSubscriptionId: userRow["stripe_subscription_id"] ?? null,
-        billingEmail:       userRow["billing_email"] ?? null,
-        trialEndsAt:        userRow["trial_ends_at"] ?? null,
-        createdAt:          userRow["created_at"],
-        updatedAt:          userRow["updated_at"],
-        adminStatus:        userRow["admin_status"],
-        adminStatusReason:  userRow["admin_status_reason"] ?? null,
-        adminStatusSince:   userRow["admin_status_since"] ?? null,
+        clerkUserId:        headerRow["clerk_user_id"],
+        email:              headerRow["email"],
+        role:               headerRow["role"],
+        plan:               headerRow["plan"],
+        planStatus:         headerRow["plan_status"],
+        stripeCustomerId:   headerRow["stripe_customer_id"] ?? null,
+        stripeSubscriptionId: headerRow["stripe_subscription_id"] ?? null,
+        billingEmail:       headerRow["billing_email"] ?? null,
+        trialEndsAt:        headerRow["trial_ends_at"] ?? null,
+        createdAt:          headerRow["created_at"],
+        updatedAt:          headerRow["updated_at"],
+        adminStatus:        headerRow["admin_status"],
+        adminStatusReason:  headerRow["admin_status_reason"] ?? null,
+        adminStatusSince:   headerRow["admin_status_since"] ?? null,
       },
-      settings:    settingsRows[0] ?? null,
-      simAccount:  accountRows[0] ?? null,
+      settings:    headerRow["settings_json"] ?? null,
+      simAccount:  headerRow["sim_account_json"] ?? null,
       positions,
       closedTrades: closed,
       exchangeConnections: connectionsRows,
@@ -480,9 +522,9 @@ router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<voi
         openPositions: positions.length,
         openLivePositions: openLive,
         exposureUsd,
-        feesGenerated: Number(feesRows[0]?.fees_total ?? 0),
-        feeRecords:    Number(feesRows[0]?.fee_records ?? 0),
-        profitablePnl: Number(feesRows[0]?.profitable_pnl ?? 0),
+        feesGenerated: Number(headerRow["fees_total"] ?? 0),
+        feeRecords:    Number(headerRow["fee_records"] ?? 0),
+        profitablePnl: Number(headerRow["profitable_pnl"] ?? 0),
         tradesPerDay,
         lifetimeDays,
         avgConfidence: avgConf,
@@ -570,24 +612,24 @@ router.get("/admin/platform/leaderboards", ...requireOperator, async (req, res):
       LIMIT 10
     `).then(r => r.rows);
 
-    // Platform totals.
-    const [exposureRow] = await db.execute(sql`
+    // Platform totals — collapsed into a single query via scalar subquery.
+    const [totalsRow] = await db.execute(sql`
       SELECT
         COALESCE(SUM(size_usd), 0)::float                                          AS total_exposure_usd,
         COALESCE(SUM(CASE WHEN exchange IS NOT NULL THEN size_usd ELSE 0 END),0)::float AS live_capital_deployed_usd,
         COUNT(*)::int                                                              AS open_positions,
-        COUNT(*) FILTER (WHERE exchange IS NOT NULL)::int                          AS open_live_positions
+        COUNT(*) FILTER (WHERE exchange IS NOT NULL)::int                          AS open_live_positions,
+        (
+          SELECT COALESCE(SUM(fee_amount_usd), 0)::float
+          FROM performance_fees
+          WHERE created_at >= to_timestamp(${startTsSec})
+        )                                                                          AS platform_fee_revenue_usd
       FROM sim_positions
     `).then(r => r.rows as Array<{
       total_exposure_usd: number; live_capital_deployed_usd: number;
       open_positions: number; open_live_positions: number;
+      platform_fee_revenue_usd: number;
     }>);
-
-    const [feeTotalsRow] = await db.execute(sql`
-      SELECT COALESCE(SUM(fee_amount_usd), 0)::float AS platform_fee_revenue_usd
-      FROM performance_fees
-      WHERE created_at >= to_timestamp(${startTsSec})
-    `).then(r => r.rows as Array<{ platform_fee_revenue_usd: number }>);
 
     const payload = {
       window,
@@ -598,11 +640,11 @@ router.get("/admin/platform/leaderboards", ...requireOperator, async (req, res):
       inDrawdown,
       feeLeaderboard: feeRows,
       totals: {
-        platformFeeRevenueUsd:   feeTotalsRow?.platform_fee_revenue_usd ?? 0,
-        totalExposureUsd:        exposureRow?.total_exposure_usd ?? 0,
-        liveCapitalDeployedUsd:  exposureRow?.live_capital_deployed_usd ?? 0,
-        openPositions:           exposureRow?.open_positions ?? 0,
-        openLivePositions:       exposureRow?.open_live_positions ?? 0,
+        platformFeeRevenueUsd:   totalsRow?.platform_fee_revenue_usd ?? 0,
+        totalExposureUsd:        totalsRow?.total_exposure_usd ?? 0,
+        liveCapitalDeployedUsd:  totalsRow?.live_capital_deployed_usd ?? 0,
+        openPositions:           totalsRow?.open_positions ?? 0,
+        openLivePositions:       totalsRow?.open_live_positions ?? 0,
       },
       timestamp: Date.now(),
     };

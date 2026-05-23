@@ -110,6 +110,7 @@ describe("GET /admin/users", () => {
           open_positions: 2, open_exposure_usd: 200, open_live_positions: 1,
           exchange_total: 1, exchange_active: 1, exchange_error: 0,
           has_live_exchange: true, trade_cap_tier: 100,
+          trade_cap_override_expires_at: null, used_24h: 3,
           last_activity_at: now - 60_000,
         },
         {
@@ -124,6 +125,7 @@ describe("GET /admin/users", () => {
           open_positions: 0, open_exposure_usd: 0, open_live_positions: 0,
           exchange_total: 0, exchange_active: 0, exchange_error: 0,
           has_live_exchange: false, trade_cap_tier: 50,
+          trade_cap_override_expires_at: null, used_24h: 0,
           last_activity_at: now - 3 * 86_400_000,
         },
       ] },
@@ -140,6 +142,12 @@ describe("GET /admin/users", () => {
     expect(body.users[0]!["winRate"]).toBeCloseTo(0.7);
     expect(body.users[0]!["mrrUsd"]).toBe(39.99);
     expect(body.users[0]!["tradeCapTier"]).toBe(100);
+    expect(body.users[0]!["tradeLimit"]).toMatchObject({
+      used24h: 3, capTier: 100, remaining: 97, blocked: false, reason: "ok",
+    });
+    expect(body.users[1]!["tradeLimit"]).toMatchObject({
+      used24h: 0, capTier: 50, remaining: 50, blocked: false,
+    });
     expect(body.users[0]!["onlineNow"]).toBe(true);   // last trade 60s ago
     expect(body.users[1]!["winRate"]).toBeNull();      // tradesCount=0
     expect(body.users[1]!["onlineNow"]).toBe(false);   // 3 days ago
@@ -180,18 +188,17 @@ describe("GET /admin/users/:id", () => {
   it("aggregates positions + closed trades + fees into a single payload", async () => {
     const userCreated = new Date(Date.now() - 10 * 86_400_000);
     executeQueue = [
-      // user lookup
+      // consolidated header lookup (user + admin_status + settings + sim_account + fees)
       { rows: [{
         clerk_user_id: "u1", email: "a@x", role: "user", plan: "pro",
         plan_status: "active", stripe_customer_id: "cus_1",
         stripe_subscription_id: "sub_1", billing_email: "a@x",
         trial_ends_at: null, created_at: userCreated, updated_at: userCreated,
         admin_status: "active", admin_status_reason: null, admin_status_since: null,
+        settings_json: { user_id: "u1", auto_mode: true, min_confidence: 65 },
+        sim_account_json: { user_id: "u1", cash_balance: 95_000 },
+        fee_records: 2, fees_total: 4.5, profitable_pnl: 150,
       }] },
-      // settings
-      { rows: [{ user_id: "u1", auto_mode: true, min_confidence: 65 }] },
-      // sim_accounts
-      { rows: [{ user_id: "u1", cash_balance: 95_000 }] },
       // positions (one live, one paper)
       { rows: [
         { id: "p1", symbol: "BTCUSD", size_usd: 100, exchange: "Kraken" },
@@ -207,8 +214,6 @@ describe("GET /admin/users/:id", () => {
       { rows: [{ id: "ec1", exchange: "Kraken", status: "active", trading_mode: "paper" }] },
       // audit trail
       { rows: [] },
-      // fees row
-      { rows: [{ fee_records: 2, fees_total: 4.5, profitable_pnl: 150 }] },
       // audit_log events (AI decisions + latency + one error)
       { rows: [
         { id: "e1", ts_ms: Date.now(), type: "ai_decision", severity: "info",
@@ -263,13 +268,12 @@ describe("GET /admin/platform/leaderboards", () => {
       { rows: [
         { user_id: "u3", email: "c@x", profitable_trades: 5, fees_generated: 60, realized_pnl: 1_200 },
       ] },
-      // exposure
+      // consolidated totals
       { rows: [{
         total_exposure_usd: 9_000, live_capital_deployed_usd: 3_000,
         open_positions: 12, open_live_positions: 4,
+        platform_fee_revenue_usd: 60,
       }] },
-      // fee totals
-      { rows: [{ platform_fee_revenue_usd: 60 }] },
     ];
 
     const handler = getHandler("/admin/platform/leaderboards");
@@ -298,8 +302,10 @@ describe("GET /admin/platform/leaderboards", () => {
   it("defaults to window=all when query is missing or invalid", async () => {
     executeQueue = [
       { rows: [] }, { rows: [] },
-      { rows: [{ total_exposure_usd: 0, live_capital_deployed_usd: 0, open_positions: 0, open_live_positions: 0 }] },
-      { rows: [{ platform_fee_revenue_usd: 0 }] },
+      { rows: [{
+        total_exposure_usd: 0, live_capital_deployed_usd: 0,
+        open_positions: 0, open_live_positions: 0, platform_fee_revenue_usd: 0,
+      }] },
     ];
     const handler = getHandler("/admin/platform/leaderboards");
     const req = makeReq({ window: "bogus" }, {}, "/admin/platform/leaderboards");
