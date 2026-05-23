@@ -4121,6 +4121,48 @@ function PortalInner() {
   // other state (loading / standby / error / legacy "simulation") renders
   // "—" so the institutional terminal never surfaces a fake hero balance.
   const adminUsd          = adminIsLive ? (adminKraken?.balances.USD ?? 0) : null;
+
+  // ── Operator live-state telemetry ──────────────────────────────────────────
+  // Replaces the previous `stats.openCount / ADMIN_CONCURRENT_CAP` tile (which
+  // sourced from paper sim_positions and was permanently 0 for operators).
+  // Now reads from /api/exchange/live-state which derives openPositionsCount
+  // from the in-memory `_orders` ledger (filled BUYs − filled SELLs per
+  // symbol) plus a live Kraken account read for total equity. Also surfaces
+  // the ExecutionQueue depth+processing+concurrency, which is the single
+  // best diagnostic for the operator's reported "stall around 30 BUYs".
+  // Diagnostics — keep until the stall hypothesis is confirmed/refuted.
+  type LiveExchangeStateLite = {
+    source:              "live" | "error" | "standby";
+    totalEquityUSD:      number;
+    openPositionsCount:  number;
+    filledTotal:         number;
+    filledToday:         number;
+    realizedTodayUSD:    number;
+    positions: Array<{ symbol: string; netQty: number; avgEntryUSD: number; markPriceUSD: number; unrealizedUSD: number }>;
+    queue: { concurrency: number; processing: number; depth: number; completed: number; failed: number; avgLatencyMs: number };
+  };
+  const [adminLiveState, setAdminLiveState] = useState<LiveExchangeStateLite | null>(null);
+  useEffect(() => {
+    if (!isAdmin || !isSignedIn) return;
+    let cancelled = false;
+    const fetchLive = async () => {
+      try {
+        const res = await authFetch(`${apiBaseUrl}/api/exchange/live-state`, {
+          credentials: "include",
+          cache:       "no-store",
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as LiveExchangeStateLite;
+        if (!cancelled) setAdminLiveState(data);
+      } catch { /* keep last */ }
+    };
+    void fetchLive();
+    const iv = setInterval(fetchLive, 5_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [isAdmin, isSignedIn]);
+  const adminUnrealized = adminLiveState
+    ? adminLiveState.positions.reduce((s, p) => s + p.unrealizedUSD, 0)
+    : 0;
   const adminExchangeName = (adminKraken?.exchange ?? "kraken").toUpperCase();
   const adminLiveBadge = adminIsLive
     ? `${adminExchangeName} LIVE`
@@ -4216,12 +4258,23 @@ function PortalInner() {
           gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
           gap: 10,
         }}>
+          {/* TOTAL EQUITY — USD + Σ(base × markPrice). The single most
+              important operator number; replaces the lone raw-USD tile that
+              read $0.14 while ETH was clearly held on Kraken. */}
+          <MetricTile
+            label="TOTAL EQUITY"
+            value={adminLiveState && adminLiveState.source === "live"
+              ? `$${adminLiveState.totalEquityUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : "—"}
+            delta={adminLiveState ? `${adminLiveBadge}` : "LOADING…"}
+            positive={adminLiveState?.source === "live"}
+          />
           <MetricTile
             label={`${adminExchangeName} USD`}
             value={adminUsd !== null
               ? `$${adminUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
               : "—"}
-            delta={adminLiveBadge}
+            delta="AVAILABLE"
             positive={adminIsLive}
           />
           <MetricTile
@@ -4242,11 +4295,48 @@ function PortalInner() {
             delta={adminIsLive ? "LIVE" : "—"}
             positive={adminIsLive}
           />
+          {/* LIVE POSITIONS — now derived from the real Kraken-executed
+              order ledger (filled BUYs − filled SELLs per symbol) instead
+              of the always-zero paper sim_positions. */}
           <MetricTile
-            label="LIVE AI TRADES"
-            value={`${stats.openCount} / ${ADMIN_CONCURRENT_CAP}`}
-            delta="OPERATOR"
+            label="LIVE POSITIONS"
+            value={adminLiveState
+              ? `${adminLiveState.openPositionsCount} / ${ADMIN_CONCURRENT_CAP}`
+              : "—"}
+            delta="OPEN ON KRAKEN"
+            positive={!!adminLiveState && adminLiveState.openPositionsCount > 0}
+          />
+          <MetricTile
+            label="UNREALIZED P/L"
+            value={adminLiveState ? fmtMoney(adminUnrealized) : "—"}
+            delta={adminLiveState ? "MARK TO MARKET" : "—"}
+            positive={adminUnrealized >= 0}
+          />
+          <MetricTile
+            label="REALIZED TODAY"
+            value={adminLiveState ? fmtMoney(adminLiveState.realizedTodayUSD) : "—"}
+            delta={adminLiveState ? `${adminLiveState.filledToday} FILLS TODAY` : "—"}
+            positive={!!adminLiveState && adminLiveState.realizedTodayUSD >= 0}
+          />
+          <MetricTile
+            label="TOTAL FILLS"
+            value={adminLiveState ? String(adminLiveState.filledTotal) : "—"}
+            delta="LIFETIME"
             positive
+          />
+          {/* EXECUTION QUEUE — diagnostic tile, kept until the operator's
+              ~30-BUY stall hypothesis is confirmed or refuted. processing
+              should always be ≤ concurrency; if depth grows unboundedly,
+              the queue is saturated. */}
+          <MetricTile
+            label="EXEC QUEUE"
+            value={adminLiveState
+              ? `${adminLiveState.queue.processing}/${adminLiveState.queue.concurrency}`
+              : "—"}
+            delta={adminLiveState
+              ? `${adminLiveState.queue.depth} WAITING · ${adminLiveState.queue.failed} FAIL`
+              : "—"}
+            positive={!!adminLiveState && adminLiveState.queue.depth === 0}
           />
           <MetricTile
             label="EXCHANGE"

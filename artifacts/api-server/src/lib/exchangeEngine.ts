@@ -654,6 +654,225 @@ export function getOrders(limit = 50): ExchangeOrder[] {
   return _orders.slice(0, limit);
 }
 
+// ── Live exchange state (operator telemetry reconciliation) ───────────────────
+//
+// Single endpoint that surfaces the full operator picture from the in-memory
+// `_orders` ledger + a one-shot Kraken (or active adapter) account read +
+// mark-to-market via `getTicker` per held symbol. Built so the admin Portal
+// can stop deriving openCount from paper `sim_positions` (which is always 0
+// for operators) and instead reflect real Kraken-derived positions.
+//
+// Derivation:
+//   • positions: per unique symbol with at least one filled BUY/SELL,
+//     netQty = Σ(filled BUY volumeBase) − Σ(filled SELL volumeBase).
+//     A position is "open" when netQty > epsilon. avgEntry is the
+//     volume-weighted average of filled BUY fillPrices; markPrice is the
+//     current ticker; unrealizedUSD = (markPrice − avgEntry) × netQty.
+//   • totalEquityUSD: balances.USD + Σ(balance × ticker.price) for each
+//     non-zero base balance. NB: this is *raw account equity from the
+//     exchange* — independent of `_orders` (so it stays correct even if
+//     the engine memory was wiped or the operator funded the account
+//     externally).
+//   • queue: ExecutionQueue stats (depth + processing + completed + failed).
+//     Surfaced because operator reports a stall around 30 BUYs — this is
+//     the single best diagnostic to confirm/refute a queue saturation
+//     hypothesis. concurrency is the configured cap.
+//   • Any failure on the live read returns source="error" with raw _orders
+//     counts still populated — those derive from local memory and can't
+//     fail.
+export interface LiveExchangePosition {
+  symbol:         string;
+  netQty:         number;          // base units; >0 means long
+  avgEntryUSD:    number;          // VWAP of filled BUYs
+  markPriceUSD:   number;          // current ticker
+  unrealizedUSD:  number;          // (mark − entry) × netQty
+  unrealizedPct:  number;          // unrealizedUSD / (avgEntry × netQty) × 100
+  buyCount:       number;
+  sellCount:      number;
+  firstFillAt:    number;
+  lastFillAt:     number;
+}
+
+export interface LiveExchangeState {
+  source:              "live" | "error" | "standby";
+  exchange:            string;
+  mode:                ExchangeMode;
+  apiConfigured:       boolean;
+  liveCapable:         boolean;
+  balances:            Balances;
+  markPrices:          Record<string, number>;       // by base symbol e.g. "BTC"
+  totalEquityUSD:      number;                       // USD + Σ(base × mark)
+  positions:           LiveExchangePosition[];       // only open positions
+  openPositionsCount:  number;                       // positions.length
+  filledTotal:         number;                       // _orders filled lifetime
+  filledToday:         number;                       // filled today (UTC date)
+  lastFillAt:          number | null;
+  realizedTodayUSD:    number;                       // Σ realized P/L from closed slices today (simplified)
+  queue: {
+    concurrency:  number;
+    processing:   number;
+    depth:        number;                            // queued waiting to start
+    completed:    number;
+    failed:       number;
+    avgLatencyMs: number;
+  };
+  error?:              string;
+}
+
+export async function getLiveExchangeState(): Promise<LiveExchangeState> {
+  const today      = new Date().toISOString().slice(0, 10);
+  const startOfDay = new Date(today).getTime();
+  const filledLifetime = _orders.filter(o => o.status === "filled");
+  const filledToday    = filledLifetime.filter(o => o.timestamp >= startOfDay).length;
+  const lastFill       = filledLifetime[0]; // _orders is newest-first
+
+  // ── Positions derivation from in-memory ledger ─────────────────────────
+  type Agg = { netQty: number; buyVol: number; buyNotional: number; sells: number; buyCount: number; sellCount: number; first: number; last: number };
+  const agg = new Map<string, Agg>();
+  for (const o of filledLifetime) {
+    const cur = agg.get(o.symbol) ?? {
+      netQty: 0, buyVol: 0, buyNotional: 0, sells: 0, buyCount: 0, sellCount: 0,
+      first: o.timestamp, last: o.timestamp,
+    };
+    if (o.side === "buy") {
+      cur.netQty      += o.volumeBase;
+      cur.buyVol      += o.volumeBase;
+      cur.buyNotional += o.volumeBase * o.fillPrice;
+      cur.buyCount    += 1;
+    } else {
+      cur.netQty   -= o.volumeBase;
+      cur.sells    += o.volumeBase;
+      cur.sellCount += 1;
+    }
+    cur.first = Math.min(cur.first, o.timestamp);
+    cur.last  = Math.max(cur.last,  o.timestamp);
+    agg.set(o.symbol, cur);
+  }
+
+  // ── Live balances + mark prices ────────────────────────────────────────
+  let balances: Balances = { USD: 0, BTC: 0, ETH: 0, SOL: 0 };
+  let source: LiveExchangeState["source"] = "standby";
+  let error: string | undefined;
+  if (isApiConfigured()) {
+    try {
+      balances = await fetchLiveBalances();
+      source   = "live";
+    } catch (err) {
+      source = "error";
+      error  = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  // Collect symbols we need marks for: every base with non-zero balance OR
+  // every symbol with an open net position. We do this in one pass and
+  // tolerate individual ticker failures (mark falls back to 0 → unrealized=0
+  // rather than failing the whole endpoint).
+  const baseSymbols = new Set<string>();
+  if (balances.BTC > 0) baseSymbols.add("BTCUSD");
+  if (balances.ETH > 0) baseSymbols.add("ETHUSD");
+  if (balances.SOL > 0) baseSymbols.add("SOLUSD");
+  for (const [sym, a] of agg) if (a.netQty > 1e-8) baseSymbols.add(sym);
+
+  const markPrices: Record<string, number> = {};
+  await Promise.all(
+    Array.from(baseSymbols).map(async (sym) => {
+      try {
+        const t = await getTicker(sym);
+        markPrices[sym] = t.price;
+      } catch {
+        markPrices[sym] = 0;
+      }
+    }),
+  );
+
+  // ── Build open positions list ──────────────────────────────────────────
+  const positions: LiveExchangePosition[] = [];
+  for (const [sym, a] of agg) {
+    if (a.netQty <= 1e-8) continue;
+    const avgEntry = a.buyVol > 0 ? a.buyNotional / a.buyVol : 0;
+    const mark     = markPrices[sym] ?? 0;
+    const unreal   = mark > 0 && avgEntry > 0 ? (mark - avgEntry) * a.netQty : 0;
+    const denom    = avgEntry * a.netQty;
+    positions.push({
+      symbol:        sym,
+      netQty:        parseFloat(a.netQty.toFixed(8)),
+      avgEntryUSD:   parseFloat(avgEntry.toFixed(2)),
+      markPriceUSD:  parseFloat(mark.toFixed(2)),
+      unrealizedUSD: parseFloat(unreal.toFixed(2)),
+      unrealizedPct: denom > 0 ? parseFloat(((unreal / denom) * 100).toFixed(2)) : 0,
+      buyCount:      a.buyCount,
+      sellCount:     a.sellCount,
+      firstFillAt:   a.first,
+      lastFillAt:    a.last,
+    });
+  }
+  positions.sort((a, b) => b.lastFillAt - a.lastFillAt);
+
+  // ── Total equity = USD + Σ(base × mark) ────────────────────────────────
+  const btcMark = markPrices["BTCUSD"] ?? 0;
+  const ethMark = markPrices["ETHUSD"] ?? 0;
+  const solMark = markPrices["SOLUSD"] ?? 0;
+  const totalEquity = balances.USD
+    + balances.BTC * btcMark
+    + balances.ETH * ethMark
+    + balances.SOL * solMark;
+
+  // ── Realized P/L today (simplified) ────────────────────────────────────
+  // For each filled SELL today: realized = (sell.fillPrice − avgEntryAtSell) × sell.volumeBase.
+  // We approximate avgEntryAtSell with the symbol's lifetime VWAP of BUYs.
+  // Operator can refine later with FIFO/LIFO if needed.
+  let realizedToday = 0;
+  for (const o of filledLifetime) {
+    if (o.timestamp < startOfDay) continue;
+    if (o.side !== "sell") continue;
+    const a = agg.get(o.symbol);
+    if (!a || a.buyVol === 0) continue;
+    const vwap = a.buyNotional / a.buyVol;
+    realizedToday += (o.fillPrice - vwap) * o.volumeBase;
+  }
+
+  // ── ExecutionQueue diagnostic ──────────────────────────────────────────
+  // Dynamically import to avoid the cycle (queue may import exchange utils).
+  let queueStats = { concurrency: 0, processing: 0, depth: 0, completed: 0, failed: 0, avgLatencyMs: 0 };
+  try {
+    const { executionQueue } = await import("../services/queue/ExecutionQueue.js");
+    const s = executionQueue.stats();
+    queueStats = {
+      // `concurrency` is a private field — read it via a typed structural
+      // cast since the queue intentionally doesn't expose it (Phase 2 will
+      // swap for BullMQ and the value will move into config). Operator
+      // diagnostic only — never used as a gate.
+      concurrency:  (executionQueue as unknown as { concurrency: number }).concurrency ?? 0,
+      processing:   s.processing,
+      depth:        s.depth,
+      completed:    s.completed,
+      failed:       s.failed,
+      avgLatencyMs: s.avgLatencyMs,
+    };
+  } catch {
+    /* queue introspection is best-effort */
+  }
+
+  return {
+    source,
+    exchange:            _selectedExchange,
+    mode:                _mode,
+    apiConfigured:       isApiConfigured(),
+    liveCapable:         isLiveCapable(),
+    balances,
+    markPrices,
+    totalEquityUSD:      parseFloat(totalEquity.toFixed(2)),
+    positions,
+    openPositionsCount:  positions.length,
+    filledTotal:         filledLifetime.length,
+    filledToday,
+    lastFillAt:          lastFill?.timestamp ?? null,
+    realizedTodayUSD:    parseFloat(realizedToday.toFixed(2)),
+    queue:               queueStats,
+    ...(error ? { error } : {}),
+  };
+}
+
 export function setMode(mode: ExchangeMode, exchange?: string): { ok: boolean; reason?: string } {
   if (mode === "live") {
     if (!isLiveEnabled()) return { ok: false, reason: "EXCHANGE_LIVE_ENABLED is not set to 'true'" };

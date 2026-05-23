@@ -8,6 +8,7 @@ import {
   previewOrder,
   executeOrder,
   fetchLiveBalances,
+  getLiveExchangeState,
   resetSimBalances,
   setSelectedExchange,
   type OrderSide,
@@ -34,6 +35,23 @@ router.get("/exchange/status", ...requireOperator, (_req, res) => {
 router.get("/exchange/orders", ...requireOperator, (_req, res) => {
   const limit = parseInt(String(_req.query["limit"] ?? "50"), 10);
   res.json(getOrders(limit));
+});
+
+// ── Live state (operator telemetry reconciliation) ────────────────────────────
+// Single read for the admin Portal tile row: balances, mark-to-market equity,
+// derived open positions, today's fill count, realized P/L, and the
+// ExecutionQueue saturation snapshot. See `getLiveExchangeState()` in
+// `lib/exchangeEngine.ts` for the derivation rules. Replaces the older
+// pattern where Portal.tsx synthesised `openCount` from paper sim_positions.
+router.get("/exchange/live-state", ...requireOperator, async (req, res) => {
+  try {
+    const state = await getLiveExchangeState();
+    res.json(state);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "live-state failed";
+    req.log.error({ err }, "[live-state] unexpected failure");
+    res.status(502).json({ error: msg });
+  }
 });
 
 // ── Balances (live or sim) ────────────────────────────────────────────────────

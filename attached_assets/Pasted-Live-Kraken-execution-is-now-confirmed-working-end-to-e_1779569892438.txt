@@ -1,0 +1,68 @@
+Live Kraken execution is now confirmed working end-to-end on the dev preview.
+
+However, there are still telemetry/state synchronization issues that need to be fixed before production deployment.
+
+Current issues observed:
+
+LIVE AI TRADES counter is incorrect
+Dashboard still shows 0 / 30
+But live Kraken positions and closed trades are clearly executing successfully
+The UI counter is not synchronized with actual Kraken open positions
+Balance/equity telemetry is incorrect
+USD balance widget shows $0.14
+But multiple live and closed Kraken trades exist
+Need proper separation of:
+available balance
+used margin
+total account equity
+unrealized P/L
+realized P/L
+Trading engine appears frozen/stalled around ~30 BUY executions
+Signals continue rendering
+But execution flow appears throttled/stuck after approximately 30 buys
+Need investigation into:
+execution queue saturation
+slot release logic
+stale open-position tracking
+websocket state sync
+concurrency cap reset
+order lifecycle cleanup
+Need full Kraken telemetry reconciliation
+Please connect all remaining operator telemetry to real Kraken state:
+open positions
+closed positions
+fills
+buying power
+available margin
+active trade slots
+realized P/L
+unrealized P/L
+fees
+DO NOT remove diagnostics yet
+Keep:
+BUY-TRACE
+PRE-AUTH tracing
+execution diagnostics
+until the freezing / slot issue is resolved.
+After stabilization:
+remove diagnostics
+trim replit.md
+architect review
+prepare clean production deployment plan
+
+And to answer your question:
+
+Yes, you can refresh the page.
+
+Refreshing the dashboard should NOT close or lose Kraken positions because the positions live on the exchange/server side, not in the browser UI.
+
+What you MAY lose temporarily:
+
+local UI state
+active websocket session
+live feed visuals
+cached telemetry
+
+But the actual Kraken positions/orders should remain open on Kraken itself.
+
+Since this is still a dev environment with sync issues, wait about 5–10 seconds after refreshing for the telemetry to reconnect before clicking anything else.
