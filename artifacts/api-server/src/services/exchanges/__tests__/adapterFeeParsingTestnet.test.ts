@@ -15,6 +15,8 @@
 //   BINANCE_TESTNET_API_KEY=...     BINANCE_TESTNET_API_SECRET=... \
 //   GEMINI_SANDBOX_API_KEY=...      GEMINI_SANDBOX_API_SECRET=... \
 //   GATEIO_TESTNET_API_KEY=...      GATEIO_TESTNET_API_SECRET=... \
+//   CRYPTOCOM_UAT_API_KEY=...       CRYPTOCOM_UAT_API_SECRET=... \
+//   BINGX_VST_API_KEY=...           BINGX_VST_API_SECRET=... \
 //   HYPERLIQUID_TESTNET_API_KEY=... HYPERLIQUID_TESTNET_API_SECRET=... \
 //   DYDX_TESTNET_API_KEY=...        DYDX_TESTNET_API_SECRET=... \
 //     pnpm --filter @workspace/api-server run test -- adapterFeeParsingTestnet
@@ -28,6 +30,8 @@
 //   ✓ Binance Spot Testnet    → testnet.binance.vision
 //   ✓ Gemini Sandbox          → api.sandbox.gemini.com
 //   ✓ Gate.io Spot Testnet    → api-testnet.gateapi.io
+//   ✓ Crypto.com Exchange UAT → uat-api.3ona.co
+//   ✓ BingX VST               → open-api-vst.bingx.com
 //
 // Wired but credential-gated (skip-if-missing; assert place→broker-fee
 // against the public sandbox the adapter already opts into via
@@ -57,21 +61,9 @@
 //                   id from `placeOrder` so `getOrder` can resolve the
 //                   broker fee.
 //
-//   ⚠ BingX VST
-//       Adapter: `placeOrder` returns `simulatedOrder(...)` unconditionally;
-//                `resolveHost` maps `testnet → null`.
-//       Sandbox: `open-api-vst.bingx.com` exists publicly.
-//       Unblockers: real order id from `placeOrder` + `testnet` host wired.
-//
 //   ⚠ HTX Demo
 //       Adapter: `placeOrder` returns `simulatedOrder(...)`; HTX has no
 //                public REST sandbox today (paper trading is UI-only).
-//
-//   ⚠ Crypto.com Exchange UAT
-//       Adapter: `placeOrder` returns `simulatedOrder(...)`; `resolveHost`
-//                maps `testnet → null`.
-//       Sandbox: `uat-api.3ona.co` exists publicly.
-//       Unblockers: real order id from `placeOrder` + `testnet` host wired.
 //
 //   ⚠ Kraken Spot Demo
 //       No public REST sandbox for Kraken Spot — `demo-futures.kraken.com`
@@ -90,11 +82,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import { BinanceAdapter }     from "../adapters/BinanceAdapter.js";
-import { GeminiAdapter }      from "../adapters/GeminiAdapter.js";
-import { GateIOAdapter }      from "../adapters/GateIOAdapter.js";
-import { HyperliquidAdapter } from "../adapters/HyperliquidAdapter.js";
-import { dYdXAdapter }        from "../adapters/dYdXAdapter.js";
+import { BinanceAdapter }      from "../adapters/BinanceAdapter.js";
+import { GeminiAdapter }       from "../adapters/GeminiAdapter.js";
+import { GateIOAdapter }       from "../adapters/GateIOAdapter.js";
+import { CryptoDotComAdapter } from "../adapters/CryptoDotComAdapter.js";
+import { BingXAdapter }        from "../adapters/BingXAdapter.js";
+import { HyperliquidAdapter }  from "../adapters/HyperliquidAdapter.js";
+import { dYdXAdapter }         from "../adapters/dYdXAdapter.js";
 
 import type { AdapterConfig, StandardOrder } from "../types.js";
 
@@ -195,11 +189,30 @@ describe.skip("Bitget Demo Trading — broker fee end-to-end (BLOCKED: see matri
   });
 });
 
-describe.skip("BingX VST — broker fee end-to-end (BLOCKED: see matrix)", () => {
-  it("placeholder — needs testnet host wired + real exchange order id from placeOrder", () => {
-    expect(true).toBe(true);
-  });
-});
+const BINGX_KEY    = process.env["BINGX_VST_API_KEY"];
+const BINGX_SECRET = process.env["BINGX_VST_API_SECRET"];
+
+describe.skipIf(!ENABLED || !BINGX_KEY || !BINGX_SECRET)(
+  "BingX VST — broker fee end-to-end",
+  () => {
+    it("places + queries a tiny BTC-USDT market order and reports broker fee", async () => {
+      const adapter = new BingXAdapter(baseCfg("BingX", BINGX_KEY, BINGX_SECRET));
+
+      // BingX `placeOrder` now preserves the real exchange order id and
+      // immediately round-trips through `getOrder`, which maps
+      // `fee` / `feeAsset` → `source: "broker"`. We still exercise an
+      // explicit `getOrder` to confirm both surfaces stay in sync.
+      const placed = await adapter.placeOrder({
+        symbol: "BTCUSD", side: "buy", type: "market", qty: 0.0002,
+      });
+      assertBrokerFee(placed, "BingX placeOrder");
+
+      await sleep(1_000);
+      const queried = await adapter.getOrder(placed.exchangeOrderId, "BTCUSD");
+      assertBrokerFee(queried, "BingX getOrder");
+    }, 45_000);
+  },
+);
 
 describe.skip("HTX Demo — broker fee end-to-end (BLOCKED: no public REST sandbox)", () => {
   it("placeholder — paper trading is UI-only on HTX today", () => {
@@ -207,11 +220,32 @@ describe.skip("HTX Demo — broker fee end-to-end (BLOCKED: no public REST sandb
   });
 });
 
-describe.skip("Crypto.com Exchange UAT — broker fee end-to-end (BLOCKED: see matrix)", () => {
-  it("placeholder — needs testnet host wired + real exchange order id from placeOrder", () => {
-    expect(true).toBe(true);
-  });
-});
+const CRYPTOCOM_KEY    = process.env["CRYPTOCOM_UAT_API_KEY"];
+const CRYPTOCOM_SECRET = process.env["CRYPTOCOM_UAT_API_SECRET"];
+
+describe.skipIf(!ENABLED || !CRYPTOCOM_KEY || !CRYPTOCOM_SECRET)(
+  "Crypto.com Exchange UAT — broker fee end-to-end",
+  () => {
+    it("places + queries a tiny BTC_USDT market order and reports broker fee", async () => {
+      const adapter = new CryptoDotComAdapter(
+        baseCfg("CryptoDotCom", CRYPTOCOM_KEY, CRYPTOCOM_SECRET),
+      );
+
+      // Crypto.com `placeOrder` now preserves the real `result.order_id`
+      // returned by `/v2/private/create-order` and immediately resolves
+      // the broker fee via `/v2/private/get-order-detail`, which maps
+      // `fee_currency_amount` / `fee_currency` → `source: "broker"`.
+      const placed = await adapter.placeOrder({
+        symbol: "BTCUSD", side: "buy", type: "market", qty: 0.0002,
+      });
+      assertBrokerFee(placed, "CryptoDotCom placeOrder");
+
+      await sleep(1_000);
+      const queried = await adapter.getOrder(placed.exchangeOrderId, "BTCUSD");
+      assertBrokerFee(queried, "CryptoDotCom getOrder");
+    }, 45_000);
+  },
+);
 
 const GATEIO_KEY    = process.env["GATEIO_TESTNET_API_KEY"];
 const GATEIO_SECRET = process.env["GATEIO_TESTNET_API_SECRET"];

@@ -41,10 +41,12 @@ export const BINGX_CONFIG: AdapterConfig = {
 };
 
 export class BingXAdapter extends BaseExchangeAdapter {
-  // BingX has no public sandbox we can target — testnet must fail loudly.
+  // BingX publishes a VST (Virtual Simulated Trading) REST sandbox at
+  // open-api-vst.bingx.com. Used by the weekly broker-fee drift smoke
+  // (see `__tests__/adapterFeeParsingTestnet.test.ts`).
   private readonly BASE = this.resolveHost({
     prod:    "open-api.bingx.com",
-    testnet: null,
+    testnet: "open-api-vst.bingx.com",
   });
   private orderSeq = 1;
 
@@ -154,8 +156,18 @@ export class BingXAdapter extends BaseExchangeAdapter {
       () => this.signedPost<BingXResp<{ orderId: string }>>("/openApi/spot/v1/trade/order", params),
       3, 500, "placeOrder",
     );
-    void data;
-    return simulatedOrder("BingX", req, this.normaliseSymbol(req.symbol), this.config);
+    // Preserve the real exchange order id so the weekly drift suite can
+    // round-trip place → getOrder and resolve a broker-sourced fee.
+    const orderId = data.data?.orderId;
+    if (!orderId) {
+      return simulatedOrder("BingX", req, this.normaliseSymbol(req.symbol), this.config);
+    }
+    const queried = await this.getOrder(String(orderId), req.symbol);
+    if (queried) return queried;
+    const fallback = simulatedOrder("BingX", req, this.normaliseSymbol(req.symbol), this.config);
+    fallback.id              = String(orderId);
+    fallback.exchangeOrderId = String(orderId);
+    return fallback;
   }
 
   async cancelOrder(req: CancelOrderRequest): Promise<{ ok: boolean; reason?: string }> {

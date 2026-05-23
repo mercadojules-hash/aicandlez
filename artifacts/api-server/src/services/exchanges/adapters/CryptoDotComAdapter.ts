@@ -41,10 +41,12 @@ export const CRYPTOCOM_CONFIG: AdapterConfig = {
 };
 
 export class CryptoDotComAdapter extends BaseExchangeAdapter {
-  // Crypto.com has no public sandbox we can target — testnet must fail loudly.
+  // Crypto.com Exchange publishes a UAT REST sandbox at uat-api.3ona.co.
+  // Used by the weekly broker-fee drift smoke (see
+  // `__tests__/adapterFeeParsingTestnet.test.ts`).
   private readonly BASE = this.resolveHost({
     prod:    "api.crypto.com",
-    testnet: null,
+    testnet: "uat-api.3ona.co",
   });
   private readonly VER  = "/v2";
   private id = 1;
@@ -155,8 +157,18 @@ export class CryptoDotComAdapter extends BaseExchangeAdapter {
       }),
       3, 500, "placeOrder",
     );
-    void data;
-    return simulatedOrder("CryptoDotCom", req, this.normaliseSymbol(req.symbol), this.config);
+    // Preserve the real exchange order id so the weekly drift suite can
+    // round-trip place → getOrder and resolve a broker-sourced fee.
+    const orderId = data.result?.order_id;
+    if (orderId == null) {
+      return simulatedOrder("CryptoDotCom", req, this.normaliseSymbol(req.symbol), this.config);
+    }
+    const queried = await this.getOrder(String(orderId), req.symbol);
+    if (queried) return queried;
+    const fallback = simulatedOrder("CryptoDotCom", req, this.normaliseSymbol(req.symbol), this.config);
+    fallback.id              = String(orderId);
+    fallback.exchangeOrderId = String(orderId);
+    return fallback;
   }
 
   async cancelOrder(req: CancelOrderRequest): Promise<{ ok: boolean; reason?: string }> {
