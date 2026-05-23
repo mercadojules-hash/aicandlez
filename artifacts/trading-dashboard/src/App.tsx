@@ -52,6 +52,16 @@ import { useUserRole } from "@/hooks/useUserRole";
 // ── Env ───────────────────────────────────────────────────────────────────────
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
+// [CLERK-DIAG] temporary boot diagnostic — remove after Kraken live-order test
+// Prints prefix + length only, NEVER the full key, so it's safe in browser console.
+if (typeof window !== "undefined") {
+  // eslint-disable-next-line no-console
+  console.log(
+    "[CLERK-DIAG] VITE_CLERK_PUBLISHABLE_KEY prefix=%s len=%d",
+    clerkPubKey ? clerkPubKey.slice(0, 8) : "<undefined>",
+    clerkPubKey?.length ?? 0,
+  );
+}
 // Clerk FAPI proxy disabled — proxy/satellite domains require a paid Clerk plan.
 // Talk directly to Clerk's shared frontend API for both dev and prod.
 const clerkProxyUrl: string | undefined = undefined;
