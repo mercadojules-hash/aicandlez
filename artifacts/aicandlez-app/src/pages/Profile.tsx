@@ -808,8 +808,9 @@ function ExchangeConnectionsHealth() {
                   boxShadow:`0 0 14px ${iconColor}30`,
                 }}>{iconCh}</div>
                 <div style={{ minWidth:0 }}>
-                  <div style={{ fontSize:15, fontFamily:SANS, fontWeight:800, color:"#FFFFFF",
-                    letterSpacing:-0.25, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                  <div style={{ fontSize:17, fontFamily:SANS, fontWeight:900, color:"#FFFFFF",
+                    letterSpacing:-0.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+                    textShadow:`0 0 14px ${iconColor}80` }}>
                     {name}
                   </div>
                   <div style={{ fontSize:9, fontFamily:SANS, color:GR, marginTop:2,
@@ -826,8 +827,9 @@ function ExchangeConnectionsHealth() {
                 <div style={{ width:7, height:7, borderRadius:"50%", background:pillCol,
                   boxShadow:`0 0 8px ${pillCol}, 0 0 16px ${pillCol}80`,
                   animation: pending ? "dot-pulse 1.4s ease-in-out infinite" : "dot-pulse 2.5s ease-in-out infinite" }}/>
-                <span style={{ fontSize:9.5, fontFamily:SANS, fontWeight:800, color:pillCol,
-                  letterSpacing:"0.16em" }}>{pillLabel}</span>
+                <span style={{ fontSize:10.5, fontFamily:SANS, fontWeight:900, color:pillCol,
+                  letterSpacing:"0.18em",
+                  textShadow: healthy ? `0 0 8px ${pillCol}, 0 0 18px ${pillCol}80` : "none" }}>{pillLabel}</span>
               </div>
             </div>
 

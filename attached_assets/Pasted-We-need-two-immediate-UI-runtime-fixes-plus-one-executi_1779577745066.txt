@@ -1,0 +1,124 @@
+We need two immediate UI/runtime fixes plus one execution-state enhancement.
+
+====================================================
+
+1. BOOTSTRAP ERROR FIX
+   ====================================================
+
+Current error:
+`trades.filter is not a function`
+
+This appeared after the telemetry reconciliation work.
+
+Likely cause:
+A telemetry endpoint or live-state payload changed shape and the UI is assuming `trades` is always an array.
+
+Requirements:
+
+* Find every `.filter()` call touching:
+
+  * trades
+  * liveTrades
+  * closedTrades
+  * execution history
+  * telemetry payloads
+* Add defensive normalization:
+
+  * Array.isArray(trades) ? trades : []
+* Do NOT silently swallow malformed payloads:
+
+  * log normalized warnings in dev
+  * preserve telemetry diagnostics
+
+Critical:
+Do NOT touch:
+
+* Kraken execution bridge
+* execution queue
+* auth
+* operator routing
+* reconciliation engine
+
+This is a frontend/runtime stabilization patch only.
+
+====================================================
+2. COMMAND CENTER EXECUTION BARS
+================================
+
+The Command Center UI is now the preferred execution-control layout.
+
+I want BOTH:
+
+* LIVE AI CRYPTO EXECUTION
+* LIVE AI EQUITIES EXECUTION
+
+displayed ABOVE their respective sections on ALL THREE SURFACES:
+
+* https://trade.aicandlez.com/portal
+* https://admintrade.aicandlez.com/portal
+* /command
+
+Behavior:
+
+* RED = halted/locked
+* ORANGE/GLOW = actively executing
+* GREEN = armed/ready
+* Must animate/live-update
+* Must reflect REAL execution state
+* Must NOT be cosmetic-only
+
+These should become the canonical execution-control bars platform-wide.
+
+====================================================
+3. EXECUTION STATE PERSISTENCE
+==============================
+
+Right now switching between:
+
+* /portal
+* /command
+* admin surfaces
+
+creates state confusion.
+
+Need:
+
+* centralized execution-state source
+* synchronized LIVE/HALTED/ARMED state
+* no desync between views
+* no UI-only toggles
+
+Execution state must come from:
+
+* server-side source of truth
+* shared telemetry store
+* or execution bus state
+
+====================================================
+4. IMPORTANT SAFETY CONSTRAINTS
+===============================
+
+DO NOT:
+
+* reset execution queues
+* clear live positions
+* restart Kraken bridge unnecessarily
+* touch auth middleware
+* modify protected execution routing
+* remove BUY-TRACE diagnostics yet
+
+This is:
+
+* UI/runtime stabilization
+* execution-state synchronization
+* telemetry-safe enhancement
+
+====================================================
+5. PRIORITY ORDER
+=================
+
+1. Fix bootstrap crash
+2. Synchronize execution state across surfaces
+3. Deploy canonical execution bars platform-wide
+4. Verify no regression on live execution
+5. Preserve current telemetry diagnostics

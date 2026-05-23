@@ -59,15 +59,12 @@ const EXCHANGES: Exchange[] = [
   { id: "Coinbase",     name: "Coinbase",    logo: "C" },
   { id: "CryptoDotCom", name: "Crypto.com",  logo: "ᶜ" },
   { id: "Binance",      name: "Binance",     logo: "B" },
-  { id: "Bitget",       name: "Bitget",      logo: "₿", needsPassphrase: true },
 ];
 
 // Exchanges that ship a no-risk demo-trading surface we can opt into at
-// connect time. Currently Bitget-only — they reuse the production REST host
-// gated by a `PAPTRADING: 1` header on signed calls, so the toggle simply
-// tells the backend to persist `demoMode: true` and stamp every adapter
-// instantiation with the demo flag.
-const DEMO_TRADING_EXCHANGES = new Set<string>(["Bitget"]);
+// connect time. Currently empty — kept as an extension surface (e.g. if
+// Bitget is ever re-added it would expose a `PAPTRADING: 1` REST header).
+const DEMO_TRADING_EXCHANGES = new Set<string>();
 
 interface Props {
   open:    boolean;
@@ -363,12 +360,15 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
               marginBottom: 14,
             }}>
               <div style={{
-                fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 700,
-                letterSpacing: "0.16em", color: N.BRAND, marginBottom: 6,
+                fontFamily: N.FONT_MONO, fontSize: 10, fontWeight: 900,
+                letterSpacing: "0.20em", color: N.BRAND, marginBottom: 8,
+                textShadow: `0 0 10px ${N.BRAND_GLOW}, 0 0 22px ${N.BRAND_GLOW}`,
               }}>
                 ◆ ALREADY CONNECTED
               </div>
-              <div style={{ fontSize: 13, color: N.TEXT_0, fontWeight: 700, marginBottom: 4 }}>
+              <div style={{ fontSize: 16, color: "#FFFFFF", fontWeight: 800, marginBottom: 4,
+                letterSpacing: -0.2,
+                textShadow: `0 0 12px ${N.BRAND_GLOW}80` }}>
                 {picked.name} · {(pickedConn.connection?.tradingMode ?? "paper").toUpperCase()}
               </div>
               <div style={{ fontSize: 11, color: N.TEXT_1, lineHeight: 1.5 }}>

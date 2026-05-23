@@ -464,8 +464,11 @@ export default function Exchange() {
               </div>
               {krakenConn?.connected && (
                 <span
-                  className="text-[11px] px-2.5 py-1 rounded-full bg-green-500/25 text-green-200 border border-green-400/60 font-bold tracking-[0.18em]"
-                  style={{ boxShadow: "0 0 14px rgba(102,255,102,0.45), 0 0 0 1px rgba(102,255,102,0.25) inset" }}
+                  className="text-[12px] px-3 py-1 rounded-full bg-green-500/25 text-green-100 border border-green-400/70 font-extrabold tracking-[0.20em]"
+                  style={{
+                    boxShadow: "0 0 18px rgba(102,255,102,0.55), 0 0 0 1px rgba(102,255,102,0.30) inset",
+                    textShadow: "0 0 10px rgba(102,255,102,0.85), 0 0 22px rgba(102,255,102,0.50)",
+                  }}
                 >
                   ● CONNECTED
                 </span>

@@ -378,10 +378,12 @@ function StatusChip({ conn }: { conn: ApiExchange | undefined }) {
           ? "0 0 10px rgba(102,255,102,0.85), 0 0 18px rgba(102,255,102,0.45)"
           : "0 0 6px rgba(255,170,0,0.55)",
         animation: active ? "dot-pulse 2.5s ease-in-out infinite" : "none" }}/>
-      <span style={{ fontSize: 11, fontFamily: SANS, fontWeight: 800,
-        color: active ? "#66FF66" : "rgba(255,170,0,0.95)",
-        letterSpacing: "0.14em", textTransform: "uppercase" as const,
-        textShadow: active ? "0 0 8px rgba(102,255,102,0.55)" : "none" }}>
+      <span style={{ fontSize: 12, fontFamily: SANS, fontWeight: 900,
+        color: active ? "#A8FFB0" : "rgba(255,170,0,0.95)",
+        letterSpacing: "0.18em", textTransform: "uppercase" as const,
+        textShadow: active
+          ? "0 0 10px rgba(102,255,102,0.85), 0 0 22px rgba(102,255,102,0.45)"
+          : "none" }}>
         {active ? "CONNECTED" : conn.status}
       </span>
       {conn.isDefault && (
@@ -607,10 +609,12 @@ export default function Exchanges() {
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 19, fontFamily: SANS, fontWeight: 800,
-                      color: conn?.connected ? "#FFFFFF" : W, marginBottom: 5,
-                      letterSpacing: -0.3,
-                      textShadow: conn?.connected ? `0 0 14px ${ex.color}90` : "none" }}>
+                    <div style={{ fontSize: 21, fontFamily: SANS, fontWeight: 900,
+                      color: conn?.connected ? "#FFFFFF" : W, marginBottom: 6,
+                      letterSpacing: -0.35,
+                      textShadow: conn?.connected
+                        ? `0 0 16px ${ex.color}, 0 0 32px ${ex.color}70`
+                        : `0 0 10px ${ex.color}30` }}>
                       {ex.name}
                     </div>
                     <StatusChip conn={conn}/>
