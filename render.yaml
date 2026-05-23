@@ -57,6 +57,13 @@ services:
         value: https://aicandlez.com,https://www.aicandlez.com,https://app.aicandlez.com,https://trade.aicandlez.com,https://admintrade.aicandlez.com,https://dashboard.aicandlez.com,https://aicandlez-dashboard.onrender.com,https://aicandlez-trade.onrender.com,https://aicandlez-admintrade.onrender.com,https://aicandlez-app.onrender.com
       - key: EXCHANGE_LIVE_ENABLED
         value: "false"
+      # Task #162 Phase B: Stripe return host fallback for the API service.
+      # Per-request Origin header takes precedence when allow-listed; this
+      # env is the canonical fallback when no Origin is supplied (ops scripts,
+      # CLI, webhooks). MUST live on the API service (not the PWA), since
+      # api-server is the one that constructs success/cancel URLs.
+      - key: CUSTOMER_APP_BASE_URL
+        value: https://app.aicandlez.com
 
   # ── Customer Desktop Terminal — trade.aicandlez.com ──────────────────────────
   # The customer-facing institutional desktop workstation. Served by the
@@ -226,10 +233,6 @@ services:
       # (would self-loop into FullPageLoader). Phase A of Task #162.
       - key: VITE_TRADING_DASHBOARD_URL
         value: https://trade.aicandlez.com
-      # Default Stripe return host (per-request Origin header takes precedence
-      # when allow-listed). Read by api-server. Task #162 Phase B.
-      - key: CUSTOMER_APP_BASE_URL
-        value: https://app.aicandlez.com
 
   # ── Marketing Landing (static) ───────────────────────────────────────────────
   - type: web

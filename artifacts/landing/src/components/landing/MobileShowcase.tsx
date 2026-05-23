@@ -1,4 +1,4 @@
-import { APP_HOME_URL } from "../../lib/appUrls";
+import { TRADE_HOME_URL } from "../../lib/appUrls";
 
 function PhoneMockup({
   screen,
@@ -366,7 +366,7 @@ export function MobileShowcase() {
             and real-time notifications — optimized for iOS and Android.
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-            <a href={APP_HOME_URL} className="btn-primary" style={{ padding: "10px 24px", fontSize: 14 }}>
+            <a href={TRADE_HOME_URL} className="btn-primary" style={{ padding: "10px 24px", fontSize: 14 }}>
               Open as PWA
             </a>
             <span
