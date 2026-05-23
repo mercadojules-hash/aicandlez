@@ -42,6 +42,12 @@ export const userExchangeConnectionsTable = pgTable(
     // paper = safe default; live = user explicitly opted in + acknowledged risk
     tradingMode: varchar("trading_mode", { length: 20 }).notNull().default("paper"),
 
+    // Bitget-only: when true, signed adapter calls send `PAPTRADING: 1` so the
+    // request hits Bitget's demo-trading wallet on the production host. Has no
+    // effect on other exchanges. Defaults false; toggled at connect time and
+    // persisted alongside the encrypted credential blob.
+    demoMode: boolean("demo_mode").notNull().default(false),
+
     // Detected API permissions from last successful connection test
     // e.g. { read: true, trade: true, withdraw: false }
     permissions: jsonb("permissions").$type<{

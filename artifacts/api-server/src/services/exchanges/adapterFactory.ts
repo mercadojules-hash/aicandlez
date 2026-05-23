@@ -40,6 +40,7 @@ type AdapterCtor = new (cfg: {
   oauthExpiresAt?:    number;
   oauthScope?:        string;
   testnet?:           boolean;
+  demoMode?:          boolean;
 }) => BaseExchangeAdapter;
 
 // ── The one and only adapter map ─────────────────────────────────────────────
@@ -95,6 +96,13 @@ export interface MakeAdapterOptions {
    * public sandbox (caller is expected to gate with `hasSandbox()` first).
    */
   testnet?: boolean;
+  /**
+   * Bitget-only: when true, the adapter sends the `PAPTRADING: 1` header on
+   * every signed call so requests hit Bitget's demo-trading wallet on the
+   * production REST host. Has no effect on any other adapter. Mutually
+   * exclusive with `testnet` in practice — Bitget has no public sandbox host.
+   */
+  demoMode?: boolean;
 }
 
 export function makeAdapter(
@@ -113,5 +121,6 @@ export function makeAdapter(
     oauthExpiresAt:    creds.oauthExpiresAt,
     oauthScope:        creds.oauthScope,
     testnet:           opts.testnet === true ? true : undefined,
+    demoMode:          opts.demoMode === true ? true : undefined,
   });
 }

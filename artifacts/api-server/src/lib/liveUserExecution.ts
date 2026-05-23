@@ -463,7 +463,7 @@ export async function placeLiveAutoOrderForUser(
   }
   let adapter: BaseExchangeAdapter;
   try {
-    adapter = makeAdapter(row.exchange, creds, { testnet: useSandbox });
+    adapter = makeAdapter(row.exchange, creds, { testnet: useSandbox, demoMode: row.demoMode });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await emitFailureNotification(userId, symbol, side, msg, row.exchange);
@@ -671,7 +671,7 @@ export async function placeLiveCloseOrderForUser(
   }
   let adapter: BaseExchangeAdapter;
   try {
-    adapter = makeAdapter(row.exchange, creds, { testnet: useSandbox });
+    adapter = makeAdapter(row.exchange, creds, { testnet: useSandbox, demoMode: row.demoMode });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await emitFailureNotification(userId, symbol, closeSide, msg, row.exchange);

@@ -23,7 +23,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { X, Loader2, ShieldCheck, AlertTriangle, Check, Link2Off } from "lucide-react";
+import { X, Loader2, ShieldCheck, AlertTriangle, Check, Link2Off, FlaskConical } from "lucide-react";
 
 const N = {
   BG_OVERLAY: "rgba(0,0,0,0.86)",
@@ -58,7 +58,15 @@ const EXCHANGES: Exchange[] = [
   { id: "Coinbase",     name: "Coinbase",    logo: "C" },
   { id: "CryptoDotCom", name: "Crypto.com",  logo: "ᶜ" },
   { id: "Binance",      name: "Binance",     logo: "B" },
+  { id: "Bitget",       name: "Bitget",      logo: "₿", needsPassphrase: true },
 ];
+
+// Exchanges that ship a no-risk demo-trading surface we can opt into at
+// connect time. Currently Bitget-only — they reuse the production REST host
+// gated by a `PAPTRADING: 1` header on signed calls, so the toggle simply
+// tells the backend to persist `demoMode: true` and stamp every adapter
+// instantiation with the demo flag.
+const DEMO_TRADING_EXCHANGES = new Set<string>(["Bitget"]);
 
 interface Props {
   open:    boolean;
@@ -127,15 +135,24 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
   const [apiKey,     setApiKey]     = useState("");
   const [apiSecret,  setApiSecret]  = useState("");
   const [passphrase, setPassphrase] = useState("");
+  const [demoMode,   setDemoMode]   = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
   const [success,    setSuccess]    = useState(false);
+  // Demo-trading toggle only applies to exchanges whose adapter honours the
+  // demoMode flag (Bitget today). Reset when the user switches exchanges so
+  // the flag never carries over from a previous picker selection.
+  const demoSupported = DEMO_TRADING_EXCHANGES.has(picked.id);
+  useEffect(() => {
+    if (!demoSupported && demoMode) setDemoMode(false);
+  }, [demoSupported, demoMode]);
 
   if (!open) return null;
 
   const reset = () => {
     setPicked(EXCHANGES[0]); setLabel(""); setApiKey(""); setApiSecret("");
-    setPassphrase(""); setError(null); setSuccess(false); setSubmitting(false);
+    setPassphrase(""); setDemoMode(false); setError(null); setSuccess(false);
+    setSubmitting(false);
     setConfirmDisconnect(false); setDisconnecting(false);
     setDisconnectError(null); setDisconnectDone(false);
   };
@@ -204,6 +221,7 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
           apiKey:    apiKey.trim(),
           apiSecret: apiSecret.trim(),
           ...(picked.needsPassphrase ? { passphrase: passphrase.trim() } : {}),
+          ...(demoSupported ? { demoMode } : {}),
         }),
       });
       const data = await r.json().catch(() => ({} as { error?: string }));
@@ -522,6 +540,71 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
               <Field label="PASSPHRASE" value={passphrase}
                      onChange={setPassphrase} placeholder="Required for this exchange"
                      monospace required masked disabled={submitting} />
+            )}
+
+            {/* Demo-trading toggle (Bitget today). Routes signed calls to the
+                exchange's demo wallet on the production host via the
+                `PAPTRADING: 1` header — no real funds touched. */}
+            {demoSupported && (
+              <button
+                type="button"
+                onClick={() => !submitting && setDemoMode(v => !v)}
+                disabled={submitting}
+                aria-pressed={demoMode}
+                style={{
+                  width: "100%",
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "11px 12px",
+                  background: demoMode
+                    ? "rgba(102,255,102,0.06)"
+                    : "rgba(255,255,255,0.03)",
+                  border: `1px solid ${demoMode ? N.BRAND : N.BORDER}`,
+                  borderRadius: 10,
+                  marginTop: 2, marginBottom: 12,
+                  cursor: submitting ? "not-allowed" : "pointer",
+                  textAlign: "left",
+                  transition: "all 120ms ease",
+                  boxShadow: demoMode
+                    ? `0 0 18px ${N.BRAND_GLOW}, 0 0 0 1px ${N.BRAND}40 inset`
+                    : "none",
+                }}
+              >
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                  background: demoMode ? `${N.BRAND}22` : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${demoMode ? N.BRAND : N.BORDER}`,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <FlaskConical size={14} color={demoMode ? N.BRAND : N.TEXT_1} strokeWidth={2.2} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontFamily: N.FONT_MONO, fontSize: 10, fontWeight: 800,
+                    letterSpacing: "0.16em", color: demoMode ? N.BRAND : N.TEXT_0,
+                    marginBottom: 2,
+                  }}>
+                    DEMO TRADING
+                  </div>
+                  <div style={{ fontSize: 10.5, color: N.TEXT_1, lineHeight: 1.45 }}>
+                    Practice on {picked.name}'s demo wallet — real broker, no real funds.
+                  </div>
+                </div>
+                <div style={{
+                  width: 34, height: 20, borderRadius: 999,
+                  background: demoMode ? N.BRAND : "rgba(255,255,255,0.10)",
+                  position: "relative", flexShrink: 0,
+                  transition: "background 120ms ease",
+                  boxShadow: demoMode ? `0 0 12px ${N.BRAND_GLOW}` : "none",
+                }}>
+                  <div style={{
+                    position: "absolute",
+                    top: 2, left: demoMode ? 16 : 2,
+                    width: 16, height: 16, borderRadius: "50%",
+                    background: demoMode ? "#001b06" : "#E8F5EC",
+                    transition: "left 120ms ease",
+                  }}/>
+                </div>
+              </button>
             )}
 
             {/* Security note */}

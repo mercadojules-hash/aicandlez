@@ -36,7 +36,15 @@ const ALL_EXCHANGES: ExchangeEntry[] = [
     needsPassphrase: false, apiGuide: "Settings → API Keys → Create Key (Exchange API)" },
   { id: "Binance",      name: "Binance",    logo: "B", active: true, color: "#f0b90b",
     needsPassphrase: false, apiGuide: "Account → API Management → Create API" },
+  { id: "Bitget",       name: "Bitget",     logo: "₿", active: true, color: "#00d4ff",
+    needsPassphrase: true,  apiGuide: "API Management → Create API Key (set passphrase)" },
 ];
+
+// Exchanges that ship a no-risk demo-trading surface we can opt into at
+// connect time. Bitget reuses the production REST host gated by the
+// `PAPTRADING: 1` header, so toggling demoMode tells the backend to
+// persist demoMode=true and pass it to every BitgetAdapter instantiation.
+const DEMO_TRADING_EXCHANGES = new Set<string>(["Bitget"]);
 
 interface ApiExchange {
   exchange: string; name: string; connected: boolean; isDefault: boolean;
@@ -150,6 +158,8 @@ function ConnectModal({
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [err,  setErr]  = useState("");
   const [show, setShow] = useState({ key: false, secret: false });
+  const [demoMode, setDemoMode] = useState(false);
+  const demoSupported = DEMO_TRADING_EXCHANGES.has(ex.id);
 
   const { gate: disclaimerGate, modal: disclaimerModal } = useDisclaimerGate();
 
@@ -160,6 +170,7 @@ function ConnectModal({
       apiKey:    form.apiKey,
       apiSecret: form.apiSecret,
       ...(ex.needsPassphrase ? { passphrase: form.passphrase } : {}),
+      ...(demoSupported ? { demoMode } : {}),
     }),
     onSuccess: onConnected,
     onError:   (e: unknown) => setErr(e instanceof Error
@@ -255,6 +266,51 @@ function ConnectModal({
         {Field("API Key",          "apiKey",    "Paste your API key",    true, "key"   )}
         {Field("API Secret",       "apiSecret", "Paste your API secret", true, "secret")}
         {ex.needsPassphrase && Field("Passphrase", "passphrase", "API passphrase")}
+
+        {/* Demo-trading toggle (Bitget today). Routes signed calls to the
+            exchange's demo wallet on the production host via PAPTRADING:1 —
+            real broker round-trip, no real funds at risk. */}
+        {demoSupported && (
+          <button
+            type="button"
+            onClick={() => setDemoMode(v => !v)}
+            aria-pressed={demoMode}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "12px 14px", marginBottom: 16, cursor: "pointer",
+              background: demoMode ? "rgba(102,255,102,0.06)" : "rgba(255,255,255,0.03)",
+              border: `1px solid ${demoMode ? "rgba(102,255,102,0.45)" : "rgba(255,255,255,0.10)"}`,
+              borderRadius: 10, textAlign: "left",
+              boxShadow: demoMode ? "0 0 16px rgba(102,255,102,0.18)" : "none",
+              transition: "all 0.15s ease",
+            }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: 9, fontFamily: SANS, fontWeight: 700,
+                color: demoMode ? "#66FF66" : "rgba(255,255,255,0.80)",
+                letterSpacing: "0.14em", marginBottom: 3,
+              }}>
+                DEMO TRADING
+              </div>
+              <div style={{ fontSize: 10.5, fontFamily: SANS, color: GR, lineHeight: 1.5 }}>
+                Practice on {ex.name}'s demo wallet — real broker, no real funds.
+              </div>
+            </div>
+            <div style={{
+              width: 34, height: 20, borderRadius: 999, flexShrink: 0,
+              background: demoMode ? "#66FF66" : "rgba(255,255,255,0.10)",
+              position: "relative",
+              transition: "background 0.15s ease",
+            }}>
+              <div style={{
+                position: "absolute", top: 2, left: demoMode ? 16 : 2,
+                width: 16, height: 16, borderRadius: "50%",
+                background: demoMode ? "#001b06" : "#ffffff",
+                transition: "left 0.15s ease",
+              }}/>
+            </div>
+          </button>
+        )}
 
         {/* Security note */}
         <div style={{ background: "rgba(0,210,100,0.04)",

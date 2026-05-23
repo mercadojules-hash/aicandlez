@@ -40,8 +40,8 @@ type AuthReq = Request & { clerkUserId: string };
 // 2. Test private endpoint (getAccount) → confirms credentials work
 // Never tests or requests withdrawal permissions.
 
-async function runConnectionTest(exchange: string, creds: ExchangeCredentials) {
-  const adapter = makeAdapter(exchange, creds);
+async function runConnectionTest(exchange: string, creds: ExchangeCredentials, demoMode = false) {
+  const adapter = makeAdapter(exchange, creds, { demoMode });
 
   // Step 1 — public ticker (network check)
   await adapter.getTicker("BTCUSD");
@@ -75,6 +75,7 @@ function safeRow(row: typeof userExchangeConnectionsTable.$inferSelect) {
     status:          row.status,
     isDefault:       row.isDefault,
     tradingMode:     row.tradingMode,
+    demoMode:        row.demoMode,
     permissions:     row.permissions,
     lastVerifiedAt:  row.lastVerifiedAt,
     lastError:       row.lastError,
@@ -121,13 +122,20 @@ router.get("/user/exchanges", requireAuth, async (req, res): Promise<void> => {
 // disclaimer gate still runs afterwards for non-admin paid users.
 router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requireDisclaimer, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
-  const { exchange, apiKey, apiSecret, passphrase, label } = req.body as {
+  const { exchange, apiKey, apiSecret, passphrase, label, demoMode } = req.body as {
     exchange:    string;
     apiKey:      string;
     apiSecret:   string;
     passphrase?: string;
     label?:      string;
+    demoMode?:   boolean;
   };
+
+  // demoMode is Bitget-only — it routes signed calls to Bitget's
+  // demo-trading wallet via the `PAPTRADING: 1` header. Silently coerce to
+  // false for every other exchange so a stale frontend flag can't accidentally
+  // toggle on a no-op field that we then persist.
+  const demoModeFlag = exchange === "Bitget" && demoMode === true;
 
   // ── Validate input ────────────────────────────────────────────────────────
 
@@ -157,8 +165,8 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
   // ── Test connection ───────────────────────────────────────────────────────
   let testResult: { ok: boolean; permissions: { read: boolean; trade: boolean; withdraw: false }; error?: string };
   try {
-    req.log.info({ userId, exchange }, "userExchanges: testing connection");
-    testResult = await runConnectionTest(exchange, creds);
+    req.log.info({ userId, exchange, demoMode: demoModeFlag }, "userExchanges: testing connection");
+    testResult = await runConnectionTest(exchange, creds, demoModeFlag);
   } catch (err) {
     req.log.warn({ userId, exchange, err: (err as Error).message }, "userExchanges: connection test failed");
     res.status(422).json({
@@ -192,6 +200,7 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
         status:         "active",
         isDefault:      false,
         tradingMode:    "paper",
+        demoMode:       demoModeFlag,
         permissions:    testResult.permissions,
         lastVerifiedAt: now,
         lastError:      null,
@@ -202,6 +211,7 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
           label:          label ?? "Default",
           encryptedBlob,
           status:         "active",
+          demoMode:       demoModeFlag,
           permissions:    testResult.permissions,
           lastVerifiedAt: now,
           lastError:      null,
@@ -279,7 +289,7 @@ async function loadBalanceForRow(
     return { ...base, error: (err as Error).message };
   }
   try {
-    const adapter = makeAdapter(row.exchange, creds);
+    const adapter = makeAdapter(row.exchange, creds, { demoMode: row.demoMode });
     const account = await adapter.getAccount();
     return {
       ...base,
@@ -391,7 +401,7 @@ router.post("/user/exchanges/:exchange/test", requireAuth, requirePlan("starter"
 
   let testResult: { ok: boolean; permissions: { read: boolean; trade: boolean; withdraw: false }; error?: string };
   try {
-    testResult = await runConnectionTest(exchange, creds);
+    testResult = await runConnectionTest(exchange, creds, row.demoMode);
   } catch (err) {
     const errorMsg = (err as Error).message;
     await db
