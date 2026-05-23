@@ -190,6 +190,12 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
           WHERE exchange IS NOT NULL AND entry_time >= ${Date.now() - 24 * 60 * 60 * 1000}
         ) o
         GROUP BY user_id
+      ),
+      trades_today AS (
+        SELECT user_id, COUNT(*)::int AS today_count
+        FROM sim_trades
+        WHERE entry_time >= ${Date.now() - 24 * 60 * 60 * 1000}
+        GROUP BY user_id
       )
       SELECT
         u.clerk_user_id                                         AS clerk_user_id,
@@ -226,6 +232,8 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         COALESCE(tl.cap_tier, 50)                                AS trade_cap_tier,
         tl.override_expires_at                                   AS trade_cap_override_expires_at,
         COALESCE(o24.used_24h, 0)                                AS used_24h,
+        COALESCE(td.today_count, 0)                              AS trades_today,
+        COALESCE(a.cash_balance, 0)                              AS cash_balance,
         GREATEST(
           COALESCE(agg.last_trade_ms, 0),
           COALESCE(EXTRACT(EPOCH FROM u.created_at)::bigint * 1000, 0)
@@ -238,6 +246,8 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
       LEFT JOIN conn_agg             conn   ON conn.user_id   = u.clerk_user_id
       LEFT JOIN user_trade_limits    tl     ON tl.user_id     = u.clerk_user_id
       LEFT JOIN live_opens_24h       o24    ON o24.user_id    = u.clerk_user_id
+      LEFT JOIN trades_today         td     ON td.user_id     = u.clerk_user_id
+      LEFT JOIN sim_accounts         a      ON a.user_id      = u.clerk_user_id
       WHERE (${search}::text IS NULL OR LOWER(u.email) LIKE ${search})
         AND (${planArg}::text IS NULL OR LOWER(u.plan) = ${planArg})
         AND (${statArg}::text IS NULL OR COALESCE(status.status, 'active') = ${statArg})
@@ -300,6 +310,8 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         exchangeError:       Number(r["exchange_error"] ?? 0),
         hasLiveExchange:     Boolean(r["has_live_exchange"]),
         tradeCapTier:        Number(r["trade_cap_tier"] ?? 50),
+        tradesToday:         Number(r["trades_today"] ?? 0),
+        equityUsd:           Number(r["cash_balance"] ?? 0),
         // Trade-limit engine-equivalent telemetry, derived in-SQL so the
         // list endpoint never N+1s the engine per row.
         tradeLimit: (() => {

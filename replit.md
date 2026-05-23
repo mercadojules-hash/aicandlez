@@ -337,48 +337,22 @@ Light theme, warm cream `#F8F6F0`, forest green `#3D7A45`, Inter, radius 16.
 
 ---
 
-# Archive — Implementation History
+# Changelog (condensed)
 
-*Condensed summaries of historical phases. Full detail lives in git history.*
+Full per-phase detail lives in git history. Anything operationally
+important has been promoted into the active sections above — this list
+is milestone reference only.
 
-**Phase 1 — Authentication (DONE)**
-Clerk fully integrated. Public landing at `/`, sign-in/up routes, all dashboard routes protected. `users` table with role enum. `clerkProxyMiddleware` + `clerkMiddleware` + `requireAuth`/`requireRole`. JIT user provisioning via `GET /api/auth/me`.
-
-**Phase 2 — User-Scoped Trading Platform (DONE)**
-Every authenticated user gets fully isolated simulation environment. 5 new DB tables (`user_settings`, `sim_accounts`, `sim_positions`, `sim_trades`, `user_notifications`). `userSimRegistry` Map with lazy DB-load + immediate persistence. All `/api/simulation/*` + `/api/user/*` routes auth-gated. `Settings.tsx` page added at `/settings`.
-
-**Phase 3 — Exchange Connection Management (DONE)**
-Per-user encrypted exchange credentials. `user_exchange_connections` table with AES-256-GCM + per-user PBKDF2. 6 exchanges. Connection test gates writes. Live mode requires `acknowledged: true`. Withdrawal perms never requested. Settings page exchange connection cards + ConnectModal wizard.
-
-**Phase 4 — Production Deployment Foundation (DONE)**
-VAPID push infra: `sw.js`, `usePushNotifications`, `SwRegistrar`, `NotificationDispatcher`, `POST /api/user/notify`. Offline push fallback in `wsServer.ts`. Module 20 Desktop Terminal at `/desktop`. `DEPLOYMENT.md`, `.env.production.example`, `render.yaml` with 4 services. Full production-readiness audit (zero apexdigital / placeholder strings).
-
-**Phase 5 — Neon-Green Brand Pivot (DONE)**
-Cyan → neon-green system-wide. Brand palette tokens, glass primitives, animation library. Home rebuilds for both PWA (Vite/React) and Expo. Legacy aliases preserved (`C.cyan`, `C.purple`, `C.teal`, `C.green` remap onto green) so existing components re-skin automatically. Tab bar reskin on natura-ai.
-
-**Phase 5.1 — PWA Home Radar Polish (DONE)**
-Centered master logo brand header. Real branded crypto icons (BTC/ETH/SOL/ADA/AVAX/DOGE inline SVG). `RadarScanner` component (concentric rings + rotating sweep + asset blips + breathing center medallion). Cinematic typography (48px tabular-nums portfolio hero), atmospheric background (orbs + rays + grid + vignette), glowing BUY/SELL CTAs.
-
-**Phase 5.2 — Final Master Polish (DONE — current)**
-- Billing.tsx full rewrite to 3-tier ladder with status badges + upgrade/downgrade/portal CTAs
-- `lib/feedback.ts` notification + sound + haptic scaffolding (10 alert types, master switches, localStorage-backed, cross-tab synced)
-- Profile.tsx Alert Preferences section
-- Home.tsx scanner expanded with 5 new intelligent states (now 10+ rotating)
-- All approved layouts/cards/nav/typography preserved exactly as-is
-- Zero `$5.99` references in source
-
-**Phase 5.3 — Dashboard Polish (DONE — current)**
-- `.neon-scroll` class added to `index.css` (opt-in green scrollbar for fixed-height containers)
-- Home.tsx: "Active Trades" → renamed "Live Trades", slice cap raised 6→15, neon scrollbar
-- Home.tsx: Trade History slice tightened 24→15, neon scrollbar
-- Home.tsx: **Compact Crypto Signals preview block** above Live Trades — pulls top 4 actionable signals from existing `/mobile/signals` `breakdowns` data, sorted by confidence
-- Home.tsx: **Compact Equity Signals preview block** above Trade History — curated 4-row shortlist matching `Equities.tsx` static map (NVDA · META · TSLA · MSFT)
-- Shared `SignalsPreviewRow` + `TickerBadge` helpers (single-column, mobile-first, no layout grid)
-- `UpgradeBanner.tsx` rewritten for tier-conditional UI:
-  - FREE → full upgrade prompt ("Start AI Trading")
-  - STARTER → single subtle "Upgrade to Pro" line, no locked/unlock language
-  - PRO → returns `null` (billing-state past_due/canceled still trump tier rule)
-- `FeatureGate.tsx` — Pro tier bypasses lock overlay entirely; legacy cyan `#00e5ff` → brand `#66FF66`; starter sees "Upgrade to Pro" CTA label
+- **Phase 1** — Clerk auth integrated; protected routes + `users` table + role enum + JIT provisioning.
+- **Phase 2** — Per-user isolated sim environment; `userSimRegistry` + 5 sim tables + auth-gated `/api/simulation/*` and `/api/user/*`.
+- **Phase 3** — Encrypted exchange credentials (AES-256-GCM + PBKDF2); connection-test-gated writes; withdrawal perms never requested.
+- **Phase 4** — VAPID push infra; Module 20 Desktop Terminal; production deployment scaffolding (`DEPLOYMENT.md`, `render.yaml` × 4 services).
+- **Phase 5** — Cyan → neon-green system-wide pivot; brand tokens, glass primitives, animation library; legacy aliases preserved.
+- **Phase 5.1–5.3** — PWA home radar polish; cinematic typography; 3-tier billing ladder; `lib/feedback.ts` (10 alert types); Crypto/Equity signals preview blocks; tier-conditional `UpgradeBanner` + `FeatureGate`.
+- **Task #157** — Customer/Admin portal separation invariant locked; `customer_live_execution_disabled` kill switch (3 enforcement points + dedicated test).
+- **Task #158** — Read-only telemetry surface: `adminUserTelemetry` (per-user + leaderboards), `adminTopTelemetry` (platform), `operatorTelemetry`.
+- **Task #159** — 10 operator action endpoints in `adminUserActions.ts` + immutable audit + Stripe billing actions + `executionStreamBus` events.
+- **Task #160 (umbrella, in progress)** — Phased operator administration; Phases 1–6 backend complete (DB schemas, audit, trade-limit engine, isolation, telemetry, actions); Phase A telemetry contract audit complete with `tradesToday` + `equityUsd` added to list payload; Phase E UI deferred until live env stabilization.
 
 ---
 
