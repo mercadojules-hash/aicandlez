@@ -1,4 +1,4 @@
-import { APP_HOME_URL } from "../../lib/appUrls";
+import { TRADE_HOME_URL } from "../../lib/appUrls";
 
 export function CTA() {
   return (
@@ -88,7 +88,7 @@ export function CTA() {
           }}
         >
           <a
-            href={APP_HOME_URL}
+            href={TRADE_HOME_URL}
             className="btn-primary"
             style={{ fontSize: 17, padding: "16px 36px" }}
           >
@@ -98,7 +98,7 @@ export function CTA() {
             Launch AICandlez — Free
           </a>
           <a
-            href={APP_HOME_URL}
+            href={TRADE_HOME_URL}
             className="btn-ghost"
             style={{ fontSize: 17, padding: "16px 36px" }}
           >

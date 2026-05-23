@@ -6,6 +6,7 @@ import { requireAuth } from "../middlewares/requireAuth.js";
 import { requireDisclaimer } from "../middlewares/requireDisclaimer.js";
 import { TIER_MAX_SIZE_USD, type TierPlan } from "../lib/tierLimits.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
+import { resolveCustomerAppBaseUrl } from "../lib/customerAppUrl.js";
 import {
   getUncachableStripeClient,
   getStripePublishableKey,
@@ -334,6 +335,10 @@ router.post("/billing/checkout", requireAuth, requireDisclaimer, async (req, res
     priceId?: string;
     planId?:  string;
     billingPeriod?: "monthly" | "yearly";
+    // Task #162 Phase B: PWA call sites supply BASE_URL-derived return paths.
+    // Honored server-side only when same-origin with the resolved baseUrl.
+    successUrl?: string;
+    cancelUrl?:  string;
   };
   let priceId = body.priceId;
 
@@ -415,21 +420,28 @@ router.post("/billing/checkout", requireAuth, requireDisclaimer, async (req, res
     const customerId = await ensureStripeCustomer(userId, user.billingEmail ?? user.email);
     const stripe     = await getUncachableStripeClient();
 
-    // Priority: explicit WEBHOOK_BASE_URL (production custom domain) →
-    // REPLIT_DOMAINS (Replit Reserved VM) → localhost (dev fallback).
-    const baseUrl =
-      process.env["WEBHOOK_BASE_URL"] ??
-      (process.env["REPLIT_DOMAINS"]
-        ? `https://${process.env["REPLIT_DOMAINS"].split(",")[0]}`
-        : "http://localhost:80");
+    // Task #162 Phase B: derive return host from request Origin (allow-listed)
+    // so PWA checkout returns land on app.aicandlez.com (PWA root) — not
+    // api.aicandlez.com (WEBHOOK_BASE_URL) which 404s. Falls back to
+    // CUSTOMER_APP_BASE_URL env, then the legacy WEBHOOK_BASE_URL chain.
+    const baseUrl = resolveCustomerAppBaseUrl(req.get("origin") ?? undefined);
+
+    // Honor client-provided success/cancel URLs when present and same-origin
+    // with the resolved baseUrl. PWA call sites (Billing.tsx, Subscribe.tsx,
+    // SubscriptionModal.tsx) supply BASE_URL-derived paths that already
+    // account for dev (`/aicandlez-app/`) vs prod (`/`) mount points.
+    const clientSuccess = typeof body.successUrl === "string" ? body.successUrl : undefined;
+    const clientCancel  = typeof body.cancelUrl  === "string" ? body.cancelUrl  : undefined;
+    const safeOrigin = (u: string | undefined) =>
+      Boolean(u && (() => { try { return new URL(u).origin === baseUrl; } catch { return false; } })());
 
     const session = await stripe.checkout.sessions.create({
       customer:             customerId,
       payment_method_types: ["card"],
       line_items:           [{ price: priceId, quantity: 1 }],
       mode:                 "subscription",
-      success_url:          `${baseUrl}/billing?success=1`,
-      cancel_url:           `${baseUrl}/billing?canceled=1`,
+      success_url:          safeOrigin(clientSuccess) ? clientSuccess! : `${baseUrl}/billing?success=1`,
+      cancel_url:           safeOrigin(clientCancel)  ? clientCancel!  : `${baseUrl}/billing?canceled=1`,
       allow_promotion_codes: true,
       subscription_data: {
         trial_period_days: 7,
@@ -466,15 +478,21 @@ router.post("/billing/portal", requireAuth, async (req, res): Promise<void> => {
 
     const stripe = await getUncachableStripeClient();
 
-    const baseUrl =
-      process.env["WEBHOOK_BASE_URL"] ??
-      (process.env["REPLIT_DOMAINS"]
-        ? `https://${process.env["REPLIT_DOMAINS"].split(",")[0]}`
-        : "http://localhost:80");
+    // Same Origin-aware derivation as the checkout handler (Task #162 Phase B).
+    const baseUrl = resolveCustomerAppBaseUrl(req.get("origin") ?? undefined);
+    const clientReturn = typeof (req.body as { returnUrl?: unknown })?.returnUrl === "string"
+      ? (req.body as { returnUrl: string }).returnUrl
+      : undefined;
+    let returnUrl = `${baseUrl}/billing`;
+    if (clientReturn) {
+      try {
+        if (new URL(clientReturn).origin === baseUrl) returnUrl = clientReturn;
+      } catch { /* ignore — fallback to default */ }
+    }
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer:   customerId,
-      return_url: `${baseUrl}/billing`,
+      return_url: returnUrl,
     });
 
     res.json({ url: portalSession.url });

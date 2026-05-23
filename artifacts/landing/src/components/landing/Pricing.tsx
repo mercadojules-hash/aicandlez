@@ -1,4 +1,4 @@
-import { APP_HOME_URL } from "../../lib/appUrls";
+import { TRADE_HOME_URL } from "../../lib/appUrls";
 
 export function Pricing() {
   return (
@@ -90,7 +90,7 @@ export function Pricing() {
                 </div>
               ))}
             </div>
-            <a href={APP_HOME_URL} className="btn-ghost" style={{ width: "100%", justifyContent: "center" }}>
+            <a href={TRADE_HOME_URL} className="btn-ghost" style={{ width: "100%", justifyContent: "center" }}>
               Start Paper Trading
             </a>
           </div>
@@ -164,7 +164,7 @@ export function Pricing() {
                 </div>
               ))}
             </div>
-            <a href={APP_HOME_URL} className="btn-primary" style={{ width: "100%", justifyContent: "center" }}>
+            <a href={TRADE_HOME_URL} className="btn-primary" style={{ width: "100%", justifyContent: "center" }}>
               Start Live Trading
             </a>
           </div>

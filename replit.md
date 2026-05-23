@@ -86,6 +86,26 @@ institutional platform.
   `/command`, `/exchange`, `/syscheck`, `/debug`, `/desktop`, `/institutional`, `/admin`
 - `/settings`, `/sign-in/*`, `/sign-up/*`
 
+## Cross-host routing matrix (Task #162 — locked)
+
+| Host                              | Signed-out                | Signed-in customer            | Signed-in admin            | Default landing       | Build env                                                                                  |
+| --------------------------------- | ------------------------- | ----------------------------- | -------------------------- | --------------------- | ------------------------------------------------------------------------------------------ |
+| `aicandlez.com` (landing)         | Marketing page            | CTAs → `trade.aicandlez.com`  | CTAs → `trade.aicandlez.com` | Marketing             | `VITE_TRADE_URL=https://trade.aicandlez.com`, `VITE_APP_URL=https://app.aicandlez.com`     |
+| `app.aicandlez.com` (PWA)         | `/` PWA home (Clerk gate) | PWA mobile experience         | PWA mobile experience      | PWA root              | `VITE_TRADING_DASHBOARD_URL=https://trade.aicandlez.com` (for `/portal` cross-host bounce) |
+| `trade.aicandlez.com` (customer)  | Landing → `/sign-in`      | `/portal` (customer desktop)  | `/command` (operator)      | `/portal`             | `VITE_DEFAULT_LANDING=/portal`                                                              |
+| `admintrade.aicandlez.com` (admin)| Landing → `/sign-in`      | **cross-host → `trade./portal`** | `/command` (operator)      | `/command`            | `VITE_DEFAULT_LANDING=/command`, `VITE_CUSTOMER_PORTAL_URL=https://trade.aicandlez.com/portal` |
+| `api.aicandlez.com`               | (API only)                | (API only)                    | (API only)                 | n/a                   | `CUSTOMER_APP_BASE_URL=https://app.aicandlez.com` (Stripe return host fallback)             |
+
+**Stripe return URL derivation (api-server `lib/customerAppUrl.ts`):**
+1. Request `Origin` header — if allow-listed (`app.`/`trade.`/`aicandlez.com` apex/www, `*.replit.app`, `*.replit.dev`, localhost).
+2. Else `CUSTOMER_APP_BASE_URL` env.
+3. Else legacy `WEBHOOK_BASE_URL` → `REPLIT_DOMAINS` chain.
+4. Client-provided `successUrl`/`cancelUrl`/`returnUrl` are honored only when their origin matches the resolved host (defense against spoofed Origin → open redirect).
+
+**Trading-dashboard role dispatch (`SignedInHomeRouter`, `AdminOnly`):**
+- On the customer host, non-admins → `VITE_DEFAULT_LANDING` (`/portal`); admins → `/command`.
+- On the admin host, non-admins → `CrossAppRedirect(VITE_CUSTOMER_PORTAL_URL)` to keep operator chrome off their screen entirely; admins → `/command`.
+
 ## Architectural separation — CUSTOMER PORTAL vs ADMIN PORTAL (LOCKED INVARIANT)
 
 These are intentionally **two different systems** that happen to share the

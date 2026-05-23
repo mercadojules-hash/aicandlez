@@ -146,6 +146,10 @@ services:
         value: wss://api.aicandlez.com/ws
       - key: VITE_DEFAULT_LANDING
         value: /command
+      # Task #162 Phase C: non-admin users hitting this host get bounced
+      # cross-host to the customer portal (never see operator chrome).
+      - key: VITE_CUSTOMER_PORTAL_URL
+        value: https://trade.aicandlez.com/portal
 
   # ── Legacy dashboard.aicandlez.com (preserve during migration) ───────────────
   # Same build; will be retired once trade./admintrade. cutover is verified.
@@ -222,6 +226,10 @@ services:
       # (would self-loop into FullPageLoader). Phase A of Task #162.
       - key: VITE_TRADING_DASHBOARD_URL
         value: https://trade.aicandlez.com
+      # Default Stripe return host (per-request Origin header takes precedence
+      # when allow-listed). Read by api-server. Task #162 Phase B.
+      - key: CUSTOMER_APP_BASE_URL
+        value: https://app.aicandlez.com
 
   # ── Marketing Landing (static) ───────────────────────────────────────────────
   - type: web

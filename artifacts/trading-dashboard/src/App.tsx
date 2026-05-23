@@ -235,12 +235,36 @@ function CrossAppRedirect({ to }: { to: string }) {
   return <FullPageLoader />;
 }
 
+// Task #162 Phase C: per-host default landing.
+//   trade.aicandlez.com       → VITE_DEFAULT_LANDING=/portal (customer)
+//   admintrade.aicandlez.com  → VITE_DEFAULT_LANDING=/command (operator)
+// Customers reaching the admintrade host get cross-host bounced to the
+// customer-side portal — they must never see operator chrome.
+const DEFAULT_LANDING = (() => {
+  const raw = (import.meta.env["VITE_DEFAULT_LANDING"] as string | undefined)?.trim();
+  if (raw && raw.startsWith("/")) return raw;
+  return "/portal";
+})();
+
+const CUSTOMER_PORTAL_URL = (() => {
+  const raw = (import.meta.env["VITE_CUSTOMER_PORTAL_URL"] as string | undefined)?.trim();
+  if (raw) return raw.replace(/\/+$/, "");
+  return "https://trade.aicandlez.com/portal";
+})();
+
+const IS_ADMIN_HOST = DEFAULT_LANDING === "/command";
+
 function SignedInHomeRouter() {
   const { isAdmin, loading } = useUserRole();
   if (loading) return <FullPageLoader />;
-  // Non-admin (customer) → local /portal customer institutional workstation.
-  // Admin → /command operator console.
-  if (!isAdmin) return <Redirect to="/portal" />;
+  // On the customer host (trade.*) admins also land on the default —
+  // they can navigate to /command from chrome. On the admin host
+  // (admintrade.*) non-admins must NOT remain — bounce cross-host to
+  // the canonical customer portal.
+  if (!isAdmin && IS_ADMIN_HOST) return <CrossAppRedirect to={CUSTOMER_PORTAL_URL} />;
+  if (isAdmin && IS_ADMIN_HOST) return <Redirect to="/command" />;
+  // Customer host: dispatch by role.
+  if (!isAdmin) return <Redirect to={DEFAULT_LANDING} />;
   return <Redirect to="/command" />;
 }
 
@@ -281,7 +305,13 @@ function Protected({ children }: { children: React.ReactNode }) {
 function AdminOnly({ children }: { children: React.ReactNode }) {
   const { isAdmin, loading } = useUserRole();
   if (loading) return <FullPageLoader />;
-  if (!isAdmin) return <Redirect to="/portal" />;
+  if (!isAdmin) {
+    // Task #162 Phase C: on the admin host, send non-admins cross-host to
+    // the customer portal (they must never see operator chrome, even briefly).
+    // On the customer host, a local /portal redirect is sufficient.
+    if (IS_ADMIN_HOST) return <CrossAppRedirect to={CUSTOMER_PORTAL_URL} />;
+    return <Redirect to="/portal" />;
+  }
   return <Layout>{children}</Layout>;
 }
 

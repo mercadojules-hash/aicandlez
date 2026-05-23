@@ -1,43 +1,62 @@
 /**
- * Landing → app cross-host URL helpers.
+ * Landing → cross-host URL helpers (Task #162).
  *
- * Single source of truth for "where does the marketing site send signed-out
- * visitors". Hardcoding `https://app.aicandlez.com/portal` across nine
- * components (Hero, Navbar, Pricing, CTA, Footer, MobileShowcase, …) is
- * a maintenance hazard and was producing an extra cross-host hop:
+ * Single source of truth for "where does the marketing site send visitors".
+ * Previously each CTA hardcoded `https://app.aicandlez.com/portal` —
+ * a maintenance hazard that was producing an extra cross-host hop:
  *
  *   Landing CTA → app.aicandlez.com/portal → (PWA mounts, sees /portal,
  *   bounces) → trade.aicandlez.com/portal
  *
- * Fix: route CTAs at the PWA root (or trade.aicandlez.com directly for
- * the "open desktop terminal" affordance). Env-driven so we can swing the
- * targets without touching component code.
+ * Fix: primary customer CTAs go directly to `trade.aicandlez.com`
+ * (customer desktop portal — the production target for signed-in users).
+ * Mobile-only "Open as PWA" affordances still target the PWA root.
  *
  * Env vars (set in render.yaml for `aicandlez-landing`):
- *   VITE_APP_URL   default https://app.aicandlez.com    (PWA root)
- *   VITE_TRADE_URL default https://trade.aicandlez.com  (customer desktop terminal)
+ *   VITE_APP_URL    default https://app.aicandlez.com    (mobile PWA root)
+ *   VITE_TRADE_URL  default https://trade.aicandlez.com  (customer desktop portal)
  */
+
+interface AppUrlEnv {
+  VITE_APP_URL?: string;
+  VITE_TRADE_URL?: string;
+}
+
+interface ResolvedAppUrls {
+  /** Mobile PWA root — used for explicit "Open as PWA" CTAs. */
+  APP_HOME_URL: string;
+  /** Customer desktop portal — default landing target for primary CTAs. */
+  TRADE_HOME_URL: string;
+  /** Customer desktop portal /portal page — deep link bypass. */
+  TRADE_PORTAL_URL: string;
+  /** Clerk sign-in page on the customer desktop portal. */
+  TRADE_SIGN_IN_URL: string;
+  /** Clerk sign-up page on the customer desktop portal. */
+  TRADE_SIGN_UP_URL: string;
+}
 
 const stripTrailingSlash = (s: string) => s.replace(/\/+$/, "");
 
-const APP_URL = stripTrailingSlash(
-  (import.meta.env["VITE_APP_URL"] as string | undefined) ?? "https://app.aicandlez.com",
-);
+/**
+ * Pure resolver — exported for unit tests. Takes an env-like object and
+ * returns the canonical URL set with normalized origins.
+ */
+export function resolveAppUrls(env: AppUrlEnv): ResolvedAppUrls {
+  const APP_URL = stripTrailingSlash(env.VITE_APP_URL ?? "https://app.aicandlez.com");
+  const TRADE_URL = stripTrailingSlash(env.VITE_TRADE_URL ?? "https://trade.aicandlez.com");
+  return {
+    APP_HOME_URL:      APP_URL,
+    TRADE_HOME_URL:    TRADE_URL,
+    TRADE_PORTAL_URL:  `${TRADE_URL}/portal`,
+    TRADE_SIGN_IN_URL: `${TRADE_URL}/sign-in`,
+    TRADE_SIGN_UP_URL: `${TRADE_URL}/sign-up`,
+  };
+}
 
-const TRADE_URL = stripTrailingSlash(
-  (import.meta.env["VITE_TRADE_URL"] as string | undefined) ?? "https://trade.aicandlez.com",
-);
+const resolved = resolveAppUrls(import.meta.env as AppUrlEnv);
 
-/** Primary customer CTA — PWA root. Mobile-first surface; signed-in users
- *  land on PWA Home, signed-out users see Clerk sign-in flow there. */
-export const APP_HOME_URL = APP_URL;
-
-/** Sign-in deep link — Clerk-managed sign-in page on the PWA. */
-export const APP_SIGN_IN_URL = `${APP_URL}/sign-in`;
-
-/** Sign-up deep link — Clerk-managed sign-up page on the PWA. */
-export const APP_SIGN_UP_URL = `${APP_URL}/sign-up`;
-
-/** Desktop customer terminal — for "Launch Desktop Terminal" style CTAs.
- *  Bypasses the PWA's cross-app /portal bounce. */
-export const TRADE_PORTAL_URL = `${TRADE_URL}/portal`;
+export const APP_HOME_URL      = resolved.APP_HOME_URL;
+export const TRADE_HOME_URL    = resolved.TRADE_HOME_URL;
+export const TRADE_PORTAL_URL  = resolved.TRADE_PORTAL_URL;
+export const TRADE_SIGN_IN_URL = resolved.TRADE_SIGN_IN_URL;
+export const TRADE_SIGN_UP_URL = resolved.TRADE_SIGN_UP_URL;
