@@ -28,6 +28,7 @@ describe("AdapterConfig.testnet switch", () => {
     const supported: Array<[string, () => unknown]> = [
       ["Binance",     () => new BinanceAdapter({ testnet: true })],
       ["Gemini",      () => new GeminiAdapter({ testnet: true })],
+      ["Gate.io",     () => new GateIOAdapter({ testnet: true })],
       ["Hyperliquid", () => new HyperliquidAdapter({ testnet: true })],
       ["Phemex",      () => new PhemexAdapter({ testnet: true })],
       ["dYdX",        () => new dYdXAdapter({ testnet: true })],
@@ -47,7 +48,6 @@ describe("AdapterConfig.testnet switch", () => {
       ["BloFin",       () => new BloFinAdapter({ testnet: true })],
       ["Coinbase",     () => new CoinbaseAdapter({ testnet: true })],
       ["Crypto.com",   () => new CryptoDotComAdapter({ testnet: true })],
-      ["Gate.io",      () => new GateIOAdapter({ testnet: true })],
       ["HTX",          () => new HTXAdapter({ testnet: true })],
       ["Kraken",       () => new KrakenAdapter({ testnet: true })],
       ["MEXC",         () => new MEXCAdapter({ testnet: true })],

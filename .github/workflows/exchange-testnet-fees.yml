@@ -1,10 +1,25 @@
 # Weekly broker-fee drift smoke test.
 #
 # Runs `adapterFeeParsingTestnet.test.ts` against each exchange's public
-# sandbox (Binance Spot Testnet, Gemini Sandbox, Phemex Testnet) so a
-# silent field rename — or a promo tier that pays fees in a different
-# asset — gets caught long before it lands on a paying customer's trade
-# receipt as `source: "estimate"`.
+# sandbox so a silent field rename — or a promo tier that pays fees in a
+# different asset — gets caught long before it lands on a paying customer's
+# trade receipt as `source: "estimate"`.
+#
+# Currently verified-green sandboxes wired in below:
+#   - Binance Spot Testnet   (BINANCE_TESTNET_*)
+#   - Gemini Sandbox         (GEMINI_SANDBOX_*)
+#   - Gate.io Spot Testnet   (GATEIO_TESTNET_*)
+#
+# Documented coverage gaps for Bitget, BingX, HTX, Crypto.com,
+# Kraken Spot, Phemex, and Coinbase Advanced Trade live as
+# `describe.skip` placeholders inside `adapterFeeParsingTestnet.test.ts`
+# (see the broker coverage matrix at the top of that file). Secrets for
+# those brokers are intentionally NOT wired here — that prevents the
+# weekly job from accidentally placing live orders if a credential
+# lands in GitHub Secrets before the matching adapter work is done.
+# Once a gap's blocker is resolved, flip its block from `describe.skip`
+# to `describe.skipIf(...)` and add the matching `*_TESTNET_*` secrets
+# to the env: block below in the same change.
 #
 # Per-exchange testnet credentials live in GitHub Actions secrets and are
 # expected to be funded with a few dollars of testnet quote currency. The
@@ -33,6 +48,8 @@ jobs:
       BINANCE_TESTNET_API_SECRET:  ${{ secrets.BINANCE_TESTNET_API_SECRET }}
       GEMINI_SANDBOX_API_KEY:      ${{ secrets.GEMINI_SANDBOX_API_KEY }}
       GEMINI_SANDBOX_API_SECRET:   ${{ secrets.GEMINI_SANDBOX_API_SECRET }}
+      GATEIO_TESTNET_API_KEY:      ${{ secrets.GATEIO_TESTNET_API_KEY }}
+      GATEIO_TESTNET_API_SECRET:   ${{ secrets.GATEIO_TESTNET_API_SECRET }}
 
     steps:
       - uses: actions/checkout@v4

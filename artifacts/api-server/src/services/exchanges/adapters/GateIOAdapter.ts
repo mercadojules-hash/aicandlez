@@ -41,11 +41,12 @@ export const GATEIO_CONFIG: AdapterConfig = {
 };
 
 export class GateIOAdapter extends BaseExchangeAdapter {
-  // Gate.io has no public spot sandbox we can target — opt-in testnet
-  // construction must fail rather than silently route to prod.
+  // Gate.io publishes a spot REST sandbox at api-testnet.gateapi.io.
+  // Used by the weekly broker-fee drift smoke (see
+  // `__tests__/adapterFeeParsingTestnet.test.ts`).
   private readonly BASE = this.resolveHost({
     prod:    "api.gateio.ws",
-    testnet: null,
+    testnet: "api-testnet.gateapi.io",
   });
   private orderSeq = 1;
 

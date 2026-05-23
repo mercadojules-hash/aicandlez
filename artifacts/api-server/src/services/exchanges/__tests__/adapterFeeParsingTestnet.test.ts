@@ -14,30 +14,72 @@
 //   RUN_EXCHANGE_TESTNET=1 \
 //   BINANCE_TESTNET_API_KEY=...    BINANCE_TESTNET_API_SECRET=... \
 //   GEMINI_SANDBOX_API_KEY=...     GEMINI_SANDBOX_API_SECRET=... \
+//   GATEIO_TESTNET_API_KEY=...     GATEIO_TESTNET_API_SECRET=... \
 //     pnpm --filter @workspace/api-server run test -- adapterFeeParsingTestnet
 //
 // Each per-exchange block additionally skips when its own testnet keys
 // are missing, so a partial credential set still produces useful signal.
 //
-// Sandbox hosts (verified against each exchange's current public docs):
-//   Binance Spot Testnet  → testnet.binance.vision
-//   Gemini Sandbox        → api.sandbox.gemini.com
+// ── Broker coverage matrix ───────────────────────────────────────────────────
 //
-// Why these two only, for now:
-//   * Phemex is intentionally excluded from the live suite — its adapter's
-//     `placeOrder` currently returns a synthetic SIM order ID (the real
-//     exchange response is discarded), so a place→query roundtrip can't
-//     resolve the broker fee. Phemex stays covered by the fixtures suite
-//     until the adapter is updated to surface the real order ID.
-//   * Coinbase Advanced Trade, Bitget, BingX, HTX, Gate.io, BloFin,
-//     Crypto.com, MEXC, Bitstamp, and Kraken either don't expose a
-//     usable public sandbox or have one that doesn't honour their
-//     production fee surface. Tracked as a follow-up.
+// Verified weekly drift coverage (real sandbox, real broker fee):
+//   ✓ Binance Spot Testnet    → testnet.binance.vision
+//   ✓ Gemini Sandbox          → api.sandbox.gemini.com
+//   ✓ Gate.io Spot Testnet    → api-testnet.gateapi.io
+//
+// Documented coverage gaps (intentionally `describe.skip` until each
+// blocker below is resolved — gap surfaces in the CI test summary so
+// the operator can see where drift would slip through). NO secrets for
+// any of these are wired into the weekly workflow until the gap is
+// closed: that prevents an accidental live-trading run if a credential
+// gets added to GitHub Secrets ahead of the adapter work.
+//
+//   ⚠ Bitget Demo Trading
+//       Adapter: `placeOrder` returns `simulatedOrder(...)` unconditionally
+//                AND demo trading is a `PAPTRADING: 1` header on the prod
+//                host (not a separate sandbox URL), so wiring `testnet`
+//                here would aim at production.
+//       Unblockers: plumb a `demoMode` flag through `AdapterConfig`, send
+//                   the demo header, and return the real exchange order
+//                   id from `placeOrder` so `getOrder` can resolve the
+//                   broker fee.
+//
+//   ⚠ BingX VST
+//       Adapter: `placeOrder` returns `simulatedOrder(...)` unconditionally;
+//                `resolveHost` maps `testnet → null`.
+//       Sandbox: `open-api-vst.bingx.com` exists publicly.
+//       Unblockers: real order id from `placeOrder` + `testnet` host wired.
+//
+//   ⚠ HTX Demo
+//       Adapter: `placeOrder` returns `simulatedOrder(...)`; HTX has no
+//                public REST sandbox today (paper trading is UI-only).
+//
+//   ⚠ Crypto.com Exchange UAT
+//       Adapter: `placeOrder` returns `simulatedOrder(...)`; `resolveHost`
+//                maps `testnet → null`.
+//       Sandbox: `uat-api.3ona.co` exists publicly.
+//       Unblockers: real order id from `placeOrder` + `testnet` host wired.
+//
+//   ⚠ Kraken Spot Demo
+//       No public REST sandbox for Kraken Spot — `demo-futures.kraken.com`
+//       only covers Kraken Futures (different adapter surface).
+//
+//   ⚠ Phemex Testnet
+//       `testnet-api.phemex.com` exists and the adapter already wires it,
+//       but `placeOrder` returns `simulatedOrder(...)` unconditionally so
+//       the place→query roundtrip can never resolve a real broker fee.
+//
+//   ⚠ Coinbase Advanced Trade
+//       No public sandbox. Catching fee-shape drift here will require a
+//       hard-gated live tiny-order + auto-refund probe; intentionally
+//       deferred until that gating is in place — *not* enabled in the
+//       weekly workflow.
 
 import { describe, expect, it } from "vitest";
 
 import { BinanceAdapter } from "../adapters/BinanceAdapter.js";
 import { GeminiAdapter }  from "../adapters/GeminiAdapter.js";
+import { GateIOAdapter }  from "../adapters/GateIOAdapter.js";
 
 import type { AdapterConfig, StandardOrder } from "../types.js";
 
@@ -121,6 +163,83 @@ describe.skipIf(!ENABLED || !GEMINI_KEY || !GEMINI_SECRET)(
     }, 45_000);
   },
 );
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Documented-gap placeholders.
+//
+// These are intentionally `describe.skip` (NOT `describe.skipIf`) so that
+// even if someone wires credentials into the env tomorrow, no live or
+// adapter-broken probe runs by accident. Each block stays here so the
+// missing coverage is visible in the CI test summary; the path to
+// enabling it is captured in the matrix at the top of this file.
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe.skip("Bitget Demo Trading — broker fee end-to-end (BLOCKED: see matrix)", () => {
+  it("placeholder — needs demo-header support + real exchange order id from placeOrder", () => {
+    expect(true).toBe(true);
+  });
+});
+
+describe.skip("BingX VST — broker fee end-to-end (BLOCKED: see matrix)", () => {
+  it("placeholder — needs testnet host wired + real exchange order id from placeOrder", () => {
+    expect(true).toBe(true);
+  });
+});
+
+describe.skip("HTX Demo — broker fee end-to-end (BLOCKED: no public REST sandbox)", () => {
+  it("placeholder — paper trading is UI-only on HTX today", () => {
+    expect(true).toBe(true);
+  });
+});
+
+describe.skip("Crypto.com Exchange UAT — broker fee end-to-end (BLOCKED: see matrix)", () => {
+  it("placeholder — needs testnet host wired + real exchange order id from placeOrder", () => {
+    expect(true).toBe(true);
+  });
+});
+
+const GATEIO_KEY    = process.env["GATEIO_TESTNET_API_KEY"];
+const GATEIO_SECRET = process.env["GATEIO_TESTNET_API_SECRET"];
+
+describe.skipIf(!ENABLED || !GATEIO_KEY || !GATEIO_SECRET)(
+  "Gate.io Spot Testnet — broker fee end-to-end",
+  () => {
+    it("places + queries a tiny BTC_USDT market order and reports broker fee", async () => {
+      const adapter = new GateIOAdapter(baseCfg("GateIO", GATEIO_KEY, GATEIO_SECRET));
+
+      // Gate.io's `placeOrder` returns the normalised exchange response,
+      // and `normaliseOrder` maps `raw.fee` → `source: "broker"` when
+      // present. `getOrder` exercises the same parsing path so we
+      // double-check both surfaces.
+      const placed = await adapter.placeOrder({
+        symbol: "BTCUSD", side: "buy", type: "market", qty: 0.0002,
+      });
+      assertBrokerFee(placed, "GateIO placeOrder");
+
+      await sleep(1_000);
+      const queried = await adapter.getOrder(placed.exchangeOrderId, "BTCUSD");
+      assertBrokerFee(queried, "GateIO getOrder");
+    }, 45_000);
+  },
+);
+
+describe.skip("Kraken Spot Demo — broker fee end-to-end (BLOCKED: no public spot sandbox)", () => {
+  it("placeholder — demo-futures.kraken.com only covers Kraken Futures", () => {
+    expect(true).toBe(true);
+  });
+});
+
+describe.skip("Phemex Testnet — broker fee end-to-end (BLOCKED: synthetic order id)", () => {
+  it("placeholder — PhemexAdapter.placeOrder discards the real exchange order id", () => {
+    expect(true).toBe(true);
+  });
+});
+
+describe.skip("Coinbase Advanced Trade — broker fee end-to-end (BLOCKED: no sandbox)", () => {
+  it("placeholder — needs hard-gated live tiny-order + auto-refund probe", () => {
+    expect(true).toBe(true);
+  });
+});
 
 // A tiny meta-test so the file is never silently empty in CI dashboards.
 describe("adapterFeeParsingTestnet harness", () => {
