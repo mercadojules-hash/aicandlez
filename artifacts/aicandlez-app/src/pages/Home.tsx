@@ -1698,6 +1698,82 @@ function TradeHistorySection({ trades, onMore }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Broker-fee resolver — prefers the exchange-reported commission over the
+// catalog estimate when available, mirroring `TradeDetailSheet.tsx` and the
+// desktop Portal trade history panel. USD-stable broker fees feed PnL math
+// directly; native-asset fees (BTC, BNB, …) are surfaced verbatim in the
+// tooltip but USD totals fall back to the catalog estimate so receipts
+// match account equity to the cent.
+// ─────────────────────────────────────────────────────────────────────────────
+const USD_STABLE_FEE_CCY = new Set([
+  "USD","USDT","USDC","BUSD","DAI","TUSD","USDP","FDUSD","ZUSD",
+]);
+// Extract the base asset from a trading symbol so we can convert a broker
+// fee quoted in the base currency (e.g. BTC on a BTC/USDT trade) to USD
+// using the trade's exit price. Handles "BTC/USDT", "BTCUSDT", "BTC-USD",
+// "XBTUSD" (Kraken) shapes. Returns null when no base asset can be derived.
+function extractBaseAsset(symbol: string): string | null {
+  if (!symbol) return null;
+  const s = symbol.toUpperCase().replace(/[/\-_]/g, "");
+  const quotes = ["USDT","USDC","BUSD","FDUSD","TUSD","USDP","DAI","ZUSD","USD"];
+  for (const q of quotes) {
+    if (s.endsWith(q) && s.length > q.length) {
+      const base = s.slice(0, s.length - q.length);
+      return base === "XBT" ? "BTC" : base;
+    }
+  }
+  return null;
+}
+function resolveFeeLeg(
+  brokerRaw:   number | string | null | undefined,
+  brokerCcy:   string | null | undefined,
+  estimateRaw: number | string | null | undefined,
+  exitPrice?:  number,
+  baseAsset?:  string | null,
+): {
+  /** Effective USD value to use in math + row display. */
+  usd: number;
+  /** True when the displayed USD amount came from broker data (either
+   *  broker-quoted in a USD-stable currency, or converted from a native
+   *  fee using the trade's exit price). */
+  displayFromBroker: boolean;
+  /** True when the broker reported any fee (regardless of currency). */
+  fromBroker: boolean;
+  /** True when the broker fee is in a USD-stable currency. */
+  brokerIsUsd: boolean;
+  /** Raw broker amount in the broker's quoted currency (when available). */
+  brokerAmount?: number;
+  /** Broker-quoted currency (when available). */
+  brokerCcy?: string;
+  /** Catalog estimate USD (when available). */
+  estimate?: number;
+} {
+  const toN = (v: number | string | null | undefined): number | undefined => {
+    if (v == null) return undefined;
+    const n = typeof v === "number" ? v : parseFloat(String(v));
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const broker   = toN(brokerRaw);
+  const estimate = toN(estimateRaw);
+  const ccy      = brokerCcy ?? undefined;
+  const fromBroker  = typeof broker === "number";
+  const brokerIsUsd = fromBroker && (!ccy || USD_STABLE_FEE_CCY.has(ccy.toUpperCase()));
+  // Convert native broker fee → USD when the fee currency matches the
+  // trade's base asset and we have an exit price (e.g. a BTC fee on a
+  // BTC/USDT trade can be priced via exitPrice).
+  const ccyMatchesBase = !!(ccy && baseAsset && ccy.toUpperCase() === baseAsset.toUpperCase());
+  const convertible = fromBroker && !brokerIsUsd && ccyMatchesBase
+    && typeof exitPrice === "number" && exitPrice > 0;
+  const brokerUsd = brokerIsUsd
+    ? broker!
+    : (convertible ? (broker! * exitPrice!) : undefined);
+  const displayFromBroker = typeof brokerUsd === "number";
+  const usd = displayFromBroker ? brokerUsd! : (estimate ?? 0);
+  return { usd, displayFromBroker, fromBroker, brokerIsUsd,
+           brokerAmount: broker, brokerCcy: ccy, estimate };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Single expandable trade card with glow state + AI reasoning tags
 // ─────────────────────────────────────────────────────────────────────────────
 function TradeHistoryCard({ trade, onOpen }: { trade: SimTrade; onOpen: (t: SimTrade) => void }) {
@@ -1871,18 +1947,81 @@ function TradeHistoryCard({ trade, onOpen }: { trade: SimTrade; onOpen: (t: SimT
           }}>
             {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
           </div>
-          {typeof trade.netFees === "number" && trade.netFees > 0 && (
-            <div
-              title={`Net P&L after broker fees: ${(pnl - trade.netFees) >= 0 ? "+" : "-"}$${Math.abs(pnl - trade.netFees).toFixed(2)}`}
-              style={{
-                fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
-                marginTop: 3, letterSpacing: 0.4,
-                fontVariantNumeric: "tabular-nums", textTransform: "uppercase",
-              }}
-            >
-              −${trade.netFees.toFixed(2)} fees
-            </div>
-          )}
+          {(() => {
+            // Prefer broker-reported commissions when present; fall back to
+            // the catalog estimate otherwise. Native-currency broker fees
+            // (e.g. BTC, BNB) are shown in the tooltip and don't override
+            // the USD estimate used for math, so this row matches the
+            // expanded receipt + desktop Portal trade history to the cent.
+            const baseAsset = extractBaseAsset(trade.symbol);
+            const entryLeg = resolveFeeLeg(
+              trade.entryFeeBroker, trade.entryFeeBrokerCurrency, trade.entryFee,
+              trade.exitPrice, baseAsset,
+            );
+            const exitLeg  = resolveFeeLeg(
+              trade.exitFeeBroker,  trade.exitFeeBrokerCurrency,  trade.exitFee,
+              trade.exitPrice, baseAsset,
+            );
+            const haveLeg  = entryLeg.fromBroker || entryLeg.estimate != null
+                          || exitLeg.fromBroker  || exitLeg.estimate  != null;
+            const fees     = haveLeg
+              ? entryLeg.usd + exitLeg.usd
+              : (typeof trade.netFees === "number" ? trade.netFees : 0);
+            if (!(fees > 0)) return null;
+            // "Actual" pill only when BOTH legs' displayed USD amount came
+            // from real broker data (either broker quoted in a USD-stable
+            // currency, or a native fee converted via the trade's exit
+            // price). Any leg that fell back to the catalog estimate
+            // demotes the row to "Est." so the label always matches what
+            // the user is actually reading.
+            const bothActual = entryLeg.displayFromBroker && exitLeg.displayFromBroker;
+            const pillLabel  = bothActual ? "Actual" : "Est.";
+            const pillColor  = bothActual ? BRAND : TEXT_DIM;
+            const fmtLeg = (legName: string, leg: ReturnType<typeof resolveFeeLeg>): string | null => {
+              if (leg.fromBroker) {
+                const ccy = leg.brokerCcy && !leg.brokerIsUsd ? ` ${leg.brokerCcy}` : "";
+                const dp  = leg.brokerIsUsd ? 2 : ((leg.brokerAmount ?? 0) < 1 ? 6 : 4);
+                const sym = leg.brokerIsUsd ? "$" : "";
+                return `${legName}: ${sym}${(leg.brokerAmount ?? 0).toFixed(dp)}${ccy} · charged by broker`;
+              }
+              if (leg.estimate != null) {
+                return `${legName}: $${leg.estimate.toFixed(2)} (est.)`;
+              }
+              return null;
+            };
+            const tipLines: string[] = [];
+            const eTip = fmtLeg("Opening commission", entryLeg);
+            const xTip = fmtLeg("Closing commission", exitLeg);
+            if (eTip) tipLines.push(eTip);
+            if (xTip) tipLines.push(xTip);
+            tipLines.push(`Net P&L after fees: ${(pnl - fees) >= 0 ? "+" : "−"}$${Math.abs(pnl - fees).toFixed(2)}`);
+            const tip = tipLines.join("\n");
+            return (
+              <div
+                title={tip}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "flex-end",
+                  gap: 4, marginTop: 3,
+                }}
+              >
+                <span style={{
+                  padding: "1px 5px", borderRadius: 3,
+                  background: `${pillColor}1F`,
+                  border: `1px solid ${pillColor}55`,
+                  fontSize: 7.5, fontFamily: SANS, fontWeight: 800,
+                  color: pillColor, letterSpacing: 0.8, textTransform: "uppercase",
+                  lineHeight: 1.2,
+                }}>{pillLabel}</span>
+                <span style={{
+                  fontSize: 9, fontFamily: SANS, fontWeight: 700, color: TEXT_DIM,
+                  letterSpacing: 0.4,
+                  fontVariantNumeric: "tabular-nums", textTransform: "uppercase",
+                }}>
+                  −${fees.toFixed(2)} fees
+                </span>
+              </div>
+            );
+          })()}
         </div>
       </div>
 

@@ -2251,36 +2251,57 @@ const USD_STABLE_FEE_CCY = new Set([
   "USD","USDT","USDC","BUSD","DAI","TUSD","USDP","FDUSD","ZUSD",
 ]);
 
-// Resolve effective per-leg fee in USD: prefer broker-reported when the broker
-// quoted it in a USD-stable currency, else fall back to the catalog estimate.
-// Returns the native broker amount/currency separately so the UI can label
-// "charged by broker" + show native units in a tooltip when applicable.
+// Extract the base asset from a trading symbol so we can convert a broker
+// fee quoted in the base currency (e.g. BTC on a BTC/USDT trade) into USD
+// using the trade's exit price. Mirrors the PWA Home helper exactly.
+function extractBaseAsset(symbol: string | null | undefined): string | null {
+  if (!symbol) return null;
+  const s = String(symbol).toUpperCase().replace(/[/\-_]/g, "");
+  const quotes = ["USDT","USDC","BUSD","FDUSD","TUSD","USDP","DAI","ZUSD","USD"];
+  for (const q of quotes) {
+    if (s.endsWith(q) && s.length > q.length) {
+      const base = s.slice(0, s.length - q.length);
+      return base === "XBT" ? "BTC" : base;
+    }
+  }
+  return null;
+}
+// Resolve effective per-leg fee in USD: prefer broker-reported when the
+// broker quoted it in a USD-stable currency OR when a native fee can be
+// converted via the trade's exit price (e.g. BTC fee on a BTC/USDT trade).
+// Falls back to the catalog estimate otherwise. `displayFromBroker`
+// tells the UI whether the USD amount being shown is actually broker
+// data (= "Actual" pill) or an estimate fallback (= "Est." pill).
 function resolveFeeLeg(
   brokerRaw:    number | string | null | undefined,
   brokerCcy:    string | null | undefined,
   estimateRaw:  number | string | null | undefined,
+  exitPrice?:   number,
+  baseAsset?:   string | null,
 ): {
-  /** Effective USD value to use in PnL math (0 when neither source). */
-  usd:           number;
-  /** True when the broker reported a fee (regardless of currency). */
-  fromBroker:    boolean;
-  /** True when the broker fee is in a USD-stable currency. */
-  brokerIsUsd:   boolean;
-  /** Raw broker amount in the broker's quoted currency (when available). */
-  brokerAmount?: number;
-  /** Broker-quoted currency (when available). */
-  brokerCcy?:    string;
-  /** Catalog estimate USD (when available). */
-  estimate?:     number;
+  usd:               number;
+  displayFromBroker: boolean;
+  fromBroker:        boolean;
+  brokerIsUsd:       boolean;
+  brokerAmount?:     number;
+  brokerCcy?:        string;
+  estimate?:         number;
 } {
   const broker   = brokerRaw   != null ? toNum(brokerRaw)   : undefined;
   const estimate = estimateRaw != null ? toNum(estimateRaw) : undefined;
   const ccy      = brokerCcy ?? undefined;
   const fromBroker  = typeof broker === "number";
   const brokerIsUsd = fromBroker && (!ccy || USD_STABLE_FEE_CCY.has(ccy.toUpperCase()));
-  const usd = brokerIsUsd ? broker! : (estimate ?? 0);
+  const ccyMatchesBase = !!(ccy && baseAsset && ccy.toUpperCase() === baseAsset.toUpperCase());
+  const convertible = fromBroker && !brokerIsUsd && ccyMatchesBase
+    && typeof exitPrice === "number" && exitPrice > 0;
+  const brokerUsd = brokerIsUsd
+    ? broker!
+    : (convertible ? (broker! * exitPrice!) : undefined);
+  const displayFromBroker = typeof brokerUsd === "number";
+  const usd = displayFromBroker ? brokerUsd! : (estimate ?? 0);
   return {
-    usd, fromBroker, brokerIsUsd,
+    usd, displayFromBroker, fromBroker, brokerIsUsd,
     brokerAmount: broker,
     brokerCcy:    ccy,
     estimate,
@@ -2431,19 +2452,28 @@ function AdminTradeHistoryPanel() {
         // fees feed PnL math directly; native-asset fees (BTC, BNB, …) are
         // surfaced in the row tooltip but USD totals fall back to the
         // catalog estimate so the dashboard matches account equity.
+        const baseAsset = extractBaseAsset(t.symbol);
         const entryLeg = resolveFeeLeg(
           t.entry_fee_broker, t.entry_fee_broker_currency, t.entry_fee,
+          exit, baseAsset,
         );
         const exitLeg  = resolveFeeLeg(
           t.exit_fee_broker,  t.exit_fee_broker_currency,  t.exit_fee,
+          exit, baseAsset,
         );
         const fees =
           (entryLeg.fromBroker || entryLeg.estimate != null
             || exitLeg.fromBroker  || exitLeg.estimate  != null)
             ? entryLeg.usd + exitLeg.usd
             : (t.net_fees != null ? toNum(t.net_fees) : 0);
-        const anyBroker = entryLeg.fromBroker || exitLeg.fromBroker;
-        const feeLabel  = anyBroker ? "BROKER FEES" : "FEES (EST.)";
+        const anyBroker  = entryLeg.fromBroker || exitLeg.fromBroker;
+        // "ACTUAL" only when BOTH legs' displayed USD came from broker
+        // data (USD-stable broker quote OR native fee converted via exit
+        // price). Anything else falls back to "EST." so the pill always
+        // matches the number the user is reading.
+        const bothActual   = entryLeg.displayFromBroker && exitLeg.displayFromBroker;
+        const feePillLabel = bothActual ? "ACTUAL" : "EST.";
+        const feePillColor = bothActual ? N.BRAND  : N.TEXT_2;
         // Tooltip surfaces both per-leg breakdown + native-currency amounts
         // when the broker quoted a non-USD fee, matching the PWA receipt.
         const fmtLegTitle = (legName: string, leg: ReturnType<typeof resolveFeeLeg>): string | null => {
@@ -2515,13 +2545,26 @@ function AdminTradeHistoryPanel() {
                 <span
                   title={feeTooltip}
                   style={{
-                    color: anyBroker ? N.BRAND_DIM : N.TEXT_2,
-                    fontSize: 8, fontWeight: 700,
-                    marginTop: 2, letterSpacing: "0.10em",
-                    fontVariantNumeric: "tabular-nums", textTransform: "uppercase",
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    marginTop: 2,
                   }}
                 >
-                  −${fees.toFixed(2)} {feeLabel}
+                  <span style={{
+                    padding: "1px 4px", borderRadius: 2,
+                    background: `${feePillColor}1F`,
+                    border: `1px solid ${feePillColor}55`,
+                    fontSize: 7, fontWeight: 800,
+                    color: feePillColor, letterSpacing: "0.10em",
+                    lineHeight: 1.2,
+                  }}>{feePillLabel}</span>
+                  <span style={{
+                    color: anyBroker ? N.BRAND_DIM : N.TEXT_2,
+                    fontSize: 8, fontWeight: 700,
+                    letterSpacing: "0.10em",
+                    fontVariantNumeric: "tabular-nums", textTransform: "uppercase",
+                  }}>
+                    −${fees.toFixed(2)} FEES
+                  </span>
                 </span>
               )}
             </div>
@@ -2844,19 +2887,28 @@ function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
         // Reuse the same broker-vs-estimate resolver as the operator panel
         // and the PWA receipt so this row's fee number matches every other
         // surface that displays the same trade.
+        const baseAsset = extractBaseAsset(t.symbol);
         const entryLeg = resolveFeeLeg(
           t.entryFeeBroker, t.entryFeeBrokerCurrency, t.entryFee,
+          exit, baseAsset,
         );
         const exitLeg  = resolveFeeLeg(
           t.exitFeeBroker,  t.exitFeeBrokerCurrency,  t.exitFee,
+          exit, baseAsset,
         );
         const fees =
           (entryLeg.fromBroker || entryLeg.estimate != null
             || exitLeg.fromBroker  || exitLeg.estimate  != null)
             ? entryLeg.usd + exitLeg.usd
             : (t.netFees != null ? toNum(t.netFees) : 0);
-        const anyBroker = entryLeg.fromBroker || exitLeg.fromBroker;
-        const feeLabel  = anyBroker ? "BROKER FEES" : "FEES (EST.)";
+        const anyBroker  = entryLeg.fromBroker || exitLeg.fromBroker;
+        // "ACTUAL" only when BOTH legs' displayed USD came from broker
+        // data (USD-stable broker quote OR native fee converted via exit
+        // price). Anything else falls back to "EST." so the pill always
+        // matches the number the user is reading.
+        const bothActual   = entryLeg.displayFromBroker && exitLeg.displayFromBroker;
+        const feePillLabel = bothActual ? "ACTUAL" : "EST.";
+        const feePillColor = bothActual ? N.BRAND  : N.TEXT_2;
         const fmtLegTitle = (legName: string, leg: ReturnType<typeof resolveFeeLeg>): string | null => {
           if (leg.fromBroker) {
             const ccy = leg.brokerCcy && !leg.brokerIsUsd ? ` ${leg.brokerCcy}` : "";
@@ -2922,13 +2974,26 @@ function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
                 <span
                   title={feeTooltip}
                   style={{
-                    color: anyBroker ? N.BRAND_DIM : N.TEXT_2,
-                    fontSize: 8, fontWeight: 700,
-                    marginTop: 2, letterSpacing: "0.10em",
-                    fontVariantNumeric: "tabular-nums", textTransform: "uppercase",
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    marginTop: 2,
                   }}
                 >
-                  −${fees.toFixed(2)} {feeLabel}
+                  <span style={{
+                    padding: "1px 4px", borderRadius: 2,
+                    background: `${feePillColor}1F`,
+                    border: `1px solid ${feePillColor}55`,
+                    fontSize: 7, fontWeight: 800,
+                    color: feePillColor, letterSpacing: "0.10em",
+                    lineHeight: 1.2,
+                  }}>{feePillLabel}</span>
+                  <span style={{
+                    color: anyBroker ? N.BRAND_DIM : N.TEXT_2,
+                    fontSize: 8, fontWeight: 700,
+                    letterSpacing: "0.10em",
+                    fontVariantNumeric: "tabular-nums", textTransform: "uppercase",
+                  }}>
+                    −${fees.toFixed(2)} FEES
+                  </span>
                 </span>
               )}
             </div>
