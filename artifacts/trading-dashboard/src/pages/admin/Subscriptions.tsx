@@ -30,12 +30,12 @@
  */
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@clerk/react";
 import {
   DollarSign, Loader2, RefreshCw, AlertTriangle, Search, Gift,
   X, Calendar, Ban,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { authFetch } from "@/lib/authFetch";
 
 interface SubRow {
   clerkUserId: string;
@@ -54,16 +54,6 @@ interface SubRow {
 }
 
 type PlanTier = "starter" | "pro";
-
-function useAuthFetch() {
-  const { getToken } = useAuth();
-  return async (p: string, init: RequestInit = {}) => {
-    const t = await getToken().catch(() => null);
-    const h: Record<string, string> = { "Content-Type": "application/json", ...(init.headers as Record<string, string> | undefined) };
-    if (t) h["Authorization"] = `Bearer ${t}`;
-    return fetch(p, { ...init, headers: h });
-  };
-}
 
 function fmtDollar(n: number) {
   if (Math.abs(n) >= 1_000_000) return `${n < 0 ? "-" : ""}$${(Math.abs(n) / 1_000_000).toFixed(2)}M`;
@@ -89,7 +79,6 @@ function classifySub(u: SubRow): "comp" | "trial" | "active" | "expired" | "free
 }
 
 export default function AdminSubscriptions() {
-  const authFetch = useAuthFetch();
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [classFilter, setClassFilter] = useState<"all" | "comp" | "trial" | "active" | "expired">("all");
@@ -350,7 +339,6 @@ function SubscriptionActionModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const authFetch = useAuthFetch();
   const [tier,  setTier]  = useState<PlanTier>("starter");
   const [days,  setDays]  = useState<number>(30);
   const [note,  setNote]  = useState<string>("");

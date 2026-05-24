@@ -11,8 +11,8 @@
  */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@clerk/react";
 import { Radio, Loader2, RefreshCw, AlertTriangle, Search } from "lucide-react";
+import { authFetch } from "@/lib/authFetch";
 
 interface SessionUserRow {
   clerkUserId: string;
@@ -26,19 +26,6 @@ interface SessionUserRow {
   exchangesConnected: number;
   hasLiveExchange: boolean;
   onlineNow: boolean;
-}
-
-function useAuthFetch() {
-  const { getToken } = useAuth();
-  return async (path: string, init: RequestInit = {}): Promise<Response> => {
-    const token = await getToken().catch(() => null);
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(init.headers as Record<string, string> | undefined),
-    };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    return fetch(path, { ...init, headers });
-  };
 }
 
 function fmtAgo(ms: number | null): string {
@@ -55,7 +42,6 @@ function sessionColor(s: SessionUserRow["sessionStatus"]) {
 }
 
 export default function AdminSessions() {
-  const authFetch = useAuthFetch();
   const [filter, setFilter] = useState<"all" | "active" | "idle" | "offline">("active");
   const [q, setQ] = useState("");
 
