@@ -76,6 +76,14 @@ interface Props {
    * Alpaca" path so they can't switch away mid-flow.
    */
   preselectedExchange?: string;
+  /**
+   * Task #165 — gate live-trading exchanges (Kraken / Coinbase / Crypto.com /
+   * Binance) behind explicit opt-in. Default = false → customer surface shows
+   * Alpaca-only (paper trading). Set to `true` only after the user has been
+   * granted live-trading permission by an admin. Admin / super-admin role
+   * bypass is handled by the caller passing `true`.
+   */
+  liveExchangesEnabled?: boolean;
   /** Fires after a successful connect. OnboardingFlow uses it to advance state. */
   onConnected?: () => void;
 }
@@ -86,7 +94,14 @@ type ConnectedRow = {
   connection: { tradingMode: string; status: string; label: string | null } | null;
 };
 
-export function PortalExchangeConnectModal({ open, onClose, preselectedExchange, onConnected }: Props) {
+export function PortalExchangeConnectModal({ open, onClose, preselectedExchange, liveExchangesEnabled = false, onConnected }: Props) {
+  // Task #165 — when liveExchangesEnabled is false (customer default), show
+  // Alpaca-only. Live exchanges (Kraken / Coinbase / Crypto.com / Binance)
+  // unlock when admin grants live trading permission OR when caller passes
+  // liveExchangesEnabled=true explicitly. Preselected exchange always wins.
+  const visibleExchanges = liveExchangesEnabled || preselectedExchange
+    ? EXCHANGES
+    : EXCHANGES.filter((e) => e.id === "Alpaca");
   const { getToken } = useAuth();
   const qc           = useQueryClient();
   const initialPick = preselectedExchange
@@ -496,7 +511,7 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
               display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6,
               marginBottom: 16,
             }}>
-              {EXCHANGES.map((ex) => {
+              {visibleExchanges.map((ex) => {
                 const isSel = ex.id === picked.id;
                 return (
                   <button

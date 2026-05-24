@@ -90,7 +90,7 @@ type Plan = "free" | "starter" | "pro";
 function tierCapacity(plan: Plan): { cap: number; label: string } {
   if (plan === "pro")     return { cap: 12, label: "UP TO 12 CONCURRENT AI TRADES" };
   if (plan === "starter") return { cap: 3,  label: "UP TO 3 CONCURRENT AI TRADES"  };
-  return { cap: 0, label: "SIMULATED ONLY · UPGRADE TO ENABLE LIVE EXECUTION" };
+  return { cap: 0, label: "PAPER TRADING · UPGRADE TO INCREASE TRADE CAPACITY" };
 }
 
 // ── Top utility bar ──────────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ function TopBar({
         color: N.BRAND, fontWeight: 800,
         textShadow: `0 0 10px ${N.BRAND_GLOW}`,
       }}>AICANDLEZ</span>
-      <span style={{ color: N.TEXT_2 }}>· {isAdmin ? "OPERATOR · LIVE" : "LIVE PORTAL"}</span>
+      <span style={{ color: N.TEXT_2 }}>· {isAdmin ? "OPERATOR · LIVE" : "AI PAPER TRADING"}</span>
 
       {statusPill}
 
@@ -145,7 +145,7 @@ function TopBar({
       <button
         type="button"
         onClick={onConnectExchange}
-        title="Connect Kraken, Coinbase, Binance or another exchange"
+        title="Connect Alpaca to enable AI paper trading on your account"
         style={{
           padding: "5px 12px",
           background: `linear-gradient(180deg, ${N.BRAND}22, ${N.BRAND}10)`,
@@ -1058,12 +1058,12 @@ function AlpacaReconnectBanner({ lastError }: { lastError: string | null }) {
         fontSize: 10, fontWeight: 800, letterSpacing: "0.20em",
         color: WARN, textShadow: `0 0 6px ${WARN}66`,
       }}>
-        ⚠ ALPACA NEEDS TO BE RECONNECTED · LIVE EXECUTION PAUSED
+        ⚠ ALPACA NEEDS TO BE RECONNECTED · PAPER TRADING PAUSED
       </div>
       <div style={{ fontSize: 10.5, color: N.TEXT_2, lineHeight: 1.55 }}>
-        Your Alpaca authorization expired or was revoked, so AI trades can no
-        longer reach your brokerage account. Reconnect in one click to resume
-        live execution.
+        Your Alpaca authorization expired or was revoked, so AI paper trades
+        can no longer be placed on your account. Reconnect in one click to
+        resume AI-assisted paper trading.
       </div>
       {lastError && (
         <div style={{
@@ -1430,7 +1430,7 @@ function ExchangeOnboardingBanner({ onConnect }: { onConnect: () => void }) {
         <div style={{
           fontSize: 8, color: N.TEXT_3, letterSpacing: "0.18em", marginTop: 6,
         }}>
-          SUPPORTED · ALPACA · KRAKEN · COINBASE · CRYPTO.COM · BINANCE
+          POWERED BY ALPACA PAPER TRADING · REAL MARKET DATA · ZERO RISK
         </div>
       </div>
       <button
@@ -4707,7 +4707,7 @@ function PortalInner() {
       }}>
         {isAdmin
           ? "AICANDLEZ · OPERATOR WORKSTATION · KRAKEN LIVE EXECUTION · INTERNAL USE ONLY"
-          : "AICANDLEZ · ALPACA-ROUTED LIVE EXECUTION · 3% FEE ON PROFITABLE TRADES ONLY"}
+          : "AICANDLEZ · AI-ASSISTED ALPACA PAPER TRADING · $100,000 SIMULATED CAPITAL · ZERO RISK"}
       </footer>
 
       <UpgradeModal    open={upgradeOpen}    onClose={() => setUpgradeOpen(false)}

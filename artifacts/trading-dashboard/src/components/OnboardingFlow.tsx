@@ -422,9 +422,9 @@ function ChooseStep({ hasLiveSub, oauthEnabled, oauthError, onClose, onPickAlpac
           Connect Your Existing Exchange
         </div>
         <div style={{ fontSize: 12, color: N.TEXT_1, lineHeight: 1.55 }}>
-          Already have an account at Kraken, Coinbase, Crypto.com, Binance, or
-          Alpaca? Paste read + trade API keys (never withdrawal) to enable
-          live execution.
+          Already have an Alpaca account? Connect it in one click to start
+          AI-assisted paper trading with $100,000 of simulated capital and
+          real market data.
         </div>
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 6,
