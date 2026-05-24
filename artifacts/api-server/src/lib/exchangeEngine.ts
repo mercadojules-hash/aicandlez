@@ -258,7 +258,19 @@ export async function fetchLiveBalances(): Promise<Balances> {
 //      the stale window, serve it with source="cached" + error message
 //      attached. Telemetry degrades gracefully instead of flipping to zero.
 type BalancesCacheEntry  = { balances: Balances; fetchedAt: number };
-type BalancesPerExchange = { cache: BalancesCacheEntry | null; inflight: Promise<Balances> | null };
+type BalancesErrorEntry  = { msg: string; at: number };
+type BalancesPerExchange = {
+  cache:    BalancesCacheEntry | null;
+  inflight: Promise<Balances> | null;
+  // Negative cache. When an upstream call fails AND we have no positive
+  // snapshot to fall back on, we remember the failure for a short cooldown.
+  // Subsequent polls within the cooldown return immediately without
+  // re-hitting Kraken — this prevents the cold-cache / rate-limit death
+  // spiral where every 4-10s panel poll keeps the throttle counter pinned
+  // and the window from ever decaying. Cleared on the next successful fetch
+  // and on setSelectedExchange().
+  lastError: BalancesErrorEntry | null;
+};
 
 // Keyed by exchange name so concurrent callers for different exchanges never
 // share a single-flight promise (architect review caught this: a global
@@ -267,8 +279,24 @@ type BalancesPerExchange = { cache: BalancesCacheEntry | null; inflight: Promise
 // slot. clearBalancesCache() flips both when the selected exchange changes.
 const _balancesByExchange = new Map<string, BalancesPerExchange>();
 
-const BALANCES_FRESH_MS = 8_000;          // 8s: serve cached, skip upstream
-const BALANCES_STALE_MS = 5 * 60 * 1000;  // 5min: serve cached on error
+// Tuning — telemetry tier only. Execution path is untouched.
+//   FRESH_MS: how long a successful snapshot is served without re-fetching.
+//     Bumped 8s → 20s in the controlled-beta stabilization pass because the
+//     hero balance is decorative for the operator (real positions/equity
+//     live in /exchange/live-state which derives from _orders, not from
+//     Balance). 20s staleness is invisible to operator and drops the
+//     upstream rate from ~7.5/min to ~3/min worst case across all panels.
+//   STALE_MS: how long a snapshot may be served as `stale-error` after the
+//     upstream starts failing. Long, because a stale real number is always
+//     better than a zero.
+//   ERROR_COOLDOWN_MS: negative-cache duration when upstream fails AND we
+//     have no positive cache to serve. Within this window the route gets
+//     the cached error string and Kraken is not touched, giving the
+//     rate-limit counter time to decay. Slightly longer than the longest
+//     poll interval (10s) so polling cycles can't immediately re-arm.
+const BALANCES_FRESH_MS        = 20_000;
+const BALANCES_STALE_MS        = 5 * 60 * 1000;
+const BALANCES_ERROR_COOLDOWN_MS = 20_000;
 
 export type LiveBalancesSource = "live" | "cached" | "stale-error";
 export interface LiveBalancesWithMeta {
@@ -282,7 +310,7 @@ export interface LiveBalancesWithMeta {
 function getBalancesSlot(exchange: string): BalancesPerExchange {
   let slot = _balancesByExchange.get(exchange);
   if (!slot) {
-    slot = { cache: null, inflight: null };
+    slot = { cache: null, inflight: null, lastError: null };
     _balancesByExchange.set(exchange, slot);
   }
   return slot;
@@ -306,12 +334,28 @@ export async function fetchLiveBalancesWithMeta(): Promise<LiveBalancesWithMeta>
     };
   }
 
+  // 1b. Negative-cache hit — upstream failed recently AND we have no usable
+  // snapshot. Skip the upstream call entirely and re-throw the cached error.
+  // This is the fix for the cold-cache rate-limit death spiral: without this,
+  // every 4-10s poll across every panel would re-hit Kraken during the
+  // throttle window, pinning the counter and preventing decay. We only honor
+  // the cooldown when no positive cache exists — if we have a snapshot
+  // (even stale), the stale-on-error branch below is strictly better.
+  if (
+    slot.lastError &&
+    !slot.cache &&
+    now - slot.lastError.at < BALANCES_ERROR_COOLDOWN_MS
+  ) {
+    throw new Error(slot.lastError.msg);
+  }
+
   // 2. Single-flight per exchange: concurrent callers for the SAME exchange
   // coalesce; callers for a different exchange use that exchange's own slot.
   if (!slot.inflight) {
     slot.inflight = fetchLiveBalances()
       .then((b) => {
-        slot.cache = { balances: b, fetchedAt: Date.now() };
+        slot.cache     = { balances: b, fetchedAt: Date.now() };
+        slot.lastError = null;  // success clears the negative cache
         return b;
       })
       .finally(() => {
@@ -324,6 +368,10 @@ export async function fetchLiveBalancesWithMeta(): Promise<LiveBalancesWithMeta>
     return { balances, exchange, source: "live", ageMs: 0 };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    // Remember the failure so subsequent polls within the cooldown window
+    // do not re-hit Kraken. Refreshed each time so a sustained outage stays
+    // suppressed for the full cooldown beyond the last attempt.
+    slot.lastError = { msg, at: Date.now() };
 
     // 3. Stale-on-error: serve last-good snapshot for THIS exchange if still
     // within the stale window. Slot-scoped → never cross-leaks across
@@ -343,6 +391,10 @@ export async function fetchLiveBalancesWithMeta(): Promise<LiveBalancesWithMeta>
     }
 
     // No cache available — bubble error to caller (route renders source="error").
+    // The negative cache above will absorb subsequent polls for the cooldown.
+    console.warn(
+      `[exchangeEngine] fetchLiveBalances failed for ${exchange} with no cache; negative-caching for ${BALANCES_ERROR_COOLDOWN_MS}ms err=${msg}`,
+    );
     throw err;
   }
 }
