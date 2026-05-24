@@ -1,0 +1,176 @@
+Excellent work. Phase A + B architecture implementation is approved.
+
+The important part is this:
+
+* enforcement is isolated
+* execution infrastructure remained untouched
+* moderation precedence preserved
+* open positions preserved
+* billing system is fully SaaS-oriented
+
+The all-or-nothing credit deduction fix was the correct decision.
+We do NOT want partial fee fragmentation or accounting drift.
+
+The moderation precedence protection was also critical:
+billing logic must NEVER override:
+
+* suspended
+* disabled
+* force_paper
+* operator moderation states
+
+That boundary is correct.
+
+====================================================
+PHASE C APPROVED
+STRIPE TOP-UP + AUTO RESTORATION
+================================
+
+Proceed with:
+
+* Stripe one-shot top-up flow
+* payment_intent.succeeded webhook integration
+* automatic billing restoration
+* outstanding fee payment flow
+
+====================================================
+PHASE C REQUIREMENTS
+====================
+
+1. CUSTOMER CREDIT TOP-UP
+   New route:
+   POST /api/billing/topup
+
+Use:
+Stripe Checkout
+mode = payment
+
+Preset packs only:
+
+* $25
+* $50
+* $100
+* $250
+
+No arbitrary amounts yet.
+
+====================================================
+2. WEBHOOK HANDLING
+===================
+
+On:
+payment_intent.succeeded
+
+If:
+metadata.type === "credit_topup"
+
+Then:
+
+* add credits
+* create immutable ledger entry
+* audit log
+* run clearBillingHoldIfHealthy()
+
+====================================================
+3. AUTO RESTORATION
+===================
+
+If:
+user.adminStatus === billing_hold
+AND
+billing health is restored
+
+Then automatically:
+
+* restore ACTIVE
+* restore live execution eligibility
+* preserve audit trail
+* preserve moderation precedence
+
+IMPORTANT:
+NEVER auto-restore:
+
+* suspended
+* disabled
+* force_paper
+* manually restricted users
+
+====================================================
+4. OUTSTANDING PAYMENT FLOW
+===========================
+
+Add:
+POST /api/billing/pay_outstanding
+
+This is for users that want to:
+
+* directly clear outstanding debt
+  instead of adding credits.
+
+Use:
+Stripe InvoiceItem / PaymentIntent flow.
+
+====================================================
+5. BILLING HOLD UX RULES
+========================
+
+billing_hold means:
+
+* NO NEW live AI executions
+* YES paper trading
+* YES dashboard access
+* YES signals/history
+* YES account access
+
+This is a software billing restriction ONLY.
+
+====================================================
+6. DO NOT TOUCH
+===============
+
+Still locked:
+
+* Kraken adapter
+* execution queue
+* live trading engine
+* telemetry systems
+* auth routing
+* customer/admin separation
+
+Single enforcement boundary remains:
+
+* userStatusGuard
+
+====================================================
+7. GLOBAL KILL SWITCH
+=====================
+
+Keep current kill-switch architecture inert.
+Do NOT activate yet.
+Just preserve the boundaries already added.
+
+====================================================
+8. REPLIT.MD
+============
+
+Yes — after Phase C stabilizes:
+trim replit.md safely.
+
+Safe to collapse:
+
+* Phase 1–4 detailed changelog
+* old task-by-task narrative
+* redundant deployment notes
+
+DO NOT remove:
+
+* architectural invariants
+* routing matrix
+* admin/customer separation rules
+* billing enforcement rules
+* moderation precedence rules
+* execution safety boundaries
+
+Git history already preserves implementation detail.
+
+Proceed with Phase C only.

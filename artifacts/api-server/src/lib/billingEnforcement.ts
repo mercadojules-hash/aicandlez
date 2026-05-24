@@ -44,6 +44,12 @@ import { and, eq, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { logger } from "./logger.js";
 
+// Drizzle's transaction handle type. Using `any` here keeps the function
+// signatures readable without dragging in the full PgTransaction generic
+// chain; correctness is enforced by the inner SQL builder usage.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Tx = any;
+
 // ── Thresholds per plan ──────────────────────────────────────────────────────
 // FREE users cannot place live orders anyway, so the threshold is N/A.
 // STARTER / PRO thresholds taken from product spec.
@@ -224,52 +230,63 @@ export async function applyFeeAgainstCredits(args: {
  *   The ledger row is then inserted in the same transaction using the
  *   RETURNed balance so balance_after is exact.
  */
-export async function addCredits(args: {
+/**
+ * tx-aware credit-add inner. Used by the public `addCredits` wrapper and by
+ * the Stripe webhook fulfillment path (where the surrounding transaction
+ * also writes the idempotency row + audit row atomically).
+ */
+export async function addCreditsInTx(tx: Tx, args: {
   userId:                 string;
-  amount:                 number;       // positive USD
-  type:                   CreditTxType; // "topup" | "refund" | "adjustment"
+  amount:                 number;
+  type:                   CreditTxType;
   stripePaymentIntentId?: string | null;
   actorAdminId?:          string | null;
   note?:                  string | null;
 }): Promise<{ newBalance: number; txId: string }> {
-  if (args.amount <= 0) throw new Error("addCredits: amount must be positive");
+  if (args.amount <= 0) throw new Error("addCreditsInTx: amount must be positive");
 
-  return await db.transaction(async (tx) => {
-    // Atomic add via SQL UPSERT.  On conflict, balance = existing + EXCLUDED.
-    // Returns the RESULTING balance so two concurrent calls cannot lose an
-    // increment.
-    const upserted = await tx
-      .insert(userCreditsTable)
-      .values({
-        userId:     args.userId,
-        balanceUsd: args.amount,
+  const upserted = await tx
+    .insert(userCreditsTable)
+    .values({
+      userId:     args.userId,
+      balanceUsd: args.amount,
+      updatedAt:  new Date(),
+    })
+    .onConflictDoUpdate({
+      target: userCreditsTable.userId,
+      set: {
+        balanceUsd: sql`${userCreditsTable.balanceUsd} + EXCLUDED.balance_usd`,
         updatedAt:  new Date(),
-      })
-      .onConflictDoUpdate({
-        target: userCreditsTable.userId,
-        set: {
-          balanceUsd: sql`${userCreditsTable.balanceUsd} + EXCLUDED.balance_usd`,
-          updatedAt:  new Date(),
-        },
-      })
-      .returning({ balance: userCreditsTable.balanceUsd });
+      },
+    })
+    .returning({ balance: userCreditsTable.balanceUsd });
 
-    const newBalance = parseFloat(Number(upserted[0]?.balance ?? args.amount).toFixed(6));
+  const newBalance = parseFloat(Number(upserted[0]?.balance ?? args.amount).toFixed(6));
 
-    const txId = newTxId(args.type === "topup" ? "TOP" : args.type === "refund" ? "REF" : "ADJ");
-    await tx.insert(creditTransactionsTable).values({
-      id:                    txId,
-      userId:                args.userId,
-      amountUsd:             args.amount,
-      type:                  args.type,
-      stripePaymentIntentId: args.stripePaymentIntentId ?? null,
-      actorAdminId:          args.actorAdminId ?? null,
-      note:                  args.note ?? null,
-      balanceAfter:          newBalance,
-    });
-
-    return { newBalance, txId };
+  const txId = newTxId(args.type === "topup" ? "TOP" : args.type === "refund" ? "REF" : "ADJ");
+  await tx.insert(creditTransactionsTable).values({
+    id:                    txId,
+    userId:                args.userId,
+    amountUsd:             args.amount,
+    type:                  args.type,
+    stripePaymentIntentId: args.stripePaymentIntentId ?? null,
+    actorAdminId:          args.actorAdminId ?? null,
+    note:                  args.note ?? null,
+    balanceAfter:          newBalance,
   });
+
+  return { newBalance, txId };
+}
+
+export async function addCredits(args: {
+  userId:                 string;
+  amount:                 number;
+  type:                   CreditTxType;
+  stripePaymentIntentId?: string | null;
+  actorAdminId?:          string | null;
+  note?:                  string | null;
+}): Promise<{ newBalance: number; txId: string }> {
+  return await db.transaction((tx) => addCreditsInTx(tx, args));
 }
 
 // ── Enforcement: set / clear billing_hold ────────────────────────────────────
@@ -468,6 +485,105 @@ export async function waiveAllPendingFees(args: {
 
   await evaluateAndEnforceBillingHold(args.userId);
   return { waivedCount: pending.length, totalWaived };
+}
+
+/**
+ * Apply a Stripe payment (outstanding-fee flow) directly against pending
+ * fees, oldest first. Used by the `/billing/pay_outstanding` webhook path.
+ *
+ * Accounting:
+ *   - Iterate pending fees in `incurredAt` order.
+ *   - For each fee that is FULLY coverable by the remaining payment,
+ *     mark it `settled` and decrement the payment pool.
+ *   - Any leftover payment (after all fully-coverable fees are settled)
+ *     is added to the user's credit balance as a `topup` so it can be
+ *     consumed by future fees. This preserves the all-or-nothing
+ *     deduction rule from `applyFeeAgainstCredits` while still giving
+ *     the user value for the full amount they paid.
+ *
+ * Returns counts for the webhook → audit payload.
+ */
+/**
+ * tx-aware outstanding-payment application. ALL mutations (fee settlement +
+ * leftover credit upsert + leftover ledger row) happen inside the caller's
+ * transaction so the financial effect is strictly all-or-nothing.
+ */
+export async function applyPaymentToOutstandingFeesInTx(tx: Tx, args: {
+  userId:                string;
+  paymentAmountUsd:      number;
+  stripePaymentIntentId: string;
+  note?:                 string | null;
+}): Promise<{
+  feesSettled:         number;
+  amountAppliedToFees: number;
+  amountToCredits:     number;
+  feeIds:              string[];
+}> {
+  if (args.paymentAmountUsd <= 0) {
+    return { feesSettled: 0, amountAppliedToFees: 0, amountToCredits: 0, feeIds: [] };
+  }
+
+  const pending = await tx
+    .select({ id: performanceFeesTable.id, amount: performanceFeesTable.feeAmountUsd })
+    .from(performanceFeesTable)
+    .where(and(
+      eq(performanceFeesTable.userId, args.userId),
+      eq(performanceFeesTable.settlementStatus, "pending"),
+      eq(performanceFeesTable.isPaper, false),
+    ))
+    .orderBy(performanceFeesTable.createdAt)
+    .for("update");
+
+  let remaining             = args.paymentAmountUsd;
+  let amountAppliedToFees   = 0;
+  const settledIds: string[] = [];
+
+  for (const fee of pending as Array<{ id: string; amount: number }>) {
+    const amt = Number(fee.amount);
+    if (amt <= remaining + 1e-6) {
+      await tx.update(performanceFeesTable)
+        .set({
+          settlementStatus: "settled",
+          settledAt:        new Date(),
+        })
+        .where(eq(performanceFeesTable.id, fee.id));
+      remaining           = parseFloat((remaining - amt).toFixed(6));
+      amountAppliedToFees = parseFloat((amountAppliedToFees + amt).toFixed(6));
+      settledIds.push(fee.id);
+    }
+  }
+
+  // Leftover → credits, inside the SAME transaction (no second commit point).
+  if (remaining > 0.0001) {
+    await addCreditsInTx(tx, {
+      userId:                args.userId,
+      amount:                remaining,
+      type:                  "topup",
+      stripePaymentIntentId: args.stripePaymentIntentId,
+      note:                  args.note ?? "outstanding_payment leftover → credits",
+    });
+  }
+
+  return {
+    feesSettled:         settledIds.length,
+    amountAppliedToFees,
+    amountToCredits:     parseFloat(remaining.toFixed(6)),
+    feeIds:              settledIds,
+  };
+}
+
+export async function applyPaymentToOutstandingFees(args: {
+  userId:                string;
+  paymentAmountUsd:      number;
+  stripePaymentIntentId: string;
+  note?:                 string | null;
+}): Promise<{
+  feesSettled:         number;
+  amountAppliedToFees: number;
+  amountToCredits:     number;
+  feeIds:              string[];
+}> {
+  return await db.transaction((tx) => applyPaymentToOutstandingFeesInTx(tx, args));
 }
 
 /**

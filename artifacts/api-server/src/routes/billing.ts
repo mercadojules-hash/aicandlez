@@ -518,4 +518,164 @@ export async function syncSubscriptionStatus(
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase C — Prepaid credit top-ups & outstanding-fee payments
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// `POST /api/billing/topup`            — fixed-pack Stripe Checkout (payment mode)
+// `POST /api/billing/pay_outstanding`  — pay current outstanding fees directly
+//
+// Webhook fulfillment (payment_intent.succeeded with metadata.type) lives in
+// `webhookHandlers.ts` so a single Stripe endpoint covers both subscription
+// (stripe-replit-sync) and credit/outstanding flows.
+//
+// Auto-restoration is handled inside `evaluateAndEnforceBillingHold`, which is
+// invoked from the webhook fulfillment path. It preserves moderation
+// precedence (never overrides suspended / disabled / force_paper).
+//
+// Strict invariants preserved:
+//   - This route only mints Stripe Checkout sessions; no exchange, queue,
+//     trading-loop, or auth-routing surface is touched.
+//   - No client-overridable success/cancel URLs (server-derived, same as
+//     subscription checkout — Task #162 Phase B).
+
+import { checkBillingHealth } from "../lib/billingEnforcement.js";
+
+const CREDIT_TOPUP_PACKS_USD = [25, 50, 100, 250] as const;
+type CreditPack = (typeof CREDIT_TOPUP_PACKS_USD)[number];
+
+router.post("/billing/topup", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
+  const body   = req.body as { amount?: number };
+  const amt    = Number(body?.amount);
+
+  if (!CREDIT_TOPUP_PACKS_USD.includes(amt as CreditPack)) {
+    res.status(400).json({
+      error:     "Invalid amount. Allowed packs: $25, $50, $100, $250.",
+      allowed:   CREDIT_TOPUP_PACKS_USD,
+    });
+    return;
+  }
+
+  try {
+    const [user] = await db
+      .select({ email: usersTable.email, billingEmail: usersTable.billingEmail })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, userId))
+      .limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    const customerId = await ensureStripeCustomer(userId, user.billingEmail ?? user.email);
+    const stripe     = await getUncachableStripeClient();
+    const baseUrl    = resolveCustomerAppBaseUrl(req.get("origin") ?? undefined);
+
+    const session = await stripe.checkout.sessions.create({
+      customer:             customerId,
+      payment_method_types: ["card"],
+      mode:                 "payment",
+      line_items: [{
+        quantity: 1,
+        price_data: {
+          currency:     "usd",
+          unit_amount:  amt * 100,
+          product_data: {
+            name:        `AICandlez Credit Top-Up ($${amt})`,
+            description: "Prepaid balance used to settle performance fees on profitable closed trades.",
+          },
+        },
+      }],
+      // Critical: metadata propagates to the PaymentIntent so the webhook
+      // path can disambiguate credit_topup vs outstanding_payment vs unrelated
+      // future flows. The clerkUserId carries identity since the PaymentIntent
+      // itself is not user-scoped at the API layer.
+      payment_intent_data: {
+        metadata: {
+          type:        "credit_topup",
+          clerkUserId: userId,
+          packUsd:     String(amt),
+        },
+      },
+      metadata: {
+        type:        "credit_topup",
+        clerkUserId: userId,
+        packUsd:     String(amt),
+      },
+      success_url: `${baseUrl}/billing?topup=success`,
+      cancel_url:  `${baseUrl}/billing?topup=canceled`,
+    });
+
+    res.json({ url: session.url, amount: amt });
+  } catch (err) {
+    req.log.error({ err, userId, amount: amt }, "POST /billing/topup failed");
+    res.status(500).json({ error: "Failed to create top-up session" });
+  }
+});
+
+router.post("/billing/pay_outstanding", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
+
+  try {
+    const health = await checkBillingHealth(userId);
+    if (health.netOwed <= 0) {
+      res.status(400).json({ error: "No outstanding balance to pay.", netOwed: 0 });
+      return;
+    }
+
+    // Minimum Stripe charge ($0.50). Round UP to cent precision so the
+    // user is never undercharged by float drift; any leftover (sub-cent or
+    // whole-cent surplus) is added to credits by applyPaymentToOutstandingFees.
+    const amountCents = Math.max(50, Math.ceil(health.netOwed * 100));
+    const amountUsd   = amountCents / 100;
+
+    const [user] = await db
+      .select({ email: usersTable.email, billingEmail: usersTable.billingEmail })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, userId))
+      .limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    const customerId = await ensureStripeCustomer(userId, user.billingEmail ?? user.email);
+    const stripe     = await getUncachableStripeClient();
+    const baseUrl    = resolveCustomerAppBaseUrl(req.get("origin") ?? undefined);
+
+    const session = await stripe.checkout.sessions.create({
+      customer:             customerId,
+      payment_method_types: ["card"],
+      mode:                 "payment",
+      line_items: [{
+        quantity: 1,
+        price_data: {
+          currency:    "usd",
+          unit_amount: amountCents,
+          product_data: {
+            name:        "AICandlez — Outstanding Performance Fees",
+            description: `Clears the current outstanding balance of $${health.netOwed.toFixed(2)}.`,
+          },
+        },
+      }],
+      payment_intent_data: {
+        metadata: {
+          type:           "outstanding_payment",
+          clerkUserId:    userId,
+          netOwedAtStart: String(health.netOwed.toFixed(2)),
+          amountUsd:      String(amountUsd.toFixed(2)),
+        },
+      },
+      metadata: {
+        type:           "outstanding_payment",
+        clerkUserId:    userId,
+        netOwedAtStart: String(health.netOwed.toFixed(2)),
+        amountUsd:      String(amountUsd.toFixed(2)),
+      },
+      success_url: `${baseUrl}/billing?outstanding=success`,
+      cancel_url:  `${baseUrl}/billing?outstanding=canceled`,
+    });
+
+    res.json({ url: session.url, amount: amountUsd, netOwed: health.netOwed });
+  } catch (err) {
+    req.log.error({ err, userId }, "POST /billing/pay_outstanding failed");
+    res.status(500).json({ error: "Failed to create outstanding payment session" });
+  }
+});
+
 export default router;
