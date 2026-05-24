@@ -1,0 +1,95 @@
+Good morning. Continuing in Launch Stabilization mode only — no new systems, no scope expansion.
+
+Current objective:
+finish Kraken telemetry stabilization and confirm controlled-beta readiness.
+
+What we know so far:
+
+✅ hydration issue fixed
+✅ customer/admin flicker fixed
+✅ execution engine stable
+✅ Kraken execution path untouched
+✅ customer/admin separation preserved
+✅ billing architecture stable
+✅ concurrent cap reduced to 3
+✅ root cause narrowed to telemetry polling behavior after Render cold starts
+
+Most important:
+this is NOT:
+
+* a Kraken bridge failure
+* an execution failure
+* a billing issue
+* an auth issue
+
+This is specifically:
+Kraken Balance telemetry destabilizing after cold-cache startup due to repeated polling + Render free-tier sleep behavior.
+
+The negative-cache cooldown + 20s freshness patch was the correct stabilization fix.
+
+====================================================
+TODAY'S PRIORITY
+================
+
+Validate whether the new telemetry patch fully stabilized production.
+
+Need to confirm:
+
+1. admintrade.aicandlez.com/portal
+
+* Kraken USD populates
+* total equity reflects live Kraken account
+* no repeated AUTH FAILED
+* no telemetry collapse to $0
+
+2. Logs
+   Need a fresh Render aicandlez-api log slice AFTER the new deploy.
+
+Specifically verify:
+
+* EAPI:Rate limit exceeded frequency dramatically reduced or eliminated
+* negative cache engages briefly then decays cleanly
+* eventual successful:
+  [Kraken] private response OK
+* no repeated Balance storm loops
+
+3. trade.aicandlez.com/portal
+
+* hydration still fast (~1–2s)
+* no black 15s gate
+* no admin/customer flicker
+* customer surface remains paper-only
+
+====================================================
+IMPORTANT
+=========
+
+Do NOT:
+
+* rewrite execution
+* touch Kraken bridge
+* alter trading loop
+* expand architecture
+* add new exchanges
+* redesign telemetry systems
+
+If telemetry is still unstable AFTER the negative-cache deploy,
+the next escalation is likely operational:
+upgrade aicandlez-api off Render free-tier sleep behavior.
+
+That is preferred over architectural churn.
+
+====================================================
+CONTROLLED BETA POSTURE
+=======================
+
+Remain at:
+
+* 1 paid subscriber
+* 2 complimentary users
+* LIVE_EXECUTION_CONCURRENT_CAP=3
+* manual oversight
+* gradual scaling only
+
+Still in:
+Launch Stabilization + Controlled Beta mode.
