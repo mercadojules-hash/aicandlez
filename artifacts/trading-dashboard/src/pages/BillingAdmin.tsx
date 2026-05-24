@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "@clerk/react";
+import { authFetch } from "@/lib/authFetch";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Activity, AlertTriangle, Banknote, CheckCircle2, Gift, RefreshCw, Search,
@@ -79,23 +79,12 @@ interface BillingDetail {
 const num = (v: number | string | null | undefined): number =>
   v == null ? 0 : typeof v === "number" ? v : parseFloat(v) || 0;
 
-// ── Auth-wrapped fetch (mirrors Admin.tsx pattern) ──────────────────────────
-function useAuthFetch() {
-  const { getToken } = useAuth();
-  return async (path: string, init: RequestInit = {}): Promise<Response> => {
-    const token = await getToken().catch(() => null);
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(init.headers as Record<string, string> | undefined),
-    };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    return fetch(path, { ...init, headers });
-  };
-}
+// authFetch is sourced from `lib/authFetch.ts` — see Admin.tsx for the
+// rationale (cross-origin VITE_API_BASE_URL prefix, prevents static-SPA
+// HTML responses being mistaken for JSON 200s on admintrade.*).
 
 // ── Hooks ───────────────────────────────────────────────────────────────────
 function useHoldQueue() {
-  const authFetch = useAuthFetch();
   return useQuery<HoldQueueResponse>({
     queryKey: ["billing-hold-queue"],
     queryFn: async () => {
@@ -109,7 +98,6 @@ function useHoldQueue() {
 }
 
 function useBillingDetail(userId: string | null) {
-  const authFetch = useAuthFetch();
   return useQuery<BillingDetail>({
     queryKey: ["billing-detail", userId],
     enabled: !!userId,
@@ -159,7 +147,6 @@ function BillingActionDrawer({ userId, onClose, isSuperAdmin }: {
   onClose: () => void;
   isSuperAdmin: boolean;
 }) {
-  const authFetch = useAuthFetch();
   const qc        = useQueryClient();
   const { data, isLoading, error, refetch } = useBillingDetail(userId);
   const [panel, setPanel] = useState<ActionPanel>(null);

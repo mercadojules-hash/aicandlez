@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@clerk/react";
+import { authFetch } from "@/lib/authFetch";
 import {
   Users, Zap, DollarSign, Activity, TrendingUp, Shield,
   Search, ChevronUp, ChevronDown, ArrowUpRight, ArrowDownRight,
@@ -119,24 +119,19 @@ function initials(email: string): string {
 }
 
 // ── Auth-wrapped fetch ───────────────────────────────────────────────────────
-
-function useAuthFetch() {
-  const { getToken } = useAuth();
-  return async (path: string, init: RequestInit = {}): Promise<Response> => {
-    const token = await getToken().catch(() => null);
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(init.headers as Record<string, string> | undefined),
-    };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    return fetch(path, { ...init, headers });
-  };
-}
+//
+// Historically this file defined a *local* `useAuthFetch` that called
+// `fetch(path, ...)` directly. On the production 3-domain split, that
+// shadow copy bypassed the `lib/authFetch.ts` cross-origin prefix —
+// `/api/admin/users` from admintrade.aicandlez.com was served by the
+// static SPA fallback (HTML, status 200), then `res.json()` threw and
+// the query silently fell back to `[]`. Symptom: 200 in the network
+// tab + empty CRM table. Now every call routes through the shared
+// authFetch which prefixes VITE_API_BASE_URL → api.aicandlez.com.
 
 // ── Admin user list hook ─────────────────────────────────────────────────────
 
 function useAdminUsers(params: { q: string; plan: string; status: string }) {
-  const authFetch = useAuthFetch();
   return useQuery<AdminUserRow[]>({
     queryKey: ["admin-users", params],
     queryFn: async () => {
@@ -217,7 +212,6 @@ function UserActionDrawer({
   onClose: () => void;
   isSuperAdmin: boolean;
 }) {
-  const authFetch = useAuthFetch();
   const qc        = useQueryClient();
   const [panel, setPanel]       = useState<ActionPanel>(null);
   const [note, setNote]         = useState("");
@@ -989,7 +983,6 @@ export default function Admin() {
   });
 
   // Sync from Clerk (back-fills users who signed up but never opened /auth/me)
-  const authFetch = useAuthFetch();
   const qc        = useQueryClient();
   const syncMutation = useMutation({
     mutationFn: async () => {

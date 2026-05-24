@@ -8,7 +8,7 @@
  */
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@clerk/react";
+import { authFetch } from "@/lib/authFetch";
 import { Activity, Loader2, RefreshCw, AlertTriangle, TrendingUp, Zap } from "lucide-react";
 
 interface ActivityRow {
@@ -28,15 +28,9 @@ interface ActivityRow {
   onlineNow: boolean;
 }
 
-function useAuthFetch() {
-  const { getToken } = useAuth();
-  return async (p: string, init: RequestInit = {}) => {
-    const t = await getToken().catch(() => null);
-    const h: Record<string, string> = { "Content-Type": "application/json", ...(init.headers as Record<string, string> | undefined) };
-    if (t) h["Authorization"] = `Bearer ${t}`;
-    return fetch(p, { ...init, headers: h });
-  };
-}
+// authFetch routed through `lib/authFetch.ts` (prefixes VITE_API_BASE_URL
+// so admin.* / trade.* / admintrade.* static hosts correctly reach
+// api.aicandlez.com instead of falling back to the SPA index.html).
 
 function fmtAgo(ms: number | null): string {
   if (!ms) return "—";
@@ -56,7 +50,6 @@ function fmtDollar(n: number) {
 function pnlColor(n: number) { return n > 0 ? "#00ff8a" : n < 0 ? "#ff3355" : "#9FB3C8"; }
 
 export default function AdminUserActivity() {
-  const authFetch = useAuthFetch();
   const { data: users = [], isLoading, isError, refetch } = useQuery<ActivityRow[]>({
     queryKey: ["admin-activity"],
     queryFn: async () => {
