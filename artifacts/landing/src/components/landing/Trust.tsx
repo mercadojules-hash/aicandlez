@@ -19,7 +19,7 @@ const TRUST_ITEMS = [
     ),
     title: "Non-Custodial",
     description:
-      "AICandlez never holds, transfers, or touches your funds. Your capital lives in your own Alpaca brokerage account — we only execute trades.",
+      "AICandlez never holds, transfers, or touches your funds. Your capital lives in your own regulated crypto exchange account (Kraken, Binance, Coinbase) — we only execute trades.",
     color: "#00ff88",
   },
   {
@@ -51,9 +51,9 @@ const TRUST_ITEMS = [
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
       </svg>
     ),
-    title: "Regulated Broker — Alpaca",
+    title: "Regulated Exchanges — Kraken · Binance · Coinbase",
     description:
-      "All live trading is routed through Alpaca Securities — a FINRA member, SEC-registered broker-dealer with SIPC protection up to $500,000.",
+      "All live trading is routed through your connected crypto exchange via read + trade API keys. Withdrawal permissions are never requested.",
     color: "#00e5ff",
   },
   {
@@ -204,19 +204,20 @@ export function Trust() {
                 color: "#fff",
               }}
             >
-              Powered by Alpaca Securities
+              Routed Through Your Own Regulated Exchange
             </h3>
             <p style={{ color: "#8892a4", fontSize: 15, maxWidth: 500, lineHeight: 1.6 }}>
-              All order execution flows through Alpaca Markets — a FINRA-registered
-              broker-dealer with SIPC coverage. AICandlez is the intelligent layer
-              on top, never the custodian.
+              Every live order is placed on your connected Kraken, Binance, or
+              Coinbase account via read + trade API keys — withdrawals never
+              requested. AICandlez is the intelligent layer on top, never the
+              custodian.
             </p>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
             {[
-              { label: "FINRA", sublabel: "Member" },
-              { label: "SEC", sublabel: "Registered" },
-              { label: "SIPC", sublabel: "$500K Protected" },
+              { label: "Kraken", sublabel: "Regulated" },
+              { label: "Binance", sublabel: "Tier-1 Liquidity" },
+              { label: "Coinbase", sublabel: "US-Listed" },
             ].map((badge) => (
               <div
                 key={badge.label}

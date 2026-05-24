@@ -126,14 +126,14 @@ const PLANS: PlanMeta[] = [
   {
     id: "pro",
     name:     "AICandlez Pro",
-    caption:  "Expanded AI capacity, crypto + equities, priority execution.",
+    caption:  "Expanded AI capacity, crypto majors + alts + emerging, priority execution.",
     price:    "$79.99",
     priceNum: "79.99",
     capacity: "Up to 12 Concurrent AI Trades",
     features: [
       "Up to 12 concurrent AI trades",
       "Priority AI execution",
-      "Crypto + Equities AI trading",
+      "Crypto AI trading (majors + alts + emerging)",
       "Advanced AI scanners",
       "Expanded AI confidence engine",
       "Enhanced analytics",

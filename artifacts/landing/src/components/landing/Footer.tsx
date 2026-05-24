@@ -316,7 +316,7 @@ export function Footer() {
               <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", letterSpacing: "0.1em", marginBottom: 20 }}>
                 SECURITY
               </div>
-              {["Trust & Safety", "Encryption", "Alpaca Broker", "Audit Logs"].map((item) => (
+              {["Trust & Safety", "Encryption", "Exchange Security", "Audit Logs"].map((item) => (
                 <div
                   key={item}
                   style={{

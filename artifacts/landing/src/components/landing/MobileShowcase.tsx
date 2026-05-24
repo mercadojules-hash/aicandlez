@@ -211,7 +211,7 @@ function PortfolioScreen() {
         {[
           { symbol: "BTC/USD", pnl: "+$521", pct: "+0.62%", up: true },
           { symbol: "ETH/USD", pnl: "+$203", pct: "+0.41%", up: true },
-          { symbol: "NVDA", pnl: "+$100", pct: "+1.24%", up: true },
+          { symbol: "SOL/USD", pnl: "+$100", pct: "+1.24%", up: true },
         ].map((pos) => (
           <div
             key={pos.symbol}
@@ -274,7 +274,7 @@ function AlertScreen() {
         },
         {
           type: "TRADE EXECUTED",
-          msg: "BUY NVDA filled @ $942.50",
+          msg: "BUY AVAX/USD filled @ $42.50",
           time: "1h ago",
           color: "#00ff88",
           icon: "⚡",

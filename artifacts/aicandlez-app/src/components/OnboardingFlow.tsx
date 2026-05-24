@@ -2,21 +2,19 @@ import { authFetch } from "@/lib/authFetch";
 /**
  * OnboardingFlow (PWA) — post-checkout live-trading onboarding for
  * app.aicandlez.com. Mirrors the trade-dashboard component but with a
- * mobile-first full-screen overlay. See
- * `artifacts/trading-dashboard/src/components/OnboardingFlow.tsx` for the
- * shared design contract.
+ * mobile-first full-screen overlay.
  *
- * Trigger:    ?checkout=success appears on any route (Stripe success
- *             redirect → /aicandlez-app/profile?checkout=success).
- *             Param is stripped after detection so the modal opens once.
+ * Trigger:    ?checkout=success appears on any route. Param is stripped
+ *             after detection so the modal opens exactly once.
  *
  * Bypass:     1+ live exchange already connected AND intro seen → skip
  *             entirely. Connected but intro not seen → jump to intro.
  *
- * Steps:      choose → alpaca_cta → connect → intro → done.
+ * Steps:      choose → exchange_cta → connect → intro → done.
  *
  * Compliance copy is locked — never "deposit money into AICandlez"; always
- * "into your Alpaca brokerage account" or "connect your existing exchange".
+ * "into your own regulated crypto exchange account (Kraken, Binance, or
+ * Coinbase)". Withdrawal permissions never requested.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -41,40 +39,39 @@ const TEXT_2     = "#5A726A";
 const SANS       = "Inter,-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif";
 const MONO       = "'SF Mono','Fira Code','JetBrains Mono','Roboto Mono',monospace";
 
-// Extension surface for upgrading the Alpaca path to OAuth / Broker API later.
+// Extension surface for upgrading the primary-exchange path to OAuth / Broker
+// API later. The user-visible label is generic; the backend `id` still maps to
+// the underlying credential vault entry.
 interface OnboardingProvider {
   id: string; label: string;
   type: "external_cta" | "oauth" | "broker_api";
   externalUrl?: string;
 }
-const ALPACA_PROVIDER: OnboardingProvider = {
-  id:          "alpaca",
-  label:       "Alpaca",
+const PRIMARY_EXCHANGE_PROVIDER: OnboardingProvider = {
+  id:          "Kraken",
+  label:       "Kraken",
   type:        "external_cta",
-  externalUrl: "https://alpaca.markets/signup",
+  externalUrl: "https://www.kraken.com/sign-up",
 };
 
-// Server-driven enablement of the in-app Alpaca OAuth handshake. Mirrors
-// trading-dashboard/OnboardingFlow.tsx — see that file for the full flow
-// description. When `enabled === false` (env vars unset), the CTA falls back
-// to the existing alpaca.markets external CTA.
-interface AlpacaOauthConfig { enabled: boolean; authorizeUrl?: string; scope?: string }
+// Server-driven enablement of the in-app one-click exchange OAuth handshake.
+// When `enabled === false` (env vars unset), the CTA falls back to the
+// external sign-up CTA + paste-keys flow.
+interface ExchangeOauthConfig { enabled: boolean; authorizeUrl?: string; scope?: string }
 
 // R1.5 — shared registry hook for exchange product metadata.
 import { useExchangeCatalog } from "@/hooks/useExchangeCatalog";
 
 // R1.5 — exchange picker hydrates from /api/exchanges/catalog (single
-// source of truth). The local fallback below mirrors the old hardcoded
-// list and is used only during the very first paint while the catalog
-// request is in flight, so the Alpaca/Kraken CTAs never read undefined.
-// IDs MUST match the backend catalog (case-sensitive).
+// source of truth). The local fallback below mirrors the user-visible list
+// of regulated crypto exchanges and is used only during the very first
+// paint while the catalog request is in flight, so the CTAs never read
+// undefined. IDs MUST match the backend catalog (case-sensitive).
 type PickerEntry = { id: string; name: string; logo: string };
 const FALLBACK_EXCHANGES: PickerEntry[] = [
-  { id: "Alpaca",       name: "Alpaca",     logo: "A" },
-  { id: "Kraken",       name: "Kraken",     logo: "K" },
-  { id: "Coinbase",     name: "Coinbase",   logo: "C" },
-  { id: "CryptoDotCom", name: "Crypto.com", logo: "ᶜ" },
-  { id: "Binance",      name: "Binance",    logo: "B" },
+  { id: "Kraken",   name: "Kraken",   logo: "K" },
+  { id: "Binance",  name: "Binance",  logo: "B" },
+  { id: "Coinbase", name: "Coinbase", logo: "C" },
 ];
 
 function useOnboardingExchanges(): PickerEntry[] {
@@ -91,7 +88,7 @@ function useOnboardingExchanges(): PickerEntry[] {
   }, [exchanges]);
 }
 
-type Step = "done" | "choose" | "alpaca_cta" | "connect" | "intro";
+type Step = "done" | "choose" | "exchange_cta" | "connect" | "intro";
 
 interface ApiExchangeRow {
   exchange:  string;
@@ -100,11 +97,11 @@ interface ApiExchangeRow {
 }
 interface ApiExchanges   { exchanges: ApiExchangeRow[] }
 
-// True when the Alpaca row is in OAuth-refresh-failed state — the background
-// AlpacaTokenRefresher marks status="error" with lastError prefixed by
-// "Alpaca OAuth refresh failed:" once the refresh_token is revoked/expired.
-export function isAlpacaOauthErrored(rows: ApiExchangeRow[] | undefined): { errored: boolean; lastError: string | null } {
-  const row = (rows ?? []).find(r => r.exchange === "Alpaca" && r.connected);
+// True when the primary exchange OAuth connection is in refresh-failed state.
+// The background token refresher marks status="error" with lastError once
+// the refresh_token is revoked/expired.
+export function isPrimaryExchangeOauthErrored(rows: ApiExchangeRow[] | undefined): { errored: boolean; lastError: string | null } {
+  const row = (rows ?? []).find(r => r.exchange === PRIMARY_EXCHANGE_PROVIDER.id && r.connected);
   const status    = row?.connection?.status ?? null;
   const lastError = row?.connection?.lastError ?? null;
   if (status !== "error") return { errored: false, lastError: null };
@@ -141,17 +138,17 @@ export function OnboardingFlow() {
     enabled:  isSignedIn === true && step !== "done",
     staleTime: 5_000,
   });
-  const oauthCfg = useQuery<AlpacaOauthConfig>({
-    queryKey: ["alpaca-oauth-config"],
+  const oauthCfg = useQuery<ExchangeOauthConfig>({
+    queryKey: ["exchange-oauth-config"],
     queryFn:  () => authFetch("/api/user/exchanges/alpaca/oauth/config", { credentials: "include" })
       .then(r => r.ok ? r.json() : { enabled: false }),
     enabled:  isSignedIn === true && step !== "done",
     staleTime: 60_000,
   });
-  const alpacaOauthEnabled = oauthCfg.data?.enabled === true;
+  const exchangeOauthEnabled = oauthCfg.data?.enabled === true;
   const [oauthError, setOauthError] = useState("");
   const connectedCount = (exchanges.data?.exchanges ?? []).filter(e => e.connected).length;
-  const alpacaErrored  = isAlpacaOauthErrored(exchanges.data?.exchanges);
+  const exchangeErrored = isPrimaryExchangeOauthErrored(exchanges.data?.exchanges);
   const introSeen = typeof window !== "undefined" && localStorage.getItem(LS_INTRO_SEEN) === "1";
 
   // Trigger on ?checkout=success
@@ -175,12 +172,12 @@ export function OnboardingFlow() {
     if (bypassResolved) return;
     if (exchanges.isLoading) return;
     setBypassResolved(true);
-    // When an OAuth-errored Alpaca connection exists, stay on the choose
-    // screen so the reconnect banner is visible — never bypass to intro/done.
-    if (alpacaErrored.errored) return;
+    // When the primary exchange OAuth connection is errored, stay on the
+    // choose screen so the reconnect banner is visible — never bypass.
+    if (exchangeErrored.errored) return;
     if (connectedCount > 0 && introSeen) { setStep("done"); return; }
     if (connectedCount > 0 && !introSeen) { setStep("intro"); return; }
-  }, [step, bypassResolved, exchanges.isLoading, connectedCount, introSeen, alpacaErrored.errored]);
+  }, [step, bypassResolved, exchanges.isLoading, connectedCount, introSeen, exchangeErrored.errored]);
 
   // External imperative trigger
   useEffect(() => {
@@ -209,16 +206,16 @@ export function OnboardingFlow() {
       : "Connection failed. Check your credentials and try again."),
   });
 
-  // ── One-click Alpaca OAuth popup ─────────────────────────────────────────
+  // ── One-click primary-exchange OAuth popup ───────────────────────────────
   // Server route postMessages the result back. Success → advance to "intro";
   // failure → surface a non-blocking inline error so the user can retry or
   // fall through to the pasted-keys path.
-  const startAlpacaOauth = () => {
-    if (!alpacaOauthEnabled || !oauthCfg.data?.authorizeUrl) return;
+  const startExchangeOauth = () => {
+    if (!exchangeOauthEnabled || !oauthCfg.data?.authorizeUrl) return;
     setOauthError("");
     const popup = window.open(
       oauthCfg.data.authorizeUrl,
-      "aicandlez-alpaca-oauth",
+      "aicandlez-exchange-oauth",
       "width=520,height=720,menubar=no,toolbar=no",
     );
     if (!popup) {
@@ -235,7 +232,7 @@ export function OnboardingFlow() {
         queryClient.invalidateQueries({ queryKey: ["exchange-connections"] });
         setStep("intro");
       } else {
-        setOauthError(data.error ?? "Alpaca did not authorize the connection.");
+        setOauthError(data.error ?? "The exchange did not authorize the connection.");
       }
     };
     window.addEventListener("message", onMessage);
@@ -260,30 +257,29 @@ export function OnboardingFlow() {
       <FullScreenShell onClose={close}>
         {step === "choose" && (
           <ChooseContent
-            oauthEnabled={alpacaOauthEnabled}
+            oauthEnabled={exchangeOauthEnabled}
             oauthError={oauthError}
-            alpacaErrored={alpacaErrored.errored}
-            alpacaErrorMsg={alpacaErrored.lastError}
-            onReconnectAlpaca={() => { if (alpacaOauthEnabled) startAlpacaOauth(); }}
-            onPickAlpaca={() => {
-              if (alpacaOauthEnabled) { startAlpacaOauth(); return; }
-              setStep("alpaca_cta");
+            exchangeErrored={exchangeErrored.errored}
+            exchangeErrorMsg={exchangeErrored.lastError}
+            onReconnectExchange={() => { if (exchangeOauthEnabled) startExchangeOauth(); }}
+            onPickPrimary={() => {
+              if (exchangeOauthEnabled) { startExchangeOauth(); return; }
+              setStep("exchange_cta");
             }}
             onPickExisting={() => {
-              // Default existing-connection target = first non-Alpaca live row
-              // (Kraken under current ordering). Falls back to catalog[0]
-              // if the catalog hasn't loaded yet.
-              const kraken = EXCHANGES.find(e => e.id === "Kraken") ?? EXCHANGES[1] ?? EXCHANGES[0];
-              setPicked(kraken); setStep("connect");
+              // Default existing-connection target = Binance, falling back to
+              // catalog[0] if the catalog hasn't loaded yet.
+              const fallback = EXCHANGES.find(e => e.id === "Binance") ?? EXCHANGES[1] ?? EXCHANGES[0];
+              setPicked(fallback); setStep("connect");
             }}
           />
         )}
-        {step === "alpaca_cta" && (
-          <AlpacaCtaContent
+        {step === "exchange_cta" && (
+          <ExchangeCtaContent
             onBack={() => setStep("choose")}
             onContinue={() => {
-              const alpaca = EXCHANGES.find(e => e.id === "Alpaca") ?? EXCHANGES[0];
-              setPicked(alpaca); setStep("connect");
+              const primary = EXCHANGES.find(e => e.id === PRIMARY_EXCHANGE_PROVIDER.id) ?? EXCHANGES[0];
+              setPicked(primary); setStep("connect");
             }}
           />
         )}
@@ -350,15 +346,15 @@ function FullScreenShell({ children, onClose }: { children: React.ReactNode; onC
 }
 
 // ─── Step 1: Choose path (PWA stacked cards) ────────────────────────────────
-function ChooseContent({ oauthEnabled, oauthError, alpacaErrored, alpacaErrorMsg, onReconnectAlpaca, onPickAlpaca, onPickExisting }: {
+function ChooseContent({ oauthEnabled, oauthError, exchangeErrored, exchangeErrorMsg, onReconnectExchange, onPickPrimary, onPickExisting }: {
   oauthEnabled: boolean; oauthError: string;
-  alpacaErrored?: boolean; alpacaErrorMsg?: string | null;
-  onReconnectAlpaca?: () => void;
-  onPickAlpaca: () => void; onPickExisting: () => void;
+  exchangeErrored?: boolean; exchangeErrorMsg?: string | null;
+  onReconnectExchange?: () => void;
+  onPickPrimary: () => void; onPickExisting: () => void;
 }) {
   return (
     <>
-      {alpacaErrored && (
+      {exchangeErrored && (
         <div style={{
           marginBottom: 18, padding: "14px 16px", borderRadius: 12,
           background: "rgba(255,176,32,0.08)",
@@ -369,24 +365,24 @@ function ChooseContent({ oauthEnabled, oauthError, alpacaErrored, alpacaErrorMsg
             fontFamily: MONO, fontSize: 10, fontWeight: 800,
             letterSpacing: "0.18em", color: "#FFB020", marginBottom: 6,
           }}>
-            ⚠ ALPACA NEEDS TO BE RECONNECTED
+            ⚠ EXCHANGE NEEDS TO BE RECONNECTED
           </div>
           <div style={{ fontSize: 12.5, color: TEXT_1, lineHeight: 1.55, marginBottom: 10 }}>
-            Your Alpaca authorization expired or was revoked, so live AI trades can no longer
-            reach your brokerage account. Reconnect in one click to resume execution.
+            Your exchange authorization expired or was revoked, so live AI trades can no
+            longer reach your account. Reconnect in one click to resume execution.
           </div>
-          {alpacaErrorMsg && (
+          {exchangeErrorMsg && (
             <div style={{
               fontFamily: MONO, fontSize: 10.5, color: "rgba(255,176,32,0.85)",
               lineHeight: 1.5, marginBottom: 10, wordBreak: "break-word",
             }}>
-              {alpacaErrorMsg}
+              {exchangeErrorMsg}
             </div>
           )}
-          {oauthEnabled && onReconnectAlpaca ? (
+          {oauthEnabled && onReconnectExchange ? (
             <button
               type="button"
-              onClick={onReconnectAlpaca}
+              onClick={onReconnectExchange}
               style={{
                 display: "inline-block", padding: "10px 16px", borderRadius: 8,
                 background: `linear-gradient(135deg, ${BRAND_DEEP} 0%, ${BRAND} 55%, ${BRAND_BRGT} 100%)`,
@@ -397,11 +393,11 @@ function ChooseContent({ oauthEnabled, oauthError, alpacaErrored, alpacaErrorMsg
                 boxShadow: `0 8px 22px rgba(102,255,102,0.30)`,
               }}
             >
-              Reconnect Alpaca →
+              Reconnect Exchange →
             </button>
           ) : (
             <div style={{ fontSize: 11, color: TEXT_2, fontFamily: MONO, letterSpacing: "0.10em" }}>
-              ONE-CLICK RECONNECT TEMPORARILY UNAVAILABLE — RE-ENTER ALPACA KEYS BELOW
+              ONE-CLICK RECONNECT TEMPORARILY UNAVAILABLE — RE-ENTER API KEYS BELOW
             </div>
           )}
         </div>
@@ -422,15 +418,16 @@ function ChooseContent({ oauthEnabled, oauthError, alpacaErrored, alpacaErrorMsg
           Choose how you want to start
         </div>
         <div style={{ fontSize: 14, color: TEXT_1, lineHeight: 1.55 }}>
-          Your funds always stay in your own brokerage or exchange account —
-          AICandlez never holds customer money.
+          Your funds always stay in your own regulated crypto exchange account —
+          AICandlez never holds customer money and never requests withdrawal
+          permissions.
         </div>
       </div>
 
       {/* PRIMARY */}
       <button
         type="button"
-        onClick={onPickAlpaca}
+        onClick={onPickPrimary}
         style={{
           display: "block", width: "100%", textAlign: "left",
           padding: "20px 20px", marginBottom: 14, borderRadius: 16,
@@ -453,20 +450,20 @@ function ChooseContent({ oauthEnabled, oauthError, alpacaErrored, alpacaErrorMsg
           letterSpacing: -0.3, marginBottom: 6, lineHeight: 1.25,
         }}>
           {oauthEnabled
-            ? "Connect Alpaca Brokerage in One Click"
-            : "Create / Fund Alpaca Brokerage Account"}
+            ? "Connect Your Crypto Exchange in One Click"
+            : "Create / Fund a Regulated Crypto Exchange Account"}
         </div>
         <div style={{ fontSize: 13, color: TEXT_1, lineHeight: 1.55 }}>
           {oauthEnabled
-            ? "Sign in to Alpaca (or sign up in seconds) and authorize AICandlez to trade on your behalf. No API keys to copy. Your funds stay at Alpaca."
-            : "Open a regulated US brokerage account at Alpaca, deposit funds into your Alpaca account, then connect it back here. Best path if you don't already have exchange API keys."}
+            ? "Sign in to your exchange (or sign up in seconds) and authorize AICandlez to place trades on your behalf. No API keys to copy. Your funds stay at the exchange."
+            : "Open a regulated crypto exchange account at Kraken, Binance, or Coinbase, fund it directly, then connect it back here. Withdrawal permissions are never requested."}
         </div>
         <div style={{
           marginTop: 14, color: BRAND,
           fontFamily: MONO, fontSize: 11, fontWeight: 800,
           letterSpacing: "0.18em",
         }}>
-          {oauthEnabled ? "CONNECT WITH ALPACA →" : "GET STARTED →"}
+          {oauthEnabled ? "CONNECT EXCHANGE →" : "GET STARTED →"}
         </div>
       </button>
 
@@ -501,8 +498,8 @@ function ChooseContent({ oauthEnabled, oauthError, alpacaErrored, alpacaErrorMsg
           Connect Your Existing Exchange
         </div>
         <div style={{ fontSize: 12.5, color: TEXT_1, lineHeight: 1.55 }}>
-          Kraken · Coinbase · Crypto.com · Binance · Alpaca — paste your
-          read + trade API keys (never withdrawal) to enable live execution.
+          Kraken · Binance · Coinbase — paste your read + trade API keys
+          (withdrawal permissions never requested) to enable live execution.
         </div>
         <div style={{
           marginTop: 12, color: TEXT_0,
@@ -520,15 +517,15 @@ function ChooseContent({ oauthEnabled, oauthError, alpacaErrored, alpacaErrorMsg
         fontSize: 12, color: TEXT_1, lineHeight: 1.55,
       }}>
         🛡  AICandlez <strong style={{ color: TEXT_0 }}>never holds your funds</strong>.
-        Your balance stays at your brokerage or exchange. You can disconnect
+        Your balance stays at your regulated exchange. You can disconnect
         any time.
       </div>
     </>
   );
 }
 
-// ─── Step 2: Alpaca external CTA (PWA) ──────────────────────────────────────
-function AlpacaCtaContent({ onBack, onContinue }: { onBack: () => void; onContinue: () => void }) {
+// ─── Step 2: Crypto exchange external CTA (PWA) ─────────────────────────────
+function ExchangeCtaContent({ onBack, onContinue }: { onBack: () => void; onContinue: () => void }) {
   return (
     <>
       <div style={{ marginBottom: 20, paddingRight: 44 }}>
@@ -538,13 +535,13 @@ function AlpacaCtaContent({ onBack, onContinue }: { onBack: () => void; onContin
           color: BRAND, marginBottom: 8,
           textShadow: `0 0 8px ${BRAND_GLOW}`,
         }}>
-          ◆ Step 1 of 2 · Open Alpaca Account
+          ◆ Step 1 of 2 · Open Exchange Account
         </div>
         <div style={{
           fontSize: 22, fontWeight: 800, color: TEXT_0,
           letterSpacing: -0.4, lineHeight: 1.2,
         }}>
-          Create &amp; fund your Alpaca brokerage account
+          Create &amp; fund a regulated crypto exchange account
         </div>
       </div>
 
@@ -552,14 +549,14 @@ function AlpacaCtaContent({ onBack, onContinue }: { onBack: () => void; onContin
         margin: 0, padding: "0 0 0 22px",
         fontSize: 14, color: TEXT_1, lineHeight: 1.7,
       }}>
-        <li>Open <strong style={{ color: TEXT_0 }}>alpaca.markets</strong> in a new tab and complete the regulated KYC sign-up.</li>
-        <li><strong style={{ color: TEXT_0 }}>Deposit funds into your Alpaca brokerage account</strong> directly — your money stays at Alpaca.</li>
-        <li>Generate live <strong style={{ color: TEXT_0 }}>API keys</strong> inside Alpaca (Read + Trade only).</li>
+        <li>Sign up at <strong style={{ color: TEXT_0 }}>kraken.com</strong>, <strong style={{ color: TEXT_0 }}>binance.com</strong>, or <strong style={{ color: TEXT_0 }}>coinbase.com</strong> and complete regulated KYC.</li>
+        <li><strong style={{ color: TEXT_0 }}>Fund your exchange account</strong> directly — your money stays at the exchange.</li>
+        <li>Generate <strong style={{ color: TEXT_0 }}>API keys</strong> in the exchange (Read + Trade only · withdrawals disabled).</li>
         <li>Come back here, paste your API key &amp; secret, start trading.</li>
       </ol>
 
       <a
-        href={ALPACA_PROVIDER.externalUrl}
+        href={PRIMARY_EXCHANGE_PROVIDER.externalUrl}
         target="_blank"
         rel="noopener noreferrer"
         style={{
@@ -574,7 +571,7 @@ function AlpacaCtaContent({ onBack, onContinue }: { onBack: () => void; onContin
           boxShadow: `0 10px 28px rgba(102,255,102,0.30), 0 1px 0 rgba(255,255,255,0.45) inset`,
         }}
       >
-        Open Alpaca ↗
+        Open Kraken ↗
       </a>
 
       <div style={{
@@ -584,13 +581,13 @@ function AlpacaCtaContent({ onBack, onContinue }: { onBack: () => void; onContin
         fontSize: 12.5, color: TEXT_1, lineHeight: 1.6,
       }}>
         <div style={{ marginBottom: 6 }}>
-          🔒 <strong style={{ color: TEXT_0 }}>Funds remain inside your Alpaca brokerage account.</strong>
+          🔒 <strong style={{ color: TEXT_0 }}>Funds remain inside your regulated crypto exchange account.</strong>
         </div>
         <div style={{ marginBottom: 6 }}>
-          🛡 AICandlez never holds customer money. We only place trades using your API key.
+          🛡 AICandlez never holds customer money. We only place trades using your read + trade API key.
         </div>
         <div>
-          ✨ You may disconnect your account any time — withdrawals happen at Alpaca.
+          ✨ You may disconnect any time — withdrawal permissions are never requested.
         </div>
       </div>
 
@@ -837,7 +834,7 @@ function IntroContent({ onDone }: { onDone: () => void }) {
       <PWAIntroRow emoji="🤖" title="Let AI trade for you"
         body="Auto Trade executes high-confidence signals on your behalf — up to 3 concurrent trades on AI Trading, 12 on AI Trading Pro. Pause or stop AI anytime." />
       <PWAIntroRow emoji="🛡" title="You always keep custody"
-        body="Funds remain in your own brokerage or exchange account. AICandlez never holds customer money." />
+        body="Funds remain in your own regulated crypto exchange account. AICandlez never holds customer money and withdrawal permissions are never requested." />
 
       <button
         type="button"

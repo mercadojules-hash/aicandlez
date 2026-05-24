@@ -52,7 +52,7 @@ const VISUAL: Record<string, {
     capacity:     "3 Concurrent AI Trades",
   },
   pro: {
-    label: "AICandlez Pro", caption: "Expanded AI capacity. Crypto + Equities. Priority execution.",
+    label: "AICandlez Pro", caption: "Expanded AI capacity. Crypto majors + alts + emerging. Priority execution.",
     badge: "UPGRADE",
     glow:         "rgba(124,255,0,0.36)",
     border:       "rgba(124,255,0,0.38)",

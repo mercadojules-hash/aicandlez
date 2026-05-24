@@ -150,7 +150,7 @@ export function Pricing() {
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }}>
               {[
                 "Everything in Paper Trading",
-                "Real Alpaca live order execution",
+                "Live order execution on Kraken, Binance, Coinbase (read + trade · no withdrawals)",
                 "Autonomous AI trading loop",
                 "Bracket orders + stop-loss auto-set",
                 "3% fee on profitable trades only",

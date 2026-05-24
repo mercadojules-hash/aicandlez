@@ -1,7 +1,7 @@
 {
   "name": "AICandlez",
   "short_name": "AICandlez",
-  "description": "AI-powered multi-asset trading platform. Crypto, equities, and ETFs powered by Alpaca.",
+  "description": "Institutional AI crypto trading platform. Real-time AI signals, paper trading, and live execution via Kraken, Binance, and Coinbase.",
   "start_url": "/aicandlez-app/",
   "scope": "/aicandlez-app/",
   "display": "standalone",

@@ -105,12 +105,12 @@ export const PLAN_FEATURES: Record<string, {
     name:           "AICandlez Pro",
     price_monthly:  7999,   // $79.99 in cents
     price_yearly:   79990,  // $799.90/yr — 2 months free
-    description:    "Expanded AI capacity. 12 concurrent trades. Crypto + Equities. Priority execution. 3% performance fee on profitable closed trades only.",
+    description:    "Expanded AI capacity. 12 concurrent trades. Crypto majors + alts + emerging. Priority execution. 3% performance fee on profitable closed trades only.",
     performanceFee: PERFORMANCE_FEE_RATE,
     features: [
       "Up to 12 concurrent AI trades",
       "Priority AI execution",
-      "Crypto + Equities AI trading",
+      "Crypto AI trading (majors + alts + emerging)",
       "Advanced AI scanners",
       "Expanded AI confidence engine",
       "Enhanced analytics",

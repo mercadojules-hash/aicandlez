@@ -1,9 +1,9 @@
 const STEPS = [
   {
     number: "01",
-    title: "Connect Your Broker",
+    title: "Connect Your Exchange",
     description:
-      "Link your Alpaca paper or live trading account in seconds. AICandlez never holds your funds — your broker handles custody with institutional-grade security.",
+      "Link your Kraken, Binance, or Coinbase account (paper or live) in seconds. AICandlez never holds your funds and withdrawal permissions are never requested — your exchange handles custody.",
     icon: (
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
@@ -11,13 +11,13 @@ const STEPS = [
       </svg>
     ),
     color: "#00e5ff",
-    detail: "Alpaca Securities — SEC & FINRA regulated",
+    detail: "Kraken · Binance · Coinbase — read + trade only",
   },
   {
     number: "02",
     title: "AI Analyzes Markets",
     description:
-      "Our multi-timeframe AI engine scans BTC, ETH, SOL, and 100+ equities every minute. It cross-references RSI, EMA, MACD, volume, and sentiment to generate high-confidence signals.",
+      "Our multi-timeframe AI engine scans BTC, ETH, SOL, and 200+ crypto assets every minute. It cross-references RSI, EMA, MACD, volume, and sentiment to generate high-confidence signals.",
     icon: (
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
         <circle cx="12" cy="12" r="3" />

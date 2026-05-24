@@ -11,7 +11,7 @@ const FEATURES = [
     icon: "⚡",
     title: "Autonomous Trade Execution",
     description:
-      "When confidence ≥ 55%, the AI places bracket orders automatically via Alpaca — entry, stop-loss, and take-profit all in one atomic action.",
+      "When confidence ≥ 55%, the AI places bracket orders automatically via your connected exchange — entry, stop-loss, and take-profit all in one atomic action.",
     tag: "Automation",
     color: "#00ff88",
   },
@@ -27,7 +27,7 @@ const FEATURES = [
     icon: "📊",
     title: "Multi-Asset Coverage",
     description:
-      "BTC/USD, ETH/USD, SOL/USD, and 100+ US equities — all analyzed concurrently by independent AI engines with cross-asset correlation tracking.",
+      "BTC, ETH, SOL, and 200+ crypto assets across majors, alts, and emerging tokens — all analyzed concurrently by independent AI engines with cross-asset correlation tracking.",
     tag: "Markets",
     color: "#ffd200",
   },

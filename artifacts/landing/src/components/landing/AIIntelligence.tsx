@@ -4,9 +4,9 @@ const SIGNALS = [
   { symbol: "BTC/USD", action: "BUY", confidence: 87, rsi: 42.1, trend: "↑ Bullish", vol: "+34%", color: "#00ff88" },
   { symbol: "ETH/USD", action: "BUY", confidence: 79, rsi: 38.7, trend: "↑ Bullish", vol: "+21%", color: "#00ff88" },
   { symbol: "SOL/USD", action: "HOLD", confidence: 61, rsi: 51.2, trend: "→ Neutral", vol: "+8%", color: "#00e5ff" },
-  { symbol: "NVDA", action: "BUY", confidence: 82, rsi: 44.3, trend: "↑ Bullish", vol: "+47%", color: "#00ff88" },
+  { symbol: "LINK/USD", action: "BUY", confidence: 82, rsi: 44.3, trend: "↑ Bullish", vol: "+47%", color: "#00ff88" },
   { symbol: "AVAX/USD", action: "SELL", confidence: 73, rsi: 68.4, trend: "↓ Bearish", vol: "+15%", color: "#ff4466" },
-  { symbol: "TSLA", action: "BUY", confidence: 68, rsi: 40.1, trend: "↑ Bullish", vol: "+29%", color: "#00ff88" },
+  { symbol: "ATOM/USD", action: "BUY", confidence: 68, rsi: 40.1, trend: "↑ Bullish", vol: "+29%", color: "#00ff88" },
 ];
 
 function ScannerLine() {
@@ -368,7 +368,7 @@ export function AIIntelligence() {
               <span style={{ fontSize: 16 }}>🤖</span>
               <div style={{ fontSize: 13, color: "#8892a4", lineHeight: 1.5 }}>
                 <span style={{ color: "#00e5ff", fontWeight: 700 }}>AI Engine:</span>{" "}
-                Strong bullish alignment across BTC, ETH and NVDA. Volume confirmation active.
+                Strong bullish alignment across BTC, ETH and SOL. Volume confirmation active.
                 Placing bracket orders with 2% stop-loss and 4% take-profit targets.
               </div>
             </div>
@@ -453,7 +453,7 @@ export function AIIntelligence() {
                 { time: "01:09:31", event: "BUY ETH/USD", detail: "Conf 79% — $1,240 position opened", color: "#00ff88", icon: "▲" },
                 { time: "01:07:18", event: "CLOSE SOL/USD", detail: "+$204 profit — TP hit +4.2%", color: "#00e5ff", icon: "✓" },
                 { time: "01:04:55", event: "SIGNAL REJECTED", detail: "AVAX below 55% threshold — SKIP", color: "#647385", icon: "✕" },
-                { time: "01:02:12", event: "BUY NVDA", detail: "Conf 82% — $1,860 position opened", color: "#00ff88", icon: "▲" },
+                { time: "01:02:12", event: "BUY LINK/USD", detail: "Conf 82% — $1,860 position opened", color: "#00ff88", icon: "▲" },
               ].map((log) => (
                 <div
                   key={log.time}

@@ -24,7 +24,6 @@ import Subscribe from "@/pages/Subscribe";
 import Consent   from "@/pages/Consent";
 import Billing   from "@/pages/Billing";
 import LegalPage from "@/pages/LegalPage";
-import Equities    from "@/pages/Equities";
 import AssetDetail from "@/pages/AssetDetail";
 import Notifications from "@/pages/Notifications";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -374,10 +373,9 @@ function Pages() {
       <Route path="/portal"  component={PortalCrossAppRedirect} />
       <Route path="/trade"   component={() => <Protected><AISignals /></Protected>} />
       <Route path="/signals" component={() => <Protected><AISignals /></Protected>} />
-      {/* Crypto + Equities both deep-link into the AISignals feed with the
-          tab pre-selected. /markets is kept as an alias for backwards-compat. */}
+      {/* /crypto deep-links into the AISignals feed. /markets is kept as
+          an alias for backwards-compat. */}
       <Route path="/crypto"   component={() => <Protected><AISignals /></Protected>} />
-      <Route path="/equities" component={() => <Protected><AISignals /></Protected>} />
       <Route path="/markets"  component={() => <Redirect to="/crypto" />} />
       <Route path="/asset/:type/:sym">
         {(params) => (

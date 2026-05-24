@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { api, type MobileSignalsResponse, type MobileTickersResponse, type SignalBreakdown } from "@/lib/api";
 import { CryptoIcon, SYM_LABEL, SYM_SHORT } from "@/components/CryptoIcon";
-import { EquityIcon, EQUITY_NAME } from "@/components/EquityIcon";
 import { EnableLiveCTA } from "@/components/EnableLiveCTA";
 import { PageHeader } from "@/components/PageHeader";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
@@ -263,10 +262,9 @@ function CinematicBackground() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Equity preview signals — deterministic, day-seeded. Until the real AI
-// equity engine is wired to a live backend, the Equities tab + the mixed
-// Active feed surface these as preview rows. Each card is tagged isPreview
-// so the visual is honest. Values are stable for the day (idempotent).
+// Preview signal generator — deterministic, day-seeded. Used to fill out the
+// long tail of crypto assets the live engine does not yet cover so the
+// feed always feels populated. Values are stable for the day (idempotent).
 // ═══════════════════════════════════════════════════════════════════════════
 function makeEqRng(seed: string) {
   let s = 5381;
@@ -279,34 +277,9 @@ type PreviewRow = {
   ticker:    { price: number; changePercent24h: number; up: boolean };
 };
 
-const EQUITY_BASES: Array<{ sym: string; base: number }> = [
-  { sym: "NVDA", base: 138.40 },
-  { sym: "TSLA", base: 182.50 },
-  { sym: "META", base: 512.80 },
-  { sym: "AAPL", base: 189.40 },
-  { sym: "MSFT", base: 414.20 },
-  { sym: "AMZN", base: 184.60 },
-  { sym: "GOOGL",base: 173.40 },
-  { sym: "AMD",  base: 162.30 },
-  { sym: "PLTR", base:  24.80 },
-  { sym: "NFLX", base: 643.20 },
-  { sym: "COIN", base: 219.50 },
-  { sym: "AVGO", base: 1620.0 },
-  { sym: "ORCL", base: 142.50 },
-  { sym: "CRM",  base: 295.10 },
-  { sym: "UBER", base:  72.40 },
-  { sym: "SHOP", base:  82.30 },
-  { sym: "SMCI", base:  48.60 },
-  { sym: "MU",   base:  98.20 },
-  { sym: "INTC", base:  21.40 },
-  { sym: "DIS",  base:  98.70 },
-];
-
 // Crypto pool — top 20 by market relevance. Real engine breakdowns
 // (BTC/ETH/SOL etc.) take precedence when present; the rest are
 // deterministic, day-seeded previews so the feed always feels populated.
-// No "PREVIEW" badge is shown — equity-style post-click routing handles
-// the not-yet-live state silently.
 const CRYPTO_BASES: Array<{ sym: string; base: number; name: string }> = [
   { sym: "BTC",  base: 71_500, name: "Bitcoin" },
   { sym: "ETH",  base:  3_820, name: "Ethereum" },
@@ -355,55 +328,26 @@ function makeCryptoPreviews(): PreviewRow[] {
   });
 }
 
-function makeEquityPreviews(): PreviewRow[] {
-  const d = new Date();
-  const seed = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
-  return EQUITY_BASES.map((e) => {
-    const rng = makeEqRng(`${seed}-${e.sym}`);
-    const r1 = rng(), r2 = rng(), r3 = rng(), r4 = rng();
-    const action = r1 > 0.78 ? "SELL" : r1 > 0.12 ? "BUY" : "HOLD";
-    const confidence = Math.round(58 + r2 * 36);
-    const changePct  = (r3 - 0.42) * 5.5;
-    const price      = e.base * (1 + (r3 - 0.5) * 0.05);
-    return {
-      breakdown: {
-        symbol: e.sym, action, confidence,
-        mtfConfirmed:    r4 > 0.35,
-        volumeConfirmed: r4 > 0.55,
-        marketCondition: r1 > 0.55 ? "TRENDING" : "RANGING",
-        trend1H:         r2 > 0.6 ? "BULLISH" : r2 > 0.3 ? "BEARISH" : "NEUTRAL",
-        blockReason:     null,
-        lastUpdated:     Date.now() - Math.round(r1 * 4200) * 1000,
-      },
-      ticker: { price, changePercent24h: changePct, up: changePct >= 0 },
-    };
-  });
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN — AI Signals page
 // ═══════════════════════════════════════════════════════════════════════════
-type TabKey = "active" | "crypto" | "equities";
+type TabKey = "active" | "crypto";
 
 export default function AISignals() {
   const [location, setLocation] = useLocation();
   // URL is the single source of truth — top tabs and bottom nav both
-  // navigate to /trade /crypto /equities, and `tab` is derived from
-  // whichever route is currently active. This guarantees the top tab,
-  // the visible feed, and the bottom-nav highlight can never desync.
+  // navigate to /trade /crypto, and `tab` is derived from whichever route
+  // is currently active. This guarantees the top tab, the visible feed,
+  // and the bottom-nav highlight can never desync.
   const tab: TabKey =
-    location.startsWith("/equities") ? "equities" :
-    location.startsWith("/crypto")   ? "crypto"   : "active";
+    location.startsWith("/crypto") ? "crypto" : "active";
   const setTab = (next: TabKey) => {
-    const target = next === "crypto"   ? "/crypto"
-                 : next === "equities" ? "/equities"
-                 : "/trade";
+    const target = next === "crypto" ? "/crypto" : "/trade";
     if (location !== target) setLocation(target);
   };
   const [cryptoQuery,  setCryptoQuery]  = useState("");
-  const [equityQuery,  setEquityQuery]  = useState("");
-  const openAsset = (atype: "crypto" | "equity", asym: string) => {
-    setLocation(`/asset/${atype}/${asym.toUpperCase()}`);
+  const openAsset = (asym: string) => {
+    setLocation(`/asset/crypto/${asym.toUpperCase()}`);
     window.scrollTo({ top: 0, behavior: "auto" });
   };
 
@@ -429,14 +373,11 @@ export default function AISignals() {
     return m;
   }, [tickersQ.data]);
 
-  // Equity preview rows — stable per day.
-  const equityPreviews = useMemo(() => makeEquityPreviews(), []);
-
-  // Active = TOP 10 mixed (real crypto BUY/SELL + equity BUY/SELL preview),
-  // ranked by AI confidence. Density-first: matches institutional feed style.
+  // Active = TOP 10 real crypto BUY/SELL signals ranked by AI confidence.
+  // Density-first: matches institutional feed style.
   const activeSignals = useMemo(() => {
     const breakdowns = signalsQ.data?.breakdowns ?? {};
-    const crypto = Object.values(breakdowns)
+    return Object.values(breakdowns)
       .filter(b => {
         const a = b.action.toUpperCase();
         return (a === "BUY" || a === "SELL") && !!tickerBySym[b.symbol];
@@ -446,22 +387,13 @@ export default function AISignals() {
         breakdown: b,
         ticker: tickerBySym[b.symbol]!,
         isPreview: false,
-      }));
-    const equity = equityPreviews
-      .filter(p => p.breakdown.action !== "HOLD")
-      .map(p => ({
-        kind: "equity" as const,
-        breakdown: p.breakdown,
-        ticker: p.ticker,
-        isPreview: true,
-      }));
-    return [...crypto, ...equity]
+      }))
       .sort((a, b) =>
         (b.breakdown.confidence - a.breakdown.confidence) ||
         a.breakdown.symbol.localeCompare(b.breakdown.symbol)
       )
       .slice(0, 10);
-  }, [signalsQ.data, tickerBySym, equityPreviews]);
+  }, [signalsQ.data, tickerBySym]);
 
   // Crypto previews — stable per day. Used to fill out the top-20 feed
   // for the long tail of assets the live engine does not yet cover.
@@ -495,14 +427,6 @@ export default function AISignals() {
       .slice(0, 20);
   }, [signalsQ.data, tickerBySym, cryptoPreviews]);
 
-  // Equities tab = TOP 20 preview rows ranked by confidence.
-  const equitySignals = useMemo(() =>
-    [...equityPreviews].sort((a, b) =>
-      (b.breakdown.confidence - a.breakdown.confidence) ||
-      a.breakdown.symbol.localeCompare(b.breakdown.symbol)
-    ).slice(0, 20),
-    [equityPreviews]);
-
   const loading = signalsQ.isLoading || tickersQ.isLoading;
 
   return (
@@ -516,7 +440,7 @@ export default function AISignals() {
         {/* Branded page header — A logo + dynamic title, with live status
             pip + action buttons mounted on the right. */}
         <PageHeader
-          title={tab === "crypto" ? "Crypto" : tab === "equities" ? "Equities" : "Signals"}
+          title={tab === "crypto" ? "Crypto" : "Signals"}
           caption="LIVE · SCANNING 24/7"
           right={
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -537,7 +461,7 @@ export default function AISignals() {
         {/* Enable Live AI Trading — shared premium upgrade CTA */}
         <EnableLiveCTA/>
 
-        {/* Tab bar — Active / Crypto / Equities */}
+        {/* Tab bar — Active / Crypto */}
         <div style={{
           margin: "4px 16px 12px",
           display: "flex", gap: 4, padding: 4, borderRadius: 999,
@@ -550,9 +474,6 @@ export default function AISignals() {
           <TabPill
             label="Crypto" badge={cryptoSignals.length}
             active={tab === "crypto"} onClick={() => setTab("crypto")}/>
-          <TabPill
-            label="Equities" badge={equitySignals.length}
-            active={tab === "equities"} onClick={() => setTab("equities")}/>
         </div>
 
         {/* Signal cards — the page IS the feed */}
@@ -582,9 +503,7 @@ export default function AISignals() {
                       isPreview={row.isPreview}
                       breakdown={row.breakdown}
                       ticker={row.ticker}
-                      onOpen={() => openAsset(row.kind, row.kind === "crypto"
-                        ? (SYM_SHORT[row.breakdown.symbol] ?? row.breakdown.symbol.replace("USD",""))
-                        : row.breakdown.symbol)}/>
+                      onOpen={() => openAsset(SYM_SHORT[row.breakdown.symbol] ?? row.breakdown.symbol.replace("USD",""))}/>
                   ))}
                 </>
           )}
@@ -619,7 +538,7 @@ export default function AISignals() {
                       isPreview={row.isPreview}
                       breakdown={row.breakdown}
                       ticker={row.ticker}
-                      onOpen={() => openAsset("crypto", SYM_SHORT[row.breakdown.symbol] ?? row.breakdown.symbol.replace("USD",""))}/>
+                      onOpen={() => openAsset(SYM_SHORT[row.breakdown.symbol] ?? row.breakdown.symbol.replace("USD",""))}/>
                   ))}
                   <SearchBar
                     placeholder="Search crypto…"
@@ -628,41 +547,6 @@ export default function AISignals() {
                 </>;
           })()}
 
-          {!loading && tab === "equities" && (() => {
-            const q = equityQuery.trim().toLowerCase();
-            const list = q
-              ? equitySignals.filter(r =>
-                  r.breakdown.symbol.toLowerCase().includes(q) ||
-                  (EQUITY_NAME[r.breakdown.symbol] ?? "").toLowerCase().includes(q))
-              : equitySignals;
-            return (
-              <>
-                <div style={{
-                  margin: "2px 2px 10px", display: "flex", alignItems: "center",
-                  justifyContent: "space-between",
-                  fontSize: 10.5, fontFamily: SANS, fontWeight: 700,
-                  color: TEXT_DIM, letterSpacing: 1.2, textTransform: "uppercase",
-                }}>
-                  <span>Top {list.length} Equities</span>
-                  <span style={{ color: BRAND }}>Sorted by Confidence</span>
-                </div>
-                {list.map((row, i) => (
-                  <SignalCard
-                    key={row.breakdown.symbol}
-                    rank={i + 1}
-                    kind="equity"
-                    isPreview
-                    breakdown={row.breakdown}
-                    ticker={row.ticker}
-                    onOpen={() => openAsset("equity", row.breakdown.symbol)}/>
-                ))}
-                <SearchBar
-                  placeholder="Search equities…"
-                  value={equityQuery}
-                  onChange={setEquityQuery}/>
-              </>
-            );
-          })()}
         </div>
       </div>
     </div>
@@ -764,12 +648,12 @@ function TabPill({ label, badge, active, onClick }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // SignalCard — the marquee card matching the reference design exactly
 // ─────────────────────────────────────────────────────────────────────────────
-function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPreview }: {
+function SignalCard({ breakdown, ticker, onOpen, rank, isPreview }: {
   breakdown: SignalBreakdown;
   ticker: { price: number; changePercent24h: number; up: boolean };
   onOpen?: () => void;
   rank?: number;
-  kind?: "crypto" | "equity";
+  kind?: "crypto";
   isPreview?: boolean;
 }) {
   const queryClient = useQueryClient();
@@ -783,21 +667,17 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
   const accent = isHold ? TEXT_SUB : (isLong ? BRAND : NEG);
   const accentDeep = isHold ? TEXT_DIM : (isLong ? BRAND_DEEP : NEG_DEEP);
   const trendDir: "up"|"down" = isHold ? (ticker.up ? "up" : "down") : (isLong ? "up" : "down");
-  const short = kind === "equity"
-    ? breakdown.symbol
-    : (SYM_SHORT[breakdown.symbol] ?? breakdown.symbol.replace("USD",""));
-  const titleLabel = kind === "equity" ? breakdown.symbol : `${short}/USDT`;
-  const subLabel   = kind === "equity"
-    ? (EQUITY_NAME[breakdown.symbol] ?? breakdown.symbol)
-    : (SYM_LABEL[breakdown.symbol] ?? short);
+  const short = SYM_SHORT[breakdown.symbol] ?? breakdown.symbol.replace("USD","");
+  const titleLabel = `${short}/USDT`;
+  const subLabel   = SYM_LABEL[breakdown.symbol] ?? short;
 
   const orderMutation = useMutation<unknown, Error, "BUY" | "SELL">({
     mutationFn: async (side) => {
-      const alpacaSymbol = kind === "crypto" ? `${short}/USD` : breakdown.symbol;
+      const orderSymbol = `${short}/USD`;
       const res = await authFetch("/api/exchange/alpaca/order", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ symbol: alpacaSymbol, side: side.toLowerCase(), notional: 1000 }),
+        body:    JSON.stringify({ symbol: orderSymbol, side: side.toLowerCase(), notional: 1000 }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
@@ -831,8 +711,9 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
     e.stopPropagation();
     if (pending) return;
     if (isPreview) {
-      // Equity live execution is not wired yet — surface this AFTER the click,
-      // never visually on the card. UI must read as production-ready, not demo.
+      // Preview-only assets are not yet wired to live execution — surface
+      // this AFTER the click, never visually on the card. UI must read as
+      // production-ready, not demo.
       setFeedback({ kind: "ok", text: `${side} queued — AI Auto Trade will route this signal` });
       setTimeout(() => setFeedback(null), 3200);
       return;
@@ -903,9 +784,7 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
             letterSpacing: -0.3,
           }}>{rank}</div>
         )}
-        {kind === "equity"
-          ? <EquityIcon sym={breakdown.symbol} size={44}/>
-          : <CryptoIcon sym={breakdown.symbol} size={44}/>}
+        <CryptoIcon sym={breakdown.symbol} size={44}/>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontSize: 16, fontFamily: SANS, fontWeight: 800, color: TEXT,

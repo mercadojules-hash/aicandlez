@@ -1365,29 +1365,6 @@ export default function Home() {
         </div>
 
         {/* ════════════════════════════════════════════════════════════════ */}
-        {/* EQUITY SIGNALS — compact AI shortlist (light-touch preview block) */}
-        {/* ════════════════════════════════════════════════════════════════ */}
-        <SectionHeader label="Equity Signals" right="AI Live" onMore={() => setLocation("/equities")}/>
-        <div style={{
-          margin: "0 16px", borderRadius: 18, overflow: "hidden",
-          background: `linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 60%, ${BG} 100%)`,
-          border: `1px solid ${BORDER_HI}`,
-          boxShadow: `0 8px 22px rgba(0,0,0,0.4)`,
-        }}>
-          {EQUITY_PREVIEW.map((e, i) => (
-            <SignalsPreviewRow
-              key={e.sym}
-              icon={<TickerBadge sym={e.sym}/>}
-              label={e.sym}
-              sub={e.name}
-              action={e.action}
-              confidence={e.confidence}
-              last={i === EQUITY_PREVIEW.length - 1}
-            />
-          ))}
-        </div>
-
-        {/* ════════════════════════════════════════════════════════════════ */}
         {/* TRADE HISTORY — cinematic AI execution log                        */}
         {/* ════════════════════════════════════════════════════════════════ */}
         <TradeHistorySection
@@ -1523,30 +1500,6 @@ function SignalsPreviewRow({
     </div>
   );
 }
-
-// Compact equity ticker badge (no SVG icon set — uses a stylized monogram).
-function TickerBadge({ sym }: { sym: string }) {
-  return (
-    <div style={{
-      width: 28, height: 28, borderRadius: 8,
-      background: `linear-gradient(135deg, ${BRAND}22 0%, ${BRAND_DEEP}18 100%)`,
-      border: `1px solid ${BORDER_HI}`,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: 9, fontFamily: SANS, fontWeight: 800,
-      color: BRAND, letterSpacing: 0.4,
-      boxShadow: `0 0 10px ${BRAND_BLOOM}`,
-    }}>{sym.slice(0, 4)}</div>
-  );
-}
-
-// Curated equity AI shortlist — matches the static map in Equities.tsx so the
-// preview is consistent with the full page. Keep in sync if you edit Equities.
-const EQUITY_PREVIEW: { sym: string; name: string; action: string; confidence: number }[] = [
-  { sym: "NVDA", name: "NVIDIA",    action: "LONG", confidence: 91 },
-  { sym: "META", name: "Meta",      action: "LONG", confidence: 86 },
-  { sym: "TSLA", name: "Tesla",     action: "LONG", confidence: 82 },
-  { sym: "MSFT", name: "Microsoft", action: "LONG", confidence: 74 },
-];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TRADE HISTORY — cinematic AI execution log

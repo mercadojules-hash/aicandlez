@@ -34,9 +34,9 @@ const LAYERS = [
     label: "INFRASTRUCTURE",
     color: "#ffd200",
     nodes: [
-      { icon: "🏦", name: "Alpaca Broker", sub: "Paper + Live orders" },
+      { icon: "🏦", name: "Crypto Exchanges", sub: "Kraken · Binance · Coinbase" },
       { icon: "🗄️", name: "PostgreSQL", sub: "User data · Trades" },
-      { icon: "📊", name: "Market Data", sub: "Crypto · Equities" },
+      { icon: "📊", name: "Market Data", sub: "Crypto (majors + alts)" },
     ],
   },
 ];

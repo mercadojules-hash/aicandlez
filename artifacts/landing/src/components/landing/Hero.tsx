@@ -5,13 +5,13 @@ const TICKER_ITEMS = [
   { symbol: "BTC/USD", price: "94,312.40", change: "+2.84%", up: true },
   { symbol: "ETH/USD", price: "3,847.22", change: "+1.92%", up: true },
   { symbol: "SOL/USD", price: "218.67", change: "+4.11%", up: true },
-  { symbol: "AAPL", price: "227.83", change: "-0.32%", up: false },
-  { symbol: "NVDA", price: "942.50", change: "+3.17%", up: true },
-  { symbol: "TSLA", price: "411.22", change: "+5.82%", up: true },
-  { symbol: "SPY", price: "558.14", change: "+0.44%", up: true },
+  { symbol: "XRP/USD", price: "2.24", change: "-0.32%", up: false },
+  { symbol: "DOGE/USD", price: "0.4218", change: "+3.17%", up: true },
+  { symbol: "ADA/USD", price: "1.04", change: "+5.82%", up: true },
+  { symbol: "MATIC/USD", price: "0.5814", change: "+0.44%", up: true },
   { symbol: "AVAX/USD", price: "42.18", change: "-1.28%", up: false },
   { symbol: "LINK/USD", price: "18.42", change: "+2.03%", up: true },
-  { symbol: "QQQ", price: "487.90", change: "+0.61%", up: true },
+  { symbol: "ATOM/USD", price: "8.79", change: "+0.61%", up: true },
 ];
 
 function AnimatedGrid() {
@@ -504,7 +504,7 @@ export function Hero() {
         >
           {[
             { icon: "🔒", text: "Non-custodial" },
-            { icon: "🛡️", text: "Alpaca broker" },
+            { icon: "🛡️", text: "Kraken · Binance · Coinbase" },
             { icon: "📱", text: "iOS & Android PWA" },
             { icon: "⚡", text: "Sub-second execution" },
           ].map((item) => (

@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 
-// Brand-green token system — matches Signals/Crypto/Equities pages so the
+// Brand-green token system — matches Signals/Crypto pages so the
 // bottom nav feels like one continuous surface across the app.
 const C   = "#66FF66";
 const DIM = "#3a4a4a";
@@ -32,19 +32,6 @@ const CryptoIcon = ({ active }: { active: boolean }) => (
   </svg>
 );
 
-const EquitiesIcon = ({ active }: { active: boolean }) => (
-  <svg width="20" height="20" viewBox="0 0 22 22" fill="none" shapeRendering="geometricPrecision">
-    <line x1="6"  y1="3"  x2="6"  y2="6"  stroke={active ? C : DIM} strokeWidth="1.4" strokeLinecap="round"/>
-    <rect x="4"  y="6"  width="4" height="9" rx="0.8"
-      stroke={active ? C : DIM} strokeWidth="1.4" fill={active ? `${C}12` : "none"}/>
-    <line x1="6"  y1="15" x2="6"  y2="19" stroke={active ? C : DIM} strokeWidth="1.4" strokeLinecap="round"/>
-    <line x1="16" y1="4"  x2="16" y2="7"  stroke={active ? C : DIM} strokeWidth="1.4" strokeLinecap="round"/>
-    <rect x="14" y="7"  width="4" height="7" rx="0.8"
-      stroke={active ? C : DIM} strokeWidth="1.4" fill={active ? `${C}12` : "none"}/>
-    <line x1="16" y1="14" x2="16" y2="19" stroke={active ? C : DIM} strokeWidth="1.4" strokeLinecap="round"/>
-  </svg>
-);
-
 const ProfileIcon = ({ active }: { active: boolean }) => (
   <svg width="20" height="20" viewBox="0 0 22 22" fill="none" shapeRendering="geometricPrecision">
     <circle cx="11" cy="7.5" r="3.5" stroke={active ? C : DIM} strokeWidth="1.5"
@@ -58,7 +45,6 @@ const TABS = [
   { path:"/",         label:"Home",     Icon:HomeIcon     },
   { path:"/crypto",   label:"Crypto",   Icon:CryptoIcon   },
   { path:"/trade",    label:"Signals",  Icon:SignalsIcon  },
-  { path:"/equities", label:"Equities", Icon:EquitiesIcon },
   { path:"/profile",  label:"Profile",  Icon:ProfileIcon  },
 ];
 

@@ -4,7 +4,6 @@ import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
 import { ExecutionFeedback, type ExecutionFeedbackPayload } from "@/components/ExecutionFeedback";
-import { EquityIcon, EQUITY_NAME } from "@/components/EquityIcon";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -36,17 +35,7 @@ const ASSET_DB: Record<string, AssetData> = {
   AVAX: { name:"Avalanche",   price:"$37.80",  basePrice:37.8,  change:"+4.21%", vol:"$28B",   action:"LONG",  confidence:74, type:"crypto" },
   MATIC:{ name:"Polygon",     price:"$0.881",  basePrice:0.881, change:"+1.78%", vol:"$18B",   action:"LONG",  confidence:61, type:"crypto" },
   DOT:  { name:"Polkadot",    price:"$8.92",   basePrice:8.92,  change:"-0.88%", vol:"$15B",   action:"HOLD",  confidence:49, type:"crypto" },
-  NVDA: { name:"NVIDIA",      price:"$875.30", basePrice:875.3, change:"+1.84%", vol:"$2.15T", action:"LONG",  confidence:91, type:"equity" },
-  TSLA: { name:"Tesla",       price:"$177.50", basePrice:177.5, change:"+3.21%", vol:"$565B",  action:"LONG",  confidence:82, type:"equity" },
-  AAPL: { name:"Apple",       price:"$189.40", basePrice:189.4, change:"-0.42%", vol:"$2.90T", action:"HOLD",  confidence:55, type:"equity" },
-  META: { name:"Meta",        price:"$512.80", basePrice:512.8, change:"+2.33%", vol:"$1.30T", action:"LONG",  confidence:86, type:"equity" },
-  MSFT: { name:"Microsoft",   price:"$414.20", basePrice:414.2, change:"+1.15%", vol:"$3.07T", action:"LONG",  confidence:74, type:"equity" },
-  GOOGL:{ name:"Alphabet",    price:"$173.40", basePrice:173.4, change:"+0.57%", vol:"$2.18T", action:"HOLD",  confidence:48, type:"equity" },
-  SPY:  { name:"S&P 500 ETF", price:"$521.40", basePrice:521.4, change:"+0.68%", vol:"ETF",    action:"HOLD",  confidence:52, type:"equity" },
-  QQQ:  { name:"Nasdaq ETF",  price:"$443.20", basePrice:443.2, change:"+0.94%", vol:"ETF",    action:"LONG",  confidence:61, type:"equity" },
-  AMD:  { name:"AMD",         price:"$162.30", basePrice:162.3, change:"-1.45%", vol:"$262B",  action:"SHORT", confidence:65, type:"equity" },
-  AMZN: { name:"Amazon",      price:"$184.60", basePrice:184.6, change:"+0.92%", vol:"$1.93T", action:"LONG",  confidence:69, type:"equity" },
-  PLTR: { name:"Palantir",    price:"$24.80",  basePrice:24.8,  change:"+4.12%", vol:"$54B",   action:"LONG",  confidence:78, type:"equity" },
+  ATOM: { name:"Cosmos",      price:"$8.79",   basePrice:8.79,  change:"+1.84%", vol:"$3.4B",  action:"LONG",  confidence:71, type:"crypto" },
   INJ:  { name:"Injective",   price:"$32.20",  basePrice:32.2,  change:"+5.44%", vol:"$11B",   action:"LONG",  confidence:76, type:"crypto" },
 };
 
@@ -447,7 +436,6 @@ const SIG_BG:     Record<string,string> = { LONG:"rgba(0,230,120,0.07)", SHORT:"
 const SIG_BORDER: Record<string,string> = { LONG:"rgba(0,230,120,0.28)", SHORT:"rgba(255,51,85,0.28)", HOLD:"rgba(0,229,255,0.22)" };
 
 const RELATED_CRYPTO  = ["BTC","ETH","SOL","AVAX","LINK","XRP","DOT","MATIC","INJ"];
-const RELATED_EQUITY  = ["NVDA","TSLA","META","MSFT","AAPL","AMD","AMZN","QQQ","PLTR"];
 const TFS = ["1H","4H","1D","1W"] as const;
 type TF = typeof TFS[number];
 
@@ -493,15 +481,15 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
     return "crypto";
   })();
 
-  const backRoute = type === "equity" ? "/equities" : "/markets";
+  const backRoute = "/crypto";
   const asset  = ASSET_DB[sym];
 
   // Feedback auto-dismiss is owned by <ExecutionFeedback> itself.
 
   // ── Paper-trade execution mutation ───────────────────────────────────────────
-  // Uses the Alpaca paper endpoint (same one AlpacaAutoTrader uses for AI auto-trades).
-  // This is the canonical paper-trading path: no Clerk auth required, real orders
-  // visible immediately on the Trade page and in Alpaca dashboards.
+  // Uses the shared paper-broker endpoint (same one the AI auto-trader uses).
+  // Canonical paper-trading path: no Clerk auth required, real orders visible
+  // immediately on the Trade page.
   interface AlpacaOrderResp {
     id:           string;
     symbol:       string;
@@ -516,8 +504,8 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   const orderMutation = useMutation<AlpacaOrderResp, Error, "BUY" | "SELL">({
     mutationFn: async (side) => {
       const notional = 1000;
-      // BTC → BTC/USD for Alpaca crypto; equities (TSLA, AAPL…) stay bare
-      const alpacaSymbol = type === "crypto" ? `${sym}/USD` : sym;
+      // BTC → BTC/USD for the paper crypto broker.
+      const alpacaSymbol = `${sym}/USD`;
       const res = await authFetch("/api/exchange/alpaca/order", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -596,8 +584,8 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   const sigCol   = SIG_COLOR[action] ?? GR;
   const reasons  = getReasoningLines(sym, action, conf);
   // Standard related list — filter out the current asset (you can't navigate to
-  // the page you're already on). Matches the simple pattern in Markets/Equities.
-  const related  = (type === "crypto" ? RELATED_CRYPTO : RELATED_EQUITY).filter(s => s !== sym).slice(0, 8);
+  // the page you're already on). Matches the simple pattern in Markets.
+  const related  = RELATED_CRYPTO.filter(s => s !== sym).slice(0, 8);
   const sg       = setupGrade(conf);
 
   // Seeded metrics
@@ -628,14 +616,11 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
     window.scrollTo({ top: 0, behavior: "auto" });
   };
 
-  // ── EQUITY HONESTY GATE ─────────────────────────────────────────────────────
-  // The AI equity signal engine is not yet wired into a real backend. To avoid
-  // fabricating live equity metrics (price, confidence, action, chart), we
-  // render an explicit "engine pending" preview view for any equity symbol.
-  // The full live detail view (with AUTO TRADE + execution) is only shown for
-  // crypto assets, which DO have a real ticker price + AI engine behind them.
+  // ── LEGACY EQUITY ROUTE GUARD ───────────────────────────────────────────────
+  // Crypto-only product: any stale `?type=equity` URL is redirected to the
+  // crypto detail view for the same symbol. No equity preview is rendered.
   if (type === "equity") {
-    const eqName = EQUITY_NAME[sym] ?? ASSET_DB[sym]?.name ?? sym;
+    const eqName = ASSET_DB[sym]?.name ?? sym;
     return (
       <div className="page-enter" style={{ background:BG, minHeight:"100%", paddingBottom:40 }}>
         <ExecutionFeedback payload={feedback} onDismiss={() => setFeedback(null)} />
@@ -658,7 +643,9 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
             </svg>
           </button>
           <div style={{ flex:1, display:"flex", alignItems:"center", gap:10 }}>
-            <EquityIcon sym={sym} size={32}/>
+            <div style={{ width:32, height:32, borderRadius:8, background:"rgba(102,255,102,0.10)",
+              border:"1px solid rgba(102,255,102,0.32)", display:"flex", alignItems:"center",
+              justifyContent:"center", color:"#66FF66", fontSize:12, fontFamily:SANS, fontWeight:800 }}>{sym.slice(0,2)}</div>
             <div>
               <div style={{ fontSize:16, fontFamily:SANS, fontWeight:800, color:W, letterSpacing:"-0.01em" }}>{sym}</div>
               <div style={{ fontSize:9.5, fontFamily:SANS, color:"rgba(255,255,255,0.55)" }}>{eqName}</div>
@@ -692,7 +679,9 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
               animation:"edge-sweep 6s ease-in-out infinite",
             }}/>
             <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:18 }}>
-              <EquityIcon sym={sym} size={56}/>
+              <div style={{ width:56, height:56, borderRadius:14, background:"rgba(102,255,102,0.10)",
+                border:"1px solid rgba(102,255,102,0.32)", display:"flex", alignItems:"center",
+                justifyContent:"center", color:"#66FF66", fontSize:20, fontFamily:SANS, fontWeight:800 }}>{sym.slice(0,2)}</div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:22, fontFamily:SANS, fontWeight:800, color:W, letterSpacing:"-0.02em" }}>{sym}</div>
                 <div style={{ fontSize:12, fontFamily:SANS, color:"rgba(255,255,255,0.65)", marginTop:2 }}>{eqName}</div>
@@ -716,7 +705,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
               lineHeight:1.55, letterSpacing:"-0.005em" }}>
               AI signals for <span style={{ color:W, fontWeight:700 }}>{eqName}</span> are
               entering final validation. Live price, confidence, and AI action will appear
-              here once the equity engine activates.
+              here once routing to the live crypto engine completes.
             </div>
             <div style={{ marginTop:14, display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
               {["Live AI Signal","Real-time Price","Confidence Score","Auto-Trade Execution"].map(s => (
@@ -751,7 +740,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
           </button>
           <div style={{ marginTop:10, fontSize:10.5, fontFamily:SANS,
             color:"rgba(255,255,255,0.42)", textAlign:"center", lineHeight:1.45 }}>
-            Crypto AI engine is live now · Equity engine launching soon
+            Crypto AI engine is live now · 200+ assets, majors + alts + emerging
           </div>
         </div>
       </div>
@@ -833,7 +822,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
               <div>
                 <div style={{ fontSize:9, fontFamily:SANS, color:GR,
                   letterSpacing:"0.12em", textTransform:"uppercase" as const, marginBottom:6 }}>
-                  {type === "crypto" ? "Crypto" : "Equity"} · Live Price
+                  Crypto · Live Price
                 </div>
                 <div style={{ fontSize:36, fontFamily:SANS, fontWeight:800, color:W,
                   letterSpacing:"-0.03em", lineHeight:1,

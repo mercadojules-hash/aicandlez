@@ -1615,11 +1615,11 @@ export default function Profile() {
           <div style={{ marginTop:10, background:CARD, border:`1px solid ${E}`,
             borderRadius:12, overflow:"hidden" }}>
             {[
-              { label:"Best Performing Asset",   val:"NVDA · +18.4%",  color:"rgba(0,255,136,0.88)" },
+              { label:"Best Performing Asset",   val:"SOL · +18.4%",   color:"rgba(0,255,136,0.88)" },
               { label:"Avg Trade Duration",       val:"4h 22m",         color:"rgba(102,255,102,0.82)" },
               { label:"Total AI Trades Executed", val:"47",             color:W },
-              { label:"Most Profitable Sector",   val:"Technology",     color:"rgba(124,255,0,0.85)" },
-              { label:"Highest Confidence Trade",  val:"NVDA · 91%",    color:GOLD },
+              { label:"Most Profitable Tier",     val:"Majors",         color:"rgba(124,255,0,0.85)" },
+              { label:"Highest Confidence Trade",  val:"BTC · 91%",     color:GOLD },
             ].map(({ label, val, color }, i, arr) => (
               <div key={label} style={{ display:"flex", justifyContent:"space-between",
                 alignItems:"center", padding:"12px 16px",

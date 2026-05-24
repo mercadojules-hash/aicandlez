@@ -44,8 +44,8 @@ PWA + `trading-dashboard` desktop institutional platform.
 | Plan ID   | Name           | Price   | Capacity                | Notes                                           |
 | --------- | -------------- | ------- | ----------------------- | ----------------------------------------------- |
 | `free`    | Paper Trading  | Free    | Simulated only          | 7-Day AI Paper, signals + watchlists, no live   |
-| `starter` | AI Trading     | $39.99  | Up to **3** AI trades   | Live AI exec (Alpaca), Auto Trade, analytics    |
-| `pro`     | AI Trading Pro | $79.99  | Up to **12** AI trades  | Crypto + Equities, priority exec, adv scanners  |
+| `starter` | AI Trading     | $39.99  | Up to **3** AI trades   | Live AI exec (Kraken), Auto Trade, analytics    |
+| `pro`     | AI Trading Pro | $79.99  | Up to **12** AI trades  | Crypto majors+alts+emerging, priority exec, scanners |
 
 - Performance fee **on profitable closed trades only** (label =
   `PERFORMANCE_FEE_LABEL` from `lib/fees`)
@@ -62,7 +62,7 @@ PWA + `trading-dashboard` desktop institutional platform.
 ## Routing — locked invariants
 
 ### aicandlez-app PWA (mobile-first customer surface)
-- `/` Home · `/signals` · `/crypto` · `/equities` · `/trade` · `/portfolio`
+- `/` Home · `/signals` · `/crypto` · `/trade` · `/portfolio`
 - `/profile` (AI Settings → Alert Preferences → Connected Accounts → Broker)
 - `/billing` · `/subscribe`
 - `/portal` → **CROSS-APP REDIRECT** to trading-dashboard's customer terminal.
@@ -263,9 +263,9 @@ DB-/engineStats-derived (no mocks).
 - `artifacts/natura-ai/constants/theme.ts` — green tokens (mobile, frozen)
 
 **Locked surfaces — do not restructure:** Home (radar centerpiece + AI
-Market Scanner + Top Gainers + Crypto/Equity Signals preview + Live
-Trades + Trade History + portfolio hero, single-column mobile-first);
-Signals/Crypto/Equities cards; Profile structure (AI Settings → Alert
+Market Scanner + Top Gainers + Crypto Signals preview + Live Trades +
+Trade History + portfolio hero, single-column mobile-first);
+Signals/Crypto cards; Profile structure (AI Settings → Alert
 Preferences → Connected Accounts → Broker); bottom nav; brand header;
 typography hierarchy.
 
