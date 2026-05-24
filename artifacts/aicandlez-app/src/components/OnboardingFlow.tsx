@@ -18,7 +18,7 @@
  * "into your Alpaca brokerage account" or "connect your existing exchange".
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -59,14 +59,36 @@ const ALPACA_PROVIDER: OnboardingProvider = {
 // to the existing alpaca.markets external CTA.
 interface AlpacaOauthConfig { enabled: boolean; authorizeUrl?: string; scope?: string }
 
+// R1.5 — shared registry hook for exchange product metadata.
+import { useExchangeCatalog } from "@/hooks/useExchangeCatalog";
+
+// R1.5 — exchange picker hydrates from /api/exchanges/catalog (single
+// source of truth). The local fallback below mirrors the old hardcoded
+// list and is used only during the very first paint while the catalog
+// request is in flight, so the Alpaca/Kraken CTAs never read undefined.
 // IDs MUST match the backend catalog (case-sensitive).
-const EXCHANGES = [
+type PickerEntry = { id: string; name: string; logo: string };
+const FALLBACK_EXCHANGES: PickerEntry[] = [
   { id: "Alpaca",       name: "Alpaca",     logo: "A" },
   { id: "Kraken",       name: "Kraken",     logo: "K" },
   { id: "Coinbase",     name: "Coinbase",   logo: "C" },
   { id: "CryptoDotCom", name: "Crypto.com", logo: "ᶜ" },
   { id: "Binance",      name: "Binance",    logo: "B" },
 ];
+
+function useOnboardingExchanges(): PickerEntry[] {
+  const { exchanges } = useExchangeCatalog();
+  return useMemo<PickerEntry[]>(() => {
+    if (exchanges.length === 0) return FALLBACK_EXCHANGES;
+    return exchanges
+      .filter(c => c.status !== "coming_soon" && c.adapterAvailable)
+      .map(c => ({
+        id:   c.id,
+        name: c.name,
+        logo: c.sigil ?? c.name.charAt(0).toUpperCase(),
+      }));
+  }, [exchanges]);
+}
 
 type Step = "done" | "choose" | "alpaca_cta" | "connect" | "intro";
 
@@ -102,7 +124,10 @@ export function OnboardingFlow() {
   // Latches the bypass routing decision so query-disable on `step="done"`
   // can't race-reopen the flow on stale data.
   const [bypassResolved, setBypassResolved] = useState(false);
-  const [picked, setPicked] = useState(EXCHANGES[0]);
+  // R1.5 — exchange list comes from the catalog hook. Initial state seeds
+  // with the fallback's Alpaca row so `picked` is never null on first paint.
+  const EXCHANGES = useOnboardingExchanges();
+  const [picked, setPicked] = useState<PickerEntry>(FALLBACK_EXCHANGES[0]);
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
   const [label, setLabel] = useState("");
@@ -243,13 +268,22 @@ export function OnboardingFlow() {
               if (alpacaOauthEnabled) { startAlpacaOauth(); return; }
               setStep("alpaca_cta");
             }}
-            onPickExisting={() => { setPicked(EXCHANGES[1]); setStep("connect"); }}
+            onPickExisting={() => {
+              // Default existing-connection target = first non-Alpaca live row
+              // (Kraken under current ordering). Falls back to catalog[0]
+              // if the catalog hasn't loaded yet.
+              const kraken = EXCHANGES.find(e => e.id === "Kraken") ?? EXCHANGES[1] ?? EXCHANGES[0];
+              setPicked(kraken); setStep("connect");
+            }}
           />
         )}
         {step === "alpaca_cta" && (
           <AlpacaCtaContent
             onBack={() => setStep("choose")}
-            onContinue={() => { setPicked(EXCHANGES[0]); setStep("connect"); }}
+            onContinue={() => {
+              const alpaca = EXCHANGES.find(e => e.id === "Alpaca") ?? EXCHANGES[0];
+              setPicked(alpaca); setStep("connect");
+            }}
           />
         )}
         {step === "connect" && (
@@ -609,6 +643,8 @@ function ConnectContent({
   error: string; submitting: boolean; canSubmit: boolean;
   onSubmit: () => void; onBack: () => void;
 }) {
+  // R1.5 — connect-step picker tiles hydrate from the shared catalog hook.
+  const EXCHANGES = useOnboardingExchanges();
   return (
     <>
       <div style={{ marginBottom: 20, paddingRight: 44 }}>

@@ -6,23 +6,23 @@
  * market heartbeat takes the visual priority.
  */
 
+import { useMemo } from "react";
 import { Cpu, Pause, Play, ShieldOff, Activity, DollarSign, Zap, Clock } from "lucide-react";
 import type { EngineStatus, ExchangeStatus, LiveBalance, SimAccount } from "../types";
 import { N } from "./theme";
+import { useExchangeCatalog, type CatalogEntry } from "@/hooks/useExchangeCatalog";
 
 interface Exchange {
   id: string; label: string; color: string; disabled?: boolean; soon?: boolean; isSim?: boolean;
 }
 
-// Operator console = LIVE-ONLY execution. Order matches the onboarding
-// catalog (Alpaca first). No paper / simulation tabs on this surface.
-const EXCHANGES: Exchange[] = [
-  { id: "alpaca",    label: "ALPACA",     color: "#ffbe00" },
-  { id: "kraken",    label: "KRAKEN",     color: N.GOLD },
-  { id: "coinbase",  label: "COINBASE",   color: "#2775ca" },
-  { id: "cryptocom", label: "CRYPTO.COM", color: "#1199fa" },
-  { id: "binance",   label: "BINANCE",    color: "#f0b90b" },
-];
+// R1.5 — operator console exchange switcher hydrates from /api/exchanges/catalog
+// (single source of truth). IDs are lowercased for backward compatibility with
+// the parent's `selectLive(ex)` handler in CommandCenter.tsx which normalizes
+// via `.toLowerCase()` before dispatching to `switchExchangeMode`. Beta exchanges
+// (status === "beta") are surfaced as disabled+SOON for visibility without being
+// selectable — operator scope on /command is Kraken-first by policy. Coming-soon
+// catalog rows are excluded entirely from the operator strip.
 
 function fmtUsd(n: number | null | undefined): string {
   if (n == null) return "—";
@@ -52,12 +52,29 @@ interface Props {
   onSelectLive:    (id: string) => void;
 }
 
+function toBarEntry(c: CatalogEntry): Exchange {
+  return {
+    id:       c.id.toLowerCase(),
+    label:    c.name.toUpperCase(),
+    color:    c.brandColor ?? N.GOLD,
+    disabled: c.status === "beta",
+    soon:     c.status === "beta",
+  };
+}
+
 export function CommandBar({
   engine, exchangeStatus, simAccount, liveBalance,
   activeId, liveActive,
   onStartEngine, onStopEngine, onTogglePause, onToggleKill,
   onSelectSim, onSelectLive,
 }: Props) {
+  const { exchanges: catalog } = useExchangeCatalog();
+  const EXCHANGES = useMemo<Exchange[]>(() =>
+    catalog
+      .filter(c => c.status !== "coming_soon" && c.adapterAvailable)
+      .map(toBarEntry),
+    [catalog]
+  );
   const isRunning = engine?.running ?? false;
   const isPaused  = exchangeStatus?.paused ?? false;
   const isKill    = exchangeStatus?.killSwitch ?? false;

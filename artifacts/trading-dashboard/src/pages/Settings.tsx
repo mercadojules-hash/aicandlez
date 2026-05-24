@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useExchangeCatalog } from "@/hooks/useExchangeCatalog";
 import {
   Brain,
   Shield,
@@ -120,7 +121,9 @@ const RISK_LEVELS = [
   { value: "high",     label: "High",     desc: "≤4% stop loss, larger positions",   color: "#ff6600" },
 ];
 
-const EXCHANGES = ["Alpaca", "Kraken", "Coinbase", "CryptoDotCom", "Binance"];
+// R1.5 — EXCHANGES list now hydrated from the shared registry hook below
+// (single source of truth: /api/exchanges/catalog). Removed hardcoded array;
+// Gemini live + Robinhood coming_soon + future additions surface automatically.
 const TIMEZONES = ["UTC", "US/Eastern", "US/Pacific", "Europe/London", "Asia/Tokyo", "Asia/Singapore"];
 const CURRENCIES = ["USD", "EUR", "GBP", "JPY"];
 
@@ -902,6 +905,19 @@ export default function Settings() {
 
   const merged: Partial<UserSettings> = { ...data, ...draft };
 
+  // R1.5 — preferred-exchange options hydrated from the shared registry.
+  // Excludes coming_soon rows; includes live + beta so operators can still
+  // pin a beta exchange as their preferred default (settings ≠ live arm).
+  const { exchanges: catalog } = useExchangeCatalog();
+  const exchangeOptions = useMemo(
+    () => (catalog.length > 0
+      ? catalog.filter(e => e.status !== "coming_soon" && e.adapterAvailable).map(e => e.id)
+      // Loading fallback — preserves the pre-R1.5 default so the picker
+      // never renders empty while the catalog request is in flight.
+      : ["Alpaca", "Kraken", "Coinbase", "CryptoDotCom", "Binance"]),
+    [catalog]
+  );
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen" style={{ background: "#060810" }}>
@@ -1080,7 +1096,7 @@ export default function Settings() {
               <ToggleSwitch value={merged.volumeFilter ?? true} onChange={v => set("volumeFilter", v)} label="VOLUME CONFIRMATION" desc="Only trade when current 5m volume ≥ 85% of 20-bar rolling average" />
               <ToggleSwitch value={merged.require1HTrend ?? false} onChange={v => set("require1HTrend", v)} label="1H TREND ALIGNMENT" desc="Require 1H EMA9 to align with signal direction before executing" />
             </div>
-            <SelectInput label="PREFERRED EXCHANGE" value={merged.preferredExchange ?? "Alpaca"} options={EXCHANGES} onChange={v => set("preferredExchange", v)} />
+            <SelectInput label="PREFERRED EXCHANGE" value={merged.preferredExchange ?? "Alpaca"} options={exchangeOptions} onChange={v => set("preferredExchange", v)} />
           </Section>
 
           {/* ── Notifications ─────────────────────────────────────────── */}

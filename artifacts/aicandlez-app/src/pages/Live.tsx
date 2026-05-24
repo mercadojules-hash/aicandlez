@@ -3,13 +3,27 @@ import { useLocation, useSearch } from "wouter";
 import { api, type LiveEligibility } from "@/lib/api";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
-const ACTIVE_EXCHANGES = [
-  { id: "Alpaca",       name: "Alpaca",     logo: "A", active: true },
-  { id: "Kraken",       name: "Kraken",     logo: "K", active: true },
-  { id: "Coinbase",     name: "Coinbase",   logo: "C", active: true },
-  { id: "CryptoDotCom", name: "Crypto.com", logo: "ᶜ", active: true },
-  { id: "Binance",      name: "Binance",    logo: "B", active: true },
-];
+// R1.5 — connected-exchange chip list hydrates from /api/exchanges/catalog.
+// Filters to status === "live" so the Live page reflects production-ready
+// brokers only (beta exchanges appear on the Exchanges connect page but
+// not here in the live-trading surface).
+import { useExchangeCatalog } from "@/hooks/useExchangeCatalog";
+import { useMemo } from "react";
+
+function useActiveExchanges() {
+  const { exchanges } = useExchangeCatalog();
+  return useMemo(
+    () => exchanges
+      .filter(c => c.status === "live" && c.adapterAvailable)
+      .map(c => ({
+        id:    c.id,
+        name:  c.name,
+        logo:  c.sigil ?? c.name.charAt(0).toUpperCase(),
+        active: true,
+      })),
+    [exchanges]
+  );
+}
 
 const COMING_SOON: string[] = [];
 
@@ -186,6 +200,8 @@ function RequiresConsentScreen() {
 
 // ── Screen: fully eligible — live controls ─────────────────────────────────────
 function LiveActiveScreen({ eligibility }: { eligibility: LiveEligibility }) {
+  // R1.5 — connected-exchange chip list hydrates from catalog hook.
+  const activeExchanges = useActiveExchanges();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
@@ -307,7 +323,7 @@ function LiveActiveScreen({ eligibility }: { eligibility: LiveEligibility }) {
 
         {/* Active exchanges */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-          {ACTIVE_EXCHANGES.map(ex => (
+          {activeExchanges.map(ex => (
             <div key={ex.id} style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "5px 10px",

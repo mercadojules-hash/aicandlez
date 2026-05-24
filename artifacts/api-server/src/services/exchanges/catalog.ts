@@ -55,6 +55,24 @@ export interface ExchangeCatalogEntry {
   customerVisible?: boolean;
   adminOnly?:       boolean;
   comingSoonNote?:  string;
+
+  /**
+   * Frontend presentation overlay (R1.5 — completion of registry
+   * unification across PWA + admin command bar + dashboard settings).
+   *
+   * - sigil: single-character UI badge rendered inside exchange tiles.
+   *   Defaults to name[0].toUpperCase() at the consumer side when absent.
+   *   Set explicitly for visual disambiguation (Crypto.com vs Coinbase).
+   * - brandColor: canonical hex used for active-tile highlight, border,
+   *   and ring glow. Single source of truth — PWA, admin CommandBar, and
+   *   customer modal all read this; no per-surface color overrides.
+   * - apiKeyGuide: short navigation hint shown in the connect wizard
+   *   ("Settings → API → Create Key") for exchanges where customers must
+   *   self-mint credentials. Optional — Alpaca OAuth path skips this.
+   */
+  sigil?:        string;
+  brandColor?:   string;
+  apiKeyGuide?:  string;
 }
 
 export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
@@ -81,6 +99,8 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
     takerFeePct: 0.00, makerFeePct: 0.00,
     rateLimit: { ordersPerSecond: 10, requestsPerMinute: 200 },
     status: "live", features: ["spot"], adapterAvailable: true,
+    sigil: "A", brandColor: "#ffbe00",
+    apiKeyGuide: "Dashboard → Paper Trading → API Keys → Generate Key",
   },
   {
     id: "Kraken", name: "Kraken", url: "https://www.kraken.com", logo: "kraken",
@@ -93,6 +113,8 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
     takerFeePct: 0.26, makerFeePct: 0.16,
     rateLimit: { ordersPerSecond: 1, requestsPerMinute: 60 },
     status: "live", features: ["spot", "futures", "perps"], adapterAvailable: true,
+    sigil: "K", brandColor: "#7c4dff",
+    apiKeyGuide: "Settings → API → Create API Key",
   },
   {
     id: "Coinbase", name: "Coinbase", url: "https://www.coinbase.com", logo: "coinbase",
@@ -105,6 +127,8 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
     takerFeePct: 0.60, makerFeePct: 0.40,
     rateLimit: { ordersPerSecond: 5, requestsPerMinute: 300 },
     status: "live", features: ["spot"], adapterAvailable: true,
+    sigil: "C", brandColor: "#0052ff",
+    apiKeyGuide: "Profile → API → New API Key (Advanced Trade)",
   },
   {
     id: "CryptoDotCom", name: "Crypto.com", url: "https://crypto.com/exchange", logo: "cryptocom",
@@ -117,6 +141,8 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
     takerFeePct: 0.075, makerFeePct: 0.075,
     rateLimit: { ordersPerSecond: 15, requestsPerMinute: 900 },
     status: "live", features: ["spot", "perps"], adapterAvailable: true,
+    sigil: "ᶜ", brandColor: "#1a6fdf",
+    apiKeyGuide: "Settings → API Keys → Create Key (Exchange API)",
   },
   {
     id: "Binance", name: "Binance", url: "https://www.binance.com", logo: "binance",
@@ -129,6 +155,8 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
     takerFeePct: 0.10, makerFeePct: 0.10,
     rateLimit: { ordersPerSecond: 10, requestsPerMinute: 1200 },
     status: "live", features: ["spot", "futures", "perps"], adapterAvailable: true,
+    sigil: "B", brandColor: "#f0b90b",
+    apiKeyGuide: "Account → API Management → Create API",
   },
   {
     // Promoted to Tier-1 live in R1 (was Tier-2 beta). Adapter has been
@@ -144,6 +172,8 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
     takerFeePct: 0.35, makerFeePct: 0.20,
     rateLimit: { ordersPerSecond: 5, requestsPerMinute: 300 },
     status: "live", features: ["spot"], adapterAvailable: true,
+    sigil: "G", brandColor: "#00dcfa",
+    apiKeyGuide: "Settings → API → Create New Key (Primary, Trader scope)",
   },
 
   // ── Tier 2 — Beta (implemented, not yet battle-tested) ─────────────────────
@@ -172,6 +202,8 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
     takerFeePct: 0.10, makerFeePct: 0.10,
     rateLimit: { ordersPerSecond: 10, requestsPerMinute: 600 },
     status: "beta", features: ["spot", "futures", "perps"], adapterAvailable: true,
+    sigil: "₿", brandColor: "#00d4ff",
+    apiKeyGuide: "API Management → Create API Key (set passphrase)",
   },
   {
     id: "MEXC", name: "MEXC", url: "https://www.mexc.com", logo: "mexc",

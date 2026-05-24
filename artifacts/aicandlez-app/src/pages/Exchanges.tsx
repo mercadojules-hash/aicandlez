@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { api, type Subscription } from "@/lib/api";
 import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useExchangeCatalog } from "@/hooks/useExchangeCatalog";
 
 // ── Design tokens ───────────────────────────────────────────────────────────────
 const BG   = "#000000";
@@ -22,23 +23,29 @@ type ExchangeEntry = {
   apiGuide?: string;
 };
 
-// IDs MUST match the backend catalog exactly — CONNECTABLE_EXCHANGE_IDS uses
-// case-sensitive lookup. Order = display order (Alpaca primary). OKX/KuCoin/
-// Bybit/Robinhood deliberately removed for US-compliance.
-const ALL_EXCHANGES: ExchangeEntry[] = [
-  { id: "Alpaca",       name: "Alpaca",     logo: "A", active: true, color: "#ffbe00",
-    needsPassphrase: false, apiGuide: "Dashboard → Paper Trading → API Keys → Generate Key" },
-  { id: "Kraken",       name: "Kraken",     logo: "K", active: true, color: "#7c4dff",
-    needsPassphrase: false, apiGuide: "Settings → API → Create API Key" },
-  { id: "Coinbase",     name: "Coinbase",   logo: "C", active: true, color: "#0052ff",
-    needsPassphrase: false, apiGuide: "Profile → API → New API Key" },
-  { id: "CryptoDotCom", name: "Crypto.com", logo: "ᶜ", active: true, color: "#1a6fdf",
-    needsPassphrase: false, apiGuide: "Settings → API Keys → Create Key (Exchange API)" },
-  { id: "Binance",      name: "Binance",    logo: "B", active: true, color: "#f0b90b",
-    needsPassphrase: false, apiGuide: "Account → API Management → Create API" },
-  { id: "Bitget",       name: "Bitget",     logo: "₿", active: true, color: "#00d4ff",
-    needsPassphrase: true,  apiGuide: "API Management → Create API Key (set passphrase)" },
-];
+// R1.5 — exchange tile list hydrates from /api/exchanges/catalog via
+// `useExchangeCatalog`. Every entry's sigil/brandColor/apiKeyGuide
+// originates from the backend registry (single source of truth). Live +
+// beta rows render as active connect targets; coming_soon rows render
+// as disabled cards via `comingSoonEntries`. The `active` boolean below
+// is preserved on the local mapped shape for compatibility with the
+// existing `ALL_EXCHANGES.filter(e => e.active)` logic.
+
+function fromCatalog(c: {
+  id: string; name: string; status: string; adapterAvailable: boolean;
+  requiresPassphrase: boolean; sigil?: string; brandColor?: string; apiKeyGuide?: string;
+}): ExchangeEntry {
+  const connectable = c.status !== "coming_soon" && c.adapterAvailable;
+  return {
+    id:    c.id,
+    name:  c.name,
+    logo:  c.sigil ?? c.name.charAt(0).toUpperCase(),
+    active: connectable,
+    color: c.brandColor ?? "#00aaff",
+    needsPassphrase: c.requiresPassphrase,
+    apiGuide: c.apiKeyGuide,
+  };
+}
 
 // Exchanges that ship a no-risk demo-trading surface we can opt into at
 // connect time. Bitget reuses the production REST host gated by the
@@ -457,8 +464,14 @@ export default function Exchanges() {
   const connectionMap = new Map<string, ApiExchange>();
   (data?.exchanges ?? []).forEach(ex => connectionMap.set(ex.exchange, ex));
 
-  const active = ALL_EXCHANGES.filter(e => e.active);
-  const coming = ALL_EXCHANGES.filter(e => !e.active);
+  // R1.5 — exchange list hydrated from /api/exchanges/catalog. `active`
+  // = catalog rows whose adapter is implemented and status != coming_soon.
+  // `coming` = catalog rows with status === "coming_soon" (Robinhood,
+  // dYdX, Hyperliquid). Single registry, both lenses.
+  const { exchanges: catalog } = useExchangeCatalog();
+  const allExchanges = useMemo<ExchangeEntry[]>(() => catalog.map(fromCatalog), [catalog]);
+  const active = allExchanges.filter(e => e.active);
+  const coming = allExchanges.filter(e => !e.active);
 
   const onConnected = () => {
     setConnectTarget(null);
