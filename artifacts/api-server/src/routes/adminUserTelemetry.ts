@@ -130,7 +130,12 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
       plan:            "u.plan",
       totalPnl:        "agg.total_pnl",
       tradesCount:     "agg.trades_count",
-      lastActivityAt:  "agg.last_activity_at",
+      // last_activity_at is a top-level SELECT alias (GREATEST(...) below),
+      // NOT a column on the trade_agg CTE — qualifying it with `agg.` raises
+      // `column agg.last_activity_at does not exist` and 500s the whole
+      // endpoint. This is the default sort, so the bug torched every
+      // unsorted /admin/users call.
+      lastActivityAt:  "last_activity_at",
       openPositions:   "pos.open_positions",
       mrr:             "mrr_usd",
     };
