@@ -50,6 +50,33 @@ async function waitForClerk(timeoutMs = 3000): Promise<void> {
   }
 }
 
+// Resolve the API base URL once at module load. On production hosts
+// (trade./admintrade.aicandlez.com) this is `https://api.aicandlez.com`
+// supplied via `VITE_API_BASE_URL`. On the dev preview / same-origin
+// builds this is empty so callers stay same-origin.
+//
+// Why this matters: admintrade.aicandlez.com is a *static* Render service —
+// it has no `/api/*` handler, so a bare `fetch("/api/exchanges/catalog")`
+// returns the SPA's `index.html` (200, text/html). `r.json()` then throws,
+// the React Query falls back to a stub catalog, and the admin sees only
+// "Alpaca" in the exchange picker. Prefixing the cross-origin API host
+// fixes every authFetch caller in one place (parity with `useUserRole`,
+// which already does this manually).
+const API_BASE_URL = (
+  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? ""
+).replace(/\/$/, "");
+
+function resolveUrl(input: RequestInfo | URL): RequestInfo | URL {
+  if (!API_BASE_URL) return input;
+  if (typeof input !== "string") return input;
+  // Only rewrite same-origin `/api/...` paths. Leave absolute URLs and
+  // non-`/api` paths alone.
+  if (input.startsWith("/api/") || input === "/api") {
+    return `${API_BASE_URL}${input}`;
+  }
+  return input;
+}
+
 export async function authFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
@@ -65,5 +92,5 @@ export async function authFetch(
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  return fetch(input, { ...init, credentials: "include", headers });
+  return fetch(resolveUrl(input), { ...init, credentials: "include", headers });
 }
