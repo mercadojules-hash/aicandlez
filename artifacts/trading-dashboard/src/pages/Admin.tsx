@@ -57,6 +57,12 @@ interface AdminUserRow {
   };
   lastActivityAt: number | null;
   onlineNow: boolean;
+  // ── CRM Phase A telemetry overlay ────────────────────────────────────
+  activeExchange:    { name: string; mode: string } | null;
+  exchangesConnected: number;
+  aiUsage24h:        number;
+  sessionStatus:     "active" | "idle" | "offline";
+  revenueGenerated:  number;
 }
 
 interface AdminUsersResponse {
@@ -1221,30 +1227,34 @@ export default function Admin() {
                   <ColHeader col="plan"           label="PLAN" />
                   <ColHeader col="adminStatus"    label="STATUS" />
                   <th className="px-3 py-2.5 text-left"><span className="text-[8px] font-mono font-bold tracking-[0.15em]" style={{ color: "#4a6a80" }}>EXCHANGES</span></th>
+                  <th className="px-3 py-2.5 text-left"><span className="text-[8px] font-mono font-bold tracking-[0.15em]" style={{ color: "#4a6a80" }}>ACTIVE EXCHANGE</span></th>
                   <th className="px-3 py-2.5 text-left"><span className="text-[8px] font-mono font-bold tracking-[0.15em]" style={{ color: "#4a6a80" }}>CAP / 24H</span></th>
                   <ColHeader col="tradesCount"    label="TRADES" />
                   <ColHeader col="feesGenerated"  label="FEES" />
                   <ColHeader col="totalPnl"       label="PNL" />
                   <ColHeader col="winRate"        label="WIN %" />
                   <ColHeader col="mrrUsd"         label="MRR" />
+                  <th className="px-3 py-2.5 text-left"><span className="text-[8px] font-mono font-bold tracking-[0.15em]" style={{ color: "#4a6a80" }}>AI 24H</span></th>
+                  <th className="px-3 py-2.5 text-left"><span className="text-[8px] font-mono font-bold tracking-[0.15em]" style={{ color: "#4a6a80" }}>REVENUE</span></th>
+                  <th className="px-3 py-2.5 text-left"><span className="text-[8px] font-mono font-bold tracking-[0.15em]" style={{ color: "#4a6a80" }}>SESSION</span></th>
                   <ColHeader col="lastActivityAt" label="LAST ACTIVE" />
                 </tr>
               </thead>
               <tbody>
                 {usersLoading && (
-                  <tr><td colSpan={11} className="px-4 py-12 text-center">
+                  <tr><td colSpan={15} className="px-4 py-12 text-center">
                     <Loader2 className="w-5 h-5 inline-block animate-spin" style={{ color: "#cc55ff" }} />
                     <div className="text-[10px] font-mono mt-2" style={{ color: "#4a6a80" }}>Loading users from /api/admin/users…</div>
                   </td></tr>
                 )}
                 {usersError && !usersLoading && (
-                  <tr><td colSpan={11} className="px-4 py-12 text-center">
+                  <tr><td colSpan={15} className="px-4 py-12 text-center">
                     <AlertTriangle className="w-5 h-5 inline-block" style={{ color: "#ff3355" }} />
                     <div className="text-[10px] font-mono mt-2" style={{ color: "#ff3355" }}>Failed to load users. Click REFRESH to retry.</div>
                   </td></tr>
                 )}
                 {!usersLoading && !usersError && paged.length === 0 && (
-                  <tr><td colSpan={11} className="px-4 py-12 text-center">
+                  <tr><td colSpan={15} className="px-4 py-12 text-center">
                     <div className="text-[10px] font-mono" style={{ color: "#4a6a80" }}>No users match the current filters.</div>
                   </td></tr>
                 )}
@@ -1370,6 +1380,27 @@ export default function Admin() {
                       </div>
                     </td>
 
+                    {/* Active Exchange — CRM Phase A */}
+                    <td className="px-3 py-2.5">
+                      {u.activeExchange ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold font-mono uppercase" style={{ color: "#EAF2FF" }}>
+                            {u.activeExchange.name}
+                          </span>
+                          <span className="text-[7px] font-bold font-mono px-1 py-0.5 rounded uppercase"
+                            style={{
+                              background: u.activeExchange.mode === "live" ? "#ff884414" : "#00aaff14",
+                              color:      u.activeExchange.mode === "live" ? "#ff8844"   : "#00aaff",
+                              border:    `1px solid ${u.activeExchange.mode === "live" ? "#ff884430" : "#00aaff30"}`,
+                            }}>
+                            {u.activeExchange.mode}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[9px] font-mono" style={{ color: "#3a5a70" }}>—</span>
+                      )}
+                    </td>
+
                     {/* Cap / 24h */}
                     <td className="px-3 py-2.5">
                       <span className="text-[10px] font-bold font-mono"
@@ -1429,6 +1460,36 @@ export default function Admin() {
                       <span className="text-[10px] font-bold font-mono" style={{ color: u.mrrUsd > 0 ? "#00ff8a" : "#4a6a80" }}>
                         {u.mrrUsd > 0 ? `$${u.mrrUsd.toFixed(0)}` : "—"}
                       </span>
+                    </td>
+
+                    {/* AI Usage 24h — CRM Phase A */}
+                    <td className="px-3 py-2.5">
+                      <span className="text-[10px] font-bold font-mono" style={{ color: u.aiUsage24h > 0 ? "#7b68ee" : "#3a5a70" }}>
+                        {u.aiUsage24h}
+                      </span>
+                    </td>
+
+                    {/* Revenue Generated — CRM Phase A (fees + current MRR) */}
+                    <td className="px-3 py-2.5">
+                      <span className="text-[10px] font-bold font-mono" style={{ color: u.revenueGenerated > 0 ? "#00ff8a" : "#3a5a70" }}>
+                        {u.revenueGenerated > 0 ? fmtDollar(u.revenueGenerated) : "—"}
+                      </span>
+                    </td>
+
+                    {/* Session Status — CRM Phase A (derived from lastActivityAt) */}
+                    <td className="px-3 py-2.5">
+                      {(() => {
+                        const c = u.sessionStatus === "active" ? "#00ff8a"
+                                : u.sessionStatus === "idle"   ? "#ffaa00" : "#4a6a80";
+                        return (
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: c, boxShadow: `0 0 4px ${c}` }} />
+                            <span className="text-[8px] font-bold font-mono uppercase" style={{ color: c }}>
+                              {u.sessionStatus}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Last Active */}

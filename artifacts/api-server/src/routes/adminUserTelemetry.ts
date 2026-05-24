@@ -196,6 +196,31 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         FROM sim_trades
         WHERE entry_time >= ${Date.now() - 24 * 60 * 60 * 1000}
         GROUP BY user_id
+      ),
+      -- CRM Phase A: surface the user's currently-active/default exchange
+      -- so the operator grid can render an "Active Exchange" column without
+      -- a per-row fan-out. Picks the is_default=true connection (or the most
+      -- recently-verified one as a fallback) per user.
+      active_exchange_agg AS (
+        SELECT DISTINCT ON (user_id) user_id, exchange, trading_mode
+        FROM user_exchange_connections
+        WHERE status = 'active'
+        ORDER BY user_id, is_default DESC, last_verified_at DESC NULLS LAST
+      ),
+      -- CRM Phase A: AI activity intensity in the last 24h, derived from
+      -- the immutable audit_log. Used as the operator's "AI Usage" column.
+      -- Filters to event types known to be emitted by the AI / execution
+      -- pipeline (signal_emit, ai_decision, auto_trade, order_placed,
+      -- order_rejected). Falls back to 0 when nothing was recorded.
+      ai_usage_24h AS (
+        SELECT user_id, COUNT(*)::int AS ai_events_24h
+        FROM audit_log
+        WHERE ts_ms >= ${Date.now() - 24 * 60 * 60 * 1000}
+          AND type IN (
+            'signal_emit', 'ai_decision', 'auto_trade',
+            'order_placed', 'order_rejected', 'trade_open', 'trade_close'
+          )
+        GROUP BY user_id
       )
       SELECT
         u.clerk_user_id                                         AS clerk_user_id,
@@ -236,6 +261,9 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         COALESCE(o24.used_24h, 0)                                AS used_24h,
         COALESCE(td.today_count, 0)                              AS trades_today,
         COALESCE(a.cash_balance, 0)                              AS cash_balance,
+        ax.exchange                                              AS active_exchange,
+        ax.trading_mode                                          AS active_exchange_mode,
+        COALESCE(ai24.ai_events_24h, 0)                          AS ai_events_24h,
         GREATEST(
           COALESCE(agg.last_trade_ms, 0),
           COALESCE(EXTRACT(EPOCH FROM u.created_at)::bigint * 1000, 0)
@@ -250,6 +278,8 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
       LEFT JOIN live_opens_24h       o24    ON o24.user_id    = u.clerk_user_id
       LEFT JOIN trades_today         td     ON td.user_id     = u.clerk_user_id
       LEFT JOIN sim_accounts         a      ON a.user_id      = u.clerk_user_id
+      LEFT JOIN active_exchange_agg  ax     ON ax.user_id     = u.clerk_user_id
+      LEFT JOIN ai_usage_24h         ai24   ON ai24.user_id   = u.clerk_user_id
       WHERE (${search}::text IS NULL OR LOWER(u.email) LIKE ${search})
         AND (${planArg}::text IS NULL OR LOWER(u.plan) = ${planArg})
         AND (${statArg}::text IS NULL OR COALESCE(status.status, 'active') = ${statArg})
@@ -342,6 +372,36 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         })(),
         lastActivityAt:      last > 0 ? last : null,
         onlineNow:           last > 0 && (now - last) < 10 * 60 * 1000,
+        // ── CRM Phase A telemetry overlay ────────────────────────────────
+        // activeExchange: the user's default/most-recently-verified active
+        // exchange (or null if none). Operator grid renders the canonical
+        // exchange name; null collapses to "—".
+        activeExchange:      r["active_exchange"] == null
+          ? null
+          : { name: String(r["active_exchange"]), mode: String(r["active_exchange_mode"] ?? "paper") },
+        // exchangesConnected: redundant alias of exchange_active so the
+        // operator grid can read a single canonical column name.
+        exchangesConnected:  Number(r["exchange_active"] ?? 0),
+        // aiUsage24h: count of AI/execution audit_log events in the last
+        // 24h. Used as a "usage intensity" column.
+        aiUsage24h:          Number(r["ai_events_24h"] ?? 0),
+        // sessionStatus: derived purely from lastActivityAt. Real session
+        // tracking lands in Phase A3; this placeholder lets the operator
+        // grid render a session pill today without inventing data.
+        //   active  — last activity < 2 min
+        //   idle    — last activity < 30 min
+        //   offline — older or null
+        sessionStatus: (() => {
+          if (!last) return "offline" as const;
+          const ageMs = now - last;
+          if (ageMs < 2 * 60 * 1000)  return "active"  as const;
+          if (ageMs < 30 * 60 * 1000) return "idle"    as const;
+          return "offline" as const;
+        })(),
+        // revenueGenerated: lifetime performance fees + current-month MRR.
+        // Operator-grade single-number revenue read; precise lifetime sub
+        // revenue is materialised separately from Stripe in BillingAdmin.
+        revenueGenerated:    Number(r["fees_generated"] ?? 0) + Number(r["mrr_usd"] ?? 0),
       };
     });
 

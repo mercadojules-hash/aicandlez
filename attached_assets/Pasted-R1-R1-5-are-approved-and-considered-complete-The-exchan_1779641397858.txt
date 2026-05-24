@@ -1,0 +1,206 @@
+R1 + R1.5 are approved and considered complete.
+
+The exchange foundation is now stable enough to begin CRM Phase A.
+
+Proceed with CRM Phase A implementation.
+
+====================================================
+CRM PHASE A — INSTITUTIONAL USER OPERATIONS LAYER
+=================================================
+
+Primary objective:
+Build the foundational admin user-management infrastructure for AICandlez.
+
+This is NOT cosmetic UI.
+This is operational fintech infrastructure.
+
+====================================================
+PHASE A SCOPE
+=============
+
+1. USERS SIDEBAR SECTION
+   ====================================================
+
+Under PLATFORM add:
+
+* Users
+* User Activity
+* Subscriptions
+* Live Sessions
+
+Maintain:
+
+* Revenue
+* Risk Monitor
+* Alerts
+* AI Models
+* Admin Console
+
+====================================================
+2. USERS GRID (PRIMARY SURFACE)
+===============================
+
+Create institutional-grade realtime user grid.
+
+One row per user.
+
+Requirements:
+
+* searchable
+* sortable
+* scalable
+* pagination-safe
+* 100k-user-ready
+* neon institutional styling
+* black container interiors
+* large readable fonts
+
+Columns:
+
+* User
+* Email
+* Plan
+* Status
+* Exchanges Connected
+* Active Exchange
+* Equity
+* PnL
+* Total Trades
+* AI Usage
+* Last Active
+* Session Status
+* Revenue Generated
+* Actions
+
+Statuses:
+
+* Active
+* Trial
+* Complimentary
+* Suspended
+* Expired
+* Fraud Watch
+* Refunded
+
+====================================================
+3. USER DETAIL PANEL
+====================
+
+Clicking a user row opens User Intelligence Panel.
+
+Include:
+
+PROFILE
+
+* name
+* email
+* user id
+* created date
+* subscription tier
+* Stripe customer id
+* complimentary status
+* revenue generated
+
+EXCHANGES
+
+* connected exchanges
+* active exchange
+* exchange health
+* auth state
+* exchange switching history
+
+TRADING
+
+* total pnl
+* trade count
+* open positions
+* execution activity
+* AI activity
+* usage telemetry
+
+====================================================
+4. COMPLIMENTARY SUBSCRIPTIONS
+==============================
+
+Wire existing backend complimentary endpoints into the UI.
+
+Need operator controls for:
+
+* complimentary starter
+* complimentary pro
+* expiration dates
+* revoke complimentary
+* extend trial
+* manual upgrade/downgrade
+
+All actions:
+
+* audit logged
+* role-gated
+* visually obvious
+
+====================================================
+5. SESSION / DEVICE FOUNDATION
+==============================
+
+Begin infrastructure for:
+
+* live sessions
+* device tracking
+* active device list
+* browser/device info
+* session revocation
+* websocket/session visibility
+
+Do NOT overbuild yet.
+Foundation first.
+
+====================================================
+6. EXCHANGE VISIBILITY CONTROLS
+===============================
+
+Add per-user exchange visibility controls.
+
+Admins/operators should eventually be able to:
+
+* enable/disable exchanges per user
+* restrict beta exchanges
+* whitelist exchanges
+* control live broker availability
+
+This must derive from the unified exchange registry.
+
+====================================================
+IMPORTANT ARCHITECTURAL RULES
+=============================
+
+DO:
+
+* reuse existing admin telemetry
+* reuse audit infrastructure
+* reuse billing infrastructure
+* reuse existing admin APIs
+* compose on top of current systems
+
+DO NOT:
+
+* duplicate admin systems
+* duplicate telemetry systems
+* merge customer/admin worlds
+* hardcode exchange lists
+* break registry invariants
+
+====================================================
+DESIGN REQUIREMENTS
+===================
+
+Maintain:
+
+* institutional Bloomberg/TradingView feel
+* realtime telemetry feel
+* neon highlights
+* operator-grade readability
+* black interior containers
+* responsive layouts
+
+This is the beginning of the AICandlez institutional CRM layer.

@@ -42,6 +42,10 @@ import Settings from "@/pages/Settings";
 import Billing from "@/pages/Billing";
 import Admin from "@/pages/Admin";
 import BillingAdmin from "@/pages/BillingAdmin";
+import AdminUsers from "@/pages/admin/Users";
+import AdminUserActivity from "@/pages/admin/UserActivity";
+import AdminSubscriptions from "@/pages/admin/Subscriptions";
+import AdminSessions from "@/pages/admin/Sessions";
 import Account from "@/pages/Account";
 import Leaderboard from "@/pages/Leaderboard";
 import AlertsPage from "@/pages/Alerts";
@@ -428,6 +432,19 @@ function Router() {
       </Route>
       <Route path="/admin/billing">
         <ProtectedAdmin><BillingAdmin /></ProtectedAdmin>
+      </Route>
+      {/* CRM Phase A — institutional user-ops surfaces */}
+      <Route path="/admin/users">
+        <ProtectedAdmin><AdminUsers /></ProtectedAdmin>
+      </Route>
+      <Route path="/admin/activity">
+        <ProtectedAdmin><AdminUserActivity /></ProtectedAdmin>
+      </Route>
+      <Route path="/admin/subscriptions">
+        <ProtectedAdmin><AdminSubscriptions /></ProtectedAdmin>
+      </Route>
+      <Route path="/admin/sessions">
+        <ProtectedAdmin><AdminSessions /></ProtectedAdmin>
       </Route>
       <Route path="/admin">
         <ProtectedAdmin><Admin /></ProtectedAdmin>

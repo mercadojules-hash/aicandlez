@@ -476,13 +476,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
     badge?:      string;
   };
   const allPlatformLinks: PlatformLink[] = [
-    { icon: User,         label: "My Account",    href: "/account",     badgeColor: "#00aaff", adminOnly: false                       },
-    { icon: ShieldAlert,  label: "Admin Console", href: "/admin",       badgeColor: "#cc55ff", adminOnly: true,  badge: "OPERATOR"    },
-    { icon: Trophy,       label: "Leaderboard",   href: "/leaderboard", badgeColor: "#ffaa00", adminOnly: false                       },
-    { icon: Bell,         label: "Alerts",        href: "/alerts",      badgeColor: "#ff6600", adminOnly: false                       },
-    { icon: Zap,          label: "AI Models",     href: "/ai",          badgeColor: "#cc55ff", adminOnly: false                       },
-    { icon: DollarSign,   label: "Revenue",       href: "/admin",       badgeColor: "#ffaa00", adminOnly: true                        },
-    { icon: AlertTriangle,label: "Risk Monitor",  href: "/risk",        badgeColor: "#ff8844", adminOnly: false                       },
+    { icon: User,         label: "My Account",      href: "/account",              badgeColor: "#00aaff", adminOnly: false                       },
+    // CRM Phase A — institutional user-ops rail
+    { icon: Users,        label: "Users",           href: "/admin/users",          badgeColor: "#cc55ff", adminOnly: true,  badge: "CRM"        },
+    { icon: Activity,     label: "User Activity",   href: "/admin/activity",       badgeColor: "#00f0ff", adminOnly: true                        },
+    { icon: DollarSign,   label: "Subscriptions",   href: "/admin/subscriptions",  badgeColor: "#00ff8a", adminOnly: true                        },
+    { icon: Radio,        label: "Live Sessions",   href: "/admin/sessions",       badgeColor: "#ff8844", adminOnly: true                        },
+    { icon: ShieldAlert,  label: "Admin Console",   href: "/admin",                badgeColor: "#cc55ff", adminOnly: true,  badge: "OPERATOR"   },
+    { icon: Trophy,       label: "Leaderboard",     href: "/leaderboard",          badgeColor: "#ffaa00", adminOnly: false                       },
+    { icon: Bell,         label: "Alerts",          href: "/alerts",               badgeColor: "#ff6600", adminOnly: false                       },
+    { icon: Zap,          label: "AI Models",       href: "/ai",                   badgeColor: "#cc55ff", adminOnly: false                       },
+    { icon: DollarSign,   label: "Revenue",         href: "/admin",                badgeColor: "#ffaa00", adminOnly: true                        },
+    { icon: AlertTriangle,label: "Risk Monitor",    href: "/risk",                 badgeColor: "#ff8844", adminOnly: false                       },
   ];
   const platformLinks = isAdmin
     ? allPlatformLinks
