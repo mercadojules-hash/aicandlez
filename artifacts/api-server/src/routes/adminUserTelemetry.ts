@@ -202,9 +202,12 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         GROUP BY user_id
       ),
       trades_today AS (
+        -- Trades closed in the last 24h (exit-time based, per CRM telemetry
+        -- spec — counts realised activity, not just orders opened in the
+        -- window).
         SELECT user_id, COUNT(*)::int AS today_count
         FROM sim_trades
-        WHERE entry_time >= ${Date.now() - 24 * 60 * 60 * 1000}
+        WHERE exit_time >= ${Date.now() - 24 * 60 * 60 * 1000}
         GROUP BY user_id
       ),
       -- CRM Phase A: surface the user's currently-active/default exchange
