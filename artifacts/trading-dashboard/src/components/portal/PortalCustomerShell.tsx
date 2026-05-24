@@ -27,7 +27,7 @@
  */
 
 import {
-  useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties,
+  memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/react";
@@ -119,7 +119,7 @@ function useCustomerPlan(): Plan {
   return p === "starter" || p === "pro" ? p : "free";
 }
 
-function OperatorPulseRibbon({
+const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
   plan, equityUsd, realizedToday, engineOnline, openCount,
   pulse, signalsPerMin,
 }: {
@@ -259,7 +259,7 @@ function OperatorPulseRibbon({
       </div>
     </header>
   );
-}
+});
 
 void Globe; void MonitorPlay; // formerly rendered NYC·US / WKS-04 stub badges; retained as imports for parity with mockup palette
 
@@ -271,7 +271,7 @@ function RibbonDivider() {
 /* Paper Mode Banner                                                        */
 /* ──────────────────────────────────────────────────────────────────────── */
 
-function PaperModeBanner() {
+const PaperModeBanner = memo(function PaperModeBanner() {
   return (
     <div style={{
       padding: "4px 16px",
@@ -289,7 +289,7 @@ function PaperModeBanner() {
       Paper Execution Mode Active — No real funds at risk
     </div>
   );
-}
+});
 
 /* ──────────────────────────────────────────────────────────────────────── */
 /* Asset Intelligence Search Bar + Filter pills                             */
@@ -299,7 +299,7 @@ type Filt =
   | "ALL" | "MAJORS" | "ALTS" | "HIGH_CONF" | "READY" | "LONG" | "SHORT" | "WATCHLIST"
   | "LOW_VOL" | "TRENDING" | "BREAKOUT" | "SCALP" | "MOMENTUM";
 
-function SearchBar({
+const SearchBar = memo(function SearchBar({
   query, setQuery, filter, setFilter, suggestionPool,
 }: {
   query:    string;
@@ -420,7 +420,7 @@ function SearchBar({
       </div>
     </section>
   );
-}
+});
 
 /* ──────────────────────────────────────────────────────────────────────── */
 /* OpportunityCard                                                          */
@@ -522,6 +522,7 @@ type EngineLite = {
   loopIntervalMs?:    number;
   signalCounts?:      { BUY?: number; SELL?: number; HOLD?: number };
   funnel?:            { total?: number; passedMTF?: number; blockedMTF?: number; executed?: number };
+  recentSignalLog?:   ReadonlyArray<ReasoningEntry>;
 };
 
 type MarketPulse = {
@@ -617,7 +618,7 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
-function OpportunityCard({ opp, onQueue, idx = 0, now }: {
+const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, now }: {
   opp: OpportunityVM;
   onQueue: (opp: OpportunityVM) => void;
   idx?: number;
@@ -917,7 +918,7 @@ function OpportunityCard({ opp, onQueue, idx = 0, now }: {
       </div>
     </article>
   );
-}
+});
 
 function ConfidenceRing({ color, value }: { color: string; value: number }) {
   const r = 42;
@@ -1035,7 +1036,7 @@ function ColumnHeader({ title, count, accent, subLabel }: {
   );
 }
 
-function OpportunityMatrix({
+const OpportunityMatrix = memo(function OpportunityMatrix({
   majors, alts, onQueue, isLoading, isError,
 }: {
   majors:    OpportunityVM[];
@@ -1077,9 +1078,9 @@ function OpportunityMatrix({
       />
     </section>
   );
-}
+});
 
-function Column({
+const Column = memo(function Column({
   title, opps, onQueue, isLoading, isError,
   accent, subLabel, tintRgba, leftDivider = false, now,
 }: {
@@ -1132,7 +1133,7 @@ function Column({
       </div>
     </div>
   );
-}
+});
 
 /* ──────────────────────────────────────────────────────────────────────── */
 /* Lower terminal zone modules                                              */
@@ -1172,23 +1173,21 @@ function PanelCard({
   );
 }
 
-function AIReasoningConsole() {
-  const exec = useExecutionState();
-  const { data: engine } = useQuery<{ recentSignalLog?: Array<{ id: string; symbol: string; timeframe: string; decision: string; confidence: number; shortSummary?: string; timestamp: number }> }>({
-    queryKey: ["engine-status-portal"],
-    queryFn: async () => {
-      const res = await authFetch(`${apiBaseUrl}/api/engine/status`, { credentials: "include", cache: "no-store" });
-      if (!res.ok) throw new Error("engine_status_failed");
-      return res.json();
-    },
-    refetchInterval: 6_000,
-    staleTime: 3_000,
-    retry: 1,
-  });
-  const log = (engine?.recentSignalLog ?? []).slice(0, 14);
+type ReasoningEntry = { id: string; symbol: string; timeframe: string; decision: string; confidence: number; shortSummary?: string; timestamp: number };
+const AIReasoningConsole = memo(function AIReasoningConsole({
+  log: rawLog, live,
+}: {
+  // Source-of-truth lifted to PortalCustomerShell so this surface no
+  // longer fires its own duplicate `/api/engine/status` query. React
+  // Query was de-duping the network round-trip but each surface still
+  // owned a redundant hook execution + interval handler.
+  log:  ReadonlyArray<ReasoningEntry> | undefined;
+  live: boolean;
+}) {
+  const log = useMemo(() => (rawLog ?? []).slice(0, 14), [rawLog]);
 
   return (
-    <PanelCard title="AI REASONING CONSOLE" span={2} live={exec.data?.engine.running}>
+    <PanelCard title="AI REASONING CONSOLE" span={2} live={live}>
       <div className="cd-scroll" style={{ padding: 10, overflowY: "auto", flex: 1, fontSize: 11 }}>
         {log.length === 0 && (
           <div style={{ color: T.TEXT_2, fontStyle: "italic" }}>Awaiting first engine signal…</div>
@@ -1215,13 +1214,13 @@ function AIReasoningConsole() {
       </div>
     </PanelCard>
   );
-}
+});
 
 function shortPair(s: string): string {
   return s.replace(/USDT?$/, "").replace(/[-/].*$/, "").toUpperCase();
 }
 
-function PortfolioIntelligence() {
+const PortfolioIntelligence = memo(function PortfolioIntelligence() {
   const { stats, open } = usePaperTrades();
   return (
     <PanelCard title="PORTFOLIO INTEL">
@@ -1269,9 +1268,9 @@ function PortfolioIntelligence() {
       </div>
     </PanelCard>
   );
-}
+});
 
-function SignalPipeline({
+const SignalPipeline = memo(function SignalPipeline({
   opps, pulse, engine,
 }: {
   opps:   OpportunityVM[];
@@ -1332,10 +1331,10 @@ function SignalPipeline({
       </div>
     </PanelCard>
   );
-}
+});
 
 type ConnectedRow = { exchange: string; connected: boolean };
-function ExchangeTopology() {
+const ExchangeTopology = memo(function ExchangeTopology() {
   const { getToken, isSignedIn } = useAuth();
   const { data } = useQuery<{ exchanges: ConnectedRow[] }>({
     queryKey: ["user-exchanges"],
@@ -1387,9 +1386,9 @@ function ExchangeTopology() {
       </div>
     </PanelCard>
   );
-}
+});
 
-function RiskHeatmap({ opps }: { opps: OpportunityVM[] }) {
+const RiskHeatmap = memo(function RiskHeatmap({ opps }: { opps: OpportunityVM[] }) {
   // 16 cells: pick top 16 opportunities by confidence; risk = inverse of conf,
   // scaled by volatility classification.
   const cells = opps.slice(0, 16).map(o => {
@@ -1418,9 +1417,9 @@ function RiskHeatmap({ opps }: { opps: OpportunityVM[] }) {
       </div>
     </PanelCard>
   );
-}
+});
 
-function MarketRegime({ opps }: { opps: OpportunityVM[] }) {
+const MarketRegime = memo(function MarketRegime({ opps }: { opps: OpportunityVM[] }) {
   const picks = ["BTC", "ETH", "SOL"]
     .map(s => opps.find(o => o.symbol === s))
     .filter((o): o is OpportunityVM => !!o);
@@ -1451,9 +1450,9 @@ function MarketRegime({ opps }: { opps: OpportunityVM[] }) {
       </div>
     </PanelCard>
   );
-}
+});
 
-function AIThroughput({
+const AIThroughput = memo(function AIThroughput({
   engine, pulse, signalsPerMin,
 }: {
   engine:        EngineLite | undefined;
@@ -1485,9 +1484,9 @@ function AIThroughput({
       </div>
     </PanelCard>
   );
-}
+});
 
-function ExecutionAwareness({ openCount }: { openCount: number }) {
+const ExecutionAwareness = memo(function ExecutionAwareness({ openCount }: { openCount: number }) {
   const { stats } = usePaperTrades();
   return (
     <PanelCard title="EXEC AWARENESS" live height={208}>
@@ -1500,7 +1499,7 @@ function ExecutionAwareness({ openCount }: { openCount: number }) {
       </div>
     </PanelCard>
   );
-}
+});
 
 function Kv({ k, v, color = T.TEXT_0 }: { k: string; v: string; color?: string }) {
   return (
@@ -1626,7 +1625,7 @@ function Divider() {
 /* ENABLE LIVE AI TRADING — aspirational command bar (paper-only, gated)    */
 /* ──────────────────────────────────────────────────────────────────────── */
 
-function EnableLiveAITradingBar({
+const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   engineOnline, openPaper, slotCap, onUpgrade,
 }: {
   engineOnline: boolean;
@@ -1732,7 +1731,7 @@ function EnableLiveAITradingBar({
       </div>
     </section>
   );
-}
+});
 
 /* ──────────────────────────────────────────────────────────────────────── */
 /* Shell                                                                    */
@@ -1785,7 +1784,10 @@ export function PortalCustomerShell() {
   const filteredMajors = useMemo(() => filterOpps(majors, query, filter), [majors, query, filter]);
   const filteredAlts   = useMemo(() => filterOpps(alts,   query, filter), [alts,   query, filter]);
 
-  const queuePaper = (opp: OpportunityVM) => {
+  // Stable identity — keeps `OpportunityMatrix` / `OpportunityCard`
+  // memoization effective across the shell's 1Hz tick. `openTrade`
+  // identity is provided by `usePaperTrades`; safe to depend on.
+  const queuePaper = useCallback((opp: OpportunityVM) => {
     if (opp.direction === "FLAT") return;
     openTrade({
       symbol:  opp.pair,
@@ -1795,7 +1797,10 @@ export function PortalCustomerShell() {
       stop:    opp.stop,
       target:  opp.target,
     });
-  };
+  }, [openTrade]);
+
+  // Stable handler refs for memo'd CTAs.
+  const openUpgrade = useCallback(() => setUpgrade(true), []);
 
   // Surface the customer shell only on the customer surface. The Portal
   // dispatcher already gates on `isAdmin`, so this is purely defensive.
@@ -1909,7 +1914,7 @@ export function PortalCustomerShell() {
           engineOnline={engineOnline}
           openPaper={openTrades.length}
           slotCap={3}
-          onUpgrade={() => setUpgrade(true)}
+          onUpgrade={openUpgrade}
         />
 
         <OpportunityMatrix
@@ -1927,7 +1932,7 @@ export function PortalCustomerShell() {
           paddingTop: 20,
           borderTop: `1px solid ${T.BORDER}`,
         }}>
-          <AIReasoningConsole />
+          <AIReasoningConsole log={engineStatus?.recentSignalLog} live={engineOnline} />
           <PortfolioIntelligence />
           <SignalPipeline opps={opportunities} pulse={pulse} engine={engineStatus} />
           <MarketRegime opps={opportunities} />

@@ -1,0 +1,96 @@
+Choose:
+
+(a) Trim now, then start #3.
+
+This is the correct pause point for the cleanup.
+
+====================================================
+WHY
+===
+
+Performance optimization is now the most context-heavy technical phase remaining.
+
+Unlike polish/animation work, #3 requires:
+
+* render-path tracing
+* memoization audits
+* query lifecycle analysis
+* hook dependency reasoning
+* interval consolidation
+* virtualization evaluation
+* telemetry synchronization analysis
+* component render-cost profiling
+
+Context efficiency matters significantly more during this phase.
+
+====================================================
+TRIM OBJECTIVE
+==============
+
+Perform a focused replit.md consolidation pass before #3.
+
+Keep ONLY:
+
+* active architectural invariants
+* current deployment topology
+* environment contracts
+* operational rules
+* current routing structure
+* crypto-only platform identity
+* customer/admin separation rules
+* telemetry architecture
+* authFetch transport invariant
+* paper-only customer rules
+* exchange governance rules
+* active portal architecture
+
+Collapse/remove:
+
+* historical milestone narration
+* completed phase storytelling
+* obsolete implementation detail
+* stale migration notes
+* old decomposition planning
+* superseded architecture commentary
+
+Git history already preserves the archive.
+
+====================================================
+GOAL
+====
+
+Reduce working-context tax before the heaviest systems-analysis phase remaining.
+
+====================================================
+AFTER TRIM
+==========
+
+Immediately begin:
+
+#3 — Performance optimization
+
+Focus areas:
+
+* memoization audit
+* render-cost profiling
+* query cache discipline
+* interval consolidation
+* virtualization analysis
+* shell decomposition performance
+* telemetry synchronization efficiency
+* animation cost audit
+* repaint/reflow reduction
+* unnecessary rerender elimination
+
+Keep RePreview live during the performance pass so I can continuously evaluate:
+
+* smoothness
+* responsiveness
+* render cadence
+* telemetry latency
+* motion fluidity
+* scroll behavior
+* interaction responsiveness
+
+The platform now feels premium enough that performance quality will be very noticeable.
+:::
