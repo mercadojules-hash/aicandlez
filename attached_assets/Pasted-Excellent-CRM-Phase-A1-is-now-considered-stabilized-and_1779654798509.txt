@@ -1,0 +1,121 @@
+Excellent. CRM Phase A1 is now considered stabilized and verified.
+
+Key confirmation:
+the telemetry layer is now real infrastructure, not placeholder scaffolding.
+
+Verified primitives now available for the future AI Intelligence Terminal redesign:
+
+* exchangesConnected
+* activeExchange { name, mode }
+* aiUsage24h
+* sessionStatus
+* revenueGenerated
+* subscriptions
+* sessions
+* admin telemetry overlays
+
+This gives us the operational foundation needed for the next-generation portal redesign.
+
+====================================================
+NEXT SEQUENCE APPROVED
+======================
+
+Proceed in this order:
+
+A2 → User Intelligence Panel refactor
+A3 → real session persistence + revoke
+A4 → per-user exchange visibility governance
+
+THEN:
+large isolated /portal AI Intelligence Terminal redesign
+
+====================================================
+A2 DIRECTION
+============
+
+Goal:
+transform Users/Admin telemetry into a true operator intelligence surface.
+
+Enhance per-user intelligence:
+
+* exchange connections
+* AI usage patterns
+* active sessions
+* trading activity
+* live/paper mode
+* revenue attribution
+* engagement ranking
+* session/device awareness
+* risk/activity indicators
+
+This should evolve toward:
+Bloomberg/prop-desk CRM intelligence rather than generic SaaS admin tables.
+
+====================================================
+A3 DIRECTION
+============
+
+Implement:
+
+* real user_sessions persistence
+* revoke session controls
+* active device/session inventory
+* force logout / revoke
+* session telemetry enrichment
+* idle/active timing accuracy
+
+This becomes foundational for:
+security
+operator oversight
+future compliance tooling
+multi-device intelligence
+
+====================================================
+A4 DIRECTION
+============
+
+Implement:
+per-user exchange visibility + governance.
+
+Examples:
+
+* which exchanges users can see
+* which exchanges users can connect
+* live vs paper permissions
+* future entitlement tiers
+* region/compliance gating
+* admin overrides
+
+This becomes critical before broader public launch.
+
+====================================================
+IMPORTANT
+=========
+
+Do NOT begin the massive /portal redesign yet.
+
+The AI Intelligence Terminal redesign should remain isolated until:
+
+* A2
+* A3
+* A4
+
+are complete and stabilized.
+
+The redesigned dashboard should consume mature operational telemetry, not temporary scaffolding.
+
+====================================================
+MAINTENANCE
+===========
+
+Approved:
+replit.md trim pass at the next natural pause.
+
+Target:
+reduce historical milestone/changelog bulk and preserve only:
+
+* architectural invariants
+* deployment topology
+* environment contracts
+* operational rules
+* active constraints

@@ -7,6 +7,7 @@ import {
   Globe, BarChart2, AlertTriangle, RefreshCw, Download,
   X, Gift, SlidersHorizontal, PauseCircle, PlayCircle, Ban,
   Power, Unplug, Loader2, CloudDownload,
+  UserCircle, Briefcase, History, Cpu,
 } from "lucide-react";
 import type { EngineStatus, FeeSummary, ExchangeStatus } from "@/components/command/types";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -187,10 +188,21 @@ function StatCard({ icon: Icon, label, value, sub, color, delta, deltaUp }: {
   );
 }
 
-// ── User Action Drawer ───────────────────────────────────────────────────────
-// Slide-out side panel. All 8 launch-critical actions wired to existing
-// POST /api/admin/users/:id/* endpoints. Each requires `note`. Mutations
-// invalidate ["admin-users"] on success.
+// ── User Intelligence Panel (CRM Phase A2) ───────────────────────────────────
+// Slide-out operator surface. Layered intelligence over the launch-critical
+// action menu: PROFILE / EXCHANGES / TRADING / ACTIONS tabs. Profile shows
+// identity + AI settings + revenue attribution. Exchanges shows per-connection
+// health (status / last verified / last error / mode / permissions) plus an
+// activity timeline derived client-side from `auditTrail` (any admin action
+// whose action name mentions "exchange") and `exchangeConnections.updated_at`.
+// Trading shows aggregates (PnL, win/loss, win rate, avg confidence, avg
+// latency, error events, fees, exposure, open positions, live capital) plus
+// the recent positions + closed trades. Actions tab preserves all 10
+// audit-logged POST /api/admin/users/:id/* endpoints — wiring unchanged.
+//
+// Data source: GET /api/admin/users/:id (already aggregates positions +
+// closedTrades + exchangeConnections + auditTrail + events + apiErrors +
+// tradeLimit + aggregates in a single round-trip).
 
 type ActionPanel =
   | "comp"
@@ -205,7 +217,87 @@ type ActionPanel =
   | "emergency"
   | null;
 
-function UserActionDrawer({
+type IntelTab = "profile" | "exchanges" | "trading" | "actions";
+
+interface UserDetailExchangeConnection {
+  id: string;
+  exchange: string;
+  label: string | null;
+  status: string;
+  is_default: boolean;
+  trading_mode: string;
+  permissions: Record<string, unknown> | null;
+  last_verified_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface UserDetailAuditAction {
+  id: string;
+  actor_admin_id: string;
+  target_user_id: string;
+  action: string;
+  payload: Record<string, unknown> | null;
+  created_at: string;
+}
+
+interface UserDetailAggregates {
+  tradesCount: number;
+  wins: number;
+  losses: number;
+  winRate: number | null;
+  realizedPnl: number;
+  openPositions: number;
+  openLivePositions: number;
+  exposureUsd: number;
+  feesGenerated: number;
+  feeRecords: number;
+  profitablePnl: number;
+  tradesPerDay: number;
+  lifetimeDays: number;
+  avgConfidence: number | null;
+  avgLatencyMs: number | null;
+  errorEventCount: number;
+}
+
+interface UserDetailResponse {
+  user: {
+    clerkUserId: string;
+    email: string;
+    role: string;
+    plan: string;
+    planStatus: string;
+    stripeCustomerId: string | null;
+    stripeSubscriptionId: string | null;
+    billingEmail: string | null;
+    trialEndsAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+    adminStatus: string;
+    adminStatusReason: string | null;
+    adminStatusSince: string | null;
+  };
+  settings: Record<string, unknown> | null;
+  simAccount: Record<string, unknown> | null;
+  positions: Array<Record<string, unknown>>;
+  closedTrades: Array<Record<string, unknown>>;
+  exchangeConnections: UserDetailExchangeConnection[];
+  auditTrail: UserDetailAuditAction[];
+  events: Array<Record<string, unknown>>;
+  apiErrors: Array<Record<string, unknown>>;
+  tradeLimit: {
+    used24h: number;
+    capTier: number;
+    remaining: number | null;
+    blocked: boolean;
+    reason: string;
+  } | null;
+  aggregates: UserDetailAggregates;
+  timestamp: number;
+}
+
+function UserIntelligencePanel({
   user, onClose, isSuperAdmin,
 }: {
   user: AdminUserRow | null;
@@ -213,6 +305,7 @@ function UserActionDrawer({
   isSuperAdmin: boolean;
 }) {
   const qc        = useQueryClient();
+  const [tab, setTab]           = useState<IntelTab>("profile");
   const [panel, setPanel]       = useState<ActionPanel>(null);
   const [note, setNote]         = useState("");
   const [reason, setReason]     = useState("");
@@ -222,8 +315,24 @@ function UserActionDrawer({
   const [compPaperOnly, setCompPaperOnly] = useState<boolean>(true);
   const [compCapOverride, setCompCapOverride] = useState<number | null>(null);
 
+  // Detail fetch — lazily loads only when a user is opened. Cached per user
+  // by react-query; invalidated by any successful mutation below.
+  const detailQuery = useQuery<UserDetailResponse>({
+    queryKey: ["admin-user-detail", user?.clerkUserId],
+    enabled:  Boolean(user?.clerkUserId),
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const res = await authFetch(`/api/admin/users/${user!.clerkUserId}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json() as UserDetailResponse;
+    },
+  });
+  const detail = detailQuery.data ?? null;
+
   useEffect(() => {
     if (user) {
+      setTab("profile");
       setPanel(null);
       setNote("");
       setReason("");
@@ -250,6 +359,7 @@ function UserActionDrawer({
     onSuccess: (_data, vars) => {
       toast({ title: "Action applied", description: `${vars.path.replace(/_/g, " ")} succeeded.` });
       qc.invalidateQueries({ queryKey: ["admin-users"] });
+      qc.invalidateQueries({ queryKey: ["admin-user-detail", user?.clerkUserId] });
       setPanel(null);
       setNote("");
       setReason("");
@@ -269,7 +379,7 @@ function UserActionDrawer({
     mutation.mutate({ path, body: { note: note.trim(), ...extra } });
   }
 
-  const W = 460;
+  const W = 640;
   const C = {
     bg:     "#040810",
     panel:  "#010C18",
@@ -341,9 +451,49 @@ function UserActionDrawer({
           <SummaryCell label="LAST ACTIVE" value={fmtAgo(user.lastActivityAt)} color={user.onlineNow ? "#00ff8a" : C.faint} />
         </div>
 
-        {/* Action menu */}
+        {/* Tab strip */}
+        <div style={{
+          display: "flex", borderBottom: `1px solid ${C.border}`,
+          background: "#000814",
+        }}>
+          {([
+            { id: "profile",   label: "PROFILE",   icon: UserCircle },
+            { id: "exchanges", label: "EXCHANGES", icon: Briefcase },
+            { id: "trading",   label: "TRADING",   icon: BarChart2 },
+            { id: "actions",   label: "ACTIONS",   icon: SlidersHorizontal },
+          ] as const).map(t => {
+            const active = tab === t.id;
+            const Icon   = t.icon;
+            return (
+              <button key={t.id}
+                onClick={() => { setTab(t.id); setPanel(null); }}
+                style={{
+                  flex: 1, padding: "10px 8px", background: "transparent",
+                  border: "none", borderBottom: `2px solid ${active ? C.accent : "transparent"}`,
+                  color: active ? C.text : C.dim, cursor: "pointer",
+                  fontFamily: "monospace", fontSize: 9, fontWeight: 700,
+                  letterSpacing: "0.1em", display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: 6, transition: "all 0.15s",
+                }}>
+                <Icon className="w-3 h-3" />
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Tab body */}
         <div style={{ padding: "14px 18px", flex: 1, overflowY: "auto" }}>
-          {panel === null && (
+          {tab === "profile" && (
+            <ProfileTab user={user} detail={detail} loading={detailQuery.isLoading} />
+          )}
+          {tab === "exchanges" && (
+            <ExchangesTab detail={detail} loading={detailQuery.isLoading} />
+          )}
+          {tab === "trading" && (
+            <TradingTab detail={detail} loading={detailQuery.isLoading} />
+          )}
+          {tab === "actions" && panel === null && (
             <>
               <SectionLabel>SUBSCRIPTION</SectionLabel>
               <ActionButton icon={Gift}              label="Grant Complimentary Days"
@@ -701,6 +851,434 @@ function UserActionDrawer({
         </div>
       </div>
     </>
+  );
+}
+
+// ── Intelligence tab subcomponents (CRM Phase A2) ────────────────────────────
+
+const TAB_C = {
+  bg:     "#040810",
+  panel:  "#010C18",
+  border: "#0d1e2e",
+  text:   "#EAF2FF",
+  dim:    "#7a9eb8",
+  faint:  "#4a6a80",
+  accent: "#cc55ff",
+} as const;
+
+function fmtMs(value: unknown): string {
+  if (value == null) return "—";
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  return fmtAgo(n);
+}
+
+function fmtIsoAgo(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? fmtAgo(ms) : "—";
+}
+
+function MetricCell({
+  label, value, color, sub,
+}: { label: string; value: string; color?: string; sub?: string }) {
+  return (
+    <div style={{
+      background: "#000814", border: `1px solid ${TAB_C.border}`,
+      borderRadius: 4, padding: "8px 10px", display: "flex",
+      flexDirection: "column", gap: 3, minWidth: 0,
+    }}>
+      <div style={{
+        fontSize: 8, fontFamily: "monospace", fontWeight: 700,
+        color: TAB_C.faint, letterSpacing: "0.1em",
+      }}>{label}</div>
+      <div style={{
+        fontSize: 13, fontFamily: "monospace", fontWeight: 700,
+        color: color ?? TAB_C.text, lineHeight: 1.2,
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>{value}</div>
+      {sub && (
+        <div style={{
+          fontSize: 8, fontFamily: "monospace", color: TAB_C.dim, lineHeight: 1.2,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>{sub}</div>
+      )}
+    </div>
+  );
+}
+
+function TabSectionLabel({ children, icon: Icon }: {
+  children: React.ReactNode;
+  icon?: React.ElementType;
+}) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 6,
+      fontSize: 9, fontFamily: "monospace", fontWeight: 700,
+      color: TAB_C.dim, letterSpacing: "0.15em",
+      margin: "14px 0 8px 0", textTransform: "uppercase",
+    }}>
+      {Icon && <Icon className="w-3 h-3" />}
+      {children}
+    </div>
+  );
+}
+
+function EmptyState({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      padding: "16px 12px", textAlign: "center", fontSize: 10,
+      fontFamily: "monospace", color: TAB_C.faint,
+      background: "#000814", border: `1px dashed ${TAB_C.border}`,
+      borderRadius: 4,
+    }}>{children}</div>
+  );
+}
+
+function TabLoading() {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: 32, color: TAB_C.dim, gap: 8,
+    }}>
+      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+      <span style={{ fontSize: 10, fontFamily: "monospace" }}>LOADING INTELLIGENCE…</span>
+    </div>
+  );
+}
+
+// ── PROFILE TAB ──────────────────────────────────────────────────────────────
+// Identity + AI engine settings + revenue attribution. Pulls from the
+// existing grid row (which already carries the CRM overlay fields) and
+// enriches with the detail endpoint's `settings` + `user` blocks once
+// available.
+function ProfileTab({ user, detail, loading }: {
+  user: AdminUserRow;
+  detail: UserDetailResponse | null;
+  loading: boolean;
+}) {
+  const settings = (detail?.settings ?? {}) as Record<string, unknown>;
+  const u        = detail?.user ?? null;
+
+  const sessionColor =
+    user.sessionStatus === "active"  ? "#00ff8a" :
+    user.sessionStatus === "idle"    ? "#ffaa00" : TAB_C.faint;
+
+  return (
+    <div>
+      <TabSectionLabel icon={UserCircle}>IDENTITY</TabSectionLabel>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <MetricCell label="EMAIL"        value={user.email} />
+        <MetricCell label="ROLE"         value={user.role.toUpperCase()}
+          color={user.role === "super-admin" ? "#cc55ff" : user.role === "admin" ? "#00aaff" : TAB_C.text} />
+        <MetricCell label="ACCOUNT AGE"  value={fmtIsoAgo(user.createdAt)} />
+        <MetricCell label="SESSION"      value={user.sessionStatus.toUpperCase()} color={sessionColor}
+          sub={user.lastActivityAt ? `last ${fmtAgo(user.lastActivityAt)}` : undefined} />
+        <MetricCell label="STRIPE CUST"  value={u?.stripeCustomerId ?? "—"} />
+        <MetricCell label="BILLING EMAIL" value={u?.billingEmail ?? user.email} />
+      </div>
+
+      <TabSectionLabel icon={DollarSign}>REVENUE ATTRIBUTION</TabSectionLabel>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+        <MetricCell label="LIFETIME REV" value={fmtDollar(user.revenueGenerated)} color="#00ff8a" />
+        <MetricCell label="MRR"          value={`${fmtDollar(user.mrrUsd)}/mo`}    color={user.mrrUsd > 0 ? "#00ff8a" : TAB_C.dim} />
+        <MetricCell label="PERF FEES"    value={fmtDollar(user.feesGenerated)}     color={user.feesGenerated > 0 ? "#00ff8a" : TAB_C.dim} />
+        <MetricCell label="EQUITY"       value={fmtDollar(user.equityUsd)} />
+        <MetricCell label="TRIAL ENDS"   value={user.trialEndsAt ? fmtIsoAgo(user.trialEndsAt) : "—"} />
+        <MetricCell label="COMPLIMENTARY" value={user.isComplimentary ? "YES" : "NO"}
+          color={user.isComplimentary ? "#cc55ff" : TAB_C.dim} />
+      </div>
+
+      <TabSectionLabel icon={Cpu}>AI ENGINE SETTINGS</TabSectionLabel>
+      {loading && !detail ? <TabLoading /> : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          <MetricCell label="AI ENABLED"   value={user.aiEnabled ? "ON" : "OFF"}
+            color={user.aiEnabled ? "#00ff8a" : "#ff3355"} />
+          <MetricCell label="RISK LEVEL"   value={(user.riskLevel ?? "—").toUpperCase()}
+            color={user.riskLevel === "high" ? "#ff8844" : user.riskLevel === "medium" ? "#ffaa00" : "#00aaff"} />
+          <MetricCell label="MIN CONF"     value={user.minConfidence != null ? `${user.minConfidence}%` : "—"} />
+          <MetricCell label="POS SIZE"     value={user.positionSizeUsd != null ? fmtDollar(user.positionSizeUsd) : "—"} />
+          <MetricCell label="MAX OPEN"     value={user.maxActivePositions != null ? `${user.maxActivePositions}` : "—"} />
+          <MetricCell label="TRADING MODE" value={String(settings["tradingMode"] ?? "—").toUpperCase()}
+            color={settings["tradingMode"] === "live" ? "#ff8844" : "#00aaff"} />
+          <MetricCell label="AUTO MODE"    value={settings["autoMode"] === true ? "ON" : "OFF"}
+            color={settings["autoMode"] === true ? "#00ff8a" : TAB_C.dim} />
+          <MetricCell label="PREF EXCH"    value={String(settings["preferredExchange"] ?? "—").toUpperCase()} />
+          <MetricCell label="VOLUME FLT"   value={settings["volumeFilter"] === true ? "ON" : "OFF"}
+            color={settings["volumeFilter"] === true ? "#00ff8a" : TAB_C.dim} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── EXCHANGES TAB ────────────────────────────────────────────────────────────
+// Per-connection health detail + a connection activity timeline. The
+// timeline merges `auditTrail` rows whose action name contains "exchange"
+// with each connection's `updated_at` / `last_verified_at` timestamps —
+// gives the operator a single "what happened to this user's broker
+// surface" view without an extra round-trip.
+function ExchangesTab({ detail, loading }: {
+  detail: UserDetailResponse | null;
+  loading: boolean;
+}) {
+  const conns = detail?.exchangeConnections ?? [];
+
+  const timeline = useMemo(() => {
+    if (!detail) return [] as Array<{ ts: number; kind: string; label: string; color: string; sub?: string }>;
+    const items: Array<{ ts: number; kind: string; label: string; color: string; sub?: string }> = [];
+
+    for (const c of conns) {
+      const verifiedMs = c.last_verified_at ? Date.parse(c.last_verified_at) : NaN;
+      if (Number.isFinite(verifiedMs)) {
+        items.push({
+          ts: verifiedMs,
+          kind: "VERIFY",
+          label: `${c.exchange.toUpperCase()} verified`,
+          color: c.last_error ? "#ff3355" : "#00ff8a",
+          sub: c.last_error ?? `${c.trading_mode} · ${c.status}`,
+        });
+      }
+      const updatedMs = Date.parse(c.updated_at);
+      if (Number.isFinite(updatedMs) && updatedMs !== verifiedMs) {
+        items.push({
+          ts: updatedMs,
+          kind: "UPDATE",
+          label: `${c.exchange.toUpperCase()} updated`,
+          color: TAB_C.dim,
+          sub: `mode=${c.trading_mode} · default=${c.is_default ? "yes" : "no"}`,
+        });
+      }
+    }
+
+    for (const a of detail.auditTrail) {
+      const action = (a.action ?? "").toLowerCase();
+      if (!action.includes("exchange") && action !== "emergency_disable") continue;
+      const ts = Date.parse(a.created_at);
+      if (!Number.isFinite(ts)) continue;
+      items.push({
+        ts,
+        kind: "ADMIN",
+        label: a.action.replace(/_/g, " ").toUpperCase(),
+        color: action.includes("revoke") || action === "emergency_disable" ? "#ff3355" : "#cc55ff",
+        sub: `by ${a.actor_admin_id}${a.payload?.["note"] ? ` · ${String(a.payload["note"]).slice(0, 60)}` : ""}`,
+      });
+    }
+
+    return items.sort((a, b) => b.ts - a.ts).slice(0, 20);
+  }, [detail, conns]);
+
+  return (
+    <div>
+      <TabSectionLabel icon={Briefcase}>CONNECTED BROKERS</TabSectionLabel>
+      {loading && !detail ? <TabLoading /> : conns.length === 0 ? (
+        <EmptyState>NO EXCHANGE CONNECTIONS</EmptyState>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {conns.map(c => {
+            const statusColorVal =
+              c.status === "active" || c.status === "verified" ? "#00ff8a" :
+              c.status === "error" ? "#ff3355" :
+              c.status === "pending" ? "#ffaa00" : TAB_C.dim;
+            return (
+              <div key={c.id} style={{
+                background: "#000814", border: `1px solid ${c.last_error ? "#ff335540" : TAB_C.border}`,
+                borderRadius: 4, padding: "10px 12px",
+              }}>
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  marginBottom: 6, gap: 8,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    <Globe className="w-3.5 h-3.5" style={{ color: statusColorVal, flexShrink: 0 }} />
+                    <div style={{
+                      fontSize: 11, fontFamily: "monospace", fontWeight: 700, color: TAB_C.text,
+                      textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {c.exchange}{c.label ? ` · ${c.label}` : ""}
+                    </div>
+                    {c.is_default && (
+                      <span style={{
+                        fontSize: 7, fontFamily: "monospace", fontWeight: 700,
+                        color: "#cc55ff", border: "1px solid #cc55ff40", padding: "1px 4px",
+                        borderRadius: 2, letterSpacing: "0.1em",
+                      }}>DEFAULT</span>
+                    )}
+                  </div>
+                  <div style={{
+                    fontSize: 8, fontFamily: "monospace", fontWeight: 700,
+                    color: statusColorVal, letterSpacing: "0.1em",
+                    padding: "2px 6px", border: `1px solid ${statusColorVal}40`, borderRadius: 2,
+                  }}>{c.status.toUpperCase()}</div>
+                </div>
+                <div style={{
+                  display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6,
+                  fontSize: 9, fontFamily: "monospace",
+                }}>
+                  <div><span style={{ color: TAB_C.faint }}>MODE </span><span style={{
+                    color: c.trading_mode === "live" ? "#ff8844" : "#00aaff",
+                  }}>{c.trading_mode.toUpperCase()}</span></div>
+                  <div><span style={{ color: TAB_C.faint }}>VERIFIED </span>
+                    <span style={{ color: TAB_C.text }}>{fmtIsoAgo(c.last_verified_at)}</span></div>
+                  <div><span style={{ color: TAB_C.faint }}>ADDED </span>
+                    <span style={{ color: TAB_C.text }}>{fmtIsoAgo(c.created_at)}</span></div>
+                </div>
+                {c.last_error && (
+                  <div style={{
+                    marginTop: 6, padding: "5px 8px", fontSize: 9, fontFamily: "monospace",
+                    color: "#ff8888", background: "#1a0808", borderRadius: 3,
+                    overflow: "hidden", textOverflow: "ellipsis",
+                  }}>⚠ {c.last_error.slice(0, 140)}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <TabSectionLabel icon={History}>CONNECTION ACTIVITY</TabSectionLabel>
+      {loading && !detail ? null : timeline.length === 0 ? (
+        <EmptyState>NO BROKER ACTIVITY RECORDED</EmptyState>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {timeline.map((t, i) => (
+            <div key={i} style={{
+              display: "flex", alignItems: "flex-start", gap: 10,
+              padding: "6px 10px", background: "#000814",
+              border: `1px solid ${TAB_C.border}`, borderRadius: 3,
+            }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: 3, marginTop: 5,
+                background: t.color, boxShadow: `0 0 6px ${t.color}`,
+                flexShrink: 0,
+              }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  fontSize: 9, fontFamily: "monospace", fontWeight: 700,
+                  color: TAB_C.text,
+                }}>
+                  <span style={{ color: t.color, fontSize: 7, letterSpacing: "0.1em" }}>{t.kind}</span>
+                  <span>{t.label}</span>
+                </div>
+                {t.sub && (
+                  <div style={{
+                    fontSize: 8, fontFamily: "monospace", color: TAB_C.dim, marginTop: 2,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>{t.sub}</div>
+                )}
+              </div>
+              <div style={{
+                fontSize: 8, fontFamily: "monospace", color: TAB_C.faint, flexShrink: 0,
+              }}>{fmtAgo(t.ts)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── TRADING TAB ──────────────────────────────────────────────────────────────
+// Aggregate engine performance + recent positions + recent closes. Prefers
+// detail aggregates when available; falls back to the grid row's totals
+// during initial load so the operator never sees an empty surface.
+function TradingTab({ detail, loading }: {
+  detail: UserDetailResponse | null;
+  loading: boolean;
+}) {
+  const agg = detail?.aggregates ?? null;
+  const positions = detail?.positions ?? [];
+  const closed    = detail?.closedTrades ?? [];
+
+  return (
+    <div>
+      <TabSectionLabel icon={TrendingUp}>PERFORMANCE</TabSectionLabel>
+      {loading && !detail ? <TabLoading /> : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          <MetricCell label="REALIZED PNL"  value={fmtDollar(agg?.realizedPnl ?? 0)}
+            color={pctColor(agg?.realizedPnl ?? 0)} />
+          <MetricCell label="WIN RATE"      value={agg?.winRate != null ? `${(agg.winRate * 100).toFixed(1)}%` : "—"}
+            color={(agg?.winRate ?? 0) >= 0.5 ? "#00ff8a" : "#ff8844"} />
+          <MetricCell label="TRADES"        value={`${agg?.tradesCount ?? 0}`}
+            sub={agg ? `${agg.wins}W / ${agg.losses}L` : undefined} />
+          <MetricCell label="AVG CONF"      value={agg?.avgConfidence != null ? `${agg.avgConfidence.toFixed(1)}%` : "—"}
+            color="#00aaff" />
+          <MetricCell label="AVG LATENCY"   value={agg?.avgLatencyMs != null ? `${Math.round(agg.avgLatencyMs)}ms` : "—"} />
+          <MetricCell label="ERROR EVENTS"  value={`${agg?.errorEventCount ?? 0}`}
+            color={(agg?.errorEventCount ?? 0) > 0 ? "#ff8844" : TAB_C.dim} />
+          <MetricCell label="FEES PAID"     value={fmtDollar(agg?.feesGenerated ?? 0)}
+            color="#cc55ff" sub={agg ? `${agg.feeRecords} fee events` : undefined} />
+          <MetricCell label="TRADES/DAY"    value={agg?.tradesPerDay != null ? agg.tradesPerDay.toFixed(2) : "—"}
+            sub={agg ? `${agg.lifetimeDays.toFixed(0)}d lifetime` : undefined} />
+          <MetricCell label="PROFITABLE PNL" value={fmtDollar(agg?.profitablePnl ?? 0)} color="#00ff8a" />
+        </div>
+      )}
+
+      <TabSectionLabel icon={Activity}>OPEN POSITIONS</TabSectionLabel>
+      {loading && !detail ? null : positions.length === 0 ? (
+        <EmptyState>NO OPEN POSITIONS</EmptyState>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {positions.slice(0, 10).map((p, i) => {
+            const live = p["exchange"] != null;
+            const side = String(p["side"] ?? "").toUpperCase();
+            return (
+              <div key={String(p["id"] ?? i)} style={{
+                display: "grid", gridTemplateColumns: "auto 60px 1fr auto auto",
+                gap: 8, alignItems: "center", padding: "6px 10px",
+                background: "#000814", border: `1px solid ${live ? "#ff884440" : TAB_C.border}`,
+                borderRadius: 3, fontSize: 9, fontFamily: "monospace",
+              }}>
+                <span style={{
+                  fontWeight: 700, color: side === "LONG" ? "#00ff8a" : "#ff3355",
+                  letterSpacing: "0.1em",
+                }}>{side}</span>
+                <span style={{ color: TAB_C.text, fontWeight: 700 }}>{String(p["symbol"] ?? "—")}</span>
+                <span style={{ color: TAB_C.dim }}>
+                  {String(p["exchange"] ?? "PAPER").toUpperCase()} · qty {Number(p["quantity"] ?? 0).toFixed(4)}
+                </span>
+                <span style={{ color: TAB_C.text }}>{fmtDollar(Number(p["size_usd"] ?? 0))}</span>
+                <span style={{ color: TAB_C.faint }}>{fmtMs(p["entry_time"])}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <TabSectionLabel icon={History}>RECENT CLOSED TRADES</TabSectionLabel>
+      {loading && !detail ? null : closed.length === 0 ? (
+        <EmptyState>NO CLOSED TRADES YET</EmptyState>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {closed.slice(0, 10).map((t, i) => {
+            const pnl  = Number(t["realized_pnl"] ?? 0);
+            const live = t["exchange"] != null;
+            const side = String(t["side"] ?? "").toUpperCase();
+            return (
+              <div key={String(t["id"] ?? i)} style={{
+                display: "grid", gridTemplateColumns: "auto 60px 1fr auto auto",
+                gap: 8, alignItems: "center", padding: "6px 10px",
+                background: "#000814", border: `1px solid ${TAB_C.border}`,
+                borderRadius: 3, fontSize: 9, fontFamily: "monospace",
+              }}>
+                <span style={{
+                  fontWeight: 700, color: side === "LONG" ? "#00ff8a" : "#ff3355",
+                  letterSpacing: "0.1em",
+                }}>{side}</span>
+                <span style={{ color: TAB_C.text, fontWeight: 700 }}>{String(t["symbol"] ?? "—")}</span>
+                <span style={{ color: TAB_C.dim }}>
+                  {live ? String(t["exchange"]).toUpperCase() : "PAPER"} · {String(t["close_reason"] ?? "exit")}
+                </span>
+                <span style={{ color: pctColor(pnl), fontWeight: 700 }}>{fmtDollar(pnl)}</span>
+                <span style={{ color: TAB_C.faint }}>{fmtMs(t["exit_time"])}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1626,8 +2204,8 @@ export default function Admin() {
 
       </div>
 
-      {/* Action drawer */}
-      <UserActionDrawer
+      {/* User intelligence panel (CRM Phase A2 — Profile/Exchanges/Trading/Actions) */}
+      <UserIntelligencePanel
         user={selectedUser}
         onClose={() => setSelectedId(null)}
         isSuperAdmin={isSuperAdmin}
