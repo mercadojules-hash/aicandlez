@@ -1,0 +1,79 @@
+Customer portal spec correction — final launch behavior
+
+The previous implementation misunderstood the intended customer experience.
+
+DO NOT render the two PAPER TRADING bars at the top of the customer portal.
+
+REMOVE entirely:
+
+* AI CRYPTO PAPER TRADING · ACTIVE
+* AI EQUITIES PAPER TRADING · ACTIVE
+
+Those bars should not exist in customer view at all.
+
+Customer portal desired behavior:
+
+* Customer logs into https://trade.aicandlez.com/portal
+* Portal opens directly into the dashboard/equity/trading metrics interface
+* Default mode is silent Alpaca paper trading in the background
+* Starting paper capital should display as:
+  $100,000.00
+* Trade limits should still respect subscription tier logic
+  (free/starter/pro/etc.)
+* Since I am logged in as admin/testing, it currently shows 30 trades — that is correct.
+
+CRITICAL:
+The customer portal should NOT show:
+
+* Kraken execution state
+* Kraken operator telemetry
+* LIVE execution bars
+* ARM / HALT execution controls
+* Operator execution context
+* Any admin execution UI
+
+Kraken should ONLY appear if:
+
+1. User explicitly connects Kraken themselves
+   AND
+2. Live trading is enabled for that user account
+
+Until then:
+
+* customer mode = Alpaca paper simulation only
+* silent background simulation
+* no giant paper banners
+* no live execution affordances
+
+The issue right now:
+The page initially loads correctly for ~20–30 seconds, then hydrates into Kraken/live operator state. That means customer hydration/state inheritance is leaking from the shared engine/admin context into the customer portal.
+
+Need a strict separation:
+ADMIN VIEW:
+
+* retains LiveControlBars
+* retains orange/red execution states
+* retains Kraken operator telemetry
+
+CUSTOMER VIEW:
+
+* no bars
+* no Kraken
+* no operator execution state
+* only paper account metrics + AI signal dashboard
+
+Also:
+Landing page Navbar:
+Operator Console button must resolve to:
+https://trade.aicandlez.com/portal
+
+NOT:
+https://admintrade.aicandlez.com/
+
+Please:
+
+1. commit
+2. push to GitHub main
+3. verify Render auto-deploy fires
+4. validate production bundles
+5. confirm customer portal no longer hydrates into Kraken/live operator state
