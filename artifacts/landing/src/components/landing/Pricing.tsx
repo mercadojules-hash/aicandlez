@@ -1,4 +1,4 @@
-import { TRADE_HOME_URL } from "../../lib/appUrls";
+import { TRADE_PORTAL_URL } from "../../lib/appUrls";
 
 export function Pricing() {
   return (
@@ -90,7 +90,7 @@ export function Pricing() {
                 </div>
               ))}
             </div>
-            <a href={TRADE_HOME_URL} className="btn-ghost" style={{ width: "100%", justifyContent: "center" }}>
+            <a href={TRADE_PORTAL_URL} className="btn-ghost" style={{ width: "100%", justifyContent: "center" }}>
               Start Paper Trading
             </a>
           </div>
@@ -164,7 +164,7 @@ export function Pricing() {
                 </div>
               ))}
             </div>
-            <a href={TRADE_HOME_URL} className="btn-primary" style={{ width: "100%", justifyContent: "center" }}>
+            <a href={TRADE_PORTAL_URL} className="btn-primary" style={{ width: "100%", justifyContent: "center" }}>
               Start Live Trading
             </a>
           </div>
@@ -184,7 +184,6 @@ export function Pricing() {
           }}
         >
           {[
-            { icon: "💡", text: "No monthly subscription ever" },
             { icon: "📉", text: "Zero fee on losing trades" },
             { icon: "🤝", text: "We win when you win" },
             { icon: "🔒", text: "Cancel anytime, no lock-in" },

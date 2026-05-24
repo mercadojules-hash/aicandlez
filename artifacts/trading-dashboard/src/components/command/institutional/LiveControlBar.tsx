@@ -22,7 +22,7 @@ import { N } from "./theme";
 // when fed from useExecutionState. Legacy operator states (LIVE/STANDBY/
 // PAUSED) remain supported for back-compat with the existing /command
 // arm-switch interaction.
-type State = "LIVE" | "STANDBY" | "PAUSED" | "ARMED" | "EXECUTING" | "HALTED";
+type State = "LIVE" | "STANDBY" | "PAUSED" | "ARMED" | "EXECUTING" | "HALTED" | "PAPER";
 
 const PILL_LABEL: Record<State, string> = {
   LIVE:      "EXECUTING",
@@ -31,6 +31,7 @@ const PILL_LABEL: Record<State, string> = {
   STANDBY:   "STANDBY",
   PAUSED:    "HALTED",
   HALTED:    "HALTED",
+  PAPER:     "PAPER",
 };
 
 interface Props {
@@ -86,6 +87,10 @@ export function LiveControlBar({
   const isExecuting = state === "LIVE" || state === "EXECUTING";
   const isHalted    = state === "PAUSED" || state === "HALTED";
   const isArmedRdy  = state === "ARMED";
+  // PAPER — customer simulated-trading mode. Neon-green soft glow,
+  // no order-firing animation, read-only by design. Reuses the ARMED
+  // visual treatment with a distinct pill + label.
+  const isPaper     = state === "PAPER";
   // Back-compat shims so the existing animation/branch code keeps working.
   const isLive   = isExecuting;
   const isPaused = isHalted;
@@ -105,12 +110,14 @@ export function LiveControlBar({
   const color =
     isExecuting ? N.GOLD       :
     isArmedRdy  ? N.BRAND      :
+    isPaper     ? N.BRAND      :
     isHalted    ? N.DANGER     :
                   N.TEXT_2;
 
   const colorBrt =
     isExecuting ? N.GOLD_BRT   :
     isArmedRdy  ? N.BRAND_BRT  :
+    isPaper     ? N.BRAND_BRT  :
     isHalted    ? N.DANGER_BRT :
                   N.TEXT_1;
 
@@ -119,6 +126,8 @@ export function LiveControlBar({
       ? `LIVE AI ${assetClass} EXECUTION · EXECUTING`
       : isArmedRdy
       ? `LIVE AI ${assetClass} EXECUTION · ARMED`
+      : isPaper
+      ? `AI ${assetClass} PAPER TRADING · ACTIVE`
       : blocked
       ? `LIVE AI ${assetClass} EXECUTION · LOCKED`
       : isHalted
@@ -130,6 +139,8 @@ export function LiveControlBar({
       ? `EXECUTION ENGINE ENGAGED · LIVE ORDERS FIRING${readOnly ? "" : " · CLICK TO HALT"}`
       : isArmedRdy
       ? `ENGINE ARMED · AWAITING NEXT SIGNAL${readOnly ? "" : " · CLICK TO HALT"}`
+      : isPaper
+      ? `SIMULATED ALPACA EXECUTION · $100,000 PAPER CAPITAL · REAL MARKET DATA`
       : blocked
       ? `BELOW EXECUTION THRESHOLD · 80% CONFIDENCE REQUIRED${eligibilityReason ? ` · ${eligibilityReason}` : ""}`
       : isHalted

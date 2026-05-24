@@ -4247,31 +4247,17 @@ function PortalInner() {
           if a stale UI affordance leaks through. The admin branch (above)
           keeps PortalModeProvider absent and uses the operator workstation
           variant directly. */}
+      {/* Customer paper-trading mode — two cinematic LiveControlBar bars
+          (CRYPTO + EQUITIES) rendered read-only in PAPER state. Same
+          institutional visual vocabulary used on /command and admintrade,
+          per Task #163 spec: deploy the LIVE AI EXECUTION bar UX
+          consistently across customer portal, admin portal, and admin
+          command center, with the PAPER variant standing in for the
+          customer simulated-trading mode. */}
       {!isAdmin && (
-        <div
-          role="note"
-          style={{
-            margin: "10px 24px 0",
-            padding: "10px 14px",
-            background: `${N.BRAND}0E`,
-            border: `1px solid ${N.BRAND}33`,
-            borderRadius: 4,
-            fontFamily: N.FONT_MONO,
-            fontSize: 10,
-            letterSpacing: "0.14em",
-            color: N.TEXT_1,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <span style={{ color: N.BRAND, fontWeight: 800, letterSpacing: "0.22em" }}>
-            PAPER MODE
-          </span>
-          <span style={{ color: N.TEXT_2 }}>
-            Live execution is operated by AICandlez. Your portal runs simulated trades against
-            real market data so you can evaluate the AI before any real money is at risk.
-          </span>
+        <div style={{ padding: "12px 16px 0", display: "flex", flexDirection: "column", gap: 10 }}>
+          <LiveControlBar assetClass="CRYPTO"   state="PAPER" />
+          <LiveControlBar assetClass="EQUITIES" state="PAPER" />
         </div>
       )}
 

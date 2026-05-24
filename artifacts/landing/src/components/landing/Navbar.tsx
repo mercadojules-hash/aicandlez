@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TRADE_HOME_URL, TRADE_SIGN_IN_URL } from "../../lib/appUrls";
+import { TRADE_PORTAL_URL } from "../../lib/appUrls";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -150,14 +150,14 @@ export function Navbar() {
             Operator Console
           </a>
           <a
-            href={TRADE_SIGN_IN_URL}
+            href={TRADE_PORTAL_URL}
             className="btn-ghost"
             style={{ padding: "10px 20px", fontSize: 14 }}
           >
             Sign In
           </a>
           <a
-            href={TRADE_HOME_URL}
+            href={TRADE_PORTAL_URL}
             className="btn-primary"
             style={{ padding: "10px 20px", fontSize: 14 }}
           >
@@ -228,7 +228,7 @@ export function Navbar() {
               narrow viewports). Pricing/sign-in/sign-up etc. resolve via
               cross-app links to app.aicandlez.com (Clerk hosts the auth UI). */}
           <a
-            href={TRADE_SIGN_IN_URL}
+            href={TRADE_PORTAL_URL}
             onClick={() => setMenuOpen(false)}
             style={{
               color: "#8892a4",
@@ -242,7 +242,7 @@ export function Navbar() {
             Sign In
           </a>
           <a
-            href={TRADE_HOME_URL}
+            href={TRADE_PORTAL_URL}
             onClick={() => setMenuOpen(false)}
             className="btn-primary"
             style={{

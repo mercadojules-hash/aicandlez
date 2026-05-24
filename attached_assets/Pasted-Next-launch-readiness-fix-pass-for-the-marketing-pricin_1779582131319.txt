@@ -1,0 +1,123 @@
+Next launch-readiness fix pass for the marketing/pricing experience.
+
+We need to restore PAPER trading messaging + correct all CTA routing so the public website consistently routes users into the CUSTOMER portal only.
+
+CRITICAL:
+Do NOT touch:
+
+* admintrade operator execution infrastructure
+* Kraken bridge
+* execution queue
+* operator telemetry
+* protected admin routes
+
+This is a CUSTOMER-FACING routing + pricing-page cleanup only.
+
+====================================================
+
+1. RESTORE ALPACA PAPER TRADING
+   ====================================================
+
+On:
+https://trade.aicandlez.com/portal
+
+Restore:
+
+* Alpaca PAPER trading
+* simulated trading mode
+* customer paper-trading onboarding flow
+
+This should exist ONLY on the customer portal.
+
+DO NOT expose paper trading on:
+
+* admintrade.aicandlez.com
+* operator/admin routes
+
+Maintain the “two worlds” invariant:
+
+* CUSTOMER = paper + optional live
+* OPERATOR = live infrastructure only
+
+====================================================
+2. FIX ALL PUBLIC WEBSITE CTA ROUTING
+=====================================
+
+The following buttons/links should ALL route to:
+
+https://trade.aicandlez.com/portal
+
+Required fixes:
+
+TOP NAV:
+
+* Operator Console
+* Sign In
+* Launch App
+
+BOTTOM CTA AREAS:
+
+* Launch App
+* Operator Console
+
+PRICING CARDS:
+
+* Start Paper Trading
+* Start Live Trading
+
+ALL should resolve to:
+https://trade.aicandlez.com/portal
+
+No admintrade redirects.
+No broken loops.
+No cross-host confusion.
+
+====================================================
+3. PRICING PAGE CLEANUP
+=======================
+
+Remove:
+“No Subscription Ever”
+
+Keep the rest of the pricing structure intact.
+
+====================================================
+4. VISUAL EXECUTION STATUS UX
+=============================
+
+The LIVE AI CRYPTO EXECUTION and LIVE AI EQUITIES EXECUTION bars are excellent.
+
+Keep this exact UX pattern and deploy it consistently across:
+
+* trade.aicandlez.com/portal
+* admintrade.aicandlez.com/portal
+* admin command center
+
+Behavior:
+
+* RED when halted/locked
+* ORANGE/GLOWING when active/live
+* strong cinematic operator feel
+
+This is now part of the platform visual language.
+
+====================================================
+5. VALIDATION
+=============
+
+Validate:
+
+* all CTA links
+* customer portal routing
+* no admin redirect loops
+* paper trading customer-only
+* no regression to protected execution infrastructure
+
+Run:
+
+* landing typecheck
+* trading-dashboard typecheck
+* route validation
+
+Additive-only.
+Do not destabilize live infrastructure.
