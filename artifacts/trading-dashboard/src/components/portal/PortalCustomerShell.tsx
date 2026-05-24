@@ -27,7 +27,7 @@
  */
 
 import {
-  useEffect, useMemo, useState, type ReactNode, type CSSProperties,
+  useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/react";
@@ -113,12 +113,15 @@ function useCustomerPlan(): Plan {
 
 function OperatorPulseRibbon({
   plan, equityUsd, realizedToday, engineOnline, openCount,
+  pulse, signalsPerMin,
 }: {
   plan:          Plan;
   equityUsd:     number;
   realizedToday: number;
   engineOnline:  boolean;
   openCount:     number;
+  pulse:         MarketPulse;
+  signalsPerMin: number;
 }) {
   const now = useUtcClock();
   const planLabel =
@@ -127,6 +130,15 @@ function OperatorPulseRibbon({
                          "FREE · PAPER · 7-DAY TRIAL";
   const realizedColor = realizedToday >= 0 ? T.NEON : T.RED;
   const realizedSign  = realizedToday >= 0 ? "+" : "−";
+
+  // Long/short imbalance — neutral if both arms close to 50%.
+  const imbalance = Math.abs(pulse.longPct - pulse.shortPct);
+  const imbalanceTone =
+    imbalance < 20 ? T.TEXT_1 :
+    pulse.longPct >= pulse.shortPct ? T.NEON : T.RED;
+
+  const queueTone = pulse.ready > 0 ? T.NEON : T.TEXT_2;
+  const confTone  = pulse.avgConf >= 70 ? T.NEON : pulse.avgConf >= 55 ? T.TEXT_0 : T.TEXT_2;
 
   return (
     <header
@@ -142,20 +154,15 @@ function OperatorPulseRibbon({
     >
       <div style={{
         display: "flex", alignItems: "center",
-        gap: 16, maxWidth: 2000, margin: "0 auto",
+        gap: 14, maxWidth: 2000, margin: "0 auto",
         flexWrap: "wrap",
       }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_0, fontWeight: 700, letterSpacing: "0.18em" }}>
           <Terminal size={13} color={T.NEON} /> AICANDLEZ
         </span>
         <RibbonDivider />
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_1 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_1, fontVariantNumeric: "tabular-nums" }}>
           <Clock size={12} color={T.TEXT_2} /> {fmtUtc(now)}
-        </span>
-        <RibbonDivider />
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 16, color: T.TEXT_2 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Globe size={11} /> NYC·US</span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><MonitorPlay size={11} /> WKS-04</span>
         </span>
         <RibbonDivider />
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -169,10 +176,59 @@ function OperatorPulseRibbon({
             {engineOnline ? "ENGINE ONLINE" : "ENGINE PAUSED"}
           </span>
         </span>
+
         <RibbonDivider />
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_1 }}>
-          <Activity size={11} color={T.TEXT_2} /> PLATFORM SLOTS: {openCount}/3
+        <span
+          title={`Signals generated per minute, since session start`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}
+        >
+          <Activity size={11} color={T.TEXT_2} /> SIG/MIN:&nbsp;
+          <span style={{ color: signalsPerMin > 0 ? T.TEXT_0 : T.TEXT_2 }}>
+            {signalsPerMin >= 10 ? signalsPerMin.toFixed(0) : signalsPerMin.toFixed(1)}
+          </span>
         </span>
+
+        <RibbonDivider />
+        <span
+          title={`${pulse.long} long · ${pulse.short} short · ${pulse.flat} flat (of ${pulse.total})`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}
+        >
+          L/S:&nbsp;
+          <span style={{ color: imbalanceTone, fontWeight: 600 }}>
+            {pulse.longPct}/{pulse.shortPct}
+          </span>
+        </span>
+
+        <RibbonDivider />
+        <span
+          title={`Average AI confidence across ${pulse.total} watched symbols`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}
+        >
+          AVG CONF:&nbsp;
+          <span style={{ color: confTone, fontWeight: 600 }}>{pulse.avgConf}%</span>
+        </span>
+
+        <RibbonDivider />
+        <span
+          title={`${pulse.ready} READY · ${pulse.waiting} WAITING · ${pulse.gated} GATED`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}
+        >
+          QUEUE:&nbsp;
+          <span style={{ color: queueTone, fontWeight: 600 }}>{pulse.ready}</span>
+          <span style={{ color: T.TEXT_3 }}>/</span>
+          <span style={{ color: T.AMBER }}>{pulse.waiting}</span>
+          <span style={{ color: T.TEXT_3 }}>/</span>
+          <span style={{ color: T.RED }}>{pulse.gated}</span>
+        </span>
+
+        <RibbonDivider />
+        <span
+          title="Concurrent live trade cap (platform-wide, controlled beta)"
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_1, fontVariantNumeric: "tabular-nums" }}
+        >
+          SLOTS: {openCount}/3
+        </span>
+
         <span style={{
           marginLeft: 4,
           padding: "2px 8px",
@@ -186,16 +242,18 @@ function OperatorPulseRibbon({
           <Shield size={10} /> {planLabel}
         </span>
         <span style={{ flex: 1 }} />
-        <span style={{ color: T.TEXT_2 }}>PAPER BAL:&nbsp;
+        <span style={{ color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}>PAPER BAL:&nbsp;
           <span style={{ color: T.TEXT_0 }}>${equityUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </span>
-        <span style={{ color: T.TEXT_2 }}>REALIZED (1D):&nbsp;
+        <span style={{ color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}>REALIZED (1D):&nbsp;
           <span style={{ color: realizedColor }}>{realizedSign}${Math.abs(realizedToday).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </span>
       </div>
     </header>
   );
 }
+
+void Globe; void MonitorPlay; // formerly rendered NYC·US / WKS-04 stub badges; retained as imports for parity with mockup palette
 
 function RibbonDivider() {
   return <span style={{ width: 1, height: 14, background: T.BORDER }} />;
@@ -399,6 +457,142 @@ function useNow1s(): number {
     return () => clearInterval(id);
   }, []);
   return now;
+}
+
+/* Sub-second precision relative formatter for very fresh telemetry. */
+function signalAgePrecise(ts: number | null | undefined, now: number): string {
+  if (!ts) return "—";
+  const ms = Math.max(0, now - ts);
+  if (ms < 1000)   return `${ms}ms`;
+  if (ms < 10_000) return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  const m = Math.round(ms / 60_000);
+  if (m < 60)      return `${m}m`;
+  const h = Math.round(m / 60);
+  if (h < 24)      return `${h}h`;
+  return `${Math.round(h / 24)}d`;
+}
+
+/* Track signals/min since first non-zero observation. Ref-based, no
+ * re-render churn. Returns 0 until at least one minute of observation
+ * has elapsed (rate stabilizer — avoids "9000/min" spikes from a single
+ * tick fired 0.3s after mount). */
+function useSignalRate(signalsGenerated: number | undefined): number {
+  const anchorRef = useRef<{ value: number; ts: number } | null>(null);
+  const [, force] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => force(n => n + 1), 5000);
+    return () => clearInterval(id);
+  }, []);
+  if (signalsGenerated == null) return 0;
+  if (anchorRef.current == null) {
+    anchorRef.current = { value: signalsGenerated, ts: Date.now() };
+    return 0;
+  }
+  const anchor = anchorRef.current;
+  const elapsedMin = (Date.now() - anchor.ts) / 60_000;
+  if (elapsedMin < 0.25) return 0;
+  const delta = Math.max(0, signalsGenerated - anchor.value);
+  return delta / elapsedMin;
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* MarketPulse — synchronized telemetry view-model                           */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+type EngineLite = {
+  running?:           boolean;
+  signalsGenerated?:  number;
+  tradesExecuted?:    number;
+  tradesBlocked?:     number;
+  mtfConfirmedCount?: number;
+  mtfBlockCount?:     number;
+  correlationBlocks?: number;
+  lastTickAt?:        number | null;
+  lastSignalAt?:      number | null;
+  lastTradeAt?:       number | null;
+  loopIntervalMs?:    number;
+  signalCounts?:      { BUY?: number; SELL?: number; HOLD?: number };
+  funnel?:            { total?: number; passedMTF?: number; blockedMTF?: number; executed?: number };
+};
+
+type MarketPulse = {
+  total:        number;
+  long:         number;
+  short:        number;
+  flat:         number;
+  longPct:      number;     // 0..100, of directional only
+  shortPct:     number;     // 0..100, of directional only
+  ready:        number;
+  waiting:      number;
+  gated:        number;
+  readyPct:     number;     // 0..100, of total
+  avgConf:      number;     // 0..100
+  elevatedVolPct: number;   // 0..100
+  lowVolPct:    number;     // 0..100
+  momentumBreadthPct: number; // 0..100, share with momentum≥2
+  regimeTop:    { label: string; pct: number } | null;
+  blockRatePct: number;     // funnel MTF block rate
+  execRatePct:  number;     // funnel execute / passedMTF
+};
+
+function computeMarketPulse(
+  opps: ReadonlyArray<OpportunityVM>,
+  engine: EngineLite | undefined,
+): MarketPulse {
+  const total = opps.length;
+  let long = 0, short = 0, flat = 0;
+  let ready = 0, waiting = 0, gated = 0;
+  let confSum = 0;
+  let elevated = 0, lowVol = 0;
+  let momentumBreadth = 0;
+  const regimeCounts = new Map<string, number>();
+
+  for (const o of opps) {
+    if (o.direction === "LONG")       long++;
+    else if (o.direction === "SHORT") short++;
+    else                              flat++;
+    if (o.readiness === "READY")        ready++;
+    else if (o.readiness === "WAITING") waiting++;
+    else if (o.readiness === "GATED")   gated++;
+    confSum += o.conf || 0;
+    if (o.vol === "ELEVATED") elevated++;
+    else if (o.vol === "LOW VOL") lowVol++;
+    if (typeof o.momentum === "number" && o.momentum >= 2) momentumBreadth++;
+    if (o.regime) regimeCounts.set(o.regime, (regimeCounts.get(o.regime) ?? 0) + 1);
+  }
+
+  const directional = long + short;
+  const longPct  = directional ? Math.round((long  / directional) * 100) : 0;
+  const shortPct = directional ? Math.round((short / directional) * 100) : 0;
+
+  let regimeTop: { label: string; pct: number } | null = null;
+  if (total > 0 && regimeCounts.size > 0) {
+    let best: [string, number] = ["", 0];
+    for (const entry of regimeCounts) if (entry[1] > best[1]) best = entry;
+    if (best[1] > 0) regimeTop = { label: best[0], pct: Math.round((best[1] / total) * 100) };
+  }
+
+  const fTotal      = engine?.funnel?.total      ?? 0;
+  const fBlocked    = engine?.funnel?.blockedMTF ?? 0;
+  const fPassed     = engine?.funnel?.passedMTF  ?? 0;
+  const fExecuted   = engine?.funnel?.executed   ?? 0;
+  const blockRatePct = fTotal  ? Math.round((fBlocked  / fTotal)  * 100) : 0;
+  const execRatePct  = fPassed ? Math.round((fExecuted / fPassed) * 100) : 0;
+
+  return {
+    total, long, short, flat,
+    longPct, shortPct,
+    ready, waiting, gated,
+    readyPct: total ? Math.round((ready / total) * 100) : 0,
+    avgConf:  total ? Math.round(confSum / total) : 0,
+    elevatedVolPct: total ? Math.round((elevated / total) * 100) : 0,
+    lowVolPct:      total ? Math.round((lowVol   / total) * 100) : 0,
+    momentumBreadthPct: total ? Math.round((momentumBreadth / total) * 100) : 0,
+    regimeTop,
+    blockRatePct,
+    execRatePct,
+  };
 }
 
 function Sparkline({ data, color }: { data: number[]; color: string }) {
@@ -1043,36 +1237,64 @@ function PortfolioIntelligence() {
   );
 }
 
-function SignalPipeline({ opps }: { opps: OpportunityVM[] }) {
+function SignalPipeline({
+  opps, pulse, engine,
+}: {
+  opps:   OpportunityVM[];
+  pulse:  MarketPulse;
+  engine: EngineLite | undefined;
+}) {
+  // Top-of-stack representative per stage (still useful as a "what's in
+  // the chamber" cue), with live funnel counts driving the bar.
   const candidate = opps[opps.length - 1];
   const analyzed  = opps.find(o => o.readiness === "WAITING") ?? opps[2];
-  const confirmed = opps.find(o => o.readiness === "READY")  ?? opps[1];
+  const confirmed = opps.find(o => o.readiness === "READY")   ?? opps[1];
   const queued    = opps.find(o => o.readiness === "READY" && o.conf >= 80) ?? opps[0];
-  const steps = [
-    { label: candidate ? `CANDIDATE: ${candidate.symbol} (${candidate.conf}%)` : "CANDIDATE: —", stage: 0 },
-    { label: analyzed  ? `ANALYZED: ${analyzed.symbol} (${analyzed.conf}%)`    : "ANALYZED: —",  stage: 1 },
-    { label: confirmed ? `CONFIRMED: ${confirmed.symbol} (${confirmed.conf}%)` : "CONFIRMED: —", stage: 2 },
-    { label: queued    ? `QUEUED: ${queued.symbol} (${queued.conf}%)`          : "QUEUED: —",    stage: 3 },
+
+  const fTotal    = engine?.funnel?.total      ?? pulse.total;
+  const fPassed   = engine?.funnel?.passedMTF  ?? (pulse.ready + pulse.waiting);
+  const fExecuted = engine?.funnel?.executed   ?? 0;
+
+  const steps: Array<{ tag: string; sample: OpportunityVM | undefined; count: number; stage: 0|1|2|3 }> = [
+    { tag: "CANDIDATE", sample: candidate, count: fTotal,        stage: 0 },
+    { tag: "ANALYZED",  sample: analyzed,  count: pulse.waiting, stage: 1 },
+    { tag: "CONFIRMED", sample: confirmed, count: fPassed,       stage: 2 },
+    { tag: "QUEUED",    sample: queued,    count: pulse.ready,   stage: 3 },
   ];
+
   return (
     <PanelCard title="SIGNAL PIPELINE" live>
-      <div style={{ padding: 14, display: "flex", flexDirection: "column", justifyContent: "center", gap: 14, flex: 1 }}>
-        {steps.map((s, i) => {
+      <div style={{ padding: 14, display: "flex", flexDirection: "column", justifyContent: "center", gap: 12, flex: 1 }}>
+        {steps.map((s) => {
           const dotOpacity = [0.20, 0.40, 0.60, 1.00][s.stage];
+          const labelTone = s.stage >= 2 ? T.TEXT_0 : T.TEXT_2;
           return (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div key={s.tag} style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: T.FONT_MONO, fontVariantNumeric: "tabular-nums" }}>
               <span style={{
                 width: 8, height: 8, borderRadius: "50%",
                 background: T.NEON, opacity: dotOpacity,
                 boxShadow: s.stage === 3 ? `0 0 8px ${T.NEON_GLOW}` : "none",
+                flexShrink: 0,
               }} />
-              <span style={{
-                fontSize: 12, fontFamily: T.FONT_MONO,
-                color: s.stage >= 2 ? T.TEXT_0 : T.TEXT_2,
-              }}>{s.label}</span>
+              <span style={{ fontSize: 10, color: T.TEXT_3, letterSpacing: "0.10em", width: 72 }}>{s.tag}</span>
+              <span style={{ fontSize: 11, color: labelTone, fontWeight: 600, minWidth: 28, textAlign: "right" }}>
+                {s.count.toLocaleString()}
+              </span>
+              <span style={{ fontSize: 11, color: T.TEXT_2, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {s.sample ? `${s.sample.symbol} · ${s.sample.conf}%` : "—"}
+              </span>
             </div>
           );
         })}
+        <div style={{
+          marginTop: 4, paddingTop: 8, borderTop: `1px solid ${T.BORDER}`,
+          display: "flex", justifyContent: "space-between",
+          fontSize: 10, color: T.TEXT_2, fontVariantNumeric: "tabular-nums",
+        }}>
+          <span>MTF BLOCK <span style={{ color: pulse.blockRatePct >= 60 ? T.AMBER : T.TEXT_1 }}>{pulse.blockRatePct}%</span></span>
+          <span>EXEC RATE <span style={{ color: pulse.execRatePct  >  0 ? T.NEON  : T.TEXT_1 }}>{pulse.execRatePct}%</span></span>
+          <span>FILLED <span style={{ color: T.TEXT_0 }}>{fExecuted.toLocaleString()}</span></span>
+        </div>
       </div>
     </PanelCard>
   );
@@ -1197,30 +1419,35 @@ function MarketRegime({ opps }: { opps: OpportunityVM[] }) {
   );
 }
 
-function AIThroughput() {
-  const exec = useExecutionState();
-  const { data: engine } = useQuery<{ signalsGenerated?: number; tradesExecuted?: number; mtfConfirmedCount?: number; funnel?: { total?: number; passedMTF?: number; executed?: number } }>({
-    queryKey: ["engine-status-portal"],
-    queryFn: async () => {
-      const res = await authFetch(`${apiBaseUrl}/api/engine/status`, { credentials: "include", cache: "no-store" });
-      if (!res.ok) throw new Error("engine_status_failed");
-      return res.json();
-    },
-    refetchInterval: 6_000,
-    staleTime: 3_000,
-    retry: 1,
-  });
-  const tps = engine?.funnel?.total ?? 0;
-  const sigs = engine?.signalsGenerated ?? 0;
-  const mtf = engine?.mtfConfirmedCount ?? 0;
-  const queueDepth = exec.data ? 0 : "—";
+function AIThroughput({
+  engine, pulse, signalsPerMin,
+}: {
+  engine:        EngineLite | undefined;
+  pulse:         MarketPulse;
+  signalsPerMin: number;
+}) {
+  const evals = engine?.funnel?.total      ?? 0;
+  const sigs  = engine?.signalsGenerated   ?? 0;
+  const mtf   = engine?.mtfConfirmedCount  ?? 0;
+  const corr  = engine?.correlationBlocks  ?? 0;
+  const loopMs = engine?.loopIntervalMs    ?? 0;
+
+  // Engine load = share of evaluated symbols that passed MTF (i.e. how
+  // much real signal yield the loop is producing per cycle). Capped 100.
+  const loadPct = evals > 0 ? Math.min(100, Math.round((mtf / evals) * 100)) : 0;
+  const loadTone = loadPct >= 40 ? T.NEON : loadPct >= 15 ? T.TEXT_0 : T.TEXT_1;
+
   return (
     <PanelCard title="AI THROUGHPUT" live height={208}>
-      <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10, justifyContent: "center", flex: 1, fontSize: 10 }}>
-        <Kv k="ENGINE EVALS" v={tps.toLocaleString()} />
-        <Kv k="SIGNALS GENERATED" v={sigs.toLocaleString()} />
-        <Kv k="MTF CONFIRMED" v={mtf.toLocaleString()} />
-        <Kv k="QUEUE DEPTH" v={String(queueDepth)} />
+      <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 9, justifyContent: "center", flex: 1, fontSize: 10, fontVariantNumeric: "tabular-nums" }}>
+        <Kv k="ENGINE EVALS"     v={evals.toLocaleString()} />
+        <Kv k="SIGNALS / MIN"    v={signalsPerMin >= 10 ? signalsPerMin.toFixed(0) : signalsPerMin.toFixed(1)} color={signalsPerMin > 0 ? T.TEXT_0 : T.TEXT_2} />
+        <Kv k="SIGNALS GEN"      v={sigs.toLocaleString()} />
+        <Kv k="MTF CONFIRMED"    v={mtf.toLocaleString()} />
+        <Kv k="EXEC RATE"        v={`${pulse.execRatePct}%`} color={pulse.execRatePct > 0 ? T.NEON : T.TEXT_1} />
+        <Kv k="ENGINE LOAD"      v={`${loadPct}%`} color={loadTone} />
+        <Kv k="CORRELATION BLKS" v={corr.toLocaleString()} color={corr > 0 ? T.AMBER : T.TEXT_1} />
+        <Kv k="LOOP INTERVAL"    v={loopMs ? `${loopMs}ms` : "—"} />
       </div>
     </PanelCard>
   );
@@ -1254,7 +1481,40 @@ function Kv({ k, v, color = T.TEXT_0 }: { k: string; v: string; color?: string }
 /* Operator Telemetry Footer Strip                                          */
 /* ──────────────────────────────────────────────────────────────────────── */
 
-function OperatorTelemetryStrip({ engineOnline }: { engineOnline: boolean }) {
+function OperatorTelemetryStrip({
+  engineOnline, pulse, engine, now,
+}: {
+  engineOnline: boolean;
+  pulse:        MarketPulse;
+  engine:       EngineLite | undefined;
+  now:          number;
+}) {
+  const tickAge = engineOnline ? signalAgePrecise(engine?.lastTickAt ?? null, now) : "—";
+  const sigAge  = engineOnline ? signalAgePrecise(engine?.lastSignalAt ?? null, now) : "—";
+  const loopMs  = engine?.loopIntervalMs ?? 0;
+  // Tick freshness color: green within 2× loop interval, amber up to 5×,
+  // red beyond. Falls back to neutral if loop interval unknown.
+  const tickMs  = engine?.lastTickAt ? Math.max(0, now - engine.lastTickAt) : Infinity;
+  const tickTone =
+    !engineOnline ? T.TEXT_3 :
+    loopMs <= 0   ? T.TEXT_0 :
+    tickMs <= loopMs * 2 ? T.NEON :
+    tickMs <= loopMs * 5 ? T.AMBER : T.RED;
+
+  // Volatility pulse: tilt toward ELEVATED tone if elevated > low,
+  // else lean calm (TEXT_1).
+  const volTone =
+    pulse.elevatedVolPct >= 50 ? T.AMBER :
+    pulse.elevatedVolPct >= 25 ? T.TEXT_0 : T.TEXT_1;
+
+  const momTone =
+    pulse.momentumBreadthPct >= 50 ? T.NEON :
+    pulse.momentumBreadthPct >= 25 ? T.TEXT_0 : T.TEXT_1;
+
+  const regimeLabel = pulse.regimeTop
+    ? `${pulse.regimeTop.label} ${pulse.regimeTop.pct}%`
+    : "—";
+
   return (
     <footer style={{
       background: T.BG_TERMINAL,
@@ -1264,24 +1524,44 @@ function OperatorTelemetryStrip({ engineOnline }: { engineOnline: boolean }) {
       fontSize: 11,
       color: T.TEXT_2,
       position: "sticky", bottom: 0, zIndex: 30,
-      display: "flex", flexWrap: "wrap", gap: 24,
+      display: "flex", flexWrap: "wrap", gap: 20,
       alignItems: "center", justifyContent: "flex-start",
+      fontVariantNumeric: "tabular-nums",
     }}>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-        <Radio size={11} color={T.NEON} style={{ animation: "brand-pulse 1.4s infinite" }} />
-        LATENCY TO ENGINE:&nbsp;<span style={{ color: T.TEXT_0 }}>{engineOnline ? "12ms" : "—"}</span>
+      <span
+        title={`Last engine tick · loop ${loopMs || "—"}ms`}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+      >
+        <Radio size={11} color={engineOnline ? T.NEON : T.TEXT_3} style={engineOnline ? { animation: "brand-pulse 1.4s infinite" } : undefined} />
+        LAST TICK:&nbsp;<span style={{ color: tickTone }}>{tickAge}</span>
       </span>
       <Divider />
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-        <Database size={11} /> LAST ENGINE TICK:&nbsp;<span style={{ color: T.TEXT_0 }}>{engineOnline ? "0.4s ago" : "—"}</span>
+      <span
+        title="Most recent AI signal emitted by the engine"
+        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+      >
+        <Database size={11} /> LAST SIGNAL:&nbsp;<span style={{ color: T.TEXT_0 }}>{sigAge}</span>
       </span>
       <Divider />
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-        <LineChartIcon size={11} color={T.AMBER} /> DRAWDOWN GUARD:&nbsp;<span style={{ color: T.AMBER }}>ACTIVE (5%)</span>
+      <span
+        title={`Share of watched symbols flagged ELEVATED volatility (${pulse.elevatedVolPct}% elevated · ${pulse.lowVolPct}% low)`}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+      >
+        <LineChartIcon size={11} color={volTone} /> VOL PULSE:&nbsp;<span style={{ color: volTone }}>{pulse.elevatedVolPct}% ELEVATED</span>
       </span>
       <Divider />
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-        <PieChart size={11} /> PORTFOLIO RISK:&nbsp;<span style={{ color: T.TEXT_0 }}>LOW (12% EXPOSED)</span>
+      <span
+        title={`Share of symbols with momentum strength ≥ 2 (of 3)`}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+      >
+        <Activity size={11} color={momTone} /> MOMENTUM:&nbsp;<span style={{ color: momTone }}>{pulse.momentumBreadthPct}% BREADTH</span>
+      </span>
+      <Divider />
+      <span
+        title="Dominant market regime across watched universe"
+        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+      >
+        <PieChart size={11} /> REGIME:&nbsp;<span style={{ color: T.TEXT_0 }}>{regimeLabel}</span>
       </span>
       <span style={{ flex: 1 }} />
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_3 }}>
@@ -1415,6 +1695,35 @@ export function PortalCustomerShell() {
   const { majors, alts, opportunities, isLoading, isError } = usePaperSignals();
   const { stats: paperStats, openTrade, open: openTrades } = usePaperTrades();
 
+  // Shared synchronized telemetry tick — drives footer "LAST TICK" age
+  // readout and any other 1s relative formatters at the shell level.
+  // Card-matrix uses its own useNow1s() at OpportunityMatrix scope; both
+  // are 1Hz, so they remain visually in lock-step.
+  const nowShell = useNow1s();
+
+  // Lift the engine-status query to the shell so OperatorPulseRibbon /
+  // SignalPipeline / AIThroughput / OperatorTelemetryStrip all read from
+  // a single source-of-truth (React Query already de-dupes via the
+  // shared "engine-status-portal" key; this just removes the duplicate
+  // queryFn declaration and gives us the typed payload up front).
+  const { data: engineStatus } = useQuery<EngineLite>({
+    queryKey: ["engine-status-portal"],
+    queryFn: async () => {
+      const res = await authFetch(`${apiBaseUrl}/api/engine/status`, { credentials: "include", cache: "no-store" });
+      if (!res.ok) throw new Error("engine_status_failed");
+      return res.json();
+    },
+    refetchInterval: 6_000,
+    staleTime: 3_000,
+    retry: 1,
+  });
+
+  const signalsPerMin = useSignalRate(engineStatus?.signalsGenerated);
+  const pulse = useMemo(
+    () => computeMarketPulse(opportunities, engineStatus),
+    [opportunities, engineStatus],
+  );
+
   const [query,   setQuery]   = useState("");
   const [filter,  setFilter]  = useState<Filt>("ALL");
   const [account, setAccount] = useState(false);
@@ -1504,6 +1813,8 @@ export function PortalCustomerShell() {
         realizedToday={paperStats.todayPnl}
         engineOnline={engineOnline}
         openCount={openTrades.length}
+        pulse={pulse}
+        signalsPerMin={signalsPerMin}
       />
       <PaperModeBanner />
 
@@ -1555,16 +1866,16 @@ export function PortalCustomerShell() {
         }}>
           <AIReasoningConsole />
           <PortfolioIntelligence />
-          <SignalPipeline opps={opportunities} />
+          <SignalPipeline opps={opportunities} pulse={pulse} engine={engineStatus} />
           <MarketRegime opps={opportunities} />
           <ExchangeTopology />
           <RiskHeatmap opps={opportunities} />
-          <AIThroughput />
+          <AIThroughput engine={engineStatus} pulse={pulse} signalsPerMin={signalsPerMin} />
           <ExecutionAwareness openCount={openTrades.length} />
         </section>
       </main>
 
-      <OperatorTelemetryStrip engineOnline={engineOnline} />
+      <OperatorTelemetryStrip engineOnline={engineOnline} pulse={pulse} engine={engineStatus} now={nowShell} />
 
       <UpgradeModal    open={upgrade}    onClose={() => setUpgrade(false)} gate={disclaimerGate} />
       <AccountModal    open={account}    onClose={() => setAccount(false)} tier={plan} onUpgrade={() => setUpgrade(true)} />
