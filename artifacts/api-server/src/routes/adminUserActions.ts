@@ -37,6 +37,7 @@ import { Router, type Request, type Response } from "express";
 import { randomUUID, createHash } from "node:crypto";
 import { z } from "zod/v4";
 import { sql, eq } from "drizzle-orm";
+import { clerkClient } from "@clerk/express";
 import {
   db,
   usersTable,
@@ -46,8 +47,10 @@ import {
   userExchangeConnectionsTable,
   ADMIN_STATUSES,
   TRADE_LIMIT_CAP_TIERS,
+  DEFAULT_TRADE_LIMIT_CAP,
   type AdminStatus,
 } from "@workspace/db";
+import { isSuperAdminEmail } from "../lib/adminAllowlist.js";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import {
   cancelSubscriptionAtPeriodEnd,
@@ -619,6 +622,105 @@ router.get("/admin/users/:id/audit", ...requireOperator, async (req, res): Promi
   } catch (err) {
     req.log.error({ err }, "admin audit fetch failed");
     res.status(500).json({ error: "Failed to load audit trail" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /admin/users/sync_from_clerk
+//
+// Backfill the local `users` table from Clerk. Clerk-side signups (landing
+// page, /sign-up, Stripe checkout) provision a Clerk user but our local
+// `users` row is only JIT-created when the user hits GET /auth/me. Users
+// who sign up but never open the dashboard are therefore invisible to
+// admin telemetry. This endpoint paginates the Clerk Backend API and
+// upserts every Clerk user into `users` (and `user_trade_limits`),
+// back-filling missing emails on existing rows and auto-promoting
+// allowlisted super-admin emails.
+//
+// Read-only against Clerk. Idempotent. Safe to run repeatedly.
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.post("/admin/users/sync_from_clerk", ...requireOperator, async (req, res): Promise<void> => {
+  const ctx = resolveActor(req, res);
+  if (!ctx) return;
+
+  const PAGE = 100;
+  const MAX_USERS = 5_000;
+  let offset = 0;
+  let created = 0;
+  let updated = 0;
+  let scanned = 0;
+  const errors: Array<{ clerkUserId: string; error: string }> = [];
+
+  try {
+    while (scanned < MAX_USERS) {
+      const list = await clerkClient.users.getUserList({ limit: PAGE, offset });
+      const batch = list.data ?? [];
+      if (batch.length === 0) break;
+
+      for (const cu of batch) {
+        scanned++;
+        const clerkUserId = cu.id;
+        const email =
+          cu.primaryEmailAddress?.emailAddress ??
+          cu.emailAddresses?.[0]?.emailAddress ??
+          "";
+        const shouldBeSuperAdmin = email ? isSuperAdminEmail(email) : false;
+
+        try {
+          const [existing] = await db
+            .select()
+            .from(usersTable)
+            .where(eq(usersTable.clerkUserId, clerkUserId));
+
+          if (existing) {
+            const patch: Partial<typeof usersTable.$inferInsert> = {};
+            if (email && existing.email !== email) patch.email = email;
+            if (shouldBeSuperAdmin && existing.role !== "super-admin") patch.role = "super-admin";
+            if (Object.keys(patch).length > 0) {
+              await db
+                .update(usersTable)
+                .set({ ...patch, updatedAt: new Date() })
+                .where(eq(usersTable.clerkUserId, clerkUserId));
+              updated++;
+            }
+          } else {
+            await db
+              .insert(usersTable)
+              .values({
+                clerkUserId,
+                email,
+                role: shouldBeSuperAdmin ? "super-admin" : "user",
+              })
+              .onConflictDoNothing();
+            await db
+              .insert(userTradeLimitsTable)
+              .values({ userId: clerkUserId, capTier: DEFAULT_TRADE_LIMIT_CAP })
+              .onConflictDoNothing();
+            created++;
+          }
+        } catch (err) {
+          errors.push({ clerkUserId, error: (err as Error).message });
+        }
+      }
+
+      offset += batch.length;
+      if (batch.length < PAGE) break;
+    }
+
+    await writeAudit({
+      actorId:  ctx.actorId,
+      targetId: ctx.actorId,
+      action:   "sync_from_clerk",
+      payload:  { note: "Backfill from Clerk Backend API", scanned, created, updated, errorCount: errors.length },
+    });
+    __invalidateAdminUserTelemetryCache();
+
+    req.log.info({ scanned, created, updated, errorCount: errors.length }, "Clerk user sync completed");
+    res.json({ ok: true, scanned, created, updated, errors });
+  } catch (err) {
+    req.log.error({ err }, "Clerk user sync failed");
+    res.status(502).json({ error: `Clerk sync failed: ${(err as Error).message}`, scanned, created, updated, errors });
   }
 });
 

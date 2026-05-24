@@ -4,9 +4,9 @@ import { useAuth } from "@clerk/react";
 import {
   Users, Zap, DollarSign, Activity, TrendingUp, Shield,
   Search, ChevronUp, ChevronDown, ArrowUpRight, ArrowDownRight,
-  Globe, Cpu, BarChart2, AlertTriangle, RefreshCw, Download,
+  Globe, BarChart2, AlertTriangle, RefreshCw, Download,
   X, Gift, SlidersHorizontal, PauseCircle, PlayCircle, Ban,
-  Power, Unplug, Loader2,
+  Power, Unplug, Loader2, CloudDownload,
 } from "lucide-react";
 import type { EngineStatus, FeeSummary, ExchangeStatus } from "@/components/command/types";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -831,6 +831,30 @@ export default function Admin() {
     q: search, plan: planFilter, status: statusFilter,
   });
 
+  // Sync from Clerk (back-fills users who signed up but never opened /auth/me)
+  const authFetch = useAuthFetch();
+  const qc        = useQueryClient();
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const res = await authFetch("/api/admin/users/sync_from_clerk", { method: "POST" });
+      const text = await res.text();
+      let json: { scanned?: number; created?: number; updated?: number; error?: string } | null = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) throw new Error(json?.error ?? `HTTP ${res.status}`);
+      return json;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Synced from Clerk",
+        description: `Scanned ${data?.scanned ?? 0} · Created ${data?.created ?? 0} · Updated ${data?.updated ?? 0}`,
+      });
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Sync failed", description: err.message });
+    },
+  });
+
   // Derived platform metrics from REAL user data
   const platformMetrics = useMemo(() => {
     const total       = users.length;
@@ -942,6 +966,21 @@ export default function Admin() {
           <div className="text-[8px] font-mono" style={{ color: "#2a4050" }}>
             LAST REFRESH: {new Date().toLocaleTimeString()}
           </div>
+          <button onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded border font-mono text-[9px] font-bold transition-all"
+            style={{
+              background: syncMutation.isPending ? "#1a0e2a" : "#2a1240",
+              borderColor: "#cc55ff55",
+              color: "#cc55ff",
+              cursor: syncMutation.isPending ? "wait" : "pointer",
+            }}
+            title="Back-fill the local users table from Clerk Backend API. Idempotent.">
+            {syncMutation.isPending
+              ? <Loader2 className="w-3 h-3 animate-spin" />
+              : <CloudDownload className="w-3 h-3" />}
+            SYNC FROM CLERK
+          </button>
           <button onClick={() => refetch()}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded border font-mono text-[9px] font-bold transition-all"
             style={{ background: "#0d1e2e", borderColor: "#1a3050", color: "#9FB3C8" }}>
