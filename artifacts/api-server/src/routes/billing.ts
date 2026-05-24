@@ -7,6 +7,7 @@ import { requireDisclaimer } from "../middlewares/requireDisclaimer.js";
 import { TIER_MAX_SIZE_USD, type TierPlan } from "../lib/tierLimits.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { resolveCustomerAppBaseUrl } from "../lib/customerAppUrl.js";
+import { ensureUserRow } from "../lib/ensureUserRow.js";
 import {
   getUncachableStripeClient,
   getStripePublishableKey,
@@ -225,6 +226,10 @@ router.get("/billing/plans", async (_req, res): Promise<void> => {
 
 router.get("/billing/subscription", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
+  // Sprint 1 P1-ON-01: client may race /auth/me on first sign-in. JIT-provision
+  // the users row idempotently before reading so the downstream select can't
+  // 404 just because the user hit /billing/subscription before /auth/me.
+  await ensureUserRow(userId);
   try {
     const [user] = await db
       .select({
@@ -405,6 +410,8 @@ router.post("/billing/checkout", requireAuth, requireDisclaimer, async (req, res
 
   try {
     // Get user email for customer creation
+    // Sprint 1 P1-ON-01: JIT-provision before read.
+    await ensureUserRow(userId);
     const [user] = await db
       .select({ email: usersTable.email, billingEmail: usersTable.billingEmail })
       .from(usersTable)
@@ -453,6 +460,8 @@ router.post("/billing/checkout", requireAuth, requireDisclaimer, async (req, res
 router.post("/billing/portal", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
 
+  // Sprint 1 P1-ON-01: JIT-provision before read.
+  await ensureUserRow(userId);
   try {
     const [user] = await db
       .select({ stripeCustomerId: usersTable.stripeCustomerId, email: usersTable.email })
@@ -616,6 +625,8 @@ router.post("/billing/topup", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  // Sprint 1 P1-ON-01: JIT-provision before read.
+  await ensureUserRow(userId);
   try {
     const [user] = await db
       .select({ email: usersTable.email, billingEmail: usersTable.billingEmail })
@@ -686,6 +697,8 @@ router.post("/billing/pay_outstanding", requireAuth, async (req, res): Promise<v
     const amountCents = Math.max(50, Math.ceil(health.netOwed * 100));
     const amountUsd   = amountCents / 100;
 
+    // Sprint 1 P1-ON-01: JIT-provision before read.
+    await ensureUserRow(userId);
     const [user] = await db
       .select({ email: usersTable.email, billingEmail: usersTable.billingEmail })
       .from(usersTable)

@@ -131,7 +131,10 @@ function TopBar({
       <span style={{
         color: N.BRAND, fontWeight: 800,
         textShadow: `0 0 10px ${N.BRAND_GLOW}`,
-      }}>AICANDLEZ</span>
+      }}>AICandlez</span>
+      {/* Sprint 1 P1-UI-02: customer surface is "AICandlez" (proper case) and
+          never sees operator-internal language. Admin retains the operator
+          label — admin/customer split is enforced by host routing upstream. */}
       <span style={{ color: N.TEXT_2 }}>· {isAdmin ? "OPERATOR · LIVE" : "AI PAPER TRADING"}</span>
 
       {statusPill}
@@ -4706,8 +4709,8 @@ function PortalInner() {
         color: N.TEXT_2, fontSize: 9, letterSpacing: "0.20em",
       }}>
         {isAdmin
-          ? "AICANDLEZ · OPERATOR WORKSTATION · KRAKEN LIVE EXECUTION · INTERNAL USE ONLY"
-          : "AICANDLEZ · AI-ASSISTED ALPACA PAPER TRADING · $100,000 SIMULATED CAPITAL · ZERO RISK"}
+          ? "AICandlez · OPERATOR WORKSTATION · KRAKEN LIVE EXECUTION · INTERNAL USE ONLY"
+          : "AICandlez · AI-ASSISTED ALPACA PAPER TRADING · $100,000 SIMULATED CAPITAL · ZERO RISK"}
       </footer>
 
       <UpgradeModal    open={upgradeOpen}    onClose={() => setUpgradeOpen(false)}

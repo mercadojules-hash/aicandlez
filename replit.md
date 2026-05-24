@@ -384,6 +384,18 @@ git history.
 
 ---
 
+## On-call procedure (P0-01 mitigation — Option B)
+
+`forceRestoreBilling` and `waiveAllPendingFees` are super-admin only by
+design (no code change). To prevent on-call lockout when only one
+super-admin is reachable:
+- Maintain at least **two active super-admin Clerk users** at all times.
+- Document the rotation in the internal ops runbook (out-of-band).
+- Sprint 1 added a **72-hour restore grace window** in
+  `evaluateAndEnforceBillingHold` so a force-restore stays durable even
+  if the next fee tick re-evaluates a still-unpaid balance. Window resets
+  on every admin action; auto-enforcement resumes after expiry.
+
 ## User Preferences
 
 - Always brand work as **AICandlez** (never apex / apexdigital legacy names)

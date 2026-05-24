@@ -43,6 +43,26 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { logger } from "./logger.js";
+import { invalidateTradeLimitCache } from "./tradeLimitEngine.js";
+
+// ── Restore-override grace window (Sprint 1 fix P1-EX-02) ───────────────────
+//
+// When a super-admin force-restores a user out of billing_hold, the prior
+// behaviour was: the next fee tick re-ran `evaluateAndEnforceBillingHold`,
+// found the same unpaid debt, and immediately re-engaged the hold — making
+// `forceRestoreBilling` an effective no-op.
+//
+// To make admin restorations durable WITHOUT a schema migration, we reuse
+// the existing `user_admin_status.set_by_admin_id` + `updated_at` columns
+// as an in-band marker:
+//   - `setByAdminId === "system_billing"` → automated; freely re-engageable
+//   - `setByAdminId === <real admin id>` AND `updatedAt > now - WINDOW`
+//     → grace period; skip re-engagement and log
+//
+// 72 hours gives the admin a working window to either (a) collect the
+// promised payment, (b) waive the fees explicitly via waiveAllPendingFees,
+// or (c) let the grace expire (after which auto-enforcement resumes).
+const FORCE_RESTORE_GRACE_MS = 72 * 60 * 60 * 1000;
 
 // Drizzle's transaction handle type. Using `any` here keeps the function
 // signatures readable without dragging in the full PgTransaction generic
@@ -328,6 +348,17 @@ export async function evaluateAndEnforceBillingHold(userId: string): Promise<{
   const health = await checkBillingHealth(userId);
   const cur    = health.currentStatus;
 
+  // Read the full status row so we can also see who set it and when —
+  // needed for the restore-override grace check below.
+  const [statusMeta] = await db
+    .select({
+      setByAdminId: userAdminStatusTable.setByAdminId,
+      updatedAt:    userAdminStatusTable.updatedAt,
+    })
+    .from(userAdminStatusTable)
+    .where(eq(userAdminStatusTable.userId, userId))
+    .limit(1);
+
   // Operator-set moderation takes precedence — never auto-touch.
   if (cur === "suspended" || cur === "disabled") {
     return { health, mutated: false, newStatus: cur };
@@ -340,6 +371,33 @@ export async function evaluateAndEnforceBillingHold(userId: string): Promise<{
       logger.info(
         { userId, health },
         "billing: would set billing_hold but user is force_paper (operator); skipping status change",
+      );
+      return { health, mutated: false, newStatus: cur };
+    }
+
+    // Restore-override grace window (Sprint 1 P1-EX-02): if a real admin
+    // (not "system_billing") moved the user to `active` within the last
+    // FORCE_RESTORE_GRACE_MS, do NOT auto-re-engage the hold. The admin
+    // expects their decision to stick for the grace window; if the debt
+    // is real and unpaid, they should either waive it explicitly or wait
+    // for the window to expire.
+    if (
+      cur === "active" &&
+      statusMeta?.setByAdminId &&
+      statusMeta.setByAdminId !== "system_billing" &&
+      statusMeta.updatedAt &&
+      Date.now() - statusMeta.updatedAt.getTime() < FORCE_RESTORE_GRACE_MS
+    ) {
+      logger.info(
+        {
+          userId,
+          health,
+          setByAdminId: statusMeta.setByAdminId,
+          restoredAt:   statusMeta.updatedAt.toISOString(),
+          graceMsLeft:
+            FORCE_RESTORE_GRACE_MS - (Date.now() - statusMeta.updatedAt.getTime()),
+        },
+        "billing: would re-engage billing_hold but admin force-restore grace window is active; skipping",
       );
       return { health, mutated: false, newStatus: cur };
     }
@@ -371,6 +429,12 @@ export async function evaluateAndEnforceBillingHold(userId: string): Promise<{
         plan:        health.plan,
       },
     });
+    // Bust any per-user cached trade-limit verdict so the next live-order
+    // attempt re-reads the (now-blocked) status without waiting for TTL.
+    // userStatusGuard itself is uncached, but this is defensive against
+    // future code paths that may consult the cached tradeLimitEngine.
+    invalidateTradeLimitCache(userId);
+
     logger.warn({ ...health }, "billing_hold ENGAGED");
     return { health, mutated: true, newStatus: "billing_hold" };
   }
@@ -396,6 +460,7 @@ export async function evaluateAndEnforceBillingHold(userId: string): Promise<{
         threshold:   health.threshold,
       },
     });
+    invalidateTradeLimitCache(userId);
     logger.info({ ...health }, "billing_hold CLEARED → active");
     return { health, mutated: true, newStatus: "active" };
   }
@@ -617,11 +682,20 @@ export async function forceRestoreBilling(args: {
     })
     .where(eq(userAdminStatusTable.userId, args.userId));
 
+  // Sprint 1 P1-EX-02: invalidate any cached verdict so the user can place
+  // a live order immediately, without waiting for the trade-limit TTL.
+  invalidateTradeLimitCache(args.userId);
+
   await writeBillingAudit({
     actorId: args.actorAdminId,
     userId:  args.userId,
     action:  "billing_hold_force_cleared",
-    payload: { previousStatus, note: args.note },
+    payload: {
+      previousStatus,
+      note:           args.note,
+      graceWindowMs:  FORCE_RESTORE_GRACE_MS,
+      graceExpiresAt: new Date(Date.now() + FORCE_RESTORE_GRACE_MS).toISOString(),
+    },
   });
 
   return { previousStatus };

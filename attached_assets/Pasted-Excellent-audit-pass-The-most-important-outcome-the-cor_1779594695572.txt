@@ -1,0 +1,105 @@
+Excellent audit pass.
+
+The most important outcome:
+the core architecture held under review.
+
+Verified safe:
+
+* tradingLoop kill-switch
+* Stripe idempotency
+* top-up protection
+* open-position safety
+* billing enforcement boundaries
+
+That is the correct foundation for launch stabilization.
+
+====================================================
+DECISIONS
+=========
+
+P0-01 decision:
+Choose OPTION B.
+
+Keep:
+
+* Force Restore
+* Waive Fees
+
+SUPER-ADMIN ONLY.
+
+Do NOT downgrade casually to operator-level authority.
+
+Reason:
+Those are financial authority actions.
+
+Future operator/moderator/support roles should NOT automatically gain:
+
+* fee waivers
+* forced restorations
+* billing overrides
+
+Correct direction:
+Add:
+“Request Super-Admin Restore” escalation workflow later.
+
+For now:
+document on-call procedure temporarily if needed.
+
+====================================================
+PRIORITY FIX ORDER APPROVED
+===========================
+
+Proceed with Sprint 1 focused on:
+
+1. restore durability issue
+   (forceRestore immediately re-holds on next fee tick)
+
+2. userStatusGuard race window
+   (5s cache allowing one extra live execution)
+
+3. JIT user provisioning race
+   (/billing/subscription 404 before auth/me sync)
+
+4. customer-facing billing_hold visibility
+   (global indicator outside /billing)
+
+5. customer portal wording leaks
+
+* remove “OPERATOR · LIVE”
+* remove institutional leakage
+* preserve admin/operator terminology ONLY in admin surfaces
+
+====================================================
+IMPORTANT
+=========
+
+Natura and AICandlez must remain fully isolated systems.
+
+No shared:
+
+* branding
+* terminology
+* billing
+* onboarding
+* admin surfaces
+* marketing language
+
+Maintain strict separation.
+
+====================================================
+DO NOT START NEW FEATURES
+=========================
+
+No:
+
+* new exchanges
+* social systems
+* leaderboard systems
+* gamification systems
+* advanced automation
+* mobile-native rewrites
+
+Still in:
+Launch Stabilization Mode.
+
+Proceed with Sprint 1 fixes only.

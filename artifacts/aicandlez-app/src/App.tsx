@@ -5,6 +5,7 @@ import {
 } from "@clerk/react";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { BottomNav } from "@/components/BottomNav";
+import { BillingHoldBanner } from "@/components/BillingHoldBanner";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
 import { SubscriptionModal }    from "@/components/SubscriptionModal";
@@ -347,6 +348,17 @@ function Nav() {
   );
 }
 
+// ── Global billing-hold indicator (Sprint 1 P1-ON-02) ────────────────────────
+// Sits above page content on every signed-in route. The component itself
+// hides on /billing and unauthenticated surfaces.
+function GlobalBillingHoldIndicator() {
+  return (
+    <ClerkLoaded>
+      <Show when="signed-in"><BillingHoldBanner /></Show>
+    </ClerkLoaded>
+  );
+}
+
 // ── Page router ────────────────────────────────────────────────────────────────
 function Pages() {
   return (
@@ -448,6 +460,7 @@ function Shell() {
       <SubscriptionProvider>
         <div style={{ display: "flex", flexDirection: "column", height: "100dvh",
           maxWidth: 480, margin: "0 auto", background: "#000000", overflow: "hidden" }}>
+          <GlobalBillingHoldIndicator />
           <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden",
             paddingTop: "env(safe-area-inset-top, 0px)" }}>
             <Pages />
