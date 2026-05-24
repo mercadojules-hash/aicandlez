@@ -369,11 +369,18 @@ is milestone reference only.
 - **Phase 4** — VAPID push infra; Module 20 Desktop Terminal; production deployment scaffolding (`DEPLOYMENT.md`, `render.yaml` × 4 services).
 - **Phase 5** — Cyan → neon-green system-wide pivot; brand tokens, glass primitives, animation library; legacy aliases preserved.
 - **Phase 5.1–5.3** — PWA home radar polish; cinematic typography; 3-tier billing ladder; `lib/feedback.ts` (10 alert types); Crypto/Equity signals preview blocks; tier-conditional `UpgradeBanner` + `FeatureGate`.
-- **Task #157** — Customer/Admin portal separation invariant locked; `customer_live_execution_disabled` kill switch (3 enforcement points + dedicated test).
-- **Task #158** — Read-only telemetry surface: `adminUserTelemetry` (per-user + leaderboards), `adminTopTelemetry` (platform), `operatorTelemetry`.
-- **Task #159** — 10 operator action endpoints in `adminUserActions.ts` + immutable audit + Stripe billing actions + `executionStreamBus` events.
-- **Task #160 (umbrella, in progress)** — Phased operator administration; Phases 1–6 backend complete (DB schemas, audit, trade-limit engine, isolation, telemetry, actions); Phase A telemetry contract audit complete with `tradesToday` + `equityUsd` added to list payload; Phase E UI deferred until live env stabilization.
-- **Task #162** — Launch routing + auth unification: PWA `/portal` no longer self-loops (default cross-app target = `trade.aicandlez.com`, env `VITE_TRADING_DASHBOARD_URL`); Stripe checkout return URLs in `aicandlez-app` (Billing, Subscribe, SubscriptionModal, Account) now derive from `import.meta.env.BASE_URL` so they work on both dev (`/aicandlez-app/`) and prod (`/` on app.aicandlez.com); trading-dashboard `SignIn`/`SignUp` `fallbackRedirectUrl` lands at root so `SignedInHomeRouter` role-dispatches in one hop instead of bouncing customers through `/command → AdminOnly → /portal`; landing CTAs route to customer desktop portal (`TRADE_HOME_URL` = `https://trade.aicandlez.com`) via new `artifacts/landing/src/lib/appUrls.ts` helper instead of `app.aicandlez.com/portal` (double-bounce); `MobileShowcase` "Open as PWA" affordance also points at `TRADE_HOME_URL`. DEPLOYMENT.md routing matrix updated to 4-host model (app + trade + admintrade + api).
+Per-task narration condensed to milestone refs — invariants and contracts
+above (Architectural separation, Cross-host routing matrix, Authentication,
+AI Trading Architecture) carry the operationally-binding rules. Detail in
+git history.
+
+- **Task #157** — Customer/Admin portal separation invariant locked; `customer_live_execution_disabled` kill switch.
+- **Task #158** — Read-only telemetry surfaces: `adminUserTelemetry`, `adminTopTelemetry`, `operatorTelemetry`.
+- **Task #159** — Operator action endpoints + immutable audit + Stripe billing actions + `executionStreamBus`.
+- **Task #160** — Phased operator administration (Phases 1–6 backend complete; Phase E UI deferred).
+- **Task #162** — Launch routing + auth unification: 4-host model (app/trade/admintrade/api); PWA `/portal` cross-host bounce (`VITE_PORTAL_URL`); Stripe return URLs server-derived via Origin allow-list (`resolveCustomerAppBaseUrl`); landing CTAs → `trade.aicandlez.com/portal` (`TRADE_PORTAL_URL`); SignedInHomeRouter env-driven role dispatch.
+- **Task #163** — Customer portal restored to PAPER mode via `LiveControlBar` PAPER state (CRYPTO + EQUITIES bars on `trade/portal`); pricing copy cleanup ("No subscription" lines removed).
+- **Task #164** — Locked platform color rule: ORANGE = any live affordance (ARMED + EXECUTING), GREEN = PAPER only, RED = HALTED. Single source-of-truth in `LiveControlBar.tsx`.
 
 ---
 
