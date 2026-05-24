@@ -16,6 +16,7 @@ export * from "./auditLog";
 export * from "./userTradeLimits";
 export * from "./userAdminStatus";
 export * from "./userAdminActions";
+export * from "./userSessions";
 export * from "./userCredits";
 export * from "./creditTransactions";
 export * from "./processedStripeEvents";

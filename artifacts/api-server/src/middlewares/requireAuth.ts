@@ -3,9 +3,14 @@ import type { Request, Response, NextFunction } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { getUserStatusVerdict } from "../lib/userStatusGuard.js";
+import { touchSession } from "../lib/sessionTracker.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // requireAuth — verifies a Clerk session and attaches clerkUserId to req.
+// Also performs CRM Phase A3 session persistence + revocation gate via
+// `touchSession`: upserts a row in `user_sessions` keyed by Clerk's `sid`,
+// debounced to ~60s between writes, and rejects requests whose session row
+// has been revoked by an operator.
 // ─────────────────────────────────────────────────────────────────────────────
 export const requireAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const auth = getAuth(req);
@@ -15,6 +20,24 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     return;
   }
   (req as Request & { clerkUserId: string }).clerkUserId = userId;
+
+  // Session persistence + revocation gate. `touchSession` is fail-open on
+  // DB error so a transient outage doesn't lock everyone out. Only an
+  // explicit revoked row produces { allow: false }.
+  const sessionVerdict = await touchSession({
+    req,
+    clerkUserId:     userId,
+    clerkSessionId:  auth?.sessionId ?? null,
+  });
+  if (!sessionVerdict.allow) {
+    res.status(401).json({
+      error:     sessionVerdict.reason,
+      errorCode: "session_revoked",
+    });
+    return;
+  }
+  (req as Request & { sessionRowId: string | null }).sessionRowId =
+    sessionVerdict.sessionRowId;
 
   // Hard auth-gate: disabled accounts cannot bootstrap any authenticated
   // surface (paper, live, settings, anything). Soft statuses (suspended,

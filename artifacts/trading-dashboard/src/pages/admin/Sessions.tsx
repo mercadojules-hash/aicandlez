@@ -1,35 +1,45 @@
 /**
- * CRM Phase A — /admin/sessions
+ * CRM Phase A3 — /admin/sessions
  *
- * Live Sessions surface. Foundation page for the Phase A3 sessions /
- * device-tracking infrastructure. Today it surfaces the operator-grade
- * "who is online right now" view derived from the lastActivityAt
- * heuristic baked into adminUserTelemetry (sessionStatus ∈
- * active|idle|offline). Real session rows (sessionId, IP, UA, revoke)
- * land in A3 against the `user_sessions` table — UI shape lives here
- * already so the swap-in is data-only.
+ * Real session rows from `user_sessions` (Phase A3 backend). Each row
+ * represents one Clerk session and exposes a revoke control that
+ * marks the row revoked locally (rejected on the next request by
+ * `requireAuth`) and best-effort revokes the Clerk session JWT too.
  */
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Radio, Loader2, RefreshCw, AlertTriangle, Search } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Radio, Loader2, RefreshCw, AlertTriangle, Search, ShieldOff } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 
-interface SessionUserRow {
-  clerkUserId: string;
-  email: string;
-  plan: string;
-  adminStatus: string;
-  sessionStatus: "active" | "idle" | "offline";
-  lastActivityAt: number | null;
-  activeExchange: { name: string; mode: string } | null;
-  aiUsage24h: number;
-  exchangesConnected: number;
-  hasLiveExchange: boolean;
-  onlineNow: boolean;
+type SessionStatus = "active" | "idle" | "offline" | "revoked";
+
+interface SessionRow {
+  id:               string;
+  clerkSessionId:   string | null;
+  clerkUserId:      string;
+  email:            string | null;
+  plan:             string | null;
+  role:             string | null;
+  ipAddress:        string | null;
+  userAgent:        string | null;
+  firstSeenAt:      string;
+  lastSeenAt:       string;
+  revokedAt:        string | null;
+  revokedByAdminId: string | null;
+  revokeReason:     string | null;
+  status:           SessionStatus;
 }
 
-function fmtAgo(ms: number | null): string {
-  if (!ms) return "—";
+interface SessionsResponse {
+  sessions: SessionRow[];
+  counts:   { total: number; active: number; idle: number; offline: number; revoked: number };
+  timestamp: number;
+}
+
+function fmtAgo(iso: string | null): string {
+  if (!iso) return "—";
+  const ms = new Date(iso).getTime();
+  if (!Number.isFinite(ms)) return "—";
   const sec = Math.max(0, Math.floor((Date.now() - ms) / 1000));
   if (sec < 60)    return `${sec}s`;
   if (sec < 3600)  return `${Math.floor(sec / 60)}m`;
@@ -37,41 +47,87 @@ function fmtAgo(ms: number | null): string {
   return `${Math.floor(sec / 86400)}d`;
 }
 
-function sessionColor(s: SessionUserRow["sessionStatus"]) {
-  return s === "active" ? "#00ff8a" : s === "idle" ? "#ffaa00" : "#4a6a80";
+function shortUa(ua: string | null): string {
+  if (!ua) return "—";
+  const lower = ua.toLowerCase();
+  let os = "Other";
+  if (lower.includes("iphone") || lower.includes("ipad"))      os = "iOS";
+  else if (lower.includes("android"))                          os = "Android";
+  else if (lower.includes("mac os") || lower.includes("macintosh")) os = "macOS";
+  else if (lower.includes("windows"))                          os = "Windows";
+  else if (lower.includes("linux"))                            os = "Linux";
+  let br = "";
+  if (lower.includes("edg/"))            br = "Edge";
+  else if (lower.includes("chrome/"))    br = "Chrome";
+  else if (lower.includes("firefox/"))   br = "Firefox";
+  else if (lower.includes("safari/"))    br = "Safari";
+  return br ? `${br} · ${os}` : os;
+}
+
+function statusColor(s: SessionStatus): string {
+  return s === "active"  ? "#00ff8a"
+       : s === "idle"    ? "#ffaa00"
+       : s === "revoked" ? "#ff3355"
+       :                   "#4a6a80";
 }
 
 export default function AdminSessions() {
-  const [filter, setFilter] = useState<"all" | "active" | "idle" | "offline">("active");
+  const qc = useQueryClient();
+  const [filter, setFilter] = useState<SessionStatus | "all">("active");
   const [q, setQ] = useState("");
 
-  const { data: users = [], isLoading, isError, refetch } = useQuery<SessionUserRow[]>({
-    queryKey: ["admin-sessions"],
+  const { data, isLoading, isError, refetch } = useQuery<SessionsResponse>({
+    queryKey: ["admin-sessions", filter],
     queryFn: async () => {
-      // Backend caps pageSize at 200; requesting more silently truncates.
-      const res = await authFetch(`/api/admin/users?pageSize=200&sort=lastActivityAt&dir=desc`);
+      const res = await authFetch(`/api/admin/sessions?filter=all&pageSize=500`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const body = await res.json() as { users?: SessionUserRow[] };
-      return body.users ?? [];
+      return res.json() as Promise<SessionsResponse>;
     },
     refetchInterval: 5_000,
     staleTime: 2_000,
   });
 
+  const sessions = data?.sessions ?? [];
+  const counts   = data?.counts ?? { total: 0, active: 0, idle: 0, offline: 0, revoked: 0 };
+
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
-    return users.filter(u => {
-      if (filter !== "all" && u.sessionStatus !== filter) return false;
-      if (ql && !u.email.toLowerCase().includes(ql)) return false;
+    return sessions.filter(s => {
+      if (filter !== "all" && s.status !== filter) return false;
+      if (ql) {
+        const hay = `${s.email ?? ""} ${s.clerkUserId} ${s.ipAddress ?? ""}`.toLowerCase();
+        if (!hay.includes(ql)) return false;
+      }
       return true;
     });
-  }, [users, filter, q]);
+  }, [sessions, filter, q]);
 
-  const counts = useMemo(() => ({
-    active:  users.filter(u => u.sessionStatus === "active").length,
-    idle:    users.filter(u => u.sessionStatus === "idle").length,
-    offline: users.filter(u => u.sessionStatus === "offline").length,
-  }), [users]);
+  const revoke = useMutation({
+    mutationFn: async (args: { sessionRowId: string; note: string }) => {
+      const res = await authFetch(`/api/admin/sessions/${args.sessionRowId}/revoke`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ note: args.note }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-sessions"] });
+    },
+  });
+
+  const handleRevoke = (row: SessionRow) => {
+    const note = window.prompt(
+      `Revoke session for ${row.email ?? row.clerkUserId}?\n\nThis force-signs them out on the next request.\n\nOperator note (required):`,
+      "",
+    );
+    if (!note || !note.trim()) return;
+    revoke.mutate({ sessionRowId: row.id, note: note.trim() });
+  };
 
   return (
     <div className="min-h-screen" style={{ background: "#060810", color: "#EAF2FF" }}>
@@ -97,9 +153,9 @@ export default function AdminSessions() {
 
       <div className="p-6 space-y-6 max-w-screen-2xl mx-auto">
         {/* ── Counters ─────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-3 gap-3">
-          {(["active", "idle", "offline"] as const).map(k => {
-            const c = sessionColor(k);
+        <div className="grid grid-cols-4 gap-3">
+          {(["active", "idle", "offline", "revoked"] as const).map(k => {
+            const c = statusColor(k);
             return (
               <div key={k} className="rounded border p-4" style={{ background: "#010C18", borderColor: "#0d1e2e" }}>
                 <div className="flex items-center gap-2 mb-2">
@@ -112,7 +168,10 @@ export default function AdminSessions() {
                   {counts[k]}
                 </div>
                 <div className="text-[8px] font-mono mt-1" style={{ color: "#4a6a80" }}>
-                  {k === "active"  ? "Last activity < 2 min"  : k === "idle" ? "Last activity < 30 min" : "Older or never"}
+                  {k === "active"  ? "Last seen < 2 min"
+                  : k === "idle"   ? "Last seen < 30 min"
+                  : k === "offline"? "Older or never"
+                  :                  "Operator-revoked"}
                 </div>
               </div>
             );
@@ -129,7 +188,7 @@ export default function AdminSessions() {
             </span>
             <div className="flex-1" />
             <div className="flex items-center gap-1">
-              {(["all", "active", "idle", "offline"] as const).map(k => (
+              {(["all", "active", "idle", "offline", "revoked"] as const).map(k => (
                 <button key={k} onClick={() => setFilter(k)}
                   className="px-2.5 py-1 rounded font-mono text-[8px] font-bold border uppercase"
                   style={filter === k
@@ -143,8 +202,8 @@ export default function AdminSessions() {
               style={{ background: "#010C18", borderColor: "#1a2a36" }}>
               <Search className="w-3 h-3" style={{ color: "#4a6a80" }} />
               <input value={q} onChange={e => setQ(e.target.value)}
-                placeholder="Search email…"
-                className="bg-transparent font-mono text-[9px] outline-none w-36"
+                placeholder="Search email / ip / id…"
+                className="bg-transparent font-mono text-[9px] outline-none w-48"
                 style={{ color: "#EAF2FF" }} />
             </div>
           </div>
@@ -153,7 +212,7 @@ export default function AdminSessions() {
             <table className="w-full">
               <thead>
                 <tr style={{ borderBottom: "1px solid #0d1e2e", background: "#000" }}>
-                  {["SESSION", "USER", "PLAN", "ADMIN STATUS", "ACTIVE EXCHANGE", "EXCHANGES", "AI USAGE 24H", "LAST ACTIVITY"].map(h => (
+                  {["STATUS", "USER", "PLAN", "DEVICE", "IP", "FIRST SEEN", "LAST SEEN", ""].map(h => (
                     <th key={h} className="px-3 py-2.5 text-left">
                       <span className="text-[8px] font-mono font-bold tracking-[0.15em]" style={{ color: "#4a6a80" }}>{h}</span>
                     </th>
@@ -177,69 +236,82 @@ export default function AdminSessions() {
                     <div className="text-[10px] font-mono" style={{ color: "#4a6a80" }}>No sessions match this filter.</div>
                   </td></tr>
                 )}
-                {filtered.map((u, i) => {
-                  const c = sessionColor(u.sessionStatus);
+                {filtered.map((s, i) => {
+                  const c = statusColor(s.status);
+                  const revoked = s.status === "revoked";
                   return (
-                    <tr key={u.clerkUserId} className="border-b transition-all"
+                    <tr key={s.id} className="border-b transition-all"
                       style={{ borderColor: "#0a1520", background: i % 2 === 0 ? "#010C18" : "#020E1E" }}>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full"
                             style={{ background: c, boxShadow: `0 0 4px ${c}` }} />
                           <span className="text-[8px] font-bold font-mono uppercase" style={{ color: c }}>
-                            {u.sessionStatus}
+                            {s.status}
                           </span>
                         </div>
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="text-[10px] font-bold font-mono truncate" style={{ color: "#EAF2FF", maxWidth: 220 }}>
-                          {u.email}
+                          {s.email ?? "(unknown)"}
                         </div>
                         <div className="text-[8px] font-mono truncate" style={{ color: "#3a5a70", maxWidth: 240 }}>
-                          {u.clerkUserId}
+                          {s.clerkUserId}
                         </div>
                       </td>
                       <td className="px-3 py-2.5">
-                        <span className="text-[8px] font-bold font-mono uppercase" style={{ color: u.plan === "pro" ? "#cc55ff" : u.plan === "starter" ? "#00aaff" : "#4a6a80" }}>
-                          {u.plan || "free"}
+                        <span className="text-[8px] font-bold font-mono uppercase"
+                          style={{ color: s.plan === "pro" ? "#cc55ff" : s.plan === "starter" ? "#00aaff" : "#4a6a80" }}>
+                          {s.plan ?? "free"}
+                        </span>
+                        {s.role && s.role !== "user" && (
+                          <span className="ml-1.5 text-[7px] font-bold font-mono px-1 py-0.5 rounded uppercase"
+                            style={{ background: "#ff884414", color: "#ff8844", border: "1px solid #ff884430" }}>
+                            {s.role}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className="text-[9px] font-mono" style={{ color: "#9FB3C8" }}>
+                          {shortUa(s.userAgent)}
                         </span>
                       </td>
                       <td className="px-3 py-2.5">
-                        <span className="text-[8px] font-bold font-mono uppercase" style={{ color: u.adminStatus === "active" ? "#00ff8a" : "#ff8844" }}>
-                          {u.adminStatus}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {u.activeExchange ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-bold font-mono uppercase" style={{ color: "#EAF2FF" }}>
-                              {u.activeExchange.name}
-                            </span>
-                            <span className="text-[7px] font-bold font-mono px-1 py-0.5 rounded uppercase"
-                              style={{
-                                background: u.activeExchange.mode === "live" ? "#ff884414" : "#00aaff14",
-                                color:      u.activeExchange.mode === "live" ? "#ff8844"   : "#00aaff",
-                                border:    `1px solid ${u.activeExchange.mode === "live" ? "#ff884430" : "#00aaff30"}`,
-                              }}>
-                              {u.activeExchange.mode}
-                            </span>
-                          </div>
-                        ) : <span className="text-[10px] font-mono" style={{ color: "#3a5a70" }}>—</span>}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <span className="text-[10px] font-bold font-mono" style={{ color: u.hasLiveExchange ? "#ff8844" : "#00aaff" }}>
-                          {u.exchangesConnected}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <span className="text-[10px] font-bold font-mono" style={{ color: u.aiUsage24h > 0 ? "#7b68ee" : "#3a5a70" }}>
-                          {u.aiUsage24h}
+                        <span className="text-[9px] font-mono" style={{ color: s.ipAddress ? "#7a9eb8" : "#3a5a70" }}>
+                          {s.ipAddress ?? "—"}
                         </span>
                       </td>
                       <td className="px-3 py-2.5">
                         <span className="text-[10px] font-mono" style={{ color: "#9FB3C8" }}>
-                          {fmtAgo(u.lastActivityAt)}
+                          {fmtAgo(s.firstSeenAt)}
                         </span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className="text-[10px] font-mono" style={{ color: revoked ? "#ff335580" : "#9FB3C8" }}>
+                          {revoked
+                            ? `revoked ${fmtAgo(s.revokedAt)}`
+                            : fmtAgo(s.lastSeenAt)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {revoked ? (
+                          <span className="text-[8px] font-mono uppercase" style={{ color: "#ff335580" }}>
+                            revoked
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleRevoke(s)}
+                            disabled={revoke.isPending}
+                            className="flex items-center gap-1 px-2 py-1 rounded border font-mono text-[8px] font-bold uppercase"
+                            style={{
+                              background:  "#ff335514",
+                              borderColor: "#ff335530",
+                              color:       "#ff3355",
+                              opacity:     revoke.isPending ? 0.4 : 1,
+                            }}>
+                            <ShieldOff className="w-3 h-3" /> Revoke
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -249,19 +321,12 @@ export default function AdminSessions() {
           </div>
         </div>
 
-        {/* ── Foundation note ─────────────────────────────────────────── */}
-        <div className="rounded border p-4" style={{ background: "#010C18", borderColor: "#1a2a36" }}>
-          <div className="text-[9px] font-mono font-bold tracking-[0.2em] mb-2" style={{ color: "#ff884480" }}>
-            FOUNDATION NOTE — PHASE A3
+        {revoke.isError && (
+          <div className="rounded border p-3 text-[10px] font-mono"
+            style={{ background: "#ff335508", borderColor: "#ff335530", color: "#ff3355" }}>
+            Revoke failed: {(revoke.error as Error)?.message ?? "unknown error"}
           </div>
-          <div className="text-[10px] font-mono leading-relaxed" style={{ color: "#7a9eb8" }}>
-            Session status here is derived from the user's <code>lastActivityAt</code> heuristic
-            (active &lt; 2 min · idle &lt; 30 min · offline ≥ 30 min). Real per-session rows —
-            sessionId, IP address, device/UA, revocation — land in CRM Phase A3 against the
-            new <code style={{ color: "#ff8844" }}>user_sessions</code> table. The UI shape and
-            filter primitives are committed today so the A3 swap-in is data-only.
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
