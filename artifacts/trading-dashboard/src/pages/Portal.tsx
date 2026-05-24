@@ -3747,6 +3747,29 @@ export default function Portal() {
 function PortalInner() {
   const { isAdmin, loading: roleLoading } = useUserRole();
   const { getToken, isSignedIn } = useAuth();
+
+  // ── Hydration gate watchdog (staged rendering) ────────────────────────────
+  // The hydration gate (see `if (roleLoading)` below) exists to prevent the
+  // customer/admin flicker on first paint. But /api/auth/me can take 1–3s
+  // in production (cross-host cookies, upstream 502s + retry backoff), and a
+  // monolithic gate that long feels broken. Staged approach:
+  //
+  //   • 0–800ms while roleLoading      → full "Resolving session…" gate
+  //   • >800ms while roleLoading       → role-NEUTRAL workstation chrome
+  //     skeleton (header + logo + skeleton panels). NO admin-specific or
+  //     customer-specific content — preserves the no-flicker invariant.
+  //   • roleLoading resolves           → full Portal body (current behaviour)
+  //
+  // Target: gate clears within ~300–800ms in the happy path; even on a 2s
+  // /auth/me, the user sees workstation chrome (not a frozen spinner) at
+  // 800ms while telemetry continues to load.
+  const [gateTimedOut, setGateTimedOut] = useState(false);
+  useEffect(() => {
+    if (!roleLoading) { setGateTimedOut(false); return; }
+    const t = setTimeout(() => setGateTimedOut(true), 800);
+    return () => clearTimeout(t);
+  }, [roleLoading]);
+
   const [dbTier, setDbTier] = useState<Plan>("free");
   const [upgradeOpen,    setUpgradeOpen]    = useState(false);
   const [accountOpen,    setAccountOpen]    = useState(false);
@@ -4726,41 +4749,109 @@ function PortalInner() {
     </div>
   );
 
-  // Task #165 — hydration gate. `useUserRole()` resolves async via
-  // /api/auth/me. Without this gate, `isAdmin` defaults to `false` on first
-  // paint and the customer branch flashes for ~300–800ms before the admin
-  // role resolves and the operator branch takes over (visible flicker:
-  // customer dashboard → LIVE EXECUTION bars). Block render entirely until
-  // role + Clerk both resolve. Single source of truth is `roleLoading` from
-  // useUserRole (which itself waits on Clerk `isLoaded` + `/api/auth/me`).
+  // Task #165 — hydration gate (staged, see PortalInner header comment).
+  // `useUserRole()` resolves async via /api/auth/me. Without a gate,
+  // `isAdmin` defaults to `false` on first paint and the customer branch
+  // flashes for ~300–800ms before the admin role resolves (visible flicker:
+  // customer dashboard → LIVE EXECUTION bars). We still gate, but in two
+  // stages: a brief "Resolving session…" spinner for the happy-path 300–800ms,
+  // then a role-NEUTRAL workstation-chrome skeleton if it takes longer. The
+  // skeleton renders no customer- or admin-specific content, so the
+  // no-flicker invariant is preserved even when /auth/me is slow.
   if (roleLoading) {
+    if (!gateTimedOut) {
+      return (
+        <div
+          style={{
+            minHeight: "100vh",
+            background: N.BG,
+            color: N.TEXT_2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: "JetBrains Mono, ui-monospace, monospace",
+            fontSize: 11,
+            letterSpacing: 2,
+            textTransform: "uppercase",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+            <div
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                background: N.BRAND,
+                boxShadow: `0 0 14px ${N.BRAND_GLOW}`,
+                animation: "brand-pulse 1.2s ease-in-out infinite",
+              }}
+            />
+            <span style={{ color: N.TEXT_2 }}>Resolving session…</span>
+          </div>
+        </div>
+      );
+    }
+    // Role-neutral workstation skeleton (post-watchdog). Renders the same
+    // dark surface + brand header strip + three skeleton panels so the user
+    // sees the workstation chrome instead of a spinner that "feels frozen".
+    // No isAdmin-conditional content here — the flicker-prevention invariant
+    // requires that we paint nothing role-specific until role resolves.
     return (
       <div
         style={{
-          minHeight: "100vh",
+          minHeight:  "100vh",
           background: N.BG,
-          color: N.TEXT_2,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          color:      N.TEXT_1,
           fontFamily: "JetBrains Mono, ui-monospace, monospace",
-          fontSize: 11,
-          letterSpacing: 2,
-          textTransform: "uppercase",
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-          <div
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: "50%",
-              background: N.BRAND,
-              boxShadow: `0 0 14px ${N.BRAND_GLOW}`,
-              animation: "brand-pulse 1.2s ease-in-out infinite",
-            }}
-          />
-          <span style={{ color: N.TEXT_2 }}>Resolving session…</span>
+        <div
+          style={{
+            display:        "flex",
+            alignItems:     "center",
+            justifyContent: "space-between",
+            padding:        "14px 24px",
+            borderBottom:   `1px solid ${N.BORDER}`,
+            background:     N.BG,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                width:        10, height: 10, borderRadius: "50%",
+                background:   N.BRAND,
+                boxShadow:    `0 0 14px ${N.BRAND_GLOW}`,
+                animation:    "brand-pulse 1.2s ease-in-out infinite",
+              }}
+            />
+            <span style={{
+              color: N.TEXT_2, fontSize: 10, letterSpacing: "0.22em",
+              textTransform: "uppercase",
+            }}>
+              AICandlez · Loading Workstation
+            </span>
+          </div>
+          <span style={{
+            color: N.TEXT_2, fontSize: 9, letterSpacing: "0.18em",
+            textTransform: "uppercase",
+          }}>
+            Resolving role · Telemetry Pending
+          </span>
+        </div>
+        <div style={{ padding: 24, display: "grid", gap: 14 }}>
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              style={{
+                height:       96,
+                borderRadius: 6,
+                border:       `1px solid ${N.BORDER}`,
+                background:   `linear-gradient(90deg, ${N.BG} 0%, rgba(102,255,102,0.05) 50%, ${N.BG} 100%)`,
+                backgroundSize: "200% 100%",
+                animation:    "shimmer 1.6s linear infinite",
+              }}
+            />
+          ))}
         </div>
       </div>
     );

@@ -96,7 +96,7 @@ export function useUserRole(): UseUserRoleResult {
               if (!cancelled) { setRole("user"); setLoading(false); }
               return;
             }
-            await new Promise((r) => setTimeout(r, 400 * attempt));
+            await new Promise((r) => setTimeout(r, 200 * attempt));
             continue;
           }
 
@@ -116,7 +116,7 @@ export function useUserRole(): UseUserRoleResult {
             if (!cancelled) { setRole("user"); setLoading(false); }
             return;
           }
-          await new Promise((r) => setTimeout(r, 400 * attempt));
+          await new Promise((r) => setTimeout(r, 200 * attempt));
         }
       }
     })();

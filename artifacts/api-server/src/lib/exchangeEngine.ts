@@ -235,6 +235,129 @@ export async function fetchLiveBalances(): Promise<Balances> {
   return { USD: 0, BTC: 0, ETH: 0, SOL: 0 };
 }
 
+// ── Live balances cache + single-flight (telemetry resilience) ───────────────
+// Background: multiple admin telemetry panels poll /api/exchange/balances and
+// /api/exchange/live-state concurrently. Each call hits Kraken's private
+// /0/private/Balance endpoint, which has a strict rate limit. Without
+// coalescing, the parallel callers each trigger an upstream call, Kraken
+// returns `EAPI:Rate limit exceeded`, every panel renders "$0 / Kraken USD
+// unavailable", and the operator dashboard appears disconnected even though
+// the account is healthy (real balances, real positions, prior live trade
+// succeeded).
+//
+// Fix is telemetry-layer ONLY — it does NOT touch the execution path. The
+// Kraken bridge for order placement still calls KrakenAdapter directly with
+// no cache: only the read-side balance polling is coalesced and snapshotted.
+//
+//   1. FRESH window (BALANCES_FRESH_MS): return cached snapshot, no upstream
+//      call. Collapses bursts of concurrent panel polls.
+//   2. Single-flight: one in-flight upstream request at a time; concurrent
+//      callers await the same Promise.
+//   3. STALE-ON-ERROR window (BALANCES_STALE_MS): if the upstream call
+//      fails (rate-limit, timeout, transient) but we have a snapshot within
+//      the stale window, serve it with source="cached" + error message
+//      attached. Telemetry degrades gracefully instead of flipping to zero.
+type BalancesCacheEntry  = { balances: Balances; fetchedAt: number };
+type BalancesPerExchange = { cache: BalancesCacheEntry | null; inflight: Promise<Balances> | null };
+
+// Keyed by exchange name so concurrent callers for different exchanges never
+// share a single-flight promise (architect review caught this: a global
+// inflight could let a Coinbase caller receive Kraken balances if the
+// operator switched mid-flight). Each exchange has its own cache + inflight
+// slot. clearBalancesCache() flips both when the selected exchange changes.
+const _balancesByExchange = new Map<string, BalancesPerExchange>();
+
+const BALANCES_FRESH_MS = 8_000;          // 8s: serve cached, skip upstream
+const BALANCES_STALE_MS = 5 * 60 * 1000;  // 5min: serve cached on error
+
+export type LiveBalancesSource = "live" | "cached" | "stale-error";
+export interface LiveBalancesWithMeta {
+  balances: Balances;
+  exchange: string;
+  source:   LiveBalancesSource;
+  ageMs:    number;
+  error?:   string;
+}
+
+function getBalancesSlot(exchange: string): BalancesPerExchange {
+  let slot = _balancesByExchange.get(exchange);
+  if (!slot) {
+    slot = { cache: null, inflight: null };
+    _balancesByExchange.set(exchange, slot);
+  }
+  return slot;
+}
+
+export async function fetchLiveBalancesWithMeta(): Promise<LiveBalancesWithMeta> {
+  // Capture the exchange selection at call-entry. The slot is keyed by this
+  // value, so even if `_selectedExchange` mutates mid-await we still resolve
+  // against the slot that owns the upstream call we joined.
+  const exchange = _selectedExchange;
+  const slot     = getBalancesSlot(exchange);
+  const now      = Date.now();
+
+  // 1. Fresh cache hit — no upstream call.
+  if (slot.cache && now - slot.cache.fetchedAt < BALANCES_FRESH_MS) {
+    return {
+      balances: slot.cache.balances,
+      exchange,
+      source:   "cached",
+      ageMs:    now - slot.cache.fetchedAt,
+    };
+  }
+
+  // 2. Single-flight per exchange: concurrent callers for the SAME exchange
+  // coalesce; callers for a different exchange use that exchange's own slot.
+  if (!slot.inflight) {
+    slot.inflight = fetchLiveBalances()
+      .then((b) => {
+        slot.cache = { balances: b, fetchedAt: Date.now() };
+        return b;
+      })
+      .finally(() => {
+        slot.inflight = null;
+      });
+  }
+
+  try {
+    const balances = await slot.inflight;
+    return { balances, exchange, source: "live", ageMs: 0 };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+
+    // 3. Stale-on-error: serve last-good snapshot for THIS exchange if still
+    // within the stale window. Slot-scoped → never cross-leaks across
+    // exchanges.
+    if (slot.cache && Date.now() - slot.cache.fetchedAt < BALANCES_STALE_MS) {
+      const ageMs = Date.now() - slot.cache.fetchedAt;
+      console.warn(
+        `[exchangeEngine] fetchLiveBalances upstream failed for ${exchange}; serving stale cache ageMs=${ageMs} err=${msg}`,
+      );
+      return {
+        balances: slot.cache.balances,
+        exchange,
+        source:   "stale-error",
+        ageMs,
+        error:    msg,
+      };
+    }
+
+    // No cache available — bubble error to caller (route renders source="error").
+    throw err;
+  }
+}
+
+/**
+ * Drop in-flight + cached telemetry snapshots. Called from
+ * `setSelectedExchange()` so a switch from e.g. Kraken → Coinbase does not
+ * keep serving Kraken balances out of cache to a poll that started on the
+ * new selection. We clear ALL slots (cheap; map is at most ~6 entries) for
+ * simplicity rather than tracking only the previously-selected slot.
+ */
+export function clearBalancesCache(): void {
+  _balancesByExchange.clear();
+}
+
 // ── Price estimate ─────────────────────────────────────────────────────────────
 
 async function estimatePrice(symbol: string): Promise<number> {
@@ -739,6 +862,14 @@ export interface LiveExchangeState {
 }
 
 export async function getLiveExchangeState(): Promise<LiveExchangeState> {
+  // Capture identity at function entry so a mid-flight setSelectedExchange()
+  // cannot cause us to label balances from exchange A with exchange B's name
+  // (architect review). All response fields derived from selection use this
+  // captured value, not the live `_selectedExchange` global.
+  const entryExchange      = _selectedExchange;
+  const entryApiConfigured = isApiConfigured();
+  const entryLiveCapable   = isLiveCapable();
+
   const today      = new Date().toISOString().slice(0, 10);
   const startOfDay = new Date(today).getTime();
   const filledLifetime = _orders.filter(o => o.status === "filled");
@@ -772,10 +903,19 @@ export async function getLiveExchangeState(): Promise<LiveExchangeState> {
   let balances: Balances = { USD: 0, BTC: 0, ETH: 0, SOL: 0 };
   let source: LiveExchangeState["source"] = "standby";
   let error: string | undefined;
-  if (isApiConfigured()) {
+  if (entryApiConfigured) {
     try {
-      balances = await fetchLiveBalances();
+      // Route through the cached/single-flight wrapper so getLiveExchangeState
+      // and /api/exchange/balances coalesce onto the same upstream call and
+      // share the same stale-on-error snapshot. Without this, the two
+      // endpoints fight for the same Kraken Balance rate-limit budget.
+      const meta = await fetchLiveBalancesWithMeta();
+      balances = meta.balances;
+      // Map telemetry source: stale-on-error still surfaces "live" balances
+      // to the operator grid (so the dashboard does not zero out) but
+      // attaches the error string so the UI can show a "stale" pill.
       source   = "live";
+      if (meta.source === "stale-error" && meta.error) error = meta.error;
     } catch (err) {
       source = "error";
       error  = err instanceof Error ? err.message : String(err);
@@ -874,10 +1014,10 @@ export async function getLiveExchangeState(): Promise<LiveExchangeState> {
 
   return {
     source,
-    exchange:            _selectedExchange,
+    exchange:            entryExchange,
     mode:                _mode,
-    apiConfigured:       isApiConfigured(),
-    liveCapable:         isLiveCapable(),
+    apiConfigured:       entryApiConfigured,
+    liveCapable:         entryLiveCapable,
     balances,
     markPrices,
     totalEquityUSD:      parseFloat(totalEquity.toFixed(2)),
@@ -938,5 +1078,10 @@ export function resetSimBalances(): Balances {
 }
 
 export function setSelectedExchange(name: string): void {
+  const prev = _selectedExchange;
   _selectedExchange = name;
+  // Invalidate cached balances + drop any in-flight upstream calls so the
+  // next /api/exchange/balances poll cannot serve stale data from the
+  // previously-selected exchange. Cheap (Map.clear); see clearBalancesCache.
+  if (prev !== name) clearBalancesCache();
 }

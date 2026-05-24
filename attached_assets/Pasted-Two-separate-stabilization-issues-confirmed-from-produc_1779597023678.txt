@@ -1,0 +1,103 @@
+Two separate stabilization issues confirmed from production screenshots.
+
+ISSUE 1 — excessive hydration gate duration
+
+Both:
+
+* https://admintrade.aicandlez.com/portal
+* https://trade.aicandlez.com/portal
+
+are remaining on:
+"Resolving session..."
+for approximately 10–15 seconds after refresh.
+
+Original hydration gate objective was correct:
+prevent customer/admin flicker.
+
+However:
+the gate now appears to be waiting on too many async dependencies before rendering:
+
+* Clerk auth hydration
+* role resolution
+* /api/auth/me
+* possibly Kraken telemetry preload
+
+This is now a UX/perceived-performance issue.
+
+Target behavior:
+
+* gate should clear within ~300–800ms
+* dashboard chrome should render immediately
+* telemetry/data panels can skeleton-load afterward
+
+Important:
+DO NOT remove the hydration gate entirely.
+The admin/customer flicker fix was correct.
+Need staged rendering instead of monolithic blocking.
+
+---
+
+ISSUE 2 — Kraken telemetry desynchronization
+
+Production Kraken account is healthy.
+
+Kraken Pro screenshot confirms:
+
+* account connected
+* balance exists (~$101.58)
+* ETH position exists
+* prior live trade executed successfully
+
+However:
+admintrade dashboard still shows:
+
+* Kraken USD unavailable
+* $0.00 telemetry
+* failed Kraken auth state
+
+This strongly suggests:
+telemetry synchronization failure,
+NOT execution-path failure.
+
+Because:
+live trade execution already succeeded earlier.
+
+Most likely surfaces:
+
+* adapter health reconciliation
+* telemetry cache invalidation
+* Kraken balance endpoint parse
+* websocket state reconciliation
+* stale adapter snapshot
+* auth-refresh mismatch
+
+Important:
+Treat this as:
+telemetry-layer debugging
+
+NOT:
+execution-engine refactor.
+
+Do NOT:
+
+* rewrite execution queue
+* rewrite Kraken bridge
+* alter order execution path
+* change concurrency gate
+* modify billing enforcement
+
+Need:
+focused telemetry diagnosis only.
+
+Priority order:
+
+1. Fix Kraken telemetry synchronization
+2. Reduce hydration gate duration
+3. Preserve all locked stabilization invariants
+
+Current controlled-beta operational posture remains correct:
+
+* 3 concurrent live trades max
+* low user count
+* manual oversight
+* gradual scaling only

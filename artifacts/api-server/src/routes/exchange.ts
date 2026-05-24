@@ -7,7 +7,7 @@ import {
   togglePause,
   previewOrder,
   executeOrder,
-  fetchLiveBalances,
+  fetchLiveBalancesWithMeta,
   getLiveExchangeState,
   resetSimBalances,
   setSelectedExchange,
@@ -65,18 +65,30 @@ router.get("/exchange/balances", ...requireOperator, async (req, res) => {
   // any failure return source="error" with zero balances. We only emit
   // source="simulation" when no API keys exist at all, and even then with
   // zero balances so the UI displays "—" instead of $100K.
-  const tryLive = async () => {
-    const balances = await fetchLiveBalances();
-    return { source: "live" as const, balances, exchange: status.exchangeName };
-  };
+  // Routes through fetchLiveBalancesWithMeta so concurrent admin panels
+  // coalesce onto a single Kraken Balance call (FRESH window), and a
+  // rate-limit / transient upstream failure serves the last-good snapshot
+  // (STALE window) instead of zeroing the operator telemetry. The route
+  // contract still distinguishes:
+  //   • source="live"        → fresh upstream success
+  //   • source="cached"      → served from in-process cache, recent
+  //   • source="stale-error" → cache served because upstream just failed
+  //                            (error string attached; balances still real)
+  //   • source="error"       → upstream failed AND no usable cache
   if (status.apiConfigured) {
     try {
-      const payload = await tryLive();
-      res.json(payload);
+      const meta = await fetchLiveBalancesWithMeta();
+      res.json({
+        source:   meta.source,
+        balances: meta.balances,
+        exchange: meta.exchange,
+        ageMs:    meta.ageMs,
+        ...(meta.error ? { error: meta.error } : {}),
+      });
       return;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      req.log.error({ err, exchange: status.exchangeName }, "fetchLiveBalances failed");
+      req.log.error({ err, exchange: status.exchangeName }, "fetchLiveBalances failed (no cache fallback)");
       res.json({ source: "error", balances: zero, exchange: status.exchangeName, error: msg });
       return;
     }
