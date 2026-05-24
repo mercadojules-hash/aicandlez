@@ -2,20 +2,19 @@
 
 Institutional AI crypto trading SaaS. pnpm workspace monorepo, TypeScript.
 
-> Only the *current* production-active architecture lives in this file.
-> Historical phase / per-task narration has been removed; git history is
-> the authoritative archive.
+> Only the *current* production-active architecture lives here.
+> Historical phase / per-task narration is preserved in git history.
 
 ---
 
 ## Stack
 
-- **Monorepo**: pnpm workspaces, Node 24, TypeScript 5.9
-- **API**: Express 5 + Drizzle ORM (PostgreSQL) + Zod (`zod/v4`, `drizzle-zod`)
-- **API codegen**: Orval (from OpenAPI in `lib/api-spec`)
-- **Auth**: Replit-managed Clerk (httpOnly cookie web, Bearer mobile)
-- **Billing**: Stripe (3-tier ladder)
-- **Build**: esbuild (CJS bundle for server), Vite (PWA + dashboard + landing)
+- pnpm workspaces, Node 24, TypeScript 5.9
+- API: Express 5 + Drizzle ORM (PostgreSQL) + Zod (`zod/v4`, `drizzle-zod`)
+- API codegen: Orval (from OpenAPI in `lib/api-spec`)
+- Auth: Replit-managed Clerk (httpOnly cookie web, Bearer mobile)
+- Billing: Stripe (3-tier ladder)
+- Build: esbuild (CJS server bundle), Vite (PWA + dashboard + landing)
 
 See `pnpm-workspace` skill for workspace structure and TS project references.
 
@@ -23,172 +22,158 @@ See `pnpm-workspace` skill for workspace structure and TS project references.
 
 ## Artifacts (production-active)
 
-| Artifact              | Kind   | Path             | Role                                                |
-| --------------------- | ------ | ---------------- | --------------------------------------------------- |
-| `landing`             | web    | `/`              | Public marketing landing (signed-out)               |
-| `aicandlez-app`       | web    | `/aicandlez-app` | **Primary PWA** — institutional mobile-first        |
-| `trading-dashboard`   | web    | `/dashboard`     | Operator desktop console (19 modules + `/desktop`)  |
-| `api-server`          | api    | `/api`           | Shared Express backend                              |
-| `natura-ai`           | mobile | `/natura-ai`     | Expo wellness app — **production-frozen**           |
-| `natura-web`          | web    | `/natura-web`    | Legacy companion site                               |
-| `mockup-sandbox`      | design | `/sandbox`       | Canvas iframe variant previews                      |
+| Artifact            | Kind   | Path             | Role                                                |
+| ------------------- | ------ | ---------------- | --------------------------------------------------- |
+| `landing`           | web    | `/`              | Public marketing landing (signed-out)               |
+| `aicandlez-app`     | web    | `/aicandlez-app` | **Primary PWA** — institutional mobile-first        |
+| `trading-dashboard` | web    | `/dashboard`     | Operator console + customer desktop portal          |
+| `api-server`        | api    | `/api`           | Shared Express backend                              |
+| `natura-ai`         | mobile | `/natura-ai`     | Expo wellness app — **production-frozen**           |
+| `natura-web`        | web    | `/natura-web`    | Legacy companion site                               |
+| `mockup-sandbox`    | design | `/sandbox`       | Canvas iframe variant previews                      |
 
-**Mobile freeze (current phase):** `natura-ai` is in production freeze.
-All forward work is on **`aicandlez-app` PWA** + **`trading-dashboard`** desktop
-institutional platform.
-
----
-
-## Billing Structure (current — supersedes all earlier pricing)
-
-3-tier ladder. **No `$5.99` references exist anywhere in the codebase.**
-
-| Plan ID   | Name              | Price   | Capacity                    | Key features                                              |
-| --------- | ----------------- | ------- | --------------------------- | --------------------------------------------------------- |
-| `free`    | Paper Trading     | Free    | Simulated only              | 7-Day AI Paper Trading, signals + watchlists, no live exec |
-| `starter` | AI Trading        | $39.99  | Up to **3** AI trades       | Live AI exec (Alpaca), Auto Trade, analytics              |
-| `pro`     | AI Trading Pro    | $79.99  | Up to **12** AI trades      | Crypto + Equities, priority exec, advanced AI scanners    |
-
-- Performance fee on **profitable closed trades only** (label = `PERFORMANCE_FEE_LABEL` from `lib/fees`)
-- Stripe billing: monthly · cancel anytime · customer portal for downgrades
-
-**Routes:**
-- `Subscribe.tsx` — full marketing 3-tier ladder (entry from upgrade banners)
-- `Billing.tsx` — account billing & plan page with status banner, CURRENT / ACTIVE / PRO ACTIVE badges, upgrade CTAs, Manage Billing portal
-- `SubscriptionContext.tsx` — single source of truth for `plan` (`free`/`starter`/`pro`)
-
-**API:** `POST /billing/checkout`, `POST /billing/portal`, `GET /billing/subscription`
+**Mobile freeze:** `natura-ai` is frozen. Forward work = `aicandlez-app`
+PWA + `trading-dashboard` desktop institutional platform.
 
 ---
 
-## Routing (current)
+## Billing (3-tier ladder)
 
-**aicandlez-app PWA (mobile-first, narrow-viewport customer surface):**
-- `/` Home (radar + AI Market Scanner + Top Gainers + Active Trades)
-- `/signals`, `/crypto`, `/equities`, `/trade`, `/portfolio`
-- `/profile` → AI Settings, **Alert Preferences**, Connected Accounts, Broker
-- `/billing`, `/subscribe`
+**No `$5.99` references exist anywhere in the codebase.**
+
+| Plan ID   | Name           | Price   | Capacity                | Notes                                           |
+| --------- | -------------- | ------- | ----------------------- | ----------------------------------------------- |
+| `free`    | Paper Trading  | Free    | Simulated only          | 7-Day AI Paper, signals + watchlists, no live   |
+| `starter` | AI Trading     | $39.99  | Up to **3** AI trades   | Live AI exec (Alpaca), Auto Trade, analytics    |
+| `pro`     | AI Trading Pro | $79.99  | Up to **12** AI trades  | Crypto + Equities, priority exec, adv scanners  |
+
+- Performance fee **on profitable closed trades only** (label =
+  `PERFORMANCE_FEE_LABEL` from `lib/fees`)
+- Monthly · cancel anytime · customer portal for downgrades
+
+**Routes/state:** `Subscribe.tsx` (marketing ladder), `Billing.tsx`
+(account billing), `SubscriptionContext.tsx` (single source of truth for
+`plan` = `free`/`starter`/`pro`).
+
+**API:** `POST /billing/checkout`, `POST /billing/portal`, `GET /billing/subscription`.
+
+---
+
+## Routing — locked invariants
+
+### aicandlez-app PWA (mobile-first customer surface)
+- `/` Home · `/signals` · `/crypto` · `/equities` · `/trade` · `/portfolio`
+- `/profile` (AI Settings → Alert Preferences → Connected Accounts → Broker)
+- `/billing` · `/subscribe`
 - `/portal` → **CROSS-APP REDIRECT** to trading-dashboard's customer terminal.
-  The mobile PWA does **NOT** render its own desktop terminal. The old
-  `PortalDesktop.tsx` has been deleted. There is no responsive switching,
-  no Home.tsx fallback, no mobile-shell impersonation of the desktop UI.
+  The mobile PWA does NOT render its own desktop terminal. No
+  `PortalDesktop.tsx`, no responsive switching, no mobile-shell
+  impersonation of the desktop UI.
 
-**trading-dashboard (operator console + customer desktop terminal):**
+### trading-dashboard (operator console + customer desktop terminal)
 - `/` Landing (signed-out) → role-based: admin → `/command`, customer → `/portal`
-- `/portal` — **customer institutional desktop workstation** (Portal.tsx, 1846 LOC):
-  Market Heartbeat, Crypto + Equity Signals (top 20 each w/ confidence rings),
-  AI War Room, tier-gated live execution (free/starter/pro), Active Trades,
-  Trade History, Subscription, AI Auto Trade Queue. Signed-in `Protected`,
-  **NOT** AdminOnly — customer auth distinct from operator auth.
-- `/dashboard`, `/market`, `/ai`, `/risk`, `/sim`, `/backtest`, `/optimizer`,
-  `/scanner`, `/portfolio`, `/correlation`, `/journal`, `/validation`,
-  `/sentiment`, `/charts` — signed-in (admin or customer)
-- **Operator/admin only** (`ProtectedAdmin` → bounce to `/portal` for non-admins):
-  `/command`, `/exchange`, `/syscheck`, `/debug`, `/desktop`, `/institutional`, `/admin`
+- `/portal` — **customer institutional desktop workstation**
+  (Portal.tsx). Signed-in `Protected`, **NOT** `AdminOnly`.
+- `/dashboard`, `/market`, `/ai`, `/risk`, `/sim`, `/backtest`,
+  `/optimizer`, `/scanner`, `/portfolio`, `/correlation`, `/journal`,
+  `/validation`, `/sentiment`, `/charts` — signed-in (admin or customer)
+- **Operator/admin only** (`ProtectedAdmin` → bounce to `/portal` for
+  non-admins): `/command`, `/exchange`, `/syscheck`, `/debug`,
+  `/desktop`, `/institutional`, `/admin`
 - `/settings`, `/sign-in/*`, `/sign-up/*`
 
-## Cross-host routing matrix (Task #162 — locked)
+### Cross-host routing matrix (locked)
 
-| Host                              | Signed-out                | Signed-in customer            | Signed-in admin            | Default landing       | Build env                                                                                  |
-| --------------------------------- | ------------------------- | ----------------------------- | -------------------------- | --------------------- | ------------------------------------------------------------------------------------------ |
-| `aicandlez.com` (landing)         | Marketing page            | CTAs → `trade.aicandlez.com`  | CTAs → `trade.aicandlez.com` | Marketing             | `VITE_TRADE_URL=https://trade.aicandlez.com`, `VITE_APP_URL=https://app.aicandlez.com`     |
-| `app.aicandlez.com` (PWA)         | `/` PWA home (Clerk gate) | PWA mobile experience         | PWA mobile experience      | PWA root              | `VITE_TRADING_DASHBOARD_URL=https://trade.aicandlez.com` (for `/portal` cross-host bounce) |
-| `trade.aicandlez.com` (customer)  | Landing → `/sign-in`      | `/portal` (customer desktop)  | `/command` (operator)      | `/portal`             | `VITE_DEFAULT_LANDING=/portal`                                                              |
-| `admintrade.aicandlez.com` (admin)| Landing → `/sign-in`      | **cross-host → `trade./portal`** | `/command` (operator)      | `/command`            | `VITE_DEFAULT_LANDING=/command`, `VITE_CUSTOMER_PORTAL_URL=https://trade.aicandlez.com/portal` |
-| `api.aicandlez.com`               | (API only)                | (API only)                    | (API only)                 | n/a                   | `CUSTOMER_APP_BASE_URL=https://app.aicandlez.com` (Stripe return host fallback)             |
+| Host                                | Signed-out          | Customer                       | Admin                | Default       |
+| ----------------------------------- | ------------------- | ------------------------------ | -------------------- | ------------- |
+| `aicandlez.com` (landing)           | Marketing           | CTAs → `trade.`                | CTAs → `trade.`      | Marketing     |
+| `app.aicandlez.com` (PWA)           | PWA root (gated)    | PWA mobile                     | PWA mobile           | PWA           |
+| `trade.aicandlez.com` (customer)    | Landing → sign-in   | `/portal`                      | `/command`           | `/portal`     |
+| `admintrade.aicandlez.com` (admin)  | Landing → sign-in   | cross-host → `trade./portal`   | `/command`           | `/command`    |
+| `api.aicandlez.com`                 | (API only)          | (API only)                     | (API only)           | n/a           |
 
-**Stripe return URL derivation (api-server `lib/customerAppUrl.ts`):**
-1. Request `Origin` header — if allow-listed (`app.`/`trade.`/`aicandlez.com` apex/www, `*.replit.app`, `*.replit.dev`, localhost).
-2. Else `CUSTOMER_APP_BASE_URL` env.
-3. Else legacy `WEBHOOK_BASE_URL` → `REPLIT_DOMAINS` chain.
-4. Client-provided `successUrl`/`cancelUrl`/`returnUrl` are honored only when their origin matches the resolved host (defense against spoofed Origin → open redirect).
+Required build env per host: `VITE_TRADE_URL`, `VITE_APP_URL`,
+`VITE_TRADING_DASHBOARD_URL`, `VITE_DEFAULT_LANDING`,
+`VITE_CUSTOMER_PORTAL_URL`, `CUSTOMER_APP_BASE_URL`. See `render.yaml`
+for canonical values per service.
 
-**Trading-dashboard role dispatch (`SignedInHomeRouter`, `AdminOnly`):**
-- On the customer host, non-admins → `VITE_DEFAULT_LANDING` (`/portal`); admins → `/command`.
-- On the admin host, non-admins → `CrossAppRedirect(VITE_CUSTOMER_PORTAL_URL)` to keep operator chrome off their screen entirely; admins → `/command`.
+**Stripe return URL derivation** (`api-server lib/customerAppUrl.ts`):
+Origin header (allow-listed) → `CUSTOMER_APP_BASE_URL` → legacy
+`WEBHOOK_BASE_URL` → `REPLIT_DOMAINS`. Client-provided
+`successUrl`/`cancelUrl`/`returnUrl` honored only when origin matches
+resolved host (defense against spoofed Origin → open redirect).
 
-## Architectural separation — CUSTOMER PORTAL vs ADMIN PORTAL (LOCKED INVARIANT)
-
-These are intentionally **two different systems** that happen to share the
-`trading-dashboard` artifact codebase. Future tasks MUST NOT merge them
-back together. Every change to `/portal` must be gated by role and
-preserve both worlds.
-
-### CUSTOMER PORTAL — `trade.aicandlez.com/portal` (non-admin signed-in users)
-Purpose: **paper-only onboarding + AI evaluation platform** (Task #157)
-- PAPER mode ONLY — no LIVE affordances exposed to customers
-- Real-money execution is operated by AICandlez through the admin terminal
-  (`admintrade.aicandlez.com`) using server-side env Kraken keys. Customers
-  do **not** route their own orders to broker networks from the portal.
-- Server-side kill switch: `customer_live_execution_disabled` is enforced
-  in `placeLiveAutoOrderForUser`, `POST /api/user/live-order`, and the
-  `tradingLoop` customer fan-out branch. Default off; only flips when
-  `CUSTOMER_LIVE_EXECUTION_ENABLED=true`. Admin / super-admin role bypasses.
-- Onboarding flows (`?checkout=success` trigger, OnboardingFlow component)
-- Upgrade funnels, tier gates, UpgradeBanner, FeatureGate (paid tiers
-  unlock paper capacity + AI features — not live execution)
-- Training environment + AI experimentation surface
-- Conversion funnel (free → starter → pro)
-- `PaperTradesProvider` mounted, gated `!isAdmin`
-- **No PAPER/LIVE segmented toggle in Portal header** — replaced by a
-  static "PAPER MODE" informational banner explaining that live execution
-  is operated by AICandlez.
-- **No `LiveExecutionBar` / ARM LIVE control** rendered for non-admins.
-- `user_exchange_connections` data + ConnectModal remain available for
-  forward compatibility but are not load-bearing for the current customer
-  experience.
-
-### ADMIN PORTAL — `admintrade.aicandlez.com/portal` (admin / super-admin role)
-Purpose: **institutional operator terminal**
-- **Real-only.** No paper, no simulation, no `PaperTradesProvider`
-- No onboarding friction, no upgrade prompts, no tier gates
-- Live telemetry, exchange diagnostics, execution observability
-- Operator analytics, real balances only, real execution only
-- Operator role bypasses every customer-tier guard
-- Default landing = `/command`; `/portal` here is the operator workstation
-  variant (no consumer affordances)
-
-### Rules for future task agents
-1. Anything that removes paper trading, simulation, onboarding, or upgrade
-   funnels from the codebase MUST be scoped by role/domain — never wholesale.
-2. Anything that adds onboarding, upgrade prompts, tier gates, or paper
-   affordances MUST be hidden when `useUserRole()` returns `admin` /
-   `super-admin`.
-3. Customer-side changes that touch `/portal` must verify the admin path
-   is untouched (and vice versa).
-4. Telemetry and trade history must tag rows with mode (`PAPER` / `LIVE`)
-   so the two worlds never co-mingle in metrics.
+**Role dispatch** (`SignedInHomeRouter`, `AdminOnly`): customer host
+non-admins → `/portal`; admin host non-admins → `CrossAppRedirect`.
 
 ---
 
-**Production hosting (3-domain split — current target architecture):**
-- `app.aicandlez.com/*` — mobile PWA only (aicandlez-app static build). No
-  desktop components, no /portal page (cross-app redirect to trade host).
-- `trade.aicandlez.com/*` — **customer portal** (hybrid, see above).
-  trading-dashboard static build. Default landing = `/portal`. Customer
-  auth (non-admin signed-in users) lives here.
-- `admintrade.aicandlez.com/*` — **admin/operator portal** (real-only, see
-  above). trading-dashboard static build, separate Render service. Default
-  landing = `/command`. NO paper trading, NO tier gates, NO upgrade gates,
-  unlimited execution, live Kraken only. Operator role bypasses all
-  customer-tier guards.
+## Architectural separation — CUSTOMER vs ADMIN PORTAL (LOCKED INVARIANT)
+
+Two different systems sharing the `trading-dashboard` codebase. Future
+tasks MUST NOT merge them. Every `/portal` change must be role-gated and
+preserve both worlds.
+
+### CUSTOMER PORTAL — `trade.aicandlez.com/portal` (non-admin)
+Purpose: paper-only onboarding + AI evaluation platform.
+- **PAPER mode ONLY.** No LIVE affordances exposed to customers.
+- Real-money execution operated by AICandlez through the admin terminal
+  using server-side env Kraken keys. Customers do **not** route their
+  own orders to broker networks from the portal.
+- Server-side kill switch: `customer_live_execution_disabled` enforced
+  in `placeLiveAutoOrderForUser`, `POST /api/user/live-order`, and the
+  `tradingLoop` customer fan-out branch. Default off; flips only when
+  `CUSTOMER_LIVE_EXECUTION_ENABLED=true`. Admin/super-admin bypass.
+- Onboarding flows (`?checkout=success` trigger, `OnboardingFlow`).
+- Upgrade funnels, tier gates, UpgradeBanner, FeatureGate — unlock
+  paper capacity + AI features, NOT live execution.
+- **No PAPER/LIVE toggle in Portal header** — static "PAPER MODE" banner.
+- **No `LiveExecutionBar` / ARM LIVE** for non-admins.
+- `user_exchange_connections` data + ConnectModal remain available for
+  forward compatibility but are not load-bearing.
+- `PaperTradesProvider` mounted, gated `!isAdmin`.
+
+### ADMIN PORTAL — `admintrade.aicandlez.com/portal` (admin/super-admin)
+Purpose: institutional operator terminal.
+- **Real-only.** No paper, no simulation, no `PaperTradesProvider`.
+- No onboarding friction, no upgrade prompts, no tier gates.
+- Operator role bypasses every customer-tier guard.
+- Default landing = `/command`; `/portal` here is the operator
+  workstation variant (no consumer affordances).
+
+### Rules for future task agents
+1. Anything that removes paper/simulation/onboarding/upgrade funnels
+   MUST be scoped by role/domain — never wholesale.
+2. Anything that adds onboarding/upgrade prompts/tier gates/paper
+   affordances MUST be hidden when `useUserRole()` is `admin`/`super-admin`.
+3. Customer-side `/portal` changes must verify admin path untouched
+   (and vice versa).
+4. Telemetry + trade history must tag rows with mode (`PAPER`/`LIVE`)
+   so the two worlds never co-mingle.
+
+---
+
+## Production hosting (3-domain split)
+
+- `app.aicandlez.com/*` — PWA only (aicandlez-app static build).
+  No desktop components, no `/portal` page (cross-app redirect to trade host).
+- `trade.aicandlez.com/*` — customer portal. trading-dashboard static
+  build. Default landing = `/portal`.
+- `admintrade.aicandlez.com/*` — admin/operator portal. trading-dashboard
+  static build, separate Render service. Default landing = `/command`.
+  NO paper trading, NO tier gates, NO upgrade gates, unlimited execution,
+  live Kraken only.
 - `dashboard.aicandlez.com/*` — preserved during migration; retired once
-  trade./admintrade. cutover is verified.
-- Render config: see `render.yaml` services `aicandlez-trade`,
-  `aicandlez-admintrade`, `aicandlez-dashboard`. CORS allow-list extended
-  on the api service.
+  trade./admintrade. cutover verified.
 
-**AdminTopTelemetryBar (admin-only operator strip):**
-Always-on horizontal strip rendered directly under the trading-dashboard
-top header for `admin`/`super-admin` users only (gated via `useUserRole()`
-in `Layout.tsx`). 15 real-time metrics: active users now, total registered,
-total user trades, trades 24h, platform PnL, fees collected, exchange
-connections, AI executions, live subs, MRR, failed trades, system uptime,
-websocket status, queue throughput, API latency. Data: `GET /api/admin/top-telemetry`
-(`artifacts/api-server/src/routes/adminTopTelemetry.ts`), polled every 5s,
-all values DB-derived or engineStats-derived — no mocks.
+Render config: services `aicandlez-trade`, `aicandlez-admintrade`,
+`aicandlez-dashboard` in `render.yaml`. CORS allow-list on api service.
 
-**api-server:** `/api/exchange/*`, `/api/sentiment/*`, `/api/validation/*`, `/api/journal/*`, `/api/simulation/*`, `/api/signals/*`, `/api/candles/*`, `/api/backtest/*`, `/api/auth/*`, `/api/billing/*`, `/api/user/*`
+**AdminTopTelemetryBar** (admin-only): always-on strip under
+trading-dashboard top header for `admin`/`super-admin` (gated via
+`useUserRole()` in `Layout.tsx`). 15 real-time metrics from
+`GET /api/admin/top-telemetry`, polled every 5s, all values
+DB-/engineStats-derived (no mocks).
 
 ---
 
@@ -196,241 +181,268 @@ all values DB-derived or engineStats-derived — no mocks.
 
 - Clerk app: `app_3DeE2sfuhHWTY73M9jlbRCKabFx`
 - `CLERK_SECRET_KEY` / `VITE_CLERK_PUBLISHABLE_KEY` auto-provisioned
-- `lib/db/src/schema/users.ts` — `users` table (clerkUserId, email, role: user/admin/super-admin)
-- Server: `clerkProxyMiddleware` (prod only) → `clerkMiddleware` → `requireAuth` / `requireRole`
+- `lib/db/src/schema/users.ts` — `users` table (clerkUserId, email,
+  role: user/admin/super-admin)
+- Server: `clerkProxyMiddleware` (prod only) → `clerkMiddleware` →
+  `requireAuth` / `requireRole`
+- `requireAuth` also calls `touchSession()` → writes/updates a row in
+  `user_sessions` (single indexed SELECT, debounced 60s writes,
+  fail-open). Revoked sessions reject with 401 `errorCode: "session_revoked"`.
 - Frontend: `ClerkProvider` + `ClerkQueryClientCacheInvalidator` in App shells
-- All dashboard/PWA routes redirect to `/sign-in` when unauthenticated
-- Clerk UI: dark terminal theme (#050D1A card, neon-green primary, monospace, AICandlez logo)
+- All routes redirect to `/sign-in` when unauthenticated
+- Clerk UI: dark terminal theme (#050D1A card, neon-green primary,
+  monospace, AICandlez logo)
 
 ---
 
 ## AI Trading Architecture
 
 **Global trading loop** (shared signals across users):
-- `lib/tradingLoop.ts` — EMA+RSI engine, MTF funnel (5m/15m/1H), volume + sideways + 1H-trend filters
+- `lib/tradingLoop.ts` — EMA+RSI engine, MTF funnel (5m/15m/1H),
+  volume + sideways + 1H-trend filters
 - Default `minConfidence = 60`
-- Filters: volume confirmation ON (≥85% of 20-bar avg), sideways block (<0.15% spread), 1H trend OFF by default
+- Filters: volume confirmation ON (≥85% of 20-bar avg), sideways block
+  (<0.15% spread), 1H trend OFF by default
 
 **User-scoped state** (per-userId isolation, no cross-tenant bleed):
-- `lib/userSimRegistry.ts` — `Map<userId, UserSimState>` lazy DB-load, instant persistence
-- All `/api/simulation/*` routes are `requireAuth`-gated → route through registry
-- Tables: `user_settings`, `sim_accounts`, `sim_positions`, `sim_trades`, `user_notifications`
+- `lib/userSimRegistry.ts` — `Map<userId, UserSimState>` lazy DB-load,
+  instant persistence
+- All `/api/simulation/*` routes are `requireAuth`-gated → registry
+- Tables: `user_settings`, `sim_accounts`, `sim_positions`, `sim_trades`,
+  `user_notifications`
 - Each user starts with $100,000 simulated balance
 
 **Exchange connections** (per-user encrypted credentials):
-- `user_exchange_connections` table — AES-256-GCM, per-user PBKDF2 key derivation
-- `CredentialVault` — `encryptBlob` / `decryptBlob`, raw keys never persisted plaintext
+- `user_exchange_connections` — AES-256-GCM, per-user PBKDF2 key derivation
+- `CredentialVault` — raw keys never persisted plaintext
 - Supported: Kraken, Binance, Coinbase, Bybit, OKX, KuCoin
 - **Withdrawal permissions never requested, never tested, always `false`**
-- Live mode default OFF; requires `acknowledged: true` to enable
+- Live mode default OFF; requires `acknowledged: true`
 - Connection test = `getTicker` + `getAccount` round-trip before any DB write
+- **Single source of truth = `EXCHANGE_CATALOG`** (no hardcoded lists per
+  R1.5). Per-user visibility governance via `user_exchange_visibility`
+  (presentational only — execution enforcement deferred).
 
-**Exchange secrets (LIVE mode):** `KRAKEN_API_KEY`, `KRAKEN_API_SECRET`, `EXCHANGE_LIVE_ENABLED=true`
-
----
-
-## AI Market Scanner (Home.tsx radar)
-
-10+ rotating intelligent states, priority-ordered decision tree:
-`Initializing market feed` → `Strong breakout activity detected` →
-`High volatility detected — proceed with caution` →
-`Momentum increasing across crypto markets` →
-`Bullish momentum strengthening` → `Bearish pressure increasing` →
-`Market sentiment: Bullish/Bearish` →
-`AI detecting institutional accumulation` →
-`Trend continuation likely` → `Risk elevated — choppy market` →
-`Volatility compression detected` → `Accumulation patterns forming` →
-`Low-confidence market conditions` → `Market conditions favorable` →
-`Equity market cooling — crypto holding steady` →
-`AI tracking emerging opportunities` → `Scanning for high-confidence setups`
-
-Each branch reads `breakdowns` (per-symbol AI state) + `tickersData` (live moves).
+**Exchange secrets (LIVE):** `KRAKEN_API_KEY`, `KRAKEN_API_SECRET`,
+`EXCHANGE_LIVE_ENABLED=true`.
 
 ---
 
-## Notification & Feedback Scaffolding
+## Operator surfaces (admin-only)
 
-**`artifacts/aicandlez-app/src/lib/feedback.ts`** — unified architecture layer:
-- `ALERT_DEFINITIONS` — 10 alert types (AI Signals, Auto Trade Exec, Trade Open/Close, TP/SL Hit, High-Confidence Setups, Scanner, Volatility, Portfolio)
-- `FeedbackPrefs` — localStorage object with master switches (push/sounds/haptics) + per-alert toggles
-- `useFeedbackPrefs` — React hook with cross-tab `storage` sync
-- `triggerHaptic(intensity)` — `navigator.vibrate` wrapper; OFF by default (institutional default)
-- `playNotificationCue(state)` — routes through existing `executionSounds.ts` bus
-- `shouldNotify(key)` — central gate for future push-emit code
-
-**UI:** `Profile.tsx → AlertPreferencesSection` renders all toggles between AI Settings and Connected Accounts. Child rows dim when no delivery channel is enabled.
-
-**Web Push backend** (existing, Phase 4): `public/sw.js` + `usePushNotifications` hook + `SwRegistrar` + server-side `NotificationDispatcher` with VAPID. The new feedback layer reads/writes the same `pushEnabled` flag.
+- `/admin/users` — grid with telemetry (exchanges, AI usage, session
+  status, revenue, etc.) backed by `GET /api/admin/users`.
+- `/admin/activity`, `/admin/subscriptions`, `/admin/sessions` —
+  dedicated pages composed on shared hooks.
+- **User Intelligence Panel** (drawer from `/admin/users`): 5 tabs —
+  PROFILE / EXCHANGES / TRADING / ENTITLEMENTS / ACTIONS. All
+  mutations audit-logged to `user_admin_actions`.
+- **Sessions:** `user_sessions` table; `/admin/sessions` lists active
+  + revoked sessions. Revoke is best-effort Clerk revoke + atomic local
+  revoke + audit row (super-admin cannot self-revoke).
+- **Per-user exchange visibility:** `user_exchange_visibility` overrides
+  catalog defaults per user. Admin endpoints
+  `GET/POST/DELETE /api/admin/users/:id/exchange-visibility` —
+  single-tx upsert (ON CONFLICT DO UPDATE) and `.returning()`-gated
+  delete to prevent false-positive audits on concurrent races.
 
 ---
 
-## Finalized UI System (current — locked, do not redesign)
+## UI System (locked, do not redesign)
 
-**Brand:** neon-green system. `#66FF66` brand · `#00C853` deep emerald · `#7CFF00` bright lime · `#39FF14` vivid neon. Backgrounds `#000` / `#050A07` / `#0A1410` / `#0F1F18`.
+**Brand:** neon-green. `#66FF66` brand · `#00C853` deep emerald ·
+`#7CFF00` bright lime · `#39FF14` vivid neon. Backgrounds `#000` /
+`#050A07` / `#0A1410` / `#0F1F18`.
 
-**Design tokens:**
-- `artifacts/aicandlez-app/src/index.css` — HSL `--primary` = 120° (green), `--brand{-deep,-bright,-vivid,-glow,-bloom,-whisper}`, `--ink-0..3`, `--glass-1..3`, animation lib (`brand-pulse`, `orb-breathe`, `ticker-scroll`, `dot-pulse`, `bar-in`, `bar-breathe`, `scan-line`, `edge-sweep`, `chart-drift`, `wave-bar`, `particle-float`, `shimmer`)
+**Tokens:**
+- `artifacts/aicandlez-app/src/index.css` — HSL `--primary` = 120°,
+  `--brand{-deep,-bright,-vivid,-glow,-bloom,-whisper}`, `--ink-0..3`,
+  `--glass-1..3`, animation lib (brand-pulse, orb-breathe, ticker-scroll,
+  dot-pulse, bar-in/breathe, scan-line, edge-sweep, chart-drift,
+  wave-bar, particle-float, shimmer)
 - `artifacts/natura-ai/constants/theme.ts` — green tokens (mobile, frozen)
 
-**Locked surfaces — do not restructure:**
-- Home (radar centerpiece + AI Market Scanner + Top Gainers + Crypto Signals preview + Live Trades + Equity Signals preview + Trade History + portfolio hero) — single-column mobile-first stack, no 2-column grid
-- Signals, Crypto, Equities (asset cards, ranking, confidence rings)
-- Profile structure (AI Settings → Alert Preferences → Connected Accounts → Broker)
-- Bottom navigation (green/black, status pip)
-- Brand header (centered master logo + green underglow)
-- Typography hierarchy, scroll containers, all approved cards
+**Locked surfaces — do not restructure:** Home (radar centerpiece + AI
+Market Scanner + Top Gainers + Crypto/Equity Signals preview + Live
+Trades + Trade History + portfolio hero, single-column mobile-first);
+Signals/Crypto/Equities cards; Profile structure (AI Settings → Alert
+Preferences → Connected Accounts → Broker); bottom nav; brand header;
+typography hierarchy.
 
 **Master assets:**
 - `artifacts/aicandlez-app/src/assets/aicandlez-logo-master.png`
 - `artifacts/aicandlez-app/src/assets/aicandlez-icon-master.png`
 
----
+**AI Market Scanner** (Home radar): 10+ rotating intelligent states,
+priority-ordered decision tree reading `breakdowns` (per-symbol AI
+state) + `tickersData` (live moves). Edit logic in
+`artifacts/aicandlez-app/src/pages/Home.tsx`.
 
-## Trading Dashboard Modules (19 active + 20)
-
-1 Dashboard · 2 Market Data · 3 Indicators · 4 AI Reasoning · 5 Risk Management ·
-6 Simulation · 7 Backtesting · 8 Strategy Optimizer · 9 Asset Scanner ·
-10 Portfolio · 11 Correlation · 12 Trade Journal · 13 Validation ·
-14 Sentiment AI · 15 Exchange · 16 System Verification · 17 Signal Debug ·
-18 Multi-Asset Chart · 19 Command Center · **20 Desktop Terminal** (`/desktop`)
-
-Global components (App-level): `AlertsProvider` (8s poll, dedupe, sound toggle), `SettingsDrawer` (floating gear, mobile drawer / desktop popover).
-
----
-
-## Production Deployment
-
-- `DEPLOYMENT.md` — complete domain map, DNS, SSL, Clerk prod, push setup, Render + Replit deploy, migrations, pre/post-deploy checklist
-- `render.yaml` — 4 services (aicandlez-api, aicandlez-dashboard, aicandlez-app, aicandlez-landing) with VAPID + exchange keys + security headers
-- `.env.production.example` — all env vars for all four services
-- CORS locked to `aicandlez.com`, `app.aicandlez.com`, `api.aicandlez.com`
-- Webhooks: Stripe (`STRIPE_WEBHOOK_SECRET`), Clerk
+**Notification/feedback layer:** `artifacts/aicandlez-app/src/lib/feedback.ts`
+— `ALERT_DEFINITIONS` (10 alert types), `FeedbackPrefs` (localStorage,
+master push/sounds/haptics + per-alert toggles), `useFeedbackPrefs` hook
+(cross-tab sync), `triggerHaptic` (OFF by default), `playNotificationCue`
+(routes through `executionSounds.ts`), `shouldNotify(key)` (central
+gate for push-emit). Web Push backend: `public/sw.js`, `usePushNotifications`,
+`SwRegistrar`, server-side `NotificationDispatcher` (VAPID). UI rendered
+in `Profile.tsx → AlertPreferencesSection`.
 
 ---
 
-## Production Export
+## Trading Dashboard Modules
 
-**Build the production ZIP:**
-```bash
-python3 scripts/build-export-zip.py
-```
-Output: `artifacts/trading-dashboard/public/aicandlez-production.zip`
-Served at: `/aicandlez-production.zip` (download link in dashboard sidebar)
+20 active: Dashboard · Market Data · Indicators · AI Reasoning · Risk
+Management · Simulation · Backtesting · Strategy Optimizer · Asset
+Scanner · Portfolio · Correlation · Trade Journal · Validation ·
+Sentiment AI · Exchange · System Verification · Signal Debug ·
+Multi-Asset Chart · Command Center · Desktop Terminal (`/desktop`).
 
-Includes: `lib/db`, `lib/api-spec`, `lib/api-client-react`, `lib/api-zod`,
-`artifacts/api-server`, `artifacts/trading-dashboard`, `artifacts/aicandlez-app`,
-`artifacts/landing`, `scripts/`, root configs, `.env.example`, `SETUP.md`, `DEPLOYMENT.md`, `render.yaml`.
+Global components (App-level): `AlertsProvider` (8s poll, dedupe, sound
+toggle), `SettingsDrawer` (floating gear, mobile drawer / desktop popover).
 
-Excludes: `node_modules/`, `dist/`, `.git/`, `natura-ai`, `natura-web`, `mockup-sandbox`, `attached_assets/`, `.local/`, `.replit-artifact/`.
+**api-server routes:** `/api/exchange/*`, `/api/sentiment/*`,
+`/api/validation/*`, `/api/journal/*`, `/api/simulation/*`,
+`/api/signals/*`, `/api/candles/*`, `/api/backtest/*`, `/api/auth/*`,
+`/api/billing/*`, `/api/user/*`, `/api/admin/*`.
+
+---
+
+## Cross-origin API transport (LOCKED INVARIANT)
+
+Every `/api/*` call from any frontend artifact MUST route through the
+shared `authFetch` primitive:
+- `artifacts/trading-dashboard/src/lib/authFetch.ts`
+- `artifacts/aicandlez-app/src/lib/authFetch.ts`
+
+`authFetch` prefixes `VITE_API_BASE_URL` (so `admintrade.`/`trade.`/`app.`
+cross-origin into `api.aicandlez.com` instead of hitting their own
+static SPA fallback), attaches a Clerk `Bearer` token as a cookie
+fallback (Safari ITP / SameSite=Lax), and throws a structured
+`ApiContractError` when an OK response comes back without
+`application/json` (catches the "static host returned `index.html`"
+failure that silently emptied the admin CRM grid).
+
+**Build-time guardrail:** `pnpm --filter @workspace/scripts run check-no-bare-api-fetch`
+fails CI on any bare `fetch("/api/...")` outside the two `lib/authFetch.ts`
+files and `useUserRole.ts` (which intentionally issues its pre-bootstrap
+`/api/auth/me` call with a freshly-issued `getToken()`).
+
+On `admintrade.`/`trade.`/`app.aicandlez.com` an admin-visible
+`ApiBaseUrlBanner` renders at top of page if `VITE_API_BASE_URL` is
+empty at build time.
+
+---
+
+## Controlled-beta operational mode
+
+- **Platform-wide concurrent live-trade cap: 3** (customer side).
+  Enforced in `placeLiveAutoOrderForUser` (gate 0c). Counts open
+  `sim_positions` with `exchange IS NOT NULL` across all users; admin/
+  super-admin bypass. Operator path (`exchangeEngine.placeLiveAutoOrder`,
+  no userId) not gated here — `admintrade.` runs under separate controls.
+- Rejected orders: `errorCode: "concurrent_live_cap_reached"`,
+  user-visible notification, `executionStreamBus` `order_rejected` event,
+  `logs` row tagged `[concurrent_live_cap_reached]`.
+- Ratchet up via env `LIVE_EXECUTION_CONCURRENT_CAP` (no redeploy).
+  `0` disables the gate. Default = `DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP = 3`
+  in `liveUserExecution.ts`.
+- **Known TOCTOU race (acceptable at this scale):** gate reads
+  `sim_positions` then places broker order without reservation, so N
+  concurrent placements can each pass a stale count and overshoot by
+  up to N−1. Bounded by user count (≤3 under manual oversight).
+  Before widening cap or scaling onboarding, harden with DB-backed
+  reservation primitive (advisory lock or `SELECT … FOR UPDATE` on a
+  counter row). Inline note next to `countOpenLivePositions` in
+  `liveUserExecution.ts`.
+
+## On-call procedure (P0-01 mitigation — Option B)
+
+`forceRestoreBilling` and `waiveAllPendingFees` are super-admin only
+by design. To prevent on-call lockout:
+- Maintain at least **two active super-admin Clerk users** at all times.
+- Document rotation in internal ops runbook (out-of-band).
+- 72-hour restore grace window in `evaluateAndEnforceBillingHold` so a
+  force-restore stays durable even if the next fee tick re-evaluates a
+  still-unpaid balance. Window resets on every admin action; auto-
+  enforcement resumes after expiry.
+
+---
+
+## Production Deployment & Export
+
+- `DEPLOYMENT.md` — domain map, DNS, SSL, Clerk prod, push setup,
+  Render + Replit deploy, migrations, pre/post-deploy checklist.
+- `render.yaml` — 4 services (aicandlez-api, aicandlez-dashboard,
+  aicandlez-app, aicandlez-landing) with VAPID + exchange keys +
+  security headers.
+- `.env.production.example` — all env vars for all four services.
+- CORS locked to `aicandlez.com`, `app.aicandlez.com`, `api.aicandlez.com`,
+  `trade.`, `admintrade.`.
+- Webhooks: Stripe (`STRIPE_WEBHOOK_SECRET`), Clerk.
+- **Production export ZIP:** `python3 scripts/build-export-zip.py`
+  → `artifacts/trading-dashboard/public/aicandlez-production.zip`
+  (served at `/aicandlez-production.zip` via dashboard sidebar).
+  Excludes `node_modules/`, `dist/`, `.git/`, `natura-*`,
+  `mockup-sandbox`, `attached_assets/`, `.local/`, `.replit-artifact/`.
 
 ---
 
 ## Key Commands
 
-- `pnpm run typecheck` — full typecheck (libs build → leaf typecheck)
+- `pnpm run typecheck` — full (libs build → leaf typecheck)
 - `pnpm run typecheck:libs` — composite lib build only
 - `pnpm --filter @workspace/<slug> run typecheck` — single package
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API client + Zod
-- `python3 scripts/build-export-zip.py` — build production ZIP
+- `pnpm --filter @workspace/db run push` — drizzle-kit push
+- `python3 scripts/build-export-zip.py` — production ZIP
 
 **Do not** run `pnpm dev` at workspace root — use `restart_workflow <slug>`.
 
 ---
 
-## Environment Variables (canonical list)
+## Environment Variables (canonical)
 
-**Auto-provisioned:** `DATABASE_URL`, `CLERK_SECRET_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`, `SESSION_SECRET`, `VAULT_MASTER_KEY`, `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VITE_VAPID_PUBLIC_KEY` / `VAPID_SUBJECT`
+**Auto-provisioned:** `DATABASE_URL`, `CLERK_SECRET_KEY`,
+`VITE_CLERK_PUBLISHABLE_KEY`, `SESSION_SECRET`, `VAULT_MASTER_KEY`,
+`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VITE_VAPID_PUBLIC_KEY` /
+`VAPID_SUBJECT`.
 
-**Stripe:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `VITE_STRIPE_PUBLISHABLE_KEY`, plus `STRIPE_PRICE_STARTER_MONTHLY`, `STRIPE_PRICE_PRO_MONTHLY` (price IDs mapped per `PlanId`)
+**Stripe:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+`VITE_STRIPE_PUBLISHABLE_KEY`, `STRIPE_PRICE_STARTER_MONTHLY`,
+`STRIPE_PRICE_PRO_MONTHLY`.
 
-**Exchanges (LIVE):** `KRAKEN_API_KEY/SECRET`, `BINANCE_API_KEY/SECRET`, `COINBASE_API_KEY/SECRET`, `CRYPTOCOM_API_KEY/SECRET`, `EXCHANGE_LIVE_ENABLED=true`
+**Exchanges (LIVE):** `KRAKEN_API_KEY/SECRET`, `BINANCE_API_KEY/SECRET`,
+`COINBASE_API_KEY/SECRET`, `CRYPTOCOM_API_KEY/SECRET`,
+`EXCHANGE_LIVE_ENABLED=true`.
 
-**Production-only:** `CLERK_SECRET_KEY_LIVE`, `VITE_CLERK_PUBLISHABLE_KEY_LIVE`
+**Cross-host build env:** `VITE_API_BASE_URL`, `VITE_TRADE_URL`,
+`VITE_APP_URL`, `VITE_TRADING_DASHBOARD_URL`, `VITE_DEFAULT_LANDING`,
+`VITE_CUSTOMER_PORTAL_URL`, `CUSTOMER_APP_BASE_URL`.
+
+**Operational toggles:** `CUSTOMER_LIVE_EXECUTION_ENABLED`,
+`LIVE_EXECUTION_CONCURRENT_CAP`.
+
+**Production-only:** `CLERK_SECRET_KEY_LIVE`,
+`VITE_CLERK_PUBLISHABLE_KEY_LIVE`.
 
 ---
 
 ## natura-ai (production-frozen)
 
-Mobile-first AI wellness app (Expo/React Native). AsyncStorage only — no backend.
-Onboarding → AI Chat → Wellness Plans → Recipes → Daily Routine → Grocery → Saved → Check-In → Profile.
-Light theme, warm cream `#F8F6F0`, forest green `#3D7A45`, Inter, radius 16.
-**No further dev work** while the desktop/web institutional platform is in active development.
+Mobile AI wellness app (Expo/React Native). AsyncStorage only — no
+backend. Onboarding → AI Chat → Wellness Plans → Recipes → Daily
+Routine → Grocery → Saved → Check-In → Profile. Light theme, warm
+cream `#F8F6F0`, forest green `#3D7A45`, Inter, radius 16.
+**No further dev work** while the desktop/web institutional platform
+is in active development.
 
 ---
-
-## Cross-origin API transport (Task #172 — locked invariant)
-
-Every `/api/*` call from any frontend artifact MUST route through the
-shared `authFetch` primitive:
-
-- `artifacts/trading-dashboard/src/lib/authFetch.ts`
-- `artifacts/aicandlez-app/src/lib/authFetch.ts`
-
-`authFetch` prefixes `VITE_API_BASE_URL` (so `admintrade.` / `trade.` /
-`app.aicandlez.com` cross-origin into `api.aicandlez.com` instead of
-hitting their own static SPA fallback), attaches a Clerk `Bearer` token
-as a cookie fallback (Safari ITP / SameSite=Lax cross-subdomain), and
-throws a structured `ApiContractError` when an OK response comes back
-without `application/json` (catches the "static host returned
-`index.html`" failure that silently emptied the admin CRM grid).
-
-A build-time guardrail enforces this:
-`pnpm --filter @workspace/scripts run check-no-bare-api-fetch`
-fails CI on any bare `fetch("/api/...")` outside the two `lib/authFetch.ts`
-files and `useUserRole.ts` (which intentionally issues its pre-bootstrap
-`/api/auth/me` call with a freshly-issued `getToken()`).
-
-On `admintrade.` / `trade.` / `app.aicandlez.com` an admin-visible
-`ApiBaseUrlBanner` renders at the top of the page if `VITE_API_BASE_URL`
-is empty at build time — surfaces the misconfiguration loudly instead
-of silently returning empty arrays everywhere.
-
----
-
-## Controlled-beta operational mode (current)
-
-- **Platform-wide concurrent live-trade cap: 3** (customer side).
-  Enforced in `placeLiveAutoOrderForUser` (gate 0c, after status + trade-limit
-  gates, before connection resolution). Counts open `sim_positions` with
-  `exchange IS NOT NULL` across all users; admin / super-admin bypass. The
-  operator path (`exchangeEngine.placeLiveAutoOrder`, no userId) is not
-  gated here — `admintrade.aicandlez.com` runs under separate operational
-  controls.
-- Rejected orders surface `errorCode: "concurrent_live_cap_reached"` and a
-  user-visible notification, plus an `executionStreamBus` `order_rejected`
-  event + a `logs` row tagged `[concurrent_live_cap_reached]`.
-- Ratchet up without a redeploy by setting env
-  `LIVE_EXECUTION_CONCURRENT_CAP` (e.g. `5`, then `10`, etc.). `0` disables
-  the gate entirely. Default = `DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP = 3`
-  in `liveUserExecution.ts`.
-- Scaling discipline: only widen the cap after observing stable queue
-  behavior, Kraken pacing, telemetry sync, and billing flow under the
-  current ceiling.
-- **Known TOCTOU race (acceptable at this scale):** the gate reads
-  `sim_positions` then places the broker order without a reservation, so
-  N concurrent customer placements can each pass a stale count and overshoot
-  by up to N−1. Bounded by user count (≤3 under manual oversight during
-  controlled beta). Before widening the cap or scaling onboarding,
-  harden with a DB-backed reservation primitive (advisory lock or
-  `SELECT … FOR UPDATE` on a counter row). Inline note lives next to
-  `countOpenLivePositions` in `liveUserExecution.ts`.
-
-## On-call procedure (P0-01 mitigation — Option B)
-
-`forceRestoreBilling` and `waiveAllPendingFees` are super-admin only by
-design (no code change). To prevent on-call lockout when only one
-super-admin is reachable:
-- Maintain at least **two active super-admin Clerk users** at all times.
-- Document the rotation in the internal ops runbook (out-of-band).
-- Sprint 1 added a **72-hour restore grace window** in
-  `evaluateAndEnforceBillingHold` so a force-restore stays durable even
-  if the next fee tick re-evaluates a still-unpaid balance. Window resets
-  on every admin action; auto-enforcement resumes after expiry.
 
 ## User Preferences
 
-- Always brand work as **AICandlez** (never apex / apexdigital legacy names)
-- Performance-fee language always reads "on profitable trades only · never on losses"
+- Always brand work as **AICandlez** (never apex / apexdigital legacy)
+- Performance-fee language always reads "on profitable trades only ·
+  never on losses"
 - Institutional tone — premium, restrained, no arcade/gambling cues
-- Mobile-first PWA is the primary user surface, desktop console is operator-only
+- Mobile-first PWA = primary user surface; desktop console = operator
 - Withdrawal permissions are never requested from exchanges (security promise)
