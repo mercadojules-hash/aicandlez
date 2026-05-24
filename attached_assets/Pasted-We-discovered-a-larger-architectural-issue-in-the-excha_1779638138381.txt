@@ -1,0 +1,106 @@
+We discovered a larger architectural issue in the exchange management system.
+
+Current production behavior is incorrect:
+
+- Dashboard still references Kraken state:
+  KRAKEN AUTH FAILED
+
+- BUT:
+  CONNECT EXCHANGE modal only exposes ALPACA.
+
+This is wrong for the current platform architecture.
+
+We already have exchange integrations and API credential infrastructure for:
+
+- Kraken
+- Coinbase
+- Crypto.com
+- Gemini
+- Robinhood
+- Alpaca
+- Simulation/Paper mode
+
+Future:
+- Binance
+- Uphold
+
+Expected platform behavior
+====================================================
+
+1. Exchange registry must be centralized
+There should be ONE source of truth for:
+- available exchanges
+- enabled exchanges
+- connected exchanges
+- active exchange
+- supported capabilities
+
+The dashboard state and connect modal MUST derive from the same registry source.
+
+2. Frontend modal requirements
+The CONNECT EXCHANGE modal should:
+
+- list ALL supported exchanges
+- show connection status
+- show active/inactive state
+- show "CONNECTED" badge where applicable
+- show "ACTIVE" exchange clearly highlighted
+- support exchange switching
+- support reconnect/disconnect
+- support multiple connected exchanges per user
+
+Example:
+----------------------------------------------------
+[✓] Kraken         ACTIVE
+[✓] Coinbase       CONNECTED
+[✓] Gemini         CONNECTED
+[ ] Robinhood      NOT CONNECTED
+[ ] Crypto.com     NOT CONNECTED
+[✓] Simulation     AVAILABLE
+----------------------------------------------------
+
+3. User architecture requirement
+A user may:
+- connect multiple exchanges simultaneously
+- switch active trading exchange
+- maintain dormant exchange connections
+- run simulation separately from live broker
+
+This is a HARD architectural requirement moving forward.
+
+4. Admin/operator requirements
+Admin portal should eventually show:
+- which exchange each user is using
+- exchange health
+- active exchange mode
+- connected exchange count
+- failed auth state
+- exchange switching history
+
+DO NOT build all admin UX yet.
+First fix the exchange registry foundation.
+
+Immediate task
+====================================================
+
+Audit and report:
+
+- frontend exchange registry
+- backend exchange registry
+- provider metadata source
+- connect modal filtering
+- active exchange state
+- why only Alpaca appears
+- why dashboard still references Kraken
+- whether exchange definitions became hardcoded
+- whether feature flags/environment filtering broke the registry
+
+Need:
+- exact files
+- exact conditionals
+- exact broken source-of-truth
+
+DO NOT massively refactor yet.
+DO NOT rebuild telemetry yet.
+
+First provide a root-cause analysis and proposed architectural fix plan before patching.
