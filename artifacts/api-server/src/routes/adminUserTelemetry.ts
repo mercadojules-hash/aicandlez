@@ -203,6 +203,8 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         u.role                                                   AS role,
         u.plan                                                   AS plan,
         u.plan_status                                            AS plan_status,
+        u.trial_ends_at                                          AS trial_ends_at,
+        u.stripe_subscription_id                                 AS stripe_subscription_id,
         u.created_at                                             AS created_at,
         CASE
           WHEN u.plan = 'starter' THEN 39.99
@@ -284,6 +286,11 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         role:                String(r["role"]),
         plan:                String(r["plan"]),
         planStatus:          String(r["plan_status"]),
+        trialEndsAt:         r["trial_ends_at"] == null ? null : new Date(String(r["trial_ends_at"])).toISOString(),
+        // Complimentary marker: FREE comp has no Stripe sub but has trial_ends_at;
+        // STARTER/PRO comp has both. Real paid trials also have both — operator
+        // distinguishes via audit log. UI labels both as "TRIAL · Nd" (neutral).
+        isComplimentary:     r["plan_status"] === "trialing" && r["trial_ends_at"] != null && r["stripe_subscription_id"] == null,
         adminStatus:         String(r["admin_status"]),
         createdAt:           r["created_at"],
         mrrUsd:              Number(r["mrr_usd"] ?? 0),

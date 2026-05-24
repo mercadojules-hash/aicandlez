@@ -46,6 +46,8 @@ interface AdminUserRow {
   tradeCapTier: number;
   tradesToday: number;
   equityUsd: number;
+  trialEndsAt: string | null;
+  isComplimentary?: boolean;
   tradeLimit: {
     used24h: number;
     capTier: number;
@@ -216,7 +218,9 @@ function UserActionDrawer({
   const [reason, setReason]     = useState("");
   const [days, setDays]         = useState<number>(30);
   const [capTier, setCapTier]   = useState<number>(3);
-  const [compPlan, setCompPlan] = useState<"starter" | "pro">("pro");
+  const [compPlan, setCompPlan] = useState<"free" | "starter" | "pro">("pro");
+  const [compPaperOnly, setCompPaperOnly] = useState<boolean>(true);
+  const [compCapOverride, setCompCapOverride] = useState<number | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -386,72 +390,170 @@ function UserActionDrawer({
           )}
 
           {panel === "comp" && (() => {
-            const isFreeUser = !user.plan || user.plan === "free";
+            const hasSub = Boolean(user.plan && user.plan !== "free");
+            // FREE comp is always paper-only by design.
+            const effectivePaperOnly = compPlan === "free" ? true : compPaperOnly;
             return (
-              <ActionForm title={isFreeUser ? "CREATE COMPLIMENTARY ACCESS" : "GRANT COMPLIMENTARY DAYS"} onBack={() => setPanel(null)}>
-                {isFreeUser ? (
+              <ActionForm title="CREATE COMPLIMENTARY MEMBERSHIP" onBack={() => setPanel(null)}>
+                <p style={{ fontSize: 10, color: C.dim, lineHeight: 1.55, marginBottom: 10 }}>
+                  Zero-charge complimentary access for influencers, beta testers, DJ partners,
+                  reviewers, internal QA. Auto-expires after duration.
+                  <span style={{ display: "block", marginTop: 6, color: "#cc55ff" }}>
+                    ⓘ Super-admin only. Audit-logged. Entitlement middleware behaves identical to paid.
+                  </span>
+                  {hasSub && (
+                    <span style={{ display: "block", marginTop: 6, color: "#ffaa00" }}>
+                      ⚠ User already has a paid {user.plan.toUpperCase()} subscription. For STARTER/PRO,
+                      use "Grant Complimentary Days" instead to extend it (no double-billing).
+                      You may still grant FREE comp if you want to time-box / mark them.
+                    </span>
+                  )}
+                </p>
+
+                {/* TIER PICKER */}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: C.dim, marginBottom: 6 }}>
+                    MEMBERSHIP TIER
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                    {([
+                      { p: "free",    label: "FREE",    sub: "Paper only" },
+                      { p: "starter", label: "STARTER", sub: "≤ 3 AI live" },
+                      { p: "pro",     label: "PRO",     sub: "≤ 12 AI · Eq" },
+                    ] as const).map(({ p, label, sub }) => {
+                      const disabled = hasSub && p !== "free";
+                      return (
+                        <button key={p}
+                          onClick={() => !disabled && setCompPlan(p)}
+                          disabled={disabled}
+                          title={disabled ? "User already has a paid subscription" : undefined}
+                          style={{
+                            padding: "10px 8px",
+                            background: compPlan === p ? planColor(p) + "22" : "transparent",
+                            border: `1px solid ${compPlan === p ? planColor(p) : C.border}`,
+                            borderRadius: 6,
+                            cursor: disabled ? "not-allowed" : "pointer",
+                            textAlign: "left",
+                            opacity: disabled ? 0.4 : 1,
+                          }}>
+                          <div style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 700, color: planColor(p) }}>
+                            {label}
+                          </div>
+                          <div style={{ fontSize: 8, fontFamily: "monospace", color: C.faint, marginTop: 3 }}>
+                            {sub}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* DURATION */}
+                <DaysInput value={days} onChange={setDays} max={365} />
+                <PresetRow values={[7, 14, 30, 60, 90, 180, 365]} onSelect={setDays} unit="d" />
+
+                {/* PAPER vs LIVE */}
+                <div style={{ marginTop: 12, marginBottom: 12 }}>
+                  <div style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: C.dim, marginBottom: 6 }}>
+                    EXECUTION MODE
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                    <button onClick={() => setCompPaperOnly(true)}
+                      style={{
+                        padding: "8px 10px",
+                        background: effectivePaperOnly ? "#00ff8a22" : "transparent",
+                        border: `1px solid ${effectivePaperOnly ? "#00ff8a" : C.border}`,
+                        borderRadius: 6, cursor: "pointer",
+                      }}>
+                      <div style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 700, color: "#00ff8a" }}>
+                        PAPER ONLY
+                      </div>
+                      <div style={{ fontSize: 8, fontFamily: "monospace", color: C.faint, marginTop: 2 }}>
+                        Simulated · safer default
+                      </div>
+                    </button>
+                    <button onClick={() => setCompPaperOnly(false)}
+                      disabled={compPlan === "free"}
+                      title={compPlan === "free" ? "FREE tier is paper-only by design" : undefined}
+                      style={{
+                        padding: "8px 10px",
+                        background: !effectivePaperOnly ? "#ff884422" : "transparent",
+                        border: `1px solid ${!effectivePaperOnly ? "#ff8844" : C.border}`,
+                        borderRadius: 6,
+                        cursor: compPlan === "free" ? "not-allowed" : "pointer",
+                        opacity: compPlan === "free" ? 0.4 : 1,
+                      }}>
+                      <div style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 700, color: "#ff8844" }}>
+                        LIVE ENABLED
+                      </div>
+                      <div style={{ fontSize: 8, fontFamily: "monospace", color: C.faint, marginTop: 2 }}>
+                        Real execution allowed
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* TRADE LIMIT OVERRIDE (optional) */}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: C.dim, marginBottom: 6 }}>
+                    TRADE LIMIT OVERRIDE <span style={{ color: C.faint, fontWeight: 400 }}>(optional · expires with comp)</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 4 }}>
+                    {[null, 1, 3, 12, 50, -1].map((v) => {
+                      const active = compCapOverride === v;
+                      const label = v === null ? "OFF" : v === -1 ? "∞" : String(v);
+                      return (
+                        <button key={String(v)} onClick={() => setCompCapOverride(v)}
+                          style={{
+                            padding: "7px 4px",
+                            background: active ? "#ffaa0022" : "transparent",
+                            border: `1px solid ${active ? "#ffaa00" : C.border}`,
+                            borderRadius: 4, cursor: "pointer",
+                            fontSize: 10, fontFamily: "monospace", fontWeight: 700,
+                            color: active ? "#ffaa00" : C.dim,
+                          }}>
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <NoteInput note={note} setNote={setNote} />
+
+                <SubmitButton
+                  onClick={() => submit("create_complimentary_subscription", {
+                    plan:      compPlan,
+                    days,
+                    paperOnly: effectivePaperOnly,
+                    ...(compCapOverride !== null ? { capTier: compCapOverride } : {}),
+                  })}
+                  disabled={mutation.isPending || !isSuperAdmin || (hasSub && compPlan !== "free")}
+                  pending={mutation.isPending}
+                  color={planColor(compPlan)}>
+                  {!isSuperAdmin
+                    ? "Requires super-admin role"
+                    : `Grant ${compPlan.toUpperCase()} · ${days}d · ${effectivePaperOnly ? "PAPER" : "LIVE"}${compCapOverride !== null ? ` · cap ${compCapOverride === -1 ? "∞" : compCapOverride}` : ""}`}
+                </SubmitButton>
+
+                {/* Existing-sub fallback: extend trial */}
+                {hasSub && (
                   <>
-                    <p style={{ fontSize: 10, color: C.dim, lineHeight: 1.55, marginBottom: 10 }}>
-                      Creates a brand-new Stripe subscription in <code>trialing</code> state
-                      with <code>trial_period_days = N</code> and <code>cancel_at_period_end</code>.
-                      Zero charge. Auto-cancels at trial end (no surprise billing).
-                      <span style={{ display: "block", marginTop: 6, color: "#cc55ff" }}>
-                        ⓘ Super-admin only. Use for influencers, beta testers, partners, QA.
-                      </span>
-                    </p>
-                    <div style={{ marginBottom: 12 }}>
+                    <div style={{ borderTop: `1px solid ${C.border}`, margin: "14px 0 12px", paddingTop: 12 }}>
                       <div style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: C.dim, marginBottom: 6 }}>
-                        PLAN TIER
+                        OR — EXTEND EXISTING {user.plan.toUpperCase()} TRIAL
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                        {(["starter", "pro"] as const).map((p) => (
-                          <button key={p}
-                            onClick={() => setCompPlan(p)}
-                            style={{
-                              padding: "10px 12px",
-                              background: compPlan === p ? planColor(p) + "22" : "transparent",
-                              border: `1px solid ${compPlan === p ? planColor(p) : C.border}`,
-                              borderRadius: 6, cursor: "pointer", textAlign: "left",
-                            }}>
-                            <div style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 700, color: planColor(p) }}>
-                              {p === "starter" ? "STARTER · $39.99/mo" : "PRO · $79.99/mo"}
-                            </div>
-                            <div style={{ fontSize: 8, fontFamily: "monospace", color: C.faint, marginTop: 3 }}>
-                              {p === "starter" ? "Up to 3 AI trades" : "Up to 12 AI trades · Equities"}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
+                      <p style={{ fontSize: 9, color: C.faint, marginBottom: 8, lineHeight: 1.5 }}>
+                        Pushes Stripe <code>trial_end</code> forward {days}d. Same plan, no double-billing.
+                      </p>
+                      <SubmitButton
+                        onClick={() => submit("complimentary_subscription", { days })}
+                        disabled={mutation.isPending}
+                        pending={mutation.isPending}
+                        color="#00aaff">
+                        Extend trial {days} day{days === 1 ? "" : "s"}
+                      </SubmitButton>
                     </div>
-                    <DaysInput value={days} onChange={setDays} max={365} />
-                    <PresetRow values={[7, 14, 30, 60, 90, 180, 365]} onSelect={setDays} unit="d" />
-                    <NoteInput note={note} setNote={setNote} />
-                    <SubmitButton
-                      onClick={() => submit("create_complimentary_subscription", { plan: compPlan, days })}
-                      disabled={mutation.isPending || !isSuperAdmin}
-                      pending={mutation.isPending}
-                      color={planColor(compPlan)}>
-                      {isSuperAdmin
-                        ? `Create comp ${compPlan.toUpperCase()} for ${days} day${days === 1 ? "" : "s"}`
-                        : "Requires super-admin role"}
-                    </SubmitButton>
-                  </>
-                ) : (
-                  <>
-                    <p style={{ fontSize: 10, color: C.dim, lineHeight: 1.55, marginBottom: 10 }}>
-                      Pushes Stripe <code>trial_end</code> forward N days from now. User stays
-                      on their current plan ({user.plan.toUpperCase()}) at $0 for the trial window.
-                    </p>
-                    <DaysInput value={days} onChange={setDays} max={365} />
-                    <PresetRow values={[7, 14, 30, 60, 90]} onSelect={setDays} unit="d" />
-                    <NoteInput note={note} setNote={setNote} />
-                    <SubmitButton
-                      onClick={() => submit("complimentary_subscription", { days })}
-                      disabled={mutation.isPending}
-                      pending={mutation.isPending}
-                      color="#00ff8a">
-                      Grant {days} day{days === 1 ? "" : "s"}
-                    </SubmitButton>
                   </>
                 )}
               </ActionForm>
@@ -1204,7 +1306,36 @@ export default function Admin() {
                         }}>
                         {(u.plan || "free").toUpperCase()}
                       </span>
-                      <div className="text-[7px] font-mono mt-0.5" style={{ color: "#3a5a70" }}>{u.planStatus}</div>
+                      {(() => {
+                        const trialMs = u.trialEndsAt ? new Date(u.trialEndsAt).getTime() : null;
+                        const now = Date.now();
+                        const hasTrial = u.planStatus === "trialing" && trialMs !== null;
+                        const isExpired = trialMs !== null && trialMs < now;
+                        if (!hasTrial && !isExpired) {
+                          return <div className="text-[7px] font-mono mt-0.5" style={{ color: "#3a5a70" }}>{u.planStatus}</div>;
+                        }
+                        const daysLeft = trialMs ? Math.ceil((trialMs - now) / 86_400_000) : 0;
+                        // COMP (purple) when backend confirms it; otherwise TRIAL (cyan).
+                        // Expired (red) when trial_ends_at has passed.
+                        const isComp = Boolean(u.isComplimentary);
+                        const badgeColor = isExpired ? "#ff3355" : isComp ? "#cc55ff" : "#00aaff";
+                        const tag = isComp ? "COMP" : "TRIAL";
+                        const badgeLabel = isExpired ? `${tag} EXPIRED` : `${tag} · ${daysLeft}d`;
+                        return (
+                          <div className="mt-0.5 flex flex-col gap-0.5">
+                            <span className="text-[7px] font-bold font-mono px-1 py-0.5 rounded inline-block w-fit"
+                              style={{
+                                background: `${badgeColor}14`,
+                                color: badgeColor,
+                                border: `1px solid ${badgeColor}30`,
+                              }}
+                              title={trialMs ? `Expires ${new Date(trialMs).toLocaleString()}` : undefined}>
+                              {badgeLabel}
+                            </span>
+                            <span className="text-[7px] font-mono" style={{ color: "#3a5a70" }}>{u.planStatus}</span>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Status */}

@@ -658,9 +658,13 @@ router.get("/admin/users/:id/audit", ...requireOperator, async (req, res): Promi
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CreateCompSubBodySchema = z.object({
-  plan: z.enum(["starter", "pro"]),
-  days: z.number().int().min(1).max(365),
-  note: NoteSchema,
+  plan:      z.enum(["free", "starter", "pro"]),
+  days:      z.number().int().min(1).max(365),
+  paperOnly: z.boolean().default(true),
+  capTier:   z.number().int().refine(v => TRADE_LIMIT_CAP_TIERS.includes(v as typeof TRADE_LIMIT_CAP_TIERS[number]), {
+    message: `capTier must be one of ${TRADE_LIMIT_CAP_TIERS.join(", ")}`,
+  }).optional(),
+  note:      NoteSchema,
 });
 
 router.post("/admin/users/:id/create_complimentary_subscription", ...requireSuperAdmin, async (req, res): Promise<void> => {
@@ -671,7 +675,7 @@ router.post("/admin/users/:id/create_complimentary_subscription", ...requireSupe
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid body" });
     return;
   }
-  const { plan, days, note } = parsed.data;
+  const { plan, days, paperOnly, capTier, note } = parsed.data;
 
   try {
     const [target] = await db.select({
@@ -681,60 +685,135 @@ router.post("/admin/users/:id/create_complimentary_subscription", ...requireSupe
       stripeSubscriptionId: usersTable.stripeSubscriptionId,
       plan:                 usersTable.plan,
       planStatus:           usersTable.planStatus,
+      trialEndsAt:          usersTable.trialEndsAt,
     }).from(usersTable).where(eq(usersTable.clerkUserId, ctx.targetId)).limit(1);
 
     if (!target) {
       res.status(404).json({ error: "User not found" });
       return;
     }
+    // Block ALL comp creation on users who already have a Stripe sub —
+    // including FREE — because overwriting users.plan='free' would desync
+    // local entitlement from Stripe (which would keep billing the customer).
+    // Operator must cancel the sub via Stripe portal first.
     if (target.stripeSubscriptionId) {
       res.status(409).json({
-        error: "User already has a Stripe subscription. Use 'Grant Complimentary Days' to extend the existing one instead.",
-      });
-      return;
-    }
-    const email = (target.billingEmail ?? target.email ?? "").trim();
-    if (!email) {
-      res.status(409).json({ error: "User has no email on file. Sync from Clerk first." });
-      return;
-    }
-    const priceId = resolvePriceIdForPlan(plan);
-    if (!priceId) {
-      res.status(500).json({
-        error: `Stripe price for ${plan.toUpperCase()} not configured (set STRIPE_PRICE_${plan.toUpperCase()}_MONTHLY).`,
+        error: "User already has a Stripe subscription. Use 'Grant Complimentary Days' to extend, or cancel via Stripe portal first.",
       });
       return;
     }
 
-    const idemKey = dayIdempotencyKey({
-      action: `create_comp_${plan}_${days}d`,
-      target: ctx.targetId,
-      actor:  ctx.actorId,
-    });
+    const trialEndDate = new Date(Date.now() + days * 86_400 * 1000);
+    let stripeSubId:   string | null = null;
+    let stripeCustId:  string | null = target.stripeCustomerId ?? null;
+    let stripeStatus:  string        = "trialing";
 
-    const { subscription, customerId } = await createComplimentarySubscription({
-      email,
-      clerkUserId:        ctx.targetId,
-      priceId,
-      days,
-      existingCustomerId: target.stripeCustomerId,
-      idempotencyKey:     idemKey,
-      autoCancelAtTrialEnd: true,
-    });
+    if (plan === "free") {
+      // FREE comp — no Stripe sub. Just mark users row with trial_ends_at
+      // so the operator can identify the time-boxed complimentary account.
+      // Used for paper-only beta testers / reviewers / internal QA.
+      await db.update(usersTable)
+        .set({
+          plan:        "free",
+          planStatus:  "trialing",
+          trialEndsAt: trialEndDate,
+          updatedAt:   new Date(),
+        })
+        .where(eq(usersTable.clerkUserId, ctx.targetId));
+    } else {
+      // STARTER / PRO comp — create a Stripe sub in trialing state with
+      // cancel_at_period_end=true so it auto-cancels (no surprise billing).
+      const email = (target.billingEmail ?? target.email ?? "").trim();
+      if (!email) {
+        res.status(409).json({ error: "User has no email on file. Sync from Clerk first." });
+        return;
+      }
+      const priceId = resolvePriceIdForPlan(plan);
+      if (!priceId) {
+        res.status(500).json({
+          error: `Stripe price for ${plan.toUpperCase()} not configured (set STRIPE_PRICE_${plan.toUpperCase()}_MONTHLY).`,
+        });
+        return;
+      }
+      // Idempotency key excludes actor — two super-admins clicking on the
+      // same user same day must collide, not double-subscribe.
+      const idemKey = dayIdempotencyKey({
+        action: `create_comp_${plan}_${days}d`,
+        target: ctx.targetId,
+        actor:  "shared",
+      });
+      const { subscription, customerId } = await createComplimentarySubscription({
+        email,
+        clerkUserId:          ctx.targetId,
+        priceId,
+        days,
+        existingCustomerId:   target.stripeCustomerId,
+        idempotencyKey:       idemKey,
+        autoCancelAtTrialEnd: true,
+      });
+      stripeSubId  = subscription.id;
+      stripeCustId = customerId;
+      stripeStatus = subscription.status;
 
-    // Persist to users row so entitlement middleware (`requirePlan`,
-    // SubscriptionContext, telemetry SQL) sees the new plan immediately.
-    await db.update(usersTable)
-      .set({
-        stripeCustomerId:     customerId,
-        stripeSubscriptionId: subscription.id,
-        billingEmail:         email,
-        plan,
-        planStatus:           subscription.status, // typically "trialing"
-        trialEndsAt:          subscription.trialEnd ? new Date(subscription.trialEnd * 1000) : null,
-        updatedAt:            new Date(),
-      })
-      .where(eq(usersTable.clerkUserId, ctx.targetId));
+      await db.update(usersTable)
+        .set({
+          stripeCustomerId:     customerId,
+          stripeSubscriptionId: subscription.id,
+          billingEmail:         email,
+          plan,
+          planStatus:           subscription.status,
+          trialEndsAt:          subscription.trialEnd ? new Date(subscription.trialEnd * 1000) : trialEndDate,
+          updatedAt:            new Date(),
+        })
+        .where(eq(usersTable.clerkUserId, ctx.targetId));
+    }
+
+    // Optional: apply paper-only force.
+    // - paperOnly=true → always force_paper (operator intent is explicit)
+    // - paperOnly=false → only relax to 'active' if user is NOT currently
+    //   moderated. Suspended / disabled is a moderation decision and must
+    //   never be silently cleared by a comp grant.
+    if (paperOnly) {
+      await upsertStatus({
+        userId:  ctx.targetId,
+        actorId: ctx.actorId,
+        status:  "force_paper",
+        reason:  `comp_${plan}_paper_only`,
+      });
+    } else {
+      const currentStatus = await loadStatusRow(ctx.targetId);
+      const cur = currentStatus?.status ?? "active";
+      if (cur === "suspended" || cur === "disabled") {
+        // Skip — moderation overrides comp. Operator must clear moderation explicitly.
+        req.log.warn(
+          { targetId: ctx.targetId, cur },
+          "comp paperOnly=false skipped — user is moderated; status preserved",
+        );
+      } else {
+        await upsertStatus({
+          userId:  ctx.targetId,
+          actorId: ctx.actorId,
+          status:  "active",
+          reason:  `comp_${plan}_live_enabled`,
+        });
+      }
+    }
+
+    // Optional: trade-limit override that expires with the comp.
+    if (capTier !== undefined) {
+      const now = new Date();
+      await db.insert(userTradeLimitsTable).values({
+        userId:            ctx.targetId,
+        capTier,
+        overrideExpiresAt: trialEndDate,
+        createdAt:         now,
+        updatedAt:         now,
+      }).onConflictDoUpdate({
+        target: userTradeLimitsTable.userId,
+        set:    { capTier, overrideExpiresAt: trialEndDate, updatedAt: now },
+      });
+      invalidateTradeLimitCache(ctx.targetId);
+    }
 
     await writeAudit({
       actorId:  ctx.actorId,
@@ -744,41 +823,49 @@ router.post("/admin/users/:id/create_complimentary_subscription", ...requireSupe
         note,
         plan,
         days,
+        paperOnly,
+        capTier:        capTier ?? null,
+        trialEndsAt:    trialEndDate.toISOString(),
+        complimentary:  true,
         before: {
           plan:                 target.plan,
           planStatus:           target.planStatus,
           stripeCustomerId:     target.stripeCustomerId,
-          stripeSubscriptionId: null,
+          stripeSubscriptionId: target.stripeSubscriptionId,
+          trialEndsAt:          target.trialEndsAt,
         },
         after: {
           plan,
-          planStatus:           subscription.status,
-          stripeCustomerId:     customerId,
-          stripeSubscriptionId: subscription.id,
-          trialEnd:             subscription.trialEnd,
+          planStatus:           stripeStatus,
+          stripeCustomerId:     stripeCustId,
+          stripeSubscriptionId: stripeSubId,
+          trialEnd:             trialEndDate.toISOString(),
           autoCancelAtTrialEnd: true,
+          forcePaper:           paperOnly,
+          capTier:              capTier ?? null,
         },
-        priceId,
       },
     });
     __invalidateAdminUserTelemetryCache();
 
     req.log.info(
-      { targetId: ctx.targetId, plan, days, subId: subscription.id },
-      "Complimentary subscription created",
+      { targetId: ctx.targetId, plan, days, paperOnly, capTier, subId: stripeSubId },
+      "Complimentary membership created",
     );
 
     res.json({
       ok:                   true,
       plan,
-      stripeSubscriptionId: subscription.id,
-      stripeCustomerId:     customerId,
-      stripeStatus:         subscription.status,
-      trialEnd:             subscription.trialEnd,
+      paperOnly,
+      capTier:              capTier ?? null,
+      stripeSubscriptionId: stripeSubId,
+      stripeCustomerId:     stripeCustId,
+      stripeStatus,
+      trialEnd:             Math.floor(trialEndDate.getTime() / 1000),
     });
   } catch (err) {
     req.log.error({ err }, "admin create_complimentary_subscription failed");
-    res.status(502).json({ error: `Stripe comp creation failed: ${(err as Error).message}` });
+    res.status(502).json({ error: `Comp membership creation failed: ${(err as Error).message}` });
   }
 });
 
