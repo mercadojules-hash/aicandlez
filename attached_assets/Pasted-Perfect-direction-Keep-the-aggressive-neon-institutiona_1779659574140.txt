@@ -1,0 +1,115 @@
+Perfect direction. Keep the aggressive neon institutional aesthetic — that glow is part of the identity now.
+
+Update the AI Intelligence Terminal with the following refinements:
+
+====================================================
+NEON ACCENT SYSTEM
+==================
+
+Bring back the LEFT-SIDE vertical neon confidence rail from the previous design.
+
+Each opportunity card should have:
+
+* glowing vertical neon green confidence strip on the far left
+* animated pulse/glow based on confidence level
+* brighter intensity for higher confidence setups
+* subtle flicker/energy effect acceptable
+* preserve institutional look (not arcade/gaming)
+
+The neon strip was one of the strongest visual anchors from the previous version — restore it.
+
+====================================================
+GLOBAL EXECUTION BAR
+====================
+
+Restore the full-width neon green:
+"ENABLE LIVE AI TRADING" bar ABOVE the opportunity grids.
+
+This remains:
+
+* informational/customer-facing
+* PAPER MODE ONLY
+* NO live execution controls
+* NO broker controls
+* NO ARM LIVE actions
+
+But visually it should feel:
+
+* powerful
+* institutional
+* AI engine active
+* command-center quality
+
+Keep:
+
+* green neon glow
+* full-width horizontal command bar
+* slot telemetry
+* AI system status feel
+* execution pipeline styling
+
+====================================================
+LAYOUT REFINEMENT
+=================
+
+Final structure:
+
+1. Top telemetry ribbon
+2. Global AI Execution/System bar
+3. Search + filter command strip
+4. Dual-column opportunity grid
+
+   * MAJORS
+   * ALTS / EMERGING
+5. AI reasoning / portfolio / telemetry systems underneath
+
+====================================================
+OPPORTUNITY GRID
+================
+
+Both columns:
+
+* 10 visible cards each
+* vertical scrolling
+* max 20 tracked internally
+* auto-rotation as AI confidence changes
+
+Cards should feel:
+
+* highly alive
+* constantly scanning
+* dynamic intelligence terminal
+* institutional AI workstation
+
+====================================================
+CRYPTO ONLY
+===========
+
+Still locked:
+
+* NO equities
+* NO stocks
+* NO TSLA/NVDA/SPY references
+* NO Alpaca language
+* NO equities execution terminology
+
+Entire IA is now crypto-native.
+
+====================================================
+AESTHETIC PRIORITY
+==================
+
+The neon is working extremely well.
+
+Do NOT flatten the glow system.
+
+Keep:
+
+* green bloom
+* subtle edge glows
+* scanning terminal energy
+* dark institutional background
+* high contrast telemetry styling
+
+The atmosphere should feel:
+Bloomberg x AI war room x crypto intelligence terminal.

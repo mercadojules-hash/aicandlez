@@ -1,0 +1,148 @@
+Approve CommandDeck v3 as the production direction.
+
+Proceed with:
+
+PHASE E3 — Graduate CommandDeck v3 into the real /portal.
+
+====================================================
+AI INTELLIGENCE TERMINAL — FINAL DIRECTION
+==========================================
+
+Platform is now CRYPTO ONLY.
+
+NO:
+
+* equities
+* stocks
+* NVDA
+* SPY
+* TSLA
+* Alpaca references
+* equities market language
+
+====================================================
+NEW IA STRUCTURE
+================
+
+Top centerpiece:
+
+* 20 AI opportunity cards total
+* 2-column architecture
+* LEFT = MAJORS
+* RIGHT = ALTS / EMERGING
+
+Each column:
+
+* vertically scrollable
+* max 10 visible before scroll
+* dynamic rotation based on AI confidence changes
+* cards reshuffle automatically as rankings update
+
+====================================================
+SEARCH SECTION
+==============
+
+Add a dedicated SEARCH + FILTER BAR above the opportunity grid.
+
+Supports:
+
+* BTC
+* ETH
+* SOL
+* XRP
+* ADA
+* DOGE
+* AVAX
+* LINK
+* SUI
+* PEPE
+* TAO
+* FET
+* etc
+
+Search should:
+
+* instantly filter cards
+* jump asset into focus
+* support ticker + asset name
+* preserve institutional aesthetic
+
+====================================================
+CARD PRIORITIES
+===============
+
+The CONFIDENCE SCORE is the dominant visual anchor.
+
+Cards should include:
+
+* ticker
+* confidence score
+* LONG / SHORT bias
+* volatility
+* liquidity
+* AI regime
+* momentum state
+* volume pressure
+* mini live chart
+* signal status
+* risk level
+* exchange availability
+* execution readiness
+
+====================================================
+KEEP EXISTING DATA
+==================
+
+Do NOT remove existing telemetry/data systems.
+
+Preserve:
+
+* operator pulse data
+* portfolio telemetry
+* reasoning feed
+* AI reasoning console
+* exchange topology
+* signal pipeline
+* platform stats
+* account metrics
+* terminal feeds
+
+We are restructuring the IA — not reducing intelligence density.
+
+====================================================
+LAYOUT
+======
+
+Use CommandDeck density/styling:
+
+* Bloomberg/institutional aesthetic
+* monochrome neon green
+* dense telemetry
+* thin dividers
+* compact operator styling
+* high information density
+
+Opportunity grid becomes the PRIMARY centerpiece of the workstation.
+
+Everything else flows underneath it.
+
+====================================================
+LOCKED INVARIANTS
+=================
+
+Customer portal remains:
+
+* PAPER ONLY
+* NO live execution
+* NO kill switch
+* NO broker controls
+* NO ARM LIVE
+* NO equities routing
+
+Admin/operator controls remain isolated to admintrade only.
+
+====================================================
+NEXT STEP
+=========
+
+Start decomposing Portal.tsx into modular portal components while graduating CommandDeck v3 into production.
