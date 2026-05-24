@@ -16,4 +16,6 @@ export * from "./auditLog";
 export * from "./userTradeLimits";
 export * from "./userAdminStatus";
 export * from "./userAdminActions";
+export * from "./userCredits";
+export * from "./creditTransactions";
 export * from "../constants/alertKeys";

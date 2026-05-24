@@ -1,5 +1,10 @@
 import { db } from "@workspace/db";
 import { performanceFeesTable } from "@workspace/db";
+import {
+  applyFeeAgainstCredits,
+  evaluateAndEnforceBillingHold,
+} from "./billingEnforcement.js";
+import { logger } from "./logger.js";
 
 // ── Performance fee constants ─────────────────────────────────────────────────
 // Fee is ONLY charged on realized, closed, PROFITABLE trades.
@@ -54,22 +59,54 @@ export async function recordPerformanceFee(params: {
     timestamp:   Date.now(),
   };
 
-  // Persist to DB (fire-and-forget — never block the trade close response)
-  db.insert(performanceFeesTable).values({
-    id,
-    userId:           params.userId,
-    tradeId:          params.tradeId,
-    exchange:         params.exchange,
-    symbol:           params.symbol,
-    side:             params.side,
-    realizedPnl:      params.realizedPnl,
-    feeRate:          PERFORMANCE_FEE_RATE,
-    feeAmountUsd:     feeUSD,
-    settlementStatus: "pending",
-    isPaper:          params.isPaper,
-  }).catch(() => {
-    // DB write failure must not affect trade execution
-  });
+  // Persist to DB then attempt credit deduction + billing enforcement.
+  // Fire-and-forget at the OUTER level — trade execution never blocks
+  // on billing bookkeeping.
+  (async () => {
+    try {
+      await db.insert(performanceFeesTable).values({
+        id,
+        userId:           params.userId,
+        tradeId:          params.tradeId,
+        exchange:         params.exchange,
+        symbol:           params.symbol,
+        side:             params.side,
+        realizedPnl:      params.realizedPnl,
+        feeRate:          PERFORMANCE_FEE_RATE,
+        feeAmountUsd:     feeUSD,
+        settlementStatus: "pending",
+        isPaper:          params.isPaper,
+      });
+
+      // Paper trades are audited but never billed → skip credits/hold.
+      if (params.isPaper) return;
+
+      // 1. Try credits first. If fully covered, fee is auto-settled and
+      //    no debt accrues, so no billing_hold can trigger.
+      const credResult = await applyFeeAgainstCredits({
+        userId:    params.userId,
+        feeAmount: feeUSD,
+        feeId:     id,
+      });
+
+      // 2. Re-evaluate billing health regardless — covers edge cases like
+      //    pre-existing outstanding fees that finally cross threshold even
+      //    after a partial credit deduction.
+      await evaluateAndEnforceBillingHold(params.userId);
+
+      if (!credResult.covered) {
+        logger.info(
+          { userId: params.userId, feeId: id, feeUSD, deducted: credResult.deducted },
+          "fee remains outstanding (credits insufficient)",
+        );
+      }
+    } catch (err) {
+      logger.error(
+        { err, feeId: id, userId: params.userId },
+        "fee persistence / billing enforcement failed (non-fatal to trade close)",
+      );
+    }
+  })();
 
   _entries.push(entry);
   _totalCollected += feeUSD;

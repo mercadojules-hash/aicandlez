@@ -8,6 +8,13 @@ import { usersTable } from "./users";
 //                      and see *why* they're suspended.
 //   - `disabled`     → blocks execution AND auth bootstrap. Hard lock.
 //   - `force_paper`  → blocks only live paths; paper continues to work.
+//   - `billing_hold` → automated billing enforcement. Blocks NEW live
+//                      executions only; paper, dashboard, history, and
+//                      ALL open positions remain untouched. Auto-cleared
+//                      when fees are paid (Stripe webhook) or credits
+//                      topped up. SaaS-platform-only enforcement —
+//                      never liquidates positions, never touches
+//                      exchange balances, never auto-withdraws.
 //
 // The single source of truth is read by `userStatusGuard` and respected by
 // every execution boundary.
@@ -25,5 +32,5 @@ export const userAdminStatusTable = pgTable("user_admin_status", {
 export type UserAdminStatus       = typeof userAdminStatusTable.$inferSelect;
 export type InsertUserAdminStatus = typeof userAdminStatusTable.$inferInsert;
 
-export const ADMIN_STATUSES = ["active", "suspended", "disabled", "force_paper"] as const;
+export const ADMIN_STATUSES = ["active", "suspended", "disabled", "force_paper", "billing_hold"] as const;
 export type AdminStatus = typeof ADMIN_STATUSES[number];

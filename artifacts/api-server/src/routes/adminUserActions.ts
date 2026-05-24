@@ -64,6 +64,17 @@ import {
 import { invalidateTradeLimitCache } from "../lib/tradeLimitEngine.js";
 import { executionStreamBus, type ExecStreamType } from "../lib/executionStreamBus.js";
 import { __invalidateAdminUserTelemetryCache } from "./adminUserTelemetry.js";
+import {
+  checkBillingHealth,
+  addCredits,
+  waiveAllPendingFees,
+  forceRestoreBilling,
+  evaluateAndEnforceBillingHold,
+  getOutstanding,
+  getCreditBalance,
+} from "../lib/billingEnforcement.js";
+import { performanceFeesTable, creditTransactionsTable } from "@workspace/db";
+import { desc, sql as drizzleSql } from "drizzle-orm";
 
 const router = Router();
 const requireOperator   = [requireAuth, requireRole(["admin", "super-admin"])];
@@ -952,5 +963,225 @@ router.post("/admin/users/sync_from_clerk", ...requireOperator, async (req, res)
     res.status(502).json({ error: `Clerk sync failed: ${(err as Error).message}`, scanned, created, updated, errors });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BILLING ENFORCEMENT ENDPOINTS (Phase A + B backend surface)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Every endpoint here is role-gated and audit-logged. None of these can
+// affect Kraken, the execution queue, the trading loop, open positions,
+// or exchange balances. They mutate ONLY:
+//   - user_credits (balance)
+//   - credit_transactions (immutable ledger)
+//   - performance_fees (settlement_status: pending → waived/settled)
+//   - user_admin_status (billing_hold ↔ active)
+//   - user_admin_actions (audit)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AddCreditsBodySchema = z.object({
+  note:   NoteSchema,
+  amount: z.number().positive().max(100_000),
+  type:   z.enum(["topup", "adjustment", "refund"]).default("adjustment"),
+});
+
+const WaiveFeesBodySchema = z.object({
+  note: NoteSchema,
+});
+
+const RestoreBillingBodySchema = z.object({
+  note: NoteSchema,
+});
+
+// ── GET /api/admin/users/:id/billing ──────────────────────────────────────────
+// Returns current billing health snapshot for a specific user.
+router.get("/admin/users/:id/billing", ...requireOperator, async (req: Request, res: Response) => {
+  const userId = String(req.params["id"] ?? "");
+  if (!userId) return res.status(400).json({ error: "Missing user id" });
+
+  try {
+    const health = await checkBillingHealth(userId);
+
+    const recentFees = await db
+      .select({
+        id:               performanceFeesTable.id,
+        tradeId:          performanceFeesTable.tradeId,
+        symbol:           performanceFeesTable.symbol,
+        realizedPnl:      performanceFeesTable.realizedPnl,
+        feeAmountUsd:     performanceFeesTable.feeAmountUsd,
+        settlementStatus: performanceFeesTable.settlementStatus,
+        isPaper:          performanceFeesTable.isPaper,
+        createdAt:        performanceFeesTable.createdAt,
+      })
+      .from(performanceFeesTable)
+      .where(eq(performanceFeesTable.userId, userId))
+      .orderBy(desc(performanceFeesTable.createdAt))
+      .limit(50);
+
+    const recentCreditTx = await db
+      .select()
+      .from(creditTransactionsTable)
+      .where(eq(creditTransactionsTable.userId, userId))
+      .orderBy(desc(creditTransactionsTable.createdAt))
+      .limit(50);
+
+    return res.json({ health, recentFees, recentCreditTx });
+  } catch (err) {
+    req.log.error({ err, userId }, "GET admin billing failed");
+    return res.status(500).json({ error: "Failed to load billing snapshot" });
+  }
+});
+
+// ── GET /api/admin/billing/hold_queue ─────────────────────────────────────────
+// Lists every user currently on billing_hold (queue for operator review).
+router.get("/admin/billing/hold_queue", ...requireOperator, async (req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        userId:    userAdminStatusTable.userId,
+        email:     usersTable.email,
+        plan:      usersTable.plan,
+        status:    userAdminStatusTable.status,
+        reason:    userAdminStatusTable.reason,
+        since:     userAdminStatusTable.since,
+        updatedAt: userAdminStatusTable.updatedAt,
+      })
+      .from(userAdminStatusTable)
+      .leftJoin(usersTable, eq(usersTable.clerkUserId, userAdminStatusTable.userId))
+      .where(eq(userAdminStatusTable.status, "billing_hold"))
+      .orderBy(desc(userAdminStatusTable.since));
+
+    // Enrich with outstanding + credit balance per row (best-effort, small queue)
+    const enriched = await Promise.all(rows.map(async (r) => ({
+      ...r,
+      outstanding: await getOutstanding(r.userId).catch(() => 0),
+      credits:     await getCreditBalance(r.userId).catch(() => 0),
+    })));
+
+    return res.json({ count: enriched.length, holds: enriched });
+  } catch (err) {
+    req.log.error({ err }, "GET billing hold queue failed");
+    return res.status(500).json({ error: "Failed to load hold queue" });
+  }
+});
+
+// ── POST /api/admin/users/:id/add_credits ─────────────────────────────────────
+// Grant credits to a user (admin manual adjustment). Auto-clears billing_hold
+// if it becomes healthy.
+router.post("/admin/users/:id/add_credits", ...requireOperator, async (req: Request, res: Response) => {
+  const ctx = resolveActor(req, res);
+  if (!ctx) return;
+
+  const parsed = AddCreditsBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+  }
+
+  try {
+    const result = await addCredits({
+      userId:       ctx.targetId,
+      amount:       parsed.data.amount,
+      type:         parsed.data.type,
+      actorAdminId: ctx.actorId,
+      note:         parsed.data.note,
+    });
+
+    await writeAudit({
+      actorId:  ctx.actorId,
+      targetId: ctx.targetId,
+      action:   "credits_added",
+      payload:  {
+        amount:     parsed.data.amount,
+        type:       parsed.data.type,
+        newBalance: result.newBalance,
+        txId:       result.txId,
+        note:       parsed.data.note,
+      },
+    });
+
+    // Re-evaluate billing health: may auto-clear billing_hold.
+    const enforcement = await evaluateAndEnforceBillingHold(ctx.targetId);
+
+    return res.json({
+      ok:            true,
+      newBalance:    result.newBalance,
+      txId:          result.txId,
+      statusChanged: enforcement.mutated,
+      newStatus:     enforcement.newStatus,
+    });
+  } catch (err) {
+    req.log.error({ err, userId: ctx.targetId }, "add_credits failed");
+    return res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ── POST /api/admin/users/:id/waive_fees ──────────────────────────────────────
+// Waive ALL pending performance fees for a user. Super-admin only.
+router.post("/admin/users/:id/waive_fees", ...requireSuperAdmin, async (req: Request, res: Response) => {
+  const ctx = resolveActor(req, res);
+  if (!ctx) return;
+
+  const parsed = WaiveFeesBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+  }
+
+  try {
+    const result = await waiveAllPendingFees({
+      userId:       ctx.targetId,
+      actorAdminId: ctx.actorId,
+      note:         parsed.data.note,
+    });
+
+    await writeAudit({
+      actorId:  ctx.actorId,
+      targetId: ctx.targetId,
+      action:   "fees_waived",
+      payload:  { ...result, note: parsed.data.note },
+    });
+
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    req.log.error({ err, userId: ctx.targetId }, "waive_fees failed");
+    return res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ── POST /api/admin/users/:id/restore_billing ─────────────────────────────────
+// Force-clear billing_hold (e.g. promised payment, dispute resolution).
+// Super-admin only. Does NOT waive fees.
+router.post("/admin/users/:id/restore_billing", ...requireSuperAdmin, async (req: Request, res: Response) => {
+  const ctx = resolveActor(req, res);
+  if (!ctx) return;
+
+  const parsed = RestoreBillingBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+  }
+
+  try {
+    const result = await forceRestoreBilling({
+      userId:       ctx.targetId,
+      actorAdminId: ctx.actorId,
+      note:         parsed.data.note,
+    });
+
+    await writeAudit({
+      actorId:  ctx.actorId,
+      targetId: ctx.targetId,
+      action:   "billing_restored_manual",
+      payload:  { ...result, note: parsed.data.note },
+    });
+
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    req.log.error({ err, userId: ctx.targetId }, "restore_billing failed");
+    return res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// drizzleSql exported only to silence the unused import warning when
+// future endpoints add aggregations. Keep this import wired even if no
+// inline usage today — billing analytics queries land in the next phase.
+void drizzleSql;
 
 export default router;

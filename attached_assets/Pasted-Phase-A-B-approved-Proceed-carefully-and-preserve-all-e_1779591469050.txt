@@ -1,0 +1,188 @@
+Phase A + B approved. Proceed carefully and preserve all existing execution infrastructure boundaries.
+
+ARCHITECTURAL INVARIANTS — DO NOT TOUCH
+Do NOT modify:
+
+* Kraken adapter
+* execution queue
+* live execution engine
+* auth routing
+* telemetry systems
+* customer/admin separation
+* exchange credential architecture
+
+Single integration point only:
+
+* userStatusGuard
+
+This billing system must behave as SaaS platform enforcement ONLY.
+We are NOT:
+
+* liquidating positions
+* touching exchange balances
+* acting as custodian
+* auto-withdrawing profits
+* interfering with broker assets
+
+OPEN POSITIONS MUST ALWAYS REMAIN UNTOUCHED.
+
+====================================================
+PHASE A — FOUNDATION
+====================
+
+Additive only. No behavioral changes yet.
+
+1. Extend AdminStatus enum:
+
+* billing_hold
+
+2. Add tables:
+
+user_credits
+
+* userId PK
+* balanceUsd
+* autoRechargeUsd
+* autoRechargeThreshold
+* updatedAt
+
+credit_transactions
+
+* id
+* userId
+* amountUsd
+* type:
+
+  * topup
+  * fee_deduction
+  * refund
+  * adjustment
+* stripePaymentIntentId
+* note
+* createdAt
+
+3. Add rollup service:
+   lib/billingEnforcement.ts
+
+Functions:
+
+* getOutstanding(userId)
+* getThresholdForPlan(plan)
+* checkBillingHealth(userId)
+
+Thresholds:
+
+* FREE → no live access
+* STARTER → $30
+* PRO → $100
+
+IMPORTANT:
+Credits deduct FIRST before outstanding balances accrue.
+
+Meaning:
+IF credits > 0:
+
+* deduct fees from credits
+* do NOT accumulate outstanding debt
+* do NOT enter billing_hold
+
+Only if:
+credits <= 0
+AND outstanding >= threshold
+
+THEN:
+
+* billing_hold activates
+
+====================================================
+PHASE B — ENFORCEMENT
+=====================
+
+4. Extend userStatusGuard only:
+
+* billing_hold:
+
+  * allowLive = false
+  * allowPaper = true
+  * allowDashboard = true
+
+Customer should retain:
+
+* dashboard
+* analytics
+* signals
+* history
+* paper mode
+
+Only NEW live AI executions are blocked.
+
+5. Enforcement integration point:
+   After closed-trade fee insertion in feeLedger.ts:
+
+* run checkBillingHealth(userId)
+
+If threshold exceeded:
+
+* upsert adminStatus = billing_hold
+* audit log:
+  reason = fee_threshold_exceeded
+
+6. VERY IMPORTANT:
+   Do NOT:
+
+* liquidate trades
+* cancel positions
+* touch exchange balances
+* modify Kraken execution flow
+
+Only prevent NEW live executions.
+
+====================================================
+ADMIN CONSOLE REQUIREMENTS
+==========================
+
+Prepare backend support for:
+
+* BILLING_HOLD queue
+* outstanding balances
+* credit balances
+* threshold status
+* last fee event
+* waive fees
+* add credits
+* restore user
+* emergency manual override
+
+====================================================
+GLOBAL SAFETY REQUIREMENT
+=========================
+
+Add architecture hook planning for:
+GLOBAL LIVE EXECUTION KILL SWITCH
+
+Independent of billing state:
+
+* disable ALL new live AI executions platform-wide
+* preserve paper trading
+* preserve dashboards
+* preserve open positions
+
+Do NOT fully implement yet.
+Just prepare clean architecture boundaries.
+
+====================================================
+IMPLEMENTATION RULES
+====================
+
+* additive only
+* no giant merge
+* preserve existing execution stability
+* preserve entitlement middleware
+* preserve audit architecture
+* preserve moderation protections
+* preserve admin/customer separation
+
+Proceed with:
+PHASE A + B ONLY
+
+NO Phase C/D/E/F yet.

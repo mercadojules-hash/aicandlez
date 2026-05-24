@@ -10,14 +10,24 @@
 //
 // Truth table:
 //
-//   status       allowLive  allowPaper  allowAuth
-//   ─────────────────────────────────────────────
-//   active       yes        yes         yes
-//   force_paper  no         yes         yes
-//   suspended    no         no          yes   ← user must still sign in to
-//                                                see *why* they're suspended
-//   disabled     no         no          no    ← hard lock; auth bootstrap
-//                                                returns 403
+//   status        allowLive  allowPaper  allowAuth
+//   ──────────────────────────────────────────────
+//   active        yes        yes         yes
+//   force_paper   no         yes         yes
+//   billing_hold  no         yes         yes   ← automated billing enforce-
+//                                                 ment. Identical to
+//                                                 force_paper at the guard
+//                                                 level; distinct status
+//                                                 string for telemetry +
+//                                                 customer messaging +
+//                                                 auto-restoration hooks.
+//                                                 Paper, dashboard, history,
+//                                                 open positions all
+//                                                 preserved.
+//   suspended     no         no          yes   ← user must still sign in to
+//                                                 see *why* they're suspended
+//   disabled      no         no          no    ← hard lock; auth bootstrap
+//                                                 returns 403
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { db, userAdminStatusTable, type AdminStatus } from "@workspace/db";
@@ -46,6 +56,12 @@ export function verdictFor(status: AdminStatus, reason: string | null = null): S
     case "active":
       return { status, allowLive: true,  allowPaper: true,  allowAuth: true,  reason };
     case "force_paper":
+      return { status, allowLive: false, allowPaper: true,  allowAuth: true,  reason };
+    case "billing_hold":
+      // Same gate as force_paper — blocks NEW live executions only.
+      // Open positions, paper, dashboard, history, signals all continue.
+      // Distinguishable from force_paper via the `status` field so the UI
+      // can show "Add credits to resume" instead of "Operator action".
       return { status, allowLive: false, allowPaper: true,  allowAuth: true,  reason };
     case "suspended":
       return { status, allowLive: false, allowPaper: false, allowAuth: true,  reason };
