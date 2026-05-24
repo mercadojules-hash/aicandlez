@@ -4247,19 +4247,15 @@ function PortalInner() {
           if a stale UI affordance leaks through. The admin branch (above)
           keeps PortalModeProvider absent and uses the operator workstation
           variant directly. */}
-      {/* Customer paper-trading mode — two cinematic LiveControlBar bars
-          (CRYPTO + EQUITIES) rendered read-only in PAPER state. Same
-          institutional visual vocabulary used on /command and admintrade,
-          per Task #163 spec: deploy the LIVE AI EXECUTION bar UX
-          consistently across customer portal, admin portal, and admin
-          command center, with the PAPER variant standing in for the
-          customer simulated-trading mode. */}
-      {!isAdmin && (
-        <div style={{ padding: "12px 16px 0", display: "flex", flexDirection: "column", gap: 10 }}>
-          <LiveControlBar assetClass="CRYPTO"   state="PAPER" />
-          <LiveControlBar assetClass="EQUITIES" state="PAPER" />
-        </div>
-      )}
+      {/* Task #165 — customer portal opens directly into the institutional
+          dashboard with NO PAPER bars and NO LIVE execution bars. Paper
+          mode is implied through the equity / metrics cards ($100k
+          simulated balance, tier-gated trade limits). Real-money execution
+          is operated by AICandlez through admintrade.aicandlez.com only,
+          and is server-side gated by `customer_live_execution_disabled`
+          in placeLiveAutoOrderForUser, POST /api/user/live-order, and the
+          tradingLoop customer fan-out branch. Admin branch below still
+          renders LiveControlBar — operator workstation, real execution. */}
 
       <LogoBanner tier={tier} isAdmin={isAdmin} />
 
@@ -4581,26 +4577,12 @@ function PortalInner() {
         </div>
       ) : (
       <>
-      {/* Canonical LIVE AI EXECUTION bars (server-derived, read-only on
-          customer surface) — sit directly above their signals panel so the
-          customer sees the same state /command operators see. */}
-      <div style={{
-        padding: "14px 16px 0",
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: 10,
-      }}>
-        <LiveControlBar
-          assetClass="CRYPTO"
-          state={cryptoBarState}
-          eligibilityReason={cryptoBarReason}
-        />
-        <LiveControlBar
-          assetClass="EQUITIES"
-          state={equitiesBarState}
-          eligibilityReason={equitiesBarReason}
-        />
-      </div>
+      {/* Task #165 — customer LIVE AI EXECUTION bars removed. Customer
+          portal renders signals + simulated trading metrics directly, with
+          no operator-style execution bar surface. cryptoBarState /
+          equitiesBarState / cryptoBarReason / equitiesBarReason are still
+          computed (admin branch above consumes them), but no customer-side
+          UI binds to them. */}
 
       {/* TOP 20 CRYPTO + TOP 20 EQUITY signal panels */}
       <div style={{

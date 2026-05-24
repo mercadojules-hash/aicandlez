@@ -1,0 +1,83 @@
+The latest production validation clarified the bug.
+
+The PAPER TRADING bars are now rendering correctly on https://trade.aicandlez.com/portal, HOWEVER the underlying execution context is STILL incorrectly tied to Kraken/live operator infrastructure.
+
+Current incorrect behavior:
+
+* customer portal shows:
+
+  * AI CRYPTO PAPER TRADING • ACTIVE
+  * AI EQUITIES PAPER TRADING • ACTIVE
+* BUT the execution section still references:
+
+  * Kraken
+  * LIVE mode
+  * operator/live telemetry
+  * live exchange infrastructure
+
+This is incorrect architecture for customer paper trading.
+
+CUSTOMER DEFAULT STATE MUST BE:
+
+Execution provider:
+
+* Alpaca PAPER trading ONLY
+
+Mode:
+
+* PAPER / SIMULATED
+
+Capital:
+
+* $100,000 paper balance
+
+Exchange:
+
+* NONE connected initially
+
+NO:
+
+* Kraken default
+* LIVE mode default
+* operator telemetry injection
+* operator execution adapter
+* admin exchange hydration
+* live execution queue
+* admin/live websocket state takeover
+
+Kraken should ONLY appear IF:
+
+1. customer explicitly connects Kraken
+   AND
+2. customer explicitly enables live trading
+
+Right now the portal appears to:
+
+* visually render PAPER bars
+  BUT
+* internally hydrate the LIVE Kraken execution state underneath
+
+Likely root cause:
+
+* exchange adapter initialization defaults to Kraken
+* execution context provider seeded from operator store
+* live engine hydration overriding customer state after mount
+* websocket reconciliation mutating customer execution context
+* customer portal sharing admin execution provider
+
+Required fixes:
+
+1. Separate customer PAPER execution provider from operator LIVE provider
+2. Default customer execution adapter to Alpaca paper simulation
+3. Ensure exchange = null until user explicitly connects exchange
+4. Prevent Kraken/operator state from hydrating into customer portal
+5. Ensure customer PAPER mode remains authoritative across reconnects/re-renders
+6. Remove all LIVE/KRAKEN defaults from customer portal initialization path
+
+ALSO:
+Landing page “Operator Console” button still must route to:
+https://trade.aicandlez.com/portal
+
+NOT admintrade.aicandlez.com
+
+Deploy after fix.

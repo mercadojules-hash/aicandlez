@@ -124,7 +124,7 @@ export function Navbar() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <a
-            href="https://admintrade.aicandlez.com/"
+            href={TRADE_PORTAL_URL}
             className="hidden-mobile"
             style={{
               color: "#8892a4",
