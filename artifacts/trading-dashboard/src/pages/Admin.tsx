@@ -8,6 +8,7 @@ import {
   X, Gift, SlidersHorizontal, PauseCircle, PlayCircle, Ban,
   Power, Unplug, Loader2, CloudDownload,
   UserCircle, Briefcase, History, Cpu,
+  Eye, EyeOff, RotateCcw,
 } from "lucide-react";
 import type { EngineStatus, FeeSummary, ExchangeStatus } from "@/components/command/types";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -217,7 +218,20 @@ type ActionPanel =
   | "emergency"
   | null;
 
-type IntelTab = "profile" | "exchanges" | "trading" | "actions";
+type IntelTab = "profile" | "exchanges" | "trading" | "entitlements" | "actions";
+
+// CRM Phase A4 — per-user exchange visibility / governance.
+interface VisibilityRow {
+  exchangeId:       string;
+  exchangeName:     string;
+  status:           "live" | "beta" | "coming_soon";
+  catalogDefault:   boolean;
+  override:         boolean | null;
+  effectiveVisible: boolean;
+  note:             string | null;
+  updatedAt:        string | null;
+  updatedByAdminId: string | null;
+}
 
 interface UserDetailExchangeConnection {
   id: string;
@@ -457,10 +471,11 @@ function UserIntelligencePanel({
           background: "#000814",
         }}>
           {([
-            { id: "profile",   label: "PROFILE",   icon: UserCircle },
-            { id: "exchanges", label: "EXCHANGES", icon: Briefcase },
-            { id: "trading",   label: "TRADING",   icon: BarChart2 },
-            { id: "actions",   label: "ACTIONS",   icon: SlidersHorizontal },
+            { id: "profile",      label: "PROFILE",      icon: UserCircle },
+            { id: "exchanges",    label: "EXCHANGES",    icon: Briefcase },
+            { id: "trading",      label: "TRADING",      icon: BarChart2 },
+            { id: "entitlements", label: "ENTITLEMENTS", icon: Eye },
+            { id: "actions",      label: "ACTIONS",      icon: SlidersHorizontal },
           ] as const).map(t => {
             const active = tab === t.id;
             const Icon   = t.icon;
@@ -492,6 +507,9 @@ function UserIntelligencePanel({
           )}
           {tab === "trading" && (
             <TradingTab detail={detail} loading={detailQuery.isLoading} />
+          )}
+          {tab === "entitlements" && (
+            <EntitlementsTab clerkUserId={user.clerkUserId} />
           )}
           {tab === "actions" && panel === null && (
             <>
@@ -1174,6 +1192,222 @@ function ExchangesTab({ detail, loading }: {
               }}>{fmtAgo(t.ts)}</div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ENTITLEMENTS TAB ─────────────────────────────────────────────────────────
+// CRM Phase A4 — per-user exchange governance / visibility / entitlements.
+// Hydrates from the catalog ∪ this user's override rows; each toggle is
+// audit-logged via /api/admin/users/:id/exchange-visibility. Presentational
+// only — execution enforcement is intentionally deferred to a later phase.
+function EntitlementsTab({ clerkUserId }: { clerkUserId: string }) {
+  const qc = useQueryClient();
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const visibilityQuery = useQuery<{ exchanges: VisibilityRow[]; timestamp: number }>({
+    queryKey: ["admin-user-exchange-visibility", clerkUserId],
+    enabled:  Boolean(clerkUserId),
+    staleTime: 10_000,
+    queryFn: async () => {
+      const res = await authFetch(`/api/admin/users/${clerkUserId}/exchange-visibility`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json() as { exchanges: VisibilityRow[]; timestamp: number };
+    },
+  });
+
+  const setMutation = useMutation({
+    mutationFn: async (args: { exchangeId: string; visible: boolean; note: string }) => {
+      const res = await authFetch(`/api/admin/users/${clerkUserId}/exchange-visibility`, {
+        method: "POST",
+        body:   JSON.stringify(args),
+      });
+      const text = await res.text();
+      let json: unknown = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) {
+        throw new Error((json as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
+      }
+      return json;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-user-exchange-visibility", clerkUserId] });
+      qc.invalidateQueries({ queryKey: ["admin-user-detail", clerkUserId] });
+      toast({ title: "Visibility updated", description: "Override applied + audit-logged." });
+    },
+    onError: (err: Error) => toast({ title: "Update failed", description: err.message }),
+    onSettled: () => setBusyId(null),
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: async (args: { exchangeId: string; note: string }) => {
+      const res = await authFetch(
+        `/api/admin/users/${clerkUserId}/exchange-visibility/${encodeURIComponent(args.exchangeId)}`,
+        { method: "DELETE", body: JSON.stringify({ note: args.note }) },
+      );
+      const text = await res.text();
+      let json: unknown = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) {
+        throw new Error((json as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
+      }
+      return json;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-user-exchange-visibility", clerkUserId] });
+      qc.invalidateQueries({ queryKey: ["admin-user-detail", clerkUserId] });
+      toast({ title: "Override cleared", description: "User reverts to catalog default." });
+    },
+    onError: (err: Error) => toast({ title: "Clear failed", description: err.message }),
+    onSettled: () => setBusyId(null),
+  });
+
+  function handleToggle(row: VisibilityRow) {
+    const next = !row.effectiveVisible;
+    const note = window.prompt(
+      `Audit note — ${next ? "show" : "hide"} ${row.exchangeName} for this user:`,
+      "",
+    );
+    if (note === null) return;
+    if (!note.trim()) { toast({ title: "Note required", description: "Audit-trail note cannot be empty." }); return; }
+    setBusyId(row.exchangeId);
+    setMutation.mutate({ exchangeId: row.exchangeId, visible: next, note: note.trim() });
+  }
+
+  function handleClear(row: VisibilityRow) {
+    const note = window.prompt(`Audit note — clear ${row.exchangeName} override:`, "");
+    if (note === null) return;
+    if (!note.trim()) { toast({ title: "Note required", description: "Audit-trail note cannot be empty." }); return; }
+    setBusyId(row.exchangeId);
+    clearMutation.mutate({ exchangeId: row.exchangeId, note: note.trim() });
+  }
+
+  const rows = visibilityQuery.data?.exchanges ?? [];
+  const overrides = rows.filter(r => r.override !== null).length;
+
+  return (
+    <div>
+      <TabSectionLabel icon={Eye}>EXCHANGE VISIBILITY</TabSectionLabel>
+      <div style={{
+        fontSize: 9, fontFamily: "monospace", color: TAB_C.dim,
+        padding: "0 2px 10px", lineHeight: 1.5,
+      }}>
+        Per-user exchange governance. Hidden exchanges are removed from
+        this user's connect surfaces (presentational only — execution
+        enforcement runs in a later phase). All changes audit-logged.
+        <div style={{ marginTop: 4, color: TAB_C.faint }}>
+          {overrides > 0
+            ? `${overrides} active override${overrides === 1 ? "" : "s"} · catalog drives the rest`
+            : "No overrides set — user sees catalog defaults"}
+        </div>
+      </div>
+
+      {visibilityQuery.isLoading ? <TabLoading /> : rows.length === 0 ? (
+        <EmptyState>CATALOG IS EMPTY</EmptyState>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {rows.map(row => {
+            const visible    = row.effectiveVisible;
+            const hasOverride = row.override !== null;
+            const isBusy     = busyId === row.exchangeId &&
+              (setMutation.isPending || clearMutation.isPending);
+            const statusColor =
+              row.status === "live" ? "#00ff8a" :
+              row.status === "beta" ? "#ffaa00" : "#7a9eb8";
+            const visColor = visible ? "#00ff8a" : "#ff3355";
+            const VisIcon  = visible ? Eye : EyeOff;
+            return (
+              <div key={row.exchangeId} style={{
+                background: "#000814",
+                border: `1px solid ${hasOverride ? "#cc55ff40" : TAB_C.border}`,
+                borderRadius: 4, padding: "10px 12px",
+              }}>
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  marginBottom: 6, gap: 8,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    <VisIcon className="w-3.5 h-3.5" style={{ color: visColor, flexShrink: 0 }} />
+                    <div style={{
+                      fontSize: 11, fontFamily: "monospace", fontWeight: 700, color: TAB_C.text,
+                      textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}>{row.exchangeName}</div>
+                    <span style={{
+                      fontSize: 7, fontFamily: "monospace", fontWeight: 700,
+                      color: statusColor, border: `1px solid ${statusColor}40`,
+                      padding: "1px 4px", borderRadius: 2, letterSpacing: "0.1em",
+                    }}>{row.status.toUpperCase().replace("_", " ")}</span>
+                    {hasOverride && (
+                      <span style={{
+                        fontSize: 7, fontFamily: "monospace", fontWeight: 700,
+                        color: "#cc55ff", border: "1px solid #cc55ff40",
+                        padding: "1px 4px", borderRadius: 2, letterSpacing: "0.1em",
+                      }}>OVERRIDE</span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <button
+                      disabled={isBusy}
+                      onClick={() => handleToggle(row)}
+                      style={{
+                        fontSize: 9, fontFamily: "monospace", fontWeight: 700,
+                        padding: "4px 10px", borderRadius: 3, cursor: isBusy ? "wait" : "pointer",
+                        background: visible ? "#1a0808" : "#04140a",
+                        border: `1px solid ${visColor}55`, color: visColor,
+                        letterSpacing: "0.1em", opacity: isBusy ? 0.5 : 1,
+                      }}>
+                      {visible ? "HIDE" : "SHOW"}
+                    </button>
+                    {hasOverride && (
+                      <button
+                        disabled={isBusy}
+                        onClick={() => handleClear(row)}
+                        title="Clear override — revert to catalog default"
+                        style={{
+                          padding: 5, borderRadius: 3, cursor: isBusy ? "wait" : "pointer",
+                          background: "transparent", border: `1px solid ${TAB_C.border}`,
+                          color: TAB_C.dim, display: "flex", alignItems: "center",
+                          opacity: isBusy ? 0.5 : 1,
+                        }}>
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div style={{
+                  display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6,
+                  fontSize: 9, fontFamily: "monospace",
+                }}>
+                  <div><span style={{ color: TAB_C.faint }}>DEFAULT </span>
+                    <span style={{ color: row.catalogDefault ? "#00ff8a" : "#ff3355" }}>
+                      {row.catalogDefault ? "VISIBLE" : "HIDDEN"}
+                    </span></div>
+                  <div><span style={{ color: TAB_C.faint }}>EFFECTIVE </span>
+                    <span style={{ color: visColor }}>
+                      {visible ? "VISIBLE" : "HIDDEN"}
+                    </span></div>
+                  <div><span style={{ color: TAB_C.faint }}>UPDATED </span>
+                    <span style={{ color: TAB_C.text }}>
+                      {row.updatedAt ? fmtIsoAgo(row.updatedAt) : "—"}
+                    </span></div>
+                </div>
+                {row.note && (
+                  <div style={{
+                    marginTop: 6, padding: "5px 8px", fontSize: 9, fontFamily: "monospace",
+                    color: TAB_C.dim, background: "#040810",
+                    border: `1px solid ${TAB_C.border}`, borderRadius: 3,
+                    overflow: "hidden", textOverflow: "ellipsis",
+                  }}>
+                    <span style={{ color: TAB_C.faint }}>NOTE </span>
+                    {row.note.slice(0, 200)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
