@@ -290,6 +290,93 @@ Migrations run automatically on API server start. To run manually:
 pnpm --filter @workspace/api-server run migrate
 ```
 
+### 7a. Task #174 — Admin Telemetry Schema Reconciliation (May 2026)
+
+Prior to Task #174, the prod DB lagged `lib/db` in three areas, which is
+why `adminUserTelemetry.ts` carried runtime schema-probe fallbacks. The
+probes were stripped and the following migration was applied directly
+against `RENDER_PROD_DATABASE_URL` in a single transaction. All four
+affected tables were empty at the time (0 historical rows) — no backfill
+required; historical paper trades naturally remain NULL for the new
+broker-fee / `exchange` columns, which is the correct semantic.
+
+```sql
+BEGIN;
+
+ALTER TABLE sim_trades
+  ADD COLUMN IF NOT EXISTS exchange                    text,
+  ADD COLUMN IF NOT EXISTS exchange_order_id           text,
+  ADD COLUMN IF NOT EXISTS exchange_close_order_id     text,
+  ADD COLUMN IF NOT EXISTS entry_fee                   real,
+  ADD COLUMN IF NOT EXISTS exit_fee                    real,
+  ADD COLUMN IF NOT EXISTS entry_fee_broker            real,
+  ADD COLUMN IF NOT EXISTS entry_fee_broker_currency   text,
+  ADD COLUMN IF NOT EXISTS exit_fee_broker             real,
+  ADD COLUMN IF NOT EXISTS exit_fee_broker_currency    text,
+  ADD COLUMN IF NOT EXISTS sandbox                     boolean NOT NULL DEFAULT false;
+
+ALTER TABLE sim_positions
+  ADD COLUMN IF NOT EXISTS exchange                    text,
+  ADD COLUMN IF NOT EXISTS exchange_order_id           text,
+  ADD COLUMN IF NOT EXISTS entry_fee_broker            real,
+  ADD COLUMN IF NOT EXISTS entry_fee_broker_currency   text,
+  ADD COLUMN IF NOT EXISTS sandbox                     boolean NOT NULL DEFAULT false;
+
+CREATE TABLE IF NOT EXISTS user_trade_limits (
+  user_id              varchar(255) PRIMARY KEY
+                        REFERENCES users(clerk_user_id) ON DELETE CASCADE,
+  cap_tier             integer       NOT NULL DEFAULT 50,
+  override_expires_at  timestamp,
+  created_at           timestamp     NOT NULL DEFAULT now(),
+  updated_at           timestamp     NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS user_admin_status (
+  user_id          varchar(255) PRIMARY KEY
+                    REFERENCES users(clerk_user_id) ON DELETE CASCADE,
+  status           text          NOT NULL DEFAULT 'active',
+  set_by_admin_id  varchar(255),
+  reason           text,
+  since            timestamp     NOT NULL DEFAULT now(),
+  updated_at       timestamp     NOT NULL DEFAULT now()
+);
+
+COMMIT;
+```
+
+**Rollback note:** this migration is purely additive — every `ADD COLUMN`
+uses `IF NOT EXISTS` and the two new tables are isolated. To roll back
+after redeploying the previous `adminUserTelemetry.ts` (which carried
+schema-probe fallbacks), the columns/tables can be dropped:
+
+```sql
+BEGIN;
+DROP TABLE IF EXISTS user_admin_status;
+DROP TABLE IF EXISTS user_trade_limits;
+ALTER TABLE sim_positions
+  DROP COLUMN IF EXISTS exchange,
+  DROP COLUMN IF EXISTS exchange_order_id,
+  DROP COLUMN IF EXISTS entry_fee_broker,
+  DROP COLUMN IF EXISTS entry_fee_broker_currency,
+  DROP COLUMN IF EXISTS sandbox;
+ALTER TABLE sim_trades
+  DROP COLUMN IF EXISTS exchange,
+  DROP COLUMN IF EXISTS exchange_order_id,
+  DROP COLUMN IF EXISTS exchange_close_order_id,
+  DROP COLUMN IF EXISTS entry_fee,
+  DROP COLUMN IF EXISTS exit_fee,
+  DROP COLUMN IF EXISTS entry_fee_broker,
+  DROP COLUMN IF EXISTS entry_fee_broker_currency,
+  DROP COLUMN IF EXISTS exit_fee_broker,
+  DROP COLUMN IF EXISTS exit_fee_broker_currency,
+  DROP COLUMN IF EXISTS sandbox;
+COMMIT;
+```
+
+Note: do not drop these columns once production has any LIVE trades or
+admin actions persisted — the data is required by `getTradeLimitVerdict`,
+`userStatusGuard`, and the customer trade-receipt rendering paths.
+
 Schema tables:
 | Table                       | Purpose                          |
 |-----------------------------|----------------------------------|

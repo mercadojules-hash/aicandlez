@@ -73,82 +73,11 @@ export function __invalidateAdminUserTelemetryCache(): void {
   cache.clear();
 }
 
-// ── Schema probe (prod DB drift defense) ─────────────────────────────────────
-// Production DB is on an older migration head than dev — `sim_trades` is
-// missing the broker-fee + `exchange` columns and `user_trade_limits` /
-// `user_admin_status` are absent entirely. Rather than 500 the whole admin
-// console until prod migrations land, probe the live schema once at first
-// request and compose SQL fragments that degrade gracefully (missing column
-// → 0/false/null, missing table → empty CTE). Re-runnable via
-// `__resetAdminTelemetrySchemaProbe()` after a migration.
-interface SchemaProbe {
-  simTrades:        { exchange: boolean; entryFee: boolean; exitFee: boolean; entryFeeBroker: boolean; exitFeeBroker: boolean };
-  simPositions:     { exchange: boolean };
-  userTradeLimits:  boolean;
-  userAdminStatus:  boolean;
-}
-let schemaProbe: SchemaProbe | null = null;
-let schemaProbePromise: Promise<SchemaProbe> | null = null;
-async function probeSchema(): Promise<SchemaProbe> {
-  if (schemaProbe) return schemaProbe;
-  if (schemaProbePromise) return schemaProbePromise;
-  schemaProbePromise = (async () => {
-    const cols = await db.execute(sql`
-      SELECT table_name, column_name FROM information_schema.columns
-      WHERE table_name IN ('sim_trades','sim_positions')
-    `).then(r => r.rows as Array<{ table_name: string; column_name: string }>);
-    const tabs = await db.execute(sql`
-      SELECT table_name FROM information_schema.tables
-      WHERE table_name IN ('user_trade_limits','user_admin_status')
-    `).then(r => r.rows as Array<{ table_name: string }>);
-    const has = (t: string, c: string) => cols.some(x => x.table_name === t && x.column_name === c);
-    const tab = (t: string) => tabs.some(x => x.table_name === t);
-    schemaProbe = {
-      simTrades: {
-        exchange:       has("sim_trades", "exchange"),
-        entryFee:       has("sim_trades", "entry_fee"),
-        exitFee:        has("sim_trades", "exit_fee"),
-        entryFeeBroker: has("sim_trades", "entry_fee_broker"),
-        exitFeeBroker:  has("sim_trades", "exit_fee_broker"),
-      },
-      simPositions: { exchange: has("sim_positions", "exchange") },
-      userTradeLimits: tab("user_trade_limits"),
-      userAdminStatus: tab("user_admin_status"),
-    };
-    return schemaProbe;
-  })();
-  // If the probe rejects (transient DB hiccup at boot), clear the cached
-  // promise so the next request retries instead of inheriting a permanent
-  // rejected state for the lifetime of the process.
-  schemaProbePromise.catch(() => { schemaProbePromise = null; });
-  return schemaProbePromise;
-}
-/** Re-run schema probe (call after running prod migrations). */
-export function __resetAdminTelemetrySchemaProbe(): void {
-  schemaProbe = null;
-  schemaProbePromise = null;
-}
-
-/** Build the trade-fee SUM expression based on which columns exist. */
-function feeSumExpr(s: SchemaProbe): string {
-  const entry = s.simTrades.entryFeeBroker && s.simTrades.entryFee
-    ? "COALESCE(entry_fee_broker, entry_fee, 0)"
-    : s.simTrades.entryFeeBroker ? "COALESCE(entry_fee_broker, 0)"
-    : s.simTrades.entryFee       ? "COALESCE(entry_fee, 0)"
-    : "0";
-  const exit = s.simTrades.exitFeeBroker && s.simTrades.exitFee
-    ? "COALESCE(exit_fee_broker, exit_fee, 0)"
-    : s.simTrades.exitFeeBroker  ? "COALESCE(exit_fee_broker, 0)"
-    : s.simTrades.exitFee        ? "COALESCE(exit_fee, 0)"
-    : "0";
-  return `${entry} + ${exit}`;
-}
-/** `FILTER (WHERE exchange IS NOT NULL)` if the col exists; otherwise constant-false filter so the COUNT degrades to 0 without parse errors. */
-function exchangeNotNullFilter(present: boolean): string {
-  return present ? "FILTER (WHERE exchange IS NOT NULL)" : "FILTER (WHERE FALSE)";
-}
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
+// Schema-probe defenses (broker-fee + `exchange` cols on sim_trades /
+// sim_positions, plus `user_trade_limits` / `user_admin_status` tables) were
+// stripped under Task #174 once the prod DB was reconciled with `lib/db`.
+// Failures now surface loudly instead of silently degrading to 0/false/null.
 function getAdminId(req: Request): string {
   // `requireAuth` populates req.auth.userId — clerk id of the calling admin.
   const auth = (req as Request & { auth?: { userId?: string } }).auth;
@@ -217,28 +146,6 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
     const orderBy = SORTABLE[sort] ?? SORTABLE["lastActivityAt"]!;
 
     const search   = q ? `%${q}%` : null;
-
-    // Resolve live-schema fragments (one-time probe; cached thereafter).
-    const sch = await probeSchema();
-    const feeExpr           = feeSumExpr(sch);
-    const simTradesExFilter = exchangeNotNullFilter(sch.simTrades.exchange);
-    const simPosExFilter    = exchangeNotNullFilter(sch.simPositions.exchange);
-    // sim_positions has `entry_time` in prod but no `exchange` col — when the
-    // exchange col is missing we can't UNION the live_opens_24h source rows
-    // from sim_positions (there'd be nothing to filter on). Same for sim_trades.
-    const simPosLiveOpensSrc  = sch.simPositions.exchange
-      ? sql`SELECT user_id, entry_time FROM sim_positions WHERE exchange IS NOT NULL AND entry_time >= ${Date.now() - 24 * 60 * 60 * 1000}`
-      : sql`SELECT NULL::text AS user_id, NULL::bigint AS entry_time WHERE FALSE`;
-    const simTradesLiveOpensSrc = sch.simTrades.exchange
-      ? sql`SELECT user_id, entry_time FROM sim_trades WHERE exchange IS NOT NULL AND entry_time >= ${Date.now() - 24 * 60 * 60 * 1000}`
-      : sql`SELECT NULL::text AS user_id, NULL::bigint AS entry_time WHERE FALSE`;
-    // Missing-table fallbacks: empty CTEs with the columns the JOIN expects.
-    const adminStatusCte = sch.userAdminStatus
-      ? sql`SELECT user_id, status FROM user_admin_status`
-      : sql`SELECT NULL::text AS user_id, 'active'::text AS status WHERE FALSE`;
-    const tradeLimitsCte = sch.userTradeLimits
-      ? sql`SELECT user_id, cap_tier, override_expires_at FROM user_trade_limits`
-      : sql`SELECT NULL::text AS user_id, 50::int AS cap_tier, NULL::timestamptz AS override_expires_at WHERE FALSE`;
     const planArg  = planFilter || null;
     const statArg  = statusF || null;
 
@@ -250,9 +157,12 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
           COUNT(*) FILTER (WHERE realized_pnl > 0)::int          AS wins,
           COUNT(*) FILTER (WHERE realized_pnl <= 0)::int         AS losses,
           COALESCE(SUM(realized_pnl), 0)::float                  AS total_pnl,
-          COALESCE(SUM(${sql.raw(feeExpr)}), 0)::float           AS fees_generated,
+          COALESCE(SUM(
+            COALESCE(entry_fee_broker, entry_fee, 0)
+            + COALESCE(exit_fee_broker, exit_fee, 0)
+          ), 0)::float                                           AS fees_generated,
           MAX(exit_time)::bigint                                 AS last_trade_ms,
-          COUNT(*) ${sql.raw(simTradesExFilter)}::int            AS live_trades_count
+          COUNT(*) FILTER (WHERE exchange IS NOT NULL)::int      AS live_trades_count
         FROM sim_trades
         GROUP BY user_id
       ),
@@ -261,7 +171,7 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
           user_id,
           COUNT(*)::int                                         AS open_positions,
           COALESCE(SUM(size_usd), 0)::float                      AS open_exposure_usd,
-          COUNT(*) ${sql.raw(simPosExFilter)}::int               AS open_live_positions
+          COUNT(*) FILTER (WHERE exchange IS NOT NULL)::int      AS open_live_positions
         FROM sim_positions
         GROUP BY user_id
       ),
@@ -282,9 +192,11 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
       -- N+1 engine invocations per row.
       live_opens_24h AS (
         SELECT user_id, COUNT(*)::int AS used_24h FROM (
-          ${simPosLiveOpensSrc}
+          SELECT user_id, entry_time FROM sim_positions
+            WHERE exchange IS NOT NULL AND entry_time >= ${Date.now() - 24 * 60 * 60 * 1000}
           UNION ALL
-          ${simTradesLiveOpensSrc}
+          SELECT user_id, entry_time FROM sim_trades
+            WHERE exchange IS NOT NULL AND entry_time >= ${Date.now() - 24 * 60 * 60 * 1000}
         ) o
         WHERE user_id IS NOT NULL
         GROUP BY user_id
@@ -368,11 +280,11 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         )                                                        AS last_activity_at
       FROM users u
       LEFT JOIN user_settings        s      ON s.user_id      = u.clerk_user_id
-      LEFT JOIN (${adminStatusCte}) status  ON status.user_id = u.clerk_user_id
+      LEFT JOIN user_admin_status    status ON status.user_id = u.clerk_user_id
       LEFT JOIN trade_agg            agg    ON agg.user_id    = u.clerk_user_id
       LEFT JOIN pos_agg              pos    ON pos.user_id    = u.clerk_user_id
       LEFT JOIN conn_agg             conn   ON conn.user_id   = u.clerk_user_id
-      LEFT JOIN (${tradeLimitsCte}) tl      ON tl.user_id     = u.clerk_user_id
+      LEFT JOIN user_trade_limits    tl     ON tl.user_id     = u.clerk_user_id
       LEFT JOIN live_opens_24h       o24    ON o24.user_id    = u.clerk_user_id
       LEFT JOIN trades_today         td     ON td.user_id     = u.clerk_user_id
       LEFT JOIN sim_accounts         a      ON a.user_id      = u.clerk_user_id
@@ -395,7 +307,7 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
       )
       SELECT COUNT(*)::int AS total
       FROM users u
-      LEFT JOIN (${adminStatusCte}) status ON status.user_id = u.clerk_user_id
+      LEFT JOIN user_admin_status status ON status.user_id = u.clerk_user_id
       LEFT JOIN conn_has_live    c      ON c.user_id      = u.clerk_user_id
       WHERE (${search}::text IS NULL OR LOWER(u.email) LIKE ${search})
         AND (${planArg}::text IS NULL OR LOWER(u.plan) = ${planArg})
@@ -517,8 +429,7 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
     res.json(payload);
   } catch (err) {
     req.log.error({ err }, "GET /admin/users failed");
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: "Failed to load users", detail: msg });
+    res.status(500).json({ error: "Failed to load users" });
   }
 });
 
@@ -716,8 +627,7 @@ router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<voi
     res.json(payload);
   } catch (err) {
     req.log.error({ err, userId }, "GET /admin/users/:id failed");
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: "Failed to load user detail", detail: msg });
+    res.status(500).json({ error: "Failed to load user detail" });
   }
 });
 
@@ -831,8 +741,7 @@ router.get("/admin/platform/leaderboards", ...requireOperator, async (req, res):
     res.json(payload);
   } catch (err) {
     req.log.error({ err }, "GET /admin/platform/leaderboards failed");
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: "Failed to load platform leaderboards", detail: msg });
+    res.status(500).json({ error: "Failed to load platform leaderboards" });
   }
 });
 
