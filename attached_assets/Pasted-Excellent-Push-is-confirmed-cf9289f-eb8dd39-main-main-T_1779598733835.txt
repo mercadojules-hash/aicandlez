@@ -1,0 +1,103 @@
+Excellent. Push is confirmed:
+cf9289f..eb8dd39 main -> main
+
+The stale local .lock file is non-blocking and can be ignored for now. Production deployment is the priority.
+
+Now remain in:
+Launch Stabilization + Controlled Beta mode.
+
+====================================================
+PRIORITY NOW = VALIDATION ONLY
+==============================
+
+Do NOT start:
+
+* new systems
+* architectural rewrites
+* queue redesigns
+* Kraken rewrites
+* additional exchanges
+* feature expansion
+
+Current objective:
+validate the newly deployed stabilization fixes in production.
+
+====================================================
+VALIDATION PRIORITY ORDER
+=========================
+
+1. KRAKEN TELEMETRY
+   Most important.
+
+Need to confirm:
+
+* Kraken USD populates
+* total equity reflects live Kraken value (~$101.52 +/- market movement)
+* no false "Kraken Auth Failed"
+* no repeated $0 fallback
+* no EAPI rate-limit storms
+
+Important:
+This was diagnosed correctly as a telemetry-layer issue,
+NOT an execution-layer issue.
+
+2. HYDRATION GATE
+   Need to confirm:
+
+* no 10–15s black screen
+* no customer/admin flicker
+* fast staged rendering
+* operator/customer surfaces remain isolated
+
+3. CONTROLLED BETA OPERATIONS
+   Current posture remains correct:
+
+* 1 paid subscriber
+* 2 complimentary users tomorrow
+* LIVE_EXECUTION_CONCURRENT_CAP=3
+* manual oversight
+* gradual scaling only
+
+====================================================
+IMPORTANT
+=========
+
+Tonight is NOT about scaling.
+Tonight is about:
+
+* observing
+* validating
+* monitoring
+* stabilizing
+
+The earlier issue proved:
+
+* execution path fundamentally works
+* Kraken account itself is healthy
+* telemetry synchronization was the real failure surface
+
+The architectural boundaries were preserved correctly:
+
+* execution queue untouched
+* Kraken bridge untouched
+* billing untouched
+* customer/admin separation untouched
+
+That was the right stabilization strategy.
+
+====================================================
+AFTER RENDER IS GREEN
+=====================
+
+Please validate:
+
+* admintrade portal telemetry
+* customer portal hydration
+* log stability
+* rate-limit reduction
+* stale-on-error behavior
+
+Then pause and observe behavior before further scaling.
+
+Still in:
+Controlled Beta Mode.
