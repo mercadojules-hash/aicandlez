@@ -1,0 +1,114 @@
+We need to stop feature work and fix the deployment pipeline itself.
+
+Current situation:
+
+* Replit reports multiple UI/deployment tasks as “merged”
+* But production still serves OLD frontend bundles
+* None of the latest UI changes are visible live:
+
+  * landing page still shows old pricing copy
+  * PAPER trading bars missing on trade portal
+  * ORANGE ARMED state missing
+  * old CTA routing still present
+
+Important:
+Cloudflare has been completely removed from this stack.
+DNS is now direct Namecheap → Render only.
+
+I verified:
+
+* Namecheap DNS is correct
+* Render services/domains are correct
+* Auto-deploy is enabled
+* Build/publish directories appear correct
+
+This strongly suggests:
+THE LATEST REPLIT CHANGES NEVER ACTUALLY PUSHED TO GITHUB MAIN.
+
+Need full deployment audit now.
+
+Please verify ALL of the following carefully:
+
+1. GIT / BRANCH STATE
+
+* confirm latest commits actually exist locally
+* confirm commits were pushed to GitHub
+* confirm Render is building the SAME branch
+* confirm no detached branch / stale branch situation
+* verify latest commit hash on:
+
+  * Replit
+  * GitHub main
+  * Render latest deploy
+    These must ALL match.
+
+2. RENDER DEPLOYMENT PIPELINE
+   Audit these services:
+
+* aicandlez-landing
+* aicandlez-trade
+* aicandlez-admintrade
+
+For EACH:
+
+* verify root directory
+* verify build command
+* verify publish directory
+* verify branch
+* verify latest successful deploy commit hash
+* verify latest deploy timestamp
+* verify auto deploy trigger status
+* verify build cache behavior
+
+3. FORCE CLEAN REDEPLOY
+   After verifying GitHub is current:
+
+* trigger FULL manual redeploys
+* clear build cache if possible
+* rebuild from latest commit only
+* verify new bundle hashes generated
+
+Deploy order:
+
+1. aicandlez-landing
+
+2. aicandlez-trade
+
+3. aicandlez-admintrade
+
+4. POST-DEPLOY VALIDATION
+   Confirm LIVE production now includes:
+   LANDING:
+
+* pricing copy updated
+* “No subscription ever” removed
+* all CTAs route to https://trade.aicandlez.com/portal
+
+TRADE PORTAL:
+
+* PAPER trading bars visible
+* Live AI Crypto Execution bar visible
+* Live AI Equities Execution bar visible
+* PAPER mode rendered GREEN
+* ARMED state rendered ORANGE
+* HALTED state rendered RED
+
+ADMIN PORTAL:
+
+* ARMED state ORANGE
+* HALTED state RED
+
+5. IMPORTANT
+   Do NOT touch:
+
+* Kraken execution bridge
+* execution queue
+* telemetry reconciliation
+* operator auth
+* live routing logic
+* database schema
+
+This is now strictly:
+DEPLOYMENT + BUILD PIPELINE RECONCILIATION.
+
+We need production to finally reflect the already-merged UI changes.
