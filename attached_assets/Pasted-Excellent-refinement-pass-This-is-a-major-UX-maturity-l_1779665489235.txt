@@ -1,0 +1,154 @@
+Excellent refinement pass.
+
+This is a major UX maturity leap.
+
+The workstation now has:
+semantic motion language
+instead of decorative animation noise.
+
+The biggest success:
+
+idle systems now become visually calm,
+while meaningful intelligence activity becomes noticeable because it is rare.
+
+That dramatically improves:
+
+* perceived intelligence
+* operator focus
+* signal importance
+* institutional feel
+* premium quality
+
+====================================================
+MOST IMPORTANT WIN
+==================
+
+Motion is now tied to:
+actual intelligence state.
+
+Examples:
+
+* READY signals sweep
+* fresh telemetry flickers
+* active volatility breathes
+* stale systems slow down
+* actionable systems scan
+* inactive systems settle
+
+This creates:
+motion hierarchy.
+
+That is exactly the correct direction.
+
+====================================================
+NEXT FOCUS AREA
+===============
+
+Proceed now with:
+
+2. Operator-grade polish
+
+====================================================
+GOAL
+====
+
+The platform now needs:
+precision.
+
+Architecture is stable.
+Telemetry is synchronized.
+Motion language is intelligent.
+
+Now the interface needs:
+discipline
+consistency
+clarity
+alignment
+refinement
+
+====================================================
+FOCUS AREAS
+===========
+
+Refine:
+
+* typography rhythm
+* spacing consistency
+* telemetry alignment
+* panel proportions
+* grid discipline
+* micro-interactions
+* label vocabulary
+* tonal hierarchy
+* confidence readability
+* divider consistency
+* hover-state precision
+* scroll feel
+* spacing cadence
+* visual breathing
+* section hierarchy
+* edge glow restraint
+* density balance
+
+====================================================
+TARGET FEEL
+===========
+
+The terminal should feel:
+
+precise
+confident
+institutional
+surgical
+high-end
+operational
+
+NOT:
+busy
+experimental
+over-designed
+gaming-oriented
+
+====================================================
+IMPORTANT
+=========
+
+Preserve:
+
+* neon identity
+* confidence rails
+* synchronized telemetry
+* command-center feel
+* crypto-native IA
+* paper-only customer invariant
+* high information density
+
+But tighten:
+everything.
+
+====================================================
+KEY PRINCIPLE
+=============
+
+Every pixel should feel intentional.
+
+Every label should feel curated.
+
+Every spacing decision should feel systematic.
+
+Every hover should communicate confidence and precision.
+
+====================================================
+AFTER OPERATOR-GRADE POLISH
+===========================
+
+Natural sequence:
+
+1. Performance optimization
+2. Responsive tuning
+3. Final decomposition cleanup
+
+Keep RePreview live during development so I can continuously evaluate polish quality in real time.
+
+Also:
+hold the replit.md trim pass until after the polish pass unless context pressure becomes problematic. The visual/product momentum is more important right now.

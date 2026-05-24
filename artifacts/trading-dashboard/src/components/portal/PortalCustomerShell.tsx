@@ -68,6 +68,14 @@ const T = {
   TEXT_2:      "#5F706A",
   TEXT_3:      "#3A4842",
   FONT_MONO:   "'IBM Plex Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace",
+  // ── Polish scale (institutional rhythm) ──────────────────────────────
+  // Letter-spacing tracks: collapse to 3 tiers + 1 display exception.
+  TRACK_LABEL:   "0.10em",  // short CAPS chips, telemetry labels, button text
+  TRACK_TITLE:   "0.18em",  // section / brand / engine titles
+  TRACK_DISPLAY: "-0.04em", // hero display digits (confidence ring)
+  // Transitions: one cadence everywhere so hover/state changes feel uniform.
+  TX_FAST:       "120ms ease",
+  TX_MED:        "200ms ease",
 } as const;
 
 type Plan = "free" | "starter" | "pro";
@@ -658,9 +666,19 @@ function OpportunityCard({ opp, onQueue, idx = 0, now }: {
         position: "relative", overflow: "hidden",
         height: 328,
         fontFamily: T.FONT_MONO,
+        // Deterministic hover cadence — background + border tinted in lock-step.
+        transition: `background-color ${T.TX_FAST}, border-color ${T.TX_FAST}`,
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = T.BORDER_GRN; }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = T.BORDER; }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = T.BORDER_GRN;
+        e.currentTarget.style.background   = "rgba(102,255,102,0.015)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = T.BORDER;
+        // Reset to base background (T.BG_TERMINAL) — must match the
+        // initial style above or first hover causes permanent drift.
+        e.currentTarget.style.background   = T.BG_TERMINAL;
+      }}
     >
       <div
         aria-hidden
@@ -726,7 +744,7 @@ function OpportunityCard({ opp, onQueue, idx = 0, now }: {
           <span style={{
             position: "absolute", inset: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 36, fontWeight: 300, color: dirColor, letterSpacing: "-0.04em",
+            fontSize: 36, fontWeight: 300, color: dirColor, letterSpacing: T.TRACK_DISPLAY,
           }}>{opp.conf}</span>
         </div>
 
@@ -751,7 +769,7 @@ function OpportunityCard({ opp, onQueue, idx = 0, now }: {
                 {["5m", "15m", "1H", "4H"].map(tf => (
                   <span key={tf} style={{
                     width: 11, fontSize: 7, color: T.TEXT_3,
-                    textAlign: "center", letterSpacing: "0.02em",
+                    textAlign: "center", letterSpacing: 0,
                   }}>{tf}</span>
                 ))}
               </div>
@@ -861,7 +879,7 @@ function OpportunityCard({ opp, onQueue, idx = 0, now }: {
             disabled={!ready}
             style={{
               padding: "4px 12px", fontSize: 10, fontWeight: 700,
-              fontFamily: T.FONT_MONO, letterSpacing: "0.08em",
+              fontFamily: T.FONT_MONO, letterSpacing: T.TRACK_LABEL,
               border: `1px solid ${ready ? T.NEON : T.BORDER}`,
               background: "transparent",
               color: ready ? T.NEON : T.TEXT_3,
@@ -1008,7 +1026,7 @@ function ColumnHeader({ title, count, accent, subLabel }: {
         <span style={{ fontSize: 10, color: T.TEXT_2, fontFamily: T.FONT_MONO }}>SORT: CONFIDENCE ↓</span>
       </div>
       <span style={{
-        fontFamily: T.FONT_MONO, fontSize: 9, letterSpacing: "0.14em",
+        fontFamily: T.FONT_MONO, fontSize: 9, letterSpacing: T.TRACK_TITLE,
         color: accent, opacity: 0.55,
       }}>
         {subLabel}
@@ -1090,7 +1108,8 @@ function Column({
       <div style={{
         display: "flex", flexDirection: "column", gap: 14,
         overflowY: "auto", maxHeight: 1000, paddingRight: 4,
-      }}>
+      }}
+      className="cd-scroll">
         {isError && opps.length === 0 && (
           <div style={{
             padding: 24, textAlign: "center", color: "#FF4D4D", fontFamily: T.FONT_MONO,
@@ -1139,7 +1158,7 @@ function PanelCard({
         background: "rgba(0,0,0,0.40)",
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
-        <h3 style={{ margin: 0, fontSize: 11, color: T.TEXT_0, letterSpacing: "0.08em" }}>{title}</h3>
+        <h3 style={{ margin: 0, fontSize: 11, color: T.TEXT_0, letterSpacing: T.TRACK_LABEL }}>{title}</h3>
         {live && <span style={{
           width: 6, height: 6, borderRadius: "50%",
           background: T.NEON, boxShadow: `0 0 8px ${T.NEON_GLOW}`,
@@ -1170,7 +1189,7 @@ function AIReasoningConsole() {
 
   return (
     <PanelCard title="AI REASONING CONSOLE" span={2} live={exec.data?.engine.running}>
-      <div style={{ padding: 10, overflowY: "auto", flex: 1, fontSize: 11 }}>
+      <div className="cd-scroll" style={{ padding: 10, overflowY: "auto", flex: 1, fontSize: 11 }}>
         {log.length === 0 && (
           <div style={{ color: T.TEXT_2, fontStyle: "italic" }}>Awaiting first engine signal…</div>
         )}
@@ -1599,7 +1618,8 @@ function OperatorTelemetryStrip({
 }
 
 function Divider() {
-  return <span style={{ width: 1, height: 12, background: T.BORDER }} />;
+  // Matches RibbonDivider height for cross-strip rhythm consistency.
+  return <span style={{ width: 1, height: 14, background: T.BORDER }} />;
 }
 
 /* ──────────────────────────────────────────────────────────────────────── */
@@ -1668,12 +1688,12 @@ function EnableLiveAITradingBar({
           flex: 1, minWidth: 0, textAlign: "center",
         }}>
           <span style={{
-            color: T.TEXT_0, fontSize: 13, fontWeight: 700, letterSpacing: "0.22em",
+            color: T.TEXT_0, fontSize: 13, fontWeight: 700, letterSpacing: T.TRACK_TITLE,
           }}>
             ENABLE LIVE AI TRADING
           </span>
           <span style={{
-            color: T.TEXT_1, fontSize: 10, letterSpacing: "0.14em", marginTop: 2,
+            color: T.TEXT_1, fontSize: 10, letterSpacing: T.TRACK_LABEL, marginTop: 2,
           }}>
             PAPER MODE ACTIVE · LIVE EXECUTION GATED · UPGRADE TO UNLOCK PRO QUEUE
           </span>
@@ -1681,7 +1701,7 @@ function EnableLiveAITradingBar({
 
         {/* RIGHT */}
         <div style={{ display: "inline-flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-          <span style={{ fontSize: 10, color: T.TEXT_1, letterSpacing: "0.14em" }}>
+          <span style={{ fontSize: 10, color: T.TEXT_1, letterSpacing: T.TRACK_LABEL }}>
             SLOTS:&nbsp;<span style={{ color: T.TEXT_0 }}>{openPaper}/{slotCap}</span>
           </span>
           <button
@@ -1689,7 +1709,7 @@ function EnableLiveAITradingBar({
             onClick={onUpgrade}
             style={{
               fontFamily: T.FONT_MONO, fontSize: 10, fontWeight: 700,
-              letterSpacing: "0.16em",
+              letterSpacing: T.TRACK_TITLE,
               padding: "6px 12px",
               border: `1px solid ${T.NEON}`,
               background: "rgba(102,255,102,0.06)",
@@ -1837,6 +1857,18 @@ export function PortalCustomerShell() {
         }
         /* hide scrollbar on horizontal filter pill strip */
         .cd-pills-strip::-webkit-scrollbar { display: none; }
+        /* Institutional scrollbar — thin, neon-tinted, only on hover.
+           Applied to portal vertical scroll containers (columns + panel bodies)
+           so the chrome doesn't visually compete with the data. */
+        .cd-scroll::-webkit-scrollbar              { width: 6px; }
+        .cd-scroll::-webkit-scrollbar-track        { background: transparent; }
+        .cd-scroll::-webkit-scrollbar-thumb        {
+          background: rgba(102,255,102,0.10);
+          border-radius: 3px;
+          transition: background 200ms ease;
+        }
+        .cd-scroll:hover::-webkit-scrollbar-thumb  { background: rgba(102,255,102,0.22); }
+        .cd-scroll                                 { scrollbar-width: thin; scrollbar-color: rgba(102,255,102,0.18) transparent; }
       `}</style>
       <OperatorPulseRibbon
         plan={plan}
@@ -1931,7 +1963,7 @@ function ToolbarBtn({
       style={{
         padding: "5px 12px",
         fontFamily: T.FONT_MONO, fontSize: 10, fontWeight: 700,
-        letterSpacing: "0.14em",
+        letterSpacing: T.TRACK_LABEL,
         background: brand ? "rgba(102,255,102,0.08)" : "transparent",
         border: `1px solid ${brand ? T.NEON : T.BORDER}`,
         color: brand ? T.NEON : T.TEXT_1,
