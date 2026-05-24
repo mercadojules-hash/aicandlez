@@ -616,6 +616,12 @@ function OpportunityCard({ opp, onQueue, idx = 0, now }: {
   now: number;
 }) {
   const ageStr = signalAge(opp.lastUpdated, now);
+  // Animation-gating derivations — every motion must answer
+  // "what intelligence state is this communicating?". Idle cards stay still.
+  const tickMs        = Math.max(0, now - opp.lastUpdated);
+  const isLiveTick    = tickMs < 10_000;                  // telemetry-flicker
+  const isFreshSignal = tickMs < 30_000;                  // spark-drift dot
+  const isReady       = opp.readiness === "READY";        // ring-sweep crystallization cue
   const rr     = rrRatio(opp.entry, opp.stop, opp.target);
   const gatedReason = opp.readiness === "GATED" && opp.reason ? opp.reason : null;
   const isLong = opp.direction === "LONG";
@@ -696,23 +702,27 @@ function OpportunityCard({ opp, onQueue, idx = 0, now }: {
         }}>
           <ConfidenceRing color={dirColor} value={opp.conf} />
           {/* v4.1 ring-sweep — single 30° bright arc rotating slowly over static ring. */}
-          <svg
-            aria-hidden
-            width={96} height={96}
-            style={{
-              position: "absolute", inset: 0, pointerEvents: "none",
-              animation: "ring-sweep 12s linear infinite",
-              animationDelay: `-${sweepDelayMs}ms`,
-              transformOrigin: "50% 50%",
-            }}
-          >
-            <circle
-              cx={48} cy={48} r={42} fill="none"
-              stroke={dirColor} strokeWidth={2}
-              strokeDasharray="22 242" strokeLinecap="round"
-              style={{ filter: `drop-shadow(0 0 4px ${dirColor})`, opacity: 0.7 }}
-            />
-          </svg>
+          {/* Sweep only on READY — communicates "signal has crystallized, awaiting execution".
+              WAITING / GATED cards keep a static ring. */}
+          {isReady && (
+            <svg
+              aria-hidden
+              width={96} height={96}
+              style={{
+                position: "absolute", inset: 0, pointerEvents: "none",
+                animation: "ring-sweep 12s linear infinite",
+                animationDelay: `-${sweepDelayMs}ms`,
+                transformOrigin: "50% 50%",
+              }}
+            >
+              <circle
+                cx={48} cy={48} r={42} fill="none"
+                stroke={dirColor} strokeWidth={2}
+                strokeDasharray="22 242" strokeLinecap="round"
+                style={{ filter: `drop-shadow(0 0 4px ${dirColor})`, opacity: 0.7 }}
+              />
+            </svg>
+          )}
           <span style={{
             position: "absolute", inset: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -784,18 +794,21 @@ function OpportunityCard({ opp, onQueue, idx = 0, now }: {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
         <div style={{ position: "relative", width: 80, height: 36 }}>
           <Sparkline data={opp.sparkline} color={sparkColor} />
-          {/* v4.1 spark-drift scan dot */}
-          <span
-            aria-hidden
-            style={{
-              position: "absolute", top: 16, left: 0,
-              width: 3, height: 3, borderRadius: "50%",
-              background: sparkColor, boxShadow: `0 0 4px ${sparkColor}`,
-              animation: "spark-drift 5s linear infinite",
-              animationDelay: `-${sparkDelayMs}ms`,
-              pointerEvents: "none",
-            }}
-          />
+          {/* v4.1 spark-drift scan dot — only when signal has updated within the last 30s.
+              Communicates "this price stream is live"; stale cards keep a static sparkline. */}
+          {isFreshSignal && (
+            <span
+              aria-hidden
+              style={{
+                position: "absolute", top: 16, left: 0,
+                width: 3, height: 3, borderRadius: "50%",
+                background: sparkColor, boxShadow: `0 0 4px ${sparkColor}`,
+                animation: "spark-drift 5s linear infinite",
+                animationDelay: `-${sparkDelayMs}ms`,
+                pointerEvents: "none",
+              }}
+            />
+          )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
           <div style={{ display: "flex", gap: 3 }}>
@@ -812,8 +825,10 @@ function OpportunityCard({ opp, onQueue, idx = 0, now }: {
               title={`Signal age ${ageStr} · execution latency ${opp.latency}`}
               style={{
                 fontSize: 10, color: T.TEXT_2,
-                animation: "telemetry-flicker 1.6s ease-in-out infinite",
-                animationDelay: `-${flickerDelayMs}ms`,
+                // Flicker only while telemetry is genuinely live (<10s since update).
+                // Static otherwise — prevents 20 cards from breathing in perpetuity.
+                animation: isLiveTick ? "telemetry-flicker 1.6s ease-in-out infinite" : undefined,
+                animationDelay: isLiveTick ? `-${flickerDelayMs}ms` : undefined,
                 fontVariantNumeric: "tabular-nums",
               }}>
               <span style={{ color: T.TEXT_1 }}>{ageStr}</span>
@@ -1532,7 +1547,19 @@ function OperatorTelemetryStrip({
         title={`Last engine tick · loop ${loopMs || "—"}ms`}
         style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
       >
-        <Radio size={11} color={engineOnline ? T.NEON : T.TEXT_3} style={engineOnline ? { animation: "brand-pulse 1.4s infinite" } : undefined} />
+        {/* Radio cadence tied to tick freshness:
+            NEON tick (fresh)   → fast 1.4s pulse  → "engine is talking to us"
+            AMBER tick (stale)  → slow 3s pulse    → "still alive but lagging"
+            RED tick (silent)   → no animation     → "no recent heartbeat" */}
+        <Radio
+          size={11}
+          color={engineOnline ? tickTone : T.TEXT_3}
+          style={
+            engineOnline && tickTone === T.NEON  ? { animation: "brand-pulse 1.4s infinite" } :
+            engineOnline && tickTone === T.AMBER ? { animation: "brand-pulse 3s infinite"   } :
+            undefined
+          }
+        />
         LAST TICK:&nbsp;<span style={{ color: tickTone }}>{tickAge}</span>
       </span>
       <Divider />
@@ -1589,6 +1616,10 @@ function EnableLiveAITradingBar({
 }) {
   const engineLabel = engineOnline ? "AI ENGINE · ONLINE" : "AI ENGINE · WARMING UP";
   const engineColor = engineOnline ? T.NEON : T.AMBER;
+  // Scan sweep only when there is paper-slot headroom AND the engine is alive
+  // — i.e. only when this CTA actually represents an actionable upgrade.
+  // At capacity or offline, the bar stays still (no decorative scrolling glow).
+  const hasHeadroom = engineOnline && openPaper < slotCap;
   return (
     <section
       style={{
@@ -1602,16 +1633,18 @@ function EnableLiveAITradingBar({
         fontFamily: T.FONT_MONO,
       }}
     >
-      <div
-        aria-hidden
-        style={{
-          position: "absolute", top: 0, bottom: 0, left: 0, width: 140,
-          background:
-            "linear-gradient(90deg, transparent 0%, rgba(102,255,102,0.18) 50%, transparent 100%)",
-          animation: "cmdbar-scan 6s linear infinite",
-          pointerEvents: "none",
-        }}
-      />
+      {hasHeadroom && (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute", top: 0, bottom: 0, left: 0, width: 140,
+            background:
+              "linear-gradient(90deg, transparent 0%, rgba(102,255,102,0.18) 50%, transparent 100%)",
+            animation: "cmdbar-scan 6s linear infinite",
+            pointerEvents: "none",
+          }}
+        />
+      )}
       <div
         style={{
           position: "relative", zIndex: 1,
@@ -1621,11 +1654,9 @@ function EnableLiveAITradingBar({
       >
         {/* LEFT */}
         <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <Radar
-            size={16}
-            color={engineColor}
-            style={{ animation: "brand-pulse 1.4s infinite" }}
-          />
+          {/* Static Radar — engine liveness is already pulsing in the top ribbon
+              and in the footer Radio. A third pulse here would be glow spam. */}
+          <Radar size={16} color={engineColor} />
           <span style={{
             fontSize: 11, color: engineColor, fontWeight: 700, letterSpacing: "0.20em",
           }}>{engineLabel}</span>
