@@ -1,0 +1,117 @@
+Excellent. The complimentary membership architecture is now finally aligned with launch requirements.
+
+The super-admin gated complimentary system is approved.
+
+Key wins:
+
+* selectable complimentary tiers
+* FREE / STARTER / PRO
+* auto-expiring Stripe-backed trials
+* paper-only vs live-enabled controls
+* trade-limit override support
+* audit logging
+* moderation protections
+* duplicate-subscription protection
+* complimentary/trial badge system
+
+This is a major launch milestone.
+
+Next major priority:
+REAL-TIME PERFORMANCE FEE ENFORCEMENT + PREPAID CREDIT SYSTEM
+
+We now need to formalize the monetization architecture.
+
+Target behavior:
+
+1. Platform continuously tracks:
+
+* realized profits
+* 3% fees owed
+* outstanding balances
+* available prepaid credits
+
+2. Threshold-based enforcement:
+   Example:
+
+* STARTER threshold lock = $30 outstanding
+* PRO threshold lock = $100 outstanding
+
+If:
+outstanding fees >= threshold
+AND
+usage credits <= 0
+
+Then:
+
+* account enters BILLING_HOLD
+* NEW live AI executions blocked
+* account forced into PAPER mode
+* dashboard/history preserved
+* existing open positions continue normally
+
+3. PREPAID CREDIT SYSTEM
+   Users should also be able to:
+
+* preload credits
+* automatically deduct fees from credits
+* avoid interruptions/billing holds
+
+4. AUTOMATIC RESTORATION
+   Once Stripe payment clears:
+
+* BILLING_HOLD removed
+* live execution restored
+* exchange execution permissions restored
+* force_paper removed automatically
+
+5. IMPORTANT
+   Do NOT:
+
+* liquidate positions
+* interfere with exchange balances
+* custody trading funds
+* auto-withdraw profits
+
+This is:
+SaaS software/performance billing only.
+
+6. NEW PLATFORM STATUS
+   Need formal billing state:
+
+* ACTIVE
+* PAPER_ONLY
+* BILLING_HOLD
+* SUSPENDED
+* DISABLED
+
+7. CUSTOMER EXPERIENCE
+   Need billing widgets/panels:
+
+* usage credits
+* outstanding balance
+* fee threshold
+* billing hold status
+* auto-recharge support (future-ready)
+
+8. ARCHITECTURE AUDIT REQUEST
+   Please now audit:
+
+* existing fee ledger implementation
+* realized profit tracking
+* Stripe integration readiness
+* where BILLING_HOLD should integrate
+* how auto-restoration should work
+* where prepaid credits should persist
+* what backend pieces already exist vs missing
+
+Proceed carefully:
+Do NOT destabilize:
+
+* Kraken bridge
+* execution queue
+* entitlement middleware
+* admin controls
+* audit architecture
+* customer/admin separation
+
+This is now the launch-critical monetization enforcement layer.
