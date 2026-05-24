@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
+.font-mono {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.text-neon-green { color: #66FF66; }
+.bg-neon-green { background-color: #66FF66; }
+.border-neon-green { border-color: #66FF66; }
+
+.text-deep-emerald { color: #00C853; }
+.bg-deep-emerald { background-color: #00C853; }
+
+.text-bright-lime { color: #7CFF00; }
+.bg-bright-lime { background-color: #7CFF00; }
+
+.text-vivid-neon { color: #39FF14; }
+
+.text-status-red { color: #FF4D4D; }
+.bg-status-red { background-color: #FF4D4D; }
+.border-status-red { border-color: #FF4D4D; }
+
+.text-status-amber { color: #FFB020; }
+.bg-status-amber { background-color: #FFB020; }
+
+.bg-terminal-bg { background-color: #050A07; }
+.bg-terminal-black { background-color: #000000; }
+
+.border-hairline { border-color: #1A2E22; }
+.border-hairline-green { border-color: rgba(102, 255, 102, 0.15); }
+
+@keyframes neon-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(102, 255, 102, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(102, 255, 102, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(102, 255, 102, 0); }
+}
+
+.animate-pulse-neon {
+  animation: neon-pulse 2s infinite;
+}
+
+@keyframes scan-line {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-scan {
+  animation: scan-line 3s linear infinite;
+}

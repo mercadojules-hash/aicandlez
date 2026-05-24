@@ -1,0 +1,87 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg-pure: 0 0% 0%;
+  --bg-panel: 140 33% 3%;
+  --border-subtle: 140 28% 12%;
+  
+  --neon-brand: 120 100% 70%;
+  --neon-emerald: 145 100% 39%;
+  --neon-lime: 85 100% 50%;
+  
+  --status-red: 0 100% 65%;
+  --status-amber: 39 100% 56%;
+  --status-green: var(--neon-brand);
+
+  --text-primary: 0 0% 100%;
+  --text-muted: 140 10% 60%;
+  
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-sans: 'Inter', sans-serif;
+}
+
+body {
+  background-color: hsl(var(--bg-pure));
+  color: hsl(var(--text-primary));
+  font-family: var(--font-sans);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.font-sans {
+  font-family: var(--font-sans);
+}
+
+.border-subtle {
+  border-color: hsl(var(--border-subtle));
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px 1px hsl(var(--neon-brand) / 0.5); }
+  50% { opacity: 0.5; box-shadow: 0 0 2px 0px hsl(var(--neon-brand) / 0.2); }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes scan-line {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.scan-line-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.scan-line-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(to right, transparent, hsl(var(--neon-brand) / 0.1), transparent);
+  animation: scan-line 4s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes ring-shimmer {
+  0% { transform: rotate(0deg); opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { transform: rotate(360deg); opacity: 0.8; }
+}
+
+.glow-ring {
+  background: conic-gradient(from 0deg, transparent 0%, hsl(var(--neon-brand) / 0.2) 50%, hsl(var(--neon-brand)) 100%);
+  border-radius: 50%;
+  animation: ring-shimmer 6s linear infinite;
+}
+
+.inner-circle {
+  background: hsl(var(--bg-panel));
+  border-radius: 50%;
+}
