@@ -1,0 +1,159 @@
+Dashboard redesign approved.
+
+Use the attached concept image/style as the visual direction.
+
+I want the /portal dashboard restructured into a unified AI Market Intelligence layout.
+
+====================================================
+PRIMARY LAYOUT CHANGE
+=====================
+
+Replace the current split/fragmented layout with:
+
+1. Top KPI / operator telemetry strip
+2. LIVE ENABLE AI EXECUTION BAR
+3. AI MARKET INTELLIGENCE section
+4. Top 6 dynamic asset intelligence cards
+
+   * 3 cards on row 1
+   * 3 cards on row 2
+5. Everything else below
+
+Do NOT only show BTC / ETH / SOL.
+
+Show the TOP 6 assets ranked by current AI opportunity/confidence.
+
+Cards should dynamically update as confidence/opportunity changes.
+
+====================================================
+ASSET CARD REQUIREMENTS
+=======================
+
+Each asset card should keep the same rich data style from the concept:
+
+* symbol / pair
+* asset name
+* current price
+* 24h change
+* AI Confidence Score, large and prominent
+* signal state:
+
+  * LONG
+  * SHORT
+  * WAIT
+  * WATCHLIST
+* market bias:
+
+  * Strong Long Bias
+  * Long Bias
+  * Neutral / Caution
+  * Short Bias
+* mini sparkline/chart
+* AI reasoning summary
+* trend
+* momentum
+* volume
+* volatility
+* RSI
+* MACD
+* liquidity
+* multi-timeframe confirmation
+* exchange consensus
+* risk level
+* suggested position size
+* target
+* stop loss
+* action button/status:
+
+  * ACTION: LONG
+  * ACTION: SHORT
+  * ACTION: WAIT
+
+The AI Confidence percentage should be the dominant visual anchor on each card.
+
+Make confidence scores larger than current.
+
+====================================================
+DYNAMIC RANKING LOGIC
+=====================
+
+Cards should not be hardcoded to BTC/ETH/SOL.
+
+Rank and display the top 6 assets by:
+
+1. AI confidence
+2. signal strength
+3. market opportunity
+4. execution readiness
+5. risk-adjusted score
+
+If live data is missing, gracefully degrade with realistic placeholder/skeleton states, but do not render useless "--" cards.
+
+====================================================
+LIVE EXECUTION BAR
+==================
+
+Place a prominent LIVE ENABLE AI EXECUTION BAR above the AI Market Intelligence cards.
+
+It should show:
+
+* Live AI Trading status
+* max concurrent trades
+* available slots
+* current exchange/mode
+* execution armed state
+* risk state
+* kill switch / arm execution CTA
+
+This bar should sit directly above the six asset cards.
+
+====================================================
+DESIGN STYLE
+============
+
+Match the concept image direction:
+
+* dark institutional terminal
+* neon green primary accents
+* subtle purple/yellow confidence states
+* larger confidence scores
+* premium card spacing
+* Bloomberg/TradingView/prop-desk feel
+* high readability
+* black container interiors
+* glowing borders where appropriate
+* no clutter
+* no tiny unreadable text
+
+====================================================
+IMPORTANT STRATEGIC RULE
+========================
+
+AICandlez should feel like an AI Intelligence Terminal, not a generic crypto dashboard.
+
+The dashboard must prioritize:
+
+* AI confidence
+* market opportunity
+* execution readiness
+* risk
+* exchange status
+* account/trade intelligence
+
+Do not rebuild generic ticker boxes.
+
+====================================================
+TECHNICAL REQUIREMENTS
+======================
+
+* Preserve existing execution queue logic
+* Preserve Kraken/Coinbase/Gemini/Binance exchange architecture
+* Preserve customer/admin separation
+* Do not break existing live/paper mode gates
+* Use existing telemetry APIs where possible
+* If an endpoint is missing richer fields, create a frontend-safe derived model first
+* Typecheck
+* Commit cleanly
+
+Goal:
+A cleaner, more powerful AI Market Intelligence dashboard with 6 dynamic asset cards, bigger confidence scores, and a live execution bar above the grid.
