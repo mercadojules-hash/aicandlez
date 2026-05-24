@@ -540,9 +540,68 @@ export async function syncSubscriptionStatus(
 //     subscription checkout — Task #162 Phase B).
 
 import { checkBillingHealth } from "../lib/billingEnforcement.js";
+import {
+  performanceFeesTable,
+  creditTransactionsTable,
+} from "@workspace/db";
+import { desc } from "drizzle-orm";
 
 const CREDIT_TOPUP_PACKS_USD = [25, 50, 100, 250] as const;
 type CreditPack = (typeof CREDIT_TOPUP_PACKS_USD)[number];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/billing/wallet  (self-read — Phase E)
+// ─────────────────────────────────────────────────────────────────────────────
+// Customer-facing wallet snapshot. Mirrors the admin billing read but scoped
+// to the authenticated user. Read-only — no mutations, no role checks beyond
+// requireAuth, no operator surfaces.
+//   Returns: { health, recentFees (≤25), recentCreditTx (≤25) }
+router.get("/billing/wallet", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as AuthReq).clerkUserId;
+  try {
+    const health = await checkBillingHealth(userId);
+
+    const recentFees = await db
+      .select({
+        id:               performanceFeesTable.id,
+        symbol:           performanceFeesTable.symbol,
+        realizedPnl:      performanceFeesTable.realizedPnl,
+        feeAmountUsd:     performanceFeesTable.feeAmountUsd,
+        settlementStatus: performanceFeesTable.settlementStatus,
+        isPaper:          performanceFeesTable.isPaper,
+        createdAt:        performanceFeesTable.createdAt,
+      })
+      .from(performanceFeesTable)
+      .where(eq(performanceFeesTable.userId, userId))
+      .orderBy(desc(performanceFeesTable.createdAt))
+      .limit(25);
+
+    const recentCreditTx = await db
+      .select({
+        id:                    creditTransactionsTable.id,
+        amountUsd:             creditTransactionsTable.amountUsd,
+        type:                  creditTransactionsTable.type,
+        balanceAfter:          creditTransactionsTable.balanceAfter,
+        note:                  creditTransactionsTable.note,
+        stripePaymentIntentId: creditTransactionsTable.stripePaymentIntentId,
+        createdAt:             creditTransactionsTable.createdAt,
+      })
+      .from(creditTransactionsTable)
+      .where(eq(creditTransactionsTable.userId, userId))
+      .orderBy(desc(creditTransactionsTable.createdAt))
+      .limit(25);
+
+    res.json({
+      health,
+      packs: CREDIT_TOPUP_PACKS_USD,
+      recentFees,
+      recentCreditTx,
+    });
+  } catch (err) {
+    req.log.error({ err, userId }, "GET /billing/wallet failed");
+    res.status(500).json({ error: "Failed to load wallet" });
+  }
+});
 
 router.post("/billing/topup", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;

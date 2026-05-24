@@ -41,6 +41,7 @@ import CommandCenter from "@/pages/CommandCenter";
 import Settings from "@/pages/Settings";
 import Billing from "@/pages/Billing";
 import Admin from "@/pages/Admin";
+import BillingAdmin from "@/pages/BillingAdmin";
 import Account from "@/pages/Account";
 import Leaderboard from "@/pages/Leaderboard";
 import AlertsPage from "@/pages/Alerts";
@@ -424,6 +425,9 @@ function Router() {
       </Route>
       <Route path="/billing">
         <Protected><Billing /></Protected>
+      </Route>
+      <Route path="/admin/billing">
+        <ProtectedAdmin><BillingAdmin /></ProtectedAdmin>
       </Route>
       <Route path="/admin">
         <ProtectedAdmin><Admin /></ProtectedAdmin>

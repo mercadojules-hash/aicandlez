@@ -1,8 +1,48 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { api, type Subscription, type SimAccount } from "@/lib/api";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
+
+// ── Phase E: Wallet snapshot types (mirrors GET /api/billing/wallet) ────────
+interface WalletHealth {
+  userId:        string;
+  plan:          string;
+  threshold:     number | null;
+  outstanding:   number;
+  credits:       number;
+  netOwed:       number;
+  shouldHold:    boolean;
+  currentStatus: string;
+  reason:        string;
+}
+interface WalletCreditTx {
+  id:                    string;
+  amountUsd:             number | string;
+  type:                  string;
+  balanceAfter:          number | string;
+  note:                  string | null;
+  stripePaymentIntentId: string | null;
+  createdAt:             string;
+}
+interface WalletFee {
+  id:               string;
+  symbol:           string | null;
+  realizedPnl:      number | string;
+  feeAmountUsd:     number | string;
+  settlementStatus: string;
+  isPaper:          boolean;
+  createdAt:        string;
+}
+interface WalletResponse {
+  health:         WalletHealth;
+  packs:          ReadonlyArray<number>;
+  recentFees:     WalletFee[];
+  recentCreditTx: WalletCreditTx[];
+}
+
+const num = (v: number | string): number => typeof v === "number" ? v : parseFloat(v) || 0;
 
 // ── Design tokens (locked to the neon-green system) ─────────────────────────────
 const BG         = "#000000";
@@ -133,6 +173,7 @@ function statusBadge(plan: PlanId, current: PlanId, sub: Subscription | undefine
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function Billing() {
   const [, setLocation] = useLocation();
+  const qc = useQueryClient();
   const { gate: disclaimerGate, modal: disclaimerModal } = useDisclaimerGate();
 
   const { data: sub, isLoading } = useQuery<Subscription>({
@@ -145,6 +186,37 @@ export default function Billing() {
     queryKey:  ["sim-account"],
     queryFn:   () => api.get("/account"),
     staleTime: 30_000,
+  });
+
+  // ── Phase E: Wallet snapshot ───────────────────────────────────────────────
+  // Polled at 20s so the customer sees their balance update after a webhook
+  // round-trip. Stripe redirects back to /billing?topup=success — when that
+  // marker appears, force an immediate refetch so the new balance lands
+  // without waiting for the next poll.
+  const { data: wallet, refetch: refetchWallet } = useQuery<WalletResponse>({
+    queryKey:        ["billing-wallet"],
+    queryFn:         () => api.get<WalletResponse>("/billing/wallet"),
+    staleTime:       10_000,
+    refetchInterval: 20_000,
+  });
+
+  useEffect(() => {
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.get("topup") === "success" || qs.get("outstanding") === "success") {
+      void refetchWallet();
+      void qc.invalidateQueries({ queryKey: ["subscription"] });
+    }
+  }, [qc, refetchWallet]);
+
+  const topup = useMutation({
+    mutationFn: (amount: number) =>
+      api.post<{ url: string; amount: number }>("/billing/topup", { amount }),
+    onSuccess: ({ url }) => { window.location.href = url; },
+  });
+
+  const payOutstanding = useMutation({
+    mutationFn: () => api.post<{ url: string; amount: number }>("/billing/pay_outstanding", {}),
+    onSuccess: ({ url }) => { window.location.href = url; },
   });
 
   const totalRealized = simAcc?.totalRealized ?? (simAcc as { realizedPnL?: number } | undefined)?.realizedPnL ?? 0;
@@ -172,9 +244,60 @@ export default function Billing() {
   const currentPlan = (sub?.plan ?? "free") as PlanId;
   const isPaidActive = sub?.isActive && currentPlan !== "free";
 
+  // ── Wallet derived values ──────────────────────────────────────────────────
+  const health      = wallet?.health;
+  const credits     = health?.credits ?? 0;
+  const outstanding = health?.outstanding ?? 0;
+  const netOwed     = health?.netOwed ?? 0;
+  const threshold   = health?.threshold ?? null;
+  const onHold      = health?.currentStatus === "billing_hold";
+  const packs       = wallet?.packs ?? [25, 50, 100, 250];
+  const headroom    = threshold !== null ? Math.max(0, threshold - netOwed) : null;
+  const pct         = (threshold !== null && threshold > 0)
+    ? Math.min(100, (netOwed / threshold) * 100)
+    : 0;
+
   return (
     <div className="page-enter" style={{ background: BG, minHeight: "100%", paddingBottom: 36 }}>
       {disclaimerModal}
+
+      {/* ── Phase E: Persistent billing-hold banner ───────────────────────── */}
+      {onHold && (
+        <div style={{
+          background: "linear-gradient(180deg,rgba(255,90,90,0.16) 0%,rgba(255,90,90,0.06) 100%)",
+          borderBottom: "1px solid rgba(255,90,90,0.42)",
+          padding: "12px 16px",
+        }}>
+          <div style={{
+            fontSize: 9, fontFamily: SANS, fontWeight: 800, color: "#FF8A8A",
+            letterSpacing: "0.16em", textTransform: "uppercase" as const, marginBottom: 4,
+          }}>
+            Live AI Execution Paused
+          </div>
+          <div style={{ fontSize: 12, fontFamily: SANS, color: W, lineHeight: 1.45, marginBottom: 10 }}>
+            Live AI execution paused until outstanding balance is resolved.
+            Your paper trading and signals remain fully available.
+          </div>
+          <button
+            onClick={() => payOutstanding.mutate()}
+            disabled={payOutstanding.isPending || netOwed <= 0}
+            style={{
+              width: "100%",
+              padding: "10px 14px",
+              background: "linear-gradient(180deg,#66FF66 0%,#00C853 100%)",
+              border: "none", borderRadius: 8, color: "#000",
+              fontFamily: SANS, fontSize: 12, fontWeight: 800,
+              letterSpacing: 0.4, textTransform: "uppercase" as const,
+              cursor: payOutstanding.isPending ? "wait" : "pointer",
+              opacity: payOutstanding.isPending || netOwed <= 0 ? 0.6 : 1,
+            }}
+          >
+            {payOutstanding.isPending
+              ? "Opening Stripe…"
+              : `Resolve $${netOwed.toFixed(2)} & Restore`}
+          </button>
+        </div>
+      )}
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{ padding: "18px 20px", borderBottom: `1px solid ${E}` }}>
@@ -231,6 +354,185 @@ export default function Billing() {
                 {portal.isPending ? "Opening…" : "Manage Billing"}
               </button>
             )}
+          </div>
+        )}
+
+        {/* ── Phase E: Wallet (credits + outstanding + top-up packs) ─────── */}
+        {wallet && (
+          <div style={{
+            background: CARD, border: `1px solid ${E}`, borderRadius: 14,
+            padding: "16px 16px 14px", marginBottom: 14,
+          }}>
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14,
+            }}>
+              <div>
+                <div style={{
+                  fontSize: 9, fontFamily: SANS, fontWeight: 800, color: BRAND,
+                  letterSpacing: "0.16em", textTransform: "uppercase" as const, marginBottom: 4,
+                }}>
+                  AI Wallet
+                </div>
+                <div style={{ fontSize: 13, fontFamily: SANS, color: GR }}>
+                  Prepaid balance for performance fees.
+                </div>
+              </div>
+              <div style={{
+                fontSize: 9, fontFamily: MONO, fontWeight: 700,
+                color: onHold ? "#FF8A8A" : credits > 0 ? BRAND : GR,
+                letterSpacing: "0.14em", textTransform: "uppercase" as const,
+              }}>
+                {onHold ? "ON HOLD" : credits > 0 ? "HEALTHY" : "OK"}
+              </div>
+            </div>
+
+            {/* Balance + outstanding side-by-side */}
+            <div style={{
+              display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12,
+            }}>
+              <div style={{
+                background: CARD_HI, border: `1px solid ${E}`, borderRadius: 10,
+                padding: "12px 14px",
+              }}>
+                <div style={{
+                  fontSize: 9, fontFamily: SANS, fontWeight: 700, color: GR,
+                  letterSpacing: "0.12em", textTransform: "uppercase" as const, marginBottom: 6,
+                }}>Credits</div>
+                <div style={{
+                  fontSize: 22, fontFamily: MONO, fontWeight: 700,
+                  color: credits > 0 ? BRAND : W, letterSpacing: -0.3,
+                }}>
+                  ${credits.toFixed(2)}
+                </div>
+              </div>
+              <div style={{
+                background: CARD_HI, border: `1px solid ${E}`, borderRadius: 10,
+                padding: "12px 14px",
+              }}>
+                <div style={{
+                  fontSize: 9, fontFamily: SANS, fontWeight: 700, color: GR,
+                  letterSpacing: "0.12em", textTransform: "uppercase" as const, marginBottom: 6,
+                }}>Net Owed</div>
+                <div style={{
+                  fontSize: 22, fontFamily: MONO, fontWeight: 700,
+                  color: netOwed > 0 ? "#FFC75A" : W, letterSpacing: -0.3,
+                }}>
+                  ${netOwed.toFixed(2)}
+                </div>
+                {outstanding > 0 && (
+                  <div style={{
+                    fontSize: 8.5, fontFamily: SANS, color: DIM, marginTop: 3,
+                    letterSpacing: 0.3,
+                  }}>
+                    {credits > 0
+                      ? `Pending fees $${outstanding.toFixed(2)} − credits`
+                      : `Pending fees only`}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Threshold meter (only when plan has one) */}
+            {threshold !== null && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{
+                  display: "flex", justifyContent: "space-between",
+                  fontSize: 10, fontFamily: SANS, color: GR, marginBottom: 6,
+                }}>
+                  <span>Net owed · ${netOwed.toFixed(2)}</span>
+                  <span style={{ color: headroom !== null && headroom > 0 ? BRAND : "#FFC75A" }}>
+                    {headroom !== null && headroom > 0
+                      ? `$${headroom.toFixed(2)} until hold`
+                      : `Threshold reached`}
+                  </span>
+                </div>
+                <div style={{
+                  position: "relative", height: 6, background: "rgba(255,255,255,0.06)",
+                  borderRadius: 999, overflow: "hidden",
+                }}>
+                  <div style={{
+                    position: "absolute", left: 0, top: 0, bottom: 0,
+                    width: `${pct}%`,
+                    background: pct >= 100
+                      ? "linear-gradient(90deg,#FFC75A,#FF6B6B)"
+                      : pct >= 70
+                        ? "linear-gradient(90deg,#66FF66,#FFC75A)"
+                        : `linear-gradient(90deg,${BRAND_DEEP},${BRAND})`,
+                    transition: "width 400ms ease",
+                  }} />
+                </div>
+                <div style={{
+                  fontSize: 9.5, fontFamily: SANS, color: DIM, marginTop: 6, lineHeight: 1.5,
+                }}>
+                  Hold threshold: ${threshold.toFixed(2)}. Top up to keep AI execution running.
+                </div>
+              </div>
+            )}
+
+            {/* Pay outstanding CTA (in-card, also surfaced in top banner when held) */}
+            {netOwed > 0 && !onHold && (
+              <button
+                onClick={() => payOutstanding.mutate()}
+                disabled={payOutstanding.isPending}
+                style={{
+                  width: "100%", padding: "10px 14px", marginBottom: 12,
+                  background: "rgba(255,199,90,0.10)",
+                  border: "1px solid rgba(255,199,90,0.42)",
+                  borderRadius: 8, color: "#FFC75A",
+                  fontFamily: SANS, fontSize: 11, fontWeight: 700,
+                  letterSpacing: 0.4, textTransform: "uppercase" as const,
+                  cursor: payOutstanding.isPending ? "wait" : "pointer",
+                }}
+              >
+                {payOutstanding.isPending
+                  ? "Opening Stripe…"
+                  : `Pay $${netOwed.toFixed(2)} outstanding`}
+              </button>
+            )}
+
+            {/* Top-up packs */}
+            <div style={{
+              fontSize: 9, fontFamily: SANS, fontWeight: 700, color: GR,
+              letterSpacing: "0.12em", textTransform: "uppercase" as const, marginBottom: 8,
+            }}>
+              Add Credits
+            </div>
+            <div style={{
+              display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6,
+            }}>
+              {packs.map(p => (
+                <button
+                  key={p}
+                  onClick={() => topup.mutate(p)}
+                  disabled={topup.isPending}
+                  style={{
+                    padding: "12px 0",
+                    background: "linear-gradient(180deg,rgba(102,255,102,0.10) 0%,rgba(102,255,102,0.04) 100%)",
+                    border: `1px solid rgba(102,255,102,0.34)`,
+                    borderRadius: 10, color: W,
+                    fontFamily: SANS, fontSize: 13, fontWeight: 700,
+                    cursor: topup.isPending ? "wait" : "pointer",
+                    transition: "all 160ms ease",
+                  }}
+                >
+                  ${p}
+                </button>
+              ))}
+            </div>
+            {topup.isError && (
+              <div style={{
+                marginTop: 10, padding: "8px 10px",
+                background: "rgba(255,90,90,0.08)", border: "1px solid rgba(255,90,90,0.32)",
+                borderRadius: 8, fontSize: 11, fontFamily: SANS, color: "#FF8A8A",
+              }}>
+                {topup.error instanceof Error ? topup.error.message : "Top-up failed."}
+              </div>
+            )}
+            <div style={{
+              fontSize: 9.5, fontFamily: SANS, color: DIM, marginTop: 10, lineHeight: 1.5,
+            }}>
+              Credits auto-apply to fees on profitable closed trades. Never on losing trades.
+            </div>
           </div>
         )}
 

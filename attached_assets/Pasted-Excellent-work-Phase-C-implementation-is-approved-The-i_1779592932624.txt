@@ -1,0 +1,122 @@
+Excellent work. Phase C implementation is approved.
+
+The idempotency + atomic transaction fixes were critical and absolutely the correct architecture decisions.
+
+The platform now has:
+
+* performance fee tracking
+* billing_hold enforcement
+* prepaid credits
+* Stripe one-shot topups
+* outstanding-payment clearing
+* automatic restoration
+* immutable financial ledgers
+* moderation precedence protection
+* SaaS-style execution enforcement
+
+This is now behaving like a real institutional SaaS billing architecture.
+
+Next priority:
+NO MORE CORE BACKEND EXPANSION RIGHT NOW.
+
+We now need:
+VISIBILITY + OPERATOR CONTROL + CUSTOMER BILLING UX.
+
+Proceed with:
+Phase E + F next.
+
+====================================================
+PHASE E — CUSTOMER BILLING UX
+=============================
+
+Need a customer-facing Wallet/Billing surface.
+
+Customer should clearly see:
+
+* prepaid credits
+* outstanding balance
+* billing threshold
+* billing status
+* billing_hold state
+* top-up buttons
+* pay outstanding balance CTA
+
+Preset top-up packs:
+
+* $25
+* $50
+* $100
+* $250
+
+Customer messaging tone:
+
+* modern fintech
+* beginner friendly
+* AI-assisted
+* NOT institutional/operator-heavy
+
+Need:
+
+* persistent billing_hold banner
+* “Live AI execution paused until outstanding balance is resolved”
+* one-click restoration path
+
+====================================================
+PHASE F — ADMIN BILLING CONTROL
+===============================
+
+Need Admin Console billing surfaces:
+
+* BILLING_HOLD queue
+* outstanding balances
+* prepaid credits
+* fee history
+* waive fees
+* add credits
+* restore user
+* billing audit history
+* threshold visibility
+
+Need fast operator visibility into:
+
+* who owes fees
+* who is billing-held
+* who has credits
+* highest platform revenue users
+* unpaid balances
+
+====================================================
+IMPORTANT
+=========
+
+Still do NOT touch:
+
+* Kraken adapter
+* execution queue
+* trading loop
+* auth routing
+* telemetry systems
+* customer/admin separation
+
+The backend monetization architecture is now strong enough.
+Focus now shifts to:
+
+* UX
+* visibility
+* operational controls
+* customer clarity
+* billing transparency
+
+Also:
+continue preserving:
+
+* moderation precedence
+* open-position safety
+* SaaS-only enforcement model
+
+No liquidations.
+No exchange interference.
+No custody behavior.
+
+Proceed with Phase E + F.
+:::
