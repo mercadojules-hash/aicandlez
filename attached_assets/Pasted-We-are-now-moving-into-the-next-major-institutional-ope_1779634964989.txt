@@ -1,0 +1,255 @@
+We are now moving into the next major institutional operations phase for AICandlez.
+
+The trading/admin/customer architecture separation is now stable enough to safely build the full ADMIN USER OPERATIONS SYSTEM.
+
+This is NOT a cosmetic feature. This is core fintech operational infrastructure.
+
+====================================================
+OBJECTIVE
+=========
+
+Build a full institutional-grade USER MANAGEMENT + USER INTELLIGENCE system inside the ADMIN portal.
+
+This system must allow operators/admins to:
+
+• view all users line-by-line
+• inspect individual users
+• manage subscriptions
+• grant complimentary access
+• monitor live sessions
+• monitor platform usage
+• track AI activity
+• manage risk/fraud states
+• manage operational access
+
+The UX should feel like:
+• Stripe Dashboard
+• Coinbase Admin
+• Enterprise SaaS CRM
+• Institutional broker backoffice
+
+====================================================
+LEFT SIDEBAR CHANGES
+====================
+
+Under PLATFORM add:
+
+Users
+User Activity
+Subscriptions
+Live Sessions
+
+Keep:
+Revenue
+Risk Monitor
+Alerts
+AI Models
+Admin Console
+
+====================================================
+USERS PAGE (PRIMARY PRIORITY)
+=============================
+
+Create a full institutional-style users grid.
+
+One row per user.
+
+Realtime updating preferred.
+
+Searchable + sortable.
+
+Columns:
+
+• User
+• Email
+• Plan
+• Status
+• Exchange Connected
+• Equity
+• PnL
+• Total Trades
+• AI Usage
+• Last Active
+• Session Status
+• Created Date
+• Actions
+
+Statuses should support:
+• Active
+• Trial
+• Complimentary
+• Suspended
+• Expired
+• Fraud Watch
+• Refunded
+
+Actions column:
+• View User
+• Upgrade
+• Downgrade
+• Grant Complimentary
+• Suspend
+• Disable Trading
+• Reset Sessions
+
+====================================================
+CLICKING USER ROW
+=================
+
+Clicking a user should open a detailed USER INTELLIGENCE PANEL / USER DETAIL PAGE.
+
+This becomes the operator control center for the user.
+
+Include:
+
+====================================================
+PROFILE SECTION
+===============
+
+• name
+• email
+• user id
+• created date
+• subscription tier
+• Stripe customer id
+• exchange connected
+• API status
+• total usage
+• revenue generated
+• risk state
+
+====================================================
+LIVE SESSION SECTION
+====================
+
+• active sessions
+• device list
+• browser/device info
+• IP/location
+• websocket status
+• last activity timestamp
+
+====================================================
+TRADING SECTION
+===============
+
+• portfolio snapshot
+• live positions
+• trade history
+• total pnl
+• win rate
+• execution activity
+• AI decisions generated
+
+====================================================
+AI / PLATFORM USAGE
+===================
+
+• AI request count
+• AI signal usage
+• feature usage
+• time on platform
+• login frequency
+
+====================================================
+OPERATOR CONTROLS
+=================
+
+Buttons:
+
+[ Upgrade ]
+[ Downgrade ]
+[ Grant Complimentary ]
+[ Extend Trial ]
+[ Suspend ]
+[ Remove Access ]
+[ Disable Trading ]
+[ Reset Sessions ]
+[ Clear Device Tokens ]
+
+====================================================
+COMPLIMENTARY SUBSCRIPTION SYSTEM
+=================================
+
+This is VERY IMPORTANT.
+
+Operators/admins must be able to:
+
+• grant complimentary Starter
+• grant complimentary Pro
+• set expiration dates
+• revoke complimentary access
+• create beta tester accounts
+• create influencer accounts
+• create support overrides
+
+Need:
+• UI controls
+• backend persistence
+• audit logging
+
+====================================================
+BACKEND / DATABASE
+==================
+
+Add or extend tables as needed:
+
+• users
+• subscription_overrides
+• admin_actions
+• live_sessions
+• audit_logs
+• user_activity
+• device_sessions
+
+Everything should support future scaling to 100k+ users.
+
+====================================================
+AUDIT LOGGING
+=============
+
+ALL operator actions must be logged:
+
+• who performed action
+• what action
+• target user
+• timestamp
+• previous value
+• new value
+
+====================================================
+DESIGN REQUIREMENTS
+===================
+
+Maintain:
+• institutional aesthetic
+• black interior containers
+• neon telemetry styling
+• Bloomberg / TradingView feel
+• high readability
+• large fonts
+• responsive layouts
+• realtime telemetry feel
+
+Avoid:
+• generic SaaS styling
+• white/light containers
+• cramped rows
+• tiny fonts
+
+====================================================
+IMPORTANT
+=========
+
+This system is ADMIN ONLY.
+
+NO customer-facing leakage.
+
+Customer portal must remain isolated.
+
+Do NOT merge customer/operator worlds.
+
+Preserve all architectural invariants already established in replit.md.
+
+This phase is:
+ADMIN CRM + OPERATOR INTELLIGENCE INFRASTRUCTURE.
