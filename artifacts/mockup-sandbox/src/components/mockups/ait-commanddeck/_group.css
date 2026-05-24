@@ -47,3 +47,21 @@
 .animate-scan {
   animation: scan-line 3s linear infinite;
 }
+
+@keyframes rail-pulse {
+  0%   { opacity: 0.70; }
+  50%  { opacity: 1.00; }
+  100% { opacity: 0.70; }
+}
+
+.animate-rail-pulse      { animation: rail-pulse 2.5s ease-in-out infinite; }
+.animate-rail-pulse-fast { animation: rail-pulse 1.8s ease-in-out infinite; }
+
+@keyframes cmdbar-scan {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-cmdbar-scan {
+  animation: cmdbar-scan 6s linear infinite;
+}

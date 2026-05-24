@@ -93,9 +93,30 @@ export function CommandDeck() {
     const dirColor = isLong ? 'text-neon-green' : 'text-status-red';
     const dirBg = isLong ? 'bg-neon-green/10 border-neon-green/30' : 'bg-status-red/10 border-status-red/30';
     const sparkColor = isLong ? '#66FF66' : '#FF4D4D';
+    const railColor = isLong ? '#66FF66' : '#FF4D4D';
+    const conf: number = opp.conf;
+    const railGlow =
+      conf >= 85 ? `0 0 14px ${railColor}` :
+      conf >= 70 ? `0 0 10px ${railColor}` :
+      conf >= 55 ? `0 0 6px ${railColor}`  :
+                   `0 0 3px ${railColor}`;
+    const railOpacity =
+      conf >= 85 ? 1.0 :
+      conf >= 70 ? 0.85 :
+      conf >= 55 ? 0.6 : 0.4;
+    const railPulseClass = conf >= 85 ? 'animate-rail-pulse-fast' : 'animate-rail-pulse';
 
     return (
-      <div className="bg-terminal-bg border border-hairline hover:border-hairline-green transition-colors p-4 flex flex-col gap-3 relative overflow-hidden group h-[300px]">
+      <div className="bg-terminal-bg border border-hairline hover:border-hairline-green transition-colors p-4 pl-5 flex flex-col gap-3 relative overflow-hidden group h-[300px]">
+        <div
+          className={railPulseClass}
+          style={{
+            position: 'absolute', top: 0, bottom: 0, left: 0,
+            width: 3, background: railColor,
+            boxShadow: railGlow, opacity: railOpacity,
+            pointerEvents: 'none', zIndex: 1,
+          }}
+        />
         {/* Header Row */}
         <div className="flex justify-between items-start z-10">
           <div className="flex items-center gap-2">
@@ -293,6 +314,43 @@ export function CommandDeck() {
                   {pill}
                 </button>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* 2b. ENABLE LIVE AI TRADING — aspirational command bar (paper-only) */}
+        <section
+          className="relative overflow-hidden border-t border-b border-neon-green/40 bg-terminal-bg"
+          style={{
+            backgroundImage: 'linear-gradient(90deg, rgba(102,255,102,0.06) 0%, rgba(102,255,102,0) 50%, rgba(102,255,102,0.06) 100%)',
+          }}
+        >
+          <div className="absolute top-0 left-0 h-full w-32 pointer-events-none animate-cmdbar-scan"
+               style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(102,255,102,0.18) 50%, transparent 100%)' }} />
+          <div className="relative z-10 flex items-center justify-between gap-6 px-4 py-3 font-mono">
+            {/* LEFT */}
+            <div className="flex items-center gap-2 shrink-0">
+              <LucideRadar className="w-4 h-4 text-neon-green animate-pulse-neon" />
+              <span className="text-[11px] text-neon-green tracking-widest font-bold">AI ENGINE · ONLINE</span>
+            </div>
+            {/* CENTER */}
+            <div className="flex flex-col items-center text-center flex-1 min-w-0">
+              <span className="text-white text-sm font-bold tracking-widest">ENABLE LIVE AI TRADING</span>
+              <span className="text-[10px] text-gray-400 tracking-wider mt-0.5">
+                PAPER MODE ACTIVE · LIVE EXECUTION GATED · UPGRADE TO UNLOCK PRO QUEUE
+              </span>
+            </div>
+            {/* RIGHT */}
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="text-[10px] font-mono text-gray-400 tracking-wider">
+                SLOTS: <span className="text-white">1/3</span>
+              </span>
+              <button
+                type="button"
+                className="text-[10px] font-mono font-bold tracking-widest text-neon-green border border-neon-green px-3 py-1.5 bg-neon-green/5 hover:bg-neon-green hover:text-black transition-colors"
+              >
+                VIEW PRO ACCESS
+              </button>
             </div>
           </div>
         </section>

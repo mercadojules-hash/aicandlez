@@ -361,6 +361,17 @@ function OpportunityCard({ opp, onQueue }: {
   const dirBorder = isLong ? "rgba(102,255,102,0.30)" : opp.direction === "SHORT" ? "rgba(255,77,77,0.30)" : "rgba(255,176,32,0.30)";
   const sparkColor = dirColor;
   const ready = opp.readiness === "READY";
+  const railColor = opp.direction === "SHORT" ? T.RED : T.NEON;
+  const railGlow =
+    opp.conf >= 85 ? `0 0 14px ${railColor}` :
+    opp.conf >= 70 ? `0 0 10px ${railColor}` :
+    opp.conf >= 55 ? `0 0 6px ${railColor}`  :
+                     `0 0 3px ${railColor}`;
+  const railOpacity =
+    opp.conf >= 85 ? 1.0 :
+    opp.conf >= 70 ? 0.85 :
+    opp.conf >= 55 ? 0.6 : 0.4;
+  const railAnim = opp.conf >= 85 ? "rail-pulse 1.8s ease-in-out infinite" : "rail-pulse 2.5s ease-in-out infinite";
 
   return (
     <article
@@ -368,6 +379,7 @@ function OpportunityCard({ opp, onQueue }: {
         background: T.BG_TERMINAL,
         border: `1px solid ${T.BORDER}`,
         padding: 14,
+        paddingLeft: 18,
         display: "flex", flexDirection: "column", gap: 10,
         position: "relative", overflow: "hidden",
         height: 300,
@@ -376,6 +388,17 @@ function OpportunityCard({ opp, onQueue }: {
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = T.BORDER_GRN; }}
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = T.BORDER; }}
     >
+      <div
+        aria-hidden
+        style={{
+          position: "absolute", top: 0, bottom: 0, left: 0,
+          width: 3, background: railColor,
+          boxShadow: railGlow,
+          opacity: railOpacity,
+          animation: railAnim,
+          pointerEvents: "none", zIndex: 1,
+        }}
+      />
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1024,6 +1047,114 @@ function Divider() {
 }
 
 /* ──────────────────────────────────────────────────────────────────────── */
+/* ENABLE LIVE AI TRADING — aspirational command bar (paper-only, gated)    */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+function EnableLiveAITradingBar({
+  engineOnline, openPaper, slotCap, onUpgrade,
+}: {
+  engineOnline: boolean;
+  openPaper:    number;
+  slotCap:      number;
+  onUpgrade:    () => void;
+}) {
+  const engineLabel = engineOnline ? "AI ENGINE · ONLINE" : "AI ENGINE · WARMING UP";
+  const engineColor = engineOnline ? T.NEON : T.AMBER;
+  return (
+    <section
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderTop: `1px solid ${T.NEON}`,
+        borderBottom: `1px solid ${T.NEON}`,
+        background: T.BG_TERMINAL,
+        backgroundImage:
+          "linear-gradient(90deg, rgba(102,255,102,0.06) 0%, rgba(102,255,102,0) 50%, rgba(102,255,102,0.06) 100%)",
+        fontFamily: T.FONT_MONO,
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          position: "absolute", top: 0, bottom: 0, left: 0, width: 140,
+          background:
+            "linear-gradient(90deg, transparent 0%, rgba(102,255,102,0.18) 50%, transparent 100%)",
+          animation: "cmdbar-scan 6s linear infinite",
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        style={{
+          position: "relative", zIndex: 1,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 24, padding: "10px 16px",
+        }}
+      >
+        {/* LEFT */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <Radar
+            size={16}
+            color={engineColor}
+            style={{ animation: "brand-pulse 1.4s infinite" }}
+          />
+          <span style={{
+            fontSize: 11, color: engineColor, fontWeight: 700, letterSpacing: "0.20em",
+          }}>{engineLabel}</span>
+        </div>
+
+        {/* CENTER */}
+        <div style={{
+          display: "flex", flexDirection: "column", alignItems: "center",
+          flex: 1, minWidth: 0, textAlign: "center",
+        }}>
+          <span style={{
+            color: T.TEXT_0, fontSize: 13, fontWeight: 700, letterSpacing: "0.22em",
+          }}>
+            ENABLE LIVE AI TRADING
+          </span>
+          <span style={{
+            color: T.TEXT_1, fontSize: 10, letterSpacing: "0.14em", marginTop: 2,
+          }}>
+            PAPER MODE ACTIVE · LIVE EXECUTION GATED · UPGRADE TO UNLOCK PRO QUEUE
+          </span>
+        </div>
+
+        {/* RIGHT */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <span style={{ fontSize: 10, color: T.TEXT_1, letterSpacing: "0.14em" }}>
+            SLOTS:&nbsp;<span style={{ color: T.TEXT_0 }}>{openPaper}/{slotCap}</span>
+          </span>
+          <button
+            type="button"
+            onClick={onUpgrade}
+            style={{
+              fontFamily: T.FONT_MONO, fontSize: 10, fontWeight: 700,
+              letterSpacing: "0.16em",
+              padding: "6px 12px",
+              border: `1px solid ${T.NEON}`,
+              background: "rgba(102,255,102,0.06)",
+              color: T.NEON,
+              cursor: "pointer",
+              transition: "all 120ms ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = T.NEON;
+              e.currentTarget.style.color = "#000";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(102,255,102,0.06)";
+              e.currentTarget.style.color = T.NEON;
+            }}
+          >
+            VIEW PRO ACCESS
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
 /* Shell                                                                    */
 /* ──────────────────────────────────────────────────────────────────────── */
 
@@ -1083,6 +1214,17 @@ export function PortalCustomerShell() {
       fontFamily: T.FONT_MONO,
       display: "flex", flexDirection: "column",
     }}>
+      <style>{`
+        @keyframes rail-pulse {
+          0%   { opacity: 0.70; }
+          50%  { opacity: 1.00; }
+          100% { opacity: 0.70; }
+        }
+        @keyframes cmdbar-scan {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
       <OperatorPulseRibbon
         plan={plan}
         equityUsd={paperStats.equity || STARTING_EQUITY}
@@ -1114,6 +1256,13 @@ export function PortalCustomerShell() {
           query={query} setQuery={setQuery}
           filter={filter} setFilter={setFilter}
           suggestionPool={suggestionPool}
+        />
+
+        <EnableLiveAITradingBar
+          engineOnline={engineOnline}
+          openPaper={openTrades.length}
+          slotCap={3}
+          onUpgrade={() => setUpgrade(true)}
         />
 
         <OpportunityMatrix
