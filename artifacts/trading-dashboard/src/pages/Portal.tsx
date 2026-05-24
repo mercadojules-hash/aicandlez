@@ -28,8 +28,8 @@ import { Lock, X, Zap } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 import { PortalExchangeConnectModal } from "@/components/PortalExchangeConnectModal";
+import { PortalOperatorPulseBar } from "@/components/PortalOperatorPulseBar";
 import {
-  MarketHeartbeat,
   CryptoSignalsPanel,
   EquitySignalsPanel,
   AIWarRoom,
@@ -4547,10 +4547,17 @@ function PortalInner() {
         <AIWarRoom />
       </div>
 
-      {/* Live cross-asset heartbeat (institutional row) */}
-      <div style={{ padding: "12px 16px 0" }}>
-        <MarketHeartbeat />
-      </div>
+      {/* Operator Pulse — admin-only telemetry strip. Replaces the
+          legacy BTC/ETH/SOL `MarketHeartbeat` placeholder, which was
+          static and low-value. The customer portal renders nothing in
+          this slot (per the customer/admin separation invariant).
+          Component is also defensively admin-gated server-side via
+          requireOperator on /api/admin/top-telemetry. */}
+      {isAdmin && (
+        <div style={{ padding: "12px 16px 0" }}>
+          <PortalOperatorPulseBar />
+        </div>
+      )}
 
       {/* Live AI Execution control — admin-only (Task #157). The customer
           portal is paper-only; the ARM LIVE / per-user live-execution UI is
