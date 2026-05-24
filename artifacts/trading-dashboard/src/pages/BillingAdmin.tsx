@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Activity, AlertTriangle, Banknote, Gift, RefreshCw, Search, ShieldCheck,
-  Wallet, X,
+  Activity, AlertTriangle, Banknote, CheckCircle2, Gift, RefreshCw, Search,
+  ShieldCheck, Wallet, X,
 } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "@/hooks/use-toast";
@@ -221,14 +221,38 @@ function BillingActionDrawer({ userId, onClose, isSuperAdmin }: {
         </div>
 
         {isLoading && (
-          <div className="p-8 text-center text-[11px] font-mono" style={{ color: "#4a6a80" }}>
-            Loading billing snapshot…
+          // P2-AD-03 — skeleton in place of plain "Loading…" text.
+          <div className="p-5 space-y-5 animate-pulse">
+            <div className="grid grid-cols-2 gap-3">
+              {[0, 1, 2, 3].map((k) => (
+                <div key={k} className="rounded border p-4 h-[88px]"
+                  style={{ background: "#010C18", borderColor: "#0d1e2e" }} />
+              ))}
+            </div>
+            <div className="space-y-2">
+              {[0, 1, 2].map((k) => (
+                <div key={k} className="rounded border h-[44px]"
+                  style={{ background: "#010C18", borderColor: "#0d1e2e" }} />
+              ))}
+            </div>
+            <div className="rounded border h-[140px]"
+              style={{ background: "#010C18", borderColor: "#0d1e2e" }} />
           </div>
         )}
         {error && (
+          // P2-AD-03 — retry button on error.
           <div className="m-5 p-4 rounded border text-[11px] font-mono"
             style={{ background: "rgba(255,90,90,0.06)", borderColor: "rgba(255,90,90,0.32)", color: "#FF8A8A" }}>
-            Failed to load: {error instanceof Error ? error.message : "unknown"}
+            <div className="mb-3">
+              Failed to load: {error instanceof Error ? error.message : "unknown"}
+            </div>
+            <button
+              onClick={() => void refetch()}
+              className="px-3 py-1.5 rounded border font-mono text-[10px] uppercase tracking-wider flex items-center gap-2"
+              style={{ background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,90,90,0.32)", color: "#FF8A8A" }}
+            >
+              <RefreshCw className="w-3 h-3" /> Retry
+            </button>
           </div>
         )}
 
@@ -440,6 +464,22 @@ export default function BillingAdmin() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [manualLookup, setManualLookup] = useState("");
 
+  // P2-AD-05 — Cross-nav landing target. Other admin pages
+  // (e.g. CommandCenter → OperatorTelemetryGrid) link here as
+  // /admin/billing?user=<clerkUserId> to open the drawer directly.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const qs = new URLSearchParams(window.location.search);
+    const u  = qs.get("user")?.trim();
+    if (!u) return;
+    if (!/^(user|clerk)_[A-Za-z0-9]{20,}$/.test(u)) return;
+    setSelectedUserId(u);
+    // Strip the param so navigating around the drawer doesn't re-trigger.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("user");
+    window.history.replaceState({}, "", url.toString());
+  }, []);
+
   const filteredHolds = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return queue.data?.holds ?? [];
@@ -505,7 +545,23 @@ export default function BillingAdmin() {
           />
         </div>
         <button
-          onClick={() => { if (manualLookup.trim()) setSelectedUserId(manualLookup.trim()); }}
+          onClick={() => {
+            // P2-AD-02 — validate Clerk id shape before firing the API call.
+            // Clerk Backend ids are `user_<base62>` (typical length ≥ 25).
+            // Accept both `user_` and legacy `clerk_` prefixes defensively.
+            const v = manualLookup.trim();
+            if (!v) return;
+            const ok = /^(user|clerk)_[A-Za-z0-9]{20,}$/.test(v);
+            if (!ok) {
+              toast({
+                title:       "Invalid Clerk user id",
+                description: "Expected format: user_xxxxxxxxxxxxxxxxxxxx (Clerk backend id).",
+                variant:     "destructive",
+              });
+              return;
+            }
+            setSelectedUserId(v);
+          }}
           className="px-4 py-2 rounded font-mono text-[10px] uppercase tracking-wider font-bold"
           style={{ background: "#66FF66", color: "#000" }}
         >
@@ -540,11 +596,40 @@ export default function BillingAdmin() {
             </div>
           )}
           {!queue.isLoading && filteredHolds.length === 0 && (
-            <div className="p-8 text-center text-[11px] font-mono" style={{ color: "#4a6a80" }}>
-              {totals.held === 0
-                ? "No users currently on billing_hold. Operator nothing-to-do is a healthy state."
-                : "No matches for current filter."}
-            </div>
+            // P2-AD-01 — friendly empty state with status graphic for the
+            // healthy zero-holds case; keep terse copy for filter misses.
+            totals.held === 0 ? (
+              <div className="px-6 py-12 flex flex-col items-center text-center gap-3">
+                <div
+                  className="w-14 h-14 rounded-full flex items-center justify-center"
+                  style={{
+                    background:   "rgba(102,255,102,0.08)",
+                    border:       "1px solid rgba(102,255,102,0.35)",
+                    boxShadow:    "0 0 24px rgba(102,255,102,0.18)",
+                  }}
+                >
+                  <CheckCircle2 className="w-7 h-7" style={{ color: "#66FF66" }} />
+                </div>
+                <div className="text-[13px] font-bold font-mono tracking-wider uppercase"
+                  style={{ color: "#66FF66" }}>
+                  All Clear
+                </div>
+                <div className="max-w-[420px] text-[11px] font-mono leading-relaxed"
+                  style={{ color: "#9FB3C8" }}>
+                  No customers are currently on a billing hold. This is a
+                  healthy state — fees are settling, credits are covering,
+                  and live execution is unblocked across the platform.
+                </div>
+                <div className="text-[9px] font-mono tracking-widest uppercase mt-1"
+                  style={{ color: "#4a6a80" }}>
+                  Queue auto-refreshes every 15s
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-[11px] font-mono" style={{ color: "#4a6a80" }}>
+                No matches for current filter.
+              </div>
+            )
           )}
           {filteredHolds.length > 0 && (
             <table className="w-full text-[11px] font-mono">

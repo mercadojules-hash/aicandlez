@@ -924,9 +924,20 @@ function PositionsPanel({ data }: { data: AdminPositionsResponse | undefined }) 
             <div key={r.id} className="grid gap-1 text-[9.5px] tabular-nums py-0.5"
               style={{ gridTemplateColumns: "1fr 50px 40px 60px 60px",
                        fontFamily: N.FONT_MONO, borderTop: `1px solid ${N.BORDER}` }}>
-              <span style={{ color: N.TEXT_1 }} className="truncate">
-                {(r.user_email ?? r.user_id ?? "global").split("@")[0]} · {r.symbol}
-              </span>
+              {/* P2-AD-05 — cross-nav to BillingAdmin drawer when a real
+                  user_id exists. Global/non-attributable rows render plain. */}
+              {r.user_id ? (
+                <a href={`/admin/billing?user=${encodeURIComponent(r.user_id)}`}
+                  className="truncate hover:underline"
+                  style={{ color: N.TEXT_1 }}
+                  title={`Open billing drawer for ${r.user_email ?? r.user_id}`}>
+                  {(r.user_email ?? r.user_id).split("@")[0]} · {r.symbol}
+                </a>
+              ) : (
+                <span style={{ color: N.TEXT_1 }} className="truncate">
+                  global · {r.symbol}
+                </span>
+              )}
               <span className="text-right font-bold"
                 style={{ color: r.side.toLowerCase() === "buy" ? N.LONG : N.SHORT }}>
                 {r.side.toUpperCase()}
@@ -975,9 +986,20 @@ function ClosedTradesPanel({ data }: { data: AdminClosedTradesResponse | undefin
             <div key={r.id} className="grid gap-1 text-[9.5px] tabular-nums py-0.5"
               style={{ gridTemplateColumns: "1fr 40px 40px 70px",
                        fontFamily: N.FONT_MONO, borderTop: `1px solid ${N.BORDER}` }}>
-              <span style={{ color: N.TEXT_1 }} className="truncate">
-                {(r.user_email ?? r.user_id ?? "global").split("@")[0]} · {r.symbol}
-              </span>
+              {/* P2-AD-05 — cross-nav to BillingAdmin drawer when a real
+                  user_id exists. */}
+              {r.user_id ? (
+                <a href={`/admin/billing?user=${encodeURIComponent(r.user_id)}`}
+                  className="truncate hover:underline"
+                  style={{ color: N.TEXT_1 }}
+                  title={`Open billing drawer for ${r.user_email ?? r.user_id}`}>
+                  {(r.user_email ?? r.user_id).split("@")[0]} · {r.symbol}
+                </a>
+              ) : (
+                <span style={{ color: N.TEXT_1 }} className="truncate">
+                  global · {r.symbol}
+                </span>
+              )}
               <span className="text-right font-bold"
                 style={{ color: r.side.toLowerCase() === "buy" ? N.LONG : N.SHORT }}>
                 {r.side.toUpperCase()}

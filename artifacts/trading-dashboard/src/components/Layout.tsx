@@ -8,7 +8,7 @@ import { AdminTopTelemetryBar } from "@/components/AdminTopTelemetryBar";
 // enforces the same gate via requireRole(["admin","super-admin"]).
 const ADMIN_ONLY_PATHS = new Set([
   "/command", "/exchange", "/syscheck", "/debug",
-  "/desktop", "/institutional", "/admin",
+  "/desktop", "/institutional", "/admin", "/admin/billing",
 ]);
 
 // Host-based separation between customer terminal and operator workstation.
@@ -92,6 +92,7 @@ export const MODULE_LIST = [
   { id: 19, path: "/command",     icon: Cpu,               label: "Command Center",      group: "SYS",   status: "active",  sublabel: "Unified one-screen trading view"    },
   { id: 20, path: "/desktop",     icon: Monitor,           label: "Desktop Terminal",    group: "SYS",   status: "active",  sublabel: "Power-user multi-panel trading view"},
   { id: 21, path: "/institutional", icon: Crosshair,       label: "Institutional Terminal", group: "SYS", status: "active", sublabel: "Bloomberg-grade AI command center" },
+  { id: 22, path: "/admin/billing", icon: Wallet,          label: "Billing Operations",  group: "SYS",  status: "active",  sublabel: "Hold queue, credits, waive/restore"  },
 ];
 
 /* Group accent colors */

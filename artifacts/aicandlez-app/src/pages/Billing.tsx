@@ -202,10 +202,43 @@ export default function Billing() {
 
   useEffect(() => {
     const qs = new URLSearchParams(window.location.search);
-    if (qs.get("topup") === "success" || qs.get("outstanding") === "success") {
-      void refetchWallet();
-      void qc.invalidateQueries({ queryKey: ["subscription"] });
-    }
+    const isTopup       = qs.get("topup") === "success";
+    const isOutstanding = qs.get("outstanding") === "success";
+    if (!isTopup && !isOutstanding) return;
+
+    // P1-EX-04 — Webhook ↔ client refetch race. Stripe redirects back to
+    // /billing the moment checkout completes, but the
+    // payment_intent.succeeded webhook (handleCreditTopup /
+    // handleOutstandingPayment in api-server/src/webhookHandlers.ts) lands
+    // in a separate transaction and then calls evaluateAndEnforceBillingHold
+    // post-commit. A single refetch on landing routinely shows stale
+    // outstanding / hold state for 2–8 seconds. Poll wallet every 1s for up
+    // to 12s and stop as soon as the response reflects the payment.
+    void qc.invalidateQueries({ queryKey: ["subscription"] });
+
+    const baseline = wallet?.health;
+    let cancelled = false;
+    let attempts  = 0;
+    const tick = async (): Promise<void> => {
+      if (cancelled) return;
+      attempts += 1;
+      const { data: next } = await refetchWallet();
+      const nh = next?.health;
+      // Stop on any of: status flipped off billing_hold, netOwed dropped
+      // (outstanding payment cleared fees), or credits balance increased
+      // (top-up arrived). Hard cap at 12 attempts (~12s).
+      const stopped =
+        (nh && baseline && (
+          nh.currentStatus !== baseline.currentStatus ||
+          (nh.netOwed ?? 0) < (baseline.netOwed ?? 0) ||
+          (nh.credits ?? 0) > (baseline.credits ?? 0)
+        )) ||
+        attempts >= 12;
+      if (!stopped && !cancelled) setTimeout(() => void tick(), 1000);
+    };
+    void tick();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qc, refetchWallet]);
 
   const topup = useMutation({
