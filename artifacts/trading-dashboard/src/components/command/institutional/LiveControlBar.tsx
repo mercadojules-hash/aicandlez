@@ -102,21 +102,24 @@ export function LiveControlBar({
   // it. ARMED is already eligibility-cleared upstream by the server hook.
   const blocked = !isExecuting && !isArmedRdy && !eligible;
 
-  // Four tonal systems:
+  // Platform visual language (Task #164 — locked):
   //   EXECUTING → orange/gold (hot, actively firing orders)
-  //   ARMED     → neon green   (ready, awaiting signal)
-  //   HALTED    → red          (emergency stop / kill switch)
+  //   ARMED     → orange/gold (live execution armed = live-class state)
+  //   PAPER     → neon green  (simulated mode — ONLY green state)
+  //   HALTED    → red         (emergency stop / kill switch)
   //   STANDBY   → muted neutral (idle, system safe — back-compat)
+  // Rule: ORANGE = any live affordance (armed or executing).
+  // GREEN is reserved for paper/simulated mode only.
   const color =
     isExecuting ? N.GOLD       :
-    isArmedRdy  ? N.BRAND      :
+    isArmedRdy  ? N.GOLD       :
     isPaper     ? N.BRAND      :
     isHalted    ? N.DANGER     :
                   N.TEXT_2;
 
   const colorBrt =
     isExecuting ? N.GOLD_BRT   :
-    isArmedRdy  ? N.BRAND_BRT  :
+    isArmedRdy  ? N.GOLD_BRT   :
     isPaper     ? N.BRAND_BRT  :
     isHalted    ? N.DANGER_BRT :
                   N.TEXT_1;

@@ -43,8 +43,7 @@ export function Pricing() {
             <span style={{ color: "#00ff88" }}>When You Win</span>
           </h2>
           <p style={{ color: "#8892a4", fontSize: 17, maxWidth: 520, margin: "0 auto" }}>
-            No monthly fees. No subscription traps. AICandlez charges a small
-            performance fee — only on profitable trades.
+            AICandlez charges a small performance fee — only on profitable trades.
           </p>
         </div>
 
@@ -146,7 +145,7 @@ export function Pricing() {
               of profitable trade PnL only
             </p>
             <p style={{ color: "#8892a4", fontSize: 14, marginBottom: 28, lineHeight: 1.6 }}>
-              No monthly fee. No subscription. If a trade loses money, you pay nothing. We're aligned with your success.
+              If a trade loses money, you pay nothing. We're aligned with your success.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }}>
               {[
