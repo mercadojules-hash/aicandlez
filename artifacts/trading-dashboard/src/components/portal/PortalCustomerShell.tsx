@@ -229,7 +229,9 @@ function PaperModeBanner() {
 /* Asset Intelligence Search Bar + Filter pills                             */
 /* ──────────────────────────────────────────────────────────────────────── */
 
-type Filt = "ALL" | "MAJORS" | "ALTS" | "HIGH_CONF" | "READY" | "LONG" | "SHORT";
+type Filt =
+  | "ALL" | "MAJORS" | "ALTS" | "HIGH_CONF" | "READY" | "LONG" | "SHORT" | "WATCHLIST"
+  | "LOW_VOL" | "TRENDING" | "BREAKOUT" | "SCALP" | "MOMENTUM";
 
 function SearchBar({
   query, setQuery, filter, setFilter, suggestionPool,
@@ -241,14 +243,20 @@ function SearchBar({
   suggestionPool: string[];
 }) {
   const chips = suggestionPool.slice(0, 14);
-  const pills: { id: Filt; label: string }[] = [
-    { id: "ALL",       label: "All" },
-    { id: "MAJORS",    label: "Majors" },
-    { id: "ALTS",      label: "Alts" },
-    { id: "HIGH_CONF", label: "High Confidence (≥75)" },
-    { id: "READY",     label: "Ready to Execute" },
-    { id: "LONG",      label: "Long Bias" },
-    { id: "SHORT",     label: "Short Bias" },
+  const pills: { id: Filt; label: string; group: 0 | 1 }[] = [
+    { id: "ALL",       label: "All",                   group: 0 },
+    { id: "MAJORS",    label: "Majors",                group: 0 },
+    { id: "ALTS",      label: "Alts",                  group: 0 },
+    { id: "HIGH_CONF", label: "High Confidence (≥75)", group: 0 },
+    { id: "READY",     label: "Ready to Execute",      group: 0 },
+    { id: "LONG",      label: "Long Bias",             group: 0 },
+    { id: "SHORT",     label: "Short Bias",            group: 0 },
+    { id: "WATCHLIST", label: "Watchlist",             group: 0 },
+    { id: "LOW_VOL",   label: "LOW VOL",               group: 1 },
+    { id: "TRENDING",  label: "TRENDING",              group: 1 },
+    { id: "BREAKOUT",  label: "BREAKOUT",              group: 1 },
+    { id: "SCALP",     label: "SCALP",                 group: 1 },
+    { id: "MOMENTUM",  label: "MOMENTUM",              group: 1 },
   ];
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -306,25 +314,40 @@ function SearchBar({
           ))}
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
-          <Filter size={13} color={T.TEXT_2} />
-          {pills.map(p => {
+        <div
+          className="cd-pills-strip"
+          style={{
+            display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 6,
+            overflowX: "auto", overflowY: "hidden",
+            scrollbarWidth: "none",
+          }}
+        >
+          <Filter size={13} color={T.TEXT_2} style={{ flexShrink: 0 }} />
+          {pills.map((p, i, arr) => {
             const active = filter === p.id;
+            const prev = arr[i - 1];
+            const showDivider = !!prev && prev.group !== p.group;
             return (
-              <button
-                key={p.id}
-                onClick={() => setFilter(p.id)}
-                style={{
-                  fontFamily: T.FONT_MONO, fontSize: 10,
-                  padding: "4px 10px",
-                  border: `1px solid ${active ? T.NEON : T.BORDER}`,
-                  background: active ? "rgba(102,255,102,0.05)" : "transparent",
-                  color: active ? T.NEON : T.TEXT_2,
-                  borderRadius: 2, cursor: "pointer",
-                }}
-              >
-                {p.label}
-              </button>
+              <span key={p.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                {showDivider && (
+                  <span aria-hidden style={{ width: 1, height: 14, background: T.BORDER, flexShrink: 0 }} />
+                )}
+                <button
+                  onClick={() => setFilter(p.id)}
+                  style={{
+                    fontFamily: T.FONT_MONO, fontSize: 10,
+                    padding: "4px 10px",
+                    border: `1px solid ${active ? T.NEON : T.BORDER}`,
+                    background: active ? "rgba(102,255,102,0.05)" : "transparent",
+                    color: active ? T.NEON : T.TEXT_2,
+                    borderRadius: 2, cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    boxShadow: active ? "0 0 8px rgba(102,255,102,0.25)" : "none",
+                  }}
+                >
+                  {p.label}
+                </button>
+              </span>
             );
           })}
         </div>
@@ -351,9 +374,10 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
-function OpportunityCard({ opp, onQueue }: {
+function OpportunityCard({ opp, onQueue, idx = 0 }: {
   opp: OpportunityVM;
   onQueue: (opp: OpportunityVM) => void;
+  idx?: number;
 }) {
   const isLong = opp.direction === "LONG";
   const dirColor = isLong ? T.NEON : opp.direction === "SHORT" ? T.RED : T.AMBER;
@@ -362,6 +386,11 @@ function OpportunityCard({ opp, onQueue }: {
   const sparkColor = dirColor;
   const ready = opp.readiness === "READY";
   const railColor = opp.direction === "SHORT" ? T.RED : T.NEON;
+  // v4.1 deterministic per-card animation delays so 20 cards don't sync.
+  const seed = (opp.symbol.charCodeAt(0) + idx * 7) % 100;
+  const flickerDelayMs = (seed * 17) % 1600;
+  const sparkDelayMs   = (seed * 53) % 5000;
+  const sweepDelayMs   = (seed * 113) % 12000;
   const railGlow =
     opp.conf >= 85 ? `0 0 14px ${railColor}` :
     opp.conf >= 70 ? `0 0 10px ${railColor}` :
@@ -427,6 +456,24 @@ function OpportunityCard({ opp, onQueue }: {
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           <ConfidenceRing color={dirColor} value={opp.conf} />
+          {/* v4.1 ring-sweep — single 30° bright arc rotating slowly over static ring. */}
+          <svg
+            aria-hidden
+            width={96} height={96}
+            style={{
+              position: "absolute", inset: 0, pointerEvents: "none",
+              animation: "ring-sweep 12s linear infinite",
+              animationDelay: `-${sweepDelayMs}ms`,
+              transformOrigin: "50% 50%",
+            }}
+          >
+            <circle
+              cx={48} cy={48} r={42} fill="none"
+              stroke={dirColor} strokeWidth={2}
+              strokeDasharray="22 242" strokeLinecap="round"
+              style={{ filter: `drop-shadow(0 0 4px ${dirColor})`, opacity: 0.7 }}
+            />
+          </svg>
           <span style={{
             position: "absolute", inset: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -451,12 +498,17 @@ function OpportunityCard({ opp, onQueue }: {
               ))}
             </div>
             <div style={{ display: "flex", gap: 2 }}>
-              {[1, 2, 3].map(i => (
-                <span key={i} style={{
-                  width: 5, height: 12,
-                  background: i <= opp.momentum ? dirColor : "rgba(255,255,255,0.10)",
-                }} />
-              ))}
+              {[1, 2, 3].map(i => {
+                const lit = i <= opp.momentum;
+                return (
+                  <span key={i} style={{
+                    width: 5, height: 12,
+                    background: lit ? dirColor : "rgba(255,255,255,0.10)",
+                    animation: lit ? "momentum-breathe 3.4s ease-in-out infinite" : undefined,
+                    animationDelay: lit ? `${(i - 1) * 150}ms` : undefined,
+                  }} />
+                );
+              })}
             </div>
           </div>
         </div>
@@ -464,7 +516,21 @@ function OpportunityCard({ opp, onQueue }: {
 
       {/* Sparkline + details row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <Sparkline data={opp.sparkline} color={sparkColor} />
+        <div style={{ position: "relative", width: 80, height: 36 }}>
+          <Sparkline data={opp.sparkline} color={sparkColor} />
+          {/* v4.1 spark-drift scan dot */}
+          <span
+            aria-hidden
+            style={{
+              position: "absolute", top: 16, left: 0,
+              width: 3, height: 3, borderRadius: "50%",
+              background: sparkColor, boxShadow: `0 0 4px ${sparkColor}`,
+              animation: "spark-drift 5s linear infinite",
+              animationDelay: `-${sparkDelayMs}ms`,
+              pointerEvents: "none",
+            }}
+          />
+        </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
           <div style={{ display: "flex", gap: 3 }}>
             {opp.exchanges.map(ex => (
@@ -476,7 +542,11 @@ function OpportunityCard({ opp, onQueue }: {
           </div>
           <span style={{ fontSize: 10, color: T.TEXT_1 }}>{opp.quality}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 10, color: T.TEXT_2 }}>{opp.latency}</span>
+            <span style={{
+              fontSize: 10, color: T.TEXT_2,
+              animation: "telemetry-flicker 1.6s ease-in-out infinite",
+              animationDelay: `-${flickerDelayMs}ms`,
+            }}>{opp.latency}</span>
             <span style={{
               fontSize: 11, background: "rgba(255,255,255,0.08)",
               color: T.TEXT_0, padding: "1px 6px", borderRadius: 2,
@@ -576,28 +646,45 @@ function filterOpps(opps: OpportunityVM[], query: string, filter: Filt): Opportu
       case "READY":     return o.readiness === "READY";
       case "LONG":      return o.direction === "LONG";
       case "SHORT":     return o.direction === "SHORT";
+      // v4.1 expanded filters — derived from existing OpportunityVM fields.
+      case "LOW_VOL":   return o.vol === "LOW VOL";
+      case "TRENDING":  return o.regime === "TRENDING";
+      case "BREAKOUT":  return o.regime === "BREAKOUT";
+      case "SCALP":     return o.readiness === "READY" && (o.regime === "BREAKOUT" || o.regime === "EXHAUSTED");
+      case "MOMENTUM":  return o.momentum === 3;
+      case "WATCHLIST": return true; // watchlist store not yet wired on customer surface — no-op
       default:          return true;
     }
   });
 }
 
-function ColumnHeader({ title, count }: { title: string; count: number }) {
+function ColumnHeader({ title, count, accent, subLabel }: {
+  title: string; count: number; accent: string; subLabel: string;
+}) {
   return (
     <div style={{
-      display: "flex", justifyContent: "space-between", alignItems: "center",
+      display: "flex", flexDirection: "column", gap: 4,
       borderBottom: `1px solid ${T.BORDER}`, paddingBottom: 6,
     }}>
-      <h2 style={{
-        margin: 0, fontFamily: T.FONT_MONO, fontSize: 14, color: T.TEXT_0,
-        display: "inline-flex", alignItems: "center", gap: 8,
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h2 style={{
+          margin: 0, fontFamily: T.FONT_MONO, fontSize: 14, color: T.TEXT_0,
+          display: "inline-flex", alignItems: "center", gap: 8,
+        }}>
+          <Radar size={14} color={accent} /> {title}
+          <span style={{
+            background: "rgba(255,255,255,0.10)", color: T.TEXT_0,
+            fontSize: 10, padding: "1px 6px", borderRadius: 2,
+          }}>{count}</span>
+        </h2>
+        <span style={{ fontSize: 10, color: T.TEXT_2, fontFamily: T.FONT_MONO }}>SORT: CONFIDENCE ↓</span>
+      </div>
+      <span style={{
+        fontFamily: T.FONT_MONO, fontSize: 9, letterSpacing: "0.14em",
+        color: accent, opacity: 0.55,
       }}>
-        <Radar size={14} color={T.NEON} /> {title}
-        <span style={{
-          background: "rgba(255,255,255,0.10)", color: T.TEXT_0,
-          fontSize: 10, padding: "1px 6px", borderRadius: 2,
-        }}>{count}</span>
-      </h2>
-      <span style={{ fontSize: 10, color: T.TEXT_2, fontFamily: T.FONT_MONO }}>SORT: CONFIDENCE ↓</span>
+        {subLabel}
+      </span>
     </div>
   );
 }
@@ -616,19 +703,56 @@ function OpportunityMatrix({
       display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
       gap: 20, position: "relative",
     }}>
-      <Column title="MAJORS" opps={majors} onQueue={onQueue} isLoading={isLoading} isError={isError} />
-      <Column title="ALTS / EMERGING" opps={alts} onQueue={onQueue} isLoading={isLoading} isError={isError} />
+      <Column
+        title="MAJORS"
+        opps={majors}
+        onQueue={onQueue}
+        isLoading={isLoading}
+        isError={isError}
+        accent="#66FF66"
+        subLabel={`TIER 1 · CORE LIQUIDITY · ${majors.length} TRACKED`}
+        tintRgba="rgba(102,255,102,0.015)"
+      />
+      <Column
+        title="ALTS / EMERGING"
+        opps={alts}
+        onQueue={onQueue}
+        isLoading={isLoading}
+        isError={isError}
+        accent="#7CFF00"
+        subLabel={`TIER 2 · EMERGING · HIGH BETA · ${alts.length} TRACKED`}
+        tintRgba="rgba(124,255,0,0.015)"
+        leftDivider
+      />
     </section>
   );
 }
 
-function Column({ title, opps, onQueue, isLoading, isError }: {
+function Column({
+  title, opps, onQueue, isLoading, isError,
+  accent, subLabel, tintRgba, leftDivider = false,
+}: {
   title: string; opps: OpportunityVM[]; onQueue: (opp: OpportunityVM) => void;
   isLoading: boolean; isError: boolean;
+  accent: string; subLabel: string; tintRgba: string; leftDivider?: boolean;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <ColumnHeader title={title} count={opps.length} />
+    <div style={{
+      display: "flex", flexDirection: "column", gap: 14,
+      position: "relative", paddingLeft: 12,
+      backgroundImage: `linear-gradient(180deg, ${tintRgba} 0%, rgba(0,0,0,0) 60%)`,
+      borderLeft: leftDivider ? `1px solid rgba(102,255,102,0.08)` : undefined,
+    }}>
+      <span
+        aria-hidden
+        style={{
+          position: "absolute", left: leftDivider ? 1 : 0, top: 0, bottom: 0,
+          width: 1, background: accent,
+          boxShadow: `0 0 6px ${accent}, 0 0 2px ${accent}`,
+          opacity: 0.55, pointerEvents: "none",
+        }}
+      />
+      <ColumnHeader title={title} count={opps.length} accent={accent} subLabel={subLabel} />
       <div style={{
         display: "flex", flexDirection: "column", gap: 14,
         overflowY: "auto", maxHeight: 1000, paddingRight: 4,
@@ -649,8 +773,8 @@ function Column({ title, opps, onQueue, isLoading, isError }: {
             {isLoading ? "Loading engine signals…" : `No ${title.toLowerCase()} match the current filters.`}
           </div>
         )}
-        {opps.map(o => (
-          <OpportunityCard key={o.pair} opp={o} onQueue={onQueue} />
+        {opps.map((o, idx) => (
+          <OpportunityCard key={o.pair} opp={o} idx={idx} onQueue={onQueue} />
         ))}
       </div>
     </div>
@@ -1224,6 +1348,30 @@ export function PortalCustomerShell() {
           0%   { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
         }
+        /* v4.1 — institutional card micro-animations */
+        @keyframes momentum-breathe {
+          0%   { opacity: 0.70; }
+          50%  { opacity: 1.00; }
+          100% { opacity: 0.70; }
+        }
+        @keyframes spark-drift {
+          0%   { transform: translateX(0px);  opacity: 0; }
+          20%  { opacity: 0.5; }
+          50%  { opacity: 1; }
+          80%  { opacity: 0.5; }
+          100% { transform: translateX(77px); opacity: 0; }
+        }
+        @keyframes ring-sweep {
+          0%   { transform: rotate(-90deg); }
+          100% { transform: rotate(270deg); }
+        }
+        @keyframes telemetry-flicker {
+          0%   { opacity: 0.85; }
+          50%  { opacity: 1.00; }
+          100% { opacity: 0.85; }
+        }
+        /* hide scrollbar on horizontal filter pill strip */
+        .cd-pills-strip::-webkit-scrollbar { display: none; }
       `}</style>
       <OperatorPulseRibbon
         plan={plan}

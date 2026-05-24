@@ -1,0 +1,118 @@
+This is the correct production direction.
+
+CommandDeck v4 is now the primary AI Intelligence Terminal direction.
+
+A few final refinements before graduating into the real /portal:
+
+====================================================
+VISUAL PRIORITIES
+=================
+
+The LEFT neon confidence rails are working extremely well.
+
+Keep them aggressive and alive:
+
+* glow intensity tied to confidence
+* subtle pulse animation
+* brighter on higher conviction setups
+* preserve institutional feel
+
+The neon system is now part of the AICandlez identity.
+
+====================================================
+GLOBAL EXECUTION BAR
+====================
+
+The full-width green command bar is excellent.
+
+Keep:
+
+* full-width layout
+* command-center aesthetic
+* slots telemetry
+* AI engine/system feel
+* glowing green bloom
+
+But:
+
+* customer portal remains PAPER ONLY
+* no live broker execution
+* no ARM LIVE actions
+* informational/status only
+
+====================================================
+OPPORTUNITY GRID REFINEMENT
+===========================
+
+Increase visual separation slightly between:
+
+* MAJORS
+* ALTS / EMERGING
+
+Possibly:
+
+* slightly different glow tint
+* subtle divider
+* section telemetry labels
+
+====================================================
+CARD ENHANCEMENTS
+=================
+
+Each card should feel more “alive.”
+
+Add:
+
+* tiny momentum pulse
+* slight chart animation
+* micro telemetry flicker
+* confidence ring movement
+* live scanner feel
+
+Not gaming/anime.
+Institutional AI workstation energy.
+
+====================================================
+SEARCH / FILTER
+===============
+
+Search section should become a real command strip.
+
+Add:
+
+* search field
+* quick filters
+* LONG only
+* SHORT only
+* HIGH CONFIDENCE
+* LOW VOL
+* TRENDING
+* BREAKOUT
+* SCALP
+* MOMENTUM
+
+Fast institutional filtering feel.
+
+====================================================
+PRODUCTION ARCHITECTURE
+=======================
+
+Proceed with Phase E3:
+
+* decompose Portal.tsx
+* graduate CommandDeck v4 into production
+* modularize into portal components
+* preserve all existing telemetry/data systems
+
+====================================================
+CRYPTO ONLY
+===========
+
+Still locked:
+
+* NO equities
+* NO Alpaca UI references
+* NO TSLA/NVDA/SPY
+* NO stock terminology
+
+Entire terminal is crypto-native now.

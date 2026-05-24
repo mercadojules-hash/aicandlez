@@ -88,13 +88,18 @@ export function CommandDeck() {
     );
   };
 
-  const OpportunityCard = ({ opp }: { opp: any }) => {
+  const OpportunityCard = ({ opp, idx = 0 }: { opp: any; idx?: number }) => {
     const isLong = opp.direction === 'LONG';
     const dirColor = isLong ? 'text-neon-green' : 'text-status-red';
     const dirBg = isLong ? 'bg-neon-green/10 border-neon-green/30' : 'bg-status-red/10 border-status-red/30';
     const sparkColor = isLong ? '#66FF66' : '#FF4D4D';
     const railColor = isLong ? '#66FF66' : '#FF4D4D';
     const conf: number = opp.conf;
+    // Deterministic per-card delays so animations don't sync across cards.
+    const seed = (opp.symbol.charCodeAt(0) + idx) % 10;
+    const flickerDelay = `${(seed * 137) % 1600}ms`;
+    const sparkDelay   = `${(seed * 211) % 5000}ms`;
+    const sweepDelay   = `${(seed * 313) % 12000}ms`;
     const railGlow =
       conf >= 85 ? `0 0 14px ${railColor}` :
       conf >= 70 ? `0 0 10px ${railColor}` :
@@ -132,6 +137,20 @@ export function CommandDeck() {
         <div className="flex items-center gap-4 flex-grow z-10">
           <div className="relative flex flex-col items-center justify-center shrink-0 w-24 h-24">
             <div className="absolute inset-0 glow-ring opacity-30 group-hover:opacity-60 transition-opacity duration-700 pointer-events-none" />
+            {/* v4.1 ring-sweep arc overlay */}
+            <svg
+              className="absolute inset-0 animate-ring-sweep pointer-events-none"
+              width="96" height="96" viewBox="0 0 96 96"
+              style={{ animationDelay: sweepDelay }}
+              aria-hidden
+            >
+              <circle
+                cx="48" cy="48" r="42" fill="none"
+                stroke={railColor} strokeWidth="2"
+                strokeDasharray="22 242" strokeLinecap="round"
+                style={{ filter: `drop-shadow(0 0 4px ${railColor})`, opacity: 0.7 }}
+              />
+            </svg>
             <div className="absolute inset-1 inner-circle flex flex-col items-center justify-center">
               <span className={`text-4xl font-mono font-light tracking-tighter ${dirColor}`}>{opp.conf}</span>
             </div>
@@ -154,7 +173,11 @@ export function CommandDeck() {
                </div>
                <div className="flex items-center gap-0.5">
                  {[1,2,3].map(i => (
-                    <div key={i} className={`w-1.5 h-3 ${i <= opp.momentum ? dirColor.replace('text-', 'bg-') : 'bg-white/10'}`}></div>
+                    <div
+                      key={i}
+                      className={`w-1.5 h-3 ${i <= opp.momentum ? `${dirColor.replace('text-', 'bg-')} animate-momentum-breathe` : 'bg-white/10'}`}
+                      style={i <= opp.momentum ? { animationDelay: `${(i - 1) * 150}ms` } : undefined}
+                    />
                  ))}
                </div>
             </div>
@@ -163,7 +186,21 @@ export function CommandDeck() {
 
         {/* Sparkline & Details */}
         <div className="flex items-end justify-between z-10">
-           {renderSparkline(opp.sparkline, sparkColor)}
+           <div className="relative" style={{ width: 80, height: 36 }}>
+             {renderSparkline(opp.sparkline, sparkColor)}
+             {/* v4.1 spark-drift scan dot */}
+             <span
+               aria-hidden
+               className="absolute animate-spark-drift pointer-events-none"
+               style={{
+                 top: 16, left: 0,
+                 width: 3, height: 3, borderRadius: '50%',
+                 background: sparkColor,
+                 boxShadow: `0 0 4px ${sparkColor}`,
+                 animationDelay: sparkDelay,
+               }}
+             />
+           </div>
            <div className="text-right flex flex-col items-end gap-1">
              <div className="flex gap-1 mb-1">
                {opp.exchanges.map((ex: string) => (
@@ -172,7 +209,10 @@ export function CommandDeck() {
              </div>
              <span className="text-[10px] font-mono text-gray-400">{opp.quality}</span>
              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-gray-500">{opp.latency} · 0.4s</span>
+                <span
+                  className="text-[10px] font-mono text-gray-500 animate-telemetry-flicker"
+                  style={{ animationDelay: flickerDelay }}
+                >{opp.latency} · 0.4s</span>
                 <span className="text-xs font-mono bg-white/10 text-white px-1.5 rounded">{opp.score}</span>
              </div>
            </div>
@@ -307,13 +347,36 @@ export function CommandDeck() {
               ))}
             </div>
             
-            <div className="flex flex-wrap items-center gap-2">
-              <LucideFilter className="w-3.5 h-3.5 text-gray-500" />
-              {['All', 'Majors', 'Alts', 'High Confidence (≥75)', 'Ready to Execute', 'Long Bias', 'Short Bias', 'Watchlist'].map((pill, i) => (
-                <button key={pill} className={`text-[10px] font-mono px-2.5 py-1 border rounded transition-colors ${i === 3 ? 'border-neon-green text-neon-green bg-neon-green/5' : 'border-hairline text-gray-500 hover:border-gray-500'}`}>
-                  {pill}
-                </button>
-              ))}
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-nowrap max-w-full md:max-w-[60%]">
+              <LucideFilter className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              {[
+                { label: 'All', group: 0 },
+                { label: 'Majors', group: 0 },
+                { label: 'Alts', group: 0 },
+                { label: 'High Confidence (≥75)', group: 0, active: true },
+                { label: 'Ready to Execute', group: 0 },
+                { label: 'Long Bias', group: 0 },
+                { label: 'Short Bias', group: 0 },
+                { label: 'Watchlist', group: 0 },
+                { label: 'LOW VOL', group: 1 },
+                { label: 'TRENDING', group: 1 },
+                { label: 'BREAKOUT', group: 1 },
+                { label: 'SCALP', group: 1 },
+                { label: 'MOMENTUM', group: 1 },
+              ].map((pill, i, arr) => {
+                const prev = arr[i - 1];
+                const showDivider = prev && prev.group !== pill.group;
+                return (
+                  <React.Fragment key={pill.label}>
+                    {showDivider && <span className="w-px h-4 bg-hairline shrink-0" aria-hidden />}
+                    <button
+                      className={`text-[10px] font-mono px-2.5 py-1 border rounded transition-colors shrink-0 whitespace-nowrap ${pill.active ? 'border-neon-green text-neon-green bg-neon-green/5 shadow-[0_0_8px_rgba(102,255,102,0.25)]' : 'border-hairline text-gray-500 hover:border-gray-500'}`}
+                    >
+                      {pill.label}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -357,40 +420,69 @@ export function CommandDeck() {
 
         {/* 3. Dynamic AI Opportunity Matrix */}
         <section className="grid grid-cols-1 xl:grid-cols-2 gap-6 relative">
-          {/* Majors Column */}
-          <div className="flex flex-col gap-4">
-             <div className="flex items-center justify-between border-b border-hairline pb-2">
-                <h2 className="text-base font-mono text-white flex items-center gap-2">
-                  <LucideRadar className="w-4 h-4 text-neon-green" />
-                  MAJORS
-                  <span className="bg-white/10 text-white text-[10px] px-1.5 py-0.5 rounded ml-2">10</span>
-                </h2>
-                <span className="text-[10px] font-mono text-gray-500">SORT: CONFIDENCE ↓</span>
+          {/* Majors Column — TIER 1 accent #66FF66 */}
+          <div
+            className="flex flex-col gap-4 pl-3 relative"
+            style={{ backgroundImage: 'linear-gradient(180deg, rgba(102,255,102,0.015) 0%, rgba(102,255,102,0) 60%)' }}
+          >
+             <div
+               aria-hidden
+               className="absolute left-0 top-0 bottom-0 w-px"
+               style={{ background: '#66FF66', boxShadow: '0 0 6px #66FF66, 0 0 2px #66FF66', opacity: 0.55 }}
+             />
+             <div className="flex flex-col gap-1 border-b border-hairline pb-2">
+               <div className="flex items-center justify-between">
+                  <h2 className="text-base font-mono text-white flex items-center gap-2">
+                    <LucideRadar className="w-4 h-4" style={{ color: '#66FF66' }} />
+                    MAJORS
+                    <span className="bg-white/10 text-white text-[10px] px-1.5 py-0.5 rounded ml-2">{MAJOR_OPPS.length}</span>
+                  </h2>
+                  <span className="text-[10px] font-mono text-gray-500">SORT: CONFIDENCE ↓</span>
+               </div>
+               <span className="text-[9px] font-mono tracking-[0.14em]" style={{ color: 'rgba(102,255,102,0.55)' }}>
+                 TIER 1 · CORE LIQUIDITY · {MAJOR_OPPS.length} TRACKED
+               </span>
              </div>
-             
+
              <div className="flex flex-col gap-4 overflow-y-auto h-[1000px] scrollbar-hide pr-2">
                {MAJOR_OPPS.map((opp, idx) => (
-                 <OpportunityCard key={`major-${idx}`} opp={opp} />
+                 <OpportunityCard key={`major-${idx}`} opp={opp} idx={idx} />
                ))}
              </div>
           </div>
 
-          <div className="hidden xl:block absolute top-0 bottom-0 left-1/2 w-[1px] bg-hairline -translate-x-1/2"></div>
+          <div
+            className="hidden xl:block absolute top-0 bottom-0 left-1/2 w-[1px] -translate-x-1/2"
+            style={{ background: 'rgba(102,255,102,0.08)' }}
+          />
 
-          {/* Alts Column */}
-          <div className="flex flex-col gap-4">
-             <div className="flex items-center justify-between border-b border-hairline pb-2">
-                <h2 className="text-base font-mono text-white flex items-center gap-2">
-                  <LucideRadar className="w-4 h-4 text-neon-green" />
-                  ALTS / EMERGING
-                  <span className="bg-white/10 text-white text-[10px] px-1.5 py-0.5 rounded ml-2">10</span>
-                </h2>
-                <span className="text-[10px] font-mono text-gray-500">SORT: CONFIDENCE ↓</span>
+          {/* Alts Column — TIER 2 accent #7CFF00 */}
+          <div
+            className="flex flex-col gap-4 pl-3 relative"
+            style={{ backgroundImage: 'linear-gradient(180deg, rgba(124,255,0,0.015) 0%, rgba(124,255,0,0) 60%)' }}
+          >
+             <div
+               aria-hidden
+               className="absolute left-0 top-0 bottom-0 w-px"
+               style={{ background: '#7CFF00', boxShadow: '0 0 6px #7CFF00, 0 0 2px #7CFF00', opacity: 0.55 }}
+             />
+             <div className="flex flex-col gap-1 border-b border-hairline pb-2">
+               <div className="flex items-center justify-between">
+                  <h2 className="text-base font-mono text-white flex items-center gap-2">
+                    <LucideRadar className="w-4 h-4" style={{ color: '#7CFF00' }} />
+                    ALTS / EMERGING
+                    <span className="bg-white/10 text-white text-[10px] px-1.5 py-0.5 rounded ml-2">{ALT_OPPS.length}</span>
+                  </h2>
+                  <span className="text-[10px] font-mono text-gray-500">SORT: CONFIDENCE ↓</span>
+               </div>
+               <span className="text-[9px] font-mono tracking-[0.14em]" style={{ color: 'rgba(124,255,0,0.55)' }}>
+                 TIER 2 · EMERGING · HIGH BETA · {ALT_OPPS.length} TRACKED
+               </span>
              </div>
-             
-             <div className="flex flex-col gap-4 overflow-y-auto h-[1000px] scrollbar-hide pl-2 xl:pl-0">
+
+             <div className="flex flex-col gap-4 overflow-y-auto h-[1000px] scrollbar-hide pl-0 xl:pl-0">
                {ALT_OPPS.map((opp, idx) => (
-                 <OpportunityCard key={`alt-${idx}`} opp={opp} />
+                 <OpportunityCard key={`alt-${idx}`} opp={opp} idx={idx} />
                ))}
              </div>
           </div>

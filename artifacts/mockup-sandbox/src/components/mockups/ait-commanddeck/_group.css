@@ -65,3 +65,46 @@
 .animate-cmdbar-scan {
   animation: cmdbar-scan 6s linear infinite;
 }
+
+/* v4.1 — institutional micro-animations */
+@keyframes momentum-breathe {
+  0%   { opacity: 0.70; }
+  50%  { opacity: 1.00; }
+  100% { opacity: 0.70; }
+}
+.animate-momentum-breathe {
+  animation: momentum-breathe 3.4s ease-in-out infinite;
+}
+
+@keyframes spark-drift {
+  0%   { transform: translateX(0%);   opacity: 0; }
+  20%  { opacity: 0.5; }
+  50%  { opacity: 1; }
+  80%  { opacity: 0.5; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+.animate-spark-drift {
+  animation: spark-drift 5s linear infinite;
+}
+
+@keyframes ring-sweep {
+  0%   { transform: rotate(-90deg); }
+  100% { transform: rotate(270deg); }
+}
+.animate-ring-sweep {
+  animation: ring-sweep 12s linear infinite;
+  transform-origin: 50% 50%;
+}
+
+@keyframes telemetry-flicker {
+  0%   { opacity: 0.85; }
+  50%  { opacity: 1.00; }
+  100% { opacity: 0.85; }
+}
+.animate-telemetry-flicker {
+  animation: telemetry-flicker 1.6s ease-in-out infinite;
+}
+
+/* hide scrollbar on horizontal filter pill strip */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
