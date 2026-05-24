@@ -1,0 +1,91 @@
+Excellent progress. The architecture is now finally stabilized enough for iterative live UI refinement instead of emergency restructuring.
+
+Key confirmation:
+the admin/customer separation invariant is now cleanly preserved.
+
+Current stable state:
+
+* Portal.tsx = lightweight dispatcher
+* AdminPortalLegacy.tsx = isolated admin monolith
+* PortalCustomerShell.tsx = crypto-only AI terminal shell
+* v4.1 CommandDeck visuals already integrated
+* modal cross-contamination fixed
+* customer surface remains paper-only
+* equities/Alpaca customer leakage scrubbed
+* typecheck + guardrails clean
+
+====================================================
+NEXT PHASE
+==========
+
+Continue evolving the customer AI Intelligence Terminal incrementally.
+
+Focus areas now:
+
+1. Internal decomposition of PortalCustomerShell.tsx
+2. Performance optimization
+3. Animation refinement
+4. Live telemetry enrichment
+5. Search/watchlist intelligence
+6. Responsive behavior tuning
+7. Opportunity-card intelligence depth
+8. Operator-grade polish
+
+====================================================
+IMPORTANT
+=========
+
+Please keep the customer portal LIVE in RePreview while developing.
+
+I want to actively watch:
+
+* layout evolution
+* neon behavior
+* animations
+* telemetry density
+* opportunity-card updates
+* scrolling behavior
+* responsiveness
+* visual hierarchy
+* command strip interactions
+
+as changes are being developed.
+
+Keep the preview continuously accessible during iteration.
+
+====================================================
+VISUAL PRIORITIES
+=================
+
+The following elements are now core identity features and should be protected:
+
+* left neon confidence rails
+* full-width AI execution/status bar
+* CommandDeck density
+* institutional neon glow hierarchy
+* crypto-only IA
+* dynamic opportunity matrix
+* massive AI confidence emphasis
+* alive/scanning terminal feel
+
+====================================================
+ARCHITECTURAL PRIORITIES
+========================
+
+Continue preserving:
+
+* customer/admin separation
+* paper-only customer invariant
+* transport hardening
+* modular portal direction
+* telemetry-driven architecture
+* crypto-native platform identity
+
+====================================================
+GOAL
+====
+
+AICandlez should now evolve toward:
+an institutional AI crypto intelligence operating system — not a standard trading dashboard.
+
+Keep RePreview live during development so I can continuously review iteration quality.
