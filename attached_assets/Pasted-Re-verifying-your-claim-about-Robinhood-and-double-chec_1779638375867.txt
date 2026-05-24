@@ -1,0 +1,139 @@
+Re-verifying your claim about Robinhood (and double-checking Gemini/Uphold credential infra) — I previously said Robinhood was removed but you're asserting it exists. Let me ground-truth that before I expand the RCA.
+
+
+3 actions
+Ground-truth complete. I have to correct part of what you told me — this is important to call out before we design the registry, because building around an incorrect inventory will compound the drift.
+
+Reality Check vs. Your Claimed Inventory
+Exchange	You said	Codebase reality	Action
+Kraken	Live	✅ Adapter + catalog Tier-1 live + operator env keys (KRAKEN_API_KEY/SECRET)	Confirmed
+Coinbase	Live	✅ Adapter + catalog Tier-1 live + COINBASE_API_KEY/SECRET env present	Confirmed
+Crypto.com	Live	✅ Adapter (CryptoDotComAdapter) + catalog Tier-1 live + CRYPTOCOM_API_KEY/SECRET env present	Confirmed
+Binance	Live	✅ Adapter + catalog Tier-1 live + BINANCE_API_KEY/SECRET env present	Confirmed
+Alpaca	Live	✅ Adapter + catalog Tier-1 live + OAuth flow (AlpacaTokenRefresher, AlpacaBrokerProvider)	Confirmed
+Gemini	Live	⚠️ Adapter exists + catalog Tier-2 beta + no env secrets	Real, but currently classed beta
+Robinhood	"API credential infrastructure exists"	❌ No adapter file. No env secrets. Zero credential infrastructure. All 5 "Robinhood" references in the codebase are either compliance-removal comments or a stock ticker in PlatformOverviewPanel.tsx (the HOOD equity row).	Does not exist
+Uphold	Future target	❌ Zero presence in codebase	Future, confirmed
+Simulation/Paper	Non-live	✅ Internal simulator + SANDBOX_SUPPORTED_EXCHANGES set + paper/live tradingMode per connection	Confirmed, already first-class
+Robinhood was deliberately removed for US-compliance reasons — per inline comments in 3 different files (catalog.ts:51, Exchanges.tsx:27, TradeDetailSheet.tsx:27, PortalExchangeConnectModal.tsx:54). It has never had an adapter in this codebase as far as I can see. The HOOD ticker in PlatformOverviewPanel is an equity instrument the platform trades, not a broker it connects to.
+
+Before I expand the registry RCA, please clarify:
+
+Robinhood — Are you (a) asserting we need to build a Robinhood adapter now, (b) misremembering and accepting it stays out for compliance, or (c) referring to some external infrastructure outside this codebase I don't have visibility into?
+Gemini — Promote to Tier-1 live? Adapter is ready; just hasn't been exposed in the customer modal due to the hardcoded-list bug.
+I'll proceed with the rest of the RCA assuming the confirmed 6 live (Alpaca, Kraken, Coinbase, Crypto.com, Binance, Gemini) + Simulation + future Uphold universe. If your answer changes, the registry contract still holds — just the row count shifts.
+
+Expanded Registry RCA (covers your new capability matrix)
+Gap 1 — Status enum is too narrow
+catalog.ts line 39:
+
+status: "live" | "beta" | "coming_soon";
+
+You're asking for: enabled | disabled | beta | coming_soon | admin_only | hidden | region_restricted. These conflate two orthogonal concepts. Cleanest model:
+
+// What the implementation is
+maturity: "live" | "beta" | "experimental" | "coming_soon";
+// Independent boolean flags (each defaults sensibly)
+enabled:           boolean;   // master switch  — false = hide everywhere
+adminOnly:         boolean;   // only admin/super-admin sees + connects
+customerVisible:   boolean;   // shown in customer modal (false = hidden but admin can still see)
+regionRestricted:  string[] | null;  // ["US"] = blocked for US users, null = global
+requiresLiveGate:  boolean;   // honors Task #165 customer paper-only gate
+
+The frontend then derives the displayed state from these. The visual card states you listed (CONNECTED / ACTIVE / AUTH FAILED / DISABLED / COMING SOON / PAPER MODE) are runtime states, not catalog properties — they come from joining catalog × userExchangeConnections × live health probe. Important to separate.
+
+Gap 2 — Single source of truth at runtime exists in backend, frontend never reads it
+Already covered. The catalog endpoint (GET /api/exchanges/catalog) doesn't exist yet — that's the missing seam. Once it does, all 3 frontend hardcoded lists collapse into the same hook.
+
+Gap 3 — "Active exchange" is per-user, already supported, just not surfaced
+Backend reality (userExchanges.ts):
+
+POST /user/exchanges/:exchange/default — set active (line 444)
+POST /user/exchanges/:exchange/mode — paper/live toggle (line 494)
+DELETE /user/exchanges/:exchange — disconnect (line 612)
+userExchangeConnectionsTable.isDefault — DB column already there
+So requirement #4 ("connect several simultaneously, switch active, maintain dormant") is already implemented in the backend. The frontend just doesn't render this state. The new UI you sketched ([✓] Kraken ACTIVE, [✓] Coinbase CONNECTED) is a presentation layer on top of GET /user/exchanges (which already returns it).
+
+Gap 4 — Two parallel "exchange" systems
+(Repeat from prior RCA — important for new registry design.)
+
+System	Source	Used by	Multi-exchange?
+Per-user vault connections	user_exchange_connections DB table	Customer/admin connect modal, paper trading, customer live (when gated on)	✅ Yes (one row per exchange per user)
+Operator process-env adapter	KRAKEN_API_KEY/SECRET env + lib/exchangeEngine.ts::getLiveAdapter()	/admintrade.aicandlez.com operator hero, dashboard LiveAccountPanel, customer-fan-out (when EXCHANGE_LIVE_ENABLED=true)	❌ No — Kraken-only by env
+The "KRAKEN AUTH FAILED" on the admin hero comes from System B, not System A. Even if R1–R3 ship and the modal happily lists 6 exchanges, the operator hero badge will still say KRAKEN because System B is the only path that drives operator-side execution.
+
+This is a real architectural fork and the registry redesign needs to make a decision:
+
+Keep them separate (safe during launch stabilization). Re-label the hero to say "Operator Execution: Kraken" so the conceptual separation is visible. System A serves users; System B serves the platform.
+Unify (post-launch, big rebuild). Admin's personal vault connection becomes the operator execution path. Eliminates env vars. Lets the operator route execution through any exchange. Migration risk: high — exchangeEngine.ts is the hottest path in the system.
+I do not recommend unifying during launch stabilization.
+
+Gap 5 — No catalog-driven runtime health surface
+You asked for "exchange health" / "auth failure counts" / "active exchange counts" for admin telemetry. Today:
+
+Per-connection health: userExchangeConnections.lastError, lastVerifiedAt, status columns ✅ exist
+Per-adapter circuit breakers: /api/adapters/health, /api/adapters/:exchange/health ✅ exist
+Aggregated across users: ❌ does not exist. Needs a new GET /admin/exchanges/telemetry route that joins userExchangeConnections × adapter health × circuit breaker state per catalog ID.
+This is the admin-telemetry slice from your requirement #5.
+
+Updated Capability Matrix → Proposed Registry Shape
+// lib/exchange-registry/src/types.ts  (NEW shared lib)
+export interface ExchangeRegistryEntry {
+  id:                string;          // "Kraken"  — stable identifier
+  name:              string;          // "Kraken"  — display name
+  url:               string;
+  logo:              string;
+  // Maturity (what the implementation is)
+  maturity:          "live" | "beta" | "experimental" | "coming_soon";
+  adapterAvailable:  boolean;
+  // Visibility (where it shows up)
+  enabled:           boolean;
+  customerVisible:   boolean;
+  adminOnly:         boolean;
+  // Capabilities
+  features:          ("spot" | "futures" | "perps" | "defi")[];
+  supportsPaper:     boolean;         // has sandbox/demo mode
+  supportsLive:      boolean;
+  supportsOAuth:     boolean;         // Alpaca-style OAuth vs API key
+  // Compliance
+  regionAllowList:   string[] | null; // null = global; ["US","CA"] = allowed only
+  regionBlockList:   string[] | null; // ["US"] = blocked
+  complianceNote:    string | null;
+  // Connection metadata
+  requiresPassphrase: boolean;
+  requiredPerms:     string;
+  warnings:          string[];
+  // Economics
+  takerFeePct:       number;
+  makerFeePct:       number;
+  rateLimit:         { ordersPerSecond: number; requestsPerMinute: number };
+}
+// Runtime status derived per-user (not in catalog)
+export type ConnectionState =
+  | "not_connected"
+  | "connected"
+  | "active"          // = connected && isDefault
+  | "paper_mode"
+  | "live_mode"
+  | "auth_failed"
+  | "disabled"
+  | "coming_soon";    // catalog maturity === "coming_soon"
+
+Proposed Plan (Revised — supersedes prior R1–R5)
+Phase	Scope	Risk	Bundling
+R1	New shared lib lib/exchange-registry with expanded ExchangeRegistryEntry. Backend catalog.ts rewritten to populate the new shape (no behavior change yet; old fields preserved). GET /api/exchanges/catalog endpoint. useExchangeCatalog() hook.	Low	One project task
+R2	Swap 3 hardcoded frontend lists (PortalExchangeConnectModal, aicandlez-app/Exchanges.tsx, Exchange.tsx) to consume the hook. Fix Portal.tsx:4744 to pass liveExchangesEnabled={isAdmin}. Add the visual states (CONNECTED / ACTIVE / AUTH FAILED / DISABLED / COMING SOON / PAPER MODE) as a derived helper.	Low-Med	One project task; depends on R1
+R3	Multi-exchange "active exchange switcher" UI (uses existing POST /user/exchanges/:exchange/default).	Med	One project task; depends on R2
+R4	Admin telemetry: GET /admin/exchanges/telemetry aggregating per-catalog-id (user count, active count, auth-failed count, circuit-breaker state). New admin sidebar "Exchanges" page.	Med	One project task; depends on R1; can run parallel to R3
+R5	Rename operator hero "KRAKEN AUTH FAILED" → "OPERATOR EXEC: KRAKEN — AUTH FAILED". Pure label change.	Trivial	Fold into R4
+Deferred	Unify System A + System B (operator exec via admin's vault connection)	High	Post-launch only; explicit go-ahead required
+Deferred	Robinhood adapter	High (compliance)	Requires legal/compliance sign-off before any code
+Deferred	Uphold adapter	Low engineering, blocked by your asset-threshold business gate	Build when ready
+Open questions before any code
+Robinhood — confirm path: (a) build adapter, (b) stays out for compliance (my recommendation), (c) external infra I don't see?
+Gemini — promote to Tier-1 live? (catalog change + add to customer-modal default-visible set)
+R5 unification — confirm we hold off and just relabel the operator hero (recommendation: yes hold off)
+CRM (tasks A–E) still queued from earlier — does the registry work (R1–R4) take priority over those, or run in parallel? Recommend: R1 before CRM (so the CRM "exchange" columns are catalog-driven from day one), then CRM A–E can proceed while R2–R4 land.
+Still no code touched. Standing by.
+
+(System reminder noted re: replit.md size — agreed, but holding off until launch stabilization is green, per prior agreement.)
