@@ -45,7 +45,7 @@ import { useUserRole } from "../../hooks/useUserRole";
 import { useDisclaimerGate } from "../../hooks/useDisclaimerGate";
 import {
   AccountModal, UpgradeModal, DisclaimerModal,
-} from "../../pages/portal/AdminPortalLegacy";
+} from "./modals";
 
 const apiBaseUrl: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
