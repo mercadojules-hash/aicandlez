@@ -1,11 +1,12 @@
 import { db } from "@workspace/db";
 import {
+  simPositionsTable,
   userExchangeConnectionsTable,
   userNotificationsTable,
   userSettingsTable,
   usersTable,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { vault } from "../services/vault/CredentialVault.js";
 import { ensureFreshAlpacaCreds } from "../services/exchanges/AlpacaTokenRefresher.js";
 import { hasSandbox, makeAdapter } from "../services/exchanges/adapterFactory.js";
@@ -76,7 +77,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled";
+  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "concurrent_live_cap_reached";
   error?:          string;
 }
 
@@ -102,6 +103,60 @@ export interface LiveUserOrderResult {
 export function isCustomerLiveExecutionEnabled(): boolean {
   return process.env["CUSTOMER_LIVE_EXECUTION_ENABLED"] === "true";
 }
+
+/**
+ * Controlled-beta platform-wide concurrent live-trade ceiling.
+ *
+ * Counts open rows in `sim_positions` where `exchange IS NOT NULL` (i.e. live
+ * customer fills mirrored back into the per-user sim registry). When the
+ * count reaches the cap, every subsequent customer live order — manual or
+ * auto-trade fan-out — is rejected with `concurrent_live_cap_reached`.
+ *
+ * Default = 3 during controlled beta. Operator can ratchet up via env:
+ *   LIVE_EXECUTION_CONCURRENT_CAP=5   (then 10, etc.) without a redeploy.
+ *
+ * Set to `0` to disable the gate entirely (legacy behavior).
+ *
+ * Scope: customer-side only. The operator path (`exchangeEngine.
+ * placeLiveAutoOrder`, no userId) is intentionally NOT gated here — operator
+ * execution on `admintrade.aicandlez.com` runs under separate operational
+ * controls. Admin / super-admin users authenticated on the customer path
+ * also bypass.
+ */
+export const DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP = 3;
+
+export function getLiveExecutionConcurrentCap(): number {
+  const raw = process.env["LIVE_EXECUTION_CONCURRENT_CAP"];
+  if (raw == null || raw === "") return DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP;
+  return Math.floor(n);
+}
+
+async function countOpenLivePositions(): Promise<number> {
+  try {
+    const [row] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(simPositionsTable)
+      .where(isNotNull(simPositionsTable.exchange));
+    return Number(row?.n ?? 0);
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "liveUserExecution: open-live-position count failed — failing open to legacy gates",
+    );
+    return 0;
+  }
+}
+
+// NOTE — gate-0c TOCTOU: the cap check reads `sim_positions` then places the
+// broker order without a reservation; concurrent parallel customer placements
+// (tradingLoop fan-out `Promise.all`, simultaneous manual orders) can each
+// pass a stale count and overshoot the cap by the number of in-flight calls.
+// Bounded at ~N for N concurrent users; acceptable during controlled beta
+// (≤3 users under manual oversight). Hardening — DB-backed reservation
+// primitive (advisory lock / `SELECT … FOR UPDATE` on a counter row) — is a
+// known backlog item to land before widening the cap or scaling user count.
 
 async function isOperatorRole(userId: string): Promise<boolean> {
   try {
@@ -511,6 +566,46 @@ export async function placeLiveAutoOrderForUser(
       logger.warn({ err, userId }, "liveUserExecution: trade-limit log insert failed");
     }
     return { success: false, userId, errorCode: "trade_limit_exhausted", error: msg };
+  }
+
+  // 0c. Controlled-beta concurrent live-trade ceiling (platform-wide).
+  // Counts open `sim_positions` with `exchange IS NOT NULL` across all users
+  // — this mirrors how operator telemetry counts "open live positions". When
+  // the count reaches the cap, every subsequent customer live order
+  // (manual + trading-loop fan-out) is rejected. Admin / super-admin bypass
+  // so operator tooling that happens to authenticate as a real user is
+  // unaffected. `0` disables the gate.
+  const concurrentCap = getLiveExecutionConcurrentCap();
+  if (concurrentCap > 0) {
+    const operator = await isOperatorRole(userId);
+    if (!operator) {
+      const openLive = await countOpenLivePositions();
+      if (openLive >= concurrentCap) {
+        const msg = `Platform live-execution capacity reached (${openLive}/${concurrentCap} concurrent live trades) — controlled-beta limit`;
+        await emitFailureNotification(userId, symbol, side, msg);
+        executionStreamBus.emitEvent({
+          type:     "order_rejected",
+          severity: "warn",
+          symbol, side, mode: "live",
+          gate:     "concurrent_live_cap_reached",
+          reason:   "concurrent_live_cap_reached",
+          message:  msg,
+          details:  { userId, openLive, concurrentCap },
+        });
+        try {
+          await db.insert(logsTable).values({
+            id:      crypto.randomUUID(),
+            type:    "trade",
+            level:   "warn",
+            message: `[concurrent_live_cap_reached] ${msg}`,
+            details: { userId, symbol, side, openLive, concurrentCap, errorCode: "concurrent_live_cap_reached" },
+          });
+        } catch (err) {
+          logger.warn({ err, userId }, "liveUserExecution: concurrent-cap log insert failed");
+        }
+        return { success: false, userId, errorCode: "concurrent_live_cap_reached", error: msg };
+      }
+    }
   }
 
   // 1. Resolve default live connection

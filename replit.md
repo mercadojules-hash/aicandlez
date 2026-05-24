@@ -384,6 +384,34 @@ git history.
 
 ---
 
+## Controlled-beta operational mode (current)
+
+- **Platform-wide concurrent live-trade cap: 3** (customer side).
+  Enforced in `placeLiveAutoOrderForUser` (gate 0c, after status + trade-limit
+  gates, before connection resolution). Counts open `sim_positions` with
+  `exchange IS NOT NULL` across all users; admin / super-admin bypass. The
+  operator path (`exchangeEngine.placeLiveAutoOrder`, no userId) is not
+  gated here — `admintrade.aicandlez.com` runs under separate operational
+  controls.
+- Rejected orders surface `errorCode: "concurrent_live_cap_reached"` and a
+  user-visible notification, plus an `executionStreamBus` `order_rejected`
+  event + a `logs` row tagged `[concurrent_live_cap_reached]`.
+- Ratchet up without a redeploy by setting env
+  `LIVE_EXECUTION_CONCURRENT_CAP` (e.g. `5`, then `10`, etc.). `0` disables
+  the gate entirely. Default = `DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP = 3`
+  in `liveUserExecution.ts`.
+- Scaling discipline: only widen the cap after observing stable queue
+  behavior, Kraken pacing, telemetry sync, and billing flow under the
+  current ceiling.
+- **Known TOCTOU race (acceptable at this scale):** the gate reads
+  `sim_positions` then places the broker order without a reservation, so
+  N concurrent customer placements can each pass a stale count and overshoot
+  by up to N−1. Bounded by user count (≤3 under manual oversight during
+  controlled beta). Before widening the cap or scaling onboarding,
+  harden with a DB-backed reservation primitive (advisory lock or
+  `SELECT … FOR UPDATE` on a counter row). Inline note lives next to
+  `countOpenLivePositions` in `liveUserExecution.ts`.
+
 ## On-call procedure (P0-01 mitigation — Option B)
 
 `forceRestoreBilling` and `waiveAllPendingFees` are super-admin only by
