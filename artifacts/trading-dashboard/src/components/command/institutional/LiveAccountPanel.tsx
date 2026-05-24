@@ -141,7 +141,7 @@ export function LiveAccountPanel({ engine, exchangeStatus, liveBalance, trades }
               boxShadow:  isLive ? `0 0 8px ${N.LONG}40` : isError ? `0 0 8px ${N.SHORT}40` : "none",
               fontFamily: N.FONT_MONO,
             }}>
-            {isLive ? "● LIVE" : isError ? "▲ KRAKEN AUTH FAILED" : "○ STANDBY"}
+            {isLive ? "● LIVE" : isError ? "▲ OPERATOR EXEC · KRAKEN · AUTH FAILED" : "○ STANDBY"}
           </span>
         </div>
         <div className="flex items-center gap-2 text-[8.5px] tracking-[0.18em] font-semibold"
@@ -164,7 +164,7 @@ export function LiveAccountPanel({ engine, exchangeStatus, liveBalance, trades }
           fontFamily: N.FONT_MONO,
           color: N.SHORT,
         }} className="text-[9.5px] font-bold tracking-[0.18em]">
-          ▲ KRAKEN ACCOUNT TELEMETRY UNAVAILABLE — {errorMsg ?? "auth failed"}
+          ▲ OPERATOR EXEC · KRAKEN ACCOUNT TELEMETRY UNAVAILABLE — {errorMsg ?? "auth failed"}
         </div>
       )}
 

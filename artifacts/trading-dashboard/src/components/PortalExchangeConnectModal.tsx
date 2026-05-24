@@ -43,23 +43,70 @@ const N = {
   FONT_SANS:  "'SF Pro Display','Inter',system-ui,-apple-system,sans-serif",
 };
 
+// R1 (exchange registry unification) — the modal no longer hardcodes the
+// supported-exchange list. Provider list is hydrated from the backend
+// `EXCHANGE_CATALOG` (via `GET /api/exchanges/catalog`) and joined with
+// per-user connection state from `GET /api/user/exchanges`. The picker is
+// therefore the same single source of truth as admin telemetry, customer
+// telemetry, and the connect endpoint validator.
 interface Exchange {
   id:               string;
   name:             string;
   logo:             string;
   needsPassphrase?: boolean;
+  /** Registry-level status ("live" | "beta" | "coming_soon"). */
+  status:           "live" | "beta" | "coming_soon" | "simulation";
+  /** Connect flow disabled (coming_soon, or simulation pseudo-entry). */
+  disabled?:        boolean;
+  /** Tooltip / sub-label rendered next to a disabled tile. */
+  comingSoonNote?:  string;
+  /** Live capability (requires admin or live-trading grant to connect). */
+  requiresLiveGate?: boolean;
+  /** Per-user state — only set after merge with /api/user/exchanges. */
+  connected?:       boolean;
+  /** True when this is the user's currently-active default exchange. */
+  isActive?:        boolean;
+  /** Connection trading mode ("paper" | "live") when connected. */
+  tradingMode?:     string;
 }
-// Supported live-trading exchanges. Order matches the onboarding catalog
-// (Alpaca first = primary recommendation for US users). OKX / KuCoin / Bybit /
-// Robinhood are deliberately omitted for US-compliance reasons — see
-// artifacts/api-server/src/services/exchanges/catalog.ts header comment.
-const EXCHANGES: Exchange[] = [
-  { id: "Alpaca",       name: "Alpaca",      logo: "A" },
-  { id: "Kraken",       name: "Kraken",      logo: "K" },
-  { id: "Coinbase",     name: "Coinbase",    logo: "C" },
-  { id: "CryptoDotCom", name: "Crypto.com",  logo: "ᶜ" },
-  { id: "Binance",      name: "Binance",     logo: "B" },
-];
+
+// Customer portal default-visible exchanges (no admin grant needed). Every
+// other catalog entry is rendered as "LIVE GATED" (disabled) for customers
+// until `liveExchangesEnabled=true` is passed by the host. Admin/operator
+// portal mounts the modal with `liveExchangesEnabled={isAdmin}` so all live
+// and beta tiles unlock there.
+//
+// Alpaca: primary US-friendly onboarding path (paper + brokerage).
+// Coming-soon (Robinhood, dYdX, Hyperliquid) tiles are always visible but
+// disabled by their `status === "coming_soon"` branch — they do not need to
+// appear here.
+const CUSTOMER_DEFAULT_VISIBLE_IDS = new Set<string>(["Alpaca"]);
+
+// Simulation/paper trading is always available — modelled as a virtual
+// catalog entry so it renders alongside real exchanges with the same UI
+// affordances (CONNECTED badge, ACTIVE highlight). It is NOT in
+// EXCHANGE_CATALOG (no adapter, no credentials), and the picker click
+// handler skips the connect form for this entry.
+const SIMULATION_ENTRY: Exchange = {
+  id:        "Simulation",
+  name:      "Simulation",
+  logo:      "S",
+  status:    "simulation",
+  disabled:  false,
+  connected: true,
+  comingSoonNote: "Always available · no credentials · paper trading only",
+};
+
+// Backend catalog row shape (subset — matches EXCHANGE_CATALOG).
+type CatalogRow = {
+  id:               string;
+  name:             string;
+  status:           "live" | "beta" | "coming_soon";
+  requiresPassphrase?: boolean;
+  customerVisible?: boolean;
+  adminOnly?:       boolean;
+  comingSoonNote?:  string;
+};
 
 // Exchanges that ship a no-risk demo-trading surface we can opt into at
 // connect time. Currently empty — kept as an extension surface (e.g. if
@@ -95,28 +142,45 @@ type ConnectedRow = {
 };
 
 export function PortalExchangeConnectModal({ open, onClose, preselectedExchange, liveExchangesEnabled = false, onConnected }: Props) {
-  // Task #165 — when liveExchangesEnabled is false (customer default), show
-  // Alpaca-only. Live exchanges (Kraken / Coinbase / Crypto.com / Binance)
-  // unlock when admin grants live trading permission OR when caller passes
-  // liveExchangesEnabled=true explicitly. Preselected exchange always wins.
-  const visibleExchanges = liveExchangesEnabled || preselectedExchange
-    ? EXCHANGES
-    : EXCHANGES.filter((e) => e.id === "Alpaca");
   const { getToken } = useAuth();
   const qc           = useQueryClient();
-  const initialPick = preselectedExchange
-    ? (EXCHANGES.find(e => e.id === preselectedExchange) ?? EXCHANGES[0])
-    : EXCHANGES[0];
-  const [picked,     setPicked]     = useState<Exchange>(initialPick);
+
+  // R1 — catalog hydrated from backend (single source of truth).
+  // Public endpoint, no auth required.
+  const { data: catalogData } = useQuery<{ exchanges: CatalogRow[] }>({
+    queryKey:  ["exchanges-catalog"],
+    queryFn:   async () => {
+      const r = await authFetch("/api/exchanges/catalog", { credentials: "include" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
+    enabled:   open,
+    staleTime: 5 * 60_000,
+    retry:     false,
+  });
+
+  // Bootstrap fallback (used only on first render before catalog query resolves
+  // — prevents picker from being empty / `picked` from being undefined). Mirrors
+  // the Tier-1 live set + Robinhood + Simulation to avoid a visible flash.
+  const FALLBACK_CATALOG: CatalogRow[] = [
+    { id: "Alpaca",       name: "Alpaca",      status: "live" },
+    { id: "Kraken",       name: "Kraken",      status: "live" },
+    { id: "Coinbase",     name: "Coinbase",    status: "live" },
+    { id: "CryptoDotCom", name: "Crypto.com",  status: "live" },
+    { id: "Binance",      name: "Binance",     status: "live" },
+    { id: "Gemini",       name: "Gemini",      status: "live" },
+    { id: "Robinhood",    name: "Robinhood",   status: "coming_soon",
+      comingSoonNote: "Integration in progress — pending compliance review" },
+  ];
+  const catalog = catalogData?.exchanges ?? FALLBACK_CATALOG;
   const [disconnecting,    setDisconnecting]    = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnectError,   setDisconnectError]   = useState<string | null>(null);
   const [disconnectDone,    setDisconnectDone]    = useState(false);
 
   // Live connection status so the modal can flip its CTA from "Connect" to
-  // "Disconnect" when the picked exchange (typically Alpaca preselected from
-  // the Profile / Connected Accounts surface) is already linked. Mirrors the
-  // PWA Profile disconnect flow and the dashboard Settings.tsx delete handler.
+  // "Disconnect" when the picked exchange is already linked, and so the
+  // picker can render CONNECTED / ACTIVE badges per tile.
   const { data: exchangesData } = useQuery<{ exchanges: ConnectedRow[] }>({
     queryKey:  ["user-exchanges"],
     queryFn:   async () => {
@@ -132,16 +196,95 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
     staleTime: 15_000,
     retry:     false,
   });
+
+  // R1 — derive picker rows by joining catalog × connection state. Order:
+  //   1. Catalog order (Alpaca, Kraken, Coinbase, Crypto.com, Binance, Gemini, …)
+  //   2. Robinhood (coming_soon, disabled)
+  //   3. Simulation pseudo-entry (always last; never connectable, always "available")
+  // Gating:
+  //   • Customer (liveExchangesEnabled=false, no preselection): Alpaca, Robinhood,
+  //     Simulation enabled; LIVE_GATED_IDS rendered disabled with
+  //     "REQUIRES LIVE TRADING ACCESS" sub-label.
+  //   • Admin/preselection: every tile enabled (except registry coming_soon).
+  const allExchanges: Exchange[] = (() => {
+    const rows: Exchange[] = catalog
+      .filter(c => !c.adminOnly || liveExchangesEnabled)
+      .filter(c => c.customerVisible !== false || liveExchangesEnabled)
+      .map(c => {
+        const conn = exchangesData?.exchanges?.find(e => e.exchange === c.id) ?? null;
+        const isComingSoon = c.status === "coming_soon";
+        // R1 — every catalog row is "live gated" for customers EXCEPT the
+        // default-visible allowlist (Alpaca) and coming_soon registry tiles
+        // (handled separately). Beta exchanges (GateIO, Bitget, MEXC, HTX,
+        // Bitstamp, Phemex, BloFin, BingX) therefore stay disabled for
+        // non-admin customers — fixing R1 architect-flagged regression where
+        // they would otherwise be selectable + submittable to /connect.
+        const requiresLiveGate = !isComingSoon && !CUSTOMER_DEFAULT_VISIBLE_IDS.has(c.id);
+        const gatedForCustomer = requiresLiveGate
+          && !liveExchangesEnabled
+          && preselectedExchange !== c.id;
+        return {
+          id:               c.id,
+          name:             c.name,
+          // Single-letter sigil fallback for tiles (mirrors the original
+          // EXCHANGES[].logo affordance until brand SVGs are wired up).
+          logo:             c.name.charAt(0).toUpperCase(),
+          needsPassphrase:  !!c.requiresPassphrase,
+          status:           c.status,
+          disabled:         isComingSoon || gatedForCustomer,
+          comingSoonNote:   isComingSoon
+            ? (c.comingSoonNote ?? "Coming soon")
+            : gatedForCustomer
+              ? "Requires live trading access"
+              : undefined,
+          requiresLiveGate,
+          connected:        !!conn?.connected,
+          isActive:         !!(conn?.connected && (conn as { connection?: { isDefault?: boolean } | null }).connection?.isDefault),
+          tradingMode:      conn?.connection?.tradingMode ?? undefined,
+        };
+      });
+    rows.push({ ...SIMULATION_ENTRY });
+    return rows;
+  })();
+
+  // Connectable subset used by the initial-pick + reset logic. Excludes
+  // disabled tiles (coming_soon, gated) and the Simulation pseudo-entry,
+  // which all have no credential form.
+  const connectableExchanges = allExchanges.filter(e => !e.disabled && e.status !== "simulation");
+  const visibleExchanges     = allExchanges;
+
+  const fallbackPick: Exchange = connectableExchanges[0]
+    ?? allExchanges[0]
+    ?? { id: "Alpaca", name: "Alpaca", logo: "A", status: "live" };
+  const [picked, setPicked] = useState<Exchange>(() => {
+    if (preselectedExchange) {
+      const m = allExchanges.find(e => e.id === preselectedExchange);
+      if (m && !m.disabled && m.status !== "simulation") return m;
+    }
+    return fallbackPick;
+  });
+
+  // Keep `picked` referentially fresh against the latest catalog/connection
+  // merge so the picker tile state (CONNECTED / ACTIVE badges) stays in sync.
+  useEffect(() => {
+    const fresh = allExchanges.find(e => e.id === picked.id);
+    if (fresh && fresh !== picked
+        && (fresh.connected !== picked.connected || fresh.isActive !== picked.isActive)) {
+      setPicked(fresh);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogData, exchangesData]);
+
   const pickedConn = exchangesData?.exchanges?.find(e => e.exchange === picked.id && e.connected) ?? null;
   // `useState(initialPick)` only fires on mount, so a later `preselectedExchange`
   // change (e.g., re-entering the connect step with a different lock) would
   // be silently ignored. Sync via effect.
   useEffect(() => {
     if (!preselectedExchange) return;
-    const next = EXCHANGES.find(e => e.id === preselectedExchange);
-    if (next && next.id !== picked.id) setPicked(next);
-    // We intentionally don't depend on `picked` to avoid fighting user changes
-    // after the lock — when a preselection arrives, we honor it once.
+    const next = allExchanges.find(e => e.id === preselectedExchange);
+    if (next && !next.disabled && next.status !== "simulation" && next.id !== picked.id) {
+      setPicked(next);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preselectedExchange]);
   const [label,      setLabel]      = useState("");
@@ -163,7 +306,7 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
   if (!open) return null;
 
   const reset = () => {
-    setPicked(EXCHANGES[0]); setLabel(""); setApiKey(""); setApiSecret("");
+    setPicked(fallbackPick); setLabel(""); setApiKey(""); setApiSecret("");
     setPassphrase(""); setDemoMode(false); setError(null); setSuccess(false);
     setSubmitting(false);
     setConfirmDisconnect(false); setDisconnecting(false);
@@ -512,32 +655,91 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
               marginBottom: 16,
             }}>
               {visibleExchanges.map((ex) => {
-                const isSel = ex.id === picked.id;
+                const isSel        = ex.id === picked.id;
+                const isComingSoon = ex.status === "coming_soon";
+                const isSim        = ex.status === "simulation";
+                const isActive     = !!ex.isActive;
+                const isConnected  = !!ex.connected;
+                const isDisabled   = !!ex.disabled || submitting;
+
+                // Status-driven theming (preserves institutional neon).
+                const ring = isActive
+                  ? "rgba(102,255,102,0.95)"
+                  : isSel
+                    ? N.BRAND
+                    : isConnected
+                      ? "rgba(102,255,102,0.55)"
+                      : isComingSoon
+                        ? "rgba(255,200,80,0.32)"
+                        : N.BORDER;
+                const bg = isSel
+                  ? `linear-gradient(160deg, rgba(102,255,102,0.18) 0%, rgba(0,200,83,0.10) 100%)`
+                  : isActive
+                    ? `linear-gradient(160deg, rgba(102,255,102,0.12) 0%, rgba(0,200,83,0.06) 100%)`
+                    : isComingSoon
+                      ? "rgba(255,200,80,0.04)"
+                      : "rgba(255,255,255,0.03)";
+                const badge = isComingSoon
+                  ? { text: "COMING SOON", color: "rgba(255,200,80,0.95)" }
+                  : isActive
+                    ? { text: "● ACTIVE",   color: N.BRAND }
+                    : isConnected
+                      ? { text: "CONNECTED", color: "rgba(102,255,102,0.85)" }
+                      : isSim
+                        ? { text: "PAPER", color: N.BRAND_DEEP }
+                        : ex.requiresLiveGate && ex.disabled
+                          ? { text: "LIVE GATED", color: "rgba(255,200,80,0.85)" }
+                          : null;
+
                 return (
                   <button
                     key={ex.id}
                     type="button"
-                    onClick={() => { setPicked(ex); setError(null); }}
-                    disabled={submitting}
+                    onClick={() => {
+                      if (isDisabled || isSim) return;
+                      setPicked(ex);
+                      setError(null);
+                    }}
+                    disabled={isDisabled || isSim}
+                    title={ex.comingSoonNote ?? ex.name}
+                    aria-label={`${ex.name}${badge ? ` (${badge.text.replace(/[●·]/g, "").trim()})` : ""}`}
                     style={{
-                      padding: "14px 10px",
+                      position: "relative",
+                      padding: "14px 8px 18px",
                       borderRadius: 9,
-                      background: isSel
-                        ? `linear-gradient(160deg, rgba(102,255,102,0.18) 0%, rgba(0,200,83,0.10) 100%)`
-                        : "rgba(255,255,255,0.03)",
-                      border: `1.5px solid ${isSel ? N.BRAND : N.BORDER}`,
-                      color: isSel ? "#FFFFFF" : N.TEXT_0,
-                      fontFamily: N.FONT_SANS, fontSize: 15, fontWeight: 800,
+                      background: bg,
+                      border: `1.5px solid ${ring}`,
+                      color: isComingSoon
+                        ? "rgba(255,220,160,0.85)"
+                        : isSel
+                          ? "#FFFFFF"
+                          : N.TEXT_0,
+                      fontFamily: N.FONT_SANS, fontSize: 13.5, fontWeight: 800,
                       letterSpacing: -0.2,
-                      cursor: submitting ? "not-allowed" : "pointer",
+                      opacity: isComingSoon || (ex.disabled && !isSim) ? 0.72 : 1,
+                      cursor: isDisabled || isSim ? "not-allowed" : "pointer",
                       boxShadow: isSel
                         ? `0 0 28px ${N.BRAND_GLOW}, 0 0 0 1px ${N.BRAND}55 inset`
-                        : "none",
-                      textShadow: isSel ? `0 0 14px ${N.BRAND_GLOW}` : "none",
+                        : isActive
+                          ? `0 0 18px ${N.BRAND_GLOW}`
+                          : "none",
+                      textShadow: isSel || isActive ? `0 0 14px ${N.BRAND_GLOW}` : "none",
                       transition: "all 120ms ease",
+                      textAlign: "center",
                     }}
                   >
-                    {ex.name.toUpperCase()}
+                    <div style={{ lineHeight: 1.15 }}>{ex.name.toUpperCase()}</div>
+                    {badge && (
+                      <div style={{
+                        position: "absolute",
+                        bottom: 4, left: 0, right: 0,
+                        fontFamily: N.FONT_MONO, fontSize: 7.5, fontWeight: 900,
+                        letterSpacing: "0.14em", color: badge.color,
+                        textShadow: isActive ? `0 0 8px ${N.BRAND_GLOW}` : "none",
+                      }}>
+                        {badge.text}
+                      </div>
+                    )}
                   </button>
                 );
               })}

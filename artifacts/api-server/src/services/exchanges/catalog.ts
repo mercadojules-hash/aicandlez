@@ -34,13 +34,27 @@ export interface ExchangeCatalogEntry {
   /**
    * live         → adapter fully implemented and in production use
    * beta         → adapter implemented, public + private endpoints work, not yet battle-tested
-   * coming_soon  → adapter scaffolded; exchange requires non-API-key auth (wallet signing, etc.)
+   * coming_soon  → adapter not built yet OR exchange requires non-API-key auth (wallet signing, etc.)
    */
   status: "live" | "beta" | "coming_soon";
   /** Exchange feature set */
   features: ("spot" | "futures" | "perps" | "defi")[];
   /** true when an adapter class exists in the registry */
   adapterAvailable: boolean;
+  /**
+   * Forward-compatibility flags (R1 — exchange registry unification).
+   * Optional so existing consumers continue working unchanged.
+   *
+   * - customerVisible: shown in customer-portal modal (default true).
+   *   Set false to hide from the customer registry entirely (e.g.,
+   *   admin-only Tier-2 beta exchanges).
+   * - adminOnly: only shown to admin/super-admin role (default false).
+   * - comingSoonNote: rendered next to the COMING SOON badge to explain
+   *   why connect is disabled (compliance review, wallet signing, etc.).
+   */
+  customerVisible?: boolean;
+  adminOnly?:       boolean;
+  comingSoonNote?:  string;
 }
 
 export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
@@ -48,9 +62,13 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
   //
   // Order here = display order in onboarding UIs. Alpaca is listed first
   // because it is the primary recommended path for new live users (US-friendly,
-  // instant brokerage onboarding via alpaca.markets). Robinhood, OKX, KuCoin,
-  // and Bybit were intentionally removed for US-compliance reasons; do not
-  // re-add without a live, vetted adapter and a fresh compliance review.
+  // instant brokerage onboarding via alpaca.markets). OKX, KuCoin, and Bybit
+  // were intentionally removed for US-compliance reasons; do not re-add
+  // without a live, vetted adapter and a fresh compliance review.
+  //
+  // Robinhood is listed in Tier-3 (coming_soon) below — registry-visible per
+  // R1 product decision, but adapter is not built (compliance review for
+  // unattended-trading via Robinhood API has not been completed).
 
   {
     id: "Alpaca", name: "Alpaca", url: "https://alpaca.markets", logo: "alpaca",
@@ -112,6 +130,21 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
     rateLimit: { ordersPerSecond: 10, requestsPerMinute: 1200 },
     status: "live", features: ["spot", "futures", "perps"], adapterAvailable: true,
   },
+  {
+    // Promoted to Tier-1 live in R1 (was Tier-2 beta). Adapter has been
+    // production-stable; exposing in the customer registry alongside Kraken,
+    // Coinbase, Crypto.com, Binance, Alpaca.
+    id: "Gemini", name: "Gemini", url: "https://www.gemini.com", logo: "gemini",
+    requiresPassphrase: false,
+    requiredPerms: "Trader (read + order)",
+    warnings: [
+      "Do NOT grant Fund Manager or Auditor roles.",
+      "Create a Primary API key with Trader scope only.",
+    ],
+    takerFeePct: 0.35, makerFeePct: 0.20,
+    rateLimit: { ordersPerSecond: 5, requestsPerMinute: 300 },
+    status: "live", features: ["spot"], adapterAvailable: true,
+  },
 
   // ── Tier 2 — Beta (implemented, not yet battle-tested) ─────────────────────
 
@@ -164,18 +197,7 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
     rateLimit: { ordersPerSecond: 10, requestsPerMinute: 600 },
     status: "beta", features: ["spot", "futures"], adapterAvailable: true,
   },
-  {
-    id: "Gemini", name: "Gemini", url: "https://www.gemini.com", logo: "gemini",
-    requiresPassphrase: false,
-    requiredPerms: "Trader (read + order)",
-    warnings: [
-      "Do NOT grant Fund Manager or Auditor roles.",
-      "Create a Primary API key with Trader scope only.",
-    ],
-    takerFeePct: 0.35, makerFeePct: 0.20,
-    rateLimit: { ordersPerSecond: 5, requestsPerMinute: 300 },
-    status: "beta", features: ["spot"], adapterAvailable: true,
-  },
+  // Gemini was here (Tier-2 beta) — promoted to Tier-1 live above in R1.
   {
     id: "Bitstamp", name: "Bitstamp", url: "https://www.bitstamp.net", logo: "bitstamp",
     requiresPassphrase: false,
@@ -225,8 +247,35 @@ export const EXCHANGE_CATALOG: ExchangeCatalogEntry[] = [
     status: "beta", features: ["spot", "perps"], adapterAvailable: true,
   },
 
-  // ── Tier 3 — Coming Soon (requires wallet / non-API-key authentication) ──────
+  // ── Tier 3 — Coming Soon (registry-visible, not yet connectable) ─────────────
+  //
+  // These appear in the customer + admin exchange registry so users see the
+  // full provider roadmap. The connect flow is gated by `CONNECTABLE_EXCHANGE_IDS`
+  // (status !== "coming_soon"), so any attempt to POST /user/exchanges/connect
+  // with one of these IDs returns 400. The frontend modal renders these as
+  // disabled cards with a COMING SOON badge.
 
+  {
+    // Registry-visible Tier-1 provider per R1 product decision. Adapter has
+    // not been built — Robinhood unattended-trading via their public API
+    // requires a compliance review that has not been completed. Keeping it
+    // on the registry surface (and out of CONNECTABLE_EXCHANGE_IDS) provides
+    // forward-compatible product UX without introducing premature compliance
+    // or adapter risk. Promote by changing status to "live" + adding adapter
+    // + setting adapterAvailable: true once compliance work lands.
+    id: "Robinhood", name: "Robinhood", url: "https://robinhood.com", logo: "robinhood",
+    requiresPassphrase: false,
+    requiredPerms: "Trade (read + order) — pending unattended-trading review",
+    warnings: [
+      "Robinhood integration is in progress — connect flow disabled.",
+      "Promotion requires Robinhood unattended-trading compliance review.",
+    ],
+    takerFeePct: 0.00, makerFeePct: 0.00,
+    rateLimit: { ordersPerSecond: 0, requestsPerMinute: 0 },
+    status: "coming_soon", features: ["spot"], adapterAvailable: false,
+    customerVisible: true,
+    comingSoonNote: "Integration in progress — pending compliance review",
+  },
   {
     id: "dYdX", name: "dYdX", url: "https://dydx.exchange", logo: "dydx",
     requiresPassphrase: false,

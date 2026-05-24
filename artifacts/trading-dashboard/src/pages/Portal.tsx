@@ -4744,6 +4744,7 @@ function PortalInner() {
       <PortalExchangeConnectModal
         open={connectExchangeOpen}
         onClose={() => setConnectExchangeOpen(false)}
+        liveExchangesEnabled={isAdmin}
       />
       {disclaimerGateModal}
     </div>
