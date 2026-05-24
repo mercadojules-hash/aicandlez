@@ -517,7 +517,8 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
     res.json(payload);
   } catch (err) {
     req.log.error({ err }, "GET /admin/users failed");
-    res.status(500).json({ error: "Failed to load users" });
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: "Failed to load users", detail: msg });
   }
 });
 
@@ -715,7 +716,8 @@ router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<voi
     res.json(payload);
   } catch (err) {
     req.log.error({ err, userId }, "GET /admin/users/:id failed");
-    res.status(500).json({ error: "Failed to load user detail" });
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: "Failed to load user detail", detail: msg });
   }
 });
 
@@ -829,7 +831,8 @@ router.get("/admin/platform/leaderboards", ...requireOperator, async (req, res):
     res.json(payload);
   } catch (err) {
     req.log.error({ err }, "GET /admin/platform/leaderboards failed");
-    res.status(500).json({ error: "Failed to load platform leaderboards" });
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: "Failed to load platform leaderboards", detail: msg });
   }
 });
 
