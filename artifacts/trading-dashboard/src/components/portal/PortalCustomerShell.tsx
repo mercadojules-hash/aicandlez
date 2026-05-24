@@ -360,6 +360,47 @@ function SearchBar({
 /* OpportunityCard                                                          */
 /* ──────────────────────────────────────────────────────────────────────── */
 
+function fmtPrice(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  if (n >= 1000)  return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  if (n >= 1)     return `$${n.toFixed(2)}`;
+  if (n >= 0.01)  return `$${n.toFixed(4)}`;
+  return `$${n.toPrecision(3)}`;
+}
+
+function rrRatio(entry: number, stop: number, target: number): string {
+  const risk   = Math.abs(entry - stop);
+  const reward = Math.abs(target - entry);
+  if (!Number.isFinite(risk) || !Number.isFinite(reward) || risk <= 0) return "—";
+  return `1:${(reward / risk).toFixed(1)}`;
+}
+
+function pctDelta(from: number, to: number): string {
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from === 0) return "—";
+  const pct = ((to - from) / from) * 100;
+  const sign = pct > 0 ? "+" : "";
+  return `${sign}${pct.toFixed(2)}%`;
+}
+
+function signalAge(ts: number, now: number): string {
+  const s = Math.max(0, Math.round((now - ts) / 1000));
+  if (s < 60)  return `${s}s`;
+  const m = Math.round(s / 60);
+  if (m < 60)  return `${m}m`;
+  const h = Math.round(m / 60);
+  if (h < 24)  return `${h}h`;
+  return `${Math.round(h / 24)}d`;
+}
+
+function useNow1s(): number {
+  const [now, setNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
 function Sparkline({ data, color }: { data: number[]; color: string }) {
   const w = 80, h = 36;
   const min = Math.min(...data);
@@ -374,11 +415,15 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
-function OpportunityCard({ opp, onQueue, idx = 0 }: {
+function OpportunityCard({ opp, onQueue, idx = 0, now }: {
   opp: OpportunityVM;
   onQueue: (opp: OpportunityVM) => void;
   idx?: number;
+  now: number;
 }) {
+  const ageStr = signalAge(opp.lastUpdated, now);
+  const rr     = rrRatio(opp.entry, opp.stop, opp.target);
+  const gatedReason = opp.readiness === "GATED" && opp.reason ? opp.reason : null;
   const isLong = opp.direction === "LONG";
   const dirColor = isLong ? T.NEON : opp.direction === "SHORT" ? T.RED : T.AMBER;
   const dirBg    = isLong ? "rgba(102,255,102,0.10)" : opp.direction === "SHORT" ? "rgba(255,77,77,0.10)" : "rgba(255,176,32,0.10)";
@@ -411,7 +456,7 @@ function OpportunityCard({ opp, onQueue, idx = 0 }: {
         paddingLeft: 18,
         display: "flex", flexDirection: "column", gap: 10,
         position: "relative", overflow: "hidden",
-        height: 300,
+        height: 328,
         fontFamily: T.FONT_MONO,
       }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = T.BORDER_GRN; }}
@@ -484,18 +529,28 @@ function OpportunityCard({ opp, onQueue, idx = 0 }: {
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
           <Row label="REGIME" value={opp.regime} />
           <Row label="VOLATILITY" value={opp.vol} />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
-            <div style={{ display: "flex", gap: 4 }}>
-              {opp.mtf.map((m, i) => (
-                <span
-                  key={i}
-                  title={["5m", "15m", "1H", "4H"][i]}
-                  style={{
-                    width: 11, height: 11, borderRadius: 2,
-                    background: m === "green" ? T.NEON : m === "amber" ? T.AMBER : T.RED,
-                  }}
-                />
-              ))}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 2 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ display: "flex", gap: 4 }}>
+                {opp.mtf.map((m, i) => (
+                  <span
+                    key={i}
+                    title={["5m", "15m", "1H", "4H"][i]}
+                    style={{
+                      width: 11, height: 11, borderRadius: 2,
+                      background: m === "green" ? T.NEON : m === "amber" ? T.AMBER : T.RED,
+                    }}
+                  />
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {["5m", "15m", "1H", "4H"].map(tf => (
+                  <span key={tf} style={{
+                    width: 11, fontSize: 7, color: T.TEXT_3,
+                    textAlign: "center", letterSpacing: "0.02em",
+                  }}>{tf}</span>
+                ))}
+              </div>
             </div>
             <div style={{ display: "flex", gap: 2 }}>
               {[1, 2, 3].map(i => {
@@ -512,6 +567,23 @@ function OpportunityCard({ opp, onQueue, idx = 0 }: {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Price strip — ENTRY · STOP · TGT · R:R (derived from VM, paper-only context) */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr 1fr auto",
+        gap: 8,
+        padding: "6px 0",
+        borderTop: `1px solid ${T.BORDER}`,
+        borderBottom: `1px solid ${T.BORDER}`,
+      }}>
+        <PriceCell label="ENTRY"  value={fmtPrice(opp.entry)}  tone={T.TEXT_0} />
+        <PriceCell label="STOP"   value={fmtPrice(opp.stop)}   tone={T.RED}
+          tooltip={`Stop ${fmtPrice(opp.stop)} (${pctDelta(opp.entry, opp.stop)} from entry)`} />
+        <PriceCell label="TGT"    value={fmtPrice(opp.target)} tone={T.NEON}
+          tooltip={`Target ${fmtPrice(opp.target)} (${pctDelta(opp.entry, opp.target)} from entry)`} />
+        <PriceCell label="R:R"    value={rr}                   tone={dirColor} align="right" />
       </div>
 
       {/* Sparkline + details row */}
@@ -542,11 +614,18 @@ function OpportunityCard({ opp, onQueue, idx = 0 }: {
           </div>
           <span style={{ fontSize: 10, color: T.TEXT_1 }}>{opp.quality}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{
-              fontSize: 10, color: T.TEXT_2,
-              animation: "telemetry-flicker 1.6s ease-in-out infinite",
-              animationDelay: `-${flickerDelayMs}ms`,
-            }}>{opp.latency}</span>
+            <span
+              title={`Signal age ${ageStr} · execution latency ${opp.latency}`}
+              style={{
+                fontSize: 10, color: T.TEXT_2,
+                animation: "telemetry-flicker 1.6s ease-in-out infinite",
+                animationDelay: `-${flickerDelayMs}ms`,
+                fontVariantNumeric: "tabular-nums",
+              }}>
+              <span style={{ color: T.TEXT_1 }}>{ageStr}</span>
+              <span style={{ opacity: 0.45, margin: "0 4px" }}>·</span>
+              {opp.latency}
+            </span>
             <span style={{
               fontSize: 11, background: "rgba(255,255,255,0.08)",
               color: T.TEXT_0, padding: "1px 6px", borderRadius: 2,
@@ -594,10 +673,20 @@ function OpportunityCard({ opp, onQueue, idx = 0 }: {
             QUEUE PAPER
           </button>
         </div>
-        <span style={{
-          fontSize: 10, fontStyle: "italic", color: T.TEXT_2,
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        }}>{opp.reasoning}</span>
+        <span
+          title={gatedReason ? `Gated: ${gatedReason}` : opp.reasoning}
+          style={{
+            fontSize: 10, fontStyle: "italic",
+            color: gatedReason ? T.AMBER : T.TEXT_2,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            lineHeight: 1.35,
+            maxHeight: "2.7em",
+          }}>
+          {gatedReason ? `⛔ ${gatedReason}` : opp.reasoning}
+        </span>
       </div>
     </article>
   );
@@ -627,6 +716,36 @@ function Row({ label, value }: { label: string; value: string }) {
     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
       <span style={{ color: T.TEXT_2 }}>{label}</span>
       <span style={{ color: T.TEXT_0 }}>{value}</span>
+    </div>
+  );
+}
+
+function PriceCell({ label, value, tone, align = "left", tooltip }: {
+  label: string;
+  value: string;
+  tone: string;
+  align?: "left" | "right";
+  tooltip?: string;
+}) {
+  return (
+    <div
+      title={tooltip}
+      style={{
+        display: "flex", flexDirection: "column", gap: 1,
+        alignItems: align === "right" ? "flex-end" : "flex-start",
+        minWidth: 0,
+        cursor: tooltip ? "help" : undefined,
+    }}>
+      <span style={{
+        fontSize: 8, color: T.TEXT_3,
+        letterSpacing: "0.10em", textTransform: "uppercase",
+      }}>{label}</span>
+      <span style={{
+        fontSize: 12, color: tone, fontWeight: 600,
+        fontVariantNumeric: "tabular-nums",
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        maxWidth: "100%",
+      }}>{value}</span>
     </div>
   );
 }
@@ -698,6 +817,9 @@ function OpportunityMatrix({
   isLoading: boolean;
   isError:   boolean;
 }) {
+  // Single 1s tick shared by every card in both columns — drives signal-age
+  // readouts without spawning N intervals.
+  const now = useNow1s();
   return (
     <section style={{
       display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
@@ -712,6 +834,7 @@ function OpportunityMatrix({
         accent="#66FF66"
         subLabel={`TIER 1 · CORE LIQUIDITY · ${majors.length} TRACKED`}
         tintRgba="rgba(102,255,102,0.015)"
+        now={now}
       />
       <Column
         title="ALTS / EMERGING"
@@ -723,6 +846,7 @@ function OpportunityMatrix({
         subLabel={`TIER 2 · EMERGING · HIGH BETA · ${alts.length} TRACKED`}
         tintRgba="rgba(124,255,0,0.015)"
         leftDivider
+        now={now}
       />
     </section>
   );
@@ -730,11 +854,12 @@ function OpportunityMatrix({
 
 function Column({
   title, opps, onQueue, isLoading, isError,
-  accent, subLabel, tintRgba, leftDivider = false,
+  accent, subLabel, tintRgba, leftDivider = false, now,
 }: {
   title: string; opps: OpportunityVM[]; onQueue: (opp: OpportunityVM) => void;
   isLoading: boolean; isError: boolean;
   accent: string; subLabel: string; tintRgba: string; leftDivider?: boolean;
+  now: number;
 }) {
   return (
     <div style={{
@@ -774,7 +899,7 @@ function Column({
           </div>
         )}
         {opps.map((o, idx) => (
-          <OpportunityCard key={o.pair} opp={o} idx={idx} onQueue={onQueue} />
+          <OpportunityCard key={o.pair} opp={o} idx={idx} onQueue={onQueue} now={now} />
         ))}
       </div>
     </div>
