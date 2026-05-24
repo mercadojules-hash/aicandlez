@@ -1,0 +1,128 @@
+New UX/Product idea for a future polish phase — institutional profit milestone bell system.
+
+This is NOT core infrastructure priority right now.
+Do NOT interrupt:
+
+* billing architecture
+* Admin Console
+* monetization enforcement
+* execution stability work
+
+But I want this added to the future UX/polish roadmap.
+
+====================================================
+PROFIT MILESTONE BELL SYSTEM
+============================
+
+Concept:
+When users cross major realized profit milestones, the platform triggers a premium institutional stock-market bell sound.
+
+Examples:
+
+* +$500 realized profit
+* +$1,000
+* +$5,000
+* +$10,000
+* new all-time highs
+* major profit streaks
+
+IMPORTANT:
+Do NOT trigger on every trade.
+
+Only on milestone threshold crossings.
+
+====================================================
+SOUND DESIGN
+============
+
+Tone should feel:
+
+* institutional
+* Bloomberg/trading-floor style
+* NYSE/Nasdaq inspired
+* cinematic
+* premium
+
+Do NOT:
+
+* make it casino-like
+* make it feel like gambling
+* use arcade/slot-machine sounds
+
+Need:
+
+* subtle metallic market bell
+* short duration (1–2 sec max)
+* optional soft reverb
+
+====================================================
+VISUAL EFFECTS
+==============
+
+Possible paired UI moment:
+
+* orange glow pulse
+* subtle ticker animation
+* “NEW PROFIT MILESTONE”
+* temporary dashboard highlight
+* optional confetti-lite effect (minimal/professional)
+
+====================================================
+SETTINGS
+========
+
+Future user toggle:
+[✓] Profit milestone sounds
+
+Possible future sound packs:
+
+* NYSE Bell
+* Nasdaq Bell
+* Minimal
+* Cinematic
+* Silent
+
+====================================================
+IMPLEMENTATION NOTES
+====================
+
+Trigger only once per threshold crossing.
+
+Example:
+
+* crossing $500 realized PnL → bell once
+* crossing $1000 realized PnL → bell once
+
+Do NOT repeatedly trigger while fluctuating around threshold.
+
+Likely future integration points:
+
+* Command Center
+* customer dashboard
+* profit telemetry
+* milestone achievement system
+* operator notifications
+
+====================================================
+IMPORTANT
+=========
+
+This should remain:
+
+* professional
+* achievement-oriented
+* institutional
+
+NOT:
+
+* gambling psychology
+* casino reinforcement
+* hyper-stimulation
+
+Add this to the future UX/polish roadmap after:
+
+* billing system
+* Admin Console
+* monetization enforcement
+* launch stabilization
+  are complete.
