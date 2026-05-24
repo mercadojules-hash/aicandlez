@@ -1,0 +1,166 @@
+Switching to Plan mode is the correct move.
+
+Proceed with creating E3 as a dedicated project task.
+
+====================================================
+E3 — AI INTELLIGENCE TERMINAL GRADUATION
+========================================
+
+This is now the primary production initiative.
+
+Goal:
+Graduate CommandDeck v4.1 into the real customer /portal experience while decomposing the monolithic Portal.tsx architecture into modular portal systems.
+
+====================================================
+CORE OBJECTIVE
+==============
+
+Transform the current customer portal into the new:
+
+AI INTELLIGENCE TERMINAL
+
+using the approved:
+CommandDeck v4.1 architecture.
+
+====================================================
+ARCHITECTURE REQUIREMENTS
+=========================
+
+Portal.tsx decomposition required.
+
+Current:
+
+* 5111 LOC monolith
+* mixed admin/customer concerns
+* difficult to maintain
+* difficult to scale
+
+Target:
+modular portal architecture under:
+
+pages/portal/
+components/portal/
+hooks/portal/
+
+====================================================
+KNOWN EXTRACTIONS
+=================
+
+Expected extraction scope includes:
+
+* OpportunityGrid
+* OpportunityCard
+* OpportunityColumn
+* OpportunitySearchBar
+* OpportunityFilters
+* ExecutionStatusBar
+* TelemetryRibbon
+* AIReasoningFeed
+* SignalPipeline
+* PortfolioIntel
+* ExchangeTopology
+* ScannerTelemetry
+* ConfidenceRail
+* CommandDeckLayout
+* TerminalFooter
+* LiveSystemStatus
+
+Plus:
+
+* modal extractions
+* admin/customer separation cleanup
+* paper-signal adapter layer
+* legacy admin extraction
+
+====================================================
+LOCKED INVARIANTS
+=================
+
+Customer portal MUST remain:
+
+* PAPER ONLY
+* NO live execution controls
+* NO ARM LIVE
+* NO kill switch
+* NO broker execution controls
+* NO equities
+* NO stock tickers
+* NO Alpaca UI leakage
+
+Admin/operator controls remain isolated to:
+admintrade.aicandlez.com only.
+
+====================================================
+CRYPTO-ONLY PLATFORM
+====================
+
+Entire customer IA is now:
+crypto-native.
+
+NO:
+
+* equities
+* TSLA/NVDA/SPY
+* Alpaca branding
+* stock terminology
+* equity scanner language
+
+====================================================
+VISUAL PRIORITIES
+=================
+
+Preserve:
+
+* aggressive neon glow system
+* left-side confidence rails
+* full-width AI execution status bar
+* institutional Bloomberg-style density
+* dark command-center aesthetic
+* dynamic scanning energy
+
+Confidence remains the dominant visual anchor.
+
+====================================================
+DATA SYSTEMS
+============
+
+Preserve all existing telemetry/data systems:
+
+* AI reasoning
+* portfolio telemetry
+* signal pipeline
+* exchange topology
+* operator pulse
+* scanner telemetry
+* account metrics
+* live feeds
+
+This is an IA restructure — not a reduction in intelligence density.
+
+====================================================
+EXECUTION APPROACH
+==================
+
+Strongly prefer:
+
+* isolated task agent
+* checkpointed refactor
+* incremental extraction
+* component-by-component verification
+* invariant validation after each milestone
+
+Admin path must remain byte-identical during customer refactor.
+
+====================================================
+SUCCESS CRITERIA
+================
+
+End result:
+A production-grade institutional AI crypto terminal that feels:
+Bloomberg x AI war room x crypto intelligence workstation.
+
+Customer-facing.
+Crypto-native.
+Paper-trading locked.
+Modularized.
+Scalable.
