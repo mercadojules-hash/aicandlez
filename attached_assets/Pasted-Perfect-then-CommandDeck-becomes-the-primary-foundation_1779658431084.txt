@@ -1,0 +1,173 @@
+Perfect — then CommandDeck becomes the primary foundation.
+
+That is the right decision if the goal is:
+
+* operator workstation
+* institutional intelligence terminal
+* high-density AI telemetry
+* scalable multi-asset monitoring
+
+The PulseGrid visual language can still influence:
+
+* confidence ring styling
+* glow hierarchy
+* breathing room
+* cinematic polish
+
+—but CommandDeck should drive the IA and layout structure.
+
+====================================================
+UPDATED COMMANDDECK DIRECTION
+=============================
+
+Core layout:
+
+TOP:
+Operator Pulse Ribbon
+
+NEW:
+Global Asset Intelligence Search Bar
+(positioned above the opportunity grid)
+
+Capabilities:
+
+* search crypto ticker
+* search equities
+* search AI opportunities
+* instant filter
+* quick symbol jump
+* future watchlist support
+
+Examples:
+BTC
+ETH
+SOL
+NVDA
+SPY
+DOGE
+XRP
+etc.
+
+This becomes the primary navigation mechanism for the workstation.
+
+====================================================
+MAIN CENTERPIECE
+================
+
+Dynamic AI Opportunity Matrix
+
+Structure:
+
+* 2 columns
+* 10 cards left
+* 10 cards right
+* independently scrollable columns
+* supports up to 20 active opportunities simultaneously
+
+Behavior:
+
+* cards dynamically reorder by:
+
+  * AI confidence
+  * execution readiness
+  * volatility regime
+  * signal strength
+  * risk-adjusted weighting
+
+Highest-confidence opportunities float upward automatically.
+
+====================================================
+CARD EVOLUTION
+==============
+
+Each card should evolve into a compact AI workstation.
+
+Every card should support:
+
+* ticker
+* asset class
+* AI confidence
+* LONG/SHORT bias
+* regime state
+* MTF agreement
+* execution readiness
+* volatility state
+* mini chart
+* momentum profile
+* signal quality
+* exchange availability
+* AI reasoning snippet
+* latency/execution telemetry
+* risk score
+
+The cards should feel:
+alive
+dynamic
+institutional
+high-frequency
+AI-native
+
+====================================================
+VISUAL DIRECTION
+================
+
+Maintain:
+
+* black interiors
+* Bloomberg/prop-desk density
+* thin telemetry dividers
+* institutional monospace typography
+* premium neon hierarchy
+* confidence-driven color weighting
+* cinematic glow restraint
+* high readability
+
+Avoid:
+
+* oversized empty spacing
+* generic exchange widgets
+* retail-dashboard aesthetics
+
+====================================================
+LOWER TERMINAL ZONE
+===================
+
+Keep:
+
+* AI Reasoning Console
+* Portfolio Intelligence
+* Signal Pipeline
+* Exchange Topology
+* Risk Heatmap
+* AI Throughput
+* Market Regime
+* Execution Awareness
+
+These become secondary intelligence systems beneath the Opportunity Matrix.
+
+====================================================
+IMPORTANT
+=========
+
+Portal remains:
+
+* customer-side
+* paper-only
+* no ARM LIVE
+* no kill switch
+* no broker execution controls
+
+Admin execution controls remain isolated to:
+admintrade.aicandlez.com
+
+====================================================
+ARCHITECTURE
+============
+
+Portal.tsx decomposition is approved if necessary.
+
+Preferred direction:
+split into modular workstation surfaces/components rather than continuing monolithic Portal.tsx growth.
+
+Goal:
+make AICandlez feel like an AI Intelligence Operating System — not a standard trading dashboard.
