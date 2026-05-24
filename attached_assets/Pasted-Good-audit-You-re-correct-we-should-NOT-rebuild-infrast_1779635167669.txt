@@ -1,0 +1,143 @@
+Good audit. You're correct — we should NOT rebuild infrastructure that already exists.
+
+You are also correct that the Kraken stabilization deploy must remain priority #1 until production telemetry is stable.
+
+Decision:
+
+1. Push and stabilize Kraken production first.
+2. Do NOT begin massive Build-mode implementation yet.
+3. Move this into structured Plan mode / task-based implementation.
+4. Reuse ALL existing admin infrastructure wherever possible.
+5. Build only the missing layers.
+
+====================================================
+IMMEDIATE PRIORITY
+==================
+
+FIRST:
+Finish Kraken stabilization validation on production.
+
+We already confirmed:
+• negative-cache patch is live
+• cooldown loop is functioning
+• deploy pipeline is functioning
+• UI stability improved
+• request hammering stopped
+
+Continue monitoring:
+• negative-caching cadence
+• eventual private response OK recovery
+• whether Render free-tier cold sleep is still poisoning Kraken recovery
+
+IF Kraken still does not recover after extended cooldown:
+upgrade ONLY:
+aicandlez-api
+from Free → Starter
+
+Do NOT touch:
+• trade frontend
+• admintrade frontend
+• DB
+• landing
+
+====================================================
+THEN — MOVE TO PLAN MODE
+========================
+
+Do NOT attempt this entire CRM system in one Build-mode pass.
+
+Agreed:
+This is now a true multi-task infrastructure project.
+
+====================================================
+APPROVED TASK BREAKDOWN
+=======================
+
+A — Schema + migrations
+• subscription_overrides
+• live_sessions
+• device_sessions
+• user_activity
+
+B — Backend complimentary system
+• grant/revoke complimentary access
+• expiry handling
+• audit logging
+• Stripe integration compatibility
+
+C — Live session infrastructure
+• Clerk session tracking
+• realtime session persistence
+• session termination
+• clear device tokens
+
+D — Institutional Users Grid
+• Users.tsx
+• paginated grid
+• search/sort/filter
+• realtime telemetry feel
+• sidebar integration
+
+E — User Intelligence Panel
+• detailed user profile
+• subscription management
+• live sessions
+• AI telemetry
+• trading telemetry
+• operator controls
+
+====================================================
+VERY IMPORTANT
+==============
+
+DO NOT:
+• duplicate audit systems
+• duplicate admin tables
+• duplicate telemetry systems
+• rebuild existing admin console primitives
+
+Reuse:
+• auditLog
+• adminUserTelemetry
+• adminUserActions
+• userAdminStatus
+• BillingAdmin infrastructure
+• existing operator telemetry
+
+Compose ON TOP of the current architecture.
+
+====================================================
+IMPLEMENTATION REQUIREMENTS
+===========================
+
+Preserve ALL architectural invariants:
+
+• customer/admin isolation
+• no customer telemetry leakage
+• operator-only controls
+• institutional black/neon aesthetic
+• scalable architecture
+• realtime telemetry feel
+
+Target:
+100k+ user operational scalability.
+
+====================================================
+NEXT STEP
+=========
+
+Move this into Plan mode and create structured task documents in:
+.local/tasks/
+
+I want:
+• isolated task execution
+• clean code review boundaries
+• smaller commits
+• safer migrations
+• backend/frontend separation
+• operational review checkpoints
+
+Recommended implementation order:
+A → B → C → D → E
+
+Kraken stabilization remains the active production blocker until green.
