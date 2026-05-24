@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 /**
  * CRM Phase A — /admin/activity
  *
@@ -8,7 +9,6 @@
  */
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { authFetch } from "@/lib/authFetch";
 import { Activity, Loader2, RefreshCw, AlertTriangle, TrendingUp, Zap } from "lucide-react";
 
 interface ActivityRow {

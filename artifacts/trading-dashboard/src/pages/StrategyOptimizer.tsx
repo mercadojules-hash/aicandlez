@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -102,7 +103,7 @@ export default function StrategyOptimizer() {
   // ── API call ─────────────────────────────────────────────────────────────────
   const mutation = useMutation<OptimizationResult, Error, void>({
     mutationFn: async () => {
-      const r = await fetch("/api/optimizer/run", {
+      const r = await authFetch("/api/optimizer/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol, timeframe, initialCapital: initialCap, optimizeFor }),

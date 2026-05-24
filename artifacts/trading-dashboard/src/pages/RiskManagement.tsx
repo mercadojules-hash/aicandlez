@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useCallback } from "react";
 import {
   Shield, RefreshCw, AlertTriangle, CheckCircle2,
@@ -157,7 +158,7 @@ export default function RiskManagement() {
     if (!quiet) setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/risk/config");
+      const res = await authFetch("/api/risk/config");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: { config: RiskConfig; status: RiskStatus } = await res.json();
       setConfig(data.config);
@@ -182,7 +183,7 @@ export default function RiskManagement() {
     if (!draft) return;
     setSaving(true);
     try {
-      const res = await fetch("/api/risk/config", {
+      const res = await authFetch("/api/risk/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(draft),
@@ -204,7 +205,7 @@ export default function RiskManagement() {
 
   async function toggleKillSwitch() {
     try {
-      const res = await fetch("/api/risk/kill-switch", { method: "POST" });
+      const res = await authFetch("/api/risk/kill-switch", { method: "POST" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: { killSwitchActive: boolean; status: RiskStatus } = await res.json();
       setConfig((c) => c ? { ...c, killSwitchActive: data.killSwitchActive } : null);
@@ -219,7 +220,7 @@ export default function RiskManagement() {
     setValidating(true);
     setValidateResult(null);
     try {
-      const res = await fetch("/api/risk/validate", {
+      const res = await authFetch("/api/risk/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sizeUSD: validateSize }),

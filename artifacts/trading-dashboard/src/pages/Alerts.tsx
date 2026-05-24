@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, AlertTriangle, TrendingUp, Info, Zap } from "lucide-react";
@@ -116,18 +117,18 @@ export default function Alerts() {
 
   const { data, isLoading } = useQuery<{ notifications: Notification[]; unreadCount: number }>({
     queryKey:        ["notifications-page"],
-    queryFn:         () => fetch("/api/user/notifications").then(r => r.json()),
+    queryFn:         () => authFetch("/api/user/notifications").then(r => r.json()),
     refetchInterval: 15_000,
     ...Q_OPTS,
   });
 
   const markAllRead = useMutation({
-    mutationFn: () => fetch("/api/user/notifications/read-all", { method: "POST" }).then(r => r.json()),
+    mutationFn: () => authFetch("/api/user/notifications/read-all", { method: "POST" }).then(r => r.json()),
     onSuccess:  () => qc.invalidateQueries({ queryKey: ["notifications-page"] }),
   });
 
   const markOne = useMutation({
-    mutationFn: (id: string) => fetch(`/api/user/notifications/${id}/read`, { method: "POST" }).then(r => r.json()),
+    mutationFn: (id: string) => authFetch(`/api/user/notifications/${id}/read`, { method: "POST" }).then(r => r.json()),
     onSuccess:  () => qc.invalidateQueries({ queryKey: ["notifications-page"] }),
   });
 

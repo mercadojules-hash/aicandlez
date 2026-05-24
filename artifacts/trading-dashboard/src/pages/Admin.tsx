@@ -1,6 +1,6 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { authFetch } from "@/lib/authFetch";
 import {
   Users, Zap, DollarSign, Activity, TrendingUp, Shield,
   Search, ChevronUp, ChevronDown, ArrowUpRight, ArrowDownRight,
@@ -963,17 +963,17 @@ export default function Admin() {
   // Real engine + fees + exchange status (existing endpoints, real data)
   const { data: engine }         = useQuery<EngineStatus>({
     queryKey: ["admin-engine"],
-    queryFn: () => fetch("/api/engine/status").then(r => r.json()),
+    queryFn: () => authFetch("/api/engine/status").then(r => r.json()),
     refetchInterval: 5000,
   });
   const { data: feeSummary }     = useQuery<FeeSummary>({
     queryKey: ["admin-fees"],
-    queryFn: () => fetch("/api/fees").then(r => r.json()),
+    queryFn: () => authFetch("/api/fees").then(r => r.json()),
     refetchInterval: 15000,
   });
   const { data: exchangeStatus } = useQuery<ExchangeStatus>({
     queryKey: ["admin-exchange"],
-    queryFn: () => fetch("/api/exchange/status").then(r => r.json()),
+    queryFn: () => authFetch("/api/exchange/status").then(r => r.json()),
     refetchInterval: 8000,
   });
 

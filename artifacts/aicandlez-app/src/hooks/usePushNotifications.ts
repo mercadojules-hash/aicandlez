@@ -1,7 +1,10 @@
 import { useEffect, useCallback, useState } from "react";
 import { useAuth } from "@clerk/react";
+import { authFetch } from "@/lib/authFetch";
 
 const VAPID_PUBLIC = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+// BASE is the SPA's own base path (not the API host). It is used only for
+// the service-worker script URL — same-origin and unrelated to /api/*.
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
 function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
@@ -74,13 +77,9 @@ export function usePushNotifications(): PushState {
       const token = await getToken();
       if (!token) return;
 
-      const res = await fetch(`${BASE}/api/user/push-token`, {
+      const res = await authFetch(`/api/user/push-token`, {
         method:  "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization:  `Bearer ${token}`,
-        },
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token:      JSON.stringify(sub.toJSON()),
           platform:   "web",
@@ -107,13 +106,9 @@ export function usePushNotifications(): PushState {
 
       const token = await getToken();
       if (token) {
-        await fetch(`${BASE}/api/user/push-token`, {
+        await authFetch(`/api/user/push-token`, {
           method:  "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization:  `Bearer ${token}`,
-          },
-          credentials: "include",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token: JSON.stringify(sub.toJSON()) }),
         });
       }

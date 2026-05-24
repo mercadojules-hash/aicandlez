@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   MessageSquare, RefreshCw, TrendingUp, TrendingDown, Minus,
@@ -352,7 +353,7 @@ export default function Sentiment() {
 
   const { data, isLoading } = useQuery<SentimentOverview>({
     queryKey: ["/sentiment/overview"],
-    queryFn: () => fetch("/api/sentiment/overview").then(r => r.json()),
+    queryFn: () => authFetch("/api/sentiment/overview").then(r => r.json()),
     refetchInterval: 5 * 60 * 1000,   // refresh every 5 minutes
   });
 

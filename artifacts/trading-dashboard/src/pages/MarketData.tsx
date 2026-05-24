@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AreaChart, Area, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 import { Radio, RefreshCw, TrendingUp, TrendingDown, Activity, Clock, Layers } from "lucide-react";
@@ -120,7 +121,7 @@ export default function MarketData() {
     if (!quiet) setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/market-data/${sym}?timeframe=${tf}&limit=100`);
+      const res = await authFetch(`/api/market-data/${sym}?timeframe=${tf}&limit=100`);
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error ?? `HTTP ${res.status}`);

@@ -22,12 +22,7 @@ import { usePaperTrades } from "@/hooks/usePaperTrades";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { toast } from "@/hooks/use-toast";
-
-// Cross-origin API base — production lives on api.aicandlez.com via
-// VITE_API_BASE_URL. Same-origin "/api" fallback for dev (shared proxy).
-const apiBaseUrl: string = (
-  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? ""
-).replace(/\/$/, "");
+import { authFetch } from "@/lib/authFetch";
 
 function fmt(n: number): string {
   if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -117,14 +112,9 @@ export function SignalRow({ spec, breakdown }: Props) {
     sym: string, side: "BUY" | "SELL",
   ): Promise<void> => {
     try {
-      const token = await getToken().catch(() => null);
-      await fetch(`${apiBaseUrl}/api/simulation/order`, {
+      await authFetch(`/api/simulation/order`, {
         method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol: sym, side, sizeUSD: 100 }),
       });
     } catch { /* best-effort mirror */ }
@@ -142,14 +132,9 @@ export function SignalRow({ spec, breakdown }: Props) {
     dryRun?: boolean;
   }> => {
     try {
-      const token = await getToken().catch(() => null);
-      const res = await fetch(`${apiBaseUrl}/api/user/live-order`, {
+      const res = await authFetch(`/api/user/live-order`, {
         method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol: sym, side, sizeUSD }),
       });
       if (!res.ok) {

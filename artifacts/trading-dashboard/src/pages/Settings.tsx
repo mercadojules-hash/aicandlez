@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useExchangeCatalog } from "@/hooks/useExchangeCatalog";
@@ -86,13 +87,13 @@ interface ExchangeEntry {
 // ── API helpers ───────────────────────────────────────────────────────────────
 
 async function fetchSettings(): Promise<UserSettings> {
-  const r = await fetch("/api/user/settings");
+  const r = await authFetch("/api/user/settings");
   if (!r.ok) throw new Error("Failed to load settings");
   return r.json();
 }
 
 async function saveSettings(patch: Partial<UserSettings>): Promise<UserSettings> {
-  const r = await fetch("/api/user/settings", {
+  const r = await authFetch("/api/user/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
@@ -102,7 +103,7 @@ async function saveSettings(patch: Partial<UserSettings>): Promise<UserSettings>
 }
 
 async function fetchExchanges(): Promise<{ exchanges: ExchangeEntry[] }> {
-  const r = await fetch("/api/user/exchanges");
+  const r = await authFetch("/api/user/exchanges");
   if (!r.ok) throw new Error("Failed to load exchange connections");
   return r.json();
 }
@@ -273,7 +274,7 @@ function ConnectModal({
     setLoading(true);
     setError(null);
     try {
-      const r = await fetch("/api/user/exchanges/connect", {
+      const r = await authFetch("/api/user/exchanges/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -724,7 +725,7 @@ function ExchangeConnectionsSection() {
   async function handleDisconnect(exchange: string) {
     setActionExchange(exchange);
     try {
-      await fetch(`/api/user/exchanges/${exchange}`, { method: "DELETE" });
+      await authFetch(`/api/user/exchanges/${exchange}`, { method: "DELETE" });
       await qc.invalidateQueries({ queryKey: ["user-exchanges"] });
     } finally {
       setActionExchange(null);
@@ -734,7 +735,7 @@ function ExchangeConnectionsSection() {
   async function handleTest(exchange: string) {
     setTestingExchange(exchange);
     try {
-      await fetch(`/api/user/exchanges/${exchange}/test`, { method: "POST" });
+      await authFetch(`/api/user/exchanges/${exchange}/test`, { method: "POST" });
       await qc.invalidateQueries({ queryKey: ["user-exchanges"] });
     } finally {
       setTestingExchange(null);
@@ -742,12 +743,12 @@ function ExchangeConnectionsSection() {
   }
 
   async function handleSetDefault(exchange: string) {
-    await fetch(`/api/user/exchanges/${exchange}/default`, { method: "POST" });
+    await authFetch(`/api/user/exchanges/${exchange}/default`, { method: "POST" });
     await qc.invalidateQueries({ queryKey: ["user-exchanges"] });
   }
 
   async function handleSetMode(exchange: string, mode: "paper" | "live") {
-    await fetch(`/api/user/exchanges/${exchange}/mode`, {
+    await authFetch(`/api/user/exchanges/${exchange}/mode`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode, acknowledged: mode === "live" ? true : undefined }),

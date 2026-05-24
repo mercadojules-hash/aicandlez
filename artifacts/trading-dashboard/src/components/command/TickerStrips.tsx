@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useQueries } from "@tanstack/react-query";
 import type { EngineStatus } from "./types";
 import { ASSETS } from "./types";
@@ -139,7 +140,7 @@ export function TickerStrips({ engine }: Props) {
     queries: ASSETS.map((a) => ({
       queryKey:        ["ticker-candle", a.symbol],
       queryFn:         () =>
-        fetch(`/api/candles?symbol=${a.symbol}&timeframe=15m&limit=3`, { cache: "no-store" })
+        authFetch(`/api/candles?symbol=${a.symbol}&timeframe=15m&limit=3`, { cache: "no-store" })
           .then((r) => r.ok ? r.json() as Promise<Candle[]> : []),
       refetchInterval: 60_000,
       staleTime: 0,

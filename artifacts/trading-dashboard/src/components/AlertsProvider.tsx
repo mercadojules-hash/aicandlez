@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import {
   createContext, useContext, useState, useEffect, useRef, useCallback,
 } from "react";
@@ -433,7 +434,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const poll = async () => {
       try {
-        const res = await fetch("/api/engine/status");
+        const res = await authFetch("/api/engine/status");
         if (!res.ok) return;
         const data: EngineStatus = await res.json();
 

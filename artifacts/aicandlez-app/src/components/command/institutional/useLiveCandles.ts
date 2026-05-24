@@ -9,14 +9,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-
-// In prod the API lives cross-origin on api.aicandlez.com (set via
-// VITE_API_BASE_URL). In dev VITE_API_BASE_URL is unset and the shared
-// proxy routes /api/* to the api-server on same-origin, so this falls
-// back to "". Mirrors the contract in src/lib/api.ts.
-const API_BASE = (
-  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? ""
-).replace(/\/$/, "");
+import { authFetch } from "@/lib/authFetch";
 
 export interface LivePoint { i: number; close: number; volume: number; }
 
@@ -101,8 +94,8 @@ export function useLiveCandles({
       syntheticAnchor ?? SYNTHETIC_ANCHORS[symbol] ?? 100;
 
     const fetchOnce = () => {
-      fetch(`${API_BASE}/api/candles?symbol=${symbol}&timeframe=${timeframe}&limit=${limit}`,
-            { cache: "no-store", credentials: "include" })
+      authFetch(`/api/candles?symbol=${symbol}&timeframe=${timeframe}&limit=${limit}`,
+            { cache: "no-store" })
         .then(async r => {
           if (cancelled) return;
           if (!r.ok) throw new Error(`HTTP ${r.status}`);

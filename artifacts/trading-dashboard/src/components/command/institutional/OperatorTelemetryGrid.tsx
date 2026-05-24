@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 /**
  * OperatorTelemetryGrid — institutional operator-only telemetry surface.
  *
@@ -256,7 +257,7 @@ export function OperatorTelemetryGrid() {
       : "ACTIVATE kill switch? This halts all live execution platform-wide.";
     if (!window.confirm(prompt)) return;
     try {
-      await fetch("/api/exchange/kill", { method: "POST", cache: "no-store" });
+      await authFetch("/api/exchange/kill", { method: "POST", cache: "no-store" });
       await refetchExch();
       qc.invalidateQueries({ queryKey: ["operator-engine-status"] });
     } catch { /* swallow */ }

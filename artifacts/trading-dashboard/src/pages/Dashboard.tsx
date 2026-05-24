@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useEffect, useState } from "react";
 import {
   Activity,
@@ -43,7 +44,7 @@ export default function Dashboard() {
     const ping = async () => {
       const start = performance.now();
       try {
-        const res = await fetch("/api/healthz", { signal: AbortSignal.timeout(4000) });
+        const res = await authFetch("/api/healthz", { signal: AbortSignal.timeout(4000) });
         if (res.ok) {
           setApiHealth({ ok: true, latencyMs: Math.round(performance.now() - start) });
         } else {

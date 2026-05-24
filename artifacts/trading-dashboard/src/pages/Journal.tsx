@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -390,7 +391,7 @@ export default function Journal() {
     queryKey: ["/simulation/trades"],
     queryFn: async () => {
       // Uses the auth-gated, per-user DB-backed simulation trade history
-      const res = await fetch("/api/simulation/trades", { cache: "no-store" });
+      const res = await authFetch("/api/simulation/trades", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: UserSimTrade[] = await res.json();
       return Array.isArray(data) ? data.map(normalizeSimTrade) : [];

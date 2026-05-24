@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState } from "react";
 import {
   BarChart2, Play, RefreshCw, AlertTriangle, TrendingUp, TrendingDown,
@@ -190,7 +191,7 @@ export default function Backtest() {
     setResult(null);
     setShowAll(false);
     try {
-      const res = await fetch("/api/backtest/run", {
+      const res = await authFetch("/api/backtest/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol, timeframe, initialCapital }),

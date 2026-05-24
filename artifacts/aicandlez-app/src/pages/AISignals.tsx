@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -793,7 +794,7 @@ function SignalCard({ breakdown, ticker, onOpen, rank, kind = "crypto", isPrevie
   const orderMutation = useMutation<unknown, Error, "BUY" | "SELL">({
     mutationFn: async (side) => {
       const alpacaSymbol = kind === "crypto" ? `${short}/USD` : breakdown.symbol;
-      const res = await fetch("/api/exchange/alpaca/order", {
+      const res = await authFetch("/api/exchange/alpaca/order", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ symbol: alpacaSymbol, side: side.toLowerCase(), notional: 1000 }),

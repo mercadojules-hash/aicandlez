@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   FlaskConical, RefreshCw, AlertTriangle, CheckCircle2,
@@ -126,8 +127,8 @@ export default function Simulation() {
     if (!quiet) setLoading(true);
     try {
       const [accRes, tradesRes] = await Promise.all([
-        fetch("/api/simulation/account"),
-        fetch("/api/simulation/trades"),
+        authFetch("/api/simulation/account"),
+        authFetch("/api/simulation/trades"),
       ]);
       const accData: AccountSummary = await accRes.json();
       const tradesData: { trades: SimTrade[] } = await tradesRes.json();
@@ -152,7 +153,7 @@ export default function Simulation() {
     setPlacing(true);
     setOrderMsg(null);
     try {
-      const res = await fetch("/api/simulation/order", {
+      const res = await authFetch("/api/simulation/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol, side, sizeUSD }),
@@ -179,7 +180,7 @@ export default function Simulation() {
   async function closePos(id: string) {
     setClosing((c) => ({ ...c, [id]: true }));
     try {
-      const res = await fetch(`/api/simulation/close/${id}`, { method: "POST" });
+      const res = await authFetch(`/api/simulation/close/${id}`, { method: "POST" });
       const data = await res.json();
       if (data.success) {
         setOrderMsg({ ok: true, text: `Position closed · P&L: ${data.trade.realizedPnL >= 0 ? "+" : ""}${usd(data.trade.realizedPnL)}` });
@@ -193,7 +194,7 @@ export default function Simulation() {
 
   async function reset() {
     if (!confirm("Reset simulation to $100,000? This deletes all positions and history.")) return;
-    await fetch("/api/simulation/reset", { method: "POST" });
+    await authFetch("/api/simulation/reset", { method: "POST" });
     setOrderMsg(null);
     await fetchAccount();
   }

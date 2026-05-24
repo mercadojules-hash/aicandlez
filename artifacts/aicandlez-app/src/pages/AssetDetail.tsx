@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -517,7 +518,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
       const notional = 1000;
       // BTC → BTC/USD for Alpaca crypto; equities (TSLA, AAPL…) stay bare
       const alpacaSymbol = type === "crypto" ? `${sym}/USD` : sym;
-      const res = await fetch("/api/exchange/alpaca/order", {
+      const res = await authFetch("/api/exchange/alpaca/order", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ symbol: alpacaSymbol, side: side.toLowerCase(), notional }),

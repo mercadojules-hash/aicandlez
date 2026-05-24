@@ -2,8 +2,9 @@
 
 Institutional AI crypto trading SaaS. pnpm workspace monorepo, TypeScript.
 
-> Phase 1–4 + Phase 5 design history is archived at the end of this file.
-> Only the *current* production-active architecture lives in the top sections.
+> Only the *current* production-active architecture lives in this file.
+> Historical phase / per-task narration has been removed; git history is
+> the authoritative archive.
 
 ---
 
@@ -357,30 +358,32 @@ Light theme, warm cream `#F8F6F0`, forest green `#3D7A45`, Inter, radius 16.
 
 ---
 
-# Changelog (condensed)
+## Cross-origin API transport (Task #172 — locked invariant)
 
-Full per-phase detail lives in git history. Anything operationally
-important has been promoted into the active sections above — this list
-is milestone reference only.
+Every `/api/*` call from any frontend artifact MUST route through the
+shared `authFetch` primitive:
 
-- **Phase 1** — Clerk auth integrated; protected routes + `users` table + role enum + JIT provisioning.
-- **Phase 2** — Per-user isolated sim environment; `userSimRegistry` + 5 sim tables + auth-gated `/api/simulation/*` and `/api/user/*`.
-- **Phase 3** — Encrypted exchange credentials (AES-256-GCM + PBKDF2); connection-test-gated writes; withdrawal perms never requested.
-- **Phase 4** — VAPID push infra; Module 20 Desktop Terminal; production deployment scaffolding (`DEPLOYMENT.md`, `render.yaml` × 4 services).
-- **Phase 5** — Cyan → neon-green system-wide pivot; brand tokens, glass primitives, animation library; legacy aliases preserved.
-- **Phase 5.1–5.3** — PWA home radar polish; cinematic typography; 3-tier billing ladder; `lib/feedback.ts` (10 alert types); Crypto/Equity signals preview blocks; tier-conditional `UpgradeBanner` + `FeatureGate`.
-Per-task narration condensed to milestone refs — invariants and contracts
-above (Architectural separation, Cross-host routing matrix, Authentication,
-AI Trading Architecture) carry the operationally-binding rules. Detail in
-git history.
+- `artifacts/trading-dashboard/src/lib/authFetch.ts`
+- `artifacts/aicandlez-app/src/lib/authFetch.ts`
 
-- **Task #157** — Customer/Admin portal separation invariant locked; `customer_live_execution_disabled` kill switch.
-- **Task #158** — Read-only telemetry surfaces: `adminUserTelemetry`, `adminTopTelemetry`, `operatorTelemetry`.
-- **Task #159** — Operator action endpoints + immutable audit + Stripe billing actions + `executionStreamBus`.
-- **Task #160** — Phased operator administration (Phases 1–6 backend complete; Phase E UI deferred).
-- **Task #162** — Launch routing + auth unification: 4-host model (app/trade/admintrade/api); PWA `/portal` cross-host bounce (`VITE_PORTAL_URL`); Stripe return URLs server-derived via Origin allow-list (`resolveCustomerAppBaseUrl`); landing CTAs → `trade.aicandlez.com/portal` (`TRADE_PORTAL_URL`); SignedInHomeRouter env-driven role dispatch.
-- **Task #163** — Customer portal restored to PAPER mode via `LiveControlBar` PAPER state (CRYPTO + EQUITIES bars on `trade/portal`); pricing copy cleanup ("No subscription" lines removed).
-- **Task #164** — Locked platform color rule: ORANGE = any live affordance (ARMED + EXECUTING), GREEN = PAPER only, RED = HALTED. Single source-of-truth in `LiveControlBar.tsx`.
+`authFetch` prefixes `VITE_API_BASE_URL` (so `admintrade.` / `trade.` /
+`app.aicandlez.com` cross-origin into `api.aicandlez.com` instead of
+hitting their own static SPA fallback), attaches a Clerk `Bearer` token
+as a cookie fallback (Safari ITP / SameSite=Lax cross-subdomain), and
+throws a structured `ApiContractError` when an OK response comes back
+without `application/json` (catches the "static host returned
+`index.html`" failure that silently emptied the admin CRM grid).
+
+A build-time guardrail enforces this:
+`pnpm --filter @workspace/scripts run check-no-bare-api-fetch`
+fails CI on any bare `fetch("/api/...")` outside the two `lib/authFetch.ts`
+files and `useUserRole.ts` (which intentionally issues its pre-bootstrap
+`/api/auth/me` call with a freshly-issued `getToken()`).
+
+On `admintrade.` / `trade.` / `app.aicandlez.com` an admin-visible
+`ApiBaseUrlBanner` renders at the top of the page if `VITE_API_BASE_URL`
+is empty at build time — surfaces the misconfiguration loudly instead
+of silently returning empty arrays everywhere.
 
 ---
 

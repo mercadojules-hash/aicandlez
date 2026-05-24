@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useUser, useAuth } from "@clerk/react";
+import { API_BASE_URL } from "@/lib/authFetch";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // useUserRole
@@ -14,13 +15,12 @@ import { useUser, useAuth } from "@clerk/react";
 //   loading     — true until both Clerk + /auth/me resolve
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Resolve API base URL. In production this is the cross-origin API host
-// (e.g. https://api.aicandlez.com) supplied via VITE_API_BASE_URL. In dev it
-// falls back to the same-origin Vite proxy.
-const apiBaseUrl = (
-  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ??
-  (import.meta.env.BASE_URL ?? "/")
-).replace(/\/$/, "");
+// API base URL comes from the same source-of-truth as the shared `authFetch`.
+// This hook intentionally does NOT call `authFetch` itself: it needs a
+// freshly-issued `getToken()` from the React hook context before Clerk's
+// global session cache (`window.Clerk.session`) is hot. Once /auth/me
+// returns, the rest of the app uses `authFetch` exclusively.
+const apiBaseUrl = API_BASE_URL || (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
 export type UserRole = "user" | "admin" | "super-admin";
 

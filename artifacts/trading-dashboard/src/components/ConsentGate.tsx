@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Shield, CheckCircle2, Circle, AlertTriangle, Loader2, X } from "lucide-react";
@@ -43,7 +44,7 @@ type ConsentKey = typeof CONSENT_ITEMS[number]["id"];
 export function useLiveConsent() {
   const { data, isLoading } = useQuery<ConsentStatus>({
     queryKey: ["user-consent"],
-    queryFn:  () => fetch("/api/user/consent").then(r => r.json()),
+    queryFn:  () => authFetch("/api/user/consent").then(r => r.json()),
     staleTime: Infinity,
     retry: false,
   });
@@ -76,7 +77,7 @@ export function LiveConsentModal({ open, onConsented, onCancel }: LiveConsentMod
 
   const { mutate: submitConsent, isPending, isError } = useMutation({
     mutationFn: () =>
-      fetch("/api/user/consent", {
+      authFetch("/api/user/consent", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(checked),

@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Fragment } from "react";
@@ -247,7 +248,7 @@ export default function CorrelationPage() {
   const { data, isFetching, isError, error, refetch } = useQuery<OverviewData>({
     queryKey:        ["correlation-overview"],
     queryFn:         async () => {
-      const r = await fetch("/api/correlation/overview");
+      const r = await authFetch("/api/correlation/overview");
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? r.statusText);
       return r.json();
     },
@@ -256,7 +257,7 @@ export default function CorrelationPage() {
 
   const configMutation = useMutation({
     mutationFn: async (patch: Partial<TrailingStopConfig>) => {
-      const r = await fetch("/api/correlation/stops/config", {
+      const r = await authFetch("/api/correlation/stops/config", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(patch),

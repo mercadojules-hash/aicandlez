@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 /**
  * Lightweight, polling live-candle hook for institutional dashboard tiles.
  *
@@ -93,7 +94,7 @@ export function useLiveCandles({
       syntheticAnchor ?? SYNTHETIC_ANCHORS[symbol] ?? 100;
 
     const fetchOnce = () => {
-      fetch(`/api/candles?symbol=${symbol}&timeframe=${timeframe}&limit=${limit}`,
+      authFetch(`/api/candles?symbol=${symbol}&timeframe=${timeframe}&limit=${limit}`,
             { cache: "no-store" })
         .then(async r => {
           if (cancelled) return;

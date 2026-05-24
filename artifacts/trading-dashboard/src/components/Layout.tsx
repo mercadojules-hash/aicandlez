@@ -1,8 +1,10 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { useUserRole } from "@/hooks/useUserRole";
 import { AdminTopTelemetryBar } from "@/components/AdminTopTelemetryBar";
+import { ApiBaseUrlBanner } from "@/components/ApiBaseUrlBanner";
 
 // Admin-only routes — hidden from non-admin users in the left nav. Backend
 // enforces the same gate via requireRole(["admin","super-admin"]).
@@ -574,6 +576,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           operator host. The customer terminal at trade.aicandlez.com must
           never show platform-wide operator vitals, even if an admin signs
           in there. Telemetry lives exclusively on admintrade. */}
+      <ApiBaseUrlBanner />
       {IS_ADMIN_HOST && isAdmin && <AdminTopTelemetryBar />}
 
       {/* Body */}
@@ -634,7 +637,7 @@ function SystemStatusBar() {
   const [apiOk, setApiOk] = useState(false);
   useEffect(() => {
     const ping = async () => {
-      try { const r = await fetch("/api/healthz", { signal: AbortSignal.timeout(3000) }); setApiOk(r.ok); }
+      try { const r = await authFetch("/api/healthz", { signal: AbortSignal.timeout(3000) }); setApiOk(r.ok); }
       catch { setApiOk(false); }
     };
     ping();

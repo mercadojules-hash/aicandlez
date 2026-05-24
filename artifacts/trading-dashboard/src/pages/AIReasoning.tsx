@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Brain, RefreshCw, TrendingUp, TrendingDown, Minus,
@@ -208,7 +209,7 @@ export default function AIReasoning() {
     if (!quiet) setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/ai-decision/${sym}?timeframe=${tf}&limit=100`);
+      const res = await authFetch(`/api/ai-decision/${sym}?timeframe=${tf}&limit=100`);
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error((j as { error?: string }).error ?? `HTTP ${res.status}`);

@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 /**
  * OnboardingFlow (PWA) — post-checkout live-trading onboarding for
  * app.aicandlez.com. Mirrors the trade-dashboard component but with a
@@ -135,14 +136,14 @@ export function OnboardingFlow() {
 
   const exchanges = useQuery<ApiExchanges>({
     queryKey: ["onboarding-exchanges"],
-    queryFn:  () => fetch("/api/user/exchanges", { credentials: "include" })
+    queryFn:  () => authFetch("/api/user/exchanges", { credentials: "include" })
       .then(r => r.ok ? r.json() : { exchanges: [] }),
     enabled:  isSignedIn === true && step !== "done",
     staleTime: 5_000,
   });
   const oauthCfg = useQuery<AlpacaOauthConfig>({
     queryKey: ["alpaca-oauth-config"],
-    queryFn:  () => fetch("/api/user/exchanges/alpaca/oauth/config", { credentials: "include" })
+    queryFn:  () => authFetch("/api/user/exchanges/alpaca/oauth/config", { credentials: "include" })
       .then(r => r.ok ? r.json() : { enabled: false }),
     enabled:  isSignedIn === true && step !== "done",
     staleTime: 60_000,

@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 /**
  * useExchangeCatalog (PWA) — single source of truth for exchange product
  * metadata across the aicandlez-app frontend. Hydrates
@@ -46,7 +47,7 @@ interface CatalogResponse { exchanges: CatalogEntry[] }
 export function useExchangeCatalog() {
   const q = useQuery<CatalogResponse>({
     queryKey:  ["exchanges-catalog"],
-    queryFn:   () => fetch("/api/exchanges/catalog").then(r => r.json()),
+    queryFn:   () => authFetch("/api/exchanges/catalog").then(r => r.json()),
     staleTime: 60_000,
   });
   const exchanges = q.data?.exchanges ?? [];

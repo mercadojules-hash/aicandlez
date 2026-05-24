@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useUser } from "@clerk/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -103,23 +104,23 @@ export default function Account() {
 
   const { data: settings } = useQuery<UserSettings>({
     queryKey: ["account-settings"],
-    queryFn:  () => fetch("/api/user/settings").then(r => r.json()),
+    queryFn:  () => authFetch("/api/user/settings").then(r => r.json()),
   });
   const { data: simAccount } = useQuery<SimAccount>({
     queryKey: ["account-sim"],
-    queryFn:  () => fetch("/api/simulation/account").then(r => r.json()),
+    queryFn:  () => authFetch("/api/simulation/account").then(r => r.json()),
   });
   const { data: trades } = useQuery<Trade[]>({
     queryKey: ["account-trades"],
-    queryFn:  () => fetch("/api/trades").then(r => r.json()).then(d => Array.isArray(d) ? d : []),
+    queryFn:  () => authFetch("/api/trades").then(r => r.json()).then(d => Array.isArray(d) ? d : []),
   });
   const { data: feeSummary } = useQuery<FeeSummary>({
     queryKey: ["account-fees"],
-    queryFn:  () => fetch("/api/fees").then(r => r.json()),
+    queryFn:  () => authFetch("/api/fees").then(r => r.json()),
   });
   const { data: exchangesResp } = useQuery<ExchangeListResponse>({
     queryKey: ["account-exchanges"],
-    queryFn:  () => fetch("/api/user/exchanges").then(r => r.json()),
+    queryFn:  () => authFetch("/api/user/exchanges").then(r => r.json()),
   });
 
   // Derived stats

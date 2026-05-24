@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -128,7 +129,7 @@ export function SettingsDrawer() {
 
   const { data: remoteSettings, isLoading } = useQuery<AppSettings>({
     queryKey:  ["settings"],
-    queryFn:   () => fetch("/api/settings").then((r) => r.json()),
+    queryFn:   () => authFetch("/api/settings").then((r) => r.json()),
     staleTime: 30_000,
   });
 
@@ -150,7 +151,7 @@ export function SettingsDrawer() {
 
   const mutation = useMutation({
     mutationFn: (patch: Partial<AppSettings>) =>
-      fetch("/api/settings", {
+      authFetch("/api/settings", {
         method:  "PUT",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(patch),

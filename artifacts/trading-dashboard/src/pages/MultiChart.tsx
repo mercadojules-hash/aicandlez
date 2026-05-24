@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
@@ -149,7 +150,7 @@ function AssetChart({
   const { data: candles, isLoading, isFetching, refetch } = useQuery<Candle[]>({
     queryKey: ["candles", asset.symbol, timeframe, limit],
     queryFn:  () =>
-      fetch(`/api/candles?symbol=${asset.symbol}&timeframe=${timeframe}&limit=${limit}`)
+      authFetch(`/api/candles?symbol=${asset.symbol}&timeframe=${timeframe}&limit=${limit}`)
         .then((r) => r.json()),
     refetchInterval: timeframe === "5m" ? 30_000 : timeframe === "15m" ? 60_000 : 120_000,
     staleTime: 20_000,

@@ -31,6 +31,38 @@ auth.aicandlez.com       → Clerk auth proxy (optional)
 
 ---
 
+## 0. Post-deploy verification matrix (Task #172)
+
+Run after every Render deploy. Each host MUST return JSON (not
+`text/html`) from `api.aicandlez.com`. A `text/html` response means
+`VITE_API_BASE_URL` is empty on that service — the SPA fallback is
+serving `index.html` for `/api/*` and React Query is silently defaulting
+to `[]`. Look for the red `ApiBaseUrlBanner` on the dashboard hosts as
+an in-browser confirmation.
+
+| Host                              | Endpoint                                       | Expected                            |
+| --------------------------------- | ---------------------------------------------- | ----------------------------------- |
+| `https://api.aicandlez.com`       | `/api/healthz`                                 | 200 · `application/json` · `{ok:true}` |
+| `https://trade.aicandlez.com`     | DevTools → `/api/auth/me` (signed-in)          | 200 · `application/json` · role payload |
+| `https://trade.aicandlez.com`     | DevTools → `/api/exchanges/catalog`            | 200 · `application/json` · catalog array |
+| `https://admintrade.aicandlez.com`| DevTools → `/api/admin/users`                  | 200 · `application/json` · users array |
+| `https://admintrade.aicandlez.com`| DevTools → `/api/admin/top-telemetry`          | 200 · `application/json` · telemetry payload |
+| `https://app.aicandlez.com`       | DevTools → `/api/user/exchanges` (signed-in)   | 200 · `application/json` · connections payload |
+| `http://localhost:80` (dev)       | `/api/healthz`                                 | 200 · `application/json` (same-origin proxy) |
+
+CLI smoke test (any host):
+
+```bash
+curl -sI https://api.aicandlez.com/api/healthz | grep -i content-type
+# expect: content-type: application/json
+```
+
+If the dashboard hosts show the red top banner, fix the failing service's
+`VITE_API_BASE_URL` env in `render.yaml` and redeploy — do not chase
+empty-table bug reports until the banner clears.
+
+---
+
 ## 1. DNS Records
 
 Configure at your DNS provider (Cloudflare recommended — use Full Strict SSL mode):

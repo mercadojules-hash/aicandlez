@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useQuery } from "@tanstack/react-query";
 import type { EngineStatus } from "@/components/command/types";
 
@@ -6,7 +7,7 @@ const Q_OPTS = { refetchOnWindowFocus: false, retry: false } as const;
 export default function Leaderboard() {
   const { data: engine } = useQuery<EngineStatus>({
     queryKey: ["engine-leaderboard"],
-    queryFn:  () => fetch("/api/engine/status").then(r => r.json()),
+    queryFn:  () => authFetch("/api/engine/status").then(r => r.json()),
     refetchInterval: 10_000,
     ...Q_OPTS,
   });

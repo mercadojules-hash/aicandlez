@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -171,7 +172,7 @@ function AssetMiniChart({ displayName }: { displayName: string }) {
   const { data: candles, isLoading } = useQuery<CandlePoint[]>({
     queryKey: ["miniChart", apiSymbol],
     queryFn: async () => {
-      const r = await fetch(`/api/candles?symbol=${apiSymbol}&timeframe=15m&limit=60`);
+      const r = await authFetch(`/api/candles?symbol=${apiSymbol}&timeframe=15m&limit=60`);
       if (!r.ok) throw new Error("candle fetch failed");
       return r.json();
     },
@@ -253,7 +254,7 @@ export default function AssetScanner() {
   } = useQuery<ScanResult>({
     queryKey: ["scanner-scan", resetKey],
     queryFn:  async () => {
-      const r = await fetch("/api/scanner/scan", { method: "POST" });
+      const r = await authFetch("/api/scanner/scan", { method: "POST" });
       if (!r.ok) {
         const e = await r.json().catch(() => ({ error: r.statusText }));
         throw new Error(e.error ?? "Scan failed");

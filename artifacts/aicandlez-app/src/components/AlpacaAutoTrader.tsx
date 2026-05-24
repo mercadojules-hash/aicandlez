@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useEffect, useRef, useCallback } from "react";
 import { useAIAutoTrade } from "@/contexts/AIAutoTradeContext";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
@@ -34,7 +35,7 @@ export function AlpacaAutoTrader() {
 
   const checkAndTrade = useCallback(async () => {
     try {
-      const res = await fetch("/api/mobile/status");
+      const res = await authFetch("/api/mobile/status");
       if (!res.ok) return;
       const data = (await res.json()) as MobileStatusResp;
       const sig  = data.lastSignal;
@@ -50,7 +51,7 @@ export function AlpacaAutoTrader() {
         const symbol = fmtSymbol(sig.symbol ?? "BTC/USD");
         const side   = sig.action === "BUY" ? "buy" : "sell";
 
-        const orderRes = await fetch("/api/exchange/alpaca/order", {
+        const orderRes = await authFetch("/api/exchange/alpaca/order", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({ symbol, side, notional: ORDER_NOTIONAL }),
@@ -72,7 +73,7 @@ export function AlpacaAutoTrader() {
     if (!isActive) return;
 
     // Seed lastSignalTs so we don't replay old signals on enable
-    void fetch("/api/mobile/status")
+    void authFetch("/api/mobile/status")
       .then(r => r.ok ? r.json() as Promise<MobileStatusResp> : null)
       .then(d => {
         if (d?.lastSignal?.ts) lastSignalTs.current = d.lastSignal.ts;

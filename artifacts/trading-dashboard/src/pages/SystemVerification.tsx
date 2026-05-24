@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useQuery } from "@tanstack/react-query";
 import {
   CheckCircle2, XCircle, AlertCircle, RefreshCw, Activity, Database,
@@ -142,7 +143,7 @@ function Row({ label, value, mono = false }: { label: string; value: React.React
 export default function SystemVerification() {
   const { data, isLoading, isFetching, refetch, dataUpdatedAt } = useQuery<VerificationData>({
     queryKey:        ["system-verification"],
-    queryFn:         () => fetch("/api/system/verification").then((r) => r.json()),
+    queryFn:         () => authFetch("/api/system/verification").then((r) => r.json()),
     refetchInterval: 30_000,
   });
 

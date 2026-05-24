@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -172,7 +173,7 @@ function DebugMiniChart({ symbol }: { symbol: string }) {
   const { data: candles, isLoading } = useQuery<CandlePoint[]>({
     queryKey: ["debugMiniChart", symbol],
     queryFn: async () => {
-      const r = await fetch(`/api/candles?symbol=${symbol}&timeframe=5m&limit=48`);
+      const r = await authFetch(`/api/candles?symbol=${symbol}&timeframe=5m&limit=48`);
       if (!r.ok) throw new Error("candle fetch failed");
       return r.json();
     },
@@ -344,13 +345,13 @@ export default function SignalDebug() {
 
   const { data, isLoading, isFetching, refetch } = useQuery<EngineStatus>({
     queryKey:        ["engine-debug"],
-    queryFn:         () => fetch("/api/engine/status").then((r) => r.json()),
+    queryFn:         () => authFetch("/api/engine/status").then((r) => r.json()),
     refetchInterval: 15_000,
   });
 
   const testModeMutation = useMutation({
     mutationFn: (enabled: boolean) =>
-      fetch("/api/engine/testmode", {
+      authFetch("/api/engine/testmode", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ enabled }),
@@ -360,7 +361,7 @@ export default function SignalDebug() {
 
   const filterMutation = useMutation({
     mutationFn: (patch: { volumeFilter?: boolean; require1HTrend?: boolean }) =>
-      fetch("/api/engine/filters", {
+      authFetch("/api/engine/filters", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(patch),

@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -328,12 +329,12 @@ export default function Validation() {
 
   const { data: status, isLoading: statusLoading } = useQuery<StatusResponse>({
     queryKey: ["/validation/status"],
-    queryFn: () => fetch("/api/validation/status").then(r => r.json()),
+    queryFn: () => authFetch("/api/validation/status").then(r => r.json()),
     refetchInterval: 5_000,
   });
 
   const runMutation = useMutation<ValidationResult, Error>({
-    mutationFn: () => fetch("/api/validation/run", { method: "POST" }).then(r => {
+    mutationFn: () => authFetch("/api/validation/run", { method: "POST" }).then(r => {
       if (!r.ok) return r.json().then(e => Promise.reject(new Error(e.error)));
       return r.json();
     }),
@@ -350,7 +351,7 @@ export default function Validation() {
 
   const overrideMutation = useMutation({
     mutationFn: (lock: boolean) =>
-      fetch("/api/validation/override", {
+      authFetch("/api/validation/override", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lock }),

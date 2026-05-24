@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -157,7 +158,7 @@ export default function Portfolio() {
   const { data, isFetching, isError, error, refetch } = useQuery<PortfolioOverview>({
     queryKey:        ["portfolio-overview"],
     queryFn:         async () => {
-      const r = await fetch("/api/portfolio/overview");
+      const r = await authFetch("/api/portfolio/overview");
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? r.statusText);
       return r.json();
     },
@@ -166,7 +167,7 @@ export default function Portfolio() {
 
   const configMutation = useMutation({
     mutationFn: async (patch: Partial<PortfolioOverview["config"]>) => {
-      const r = await fetch("/api/portfolio/config", {
+      const r = await authFetch("/api/portfolio/config", {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(patch),

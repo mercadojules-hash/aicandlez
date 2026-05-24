@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { AlpacaActivateResult } from "@/lib/api";
 
@@ -28,7 +29,7 @@ export function AIAutoTradeProvider({ children }: { children: ReactNode }) {
 
     // When enabling, try to activate Alpaca paper trading
     if (v) {
-      void fetch("/api/exchange/alpaca/activate", { method: "POST" })
+      void authFetch("/api/exchange/alpaca/activate", { method: "POST" })
         .then(r => r.ok ? r.json() as Promise<AlpacaActivateResult> : null)
         .then(() => { /* Alpaca activated (or unavailable) — no client-side action needed */ })
         .catch(() => { /* credentials may not be set — silently ignore */ });

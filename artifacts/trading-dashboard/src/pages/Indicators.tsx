@@ -1,3 +1,4 @@
+import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   BarChart3, RefreshCw, TrendingUp, TrendingDown, Minus,
@@ -317,7 +318,7 @@ export default function Indicators() {
     if (!quiet) setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/analysis/${sym}?timeframe=${tf}&limit=100`);
+      const res = await authFetch(`/api/analysis/${sym}?timeframe=${tf}&limit=100`);
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error((j as { error?: string }).error ?? `HTTP ${res.status}`);

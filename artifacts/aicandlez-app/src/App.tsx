@@ -6,6 +6,7 @@ import {
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { BottomNav } from "@/components/BottomNav";
 import { BillingHoldBanner } from "@/components/BillingHoldBanner";
+import { ApiBaseUrlBanner } from "@/components/ApiBaseUrlBanner";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
 import { SubscriptionModal }    from "@/components/SubscriptionModal";
@@ -354,6 +355,7 @@ function Nav() {
 function GlobalBillingHoldIndicator() {
   return (
     <ClerkLoaded>
+      <ApiBaseUrlBanner />
       <Show when="signed-in"><BillingHoldBanner /></Show>
     </ClerkLoaded>
   );
