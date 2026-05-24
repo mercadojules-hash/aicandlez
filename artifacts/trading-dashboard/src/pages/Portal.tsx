@@ -3742,7 +3742,7 @@ export default function Portal() {
 }
 
 function PortalInner() {
-  const { isAdmin } = useUserRole();
+  const { isAdmin, loading: roleLoading } = useUserRole();
   const { getToken, isSignedIn } = useAuth();
   const [dbTier, setDbTier] = useState<Plan>("free");
   const [upgradeOpen,    setUpgradeOpen]    = useState(false);
@@ -4722,6 +4722,46 @@ function PortalInner() {
       {disclaimerGateModal}
     </div>
   );
+
+  // Task #165 — hydration gate. `useUserRole()` resolves async via
+  // /api/auth/me. Without this gate, `isAdmin` defaults to `false` on first
+  // paint and the customer branch flashes for ~300–800ms before the admin
+  // role resolves and the operator branch takes over (visible flicker:
+  // customer dashboard → LIVE EXECUTION bars). Block render entirely until
+  // role + Clerk both resolve. Single source of truth is `roleLoading` from
+  // useUserRole (which itself waits on Clerk `isLoaded` + `/api/auth/me`).
+  if (roleLoading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: N.BG,
+          color: N.TEXT_2,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "JetBrains Mono, ui-monospace, monospace",
+          fontSize: 11,
+          letterSpacing: 2,
+          textTransform: "uppercase",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+          <div
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              background: N.BRAND,
+              boxShadow: `0 0 14px ${N.BRAND_GLOW}`,
+              animation: "brand-pulse 1.2s ease-in-out infinite",
+            }}
+          />
+          <span style={{ color: N.TEXT_2 }}>Resolving session…</span>
+        </div>
+      </div>
+    );
+  }
 
   // Admin operators on admintrade.aicandlez.com: real-only, no PAPER store,
   // no PAPER/LIVE toggle, no per-tier gates. They get the raw body.
