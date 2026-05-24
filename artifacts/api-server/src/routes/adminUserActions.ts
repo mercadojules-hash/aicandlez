@@ -57,6 +57,8 @@ import {
   cancelSubscriptionImmediately,
   grantComplimentaryDays,
   extendSubscriptionByDays,
+  createComplimentarySubscription,
+  resolvePriceIdForPlan,
   type StripeSubscriptionOutcome,
 } from "../lib/adminBillingActions.js";
 import { invalidateTradeLimitCache } from "../lib/tradeLimitEngine.js";
@@ -639,6 +641,146 @@ router.get("/admin/users/:id/audit", ...requireOperator, async (req, res): Promi
 //
 // Read-only against Clerk. Idempotent. Safe to run repeatedly.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /admin/users/:id/create_complimentary_subscription   (super-admin only)
+//
+// Create a brand-new STARTER or PRO subscription for a user who has NO
+// existing Stripe subscription. Used for influencers, beta testers, DJs,
+// affiliate partners, internal QA, reviewers, promotional onboarding.
+//
+// Zero charge — Stripe sub is created in `trialing` state with
+// `trial_period_days=N` and `cancel_at_period_end=true` so it auto-cancels
+// at trial end (operator must explicitly extend or convert to paid).
+// Fully compatible with existing entitlement middleware: `users.plan` and
+// `users.plan_status` are persisted, the same fields every gate reads.
+// Auto-cancel default protects against accidental billing.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CreateCompSubBodySchema = z.object({
+  plan: z.enum(["starter", "pro"]),
+  days: z.number().int().min(1).max(365),
+  note: NoteSchema,
+});
+
+router.post("/admin/users/:id/create_complimentary_subscription", ...requireSuperAdmin, async (req, res): Promise<void> => {
+  const ctx = resolveActor(req, res);
+  if (!ctx) return;
+  const parsed = CreateCompSubBodySchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid body" });
+    return;
+  }
+  const { plan, days, note } = parsed.data;
+
+  try {
+    const [target] = await db.select({
+      email:                usersTable.email,
+      billingEmail:         usersTable.billingEmail,
+      stripeCustomerId:     usersTable.stripeCustomerId,
+      stripeSubscriptionId: usersTable.stripeSubscriptionId,
+      plan:                 usersTable.plan,
+      planStatus:           usersTable.planStatus,
+    }).from(usersTable).where(eq(usersTable.clerkUserId, ctx.targetId)).limit(1);
+
+    if (!target) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    if (target.stripeSubscriptionId) {
+      res.status(409).json({
+        error: "User already has a Stripe subscription. Use 'Grant Complimentary Days' to extend the existing one instead.",
+      });
+      return;
+    }
+    const email = (target.billingEmail ?? target.email ?? "").trim();
+    if (!email) {
+      res.status(409).json({ error: "User has no email on file. Sync from Clerk first." });
+      return;
+    }
+    const priceId = resolvePriceIdForPlan(plan);
+    if (!priceId) {
+      res.status(500).json({
+        error: `Stripe price for ${plan.toUpperCase()} not configured (set STRIPE_PRICE_${plan.toUpperCase()}_MONTHLY).`,
+      });
+      return;
+    }
+
+    const idemKey = dayIdempotencyKey({
+      action: `create_comp_${plan}_${days}d`,
+      target: ctx.targetId,
+      actor:  ctx.actorId,
+    });
+
+    const { subscription, customerId } = await createComplimentarySubscription({
+      email,
+      clerkUserId:        ctx.targetId,
+      priceId,
+      days,
+      existingCustomerId: target.stripeCustomerId,
+      idempotencyKey:     idemKey,
+      autoCancelAtTrialEnd: true,
+    });
+
+    // Persist to users row so entitlement middleware (`requirePlan`,
+    // SubscriptionContext, telemetry SQL) sees the new plan immediately.
+    await db.update(usersTable)
+      .set({
+        stripeCustomerId:     customerId,
+        stripeSubscriptionId: subscription.id,
+        billingEmail:         email,
+        plan,
+        planStatus:           subscription.status, // typically "trialing"
+        trialEndsAt:          subscription.trialEnd ? new Date(subscription.trialEnd * 1000) : null,
+        updatedAt:            new Date(),
+      })
+      .where(eq(usersTable.clerkUserId, ctx.targetId));
+
+    await writeAudit({
+      actorId:  ctx.actorId,
+      targetId: ctx.targetId,
+      action:   "create_complimentary_subscription",
+      payload:  {
+        note,
+        plan,
+        days,
+        before: {
+          plan:                 target.plan,
+          planStatus:           target.planStatus,
+          stripeCustomerId:     target.stripeCustomerId,
+          stripeSubscriptionId: null,
+        },
+        after: {
+          plan,
+          planStatus:           subscription.status,
+          stripeCustomerId:     customerId,
+          stripeSubscriptionId: subscription.id,
+          trialEnd:             subscription.trialEnd,
+          autoCancelAtTrialEnd: true,
+        },
+        priceId,
+      },
+    });
+    __invalidateAdminUserTelemetryCache();
+
+    req.log.info(
+      { targetId: ctx.targetId, plan, days, subId: subscription.id },
+      "Complimentary subscription created",
+    );
+
+    res.json({
+      ok:                   true,
+      plan,
+      stripeSubscriptionId: subscription.id,
+      stripeCustomerId:     customerId,
+      stripeStatus:         subscription.status,
+      trialEnd:             subscription.trialEnd,
+    });
+  } catch (err) {
+    req.log.error({ err }, "admin create_complimentary_subscription failed");
+    res.status(502).json({ error: `Stripe comp creation failed: ${(err as Error).message}` });
+  }
+});
 
 router.post("/admin/users/sync_from_clerk", ...requireOperator, async (req, res): Promise<void> => {
   const ctx = resolveActor(req, res);

@@ -216,6 +216,7 @@ function UserActionDrawer({
   const [reason, setReason]     = useState("");
   const [days, setDays]         = useState<number>(30);
   const [capTier, setCapTier]   = useState<number>(3);
+  const [compPlan, setCompPlan] = useState<"starter" | "pro">("pro");
 
   useEffect(() => {
     if (user) {
@@ -384,30 +385,78 @@ function UserActionDrawer({
             </>
           )}
 
-          {panel === "comp" && (
-            <ActionForm title="GRANT COMPLIMENTARY DAYS" onBack={() => setPanel(null)}>
-              <p style={{ fontSize: 10, color: C.dim, lineHeight: 1.55, marginBottom: 10 }}>
-                Pushes Stripe <code>trial_end</code> forward N days from now. User stays
-                on their current plan ({user.plan.toUpperCase()}) at $0 for the trial window.
-                {!user.plan || user.plan === "free" ? (
-                  <span style={{ display: "block", marginTop: 6, color: "#ffaa00" }}>
-                    ⚠ User has no paid subscription. Ask them to start checkout for STARTER
-                    or PRO first, then come back to grant complimentary days.
-                  </span>
-                ) : null}
-              </p>
-              <DaysInput value={days} onChange={setDays} max={365} />
-              <PresetRow values={[7, 14, 30, 60, 90]} onSelect={setDays} unit="d" />
-              <NoteInput note={note} setNote={setNote} />
-              <SubmitButton
-                onClick={() => submit("complimentary_subscription", { days })}
-                disabled={mutation.isPending || !user.plan || user.plan === "free"}
-                pending={mutation.isPending}
-                color="#00ff8a">
-                Grant {days} day{days === 1 ? "" : "s"}
-              </SubmitButton>
-            </ActionForm>
-          )}
+          {panel === "comp" && (() => {
+            const isFreeUser = !user.plan || user.plan === "free";
+            return (
+              <ActionForm title={isFreeUser ? "CREATE COMPLIMENTARY ACCESS" : "GRANT COMPLIMENTARY DAYS"} onBack={() => setPanel(null)}>
+                {isFreeUser ? (
+                  <>
+                    <p style={{ fontSize: 10, color: C.dim, lineHeight: 1.55, marginBottom: 10 }}>
+                      Creates a brand-new Stripe subscription in <code>trialing</code> state
+                      with <code>trial_period_days = N</code> and <code>cancel_at_period_end</code>.
+                      Zero charge. Auto-cancels at trial end (no surprise billing).
+                      <span style={{ display: "block", marginTop: 6, color: "#cc55ff" }}>
+                        ⓘ Super-admin only. Use for influencers, beta testers, partners, QA.
+                      </span>
+                    </p>
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: C.dim, marginBottom: 6 }}>
+                        PLAN TIER
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                        {(["starter", "pro"] as const).map((p) => (
+                          <button key={p}
+                            onClick={() => setCompPlan(p)}
+                            style={{
+                              padding: "10px 12px",
+                              background: compPlan === p ? planColor(p) + "22" : "transparent",
+                              border: `1px solid ${compPlan === p ? planColor(p) : C.border}`,
+                              borderRadius: 6, cursor: "pointer", textAlign: "left",
+                            }}>
+                            <div style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 700, color: planColor(p) }}>
+                              {p === "starter" ? "STARTER · $39.99/mo" : "PRO · $79.99/mo"}
+                            </div>
+                            <div style={{ fontSize: 8, fontFamily: "monospace", color: C.faint, marginTop: 3 }}>
+                              {p === "starter" ? "Up to 3 AI trades" : "Up to 12 AI trades · Equities"}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <DaysInput value={days} onChange={setDays} max={365} />
+                    <PresetRow values={[7, 14, 30, 60, 90, 180, 365]} onSelect={setDays} unit="d" />
+                    <NoteInput note={note} setNote={setNote} />
+                    <SubmitButton
+                      onClick={() => submit("create_complimentary_subscription", { plan: compPlan, days })}
+                      disabled={mutation.isPending || !isSuperAdmin}
+                      pending={mutation.isPending}
+                      color={planColor(compPlan)}>
+                      {isSuperAdmin
+                        ? `Create comp ${compPlan.toUpperCase()} for ${days} day${days === 1 ? "" : "s"}`
+                        : "Requires super-admin role"}
+                    </SubmitButton>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 10, color: C.dim, lineHeight: 1.55, marginBottom: 10 }}>
+                      Pushes Stripe <code>trial_end</code> forward N days from now. User stays
+                      on their current plan ({user.plan.toUpperCase()}) at $0 for the trial window.
+                    </p>
+                    <DaysInput value={days} onChange={setDays} max={365} />
+                    <PresetRow values={[7, 14, 30, 60, 90]} onSelect={setDays} unit="d" />
+                    <NoteInput note={note} setNote={setNote} />
+                    <SubmitButton
+                      onClick={() => submit("complimentary_subscription", { days })}
+                      disabled={mutation.isPending}
+                      pending={mutation.isPending}
+                      color="#00ff8a">
+                      Grant {days} day{days === 1 ? "" : "s"}
+                    </SubmitButton>
+                  </>
+                )}
+              </ActionForm>
+            );
+          })()}
 
           {panel === "extend" && (
             <ActionForm title="EXTEND PAID SUBSCRIPTION" onBack={() => setPanel(null)}>

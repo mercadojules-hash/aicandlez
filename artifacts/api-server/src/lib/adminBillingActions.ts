@@ -60,6 +60,69 @@ export async function cancelSubscriptionImmediately(
   return shape(sub);
 }
 
+/** Create a brand-new complimentary subscription for a user who has no
+ *  existing Stripe subscription. Used by Admin Console "Create Complimentary
+ *  STARTER/PRO" for influencers, beta testers, reviewers, partners.
+ *
+ *  Flow:
+ *    1. Lookup or create Stripe customer (by email, metadata.clerkUserId)
+ *    2. stripe.subscriptions.create({ items: [{ price }], trial_period_days })
+ *    3. Caller is responsible for persisting `stripe_subscription_id`,
+ *       `plan`, `plan_status='trialing'`, `trial_ends_at` on the users row.
+ *
+ *  No upfront charge — Stripe collects nothing until trial ends. Caller
+ *  should set `cancel_at_period_end=true` afterwards if comp should NOT
+ *  auto-renew (default behaviour here = auto-cancel at trial end).
+ */
+export async function createComplimentarySubscription(opts: {
+  email:           string;
+  clerkUserId:     string;
+  priceId:         string;
+  days:            number;
+  existingCustomerId?: string | null;
+  idempotencyKey:  string;
+  autoCancelAtTrialEnd?: boolean;
+}): Promise<{ subscription: StripeSubscriptionOutcome; customerId: string }> {
+  const stripe = await getUncachableStripeClient();
+
+  let customerId = opts.existingCustomerId ?? null;
+  if (!customerId) {
+    const customer = await stripe.customers.create(
+      { email: opts.email, metadata: { clerkUserId: opts.clerkUserId } },
+      { idempotencyKey: `${opts.idempotencyKey}-cust` },
+    );
+    customerId = customer.id;
+  }
+
+  const sub = await stripe.subscriptions.create(
+    {
+      customer:           customerId,
+      items:              [{ price: opts.priceId }],
+      trial_period_days:  opts.days,
+      // Auto-cancel at trial end so comp users don't accidentally start
+      // paying. Operator can flip this later via extend/cancel actions.
+      cancel_at_period_end: opts.autoCancelAtTrialEnd ?? true,
+      payment_behavior:   "default_incomplete",
+      metadata:           {
+        complimentary:   "true",
+        clerkUserId:     opts.clerkUserId,
+        compDays:        String(opts.days),
+      },
+    },
+    { idempotencyKey: opts.idempotencyKey },
+  );
+
+  return { subscription: shape(sub), customerId };
+}
+
+/** Resolve a Stripe monthly price ID for a plan tier. Env-first, matches the
+ *  same resolution used by customer-facing checkout. */
+export function resolvePriceIdForPlan(plan: "starter" | "pro"): string | null {
+  const envKey = plan === "starter" ? "STRIPE_PRICE_STARTER_MONTHLY" : "STRIPE_PRICE_PRO_MONTHLY";
+  const val = process.env[envKey];
+  return val && val.startsWith("price_") ? val : null;
+}
+
 /** Grant a complimentary period by pushing `trial_end` forward N days.
  *  Stripe-native, proration disabled so the customer is not retroactively
  *  charged for the comp window. */
