@@ -55,6 +55,16 @@ const apiBaseUrl: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
 
 // ── Theme tokens (mirrors mockup `_group.css`) ─────────────────────────────
+/* nz — coerce any value (null/undefined/NaN/string) to a finite number.
+   Guards every render-time .toLocaleString() / .toFixed() / arithmetic on
+   telemetry that may be null/undefined during bootstrap, on standby, or
+   on transient upstream errors. */
+function nz(v: unknown, fallback = 0): number {
+  if (v === null || v === undefined) return fallback;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 const T = {
   BG_BLACK:    "#000000",
   BG_TERMINAL: "#050A07",
@@ -367,7 +377,7 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
         >
           <Activity size={11} color={T.TEXT_2} /> SIG/MIN:&nbsp;
           <span style={{ color: signalsPerMin > 0 ? T.TEXT_0 : T.TEXT_2 }}>
-            {signalsPerMin >= 10 ? signalsPerMin.toFixed(0) : signalsPerMin.toFixed(1)}
+            {nz(signalsPerMin) >= 10 ? nz(signalsPerMin).toFixed(0) : nz(signalsPerMin).toFixed(1)}
           </span>
         </span>
 
@@ -444,7 +454,7 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
           <span style={{
             color: T.TEXT_0, fontVariantNumeric: "tabular-nums",
             fontSize: 12, fontWeight: 700, letterSpacing: "-0.01em",
-          }}>${equityUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          }}>${nz(equityUsd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           <span aria-hidden style={{ width: 1, height: 12, background: "rgba(102,255,102,0.20)" }} />
           <span style={{ color: T.TEXT_3, fontVariantNumeric: "tabular-nums", fontSize: 9, letterSpacing: "0.16em" }}>REALIZED 1D</span>
           <span style={{
@@ -452,7 +462,7 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
             fontSize: 12, fontWeight: 700, letterSpacing: "-0.01em",
             textShadow: realizedToday !== 0 ? `0 0 6px ${realizedColor}33` : undefined,
           }}>
-            {realizedSign}${Math.abs(realizedToday).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {realizedSign}${Math.abs(nz(realizedToday)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </span>
       </div>
@@ -2651,9 +2661,9 @@ const RecentExits = memo(function RecentExits({ now }: { now: number }) {
                   <span style={{ color: T.TEXT_3, marginLeft: 6 }}>{reasonGloss(h.reason)}</span>
                 </span>
                 <span>
-                  ENTRY ${h.entry.toLocaleString("en-US", { maximumFractionDigits: 4 })}
+                  ENTRY ${nz(h.entry).toLocaleString("en-US", { maximumFractionDigits: 4 })}
                   &nbsp;→&nbsp;
-                  ${h.exit.toLocaleString("en-US", { maximumFractionDigits: 4 })}
+                  ${nz(h.exit).toLocaleString("en-US", { maximumFractionDigits: 4 })}
                 </span>
               </div>
             </div>
@@ -2705,7 +2715,7 @@ const SignalPipeline = memo(function SignalPipeline({
               }} />
               <span style={{ fontSize: 10, color: T.TEXT_3, letterSpacing: "0.10em", width: 72 }}>{s.tag}</span>
               <span style={{ fontSize: 11, color: labelTone, fontWeight: 600, minWidth: 28, textAlign: "right" }}>
-                {s.count.toLocaleString()}
+                {nz(s.count).toLocaleString()}
               </span>
               <span style={{ fontSize: 11, color: T.TEXT_2, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {s.sample ? `${s.sample.symbol} · ${s.sample.conf}%` : "—"}
@@ -2720,7 +2730,7 @@ const SignalPipeline = memo(function SignalPipeline({
         }}>
           <span>MTF BLOCK <span style={{ color: pulse.blockRatePct >= 60 ? T.AMBER : T.TEXT_1 }}>{pulse.blockRatePct}%</span></span>
           <span>EXEC RATE <span style={{ color: pulse.execRatePct  >  0 ? T.NEON  : T.TEXT_1 }}>{pulse.execRatePct}%</span></span>
-          <span>FILLED <span style={{ color: T.TEXT_0 }}>{fExecuted.toLocaleString()}</span></span>
+          <span>FILLED <span style={{ color: T.TEXT_0 }}>{nz(fExecuted).toLocaleString()}</span></span>
         </div>
       </div>
     </PanelCard>
