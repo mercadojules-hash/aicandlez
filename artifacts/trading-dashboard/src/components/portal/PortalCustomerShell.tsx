@@ -2706,35 +2706,89 @@ const MarketRegime = memo(function MarketRegime({ opps }: { opps: OpportunityVM[
   );
 });
 
-const AIThroughput = memo(function AIThroughput({
-  engine, pulse, signalsPerMin,
+// Pass 7S — AccountStatusStrip. Replaces AIThroughput (deleted) under
+// the matrix. Customer-facing telemetry only: paper equity, realized
+// + unrealized PNL, win %, wins/losses, open trades, active signals,
+// queue depth, exec status, AI avg confidence ring. NO internal engine
+// metrics (evals, MTF count, correlation blocks, loop interval). Same
+// PanelCard chassis as LIVE TRADES + TRADE HISTORY so the lower
+// section reads as one continuous trading surface, not a strip of
+// admin widgets.
+const AccountStatusStrip = memo(function AccountStatusStrip({
+  pulse, activeSignals, engineOnline,
 }: {
-  engine:        EngineLite | undefined;
   pulse:         MarketPulse;
-  signalsPerMin: number;
+  activeSignals: number;
+  engineOnline:  boolean;
 }) {
-  const evals = engine?.funnel?.total      ?? 0;
-  const sigs  = engine?.signalsGenerated   ?? 0;
-  const mtf   = engine?.mtfConfirmedCount  ?? 0;
-  const corr  = engine?.correlationBlocks  ?? 0;
-  const loopMs = engine?.loopIntervalMs    ?? 0;
+  const { stats, history } = usePaperTrades();
+  const equity        = stats.equity || STARTING_EQUITY;
+  const realizedPnl   = stats.realizedPnl;
+  const unrealizedPnl = stats.unrealizedPnl;
+  const openCount     = stats.openCount;
+  const closedCount   = stats.closedCount;
+  const wins   = useMemo(() => history.reduce((n, h) => n + (h.pnl >  0 ? 1 : 0), 0), [history]);
+  const losses = useMemo(() => history.reduce((n, h) => n + (h.pnl <= 0 ? 1 : 0), 0), [history]);
+  const winPct = closedCount > 0 ? Math.round((wins / closedCount) * 100) : 0;
+  const queueDepth = pulse.waiting;
+  const execActive = engineOnline && pulse.execRatePct > 0;
+  const execLabel  = !engineOnline ? "OFFLINE" : execActive ? `${pulse.execRatePct}% LIVE` : "IDLE";
+  const execColor  = !engineOnline ? T.RED : execActive ? T.NEON : T.AMBER;
+  const confColor  = pulse.avgConf >= 70 ? T.NEON : pulse.avgConf >= 55 ? T.AMBER : T.TEXT_1;
 
-  // Engine load = share of evaluated symbols that passed MTF (i.e. how
-  // much real signal yield the loop is producing per cycle). Capped 100.
-  const loadPct = evals > 0 ? Math.min(100, Math.round((mtf / evals) * 100)) : 0;
-  const loadTone = loadPct >= 40 ? T.NEON : loadPct >= 15 ? T.TEXT_0 : T.TEXT_1;
+  const fmtMoney = (n: number) =>
+    `${n < 0 ? "−" : n > 0 ? "+" : ""}$${Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmtEquity = (n: number) =>
+    `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  // Cell renderer — same Kv visual language but stacked (label above
+  // value) so the strip reads as a row of operator stat cells rather
+  // than a 2-column key list. Matches the density of OpportunityCard
+  // micro-stats so the lower section feels like a continuation of the
+  // matrix surface.
+  const Cell = ({ k, v, color = T.TEXT_0 }: { k: string; v: string; color?: string }) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+      <span style={{ fontSize: 9, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL, whiteSpace: "nowrap" }}>{k}</span>
+      <span style={{ fontSize: 14, color, fontVariantNumeric: "tabular-nums", fontWeight: 600, whiteSpace: "nowrap" }}>{v}</span>
+    </div>
+  );
 
   return (
-    <PanelCard title="AI THROUGHPUT" live height={208}>
-      <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 9, justifyContent: "center", flex: 1, fontSize: 10, fontVariantNumeric: "tabular-nums" }}>
-        <Kv k="ENGINE EVALS"     v={evals.toLocaleString()} />
-        <Kv k="SIGNALS / MIN"    v={signalsPerMin >= 10 ? signalsPerMin.toFixed(0) : signalsPerMin.toFixed(1)} color={signalsPerMin > 0 ? T.TEXT_0 : T.TEXT_2} />
-        <Kv k="SIGNALS GEN"      v={sigs.toLocaleString()} />
-        <Kv k="MTF CONFIRMED"    v={mtf.toLocaleString()} />
-        <Kv k="EXEC RATE"        v={`${pulse.execRatePct}%`} color={pulse.execRatePct > 0 ? T.NEON : T.TEXT_1} />
-        <Kv k="ENGINE LOAD"      v={`${loadPct}%`} color={loadTone} />
-        <Kv k="CORRELATION BLKS" v={corr.toLocaleString()} color={corr > 0 ? T.AMBER : T.TEXT_1} />
-        <Kv k="LOOP INTERVAL"    v={loopMs ? `${loopMs}ms` : "—"} />
+    <PanelCard title="ACCOUNT STATUS" live height={140}>
+      <div style={{
+        padding: "14px 18px",
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        gap: 20,
+        fontFamily: T.FONT_MONO,
+      }}>
+        <div style={{
+          flex: 1,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))",
+          gap: 16,
+          alignItems: "center",
+        }}>
+          <Cell k="PAPER EQUITY"   v={fmtEquity(equity)} color={equity >= STARTING_EQUITY ? T.NEON : T.RED} />
+          <Cell k="REALIZED PNL"   v={fmtMoney(realizedPnl)}   color={realizedPnl   >= 0 ? T.NEON : T.RED} />
+          <Cell k="UNREALIZED PNL" v={fmtMoney(unrealizedPnl)} color={unrealizedPnl >= 0 ? T.NEON : T.RED} />
+          <Cell k="WIN %"          v={closedCount > 0 ? `${winPct}%` : "—"} color={winPct >= 50 ? T.NEON : winPct > 0 ? T.AMBER : T.TEXT_2} />
+          <Cell k="WINS / LOSSES"  v={`${wins} / ${losses}`} />
+          <Cell k="OPEN TRADES"    v={openCount.toString()} color={openCount > 0 ? T.NEON : T.TEXT_2} />
+          <Cell k="ACTIVE SIGNALS" v={activeSignals.toString()} color={activeSignals > 0 ? T.TEXT_0 : T.TEXT_2} />
+          <Cell k="QUEUE"          v={queueDepth.toString()} color={queueDepth > 0 ? T.AMBER : T.TEXT_2} />
+          <Cell k="EXECUTION"      v={execLabel} color={execColor} />
+        </div>
+        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, paddingLeft: 16, borderLeft: `1px solid ${T.BORDER}` }}>
+          <div style={{ position: "relative", width: 78, height: 78 }}>
+            <ConfidenceRing color={confColor} value={pulse.avgConf} size={78} />
+            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+              <span style={{ fontSize: 18, color: confColor, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>{pulse.avgConf}</span>
+              <span style={{ fontSize: 7, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL }}>AVG CONF</span>
+            </div>
+          </div>
+        </div>
       </div>
     </PanelCard>
   );
@@ -3486,13 +3540,17 @@ export function PortalCustomerShell() {
           paddingTop: 20,
           borderTop: `1px solid ${T.BORDER}`,
         }}>
-          {/* Pass 7R — AI THROUGHPUT promoted out of the lower
-              auto-fit grid into a dedicated full-width strip
-              directly under the matrix. Contains the operational
-              telemetry the user asked to surface higher: signals/min,
-              MTF confirmed, exec rate, engine load, correlation
-              blocks. Renders above LIVE TRADES / TRADE HISTORY. */}
-          <AIThroughput engine={engineStatus} pulse={pulse} signalsPerMin={signalsPerMin} />
+          {/* Pass 7S — AI THROUGHPUT removed entirely. Replaced with
+              ACCOUNT STATUS strip: customer-facing user activity +
+              account telemetry (paper equity, realized + unrealized
+              PNL, win %, wins/losses, open trades, active signals,
+              queue, exec status, AI avg confidence ring). No internal
+              engine metrics surface on the customer portal. */}
+          <AccountStatusStrip
+            pulse={pulse}
+            activeSignals={opportunities.length}
+            engineOnline={engineOnline}
+          />
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
