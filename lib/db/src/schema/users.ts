@@ -1,4 +1,4 @@
-import { pgTable, varchar, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, varchar, timestamp, uuid, boolean, integer, text, jsonb } from "drizzle-orm/pg-core";
 
 export const usersTable = pgTable("users", {
   id:                    uuid("id").primaryKey().defaultRandom(),
@@ -20,6 +20,19 @@ export const usersTable = pgTable("users", {
   aiDisclaimerAcceptedAt: timestamp("ai_disclaimer_accepted_at"),
   aiDisclaimerVersion:    varchar("ai_disclaimer_version", { length: 32 }),
   aiDisclaimerIp:         varchar("ai_disclaimer_ip", { length: 64 }),
+  // ── Billing overrides (super-admin editable, audit-logged) ───────────────────
+  // All optional / off by default. When set, override the derived/default
+  // billing posture for this user. Mutated only via PATCH
+  // /api/admin/users/:id/billing-overrides (super-admin). Every change is
+  // captured in `user_admin_actions` as `update_billing_overrides`.
+  perfFeeBpsOverride:    integer("perf_fee_bps_override"),               // null = use platform default (300 = 3%)
+  feeWaiverActive:       boolean("fee_waiver_active").notNull().default(false),
+  feeWaiverUntil:        timestamp("fee_waiver_until"),                  // null = indefinite while active
+  isComplimentaryAccount: boolean("is_complimentary_account").notNull().default(false),
+  isInternalAccount:     boolean("is_internal_account").notNull().default(false),
+  revenueShareBps:       integer("revenue_share_bps").notNull().default(0),
+  billingOverrideNotes:  text("billing_override_notes"),
+  billingOverrideMeta:   jsonb("billing_override_meta").$type<Record<string, unknown>>(),
   // ── Timestamps ────────────────────────────────────────────────────────────────
   createdAt:             timestamp("created_at").defaultNow().notNull(),
   updatedAt:             timestamp("updated_at").defaultNow().notNull(),

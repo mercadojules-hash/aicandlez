@@ -500,7 +500,7 @@ function UserIntelligencePanel({
         {/* Tab body */}
         <div style={{ padding: "14px 18px", flex: 1, overflowY: "auto" }}>
           {tab === "profile" && (
-            <ProfileTab user={user} detail={detail} loading={detailQuery.isLoading} />
+            <ProfileTab user={user} detail={detail} loading={detailQuery.isLoading} isSuperAdmin={isSuperAdmin} />
           )}
           {tab === "exchanges" && (
             <ExchangesTab detail={detail} loading={detailQuery.isLoading} />
@@ -966,24 +966,494 @@ function TabLoading() {
 }
 
 // ── PROFILE TAB ──────────────────────────────────────────────────────────────
-// Identity + AI engine settings + revenue attribution. Pulls from the
-// existing grid row (which already carries the CRM overlay fields) and
-// enriches with the detail endpoint's `settings` + `user` blocks once
-// available.
-function ProfileTab({ user, detail, loading }: {
+// Identity (read-only) + AI engine settings (editable, operator) + revenue /
+// billing attribution (editable, super-admin). The editable sections use a
+// single shared dirty-state form with explicit SAVE CHANGES / RESET buttons
+// at the bottom of each section. Mutations are optimistic with rollback on
+// failure (full snapshot restored via setQueryData) and every save writes an
+// audit row to `user_admin_actions` server-side.
+//
+// Read-only telemetry (lifetime rev, MRR, perf fees, equity) stays as a
+// metric strip — those are aggregates, not policy.
+
+const EDIT_CELL_BG    = "#000814";
+const EDIT_CELL_BG_HI = "#001624";
+
+function FieldShell({
+  label, sub, accent, dirty, disabled, children,
+}: {
+  label:    string;
+  sub?:     string;
+  accent?:  string;
+  dirty?:   boolean;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  const borderColor = dirty ? "#ffaa00" : TAB_C.border;
+  return (
+    <div style={{
+      background: dirty ? EDIT_CELL_BG_HI : EDIT_CELL_BG,
+      border: `1px solid ${borderColor}`,
+      borderRadius: 4, padding: "8px 10px",
+      display: "flex", flexDirection: "column", gap: 4, minWidth: 0,
+      opacity: disabled ? 0.55 : 1,
+      transition: "border-color 120ms ease, background 120ms ease",
+    }}>
+      <div style={{
+        fontSize: 8, fontFamily: "monospace", fontWeight: 700,
+        color: accent ?? TAB_C.faint, letterSpacing: "0.1em",
+        display: "flex", alignItems: "center", gap: 4,
+      }}>
+        {label}
+        {dirty && <span style={{ color: "#ffaa00", fontSize: 7 }}>●</span>}
+      </div>
+      {children}
+      {sub && <div style={{ fontSize: 7, fontFamily: "monospace", color: TAB_C.dim }}>{sub}</div>}
+    </div>
+  );
+}
+
+function TextField({
+  value, onChange, type = "text", disabled, placeholder, color,
+}: {
+  value:       string;
+  onChange:    (v: string) => void;
+  type?:       "text" | "number";
+  disabled?:   boolean;
+  placeholder?: string;
+  color?:      string;
+}) {
+  return (
+    <input
+      type={type}
+      value={value}
+      placeholder={placeholder}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        background: "transparent", border: "none", outline: "none",
+        padding: 0, margin: 0, width: "100%",
+        fontSize: 13, fontFamily: "monospace", fontWeight: 700,
+        color: color ?? TAB_C.text,
+      }}
+    />
+  );
+}
+
+function SelectField<T extends string>({
+  value, options, onChange, disabled, color,
+}: {
+  value:    T;
+  options:  ReadonlyArray<{ label: string; value: T; color?: string }>;
+  onChange: (v: T) => void;
+  disabled?: boolean;
+  color?:   string;
+}) {
+  return (
+    <select
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value as T)}
+      style={{
+        background: "#000", border: `1px solid ${TAB_C.border}`,
+        padding: "2px 4px", margin: 0, width: "100%",
+        fontSize: 13, fontFamily: "monospace", fontWeight: 700,
+        color: color ?? TAB_C.text, borderRadius: 3,
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}>
+      {options.map(o => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  );
+}
+
+function ToggleField({
+  value, onChange, disabled, onLabel = "ON", offLabel = "OFF",
+}: {
+  value:    boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+  onLabel?:  string;
+  offLabel?: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onChange(!value)}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
+        background: value ? "#003a1f" : "#1a0508",
+        border: `1px solid ${value ? "#00ff8a" : "#ff3355"}55`,
+        borderRadius: 3, padding: "3px 8px",
+        fontSize: 11, fontFamily: "monospace", fontWeight: 700,
+        color: value ? "#00ff8a" : "#ff3355",
+        cursor: disabled ? "not-allowed" : "pointer", width: "fit-content",
+        transition: "background 120ms ease",
+      }}>
+      <span style={{
+        width: 7, height: 7, borderRadius: 4,
+        background: value ? "#00ff8a" : "#ff3355",
+        boxShadow: `0 0 4px ${value ? "#00ff8a" : "#ff3355"}`,
+      }} />
+      {value ? onLabel : offLabel}
+    </button>
+  );
+}
+
+// ── Editable form state shapes ───────────────────────────────────────────────
+
+interface AiSettingsForm {
+  autoMode:           boolean;
+  riskLevel:          string;
+  minConfidence:      number;
+  positionSizeUSD:    number;
+  maxActivePositions: number;
+  tradingMode:        "simulation" | "live";
+  preferredExchange:  string;
+  volumeFilter:       boolean;
+}
+
+interface BillingOverridesForm {
+  perfFeeBpsOverride:     number | null;
+  feeWaiverActive:        boolean;
+  isComplimentaryAccount: boolean;
+  isInternalAccount:      boolean;
+  revenueShareBps:        number;
+  billingOverrideNotes:   string;
+}
+
+function pickAiSettings(s: Record<string, unknown> | null): AiSettingsForm {
+  const r = s ?? {};
+  return {
+    autoMode:           r["autoMode"]           === true,
+    riskLevel:          (typeof r["riskLevel"]        === "string" ? r["riskLevel"]        : "moderate") as string,
+    minConfidence:      typeof r["minConfidence"]     === "number" ? r["minConfidence"]      : 60,
+    positionSizeUSD:    typeof r["positionSizeUSD"]   === "number" ? r["positionSizeUSD"]    : 20,
+    maxActivePositions: typeof r["maxActivePositions"] === "number" ? r["maxActivePositions"] : 3,
+    tradingMode:       (r["tradingMode"] === "live" ? "live" : "simulation") as "simulation" | "live",
+    preferredExchange: typeof r["preferredExchange"] === "string" ? r["preferredExchange"] : "Kraken",
+    volumeFilter:       r["volumeFilter"] === true,
+  };
+}
+
+function pickBillingOverrides(u: UserDetailResponse["user"] | null): BillingOverridesForm {
+  const r = (u ?? {}) as unknown as Record<string, unknown>;
+  return {
+    perfFeeBpsOverride:     typeof r["perfFeeBpsOverride"] === "number" ? r["perfFeeBpsOverride"] as number : null,
+    feeWaiverActive:        r["feeWaiverActive"] === true,
+    isComplimentaryAccount: r["isComplimentaryAccount"] === true,
+    isInternalAccount:      r["isInternalAccount"] === true,
+    revenueShareBps:        typeof r["revenueShareBps"] === "number" ? r["revenueShareBps"] as number : 0,
+    billingOverrideNotes:   typeof r["billingOverrideNotes"] === "string" ? r["billingOverrideNotes"] as string : "",
+  };
+}
+
+function shallowEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const ka = Object.keys(a); const kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) if (a[k] !== b[k]) return false;
+  return true;
+}
+
+function SaveResetBar({
+  dirty, saving, onSave, onReset, disabled, disabledReason,
+}: {
+  dirty:    boolean;
+  saving:   boolean;
+  onSave:   () => void;
+  onReset:  () => void;
+  disabled?: boolean;
+  disabledReason?: string;
+}) {
+  const canSave = dirty && !saving && !disabled;
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "flex-end",
+      gap: 8, marginTop: 8,
+    }}>
+      {disabled && disabledReason && (
+        <span style={{
+          fontSize: 9, fontFamily: "monospace", color: TAB_C.faint,
+          marginRight: "auto",
+        }}>{disabledReason}</span>
+      )}
+      {dirty && !disabled && (
+        <span style={{
+          fontSize: 9, fontFamily: "monospace", color: "#ffaa00",
+          marginRight: "auto",
+        }}>● UNSAVED CHANGES</span>
+      )}
+      <button type="button"
+        onClick={onReset}
+        disabled={!dirty || saving}
+        style={{
+          padding: "5px 10px", background: "transparent",
+          border: `1px solid ${TAB_C.border}`, borderRadius: 3,
+          fontSize: 9, fontFamily: "monospace", fontWeight: 700,
+          color: dirty ? TAB_C.dim : TAB_C.faint, letterSpacing: "0.1em",
+          cursor: dirty && !saving ? "pointer" : "not-allowed",
+          display: "inline-flex", alignItems: "center", gap: 4,
+        }}>
+        <RotateCcw className="w-3 h-3" /> RESET
+      </button>
+      <button type="button"
+        onClick={onSave}
+        disabled={!canSave}
+        style={{
+          padding: "5px 12px", background: canSave ? "#003a1f" : "transparent",
+          border: `1px solid ${canSave ? "#00ff8a" : TAB_C.border}`, borderRadius: 3,
+          fontSize: 9, fontFamily: "monospace", fontWeight: 700,
+          color: canSave ? "#00ff8a" : TAB_C.faint, letterSpacing: "0.1em",
+          cursor: canSave ? "pointer" : "not-allowed",
+          display: "inline-flex", alignItems: "center", gap: 4,
+        }}>
+        {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+        SAVE CHANGES
+      </button>
+    </div>
+  );
+}
+
+function NoteRow({
+  note, setNote, placeholder, disabled,
+}: {
+  note: string; setNote: (v: string) => void;
+  placeholder: string; disabled?: boolean;
+}) {
+  return (
+    <div style={{
+      background: EDIT_CELL_BG, border: `1px solid ${TAB_C.border}`,
+      borderRadius: 4, padding: "6px 10px", marginTop: 8,
+    }}>
+      <div style={{
+        fontSize: 8, fontFamily: "monospace", fontWeight: 700,
+        color: TAB_C.faint, letterSpacing: "0.1em", marginBottom: 3,
+      }}>AUDIT NOTE (REQUIRED)</div>
+      <input
+        type="text"
+        value={note}
+        disabled={disabled}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          background: "transparent", border: "none", outline: "none",
+          padding: 0, margin: 0, width: "100%",
+          fontSize: 11, fontFamily: "monospace",
+          color: TAB_C.text,
+        }} />
+    </div>
+  );
+}
+
+function ProfileTab({ user, detail, loading, isSuperAdmin }: {
   user: AdminUserRow;
   detail: UserDetailResponse | null;
   loading: boolean;
+  isSuperAdmin: boolean;
 }) {
-  const settings = (detail?.settings ?? {}) as Record<string, unknown>;
-  const u        = detail?.user ?? null;
+  const qc = useQueryClient();
+  const u  = detail?.user ?? null;
 
   const sessionColor =
     user.sessionStatus === "active"  ? "#00ff8a" :
     user.sessionStatus === "idle"    ? "#ffaa00" : TAB_C.faint;
 
+  // ── Server snapshots (re-derived whenever detail changes) ────────────────
+  const aiServer      = useMemo(() => pickAiSettings(detail?.settings ?? null),       [detail?.settings]);
+  const billingServer = useMemo(() => pickBillingOverrides(u),                        [u]);
+
+  // ── Local dirty state ────────────────────────────────────────────────────
+  const [aiDraft, setAiDraft]             = useState<AiSettingsForm>(aiServer);
+  const [billingDraft, setBillingDraft]   = useState<BillingOverridesForm>(billingServer);
+  const [aiNote, setAiNote]               = useState("");
+  const [billingNote, setBillingNote]     = useState("");
+
+  // Re-sync drafts ONLY when the operator switches users. Background refetch
+  // identity changes on `aiServer` / `billingServer` MUST NOT clobber in-flight
+  // unsaved edits. Post-save draft collapse is handled explicitly in each
+  // mutation's onSuccess via setAiDraft(data.after) / setBillingDraft(...).
+  useEffect(() => {
+    setAiDraft(pickAiSettings(detail?.settings ?? null));
+    setBillingDraft(pickBillingOverrides(detail?.user ?? null));
+    setAiNote("");
+    setBillingNote("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.clerkUserId]);
+
+  const aiDirty      = !shallowEqual(aiDraft as unknown as Record<string, unknown>,           aiServer as unknown as Record<string, unknown>);
+  const billingDirty = !shallowEqual(billingDraft as unknown as Record<string, unknown>,      billingServer as unknown as Record<string, unknown>);
+
+  // ── Mutations ────────────────────────────────────────────────────────────
+  const detailKey = ["admin-user-detail", user.clerkUserId] as const;
+  const listKey   = ["admin-users"] as const;
+
+  const aiMutation = useMutation({
+    mutationFn: async (body: Record<string, unknown>) => {
+      const res = await authFetch(`/api/admin/users/${user.clerkUserId}/ai-settings`, {
+        method: "PATCH",
+        body:   JSON.stringify(body),
+      });
+      const text = await res.text();
+      let json: unknown = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) {
+        throw new Error((json as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
+      }
+      return json as { ok: true; after: Record<string, unknown>; changedFields: string[] };
+    },
+    onMutate: async (body) => {
+      // Optimistic — patch only the fields this mutation touched. Snapshot
+      // only the *prior values of those fields* so rollback can't overwrite
+      // unrelated concurrent cache updates on the same detail key.
+      await qc.cancelQueries({ queryKey: detailKey });
+      const prior = qc.getQueryData<UserDetailResponse>(detailKey);
+      const patchedKeys = Object.keys(body).filter((k) => k !== "note");
+      const priorPatch: Record<string, unknown> = {};
+      if (prior) {
+        const priorSettings = (prior.settings ?? {}) as Record<string, unknown>;
+        for (const k of patchedKeys) priorPatch[k] = priorSettings[k];
+        const optimisticSettings: Record<string, unknown> = { ...priorSettings };
+        for (const k of patchedKeys) optimisticSettings[k] = (body as Record<string, unknown>)[k];
+        qc.setQueryData<UserDetailResponse>(detailKey, {
+          ...prior,
+          settings: optimisticSettings,
+        });
+      }
+      return { priorPatch, patchedKeys };
+    },
+    onError: (err: Error, _body, ctx) => {
+      // Scoped rollback: restore only the fields we touched.
+      const cur = qc.getQueryData<UserDetailResponse>(detailKey);
+      if (cur && ctx) {
+        const settings = { ...((cur.settings ?? {}) as Record<string, unknown>) };
+        for (const k of ctx.patchedKeys) settings[k] = ctx.priorPatch[k];
+        qc.setQueryData<UserDetailResponse>(detailKey, { ...cur, settings });
+      }
+      toast({
+        title: "AI settings save failed",
+        description: `${err.message} — changes rolled back.`,
+        variant: "destructive",
+      });
+    },
+    onSuccess: (data) => {
+      const n = data.changedFields.length;
+      toast({
+        title: "AI settings saved",
+        description: n === 0
+          ? "No changes to apply."
+          : `${n} field${n === 1 ? "" : "s"} updated and audit-logged.`,
+      });
+      // Collapse dirty state to authoritative server `after` payload.
+      setAiDraft(pickAiSettings(data.after ?? null));
+      setAiNote("");
+      qc.invalidateQueries({ queryKey: detailKey });
+      qc.invalidateQueries({ queryKey: listKey });
+    },
+  });
+
+  const billingMutation = useMutation({
+    mutationFn: async (body: Record<string, unknown>) => {
+      const res = await authFetch(`/api/admin/users/${user.clerkUserId}/billing-overrides`, {
+        method: "PATCH",
+        body:   JSON.stringify(body),
+      });
+      const text = await res.text();
+      let json: unknown = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) {
+        throw new Error((json as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
+      }
+      return json as { ok: true; after: Record<string, unknown>; changedFields: string[] };
+    },
+    onMutate: async (body) => {
+      // Scoped optimistic patch + scoped prior snapshot (see ai mutation
+      // for rationale — prevents clobbering concurrent edits on rollback).
+      await qc.cancelQueries({ queryKey: detailKey });
+      const prior = qc.getQueryData<UserDetailResponse>(detailKey);
+      const patchedKeys = Object.keys(body).filter((k) => k !== "note");
+      const priorPatch: Record<string, unknown> = {};
+      if (prior && prior.user) {
+        const priorUserRec = prior.user as unknown as Record<string, unknown>;
+        for (const k of patchedKeys) priorPatch[k] = priorUserRec[k];
+        const optimisticUser: Record<string, unknown> = { ...priorUserRec };
+        for (const k of patchedKeys) optimisticUser[k] = (body as Record<string, unknown>)[k];
+        qc.setQueryData<UserDetailResponse>(detailKey, {
+          ...prior,
+          user: optimisticUser as unknown as UserDetailResponse["user"],
+        });
+      }
+      return { priorPatch, patchedKeys };
+    },
+    onError: (err: Error, _body, ctx) => {
+      const cur = qc.getQueryData<UserDetailResponse>(detailKey);
+      if (cur && cur.user && ctx) {
+        const userRec = { ...(cur.user as unknown as Record<string, unknown>) };
+        for (const k of ctx.patchedKeys) userRec[k] = ctx.priorPatch[k];
+        qc.setQueryData<UserDetailResponse>(detailKey, {
+          ...cur,
+          user: userRec as unknown as UserDetailResponse["user"],
+        });
+      }
+      toast({
+        title: "Billing overrides save failed",
+        description: `${err.message} — changes rolled back.`,
+        variant: "destructive",
+      });
+    },
+    onSuccess: (data) => {
+      const n = data.changedFields.length;
+      toast({
+        title: "Billing overrides saved",
+        description: n === 0
+          ? "No changes to apply."
+          : `${n} field${n === 1 ? "" : "s"} updated and audit-logged.`,
+      });
+      // Collapse dirty state from the server's authoritative `after`.
+      setBillingDraft(pickBillingOverrides(data.after as unknown as UserDetailResponse["user"]));
+      setBillingNote("");
+      qc.invalidateQueries({ queryKey: detailKey });
+      qc.invalidateQueries({ queryKey: listKey });
+    },
+  });
+
+  function submitAi() {
+    if (!aiDirty) return;
+    if (!aiNote.trim()) {
+      toast({ title: "Audit note required", description: "Add a short note before saving AI settings.", variant: "destructive" });
+      return;
+    }
+    // Send only changed fields so we don't clobber server-default semantics.
+    const body: Record<string, unknown> = { note: aiNote.trim() };
+    const aiDraftRec  = aiDraft  as unknown as Record<string, unknown>;
+    const aiServerRec = aiServer as unknown as Record<string, unknown>;
+    for (const k of Object.keys(aiDraftRec)) {
+      if (aiDraftRec[k] !== aiServerRec[k]) body[k] = aiDraftRec[k];
+    }
+    aiMutation.mutate(body);
+  }
+  function submitBilling() {
+    if (!billingDirty) return;
+    if (!billingNote.trim()) {
+      toast({ title: "Audit note required", description: "Add a short note before saving billing overrides.", variant: "destructive" });
+      return;
+    }
+    const body: Record<string, unknown> = { note: billingNote.trim() };
+    const bDraftRec  = billingDraft  as unknown as Record<string, unknown>;
+    const bServerRec = billingServer as unknown as Record<string, unknown>;
+    for (const k of Object.keys(bDraftRec)) {
+      if (bDraftRec[k] !== bServerRec[k]) body[k] = bDraftRec[k];
+    }
+    billingMutation.mutate(body);
+  }
+
+  const aiDisabled      = aiMutation.isPending      || loading;
+  const billingDisabled = billingMutation.isPending || loading || !isSuperAdmin;
+
   return (
     <div>
+      {/* ── IDENTITY (read-only) ───────────────────────────────────────── */}
       <TabSectionLabel icon={UserCircle}>IDENTITY</TabSectionLabel>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <MetricCell label="EMAIL"        value={user.email} />
@@ -996,6 +1466,7 @@ function ProfileTab({ user, detail, loading }: {
         <MetricCell label="BILLING EMAIL" value={u?.billingEmail ?? user.email} />
       </div>
 
+      {/* ── REVENUE ATTRIBUTION (read-only telemetry + editable overrides) ── */}
       <TabSectionLabel icon={DollarSign}>REVENUE ATTRIBUTION</TabSectionLabel>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
         <MetricCell label="LIFETIME REV" value={fmtDollar(user.revenueGenerated)} color="#00ff8a" />
@@ -1003,28 +1474,197 @@ function ProfileTab({ user, detail, loading }: {
         <MetricCell label="PERF FEES"    value={fmtDollar(user.feesGenerated)}     color={user.feesGenerated > 0 ? "#00ff8a" : TAB_C.dim} />
         <MetricCell label="EQUITY"       value={fmtDollar(user.equityUsd)} />
         <MetricCell label="TRIAL ENDS"   value={user.trialEndsAt ? fmtIsoAgo(user.trialEndsAt) : "—"} />
-        <MetricCell label="COMPLIMENTARY" value={user.isComplimentary ? "YES" : "NO"}
+        <MetricCell label="DERIVED COMP" value={user.isComplimentary ? "TRIALING" : "—"}
           color={user.isComplimentary ? "#cc55ff" : TAB_C.dim} />
       </div>
 
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 8 }}>
+        <FieldShell label="PERF FEE %"
+          sub="0–100 (default 3%)"
+          dirty={billingDraft.perfFeeBpsOverride !== billingServer.perfFeeBpsOverride}
+          disabled={billingDisabled}
+          accent="#cc55ff">
+          <TextField type="number"
+            value={billingDraft.perfFeeBpsOverride == null ? "" : String(billingDraft.perfFeeBpsOverride / 100)}
+            disabled={billingDisabled}
+            placeholder="3"
+            onChange={(v) => {
+              if (v.trim() === "") return setBillingDraft({ ...billingDraft, perfFeeBpsOverride: null });
+              const n = Number(v); if (!Number.isFinite(n)) return;
+              setBillingDraft({ ...billingDraft, perfFeeBpsOverride: Math.round(n * 100) });
+            }} />
+        </FieldShell>
+        <FieldShell label="FEE WAIVER"
+          dirty={billingDraft.feeWaiverActive !== billingServer.feeWaiverActive}
+          disabled={billingDisabled} accent="#cc55ff">
+          <ToggleField value={billingDraft.feeWaiverActive} disabled={billingDisabled}
+            onChange={(v) => setBillingDraft({ ...billingDraft, feeWaiverActive: v })}
+            onLabel="WAIVED" offLabel="ACTIVE" />
+        </FieldShell>
+        <FieldShell label="COMPLIMENTARY"
+          dirty={billingDraft.isComplimentaryAccount !== billingServer.isComplimentaryAccount}
+          disabled={billingDisabled} accent="#cc55ff">
+          <ToggleField value={billingDraft.isComplimentaryAccount} disabled={billingDisabled}
+            onChange={(v) => setBillingDraft({ ...billingDraft, isComplimentaryAccount: v })}
+            onLabel="YES" offLabel="NO" />
+        </FieldShell>
+        <FieldShell label="INTERNAL ACCT"
+          dirty={billingDraft.isInternalAccount !== billingServer.isInternalAccount}
+          disabled={billingDisabled} accent="#cc55ff">
+          <ToggleField value={billingDraft.isInternalAccount} disabled={billingDisabled}
+            onChange={(v) => setBillingDraft({ ...billingDraft, isInternalAccount: v })}
+            onLabel="YES" offLabel="NO" />
+        </FieldShell>
+        <FieldShell label="REV SHARE %"
+          sub="0–100"
+          dirty={billingDraft.revenueShareBps !== billingServer.revenueShareBps}
+          disabled={billingDisabled} accent="#cc55ff">
+          <TextField type="number"
+            value={String(billingDraft.revenueShareBps / 100)}
+            disabled={billingDisabled}
+            onChange={(v) => {
+              const n = Number(v); if (!Number.isFinite(n)) return;
+              setBillingDraft({ ...billingDraft, revenueShareBps: Math.max(0, Math.min(10000, Math.round(n * 100))) });
+            }} />
+        </FieldShell>
+        <FieldShell label="BILLING OVERRIDE"
+          dirty={billingDraft.billingOverrideNotes !== billingServer.billingOverrideNotes}
+          disabled={billingDisabled} accent="#cc55ff">
+          <TextField
+            value={billingDraft.billingOverrideNotes}
+            disabled={billingDisabled}
+            placeholder="(none)"
+            onChange={(v) => setBillingDraft({ ...billingDraft, billingOverrideNotes: v })} />
+        </FieldShell>
+      </div>
+
+      {isSuperAdmin && billingDirty && (
+        <NoteRow note={billingNote} setNote={setBillingNote}
+          placeholder="Why are you changing billing for this user?"
+          disabled={billingMutation.isPending} />
+      )}
+      <SaveResetBar
+        dirty={billingDirty}
+        saving={billingMutation.isPending}
+        onSave={submitBilling}
+        onReset={() => { setBillingDraft(billingServer); setBillingNote(""); }}
+        disabled={!isSuperAdmin}
+        disabledReason={!isSuperAdmin ? "Super-admin only" : undefined}
+      />
+
+      {/* ── AI ENGINE SETTINGS (editable, operator) ───────────────────── */}
       <TabSectionLabel icon={Cpu}>AI ENGINE SETTINGS</TabSectionLabel>
       {loading && !detail ? <TabLoading /> : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-          <MetricCell label="AI ENABLED"   value={user.aiEnabled ? "ON" : "OFF"}
-            color={user.aiEnabled ? "#00ff8a" : "#ff3355"} />
-          <MetricCell label="RISK LEVEL"   value={(user.riskLevel ?? "—").toUpperCase()}
-            color={user.riskLevel === "high" ? "#ff8844" : user.riskLevel === "medium" ? "#ffaa00" : "#00aaff"} />
-          <MetricCell label="MIN CONF"     value={user.minConfidence != null ? `${user.minConfidence}%` : "—"} />
-          <MetricCell label="POS SIZE"     value={user.positionSizeUsd != null ? fmtDollar(user.positionSizeUsd) : "—"} />
-          <MetricCell label="MAX OPEN"     value={user.maxActivePositions != null ? `${user.maxActivePositions}` : "—"} />
-          <MetricCell label="TRADING MODE" value={String(settings["tradingMode"] ?? "—").toUpperCase()}
-            color={settings["tradingMode"] === "live" ? "#ff8844" : "#00aaff"} />
-          <MetricCell label="AUTO MODE"    value={settings["autoMode"] === true ? "ON" : "OFF"}
-            color={settings["autoMode"] === true ? "#00ff8a" : TAB_C.dim} />
-          <MetricCell label="PREF EXCH"    value={String(settings["preferredExchange"] ?? "—").toUpperCase()} />
-          <MetricCell label="VOLUME FLT"   value={settings["volumeFilter"] === true ? "ON" : "OFF"}
-            color={settings["volumeFilter"] === true ? "#00ff8a" : TAB_C.dim} />
-        </div>
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <FieldShell label="AI ENABLED"
+              dirty={aiDraft.autoMode !== aiServer.autoMode}
+              disabled={aiDisabled}>
+              <ToggleField value={aiDraft.autoMode} disabled={aiDisabled}
+                onChange={(v) => setAiDraft({ ...aiDraft, autoMode: v })} />
+            </FieldShell>
+            <FieldShell label="RISK LEVEL"
+              dirty={aiDraft.riskLevel !== aiServer.riskLevel}
+              disabled={aiDisabled}>
+              <SelectField
+                value={aiDraft.riskLevel}
+                disabled={aiDisabled}
+                options={[
+                  { label: "CONSERVATIVE", value: "conservative" },
+                  { label: "MODERATE",     value: "moderate" },
+                  { label: "AGGRESSIVE",   value: "aggressive" },
+                ] as const}
+                color={aiDraft.riskLevel === "aggressive" ? "#ff8844"
+                  : aiDraft.riskLevel === "conservative" ? "#00aaff" : "#ffaa00"}
+                onChange={(v) => setAiDraft({ ...aiDraft, riskLevel: v })} />
+            </FieldShell>
+            <FieldShell label="MIN CONFIDENCE"
+              sub="0–100"
+              dirty={aiDraft.minConfidence !== aiServer.minConfidence}
+              disabled={aiDisabled}>
+              <TextField type="number" value={String(aiDraft.minConfidence)}
+                disabled={aiDisabled}
+                onChange={(v) => {
+                  const n = Number(v); if (!Number.isFinite(n)) return;
+                  setAiDraft({ ...aiDraft, minConfidence: Math.max(0, Math.min(100, n)) });
+                }} />
+            </FieldShell>
+            <FieldShell label="POS SIZE (USD)"
+              dirty={aiDraft.positionSizeUSD !== aiServer.positionSizeUSD}
+              disabled={aiDisabled}>
+              <TextField type="number" value={String(aiDraft.positionSizeUSD)}
+                disabled={aiDisabled}
+                onChange={(v) => {
+                  const n = Number(v); if (!Number.isFinite(n)) return;
+                  setAiDraft({ ...aiDraft, positionSizeUSD: Math.max(1, n) });
+                }} />
+            </FieldShell>
+            <FieldShell label="MAX OPEN POSITIONS"
+              dirty={aiDraft.maxActivePositions !== aiServer.maxActivePositions}
+              disabled={aiDisabled}>
+              <TextField type="number" value={String(aiDraft.maxActivePositions)}
+                disabled={aiDisabled}
+                onChange={(v) => {
+                  const n = Number(v); if (!Number.isFinite(n)) return;
+                  setAiDraft({ ...aiDraft, maxActivePositions: Math.max(0, Math.min(100, Math.round(n))) });
+                }} />
+            </FieldShell>
+            <FieldShell label="TRADING MODE"
+              dirty={aiDraft.tradingMode !== aiServer.tradingMode}
+              disabled={aiDisabled}>
+              <SelectField
+                value={aiDraft.tradingMode}
+                disabled={aiDisabled}
+                options={[
+                  { label: "SIMULATION", value: "simulation" },
+                  { label: "LIVE",       value: "live" },
+                ] as const}
+                color={aiDraft.tradingMode === "live" ? "#ff8844" : "#00aaff"}
+                onChange={(v) => setAiDraft({ ...aiDraft, tradingMode: v })} />
+            </FieldShell>
+            <FieldShell label="AUTO MODE"
+              sub="Alias of AI Enabled (same column)"
+              dirty={false}
+              disabled={true}>
+              <ToggleField value={aiDraft.autoMode} disabled={true}
+                onChange={() => { /* mirror only */ }} />
+            </FieldShell>
+            <FieldShell label="PREF EXCHANGE"
+              dirty={aiDraft.preferredExchange !== aiServer.preferredExchange}
+              disabled={aiDisabled}>
+              <SelectField
+                value={aiDraft.preferredExchange}
+                disabled={aiDisabled}
+                options={[
+                  { label: "KRAKEN",   value: "Kraken" },
+                  { label: "COINBASE", value: "Coinbase" },
+                  { label: "BINANCE",  value: "Binance" },
+                  { label: "BYBIT",    value: "Bybit" },
+                  { label: "OKX",      value: "OKX" },
+                  { label: "KUCOIN",   value: "KuCoin" },
+                ] as const}
+                onChange={(v) => setAiDraft({ ...aiDraft, preferredExchange: v })} />
+            </FieldShell>
+            <FieldShell label="VOLUME FILTER"
+              dirty={aiDraft.volumeFilter !== aiServer.volumeFilter}
+              disabled={aiDisabled}>
+              <ToggleField value={aiDraft.volumeFilter} disabled={aiDisabled}
+                onChange={(v) => setAiDraft({ ...aiDraft, volumeFilter: v })} />
+            </FieldShell>
+          </div>
+
+          {aiDirty && (
+            <NoteRow note={aiNote} setNote={setAiNote}
+              placeholder="Why are you changing AI engine settings for this user?"
+              disabled={aiMutation.isPending} />
+          )}
+          <SaveResetBar
+            dirty={aiDirty}
+            saving={aiMutation.isPending}
+            onSave={submitAi}
+            onReset={() => { setAiDraft(aiServer); setAiNote(""); }}
+          />
+        </>
       )}
     </div>
   );
