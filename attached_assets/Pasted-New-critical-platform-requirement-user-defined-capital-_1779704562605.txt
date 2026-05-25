@@ -1,0 +1,105 @@
+New critical platform requirement: user-defined capital allocation and AI risk budgeting.
+
+Current issue:
+The AI trader can theoretically continue opening positions without a clear user-defined per-trade allocation framework.
+
+This must become a first-class risk-management system before wider launch.
+
+Required system design:
+
+1. User-defined trade allocation controls
+   Each user must explicitly configure:
+
+* max capital allocation per trade
+* max simultaneous trades
+* max daily exposure
+* max total AI allocation
+* optional reserve cash amount
+* optional per-asset caps
+
+Examples:
+
+* $20 per trade
+* max 3 simultaneous trades
+* stop opening new trades below $40 available funds
+* reserve $25 untouched cash
+
+2. AI execution engine must respect capital limits
+   Before ANY AI trade opens:
+
+engine validates:
+
+* available balance
+* reserved capital
+* current exposure
+* max concurrent trades
+* per-trade allocation
+* exchange minimum order size
+
+If limits would be exceeded:
+
+* trade is rejected
+* no order placed
+* user receives notification
+
+3. Low-funds / allocation warning system
+   Add professional warning modals/toasts:
+
+Examples:
+
+* “AI allocation limit reached”
+* “Insufficient available funds”
+* “Max concurrent trades reached”
+* “Reserved cash protection active”
+* “Trade skipped: exceeds per-trade allocation”
+
+4. Portfolio protection layer
+   AI should maintain:
+
+* usable capital
+* reserved capital
+* active exposure
+* remaining buying power
+
+Example:
+Kraken balance: $100
+Reserved cash: $40
+AI allocation pool: $60
+Per trade: $20
+Concurrent trades: 3
+
+Once 3 trades are active OR available allocation drops below threshold:
+AI pauses new entries automatically.
+
+5. Operator/admin visibility
+   Admin portal should show:
+
+* allocated capital %
+* remaining buying power
+* reserved funds
+* blocked trades count
+* rejected execution reasons
+* AI risk throttling state
+
+6. UI/UX requirements
+   Customer portal needs:
+
+* AI Risk Settings panel
+* editable allocation controls
+* clear “capital at risk” visualization
+* estimated remaining buying power
+* warnings before enabling AI
+
+7. Hard backend enforcement
+   Do NOT trust frontend state.
+
+Execution engine itself must enforce:
+
+* allocation rules
+* exposure caps
+* reserve limits
+* concurrent trade limits
+
+Even direct API requests must fail if limits exceeded.
+
+This is a core production safety requirement, not a cosmetic enhancement.
