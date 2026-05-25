@@ -43,6 +43,9 @@ import Billing from "@/pages/Billing";
 import Admin from "@/pages/Admin";
 import BillingAdmin from "@/pages/BillingAdmin";
 import AdminUsers from "@/pages/admin/Users";
+import AdminExchangeConnections from "@/pages/admin/ExchangeConnections";
+import AdminAiUsage from "@/pages/admin/AiUsage";
+import AdminPlatformMetrics from "@/pages/admin/PlatformMetrics";
 import AdminUserActivity from "@/pages/admin/UserActivity";
 import AdminSubscriptions from "@/pages/admin/Subscriptions";
 import AdminSessions from "@/pages/admin/Sessions";
@@ -445,6 +448,15 @@ function Router() {
       </Route>
       <Route path="/admin/sessions">
         <ProtectedAdmin><AdminSessions /></ProtectedAdmin>
+      </Route>
+      <Route path="/admin/exchange-connections">
+        <ProtectedAdmin><AdminExchangeConnections /></ProtectedAdmin>
+      </Route>
+      <Route path="/admin/ai-usage">
+        <ProtectedAdmin><AdminAiUsage /></ProtectedAdmin>
+      </Route>
+      <Route path="/admin/metrics">
+        <ProtectedAdmin><AdminPlatformMetrics /></ProtectedAdmin>
       </Route>
       <Route path="/admin">
         <ProtectedAdmin><Admin /></ProtectedAdmin>

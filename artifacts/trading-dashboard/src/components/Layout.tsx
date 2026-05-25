@@ -477,23 +477,37 @@ export function Layout({ children }: { children: React.ReactNode }) {
     adminOnly:   boolean;
     badge?:      string;
   };
+
+  // ── PLATFORM ADMIN — institutional operator control layer ────────────────
+  // Admin-only. Backend mirrors via requireRole(["admin","super-admin"]).
+  // Order matches the operator's mental model: who is using the platform
+  // (Users → Sessions → Exchanges → Subs) → what they're doing (Metrics →
+  // Activity → AI Usage) → is the platform healthy (System Health).
+  const platformAdminLinks: PlatformLink[] = [
+    { icon: Users,         label: "Users",                href: "/admin/users",                 badgeColor: "#cc55ff", adminOnly: true, badge: "CRM" },
+    { icon: Radio,         label: "Active Sessions",      href: "/admin/sessions",              badgeColor: "#ff8844", adminOnly: true               },
+    { icon: ArrowLeftRight,label: "Exchange Connections", href: "/admin/exchange-connections",  badgeColor: "#00aaff", adminOnly: true               },
+    { icon: DollarSign,    label: "Subscription Plans",   href: "/admin/subscriptions",         badgeColor: "#00ff8a", adminOnly: true               },
+    { icon: Activity,      label: "Platform Metrics",     href: "/admin/metrics",               badgeColor: "#00f0ff", adminOnly: true               },
+    { icon: TrendingUp,    label: "Trade Activity",       href: "/admin/activity",              badgeColor: "#00f0ff", adminOnly: true               },
+    { icon: Brain,         label: "AI Usage",             href: "/admin/ai-usage",              badgeColor: "#cc55ff", adminOnly: true               },
+    { icon: ShieldCheck,   label: "System Health",        href: "/syscheck",                    badgeColor: "#00eeff", adminOnly: true               },
+  ];
+
+  // User-facing supplemental links (visible to everyone). The previous
+  // mixed "PLATFORM" array buried admin items among customer items; that
+  // is now split into PLATFORM ADMIN (above) and PLATFORM (here).
   const allPlatformLinks: PlatformLink[] = [
-    { icon: User,         label: "My Account",      href: "/account",              badgeColor: "#00aaff", adminOnly: false                       },
-    // CRM Phase A — institutional user-ops rail
-    { icon: Users,        label: "Users",           href: "/admin/users",          badgeColor: "#cc55ff", adminOnly: true,  badge: "CRM"        },
-    { icon: Activity,     label: "User Activity",   href: "/admin/activity",       badgeColor: "#00f0ff", adminOnly: true                        },
-    { icon: DollarSign,   label: "Subscriptions",   href: "/admin/subscriptions",  badgeColor: "#00ff8a", adminOnly: true                        },
-    { icon: Radio,        label: "Live Sessions",   href: "/admin/sessions",       badgeColor: "#ff8844", adminOnly: true                        },
-    { icon: ShieldAlert,  label: "Admin Console",   href: "/admin",                badgeColor: "#cc55ff", adminOnly: true,  badge: "OPERATOR"   },
-    { icon: Trophy,       label: "Leaderboard",     href: "/leaderboard",          badgeColor: "#ffaa00", adminOnly: false                       },
-    { icon: Bell,         label: "Alerts",          href: "/alerts",               badgeColor: "#ff6600", adminOnly: false                       },
-    { icon: Zap,          label: "AI Models",       href: "/ai",                   badgeColor: "#cc55ff", adminOnly: false                       },
-    { icon: DollarSign,   label: "Revenue",         href: "/admin",                badgeColor: "#ffaa00", adminOnly: true                        },
-    { icon: AlertTriangle,label: "Risk Monitor",    href: "/risk",                 badgeColor: "#ff8844", adminOnly: false                       },
+    { icon: User,         label: "My Account",      href: "/account",     badgeColor: "#00aaff", adminOnly: false                  },
+    { icon: ShieldAlert,  label: "Admin Console",   href: "/admin",       badgeColor: "#cc55ff", adminOnly: true, badge: "OPERATOR"},
+    { icon: Trophy,       label: "Leaderboard",     href: "/leaderboard", badgeColor: "#ffaa00", adminOnly: false                  },
+    { icon: Bell,         label: "Alerts",          href: "/alerts",      badgeColor: "#ff6600", adminOnly: false                  },
+    { icon: AlertTriangle,label: "Risk Monitor",    href: "/risk",        badgeColor: "#ff8844", adminOnly: false                  },
   ];
   const platformLinks = isAdmin
     ? allPlatformLinks
     : allPlatformLinks.filter((l) => !l.adminOnly);
+  const visiblePlatformAdminLinks = isAdmin ? platformAdminLinks : [];
 
   const SidebarContent = ({ onNavigate, collap }: { onNavigate?: () => void; collap: boolean }) => (
     <>
@@ -501,6 +515,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {visibleModules.map(mod => (
           <NavItem key={mod.id} mod={mod} active={isActive(mod)} collapsed={collap} onNavigate={onNavigate} />
         ))}
+
+        {visiblePlatformAdminLinks.length > 0 && (
+          <>
+            <SectionDivider label="PLATFORM ADMIN" collapsed={collap} />
+            {visiblePlatformAdminLinks.map(item => (
+              <PlatformNavLink
+                key={item.label}
+                icon={item.icon}
+                label={item.label}
+                href={item.href}
+                badge={item.badge}
+                badgeColor={item.badgeColor}
+                collapsed={collap}
+                active={location === item.href}
+              />
+            ))}
+          </>
+        )}
 
         <SectionDivider label="PLATFORM" collapsed={collap} />
 
