@@ -1,0 +1,122 @@
+Do NOT rerun E3.
+
+The current portal architecture is already correct and substantially beyond the original E3 scope.
+
+Pass 7c is moving in the right direction.
+
+However:
+the ACTIVE conviction layer is STILL not visually dominating enough.
+
+The problem is now specifically:
+HIGH-CONFIDENCE SIGNAL PRESENCE.
+
+Right now:
+the user should instantly feel:
+“these are the AI’s strongest opportunities.”
+
+But visually:
+the active cards are still too close in energy to the evaluating layer.
+
+Direction for the next calibration pass:
+
+1. ACTIVE 80+/90+ MUST FEEL ELITE
+
+These should immediately command attention.
+
+Amplify:
+
+* confidence ring luminance
+* border glow
+* sparkline energy
+* typography brightness
+* telemetry clarity
+* edge separation
+* confidence-color identity
+
+Especially:
+90+ confidence rows should feel unmistakable.
+
+2. EVALUATING NOW SITS IN A BETTER PLACE
+
+Reducing:
+
+* opacity
+* saturation
+
+was correct.
+
+The evaluating layer now properly supports the active layer instead of competing with it.
+
+Do NOT dim it further.
+
+3. THE ISSUE IS NOW HERO ENERGY
+
+The platform already has:
+
+* cognition
+* scanning
+* lifecycle
+* temporal behavior
+* consequence
+* memory
+
+Now it needs:
+CONVICTION DOMINANCE.
+
+The strongest AI opportunities should visually feel:
+high-value,
+high-priority,
+high-conviction.
+
+4. SPARKLINES SHOULD LEAD THE EYE
+
+The sparklines are becoming the emotional center of the interface.
+
+For high-confidence active rows:
+
+* stronger glow
+* slightly brighter line weight
+* clearer movement readability
+
+Those rows should instantly pull operator focus.
+
+5. CONFIDENCE RINGS NEED MORE AUTHORITY
+
+Especially:
+80+
+90+
+
+Those rings should psychologically communicate:
+“the AI strongly believes in this setup.”
+
+Right now they still feel slightly too restrained.
+
+6. THE PLATFORM IS VERY CLOSE
+
+The architecture is now strong.
+
+The market cognition layer is strong.
+
+The temporal behavior layer is strong.
+
+The lifecycle realism layer is strong.
+
+This is now:
+visual hierarchy refinement.
+
+Not system redesign.
+
+7. NEXT BEST STEP
+
+Before any new systems:
+verify the hierarchy visually in the live preview.
+
+Specifically check:
+
+* can the eye instantly identify the strongest opportunities?
+* do ACTIVE rows clearly dominate?
+* do 90+ setups feel important?
+* does the evaluating layer properly recede?
+* do the sparklines carry enough energy?
+
+That is the current bottleneck.

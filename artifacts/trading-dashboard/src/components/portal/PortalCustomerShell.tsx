@@ -828,13 +828,40 @@ function computeMarketPulse(
  */
 function Sparkline({
   data, color, height = 62, live = false, seedDelayMs = 0,
+  intensity = "baseline",
 }: {
   data: number[];
   color: string;
   height?: number;
   live?: boolean;
   seedDelayMs?: number;
+  /** Pass 7d — conviction-tier amplification. ELITE (>=90) and STRONG
+   *  (>=80) rows get thicker inner stroke + brighter halo so the
+   *  sparkline becomes a visible focal point on hero cards. BASELINE
+   *  preserves Pass 6.1a tuning so low-conf rows stay restrained. */
+  intensity?: "baseline" | "strong" | "elite";
 }) {
+  const innerStrokeWidth =
+    intensity === "elite"  ? 3.2 :
+    intensity === "strong" ? 2.9 : 2.6;
+  const innerStrokeFilter =
+    intensity === "elite"
+      ? `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 10px ${color}) drop-shadow(0 0 20px ${color})`
+      : intensity === "strong"
+      ? `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 8px ${color}) drop-shadow(0 0 16px ${color})`
+      : `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 7px ${color}) drop-shadow(0 0 14px ${color})`;
+  const outerGlowOpacity =
+    intensity === "elite"  ? 0.42 :
+    intensity === "strong" ? 0.34 : 0.28;
+  const liveStrokeWidth =
+    intensity === "elite"  ? 3.4 :
+    intensity === "strong" ? 3.1 : 2.8;
+  const liveFilter =
+    intensity === "elite"
+      ? `drop-shadow(0 0 5px ${color}) drop-shadow(0 0 14px ${color})`
+      : intensity === "strong"
+      ? `drop-shadow(0 0 5px ${color}) drop-shadow(0 0 12px ${color})`
+      : `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 10px ${color})`;
   // viewBox coords — we'll scale via preserveAspectRatio=none so the
   // SVG stretches to any container width while the chart line stays
   // crisp (vector). VBW chosen large enough that per-bar steps don't
@@ -948,24 +975,26 @@ function Sparkline({
         d={areaPath}
         fill={`url(#${gradId})`}
       />
-      {/* Soft outer glow stroke — smooth path */}
+      {/* Soft outer glow stroke — smooth path. Pass 7d: opacity scales
+          with conviction tier so hero cards visibly bloom. */}
       <path
         d={smoothPath}
         fill="none" stroke={color} strokeWidth={6}
         strokeLinecap="round" strokeLinejoin="round"
-        strokeOpacity={0.28}
+        strokeOpacity={outerGlowOpacity}
         vectorEffect="non-scaling-stroke"
         style={{ filter: `blur(3px)` }}
       />
-      {/* Crisp inner stroke with multi-layer drop-shadow halo — Pass 6.1a
-          bumped 2/5/12px → 3/7/14px so sparklines read as "live market
-          telemetry" instead of a faint trace against the chassis. */}
+      {/* Crisp inner stroke with multi-layer drop-shadow halo. Pass 7d:
+          conf-tier amplified — ELITE / STRONG rows get thicker stroke
+          + brighter halo so the sparkline reads as the focal point of
+          a hero row. */}
       <path
         d={smoothPath}
-        fill="none" stroke={color} strokeWidth={2.6}
+        fill="none" stroke={color} strokeWidth={innerStrokeWidth}
         strokeLinecap="round" strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
-        style={{ filter: `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 7px ${color}) drop-shadow(0 0 14px ${color})` }}
+        style={{ filter: innerStrokeFilter }}
       />
       {/* Pass 4.4 — CONTINUOUS FLOW OVERLAY (Pass 4.5: smooth-pathed).
           A duplicate of the trace stroked with a single bright dash
@@ -979,12 +1008,12 @@ function Sparkline({
       {live && (
         <path
           d={smoothPath}
-          fill="none" stroke={color} strokeWidth={2.8}
+          fill="none" stroke={color} strokeWidth={liveStrokeWidth}
           strokeLinecap="round" strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
           strokeDasharray={`${flowDash} ${flowGap}`}
           style={{
-            filter: `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 10px ${color})`,
+            filter: liveFilter,
             animation: `spark-flow 3s linear infinite`,
             animationDelay: `-${seedDelayMs}ms`,
             opacity: 0.95,
@@ -1103,16 +1132,18 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // static contrast amplified.
   const isElite  = opp.conf >= 90;
   const isStrong = opp.conf >= 80 && !isElite;
+  // Pass 7d — tier alphas pushed up. ELITE border now reads as a
+  // conf-color frame (not a tint), STRONG sits clearly above neutral.
   const tierBorderColor =
-    isElite  ? `rgba(102,255,102,0.55)` :
-    isStrong ? `rgba(102,255,102,0.30)` : T.BORDER;
+    isElite  ? `rgba(102,255,102,0.78)` :
+    isStrong ? `rgba(102,255,102,0.42)` : T.BORDER;
   const tierBackground =
-    isElite  ? `linear-gradient(180deg, rgba(102,255,102,0.045) 0%, ${T.BG_TERMINAL} 65%)` :
-    isStrong ? `linear-gradient(180deg, rgba(102,255,102,0.022) 0%, ${T.BG_TERMINAL} 65%)` :
+    isElite  ? `linear-gradient(180deg, rgba(102,255,102,0.075) 0%, ${T.BG_TERMINAL} 60%)` :
+    isStrong ? `linear-gradient(180deg, rgba(102,255,102,0.035) 0%, ${T.BG_TERMINAL} 60%)` :
                T.BG_TERMINAL;
   const tierShadow =
-    isElite  ? `inset 0 0 24px rgba(102,255,102,0.06), 0 0 16px rgba(102,255,102,0.10)` :
-    isStrong ? `inset 0 0 16px rgba(102,255,102,0.035)` :
+    isElite  ? `inset 0 0 28px rgba(102,255,102,0.09), 0 0 22px rgba(102,255,102,0.16)` :
+    isStrong ? `inset 0 0 18px rgba(102,255,102,0.05), 0 0 10px rgba(102,255,102,0.07)` :
                undefined;
 
   // Pass 7b — outcome memory. When this symbol has a paper close within
@@ -1213,15 +1244,20 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             gap: 0, lineHeight: 1,
           }}>
             <span style={{
-              fontSize: 26,
-              fontWeight: opp.conf >= 70 ? 700 : 600,
+              // Pass 7d — typography authority. ELITE numerals push to
+              // 28px / weight 800 with a layered text-shadow so the
+              // conviction score reads as the loudest signal on the
+              // card. STRONG bumped to weight 700 + brighter shadow.
+              fontSize: isElite ? 28 : 26,
+              fontWeight: isElite ? 800 : opp.conf >= 70 ? 700 : 600,
               color: confColor, letterSpacing: T.TRACK_DISPLAY,
               fontVariantNumeric: "tabular-nums",
               textShadow:
-                opp.conf >= 85 ? `0 0 12px ${confColor}, 0 0 6px ${confColor}, 0 0 3px ${confColor}` :
-                opp.conf >= 70 ? `0 0 8px ${confColor}, 0 0 4px ${confColor}` :
-                opp.conf >= 55 ? `0 0 4px ${confColor}` :
-                                 `0 0 2px ${confColor}`,
+                isElite          ? `0 0 18px ${confColor}, 0 0 10px ${confColor}, 0 0 5px ${confColor}, 0 0 2px ${confColor}` :
+                opp.conf >= 85   ? `0 0 14px ${confColor}, 0 0 7px ${confColor}, 0 0 3px ${confColor}` :
+                opp.conf >= 70   ? `0 0 8px ${confColor}, 0 0 4px ${confColor}` :
+                opp.conf >= 55   ? `0 0 4px ${confColor}` :
+                                   `0 0 2px ${confColor}`,
             }}>{opp.conf}</span>
             <span style={{
               fontSize: 7, fontWeight: 700, color: T.TEXT_2,
@@ -1319,6 +1355,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             height={70}
             live={isFreshSignal}
             seedDelayMs={sparkDelayMs}
+            intensity={isElite ? "elite" : isStrong ? "strong" : "baseline"}
           />
           {isLiveTick && (
             <span aria-hidden style={{
@@ -1443,21 +1480,21 @@ function ConfidenceRing({ color, value, size = 78 }: { color: string; value: num
   // Conf-tiered glow intensity — high-conviction signals visibly bloom,
   // low-conviction stay restrained. State-gated motion policy: glow
   // amount encodes confidence tier.
-  // Pass 7c — top-tier glow + halo amplified. ELITE (>=90) now visibly
-  // blooms beyond STRONG (>=80) so the eye reads the elite tier as
-  // hero conviction. Lower tiers untouched to preserve the discipline
-  // gradient (low conf must still look quiet).
+  // Pass 7d — hero conviction. ELITE (>=90) ring blooms past STRONG so
+  // the eye locks onto it; STRONG sits clearly above the median. Lower
+  // tiers preserved so the discipline gradient stays intact (low conf
+  // must still look quiet — no fake conviction).
   const glowPx =
-    value >= 90 ? 26 :
-    value >= 85 ? 20 :
+    value >= 90 ? 34 :
+    value >= 85 ? 24 :
     value >= 70 ? 13 :
     value >= 55 ? 8  : 4;
-  const ringStroke = value >= 90 ? 4.5 : value >= 85 ? 4 : value >= 70 ? 3.5 : 3;
-  // Pass 7c — halo tier raised at the top end. ELITE = 0.70, STRONG =
-  // 0.55. Lower tiers preserved from Pass 6.1a.
+  const ringStroke = value >= 90 ? 5 : value >= 85 ? 4.2 : value >= 70 ? 3.5 : 3;
+  // Pass 7d — halo raised again at the top. ELITE = 0.85 (volumetric
+  // halo physically present), STRONG = 0.62.
   const haloOpacity =
-    value >= 90 ? 0.70 :
-    value >= 85 ? 0.55 :
+    value >= 90 ? 0.85 :
+    value >= 85 ? 0.62 :
     value >= 70 ? 0.38 :
     value >= 55 ? 0.24 : 0.14;
   // 12-tick dial. Each tick is a short radial mark; ticks beneath the
