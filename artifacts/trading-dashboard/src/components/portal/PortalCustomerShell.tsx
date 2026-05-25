@@ -744,7 +744,7 @@ function computeMarketPulse(
  *    crossing into arcade territory.
  */
 function Sparkline({
-  data, color, height = 140, live = false, seedDelayMs = 0,
+  data, color, height = 62, live = false, seedDelayMs = 0,
 }: {
   data: number[];
   color: string;
@@ -985,14 +985,14 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
       style={{
         background: T.BG_TERMINAL,
         border: `1px solid ${T.BORDER}`,
-        padding: 14,
+        padding: 10,
         paddingLeft: 18,
         // Pass 4.4 — tightened inter-row gap (10→7) so the chart band
         // can claim the reclaimed vertical real estate. Every pixel
         // shaved off the static rows flows downstream into chart height.
-        display: "flex", flexDirection: "column", gap: 7,
+        display: "flex", flexDirection: "column", gap: 5,
         position: "relative", overflow: "hidden",
-        height: 388,
+        height: 268,
         fontFamily: T.FONT_MONO,
         // Deterministic hover cadence — background + border tinted in lock-step.
         transition: `background-color ${T.TX_FAST}, border-color ${T.TX_FAST}`,
@@ -1026,7 +1026,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           right-side anchor. */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 24, fontWeight: 700, color: T.TEXT_0 }}>{opp.symbol}</span>
+          <span style={{ fontSize: 17, fontWeight: 700, color: T.TEXT_0, letterSpacing: "-0.01em" }}>{opp.symbol}</span>
           <span style={{
             fontSize: 10, padding: "2px 6px", borderRadius: 3,
             background: "rgba(255,255,255,0.05)", color: T.TEXT_1,
@@ -1069,22 +1069,23 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           ring, thicker stroke, layered halo, bolder number, "AI CONF"
           micro-label so the eye reads it as institutional conviction,
           not a thin percentage gauge. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
         <div style={{
           position: "relative", flexShrink: 0,
-          width: 116, height: 116,
+          width: 78, height: 78,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <ConfidenceRing color={confColor} value={opp.conf} />
+          <ConfidenceRing color={confColor} value={opp.conf} size={78} />
           {/* v4.1 ring-sweep — single 30° bright arc rotating slowly over static ring.
               Sweep only on READY — communicates "signal has crystallized, awaiting execution".
               WAITING / GATED cards keep a static ring. Pass 4.5 — uses
               conf-tier color so the sweep reads as conviction-signal,
-              not direction. */}
+              not direction. Pass 4.6 — rescaled with ring (cx=39, r=34)
+              to preserve identical geometry at compressed size. */}
           {isReady && (
             <svg
               aria-hidden
-              width={116} height={116}
+              width={78} height={78}
               style={{
                 position: "absolute", inset: 0, pointerEvents: "none",
                 animation: "ring-sweep 12s linear infinite",
@@ -1093,10 +1094,10 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
               }}
             >
               <circle
-                cx={58} cy={58} r={51} fill="none"
-                stroke={confColor} strokeWidth={2.5}
-                strokeDasharray="28 292" strokeLinecap="round"
-                style={{ filter: `drop-shadow(0 0 5px ${confColor})`, opacity: 0.8 }}
+                cx={39} cy={39} r={34} fill="none"
+                stroke={confColor} strokeWidth={2}
+                strokeDasharray="19 195" strokeLinecap="round"
+                style={{ filter: `drop-shadow(0 0 4px ${confColor})`, opacity: 0.8 }}
               />
             </svg>
           )}
@@ -1107,7 +1108,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             gap: 0, lineHeight: 1,
           }}>
             <span style={{
-              fontSize: 44,
+              fontSize: 28,
               // Pass 4.4 — always-bold conviction typography. Glow tiered
               // by conf so high-conviction signals visibly bloom while
               // low-conf stays legibly restrained. Pass 4.5 — color now
@@ -1116,22 +1117,22 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
               color: confColor, letterSpacing: T.TRACK_DISPLAY,
               fontVariantNumeric: "tabular-nums",
               textShadow:
-                opp.conf >= 85 ? `0 0 22px ${confColor}, 0 0 12px ${confColor}, 0 0 4px ${confColor}` :
-                opp.conf >= 70 ? `0 0 14px ${confColor}, 0 0 6px ${confColor}` :
-                opp.conf >= 55 ? `0 0 8px ${confColor}`  :
-                                 `0 0 3px ${confColor}`,
+                opp.conf >= 85 ? `0 0 14px ${confColor}, 0 0 7px ${confColor}, 0 0 3px ${confColor}` :
+                opp.conf >= 70 ? `0 0 9px ${confColor}, 0 0 4px ${confColor}` :
+                opp.conf >= 55 ? `0 0 5px ${confColor}`  :
+                                 `0 0 2px ${confColor}`,
             }}>{opp.conf}</span>
             <span style={{
-              fontSize: 8, fontWeight: 700, color: T.TEXT_2,
-              letterSpacing: T.TRACK_LABEL, marginTop: 1,
+              fontSize: 7, fontWeight: 700, color: T.TEXT_2,
+              letterSpacing: T.TRACK_LABEL, marginTop: 0,
               textTransform: "uppercase",
             }}>AI Conf</span>
           </div>
         </div>
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
           <Row label="REGIME" value={opp.regime} />
-          <Row label="VOLATILITY" value={opp.vol} />
+          <Row label="VOL" value={opp.vol} />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 2 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               <div style={{ display: "flex", gap: 4 }}>
@@ -1218,8 +1219,8 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
       <div style={{
         position: "relative",
         width: "100%",
-        height: 140,
-        marginTop: 2,
+        height: 62,
+        marginTop: 1,
         background: "linear-gradient(180deg, rgba(255,255,255,0.022) 0%, rgba(0,0,0,0) 65%, rgba(255,255,255,0.014) 100%)",
         borderTop: `1px solid ${T.BORDER}`,
         borderBottom: `1px solid ${T.BORDER}`,
@@ -1228,7 +1229,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         <Sparkline
           data={opp.sparkline}
           color={sparkColor}
-          height={140}
+          height={62}
           live={isFreshSignal}
           seedDelayMs={sparkDelayMs}
         />
@@ -1254,8 +1255,8 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         )}
       </div>
 
-      {/* Footer: readiness + action */}
-      <div style={{ borderTop: `1px solid ${T.BORDER}`, paddingTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+      {/* Footer: readiness + action — Pass 4.6 compressed, 1-line reasoning. */}
+      <div style={{ borderTop: `1px solid ${T.BORDER}`, paddingTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{
             fontSize: 11, fontWeight: 700,
@@ -1299,11 +1300,13 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             fontSize: 10, fontStyle: "italic",
             color: gatedReason ? T.AMBER : T.TEXT_2,
             display: "-webkit-box",
-            WebkitLineClamp: 2,
+            WebkitLineClamp: 1,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
-            lineHeight: 1.35,
-            maxHeight: "2.7em",
+            lineHeight: 1.3,
+            maxHeight: "1.3em",
+            whiteSpace: "nowrap",
+            textOverflow: "ellipsis",
           }}>
           {gatedReason ? `⛔ ${gatedReason}` : opp.reasoning}
         </span>
@@ -1332,10 +1335,13 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
  * Motion policy preserved: ring itself is static; the ring-sweep arc
  * (mounted by the parent on READY-only) provides the only motion.
  */
-function ConfidenceRing({ color, value }: { color: string; value: number }) {
-  const SIZE = 116;
+function ConfidenceRing({ color, value, size = 78 }: { color: string; value: number; size?: number }) {
+  // Pass 4.6 — parameterized. Original SIZE=116 / r=51 (ratio 0.44)
+  // preserved at the smaller default so glow + halo + ticks scale
+  // proportionally without redesigning the geometry.
+  const SIZE = size;
   const CX   = SIZE / 2;
-  const r    = 51;
+  const r    = Math.round(SIZE * 0.44);
   const c    = 2 * Math.PI * r;
   const pct  = Math.max(0, Math.min(100, value)) / 100;
   // Conf-tiered glow intensity — high-conviction signals visibly bloom,
@@ -1358,15 +1364,15 @@ function ConfidenceRing({ color, value }: { color: string; value: number }) {
     <svg width={SIZE} height={SIZE} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
       {/* Outer volumetric halo — always rendered, opacity tiered by conf. */}
       <circle
-        cx={CX} cy={CX} r={r + 6} fill="none"
+        cx={CX} cy={CX} r={r + 4} fill="none"
         stroke={color} strokeWidth={1}
-        style={{ filter: `drop-shadow(0 0 10px ${color}) drop-shadow(0 0 18px ${color})`, opacity: haloOpacity }}
+        style={{ filter: `drop-shadow(0 0 7px ${color}) drop-shadow(0 0 13px ${color})`, opacity: haloOpacity }}
       />
       {/* Dial tick marks — institutional gauge vocabulary. */}
       {ticks.map(i => {
         const angle = (i / 12) * 2 * Math.PI - Math.PI / 2;
-        const r1 = r + 8;
-        const r2 = r + 12;
+        const r1 = r + 5;
+        const r2 = r + 8;
         const x1 = CX + Math.cos(angle) * r1;
         const y1 = CX + Math.sin(angle) * r1;
         const x2 = CX + Math.cos(angle) * r2;
@@ -1565,12 +1571,20 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
 // only sets the initial scrollbar geometry. Dialed in against the
 // approved CommandDeck mockup density: confidence ring + reasoning
 // block + sparkline + exchange row ≈ 380px tall.
-const CARD_ESTIMATE_PX = 380;
+// Pass 4.6 — density restoration. Original platform's psychological
+// power came from many telemetry rails moving simultaneously, longs and
+// shorts creating market tension across a dense viewport. Pass 4.4/4.5
+// pushed card height to 388 chasing cinematic scale; this pass walks
+// that back to 268 while preserving every visual upgrade (semantic
+// confidence color, bezier-smoothed sparklines, layered ring, flow
+// overlay) at a tighter scale. Goal: ~3 cards per ~900px column → the
+// scanning rhythm the operators expect.
+const CARD_ESTIMATE_PX = 268;
 // Gap between cards, preserved from the pre-virtualization flex layout
 // (was `gap: 14` on the scroll container). Absolute positioning means
 // we now carry the gap as `paddingBottom` on each row wrapper so the
 // virtualizer's `measureElement` includes it in the row's total height.
-const CARD_ROW_GAP_PX = 14;
+const CARD_ROW_GAP_PX = 8;
 
 const Column = memo(function Column({
   title, opps, onQueue, isLoading, isError,

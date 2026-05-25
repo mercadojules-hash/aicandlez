@@ -1,0 +1,87 @@
+This clarifies the direction perfectly.
+
+I do NOT want the new layout to become giant cinematic showcase cards.
+
+I actually want to preserve the overall psychology and scanning rhythm of the ORIGINAL platform — just modernized and improved.
+
+The original system worked because:
+
+* high telemetry density
+* many simultaneous opportunities visible
+* fast institutional scanning cadence
+* live flowing chart rails
+* strong AI confidence focal points
+* dual long/short symmetry
+* constant market movement across the viewport
+
+That feeling is critical.
+
+The updated version should evolve that — not replace it with oversized isolated cards.
+
+The ideal direction now is:
+
+Layout structure (preserve original rhythm)
+
+* Top 20 LONGS on the left
+* Top 20 SHORTS on the right
+* both independently scrollable
+* display roughly 8–10 visible rows at a time
+* maintain dense scanning cadence
+
+Lower section:
+
+* bottom left = Live Trade Data
+* bottom right = Trade History
+* both scrollable
+* both capable of showing ~10 rows visible simultaneously
+
+That structure felt operational and institutional.
+
+Card sizing
+
+* slightly larger than the original system
+* NOT dramatically larger
+* tighter vertical density
+* preserve rapid scanning behavior
+* more visible simultaneous opportunities
+
+Charts
+This is still the biggest emotional component.
+
+I want the chart rails to:
+
+* move live with the market
+* continuously evolve
+* feel like active telemetry streams
+* feel Bloomberg/institutional
+* smoother flowing traces
+* subtle but constant market movement
+
+The charts should feel:
+alive from market activity itself —
+not from decorative animation.
+
+Confidence system
+The newer confidence circles are much closer now.
+
+Keep:
+
+* thicker confidence typography
+* stronger focal hierarchy
+* premium ring treatment
+
+But preserve the old rhythm where:
+multiple confidence systems are visible simultaneously across the viewport.
+
+That density matters psychologically.
+
+The current oversized-card direction loses:
+
+* scan speed
+* opportunity density
+* institutional terminal feel
+
+So I want:
+the ORIGINAL operational cadence,
+combined with:
+the NEW visual quality improvements.
