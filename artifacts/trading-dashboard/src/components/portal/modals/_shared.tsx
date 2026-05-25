@@ -267,13 +267,21 @@ export function useAlertPreferences(enabled: boolean) {
     enabled,
     refetchOnWindowFocus: false,
     queryFn: async () => {
-      const token = await getToken().catch(() => null);
-      const res = await authFetch(`${apiBaseUrl}/api/user/settings`, {
-        credentials: "include",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error("Failed to load settings");
-      return res.json();
+      // Defensive: never throw on settings load. A 500 / network blip
+      // during portal bootstrap previously cascaded into a render crash
+      // ("Cannot read properties of null"). Falling back to {} lets
+      // resolveAlert() use per-key defaultOn and keeps the portal alive.
+      try {
+        const token = await getToken().catch(() => null);
+        const res = await authFetch(`${apiBaseUrl}/api/user/settings`, {
+          credentials: "include",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) return {};
+        return await res.json();
+      } catch {
+        return {};
+      }
     },
   });
 

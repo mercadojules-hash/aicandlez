@@ -9,6 +9,46 @@ const router = Router();
 
 type AuthReq = Request & { clerkUserId: string };
 
+// Default settings shape — mirrors the column defaults in
+// `lib/db/src/schema/userSettings.ts`. Returned by GET /user/settings
+// whenever a row cannot be loaded OR JIT-provisioned (e.g. the parent
+// `users` row hasn't been created yet because the frontend raced ahead
+// of /auth/me). Guarantees the endpoint NEVER 500s during portal
+// bootstrap, which previously cascaded into a render crash.
+function defaultSettings(userId: string) {
+  const now = new Date();
+  return {
+    id:                          "default",
+    userId,
+    aiPersonality:               "balanced",
+    minConfidence:               60,
+    riskLevel:                   "moderate",
+    positionSizeUSD:             20,
+    maxTradesPerDay:             5,
+    maxActivePositions:          3,
+    stopLossPercent:             2,
+    takeProfitPercent:           4,
+    autoMode:                    false,
+    tradingMode:                 "simulation",
+    volumeFilter:                true,
+    require1HTrend:              false,
+    preferredExchange:           "Kraken",
+    preferredLiveOrderSizeUsd:   100,
+    paperSandboxEnabled:         false,
+    notificationsTradeExec:      true,
+    notificationsSignals:        false,
+    notificationsRiskAlerts:     true,
+    notificationsLiveFills:      true,
+    exchangeOutageEmailEnabled:  true,
+    exchangeOutagePushEnabled:   true,
+    alertPrefs:                  {} as AlertPrefs,
+    timezone:                    "UTC",
+    currency:                    "USD",
+    createdAt:                   now,
+    updatedAt:                   now,
+  };
+}
+
 async function getOrCreateSettings(userId: string) {
   let row = await db
     .select()
@@ -18,23 +58,56 @@ async function getOrCreateSettings(userId: string) {
     .then((r) => r[0]);
 
   if (!row) {
+    // JIT-provision the parent `users` row first. The settings table FKs
+    // into users.clerkUserId — without this, a fresh Clerk session that
+    // hasn't hit /auth/me yet would trigger a FK violation here and
+    // bubble up as a 500. Idempotent via onConflictDoNothing.
+    await db
+      .insert(usersTable)
+      .values({ clerkUserId: userId, email: "", role: "user" })
+      .onConflictDoNothing();
+
     [row] = await db
       .insert(userSettingsTable)
       .values({ userId })
+      .onConflictDoNothing()
       .returning();
+
+    // Settings race: another concurrent request created the row between
+    // our SELECT and INSERT — re-read.
+    if (!row) {
+      row = await db
+        .select()
+        .from(userSettingsTable)
+        .where(eq(userSettingsTable.userId, userId))
+        .limit(1)
+        .then((r) => r[0]);
+    }
   }
 
-  return row!;
+  return row;
 }
 
 router.get("/user/settings", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
   try {
     const settings = await getOrCreateSettings(userId);
-    res.json(settings);
+    if (settings) {
+      res.json(settings);
+      return;
+    }
+    // Should be unreachable after the JIT path above, but if a deeper
+    // DB issue still produced no row, return safe defaults instead of
+    // 500 so the portal can hydrate without crashing.
+    req.log.warn({ userId }, "GET /user/settings produced no row — returning defaults");
+    res.json(defaultSettings(userId));
   } catch (err) {
-    req.log.error({ err }, "GET /user/settings failed");
-    res.status(500).json({ error: "Failed to load settings" });
+    // Production-safety: never 500 from settings on bootstrap. Log the
+    // real error for triage, but hand the client a valid default-shaped
+    // payload so the portal stays alive. Mutations (PUT) still 500 on
+    // failure — only the GET bootstrap path falls back here.
+    req.log.error({ err, userId }, "GET /user/settings failed — returning defaults");
+    res.json(defaultSettings(userId));
   }
 });
 
