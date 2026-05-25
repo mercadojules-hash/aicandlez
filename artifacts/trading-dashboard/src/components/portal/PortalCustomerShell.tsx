@@ -85,14 +85,9 @@ type Plan = "free" | "starter" | "pro";
 /* Operator Pulse Ribbon                                                    */
 /* ──────────────────────────────────────────────────────────────────────── */
 
-function useUtcClock() {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return now;
-}
+/* Pass 3.3: `useUtcClock` removed. The ribbon now derives its Date
+ * from the shared shell-level `nowShell` (single 1Hz source) passed
+ * as a prop, eliminating a redundant 1s setInterval at module load. */
 
 function fmtUtc(d: Date): string {
   return `${d.toISOString().split("T")[1]?.split(".")[0]} UTC`;
@@ -122,7 +117,7 @@ function useCustomerPlan(): Plan {
 
 const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
   plan, equityUsd, realizedToday, engineOnline, openCount,
-  pulse, signalsPerMin,
+  pulse, signalsPerMin, now: nowMs,
 }: {
   plan:          Plan;
   equityUsd:     number;
@@ -131,8 +126,13 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
   openCount:     number;
   pulse:         MarketPulse;
   signalsPerMin: number;
+  /** Pass 3.3: shared 1Hz tick from shell. Was an internal
+   *  `useUtcClock` setInterval; now a single source of truth. */
+  now:           number;
 }) {
-  const now = useUtcClock();
+  // Construct Date from shared tick — re-renders at the shell cadence
+  // (paused when the tab is hidden via the visibility-aware `useNow1s`).
+  const now = useMemo(() => new Date(nowMs), [nowMs]);
   const planLabel =
     plan === "pro"     ? "PRO · CRYPTO · PRIORITY EXEC" :
     plan === "starter" ? "STARTER · CRYPTO · AI EXEC"   :
@@ -459,11 +459,42 @@ function signalAge(ts: number, now: number): string {
   return `${Math.round(h / 24)}d`;
 }
 
+/* Pass 3.3: visibility-aware 1Hz tick. The shell mounts ONE of these
+ * (`nowShell`) and passes it down to every consumer (OperatorPulseRibbon,
+ * OpportunityMatrix → Column → OpportunityCard, OperatorTelemetryStrip).
+ * - Pauses its setInterval when `document.hidden` so background tabs
+ *   stop spending cycles on relative-age repaints.
+ * - On `visibilitychange` back to visible, immediately resyncs `now`
+ *   to wall-clock then resumes ticking — no stale `42m` for `3s`
+ *   while the user is re-focusing the tab. */
 function useNow1s(): number {
   const [now, setNow] = useState<number>(() => Date.now());
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
+    let id: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (id == null) id = setInterval(() => setNow(Date.now()), 1000);
+    };
+    const stop = () => {
+      if (id != null) { clearInterval(id); id = null; }
+    };
+    const onVis = () => {
+      if (typeof document !== "undefined" && document.hidden) {
+        stop();
+      } else {
+        setNow(Date.now());
+        start();
+      }
+    };
+    if (typeof document === "undefined" || !document.hidden) start();
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVis);
+    }
+    return () => {
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVis);
+      }
+      stop();
+    };
   }, []);
   return now;
 }
@@ -1038,17 +1069,19 @@ function ColumnHeader({ title, count, accent, subLabel }: {
 }
 
 const OpportunityMatrix = memo(function OpportunityMatrix({
-  majors, alts, onQueue, isLoading, isError,
+  majors, alts, onQueue, isLoading, isError, now,
 }: {
   majors:    OpportunityVM[];
   alts:      OpportunityVM[];
   onQueue:   (opp: OpportunityVM) => void;
   isLoading: boolean;
   isError:   boolean;
+  /** Pass 3.3: shell-level shared 1Hz tick. Previously this component
+   *  spawned its own `useNow1s()` — now consolidated to a single shell
+   *  source so the ribbon, matrix, and footer all tick in lock-step
+   *  with zero observable drift and one timer instead of three. */
+  now:       number;
 }) {
-  // Single 1s tick shared by every card in both columns — drives signal-age
-  // readouts without spawning N intervals.
-  const now = useNow1s();
   return (
     <section style={{
       display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
@@ -1822,31 +1855,25 @@ export function PortalCustomerShell() {
   const plan = useCustomerPlan();
   const exec = useExecutionState();
   const engineOnline = !!exec.data?.engine.running;
-  const { majors, alts, opportunities, isLoading, isError } = usePaperSignals();
+  const { majors, alts, opportunities, engine, isLoading, isError } = usePaperSignals();
   const { stats: paperStats, openTrade, open: openTrades } = usePaperTrades();
 
-  // Shared synchronized telemetry tick — drives footer "LAST TICK" age
-  // readout and any other 1s relative formatters at the shell level.
-  // Card-matrix uses its own useNow1s() at OpportunityMatrix scope; both
-  // are 1Hz, so they remain visually in lock-step.
+  // Pass 3.3: ONE shell-level 1Hz tick — passed as a prop to
+  // `OperatorPulseRibbon`, `OpportunityMatrix`, and
+  // `OperatorTelemetryStrip` (which already accepts `now`). The ribbon
+  // no longer spawns its own `useUtcClock`, and the matrix no longer
+  // spawns its own `useNow1s`. Visibility-aware: pauses on hidden tab.
   const nowShell = useNow1s();
 
-  // Lift the engine-status query to the shell so OperatorPulseRibbon /
-  // SignalPipeline / AIThroughput / OperatorTelemetryStrip all read from
-  // a single source-of-truth (React Query already de-dupes via the
-  // shared "engine-status-portal" key; this just removes the duplicate
-  // queryFn declaration and gives us the typed payload up front).
-  const { data: engineStatus } = useQuery<EngineLite>({
-    queryKey: ["engine-status-portal"],
-    queryFn: async () => {
-      const res = await authFetch(`${apiBaseUrl}/api/engine/status`, { credentials: "include", cache: "no-store" });
-      if (!res.ok) throw new Error("engine_status_failed");
-      return res.json();
-    },
-    refetchInterval: 6_000,
-    staleTime: 3_000,
-    retry: 1,
-  });
+  // Pass 3.3: engine status now comes from `usePaperSignals` directly
+  // (single observer instead of two). The hook already fetches
+  // `/api/engine/status` with key `["engine-status-portal"]`; the
+  // previously-lifted shell-level `useQuery` was a duplicate observer
+  // (same key, same interval, same staleTime) that registered a second
+  // refetch timer for no additional information. EngineStatus is a
+  // structural superset of EngineLite — the cast is a narrowing
+  // documentation hint, not a coercion.
+  const engineStatus: EngineLite | undefined = engine ?? undefined;
 
   const signalsPerMin = useSignalRate(engineStatus?.signalsGenerated);
   const pulse = useMemo(
@@ -1963,6 +1990,7 @@ export function PortalCustomerShell() {
         openCount={openTrades.length}
         pulse={pulse}
         signalsPerMin={signalsPerMin}
+        now={nowShell}
       />
       <PaperModeBanner />
 
@@ -2003,6 +2031,7 @@ export function PortalCustomerShell() {
           onQueue={queuePaper}
           isLoading={isLoading}
           isError={isError}
+          now={nowShell}
         />
 
         <section style={{

@@ -1,0 +1,119 @@
+Excellent. Pass 3.2 was the correct high-impact optimization.
+
+Virtualization + stable identity keys + bounded overscan was exactly the right architecture choice.
+
+The important win is not just FPS —
+it’s preserving the feeling of:
+“alive synchronized intelligence”
+while dramatically reducing render pressure.
+
+The pair-key identity preservation was especially important because:
+
+* confidence rails
+* signal states
+* animations
+* gating states
+* telemetry continuity
+
+now survive reordering naturally.
+
+That protects the emotional continuity of the terminal.
+
+====================================================
+NEXT STEP
+=========
+
+Proceed with:
+
+PASS 3.3 — Interval consolidation + fresh-state render discipline
+
+====================================================
+GOAL
+====
+
+Now that row-render cost is bounded,
+reduce unnecessary temporal churn.
+
+The workstation should update:
+intelligently,
+not constantly.
+
+====================================================
+FOCUS AREAS
+===========
+
+Audit and consolidate:
+
+* remaining 1Hz intervals
+* duplicate observers
+* repeated freshness timers
+* engine-status polling cadence
+* telemetry cadence alignment
+* stale-card update behavior
+* hidden/offscreen timer activity
+* unnecessary “alive” states
+
+====================================================
+TARGET DIRECTION
+================
+
+Fresh / active intelligence:
+
+* updates rapidly
+* pulses
+* breathes
+* scans
+* ticks
+
+Stale / inactive intelligence:
+
+* settles
+* slows
+* quiets
+* stops wasting cycles
+
+====================================================
+IMPORTANT
+=========
+
+Avoid:
+
+* constant full-shell ticking
+* synchronized unnecessary updates
+* stale-card repaint churn
+* hidden telemetry loops
+* decorative polling
+
+The platform should feel:
+efficient
+deliberate
+alive with purpose
+
+====================================================
+DESIRED OUTCOME
+===============
+
+The user should subconsciously feel:
+
+“the AI engine is prioritizing attention.”
+
+Meaning:
+active opportunities feel alive,
+inactive opportunities fade into calm.
+
+====================================================
+VERIFY
+======
+
+After Pass 3.3:
+
+* typecheck
+* authFetch guardrail
+* browser console
+* render cadence observation
+* scroll smoothness
+* hover responsiveness
+* telemetry synchronization validation
+* offscreen stability
+
+Keep RePreview live during the pass so I can evaluate cadence quality and perceived intelligence responsiveness.

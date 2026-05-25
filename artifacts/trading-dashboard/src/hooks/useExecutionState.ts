@@ -57,7 +57,10 @@ export function useExecutionState() {
     queryKey:                    ["execution-state"],
     queryFn:                     fetchExecutionState,
     refetchInterval:             4_000,
-    refetchIntervalInBackground: true,
+    // Pass 3.3 — quiet hidden tabs. The 4s execution-state poll was
+    // running indefinitely in background tabs, repainting nothing.
+    // Foreground sees no change (RQ refires on focus by default).
+    refetchIntervalInBackground: false,
     staleTime:                   2_000,
     retry:                       false,
   });
