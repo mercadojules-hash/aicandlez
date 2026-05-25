@@ -1654,14 +1654,12 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // to 20px glow so the rail reads as a vertical bar of light, not a
   // hairline. STRONG bumped 14→16 for stronger separation from
   // BASELINE. Lower tiers preserved.
-  // Launch-finalization pass — admin rails must read as crisp solid
-  // Bloomberg/TradingView-style directional accents, not atmospheric
-  // glow. Removed the 20/16/10/6px halos entirely; the rail is now a
-  // pure solid color bar at full opacity across every tier. ELITE/HIGH
-  // get a 2px hairline accent shadow only so the eye still finds them
-  // first, but there is NO bloom, NO haze, NO blur.
-  const railGlow =
-    opp.convictionScore >= 70 ? `0 0 2px ${railColor}` : "none";
+  // Launch-finalization — DIRECTIONAL RAIL IS A POLARITY INDICATOR,
+  // NOT A CONVICTION INDICATOR. Same brightness across every tier so
+  // LONG/SHORT snap visible the instant a card flips. Tight 2px edge
+  // glow + a 1px inner highlight so the bar feels physically lit
+  // against the dark chassis. No outward bloom.
+  const railGlow = `0 0 2px ${railColor}, inset 1px 0 0 rgba(255,255,255,0.35)`;
   const railOpacity = 1.0;
   // Pass 4.4 — rail animation state-gated. Only READY cards with fresh
   // telemetry pulse; WAITING / GATED / stale cards keep a static rail
@@ -1806,7 +1804,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           // 7i widens STRONG and ACTIVE so the entire active stack
           // carries a recognizable directional bar — not just the
           // hero.
-          width: isElite ? 7 : isStrong ? 6 : isActiveBaseline ? 5 : 3,
+          width: isActive ? 6 : 3,
           background: railColor,
           boxShadow: railGlow,
           opacity: railOpacity,
