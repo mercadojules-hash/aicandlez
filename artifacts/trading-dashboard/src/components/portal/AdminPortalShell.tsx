@@ -1375,24 +1375,29 @@ function Sparkline({
   const innerStrokeWidth =
     intensity === "elite"  ? 3.6 :
     intensity === "strong" ? 3.4 : 3.2;
+  // Launch-finalization — sparkline collapsed from triple-stacked
+  // drop-shadow halos (5+12+22 px) to a single 2px accent. Outer glow
+  // band reduced from 0.58 → 0.18 opacity so the chart reads as a
+  // precise trace, not an atmospheric haze. ELITE/STRONG retain the
+  // stroke-width step so hero rows still visually dominate.
   const innerStrokeFilter =
     intensity === "elite"
-      ? `drop-shadow(0 0 5px ${color}) drop-shadow(0 0 12px ${color}) drop-shadow(0 0 22px ${color})`
+      ? `drop-shadow(0 0 2px ${color})`
       : intensity === "strong"
-      ? `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 10px ${color}) drop-shadow(0 0 18px ${color})`
-      : `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 9px ${color}) drop-shadow(0 0 16px ${color})`;
+      ? `drop-shadow(0 0 2px ${color})`
+      : `drop-shadow(0 0 1px ${color})`;
   const outerGlowOpacity =
-    intensity === "elite"  ? 0.58 :
-    intensity === "strong" ? 0.50 : 0.46;
+    intensity === "elite"  ? 0.22 :
+    intensity === "strong" ? 0.18 : 0.14;
   const liveStrokeWidth =
     intensity === "elite"  ? 3.8 :
     intensity === "strong" ? 3.5 : 3.2;
   const liveFilter =
     intensity === "elite"
-      ? `drop-shadow(0 0 5px ${color}) drop-shadow(0 0 14px ${color})`
+      ? `drop-shadow(0 0 2px ${color})`
       : intensity === "strong"
-      ? `drop-shadow(0 0 5px ${color}) drop-shadow(0 0 12px ${color})`
-      : `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 10px ${color})`;
+      ? `drop-shadow(0 0 2px ${color})`
+      : `drop-shadow(0 0 1px ${color})`;
   // viewBox coords — we'll scale via preserveAspectRatio=none so the
   // SVG stretches to any container width while the chart line stays
   // crisp (vector). VBW chosen large enough that per-bar steps don't
@@ -1512,15 +1517,16 @@ function Sparkline({
         d={areaPath}
         fill={`url(#${gradId})`}
       />
-      {/* Soft outer glow stroke — smooth path. Pass 7d: opacity scales
-          with conviction tier so hero cards visibly bloom. */}
+      {/* Outer glow stroke — narrowed from 6px+blur(3px) (admin chart
+          bloom source) to 3px+blur(1px) at much lower opacity. Keeps a
+          hint of depth without the atmospheric haze. */}
       <path
         d={smoothPath}
-        fill="none" stroke={color} strokeWidth={6}
+        fill="none" stroke={color} strokeWidth={3}
         strokeLinecap="round" strokeLinejoin="round"
         strokeOpacity={outerGlowOpacity}
         vectorEffect="non-scaling-stroke"
-        style={{ filter: `blur(3px)` }}
+        style={{ filter: `blur(1px)` }}
       />
       {/* Crisp inner stroke with multi-layer drop-shadow halo. Pass 7d:
           conf-tier amplified — ELITE / STRONG rows get thicker stroke
@@ -1648,22 +1654,21 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // to 20px glow so the rail reads as a vertical bar of light, not a
   // hairline. STRONG bumped 14→16 for stronger separation from
   // BASELINE. Lower tiers preserved.
+  // Launch-finalization pass — admin rails must read as crisp solid
+  // Bloomberg/TradingView-style directional accents, not atmospheric
+  // glow. Removed the 20/16/10/6px halos entirely; the rail is now a
+  // pure solid color bar at full opacity across every tier. ELITE/HIGH
+  // get a 2px hairline accent shadow only so the eye still finds them
+  // first, but there is NO bloom, NO haze, NO blur.
   const railGlow =
-    opp.conf >= 90 ? `0 0 20px ${railColor}, 0 0 10px ${railColor}` :
-    opp.conf >= 85 ? `0 0 16px ${railColor}` :
-    opp.conf >= 70 ? `0 0 10px ${railColor}` :
-    opp.conf >= 55 ? `0 0 6px ${railColor}`  :
-                     `0 0 3px ${railColor}`;
-  const railOpacity =
-    opp.conf >= 85 ? 1.0 :
-    opp.conf >= 70 ? 0.85 :
-    opp.conf >= 55 ? 0.6 : 0.4;
+    opp.convictionScore >= 70 ? `0 0 2px ${railColor}` : "none";
+  const railOpacity = 1.0;
   // Pass 4.4 — rail animation state-gated. Only READY cards with fresh
   // telemetry pulse; WAITING / GATED / stale cards keep a static rail
   // honoring the "idle systems stay still" invariant. Glow + opacity
   // continue to encode conf tier without continuous motion.
   const railAnim = isReady && isFreshSignal
-    ? (opp.conf >= 85 ? "rail-pulse 1.8s ease-in-out infinite" : "rail-pulse 2.5s ease-in-out infinite")
+    ? (opp.convictionScore >= 75 ? "rail-pulse 1.8s ease-in-out infinite" : "rail-pulse 2.5s ease-in-out infinite")
     : undefined;
 
   // Pass 7c — CONVICTION DOMINANCE. The TOP 20 LONGS / SHORTS must
@@ -1847,7 +1852,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
               <circle cx={36} cy={36} r={31} fill="none"
                 stroke={confColor} strokeWidth={2}
                 strokeDasharray="18 178" strokeLinecap="round"
-                style={{ filter: `drop-shadow(0 0 3px ${confColor})`, opacity: 0.75 }} />
+                style={{ opacity: 0.6 }} />
             </svg>
           )}
           <div style={{
@@ -1865,10 +1870,32 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
               color: confColor, letterSpacing: T.TRACK_DISPLAY,
               fontVariantNumeric: "tabular-nums",
             }}>{opp.conf}</span>
-            <span style={{
-              fontSize: 8, fontWeight: 700, color: T.TEXT_2,
-              letterSpacing: T.TRACK_LABEL, textTransform: "uppercase",
-            }}>AI Conf</span>
+            {/* Launch-finalization — admin keeps RAW engine confidence
+                as the primary headline (execution truth) and gains a
+                small calibrated tier badge BELOW so operators get fast
+                conviction scanning without losing low-level honesty.
+                Hover for the per-factor "Why?" breakdown. */}
+            <span
+              title={(() => {
+                const b = opp.convictionBreakdown;
+                const row = (f: { label: string; value: number; weight: number; contribution: number; verdict: string }) =>
+                  `${f.label.padEnd(28)} ${String(f.value).padStart(3)}/100  · ${f.verdict.padEnd(8)} · +${f.contribution.toFixed(1)} pts`;
+                return [
+                  `${opp.convictionTier} CONVICTION · ${opp.convictionScore}/100`,
+                  `(raw engine confidence: ${opp.conf})`,
+                  ``,
+                  `Why this score?`,
+                  row(b.raw), row(b.rank), row(b.mtf),
+                  row(b.trend), row(b.liquidity), row(b.regime), row(b.rr),
+                ].join("\n");
+              })()}
+              style={{
+                fontSize: 8, fontWeight: 700,
+                color: opp.convictionScore >= 70 ? confColor : T.TEXT_2,
+                letterSpacing: T.TRACK_LABEL, textTransform: "uppercase",
+                cursor: "help",
+              }}
+            >{opp.convictionTier}</span>
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
@@ -2117,31 +2144,36 @@ function ConfidenceRing({ color, value, size = 78 }: { color: string; value: num
   // card surface. Halo bumped in lockstep. 55-tier and base preserved
   // (those are mostly evaluating cards which sit inside the dimmer
   // wrapper anyway).
+  // Launch-finalization — admin ring is operator-grade: crisp arc,
+  // tiny accent halo, no atmospheric bloom. Down from 40/30/24/12/7
+  // px glow to 6/4/3/2/1 px; halo opacity collapsed from 0.95→0.30
+  // max so the ring reads as institutional gauge instead of cyberpunk.
   const glowPx =
-    value >= 90 ? 40 :
-    value >= 85 ? 30 :
-    value >= 70 ? 24 :
-    value >= 55 ? 12 : 7;
+    value >= 85 ? 6 :
+    value >= 70 ? 4 :
+    value >= 55 ? 3 :
+    value >= 40 ? 2 : 1;
   const ringStroke =
-    value >= 90 ? 5.5 :
-    value >= 85 ? 4.6 :
-    value >= 70 ? 4.2 : 3.4;
+    value >= 85 ? 4.4 :
+    value >= 70 ? 3.8 :
+    value >= 55 ? 3.4 : 3.0;
   const haloOpacity =
-    value >= 90 ? 0.95 :
-    value >= 85 ? 0.72 :
-    value >= 70 ? 0.60 :
-    value >= 55 ? 0.36 : 0.22;
+    value >= 85 ? 0.30 :
+    value >= 70 ? 0.20 :
+    value >= 55 ? 0.12 : 0.06;
   // 12-tick dial. Each tick is a short radial mark; ticks beneath the
   // progress arc are tinted with the color, ticks beyond stay neutral.
   const ticks = Array.from({ length: 12 }, (_, i) => i);
   const tickBoundary = pct * 12;
   return (
     <svg width={SIZE} height={SIZE} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
-      {/* Outer volumetric halo — always rendered, opacity tiered by conf. */}
+      {/* Outer accent halo — single, narrow drop-shadow only. The 7px +
+          13px stacked blur was the primary source of admin ring spill;
+          replaced with one 3px halo at much lower opacity. */}
       <circle
         cx={CX} cy={CX} r={r + 4} fill="none"
         stroke={color} strokeWidth={1}
-        style={{ filter: `drop-shadow(0 0 7px ${color}) drop-shadow(0 0 13px ${color})`, opacity: haloOpacity }}
+        style={{ filter: `drop-shadow(0 0 3px ${color})`, opacity: haloOpacity }}
       />
       {/* Dial tick marks — institutional gauge vocabulary. */}
       {ticks.map(i => {
@@ -2166,16 +2198,9 @@ function ConfidenceRing({ color, value, size = 78 }: { color: string; value: num
       })}
       {/* Static track ring — base reference. */}
       <circle cx={CX} cy={CX} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={ringStroke} />
-      {/* Soft underlay progress — thick blurred glow band. */}
-      <circle
-        cx={CX} cy={CX} r={r} fill="none"
-        stroke={color} strokeWidth={ringStroke + 4}
-        strokeDasharray={`${c * pct} ${c}`}
-        strokeLinecap="round"
-        transform={`rotate(-90 ${CX} ${CX})`}
-        opacity={0.35}
-        style={{ filter: `blur(3px)`, transition: "stroke-dasharray 600ms ease" }}
-      />
+      {/* Soft underlay removed for launch-finalization — the blurred
+          glow band was creating the "fuzzy" ring perception in admin.
+          Crisp inner arc below carries the conviction read on its own. */}
       {/* Crisp inner progress — primary conviction arc. */}
       <circle
         cx={CX} cy={CX} r={r} fill="none"
