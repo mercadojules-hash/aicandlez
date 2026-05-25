@@ -1,0 +1,89 @@
+Smoke test passed.
+
+Both admin and customer dashboards are now rendering correctly in production.
+
+Confirmed:
+
+* no white screens
+* telemetry loads
+* no repeated 500 loops
+* dashboards operational
+* subscription gating behavior appears active
+* production API healthy
+
+New priorities:
+
+1. Reduce glow/bloom intensity globally
+   The production dashboards are visually overexposed compared to the cleaner test dashboard.
+
+Required:
+
+* reduce neon bloom strength
+* reduce excessive box-shadow intensity
+* reduce chart glow opacity
+* reduce background radial glow overlays
+* preserve the cinematic black/neon aesthetic without causing eye fatigue
+
+Focus especially on:
+
+* chart glow layers
+* container borders
+* signal cards
+* confidence rings
+* header telemetry bars
+
+Goal:
+closer to institutional terminal polish rather than heavy cyberpunk bloom.
+
+2. Improve execution modal behavior
+   During customer portal testing, clicking Buy triggered a large execution modal:
+   “LIVE EXECUTION — PHASE 2 PENDING”
+
+I correctly did NOT continue because:
+
+* confidence was low
+* multiple portals were simultaneously logged in
+* unclear whether this could route to live execution
+
+Tasks:
+
+* verify customer paper mode cannot accidentally trigger real execution
+* ensure modal clearly states SIMULATION vs LIVE
+* add explicit environment badge:
+  PAPER / LIVE / ADMIN
+* ensure customer portal defaults safely to simulation
+
+3. Add trade notifications/toasts
+   Currently there is no visible confirmation when a trade executes or closes.
+
+Required:
+Add professional toast notifications for:
+
+* BUY executed
+* SELL executed
+* TP hit
+* SL hit
+* AI enabled
+* AI disabled
+* Exchange connected/disconnected
+
+Style:
+
+* subtle terminal-style notifications
+* lower glow
+* concise
+* stacked top-right or bottom-right
+* auto-dismiss
+* color-coded by event severity/type
+
+4. Multi-session hardening
+   I was simultaneously logged into admin + customer portals during testing.
+
+Please verify:
+
+* operator session cannot leak execution state into customer session
+* modal routing is session-scoped
+* admin execution controls cannot appear on customer portal
+
+No major redesign work yet.
+Finish stabilization + UX hardening first.
