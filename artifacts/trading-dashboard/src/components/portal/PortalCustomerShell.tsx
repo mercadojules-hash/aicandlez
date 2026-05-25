@@ -161,20 +161,21 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
         overflow: "hidden",
       }}
     >
-      <div style={{
+      <div className="cd-ribbon" style={{
         display: "flex", alignItems: "center",
         gap: 14, maxWidth: 2000, margin: "0 auto",
-        flexWrap: "wrap",
+        flexWrap: "nowrap", minWidth: 0, overflow: "hidden",
+        whiteSpace: "nowrap",
       }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_0, fontWeight: 700, letterSpacing: "0.18em" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_0, fontWeight: 700, letterSpacing: "0.18em", flexShrink: 0 }}>
           <Terminal size={13} color={T.NEON} /> AICANDLEZ
         </span>
         <RibbonDivider />
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_1, fontVariantNumeric: "tabular-nums" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_1, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
           <Clock size={12} color={T.TEXT_2} /> {fmtUtc(now)}
         </span>
         <RibbonDivider />
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           <span style={{
             width: 7, height: 7, borderRadius: "50%",
             background: engineOnline ? T.NEON : T.AMBER,
@@ -186,10 +187,11 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
           </span>
         </span>
 
-        <RibbonDivider />
+        <RibbonDivider prio={2} />
         <span
+          data-prio="2"
           title={`Signals generated per minute, since session start`}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_2, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}
         >
           <Activity size={11} color={T.TEXT_2} /> SIG/MIN:&nbsp;
           <span style={{ color: signalsPerMin > 0 ? T.TEXT_0 : T.TEXT_2 }}>
@@ -197,10 +199,11 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
           </span>
         </span>
 
-        <RibbonDivider />
+        <RibbonDivider prio={2} />
         <span
+          data-prio="2"
           title={`${pulse.long} long · ${pulse.short} short · ${pulse.flat} flat (of ${pulse.total})`}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_2, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}
         >
           L/S:&nbsp;
           <span style={{ color: imbalanceTone, fontWeight: 600 }}>
@@ -208,19 +211,21 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
           </span>
         </span>
 
-        <RibbonDivider />
+        <RibbonDivider prio={2} />
         <span
+          data-prio="2"
           title={`Average AI confidence across ${pulse.total} watched symbols`}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_2, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}
         >
           AVG CONF:&nbsp;
           <span style={{ color: confTone, fontWeight: 600 }}>{pulse.avgConf}%</span>
         </span>
 
-        <RibbonDivider />
+        <RibbonDivider prio={3} />
         <span
+          data-prio="3"
           title={`${pulse.ready} READY · ${pulse.waiting} WAITING · ${pulse.gated} GATED`}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_2, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}
         >
           QUEUE:&nbsp;
           <span style={{ color: queueTone, fontWeight: 600 }}>{pulse.ready}</span>
@@ -230,10 +235,11 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
           <span style={{ color: T.RED }}>{pulse.gated}</span>
         </span>
 
-        <RibbonDivider />
+        <RibbonDivider prio={3} />
         <span
+          data-prio="3"
           title="Concurrent live trade cap (platform-wide, controlled beta)"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_1, fontVariantNumeric: "tabular-nums" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_1, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}
         >
           SLOTS: {openCount}/3
         </span>
@@ -264,8 +270,13 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
 
 void Globe; void MonitorPlay; // formerly rendered NYC·US / WKS-04 stub badges; retained as imports for parity with mockup palette
 
-function RibbonDivider() {
-  return <span style={{ width: 1, height: 14, background: T.BORDER }} />;
+function RibbonDivider({ prio }: { prio?: 2 | 3 } = {}) {
+  return (
+    <span
+      data-prio={prio}
+      style={{ width: 1, height: 14, background: T.BORDER, flexShrink: 0 }}
+    />
+  );
 }
 
 /* ──────────────────────────────────────────────────────────────────────── */
@@ -1516,7 +1527,7 @@ const RiskHeatmap = memo(function RiskHeatmap({ opps }: { opps: OpportunityVM[] 
   while (cells.length < 16) cells.push({ sym: "—", risk: 0.05 });
   return (
     <PanelCard title="RISK HEATMAP" height={208}>
-      <div style={{ padding: 12, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4, flex: 1 }}>
+      <div style={{ padding: 12, display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 4, flex: 1 }}>
         {cells.map((c, i) => {
           const color = c.risk > 0.7 ? T.RED : c.risk > 0.4 ? T.AMBER : T.NEON;
           return (
@@ -1666,7 +1677,7 @@ function OperatorTelemetryStrip({
     : "—";
 
   return (
-    <footer style={{
+    <footer className="cd-footer" style={{
       background: T.BG_TERMINAL,
       borderTop: `1px solid ${T.BORDER}`,
       padding: "8px 16px",
@@ -1674,13 +1685,14 @@ function OperatorTelemetryStrip({
       fontSize: 11,
       color: T.TEXT_2,
       position: "sticky", bottom: 0, zIndex: 30,
-      display: "flex", flexWrap: "wrap", gap: 20,
+      display: "flex", flexWrap: "nowrap", gap: 20,
       alignItems: "center", justifyContent: "flex-start",
       fontVariantNumeric: "tabular-nums",
+      minWidth: 0, overflow: "hidden", whiteSpace: "nowrap",
     }}>
       <span
         title={`Last engine tick · loop ${loopMs || "—"}ms`}
-        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}
       >
         {/* Radio cadence tied to tick freshness:
             NEON tick (fresh)   → fast 1.4s pulse  → "engine is talking to us"
@@ -1697,45 +1709,54 @@ function OperatorTelemetryStrip({
         />
         LAST TICK:&nbsp;<span style={{ color: tickTone }}>{tickAge}</span>
       </span>
-      <Divider />
+      <Divider prio={2} />
       <span
+        data-prio="2"
         title="Most recent AI signal emitted by the engine"
-        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}
       >
         <Database size={11} /> LAST SIGNAL:&nbsp;<span style={{ color: T.TEXT_0 }}>{sigAge}</span>
       </span>
-      <Divider />
+      <Divider prio={2} />
       <span
+        data-prio="2"
         title={`Share of watched symbols flagged ELEVATED volatility (${pulse.elevatedVolPct}% elevated · ${pulse.lowVolPct}% low)`}
-        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}
       >
         <LineChartIcon size={11} color={volTone} /> VOL PULSE:&nbsp;<span style={{ color: volTone }}>{pulse.elevatedVolPct}% ELEVATED</span>
       </span>
-      <Divider />
+      <Divider prio={3} />
       <span
+        data-prio="3"
         title={`Share of symbols with momentum strength ≥ 2 (of 3)`}
-        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}
       >
         <Activity size={11} color={momTone} /> MOMENTUM:&nbsp;<span style={{ color: momTone }}>{pulse.momentumBreadthPct}% BREADTH</span>
       </span>
-      <Divider />
+      <Divider prio={3} />
       <span
+        data-prio="3"
         title="Dominant market regime across watched universe"
-        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}
       >
         <PieChart size={11} /> REGIME:&nbsp;<span style={{ color: T.TEXT_0 }}>{regimeLabel}</span>
       </span>
-      <span style={{ flex: 1 }} />
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_3 }}>
+      <span style={{ flex: 1, minWidth: 0 }} />
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_3, flexShrink: 0 }}>
         <AlertTriangle size={11} /> Paper telemetry · zero broker exposure
       </span>
     </footer>
   );
 }
 
-function Divider() {
+function Divider({ prio }: { prio?: 2 | 3 } = {}) {
   // Matches RibbonDivider height for cross-strip rhythm consistency.
-  return <span style={{ width: 1, height: 14, background: T.BORDER }} />;
+  return (
+    <span
+      data-prio={prio}
+      style={{ width: 1, height: 14, background: T.BORDER, flexShrink: 0 }}
+    />
+  );
 }
 
 /* ──────────────────────────────────────────────────────────────────────── */
@@ -1985,6 +2006,25 @@ export function PortalCustomerShell() {
         }
         .cd-scroll:hover::-webkit-scrollbar-thumb  { background: rgba(102,255,102,0.22); }
         .cd-scroll                                 { scrollbar-width: thin; scrollbar-color: rgba(102,255,102,0.18) transparent; }
+        /* Operator strip progressive collapse — institutional single-line
+           preservation. Priority numbering matches operator importance:
+           P1 > P2 > P3. Lower-priority chips drop at LARGER viewport
+           widths (i.e. drop sooner). Below ~1280px we drop the tertiary
+           detail chips (QUEUE breakdown, SLOTS counter · MOMENTUM,
+           REGIME); below ~1100px we additionally drop the secondary
+           throughput chips (SIG/MIN, L/S, AVG CONF · LAST SIGNAL,
+           VOL PULSE). P1 chips (brand, clock, ENGINE, plan, BAL,
+           REALIZED, LAST TICK, paper tagline) always render.
+           Preserves dense terminal aesthetic on standard laptop widths
+           without flexWrap row-collapse. */
+        @media (max-width: 1280px) {
+          .cd-ribbon [data-prio="3"],
+          .cd-footer [data-prio="3"] { display: none !important; }
+        }
+        @media (max-width: 1100px) {
+          .cd-ribbon [data-prio="2"],
+          .cd-footer [data-prio="2"] { display: none !important; }
+        }
       `}</style>
       <OperatorPulseRibbon
         plan={plan}
