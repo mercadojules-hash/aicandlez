@@ -81,6 +81,25 @@ export function useUserRole(): UseUserRoleResult {
           });
 
           if (res.status === 401) {
+            // LOUD: a 401 here means Clerk auth failed end-to-end (cookie + Bearer
+            // both rejected by api-server). The most common production cause is a
+            // CLERK_SECRET_KEY / VITE_CLERK_PUBLISHABLE_KEY mismatch (test vs live)
+            // on the api-server. Surface it everywhere so it's never invisible.
+            const diag = {
+              status: 401,
+              tokenPresent: !!token,
+              tokenPrefix: token ? token.slice(0, 12) + "…" : null,
+              url: `${apiBaseUrl}/api/auth/me`,
+              host: typeof window !== "undefined" ? window.location.hostname : null,
+              hint: token
+                ? "Bearer sent but rejected — api-server CLERK_SECRET_KEY likely mismatches the publishable key (test vs live)."
+                : "No Bearer token issued — Clerk session not active on this host.",
+              at: new Date().toISOString(),
+            };
+            console.error("[useUserRole] /api/auth/me 401 — silently demoting to role:user", diag);
+            if (typeof window !== "undefined") {
+              (window as unknown as { __authDiag?: unknown }).__authDiag = diag;
+            }
             if (!cancelled) { setRole("user"); setLoading(false); }
             return;
           }
