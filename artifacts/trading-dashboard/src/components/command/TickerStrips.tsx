@@ -67,7 +67,7 @@ function Chip({
           className={`${large ? "text-[12px]" : "text-[11px]"} font-mono font-bold`}
           style={{
             color: isPos ? "#00ff8a" : isNeg ? "#ff3366" : "#ffb800",
-            textShadow: isPos ? "0 0 8px #00ff8a80" : isNeg ? "0 0 8px #ff336680" : "0 0 8px #ffb80080",
+            textShadow: isPos ? "0 0 5px #00ff8a80" : isNeg ? "0 0 5px #ff336680" : "0 0 5px #ffb80080",
           }}
         >
           {chg}
@@ -165,7 +165,7 @@ export function TickerStrips({ engine }: Props) {
             <span className="text-[13px] font-bold" style={{ color: c }}>
               {sym}
             </span>
-            <span className="text-[13px] font-bold" style={{ color: dCol, textShadow: `0 0 8px ${dCol}80` }}>
+            <span className="text-[13px] font-bold" style={{ color: dCol, textShadow: `0 0 5px ${dCol}80` }}>
               {s.decision}
             </span>
             <span className="text-[12px] font-mono" style={{ color: "#c0eeff90" }}>

@@ -348,7 +348,7 @@ function Panel({
         display: "flex",
         flexDirection: "column",
         minHeight: 180,
-        boxShadow: `inset 0 1px 0 ${accent}08, 0 0 18px ${accent}05`,
+        boxShadow: `inset 0 1px 0 ${accent}08, 0 0 12px ${accent}05`,
       }}
     >
       <div className="flex items-center gap-1.5 mb-2">
@@ -472,7 +472,7 @@ function FunnelPanel({ data }: { data: FunnelData | undefined }) {
                 height: "100%",
                 width: `${i === 0 ? 100 : Math.min(100, pct)}%`,
                 background: color,
-                boxShadow: `0 0 6px ${color}66`,
+                boxShadow: `0 0 4px ${color}66`,
                 transition: "width 0.4s",
               }} />
             </div>

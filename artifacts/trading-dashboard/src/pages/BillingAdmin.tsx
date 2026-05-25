@@ -121,7 +121,7 @@ function StatTile({ icon: Icon, label, value, accent, sub }: {
       style={{ background: "#010C18", borderColor: "#0d1e2e" }}>
       <div className="flex items-center justify-between">
         <div className="p-1.5 rounded" style={{ background: `${accent}15`, border: `1px solid ${accent}25` }}>
-          <Icon className="w-3.5 h-3.5" style={{ color: accent, filter: `drop-shadow(0 0 6px ${accent})` }} />
+          <Icon className="w-3.5 h-3.5" style={{ color: accent, filter: `drop-shadow(0 0 4px ${accent})` }} />
         </div>
       </div>
       <div>
@@ -592,7 +592,7 @@ export default function BillingAdmin() {
                   style={{
                     background:   "rgba(102,255,102,0.08)",
                     border:       "1px solid rgba(102,255,102,0.35)",
-                    boxShadow:    "0 0 24px rgba(102,255,102,0.18)",
+                    boxShadow: "0 0 16px rgba(102,255,102,0.108)",
                   }}
                 >
                   <CheckCircle2 className="w-7 h-7" style={{ color: "#66FF66" }} />

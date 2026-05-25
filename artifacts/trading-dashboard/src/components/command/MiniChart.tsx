@@ -269,7 +269,7 @@ export function MiniChart({ symbol, label, color, breakdown }: Props) {
                   {volOk ? "✓VOL" : "✗VOL"}
                 </span>
                 <span className="text-[13px] font-bold font-mono tabular-nums"
-                  style={{ color, textShadow: `0 0 8px ${color}40` }}>
+                  style={{ color, textShadow: `0 0 5px ${color}40` }}>
                   {conf.toFixed(0)}%
                 </span>
               </div>

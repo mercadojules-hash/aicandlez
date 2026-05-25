@@ -135,7 +135,7 @@ export function AutonomousExecutionFeed({ engine }: Props) {
                     width: 7,
                     height: 7,
                     background: step.color,
-                    boxShadow: isActive ? `0 0 8px ${step.color}, 0 0 16px ${step.color}60` : "none",
+                    boxShadow: isActive ? `0 0 5px ${step.color}, 0 0 16px ${step.color}60` : "none",
                     opacity: isActive ? 1 : 0.35,
                   }}
                 />

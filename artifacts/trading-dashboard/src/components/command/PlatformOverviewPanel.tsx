@@ -48,7 +48,7 @@ function DonutChart({ segments, centerValue, centerLabel }: {
       <div className="absolute flex flex-col items-center justify-center"
         style={{ inset: 0, marginLeft: 26, marginRight: 26, marginTop: 32, marginBottom: 32 }}>
         <div className="text-[17px] font-bold font-mono tabular-nums leading-none"
-          style={{ color: "#00f0ff", textShadow: "0 0 14px #00f0ff55" }}>
+          style={{ color: "#00f0ff", textShadow: "0 0 9px #00f0ff55" }}>
           {centerValue}
         </div>
         <div className="text-[7px] font-mono tracking-[0.16em] mt-1 font-medium" style={{ color: "#9FB3C8" }}>
@@ -217,7 +217,7 @@ export function PlatformOverviewPanel({ simAccount, liveBalance, engine, feeSumm
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="panel-header">
         <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-          style={{ background: "#00aaff", boxShadow: "0 0 5px #00aaff" }} />
+          style={{ background: "#00aaff", boxShadow: "0 0 3px #00aaff" }} />
         <span className="panel-header-title" style={{ color: "#00aaff" }}>
           {isAlpaca ? "ALPACA OPERATOR OVERVIEW" : "OPERATOR INTELLIGENCE"}
         </span>

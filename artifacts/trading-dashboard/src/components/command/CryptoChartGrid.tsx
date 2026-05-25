@@ -11,7 +11,7 @@ export function CryptoChartGrid({ breakdowns }: Props) {
       <div className="flex items-center gap-3 mb-3">
         <div className="live-dot live-dot-cyan" style={{ width: 7, height: 7 }} />
         <span className="text-[13px] font-bold tracking-[0.2em] uppercase"
-          style={{ color: "#00f0ff", textShadow: "0 0 12px #00f0ff60" }}>
+          style={{ color: "#00f0ff", textShadow: "0 0 8px #00f0ff60" }}>
           CRYPTO CHART GRID
         </span>
         <span className="text-[10px] font-mono font-medium ml-1" style={{ color: "#9FB3C8" }}>

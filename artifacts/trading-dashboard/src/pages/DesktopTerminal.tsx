@@ -118,7 +118,7 @@ function Widget({
         <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: accent, letterSpacing: "0.12em", flex: 1 }}>
           {title}
         </span>
-        <span style={{ width: 5, height: 5, borderRadius: "50%", background: G, boxShadow: `0 0 6px ${G}`, flexShrink: 0 }} />
+        <span style={{ width: 5, height: 5, borderRadius: "50%", background: G, boxShadow: `0 0 4px ${G}`, flexShrink: 0 }} />
         {onToggle && (
           <button onClick={onToggle} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}>
             {maximized
@@ -169,7 +169,7 @@ function TickerRow({ tickers, wsConnected }: { tickers: TickerEntry[]; wsConnect
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: wsConnected ? G : R,
-            boxShadow: wsConnected ? `0 0 8px ${G}` : "none", flexShrink: 0 }} />
+            boxShadow: wsConnected ? `0 0 5px ${G}` : "none", flexShrink: 0 }} />
           <span style={{ fontFamily: MONO, fontSize: 8, color: wsConnected ? G : R }}>
             {wsConnected ? "LIVE" : "OFFLINE"}
           </span>

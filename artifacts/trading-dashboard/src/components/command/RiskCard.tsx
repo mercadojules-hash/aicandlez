@@ -44,7 +44,7 @@ export function RiskCard({ engine, settings }: Props) {
           <div className="rounded overflow-hidden" style={{ height: 6, background: "#0a0a0a" }}>
             <div
               className="h-full rounded transition-all"
-              style={{ width: `${riskPct * 100}%`, background: barColor, boxShadow: `0 0 6px ${barColor}50` }}
+              style={{ width: `${riskPct * 100}%`, background: barColor, boxShadow: `0 0 4px ${barColor}50` }}
             />
           </div>
         </div>
@@ -57,7 +57,7 @@ export function RiskCard({ engine, settings }: Props) {
             { v: `${engine?.tradesExecuted ?? 0}`,       l: "TOTAL EXECUTED",  c: "#00ff88" },
           ].map(({ v, l, c }) => (
             <div key={l} className="rounded p-2.5 text-center" style={{ background: "#050505", border: "1px solid #181818" }}>
-              <div className="text-[16px] font-bold mb-0.5 tabular-nums" style={{ color: c, textShadow: `0 0 8px ${c}40` }}>
+              <div className="text-[16px] font-bold mb-0.5 tabular-nums" style={{ color: c, textShadow: `0 0 5px ${c}40` }}>
                 {v}
               </div>
               <div className="text-[7px] uppercase tracking-widest" style={{ color: "#1a2a35" }}>{l}</div>

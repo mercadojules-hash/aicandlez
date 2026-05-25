@@ -147,7 +147,7 @@ function Section({
         className="w-full flex items-center gap-2.5 px-4 py-3 text-left"
         style={{ background: "#020E1C" }}
       >
-        <Icon className="w-3.5 h-3.5 shrink-0" style={{ color, filter: `drop-shadow(0 0 6px ${color}60)` }} />
+        <Icon className="w-3.5 h-3.5 shrink-0" style={{ color, filter: `drop-shadow(0 0 4px ${color}60)` }} />
         <span className="font-mono text-[11px] font-bold tracking-[0.2em] flex-1" style={{ color: "#7ab8cc" }}>
           {title}
         </span>
@@ -183,7 +183,7 @@ function ToggleSwitch({
           style={{
             left: value ? "calc(100% - 18px)" : "2px",
             background: value ? "#00aaff" : "#2a4a60",
-            boxShadow: value ? "0 0 6px #00aaff80" : "none",
+            boxShadow: value ? "0 0 4px #00aaff80" : "none",
           }}
         />
       </button>
@@ -524,7 +524,7 @@ function ExchangeCard({
       style={{
         background:   isConnected ? "#020E1C" : "#010C18",
         borderColor:  isConnected ? "#00ff8a18" : isError ? "#ff445518" : "#0D2035",
-        boxShadow:    isConnected ? "0 0 12px #00ff8a06" : "none",
+        boxShadow: isConnected ? "0 0 8px #00ff8a06" : "none",
       }}
     >
       {/* Top row */}
@@ -533,14 +533,14 @@ function ExchangeCard({
           <div
             className="w-3 h-3 rounded-full shrink-0"
             style={{ background: statusColor,
-              boxShadow: isConnected ? `0 0 12px ${statusColor}, 0 0 22px ${statusColor}aa` : "none",
+              boxShadow: isConnected ? `0 0 8px ${statusColor}, 0 0 22px ${statusColor}aa` : "none",
               animation: isConnected ? "dot-pulse 2.5s ease-in-out infinite" : "none" }}
           />
           <span
             className="text-[17px] font-extrabold tracking-tight"
             style={{
               color: isConnected ? "#FFFFFF" : isError ? "#ff4455" : "#EAF2FF",
-              textShadow: isConnected ? `0 0 14px ${statusColor}aa, 0 0 4px ${statusColor}` : "none",
+              textShadow: isConnected ? `0 0 9px ${statusColor}aa, 0 0 4px ${statusColor}` : "none",
               letterSpacing: "-0.01em",
             }}
           >
@@ -575,7 +575,7 @@ function ExchangeCard({
           className="font-mono text-[11px] font-extrabold tracking-widest"
           style={{
             color: statusColor,
-            textShadow: isConnected ? `0 0 8px ${statusColor}66` : "none",
+            textShadow: isConnected ? `0 0 5px ${statusColor}66` : "none",
           }}
         >{statusLabel}</span>
       </div>
@@ -975,7 +975,7 @@ export default function Settings() {
                 background: saved ? "#00ff8a18" : mutation.isPending ? "#00aaff10" : "#00aaff20",
                 border: `1px solid ${saved ? "#00ff8a60" : "#00aaff60"}`,
                 color: saved ? "#00ff8a" : "#00aaff",
-                boxShadow: saved ? "0 0 12px #00ff8a18" : mutation.isPending ? "none" : "0 0 12px #00aaff12",
+                boxShadow: saved ? "0 0 8px #00ff8a18" : mutation.isPending ? "none" : "0 0 8px #00aaff12",
               }}
             >
               {saved
@@ -1023,7 +1023,7 @@ export default function Settings() {
                     style={{
                       background: merged.aiPersonality === p.value ? `${p.color}0c` : "#020E1C",
                       borderColor: merged.aiPersonality === p.value ? `${p.color}50` : "#0D2035",
-                      boxShadow:   merged.aiPersonality === p.value ? `0 0 12px ${p.color}12` : "none",
+                      boxShadow: merged.aiPersonality === p.value ? `0 0 8px ${p.color}12` : "none",
                     }}
                   >
                     <span className="font-mono text-[10px] font-bold"

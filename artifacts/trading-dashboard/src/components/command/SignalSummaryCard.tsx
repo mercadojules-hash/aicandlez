@@ -32,7 +32,7 @@ export function SignalSummaryCard({ engine }: Props) {
                     width: `${(count / total) * 100}%`,
                     background: color,
                     opacity: 0.7,
-                    boxShadow: `0 0 6px ${color}50`,
+                    boxShadow: `0 0 4px ${color}50`,
                   }}
                 />
               </div>
@@ -44,13 +44,13 @@ export function SignalSummaryCard({ engine }: Props) {
         <div className="neon-divider mb-2" />
         <div className="grid grid-cols-2 gap-2 text-center text-[8px] font-mono mb-3">
           <div>
-            <div className="text-[14px] font-bold text-[#00eeff]" style={{ textShadow: "0 0 12px #00eeff60" }}>
+            <div className="text-[14px] font-bold text-[#00eeff]" style={{ textShadow: "0 0 8px #00eeff60" }}>
               {funnel.passedMTF}
             </div>
             <div className="text-[#0E2235] uppercase tracking-widest">MTF PASSED</div>
           </div>
           <div>
-            <div className="text-[14px] font-bold text-[#00ff88]" style={{ textShadow: "0 0 12px #00ff8860" }}>
+            <div className="text-[14px] font-bold text-[#00ff88]" style={{ textShadow: "0 0 8px #00ff8860" }}>
               {funnel.executed}
             </div>
             <div className="text-[#0E2235] uppercase tracking-widest">EXECUTED</div>

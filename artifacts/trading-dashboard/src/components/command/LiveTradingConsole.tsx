@@ -109,7 +109,7 @@ function LargeButton({
         color,
         background:    bgColor,
         border:        `1px solid ${borderColor}`,
-        boxShadow:     `0 0 12px ${bgColor}40`,
+        boxShadow: `0 0 8px ${bgColor}40`,
         opacity:       disabled ? 0.35 : 1,
         cursor:        disabled ? "not-allowed" : "pointer",
       }}>
@@ -181,14 +181,14 @@ function SignalWaitingViz() {
           <path d={aiArea} fill="url(#sviz-ai-grad)" />
           {/* AI signal line */}
           <path d={aiLine} fill="none" stroke="#00f0ff" strokeWidth={1.5}
-            style={{ filter: "drop-shadow(0 0 6px #00f0ff55)" }} />
+            style={{ filter: "drop-shadow(0 0 4px #00f0ff55)" }} />
           {/* Execution spikes — green vertical lines */}
           {pts.map((p, i) => !p.exec ? null : (
             <line key={`e${i}`}
               x1={(i / (N - 1)) * W} y1={H}
               x2={(i / (N - 1)) * W} y2={H - 38}
               stroke="#00ff8a" strokeWidth={2} opacity={0.8}
-              style={{ filter: "drop-shadow(0 0 5px #00ff8a)" }} />
+              style={{ filter: "drop-shadow(0 0 3px #00ff8a)" }} />
           ))}
           {/* Risk bars — red micro bars at bottom */}
           {pts.map((p, i) => p.risk <= 0 ? null : (
@@ -243,7 +243,7 @@ function SignalWaitingViz() {
         ].map(({ label, color, pulse }) => (
           <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ width: 5, height: 5, borderRadius: "50%", background: color,
-              boxShadow: `0 0 5px ${color}`, flexShrink: 0 }}
+              boxShadow: `0 0 3px ${color}`, flexShrink: 0 }}
               className={pulse ? "live-dot" : ""} />
             <span style={{ fontSize: 7.5, fontFamily: "monospace",
               color: `${color}58`, letterSpacing: "0.1em", textTransform: "uppercase" }}>
@@ -403,7 +403,7 @@ function LiveAssetIntelPanel({ engine }: { engine?: EngineStatus }) {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#00f0ff",
-            boxShadow: "0 0 6px #00f0ff", flexShrink: 0 }} className="live-dot" />
+            boxShadow: "0 0 4px #00f0ff", flexShrink: 0 }} className="live-dot" />
           <span style={{ fontSize: 8, fontFamily: "monospace", fontWeight: 700,
             color: "#00f0ff88", letterSpacing: "0.22em", textTransform: "uppercase" }}>
             AI MICROSTRUCTURE
@@ -419,7 +419,7 @@ function LiveAssetIntelPanel({ engine }: { engine?: EngineStatus }) {
             fontSize: 22, fontFamily: "monospace", fontWeight: 700,
             color: "#e8f8ff",
             letterSpacing: "0.06em",
-            textShadow: "0 0 14px #00f0ff60, 0 0 4px #00f0ff40",
+            textShadow: "0 0 9px #00f0ff60, 0 0 4px #00f0ff40",
             lineHeight: 1,
           }}>
             {activeSym}
@@ -487,7 +487,7 @@ function LiveAssetIntelPanel({ engine }: { engine?: EngineStatus }) {
 
           {/* Primary flow line (cyan, glowing) */}
           <path d={flowPath} fill="none" stroke="#00f0ff" strokeWidth={1.6}
-            style={{ filter: "drop-shadow(0 0 6px #00f0ff55)" }} />
+            style={{ filter: "drop-shadow(0 0 4px #00f0ff55)" }} />
 
           {/* Execution heat events (vertical glow spikes) */}
           {execEvents.map((idx, i) => {
@@ -508,13 +508,13 @@ function LiveAssetIntelPanel({ engine }: { engine?: EngineStatus }) {
             const [px, py] = flowCoords[idx] ?? [0, 0];
             return (
               <circle key={i} cx={px} cy={py} r={2.8} fill="#00f0ff" opacity={0.8}
-                style={{ filter: "drop-shadow(0 0 5px #00f0ff)" }} />
+                style={{ filter: "drop-shadow(0 0 3px #00f0ff)" }} />
             );
           })}
 
           {/* Live tip dot */}
           <circle cx={lastFX} cy={lastFY} r={3} fill="#00f0ff"
-            style={{ filter: "drop-shadow(0 0 8px #00f0ff)" }} className="live-dot" />
+            style={{ filter: "drop-shadow(0 0 5px #00f0ff)" }} className="live-dot" />
 
           {/* Scanning sweep line */}
           <line x1={scanX} y1={0} x2={scanX} y2={H}
@@ -559,7 +559,7 @@ function LiveAssetIntelPanel({ engine }: { engine?: EngineStatus }) {
           <div key={label} style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
             <span style={{
               fontSize: 14, fontFamily: "monospace", fontWeight: 700,
-              color, lineHeight: 1, textShadow: `0 0 12px ${color}60`,
+              color, lineHeight: 1, textShadow: `0 0 8px ${color}60`,
             }}>{value}</span>
             <span style={{ fontSize: 6, fontFamily: "monospace", color: "#1a3040",
               textTransform: "uppercase", letterSpacing: "0.14em" }}>{label}</span>
@@ -609,7 +609,7 @@ function ActiveTradeCard({ openTrade, simPos }: {
       <div className="flex items-center gap-3 px-4 pt-3 pb-1.5">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full flex-shrink-0 live-dot"
-            style={{ background: sideColor, boxShadow: `0 0 6px ${sideColor}` }} />
+            style={{ background: sideColor, boxShadow: `0 0 4px ${sideColor}` }} />
           <span className="text-[13px] font-bold font-mono" style={{ color: "#EAF2FF" }}>
             {symbol}
           </span>
@@ -799,7 +799,7 @@ export function LiveTradingConsole({
         <div className="flex items-center gap-2 flex-shrink-0">
           {(isRunning && !isKill) && (
             <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 live-dot"
-              style={{ background: modeBadgeColor, boxShadow: `0 0 8px ${modeBadgeColor}` }} />
+              style={{ background: modeBadgeColor, boxShadow: `0 0 5px ${modeBadgeColor}` }} />
           )}
           {isKill && <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: "#ff2255" }} />}
           <span className="text-[11px] font-bold font-mono tracking-[0.15em]"
@@ -966,7 +966,7 @@ export function LiveTradingConsole({
                 fontSize: 36,
                 lineHeight: 1,
                 color: "#00f0ff",
-                textShadow: "0 0 14px #00f0ffaa, 0 0 32px #00f0ff44, 0 0 2px #00f0ff",
+                textShadow: "0 0 9px #00f0ffaa, 0 0 21px #00f0ff44, 0 0 2px #00f0ff",
                 letterSpacing: "-0.02em",
               }}>
                 {confidence}

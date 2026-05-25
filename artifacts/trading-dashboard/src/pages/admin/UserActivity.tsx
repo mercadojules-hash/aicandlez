@@ -89,7 +89,7 @@ export default function AdminUserActivity() {
     <div className="min-h-screen" style={{ background: "#060810", color: "#EAF2FF" }}>
       <div className="border-b px-6 py-4 flex items-center gap-4" style={{ background: "#000", borderColor: "#0d1e2e" }}>
         <div className="p-2 rounded" style={{ background: "#00f0ff12", border: "1px solid #00f0ff30" }}>
-          <Activity className="w-4 h-4" style={{ color: "#00f0ff", filter: "drop-shadow(0 0 6px #00f0ff)" }} />
+          <Activity className="w-4 h-4" style={{ color: "#00f0ff", filter: "drop-shadow(0 0 4px #00f0ff)" }} />
         </div>
         <div>
           <div className="text-[10px] font-mono font-bold tracking-[0.3em]" style={{ color: "#00f0ff80" }}>

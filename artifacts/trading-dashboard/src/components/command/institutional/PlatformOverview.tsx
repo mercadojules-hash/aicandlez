@@ -72,7 +72,7 @@ export function PlatformOverview() {
         border: `1px solid ${N.BORDER}`,
         borderRadius: 4,
         padding: "8px 10px",
-        boxShadow: `inset 0 1px 0 ${N.BRAND}08, 0 0 22px ${N.BRAND}06`,
+        boxShadow: `inset 0 1px 0 ${N.BRAND}08, 0 0 14px ${N.BRAND}06`,
       }}
     >
       <div className="flex items-center justify-between mb-2 px-1">
@@ -151,7 +151,7 @@ function MetricCard({
         <span style={{
           position: "absolute", top: 5, right: 5,
           width: 5, height: 5, borderRadius: 5,
-          background: accent, boxShadow: `0 0 6px ${accent}`,
+          background: accent, boxShadow: `0 0 4px ${accent}`,
           animation: "neon-pulse 1.4s infinite",
         }} />
       )}
@@ -166,7 +166,7 @@ function MetricCard({
         style={{
           color: accent,
           fontFamily: N.FONT_MONO,
-          textShadow: live ? `0 0 6px ${accent}55` : "none",
+          textShadow: live ? `0 0 4px ${accent}55` : "none",
           lineHeight: 1.1,
         }}>
         {value}

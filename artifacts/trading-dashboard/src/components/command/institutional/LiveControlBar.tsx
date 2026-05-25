@@ -57,20 +57,20 @@ const KEYFRAMES = `
   100% { transform: translateX(130%); }
 }
 @keyframes live-bar-pulse {
-  0%, 100% { box-shadow: 0 0 24px var(--lbc), inset 0 0 22px var(--lbcI); }
-  50%      { box-shadow: 0 0 44px var(--lbc), inset 0 0 32px var(--lbcI); }
+  0%, 100% { box-shadow: 0 0 16px var(--lbc), inset 0 0 22px var(--lbcI); }
+  50%      { box-shadow: 0 0 29px var(--lbc), inset 0 0 32px var(--lbcI); }
 }
 @keyframes live-bar-dot {
-  0%, 100% { transform: scale(1);    box-shadow: 0 0 10px var(--lbc), 0 0 22px var(--lbc); }
-  50%      { transform: scale(1.35); box-shadow: 0 0 18px var(--lbc), 0 0 36px var(--lbc); }
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 7px var(--lbc), 0 0 22px var(--lbc); }
+  50%      { transform: scale(1.35); box-shadow: 0 0 12px var(--lbc), 0 0 36px var(--lbc); }
 }
 @keyframes halt-bar-pulse {
-  0%, 100% { box-shadow: 0 0 18px var(--lbc), inset 0 0 14px var(--lbcI); border-color: var(--lbcB1); }
-  50%      { box-shadow: 0 0 36px var(--lbc), inset 0 0 22px var(--lbcI); border-color: var(--lbcB2); }
+  0%, 100% { box-shadow: 0 0 12px var(--lbc), inset 0 0 14px var(--lbcI); border-color: var(--lbcB1); }
+  50%      { box-shadow: 0 0 23px var(--lbc), inset 0 0 22px var(--lbcI); border-color: var(--lbcB2); }
 }
 @keyframes halt-bar-dot {
-  0%, 100% { transform: scale(1);    opacity: 0.85; box-shadow: 0 0 10px var(--lbc); }
-  50%      { transform: scale(1.25); opacity: 1;    box-shadow: 0 0 22px var(--lbc), 0 0 40px var(--lbc); }
+  0%, 100% { transform: scale(1);    opacity: 0.85; box-shadow: 0 0 7px var(--lbc); }
+  50%      { transform: scale(1.25); opacity: 1;    box-shadow: 0 0 14px var(--lbc), 0 0 40px var(--lbc); }
 }
 `;
 
@@ -244,11 +244,11 @@ export function LiveControlBar({
             flexShrink: 0,
           }}>
             {isHalted
-              ? <OctagonAlert size={24} style={{ color, filter: `drop-shadow(0 0 6px ${color})` }} />
+              ? <OctagonAlert size={24} style={{ color, filter: `drop-shadow(0 0 4px ${color})` }} />
               : isExecuting
-              ? <Activity     size={24} style={{ color: colorBrt, animation: "neon-pulse 1.1s infinite", filter: `drop-shadow(0 0 6px ${color})` }} />
+              ? <Activity     size={24} style={{ color: colorBrt, animation: "neon-pulse 1.1s infinite", filter: `drop-shadow(0 0 4px ${color})` }} />
               : isArmedRdy
-              ? <ShieldCheck  size={24} style={{ color: colorBrt, filter: `drop-shadow(0 0 6px ${color})` }} />
+              ? <ShieldCheck  size={24} style={{ color: colorBrt, filter: `drop-shadow(0 0 4px ${color})` }} />
               : blocked
               ? <Ban          size={24} style={{ color: N.TEXT_3 }} />
               : <Zap          size={24} style={{ color }} />}
@@ -290,7 +290,7 @@ export function LiveControlBar({
           <span style={{
             width: 12, height: 12, borderRadius: 12,
             background: color,
-            boxShadow: `0 0 10px ${color}, 0 0 22px ${color}`,
+            boxShadow: `0 0 7px ${color}, 0 0 14px ${color}`,
             animation:
               isExecuting ? "live-bar-dot 1.2s ease-in-out infinite" :
               isArmedRdy  ? "live-bar-dot 2.0s ease-in-out infinite" :
@@ -307,7 +307,7 @@ export function LiveControlBar({
             letterSpacing: "0.32em",
             color: isExecuting || isArmedRdy ? colorBrt : color,
             fontFamily: N.FONT_MONO,
-            textShadow: isExecuting || isArmedRdy ? `0 0 10px ${color}` : "none",
+            textShadow: isExecuting || isArmedRdy ? `0 0 7px ${color}` : "none",
             boxShadow: isExecuting
               ? `0 0 14px ${color}55, inset 0 0 8px ${color}30`
               : isArmedRdy

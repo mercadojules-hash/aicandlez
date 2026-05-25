@@ -105,7 +105,7 @@ export function CommandBar({
                width: 26, height: 26,
                background: `${N.BRAND}12`,
                border:     `1px solid ${N.BRAND}55`,
-               boxShadow:  `0 0 8px ${N.BRAND}30, inset 0 0 8px ${N.BRAND}10`,
+               boxShadow: `0 0 5px ${N.BRAND}30, inset 0 0 5px ${N.BRAND}10`,
              }}>
           <Cpu className="w-3.5 h-3.5" style={{ color: N.BRAND }} />
         </div>
@@ -126,7 +126,7 @@ export function CommandBar({
         <span style={{
           width: 6, height: 6, borderRadius: 4,
           background: isRunning ? N.BRAND : N.TEXT_3,
-          boxShadow:  isRunning ? `0 0 8px ${N.BRAND}` : "none",
+          boxShadow: isRunning ? `0 0 5px ${N.BRAND}` : "none",
           animation:  isRunning ? "neon-pulse 1.4s infinite" : "none",
         }} />
         <span className="text-[9px] font-bold tracking-[0.2em]"
@@ -184,7 +184,7 @@ export function CommandBar({
                 color:      isActive ? ex.color : disabled ? N.TEXT_3 : N.TEXT_2,
                 background: isActive ? `${ex.color}18` : "transparent",
                 border:     `1px solid ${isActive ? ex.color + "55" : "transparent"}`,
-                boxShadow:  isActive ? `0 0 8px ${ex.color}40` : "none",
+                boxShadow: isActive ? `0 0 5px ${ex.color}40` : "none",
                 cursor:     disabled ? "not-allowed" : "pointer",
                 opacity:    disabled ? 0.45 : 1,
               }}
@@ -246,7 +246,7 @@ function Stat({
       </span>
       <span
         className="text-[11px] font-bold tabular-nums"
-        style={{ color, textShadow: glow ? `0 0 6px ${color}50` : "none" }}
+        style={{ color, textShadow: glow ? `0 0 4px ${color}50` : "none" }}
       >
         {value}
       </span>
@@ -270,7 +270,7 @@ function BarBtn({
         color:      active ? color : N.TEXT_1,
         background: active ? `${color}18` : "transparent",
         border:     `1px solid ${active ? color + "55" : N.BORDER}`,
-        boxShadow:  active ? `0 0 8px ${color}40` : "none",
+        boxShadow: active ? `0 0 5px ${color}40` : "none",
         fontFamily: N.FONT_MONO,
       }}
       onMouseEnter={e => {

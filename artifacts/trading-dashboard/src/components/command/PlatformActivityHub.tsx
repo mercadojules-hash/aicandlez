@@ -65,7 +65,7 @@ function MetCell({ label, value, sub, color, pulse = false, wide = false }: {
           height:       4,
           borderRadius: "50%",
           background:   color,
-          boxShadow:    `0 0 5px ${color}`,
+          boxShadow: `0 0 3px ${color}`,
         }} className="live-dot" />
       )}
       <div style={{
@@ -76,7 +76,7 @@ function MetCell({ label, value, sub, color, pulse = false, wide = false }: {
         lineHeight:    1,
         letterSpacing: "-0.02em",
         marginBottom:  3,
-        textShadow:    `0 0 14px ${color}35`,
+        textShadow: `0 0 9px ${color}35`,
       }}>
         {value}
       </div>
@@ -181,7 +181,7 @@ function ActivityChart({ data }: { data: Pt[] }) {
 
       {lastAi && (
         <circle cx={lastAi.x} cy={lastAi.y} r={4} fill="#00f0ff"
-          style={{ filter: "drop-shadow(0 0 6px #00f0ff)" }} />
+          style={{ filter: "drop-shadow(0 0 4px #00f0ff)" }} />
       )}
 
       {[0, 25, 50, 75, 100].map(p => (
@@ -261,7 +261,7 @@ function EventStream({ events }: { events: Evt[] }) {
                   height:       5,
                   borderRadius: "50%",
                   background:   ev.color,
-                  boxShadow:    `0 0 4px ${ev.color}`,
+                  boxShadow: `0 0 4px ${ev.color}`,
                   flexShrink:   0,
                 }} />
                 <span style={{

@@ -635,7 +635,7 @@ export function SignalRow({ spec, breakdown }: Props) {
               color: dirColor,
               background: `${dirColor}1c`,
               border: `1px solid ${dirColor}70`,
-              boxShadow: `0 0 8px ${dirColor}40`,
+              boxShadow: `0 0 5px ${dirColor}40`,
               fontFamily: N.FONT_MONO,
             }}>
             {direction}
@@ -643,7 +643,7 @@ export function SignalRow({ spec, breakdown }: Props) {
           <span style={{
             width: 5, height: 5, borderRadius: 5,
             background: state === "live" ? N.BRAND : state === "synthetic" ? N.WARN : N.TEXT_3,
-            boxShadow:  state === "live" ? `0 0 6px ${N.BRAND}` : "none",
+            boxShadow: state === "live" ? `0 0 4px ${N.BRAND}` : "none",
             animation:  state === "live" ? "neon-pulse 1.4s infinite" : "none",
           }} />
           <span className="text-[14px] font-extrabold tracking-wide"
@@ -686,7 +686,7 @@ export function SignalRow({ spec, breakdown }: Props) {
               style={{ color: N.TEXT_3 }}>LAST</span>
             <span className="text-[12px] font-extrabold tabular-nums"
               style={{ color: N.TEXT_0, lineHeight: 1.05,
-                       textShadow: state === "live" ? `0 0 5px ${dirGlow}` : "none" }}>
+                       textShadow: state === "live" ? `0 0 3px ${dirGlow}` : "none" }}>
               ${fmt(last)}
             </span>
             <span className="text-[10px] font-bold tabular-nums"
@@ -735,7 +735,7 @@ export function SignalRow({ spec, breakdown }: Props) {
         flexDirection: "column",
         alignItems: "center",
         gap: 2,
-        boxShadow: `inset 0 0 10px ${confColor}10, 0 0 8px ${confColor}10`,
+        boxShadow: `inset 0 0 7px ${confColor}10, 0 0 5px ${confColor}10`,
       }}>
         <span className="text-[7.5px] font-bold tracking-[0.18em]"
           style={{ color: N.TEXT_3 }}>AI CONF</span>
@@ -758,7 +758,7 @@ export function SignalRow({ spec, breakdown }: Props) {
             style={{
               color: confColor,
               fontFamily: N.FONT_MONO,
-              textShadow: `0 0 6px ${confColor}80`,
+              textShadow: `0 0 4px ${confColor}80`,
             }}>
             {conf}
           </span>
@@ -824,7 +824,7 @@ function SizePicker({
           color: N.BRAND,
           background: `${N.BRAND}1c`,
           border: `1px solid ${N.BRAND}70`,
-          boxShadow: `0 0 6px ${N.BRAND}40`,
+          boxShadow: `0 0 4px ${N.BRAND}40`,
           fontFamily: N.FONT_MONO,
         }}
       >
@@ -844,7 +844,7 @@ function SizePicker({
               zIndex: 50,
               background: "#050A07",
               border: `1px solid ${N.BRAND}55`,
-              boxShadow: `0 0 18px ${N.BRAND}30, 0 8px 24px rgba(0,0,0,0.6)`,
+              boxShadow: `0 0 12px ${N.BRAND}30, 0 8px 24px rgba(0,0,0,0.36)`,
               borderRadius: 6,
               padding: 8,
               minWidth: 168,
@@ -986,7 +986,7 @@ function ActionPill({
         color: flashing ? "#000" : color,
         background: flashing ? color : active ? `${color}1f` : "transparent",
         border:     `1px solid ${active || flashing ? color : color + "30"}`,
-        boxShadow:  flashing
+        boxShadow: flashing
           ? `0 0 0 2px ${color}60, 0 0 18px ${color}cc`
           : active ? `0 0 8px ${color}50` : "none",
         fontFamily: N.FONT_MONO,
@@ -1026,7 +1026,7 @@ function AutoTradeBtn({ confident, onClick }: { confident: boolean; onClick?: ()
           ? N.BRAND
           : confident ? `${N.BRAND}1c` : "transparent",
         border:     `1px solid ${flashing ? N.BRAND : confident ? N.BRAND + "70" : N.BRAND + "28"}`,
-        boxShadow:  flashing
+        boxShadow: flashing
           ? `0 0 0 2px ${N.BRAND}60, 0 0 18px ${N.BRAND}cc`
           : confident ? `0 0 10px ${N.BRAND}50` : "none",
         color: flashing ? "#000" : confident ? N.BRAND : N.TEXT_3,

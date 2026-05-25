@@ -36,7 +36,7 @@ export function PlatformFeeCard({ feeSummary }: Props) {
             >
               <div
                 className="text-[16px] font-bold font-mono tabular-nums"
-                style={{ color, textShadow: `0 0 10px ${color}50` }}
+                style={{ color, textShadow: `0 0 7px ${color}50` }}
               >
                 {val}
               </div>

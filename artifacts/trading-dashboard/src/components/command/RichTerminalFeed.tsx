@@ -194,7 +194,7 @@ export function RichTerminalFeed({ engine }: Props) {
       <div className="flex items-center gap-3 px-3 py-2 border-b flex-shrink-0"
         style={{ borderBottomColor: "#111111" }}>
         <div className="w-1.5 h-1.5 rounded-sm flex-shrink-0"
-          style={{ background: "#00aaff", boxShadow: "0 0 5px #00aaff" }} />
+          style={{ background: "#00aaff", boxShadow: "0 0 3px #00aaff" }} />
         <span className="text-[11px] font-bold font-mono tracking-[0.18em]" style={{ color: "#00aaff" }}>
           LIVE TERMINAL FEED
         </span>
@@ -291,7 +291,7 @@ export function RichTerminalFeed({ engine }: Props) {
                   style={{
                     fontSize:   13,
                     color:      decColor,
-                    textShadow: (!isGhost && s.decision !== "HOLD") ? `0 0 12px ${decColor}65` : undefined,
+                    textShadow: (!isGhost && s.decision !== "HOLD") ? `0 0 8px ${decColor}65` : undefined,
                     minWidth:   38,
                   }}>
                   {s.decision}
@@ -307,7 +307,7 @@ export function RichTerminalFeed({ engine }: Props) {
                     background: isGhost ? "#1a2a35" : confColor,
                     borderRadius: 3,
                     transition:   "width 0.8s ease",
-                    boxShadow:    isGhost ? "none" : `0 0 7px ${confColor}65`,
+                    boxShadow: isGhost ? "none" : `0 0 5px ${confColor}65`,
                   }} />
                 </div>
                 <span className="font-bold font-mono tabular-nums flex-shrink-0"

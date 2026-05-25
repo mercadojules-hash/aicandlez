@@ -466,8 +466,8 @@ export default function Exchange() {
                 <span
                   className="text-[12px] px-3 py-1 rounded-full bg-green-500/25 text-green-100 border border-green-400/70 font-extrabold tracking-[0.20em]"
                   style={{
-                    boxShadow: "0 0 18px rgba(102,255,102,0.55), 0 0 0 1px rgba(102,255,102,0.30) inset",
-                    textShadow: "0 0 10px rgba(102,255,102,0.85), 0 0 22px rgba(102,255,102,0.50)",
+                    boxShadow: "0 0 12px rgba(102,255,102,0.33), 0 0 0 1px rgba(102,255,102,0.18) inset",
+                    textShadow: "0 0 7px rgba(102,255,102,0.51), 0 0 14px rgba(102,255,102,0.3)",
                   }}
                 >
                   ● CONNECTED

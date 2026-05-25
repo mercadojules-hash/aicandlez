@@ -138,7 +138,7 @@ export function BottomAnalyticsRow({ engine, trades }: Props) {
           <div>
             <div className="text-[8px] font-mono font-semibold mb-1" style={{ color: "#9FB3C8" }}>SIGNAL-WEIGHTED BIAS</div>
             <div className="text-[28px] font-bold font-mono leading-none"
-              style={{ color: rColor, textShadow: `0 0 16px ${rColor}40` }}>
+              style={{ color: rColor, textShadow: `0 0 10px ${rColor}40` }}>
               {bds.length === 0 ? "—" : regime}
             </div>
           </div>

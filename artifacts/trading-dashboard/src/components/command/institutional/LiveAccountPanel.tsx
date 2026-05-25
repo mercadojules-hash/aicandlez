@@ -138,7 +138,7 @@ export function LiveAccountPanel({ engine, exchangeStatus, liveBalance, trades }
               color: isLive ? N.LONG : isError ? N.SHORT : N.WARN,
               border: `1px solid ${(isLive ? N.LONG : isError ? N.SHORT : N.WARN)}50`,
               background: isLive ? `${N.LONG}12` : isError ? `${N.SHORT}12` : `${N.WARN}10`,
-              boxShadow:  isLive ? `0 0 8px ${N.LONG}40` : isError ? `0 0 8px ${N.SHORT}40` : "none",
+              boxShadow: isLive ? `0 0 5px ${N.LONG}40` : isError ? `0 0 8px ${N.SHORT}40` : "none",
               fontFamily: N.FONT_MONO,
             }}>
             {isLive ? "● LIVE" : isError ? "▲ OPERATOR EXEC · KRAKEN · AUTH FAILED" : "○ STANDBY"}
@@ -190,7 +190,7 @@ export function LiveAccountPanel({ engine, exchangeStatus, liveBalance, trades }
             style={{
               color: N.TEXT_0, fontFamily: N.FONT_MONO,
               lineHeight: 1.05,
-              textShadow: isLive ? `0 0 14px ${N.BRAND}40` : "none",
+              textShadow: isLive ? `0 0 9px ${N.BRAND}40` : "none",
             }}>
             {fmtUSD(equity)}
           </span>
@@ -202,7 +202,7 @@ export function LiveAccountPanel({ engine, exchangeStatus, liveBalance, trades }
             <span className="text-[12px] font-bold tabular-nums"
               style={{
                 color: pnlPositive ? N.LONG : N.SHORT,
-                textShadow: `0 0 6px ${pnlPositive ? N.LONG : N.SHORT}40`,
+                textShadow: `0 0 4px ${pnlPositive ? N.LONG : N.SHORT}40`,
                 fontFamily: N.FONT_MONO,
               }}>
               {pnlPositive ? "+" : ""}{fmtUSD(stats.realized)}
@@ -261,7 +261,7 @@ export function LiveAccountPanel({ engine, exchangeStatus, liveBalance, trades }
                 <Line type="monotone" dataKey="v"
                   stroke={curveColor} strokeWidth={1.6}
                   dot={false} isAnimationActive={false}
-                  style={{ filter: `drop-shadow(0 0 5px ${curveColor}80)` }} />
+                  style={{ filter: `drop-shadow(0 0 3px ${curveColor}80)` }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -298,7 +298,7 @@ function StatBox({
         style={{
           color, fontFamily: N.FONT_MONO,
           lineHeight: 1.1,
-          textShadow: positive === true ? `0 0 5px ${color}40` : "none",
+          textShadow: positive === true ? `0 0 3px ${color}40` : "none",
         }}>
         {value}
       </span>

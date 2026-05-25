@@ -95,7 +95,7 @@ export function HeartbeatTile({ spec }: Props) {
               background:
                 state === "live"      ? N.BRAND :
                 state === "synthetic" ? N.WARN  : N.TEXT_3,
-              boxShadow: state === "live" ? `0 0 6px ${N.BRAND}` : "none",
+              boxShadow: state === "live" ? `0 0 4px ${N.BRAND}` : "none",
               animation: state === "live" ? "neon-pulse 1.6s infinite" : "none",
             }}
           />
@@ -113,7 +113,7 @@ export function HeartbeatTile({ spec }: Props) {
         </span>
         <span
           className="font-bold tabular-nums leading-none"
-          style={{ fontSize: 11, color: dirColor, textShadow: `0 0 6px ${dirColor}50` }}
+          style={{ fontSize: 11, color: dirColor, textShadow: `0 0 4px ${dirColor}50` }}
         >
           {up ? "+" : ""}{summary.pct.toFixed(2)}%
         </span>

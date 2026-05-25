@@ -124,7 +124,7 @@ export default function AdminSubscriptions() {
     <div className="min-h-screen" style={{ background: "#060810", color: "#EAF2FF" }}>
       <div className="border-b px-6 py-4 flex items-center gap-4" style={{ background: "#000", borderColor: "#0d1e2e" }}>
         <div className="p-2 rounded" style={{ background: "#00ff8a12", border: "1px solid #00ff8a30" }}>
-          <DollarSign className="w-4 h-4" style={{ color: "#00ff8a", filter: "drop-shadow(0 0 6px #00ff8a)" }} />
+          <DollarSign className="w-4 h-4" style={{ color: "#00ff8a", filter: "drop-shadow(0 0 4px #00ff8a)" }} />
         </div>
         <div>
           <div className="text-[10px] font-mono font-bold tracking-[0.3em]" style={{ color: "#00ff8a80" }}>

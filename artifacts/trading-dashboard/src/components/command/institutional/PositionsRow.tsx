@@ -231,13 +231,13 @@ function ActivePositionRow(p: ActivePositionRowProps) {
               color: dirColor,
               background: `${dirColor}1c`,
               border: `1px solid ${dirColor}70`,
-              boxShadow: `0 0 8px ${dirColor}40`,
+              boxShadow: `0 0 5px ${dirColor}40`,
             }}>
             {p.side}
           </span>
           <span style={{
             width: 4, height: 14, background: tickerCo, borderRadius: 1,
-            boxShadow: `0 0 6px ${tickerCo}80`,
+            boxShadow: `0 0 4px ${tickerCo}80`,
           }} />
           <span className="text-[14px] font-extrabold tracking-wide" style={{ color: N.TEXT_0 }}>
             {p.symbol.replace("USD", "")}
@@ -247,7 +247,7 @@ function ActivePositionRow(p: ActivePositionRowProps) {
               style={{
                 color: N.BRAND_BRT, background: `${N.BRAND_BRT}14`,
                 border: `1px solid ${N.BRAND_BRT}55`,
-                boxShadow: `0 0 6px ${N.BRAND_BRT}40`,
+                boxShadow: `0 0 4px ${N.BRAND_BRT}40`,
               }}>
               TRAIL · ON
             </span>
@@ -281,14 +281,14 @@ function ActivePositionRow(p: ActivePositionRowProps) {
             <span className="text-[12px] font-extrabold tabular-nums"
               style={{
                 color: N.TEXT_0, lineHeight: 1.05,
-                textShadow: state === "live" ? `0 0 5px ${dirGlow}` : "none",
+                textShadow: state === "live" ? `0 0 3px ${dirGlow}` : "none",
               }}>
               ${fmtPrice(last)}
             </span>
             <span className="text-[11px] font-extrabold tabular-nums"
               style={{
                 color: pnlPos ? N.LONG : N.SHORT,
-                textShadow: `0 0 6px ${pnlPos ? N.LONG_GLOW : N.SHORT_GLOW}`,
+                textShadow: `0 0 4px ${pnlPos ? N.LONG_GLOW : N.SHORT_GLOW}`,
               }}>
               {fmtUsd(p.pnl)}
               <span className="text-[9px] ml-1" style={{ opacity: 0.85 }}>
@@ -316,7 +316,7 @@ function ActivePositionRow(p: ActivePositionRowProps) {
         flexDirection: "column",
         alignItems: "center",
         gap: 2,
-        boxShadow: `inset 0 0 10px ${confColor}10, 0 0 8px ${confColor}10`,
+        boxShadow: `inset 0 0 7px ${confColor}10, 0 0 5px ${confColor}10`,
       }}>
         <span className="text-[7.5px] font-bold tracking-[0.18em]" style={{ color: N.TEXT_3 }}>AI CONF</span>
         <div style={{ position: "relative", width: RING, height: RING }}>
@@ -338,7 +338,7 @@ function ActivePositionRow(p: ActivePositionRowProps) {
             style={{
               color: confColor,
               fontFamily: N.FONT_MONO,
-              textShadow: `0 0 6px ${confColor}80`,
+              textShadow: `0 0 4px ${confColor}80`,
             }}>
             {p.conf}
           </span>
@@ -538,7 +538,7 @@ function ClosedPanel({ closedTrades }: { closedTrades: Trade[] }) {
               <div className="text-right">
                 <div className="text-[10.5px] font-bold tabular-nums"
                   style={{ color: pnlOk ? N.LONG : N.SHORT,
-                           textShadow: pnlOk ? `0 0 6px ${N.LONG_GLOW}` : `0 0 6px ${N.SHORT_GLOW}` }}>
+                           textShadow: pnlOk ? `0 0 4px ${N.LONG_GLOW}` : `0 0 6px ${N.SHORT_GLOW}` }}>
                   {fmtUsd(pnl)}
                 </div>
                 <div className="text-[8px] tabular-nums" style={{ color: pnlOk ? N.LONG : N.SHORT, opacity: 0.8 }}>
@@ -627,7 +627,7 @@ function Panel({
             className="rounded-full"
             style={{
               width: 6, height: 6, background: brand,
-              boxShadow: `0 0 6px ${brand}, 0 0 14px ${brand}40`,
+              boxShadow: `0 0 4px ${brand}, 0 0 9px ${brand}40`,
               animation: "neon-pulse 1.6s infinite",
             }}
           />

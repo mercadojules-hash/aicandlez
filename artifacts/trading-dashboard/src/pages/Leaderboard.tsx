@@ -57,7 +57,7 @@ export default function Leaderboard() {
             border: "1px solid #0d1e2e",
             borderRadius: 3,
           }}>
-            <div style={{ fontSize: 30, fontWeight: 700, color: stat.color, lineHeight: 1, textShadow: `0 0 20px ${stat.color}30` }}>
+            <div style={{ fontSize: 30, fontWeight: 700, color: stat.color, lineHeight: 1, textShadow: `0 0 13px ${stat.color}30` }}>
               {engine ? String(stat.value) : "—"}
             </div>
             <div style={{ fontSize: 7.5, color: "#2a4050", textTransform: "uppercase", letterSpacing: "0.15em", marginTop: 5 }}>

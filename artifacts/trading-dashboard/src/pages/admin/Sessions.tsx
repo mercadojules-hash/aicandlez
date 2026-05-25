@@ -133,7 +133,7 @@ export default function AdminSessions() {
     <div className="min-h-screen" style={{ background: "#060810", color: "#EAF2FF" }}>
       <div className="border-b px-6 py-4 flex items-center gap-4" style={{ background: "#000", borderColor: "#0d1e2e" }}>
         <div className="p-2 rounded" style={{ background: "#ff884412", border: "1px solid #ff884430" }}>
-          <Radio className="w-4 h-4" style={{ color: "#ff8844", filter: "drop-shadow(0 0 6px #ff8844)" }} />
+          <Radio className="w-4 h-4" style={{ color: "#ff8844", filter: "drop-shadow(0 0 4px #ff8844)" }} />
         </div>
         <div>
           <div className="text-[10px] font-mono font-bold tracking-[0.3em]" style={{ color: "#ff884480" }}>
@@ -159,7 +159,7 @@ export default function AdminSessions() {
             return (
               <div key={k} className="rounded border p-4" style={{ background: "#010C18", borderColor: "#0d1e2e" }}>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: c, boxShadow: `0 0 6px ${c}` }} />
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: c, boxShadow: `0 0 4px ${c}` }} />
                   <span className="text-[9px] font-mono font-bold tracking-[0.2em] uppercase" style={{ color: c }}>
                     {k}
                   </span>

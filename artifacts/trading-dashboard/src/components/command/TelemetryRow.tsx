@@ -34,7 +34,7 @@ function Cell({
         <div style={{
           position: "absolute", top: 5, right: 7,
           width: 3.5, height: 3.5, borderRadius: "50%",
-          background: color, boxShadow: `0 0 5px ${color}`,
+          background: color, boxShadow: `0 0 3px ${color}`,
         }} className="live-dot" />
       )}
 
@@ -43,7 +43,7 @@ function Cell({
         style={{
           fontSize:      22,
           color:         valColor,
-          textShadow:    dim ? "none" : `0 0 14px ${color}45, 0 0 28px ${color}18`,
+          textShadow: dim ? "none" : `0 0 9px ${color}45, 0 0 28px ${color}18`,
           marginBottom:  3,
           letterSpacing: "-0.02em",
         }}

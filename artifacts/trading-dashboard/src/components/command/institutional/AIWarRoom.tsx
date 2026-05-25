@@ -20,7 +20,7 @@ const KEYFRAMES = `
 @keyframes warroom-sweep        { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes warroom-sweep-rev    { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
 @keyframes warroom-pulse        { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
-@keyframes warroom-arc-glow     { 0%,100% { filter: drop-shadow(0 0 5px ${N.BRAND}90); } 50% { filter: drop-shadow(0 0 14px ${N.BRAND}); } }
+@keyframes warroom-arc-glow     { 0%,100% { filter: drop-shadow(0 0 3px ${N.BRAND}90); } 50% { filter: drop-shadow(0 0 9px ${N.BRAND}); } }
 @keyframes warroom-bloom        { 0%,100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 0.65; transform: scale(1.04); } }
 @keyframes warroom-needle       { 0%,100% { transform: rotate(-22deg); } 50% { transform: rotate(20deg); } }
 @keyframes warroom-blip         { 0%,100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.18); opacity: 1; } }
@@ -422,7 +422,7 @@ function SignalPipeline() {
                 <div style={{
                   width: `${w}%`, height: "100%",
                   background: `linear-gradient(90deg, ${s.color}, ${s.color}80)`,
-                  boxShadow: `0 0 6px ${s.color}90`,
+                  boxShadow: `0 0 4px ${s.color}90`,
                   transition: "width 900ms ease",
                   animation: `warroom-bar 3s ${i * 0.18}s ease-in-out infinite`,
                 }} />
@@ -477,7 +477,7 @@ function RiskExposure() {
                 <div style={{
                   height: "100%", width: `${Math.min(e.pct * 3.2, 100)}%`,
                   background: `linear-gradient(90deg, ${color}, ${color}80)`,
-                  boxShadow: `0 0 5px ${color}70`,
+                  boxShadow: `0 0 3px ${color}70`,
                   transformOrigin: "left",
                   animation: "warroom-fill 1.2s ease-out",
                 }} />
@@ -540,7 +540,7 @@ function StatRow({ label, value, color }: { label: string; value: string; color:
       }}>{label}</span>
       <span style={{
         fontSize: 11.5, fontWeight: 800, fontVariantNumeric: "tabular-nums",
-        color, textShadow: `0 0 5px ${color}70`,
+        color, textShadow: `0 0 3px ${color}70`,
         transition: "color 600ms ease",
       }}>{value}</span>
     </div>
@@ -621,7 +621,7 @@ export function AIWarRoom() {
           <span style={{
             width: 6, height: 6, borderRadius: "50%",
             background: N.BRAND,
-            boxShadow: `0 0 8px ${N.BRAND}, 0 0 18px ${N.BRAND}50`,
+            boxShadow: `0 0 5px ${N.BRAND}, 0 0 12px ${N.BRAND}50`,
             animation: "warroom-pulse 3s infinite",
           }} />
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.22em", color: N.TEXT_0 }}>

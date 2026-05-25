@@ -270,7 +270,7 @@ export default function Alerts() {
           <span style={{
             width: 6, height: 6, borderRadius: "50%",
             background: unreadOnly ? "#00aaff" : "#2a4050",
-            boxShadow: unreadOnly ? "0 0 6px #00aaff" : "none",
+            boxShadow: unreadOnly ? "0 0 4px #00aaff" : "none",
           }}/>
           UNREAD ONLY
           <span style={{ color: unreadOnly ? "#00aaff" : "#3a5a70", letterSpacing: 0 }}>

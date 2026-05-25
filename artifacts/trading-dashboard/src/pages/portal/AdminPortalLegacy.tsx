@@ -130,7 +130,7 @@ function TopBar({
     }}>
       <span style={{
         color: N.BRAND, fontWeight: 800,
-        textShadow: `0 0 10px ${N.BRAND_GLOW}`,
+        textShadow: `0 0 5px ${N.BRAND_GLOW}`,
       }}>AICandlez</span>
       {/* Sprint 1 P1-UI-02: customer surface is "AICandlez" (proper case) and
           never sees operator-internal language. Admin retains the operator
@@ -158,8 +158,8 @@ function TopBar({
           fontSize: 10, fontWeight: 800,
           letterSpacing: "0.16em",
           fontFamily: N.FONT_MONO,
-          textShadow: `0 0 8px ${N.BRAND_GLOW}`,
-          boxShadow: `0 0 12px ${N.BRAND_GLOW}, inset 0 0 8px ${N.BRAND}18`,
+          textShadow: `0 0 3px ${N.BRAND_GLOW}`,
+          boxShadow: `0 0 5px ${N.BRAND_GLOW}, inset 0 0 3px ${N.BRAND}18`,
           cursor: "pointer",
           display: "inline-flex", alignItems: "center", gap: 6,
           whiteSpace: "nowrap",
@@ -279,7 +279,7 @@ function PortalModal({
           borderRadius: 8,
           padding: 28,
           fontFamily: N.FONT_MONO,
-          boxShadow: `0 0 40px ${N.BRAND_GLOW}, inset 0 0 40px ${N.BRAND}10`,
+          boxShadow: `0 0 17px ${N.BRAND_GLOW}, inset 0 0 17px ${N.BRAND}10`,
           position: "relative", overflow: "hidden",
           maxHeight: "calc(100dvh - 48px)", overflowY: "auto",
         }}
@@ -291,7 +291,7 @@ function PortalModal({
 
         <div style={{
           fontSize: 11, fontWeight: 800, letterSpacing: "0.22em",
-          color: N.BRAND, textShadow: `0 0 8px ${N.BRAND_GLOW}`,
+          color: N.BRAND, textShadow: `0 0 3px ${N.BRAND_GLOW}`,
           marginBottom: 8,
         }}>{eyebrow}</div>
         <h3 style={{
@@ -521,7 +521,7 @@ export function AccountModal({
             color: "#001a0d", fontWeight: 800, fontSize: 11,
             letterSpacing: "0.18em",
             fontFamily: N.FONT_MONO, cursor: "pointer",
-            boxShadow: `0 0 22px ${N.BRAND_GLOW}`,
+            boxShadow: `0 0 9px ${N.BRAND_GLOW}`,
           }}>
           UPGRADE TO AI TRADING →
         </button>
@@ -537,7 +537,7 @@ export function AccountModal({
             color: "#001a0d", fontWeight: 800, fontSize: 11,
             letterSpacing: "0.18em",
             fontFamily: N.FONT_MONO, cursor: "pointer",
-            boxShadow: `0 0 22px ${N.BRAND_GLOW}`,
+            boxShadow: `0 0 9px ${N.BRAND_GLOW}`,
           }}>
           MANAGE BILLING →
         </button>
@@ -580,7 +580,7 @@ function AccountRow({ label, value, sub, color = N.TEXT_0 }: {
       <div style={{ textAlign: "right", maxWidth: "65%" }}>
         <div style={{
           fontSize: 12, color, fontWeight: 700,
-          textShadow: color !== N.TEXT_0 ? `0 0 6px ${color}40` : "none",
+          textShadow: color !== N.TEXT_0 ? `0 0 4px ${color}40` : "none",
         }}>{value}</div>
         {sub && (
           <div style={{ fontSize: 9, color: N.TEXT_2, marginTop: 2, lineHeight: 1.4 }}>
@@ -637,7 +637,7 @@ function AlertToggleRow({ label, sub, value, loading, onChange }: {
           border: `1px solid ${value ? N.BRAND : N.BORDER_HI}`,
           borderRadius: 999,
           cursor: loading ? "wait" : "pointer",
-          boxShadow: value ? `0 0 10px ${N.BRAND_GLOW}` : "none",
+          boxShadow: value ? `0 0 5px ${N.BRAND_GLOW}` : "none",
           transition: "background 160ms ease, box-shadow 160ms ease",
           padding: 0,
         }}>
@@ -646,7 +646,7 @@ function AlertToggleRow({ label, sub, value, loading, onChange }: {
           width: 16, height: 16, borderRadius: "50%",
           background: knob,
           transition: "left 160ms ease, background 160ms ease",
-          boxShadow: value ? `0 0 6px ${N.BRAND_GLOW}` : "none",
+          boxShadow: value ? `0 0 4px ${N.BRAND_GLOW}` : "none",
         }} />
       </button>
     </div>
@@ -749,7 +749,7 @@ export function DisclaimerModal({ open, onClose }: { open: boolean; onClose: () 
               border: `1px solid ${N.BRAND}40`,
               color: N.BRAND, fontSize: 9, fontWeight: 800,
               display: "inline-flex", alignItems: "center", justifyContent: "center",
-              boxShadow: `0 0 8px ${N.BRAND_GLOW}`,
+              boxShadow: `0 0 3px ${N.BRAND_GLOW}`,
             }}>{i + 1}</span>
             <span>{p}</span>
           </li>
@@ -812,7 +812,7 @@ function LogoBanner({ tier, isAdmin = false }: { tier: Plan; isAdmin?: boolean }
           width: "auto",
           maxWidth: "min(560px, 86vw)",
           position: "relative", zIndex: 1,
-          filter: `drop-shadow(0 0 14px ${N.BRAND_GLOW}) drop-shadow(0 0 28px ${N.BRAND}30)`,
+          filter: `drop-shadow(0 0 6px ${N.BRAND_GLOW}) drop-shadow(0 0 12px ${N.BRAND}30)`,
         }}
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
       />
@@ -831,12 +831,12 @@ function LogoBanner({ tier, isAdmin = false }: { tier: Plan; isAdmin?: boolean }
           color: N.LONG,
           fontFamily: N.FONT_MONO, fontSize: 9, letterSpacing: "0.28em",
           fontWeight: 700,
-          textShadow: `0 0 6px ${N.LONG_GLOW}`,
+          textShadow: `0 0 4px ${N.LONG_GLOW}`,
         }}>
           <span style={{
             width: 7, height: 7, borderRadius: "50%",
             background: N.LONG,
-            boxShadow: `0 0 8px ${N.LONG}, 0 0 18px ${N.LONG_GLOW}`,
+            boxShadow: `0 0 3px ${N.LONG}, 0 0 8px ${N.LONG_GLOW}`,
             animation: "live-breathe 2.4s ease-in-out infinite",
           }} />
           LIVE
@@ -852,7 +852,7 @@ function LogoBanner({ tier, isAdmin = false }: { tier: Plan; isAdmin?: boolean }
           fontFamily: N.FONT_MONO, fontSize: 10,
           color: isAdmin || tier !== "free" ? N.BRAND : N.TEXT_1,
           letterSpacing: "0.18em", fontWeight: 700,
-          boxShadow: isAdmin || tier !== "free" ? `0 0 14px ${N.BRAND_GLOW}` : "none",
+          boxShadow: isAdmin || tier !== "free" ? `0 0 6px ${N.BRAND_GLOW}` : "none",
         }}>
           {isAdmin ? "ADMIN · OPERATOR" : `TIER · ${tier.toUpperCase()}`}
         </span>
@@ -860,7 +860,7 @@ function LogoBanner({ tier, isAdmin = false }: { tier: Plan; isAdmin?: boolean }
 
       <style>{`
         @keyframes live-breathe {
-          0%,100% { opacity: 1;    transform: scale(1);    box-shadow: 0 0 8px ${N.LONG}, 0 0 14px ${N.LONG_GLOW}; }
+          0%,100% { opacity: 1;    transform: scale(1);    box-shadow: 0 0 3px ${N.LONG}, 0 0 14px ${N.LONG_GLOW}; }
           50%     { opacity: 0.55; transform: scale(1.18); box-shadow: 0 0 4px ${N.LONG}, 0 0  8px ${N.LONG_GLOW}; }
         }
         @keyframes aura-breathe {
@@ -924,7 +924,7 @@ function MetricTile({
       <div style={{
         fontSize: 22, color: N.TEXT_0, fontWeight: 700,
         fontVariantNumeric: "tabular-nums",
-        textShadow: positive ? `0 0 12px ${N.BRAND}22` : "none",
+        textShadow: positive ? `0 0 5px ${N.BRAND}22` : "none",
       }}>{value}</div>
       {delta && (
         <div style={{
@@ -1053,13 +1053,13 @@ function AlpacaReconnectBanner({ lastError }: { lastError: string | null }) {
       borderRadius: 6,
       border: `1px solid ${WARN}55`,
       background: `linear-gradient(180deg, ${WARN}14, ${WARN}06)`,
-      boxShadow: `inset 0 0 24px ${WARN}10`,
+      boxShadow: `inset 0 0 10px ${WARN}10`,
       fontFamily: N.FONT_MONO,
       display: "flex", flexDirection: "column", gap: 8,
     }}>
       <div style={{
         fontSize: 10, fontWeight: 800, letterSpacing: "0.20em",
-        color: WARN, textShadow: `0 0 6px ${WARN}66`,
+        color: WARN, textShadow: `0 0 4px ${WARN}66`,
       }}>
         ⚠ ALPACA NEEDS TO BE RECONNECTED · PAPER TRADING PAUSED
       </div>
@@ -1322,7 +1322,7 @@ function ExchangeWarningBanner({
       borderRadius: 6,
       border: `1px solid ${WARN}55`,
       background: `linear-gradient(180deg, ${WARN}14, ${WARN}06)`,
-      boxShadow: `inset 0 0 24px ${WARN}10`,
+      boxShadow: `inset 0 0 10px ${WARN}10`,
       fontFamily: N.FONT_MONO,
       display: "flex", flexDirection: "column", gap: 8,
     }}>
@@ -1331,7 +1331,7 @@ function ExchangeWarningBanner({
       }}>
         <div style={{
           fontSize: 10, fontWeight: 800, letterSpacing: "0.20em",
-          color: WARN, textShadow: `0 0 6px ${WARN}66`,
+          color: WARN, textShadow: `0 0 4px ${WARN}66`,
         }}>
           ⚠ EXCHANGE CONNECTION UNHEALTHY · LIVE DATA UNAVAILABLE
         </div>
@@ -1404,7 +1404,7 @@ function ExchangeOnboardingBanner({ onConnect }: { onConnect: () => void }) {
       borderRadius: 6,
       border: `1px solid ${N.BRAND}45`,
       background: `linear-gradient(180deg, ${N.BRAND}10, ${N.BRAND}04)`,
-      boxShadow: `inset 0 0 30px ${N.BRAND}10`,
+      boxShadow: `inset 0 0 13px ${N.BRAND}10`,
       display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap",
       fontFamily: N.FONT_MONO,
     }}>
@@ -1413,15 +1413,15 @@ function ExchangeOnboardingBanner({ onConnect }: { onConnect: () => void }) {
         border: `1px solid ${N.BRAND}80`,
         background: N.SURFACE_2,
         display: "inline-flex", alignItems: "center", justifyContent: "center",
-        boxShadow: `0 0 14px ${N.BRAND_GLOW}`,
+        boxShadow: `0 0 6px ${N.BRAND_GLOW}`,
         flexShrink: 0,
       }}>
-        <Zap size={18} color={N.BRAND} style={{ filter: `drop-shadow(0 0 6px ${N.BRAND})` }} />
+        <Zap size={18} color={N.BRAND} style={{ filter: `drop-shadow(0 0 4px ${N.BRAND})` }} />
       </div>
       <div style={{ flex: 1, minWidth: 220 }}>
         <div style={{
           fontSize: 11, fontWeight: 800, letterSpacing: "0.20em",
-          color: N.BRAND, textShadow: `0 0 6px ${N.BRAND_GLOW}`,
+          color: N.BRAND, textShadow: `0 0 4px ${N.BRAND_GLOW}`,
         }}>
           CONNECT YOUR EXCHANGE TO ENABLE LIVE AI TRADING
         </div>
@@ -1447,7 +1447,7 @@ function ExchangeOnboardingBanner({ onConnect }: { onConnect: () => void }) {
           color: "#001a0d",
           fontWeight: 800, fontSize: 11, letterSpacing: "0.18em",
           fontFamily: N.FONT_MONO, textDecoration: "none", cursor: "pointer",
-          boxShadow: `0 0 22px ${N.BRAND_GLOW}`,
+          boxShadow: `0 0 9px ${N.BRAND_GLOW}`,
           whiteSpace: "nowrap",
         }}
       >
@@ -1553,7 +1553,7 @@ function LiveExecutionBar({
         padding: "14px 18px",
         display: "flex", alignItems: "center", gap: 18,
         overflow: "hidden",
-        boxShadow: locked ? "none" : `inset 0 0 40px ${N.BRAND_GLOW}, 0 0 24px ${N.BRAND}10`,
+        boxShadow: locked ? "none" : `inset 0 0 17px ${N.BRAND_GLOW}, 0 0 24px ${N.BRAND}10`,
       }}>
         {/* Scan sweep — animated edge */}
         {!locked && (
@@ -1576,7 +1576,7 @@ function LiveExecutionBar({
           {locked
             ? <Lock  size={14} color={N.TEXT_2} />
             : <Zap   size={16} color={armed ? N.LONG : N.BRAND}
-                     style={{ filter: `drop-shadow(0 0 6px ${armed ? N.LONG : N.BRAND})` }} />
+                     style={{ filter: `drop-shadow(0 0 4px ${armed ? N.LONG : N.BRAND})` }} />
           }
         </div>
 
@@ -1585,7 +1585,7 @@ function LiveExecutionBar({
           <div style={{
             fontSize: 11, fontWeight: 800, letterSpacing: "0.24em",
             color: locked ? N.TEXT_1 : armed ? N.LONG : N.BRAND,
-            textShadow: locked ? "none" : `0 0 8px ${armed ? N.LONG_GLOW : N.BRAND_GLOW}`,
+            textShadow: locked ? "none" : `0 0 3px ${armed ? N.LONG_GLOW : N.BRAND_GLOW}`,
           }}>
             {tierLocked
               ? "LIVE AI EXECUTION · LOCKED"
@@ -1612,7 +1612,7 @@ function LiveExecutionBar({
             <span style={{
               fontSize: 18, color: N.BRAND, fontWeight: 800,
               fontVariantNumeric: "tabular-nums",
-              textShadow: `0 0 10px ${N.BRAND_GLOW}`,
+              textShadow: `0 0 5px ${N.BRAND_GLOW}`,
             }}>{openSlots} / {cap.cap}</span>
           </div>
         )}
@@ -1779,7 +1779,7 @@ export function UpgradeModal({ open, onClose, gate }: {
           borderRadius: 8,
           padding: 28,
           fontFamily: N.FONT_MONO,
-          boxShadow: `0 0 40px ${N.BRAND_GLOW}, inset 0 0 40px ${N.BRAND}10`,
+          boxShadow: `0 0 17px ${N.BRAND_GLOW}, inset 0 0 17px ${N.BRAND}10`,
           position: "relative", overflow: "hidden",
         }}
       >
@@ -1792,7 +1792,7 @@ export function UpgradeModal({ open, onClose, gate }: {
           <Lock size={18} color={N.BRAND} />
           <span style={{
             fontSize: 12, fontWeight: 800, letterSpacing: "0.22em",
-            color: N.BRAND, textShadow: `0 0 8px ${N.BRAND_GLOW}`,
+            color: N.BRAND, textShadow: `0 0 3px ${N.BRAND_GLOW}`,
           }}>PREMIUM FEATURE · LIVE AI EXECUTION</span>
         </div>
 
@@ -1877,7 +1877,7 @@ function PlanCard({
         opacity: isDim ? 0.5 : 1,
         fontFamily: N.FONT_MONO,
         transition: "transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease",
-        boxShadow: pending ? `0 0 22px ${data.color}55` : "none",
+        boxShadow: pending ? `0 0 9px ${data.color}55` : "none",
       }}
       onMouseEnter={(e) => {
         if (disabled) return;
@@ -1909,7 +1909,7 @@ function PlanCard({
       <div style={{
         fontSize: 18, color: N.TEXT_0, fontWeight: 800,
         fontVariantNumeric: "tabular-nums",
-        textShadow: `0 0 8px ${data.color}60`,
+        textShadow: `0 0 3px ${data.color}60`,
       }}>{data.price}<span style={{ fontSize: 10, color: N.TEXT_2 }}>/mo</span></div>
     </button>
   );
@@ -1945,7 +1945,7 @@ function Panel({
         <span style={{
           width: 6, height: 6, borderRadius: "50%",
           background: locked ? N.GOLD : accent,
-          boxShadow: `0 0 8px ${locked ? N.GOLD : accent}, 0 0 18px ${locked ? N.GOLD_GLOW : accent + "50"}`,
+          boxShadow: `0 0 3px ${locked ? N.GOLD : accent}, 0 0 8px ${locked ? N.GOLD_GLOW : accent + "50"}`,
           animation: "neon-pulse 1.4s infinite",
         }} />
         <span style={{
@@ -2001,7 +2001,7 @@ function Panel({
               background: N.SURFACE_2,
               border: `1px solid ${N.GOLD}60`,
               display: "inline-flex", alignItems: "center", justifyContent: "center",
-              boxShadow: `0 0 18px ${N.GOLD_GLOW}`,
+              boxShadow: `0 0 8px ${N.GOLD_GLOW}`,
             }}>
               <Lock size={16} color={N.GOLD} />
             </div>
@@ -2038,7 +2038,7 @@ function Panel({
                 color: "#1a0e00", fontSize: 10, fontWeight: 800,
                 letterSpacing: "0.18em",
                 fontFamily: N.FONT_MONO, cursor: "pointer",
-                boxShadow: `0 0 16px ${N.GOLD_GLOW}`,
+                boxShadow: `0 0 7px ${N.GOLD_GLOW}`,
                 transition: "transform 220ms ease, box-shadow 220ms ease, letter-spacing 220ms ease",
               }}
             >
@@ -2067,7 +2067,7 @@ function Row({ left, right, color = N.TEXT_0, sub }: {
       </div>
       <span style={{
         color, fontVariantNumeric: "tabular-nums", fontWeight: 700,
-        textShadow: color !== N.TEXT_0 ? `0 0 6px ${color}40` : "none",
+        textShadow: color !== N.TEXT_0 ? `0 0 4px ${color}40` : "none",
       }}>{right}</span>
     </div>
   );
@@ -2210,7 +2210,7 @@ function ExchangeConnectionsHealthPanel() {
               }}>
                 <span style={{
                   width: 6, height: 6, borderRadius: "50%", background: pillCol,
-                  boxShadow: `0 0 8px ${pillCol}, 0 0 16px ${pillCol}60`,
+                  boxShadow: `0 0 3px ${pillCol}, 0 0 7px ${pillCol}60`,
                   animation: pending ? "dot-pulse 1.4s ease-in-out infinite" : undefined,
                 }} />
                 {pillLabel}
@@ -2591,7 +2591,7 @@ function AdminTradeHistoryPanel() {
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
               <span style={{
                 color, fontWeight: 800, fontVariantNumeric: "tabular-nums",
-                textShadow: `0 0 6px ${color}40`,
+                textShadow: `0 0 4px ${color}40`,
               }}>
                 {fmtMoney(pnl)}
               </span>
@@ -2833,7 +2833,7 @@ function ActiveTradesPanel({ onUpgrade }: { onUpgrade: () => void }) {
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
                 <span style={{
                   color, fontWeight: 800, fontVariantNumeric: "tabular-nums",
-                  textShadow: `0 0 6px ${color}40`,
+                  textShadow: `0 0 4px ${color}40`,
                 }}>
                   {fmtMoney(pnl)}
                 </span>
@@ -3065,7 +3065,7 @@ function TradeHistoryPanel({ onUpgrade }: { onUpgrade: () => void }) {
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
               <span style={{
                 color, fontWeight: 800, fontVariantNumeric: "tabular-nums",
-                textShadow: `0 0 6px ${color}40`,
+                textShadow: `0 0 4px ${color}40`,
               }}>
                 {fmtMoney(pnl)}
               </span>
@@ -3395,14 +3395,14 @@ function PortalFeesTrend({
                   <div style={{
                     width: "45%", height: profitH, borderRadius: 2,
                     background: profitColor,
-                    boxShadow: profit > 0 ? `0 0 8px ${N.BRAND_GLOW}` : "none",
+                    boxShadow: profit > 0 ? `0 0 3px ${N.BRAND_GLOW}` : "none",
                   }} />
                 )}
                 {feeH > 0 && (
                   <div style={{
                     width: "45%", height: feeH, borderRadius: 2,
                     background: feeColor,
-                    boxShadow: overrun ? "0 0 8px rgba(255,122,61,0.5)" : "none",
+                    boxShadow: overrun ? "0 0 3px rgba(255,122,61,0.5)" : "none",
                   }} />
                 )}
                 {profitH === 0 && feeH === 0 && (
@@ -3598,7 +3598,7 @@ function PortalFeesMonthModal({
           borderRadius: 8,
           padding: "18px 20px 22px",
           maxHeight: "84vh", overflowY: "auto",
-          boxShadow: `0 0 40px ${N.BRAND_GLOW}, inset 0 0 20px ${N.BRAND}08`,
+          boxShadow: `0 0 17px ${N.BRAND_GLOW}, inset 0 0 8px ${N.BRAND}08`,
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
@@ -3607,7 +3607,7 @@ function PortalFeesMonthModal({
               MONTHLY FEE BREAKDOWN
             </div>
             <div style={{ fontSize: 20, fontWeight: 700, color: N.BRAND, marginTop: 4,
-              letterSpacing: "0.06em", textShadow: `0 0 8px ${N.BRAND_GLOW}` }}>
+              letterSpacing: "0.06em", textShadow: `0 0 3px ${N.BRAND_GLOW}` }}>
               {label}
             </div>
           </div>
@@ -3625,7 +3625,7 @@ function PortalFeesMonthModal({
                 padding: "0 12px", height: 36, borderRadius: 6,
                 fontFamily: N.FONT_MONO, fontSize: 10, fontWeight: 800,
                 letterSpacing: "0.16em",
-                textShadow: monthTrades.length === 0 ? "none" : `0 0 8px ${N.BRAND_GLOW}`,
+                textShadow: monthTrades.length === 0 ? "none" : `0 0 3px ${N.BRAND_GLOW}`,
                 cursor: monthTrades.length === 0 ? "not-allowed" : "pointer",
                 opacity: monthTrades.length === 0 ? 0.4 : 1,
               }}
@@ -3697,7 +3697,7 @@ function PortalFeesMonthModal({
                 <div style={{
                   width: 3, alignSelf: "stretch", borderRadius: 2,
                   background: up ? N.BRAND : "#ff4466",
-                  boxShadow: up ? `0 0 6px ${N.BRAND_GLOW}` : "0 0 6px rgba(255,68,102,0.4)",
+                  boxShadow: up ? `0 0 4px ${N.BRAND_GLOW}` : "0 0 6px rgba(255,68,102,0.4)",
                 }}/>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: N.TEXT_1 }}>
@@ -4682,7 +4682,7 @@ function PortalInner() {
                   letterSpacing: "0.16em",
                   cursor: "pointer",
                   fontFamily: N.FONT_MONO,
-                  boxShadow: `0 0 18px ${N.BRAND_GLOW}`,
+                  boxShadow: `0 0 8px ${N.BRAND_GLOW}`,
                 }}
               >
                 MANAGE BILLING
@@ -4703,7 +4703,7 @@ function PortalInner() {
                   letterSpacing: "0.16em",
                   cursor: "pointer",
                   fontFamily: N.FONT_MONO,
-                  boxShadow: `0 0 18px ${N.BRAND_GLOW}`,
+                  boxShadow: `0 0 8px ${N.BRAND_GLOW}`,
                   transition: "transform 200ms ease, box-shadow 200ms ease",
                 }}
                 onMouseEnter={(e) => {
@@ -4796,7 +4796,7 @@ function PortalInner() {
                 height: 10,
                 borderRadius: "50%",
                 background: N.BRAND,
-                boxShadow: `0 0 14px ${N.BRAND_GLOW}`,
+                boxShadow: `0 0 6px ${N.BRAND_GLOW}`,
                 animation: "brand-pulse 1.2s ease-in-out infinite",
               }}
             />
@@ -4834,7 +4834,7 @@ function PortalInner() {
               style={{
                 width:        10, height: 10, borderRadius: "50%",
                 background:   N.BRAND,
-                boxShadow:    `0 0 14px ${N.BRAND_GLOW}`,
+                boxShadow: `0 0 6px ${N.BRAND_GLOW}`,
                 animation:    "brand-pulse 1.2s ease-in-out infinite",
               }}
             />
@@ -4928,7 +4928,7 @@ function PortalModeToggle({
           background: `${N.BRAND}1f`,
           color: N.BRAND,
           fontSize: 10, fontWeight: 800, letterSpacing: "0.22em",
-          textShadow: `0 0 8px ${N.BRAND}80`,
+          textShadow: `0 0 3px ${N.BRAND}80`,
         }}>
           PAPER MODE
         </span>
@@ -4937,7 +4937,7 @@ function PortalModeToggle({
           style={{
             fontSize: 9, letterSpacing: "0.18em", fontWeight: 700,
             color: N.GOLD,
-            textShadow: `0 0 6px ${N.GOLD_GLOW}`,
+            textShadow: `0 0 4px ${N.GOLD_GLOW}`,
             fontFamily: N.FONT_MONO,
             textDecoration: "none",
           }}
@@ -4971,7 +4971,7 @@ function PortalModeToggle({
         borderRadius: 4,
         overflow: "hidden",
         background: N.SURFACE_1,
-        boxShadow: `inset 0 0 14px ${N.BRAND}08`,
+        boxShadow: `inset 0 0 6px ${N.BRAND}08`,
       }}>
         <ModeSeg
           label="PAPER"
@@ -4998,7 +4998,7 @@ function PortalModeToggle({
             background: "transparent", border: "none", padding: 0,
             fontSize: 9, letterSpacing: "0.18em", fontWeight: 700,
             color: N.GOLD, cursor: "pointer",
-            textShadow: `0 0 6px ${N.GOLD_GLOW}`,
+            textShadow: `0 0 4px ${N.GOLD_GLOW}`,
             fontFamily: N.FONT_MONO,
           }}
         >
@@ -5062,7 +5062,7 @@ function PaperSandboxToggle({ defaultExchange }: { defaultExchange: string | nul
         <span style={{
           fontSize: 10, letterSpacing: "0.18em", fontWeight: 700,
           color: supported && paperSandboxEnabled ? N.BRAND : N.TEXT_1,
-          textShadow: supported && paperSandboxEnabled ? `0 0 6px ${N.BRAND}80` : undefined,
+          textShadow: supported && paperSandboxEnabled ? `0 0 4px ${N.BRAND}80` : undefined,
         }}>
           USE EXCHANGE SANDBOX
         </span>
@@ -5103,7 +5103,7 @@ function ModeSeg({
         background: active ? `${color}1f` : "transparent",
         color, border: "none", cursor: "pointer",
         borderRight: tone === "live" ? "none" : `1px solid ${N.BORDER_HI}`,
-        textShadow: active ? `0 0 8px ${color}80` : "none",
+        textShadow: active ? `0 0 3px ${color}80` : "none",
         opacity: disabled && !active ? 0.55 : 1,
         transition: "background 140ms ease",
       }}

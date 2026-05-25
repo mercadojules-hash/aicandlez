@@ -213,7 +213,7 @@ function StatusBar({ tick, tickers }: { tick: number; tickers: MobileTicker[] })
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{
           width: 7, height: 7, borderRadius: "50%", background: BRAND,
-          boxShadow: `0 0 8px ${BRAND}`,
+          boxShadow: `0 0 5px ${BRAND}`,
           animation: tick % 2 ? "none" : "none",
         }}/>
         <span style={{ color: BRAND, fontWeight: 800, letterSpacing: "0.18em" }}>LIVE · AI TERMINAL</span>
@@ -363,9 +363,9 @@ function CandleAreaChart({ closes, min, max }: { closes: number[]; min: number; 
       ))}
       <path d={areaPath} fill="url(#hero-area)"/>
       <path d={linePath} fill="none" stroke="url(#hero-line)" strokeWidth={1.6}
-        style={{ filter: `drop-shadow(0 0 5px ${BRAND_GLOW})` }}/>
+        style={{ filter: `drop-shadow(0 0 3px ${BRAND_GLOW})` }}/>
       <circle cx={x(closes.length - 1)} cy={y(closes[closes.length - 1])} r={3} fill={BRAND_BRGT}
-        style={{ filter: `drop-shadow(0 0 6px ${BRAND_BRGT})` }}/>
+        style={{ filter: `drop-shadow(0 0 4px ${BRAND_BRGT})` }}/>
     </svg>
   );
 }
@@ -444,7 +444,7 @@ function AIRadarCard({ breakdowns, tick }: { breakdowns: Record<string, SignalBr
               return (
                 <g key={i}>
                   <circle cx={bl.x} cy={bl.y} r={3} fill={c}
-                    style={{ filter: `drop-shadow(0 0 5px ${c})` }}/>
+                    style={{ filter: `drop-shadow(0 0 3px ${c})` }}/>
                   <circle cx={bl.x} cy={bl.y} r={6 + (tick % 3) * 2}
                     fill="none" stroke={c} strokeOpacity={0.4 - (tick % 3) * 0.12}/>
                 </g>
@@ -452,7 +452,7 @@ function AIRadarCard({ breakdowns, tick }: { breakdowns: Record<string, SignalBr
             })}
             {/* Center medallion */}
             <circle cx={100} cy={100} r={6} fill={BRAND}
-              style={{ filter: `drop-shadow(0 0 8px ${BRAND})` }}/>
+              style={{ filter: `drop-shadow(0 0 5px ${BRAND})` }}/>
           </svg>
         </div>
         <div style={{ display: "grid", gridTemplateRows: "auto auto auto auto", gap: 8, alignContent: "center" }}>
@@ -473,7 +473,7 @@ function RadarStat({ label, value, color }: { label: string; value: string; colo
       border: `1px solid ${E}`, borderRadius: 6 }}>
       <span style={{ fontFamily: MONO, fontSize: 9, color: GR, letterSpacing: "0.14em" }}>{label}</span>
       <span style={{ fontFamily: MONO, fontSize: 15, color, fontWeight: 800, letterSpacing: -0.4,
-        textShadow: `0 0 8px ${color}55` }}>{value}</span>
+        textShadow: `0 0 5px ${color}55` }}>{value}</span>
     </div>
   );
 }
@@ -502,7 +502,7 @@ function ConfidenceDistributionCard({ breakdowns }: { breakdowns: Record<string,
                 minHeight: v ? 4 : 0,
                 background: `linear-gradient(180deg, ${colors[i]} 0%, ${colors[i]}55 100%)`,
                 borderRadius: "4px 4px 0 0",
-                boxShadow: i >= 3 ? `0 0 8px ${colors[i]}88` : "none",
+                boxShadow: i >= 3 ? `0 0 5px ${colors[i]}88` : "none",
                 transition: "height 0.4s",
               }}/>
             </div>
@@ -536,7 +536,7 @@ function SectorMomentumCard({ tickers }: { tickers: MobileTicker[] }) {
                   position: "absolute", left: pct >= 0 ? "50%" : `${50 - w * 50}%`,
                   width: `${w * 50}%`, height: "100%",
                   background: `linear-gradient(90deg, ${c}33, ${c})`,
-                  borderRadius: 3, boxShadow: `0 0 5px ${c}66`,
+                  borderRadius: 3, boxShadow: `0 0 3px ${c}66`,
                 }}/>
                 <div style={{ position: "absolute", left: "50%", top: -1, bottom: -1,
                   width: 1, background: "rgba(255,255,255,0.12)" }}/>
@@ -865,7 +865,7 @@ function ConfidenceRing({ pct, color }: { pct: number; color: string }) {
         <circle cx={28} cy={28} r={R} fill="none" stroke={CARD_HI} strokeWidth={3}/>
         <circle cx={28} cy={28} r={R} fill="none" stroke={color} strokeWidth={3}
           strokeDasharray={C_} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ filter: `drop-shadow(0 0 5px ${color}88)`, transition: "stroke-dashoffset 0.4s" }}/>
+          style={{ filter: `drop-shadow(0 0 3px ${color}88)`, transition: "stroke-dashoffset 0.4s" }}/>
       </svg>
       <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center",
         fontFamily: MONO, fontSize: 13, color, fontWeight: 800, letterSpacing: -0.4 }}>
@@ -892,7 +892,7 @@ function Card({ children }: { children: React.ReactNode }) {
       display: "flex", flexDirection: "column",
       minHeight: 0,
       overflow: "hidden",
-      boxShadow: "0 1px 0 rgba(255,255,255,0.02) inset",
+      boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
     }}>{children}</div>
   );
 }
@@ -992,7 +992,7 @@ function AssetCell({ symbol }: { symbol: string }) {
         background: `linear-gradient(135deg, ${BRAND_DEEP}, ${BRAND})`,
         display: "grid", placeItems: "center",
         fontFamily: MONO, fontSize: 8, fontWeight: 800, color: "#001b06",
-        boxShadow: `0 0 6px ${BRAND_GLOW}`,
+        boxShadow: `0 0 4px ${BRAND_GLOW}`,
       }}>{short.slice(0, 3)}</span>
       <span style={{ fontFamily: MONO, fontSize: 11, color: W, fontWeight: 700 }}>{symbol}</span>
     </span>

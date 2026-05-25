@@ -93,7 +93,7 @@ export function OpportunityScanner({ breakdowns }: Props) {
           <div className="flex items-center gap-1.5">
             <span className="text-[8px] font-mono font-semibold" style={{ color: "#4a6a80" }}>LONG BIAS</span>
             <span className="text-[14px] font-bold font-mono tabular-nums"
-              style={{ color: "#00ff8a", textShadow: "0 0 8px #00ff8a50" }}>
+              style={{ color: "#00ff8a", textShadow: "0 0 5px #00ff8a50" }}>
               {longPct}%
             </span>
           </div>
@@ -108,7 +108,7 @@ export function OpportunityScanner({ breakdowns }: Props) {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-[14px] font-bold font-mono tabular-nums"
-              style={{ color: "#ff3355", textShadow: "0 0 8px #ff335550" }}>
+              style={{ color: "#ff3355", textShadow: "0 0 5px #ff335550" }}>
               {shortPct}%
             </span>
             <span className="text-[8px] font-mono font-semibold" style={{ color: "#4a6a80" }}>SHORT BIAS</span>
@@ -194,14 +194,14 @@ export function OpportunityScanner({ breakdowns }: Props) {
 
               return (
                 <div className="mx-2 mt-2 mb-1.5 rounded-lg overflow-hidden"
-                  style={{ background: "#040608", border: `1px solid ${color}22`, boxShadow: `0 0 24px ${color}08` }}>
+                  style={{ background: "#040608", border: `1px solid ${color}22`, boxShadow: `0 0 16px ${color}08` }}>
 
                   {/* Header row */}
                   <div className="flex items-center justify-between px-3 pt-2.5 pb-2"
                     style={{ borderBottom: `1px solid ${color}12` }}>
                     <div className="flex items-center gap-2">
-                      <div style={{ width: 6, height: 6, borderRadius: 2, background: color, boxShadow: `0 0 6px ${color}` }} />
-                      <span className="text-[13px] font-bold font-mono" style={{ color, textShadow: `0 0 16px ${color}60` }}>
+                      <div style={{ width: 6, height: 6, borderRadius: 2, background: color, boxShadow: `0 0 4px ${color}` }} />
+                      <span className="text-[13px] font-bold font-mono" style={{ color, textShadow: `0 0 10px ${color}60` }}>
                         {lbl}
                       </span>
                       <span className="text-[9px] font-mono" style={{ color: `${color}70` }}>/ USDT</span>
@@ -231,7 +231,7 @@ export function OpportunityScanner({ breakdowns }: Props) {
                     {/* Left: big number */}
                     <div className="flex flex-col justify-center px-3 py-2 flex-shrink-0" style={{ minWidth: 90 }}>
                       <div className="font-bold font-mono tabular-nums leading-none"
-                        style={{ fontSize: 38, color, textShadow: `0 0 28px ${color}55`, letterSpacing: "-0.03em" }}>
+                        style={{ fontSize: 38, color, textShadow: `0 0 18px ${color}55`, letterSpacing: "-0.03em" }}>
                         {aiConv.toFixed(0)}
                       </div>
                       <div className="text-[7.5px] font-mono mt-0.5" style={{ color: "#3a5a70", letterSpacing: "0.1em" }}>
@@ -260,7 +260,7 @@ export function OpportunityScanner({ breakdowns }: Props) {
                           {/* Latest dot */}
                           {(sparkPath as any).last && (
                             <circle cx={(sparkPath as any).last.x} cy={(sparkPath as any).last.y} r={3}
-                              fill={color} style={{ filter: `drop-shadow(0 0 5px ${color})` }} />
+                              fill={color} style={{ filter: `drop-shadow(0 0 3px ${color})` }} />
                           )}
                           {/* Axis labels */}
                           <text x={pl} y={H - 1} fontSize={6} fill="#1a3050" fontFamily="monospace">0</text>
@@ -298,7 +298,7 @@ export function OpportunityScanner({ breakdowns }: Props) {
                             background: col,
                             borderRadius: 3,
                             transition: "width 0.25s ease",
-                            boxShadow: `0 0 8px ${col}55`,
+                            boxShadow: `0 0 5px ${col}55`,
                           }} />
                         </div>
                       </div>
@@ -349,7 +349,7 @@ export function OpportunityScanner({ breakdowns }: Props) {
                       {action}
                     </span>
                     <span className="text-[15px] font-bold font-mono tabular-nums w-12 text-right flex-shrink-0"
-                      style={{ color: "#EAF2FF", textShadow: `0 0 8px ${color}40` }}>
+                      style={{ color: "#EAF2FF", textShadow: `0 0 5px ${color}40` }}>
                       {b.avgConfidence.toFixed(0)}%
                     </span>
                   </div>

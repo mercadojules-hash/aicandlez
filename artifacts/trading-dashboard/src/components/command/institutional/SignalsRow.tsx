@@ -256,7 +256,7 @@ function GroupDivider({
     >
       <span style={{ color, filter: `drop-shadow(0 0 4px ${color}80)`, display: "inline-flex" }}>{icon}</span>
       <span className="text-[9px] font-extrabold tracking-[0.28em]"
-        style={{ color, textShadow: `0 0 6px ${color}60` }}>{label}</span>
+        style={{ color, textShadow: `0 0 4px ${color}60` }}>{label}</span>
       <span className="text-[8.5px] font-bold tracking-[0.18em]" style={{ color: N.TEXT_3 }}>· {count}</span>
       <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${color}40, transparent)` }} />
     </div>
@@ -274,7 +274,7 @@ function FilterTab({
         color:      active ? color : N.TEXT_2,
         background: active ? `${color}1a` : "transparent",
         border:     `1px solid ${active ? color + "55" : "transparent"}`,
-        boxShadow:  active ? `0 0 8px ${color}35` : "none",
+        boxShadow: active ? `0 0 5px ${color}35` : "none",
         fontFamily: N.FONT_MONO,
       }}
     >

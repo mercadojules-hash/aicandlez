@@ -166,7 +166,7 @@ function StatCard({ icon: Icon, label, value, sub, color, delta, deltaUp }: {
         style={{ background: `radial-gradient(ellipse at top left, ${color}, transparent 70%)` }} />
       <div className="flex items-center justify-between relative">
         <div className="p-1.5 rounded" style={{ background: `${color}15`, border: `1px solid ${color}25` }}>
-          <Icon className="w-3.5 h-3.5" style={{ color, filter: `drop-shadow(0 0 6px ${color})` }} />
+          <Icon className="w-3.5 h-3.5" style={{ color, filter: `drop-shadow(0 0 4px ${color})` }} />
         </div>
         {delta && (
           <div className="flex items-center gap-0.5 text-[9px] font-mono font-bold"
@@ -415,7 +415,7 @@ function UserIntelligencePanel({
         position: "fixed", top: 0, right: 0, bottom: 0, width: W, maxWidth: "100vw",
         background: C.bg, borderLeft: `1px solid ${C.border}`, zIndex: 91,
         display: "flex", flexDirection: "column", color: C.text,
-        boxShadow: "-20px 0 60px rgba(0,0,0,0.5)",
+        boxShadow: "-20px 0 60px rgba(0,0,0,0.3)",
       }}>
         {/* Drawer header */}
         <div style={{
@@ -1168,7 +1168,7 @@ function ExchangesTab({ detail, loading }: {
             }}>
               <div style={{
                 width: 6, height: 6, borderRadius: 3, marginTop: 5,
-                background: t.color, boxShadow: `0 0 6px ${t.color}`,
+                background: t.color, boxShadow: `0 0 4px ${t.color}`,
                 flexShrink: 0,
               }} />
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -1909,7 +1909,7 @@ export default function Admin() {
       <div className="border-b px-6 py-4 flex items-center gap-4"
         style={{ background: "#000000", borderColor: "#0d1e2e" }}>
         <div className="p-2 rounded" style={{ background: "#cc55ff12", border: "1px solid #cc55ff30" }}>
-          <Shield className="w-4 h-4" style={{ color: "#cc55ff", filter: "drop-shadow(0 0 6px #cc55ff)" }} />
+          <Shield className="w-4 h-4" style={{ color: "#cc55ff", filter: "drop-shadow(0 0 4px #cc55ff)" }} />
         </div>
         <div>
           <div className="text-[10px] font-mono font-bold tracking-[0.3em]" style={{ color: "#cc55ff80" }}>
@@ -1920,7 +1920,7 @@ export default function Admin() {
           </div>
         </div>
         <div className="flex items-center gap-1.5 ml-3">
-          <span className="live-dot" style={{ width: 6, height: 6, background: "#cc55ff", boxShadow: "0 0 8px #cc55ff" }} />
+          <span className="live-dot" style={{ width: 6, height: 6, background: "#cc55ff", boxShadow: "0 0 5px #cc55ff" }} />
           <span className="text-[9px] font-mono font-bold" style={{ color: "#cc55ff" }}>PLATFORM LIVE</span>
         </div>
         <div className="flex-1" />

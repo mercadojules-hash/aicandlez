@@ -228,7 +228,7 @@ function StatCell({
         <span className="live-dot" style={{
           position: "absolute", top: 8, right: 10,
           width: 4, height: 4,
-          background: color, boxShadow: `0 0 6px ${color}`,
+          background: color, boxShadow: `0 0 4px ${color}`,
         }} />
       )}
       <div style={{
@@ -238,7 +238,7 @@ function StatCell({
         color,
         lineHeight:    1,
         letterSpacing: "-0.02em",
-        textShadow:    `0 0 16px ${color}35`,
+        textShadow: `0 0 10px ${color}35`,
         marginBottom:  3,
       }}>
         {value}
@@ -357,7 +357,7 @@ export function LiveUserActivityPanel({ engine, openTrade, simPos }: Props) {
         flexShrink:   0,
         background:   "#000000",
       }}>
-        <span className="live-dot" style={{ width: 5, height: 5, background: "#00f0ff", boxShadow: "0 0 8px #00f0ff" }} />
+        <span className="live-dot" style={{ width: 5, height: 5, background: "#00f0ff", boxShadow: "0 0 5px #00f0ff" }} />
         <span style={{
           fontSize:      9.5,
           fontFamily:    "monospace",
@@ -424,7 +424,7 @@ export function LiveUserActivityPanel({ engine, openTrade, simPos }: Props) {
           background:   `${sideColor}06`,
           flexShrink:   0,
         }}>
-          <span className="live-dot" style={{ width: 4, height: 4, background: sideColor, boxShadow: `0 0 6px ${sideColor}` }} />
+          <span className="live-dot" style={{ width: 4, height: 4, background: sideColor, boxShadow: `0 0 4px ${sideColor}` }} />
           <span style={{ fontSize: 8, fontFamily: "monospace", fontWeight: 700, color: `${sideColor}90`, letterSpacing: "0.15em" }}>
             ACTIVE POSITION
           </span>

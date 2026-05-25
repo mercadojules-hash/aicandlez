@@ -65,7 +65,7 @@ function PlanCard({
       style={{
         background:   isCurrent ? `${color}08` : "#010C18",
         borderColor:  isCurrent ? `${color}40` : "#0D2035",
-        boxShadow:    isCurrent ? `0 0 20px ${color}10` : "none",
+        boxShadow: isCurrent ? `0 0 13px ${color}10` : "none",
       }}
     >
       {isCurrent && (
@@ -79,7 +79,7 @@ function PlanCard({
 
       {/* Header */}
       <div className="flex items-center gap-2.5">
-        <Icon className="w-4 h-4 shrink-0" style={{ color, filter: `drop-shadow(0 0 6px ${color}60)` }} />
+        <Icon className="w-4 h-4 shrink-0" style={{ color, filter: `drop-shadow(0 0 4px ${color}60)` }} />
         <div>
           <div className="font-mono text-[13px] font-bold" style={{ color: "#EAF2FF" }}>{plan.name}</div>
           <div className="font-mono text-[9px]" style={{ color: "#3a5a70" }}>{plan.description}</div>

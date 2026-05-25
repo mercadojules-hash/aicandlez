@@ -18,10 +18,10 @@ export default function Landing() {
       <header className="h-12 flex items-center justify-between px-6 border-b shrink-0 sticky top-0 z-50"
         style={{ background: "rgba(5,10,7,0.95)", borderColor: "#0F1F18", backdropFilter: "blur(10px)" }}>
         <div className="flex items-center gap-2">
-          <Cpu className="w-4 h-4" style={{ color: "#66FF66", filter: "drop-shadow(0 0 6px #66FF66)" }} />
+          <Cpu className="w-4 h-4" style={{ color: "#66FF66", filter: "drop-shadow(0 0 4px #66FF66)" }} />
           <span className="font-mono text-[13px] font-bold tracking-[0.22em]">
             <span style={{ color: "#4a8a60" }}>AI</span>
-            <span style={{ color: "#66FF66", textShadow: "0 0 16px rgba(102,255,102,0.45)" }}>CANDLEZ</span>
+            <span style={{ color: "#66FF66", textShadow: "0 0 10px rgba(102,255,102,0.27)" }}>CANDLEZ</span>
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -57,7 +57,7 @@ export default function Landing() {
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-mono font-bold tracking-tight mb-6 max-w-4xl leading-[1.1]">
           <span style={{ color: "#EAFFEA" }}>Institutional-Grade</span>
           <br />
-          <span style={{ color: "#66FF66", textShadow: "0 0 40px rgba(102,255,102,0.45)" }}>AI Crypto Trading</span>
+          <span style={{ color: "#66FF66", textShadow: "0 0 26px rgba(102,255,102,0.27)" }}>AI Crypto Trading</span>
         </h1>
 
         <p className="text-[14px] font-mono max-w-xl mb-10 leading-relaxed" style={{ color: "#7ab895" }}>
@@ -68,7 +68,7 @@ export default function Landing() {
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Link href="/sign-up"
             className="flex items-center gap-2 px-6 py-3 rounded font-mono text-[12px] font-bold tracking-wide transition-all"
-            style={{ background: "linear-gradient(135deg, #00C853, #66FF66)", color: "#000", boxShadow: "0 0 24px rgba(102,255,102,0.35)" }}
+            style={{ background: "linear-gradient(135deg, #00C853, #66FF66)", color: "#000", boxShadow: "0 0 16px rgba(102,255,102,0.21)" }}
             onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 0 40px rgba(102,255,102,0.55)"; }}
             onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 0 24px rgba(102,255,102,0.35)"; }}>
             Start Trading <ArrowRight className="w-3.5 h-3.5" />

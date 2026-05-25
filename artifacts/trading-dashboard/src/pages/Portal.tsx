@@ -78,7 +78,7 @@ function ResolvingSession() {
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
         <div style={{
           width: 10, height: 10, borderRadius: "50%",
-          background: N.BRAND, boxShadow: `0 0 14px ${N.BRAND_GLOW}`,
+          background: N.BRAND, boxShadow: `0 0 9px ${N.BRAND_GLOW}`,
           animation: "brand-pulse 1.2s ease-in-out infinite",
         }} />
         <span style={{ color: N.TEXT_2 }}>Resolving session…</span>
@@ -100,7 +100,7 @@ function SkeletonChrome() {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{
             width: 10, height: 10, borderRadius: "50%", background: N.BRAND,
-            boxShadow: `0 0 14px ${N.BRAND_GLOW}`,
+            boxShadow: `0 0 9px ${N.BRAND_GLOW}`,
             animation: "brand-pulse 1.2s ease-in-out infinite",
           }} />
           <span style={{ color: N.TEXT_2, fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase" }}>
