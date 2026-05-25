@@ -468,8 +468,10 @@ const SearchBar = memo(function SearchBar({
   const pills: { id: Filt; label: string; group: 0 | 1 }[] = [
     { id: "ALL",       label: "All",                   group: 0 },
     { id: "MAJORS",    label: "Majors",                group: 0 },
-    { id: "ALTS",      label: "Alts",                  group: 0 },
+    // Pass 7Q — MEME / Hi-Vol promoted ahead of ALTS per user spec.
+    // Pure ordering change; no styling, no new pills, no logic delta.
     { id: "MEME",      label: "Meme / Hi-Vol",         group: 0 },
+    { id: "ALTS",      label: "Alts",                  group: 0 },
     { id: "HIGH_CONF", label: "High Confidence (≥75)", group: 0 },
     { id: "READY",     label: "Ready to Execute",      group: 0 },
     { id: "LONG",      label: "Long Bias",             group: 0 },
