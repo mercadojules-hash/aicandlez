@@ -65,8 +65,12 @@ const T = {
   // Chassis (BG_BLACK/TERMINAL/CARD) still untouched — these are
   // foreground tokens only. Matrix is unaffected: cards key off
   // TEXT_0/TEXT_1 + dirColor-tinted borders, not these tokens.
-  BORDER:      "#2F5040",
-  BORDER_GRN:  "rgba(102, 255, 102, 0.34)",
+  // Pass 7M — neutralized. Borders had drifted too green; neutral
+  // dark separators read more professionally and stop the whole
+  // portal from feeling tinted. BORDER_GRN reserved for actual
+  // active/hover states only.
+  BORDER:      "#2A3D33",
+  BORDER_GRN:  "rgba(102, 255, 102, 0.24)",
   NEON:        "#66FF66",
   NEON_GLOW:   "rgba(102, 255, 102, 0.45)",
   EMERALD:     "#00C853",
@@ -1186,62 +1190,22 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
     isStrong         ? `rgba(${dirRgb},0.96)` :
     isActiveBaseline ? `rgba(${dirRgb},0.82)` :
                        T.BORDER;
-  // Pass 7L — STOP fading into the chassis. The previous gradient
-  // collapsed to `T.BG_TERMINAL` at 100%, meaning ~60% of every
-  // active card was visually identical to the workspace behind it,
-  // which is why the top-20 rows refused to "pop". New approach:
-  //   • Card body sits on an ELEVATED dark plate (#0C1812 LONG /
-  //     #180C0E SHORT) — not chassis. The card is materially
-  //     brighter than the workspace under it.
-  //   • Strong dirColor wash overlays the plate top-to-bottom at
-  //     real alpha (no fade-to-zero). Active rows are saturated
-  //     with directional identity throughout, not just at the top
-  //     edge.
-  //   • EVALUATING (FLAT) fall-through preserved (locked invariant).
-  const tierBaseDark =
-    isLong                       ? "#0C1812" :
-    opp.direction === "SHORT"    ? "#180C0E" :
-                                    T.BG_TERMINAL;
-  const tierBackground =
-    isElite          ? `linear-gradient(180deg, rgba(${dirRgb},0.32) 0%, rgba(${dirRgb},0.16) 100%), ${tierBaseDark}` :
-    isStrong         ? `linear-gradient(180deg, rgba(${dirRgb},0.26) 0%, rgba(${dirRgb},0.12) 100%), ${tierBaseDark}` :
-    isActiveBaseline ? `linear-gradient(180deg, rgba(${dirRgb},0.18) 0%, rgba(${dirRgb},0.08) 100%), ${tierBaseDark}` :
-                       T.BG_TERMINAL;
-  // Tier shadow stack (read outer→inner):
-  //  1. `0 0 0 1px ...` — engraved double-ring on hero (zero layout cost)
-  //  2. `0 N px ... rgba(0,0,0,...)` — drop-shadow that gives real depth
-  //     against the dark chassis (chassis itself stays dark)
-  //  3. `0 0 N px rgba(dirRgb,...)` — wide colored halo making the
-  //     card glow into the surrounding empty space
-  //  4. `inset 0 0 N px rgba(dirRgb,...)` — internal bloom so the card
-  //     body reads as energized, not just framed
-  // Pass 7i — STRONG halo pushed 56→72px, alpha 0.50→0.64, drop
-  // shadow deepened. ACTIVE BASELINE gains its own engraved ring
-  // (0.22 alpha) and halo widens 32→52px / 0.32→0.46 so every
-  // active row carries the same dimensional vocabulary as the
-  // hero — just at lower amplitude. ELITE values frozen.
-  const tierShadow =
-    isElite          ? `0 0 0 1px rgba(${dirRgb},0.55), 0 14px 40px rgba(0,0,0,0.85), 0 0 80px rgba(${dirRgb},0.70), inset 0 0 60px rgba(${dirRgb},0.26)` :
-    isStrong         ? `0 0 0 1px rgba(${dirRgb},0.50), 0 12px 34px rgba(0,0,0,0.80), 0 0 72px rgba(${dirRgb},0.64), inset 0 0 52px rgba(${dirRgb},0.22)` :
-    isActiveBaseline ? `0 0 0 1px rgba(${dirRgb},0.28), 0 9px 26px rgba(0,0,0,0.70), 0 0 52px rgba(${dirRgb},0.46), inset 0 0 36px rgba(${dirRgb},0.14)` :
-                       undefined;
-  // Physical elevation — ELITE rides highest, STRONG and active
-  // baseline step down. Only translateY (no scale) so the grid
-  // alignment stays exact and there's zero layout shift.
-  // Pass 7i — STRONG -3→-3.5, ACTIVE -1.5→-2.5 to keep the
-  // elevation cascade continuous instead of dropping off a cliff
-  // below ELITE.
-  const liftTransform =
-    isElite          ? "translateY(-4px)" :
-    isStrong         ? "translateY(-3.5px)" :
-    isActiveBaseline ? "translateY(-2.5px)" :
-                       undefined;
-  // Higher z-index so hero cards visually stack above neighbors
-  // when their halos overlap.
-  const liftZ =
-    isElite          ? 3 :
-    isStrong         ? 2 :
-    isActiveBaseline ? 1 : 0;
+  // Pass 7M — FINALIZATION. Stripping the cinematic vocabulary
+  // (saturated full-card washes, 80px halos, translateY lift,
+  // engraved double-rings, dirColor borders). Replaced with a
+  // clean Bloomberg-style row: neutral elevated dark plate,
+  // conviction read via BORDER WEIGHT + LEFT-RAIL THICKNESS only.
+  // Hierarchy is functional, not decorative. Goal: scannable
+  // density, not theatrical depth.
+  const tierBackground = isActive ? "#0C1410" : T.BG_TERMINAL;
+  // One light static drop-shadow so the card sits on the chassis
+  // (not into it). Same shadow for every active tier — hierarchy
+  // is in the border, not the halo.
+  const tierShadow = isActive
+    ? `0 1px 0 rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.025)`
+    : undefined;
+  const liftTransform = undefined;
+  const liftZ = isElite ? 2 : isStrong ? 1 : 0;
 
   // Pass 7b — outcome memory. When this symbol has a paper close within
   // the last 5 minutes, surface the outcome inline on the card so the
@@ -1267,16 +1231,16 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         transform: liftTransform,
         zIndex: liftZ,
         boxSizing: "border-box",
-        // Pass 7L — real breathing room. Padding 8/18/10 → 12/22/14;
-        // height 142 → 172. The top 20 longs/shorts get +30px of
-        // vertical authority each so the matrix physically dominates
-        // the viewport (was the user's #2 demand).
-        padding: 12,
-        paddingLeft: 22,
-        paddingRight: 14,
+        // Pass 7M — finalization. Tightened to a scannable
+        // Bloomberg-style row. Padding 12/22/14 → 8/16/10,
+        // height 172 → 124. Density beats theatre for a 20-row
+        // matrix; more rows fit in one viewport, eye sweeps faster.
+        padding: 8,
+        paddingLeft: 16,
+        paddingRight: 10,
         display: "flex", flexDirection: "row", gap: 0,
         position: "relative", overflow: "hidden",
-        height: 172,
+        height: 124,
         fontFamily: T.FONT_MONO,
         // Pass 7a — age decay. ageOpacity collapses FRESH→SETTLING→
         // AGING→EXPIRED into a single multiplier so the whole card
@@ -1322,86 +1286,66 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           original "live execution terminal" cadence while preserving
           Pass 4.4/4.5/4.6 visual upgrades (semantic conf color,
           bezier sparkline, layered ring, flow overlay).            */}
-      {/* LEFT ANCHOR — symbol · ring · direction pill */}
+      {/* LEFT ANCHOR — symbol · ring · direction pill.
+          Pass 7M — reset to clean institutional sizing. No text-
+          shadow theatre on the symbol, no oversized conf headline,
+          no heavy direction pill. The conviction number is just a
+          number; the row chemistry comes from the data, not glow. */}
       <div style={{
-        // Pass 7L — anchor widened 96 → 116 to accommodate the
-        // larger ring + bigger confidence numeral. Symbol, ring,
-        // and direction pill all project at a higher tier so the
-        // conviction reads from across the room.
-        width: 116, flexShrink: 0,
+        width: 90, flexShrink: 0,
         display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "space-between",
         gap: 4,
       }}>
         <span style={{
-          fontSize: 16, fontWeight: 800, color: T.TEXT_0,
+          fontSize: 13, fontWeight: 700, color: T.TEXT_0,
           letterSpacing: "-0.01em",
-          textShadow: `0 0 8px rgba(0,0,0,0.7), 0 0 2px rgba(${dirRgb},0.4)`,
         }}>
           {opp.symbol}
         </span>
-        <div style={{ position: "relative", width: 92, height: 92, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <ConfidenceRing color={confColor} value={opp.conf} size={92} />
+        <div style={{ position: "relative", width: 72, height: 72, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <ConfidenceRing color={confColor} value={opp.conf} size={72} />
           {isReady && (
-            <svg aria-hidden width={92} height={92} style={{
+            <svg aria-hidden width={72} height={72} style={{
               position: "absolute", inset: 0, pointerEvents: "none",
               animation: "ring-sweep 12s linear infinite",
               animationDelay: `-${sweepDelayMs}ms`,
               transformOrigin: "50% 50%",
             }}>
-              <circle cx={46} cy={46} r={40} fill="none"
+              <circle cx={36} cy={36} r={31} fill="none"
                 stroke={confColor} strokeWidth={2}
-                strokeDasharray="22 229" strokeLinecap="round"
-                style={{ filter: `drop-shadow(0 0 4px ${confColor})`, opacity: 0.85 }} />
+                strokeDasharray="18 178" strokeLinecap="round"
+                style={{ filter: `drop-shadow(0 0 3px ${confColor})`, opacity: 0.75 }} />
             </svg>
           )}
           <div style={{
             position: "absolute", inset: 0,
             display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center",
-            gap: 1, lineHeight: 1,
+            gap: 0, lineHeight: 1,
           }}>
             <span style={{
-              // Pass 7L — confidence numerals are the single biggest
-              // signal of conviction. Pushed up: ELITE 32→40, STRONG
-              // 30→36, ACTIVE 28→32, EVAL 26→28. This is the headline
-              // number on the screen.
-              fontSize:
-                isElite          ? 40 :
-                isStrong         ? 36 :
-                isActiveBaseline ? 32 : 28,
-              fontWeight:
-                isElite          ? 800 :
-                isStrong         ? 800 :
-                isActiveBaseline ? 800 : 700,
+              // Pass 7M — uniform sizing. Hierarchy by weight + color,
+              // not by 40px headlines. ELITE/STRONG share 24px wt 800,
+              // ACTIVE/EVAL share 22px wt 700. No text-shadow halos.
+              fontSize: opp.conf >= 80 ? 24 : 22,
+              fontWeight: opp.conf >= 80 ? 800 : 700,
               color: confColor, letterSpacing: T.TRACK_DISPLAY,
               fontVariantNumeric: "tabular-nums",
-              textShadow:
-                isElite          ? `0 0 26px ${confColor}, 0 0 14px ${confColor}, 0 0 7px ${confColor}, 0 0 2px ${confColor}` :
-                opp.conf >= 85   ? `0 0 18px ${confColor}, 0 0 10px ${confColor}, 0 0 4px ${confColor}` :
-                opp.conf >= 70   ? `0 0 12px ${confColor}, 0 0 6px ${confColor}` :
-                opp.conf >= 55   ? `0 0 5px ${confColor}` :
-                                   `0 0 3px ${confColor}`,
             }}>{opp.conf}</span>
             <span style={{
-              fontSize: 9, fontWeight: 700, color: T.TEXT_1,
+              fontSize: 8, fontWeight: 700, color: T.TEXT_2,
               letterSpacing: T.TRACK_LABEL, textTransform: "uppercase",
             }}>AI Conf</span>
           </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
           <span style={{
-            // Pass 7L — direction pill is the second-strongest visual
-            // identity cue. Bumped 9px→11, padding 2x8→4x12, fill
-            // alpha 0.10→0.18, border alpha 0.30→0.55, real
-            // dirColor text-shadow. Reads as a proper status chip,
-            // not a faint label.
-            fontSize: 11, padding: "4px 12px",
-            border: `1px solid rgba(${dirRgb},0.55)`,
-            background: `rgba(${dirRgb},0.18)`,
-            color: dirColor, fontWeight: 800, letterSpacing: "0.12em",
+            fontSize: 9, padding: "2px 8px",
+            border: `1px solid ${dirBorder}`,
+            background: dirBg,
+            color: dirColor, fontWeight: 700, letterSpacing: "0.10em",
             borderRadius: 2,
-            textShadow: `0 0 6px rgba(${dirRgb},0.55)`,
           }}>{opp.direction}</span>
           {lastExit && (
             <span
@@ -1421,24 +1365,26 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         </div>
       </div>
 
-      {/* RIGHT MAIN — telemetry meta · chart rail · action strip */}
+      {/* RIGHT MAIN — telemetry meta · chart rail · action strip.
+          Pass 7M — finalization. Stripped all glow/halo/box-shadow
+          decoration on MTF dots, momentum bars, score badge, and
+          ageStr. Cleaner labels, neutral chart rail. */}
       <div style={{
         flex: 1, minWidth: 0,
         display: "flex", flexDirection: "column",
-        gap: 6, paddingLeft: 14,
+        gap: 4, paddingLeft: 12,
       }}>
         {/* Top meta — REGIME · VOL · MTF dots · momentum · age/latency · score */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 11, color: T.TEXT_1, lineHeight: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: T.TEXT_0, letterSpacing: T.TRACK_LABEL, textTransform: "uppercase", whiteSpace: "nowrap", textShadow: `0 0 4px rgba(0,0,0,0.6)` }}>
-              {opp.regime} <span style={{ opacity: 0.45, color: T.TEXT_2 }}>·</span> <span style={{ color: T.TEXT_1, fontWeight: 500 }}>{opp.vol}</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: T.TEXT_1, letterSpacing: T.TRACK_LABEL, textTransform: "uppercase", whiteSpace: "nowrap" }}>
+              {opp.regime} <span style={{ opacity: 0.45, color: T.TEXT_3 }}>·</span> <span style={{ color: T.TEXT_2, fontWeight: 500 }}>{opp.vol}</span>
             </span>
             <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
               {opp.mtf.map((m, i) => (
                 <span key={i} title={["5m","15m","1H","4H"][i]} style={{
-                  width: 9, height: 9, borderRadius: 1,
+                  width: 7, height: 7, borderRadius: 1,
                   background: m === "green" ? T.NEON : m === "amber" ? T.AMBER : T.RED,
-                  boxShadow: m === "green" ? `0 0 4px ${T.NEON}` : m === "amber" ? `0 0 4px ${T.AMBER}` : `0 0 4px ${T.RED}`,
                 }} />
               ))}
             </div>
@@ -1447,9 +1393,8 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
                 const lit = i <= opp.momentum;
                 return (
                   <span key={i} style={{
-                    width: 5, height: 12,
+                    width: 4, height: 10,
                     background: lit ? dirColor : "rgba(255,255,255,0.10)",
-                    boxShadow: lit ? `0 0 4px rgba(${dirRgb},0.5)` : undefined,
                     animation: lit && isFreshSignal ? "momentum-breathe 3.4s ease-in-out infinite" : undefined,
                     animationDelay: lit && isFreshSignal ? `${(i - 1) * 150}ms` : undefined,
                   }} />
@@ -1460,31 +1405,27 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           <span
             title={`Signal age ${ageStr} · execution latency ${opp.latency}`}
             style={{
-              fontSize: 11, fontVariantNumeric: "tabular-nums",
-              whiteSpace: "nowrap", color: T.TEXT_1,
+              fontSize: 10, fontVariantNumeric: "tabular-nums",
+              whiteSpace: "nowrap", color: T.TEXT_2,
               animation: isLiveTick ? "telemetry-flicker 1.6s ease-in-out infinite" : undefined,
               animationDelay: isLiveTick ? `-${flickerDelayMs}ms` : undefined,
             }}>
-            <span style={{ color: T.TEXT_0, fontWeight: 600 }}>{ageStr}</span>
+            <span style={{ color: T.TEXT_1, fontWeight: 600 }}>{ageStr}</span>
             <span style={{ opacity: 0.45, margin: "0 4px" }}>·</span>
             {opp.latency}
             <span style={{ opacity: 0.45, margin: "0 6px" }}>·</span>
-            <span style={{ background: `rgba(${dirRgb},0.18)`, color: T.TEXT_0, padding: "2px 7px", borderRadius: 2, fontWeight: 700, border: `1px solid rgba(${dirRgb},0.32)` }}>{opp.score}</span>
+            <span style={{ background: "rgba(255,255,255,0.08)", color: T.TEXT_0, padding: "1px 6px", borderRadius: 2, fontWeight: 700 }}>{opp.score}</span>
           </span>
         </div>
 
-        {/* CHART RAIL — dominant horizontal flow.
-            Pass 7L: was ghost-white-on-nothing (0.022 alpha), reads
-            as a real dirColor-tinted plate with stronger borders so
-            the chart sits inside a recognizable container, not
-            floating in space. Height 70→80. */}
+        {/* CHART RAIL — neutral plate. No dirColor borders, no
+            color wash. The sparkline already carries direction via
+            its own color; the container should be quiet. */}
         <div style={{
-          position: "relative", width: "100%", height: 80,
-          background: isActive
-            ? `linear-gradient(180deg, rgba(${dirRgb},0.08) 0%, rgba(0,0,0,0.30) 100%)`
-            : "linear-gradient(180deg, rgba(255,255,255,0.022) 0%, rgba(0,0,0,0) 65%, rgba(255,255,255,0.014) 100%)",
-          borderTop:    `1px solid ${isActive ? `rgba(${dirRgb},0.32)` : T.BORDER}`,
-          borderBottom: `1px solid ${isActive ? `rgba(${dirRgb},0.32)` : T.BORDER}`,
+          position: "relative", width: "100%", height: 56,
+          background: "linear-gradient(180deg, rgba(255,255,255,0.022) 0%, rgba(0,0,0,0) 65%, rgba(255,255,255,0.014) 100%)",
+          borderTop:    `1px solid ${T.BORDER}`,
+          borderBottom: `1px solid ${T.BORDER}`,
           overflow: "hidden",
         }}>
           <Sparkline
@@ -1508,60 +1449,54 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         </div>
 
         {/* Inline action strip — prices · readiness · reasoning · QUEUE.
-            Pass 7L: full typography lift. Was 10/TEXT_2 with italic
-            gray reasoning that disappeared. Now 12/TEXT_1, reasoning
-            de-italicized at weight 500/TEXT_0, prices weight 700,
-            R:R weight 800, QUEUE button bigger with real ready-state
-            fill so the call-to-action actually reads. */}
+            Pass 7M — keeps the 7L readability wins (11px font, weight
+            700 prices, de-italicized reasoning) but drops every
+            decorative text-shadow / halo. Clean institutional row. */}
         <div style={{
-          display: "flex", alignItems: "center", gap: 12,
-          fontSize: 12, color: T.TEXT_1,
+          display: "flex", alignItems: "center", gap: 10,
+          fontSize: 11, color: T.TEXT_1,
           fontVariantNumeric: "tabular-nums", lineHeight: 1, minWidth: 0,
         }}>
           <span style={{ whiteSpace: "nowrap" }}>
-            <span style={{ color: T.TEXT_2, marginRight: 4, fontWeight: 600 }}>E</span>
+            <span style={{ color: T.TEXT_3, marginRight: 3 }}>E</span>
             <span style={{ color: T.TEXT_0, fontWeight: 700 }}>{fmtPrice(opp.entry)}</span>
           </span>
           <span
             title={`Stop ${fmtPrice(opp.stop)} (${pctDelta(opp.entry, opp.stop)} from entry)`}
             style={{ whiteSpace: "nowrap", cursor: "help" }}
           >
-            <span style={{ color: T.TEXT_2, marginRight: 4, fontWeight: 600 }}>S</span>
+            <span style={{ color: T.TEXT_3, marginRight: 3 }}>S</span>
             <span style={{ color: T.RED, fontWeight: 700 }}>{fmtPrice(opp.stop)}</span>
           </span>
           <span
             title={`Target ${fmtPrice(opp.target)} (${pctDelta(opp.entry, opp.target)} from entry)`}
             style={{ whiteSpace: "nowrap", cursor: "help" }}
           >
-            <span style={{ color: T.TEXT_2, marginRight: 4, fontWeight: 600 }}>T</span>
+            <span style={{ color: T.TEXT_3, marginRight: 3 }}>T</span>
             <span style={{ color: T.NEON, fontWeight: 700 }}>{fmtPrice(opp.target)}</span>
           </span>
           <span style={{ whiteSpace: "nowrap" }}>
-            <span style={{ color: T.TEXT_2, marginRight: 4, fontWeight: 600 }}>R:R</span>
-            <span style={{ color: dirColor, fontWeight: 800, textShadow: `0 0 4px rgba(${dirRgb},0.5)` }}>{rr}</span>
+            <span style={{ color: T.TEXT_3, marginRight: 3 }}>R:R</span>
+            <span style={{ color: dirColor, fontWeight: 700 }}>{rr}</span>
           </span>
           <span style={{
-            fontSize: 11, fontWeight: 800, whiteSpace: "nowrap",
+            fontSize: 10, fontWeight: 700, whiteSpace: "nowrap",
             color: opp.readiness === "READY" ? T.NEON : opp.readiness === "WAITING" ? T.AMBER : T.TEXT_2,
-            display: "inline-flex", alignItems: "center", gap: 4,
-            padding: "3px 8px", borderRadius: 2,
-            border: `1px solid ${opp.readiness === "READY" ? `rgba(102,255,102,0.42)` : opp.readiness === "WAITING" ? `rgba(255,176,32,0.42)` : T.BORDER}`,
-            background: opp.readiness === "READY" ? `rgba(102,255,102,0.10)` : opp.readiness === "WAITING" ? `rgba(255,176,32,0.10)` : "transparent",
+            display: "inline-flex", alignItems: "center", gap: 3,
             letterSpacing: T.TRACK_LABEL,
           }}>
-            {opp.readiness === "READY"   && <CheckCircle2 size={11} />}
-            {opp.readiness === "WAITING" && <Timer size={11} />}
-            {opp.readiness === "GATED"   && <Lock size={11} />}
+            {opp.readiness === "READY"   && <CheckCircle2 size={10} />}
+            {opp.readiness === "WAITING" && <Timer size={10} />}
+            {opp.readiness === "GATED"   && <Lock size={10} />}
             {opp.readiness}
           </span>
           <span
             title={gatedReason ? `Gated: ${gatedReason}` : opp.reasoning}
             style={{
               flex: 1, minWidth: 0,
-              fontSize: 11, fontWeight: 500,
-              color: gatedReason ? T.AMBER : T.TEXT_0,
+              fontSize: 11, fontWeight: 400,
+              color: gatedReason ? T.AMBER : T.TEXT_1,
               overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
-              textShadow: `0 0 4px rgba(0,0,0,0.6)`,
             }}>
             {gatedReason ? `⛔ ${gatedReason}` : opp.reasoning}
           </span>
@@ -1569,15 +1504,13 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             onClick={() => ready && onQueue(opp)}
             disabled={!ready}
             style={{
-              padding: "6px 14px", fontSize: 11, fontWeight: 800,
+              padding: "4px 12px", fontSize: 10, fontWeight: 700,
               fontFamily: T.FONT_MONO, letterSpacing: T.TRACK_LABEL,
               border: `1px solid ${ready ? T.NEON : T.BORDER}`,
-              background: ready ? `rgba(102,255,102,0.18)` : "transparent",
+              background: "transparent",
               color: ready ? T.NEON : T.TEXT_3,
-              boxShadow: ready ? `0 0 12px rgba(102,255,102,0.30), inset 0 0 8px rgba(102,255,102,0.10)` : undefined,
-              textShadow: ready ? `0 0 6px rgba(102,255,102,0.6)` : undefined,
               cursor: ready ? "pointer" : "not-allowed",
-              transition: "all 120ms ease",
+              transition: "background-color 120ms ease, color 120ms ease",
               flexShrink: 0,
               borderRadius: 2,
             }}
@@ -1585,13 +1518,11 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
               if (!ready) return;
               e.currentTarget.style.background = T.NEON;
               e.currentTarget.style.color = "#000";
-              e.currentTarget.style.textShadow = "none";
             }}
             onMouseLeave={(e) => {
               if (!ready) return;
-              e.currentTarget.style.background = "rgba(102,255,102,0.18)";
+              e.currentTarget.style.background = "transparent";
               e.currentTarget.style.color = T.NEON;
-              e.currentTarget.style.textShadow = `0 0 6px rgba(102,255,102,0.6)`;
             }}
           >QUEUE PAPER</button>
         </div>
