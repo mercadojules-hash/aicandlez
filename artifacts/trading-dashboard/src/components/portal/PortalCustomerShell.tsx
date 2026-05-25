@@ -39,6 +39,8 @@ import {
 } from "lucide-react";
 
 import { authFetch } from "../../lib/authFetch";
+// Pass 7V — brand logo used above search bar (replaces ticker chips row).
+import aiCandlezLogoHorizontal from "@assets/aicandlez-logo-horizontal-master_1779691403317.png";
 import { usePaperSignals, type OpportunityVM } from "../../hooks/usePaperSignals";
 import { useExecutionState } from "../../hooks/useExecutionState";
 import { usePaperTrades, STARTING_EQUITY } from "../../hooks/usePaperTrades";
@@ -464,7 +466,11 @@ const SearchBar = memo(function SearchBar({
   setFilter: (f: Filt) => void;
   suggestionPool: string[];
 }) {
-  const chips = suggestionPool.slice(0, 14);
+  // Pass 7V — quick-jump ticker chips row removed per user spec.
+  // Replaced with centered brand logo above the search bar (rendered
+  // below). `suggestionPool` arg retained for API stability but no
+  // longer rendered as chips.
+  void suggestionPool;
   const pills: { id: Filt; label: string; group: 0 | 1 }[] = [
     { id: "ALL",       label: "All",                   group: 0 },
     { id: "MAJORS",    label: "Majors",                group: 0 },
@@ -485,6 +491,15 @@ const SearchBar = memo(function SearchBar({
   ];
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* Pass 7V — centered AICandlez horizontal logo above the search.
+          Replaces the deleted quick-jump ticker chip row. */}
+      <div style={{ display: "flex", justifyContent: "center", paddingBottom: 4 }}>
+        <img
+          src={aiCandlezLogoHorizontal}
+          alt="AICandlez"
+          style={{ height: 56, width: "auto", objectFit: "contain", display: "block" }}
+        />
+      </div>
       <div style={{ position: "relative" }}>
         <Search size={18} color={T.NEON} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
         <input
@@ -522,23 +537,6 @@ const SearchBar = memo(function SearchBar({
       <div style={{
         display: "flex", flexDirection: "column", gap: 10,
       }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {chips.map(chip => (
-            <button
-              key={chip}
-              onClick={() => setQuery(chip)}
-              style={{
-                fontFamily: T.FONT_MONO, fontSize: 10,
-                color: T.TEXT_1, background: "rgba(255,255,255,0.04)",
-                border: "none", padding: "4px 8px",
-                cursor: "pointer", borderRadius: 2,
-              }}
-            >
-              {chip}
-            </button>
-          ))}
-        </div>
-
         <div
           className="cd-pills-strip"
           style={{
@@ -2311,25 +2309,28 @@ const PortfolioIntelligence = memo(function PortfolioIntelligence({ now }: { now
   const exitOpacity = exitFresh ? Math.max(0, 1 - closeAgeMs / 8_000) : 0;
   const exitColor   = lastClose && lastClose.pnl >= 0 ? T.NEON : T.RED;
 
+  // Pass 7V — auto-collapse LIVE TRADES when no positions are open.
+  // Duplicate Paper Equity header removed (already dominant in
+  // ACCOUNT STATUS above). Empty state collapses the panel to a
+  // single-line placeholder so the page reflows upward instead of
+  // showing a 480px void.
+  const hasActivity = open.length > 0 || exitFresh;
+  if (!hasActivity) {
+    return (
+      <PanelCard title="LIVE TRADES" height={72} live>
+        <div style={{
+          flex: 1, display: "flex", alignItems: "center", padding: "0 16px",
+          fontFamily: T.FONT_MONO, fontSize: 11, color: T.TEXT_2, letterSpacing: "0.06em",
+        }}>
+          No active paper trades.
+        </div>
+      </PanelCard>
+    );
+  }
+
   return (
     <PanelCard title="LIVE TRADES" height={480} live>
       <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-          <div>
-            <div style={{ fontSize: 10, color: T.TEXT_2, marginBottom: 3 }}>PAPER EQUITY (USD)</div>
-            <div style={{ fontSize: 20, color: T.TEXT_0, fontVariantNumeric: "tabular-nums" }}>
-              ${stats.equity.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              <span style={{ color: T.TEXT_2 }}>.{(stats.equity % 1).toFixed(2).slice(2)}</span>
-            </div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 10, color: T.TEXT_2, marginBottom: 3 }}>REALIZED</div>
-            <div style={{ fontSize: 13, color: stats.realizedPnl >= 0 ? T.NEON : T.RED, fontVariantNumeric: "tabular-nums" }}>
-              {stats.realizedPnl >= 0 ? "+" : "−"}${Math.abs(stats.realizedPnl).toFixed(2)}
-            </div>
-          </div>
-        </div>
-
         {/* Real equity curve — 60s rolling, redraws each shell tick. */}
         <svg width="100%" height={40} viewBox="0 0 100 40" preserveAspectRatio="none"
              style={{ transition: "color 600ms ease" }}>
@@ -2458,6 +2459,22 @@ const RecentExits = memo(function RecentExits({ now }: { now: number }) {
   const { history } = usePaperTrades();
   const exits = useMemo(() => history.slice(0, RECENT_EXITS_LIMIT), [history]);
 
+  // Pass 7V — auto-collapse TRADE HISTORY when no closed positions.
+  // Page reflows upward instead of holding a 480px void below the
+  // matrix while the operator is still in pre-trade setup.
+  if (exits.length === 0) {
+    return (
+      <PanelCard title="TRADE HISTORY" height={72}>
+        <div style={{
+          flex: 1, display: "flex", alignItems: "center", padding: "0 16px",
+          fontFamily: T.FONT_MONO, fontSize: 11, color: T.TEXT_2, letterSpacing: "0.06em",
+        }}>
+          No completed positions yet.
+        </div>
+      </PanelCard>
+    );
+  }
+
   return (
     <PanelCard title="TRADE HISTORY" height={480}>
       <div className="cd-scroll" style={{
@@ -2465,11 +2482,7 @@ const RecentExits = memo(function RecentExits({ now }: { now: number }) {
         display: "flex", flexDirection: "column", gap: 4,
         fontVariantNumeric: "tabular-nums",
       }}>
-        {exits.length === 0 ? (
-          <div style={{ color: T.TEXT_2, fontSize: 10, fontStyle: "italic", paddingLeft: 2 }}>
-            No completed positions yet.
-          </div>
-        ) : exits.map((h) => {
+        {exits.map((h) => {
           const ageMs    = Math.max(0, now - h.closedAt);
           const isFresh  = ageMs < 6_000;
           const pnlColor = h.pnl >= 0 ? T.NEON : T.RED;
@@ -2743,10 +2756,18 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
   // in OperatorPulseRibbon already.
   const confColor  = pulse.avgConf >= 70 ? T.NEON : pulse.avgConf >= 55 ? T.AMBER : T.TEXT_1;
 
-  const fmtMoney = (n: number) =>
-    `${n < 0 ? "−" : n > 0 ? "+" : ""}$${Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const fmtEquity = (n: number) =>
-    `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // Pass 7V — compact $XXXK / $X.XXM formatting per user spec.
+  // "$100,000.00" → "$100K"; PNL "+$1,234.56" → "+$1.23K"; under $1K
+  // keeps two decimals for legibility on small wins/losses.
+  const fmtCompact = (n: number): string => {
+    const abs = Math.abs(n);
+    if (abs >= 1_000_000) return `$${(abs / 1_000_000).toFixed(2)}M`;
+    if (abs >= 10_000)    return `$${Math.round(abs / 1_000)}K`;
+    if (abs >= 1_000)     return `$${(abs / 1_000).toFixed(2)}K`;
+    return `$${abs.toFixed(2)}`;
+  };
+  const fmtMoney  = (n: number) => `${n < 0 ? "−" : n > 0 ? "+" : ""}${fmtCompact(n)}`;
+  const fmtEquity = (n: number) => fmtCompact(n);
 
   // Pass 7U — stat cells upsized. Tier 1 cells (PAPER EQUITY, REALIZED
   // PNL, UNREALIZED PNL) render larger so account status reads first.
@@ -2763,37 +2784,37 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
   );
 
   return (
-    <PanelCard title="ACCOUNT STATUS" live height={196}>
+    <PanelCard title="ACCOUNT STATUS" live height={236}>
       <div style={{
-        padding: "18px 22px",
+        padding: "22px 26px",
         flex: 1,
         display: "flex",
         alignItems: "center",
-        gap: 24,
+        gap: 28,
         fontFamily: T.FONT_MONO,
       }}>
         <div style={{
           flex: 1,
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))",
-          gap: "18px 20px",
+          gap: "20px 22px",
           alignItems: "center",
         }}>
-          <Cell k="PAPER EQUITY"   size={26} v={fmtEquity(equity)} color={equity >= STARTING_EQUITY ? T.NEON : T.RED} />
-          <Cell k="REALIZED PNL"   size={24} v={fmtMoney(realizedPnl)}   color={realizedPnl   >= 0 ? T.NEON : T.RED} />
-          <Cell k="UNREALIZED PNL" size={24} v={fmtMoney(unrealizedPnl)} color={unrealizedPnl >= 0 ? T.NEON : T.RED} />
-          <Cell k="WIN %"          size={20} v={closedCount > 0 ? `${winPct}%` : "—"} color={winPct >= 50 ? T.NEON : winPct > 0 ? T.AMBER : T.TEXT_2} />
-          <Cell k="WINS / LOSSES"  size={20} v={`${wins} / ${losses}`} />
-          <Cell k="OPEN TRADES"    size={20} v={openCount.toString()} color={openCount > 0 ? T.NEON : T.TEXT_2} />
-          <Cell k="ACTIVE SIGNALS" size={20} v={activeSignals.toString()} color={activeSignals > 0 ? T.TEXT_0 : T.TEXT_2} />
-          <Cell k="QUEUE"          size={20} v={queueDepth.toString()} color={queueDepth > 0 ? T.AMBER : T.TEXT_2} />
+          <Cell k="PAPER EQUITY"   size={34} v={fmtEquity(equity)} color={equity >= STARTING_EQUITY ? T.NEON : T.RED} />
+          <Cell k="REALIZED PNL"   size={30} v={fmtMoney(realizedPnl)}   color={realizedPnl   >= 0 ? T.NEON : T.RED} />
+          <Cell k="UNREALIZED PNL" size={30} v={fmtMoney(unrealizedPnl)} color={unrealizedPnl >= 0 ? T.NEON : T.RED} />
+          <Cell k="WIN %"          size={24} v={closedCount > 0 ? `${winPct}%` : "—"} color={winPct >= 50 ? T.NEON : winPct > 0 ? T.AMBER : T.TEXT_2} />
+          <Cell k="WINS / LOSSES"  size={24} v={`${wins} / ${losses}`} />
+          <Cell k="OPEN TRADES"    size={24} v={openCount.toString()} color={openCount > 0 ? T.NEON : T.TEXT_2} />
+          <Cell k="ACTIVE SIGNALS" size={24} v={activeSignals.toString()} color={activeSignals > 0 ? T.TEXT_0 : T.TEXT_2} />
+          <Cell k="QUEUE"          size={24} v={queueDepth.toString()} color={queueDepth > 0 ? T.AMBER : T.TEXT_2} />
         </div>
-        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, paddingLeft: 22, borderLeft: `1px solid ${T.BORDER}` }}>
-          <div style={{ position: "relative", width: 112, height: 112 }}>
-            <ConfidenceRing color={confColor} value={pulse.avgConf} size={112} />
+        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, paddingLeft: 26, borderLeft: `1px solid ${T.BORDER}` }}>
+          <div style={{ position: "relative", width: 144, height: 144 }}>
+            <ConfidenceRing color={confColor} value={pulse.avgConf} size={144} />
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-              <span style={{ fontSize: 30, color: confColor, fontVariantNumeric: "tabular-nums", fontWeight: 700, lineHeight: 1 }}>{pulse.avgConf}</span>
-              <span style={{ fontSize: 9, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL, marginTop: 4 }}>AI AVG CONF</span>
+              <span style={{ fontSize: 40, color: confColor, fontVariantNumeric: "tabular-nums", fontWeight: 700, lineHeight: 1 }}>{pulse.avgConf}</span>
+              <span style={{ fontSize: 10, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL, marginTop: 6 }}>AI AVG CONF</span>
             </div>
           </div>
         </div>
