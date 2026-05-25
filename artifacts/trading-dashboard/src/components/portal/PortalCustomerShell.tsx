@@ -513,17 +513,21 @@ function signalAgePrecise(ts: number | null | undefined, now: number): string {
   return `${Math.round(h / 24)}d`;
 }
 
-/* Track signals/min since first non-zero observation. Ref-based, no
- * re-render churn. Returns 0 until at least one minute of observation
- * has elapsed (rate stabilizer — avoids "9000/min" spikes from a single
- * tick fired 0.3s after mount). */
+/* Pass 3.4: ZERO internal timers. Track signals/min since first
+ * non-zero observation; recompute happens naturally on the shell's
+ * 1Hz `nowShell` re-render (which the shell already owns and which
+ * pauses on hidden tab). The previous 5s `setInterval(force…)` was
+ * the last surviving custom-interval source in the customer portal
+ * surface; removing it leaves the shell with a single 1Hz timer plus
+ * React Query's own per-query refetch schedulers and nothing else.
+ *
+ * Stabilizer behavior preserved: returns 0 until ≥0.25 min elapsed
+ * since the first non-null observation (avoids "9000/min" spikes
+ * from a single tick fired moments after mount). `now` is taken
+ * inline via `Date.now()` rather than as a prop so callers can
+ * trigger recompute by any means (currently: shell 1Hz tick). */
 function useSignalRate(signalsGenerated: number | undefined): number {
   const anchorRef = useRef<{ value: number; ts: number } | null>(null);
-  const [, force] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => force(n => n + 1), 5000);
-    return () => clearInterval(id);
-  }, []);
   if (signalsGenerated == null) return 0;
   if (anchorRef.current == null) {
     anchorRef.current = { value: signalsGenerated, ts: Date.now() };
