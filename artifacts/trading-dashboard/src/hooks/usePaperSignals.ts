@@ -393,7 +393,10 @@ export function usePaperSignals() {
       if (/^(NVDA|TSLA|AAPL|MSFT|GOOGL|META|AMZN|SPY|QQQ|AMD|NFLX)$/.test(sym)) continue;
       const dir   = actionToDirection(b.agreedAction);
       const lean  = leanFromBreakdown(b);
-      const conf  = Math.round(b.avgConfidence);
+      // Pass E3 — render layer reads displayConfidence (context-enriched).
+      // Execution path reads avgConfidence (untouched). Fallback preserves
+      // backward compat if backend hasn't shipped the new field yet.
+      const conf  = Math.round(b.displayConfidence ?? b.avgConfidence);
       const score = Math.max(0, Math.min(99, Math.round((b.fast.confidence + b.slow.confidence) / 2)));
       const lastPrice = b.fast.ema9 || b.slow.ema9 || 100;
       const stopPct   = dir === "SHORT" ? +0.02 : -0.02;

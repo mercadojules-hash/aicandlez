@@ -50,6 +50,17 @@ export interface SymbolBreakdown {
   mtfConfirmed:    boolean;
   agreedAction:    string;
   avgConfidence:   number;
+  // Pass E3 — display-only confidence (LOCKED INVARIANT).
+  // `avgConfidence` drives EXECUTION (80% live floor, riskGate,
+  // KrakenAdapter, concurrent-trade cap). It is bytewise unchanged.
+  // `displayConfidence` is the human-facing context-enriched
+  // confidence: avgConfidence + MTF-agreement bonus + volume bonus
+  // - sideways penalty + trending bonus, clamped 0-100. ONLY the
+  // render layer reads this; the execution path NEVER reads it.
+  // This decouples "what the engine acts on" from "what the user
+  // sees" so we can fix the customer-visible distribution without
+  // re-opening the launch-risk audit.
+  displayConfidence: number;
   blockReason:     string;
   lastUpdated:     number;
   // Quality filters
@@ -335,11 +346,57 @@ interface MTFResult {
   slowSnap:        TimeframeSnapshot;
   mtfConfirmed:    boolean;
   agreedAction:    "BUY" | "SELL" | "HOLD";
-  avgConfidence:   number;
+  avgConfidence:   number;       // EXECUTION confidence — 80% live floor reads this
+  displayConfidence: number;     // DISPLAY conviction — render layer reads this
   blockReason:     string;
   volumeConfirmed: boolean;
   marketCondition: "trending" | "sideways" | "neutral";
   trend1H:         "bullish" | "bearish" | "unknown";
+}
+
+// ── Pass E3 — Display-only conviction calculator ─────────────────────
+// Context-enriches the raw `avgConfidence` for HUMAN-FACING display
+// without touching the value the execution path acts on. This is the
+// single source of truth for `displayConfidence`; the render layer
+// (`usePaperSignals.ts`) reads it and applies its own calibration
+// curve + cohort ranking on top.
+//
+// Modifiers (additive, applied to raw avgConfidence, clamped 0-100):
+//   +18  mtfConfirmed (both 5m and 15m agree in direction)
+//   +8   volumeConfirmed (current bar ≥ 85% of 20-bar avg)
+//   +6   marketCondition === "trending"  (EMA spread ≥ 0.30%)
+//   -12  marketCondition === "sideways"  (EMA spread < 0.15%)
+//   +4   trend1H aligned with agreedAction (1H EMA agrees w/ trade dir)
+//
+// Realistic ceiling: a perfectly-aligned setup (raw 35, MTF, volume,
+// trending, 1H aligned) reaches 71 displayConf, which the render
+// power-0.50 curve maps to ~84 calibrated, plus cohort percentile +
+// synergy lands in ELITE band 85+. A weak ranging signal (raw 20, no
+// MTF, no volume, sideways) reaches displayConf 8, calibrated ~28,
+// plus rank dampening stays in DEVELOPING/LOW. The distribution
+// finally breathes 10-95+ instead of clustering 26-41.
+//
+// IMPORTANT: this function MUST NOT be called from any execution-path
+// code. It is exclusively for `engineStats.symbolBreakdowns` and the
+// render API surface.
+function computeDisplayConfidence(input: {
+  avgConfidence:   number;
+  mtfConfirmed:    boolean;
+  volumeConfirmed: boolean;
+  marketCondition: "trending" | "sideways" | "neutral";
+  trend1H:         "bullish" | "bearish" | "unknown";
+  agreedAction:    "BUY" | "SELL" | "HOLD";
+}): number {
+  let v = input.avgConfidence;
+  if (input.mtfConfirmed)                       v += 18;
+  if (input.volumeConfirmed)                    v += 8;
+  if (input.marketCondition === "trending")     v += 6;
+  if (input.marketCondition === "sideways")     v -= 12;
+  const trend1HAligned =
+    (input.trend1H === "bullish" && input.agreedAction === "BUY") ||
+    (input.trend1H === "bearish" && input.agreedAction === "SELL");
+  if (trend1HAligned)                           v += 4;
+  return parseFloat(Math.max(0, Math.min(100, v)).toFixed(1));
 }
 
 async function computeMTFDecision(symbol: string): Promise<MTFResult> {
@@ -424,9 +481,18 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
   }
   if (marketCondition === "sideways") blockReason = blockReason === "None" ? "Sideways market" : blockReason;
 
+  const displayConfidence = computeDisplayConfidence({
+    avgConfidence,
+    mtfConfirmed,
+    volumeConfirmed,
+    marketCondition,
+    trend1H,
+    agreedAction,
+  });
+
   return {
     symbol, fast, slow, fastSnap, slowSnap,
-    mtfConfirmed, agreedAction, avgConfidence, blockReason,
+    mtfConfirmed, agreedAction, avgConfidence, displayConfidence, blockReason,
     volumeConfirmed, marketCondition, trend1H,
   };
 }
@@ -965,16 +1031,17 @@ async function tick() {
       // Update per-symbol breakdown
       engineStats.symbolBreakdowns[symbol] = {
         symbol,
-        fast:            mtf.fastSnap,
-        slow:            mtf.slowSnap,
-        mtfConfirmed:    mtf.mtfConfirmed,
-        agreedAction:    mtf.agreedAction,
-        avgConfidence:   mtf.avgConfidence,
-        blockReason:     mtf.blockReason,
-        lastUpdated:     Date.now(),
-        volumeConfirmed: mtf.volumeConfirmed,
-        marketCondition: mtf.marketCondition,
-        trend1H:         mtf.trend1H,
+        fast:              mtf.fastSnap,
+        slow:              mtf.slowSnap,
+        mtfConfirmed:      mtf.mtfConfirmed,
+        agreedAction:      mtf.agreedAction,
+        avgConfidence:     mtf.avgConfidence,       // EXECUTION (80% live floor, riskGate, KrakenAdapter)
+        displayConfidence: mtf.displayConfidence,   // DISPLAY ONLY (render layer)
+        blockReason:       mtf.blockReason,
+        lastUpdated:       Date.now(),
+        volumeConfirmed:   mtf.volumeConfirmed,
+        marketCondition:   mtf.marketCondition,
+        trend1H:           mtf.trend1H,
       };
 
       logger.info({

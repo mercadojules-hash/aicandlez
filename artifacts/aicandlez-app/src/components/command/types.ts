@@ -25,7 +25,11 @@ export interface SymBreakdown {
   slow:            TFSnap;
   mtfConfirmed:    boolean;
   agreedAction:    string;
+  /** EXECUTION confidence — 80% live floor, riskGate, KrakenAdapter read this. NEVER display directly. */
   avgConfidence:   number;
+  /** Pass E3 — DISPLAY-ONLY context-enriched conviction. Optional for backward
+   *  compatibility (fallback to `avgConfidence`). Render layer reads this. */
+  displayConfidence?: number;
   blockReason:     string;
   lastUpdated:     number;
   volumeConfirmed: boolean;
