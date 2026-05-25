@@ -209,7 +209,7 @@ function TpSlBar({ sl, tp, current, up }: { sl:number; tp:number; current:number
           width:2, height:6,
           background:"white", borderRadius:1,
           transform:"translateX(-50%)",
-          boxShadow:"0 0 5px rgba(255,255,255,0.85)",
+          boxShadow: "0 0 5px rgba(255,255,255,0.51)",
         }}/>
       </div>
       <div style={{ display:"flex", justifyContent:"space-between", marginTop:5 }}>
@@ -247,7 +247,7 @@ function PositionCard({ pos, tick, sparkPoints }: { pos: Portfolio["positions"][
       background:`linear-gradient(160deg, #0e1c2e 0%, #0a1520 100%)`,
       border:`1px solid ${up ? "rgba(0,255,136,0.14)" : "rgba(255,51,85,0.12)"}`,
       borderRadius:14, padding:"14px 16px", marginBottom:10,
-      boxShadow:[
+      boxShadow: [
         "0 8px 32px rgba(0,0,0,0.90)",
         `0 0 0 0.5px ${up ? "rgba(0,255,136,0.06)" : "rgba(255,51,85,0.05)"} inset`,
       ].join(","),
@@ -275,7 +275,7 @@ function PositionCard({ pos, tick, sparkPoints }: { pos: Portfolio["positions"][
               {/* Live pulse dot */}
               <div style={{
                 width:5, height:5, borderRadius:"50%", background:col, flexShrink:0,
-                boxShadow:`0 0 7px ${col}99`,
+                boxShadow: `0 0 7px ${col}99`,
                 animation:"dot-pulse 2s ease-in-out infinite",
               }}/>
               <span style={{ fontSize:16, fontFamily:SANS, fontWeight:800, color:W,
@@ -380,7 +380,7 @@ function TradeRow({ trade, onOpen }: { trade: SimTrade; onOpen: (t: SimTrade) =>
       <div style={{
         width:2.5, height:36, flexShrink:0, marginRight:12, borderRadius:2,
         background:`linear-gradient(180deg, ${pnlCol}, ${pnlCol}44)`,
-        boxShadow:`0 0 5px ${pnlCol}33`,
+        boxShadow: `0 0 5px ${pnlCol}33`,
       }}/>
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ fontSize:13, fontFamily:SANS, fontWeight:700, color:W,
@@ -463,7 +463,7 @@ function SectionHead({ label, count, color = GR }: {
     <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
       <div style={{
         width:2.5, height:14, background:color, borderRadius:2, flexShrink:0,
-        opacity:0.60, boxShadow:`0 0 6px ${color}55`,
+        opacity:0.60, boxShadow: `0 0 6px ${color}55`,
       }}/>
       <span style={{ fontSize:9, fontFamily:SANS, fontWeight:700,
         color:"rgba(255,255,255,0.50)",
@@ -607,7 +607,7 @@ export default function Trade() {
           <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:5 }}>
             <div style={{
               width:5, height:5, borderRadius:"50%", background:G, flexShrink:0,
-              boxShadow:`0 0 8px ${G}99`,
+              boxShadow: `0 0 8px ${G}99`,
               animation:"dot-pulse 2.5s ease-in-out infinite",
             }}/>
             <span style={{ fontSize:9, fontFamily:SANS, fontWeight:500, color:GR,
@@ -695,7 +695,7 @@ export default function Trade() {
           background:`linear-gradient(160deg, #0d1822 0%, #090f1c 100%)`,
           border:"1px solid rgba(255,255,255,0.07)",
           borderRadius:16, padding:"22px 10px 18px", marginBottom:12,
-          boxShadow:"0 8px 32px rgba(0,0,0,0.90)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.54)",
         }}>
           {/* Laser top edge */}
           <div aria-hidden style={{
@@ -745,7 +745,7 @@ export default function Trade() {
           border:`1px solid ${openPnL >= 0 ? "rgba(0,255,136,0.16)" : "rgba(255,51,85,0.14)"}`,
           borderRadius:12, padding:"13px 18px", marginBottom:14,
           display:"flex", justifyContent:"space-between", alignItems:"center",
-          boxShadow:`0 0 0 0.5px ${openPnL >= 0 ? "rgba(0,255,136,0.05)" : "rgba(255,51,85,0.04)"} inset`,
+          boxShadow: `0 0 0 0.5px ${openPnL >= 0 ? "rgba(0,255,136,0.04)" : "rgba(255,51,85,0.04)"} inset`,
         }}>
           <div>
             <div style={{ fontSize:9, fontFamily:SANS, fontWeight:600, color:GR,
@@ -834,7 +834,7 @@ export default function Trade() {
             background:`linear-gradient(160deg, #0a1620, #080f1a)`,
             border:`1px solid rgba(0,229,255,0.09)`,
             borderRadius:14, overflow:"hidden",
-            boxShadow:"0 8px 32px rgba(0,0,0,0.90), 0 0 0 0.5px rgba(0,229,255,0.04) inset",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.54), 0 0 0 0.5px rgba(0,229,255,0.04) inset",
           }}>
             {/* Card top edge */}
             <div aria-hidden style={{
@@ -908,7 +908,7 @@ export default function Trade() {
         @keyframes chart-drift { 0%,100%{transform:translateY(0)} 35%{transform:translateY(-.55px)} 70%{transform:translateY(.28px)} }
         @keyframes timer-tick  { 0%,49%{opacity:1} 50%,100%{opacity:.55} }
         @keyframes orb-breathe { 0%,100%{opacity:.55;transform:scale(1)} 50%{opacity:1;transform:scale(1.20)} }
-        @keyframes cta-breathe { 0%,100%{box-shadow:0 0 12px rgba(0,229,255,0.06)} 50%{box-shadow:0 0 28px rgba(0,229,255,0.14)} }
+        @keyframes cta-breathe { 0%,100%{box-shadow: 0 0 12px rgba(0,229,255,0.06)} 50%{box-shadow: 0 0 28px rgba(0,229,255,0.14)} }
         @keyframes page-in     { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         .page-enter            { animation: page-in 0.35s ease-out both; }
 

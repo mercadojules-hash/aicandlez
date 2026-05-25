@@ -232,7 +232,7 @@ function LiveActiveScreen({ eligibility }: { eligibility: LiveEligibility }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%",
             background: isLive ? "#00ff8a" : "#ffaa00",
-            boxShadow:  isLive ? "0 0 10px #00ff8a" : "0 0 8px #ffaa00" }} />
+            boxShadow: isLive ? "0 0 10px #00ff8a" : "0 0 8px #ffaa00" }} />
           <div style={{ fontSize: 9, fontFamily: "monospace", color: "#2a4060",
             letterSpacing: "0.2em" }}>
             {isLive ? "LIVE MODE ACTIVE" : "PAPER MODE"}

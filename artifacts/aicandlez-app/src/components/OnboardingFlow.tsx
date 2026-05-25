@@ -359,7 +359,7 @@ function ChooseContent({ oauthEnabled, oauthError, exchangeErrored, exchangeErro
           marginBottom: 18, padding: "14px 16px", borderRadius: 12,
           background: "rgba(255,176,32,0.08)",
           border: "1px solid rgba(255,176,32,0.45)",
-          boxShadow: "0 0 18px rgba(255,176,32,0.18) inset",
+          boxShadow: "0 0 18px rgba(255,176,32,0.108) inset",
         }}>
           <div style={{
             fontFamily: MONO, fontSize: 10, fontWeight: 800,
@@ -390,7 +390,7 @@ function ChooseContent({ oauthEnabled, oauthError, exchangeErrored, exchangeErro
                 fontFamily: MONO, fontSize: 11, fontWeight: 800,
                 letterSpacing: "0.18em", textTransform: "uppercase",
                 cursor: "pointer",
-                boxShadow: `0 8px 22px rgba(102,255,102,0.30)`,
+                boxShadow: `0 8px 22px rgba(102,255,102,0.18)`,
               }}
             >
               Reconnect Exchange →
@@ -433,7 +433,7 @@ function ChooseContent({ oauthEnabled, oauthError, exchangeErrored, exchangeErro
           padding: "20px 20px", marginBottom: 14, borderRadius: 16,
           background: `linear-gradient(160deg, rgba(102,255,102,0.14) 0%, rgba(0,200,83,0.08) 100%)`,
           border: `1.5px solid ${BRAND}`,
-          boxShadow: `0 0 28px rgba(102,255,102,0.22), 0 0 0 1px rgba(102,255,102,0.18) inset`,
+          boxShadow: `0 0 28px rgba(102,255,102,0.132), 0 0 0 1px rgba(102,255,102,0.108) inset`,
           cursor: "pointer",
         }}
       >
@@ -568,7 +568,7 @@ function ExchangeCtaContent({ onBack, onContinue }: { onBack: () => void; onCont
           fontFamily: MONO, fontSize: 12, fontWeight: 800,
           letterSpacing: "0.18em", textTransform: "uppercase",
           textDecoration: "none",
-          boxShadow: `0 10px 28px rgba(102,255,102,0.30), 0 1px 0 rgba(255,255,255,0.45) inset`,
+          boxShadow: `0 10px 28px rgba(102,255,102,0.18), 0 1px 0 rgba(255,255,255,0.27) inset`,
         }}
       >
         Open Kraken ↗
@@ -618,7 +618,7 @@ function ExchangeCtaContent({ onBack, onContinue }: { onBack: () => void; onCont
             fontFamily: MONO, fontSize: 11.5, fontWeight: 800,
             letterSpacing: "0.16em", textTransform: "uppercase",
             cursor: "pointer",
-            boxShadow: `0 10px 28px rgba(102,255,102,0.30), 0 1px 0 rgba(255,255,255,0.45) inset`,
+            boxShadow: `0 10px 28px rgba(102,255,102,0.18), 0 1px 0 rgba(255,255,255,0.27) inset`,
           }}
         >
           I have my keys →
@@ -847,7 +847,7 @@ function IntroContent({ onDone }: { onDone: () => void }) {
           fontFamily: MONO, fontSize: 12.5, fontWeight: 800,
           letterSpacing: "0.18em", textTransform: "uppercase",
           cursor: "pointer",
-          boxShadow: `0 10px 30px rgba(102,255,102,0.32), 0 1px 0 rgba(255,255,255,0.45) inset`,
+          boxShadow: `0 10px 30px rgba(102,255,102,0.192), 0 1px 0 rgba(255,255,255,0.27) inset`,
         }}
       >
         ✓ Start Trading

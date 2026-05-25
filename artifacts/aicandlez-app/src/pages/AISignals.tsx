@@ -567,7 +567,7 @@ function SearchBar({ placeholder, value, onChange }: {
       padding: "11px 14px", borderRadius: 14,
       background: "rgba(255,255,255,0.04)",
       border: `1px solid ${BORDER_HI}`,
-      boxShadow: `0 0 18px ${BRAND_BLOOM}, inset 0 0 0 1px rgba(255,255,255,0.03)`,
+      boxShadow: `0 0 18px ${BRAND_BLOOM}, inset 0 0 0 1px rgba(255,255,255,0.04)`,
     }}>
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, opacity: 0.7 }}>
         <circle cx="7" cy="7" r="5" stroke={BRAND} strokeWidth="1.6"/>
@@ -941,7 +941,7 @@ function SignalCard({ breakdown, ticker, onOpen, rank, isPreview }: {
             border: `1px solid ${BRAND_BRGT}`,
             color: "#001b06", fontFamily: SANS, fontWeight: 900,
             fontSize: 11.5, letterSpacing: 0.9, textTransform: "uppercase",
-            boxShadow: `0 8px 22px ${BRAND_GLOW}, 0 0 0 1px rgba(255,255,255,0.18) inset, 0 1px 0 rgba(255,255,255,0.45) inset`,
+            boxShadow: `0 8px 22px ${BRAND_GLOW}, 0 0 0 1px rgba(255,255,255,0.108) inset, 0 1px 0 rgba(255,255,255,0.27) inset`,
             display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
           }}>
           <span style={{

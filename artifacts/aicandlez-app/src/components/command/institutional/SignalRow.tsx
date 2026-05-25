@@ -283,7 +283,7 @@ export function SignalRow({ spec, breakdown }: Props) {
           <span style={{
             width: 5, height: 5, borderRadius: 5,
             background: state === "live" ? N.BRAND : state === "synthetic" ? N.WARN : N.TEXT_3,
-            boxShadow:  state === "live" ? `0 0 6px ${N.BRAND}` : "none",
+            boxShadow: state === "live" ? `0 0 6px ${N.BRAND}` : "none",
             animation:  state === "live" ? "neon-pulse 1.4s infinite" : "none",
           }} />
           <span className="text-[14px] font-extrabold tracking-wide"
@@ -429,7 +429,7 @@ function ActionPill({
         color: flashing ? "#000" : color,
         background: flashing ? color : active ? `${color}1f` : "transparent",
         border:     `1px solid ${active || flashing ? color : color + "30"}`,
-        boxShadow:  flashing
+        boxShadow: flashing
           ? `0 0 0 2px ${color}60, 0 0 18px ${color}cc`
           : active ? `0 0 8px ${color}50` : "none",
         fontFamily: N.FONT_MONO,
@@ -469,7 +469,7 @@ function AutoTradeBtn({ confident, onClick }: { confident: boolean; onClick?: ()
           ? N.BRAND
           : confident ? `${N.BRAND}1c` : "transparent",
         border:     `1px solid ${flashing ? N.BRAND : confident ? N.BRAND + "70" : N.BRAND + "28"}`,
-        boxShadow:  flashing
+        boxShadow: flashing
           ? `0 0 0 2px ${N.BRAND}60, 0 0 18px ${N.BRAND}cc`
           : confident ? `0 0 10px ${N.BRAND}50` : "none",
         color: flashing ? "#000" : confident ? N.BRAND : N.TEXT_3,

@@ -30,14 +30,14 @@ export function EnableLiveCTA({
           color: "#001b06",
           fontSize: 13.5, fontFamily: SANS, fontWeight: 900,
           letterSpacing: 0.6, textTransform: "uppercase",
-          boxShadow: `0 10px 32px ${BRAND_GLOW}, 0 0 0 1px rgba(255,255,255,0.18) inset, 0 1px 0 rgba(255,255,255,0.45) inset`,
+          boxShadow: `0 10px 32px ${BRAND_GLOW}, 0 0 0 1px rgba(255,255,255,0.108) inset, 0 1px 0 rgba(255,255,255,0.27) inset`,
           animation: "orb-breathe 3.6s ease-in-out infinite",
           display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
         }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <span style={{
             width: 7, height: 7, borderRadius: "50%", background: "#001b06",
-            boxShadow: "0 0 8px rgba(0,0,0,0.4)",
+            boxShadow: "0 0 8px rgba(0,0,0,0.24)",
             animation: "dot-pulse 1.4s ease-in-out infinite",
           }}/>
           Enable Live AI Execution

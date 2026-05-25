@@ -142,7 +142,7 @@ export function TradeDetailSheet({ trade, onClose }: TradeDetailSheetProps) {
           borderTopLeftRadius: 22, borderTopRightRadius: 22,
           border: `1px solid ${BORDER_HI}`,
           borderBottom: "none",
-          boxShadow: `0 -24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(102,255,102,0.08) inset`,
+          boxShadow: `0 -24px 60px rgba(0,0,0,0.36), 0 0 0 1px rgba(102,255,102,0.048) inset`,
           padding: "10px 18px 28px",
           maxHeight: "92vh",
           overflowY: "auto",
@@ -204,7 +204,7 @@ export function TradeDetailSheet({ trade, onClose }: TradeDetailSheetProps) {
           padding: "14px 16px", borderRadius: 16, marginBottom: 14,
           background: `linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 100%)`,
           border: `1px solid ${isWin ? BORDER_HI : "rgba(255,64,96,0.28)"}`,
-          boxShadow: `0 0 22px -10px ${isWin ? BRAND_GLOW : "rgba(255,64,96,0.35)"}`,
+          boxShadow: `0 0 22px -10px ${isWin ? BRAND_GLOW : "rgba(255,64,96,0.21)"}`,
         }}>
           <div style={{
             fontSize: 9, fontWeight: 700, color: TEXT_DIM,
@@ -214,7 +214,7 @@ export function TradeDetailSheet({ trade, onClose }: TradeDetailSheetProps) {
             fontSize: 30, fontWeight: 800, color: accent,
             letterSpacing: -0.8, fontVariantNumeric: "tabular-nums",
             marginTop: 2,
-            textShadow: `0 0 18px ${isWin ? "rgba(102,255,102,0.35)" : "rgba(255,64,96,0.30)"}`,
+            textShadow: `0 0 18px ${isWin ? "rgba(102,255,102,0.21)" : "rgba(255,64,96,0.18)"}`,
           }}>
             {(trade.pnl ?? 0) >= 0 ? "+" : ""}${Math.abs(trade.pnl ?? 0).toFixed(2)}
           </div>

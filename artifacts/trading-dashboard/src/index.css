@@ -141,13 +141,13 @@
   border-left: 1px solid rgba(102, 255, 102, 0.08);
 }
 .neon-scroll::-webkit-scrollbar-thumb {
-  background: rgba(102, 255, 102, 0.28);
+  background: rgba(102, 255, 102, 0.22);
   border-radius: 3px;
-  box-shadow: 0 0 6px rgba(102, 255, 102, 0.22);
+  box-shadow: 0 0 4px rgba(102, 255, 102, 0.14);
 }
 .neon-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(102, 255, 102, 0.55);
-  box-shadow: 0 0 10px rgba(102, 255, 102, 0.45);
+  background: rgba(102, 255, 102, 0.45);
+  box-shadow: 0 0 6px rgba(102, 255, 102, 0.28);
 }
 .neon-scroll::-webkit-scrollbar-corner { background: transparent; }
 
@@ -171,9 +171,9 @@
 }
 
 @keyframes glow-border-anim {
-  0%   { box-shadow: 0 0 4px #00f0ff30, inset 0 0 20px #00f0ff04; }
-  50%  { box-shadow: 0 0 16px #00f0ff60, inset 0 0 40px #00f0ff0a; }
-  100% { box-shadow: 0 0 4px #00f0ff30, inset 0 0 20px #00f0ff04; }
+  0%   { box-shadow: 0 0 2px #00f0ff20, inset 0 0 12px #00f0ff03; }
+  50%  { box-shadow: 0 0 10px #00f0ff3a, inset 0 0 24px #00f0ff06; }
+  100% { box-shadow: 0 0 2px #00f0ff20, inset 0 0 12px #00f0ff03; }
 }
 
 @keyframes slide-in-top {
@@ -197,8 +197,8 @@
 }
 
 @keyframes exec-pulse {
-  0%   { box-shadow: 0 0 0 0 #ffb80060; }
-  70%  { box-shadow: 0 0 0 5px transparent; }
+  0%   { box-shadow: 0 0 0 0 #ffb80038; }
+  70%  { box-shadow: 0 0 0 4px transparent; }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
@@ -210,18 +210,18 @@
 }
 
 @keyframes pnl-glow-green {
-  0%, 100% { text-shadow: 0 0 8px #00ff8a60, 0 0 20px #00ff8a30; }
-  50%       { text-shadow: 0 0 18px #00ff8aaa, 0 0 40px #00ff8a55, 0 0 60px #00ff8a20; }
+  0%, 100% { text-shadow: 0 0 5px #00ff8a3a, 0 0 12px #00ff8a1d; }
+  50%       { text-shadow: 0 0 11px #00ff8a66, 0 0 24px #00ff8a33, 0 0 36px #00ff8a14; }
 }
 
 @keyframes pnl-glow-red {
-  0%, 100% { text-shadow: 0 0 8px #ff335560, 0 0 20px #ff335530; }
-  50%       { text-shadow: 0 0 18px #ff3355aa, 0 0 40px #ff335555, 0 0 60px #ff335520; }
+  0%, 100% { text-shadow: 0 0 5px #ff33553a, 0 0 12px #ff33551d; }
+  50%       { text-shadow: 0 0 11px #ff335566, 0 0 24px #ff335533, 0 0 36px #ff335514; }
 }
 
 @keyframes open-badge-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 #00eeff20; opacity: 1; }
-  50%       { box-shadow: 0 0 0 4px transparent; opacity: 0.75; }
+  0%, 100% { box-shadow: 0 0 0 0 #00eeff14; opacity: 1; }
+  50%       { box-shadow: 0 0 0 3px transparent; opacity: 0.8; }
 }
 
 @keyframes row-enter {
@@ -230,8 +230,8 @@
 }
 
 @keyframes segment-glow {
-  0%, 100% { filter: drop-shadow(0 0 3px currentColor); }
-  50%       { filter: drop-shadow(0 0 8px currentColor); }
+  0%, 100% { filter: drop-shadow(0 0 2px currentColor); }
+  50%       { filter: drop-shadow(0 0 5px currentColor); }
 }
 
 @keyframes user-count-tick {
@@ -242,8 +242,8 @@
 }
 
 @keyframes conf-bar-glow {
-  0%, 100% { box-shadow: 0 0 4px currentColor; }
-  50%       { box-shadow: 0 0 12px currentColor, 0 0 24px currentColor; }
+  0%, 100% { box-shadow: 0 0 2px currentColor; }
+  50%       { box-shadow: 0 0 7px currentColor, 0 0 14px currentColor; }
 }
 
 @keyframes scanline-sweep {
@@ -283,10 +283,10 @@
 .neon-red    { color: #ff2255; }
 .neon-purple { color: #c855f7; }
 
-.glow-text-cyan  { color: #00f0ff; text-shadow: 0 0 12px #00f0ffb0, 0 0 28px #00f0ff60, 0 0 48px #00f0ff30; }
-.glow-text-green { color: #00ff8a; text-shadow: 0 0 12px #00ff8ab0, 0 0 28px #00ff8a60, 0 0 48px #00ff8a30; }
-.glow-text-amber { color: #ffb800; text-shadow: 0 0 12px #ffb800b0, 0 0 28px #ffb80060, 0 0 48px #ffb80030; }
-.glow-text-red   { color: #ff2255; text-shadow: 0 0 12px #ff2255b0, 0 0 28px #ff225560, 0 0 48px #ff225530; }
+.glow-text-cyan  { color: #00f0ff; text-shadow: 0 0 7px #00f0ff6a, 0 0 16px #00f0ff3a, 0 0 28px #00f0ff1d; }
+.glow-text-green { color: #00ff8a; text-shadow: 0 0 7px #00ff8a6a, 0 0 16px #00ff8a3a, 0 0 28px #00ff8a1d; }
+.glow-text-amber { color: #ffb800; text-shadow: 0 0 7px #ffb8006a, 0 0 16px #ffb8003a, 0 0 28px #ffb8001d; }
+.glow-text-red   { color: #ff2255; text-shadow: 0 0 7px #ff22556a, 0 0 16px #ff22553a, 0 0 28px #ff22551d; }
 
 /* Live PnL glow — used on open-position PnL values */
 .pnl-live-green {
@@ -298,10 +298,10 @@
   animation: pnl-glow-red 2.4s ease-in-out infinite;
 }
 
-.glow-border-cyan  { box-shadow: 0 0 0 1px #00f0ff30, inset 0 0 30px #00f0ff06; border-color: #00f0ff25 !important; }
-.glow-border-green { box-shadow: 0 0 0 1px #00ff8a30, inset 0 0 30px #00ff8a06; border-color: #00ff8a25 !important; }
-.glow-border-amber { box-shadow: 0 0 0 1px #ffb80030, inset 0 0 30px #ffb80006; border-color: #ffb80025 !important; }
-.glow-border-red   { box-shadow: 0 0 0 1px #ff225530, inset 0 0 30px #ff225506; border-color: #ff225525 !important; }
+.glow-border-cyan  { box-shadow: 0 0 0 1px #00f0ff1d, inset 0 0 18px #00f0ff03; border-color: #00f0ff18 !important; }
+.glow-border-green { box-shadow: 0 0 0 1px #00ff8a1d, inset 0 0 18px #00ff8a03; border-color: #00ff8a18 !important; }
+.glow-border-amber { box-shadow: 0 0 0 1px #ffb8001d, inset 0 0 18px #ffb80003; border-color: #ffb80018 !important; }
+.glow-border-red   { box-shadow: 0 0 0 1px #ff22551d, inset 0 0 18px #ff225503; border-color: #ff225518 !important; }
 
 /* ════════════════════════════════════════════════════════════════════════════
    TERMINAL CARD — institutional panel base
@@ -345,7 +345,7 @@
 
 .terminal-card:hover {
   border-color: #222222;
-  box-shadow: 0 0 0 1px #00f0ff08, inset 0 0 40px #00f0ff03;
+  box-shadow: 0 0 0 1px #00f0ff05, inset 0 0 24px #00f0ff02;
 }
 
 /* ── Panel header — shared across all institutional panels ────────────────── */
@@ -376,14 +376,14 @@
   width: 7px; height: 7px;
   border-radius: 50%;
   background: #00ff8a;
-  box-shadow: 0 0 8px #00ff8a, 0 0 20px #00ff8a60;
+  box-shadow: 0 0 5px #00ff8a, 0 0 12px #00ff8a38;
   animation: neon-pulse 1.6s ease-in-out infinite;
   flex-shrink: 0;
 }
-.live-dot-cyan   { background: #00f0ff; box-shadow: 0 0 8px #00f0ff, 0 0 20px #00f0ff60; }
-.live-dot-amber  { background: #ffb800; box-shadow: 0 0 8px #ffb800, 0 0 20px #ffb80060; }
-.live-dot-red    { background: #ff2255; box-shadow: 0 0 8px #ff2255, 0 0 20px #ff225560; }
-.live-dot-purple { background: #c855f7; box-shadow: 0 0 8px #c855f7, 0 0 20px #c855f760; }
+.live-dot-cyan   { background: #00f0ff; box-shadow: 0 0 5px #00f0ff, 0 0 12px #00f0ff38; }
+.live-dot-amber  { background: #ffb800; box-shadow: 0 0 5px #ffb800, 0 0 12px #ffb80038; }
+.live-dot-red    { background: #ff2255; box-shadow: 0 0 5px #ff2255, 0 0 12px #ff225538; }
+.live-dot-purple { background: #c855f7; box-shadow: 0 0 5px #c855f7, 0 0 12px #c855f738; }
 
 /* ════════════════════════════════════════════════════════════════════════════
    CONFIDENCE BAR — glowing institutional style

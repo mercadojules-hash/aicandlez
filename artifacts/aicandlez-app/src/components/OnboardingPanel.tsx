@@ -95,7 +95,7 @@ export function OnboardingPanel(): React.ReactElement | null {
         overflow:     "hidden",
         background:   `linear-gradient(180deg, ${INK_1} 0%, ${INK_0} 100%)`,
         border:       `1px solid rgba(102,255,102,0.18)`,
-        boxShadow:    `0 24px 60px -28px rgba(0,200,83,0.35), inset 0 1px 0 rgba(255,255,255,0.04)`,
+        boxShadow: `0 24px 60px -28px rgba(0,200,83,0.21), inset 0 1px 0 rgba(255,255,255,0.04)`,
         fontFamily:   SANS,
       }}
     >
@@ -266,7 +266,7 @@ export function OnboardingPanel(): React.ReactElement | null {
                       height:       6,
                       borderRadius: 999,
                       background:   BRAND,
-                      boxShadow:    `0 0 8px ${BRAND}`,
+                      boxShadow: `0 0 8px ${BRAND}`,
                     }}
                   />
                   {b}

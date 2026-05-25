@@ -566,7 +566,7 @@ function Phase2PlaceholderModal({ open, intent, onClose }: {
           width: "100%", maxWidth: 520,
           background: T.BG_TERMINAL,
           border: `1px solid ${T.AMBER}`,
-          boxShadow: `0 0 0 1px rgba(255,176,32,0.25), 0 12px 60px rgba(0,0,0,0.85), inset 0 1px 0 rgba(255,255,255,0.05)`,
+          boxShadow: `0 0 0 1px rgba(255,176,32,0.15), 0 12px 60px rgba(0,0,0,0.51), inset 0 1px 0 rgba(255,255,255,0.04)`,
           padding: 28, color: T.TEXT_0,
         }}
       >
@@ -598,7 +598,7 @@ function Phase2PlaceholderModal({ open, intent, onClose }: {
             padding: "10px 12px",
             background: "rgba(102,255,102,0.08)",
             border: `1px solid ${T.NEON}`,
-            boxShadow: `0 0 0 1px rgba(102,255,102,0.18)`,
+            boxShadow: `0 0 0 1px rgba(102,255,102,0.108)`,
             fontFamily: T.FONT_MONO,
           }}
         >
@@ -630,7 +630,7 @@ function Phase2PlaceholderModal({ open, intent, onClose }: {
               letterSpacing: T.TRACK_LABEL,
               background: T.NEON, color: "#000",
               border: `1px solid ${T.NEON}`,
-              boxShadow: `0 0 16px rgba(102,255,102,0.35)`,
+              boxShadow: `0 0 16px rgba(102,255,102,0.21)`,
               cursor: "pointer",
             }}
           >
@@ -694,7 +694,7 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
         // Bottom edge glow — single neon hairline that anchors the
         // ribbon visually to the workspace below. Always-on; reads as
         // a hardware power-rail indicator.
-        boxShadow: `inset 0 -1px 0 rgba(102,255,102,0.12), 0 1px 0 rgba(102,255,102,0.06)`,
+        boxShadow: `inset 0 -1px 0 rgba(102,255,102,0.072), 0 1px 0 rgba(102,255,102,0.04)`,
       }}
     >
       <div className="cd-ribbon" style={{
@@ -706,7 +706,7 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
         <span style={{
           display: "inline-flex", alignItems: "center", gap: 7,
           color: T.TEXT_0, fontWeight: 700, letterSpacing: "0.20em",
-          flexShrink: 0, textShadow: `0 0 6px rgba(102,255,102,0.30)`,
+          flexShrink: 0, textShadow: `0 0 6px rgba(102,255,102,0.18)`,
         }}>
           <Terminal size={13} color={T.NEON} style={{ filter: `drop-shadow(0 0 4px ${T.NEON_GLOW})` }} />
           AICANDLEZ
@@ -945,7 +945,7 @@ const DataFeedBanner = memo(function DataFeedBanner({
     }}>
       <span style={{
         width: 6, height: 6, borderRadius: "50%",
-        background: "#FF4D4D", boxShadow: "0 0 6px rgba(255,77,77,0.8)",
+        background: "#FF4D4D", boxShadow: "0 0 6px rgba(255,77,77,0.48)",
         animation: "brand-pulse 1.4s infinite",
       }} />
       Candle Feed Degraded · Engine Paused · {ageText} · {health.primary}={health.primaryStatus} {health.fallback}={health.fallbackStatus}
@@ -2250,7 +2250,7 @@ function ColumnHeader({ title, count, accent, subLabel }: {
         <h2 style={{
           margin: 0, fontFamily: T.FONT_MONO, fontSize: 14, color: T.TEXT_0,
           display: "inline-flex", alignItems: "center", gap: 8,
-          textShadow: `0 0 6px rgba(0,0,0,0.4)`,
+          textShadow: `0 0 6px rgba(0,0,0,0.24)`,
         }}>
           <Radar size={14} color={accent} /> {title}
           <span style={{
@@ -2709,7 +2709,7 @@ function PanelCard({
         {live && <span style={{
           width: 9, height: 9, borderRadius: "50%",
           background: T.NEON,
-          boxShadow: `0 0 10px ${T.NEON}, 0 0 18px ${T.NEON_GLOW}, 0 0 28px rgba(102,255,102,0.30)`,
+          boxShadow: `0 0 10px ${T.NEON}, 0 0 18px ${T.NEON_GLOW}, 0 0 28px rgba(102,255,102,0.18)`,
           animation: "brand-pulse 1.4s infinite",
         }} />}
       </div>
@@ -3392,7 +3392,7 @@ const GlobalAIConfidenceRing = memo(function GlobalAIConfidenceRing({ value }: {
       padding: "10px 16px",
       border: `1px solid ${value >= 80 ? "rgba(102,255,102,0.32)" : value >= 50 ? "rgba(255,176,32,0.32)" : "rgba(255,64,64,0.32)"}`,
       background: `linear-gradient(180deg, #0E1A15 0%, ${T.BG_TERMINAL} 100%)`,
-      boxShadow: `0 0 0 1px rgba(${value >= 80 ? "102,255,102" : value >= 50 ? "255,176,32" : "255,64,64"},0.12), inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 20px rgba(0,0,0,0.55)`,
+      boxShadow: `0 0 0 1px rgba(${value >= 80 ? "102,255,102" : value >= 50 ? "255,176,32" : "255,64,64"},0.12), inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 20px rgba(0,0,0,0.33)`,
       fontFamily: T.FONT_MONO,
     }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
@@ -3666,7 +3666,7 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
           borderLeft:   "none",
           borderRight:  "none",
           background: "linear-gradient(90deg, rgba(255,48,64,0.22) 0%, rgba(255,48,64,0.12) 50%, rgba(255,48,64,0.22) 100%)",
-          boxShadow: "inset 0 0 24px rgba(255,48,64,0.18), 0 0 24px rgba(255,48,64,0.12)",
+          boxShadow: "inset 0 0 24px rgba(255,48,64,0.108), 0 0 24px rgba(255,48,64,0.072)",
           fontFamily: T.FONT_MONO,
           padding: 0,
           transition: T.TX_MED,
@@ -3707,7 +3707,7 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
           }}>
             <span style={{
               color: "#fff", fontSize: 14, fontWeight: 800,
-              letterSpacing: T.TRACK_TITLE, textShadow: "0 0 8px rgba(255,48,64,0.45)",
+              letterSpacing: T.TRACK_TITLE, textShadow: "0 0 8px rgba(255,48,64,0.27)",
             }}>
               CLICK HERE TO ENABLE LIVE AI TRADING
             </span>
@@ -3723,7 +3723,7 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
             padding: "6px 14px",
             border: `1px solid ${T.RED}`,
             background: T.RED,
-            boxShadow: "0 0 14px rgba(255,48,64,0.55)",
+            boxShadow: "0 0 14px rgba(255,48,64,0.33)",
           }}>
             ENABLE AI →
           </div>
@@ -3744,7 +3744,7 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
         borderTop:    `1px solid ${T.NEON}`,
         borderBottom: `1px solid ${T.NEON}`,
         background: "linear-gradient(90deg, rgba(102,255,102,0.20) 0%, rgba(102,255,102,0.10) 50%, rgba(102,255,102,0.20) 100%)",
-        boxShadow: "inset 0 0 24px rgba(102,255,102,0.18), 0 0 24px rgba(102,255,102,0.18)",
+        boxShadow: "inset 0 0 24px rgba(102,255,102,0.108), 0 0 24px rgba(102,255,102,0.108)",
         fontFamily: T.FONT_MONO,
       }}
     >
@@ -3775,7 +3775,7 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
         }}>
           <span style={{
             color: "#fff", fontSize: 14, fontWeight: 800,
-            letterSpacing: T.TRACK_TITLE, textShadow: "0 0 8px rgba(102,255,102,0.45)",
+            letterSpacing: T.TRACK_TITLE, textShadow: "0 0 8px rgba(102,255,102,0.27)",
           }}>
             AI LIVE TRADING ACTIVE
           </span>
@@ -4341,7 +4341,7 @@ function KrakenLiveConnectedChip() {
         color: T.NEON,
         background: "linear-gradient(180deg, rgba(102,255,102,0.16) 0%, rgba(102,255,102,0.06) 100%)",
         border: `1px solid ${T.NEON}`,
-        boxShadow: `0 0 0 1px rgba(102,255,102,0.20), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 18px rgba(102,255,102,0.22)`,
+        boxShadow: `0 0 0 1px rgba(102,255,102,0.12), inset 0 1px 0 rgba(255,255,255,0.04), 0 0 18px rgba(102,255,102,0.132)`,
         textTransform: "uppercase",
         whiteSpace: "nowrap",
       }}

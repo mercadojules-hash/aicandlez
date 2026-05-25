@@ -300,7 +300,7 @@ export function BrokerStatusCard({ compact = false }: BrokerStatusCardProps) {
               <div style={{
                 width:5, height:5, borderRadius:"50%",
                 background:"rgba(0,255,136,0.85)",
-                boxShadow:"0 0 5px rgba(0,255,136,0.55)",
+                boxShadow: "0 0 5px rgba(0,255,136,0.33)",
               }}/>
               <span style={{ fontSize:7, fontFamily:SANS, color:"rgba(0,255,136,0.65)",
                 letterSpacing:"0.06em" }}>CONNECTED</span>

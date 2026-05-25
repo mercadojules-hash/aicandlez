@@ -273,7 +273,7 @@ function FilterTab({
         color:      active ? color : N.TEXT_2,
         background: active ? `${color}1a` : "transparent",
         border:     `1px solid ${active ? color + "55" : "transparent"}`,
-        boxShadow:  active ? `0 0 8px ${color}35` : "none",
+        boxShadow: active ? `0 0 8px ${color}35` : "none",
         fontFamily: N.FONT_MONO,
       }}
     >

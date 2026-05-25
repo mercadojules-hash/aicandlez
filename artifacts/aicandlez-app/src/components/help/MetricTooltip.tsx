@@ -54,7 +54,7 @@ export function MetricTooltip({ term, inline = false }: MetricTooltipProps) {
             zIndex:200, minWidth:210, maxWidth:260,
             background:"#0d1a28", border:"1px solid rgba(0,229,255,0.18)",
             borderRadius:10, padding:"10px 12px",
-            boxShadow:"0 8px 24px rgba(0,0,0,0.85)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.51)",
             cursor:"default",
           }}
         >

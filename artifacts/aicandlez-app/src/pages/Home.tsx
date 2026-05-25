@@ -93,7 +93,7 @@ function ExchangeWarningCard({
       borderRadius: 18,
       border: `1px solid rgba(255,176,32,0.45)`,
       background: `linear-gradient(160deg, ${WARN_DIM}, rgba(255,176,32,0.04) 60%, rgba(10,20,16,0.85) 100%)`,
-      boxShadow: `0 14px 36px rgba(0,0,0,0.55), inset 0 0 30px rgba(255,176,32,0.08)`,
+      boxShadow: `0 14px 36px rgba(0,0,0,0.33), inset 0 0 30px rgba(255,176,32,0.048)`,
       fontFamily: SANS,
       display: "flex", flexDirection: "column", gap: 10,
     }}>
@@ -168,7 +168,7 @@ function ExchangeWarningCard({
           color: "#1a1100",
           fontFamily: SANS, fontWeight: 800, fontSize: 12, letterSpacing: 1.2,
           textTransform: "uppercase", cursor: "pointer",
-          boxShadow: `0 0 18px rgba(255,176,32,0.35)`,
+          boxShadow: `0 0 18px rgba(255,176,32,0.21)`,
         }}
       >
         Reconnect Exchange →
@@ -920,7 +920,7 @@ export default function Home() {
           `,
           border: `1px solid ${BORDER_HI}`,
           padding: "22px 22px 20px",
-          boxShadow: `0 28px 80px rgba(0,0,0,0.75), 0 0 70px rgba(102,255,102,0.10)`,
+          boxShadow: `0 28px 80px rgba(0,0,0,0.45), 0 0 70px rgba(102,255,102,0.06)`,
         }}>
           {/* Top edge sweep */}
           <div aria-hidden style={{
@@ -954,7 +954,7 @@ export default function Home() {
           <div style={{
             fontSize: 48, fontFamily: SANS, fontWeight: 700, color: TEXT,
             letterSpacing: -1.6, lineHeight: 1.05, marginTop: 12,
-            textShadow: `0 0 32px rgba(255,255,255,0.10), 0 2px 8px rgba(0,0,0,0.5)`,
+            textShadow: `0 0 32px rgba(255,255,255,0.06), 0 2px 8px rgba(0,0,0,0.3)`,
             fontVariantNumeric: "tabular-nums",
           }}>
             {fmt$(tv)}
@@ -1025,7 +1025,7 @@ export default function Home() {
           `,
           border: `1px solid ${BORDER_HI}`,
           padding: "22px 18px 20px",
-          boxShadow: `0 24px 60px rgba(0,0,0,0.65), 0 0 60px rgba(102,255,102,0.06)`,
+          boxShadow: `0 24px 60px rgba(0,0,0,0.39), 0 0 60px rgba(102,255,102,0.04)`,
         }}>
           {/* RADAR */}
           <RadarScanner size={260} blips={radarBlips} status="AI ACTIVE · SCANNING"/>
@@ -1149,7 +1149,7 @@ export default function Home() {
               color: "#031309", fontFamily: SANS, fontWeight: 800, fontSize: 14,
               letterSpacing: 0.6, textTransform: "uppercase",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-              boxShadow: `0 0 24px ${BRAND_GLOW}, 0 8px 20px rgba(0,200,83,0.35), inset 0 1px 0 rgba(255,255,255,0.25)`,
+              boxShadow: `0 0 24px ${BRAND_GLOW}, 0 8px 20px rgba(0,200,83,0.21), inset 0 1px 0 rgba(255,255,255,0.15)`,
               transition: "all 0.15s ease",
             }} onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
                onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}>
@@ -1162,7 +1162,7 @@ export default function Home() {
               color: NEG, fontFamily: SANS, fontWeight: 800, fontSize: 14,
               letterSpacing: 0.6, textTransform: "uppercase",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-              boxShadow: `0 0 18px rgba(255,64,96,0.30), 0 8px 18px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)`,
+              boxShadow: `0 0 18px rgba(255,64,96,0.18), 0 8px 18px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)`,
               transition: "all 0.15s ease",
             }} onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
                onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}>
@@ -1179,7 +1179,7 @@ export default function Home() {
           margin: "0 16px", borderRadius: 20, overflow: "hidden",
           background: `linear-gradient(180deg, ${SURFACE} 0%, ${BG} 100%)`,
           border: `1px solid ${BORDER}`,
-          boxShadow: `0 12px 32px rgba(0,0,0,0.5)`,
+          boxShadow: `0 12px 32px rgba(0,0,0,0.3)`,
           maxHeight: 360,
           overflowY: "auto",
           WebkitOverflowScrolling: "touch",
@@ -1256,7 +1256,7 @@ export default function Home() {
           margin: "0 16px", borderRadius: 18, overflow: "hidden",
           background: `linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 60%, ${BG} 100%)`,
           border: `1px solid ${BORDER_HI}`,
-          boxShadow: `0 8px 22px rgba(0,0,0,0.4)`,
+          boxShadow: `0 8px 22px rgba(0,0,0,0.24)`,
         }}>
           {cryptoSignalRows.length === 0 ? (
             <div style={{ padding: "22px 18px", textAlign: "center" }}>
@@ -1318,7 +1318,7 @@ export default function Home() {
                   marginBottom: 10, padding: "16px 18px", borderRadius: 18,
                   background: `linear-gradient(140deg, ${SURFACE} 0%, ${BG} 100%)`,
                   border: `1px solid ${BORDER}`,
-                  boxShadow: `0 8px 22px rgba(0,0,0,0.4)`,
+                  boxShadow: `0 8px 22px rgba(0,0,0,0.24)`,
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 10 }}>
                     <CryptoIcon sym={p.symbol} size={34}/>
@@ -1556,7 +1556,7 @@ function TradeHistorySection({ trades: tradesInput, onMore }: {
               linear-gradient(140deg, ${SURFACE_2} 0%, ${SURFACE} 60%, ${BG} 100%)
             `,
             border: `1px solid ${BORDER_HI}`,
-            boxShadow: `0 8px 28px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)`,
+            boxShadow: `0 8px 28px rgba(0,0,0,0.27), inset 0 1px 0 rgba(255,255,255,0.04)`,
           }}>
             {/* sweep accent */}
             <div style={{
@@ -1581,7 +1581,7 @@ function TradeHistorySection({ trades: tradesInput, onMore }: {
                   fontSize: 22, fontFamily: SANS, fontWeight: 800,
                   color: stats.netPnL >= 0 ? POS : NEG,
                   letterSpacing: -0.6, fontVariantNumeric: "tabular-nums",
-                  textShadow: `0 0 18px ${stats.netPnL >= 0 ? "rgba(102,255,102,0.35)" : "rgba(255,64,96,0.30)"}`,
+                  textShadow: `0 0 18px ${stats.netPnL >= 0 ? "rgba(102,255,102,0.21)" : "rgba(255,64,96,0.18)"}`,
                   marginTop: 2,
                 }}>
                   {stats.netPnL >= 0 ? "+" : ""}${Math.abs(stats.netPnL).toFixed(2)}

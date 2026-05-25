@@ -82,7 +82,7 @@ export function DisclaimerModal({ open, submitting, error, onAccept, onCancel }:
           border: `1px solid rgba(102,255,102,0.32)`,
           borderRadius: 18,
           padding: "22px 22px 20px",
-          boxShadow: `0 24px 72px rgba(0,0,0,0.7), 0 0 0 1px rgba(102,255,102,0.18) inset, 0 0 56px rgba(102,255,102,0.18)`,
+          boxShadow: `0 24px 72px rgba(0,0,0,0.42), 0 0 0 1px rgba(102,255,102,0.108) inset, 0 0 56px rgba(102,255,102,0.108)`,
         }}
       >
         {/* Top edge sweep */}

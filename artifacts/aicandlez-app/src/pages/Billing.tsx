@@ -777,7 +777,7 @@ export default function Billing() {
                     fontFamily: SANS, fontSize: 13, fontWeight: 800,
                     letterSpacing: 0.6, textTransform: "uppercase" as const,
                     cursor: checkout.isPending ? "wait" : "pointer",
-                    boxShadow: `0 10px 30px ${plan.glow}, 0 1px 0 rgba(255,255,255,0.45) inset`,
+                    boxShadow: `0 10px 30px ${plan.glow}, 0 1px 0 rgba(255,255,255,0.27) inset`,
                   }}>
                   {checkout.isPending
                     ? "Redirecting…"

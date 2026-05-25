@@ -48,7 +48,7 @@ export function PageHeader({
             flexShrink:   0,
             background:   "linear-gradient(135deg, rgba(102,255,102,0.10) 0%, rgba(0,200,83,0.06) 100%)",
             border:       `1px solid ${BRAND_BLOOM}`,
-            boxShadow:    `0 0 14px ${BRAND_BLOOM}, inset 0 0 8px rgba(102,255,102,0.08)`,
+            boxShadow: `0 0 14px ${BRAND_BLOOM}, inset 0 0 8px rgba(102,255,102,0.048)`,
             display:      "flex",
             alignItems:   "center",
             justifyContent: "center",

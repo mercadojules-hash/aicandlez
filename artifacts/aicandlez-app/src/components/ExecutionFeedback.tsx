@@ -166,7 +166,7 @@ export function ExecutionFeedback({ payload, onDismiss }: Props) {
         borderRadius: 16,
         padding: "16px 20px 14px",
         overflow: "hidden",
-        boxShadow: `0 14px 56px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04), 0 0 32px ${cfg.glow}`,
+        boxShadow: `0 14px 56px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04), 0 0 32px ${cfg.glow}`,
         backdropFilter: "blur(28px)",
       }}>
 

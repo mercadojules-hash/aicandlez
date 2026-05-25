@@ -69,7 +69,7 @@ function SignalCard({ symbol, breakdown }: { symbol: string; breakdown: SignalBr
               width:      `${breakdown.confidence}%`,
               background: color,
               borderRadius: 2,
-              boxShadow:  `0 0 4px ${color}80`,
+              boxShadow: `0 0 4px ${color}80`,
             }} />
           </div>
         </div>

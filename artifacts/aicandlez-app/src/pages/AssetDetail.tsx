@@ -365,7 +365,7 @@ function AiBar({ label, value, color }: { label:string; value:number; color:stri
       </div>
       <div style={{ height:3, background:"rgba(255,255,255,0.05)", borderRadius:2 }}>
         <div style={{ height:"100%", width:`${value}%`, borderRadius:2, background:color,
-          boxShadow:`0 0 6px ${color}50`, transition:"width 0.8s ease" }}/>
+          boxShadow: `0 0 6px ${color}50`, transition:"width 0.8s ease" }}/>
       </div>
     </div>
   );
@@ -685,7 +685,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
               linear-gradient(140deg, #0F1F18 0%, #0A1410 60%, #050A07 100%)
             `,
             border:"1px solid rgba(102,255,102,0.22)",
-            boxShadow:"0 12px 36px rgba(0,0,0,0.55), 0 0 30px -8px rgba(102,255,102,0.30)",
+            boxShadow: "0 12px 36px rgba(0,0,0,0.33), 0 0 30px -8px rgba(102,255,102,0.18)",
           }}>
             <div aria-hidden style={{
               position:"absolute", top:0, left:0, right:0, height:2,
@@ -709,7 +709,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
               }}>
                 <span style={{
                   width:6, height:6, borderRadius:"50%", background:"#66FF66",
-                  boxShadow:"0 0 10px rgba(102,255,102,0.7)",
+                  boxShadow: "0 0 10px rgba(102,255,102,0.42)",
                   animation:"dot-pulse 1.8s ease-in-out infinite",
                 }}/>
                 Engine Pending
@@ -748,7 +748,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
               borderRadius:14, cursor:"pointer",
               fontSize:13, fontFamily:SANS, fontWeight:800,
               color:"#7CFF00", letterSpacing:"0.06em",
-              boxShadow:"0 8px 24px rgba(0,0,0,0.50), 0 0 18px rgba(102,255,102,0.12)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.3), 0 0 18px rgba(102,255,102,0.072)",
             }}>
             EXPLORE LIVE CRYPTO SIGNALS
           </button>
@@ -819,7 +819,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
           background:`linear-gradient(160deg, #0e1c2e 0%, #090f1c 100%)`,
           border:`1px solid ${SIG_BORDER[action]}`,
           borderRadius:18, padding:"20px 18px 18px", marginTop:14, marginBottom:12,
-          boxShadow:`0 8px 40px rgba(0,0,0,0.95), 0 0 0 0.5px ${sigCol}08 inset`,
+          boxShadow: `0 8px 40px rgba(0,0,0,0.57), 0 0 0 0.5px ${sigCol}08 inset`,
         }}>
           <div aria-hidden style={{
             position:"absolute", top:0, left:0, right:0, height:2,
@@ -871,7 +871,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
           background:"linear-gradient(160deg, #080f1c 0%, #05090f 100%)",
           border:"1px solid rgba(255,255,255,0.07)",
           borderRadius:18, marginBottom:12,
-          boxShadow:"0 8px 40px rgba(0,0,0,0.95)",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.57)",
         }}>
           <div aria-hidden style={{
             position:"absolute", top:0, left:0, right:0, height:1.5,
@@ -892,7 +892,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
             ))}
             <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:5 }}>
               <div style={{ width:5, height:5, borderRadius:"50%", background:G,
-                boxShadow:"0 0 7px rgba(0,255,136,0.80)",
+                boxShadow: "0 0 7px rgba(0,255,136,0.48)",
                 animation:"dot-pulse 2s ease-in-out infinite" }}/>
               <span style={{ fontSize:8, fontFamily:SANS, color:GR, letterSpacing:"0.10em" }}>LIVE</span>
             </div>
@@ -908,7 +908,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
           background:"linear-gradient(160deg, #0d1824 0%, #09101c 100%)",
           border:"1px solid rgba(255,255,255,0.07)",
           borderRadius:18, padding:"18px 16px", marginBottom:12,
-          boxShadow:"0 8px 40px rgba(0,0,0,0.90)",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.54)",
         }}>
           <div aria-hidden style={{
             position:"absolute", top:0, left:0, right:0, height:1.5,
@@ -937,7 +937,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
           background:"linear-gradient(160deg, #080f1c 0%, #050b14 100%)",
           border:"1px solid rgba(0,229,255,0.09)",
           borderRadius:18, padding:"18px 16px", marginBottom:14,
-          boxShadow:"0 8px 40px rgba(0,0,0,0.95)",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.57)",
         }}>
           <div aria-hidden style={{
             position:"absolute", top:0, left:0, right:0, height:1,
@@ -966,7 +966,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
                   flexShrink:0, marginTop:4,
                   width:4, height:4, borderRadius:"50%",
                   background: i===0 ? sigCol : i===1 ? C : i===2 ? P : GR,
-                  boxShadow:`0 0 4px ${i===0 ? sigCol : i===1 ? C : P}60`,
+                  boxShadow: `0 0 4px ${i===0 ? sigCol : i===1 ? C : P}60`,
                 }}/>
                 <span style={{ fontSize:10, fontFamily:SANS, color:"rgba(255,255,255,0.72)",
                   lineHeight:1.65, letterSpacing:"0.005em" }}>{line}</span>
@@ -1091,7 +1091,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
                 </span>
                 {autoActive && (
                   <div style={{ width:9, height:9, borderRadius:"50%", background:"#66FF66",
-                    boxShadow:"0 0 16px rgba(102,255,102,0.95)", animation:"dot-pulse 1.2s infinite" }}/>
+                    boxShadow: "0 0 16px rgba(102,255,102,0.57)", animation:"dot-pulse 1.2s infinite" }}/>
                 )}
               </div>
               <span style={{ fontSize:9.5, fontFamily:SANS,
@@ -1115,7 +1115,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
               background: executing==="buy" ? "rgba(0,255,136,0.14)" : "linear-gradient(160deg, rgba(0,255,136,0.09), rgba(0,200,100,0.05))",
               border:"1px solid rgba(0,255,136,0.32)", borderRadius:14, cursor:"pointer",
               display:"flex", flexDirection:"column", alignItems:"center", gap:5,
-              boxShadow:`0 0 ${executing==="buy" ? "22px" : "8px"} rgba(0,255,136,${executing==="buy" ? "0.18" : "0.07"})`,
+              boxShadow: `0 0 ${executing==="buy" ? "22px" : "8px"} rgba(0,255,136,${executing==="buy" ? "0.18" : "0.07"})`,
               transition:"all 0.25s ease",
             }}>
               <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
@@ -1135,7 +1135,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
               background: executing==="sell" ? "rgba(255,51,85,0.14)" : "linear-gradient(160deg, rgba(255,51,85,0.09), rgba(200,40,60,0.05))",
               border:"1px solid rgba(255,51,85,0.32)", borderRadius:14, cursor:"pointer",
               display:"flex", flexDirection:"column", alignItems:"center", gap:5,
-              boxShadow:`0 0 ${executing==="sell" ? "22px" : "8px"} rgba(255,51,85,${executing==="sell" ? "0.18" : "0.07"})`,
+              boxShadow: `0 0 ${executing==="sell" ? "22px" : "8px"} rgba(255,51,85,${executing==="sell" ? "0.18" : "0.07"})`,
               transition:"all 0.25s ease",
             }}>
               <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
@@ -1227,7 +1227,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
         @keyframes pnl-flash    { 0%,100%{opacity:1} 50%{opacity:.74} }
         @keyframes edge-sweep   { 0%{opacity:.10;transform:scaleX(.25) translateX(-80%)} 50%{opacity:1;transform:scaleX(1) translateX(0)} 100%{opacity:.10;transform:scaleX(.25) translateX(80%)} }
         @keyframes orb-breathe  { 0%,100%{opacity:.50;transform:scale(1)} 50%{opacity:1;transform:scale(1.22)} }
-        @keyframes cta-breathe  { 0%,100%{box-shadow:0 0 20px rgba(0,229,255,0.10)} 50%{box-shadow:0 0 45px rgba(0,229,255,0.22)} }
+        @keyframes cta-breathe  { 0%,100%{box-shadow: 0 0 20px rgba(0,229,255,0.10)} 50%{box-shadow: 0 0 45px rgba(0,229,255,0.22)} }
         @keyframes shimmer-sweep{ 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
         @keyframes candle-live  { 0%,100%{opacity:0.90;r:3} 50%{opacity:0.30} }
         @keyframes page-in      { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }

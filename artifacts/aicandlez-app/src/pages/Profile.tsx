@@ -407,7 +407,7 @@ function AIToggle({ label, sub, value, onChange, divider=true }: {
         position:"relative", width:46, height:26, borderRadius:13,
         background:value?"rgba(102,255,102,0.15)":"rgba(255,255,255,0.05)",
         border:`1px solid ${value?"rgba(102,255,102,0.40)":"rgba(255,255,255,0.10)"}`,
-        boxShadow:value?"0 0 14px rgba(102,255,102,0.22)":"none",
+        boxShadow: value?"0 0 14px rgba(102,255,102,0.22)":"none",
         transition:"all 0.25s ease",
       }}>
         <div style={{
@@ -415,7 +415,7 @@ function AIToggle({ label, sub, value, onChange, divider=true }: {
           left:value?"calc(100% - 22px)":"3px",
           width:18, height:18, borderRadius:"50%",
           background:value?C:"rgba(255,255,255,0.35)",
-          boxShadow:value?"0 0 8px rgba(102,255,102,0.60)":"none",
+          boxShadow: value?"0 0 8px rgba(102,255,102,0.60)":"none",
           transition:"left 0.25s ease, background 0.25s ease, box-shadow 0.25s ease",
         }}/>
       </button>
@@ -569,7 +569,7 @@ function AIStatusCard({ enabled, positions, maxPositions }: {
         :"linear-gradient(160deg,#0A1410 0%,#050A07 100%)",
       border:`1px solid ${enabled?"rgba(102,255,102,0.30)":"rgba(255,255,255,0.08)"}`,
       borderRadius:18, padding:"18px 16px",
-      boxShadow:enabled
+      boxShadow: enabled
         ?"0 0 50px rgba(102,255,102,0.10),0 12px 40px rgba(0,0,0,0.95)"
         :"0 8px 32px rgba(0,0,0,0.90)",
       transition:"all 0.40s ease", marginBottom:18,
@@ -594,7 +594,7 @@ function AIStatusCard({ enabled, positions, maxPositions }: {
               <div style={{
                 width:8, height:8, borderRadius:"50%",
                 background:enabled?C:GR,
-                boxShadow:enabled?`0 0 12px ${C}80`:"none",
+                boxShadow: enabled?`0 0 12px ${C}80`:"none",
                 animation:enabled?"dot-pulse 1.2s ease-in-out infinite":"none",
                 transition:"all 0.30s ease",
               }}/>
@@ -683,17 +683,17 @@ function ExchangeRow({ name, status, statusCol, icon, iconBg, iconBorder, iconCo
           background:iconBg, border:`1px solid ${iconBorder}`,
           display:"flex", alignItems:"center", justifyContent:"center",
           fontSize:16, fontFamily:MONO, fontWeight:800, color:iconColor,
-          boxShadow:`0 0 14px ${iconColor}30`,
+          boxShadow: `0 0 14px ${iconColor}30`,
         }}>{icon}</div>
         <span style={{ fontSize:17, fontFamily:SANS, fontWeight:800, color:"#FFFFFF",
-          letterSpacing:-0.25, textShadow:`0 0 12px ${iconColor}40` }}>{name}</span>
+          letterSpacing:-0.25, textShadow: `0 0 12px ${iconColor}40` }}>{name}</span>
       </div>
       <div style={{ display:"flex", alignItems:"center", gap:8 }}>
         <div style={{ width:8, height:8, borderRadius:"50%", background:statusCol,
-          boxShadow:`0 0 12px ${statusCol}, 0 0 22px ${statusCol}90`,
+          boxShadow: `0 0 12px ${statusCol}, 0 0 22px ${statusCol}90`,
           animation:"dot-pulse 2.5s ease-in-out infinite" }}/>
         <span style={{ fontSize:12, fontFamily:SANS, fontWeight:800, color:statusCol,
-          letterSpacing:"0.16em", textShadow:`0 0 10px ${statusCol}80` }}>{status}</span>
+          letterSpacing:"0.16em", textShadow: `0 0 10px ${statusCol}80` }}>{status}</span>
       </div>
     </div>
   );
@@ -805,12 +805,12 @@ function ExchangeConnectionsHealth() {
                   background:`${iconColor}1A`, border:`1px solid ${iconColor}55`,
                   display:"flex", alignItems:"center", justifyContent:"center",
                   fontSize:16, fontFamily:MONO, fontWeight:800, color:iconColor,
-                  boxShadow:`0 0 14px ${iconColor}30`,
+                  boxShadow: `0 0 14px ${iconColor}30`,
                 }}>{iconCh}</div>
                 <div style={{ minWidth:0 }}>
                   <div style={{ fontSize:17, fontFamily:SANS, fontWeight:900, color:"#FFFFFF",
                     letterSpacing:-0.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
-                    textShadow:`0 0 14px ${iconColor}80` }}>
+                    textShadow: `0 0 14px ${iconColor}80` }}>
                     {name}
                   </div>
                   <div style={{ fontSize:9, fontFamily:SANS, color:GR, marginTop:2,
@@ -825,7 +825,7 @@ function ExchangeConnectionsHealth() {
                 background:`${pillCol}14`, border:`1px solid ${pillCol}55`,
               }}>
                 <div style={{ width:7, height:7, borderRadius:"50%", background:pillCol,
-                  boxShadow:`0 0 8px ${pillCol}, 0 0 16px ${pillCol}80`,
+                  boxShadow: `0 0 8px ${pillCol}, 0 0 16px ${pillCol}80`,
                   animation: pending ? "dot-pulse 1.4s ease-in-out infinite" : "dot-pulse 2.5s ease-in-out infinite" }}/>
                 <span style={{ fontSize:10.5, fontFamily:SANS, fontWeight:900, color:pillCol,
                   letterSpacing:"0.18em",
@@ -955,7 +955,7 @@ function AlpacaReconnectBanner() {
       marginBottom: 10, padding: "12px 14px", borderRadius: 12,
       background: "rgba(255,176,32,0.08)",
       border: "1px solid rgba(255,176,32,0.45)",
-      boxShadow: "0 0 16px rgba(255,176,32,0.16) inset",
+      boxShadow: "0 0 16px rgba(255,176,32,0.096) inset",
     }}>
       <div style={{
         fontFamily: MONO, fontSize: 9.5, fontWeight: 800,
@@ -983,7 +983,7 @@ function AlpacaReconnectBanner() {
           fontFamily: MONO, fontSize: 10.5, fontWeight: 800,
           letterSpacing: "0.16em", textTransform: "uppercase" as const,
           cursor: "pointer",
-          boxShadow: "0 6px 18px rgba(102,255,102,0.30)",
+          boxShadow: "0 6px 18px rgba(102,255,102,0.18)",
         }}
       >
         {oauthEnabled ? "Reconnect Alpaca →" : "Re-enter Alpaca Keys →"}
@@ -1493,7 +1493,7 @@ export default function Profile() {
             <div style={{ position:"absolute", bottom:20, right:-1,
               width:10, height:10, borderRadius:"50%",
               background:"rgba(0,210,100,0.90)", border:"2px solid #000",
-              boxShadow:"0 0 8px rgba(0,210,100,0.60)" }}/>
+              boxShadow: "0 0 8px rgba(0,210,100,0.36)" }}/>
           </div>
 
           {/* Name & badges */}
@@ -1525,7 +1525,7 @@ export default function Profile() {
                   borderRadius:4 }}>
                   <div style={{ width:4, height:4, borderRadius:"50%", background:C,
                     animation:"dot-pulse 1.2s ease-in-out infinite",
-                    boxShadow:`0 0 6px ${C}80` }}/>
+                    boxShadow: `0 0 6px ${C}80` }}/>
                   <span style={{ fontSize:7.5, fontFamily:SANS, fontWeight:700, color:C,
                     letterSpacing:"0.10em" }}>AI ACTIVE</span>
                 </div>
@@ -1971,7 +1971,7 @@ export default function Profile() {
               style={{
                 background:CARD, border:`1px solid rgba(255,68,85,0.30)`,
                 borderRadius:16, padding:20, maxWidth:380, width:"100%",
-                boxShadow:"0 18px 60px rgba(0,0,0,0.6)",
+                boxShadow: "0 18px 60px rgba(0,0,0,0.36)",
               }}>
               <div style={{
                 fontSize:11, fontFamily:SANS, fontWeight:700, letterSpacing:"0.16em",
@@ -2116,7 +2116,7 @@ export default function Profile() {
               background:CARD, border:`1px solid ${accent}`,
               borderLeft:`3px solid ${accent}`, borderRadius:12,
               padding:"12px 14px", display:"flex", alignItems:"flex-start", gap:12,
-              boxShadow:"0 18px 40px rgba(0,0,0,0.55)",
+              boxShadow: "0 18px 40px rgba(0,0,0,0.33)",
               animation:"alpaca-toast-in 0.28s cubic-bezier(0.2,0.9,0.3,1.2) both",
             }}>
             <div style={{

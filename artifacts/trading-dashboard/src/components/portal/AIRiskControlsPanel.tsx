@@ -317,7 +317,7 @@ export const AIRiskControlsPanel = memo(function AIRiskControlsPanel() {
       background: `linear-gradient(180deg, #0B1612 0%, ${C.BG_PANEL} 55%, #050C09 100%)`,
       border: `1px solid ${C.BORDER}`,
       fontFamily: "JetBrains Mono, IBM Plex Mono, monospace",
-      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 14px rgba(0,0,0,0.55)`,
+      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 14px rgba(0,0,0,0.33)`,
     }}>
       {/* Header — collapsible */}
       <button
@@ -334,7 +334,7 @@ export const AIRiskControlsPanel = memo(function AIRiskControlsPanel() {
         <Shield size={14} style={{ color: C.NEON, filter: `drop-shadow(0 0 4px ${C.GLOW})` }} />
         <span style={{
           fontSize: 13, fontWeight: 600, letterSpacing: C.TRACK_LABEL,
-          textShadow: `0 0 4px rgba(0,0,0,0.6)`,
+          textShadow: `0 0 4px rgba(0,0,0,0.36)`,
         }}>AI RISK CONTROLS</span>
         <span style={{
           fontSize: 10, color: draft?.enabled ? C.NEON_DIM : C.TEXT_2,
