@@ -27,7 +27,7 @@
  */
 
 import {
-  memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties,
+  memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode, type CSSProperties,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -179,10 +179,17 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
           <span style={{
             width: 7, height: 7, borderRadius: "50%",
             background: engineOnline ? T.NEON : T.AMBER,
-            boxShadow: engineOnline ? `0 0 8px ${T.NEON_GLOW}` : `0 0 8px ${T.AMBER}`,
+            // Multi-layer beacon bloom — encodes "engine is live" as a
+            // focal anchor in the ribbon. Paused state stays single-layer.
+            boxShadow: engineOnline
+              ? `0 0 6px ${T.NEON}, 0 0 14px ${T.NEON_GLOW}, 0 0 22px rgba(102,255,102,0.20)`
+              : `0 0 8px ${T.AMBER}`,
             animation: engineOnline ? "brand-pulse 1.4s infinite" : undefined,
           }} />
-          <span style={{ color: engineOnline ? T.NEON : T.AMBER, fontWeight: 600 }}>
+          <span style={{
+            color: engineOnline ? T.NEON : T.AMBER, fontWeight: 600,
+            textShadow: engineOnline ? `0 0 8px ${T.NEON_GLOW}` : undefined,
+          }}>
             {engineOnline ? "ENGINE ONLINE" : "ENGINE PAUSED"}
           </span>
         </span>
@@ -658,9 +665,27 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   const range = max - min || 1;
   const step = w / Math.max(1, data.length - 1);
   const points = data.map((v, i) => `${(i * step).toFixed(1)},${(h - ((v - min) / range) * h).toFixed(1)}`).join(" ");
+  // Per-instance unique id — avoids duplicate-DOM-id coupling across many
+  // sparklines (architect nit, Pass 4.1). useId() output contains ":" which
+  // SVG url(#...) tolerates, but sanitize for safety against future XML
+  // serializers.
+  const rawId  = useId();
+  const gradId = `spark-grad-${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
-    <svg width={w} height={h} style={{ overflow: "visible", opacity: 0.85 }}>
-      <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={w} height={h} style={{ overflow: "visible" }}>
+      <defs>
+        <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%"  stopColor={color} stopOpacity="0.40" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={`0,${h} ${points} ${w},${h}`} fill={`url(#${gradId})`} />
+      <polyline
+        points={points}
+        fill="none" stroke={color} strokeWidth={2}
+        strokeLinecap="round" strokeLinejoin="round"
+        style={{ filter: `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 6px ${color})` }}
+      />
     </svg>
   );
 }
@@ -792,7 +817,16 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           <span style={{
             position: "absolute", inset: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 36, fontWeight: 300, color: dirColor, letterSpacing: T.TRACK_DISPLAY,
+            fontSize: 36,
+            // Conf-tiered weight + bloom — conviction-grade signals
+            // visibly anchor the focal grid; low-conf stays restrained.
+            fontWeight: opp.conf >= 85 ? 400 : 300,
+            color: dirColor, letterSpacing: T.TRACK_DISPLAY,
+            textShadow:
+              opp.conf >= 85 ? `0 0 16px ${dirColor}, 0 0 8px ${dirColor}` :
+              opp.conf >= 70 ? `0 0 10px ${dirColor}` :
+              opp.conf >= 55 ? `0 0 6px ${dirColor}`  :
+                               "none",
           }}>{opp.conf}</span>
         </div>
 
@@ -971,16 +1005,36 @@ function ConfidenceRing({ color, value }: { color: string; value: number }) {
   const r = 42;
   const c = 2 * Math.PI * r;
   const pct = Math.max(0, Math.min(100, value)) / 100;
+  // Conf-tiered glow intensity — high-conviction signals visibly bloom,
+  // low-conviction stay restrained. State-gated motion policy: glow
+  // amount encodes confidence tier.
+  const glowPx =
+    value >= 85 ? 14 :
+    value >= 70 ? 10 :
+    value >= 55 ? 6  : 3;
+  const ringStroke = value >= 70 ? 2.5 : 2;
+  const showHalo = value >= 85;
   return (
-    <svg width={96} height={96} style={{ position: "absolute", inset: 0 }}>
+    <svg width={96} height={96} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
+      {/* Outer bloom halo — only for conviction-grade signals (>=85). */}
+      {showHalo && (
+        <circle
+          cx={48} cy={48} r={46} fill="none"
+          stroke={color} strokeWidth={1}
+          style={{ filter: `drop-shadow(0 0 8px ${color})`, opacity: 0.35 }}
+        />
+      )}
       <circle cx={48} cy={48} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={2} />
       <circle
         cx={48} cy={48} r={r} fill="none"
-        stroke={color} strokeWidth={2}
+        stroke={color} strokeWidth={ringStroke}
         strokeDasharray={`${c * pct} ${c}`}
         strokeLinecap="round"
         transform="rotate(-90 48 48)"
-        style={{ filter: `drop-shadow(0 0 6px ${color})`, transition: "stroke-dasharray 600ms ease" }}
+        style={{
+          filter: `drop-shadow(0 0 ${glowPx}px ${color}) drop-shadow(0 0 ${Math.round(glowPx / 2)}px ${color})`,
+          transition: "stroke-dasharray 600ms ease",
+        }}
       />
     </svg>
   );
@@ -1530,14 +1584,22 @@ const RiskHeatmap = memo(function RiskHeatmap({ opps }: { opps: OpportunityVM[] 
       <div style={{ padding: 12, display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 4, flex: 1 }}>
         {cells.map((c, i) => {
           const color = c.risk > 0.7 ? T.RED : c.risk > 0.4 ? T.AMBER : T.NEON;
+          // Hot cells (>0.7) get a pulsing bloom — communicates "this
+          // symbol is in a danger band right now". Calm cells stay
+          // static. Deterministic per-cell delay so 16 cells don't sync.
+          const isHot = c.risk > 0.7;
+          const delayMs = (i * 137) % 1800;
           return (
             <div
               key={i}
               title={`${c.sym} · risk ${(c.risk * 100).toFixed(0)}%`}
               style={{
                 background: color,
-                opacity: Math.max(0.20, c.risk),
+                opacity: isHot ? undefined : Math.max(0.20, c.risk),
                 borderRadius: 2,
+                boxShadow: isHot ? `0 0 8px ${color}, inset 0 0 4px ${color}` : undefined,
+                animation: isHot ? "risk-pulse 1.8s ease-in-out infinite" : undefined,
+                animationDelay: isHot ? `-${delayMs}ms` : undefined,
               }}
             />
           );
@@ -1991,6 +2053,27 @@ export function PortalCustomerShell() {
           0%   { opacity: 0.85; }
           50%  { opacity: 1.00; }
           100% { opacity: 0.85; }
+        }
+        /* Pass 4.1 — RiskHeatmap hot-cell pulse. State-gated: only cells
+           with risk > 0.7 receive this; calm cells stay static. Floor
+           kept >= amber's static ceiling (0.70) so hot cells never
+           visually under-rank amber at trough. */
+        @keyframes risk-pulse {
+          0%   { opacity: 0.75; }
+          50%  { opacity: 1.00; }
+          100% { opacity: 0.75; }
+        }
+        /* Pass 4.1 — honor reduced-motion preference. Holds at the
+           bright phase so state semantics (hot/online/fresh) remain
+           legible without continuous motion. Scope: only the keyframes
+           introduced or amplified in 4.x. */
+        @media (prefers-reduced-motion: reduce) {
+          .cd-ribbon *,
+          .cd-footer *,
+          .cd-scroll * {
+            animation-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+          }
         }
         /* hide scrollbar on horizontal filter pill strip */
         .cd-pills-strip::-webkit-scrollbar { display: none; }
