@@ -1174,6 +1174,39 @@ function stripUndefined(body: Record<string, unknown>): Record<string, unknown> 
   return out;
 }
 
+// ── Enum normalizers at the serialization boundary ──────────────────────────
+// Defensive against legacy DB rows that stored uppercased values
+// ("LIVE", "COINBASE") or any future control that emits non-canonical case.
+// Backend AiSettingsBody requires:
+//   tradingMode ∈ {"simulation","live"}
+//   riskLevel   ∈ {"conservative","moderate","aggressive","high","medium","low"}
+//   preferredExchange = z.string()  (no enum, but exchange clients are case-
+//                                    sensitive — keep canonical capitalization)
+
+const TRADING_MODE_SET    = new Set(["simulation", "live"]);
+const RISK_LEVEL_SET      = new Set(["conservative","moderate","aggressive","high","medium","low"]);
+const EXCHANGE_CANONICAL: Record<string, string> = {
+  kraken: "Kraken", coinbase: "Coinbase", binance: "Binance",
+  bybit:  "Bybit",  okx:      "OKX",      kucoin:  "KuCoin",
+};
+
+function normalizeAiPayload(body: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...body };
+  if ("tradingMode" in out) {
+    const v = typeof out.tradingMode === "string" ? out.tradingMode.toLowerCase() : "";
+    out.tradingMode = TRADING_MODE_SET.has(v) ? v : "simulation";
+  }
+  if ("riskLevel" in out) {
+    const v = typeof out.riskLevel === "string" ? out.riskLevel.toLowerCase() : "";
+    out.riskLevel = RISK_LEVEL_SET.has(v) ? v : "moderate";
+  }
+  if ("preferredExchange" in out) {
+    const v = typeof out.preferredExchange === "string" ? out.preferredExchange.toLowerCase() : "";
+    out.preferredExchange = EXCHANGE_CANONICAL[v] ?? "Kraken";
+  }
+  return out;
+}
+
 function shallowEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
   const ka = Object.keys(a); const kb = Object.keys(b);
   if (ka.length !== kb.length) return false;
@@ -1315,14 +1348,9 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
 
   const aiMutation = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
-      const cleanBody = stripUndefined(body);
-      if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
-        console.debug(
-          `[admin-profile] PATCH /api/admin/users/${user.clerkUserId}/ai-settings`,
-          cleanBody,
-        );
-      }
+      const cleanBody = normalizeAiPayload(stripUndefined(body));
+      // eslint-disable-next-line no-console
+      console.debug("[admin-profile] FINAL PAYLOAD (ai-settings)", cleanBody);
       const res = await authFetch(`/api/admin/users/${user.clerkUserId}/ai-settings`, {
         method: "PATCH",
         body:   JSON.stringify(cleanBody),
@@ -1331,7 +1359,12 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
       let json: unknown = null;
       try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
       if (!res.ok) {
-        throw new Error((json as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
+        // eslint-disable-next-line no-console
+        console.warn("[admin-profile] PATCH ai-settings failed", { status: res.status, response: json, sent: cleanBody });
+        const err  = (json as { error?: string;  issues?: Array<{ path: string; message: string }> } | null);
+        const path = err?.issues?.[0]?.path;
+        const msg  = err?.error ?? `HTTP ${res.status}`;
+        throw new Error(path && !msg.startsWith(path) ? `${path}: ${msg}` : msg);
       }
       return json as { ok: true; after: Record<string, unknown>; changedFields: string[] };
     },
@@ -1388,13 +1421,8 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
   const billingMutation = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
       const cleanBody = stripUndefined(body);
-      if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
-        console.debug(
-          `[admin-profile] PATCH /api/admin/users/${user.clerkUserId}/billing-overrides`,
-          cleanBody,
-        );
-      }
+      // eslint-disable-next-line no-console
+      console.debug("[admin-profile] FINAL PAYLOAD (billing-overrides)", cleanBody);
       const res = await authFetch(`/api/admin/users/${user.clerkUserId}/billing-overrides`, {
         method: "PATCH",
         body:   JSON.stringify(cleanBody),
@@ -1403,7 +1431,12 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
       let json: unknown = null;
       try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
       if (!res.ok) {
-        throw new Error((json as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
+        // eslint-disable-next-line no-console
+        console.warn("[admin-profile] PATCH billing-overrides failed", { status: res.status, response: json, sent: cleanBody });
+        const err  = (json as { error?: string;  issues?: Array<{ path: string; message: string }> } | null);
+        const path = err?.issues?.[0]?.path;
+        const msg  = err?.error ?? `HTTP ${res.status}`;
+        throw new Error(path && !msg.startsWith(path) ? `${path}: ${msg}` : msg);
       }
       return json as { ok: true; after: Record<string, unknown>; changedFields: string[] };
     },
