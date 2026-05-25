@@ -1709,27 +1709,45 @@ function filterOpps(opps: OpportunityVM[], query: string, filter: Filt): Opportu
 function ColumnHeader({ title, count, accent, subLabel }: {
   title: string; count: number; accent: string; subLabel: string;
 }) {
+  // Pass 7j — MAJORS/ALTS column headers carry their own authority.
+  //   • count badge is now accent-tinted (was neutral white-tint) so
+  //     it reads as a status pill that belongs to the column
+  //   • bottom border gets a faint accent gradient underline so the
+  //     column header connects visually to the matrix below it
+  //   • title gains a subtle drop-shadow for crispness on the deeper
+  //     gradient background
   return (
     <div style={{
       display: "flex", flexDirection: "column", gap: 4,
-      borderBottom: `1px solid ${T.BORDER}`, paddingBottom: 6,
+      borderBottom: `1px solid ${T.BORDER}`, paddingBottom: 8,
+      position: "relative",
+      backgroundImage: `linear-gradient(180deg, transparent 0%, transparent calc(100% - 1px), ${accent} 100%)`,
+      backgroundSize: "30% 1px",
+      backgroundPosition: "left bottom",
+      backgroundRepeat: "no-repeat",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{
           margin: 0, fontFamily: T.FONT_MONO, fontSize: 14, color: T.TEXT_0,
           display: "inline-flex", alignItems: "center", gap: 8,
+          textShadow: `0 0 6px rgba(0,0,0,0.4)`,
         }}>
           <Radar size={14} color={accent} /> {title}
           <span style={{
-            background: "rgba(255,255,255,0.10)", color: T.TEXT_0,
-            fontSize: 10, padding: "1px 6px", borderRadius: 2,
+            background: `rgba(${accent === T.NEON ? "102,255,102" : "255,77,77"},0.16)`,
+            color: accent,
+            border: `1px solid rgba(${accent === T.NEON ? "102,255,102" : "255,77,77"},0.42)`,
+            fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 2,
+            letterSpacing: T.TRACK_LABEL,
+            fontVariantNumeric: "tabular-nums",
+            textShadow: `0 0 6px ${accent}`,
           }}>{count}</span>
         </h2>
-        <span style={{ fontSize: 10, color: T.TEXT_2, fontFamily: T.FONT_MONO }}>SORT: CONFIDENCE ↓</span>
+        <span style={{ fontSize: 10, color: T.TEXT_2, fontFamily: T.FONT_MONO, letterSpacing: T.TRACK_LABEL }}>SORT: CONFIDENCE ↓</span>
       </div>
       <span style={{
         fontFamily: T.FONT_MONO, fontSize: 9, letterSpacing: T.TRACK_TITLE,
-        color: accent, opacity: 0.55,
+        color: accent, opacity: 0.70,
       }}>
         {subLabel}
       </span>
@@ -2159,23 +2177,30 @@ function PanelCard({
 }: {
   title: string; children: ReactNode; span?: number; height?: number; live?: boolean;
 }) {
-  // Pass 4.9 — physical bezel depth. Layered effects:
-  //   • subtle top→bottom gradient on the panel body (lit-from-above)
-  //   • inset top hairline highlight (edge lighting / chrome bevel)
-  //   • inset bottom shadow (anchors the panel to its plane)
-  //   • outer 1px down-shadow (separates from the workspace)
-  //   • live panels carry a very faint inner neon bloom (cycles
-  //     `panel-breathe` over 9s); reduced-motion umbrella halts it
+  // Pass 4.9 → Pass 7j — bezel depth carried into the dimensional
+  // vocabulary established by the matrix (7h/7i). Layered effects:
+  //   • body gradient deepened to match matrix terminal darkness
+  //   • LIVE panels get an engraved neon hairline (border + outer
+  //     1px ring) and a real drop-shadow so they project above the
+  //     workspace — matching the active-row treatment one level up
+  //   • static panels get a deeper drop-shadow than before so the
+  //     entire panel grid reads as physically seated, not flat
+  //   • title bar: live panels get a stronger neon underline (0.05
+  //     → 0.22) so the panel header carries its own authority
   const style: CSSProperties = {
-    background: `linear-gradient(180deg, #0B1612 0%, ${T.BG_TERMINAL} 55%, #050C09 100%)`,
-    border: `1px solid ${T.BORDER}`,
+    background: live
+      ? `linear-gradient(180deg, #0E1A15 0%, ${T.BG_TERMINAL} 50%, #050C09 100%)`
+      : `linear-gradient(180deg, #0B1612 0%, ${T.BG_TERMINAL} 55%, #050C09 100%)`,
+    border: live
+      ? `1px solid rgba(102,255,102,0.28)`
+      : `1px solid ${T.BORDER}`,
     display: "flex", flexDirection: "column",
     height,
     fontFamily: T.FONT_MONO,
     gridColumn: span > 1 ? `span ${span}` : undefined,
     boxShadow: live
-      ? `inset 0 1px 0 rgba(102,255,102,0.08), inset 0 -1px 0 rgba(0,0,0,0.50), 0 1px 0 rgba(0,0,0,0.60), inset 0 0 24px rgba(102,255,102,0.04)`
-      : `inset 0 1px 0 rgba(255,255,255,0.03), inset 0 -1px 0 rgba(0,0,0,0.50), 0 1px 0 rgba(0,0,0,0.60)`,
+      ? `0 0 0 1px rgba(102,255,102,0.12), inset 0 1px 0 rgba(102,255,102,0.18), inset 0 -1px 0 rgba(0,0,0,0.55), 0 6px 20px rgba(0,0,0,0.60), 0 0 36px rgba(102,255,102,0.10), inset 0 0 38px rgba(102,255,102,0.05)`
+      : `inset 0 1px 0 rgba(255,255,255,0.04), inset 0 -1px 0 rgba(0,0,0,0.55), 0 4px 14px rgba(0,0,0,0.55), 0 1px 0 rgba(0,0,0,0.65)`,
     animation: live ? "panel-breathe 9s ease-in-out infinite" : undefined,
     position: "relative",
   };
@@ -2183,21 +2208,23 @@ function PanelCard({
     <div style={style}>
       <div style={{
         padding: 10,
-        borderBottom: `1px solid ${T.BORDER}`,
-        // Pass 4.9 — title bar reads as a slightly darker bezel cap
-        // with a faint neon hairline at its base; reinforces the
-        // "panel bonded to its lit border" feel.
+        borderBottom: `1px solid ${live ? "rgba(102,255,102,0.18)" : T.BORDER}`,
+        // Pass 7j — title bar reads as a slightly darker bezel cap.
+        // LIVE panels carry a stronger neon hairline at the base of
+        // the header so the title section has its own authority and
+        // doesn't get visually swallowed by the body gradient.
         background: `linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.30) 100%)`,
-        boxShadow: `inset 0 -1px 0 rgba(102,255,102,0.05)`,
+        boxShadow: live
+          ? `inset 0 -1px 0 rgba(102,255,102,0.22)`
+          : `inset 0 -1px 0 rgba(102,255,102,0.05)`,
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
         <h3 style={{
           margin: 0, fontSize: 11, color: T.TEXT_0,
           letterSpacing: T.TRACK_LABEL,
-          // Pass 4.9 — micro text shadow on titles for crispness on
-          // the new gradient bezel; intensity tuned to preserve
-          // monospaced glyph sharpness.
-          textShadow: live ? `0 0 6px rgba(102,255,102,0.18)` : undefined,
+          // Pass 7j — title text-shadow strengthened on live panels
+          // (0.18 → 0.28) for crispness against the new bezel.
+          textShadow: live ? `0 0 8px rgba(102,255,102,0.28)` : undefined,
         }}>{title}</h3>
         {live && <span style={{
           width: 6, height: 6, borderRadius: "50%",
