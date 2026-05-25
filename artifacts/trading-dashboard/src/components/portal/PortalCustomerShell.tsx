@@ -1069,7 +1069,7 @@ function Sparkline({
 
 const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, now }: {
   opp: OpportunityVM;
-  onQueue: (opp: OpportunityVM) => void;
+  onQueue: (opp: OpportunityVM, side: "LONG" | "SHORT") => void;
   idx?: number;
   now: number;
 }) {
@@ -1511,46 +1511,38 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             }}>
             {gatedReason ? `⛔ ${gatedReason}` : opp.reasoning}
           </span>
-          {/* Pass 7O — restore explicit BUY/SELL action.
-              7M's "QUEUE PAPER" outlined ghost at 10px disappeared
-              against the chassis. Operators expect to see the action
-              they're committing to (BUY a LONG signal, SELL a SHORT
-              signal) — semantic color, compact but visible.
-              Direction comes from the card; openTrade routes paper
-              accordingly. Disabled state preserved for !ready. */}
+          {/* Pass 7U — every row exposes BOTH BUY + SELL consistently.
+              Users paper-trade manually alongside AI guidance, so the
+              action surface is no longer gated by AI direction or
+              readiness. Each button routes a paper trade in the
+              chosen side; stops/targets mirror around entry when the
+              user opts opposite the AI lean. */}
           {(() => {
-            const isLong = opp.direction === "LONG";
-            const actionLabel = isLong ? "BUY" : opp.direction === "SHORT" ? "SELL" : "QUEUE";
-            const actionColor = isLong ? T.NEON : opp.direction === "SHORT" ? T.RED : T.TEXT_3;
-            const actionRgb   = isLong ? "102,255,102" : opp.direction === "SHORT" ? "255,77,77" : "255,255,255";
-            return (
+            const ActionBtn = ({ side, label, color, rgb }: { side: "LONG" | "SHORT"; label: string; color: string; rgb: string }) => (
               <button
-                onClick={() => ready && onQueue(opp)}
-                disabled={!ready}
-                title={ready ? `Paper ${actionLabel} ${opp.symbol} @ ${fmtPrice(opp.entry)}` : "Awaiting signal confirmation"}
+                onClick={() => onQueue(opp, side)}
+                title={`Paper ${label} ${opp.symbol} @ ${fmtPrice(opp.entry)}`}
                 style={{
-                  padding: "5px 14px", fontSize: 11, fontWeight: 800,
+                  padding: "5px 12px", fontSize: 11, fontWeight: 800,
                   fontFamily: T.FONT_MONO, letterSpacing: "0.10em",
-                  border: `1px solid ${ready ? actionColor : T.BORDER}`,
-                  background: ready ? `rgba(${actionRgb},0.10)` : "transparent",
-                  color: ready ? actionColor : T.TEXT_3,
-                  cursor: ready ? "pointer" : "not-allowed",
+                  border: `1px solid ${color}`,
+                  background: `rgba(${rgb},0.10)`,
+                  color,
+                  cursor: "pointer",
                   transition: "background-color 120ms ease, color 120ms ease",
                   flexShrink: 0,
                   borderRadius: 2,
-                  minWidth: 56,
+                  minWidth: 52,
                 }}
-                onMouseEnter={(e) => {
-                  if (!ready) return;
-                  e.currentTarget.style.background = actionColor;
-                  e.currentTarget.style.color = "#000";
-                }}
-                onMouseLeave={(e) => {
-                  if (!ready) return;
-                  e.currentTarget.style.background = `rgba(${actionRgb},0.10)`;
-                  e.currentTarget.style.color = actionColor;
-                }}
-              >{actionLabel}</button>
+                onMouseEnter={(e) => { e.currentTarget.style.background = color; e.currentTarget.style.color = "#000"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = `rgba(${rgb},0.10)`; e.currentTarget.style.color = color; }}
+              >{label}</button>
+            );
+            return (
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <ActionBtn side="LONG"  label="BUY"  color={T.NEON} rgb="102,255,102" />
+                <ActionBtn side="SHORT" label="SELL" color={T.RED}  rgb="255,77,77"   />
+              </div>
             );
           })()}
         </div>
@@ -1769,7 +1761,7 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
 }: {
   longs:     OpportunityVM[];
   shorts:    OpportunityVM[];
-  onQueue:   (opp: OpportunityVM) => void;
+  onQueue:   (opp: OpportunityVM, side: "LONG" | "SHORT") => void;
   isLoading: boolean;
   isError:   boolean;
   /** Pass 3.3: shell-level shared 1Hz tick. Previously this component
@@ -1962,7 +1954,7 @@ const Column = memo(function Column({
   accent, subLabel, tintRgba, leftDivider = false, now,
   idleSymbols, lastTickAt, idleLabel,
 }: {
-  title: string; opps: OpportunityVM[]; onQueue: (opp: OpportunityVM) => void;
+  title: string; opps: OpportunityVM[]; onQueue: (opp: OpportunityVM, side: "LONG" | "SHORT") => void;
   isLoading: boolean; isError: boolean;
   accent: string; subLabel: string; tintRgba: string; leftDivider?: boolean;
   now: number;
@@ -2746,9 +2738,9 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
   const losses = useMemo(() => history.reduce((n, h) => n + (h.pnl <= 0 ? 1 : 0), 0), [history]);
   const winPct = closedCount > 0 ? Math.round((wins / closedCount) * 100) : 0;
   const queueDepth = pulse.waiting;
-  const execActive = engineOnline && pulse.execRatePct > 0;
-  const execLabel  = !engineOnline ? "OFFLINE" : execActive ? `${pulse.execRatePct}% LIVE` : "IDLE";
-  const execColor  = !engineOnline ? T.RED : execActive ? T.NEON : T.AMBER;
+  // Pass 7U — EXECUTION cell removed entirely (was "IDLE / N% LIVE /
+  // OFFLINE"). In paper mode the line was noise; engine health surfaces
+  // in OperatorPulseRibbon already.
   const confColor  = pulse.avgConf >= 70 ? T.NEON : pulse.avgConf >= 55 ? T.AMBER : T.TEXT_1;
 
   const fmtMoney = (n: number) =>
@@ -2756,51 +2748,52 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
   const fmtEquity = (n: number) =>
     `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  // Cell renderer — same Kv visual language but stacked (label above
-  // value) so the strip reads as a row of operator stat cells rather
-  // than a 2-column key list. Matches the density of OpportunityCard
-  // micro-stats so the lower section feels like a continuation of the
-  // matrix surface.
-  const Cell = ({ k, v, color = T.TEXT_0 }: { k: string; v: string; color?: string }) => (
+  // Pass 7U — stat cells upsized. Tier 1 cells (PAPER EQUITY, REALIZED
+  // PNL, UNREALIZED PNL) render larger so account status reads first.
+  // Tier 2 cells (WIN %, WINS/LOSSES, OPEN TRADES, ACTIVE SIGNALS,
+  // QUEUE) stay readable but secondary. Same chassis + typography
+  // family; only size + weight shift.
+  const Cell = ({
+    k, v, color = T.TEXT_0, size = 16,
+  }: { k: string; v: string; color?: string; size?: number }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
-      <span style={{ fontSize: 9, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL, whiteSpace: "nowrap" }}>{k}</span>
-      <span style={{ fontSize: 14, color, fontVariantNumeric: "tabular-nums", fontWeight: 600, whiteSpace: "nowrap" }}>{v}</span>
+      <span style={{ fontSize: 10, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL, whiteSpace: "nowrap" }}>{k}</span>
+      <span style={{ fontSize: size, color, fontVariantNumeric: "tabular-nums", fontWeight: 700, whiteSpace: "nowrap" }}>{v}</span>
     </div>
   );
 
   return (
-    <PanelCard title="ACCOUNT STATUS" live height={140}>
+    <PanelCard title="ACCOUNT STATUS" live height={196}>
       <div style={{
-        padding: "14px 18px",
+        padding: "18px 22px",
         flex: 1,
         display: "flex",
         alignItems: "center",
-        gap: 20,
+        gap: 24,
         fontFamily: T.FONT_MONO,
       }}>
         <div style={{
           flex: 1,
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))",
-          gap: 16,
+          gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))",
+          gap: "18px 20px",
           alignItems: "center",
         }}>
-          <Cell k="PAPER EQUITY"   v={fmtEquity(equity)} color={equity >= STARTING_EQUITY ? T.NEON : T.RED} />
-          <Cell k="REALIZED PNL"   v={fmtMoney(realizedPnl)}   color={realizedPnl   >= 0 ? T.NEON : T.RED} />
-          <Cell k="UNREALIZED PNL" v={fmtMoney(unrealizedPnl)} color={unrealizedPnl >= 0 ? T.NEON : T.RED} />
-          <Cell k="WIN %"          v={closedCount > 0 ? `${winPct}%` : "—"} color={winPct >= 50 ? T.NEON : winPct > 0 ? T.AMBER : T.TEXT_2} />
-          <Cell k="WINS / LOSSES"  v={`${wins} / ${losses}`} />
-          <Cell k="OPEN TRADES"    v={openCount.toString()} color={openCount > 0 ? T.NEON : T.TEXT_2} />
-          <Cell k="ACTIVE SIGNALS" v={activeSignals.toString()} color={activeSignals > 0 ? T.TEXT_0 : T.TEXT_2} />
-          <Cell k="QUEUE"          v={queueDepth.toString()} color={queueDepth > 0 ? T.AMBER : T.TEXT_2} />
-          <Cell k="EXECUTION"      v={execLabel} color={execColor} />
+          <Cell k="PAPER EQUITY"   size={26} v={fmtEquity(equity)} color={equity >= STARTING_EQUITY ? T.NEON : T.RED} />
+          <Cell k="REALIZED PNL"   size={24} v={fmtMoney(realizedPnl)}   color={realizedPnl   >= 0 ? T.NEON : T.RED} />
+          <Cell k="UNREALIZED PNL" size={24} v={fmtMoney(unrealizedPnl)} color={unrealizedPnl >= 0 ? T.NEON : T.RED} />
+          <Cell k="WIN %"          size={20} v={closedCount > 0 ? `${winPct}%` : "—"} color={winPct >= 50 ? T.NEON : winPct > 0 ? T.AMBER : T.TEXT_2} />
+          <Cell k="WINS / LOSSES"  size={20} v={`${wins} / ${losses}`} />
+          <Cell k="OPEN TRADES"    size={20} v={openCount.toString()} color={openCount > 0 ? T.NEON : T.TEXT_2} />
+          <Cell k="ACTIVE SIGNALS" size={20} v={activeSignals.toString()} color={activeSignals > 0 ? T.TEXT_0 : T.TEXT_2} />
+          <Cell k="QUEUE"          size={20} v={queueDepth.toString()} color={queueDepth > 0 ? T.AMBER : T.TEXT_2} />
         </div>
-        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, paddingLeft: 16, borderLeft: `1px solid ${T.BORDER}` }}>
-          <div style={{ position: "relative", width: 78, height: 78 }}>
-            <ConfidenceRing color={confColor} value={pulse.avgConf} size={78} />
+        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, paddingLeft: 22, borderLeft: `1px solid ${T.BORDER}` }}>
+          <div style={{ position: "relative", width: 112, height: 112 }}>
+            <ConfidenceRing color={confColor} value={pulse.avgConf} size={112} />
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-              <span style={{ fontSize: 18, color: confColor, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>{pulse.avgConf}</span>
-              <span style={{ fontSize: 7, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL }}>AVG CONF</span>
+              <span style={{ fontSize: 30, color: confColor, fontVariantNumeric: "tabular-nums", fontWeight: 700, lineHeight: 1 }}>{pulse.avgConf}</span>
+              <span style={{ fontSize: 9, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL, marginTop: 4 }}>AI AVG CONF</span>
             </div>
           </div>
         </div>
@@ -3222,15 +3215,32 @@ export function PortalCustomerShell() {
   // Stable identity — keeps `OpportunityMatrix` / `OpportunityCard`
   // memoization effective across the shell's 1Hz tick. `openTrade`
   // identity is provided by `usePaperTrades`; safe to depend on.
-  const queuePaper = useCallback((opp: OpportunityVM) => {
-    if (opp.direction === "FLAT") return;
+  // Pass 7U — manual side override. Caller (BUY / SELL button on each
+  // OpportunityCard) passes the chosen side explicitly. When the user
+  // opts opposite the AI lean — or when the row is FLAT — stops/targets
+  // are mirrored around entry so the paper position is sane regardless
+  // of which side the user picked. Falls back to ±2% bands when the
+  // engine hasn't supplied stop/target yet (FLAT rows).
+  const queuePaper = useCallback((opp: OpportunityVM, side: "LONG" | "SHORT") => {
+    const entry = opp.entry;
+    const haveBands = Number.isFinite(opp.stop) && Number.isFinite(opp.target) && opp.stop > 0 && opp.target > 0;
+    let stop:   number;
+    let target: number;
+    if (haveBands) {
+      const matchesAi = opp.direction === side;
+      stop   = matchesAi ? opp.stop   : opp.target;
+      target = matchesAi ? opp.target : opp.stop;
+    } else {
+      stop   = side === "LONG" ? entry * 0.98 : entry * 1.02;
+      target = side === "LONG" ? entry * 1.02 : entry * 0.98;
+    }
     openTrade({
       symbol:  opp.pair,
       display: opp.display,
-      side:    opp.direction === "LONG" ? "LONG" : "SHORT",
-      entry:   opp.entry,
-      stop:    opp.stop,
-      target:  opp.target,
+      side,
+      entry,
+      stop,
+      target,
     });
   }, [openTrade]);
 
