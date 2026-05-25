@@ -1031,27 +1031,34 @@ function Sparkline({
   // drop-shadow blurs widened so the line carries clear presence.
   // ELITE / STRONG amplitudes preserved relative to baseline so the
   // hero hierarchy still reads as a step UP, not parity.
+  // Pass E3-polish — sparkline stabilization. Triple drop-shadow
+  // stack (22/18/16px outer halos) was reading as full bloom across
+  // the matrix now that E3 puts more cards into STRONG/ELITE bands.
+  // Collapsed to single edge illumination per intensity tier; outer
+  // halo opacity dropped 0.46-0.58 → 0.20-0.28 so the gradient fill
+  // no longer bleeds into surrounding black space. Stroke widths
+  // preserved (line presence is geometry, not glow).
   const innerStrokeWidth =
     intensity === "elite"  ? 3.6 :
     intensity === "strong" ? 3.4 : 3.2;
   const innerStrokeFilter =
     intensity === "elite"
-      ? `drop-shadow(0 0 5px ${color}) drop-shadow(0 0 12px ${color}) drop-shadow(0 0 22px ${color})`
+      ? `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 7px ${color})`
       : intensity === "strong"
-      ? `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 10px ${color}) drop-shadow(0 0 18px ${color})`
-      : `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 9px ${color}) drop-shadow(0 0 16px ${color})`;
+      ? `drop-shadow(0 0 2px ${color}) drop-shadow(0 0 5px ${color})`
+      : `drop-shadow(0 0 2px ${color}) drop-shadow(0 0 4px ${color})`;
   const outerGlowOpacity =
-    intensity === "elite"  ? 0.58 :
-    intensity === "strong" ? 0.50 : 0.46;
+    intensity === "elite"  ? 0.28 :
+    intensity === "strong" ? 0.22 : 0.18;
   const liveStrokeWidth =
     intensity === "elite"  ? 3.8 :
     intensity === "strong" ? 3.5 : 3.2;
   const liveFilter =
     intensity === "elite"
-      ? `drop-shadow(0 0 5px ${color}) drop-shadow(0 0 14px ${color})`
+      ? `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 6px ${color})`
       : intensity === "strong"
-      ? `drop-shadow(0 0 5px ${color}) drop-shadow(0 0 12px ${color})`
-      : `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 10px ${color})`;
+      ? `drop-shadow(0 0 2px ${color}) drop-shadow(0 0 5px ${color})`
+      : `drop-shadow(0 0 2px ${color}) drop-shadow(0 0 4px ${color})`;
   // viewBox coords — we'll scale via preserveAspectRatio=none so the
   // SVG stretches to any container width while the chart line stays
   // crisp (vector). VBW chosen large enough that per-bar steps don't
@@ -1132,9 +1139,13 @@ function Sparkline({
         {/* Pass 7f — area-fill gradient lifted (0.55→0.72 top,
             0.18→0.30 mid) so the curve's underside reads as a real
             envelope, not a faint wash. */}
+        {/* Pass E3-polish — gradient fill toned down. Top 0.72 → 0.42,
+            mid 0.30 → 0.14. Amber fills were bleeding orange into the
+            surrounding black chassis; envelope still readable but no
+            longer flooding the row. */}
         <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%"   stopColor={color} stopOpacity="0.72" />
-          <stop offset="55%"  stopColor={color} stopOpacity="0.30" />
+          <stop offset="0%"   stopColor={color} stopOpacity="0.42" />
+          <stop offset="55%"  stopColor={color} stopOpacity="0.14" />
           <stop offset="100%" stopColor={color} stopOpacity="0"    />
         </linearGradient>
         <radialGradient id={tipId} cx="50%" cy="50%" r="50%">
@@ -1380,10 +1391,16 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // pushed UP to close the hierarchy gap so the top 20 reads as a
   // continuous field of live signals (not one hero floating above
   // faint rows). EVALUATING fall-through (T.BORDER) untouched.
+  // Pass E3-polish — tier border alphas calmed. Pre-E3 the ladder
+  // was 1.00 / 0.96 / 0.82 because ELITE was rare. E3 widens the
+  // distribution and now most active rows qualify for ELITE/STRONG,
+  // so saturated borders were reading as global noise rather than
+  // hierarchy. Spread out the alphas (0.72 / 0.55 / 0.38) so the
+  // step between tiers is preserved but no row burns the eye.
   const tierBorderColor =
-    isElite          ? `rgba(${dirRgb},1.00)` :
-    isStrong         ? `rgba(${dirRgb},0.96)` :
-    isActiveBaseline ? `rgba(${dirRgb},0.82)` :
+    isElite          ? `rgba(${dirRgb},0.72)` :
+    isStrong         ? `rgba(${dirRgb},0.55)` :
+    isActiveBaseline ? `rgba(${dirRgb},0.38)` :
                        T.BORDER;
   // Pass 7M — FINALIZATION. Stripping the cinematic vocabulary
   // (saturated full-card washes, 80px halos, translateY lift,
@@ -1828,31 +1845,41 @@ function ConfidenceRing({ color, value, size = 78 }: { color: string; value: num
   // card surface. Halo bumped in lockstep. 55-tier and base preserved
   // (those are mostly evaluating cards which sit inside the dimmer
   // wrapper anyway).
+  // Pass E3-polish — ConfidenceRing bloom stabilization. Pre-E3 the
+  // ring glow stack went up to 40px outer + 20px inner (line ~1898
+  // doubled it), reading as a halo explosion now that more rings
+  // sit above 70/85. Collapsed to a thin edge-illumination ladder:
+  // ELITE still loudest, baseline still readable, no card emits a
+  // bloom larger than its own footprint. Stroke widths preserved
+  // (geometry not glow).
   const glowPx =
-    value >= 90 ? 40 :
-    value >= 85 ? 30 :
-    value >= 70 ? 24 :
-    value >= 55 ? 12 : 7;
+    value >= 90 ? 14 :
+    value >= 85 ? 11 :
+    value >= 70 ? 9 :
+    value >= 55 ? 6 : 4;
   const ringStroke =
     value >= 90 ? 5.5 :
     value >= 85 ? 4.6 :
     value >= 70 ? 4.2 : 3.4;
   const haloOpacity =
-    value >= 90 ? 0.95 :
-    value >= 85 ? 0.72 :
-    value >= 70 ? 0.60 :
-    value >= 55 ? 0.36 : 0.22;
+    value >= 90 ? 0.45 :
+    value >= 85 ? 0.32 :
+    value >= 70 ? 0.24 :
+    value >= 55 ? 0.16 : 0.10;
   // 12-tick dial. Each tick is a short radial mark; ticks beneath the
   // progress arc are tinted with the color, ticks beyond stay neutral.
   const ticks = Array.from({ length: 12 }, (_, i) => i);
   const tickBoundary = pct * 12;
   return (
     <svg width={SIZE} height={SIZE} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
-      {/* Outer volumetric halo — always rendered, opacity tiered by conf. */}
+      {/* Outer volumetric halo — always rendered, opacity tiered by conf.
+          Pass E3-polish: drop-shadow stack 7px+13px → 3px+6px so the
+          halo reads as thin edge illumination instead of an outward
+          bloom that bleeds past the card border. */}
       <circle
         cx={CX} cy={CX} r={r + 4} fill="none"
         stroke={color} strokeWidth={1}
-        style={{ filter: `drop-shadow(0 0 7px ${color}) drop-shadow(0 0 13px ${color})`, opacity: haloOpacity }}
+        style={{ filter: `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 6px ${color})`, opacity: haloOpacity }}
       />
       {/* Dial tick marks — institutional gauge vocabulary. */}
       {ticks.map(i => {
@@ -1877,17 +1904,23 @@ function ConfidenceRing({ color, value, size = 78 }: { color: string; value: num
       })}
       {/* Static track ring — base reference. */}
       <circle cx={CX} cy={CX} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={ringStroke} />
-      {/* Soft underlay progress — thick blurred glow band. */}
+      {/* Soft underlay progress — thin blurred glow band.
+          Pass E3-polish: blur(3px)/0.35 → blur(2px)/0.20 so the
+          underlay no longer doubles the apparent ring thickness. */}
       <circle
         cx={CX} cy={CX} r={r} fill="none"
-        stroke={color} strokeWidth={ringStroke + 4}
+        stroke={color} strokeWidth={ringStroke + 3}
         strokeDasharray={`${c * pct} ${c}`}
         strokeLinecap="round"
         transform={`rotate(-90 ${CX} ${CX})`}
-        opacity={0.35}
-        style={{ filter: `blur(3px)`, transition: "stroke-dasharray 600ms ease" }}
+        opacity={0.20}
+        style={{ filter: `blur(2px)`, transition: "stroke-dasharray 600ms ease" }}
       />
-      {/* Crisp inner progress — primary conviction arc. */}
+      {/* Crisp inner progress — primary conviction arc.
+          Pass E3-polish: double drop-shadow (glowPx + glowPx/2)
+          collapsed to a single edge drop-shadow. Pre-E3 this stack
+          was multiplying the bloom for every card; one layer keeps
+          the ring "lit" without the volumetric halo. */}
       <circle
         cx={CX} cy={CX} r={r} fill="none"
         stroke={color} strokeWidth={ringStroke}
@@ -1895,7 +1928,7 @@ function ConfidenceRing({ color, value, size = 78 }: { color: string; value: num
         strokeLinecap="round"
         transform={`rotate(-90 ${CX} ${CX})`}
         style={{
-          filter: `drop-shadow(0 0 ${glowPx}px ${color}) drop-shadow(0 0 ${Math.round(glowPx / 2)}px ${color})`,
+          filter: `drop-shadow(0 0 ${glowPx}px ${color})`,
           transition: "stroke-dasharray 600ms ease",
         }}
       />
