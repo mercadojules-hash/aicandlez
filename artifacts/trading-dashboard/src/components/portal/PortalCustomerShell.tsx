@@ -30,6 +30,7 @@ import {
   memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAuth } from "@clerk/react";
 import {
   Activity, AlertTriangle, CheckCircle2, Clock, Database, Filter, Globe,
@@ -1080,6 +1081,18 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
   );
 });
 
+// Estimated card height (px) for the virtualizer pre-measure pass. Actual
+// per-card height is observed via `measureElement` once mounted, so this
+// only sets the initial scrollbar geometry. Dialed in against the
+// approved CommandDeck mockup density: confidence ring + reasoning
+// block + sparkline + exchange row ≈ 380px tall.
+const CARD_ESTIMATE_PX = 380;
+// Gap between cards, preserved from the pre-virtualization flex layout
+// (was `gap: 14` on the scroll container). Absolute positioning means
+// we now carry the gap as `paddingBottom` on each row wrapper so the
+// virtualizer's `measureElement` includes it in the row's total height.
+const CARD_ROW_GAP_PX = 14;
+
 const Column = memo(function Column({
   title, opps, onQueue, isLoading, isError,
   accent, subLabel, tintRgba, leftDivider = false, now,
@@ -1089,6 +1102,34 @@ const Column = memo(function Column({
   accent: string; subLabel: string; tintRgba: string; leftDivider?: boolean;
   now: number;
 }) {
+  const parentRef = useRef<HTMLDivElement | null>(null);
+
+  // Stable key per opportunity → preserves card identity (and its
+  // animation gating state) across re-rank reorders and search filter
+  // changes. Without this, the virtualizer would key by index and any
+  // ranking shuffle would reset card mounts.
+  const getItemKey = useCallback(
+    (i: number) => opps[i]?.pair ?? `row-${i}`,
+    [opps],
+  );
+
+  const virtualizer = useVirtualizer({
+    count: opps.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => CARD_ESTIMATE_PX + CARD_ROW_GAP_PX,
+    // Keep ~10 cards alive in the DOM (≈2-3 visible at maxHeight 1000
+    // + 7-8 above/below) so scroll never reveals a frame of unmounted
+    // whitespace and so freshly-arrived signals at the rank edge stay
+    // animation-eligible. Same total render budget as the "10-visible
+    // design intent" while bounding the 1Hz tick cost.
+    overscan: 7,
+    getItemKey,
+  });
+
+  const items = virtualizer.getVirtualItems();
+  const totalSize = virtualizer.getTotalSize();
+  const showList  = opps.length > 0;
+
   return (
     <div style={{
       display: "flex", flexDirection: "column", gap: 14,
@@ -1106,12 +1147,22 @@ const Column = memo(function Column({
         }}
       />
       <ColumnHeader title={title} count={opps.length} accent={accent} subLabel={subLabel} />
-      <div style={{
-        display: "flex", flexDirection: "column", gap: 14,
-        overflowY: "auto", maxHeight: 1000, paddingRight: 4,
-      }}
-      className="cd-scroll">
-        {isError && opps.length === 0 && (
+      <div
+        ref={parentRef}
+        className="cd-scroll"
+        style={{
+          // No `display: flex / gap` here — virtualized children are
+          // absolutely positioned inside the inner spacer below.
+          overflowY: "auto",
+          maxHeight: 1000,
+          paddingRight: 4,
+          // `contain: strict` would clip the card hover/glow overlays;
+          // `layout` alone gets the perf benefit (paint isolation, no
+          // forced reflow into ancestors) without cropping shadows.
+          contain: "layout",
+        }}
+      >
+        {isError && !showList && (
           <div style={{
             padding: 24, textAlign: "center", color: "#FF4D4D", fontFamily: T.FONT_MONO,
             border: `1px dashed #FF4D4D55`, fontSize: 11,
@@ -1119,7 +1170,7 @@ const Column = memo(function Column({
             ENGINE FEED UNAVAILABLE · /api/engine/status failed · retrying…
           </div>
         )}
-        {!isError && opps.length === 0 && (
+        {!isError && !showList && (
           <div style={{
             padding: 24, textAlign: "center", color: T.TEXT_2, fontFamily: T.FONT_MONO,
             border: `1px dashed ${T.BORDER}`, fontSize: 11,
@@ -1127,9 +1178,38 @@ const Column = memo(function Column({
             {isLoading ? "Loading engine signals…" : `No ${title.toLowerCase()} match the current filters.`}
           </div>
         )}
-        {opps.map((o, idx) => (
-          <OpportunityCard key={o.pair} opp={o} idx={idx} onQueue={onQueue} now={now} />
-        ))}
+        {showList && (
+          <div style={{
+            position: "relative",
+            height: totalSize,
+            width: "100%",
+          }}>
+            {items.map(vi => {
+              const o = opps[vi.index];
+              if (!o) return null;
+              return (
+                <div
+                  key={vi.key}
+                  data-index={vi.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    transform: `translateY(${vi.start}px)`,
+                    // Row gap preserved as bottom padding so the next
+                    // row's `start` lands with the same visual rhythm
+                    // as the pre-virtualization flex `gap: 14`.
+                    paddingBottom: CARD_ROW_GAP_PX,
+                  }}
+                >
+                  <OpportunityCard opp={o} idx={vi.index} onQueue={onQueue} now={now} />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
