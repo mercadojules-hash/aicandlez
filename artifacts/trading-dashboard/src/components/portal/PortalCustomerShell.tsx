@@ -1776,7 +1776,7 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
         isLoading={isLoading}
         isError={isError}
         accent="#66FF66"
-        subLabel={`BULLISH BIAS · CONFIDENCE-RANKED · ${longs.length} TRACKED`}
+        subLabel={`${longs.length} ACTIVE · ${evaluatingLongs.length} EVALUATING · CONFIDENCE-RANKED`}
         tintRgba="rgba(102,255,102,0.015)"
         now={now}
         idleSymbols={idleSymbols}
@@ -1791,7 +1791,7 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
         isLoading={isLoading}
         isError={isError}
         accent="#FF4D4D"
-        subLabel={`BEARISH BIAS · CONFIDENCE-RANKED · ${shorts.length} TRACKED`}
+        subLabel={`${shorts.length} ACTIVE · ${evaluatingShorts.length} EVALUATING · CONFIDENCE-RANKED`}
         tintRgba="rgba(255,77,77,0.015)"
         leftDivider
         now={now}
@@ -2011,7 +2011,16 @@ const Column = memo(function Column({
           // No `display: flex / gap` here — virtualized children are
           // absolutely positioned inside the inner spacer below.
           overflowY: "auto",
-          maxHeight: 1000,
+          // Pass 7N — column tall enough to show top-20 without
+          // scrolling on standard viewports. Each row = 124px card +
+          // 8px gap = 132px. 20 active + 8 eval header + 8 eval rows
+          // = ~2900px worst case; on small viewports the
+          // calc(100vh - 280px) keeps the column inside the fold so
+          // we never blow past the page bounds. Previous cap of 1000
+          // was visually truncating the matrix to 7.5 rows and
+          // creating the "incomplete top 20" perception.
+          maxHeight: "min(calc(100vh - 240px), 2900px)",
+          minHeight: 720,
           paddingRight: 4,
           // `contain: strict` would clip the card hover/glow overlays;
           // `layout` alone gets the perf benefit (paint isolation, no
@@ -2092,39 +2101,47 @@ const Column = memo(function Column({
             systems behave. */}
         {evaluating.length > 0 && (
           <>
+            {/* Pass 7N — EVAL section header rebuilt as an UNMISTAKABLE
+                tier separator. Previous 9px caption read as a quiet
+                footnote, so users mistook the dimmed EVAL rows below
+                it for broken ACTIVE rows. New: 11px loud label,
+                ALL-CAPS, dirColor accent text, solid 2px top rule. */}
             <div style={{
-              marginTop: showList ? 14 : 0,
+              marginTop: showList ? 18 : 0,
               display: "flex", alignItems: "center", gap: 10,
-              fontFamily: T.FONT_MONO, fontSize: 9,
+              fontFamily: T.FONT_MONO, fontSize: 11, fontWeight: 700,
               letterSpacing: T.TRACK_TITLE,
-              color: T.TEXT_2,
-              paddingTop: 10, paddingBottom: 6,
-              borderTop: showList ? `1px dashed ${accent}1A` : "none",
+              color: accent,
+              paddingTop: 12, paddingBottom: 8,
+              borderTop: showList ? `2px solid ${accent}33` : "none",
+              textTransform: "uppercase",
             }}>
               <span style={{
-                width: 5, height: 5, borderRadius: "50%",
-                background: accent, opacity: 0.55,
-                boxShadow: `0 0 4px ${accent}80`,
+                width: 7, height: 7, borderRadius: "50%",
+                background: accent, opacity: 0.85,
+                boxShadow: `0 0 6px ${accent}`,
+                animation: "brand-pulse 1.8s ease-in-out infinite",
               }} />
-              EVALUATING · {evaluating.length} ASSETS · AWAITING CONFIRMATION
+              <span>EVALUATING TIER · {evaluating.length} ASSET{evaluating.length === 1 ? "" : "S"} AWAITING CONFIRMATION</span>
+              <span style={{ flex: 1, height: 1, background: `${accent}22`, marginLeft: 8 }} />
             </div>
             <div
               aria-label="evaluating-tier"
               aria-hidden
               inert={"" as unknown as boolean}
               style={{
-                // Pass 7c — EVALUATING recession. Active 80+/90+ rows
-                // now carry conviction-tier borders, glow, and bg
-                // wash; for the hierarchy to read, EVALUATING must
-                // sit clearly below the median active row. Drop
-                // opacity 0.70→0.55 and saturation 0.90→0.65 so
-                // sparkline/ring luminance noticeably calms while
-                // engine HOLDs remain readable as "still alive".
-                // (Historical: Pass 6.1a/6.2 had this at 0.70/0.90;
-                // those tunings predated the conviction-tier border
-                // on ACTIVE cards, so the bands collided visually.)
-                opacity: 0.55,
-                filter: "saturate(0.65)",
+                // Pass 7N — EVAL dimming relaxed. Old 0.55/saturate
+                // 0.65 was calibrated against cinematic-glow ACTIVE
+                // cards (7c era); with 7M's flat Bloomberg-style
+                // ACTIVE rows, those values over-suppressed EVAL
+                // into the "muddy bronze low-contrast collapse"
+                // users mistook for broken styling. New 0.80
+                // opacity + 0.90 saturate keeps EVAL clearly
+                // subordinate to ACTIVE (still dimmer, still
+                // pointer-events: none, still visually distinct)
+                // but readable as a coherent secondary tier.
+                opacity: 0.80,
+                filter: "saturate(0.90)",
                 pointerEvents: "none",
                 display: "flex", flexDirection: "column",
                 gap: CARD_ROW_GAP_PX,
