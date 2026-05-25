@@ -1,0 +1,152 @@
+Excellent diagnostic.
+
+This is the first report that clearly identifies WHY the platform visually feels inactive despite the UI foundation now being strong.
+
+Your findings make complete sense.
+
+The biggest insight:
+the problem is NOT visual anymore.
+
+The problem is:
+PERCEIVED ENGINE PRESENCE.
+
+Right now the engine is:
+thinking silently.
+
+The UI only surfaces:
+final conviction events.
+
+That makes the system appear dead most of the time.
+
+Approved priorities:
+
+PASS 6.1 = A + B together.
+
+This is absolutely the correct next move.
+
+Why:
+A+B solve the psychological problem without touching the protected engine architecture.
+
+That is exactly the right balance.
+
+APPROVED IMPLEMENTATION DIRECTION:
+
+1. EMPTY-STATE INTELLIGENCE PANELS (A)
+
+Critical.
+
+When LONGS or SHORTS are empty:
+the user should NEVER see:
+
+* black voids
+* dead columns
+* empty containers
+
+Instead the column should communicate:
+ACTIVE EVALUATION.
+
+Direction:
+
+* rotating symbol evaluation feed
+* scan cadence indicators
+* “AI evaluating market structure”
+* last scan timestamps
+* confidence distribution hints
+* faint scan-line cadence
+* restrained telemetry motion
+
+Tone should feel:
+institutional AI waiting for alignment.
+
+NOT:
+loading spinner UI.
+
+2. HOLD → EVALUATING TIER (B)
+
+Strongly approved.
+
+This is likely the single biggest believability improvement in the entire portal.
+
+The engine is already working.
+The UI simply hides its thought process.
+
+Surfacing HOLD/EVALUATING states solves:
+
+* deadness
+* inactivity perception
+* low scan density
+* weak AI presence
+* lack of market awareness
+
+Very important:
+EVALUATING rows should feel visually subordinate to active LONG/SHORT opportunities.
+
+Suggested hierarchy:
+
+HIGH PRIORITY:
+LONG / SHORT
+bright
+high confidence
+full contrast
+
+LOW PRIORITY:
+EVALUATING
+dimmed
+lower opacity
+quieter telemetry
+muted confidence rings
+reduced saturation
+
+The user should instantly understand:
+“the AI is actively processing these assets but has not committed yet.”
+
+That is EXACTLY how institutional systems behave.
+
+3. DO NOT TOUCH ENGINE LOGIC YET
+
+Correct decision.
+
+Do NOT:
+
+* loosen MTF gates
+* weaken confidence logic
+* inflate signal counts artificially
+
+That would reduce credibility.
+
+The engine should stay disciplined.
+
+The UI should simply expose the engine’s active cognition layer better.
+
+4. SYMBOL POOL EXPANSION (C)
+
+Approved after 6.1 only.
+
+Correct sequencing.
+
+A+B likely solve 80% of the perceived inactivity issue already.
+
+5. CADENCE (D)
+
+Correct to defer.
+
+60s cadence may feel completely acceptable once:
+
+* evaluating states exist
+* scan telemetry exists
+* HOLD states are surfaced
+* idle columns become intelligent
+
+Do NOT increase API load prematurely.
+
+6. PRODUCT EVOLUTION
+
+This is the exact transition point where the platform evolves from:
+“beautiful terminal”
+
+into:
+“believable autonomous AI system.”
+
+That is the real milestone now.
+
+Proceed with Pass 6.1 (A + B together).

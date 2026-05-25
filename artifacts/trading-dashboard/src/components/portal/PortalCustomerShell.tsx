@@ -1494,10 +1494,17 @@ function ColumnHeader({ title, count, accent, subLabel }: {
 }
 
 const OpportunityMatrix = memo(function OpportunityMatrix({
-  longs, shorts, onQueue, isLoading, isError, now,
+  longs, shorts, evaluatingLongs, evaluatingShorts,
+  onQueue, isLoading, isError, now,
+  idleSymbols, lastTickAt,
 }: {
   longs:     OpportunityVM[];
   shorts:    OpportunityVM[];
+  /** Pass 6.1 — FLAT/HOLD signals routed by `lean` into the LONGS
+   *  and SHORTS columns as a dimmed EVALUATING tier. Surfaces the
+   *  engine's in-progress cognition across every scanned asset. */
+  evaluatingLongs:  OpportunityVM[];
+  evaluatingShorts: OpportunityVM[];
   onQueue:   (opp: OpportunityVM) => void;
   isLoading: boolean;
   isError:   boolean;
@@ -1506,6 +1513,11 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
    *  source so the ribbon, matrix, and footer all tick in lock-step
    *  with zero observable drift and one timer instead of three. */
   now:       number;
+  /** Pass 6.1 — symbol universe rotated by the IdleScanningPanel when
+   *  a column has zero conviction + zero evaluating bias. */
+  idleSymbols: string[];
+  /** Engine `lastTickAt` (ms epoch) for the idle-panel "last scan" line. */
+  lastTickAt:  number | null;
 }) {
   // Pass 4.7 — split by DIRECTION (longs green / shorts red) instead
   // of asset class. Restores long/short market polarity tension across
@@ -1518,6 +1530,7 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
       <Column
         title="TOP LONGS"
         opps={longs}
+        evaluating={evaluatingLongs}
         onQueue={onQueue}
         isLoading={isLoading}
         isError={isError}
@@ -1525,10 +1538,14 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
         subLabel={`BULLISH BIAS · CONFIDENCE-RANKED · ${longs.length} TRACKED`}
         tintRgba="rgba(102,255,102,0.015)"
         now={now}
+        idleSymbols={idleSymbols}
+        lastTickAt={lastTickAt}
+        idleLabel="LONG"
       />
       <Column
         title="TOP SHORTS"
         opps={shorts}
+        evaluating={evaluatingShorts}
         onQueue={onQueue}
         isLoading={isLoading}
         isError={isError}
@@ -1537,6 +1554,9 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
         tintRgba="rgba(255,77,77,0.015)"
         leftDivider
         now={now}
+        idleSymbols={idleSymbols}
+        lastTickAt={lastTickAt}
+        idleLabel="SHORT"
       />
     </section>
   );
@@ -1563,14 +1583,140 @@ const CARD_ESTIMATE_PX = 142;
 // virtualizer's `measureElement` includes it in the row's total height.
 const CARD_ROW_GAP_PX = 8;
 
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Pass 6.1 — Idle Scanning Intelligence Panel                              */
+/* Replaces the dead "No <X> match the current filters." dashed box that    */
+/* used to render when a column emitted zero LONG/SHORT signals. Instead    */
+/* of communicating "broken / empty", this panel communicates "AI actively */
+/* evaluating market structure, awaiting MTF alignment." Symbol rotation   */
+/* + cadence dot + last-scan timestamp = institutional waiting-room tone,  */
+/* not retail loading-spinner.                                              */
+/* ──────────────────────────────────────────────────────────────────────── */
+const IdleScanningPanel = memo(function IdleScanningPanel({
+  accent, symbols, lastTickAt, now, label,
+}: {
+  accent: string;
+  symbols: string[];
+  lastTickAt: number | null;
+  now: number;
+  label: string;
+}) {
+  // Rotate through the symbol pool every 1.4s using the shell's shared
+  // 1Hz tick — no extra timers, locks to the rest of the terminal cadence.
+  const pool   = symbols.length > 0 ? symbols : ["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "AVAX", "LINK"];
+  const cursor = Math.floor(now / 1400) % pool.length;
+  const focus  = pool[cursor] ?? pool[0];
+  const peek1  = pool[(cursor + 1) % pool.length];
+  const peek2  = pool[(cursor + 2) % pool.length];
+  const peek3  = pool[(cursor + 3) % pool.length];
+
+  const ageSec = lastTickAt ? Math.max(0, Math.floor((now - lastTickAt) / 1000)) : null;
+  const ageStr = ageSec === null
+    ? "—"
+    : ageSec < 60 ? `${ageSec}s ago`
+    : `${Math.floor(ageSec / 60)}m ${ageSec % 60}s ago`;
+
+  return (
+    <div style={{
+      position: "relative",
+      padding: "18px 16px",
+      border: `1px solid ${accent}22`,
+      borderRadius: 2,
+      background: `linear-gradient(180deg, ${accent}05 0%, rgba(0,0,0,0) 70%)`,
+      fontFamily: T.FONT_MONO,
+      overflow: "hidden",
+    }}>
+      {/* Faint scan-line — communicates "actively scanning" without blinking */}
+      <span aria-hidden style={{
+        position: "absolute", left: 0, right: 0, top: 0, height: 1,
+        background: `linear-gradient(90deg, transparent 0%, ${accent}55 50%, transparent 100%)`,
+        animation: "edge-sweep 4.2s linear infinite",
+        opacity: 0.55,
+      }} />
+
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8,
+        fontSize: 9, letterSpacing: T.TRACK_TITLE, color: accent, opacity: 0.85,
+      }}>
+        <span style={{
+          width: 6, height: 6, borderRadius: "50%", background: accent,
+          boxShadow: `0 0 6px ${accent}`,
+          animation: "brand-pulse 1.8s ease-in-out infinite",
+        }} />
+        AWAITING {label} ALIGNMENT
+      </div>
+
+      <div style={{
+        marginTop: 14,
+        fontSize: 11, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL,
+      }}>
+        AI EVALUATING MARKET STRUCTURE
+      </div>
+
+      {/* Rotating symbol focus — the user sees the engine sweeping its
+          universe in real time. */}
+      <div style={{
+        marginTop: 10,
+        display: "flex", alignItems: "baseline", gap: 14,
+        minHeight: 28,
+      }}>
+        <span
+          key={focus}
+          style={{
+            fontSize: 22, fontWeight: 600, color: T.TEXT_0,
+            letterSpacing: T.TRACK_DISPLAY,
+            animation: "brand-pulse 1.4s ease-out",
+          }}
+        >
+          {focus}
+        </span>
+        <span style={{ fontSize: 10, color: T.TEXT_2, opacity: 0.55 }}>
+          NEXT · {peek1} · {peek2} · {peek3}
+        </span>
+      </div>
+
+      <div style={{
+        marginTop: 14,
+        display: "flex", justifyContent: "space-between",
+        fontSize: 9, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL,
+      }}>
+        <span>POOL · {pool.length} ASSETS</span>
+        <span>LAST SCAN · {ageStr}</span>
+      </div>
+
+      <div style={{
+        marginTop: 6,
+        fontSize: 9, color: T.TEXT_2, opacity: 0.45,
+        letterSpacing: T.TRACK_LABEL,
+      }}>
+        NO QUALIFYING {label} OPPORTUNITY · CRITERIA NOT YET MET
+      </div>
+    </div>
+  );
+});
+
 const Column = memo(function Column({
-  title, opps, onQueue, isLoading, isError,
+  title, opps, evaluating, onQueue, isLoading, isError,
   accent, subLabel, tintRgba, leftDivider = false, now,
+  idleSymbols, lastTickAt, idleLabel,
 }: {
   title: string; opps: OpportunityVM[]; onQueue: (opp: OpportunityVM) => void;
+  /** Pass 6.1 — FLAT/HOLD signals routed into this column by `lean`.
+   *  Rendered as a dimmed subordinate tier beneath the active opps so
+   *  the user sees the AI's in-progress cognition (every symbol it is
+   *  currently evaluating) instead of a void when no conviction exists. */
+  evaluating: OpportunityVM[];
   isLoading: boolean; isError: boolean;
   accent: string; subLabel: string; tintRgba: string; leftDivider?: boolean;
   now: number;
+  /** Symbols cycled in the IdleScanningPanel — typically the full
+   *  opportunity universe so the user sees the engine sweeping every
+   *  asset it knows about. */
+  idleSymbols: string[];
+  /** Engine `lastTickAt` from `/api/engine/status`, ms epoch. */
+  lastTickAt: number | null;
+  /** Column polarity label for the idle panel ("LONG" / "SHORT"). */
+  idleLabel: string;
 }) {
   const parentRef = useRef<HTMLDivElement | null>(null);
 
@@ -1632,7 +1778,7 @@ const Column = memo(function Column({
           contain: "layout",
         }}
       >
-        {isError && !showList && (
+        {isError && !showList && evaluating.length === 0 && (
           <div style={{
             padding: 24, textAlign: "center", color: "#FF4D4D", fontFamily: T.FONT_MONO,
             border: `1px dashed #FF4D4D55`, fontSize: 11,
@@ -1640,13 +1786,28 @@ const Column = memo(function Column({
             ENGINE FEED UNAVAILABLE · /api/engine/status failed · retrying…
           </div>
         )}
-        {!isError && !showList && (
-          <div style={{
-            padding: 24, textAlign: "center", color: T.TEXT_2, fontFamily: T.FONT_MONO,
-            border: `1px dashed ${T.BORDER}`, fontSize: 11,
-          }}>
-            {isLoading ? "Loading engine signals…" : `No ${title.toLowerCase()} match the current filters.`}
-          </div>
+        {/* Pass 6.1 — when no active LONG/SHORT exists in this column
+            AND no evaluating bias is leaning this way, surface the
+            institutional idle-scan intelligence panel instead of a
+            dead box. The engine being healthy + waiting is the most
+            common state; communicate it as such. */}
+        {!isError && !showList && evaluating.length === 0 && (
+          isLoading ? (
+            <div style={{
+              padding: 24, textAlign: "center", color: T.TEXT_2, fontFamily: T.FONT_MONO,
+              border: `1px dashed ${T.BORDER}`, fontSize: 11,
+            }}>
+              Loading engine signals…
+            </div>
+          ) : (
+            <IdleScanningPanel
+              accent={accent}
+              symbols={idleSymbols}
+              lastTickAt={lastTickAt}
+              now={now}
+              label={idleLabel}
+            />
+          )
         )}
         {showList && (
           <div style={{
@@ -1679,6 +1840,56 @@ const Column = memo(function Column({
               );
             })}
           </div>
+        )}
+
+        {/* Pass 6.1 — EVALUATING tier. Engine HOLDs with a directional
+            lean rendered subordinate to active conviction. Wrapped in a
+            dim/desaturate layer with pointer-events disabled so QUEUE
+            chips can't be pressed (FLAT direction is rejected by
+            `queuePaper` anyway). Communicates "AI is processing these
+            assets but has not committed yet" — exactly how institutional
+            systems behave. */}
+        {evaluating.length > 0 && (
+          <>
+            <div style={{
+              marginTop: showList ? 14 : 0,
+              display: "flex", alignItems: "center", gap: 10,
+              fontFamily: T.FONT_MONO, fontSize: 9,
+              letterSpacing: T.TRACK_TITLE,
+              color: T.TEXT_2,
+              paddingTop: 10, paddingBottom: 6,
+              borderTop: showList ? `1px dashed ${accent}1A` : "none",
+            }}>
+              <span style={{
+                width: 5, height: 5, borderRadius: "50%",
+                background: accent, opacity: 0.55,
+                boxShadow: `0 0 4px ${accent}80`,
+              }} />
+              EVALUATING · {evaluating.length} ASSETS · AWAITING CONFIRMATION
+            </div>
+            <div
+              aria-label="evaluating-tier"
+              aria-hidden
+              inert={"" as unknown as boolean}
+              style={{
+                opacity: 0.42,
+                filter: "saturate(0.55)",
+                pointerEvents: "none",
+                display: "flex", flexDirection: "column",
+                gap: CARD_ROW_GAP_PX,
+              }}
+            >
+              {evaluating.map((o, i) => (
+                <OpportunityCard
+                  key={`eval-${o.pair}`}
+                  opp={o}
+                  idx={opps.length + i}
+                  onQueue={onQueue}
+                  now={now}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -2385,6 +2596,37 @@ export function PortalCustomerShell() {
     [filteredOpps],
   );
 
+  // Pass 6.1 — EVALUATING tier derivation. FLAT (engine HOLD) opps
+  // routed into a column by their fast/slow TF `lean`. NEUTRAL leans
+  // render in BOTH columns at low opacity (true "we don't know yet"
+  // state). Capped at 6 per column to keep the dimmed tier visually
+  // subordinate to active conviction. Sorted by confidence so the
+  // closest-to-aligning symbols surface first.
+  const evaluatingLongs = useMemo(
+    () => filteredOpps
+      .filter(o => o.direction === "FLAT" && (o.lean === "LONG" || o.lean === "NEUTRAL"))
+      .slice(0, 6),
+    [filteredOpps],
+  );
+  const evaluatingShorts = useMemo(
+    () => filteredOpps
+      .filter(o => o.direction === "FLAT" && (o.lean === "SHORT" || o.lean === "NEUTRAL"))
+      .slice(0, 6),
+    [filteredOpps],
+  );
+
+  // Pass 6.1 — symbol universe for the IdleScanningPanel rotation.
+  // Pulled from `opportunities` (not `filteredOpps`) so the user sees
+  // the engine sweeping its entire scan pool regardless of active
+  // filter chips — communicates total surveillance, not filter scope.
+  const idleSymbols = useMemo(
+    () => Array.from(new Set(opportunities.map(o => o.symbol))),
+    [opportunities],
+  );
+  const engineLastTickAt = engineStatus?.lastTickAt
+    ? new Date(engineStatus.lastTickAt).getTime()
+    : null;
+
   // Stable identity — keeps `OpportunityMatrix` / `OpportunityCard`
   // memoization effective across the shell's 1Hz tick. `openTrade`
   // identity is provided by `usePaperTrades`; safe to depend on.
@@ -2701,10 +2943,14 @@ export function PortalCustomerShell() {
         <OpportunityMatrix
           longs={filteredLongs}
           shorts={filteredShorts}
+          evaluatingLongs={evaluatingLongs}
+          evaluatingShorts={evaluatingShorts}
           onQueue={queuePaper}
           isLoading={isLoading}
           isError={isError}
           now={nowShell}
+          idleSymbols={idleSymbols}
+          lastTickAt={engineLastTickAt}
         />
 
         <section style={{

@@ -23,6 +23,7 @@ export const MAJORS = new Set<string>([
 ]);
 
 export type Direction = "LONG" | "SHORT" | "FLAT";
+export type Lean      = "LONG" | "SHORT" | "NEUTRAL";
 export type Readiness = "READY" | "WAITING" | "GATED";
 export type MtfDot    = "green" | "amber" | "red";
 
@@ -33,6 +34,12 @@ export interface OpportunityVM {
   name:       string;     // Bitcoin
   assetClass: "MAJOR" | "ALT";
   direction:  Direction;
+  /** Pass 6.1 — even when `direction === "FLAT"` (engine HOLD), the
+   *  underlying fast/slow timeframes usually have a bias. `lean`
+   *  routes FLATs into the EVALUATING tier of the LONGS or SHORTS
+   *  column so the operator sees the AI's in-progress cognition
+   *  instead of a dead matrix. NEUTRAL = no directional bias yet. */
+  lean:       Lean;
   conf:       number;
   score:      number;
   mtf:        [MtfDot, MtfDot, MtfDot, MtfDot];
@@ -73,6 +80,25 @@ function actionToDirection(action: string): Direction {
   if (a === "BUY"  || a === "LONG")  return "LONG";
   if (a === "SELL" || a === "SHORT") return "SHORT";
   return "FLAT";
+}
+
+/** Pass 6.1 — derive a directional lean from the fast+slow timeframe
+ *  decisions. Used to route FLAT (engine HOLD) signals into the
+ *  EVALUATING tier of the appropriate column. Each TF votes:
+ *  BUY = +1, SELL = -1, HOLD = 0. Sum > 0 → LONG lean,
+ *  sum < 0 → SHORT lean, sum === 0 → NEUTRAL. NEUTRAL rows render
+ *  in BOTH columns at low opacity (true "we don't know yet" state). */
+function leanFromBreakdown(b: SymBreakdown): Lean {
+  const vote = (d: string): number => {
+    const u = (d ?? "").toUpperCase();
+    if (u === "BUY"  || u === "LONG")  return 1;
+    if (u === "SELL" || u === "SHORT") return -1;
+    return 0;
+  };
+  const sum = vote(b.fast.decision) + vote(b.slow.decision);
+  if (sum > 0) return "LONG";
+  if (sum < 0) return "SHORT";
+  return "NEUTRAL";
 }
 
 function regimeFromBreakdown(b: SymBreakdown): OpportunityVM["regime"] {
@@ -205,6 +231,7 @@ export function usePaperSignals() {
       // crypto-only today but we never want an equity ticker leaking in).
       if (/^(NVDA|TSLA|AAPL|MSFT|GOOGL|META|AMZN|SPY|QQQ|AMD|NFLX)$/.test(sym)) continue;
       const dir   = actionToDirection(b.agreedAction);
+      const lean  = leanFromBreakdown(b);
       const conf  = Math.round(b.avgConfidence);
       const score = Math.max(0, Math.min(99, Math.round((b.fast.confidence + b.slow.confidence) / 2)));
       const lastPrice = b.fast.ema9 || b.slow.ema9 || 100;
@@ -217,6 +244,7 @@ export function usePaperSignals() {
         name:       NAME_MAP[sym] ?? sym,
         assetClass: MAJORS.has(sym) ? "MAJOR" : "ALT",
         direction:  dir,
+        lean,
         conf,
         score,
         mtf:        mtfFromBreakdown(b),
