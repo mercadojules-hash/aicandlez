@@ -985,14 +985,16 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
       style={{
         background: T.BG_TERMINAL,
         border: `1px solid ${T.BORDER}`,
-        padding: 10,
+        padding: 8,
         paddingLeft: 18,
-        // Pass 4.4 — tightened inter-row gap (10→7) so the chart band
-        // can claim the reclaimed vertical real estate. Every pixel
-        // shaved off the static rows flows downstream into chart height.
-        display: "flex", flexDirection: "column", gap: 5,
+        paddingRight: 10,
+        // Pass 4.7 — outer article is now a single horizontal row. The
+        // inner flex split (left ring anchor | right telemetry+chart+
+        // action) replaces the previous vertical stack so the chart
+        // becomes the dominant horizontal movement surface.
+        display: "flex", flexDirection: "row", gap: 0,
         position: "relative", overflow: "hidden",
-        height: 268,
+        height: 142,
         fontFamily: T.FONT_MONO,
         // Deterministic hover cadence — background + border tinted in lock-step.
         transition: `background-color ${T.TX_FAST}, border-color ${T.TX_FAST}`,
@@ -1019,86 +1021,38 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           pointerEvents: "none", zIndex: 1,
         }}
       />
-      {/* Header — Pass 4.5: score chip + signal-age telemetry pulled
-          INTO the header right-side cluster so the standalone meta
-          strip can be retired and the chart band can claim the
-          reclaimed vertical space. Direction pill remains the primary
-          right-side anchor. */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 17, fontWeight: 700, color: T.TEXT_0, letterSpacing: "-0.01em" }}>{opp.symbol}</span>
-          <span style={{
-            fontSize: 10, padding: "2px 6px", borderRadius: 3,
-            background: "rgba(255,255,255,0.05)", color: T.TEXT_1,
-          }}>{opp.assetClass}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span
-            title={`Signal age ${ageStr} · execution latency ${opp.latency}`}
-            style={{
-              fontSize: 10, color: T.TEXT_2,
-              fontVariantNumeric: "tabular-nums",
-              // Flicker only while telemetry is genuinely live (<10s).
-              animation: isLiveTick ? "telemetry-flicker 1.6s ease-in-out infinite" : undefined,
-              animationDelay: isLiveTick ? `-${flickerDelayMs}ms` : undefined,
-            }}>
-            <span style={{ color: T.TEXT_1 }}>{ageStr}</span>
-            <span style={{ opacity: 0.45, margin: "0 3px" }}>·</span>
-            {opp.latency}
-          </span>
-          <span style={{
-            fontSize: 10, background: "rgba(255,255,255,0.08)",
-            color: T.TEXT_0, padding: "1px 6px", borderRadius: 2,
-            fontVariantNumeric: "tabular-nums",
-          }}>{opp.score}</span>
-          <span style={{
-            fontSize: 11, padding: "2px 8px",
-            border: `1px solid ${dirBorder}`,
-            background: dirBg,
-            color: dirColor, fontWeight: 700, letterSpacing: "0.10em",
-            borderRadius: 3,
-          }}>
-            {opp.direction}
-          </span>
-        </div>
-      </div>
-
-      {/* Middle: confidence ring + MTF + momentum
-          Pass 4.4 — confidence ring promoted from 96px to 116px and
-          re-weighted as the conviction anchor of the card. Larger
-          ring, thicker stroke, layered halo, bolder number, "AI CONF"
-          micro-label so the eye reads it as institutional conviction,
-          not a thin percentage gauge. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
-        <div style={{
-          position: "relative", flexShrink: 0,
-          width: 78, height: 78,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
+      {/* ── Pass 4.7 horizontal row layout ─────────────────────────
+          LEFT  = confidence anchor (symbol · ring · direction pill).
+          RIGHT = telemetry meta row · dominant chart rail · inline
+                  action strip (prices · readiness · reasoning · QUEUE).
+          The chart now claims the entire right-side width and reads
+          as the primary horizontal movement surface — restoring the
+          original "live execution terminal" cadence while preserving
+          Pass 4.4/4.5/4.6 visual upgrades (semantic conf color,
+          bezier sparkline, layered ring, flow overlay).            */}
+      {/* LEFT ANCHOR — symbol · ring · direction pill */}
+      <div style={{
+        width: 96, flexShrink: 0,
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "space-between",
+        gap: 4,
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: T.TEXT_0, letterSpacing: "-0.01em" }}>
+          {opp.symbol}
+        </span>
+        <div style={{ position: "relative", width: 78, height: 78, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <ConfidenceRing color={confColor} value={opp.conf} size={78} />
-          {/* v4.1 ring-sweep — single 30° bright arc rotating slowly over static ring.
-              Sweep only on READY — communicates "signal has crystallized, awaiting execution".
-              WAITING / GATED cards keep a static ring. Pass 4.5 — uses
-              conf-tier color so the sweep reads as conviction-signal,
-              not direction. Pass 4.6 — rescaled with ring (cx=39, r=34)
-              to preserve identical geometry at compressed size. */}
           {isReady && (
-            <svg
-              aria-hidden
-              width={78} height={78}
-              style={{
-                position: "absolute", inset: 0, pointerEvents: "none",
-                animation: "ring-sweep 12s linear infinite",
-                animationDelay: `-${sweepDelayMs}ms`,
-                transformOrigin: "50% 50%",
-              }}
-            >
-              <circle
-                cx={39} cy={39} r={34} fill="none"
+            <svg aria-hidden width={78} height={78} style={{
+              position: "absolute", inset: 0, pointerEvents: "none",
+              animation: "ring-sweep 12s linear infinite",
+              animationDelay: `-${sweepDelayMs}ms`,
+              transformOrigin: "50% 50%",
+            }}>
+              <circle cx={39} cy={39} r={34} fill="none"
                 stroke={confColor} strokeWidth={2}
                 strokeDasharray="19 195" strokeLinecap="round"
-                style={{ filter: `drop-shadow(0 0 4px ${confColor})`, opacity: 0.8 }}
-              />
+                style={{ filter: `drop-shadow(0 0 4px ${confColor})`, opacity: 0.8 }} />
             </svg>
           )}
           <div style={{
@@ -1108,63 +1062,58 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             gap: 0, lineHeight: 1,
           }}>
             <span style={{
-              fontSize: 28,
-              // Pass 4.4 — always-bold conviction typography. Glow tiered
-              // by conf so high-conviction signals visibly bloom while
-              // low-conf stays legibly restrained. Pass 4.5 — color now
-              // confTier (>=80 green / 60-79 amber / <60 red).
+              fontSize: 26,
               fontWeight: opp.conf >= 70 ? 700 : 600,
               color: confColor, letterSpacing: T.TRACK_DISPLAY,
               fontVariantNumeric: "tabular-nums",
               textShadow:
-                opp.conf >= 85 ? `0 0 14px ${confColor}, 0 0 7px ${confColor}, 0 0 3px ${confColor}` :
-                opp.conf >= 70 ? `0 0 9px ${confColor}, 0 0 4px ${confColor}` :
-                opp.conf >= 55 ? `0 0 5px ${confColor}`  :
+                opp.conf >= 85 ? `0 0 12px ${confColor}, 0 0 6px ${confColor}, 0 0 3px ${confColor}` :
+                opp.conf >= 70 ? `0 0 8px ${confColor}, 0 0 4px ${confColor}` :
+                opp.conf >= 55 ? `0 0 4px ${confColor}` :
                                  `0 0 2px ${confColor}`,
             }}>{opp.conf}</span>
             <span style={{
               fontSize: 7, fontWeight: 700, color: T.TEXT_2,
-              letterSpacing: T.TRACK_LABEL, marginTop: 0,
-              textTransform: "uppercase",
+              letterSpacing: T.TRACK_LABEL, textTransform: "uppercase",
             }}>AI Conf</span>
           </div>
         </div>
+        <span style={{
+          fontSize: 9, padding: "2px 8px",
+          border: `1px solid ${dirBorder}`,
+          background: dirBg,
+          color: dirColor, fontWeight: 700, letterSpacing: "0.10em",
+          borderRadius: 2,
+        }}>{opp.direction}</span>
+      </div>
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-          <Row label="REGIME" value={opp.regime} />
-          <Row label="VOL" value={opp.vol} />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 2 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <div style={{ display: "flex", gap: 4 }}>
-                {opp.mtf.map((m, i) => (
-                  <span
-                    key={i}
-                    title={["5m", "15m", "1H", "4H"][i]}
-                    style={{
-                      width: 11, height: 11, borderRadius: 2,
-                      background: m === "green" ? T.NEON : m === "amber" ? T.AMBER : T.RED,
-                    }}
-                  />
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 4 }}>
-                {["5m", "15m", "1H", "4H"].map(tf => (
-                  <span key={tf} style={{
-                    width: 11, fontSize: 7, color: T.TEXT_3,
-                    textAlign: "center", letterSpacing: 0,
-                  }}>{tf}</span>
-                ))}
-              </div>
+      {/* RIGHT MAIN — telemetry meta · chart rail · action strip */}
+      <div style={{
+        flex: 1, minWidth: 0,
+        display: "flex", flexDirection: "column",
+        gap: 4, paddingLeft: 12,
+      }}>
+        {/* Top meta — REGIME · VOL · MTF dots · momentum · age/latency · score */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 10, color: T.TEXT_2, lineHeight: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <span style={{ fontSize: 9, color: T.TEXT_1, letterSpacing: T.TRACK_LABEL, textTransform: "uppercase", whiteSpace: "nowrap" }}>
+              {opp.regime} <span style={{ opacity: 0.4 }}>·</span> {opp.vol}
+            </span>
+            <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
+              {opp.mtf.map((m, i) => (
+                <span key={i} title={["5m","15m","1H","4H"][i]} style={{
+                  width: 7, height: 7, borderRadius: 1,
+                  background: m === "green" ? T.NEON : m === "amber" ? T.AMBER : T.RED,
+                }} />
+              ))}
             </div>
             <div style={{ display: "flex", gap: 2 }}>
-              {[1, 2, 3].map(i => {
+              {[1,2,3].map(i => {
                 const lit = i <= opp.momentum;
                 return (
                   <span key={i} style={{
-                    width: 5, height: 12,
+                    width: 4, height: 10,
                     background: lit ? dirColor : "rgba(255,255,255,0.10)",
-                    // Pass 4.4 — momentum bars only breathe on fresh signals.
-                    // Stale cards keep lit bars but no motion (idle-stays-still).
                     animation: lit && isFreshSignal ? "momentum-breathe 3.4s ease-in-out infinite" : undefined,
                     animationDelay: lit && isFreshSignal ? `${(i - 1) * 150}ms` : undefined,
                   }} />
@@ -1172,113 +1121,109 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
               })}
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Price strip — ENTRY · STOP · TGT · R:R (derived from VM, paper-only context) */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr 1fr auto",
-        gap: 8,
-        padding: "6px 0",
-        borderTop: `1px solid ${T.BORDER}`,
-        borderBottom: `1px solid ${T.BORDER}`,
-      }}>
-        <PriceCell label="ENTRY"  value={fmtPrice(opp.entry)}  tone={T.TEXT_0} />
-        <PriceCell label="STOP"   value={fmtPrice(opp.stop)}   tone={T.RED}
-          tooltip={`Stop ${fmtPrice(opp.stop)} (${pctDelta(opp.entry, opp.stop)} from entry)`} />
-        <PriceCell label="TGT"    value={fmtPrice(opp.target)} tone={T.NEON}
-          tooltip={`Target ${fmtPrice(opp.target)} (${pctDelta(opp.entry, opp.target)} from entry)`} />
-        <PriceCell label="R:R"    value={rr}                   tone={dirColor} align="right" />
-      </div>
-
-      {/* Pass 4.5 — slim exchanges + quality strip. age/latency + score
-          moved into header; this row keeps the venue chips visible
-          without consuming an extra row of vertical real estate. */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        gap: 8, fontSize: 10, color: T.TEXT_2, lineHeight: 1,
-      }}>
-        <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
-          {opp.exchanges.map(ex => (
-            <span key={ex} style={{
-              fontSize: 9, color: T.TEXT_2,
-              background: "rgba(255,255,255,0.05)", padding: "1px 5px", borderRadius: 2,
-            }}>{ex}</span>
-          ))}
-        </div>
-        <span style={{ color: T.TEXT_1, fontSize: 9, letterSpacing: T.TRACK_LABEL, textTransform: "uppercase" }}>{opp.quality}</span>
-      </div>
-
-      {/* Pass 4.3 — full-width telemetry chart band.
-          Promoted from a tiny 80x36 boxed sparkline to a dominant row
-          that visually carries the card. Stretches edge-to-edge of the
-          card content box. tape-advance shimmer overlay is gated on
-          isLiveTick (under 10s since last update) so only actively-
-          ticking cards show market motion; stale cards stay still. */}
-      <div style={{
-        position: "relative",
-        width: "100%",
-        height: 62,
-        marginTop: 1,
-        background: "linear-gradient(180deg, rgba(255,255,255,0.022) 0%, rgba(0,0,0,0) 65%, rgba(255,255,255,0.014) 100%)",
-        borderTop: `1px solid ${T.BORDER}`,
-        borderBottom: `1px solid ${T.BORDER}`,
-        overflow: "hidden",
-      }}>
-        <Sparkline
-          data={opp.sparkline}
-          color={sparkColor}
-          height={62}
-          live={isFreshSignal}
-          seedDelayMs={sparkDelayMs}
-        />
-        {/* Tape-advance shimmer — a vertical translucent band that
-            sweeps left-to-right once every 6s, visually communicating
-            "market is actively flowing through this asset". Only
-            mounts when the signal stream is live (under 10s); stale
-            cards keep a static chart. Per-card deterministic delay so
-            the grid does not sync. */}
-        {isLiveTick && (
           <span
-            aria-hidden
+            title={`Signal age ${ageStr} · execution latency ${opp.latency}`}
             style={{
+              fontSize: 10, fontVariantNumeric: "tabular-nums",
+              whiteSpace: "nowrap",
+              animation: isLiveTick ? "telemetry-flicker 1.6s ease-in-out infinite" : undefined,
+              animationDelay: isLiveTick ? `-${flickerDelayMs}ms` : undefined,
+            }}>
+            <span style={{ color: T.TEXT_1 }}>{ageStr}</span>
+            <span style={{ opacity: 0.45, margin: "0 3px" }}>·</span>
+            {opp.latency}
+            <span style={{ opacity: 0.45, margin: "0 5px" }}>·</span>
+            <span style={{ background: "rgba(255,255,255,0.08)", color: T.TEXT_0, padding: "1px 5px", borderRadius: 2 }}>{opp.score}</span>
+          </span>
+        </div>
+
+        {/* CHART RAIL — dominant horizontal flow */}
+        <div style={{
+          position: "relative", width: "100%", height: 70,
+          background: "linear-gradient(180deg, rgba(255,255,255,0.022) 0%, rgba(0,0,0,0) 65%, rgba(255,255,255,0.014) 100%)",
+          borderTop: `1px solid ${T.BORDER}`,
+          borderBottom: `1px solid ${T.BORDER}`,
+          overflow: "hidden",
+        }}>
+          <Sparkline
+            data={opp.sparkline}
+            color={sparkColor}
+            height={70}
+            live={isFreshSignal}
+            seedDelayMs={sparkDelayMs}
+          />
+          {isLiveTick && (
+            <span aria-hidden style={{
               position: "absolute", top: 0, bottom: 0, left: 0, width: 80,
               background: `linear-gradient(90deg, transparent 0%, ${sparkColor} 50%, transparent 100%)`,
-              opacity: 0.10,
-              pointerEvents: "none",
+              opacity: 0.10, pointerEvents: "none",
               animation: "tape-advance 6s linear infinite",
               animationDelay: `-${sparkDelayMs}ms`,
               willChange: "transform",
-            }}
-          />
-        )}
-      </div>
+            }} />
+          )}
+        </div>
 
-      {/* Footer: readiness + action — Pass 4.6 compressed, 1-line reasoning. */}
-      <div style={{ borderTop: `1px solid ${T.BORDER}`, paddingTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        {/* Inline action strip — prices · readiness · reasoning · QUEUE */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          fontSize: 10, color: T.TEXT_2,
+          fontVariantNumeric: "tabular-nums", lineHeight: 1, minWidth: 0,
+        }}>
+          <span style={{ whiteSpace: "nowrap" }}>
+            <span style={{ color: T.TEXT_3, marginRight: 3 }}>E</span>
+            <span style={{ color: T.TEXT_0 }}>{fmtPrice(opp.entry)}</span>
+          </span>
+          <span
+            title={`Stop ${fmtPrice(opp.stop)} (${pctDelta(opp.entry, opp.stop)} from entry)`}
+            style={{ whiteSpace: "nowrap", cursor: "help" }}
+          >
+            <span style={{ color: T.TEXT_3, marginRight: 3 }}>S</span>
+            <span style={{ color: T.RED }}>{fmtPrice(opp.stop)}</span>
+          </span>
+          <span
+            title={`Target ${fmtPrice(opp.target)} (${pctDelta(opp.entry, opp.target)} from entry)`}
+            style={{ whiteSpace: "nowrap", cursor: "help" }}
+          >
+            <span style={{ color: T.TEXT_3, marginRight: 3 }}>T</span>
+            <span style={{ color: T.NEON }}>{fmtPrice(opp.target)}</span>
+          </span>
+          <span style={{ whiteSpace: "nowrap" }}>
+            <span style={{ color: T.TEXT_3, marginRight: 3 }}>R:R</span>
+            <span style={{ color: dirColor, fontWeight: 600 }}>{rr}</span>
+          </span>
           <span style={{
-            fontSize: 11, fontWeight: 700,
+            fontSize: 10, fontWeight: 700, whiteSpace: "nowrap",
             color: opp.readiness === "READY" ? T.NEON : opp.readiness === "WAITING" ? T.AMBER : T.TEXT_2,
-            display: "inline-flex", alignItems: "center", gap: 5,
+            display: "inline-flex", alignItems: "center", gap: 3,
           }}>
-            {opp.readiness === "READY"   && <CheckCircle2 size={11} />}
-            {opp.readiness === "WAITING" && <Timer size={11} />}
-            {opp.readiness === "GATED"   && <Lock size={11} />}
+            {opp.readiness === "READY"   && <CheckCircle2 size={10} />}
+            {opp.readiness === "WAITING" && <Timer size={10} />}
+            {opp.readiness === "GATED"   && <Lock size={10} />}
             {opp.readiness}
+          </span>
+          <span
+            title={gatedReason ? `Gated: ${gatedReason}` : opp.reasoning}
+            style={{
+              flex: 1, minWidth: 0,
+              fontStyle: "italic",
+              color: gatedReason ? T.AMBER : T.TEXT_2,
+              overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
+            }}>
+            {gatedReason ? `⛔ ${gatedReason}` : opp.reasoning}
           </span>
           <button
             onClick={() => ready && onQueue(opp)}
             disabled={!ready}
             style={{
-              padding: "4px 12px", fontSize: 10, fontWeight: 700,
+              padding: "3px 10px", fontSize: 9, fontWeight: 700,
               fontFamily: T.FONT_MONO, letterSpacing: T.TRACK_LABEL,
               border: `1px solid ${ready ? T.NEON : T.BORDER}`,
               background: "transparent",
               color: ready ? T.NEON : T.TEXT_3,
               cursor: ready ? "pointer" : "not-allowed",
               transition: "all 120ms ease",
+              flexShrink: 0,
             }}
             onMouseEnter={(e) => {
               if (!ready) return;
@@ -1290,27 +1235,10 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
               e.currentTarget.style.background = "transparent";
               e.currentTarget.style.color = T.NEON;
             }}
-          >
-            QUEUE PAPER
-          </button>
+          >QUEUE PAPER</button>
         </div>
-        <span
-          title={gatedReason ? `Gated: ${gatedReason}` : opp.reasoning}
-          style={{
-            fontSize: 10, fontStyle: "italic",
-            color: gatedReason ? T.AMBER : T.TEXT_2,
-            display: "-webkit-box",
-            WebkitLineClamp: 1,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-            lineHeight: 1.3,
-            maxHeight: "1.3em",
-            whiteSpace: "nowrap",
-            textOverflow: "ellipsis",
-          }}>
-          {gatedReason ? `⛔ ${gatedReason}` : opp.reasoning}
-        </span>
       </div>
+
     </article>
   );
 });
@@ -1423,47 +1351,8 @@ function ConfidenceRing({ color, value, size = 78 }: { color: string; value: num
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
-      <span style={{ color: T.TEXT_2 }}>{label}</span>
-      <span style={{ color: T.TEXT_0 }}>{value}</span>
-    </div>
-  );
-}
-
-function PriceCell({ label, value, tone, align = "left", tooltip }: {
-  label: string;
-  value: string;
-  tone: string;
-  align?: "left" | "right";
-  tooltip?: string;
-}) {
-  return (
-    <div
-      title={tooltip}
-      style={{
-        display: "flex", flexDirection: "column", gap: 1,
-        alignItems: align === "right" ? "flex-end" : "flex-start",
-        minWidth: 0,
-        cursor: tooltip ? "help" : undefined,
-    }}>
-      <span style={{
-        fontSize: 8, color: T.TEXT_3,
-        letterSpacing: "0.10em", textTransform: "uppercase",
-      }}>{label}</span>
-      <span style={{
-        fontSize: 12, color: tone, fontWeight: 600,
-        fontVariantNumeric: "tabular-nums",
-        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        maxWidth: "100%",
-      }}>{value}</span>
-    </div>
-  );
-}
-
 /* ──────────────────────────────────────────────────────────────────────── */
-/* Opportunity Matrix (Majors / Alts columns)                               */
+/* Opportunity Matrix (Longs / Shorts columns — Pass 4.7)                   */
 /* ──────────────────────────────────────────────────────────────────────── */
 
 function filterOpps(opps: OpportunityVM[], query: string, filter: Filt): OpportunityVM[] {
@@ -1521,10 +1410,10 @@ function ColumnHeader({ title, count, accent, subLabel }: {
 }
 
 const OpportunityMatrix = memo(function OpportunityMatrix({
-  majors, alts, onQueue, isLoading, isError, now,
+  longs, shorts, onQueue, isLoading, isError, now,
 }: {
-  majors:    OpportunityVM[];
-  alts:      OpportunityVM[];
+  longs:     OpportunityVM[];
+  shorts:    OpportunityVM[];
   onQueue:   (opp: OpportunityVM) => void;
   isLoading: boolean;
   isError:   boolean;
@@ -1534,31 +1423,34 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
    *  with zero observable drift and one timer instead of three. */
   now:       number;
 }) {
+  // Pass 4.7 — split by DIRECTION (longs green / shorts red) instead
+  // of asset class. Restores long/short market polarity tension across
+  // the viewport.
   return (
     <section style={{
-      display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
+      display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(520px, 1fr))",
       gap: 20, position: "relative",
     }}>
       <Column
-        title="MAJORS"
-        opps={majors}
+        title="TOP LONGS"
+        opps={longs}
         onQueue={onQueue}
         isLoading={isLoading}
         isError={isError}
         accent="#66FF66"
-        subLabel={`TIER 1 · CORE LIQUIDITY · ${majors.length} TRACKED`}
+        subLabel={`BULLISH BIAS · CONFIDENCE-RANKED · ${longs.length} TRACKED`}
         tintRgba="rgba(102,255,102,0.015)"
         now={now}
       />
       <Column
-        title="ALTS / EMERGING"
-        opps={alts}
+        title="TOP SHORTS"
+        opps={shorts}
         onQueue={onQueue}
         isLoading={isLoading}
         isError={isError}
-        accent="#7CFF00"
-        subLabel={`TIER 2 · EMERGING · HIGH BETA · ${alts.length} TRACKED`}
-        tintRgba="rgba(124,255,0,0.015)"
+        accent="#FF4D4D"
+        subLabel={`BEARISH BIAS · CONFIDENCE-RANKED · ${shorts.length} TRACKED`}
+        tintRgba="rgba(255,77,77,0.015)"
         leftDivider
         now={now}
       />
@@ -1571,15 +1463,16 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
 // only sets the initial scrollbar geometry. Dialed in against the
 // approved CommandDeck mockup density: confidence ring + reasoning
 // block + sparkline + exchange row ≈ 380px tall.
-// Pass 4.6 — density restoration. Original platform's psychological
-// power came from many telemetry rails moving simultaneously, longs and
-// shorts creating market tension across a dense viewport. Pass 4.4/4.5
-// pushed card height to 388 chasing cinematic scale; this pass walks
-// that back to 268 while preserving every visual upgrade (semantic
-// confidence color, bezier-smoothed sparklines, layered ring, flow
-// overlay) at a tighter scale. Goal: ~3 cards per ~900px column → the
-// scanning rhythm the operators expect.
-const CARD_ESTIMATE_PX = 268;
+// Pass 4.7 — horizontal row layout. Cards re-architected from
+// vertical stack (268px) into a wide row (142px) so the chart band
+// becomes the dominant horizontal movement surface and 5-6 cards fit
+// per ~900px column. Columns now split by DIRECTION (longs/shorts)
+// instead of asset class (majors/alts) so the viewport reads as
+// long/short market tension — the original platform's psychological
+// signature. Every Pass 4.4/4.5/4.6 visual upgrade preserved
+// (semantic confidence color, bezier sparkline, layered ring, flow
+// overlay) at the tighter horizontal scale.
+const CARD_ESTIMATE_PX = 142;
 // Gap between cards, preserved from the pre-virtualization flex layout
 // (was `gap: 14` on the scroll container). Absolute positioning means
 // we now carry the gap as `paddingBottom` on each row wrapper so the
@@ -2366,8 +2259,22 @@ export function PortalCustomerShell() {
   const [disclaimer, setDisclaimer] = useState(false);
   const { gate: disclaimerGate, modal: disclaimerGateModal } = useDisclaimerGate();
 
-  const filteredMajors = useMemo(() => filterOpps(majors, query, filter), [majors, query, filter]);
-  const filteredAlts   = useMemo(() => filterOpps(alts,   query, filter), [alts,   query, filter]);
+  // Pass 4.7 — re-split by direction (LONG/SHORT) from the combined
+  // opportunity stream, then take top 10 by inbound confidence rank
+  // (engine already sorts by score). MAJORS/ALTS asset-class filter
+  // pills still narrow within each column via `filterOpps`.
+  const filteredOpps = useMemo(
+    () => filterOpps(opportunities, query, filter),
+    [opportunities, query, filter],
+  );
+  const filteredLongs  = useMemo(
+    () => filteredOpps.filter(o => o.direction === "LONG").slice(0, 10),
+    [filteredOpps],
+  );
+  const filteredShorts = useMemo(
+    () => filteredOpps.filter(o => o.direction === "SHORT").slice(0, 10),
+    [filteredOpps],
+  );
 
   // Stable identity — keeps `OpportunityMatrix` / `OpportunityCard`
   // memoization effective across the shell's 1Hz tick. `openTrade`
@@ -2578,8 +2485,8 @@ export function PortalCustomerShell() {
         />
 
         <OpportunityMatrix
-          majors={filteredMajors}
-          alts={filteredAlts}
+          longs={filteredLongs}
+          shorts={filteredShorts}
           onQueue={queuePaper}
           isLoading={isLoading}
           isError={isError}
