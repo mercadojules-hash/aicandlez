@@ -155,7 +155,9 @@ change must be role-gated; never merge the two worlds.
   MarketRegime, AIThroughput, ExecutionAwareness, EnableLiveAITradingBar).
 - `hooks/usePaperSignals.ts` — crypto-only adapter to `SymBreakdown` +
   candles → `OpportunityVM`. Hardcoded MAJORS = BTC ETH SOL XRP ADA
-  DOGE AVAX LINK MATIC ATOM; ALTS = remainder.
+  DOGE AVAX LINK POL ATOM; ALTS = remainder (Pass 6.2: NEAR APT ARB
+  OP FIL added to engine pool; MATIC rebranded to POL on both
+  Coinbase + Kraken).
 - **Animation policy (focus #1):** every motion must answer "what
   intelligence state is this communicating?". Card animations gated on
   `isReady` / `isFreshSignal` (<30s) / `isLiveTick` (<10s). Footer

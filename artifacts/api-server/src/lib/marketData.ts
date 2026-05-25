@@ -74,6 +74,18 @@ const COINBASE_SYMBOLS: Record<string, string> = {
   AVAXUSD: "AVAX-USD",
   LINKUSD: "LINK-USD",
   ADAUSD:  "ADA-USD",
+  // Pass 6.2 — symbol pool 8 → 15. Majors-tier alts with deep
+  // Kraken + Coinbase liquidity, approved by product. Expands scan
+  // variety + evaluation churn without loosening engine discipline.
+  // Note: MATIC was rebranded to POL on both Coinbase and Kraken
+  // (Polygon 2.0 migration) — using POL/POL-USD here.
+  POLUSD:  "POL-USD",
+  ATOMUSD: "ATOM-USD",
+  NEARUSD: "NEAR-USD",
+  APTUSD:  "APT-USD",
+  ARBUSD:  "ARB-USD",
+  OPUSD:   "OP-USD",
+  FILUSD:  "FIL-USD",
 };
 
 // Kraken pair names differ from the spot symbol — BTC is XBT, DOGE is XDG.
@@ -86,6 +98,15 @@ const KRAKEN_SYMBOLS: Record<string, string> = {
   AVAXUSD: "AVAXUSD",
   LINKUSD: "LINKUSD",
   ADAUSD:  "ADAUSD",
+  // Pass 6.2 — mirror Coinbase additions. Kraken uses straight
+  // <SYM>USD form for all of these; no XBT-style aliases needed.
+  POLUSD:  "POLUSD",
+  ATOMUSD: "ATOMUSD",
+  NEARUSD: "NEARUSD",
+  APTUSD:  "APTUSD",
+  ARBUSD:  "ARBUSD",
+  OPUSD:   "OPUSD",
+  FILUSD:  "FILUSD",
 };
 
 // Coinbase candle granularity is seconds; Kraken is minutes.

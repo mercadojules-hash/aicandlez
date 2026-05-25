@@ -39,7 +39,7 @@ const EXECUTING_WINDOW_MS = 6_000;
 // Symbol classification — kept aligned with CommandCenter.tsx CRYPTO_SYMS.
 // Anything not in this set is treated as equities.
 const CRYPTO_BASES = new Set([
-  "BTC","ETH","SOL","XRP","ADA","AVAX","DOGE","LINK","DOT","MATIC","LTC",
+  "BTC","ETH","SOL","XRP","ADA","AVAX","DOGE","LINK","DOT","POL","MATIC","LTC",
   "ATOM","NEAR","ALGO","FIL","ARB","OP","INJ","SUI","APT","BCH","UNI",
   "AAVE","ETC",
 ]);

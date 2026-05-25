@@ -17,9 +17,11 @@ import type { EngineStatus, SymBreakdown } from "../components/command/types";
 const apiBaseUrl: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
 
-/** Hardcoded majors universe — everything else returned by the engine is an alt. */
+/** Hardcoded majors universe — everything else returned by the engine is an alt.
+ *  Pass 6.2: MATIC → POL (Polygon 2.0 rebrand). MAJORS list unchanged in size;
+ *  newly-added ATOM-tier alts (NEAR, APT, ARB, OP, FIL) flow into the ALT column. */
 export const MAJORS = new Set<string>([
-  "BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "AVAX", "LINK", "MATIC", "ATOM",
+  "BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "AVAX", "LINK", "POL", "ATOM",
 ]);
 
 export type Direction = "LONG" | "SHORT" | "FLAT";
@@ -63,7 +65,7 @@ export interface OpportunityVM {
 const NAME_MAP: Record<string, string> = {
   BTC: "Bitcoin", ETH: "Ethereum", SOL: "Solana", XRP: "Ripple",
   ADA: "Cardano", DOGE: "Dogecoin", AVAX: "Avalanche", LINK: "Chainlink",
-  MATIC: "Polygon", ATOM: "Cosmos", ARB: "Arbitrum", OP: "Optimism",
+  POL: "Polygon", ATOM: "Cosmos", ARB: "Arbitrum", OP: "Optimism", FIL: "Filecoin",
   SUI: "Sui", INJ: "Injective", PEPE: "Pepe", FET: "Fetch.ai",
   TAO: "Bittensor", RNDR: "Render", TIA: "Celestia", JTO: "Jito",
   APT: "Aptos", NEAR: "Near", LTC: "Litecoin", BCH: "Bitcoin Cash",

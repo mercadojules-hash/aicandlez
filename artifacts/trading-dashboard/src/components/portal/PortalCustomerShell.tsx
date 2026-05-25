@@ -1877,12 +1877,12 @@ const Column = memo(function Column({
               aria-hidden
               inert={"" as unknown as boolean}
               style={{
-                // Pass 6.1a — calibrated up from 0.42/sat(0.55) which
-                // was dying into the black chassis. 0.68 + sat(0.88)
-                // keeps the tier clearly subordinate to active rows
-                // while preserving neon energy + sparkline luminance.
-                opacity: 0.68,
-                filter: "saturate(0.88)",
+                // Pass 6.1a / 6.2 — calibrated up from 0.42/sat(0.55).
+                // 0.70 + sat(0.90) keeps the tier clearly subordinate
+                // to active rows while preserving neon energy +
+                // sparkline luminance.
+                opacity: 0.70,
+                filter: "saturate(0.90)",
                 pointerEvents: "none",
                 display: "flex", flexDirection: "column",
                 gap: CARD_ROW_GAP_PX,
