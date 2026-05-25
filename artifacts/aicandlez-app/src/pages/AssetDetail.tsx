@@ -461,7 +461,13 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   const [feedback, setFeedback] = useState<ExecutionFeedbackPayload | null>(null);
   const pushFeedback = (p: Omit<ExecutionFeedbackPayload, "nonce">) =>
     setFeedback({ ...p, nonce: Date.now() });
-  const { enabled: autoActive, setEnabled: setAutoActiveCtx } = useAIAutoTrade();
+  const {
+    enabled:      autoActive,
+    allowed:      autoAllowed,
+    isAdmin:      autoIsAdmin,
+    setEnabled:   setAutoActiveCtx,
+  } = useAIAutoTrade();
+  const autoLocked = !autoAllowed && !autoIsAdmin;
   const queryClient = useQueryClient();
 
   // sym/type come from route params (component is keyed on them in App.tsx → fresh mount per asset).
@@ -601,7 +607,15 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
   const mtf1D = conf > 65;
 
   const handleExec = (type2: "buy"|"sell"|"auto") => {
-    if (type2 === "auto") { setAutoActiveCtx(!autoActive); return; }
+    if (type2 === "auto") {
+      // Subscription gate — free users cannot flip AI ON. Route to
+      // the upgrade flow; server `/api/user/ai-trading/enable` is the
+      // authoritative gate (rejects with 402 even if a user bypasses
+      // the UI), but routing here gives a fast UX path to upgrade.
+      if (autoLocked) { setLocation("/subscribe"); return; }
+      void setAutoActiveCtx(!autoActive);
+      return;
+    }
     if (orderMutation.isPending || executing) return;
     setExecuting(type2);
     setFeedback(null); // clear any stale feedback so the new result is unmistakable
@@ -1067,11 +1081,13 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
                     strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <span style={{ fontSize:19, fontFamily:SANS, fontWeight:800,
-                  color: autoActive ? "#ECFFF1" : "rgba(124,255,0,1)",
+                  color: autoLocked ? "#FFD27A" : autoActive ? "#ECFFF1" : "rgba(124,255,0,1)",
                   letterSpacing:"0.06em",
-                  textShadow: autoActive ? "0 0 22px rgba(102,255,102,0.65)" : "0 0 16px rgba(102,255,102,0.45)",
+                  textShadow: autoLocked
+                    ? "0 0 16px rgba(255,176,32,0.45)"
+                    : autoActive ? "0 0 22px rgba(102,255,102,0.65)" : "0 0 16px rgba(102,255,102,0.45)",
                   transition:"all 0.30s ease" }}>
-                  {autoActive ? "AI AUTO TRADE ACTIVE" : "ENABLE AI AUTO TRADE"}
+                  {autoLocked ? "UPGRADE TO ENABLE AI" : autoActive ? "AI AUTO TRADE ACTIVE" : "ENABLE AI AUTO TRADE"}
                 </span>
                 {autoActive && (
                   <div style={{ width:9, height:9, borderRadius:"50%", background:"#66FF66",
@@ -1079,11 +1095,15 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
                 )}
               </div>
               <span style={{ fontSize:9.5, fontFamily:SANS,
-                color: autoActive ? "rgba(102,255,102,0.80)" : "rgba(102,255,102,0.62)",
+                color: autoLocked
+                  ? "rgba(255,210,140,0.80)"
+                  : autoActive ? "rgba(102,255,102,0.80)" : "rgba(102,255,102,0.62)",
                 letterSpacing:"0.14em", textTransform:"uppercase" as const, fontWeight:700 }}>
-                {autoActive
-                  ? `AI managing ${sym} · ${conf}% confidence · Stop-loss active`
-                  : `Let AI trade ${sym} · ${conf}% confidence · Risk-calibrated`}
+                {autoLocked
+                  ? `AI Auto Trade is a paid feature · Starts at $39.99/mo`
+                  : autoActive
+                    ? `AI managing ${sym} · ${conf}% confidence · Stop-loss active`
+                    : `Let AI trade ${sym} · ${conf}% confidence · Risk-calibrated`}
               </span>
             </div>
           </button>

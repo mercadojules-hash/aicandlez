@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { userSettingsTable, userConsentsTable, usersTable, DISCLAIMER_VERSION, ALERT_KEYS, type AlertKey, type AlertPrefs } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
+import { resolveAiTradingGate } from "../lib/aiTradingGate.js";
 import type { Request } from "express";
 
 const router = Router();
@@ -148,6 +149,24 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
       }
       patch.alertPrefs = cleaned;        // resolved below after merge with current
       patch.__mergeAlertPrefs = true;    // sentinel handled before update
+    } else if (k === "autoMode") {
+      // Strict boolean coercion — never accept truthy non-bools like
+      // "true" / 1 / "1" / "on". A free user trying to bypass the
+      // subscription gate by sending `{"autoMode":"true"}` would
+      // otherwise skip the `=== true` check below and reach the DB
+      // write. Reject anything that isn't a literal boolean.
+      if (typeof v !== "boolean") {
+        res.status(400).json({ error: "autoMode must be a boolean" });
+        return;
+      }
+      patch[k] = v;
+    } else if (k === "tradingMode") {
+      // Whitelist enum — same anti-bypass rationale as `autoMode`.
+      if (v !== "simulation" && v !== "live") {
+        res.status(400).json({ error: "tradingMode must be 'simulation' or 'live'" });
+        return;
+      }
+      patch[k] = v;
     } else {
       patch[k] = v;
     }
@@ -158,12 +177,32 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  // Risk-disclaimer gate: any attempt to enable LIVE execution or AUTONOMOUS
-  // (auto) AI trading requires the current disclaimer version to be accepted.
-  // Operator roles (admin / super-admin) bypass. Customers without acceptance
-  // get 412 + the same envelope the client gate already understands.
+  // Subscription gate: AI auto-trading + live execution require an
+  // active paid plan. Admin/super-admin bypass (operator surface). This
+  // duplicates the gate in POST /user/ai-trading/enable to defend
+  // against clients that bypass the dedicated endpoint and patch
+  // `autoMode` directly via PUT /user/settings. Server is the
+  // authoritative source — never trust client-side state.
   const enablesLive = patch.tradingMode === "live";
   const enablesAuto = patch.autoMode === true;
+  if (enablesLive || enablesAuto) {
+    try {
+      const gate = await resolveAiTradingGate(userId);
+      if (!gate.allowed) {
+        res.status(402).json({
+          error:        gate.reason ?? "subscription_required",
+          needsUpgrade: true,
+          plan:         gate.plan,
+          reason:       gate.reason,
+        });
+        return;
+      }
+    } catch (err) {
+      req.log.error({ err, userId }, "PUT /user/settings subscription gate failed");
+      res.status(500).json({ error: "Failed to verify subscription" });
+      return;
+    }
+  }
   if (enablesLive || enablesAuto) {
     try {
       const [userRow] = await db.select({ role: usersTable.role })

@@ -1,7 +1,9 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import https from "node:https";
 import { setSelectedExchange, getExchangeStatus } from "../lib/exchangeEngine.js";
 import { logger } from "../lib/logger.js";
+import { requireAuth } from "../middlewares/requireAuth.js";
+import { resolveAiTradingGate } from "../lib/aiTradingGate.js";
 
 const router = Router();
 
@@ -292,9 +294,30 @@ router.get("/exchange/alpaca/orders", async (req, res) => {
 
 // ── POST /api/exchange/alpaca/activate ───────────────────────────────────────
 
-router.post("/exchange/alpaca/activate", async (req, res) => {
+router.post("/exchange/alpaca/activate", requireAuth, async (req, res) => {
   if (!isConfigured()) {
     res.status(503).json({ error: "Alpaca credentials not configured" });
+    return;
+  }
+  // Subscription gate — paper-account activation is part of the AI
+  // auto-trading flow. Free users can hold a paper sandbox but cannot
+  // activate it as the AI execution target; that requires a paid plan.
+  // Admin/operator accounts bypass via `resolveAiTradingGate`.
+  try {
+    const userId = (req as Request & { clerkUserId: string }).clerkUserId;
+    const gate = await resolveAiTradingGate(userId);
+    if (!gate.allowed) {
+      res.status(402).json({
+        error:        gate.reason ?? "subscription_required",
+        needsUpgrade: true,
+        plan:         gate.plan,
+        reason:       gate.reason,
+      });
+      return;
+    }
+  } catch (err) {
+    req.log.error({ err }, "Alpaca activate: subscription gate failed");
+    res.status(500).json({ error: "Failed to verify subscription" });
     return;
   }
   try {

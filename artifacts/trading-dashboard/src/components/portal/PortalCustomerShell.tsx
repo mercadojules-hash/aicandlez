@@ -29,7 +29,7 @@
 import {
   memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode, type CSSProperties,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAuth } from "@clerk/react";
 import {
@@ -228,33 +228,59 @@ const ExchangeStatusBadge = memo(function ExchangeStatusBadge({ plan }: { plan: 
 /* ──────────────────────────────────────────────────────────────────────── */
 /* Pass 7Z — AI Trading enabled toggle (localStorage-backed)                */
 /* ──────────────────────────────────────────────────────────────────────── */
-/* Customer-side AI auto-trade toggle. Persisted to localStorage so the     */
-/* state survives reloads. Cross-tab sync via the `storage` event so a      */
-/* toggle in one tab updates the bar in every other portal tab.            */
+/* Server-backed AI auto-trade state. Source of truth lives in              */
+/* `user_settings.autoMode` on the API and is gated by                      */
+/* `resolveAiTradingGate` (plan + planStatus + role). The customer portal   */
+/* MUST treat the server response as authoritative — localStorage is no     */
+/* longer used. A free user editing localStorage cannot flip the bar to     */
+/* ON because the mutation rejects with 402 and the query continues to      */
+/* report `enabled=false`.                                                  */
 
-const AI_AUTO_TRADE_LS_KEY = "aicandlez.customer.aiAutoTrade.v1";
+interface AiTradingState {
+  enabled: boolean;
+  allowed: boolean;
+  plan:    "free" | "starter" | "pro";
+  isAdmin: boolean;
+  reason:  string | null;
+}
 
-function useAiAutoTradeEnabled(): [boolean, (next: boolean) => void] {
-  const read = (): boolean => {
-    if (typeof window === "undefined") return false;
-    try { return window.localStorage.getItem(AI_AUTO_TRADE_LS_KEY) === "1"; }
-    catch { return false; }
+const AI_TRADING_QK = ["ai-trading-state"] as const;
+
+function useAiTradingState() {
+  const qc = useQueryClient();
+  const q  = useQuery<AiTradingState>({
+    queryKey: AI_TRADING_QK,
+    queryFn: async () => {
+      const res = await authFetch("/api/user/ai-trading/state");
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      return res.json();
+    },
+    staleTime:       30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+
+  const mut = useMutation<AiTradingState, Error & { needsUpgrade?: boolean }, boolean>({
+    mutationFn: async (enabled: boolean) => {
+      const res = await authFetch("/api/user/ai-trading/enable", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ enabled }),
+      });
+      if (res.status === 402) {
+        const err = Object.assign(new Error("needs_upgrade"), { needsUpgrade: true });
+        throw err;
+      }
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      return res.json();
+    },
+    onSuccess: (data) => { qc.setQueryData(AI_TRADING_QK, data); },
+  });
+
+  const state: AiTradingState = q.data ?? {
+    enabled: false, allowed: false, plan: "free", isAdmin: false, reason: null,
   };
-  const [enabled, setEnabled] = useState<boolean>(read);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === AI_AUTO_TRADE_LS_KEY) setEnabled(e.newValue === "1");
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-  const set = useCallback((next: boolean) => {
-    setEnabled(next);
-    try { window.localStorage.setItem(AI_AUTO_TRADE_LS_KEY, next ? "1" : "0"); }
-    catch { /* ignore quota / disabled storage */ }
-  }, []);
-  return [enabled, set];
+  return { ...state, isLoading: q.isLoading, setEnabledAsync: mut.mutateAsync };
 }
 
 const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
@@ -3232,14 +3258,100 @@ function Divider({ prio }: { prio?: 2 | 3 } = {}) {
    delta between OFF/ON must be unambiguous. */
 
 const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
-  engineOnline, openPaper, slotCap,
+  engineOnline, openPaper, slotCap, onUpgrade,
 }: {
   engineOnline: boolean;
   openPaper:    number;
   slotCap:      number;
+  onUpgrade:    () => void;
 }) {
-  const [enabled, setEnabled] = useAiAutoTradeEnabled();
+  const { enabled, allowed, isAdmin, setEnabledAsync } = useAiTradingState();
   const engineLabel = engineOnline ? "AI ENGINE · ONLINE" : "AI ENGINE · WARMING UP";
+
+  // LOCKED state — subscription required (free user, non-admin).
+  // Server-authoritative: `allowed=false` means `resolveAiTradingGate`
+  // rejected this user. Clicking opens the upgrade modal; localStorage
+  // edits cannot escape this branch because `enabled` is derived from
+  // the server response, not local state.
+  const locked = !allowed && !isAdmin;
+  if (locked) {
+    return (
+      <button
+        type="button"
+        onClick={onUpgrade}
+        aria-label="Subscription required to enable AI trading — open upgrade"
+        style={{
+          width: "100%",
+          appearance: "none",
+          textAlign: "left",
+          cursor: "pointer",
+          position: "relative",
+          overflow: "hidden",
+          borderTop:    `1px solid ${T.AMBER}`,
+          borderBottom: `1px solid ${T.AMBER}`,
+          borderLeft:   "none",
+          borderRight:  "none",
+          background: "linear-gradient(90deg, rgba(255,176,32,0.22) 0%, rgba(255,176,32,0.12) 50%, rgba(255,176,32,0.22) 100%)",
+          boxShadow: "inset 0 0 24px rgba(255,176,32,0.18), 0 0 24px rgba(255,176,32,0.12)",
+          fontFamily: T.FONT_MONO,
+          padding: 0,
+          transition: T.TX_MED,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "linear-gradient(90deg, rgba(255,176,32,0.32) 0%, rgba(255,176,32,0.20) 50%, rgba(255,176,32,0.32) 100%)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "linear-gradient(90deg, rgba(255,176,32,0.22) 0%, rgba(255,176,32,0.12) 50%, rgba(255,176,32,0.22) 100%)";
+        }}
+      >
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 24, padding: "12px 16px",
+        }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <Lock size={16} color={T.AMBER} />
+            <span style={{
+              fontSize: 11, color: T.AMBER, fontWeight: 800, letterSpacing: "0.20em",
+            }}>AI LOCKED</span>
+          </div>
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "center",
+            flex: 1, minWidth: 0, textAlign: "center",
+          }}>
+            <span style={{
+              color: "#fff", fontSize: 14, fontWeight: 800,
+              letterSpacing: T.TRACK_TITLE, textShadow: "0 0 8px rgba(255,176,32,0.45)",
+            }}>
+              UPGRADE TO ENABLE AI TRADING
+            </span>
+            <span style={{
+              color: "rgba(255,235,200,0.85)", fontSize: 10, letterSpacing: T.TRACK_LABEL, marginTop: 2,
+            }}>
+              AI AUTO TRADE IS A PAID FEATURE  ·  STARTS AT $39.99/MO  ·  CANCEL ANYTIME
+            </span>
+          </div>
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 10, flexShrink: 0,
+            fontSize: 11, color: "#0A0A0A", fontWeight: 800, letterSpacing: T.TRACK_TITLE,
+            padding: "6px 14px",
+            border: `1px solid ${T.AMBER}`,
+            background: T.AMBER,
+            boxShadow: "0 0 14px rgba(255,176,32,0.55)",
+          }}>
+            UPGRADE →
+          </div>
+        </div>
+      </button>
+    );
+  }
+
+  const setEnabled = (next: boolean): void => {
+    void setEnabledAsync(next).catch((err: Error & { needsUpgrade?: boolean }) => {
+      // Race: plan downgraded between hydration and click. Refresh
+      // gate state and open upgrade modal.
+      if (err?.needsUpgrade) onUpgrade();
+    });
+  };
 
   // OFF state — saturated RED. Treat the whole bar as the CTA surface.
   if (!enabled) {
@@ -3868,6 +3980,7 @@ export function PortalCustomerShell() {
           engineOnline={engineOnline}
           openPaper={openTrades.length}
           slotCap={3}
+          onUpgrade={openUpgrade}
         />
 
         <OpportunityMatrix
