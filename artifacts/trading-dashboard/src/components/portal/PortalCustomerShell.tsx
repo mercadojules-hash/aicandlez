@@ -166,53 +166,52 @@ function useConnectedExchangeName(plan: Plan): string | null {
   return first ? first.exchange.toUpperCase() : null;
 }
 
+/* Pass 7AA — compact inline terminal chip. Was a large two-line boxed
+   container alongside the search bar; now a single-line monospace chip
+   that lives inside the toolbar button row beside CONNECT EXCHANGE.
+   Same telemetry language as the operator pulse ribbon — no large
+   panel, no card chassis. Label text per launch spec:
+     free          → "PAPER MODE"
+     subscribed    → "ALPACA PAPER" (no exchange linked)
+     subscribed +  → "<EXCHANGE> CONNECTED" (or " LIVE" if live keys)   */
 const ExchangeStatusBadge = memo(function ExchangeStatusBadge({ plan }: { plan: Plan }) {
   const connectedName = useConnectedExchangeName(plan);
-  // Resolve label + tone based on subscription + connection state.
-  // Subscribed-but-unconnected falls back to the broker paper account
-  // label per launch spec; free users always read PAPER TRADING.
-  const { label, tone, sublabel } =
+  const { label, tone } =
     plan === "free"
-      ? { label: "PAPER TRADING",         tone: T.TEXT_1, sublabel: "SIMULATED CAPITAL" }
+      ? { label: "PAPER MODE",                       tone: T.TEXT_1 }
       : connectedName
-        ? { label: connectedName,         tone: T.NEON,   sublabel: "LIVE EXCHANGE LINKED" }
-        : { label: "ALPACA PAPER ACCOUNT", tone: T.AMBER, sublabel: "AWAITING EXCHANGE CONNECT" };
+        ? { label: `${connectedName} CONNECTED`,     tone: T.NEON   }
+        : { label: "ALPACA PAPER",                   tone: T.AMBER  };
+  // Match telemetry chip language: small dot + uppercase mono label.
+  const dotShadow = tone === T.NEON  ? `0 0 6px ${T.NEON}`
+                  : tone === T.AMBER ? `0 0 5px ${T.AMBER}`
+                                     : "none";
   return (
-    <div
-      title={sublabel}
+    <span
       style={{
-        display: "inline-flex",
-        flexDirection: "column",
-        alignItems: "flex-start",
-        gap: 2,
-        padding: "8px 12px",
-        border: `1px solid ${tone === T.NEON ? tone : T.BORDER}`,
-        background: tone === T.NEON
-          ? "rgba(102,255,102,0.06)"
-          : tone === T.AMBER
-            ? "rgba(255,176,32,0.05)"
-            : "rgba(255,255,255,0.02)",
-        boxShadow: tone === T.NEON
-          ? "0 0 12px rgba(102,255,102,0.18), inset 0 1px 0 rgba(255,255,255,0.04)"
-          : "inset 0 1px 0 rgba(255,255,255,0.03)",
+        display: "inline-flex", alignItems: "center", gap: 6,
+        padding: "5px 10px",
+        border: `1px solid ${tone === T.NEON ? "rgba(102,255,102,0.45)"
+                          : tone === T.AMBER ? "rgba(255,176,32,0.40)"
+                                             : T.BORDER}`,
+        background: tone === T.NEON  ? "rgba(102,255,102,0.05)"
+                  : tone === T.AMBER ? "rgba(255,176,32,0.04)"
+                                     : "rgba(255,255,255,0.02)",
         fontFamily: T.FONT_MONO,
+        fontSize: 10, fontWeight: 700,
+        letterSpacing: T.TRACK_LABEL,
+        color: tone,
         whiteSpace: "nowrap",
         flexShrink: 0,
-        alignSelf: "stretch",
-        justifyContent: "center",
+        lineHeight: 1.2,
       }}
     >
-      <span style={{
-        fontSize: 9, color: T.TEXT_3, letterSpacing: T.TRACK_LABEL,
-      }}>
-        ACCOUNT
-      </span>
-      <span style={{
-        fontSize: 12, color: tone, fontWeight: 700, letterSpacing: T.TRACK_TITLE,
-      }}>
-        {label}
-      </span>
-    </div>
+      <span aria-hidden style={{
+        width: 6, height: 6, borderRadius: "50%",
+        background: tone, boxShadow: dotShadow, flexShrink: 0,
+      }} />
+      {label}
+    </span>
   );
 });
 
@@ -1234,7 +1233,15 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   const confColor = opp.conf >= 80 ? T.NEON : opp.conf >= 60 ? T.AMBER : T.RED;
   const dirBg    = isLong ? "rgba(102,255,102,0.10)" : opp.direction === "SHORT" ? "rgba(255,77,77,0.10)" : "rgba(255,176,32,0.10)";
   const dirBorder = isLong ? "rgba(102,255,102,0.30)" : opp.direction === "SHORT" ? "rgba(255,77,77,0.30)" : "rgba(255,176,32,0.30)";
-  const sparkColor = dirColor;
+  // Pass 7AA — sparkline color now follows the AI-confidence bucket
+  // (matches the confidence ring + global AI confidence visual
+  // language) instead of trade direction. Rule:
+  //   conf ≥ 80  → NEON GREEN (high-conviction trades pop instantly)
+  //   conf < 80  → AMBER       (medium / low conviction)
+  // SHORTs still carry red via the direction pill + railColor; the
+  // sparkline itself communicates conviction strength, not side.
+  const sparkColor = opp.conf >= 80 ? T.NEON : T.AMBER;
+  void dirColor;
   const ready = opp.readiness === "READY";
   const railColor = opp.direction === "SHORT" ? T.RED : T.NEON;
   // v4.1 deterministic per-card animation delays so 20 cards don't sync.
@@ -3818,14 +3825,6 @@ export function PortalCustomerShell() {
               suggestionPool={suggestionPool}
             />
           </div>
-          {/* Pass 7Z — exchange / account status badge. Sits inline
-              to the right of the search bar so the operator can read
-              their active account context at a glance:
-                free          → PAPER TRADING
-                subscribed    → ALPACA PAPER ACCOUNT (no exchange linked)
-                subscribed+   → connected exchange name (KRAKEN, ...)
-              Same React Query key as ExchangeTopology — single fetch. */}
-          <ExchangeStatusBadge plan={plan} />
           <div style={{
             display: "flex", flexDirection: "column", gap: 14,
             alignItems: "flex-end", flexShrink: 0,
@@ -3842,6 +3841,12 @@ export function PortalCustomerShell() {
                 onClick={() => plan === "free" ? setUpgrade(true) : setConnectOpen(true)}
                 gated={plan === "free"}
               />
+              {/* Pass 7AA — compact account/exchange status chip moved
+                  out of the search row and into the toolbar cluster,
+                  directly to the right of CONNECT EXCHANGE. Frees
+                  horizontal space and tightens the top header into
+                  one institutional terminal strip. */}
+              <ExchangeStatusBadge plan={plan} />
               {plan !== "pro" && <ToolbarBtn variant="brand" onClick={() => setUpgrade(true)}>UPGRADE</ToolbarBtn>}
               <ToolbarBtn onClick={() => setDisclaimer(true)}>DISCLAIMER</ToolbarBtn>
             </div>
