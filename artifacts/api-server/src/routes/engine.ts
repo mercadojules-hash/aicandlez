@@ -19,7 +19,8 @@ import { runAIDecision } from "../lib/aiReasoning.js";
 import { clearAllPositions } from "../lib/simulationEngine.js";
 import { registry } from "../services/exchanges/ExchangeRegistry.js";
 import { db } from "@workspace/db";
-import { tradesTable, logsTable, usersTable } from "@workspace/db";
+import { tradesTable, logsTable, usersTable, settingsTable } from "@workspace/db";
+import { settingsStore } from "../lib/settingsStore.js";
 import { eq } from "drizzle-orm";
 import {
   generateId,
@@ -36,8 +37,16 @@ const router = Router();
 const requireOperator = [requireAuth, requireRole(["admin", "super-admin"])];
 
 router.get("/engine/status", (_req, res) => {
+  // Surface server-truth execution state so frontends never trust their own
+  // localStorage assumptions about whether AI is actually running.
+  // `killSwitch` here is the platform-wide flag respected by tradingLoop.ts
+  // at tick start (line ~1023). When true, NO new orders flow anywhere.
+  const killSwitch = settingsStore.get().killSwitch === true;
+  const executionActive = engineStats.running && !killSwitch;
   res.json({
     running:            engineStats.running,
+    killSwitch,                              // platform global stop
+    executionActive,                         // running AND !killSwitch
     startedAt:          engineStats.startedAt,
     lastTickAt:         engineStats.lastTickAt,
     lastSignalAt:       engineStats.lastSignalAt,

@@ -79,7 +79,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted";
+  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted";
   error?:          string;
 }
 
@@ -526,6 +526,57 @@ export async function placeLiveAutoOrderForUser(
       logger.warn({ err, userId }, "liveUserExecution: status-block log insert failed");
     }
     return { success: false, userId, errorCode: "user_status_blocked", error: msg };
+  }
+
+  // 0a2. PER-USER AI ENABLED gate (fail-closed safety stop).
+  // Reads `user_settings.autoMode` — the server-backed truth flipped by
+  // POST /api/user/ai-trading/enable. When false, the user has explicitly
+  // halted AI execution (or never enabled it). EVERY customer-side live
+  // order MUST stop here. Admin/super-admin bypass — operator terminal
+  // routes through the no-userId entry point but if an admin authenticates
+  // and triggers this path manually we don't want their toggle to lock
+  // them out. Missing settings row → fail-closed (treat as disabled).
+  {
+    const operatorAi = await isOperatorRole(userId);
+    if (!operatorAi) {
+      let userAiEnabled = false;
+      try {
+        const [row] = await db
+          .select({ autoMode: userSettingsTable.autoMode })
+          .from(userSettingsTable)
+          .where(eq(userSettingsTable.userId, userId))
+          .limit(1);
+        userAiEnabled = row?.autoMode === true;
+      } catch (err) {
+        logger.warn({ err, userId }, "liveUserExecution: user AI flag lookup failed — failing closed");
+        userAiEnabled = false;
+      }
+      if (!userAiEnabled) {
+        const msg = "AI trading is disabled for this account. Enable AI in your portal to resume execution.";
+        await emitFailureNotification(userId, symbol, side, msg);
+        executionStreamBus.emitEvent({
+          type:     "order_rejected",
+          severity: "warn",
+          symbol, side, mode: "live",
+          gate:     "user_ai_disabled",
+          reason:   "user_ai_disabled",
+          message:  msg,
+          details:  { userId },
+        });
+        try {
+          await db.insert(logsTable).values({
+            id:      crypto.randomUUID(),
+            type:    "trade",
+            level:   "warn",
+            message: `[user_ai_disabled] ${msg}`,
+            details: { userId, symbol, side, errorCode: "user_ai_disabled" },
+          });
+        } catch (err) {
+          logger.warn({ err, userId }, "liveUserExecution: user-ai-disabled log insert failed");
+        }
+        return { success: false, userId, errorCode: "user_ai_disabled", error: msg };
+      }
+    }
   }
 
   // 0b. Trade-limit guard — rolling 24h cap. Operators in the no-userId

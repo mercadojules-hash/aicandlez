@@ -1,11 +1,17 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { settingsTable, logsTable } from "@workspace/db";
+import { settingsTable, logsTable, userAdminActionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { generateId } from "../lib/trading.js";
 import { settingsStore } from "../lib/settingsStore.js";
+import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
+import type { Request } from "express";
 
 const router = Router();
+// Global kill switch is the platform's last-resort circuit breaker. It
+// halts the entire trading loop (tradingLoop.ts respects settings.killSwitch
+// at tick start) and is therefore operator-only — never customer-callable.
+const requireOperator = [requireAuth, requireRole(["admin", "super-admin"])];
 
 async function ensureSettings() {
   const rows = await db.select().from(settingsTable).where(eq(settingsTable.id, "default")).limit(1);
@@ -37,7 +43,7 @@ router.get("/settings", async (req, res) => {
   res.json(formatSettings(settings));
 });
 
-router.put("/settings", async (req, res) => {
+router.put("/settings", ...requireOperator, async (req, res) => {
   await ensureSettings();
   const update: Partial<typeof settingsTable.$inferInsert> = {};
 
@@ -79,20 +85,53 @@ router.put("/settings", async (req, res) => {
   res.json(formatSettings(updated[0]));
 });
 
-router.post("/settings/kill-switch", async (req, res) => {
-  const { active } = req.body;
+router.post("/settings/kill-switch", ...requireOperator, async (req, res) => {
+  const active = req.body?.active === true;
+  const adminId = (req as Request & { clerkUserId?: string }).clerkUserId ?? "unknown";
+
   await ensureSettings();
+
+  // Read prior state for audit trail.
+  const [before] = await db
+    .select({ killSwitch: settingsTable.killSwitch })
+    .from(settingsTable)
+    .where(eq(settingsTable.id, "default"))
+    .limit(1);
+  const previous = before?.killSwitch ?? false;
 
   await db.update(settingsTable).set({ killSwitch: active }).where(eq(settingsTable.id, "default"));
   settingsStore.patch({ killSwitch: active }); // keep in-memory store in sync
 
+  // Dual audit: system logs (visible in operator log streams) + admin
+  // actions table (per-actor forensic trail). Admin actions table requires
+  // a targetUserId; we use the actor as target since this is a global
+  // platform change, not a user-scoped action.
   await db.insert(logsTable).values({
     id: generateId(),
     type: "system",
     level: active ? "error" : "success",
-    message: active ? "KILL SWITCH ACTIVATED — All trading stopped immediately" : "Kill switch deactivated — Trading resumed",
-    details: { killSwitch: active },
+    message: active
+      ? `KILL SWITCH ACTIVATED by ${adminId} — All trading stopped immediately`
+      : `Kill switch deactivated by ${adminId} — Trading resumed`,
+    details: { killSwitch: active, previous, adminId },
   });
+
+  try {
+    await db.insert(userAdminActionsTable).values({
+      id: generateId(),
+      actorAdminId: adminId,
+      targetUserId: adminId,
+      action: active ? "emergency_disable" : "note",
+      payload: {
+        kind: active ? "global_kill_switch_activated" : "global_kill_switch_deactivated",
+        killSwitch: active,
+        previous,
+        scope: "platform_global",
+      },
+    });
+  } catch (err) {
+    req.log.warn({ err, adminId }, "kill-switch audit row insert failed (non-fatal)");
+  }
 
   res.json({
     killSwitch: active,

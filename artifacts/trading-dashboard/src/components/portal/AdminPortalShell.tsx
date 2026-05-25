@@ -30,7 +30,7 @@ import {
   createContext, memo, useCallback, useContext, useEffect, useId, useMemo, useRef, useState,
   type ReactNode, type CSSProperties,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAuth } from "@clerk/react";
 import {
@@ -233,35 +233,83 @@ const ExchangeStatusBadge = memo(function ExchangeStatusBadge({ plan }: { plan: 
 });
 
 /* ──────────────────────────────────────────────────────────────────────── */
-/* Pass 7Z — AI Trading enabled toggle (localStorage-backed)                */
+/* Phase-1 safety remediation — AI Trading toggle is now SERVER-BACKED.     */
 /* ──────────────────────────────────────────────────────────────────────── */
-/* Customer-side AI auto-trade toggle. Persisted to localStorage so the     */
-/* state survives reloads. Cross-tab sync via the `storage` event so a      */
-/* toggle in one tab updates the bar in every other portal tab.            */
+/* Previous implementation wrote only to `localStorage`, so the toggle had  */
+/* zero effect on backend execution (tradingLoop, placeLiveAutoOrderForUser */
+/* never read it). This hook now reads/writes the canonical                 */
+/* `user_settings.autoMode` flag via the existing endpoints:                */
+/*   GET  /api/user/ai-trading/state                                        */
+/*   POST /api/user/ai-trading/enable                                       */
+/* `placeLiveAutoOrderForUser` gate 0a2 fail-closes when this is false.     */
+/* localStorage is retained as a transient optimistic mirror only — it is   */
+/* never the source of truth.                                               */
 
 const AI_AUTO_TRADE_LS_KEY = "aicandlez.customer.aiAutoTrade.v1";
 
-function useAiAutoTradeEnabled(): [boolean, (next: boolean) => void] {
-  const read = (): boolean => {
+interface AiTradingState {
+  enabled: boolean;
+  allowed: boolean;
+  plan:    string;
+  isAdmin: boolean;
+  reason:  string | null;
+}
+
+function useAiAutoTradeEnabled(): [boolean, (next: boolean) => void, { isPending: boolean; reason: string | null }] {
+  const qc = useQueryClient();
+
+  const { data } = useQuery<AiTradingState>({
+    queryKey: ["user-ai-trading-state"],
+    queryFn: async () => {
+      const res = await authFetch(`${apiBaseUrl}/api/user/ai-trading/state`, { credentials: "include" });
+      if (!res.ok) throw new Error(`ai-trading/state ${res.status}`);
+      const json = await res.json() as AiTradingState;
+      try { window.localStorage.setItem(AI_AUTO_TRADE_LS_KEY, json.enabled ? "1" : "0"); } catch { /* ignore */ }
+      return json;
+    },
+    // Refresh every 10s so a server-side disable (admin emergency_disable,
+    // entitlement lapse) reflects in the UI without a manual reload.
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
+    staleTime: 5_000,
+  });
+
+  const mutation = useMutation({
+    mutationFn: async (next: boolean) => {
+      const res = await authFetch(`${apiBaseUrl}/api/user/ai-trading/enable`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ enabled: next }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? body?.reason ?? `ai-trading/enable ${res.status}`);
+      }
+      return res.json() as Promise<AiTradingState>;
+    },
+    onSuccess: (state) => {
+      qc.setQueryData(["user-ai-trading-state"], state);
+      try { window.localStorage.setItem(AI_AUTO_TRADE_LS_KEY, state.enabled ? "1" : "0"); } catch { /* ignore */ }
+    },
+  });
+
+  const set = useCallback((next: boolean) => { mutation.mutate(next); }, [mutation]);
+
+  // Initial render before the query resolves — fall back to localStorage
+  // mirror so the bar doesn't flicker. Server is still the source of truth
+  // for any actual execution decision.
+  const fallback = (() => {
     if (typeof window === "undefined") return false;
-    try { return window.localStorage.getItem(AI_AUTO_TRADE_LS_KEY) === "1"; }
-    catch { return false; }
-  };
-  const [enabled, setEnabled] = useState<boolean>(read);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === AI_AUTO_TRADE_LS_KEY) setEnabled(e.newValue === "1");
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-  const set = useCallback((next: boolean) => {
-    setEnabled(next);
-    try { window.localStorage.setItem(AI_AUTO_TRADE_LS_KEY, next ? "1" : "0"); }
-    catch { /* ignore quota / disabled storage */ }
-  }, []);
-  return [enabled, set];
+    try { return window.localStorage.getItem(AI_AUTO_TRADE_LS_KEY) === "1"; } catch { return false; }
+  })();
+
+  const enabled = data?.enabled ?? fallback;
+  return [
+    enabled,
+    set,
+    { isPending: mutation.isPending, reason: data?.reason ?? null },
+  ];
 }
 
 /* ──────────────────────────────────────────────────────────────────────── */
@@ -3679,16 +3727,20 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   openPaper:    number;
   slotCap:      number;
 }) {
-  const [enabled, setEnabled] = useAiAutoTradeEnabled();
+  const [enabled, setEnabled, { isPending, reason }] = useAiAutoTradeEnabled();
   const engineLabel = engineOnline ? "AI ENGINE · ONLINE" : "AI ENGINE · WARMING UP";
 
   // OFF state — saturated RED. Treat the whole bar as the CTA surface.
+  // While a mutation is in flight, the button is disabled to prevent
+  // double-toggle races against the server-backed source of truth.
   if (!enabled) {
     return (
       <button
         type="button"
-        onClick={() => setEnabled(true)}
-        aria-label="Click to enable AI trading"
+        disabled={isPending}
+        onClick={() => { if (!isPending) setEnabled(true); }}
+        aria-label={isPending ? "Enabling AI trading…" : (reason ? `AI trading unavailable: ${reason}` : "Click to enable AI trading")}
+        aria-busy={isPending}
         style={{
           width: "100%",
           appearance: "none",
@@ -3823,8 +3875,10 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
         <div style={{ display: "inline-flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <button
             type="button"
-            onClick={() => setEnabled(false)}
-            aria-label="Disable AI trading"
+            disabled={isPending}
+            onClick={() => { if (!isPending) setEnabled(false); }}
+            aria-label={isPending ? "Pausing AI trading…" : "Disable AI trading"}
+            aria-busy={isPending}
             style={{
               fontFamily: T.FONT_MONO, fontSize: 10, fontWeight: 700,
               letterSpacing: T.TRACK_TITLE,
@@ -3832,21 +3886,24 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
               border: `1px solid rgba(255,48,64,0.55)`,
               background: "rgba(255,48,64,0.10)",
               color: "rgba(255,210,210,0.95)",
-              cursor: "pointer",
+              cursor: isPending ? "wait" : "pointer",
+              opacity: isPending ? 0.6 : 1,
               transition: T.TX_FAST,
             }}
             onMouseEnter={(e) => {
+              if (isPending) return;
               e.currentTarget.style.background = T.RED;
               e.currentTarget.style.color = "#fff";
               e.currentTarget.style.borderColor = T.RED;
             }}
             onMouseLeave={(e) => {
+              if (isPending) return;
               e.currentTarget.style.background = "rgba(255,48,64,0.10)";
               e.currentTarget.style.color = "rgba(255,210,210,0.95)";
               e.currentTarget.style.borderColor = "rgba(255,48,64,0.55)";
             }}
           >
-            DISABLE
+            {isPending ? "PAUSING…" : "DISABLE"}
           </button>
         </div>
       </div>
