@@ -1,0 +1,74 @@
+This is definitely improving. The AI confidence circles are now much closer to the direction I wanted.
+
+What is working now:
+
+* the circles feel more premium
+* the confidence numbers are larger and more visually dominant
+* the cards finally have stronger focal hierarchy
+* the glow treatment is moving in the right direction
+
+However, the confidence system still needs stronger semantic color interaction.
+
+Confidence color hierarchy should communicate conviction instantly:
+
+* 80+ confidence → GREEN
+  high conviction / execution-ready / strongest signals
+
+* 60–79 confidence → ORANGE
+  moderate conviction / caution / developing setup
+
+* below 60 confidence → RED
+  weak conviction / low quality / avoid or watch
+
+Right now too many confidence values still visually read similarly. I want the confidence number + ring system to immediately communicate signal quality before reading any text.
+
+The confidence system should become:
+the emotional heartbeat of the platform.
+
+Second major feedback:
+I still do NOT like the charts yet.
+
+The charts are improving structurally, but they still do not feel like:
+
+* Bloomberg-style telemetry rails
+* live institutional market traces
+* continuously evolving execution movement
+
+Right now they still feel:
+
+* too geometric
+* too static
+* too constrained
+* too “designed”
+
+I want the charts to feel:
+
+* organic
+* flowing
+* alive
+* market-driven
+* constantly evolving with the tape
+
+More specifically:
+
+* smoother market movement
+* less rigid/angular movement
+* more natural telemetry flow
+* stronger continuous trace behavior
+* more believable live-market rhythm
+
+The charts should feel like active market telemetry — not decorative SVG graphics.
+
+Also:
+there is still too much unused space inside the cards.
+
+If we intelligently compress or relocate some metadata into the dead zones:
+
+* the chart band can become taller and wider
+* the confidence system can breathe more
+* the cards will feel denser and more premium
+* the market movement will visually dominate more of the viewport
+
+The overall direction is improving significantly.
+
+But the charts are still the missing piece preventing the platform from fully feeling “alive.”

@@ -744,7 +744,7 @@ function computeMarketPulse(
  *    crossing into arcade territory.
  */
 function Sparkline({
-  data, color, height = 110, live = false, seedDelayMs = 0,
+  data, color, height = 140, live = false, seedDelayMs = 0,
 }: {
   data: number[];
   color: string;
@@ -768,8 +768,33 @@ function Sparkline({
     x: i * step,
     y: VBH - ((v - min) / range) * VBH,
   }));
-  const points  = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   const lastPt  = pts[pts.length - 1];
+  // Pass 4.5 — smooth Catmull-Rom → cubic bezier path. Replaces the
+  // jagged polyline with organically-curved telemetry. Each segment's
+  // control points are derived from neighbour-vector tangents so the
+  // line flows like real market data instead of reading as
+  // angular/geometric SVG. Tension factor (1/6) is the canonical
+  // Catmull-Rom uniform-spline tightness — gives organic curvature
+  // without overshoot artifacts on tight reversals.
+  const smoothPath = (() => {
+    if (pts.length < 2) return "";
+    let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] ?? pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2] ?? p2;
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+    }
+    return d;
+  })();
+  // Closed area path: smooth top edge + baseline-back-to-origin so the
+  // gradient fills underneath the curve, not a polygon-of-vertices.
+  const areaPath = smoothPath + ` L ${VBW} ${VBH} L 0 ${VBH} Z`;
   // Per-instance unique id — avoids duplicate-DOM-id coupling across many
   // sparklines (architect nit, Pass 4.1). useId() output contains ":" which
   // SVG url(#...) tolerates, but sanitize for safety against future XML
@@ -791,8 +816,10 @@ function Sparkline({
   // Sliding-window highlight = 18% of trace, gap = rest. Animation runs
   // a full dashoffset cycle every 4s when live, deterministic per-card
   // delay so the grid doesn't sync.
-  const flowDash = Math.max(20, traceLen * 0.18);
-  const flowGap  = Math.max(20, traceLen - flowDash);
+  // Pass 4.5 — widened highlight band (18%→25%) so the rolling tape is
+  // visually obvious on tall sparklines, not a faint flicker.
+  const flowDash = Math.max(30, traceLen * 0.25);
+  const flowGap  = Math.max(30, traceLen - flowDash);
   return (
     <svg
       width="100%"
@@ -832,14 +859,15 @@ function Sparkline({
         strokeWidth={1} strokeDasharray="4 6"
         vectorEffect="non-scaling-stroke"
       />
-      {/* Area fill */}
-      <polygon
-        points={`0,${VBH} ${points} ${VBW},${VBH}`}
+      {/* Smooth area fill — bezier-curved underside reads as organic
+          market envelope, not faceted polygon. */}
+      <path
+        d={areaPath}
         fill={`url(#${gradId})`}
       />
-      {/* Soft outer glow stroke */}
-      <polyline
-        points={points}
+      {/* Soft outer glow stroke — smooth path */}
+      <path
+        d={smoothPath}
         fill="none" stroke={color} strokeWidth={6}
         strokeLinecap="round" strokeLinejoin="round"
         strokeOpacity={0.28}
@@ -847,30 +875,32 @@ function Sparkline({
         style={{ filter: `blur(3px)` }}
       />
       {/* Crisp inner stroke with multi-layer drop-shadow halo */}
-      <polyline
-        points={points}
+      <path
+        d={smoothPath}
         fill="none" stroke={color} strokeWidth={2.6}
         strokeLinecap="round" strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
         style={{ filter: `drop-shadow(0 0 2px ${color}) drop-shadow(0 0 5px ${color}) drop-shadow(0 0 12px ${color})` }}
       />
-      {/* Pass 4.4 — CONTINUOUS FLOW OVERLAY.
+      {/* Pass 4.4 — CONTINUOUS FLOW OVERLAY (Pass 4.5: smooth-pathed).
           A duplicate of the trace stroked with a single bright dash
           that slides along the line via stroke-dashoffset animation.
           This is the dominant motion cue: the line itself appears to
-          carry energy, not just sit there. Gated on `live` (signal
-          updated <30s ago); stale cards keep static traces. Tied to
-          telemetry state — not decorative. */}
+          carry energy, not just sit there. Pass 4.5 tuned tempo:
+          3s/cycle (was 4s) and a 25%-trace-length highlight (was 18%)
+          give a more obviously-rolling tape without crossing into
+          arcade speed. Gated on the live prop (signal updated <30s);
+          stale cards keep static traces. */}
       {live && (
-        <polyline
-          points={points}
-          fill="none" stroke={color} strokeWidth={2.6}
+        <path
+          d={smoothPath}
+          fill="none" stroke={color} strokeWidth={2.8}
           strokeLinecap="round" strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
           strokeDasharray={`${flowDash} ${flowGap}`}
           style={{
             filter: `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 10px ${color})`,
-            animation: `spark-flow 4s linear infinite`,
+            animation: `spark-flow 3s linear infinite`,
             animationDelay: `-${seedDelayMs}ms`,
             opacity: 0.95,
           }}
@@ -916,6 +946,13 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   const gatedReason = opp.readiness === "GATED" && opp.reason ? opp.reason : null;
   const isLong = opp.direction === "LONG";
   const dirColor = isLong ? T.NEON : opp.direction === "SHORT" ? T.RED : T.AMBER;
+  // Pass 4.5 — conviction-tier semantic color. The confidence system is
+  // now the "emotional heartbeat" of the platform: the eye reads signal
+  // QUALITY (>=80 green / 60-79 amber / <60 red) before reading any
+  // text. This decouples conviction from direction — a LOW-conf LONG
+  // and a LOW-conf SHORT both flash RED on the ring even though their
+  // direction pills stay green/red respectively.
+  const confColor = opp.conf >= 80 ? T.NEON : opp.conf >= 60 ? T.AMBER : T.RED;
   const dirBg    = isLong ? "rgba(102,255,102,0.10)" : opp.direction === "SHORT" ? "rgba(255,77,77,0.10)" : "rgba(255,176,32,0.10)";
   const dirBorder = isLong ? "rgba(102,255,102,0.30)" : opp.direction === "SHORT" ? "rgba(255,77,77,0.30)" : "rgba(255,176,32,0.30)";
   const sparkColor = dirColor;
@@ -982,8 +1019,12 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           pointerEvents: "none", zIndex: 1,
         }}
       />
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+      {/* Header — Pass 4.5: score chip + signal-age telemetry pulled
+          INTO the header right-side cluster so the standalone meta
+          strip can be retired and the chart band can claim the
+          reclaimed vertical space. Direction pill remains the primary
+          right-side anchor. */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 24, fontWeight: 700, color: T.TEXT_0 }}>{opp.symbol}</span>
           <span style={{
@@ -991,15 +1032,35 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             background: "rgba(255,255,255,0.05)", color: T.TEXT_1,
           }}>{opp.assetClass}</span>
         </div>
-        <span style={{
-          fontSize: 11, padding: "2px 8px",
-          border: `1px solid ${dirBorder}`,
-          background: dirBg,
-          color: dirColor, fontWeight: 700, letterSpacing: "0.10em",
-          borderRadius: 3,
-        }}>
-          {opp.direction}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            title={`Signal age ${ageStr} · execution latency ${opp.latency}`}
+            style={{
+              fontSize: 10, color: T.TEXT_2,
+              fontVariantNumeric: "tabular-nums",
+              // Flicker only while telemetry is genuinely live (<10s).
+              animation: isLiveTick ? "telemetry-flicker 1.6s ease-in-out infinite" : undefined,
+              animationDelay: isLiveTick ? `-${flickerDelayMs}ms` : undefined,
+            }}>
+            <span style={{ color: T.TEXT_1 }}>{ageStr}</span>
+            <span style={{ opacity: 0.45, margin: "0 3px" }}>·</span>
+            {opp.latency}
+          </span>
+          <span style={{
+            fontSize: 10, background: "rgba(255,255,255,0.08)",
+            color: T.TEXT_0, padding: "1px 6px", borderRadius: 2,
+            fontVariantNumeric: "tabular-nums",
+          }}>{opp.score}</span>
+          <span style={{
+            fontSize: 11, padding: "2px 8px",
+            border: `1px solid ${dirBorder}`,
+            background: dirBg,
+            color: dirColor, fontWeight: 700, letterSpacing: "0.10em",
+            borderRadius: 3,
+          }}>
+            {opp.direction}
+          </span>
+        </div>
       </div>
 
       {/* Middle: confidence ring + MTF + momentum
@@ -1014,10 +1075,12 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           width: 116, height: 116,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <ConfidenceRing color={dirColor} value={opp.conf} />
+          <ConfidenceRing color={confColor} value={opp.conf} />
           {/* v4.1 ring-sweep — single 30° bright arc rotating slowly over static ring.
               Sweep only on READY — communicates "signal has crystallized, awaiting execution".
-              WAITING / GATED cards keep a static ring. */}
+              WAITING / GATED cards keep a static ring. Pass 4.5 — uses
+              conf-tier color so the sweep reads as conviction-signal,
+              not direction. */}
           {isReady && (
             <svg
               aria-hidden
@@ -1031,9 +1094,9 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             >
               <circle
                 cx={58} cy={58} r={51} fill="none"
-                stroke={dirColor} strokeWidth={2.5}
+                stroke={confColor} strokeWidth={2.5}
                 strokeDasharray="28 292" strokeLinecap="round"
-                style={{ filter: `drop-shadow(0 0 5px ${dirColor})`, opacity: 0.8 }}
+                style={{ filter: `drop-shadow(0 0 5px ${confColor})`, opacity: 0.8 }}
               />
             </svg>
           )}
@@ -1047,15 +1110,16 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
               fontSize: 44,
               // Pass 4.4 — always-bold conviction typography. Glow tiered
               // by conf so high-conviction signals visibly bloom while
-              // low-conf stays legibly restrained.
+              // low-conf stays legibly restrained. Pass 4.5 — color now
+              // confTier (>=80 green / 60-79 amber / <60 red).
               fontWeight: opp.conf >= 70 ? 700 : 600,
-              color: dirColor, letterSpacing: T.TRACK_DISPLAY,
+              color: confColor, letterSpacing: T.TRACK_DISPLAY,
               fontVariantNumeric: "tabular-nums",
               textShadow:
-                opp.conf >= 85 ? `0 0 22px ${dirColor}, 0 0 12px ${dirColor}, 0 0 4px ${dirColor}` :
-                opp.conf >= 70 ? `0 0 14px ${dirColor}, 0 0 6px ${dirColor}` :
-                opp.conf >= 55 ? `0 0 8px ${dirColor}`  :
-                                 `0 0 3px ${dirColor}`,
+                opp.conf >= 85 ? `0 0 22px ${confColor}, 0 0 12px ${confColor}, 0 0 4px ${confColor}` :
+                opp.conf >= 70 ? `0 0 14px ${confColor}, 0 0 6px ${confColor}` :
+                opp.conf >= 55 ? `0 0 8px ${confColor}`  :
+                                 `0 0 3px ${confColor}`,
             }}>{opp.conf}</span>
             <span style={{
               fontSize: 8, fontWeight: 700, color: T.TEXT_2,
@@ -1127,13 +1191,12 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         <PriceCell label="R:R"    value={rr}                   tone={dirColor} align="right" />
       </div>
 
-      {/* Meta strip — exchanges · quality · age/latency · score
-          Pulled OUT from underneath the chart so the chart can dominate
-          its own row. Single horizontal line keeps vertical real estate
-          for the telemetry band below. */}
+      {/* Pass 4.5 — slim exchanges + quality strip. age/latency + score
+          moved into header; this row keeps the venue chips visible
+          without consuming an extra row of vertical real estate. */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        gap: 8, fontSize: 10, color: T.TEXT_2,
+        gap: 8, fontSize: 10, color: T.TEXT_2, lineHeight: 1,
       }}>
         <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
           {opp.exchanges.map(ex => (
@@ -1142,28 +1205,8 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
               background: "rgba(255,255,255,0.05)", padding: "1px 5px", borderRadius: 2,
             }}>{ex}</span>
           ))}
-          <span style={{ color: T.TEXT_1, marginLeft: 6 }}>{opp.quality}</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span
-            title={`Signal age ${ageStr} · execution latency ${opp.latency}`}
-            style={{
-              color: T.TEXT_2,
-              // Flicker only while telemetry is genuinely live (<10s since update).
-              // Static otherwise — prevents 20 cards from breathing in perpetuity.
-              animation: isLiveTick ? "telemetry-flicker 1.6s ease-in-out infinite" : undefined,
-              animationDelay: isLiveTick ? `-${flickerDelayMs}ms` : undefined,
-              fontVariantNumeric: "tabular-nums",
-            }}>
-            <span style={{ color: T.TEXT_1 }}>{ageStr}</span>
-            <span style={{ opacity: 0.45, margin: "0 4px" }}>·</span>
-            {opp.latency}
-          </span>
-          <span style={{
-            fontSize: 11, background: "rgba(255,255,255,0.08)",
-            color: T.TEXT_0, padding: "1px 6px", borderRadius: 2,
-          }}>{opp.score}</span>
-        </div>
+        <span style={{ color: T.TEXT_1, fontSize: 9, letterSpacing: T.TRACK_LABEL, textTransform: "uppercase" }}>{opp.quality}</span>
       </div>
 
       {/* Pass 4.3 — full-width telemetry chart band.
@@ -1175,9 +1218,9 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
       <div style={{
         position: "relative",
         width: "100%",
-        height: 110,
+        height: 140,
         marginTop: 2,
-        background: "linear-gradient(180deg, rgba(255,255,255,0.018) 0%, rgba(0,0,0,0) 70%, rgba(255,255,255,0.012) 100%)",
+        background: "linear-gradient(180deg, rgba(255,255,255,0.022) 0%, rgba(0,0,0,0) 65%, rgba(255,255,255,0.014) 100%)",
         borderTop: `1px solid ${T.BORDER}`,
         borderBottom: `1px solid ${T.BORDER}`,
         overflow: "hidden",
@@ -1185,7 +1228,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         <Sparkline
           data={opp.sparkline}
           color={sparkColor}
-          height={110}
+          height={140}
           live={isFreshSignal}
           seedDelayMs={sparkDelayMs}
         />
