@@ -280,6 +280,16 @@ interface AdminBalances {
   balances: { USD: number; BTC: number; ETH: number; SOL: number };
   ageMs?:   number;
   error?:   string;
+  // Server-computed equity rollup (api-server `fetchLiveEquityWithMeta`).
+  // `usdCash` = USD balance row. `holdingsUsd` = Σ (qty × last_price) for
+  // non-USD assets we successfully priced. `totalEquityUsd` = usdCash +
+  // holdingsUsd. `priceErrors` lists assets we hold but could not price
+  // (rendered as a soft warning chip rather than zeroing the hero).
+  usdCash?:        number;
+  holdingsUsd?:    number;
+  totalEquityUsd?: number;
+  holdings?:       Record<string, { qty: number; priceUsd: number; valueUsd: number; priceSource: "live" | "cached" }>;
+  priceErrors?:    Array<{ asset: string; qty: number; error: string }>;
 }
 interface AdminPosition {
   id:           string | number;
@@ -341,9 +351,21 @@ function useAdminTelemetry() {
   });
 
   return useMemo(() => {
-    const krakenUsd = nz(balancesQ.data?.balances?.USD);
-    const exchangeName = balancesQ.data?.exchange ?? "Kraken";
-    const connectionLive = balancesQ.data?.source === "live" || balancesQ.data?.source === "cached";
+    const b = balancesQ.data;
+    // `usdCash` is the raw USD float row from Kraken's Balance endpoint.
+    // `totalEquityUsd` is USD + Σ (qty × last_price) for held crypto
+    // (computed server-side via `fetchLiveEquityWithMeta`). When the
+    // server hasn't shipped the new fields yet (deploy skew), fall back
+    // to USD-only so the hero never renders NaN — `krakenUsd` retains
+    // its legacy meaning (= usdCash) for any consumer still reading it.
+    const usdCash        = nz(b?.usdCash ?? b?.balances?.USD);
+    const holdingsUsd    = nz(b?.holdingsUsd);
+    const totalEquityUsd = nz(b?.totalEquityUsd ?? (usdCash + holdingsUsd));
+    const krakenUsd      = usdCash;
+    const exchangeName   = b?.exchange ?? "Kraken";
+    const connectionLive = b?.source === "live" || b?.source === "cached";
+    const holdings       = b?.holdings    ?? {};
+    const priceErrors    = b?.priceErrors ?? [];
     const positions = positionsQ.data?.positions ?? [];
     const closed    = closedQ.data?.trades   ?? [];
     const rawSummary = closedQ.data?.summary;
@@ -354,8 +376,10 @@ function useAdminTelemetry() {
       total_pnl: nz(rawSummary?.total_pnl),
     };
     return {
-      krakenUsd, exchangeName, connectionLive,
-      balancesSource: balancesQ.data?.source ?? "standby",
+      krakenUsd, usdCash, holdingsUsd, totalEquityUsd,
+      holdings, priceErrors,
+      exchangeName, connectionLive,
+      balancesSource: b?.source ?? "standby",
       positions, closed, summary,
     };
   }, [balancesQ.data, positionsQ.data, closedQ.data]);
@@ -376,6 +400,17 @@ interface AdminStubCtx {
   history:    ClosedPaperTrade[];
   openTrade:  (input: { symbol: string; display?: string; side: "LONG" | "SHORT"; entry: number; stop: number; target: number }) => PaperTrade;
   closeTrade: (id: string) => void;
+  // Server-computed Kraken equity rollup. `usdCash` is the USD float
+  // (the legacy "$0.14" leftover); `totalEquityUsd` adds USD-priced
+  // crypto holdings (BTC/ETH/SOL marked-to-market via active adapter
+  // ticker). ACCOUNT STATUS strip renders `totalEquityUsd` as KRAKEN
+  // EQUITY and `usdCash` as USD CASH so the hero matches Kraken Pro.
+  exchangeBreakdown: {
+    usdCash:        number;
+    holdingsUsd:    number;
+    totalEquityUsd: number;
+    priceErrorCount: number;
+  };
 }
 
 const AdminTelemetryContext = createContext<AdminStubCtx | null>(null);
@@ -455,7 +490,12 @@ function AdminTelemetryProvider({ children }: { children: ReactNode }) {
       todayPnl,
       monthPnl:      realizedPnl,
       winRate:       closedCount > 0 ? (wins / closedCount) * 100 : 0,
-      equity:        t.krakenUsd,
+      // PAPER EQUITY hero on ACCOUNT STATUS now reflects TOTAL Kraken
+      // account value (USD cash + USD-priced crypto holdings) instead of
+      // the leftover USD float alone, so the operator sees the same
+      // number Kraken Pro shows. `usdCash` ships separately via
+      // `exchangeBreakdown` and renders as its own cell.
+      equity:        t.totalEquityUsd,
       bestSymbol,
       bestPnl,
     };
@@ -463,6 +503,12 @@ function AdminTelemetryProvider({ children }: { children: ReactNode }) {
       stats, open, history,
       openTrade: () => ({} as PaperTrade),
       closeTrade: () => { /* admin path — no-op */ },
+      exchangeBreakdown: {
+        usdCash:         t.usdCash,
+        holdingsUsd:     t.holdingsUsd,
+        totalEquityUsd:  t.totalEquityUsd,
+        priceErrorCount: t.priceErrors.length,
+      },
     };
   }, [t]);
   return <AdminTelemetryContext.Provider value={value}>{children}</AdminTelemetryContext.Provider>;
@@ -482,6 +528,7 @@ function useAdminPaperStub(): AdminStubCtx {
       open: [], history: [],
       openTrade: () => ({} as PaperTrade),
       closeTrade: () => {},
+      exchangeBreakdown: { usdCash: 0, holdingsUsd: 0, totalEquityUsd: 0, priceErrorCount: 0 },
     };
   }
   return ctx;
@@ -3216,11 +3263,18 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
   pulse:         MarketPulse;
   engineOnline:  boolean;
 }) {
-  const { stats, history } = useAdminPaperStub();
-  // Admin path: show RAW live Kraken USD balance. No paper baseline
-  // fallback — a $0 / standby / error state must render as $0 so the
-  // operator notices a broken key / unconfigured exchange immediately.
+  const { stats, history, exchangeBreakdown } = useAdminPaperStub();
+  // Admin path: show RAW live Kraken equity. No paper baseline fallback
+  // — a $0 / standby / error state must render as $0 so the operator
+  // notices a broken key / unconfigured exchange immediately.
+  //   • KRAKEN EQUITY  = USD cash + Σ (qty × last_price) for held crypto
+  //                       (server-computed via fetchLiveEquityWithMeta)
+  //   • USD CASH       = USD balance row only (the leftover float)
+  // Splitting these means a Kraken account holding $101 of ETH no
+  // longer renders as the $0.14 USD leftover.
   const equity        = stats.equity;
+  const usdCash       = exchangeBreakdown.usdCash;
+  const priceErrCount = exchangeBreakdown.priceErrorCount;
   const realizedPnl   = stats.realizedPnl;
   const unrealizedPnl = stats.unrealizedPnl;
   const openCount     = stats.openCount;
@@ -3282,7 +3336,13 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
           gap: "20px 22px",
           alignItems: "center",
         }}>
-          <Cell k="KRAKEN BALANCE" size={34} v={fmtEquity(equity)} color={equity > 0 ? T.NEON : T.AMBER} />
+          <Cell
+            k={priceErrCount > 0 ? `KRAKEN EQUITY · ${priceErrCount} UNPRICED` : "KRAKEN EQUITY"}
+            size={34}
+            v={fmtEquity(equity)}
+            color={equity > 0 ? T.NEON : T.AMBER}
+          />
+          <Cell k="USD CASH"       size={24} v={fmtEquity(usdCash)} color={usdCash > 0 ? T.TEXT_0 : T.TEXT_2} />
           <Cell k="REALIZED PNL"   size={30} v={fmtMoney(realizedPnl)}   color={realizedPnl   >= 0 ? T.NEON : T.RED} />
           <Cell k="UNREALIZED PNL" size={30} v={fmtMoney(unrealizedPnl)} color={unrealizedPnl >= 0 ? T.NEON : T.RED} />
           <Cell k="WIN %"          size={24} v={closedCount > 0 ? `${winPct}%` : "—"} color={winPct >= 50 ? T.NEON : winPct > 0 ? T.AMBER : T.TEXT_2} />

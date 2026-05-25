@@ -399,6 +399,171 @@ export async function fetchLiveBalancesWithMeta(): Promise<LiveBalancesWithMeta>
   }
 }
 
+// ── Live equity (balances + USD-priced crypto holdings) ─────────────────────
+// Background: `/api/exchange/balances` previously surfaced ONLY the USD cash
+// row from Kraken's Balance endpoint. Operators with a Kraken account
+// holding crypto (e.g. ETH worth $101) saw "KRAKEN BALANCE = $0.14" — the
+// leftover USD float — and not their actual account value. The admin
+// terminal must reflect TOTAL ACCOUNT EQUITY (USD cash + every crypto
+// holding marked-to-market) so that the operator's mental model matches
+// what they see in Kraken Pro.
+//
+// Equity = USD + Σ (qty_asset × last_price_assetUSD)
+//
+// Pricing strategy:
+//   • Pull live ticker once per asset per cycle via the active adapter.
+//   • Cache last-good price per (exchange, symbol) for `PRICE_CACHE_FRESH_MS`
+//     so the equity recompute doesn't fan out ticker calls every poll.
+//   • If a ticker fetch fails AND we have no cached price, mark that asset
+//     in `priceErrors` and omit it from the equity sum (under-report rather
+//     than crash). The UI shows a soft warning chip instead of zeroing the
+//     hero. A stale price is always better than no price; a missing price
+//     is always better than $0 equity.
+//   • Only price non-USD assets with a positive total. Dust below
+//     `DUST_QTY_THRESHOLD` is ignored to avoid wasting ticker calls on
+//     remnants that round to <$0.01 of equity.
+
+const PRICE_CACHE_FRESH_MS = 30_000;
+const DUST_QTY_THRESHOLD   = 1e-8;
+
+type PriceCacheEntry = { price: number; fetchedAt: number };
+const _priceCache = new Map<string, PriceCacheEntry>();
+
+function priceCacheKey(exchange: string, symbol: string): string {
+  return `${exchange}::${symbol}`;
+}
+
+/**
+ * Get a USD price for `${asset}USD` on the active exchange's adapter, using
+ * a short-lived per-(exchange,symbol) cache. Returns `{ price, source }`
+ * where source ∈ "live" | "cached" | "error". On error returns
+ * `{ price: null, source: "error", error }` so the caller can decide
+ * whether to omit the asset from the equity sum.
+ */
+async function getCachedSpotPriceUSD(
+  exchange: string,
+  asset: string,
+): Promise<{ price: number; source: "live" | "cached" } | { price: null; source: "error"; error: string }> {
+  const symbol = `${asset}USD`;
+  const key    = priceCacheKey(exchange, symbol);
+  const now    = Date.now();
+  const cached = _priceCache.get(key);
+
+  if (cached && now - cached.fetchedAt < PRICE_CACHE_FRESH_MS) {
+    return { price: cached.price, source: "cached" };
+  }
+
+  try {
+    let price = NaN;
+    if (exchange === "Kraken") {
+      const { KrakenAdapter, KRAKEN_CONFIG } = await import("../services/exchanges/adapters/KrakenAdapter.js");
+      const adapter = new KrakenAdapter({
+        ...KRAKEN_CONFIG,
+        apiKey:    process.env["KRAKEN_API_KEY"],
+        apiSecret: process.env["KRAKEN_API_SECRET"],
+      });
+      const t = await adapter.getTicker(symbol);
+      price = t.last;
+    } else if (exchange === "Coinbase") {
+      const adapter = new CoinbaseAdapter();
+      const t = await adapter.getTicker(symbol);
+      price = t.last;
+    } else if (exchange === "Alpaca") {
+      const adapter = new AlpacaAdapter();
+      const t = await adapter.getTicker(symbol);
+      price = t.last;
+    } else {
+      throw new Error(`No live-ticker adapter wired for exchange=${exchange}`);
+    }
+    if (!Number.isFinite(price) || price <= 0) {
+      throw new Error(`Adapter returned non-positive price for ${symbol}: ${price}`);
+    }
+    _priceCache.set(key, { price, fetchedAt: now });
+    return { price, source: "live" };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Fallback: serve cached even if past freshness window — a stale price
+    // is strictly better than dropping the asset from the equity total.
+    // We don't gate this on a stale window because there's no upper bound
+    // on how long a price stays "useful enough" — the equity hero just
+    // needs SOMETHING believable. If even that's missing, return error.
+    if (cached) {
+      console.warn(
+        `[exchangeEngine] getCachedSpotPriceUSD ${symbol} upstream failed; serving stale cache ageMs=${now - cached.fetchedAt} err=${msg}`,
+      );
+      return { price: cached.price, source: "cached" };
+    }
+    console.warn(`[exchangeEngine] getCachedSpotPriceUSD ${symbol} failed with no cache: ${msg}`);
+    return { price: null, source: "error", error: msg };
+  }
+}
+
+export interface LiveEquityWithMeta extends LiveBalancesWithMeta {
+  /** USD cash row (Balance endpoint `USD`). */
+  usdCash:        number;
+  /** Σ (qty_asset × last_price) across non-USD assets we could price. */
+  holdingsUsd:    number;
+  /** usdCash + holdingsUsd — what the UI shows as "KRAKEN EQUITY". */
+  totalEquityUsd: number;
+  /** Per-asset USD value (omitted when qty<=dust or price unavailable). */
+  holdings:       Record<string, { qty: number; priceUsd: number; valueUsd: number; priceSource: "live" | "cached" }>;
+  /** Assets we hold but could not price (UI shows a soft warning chip). */
+  priceErrors:    Array<{ asset: string; qty: number; error: string }>;
+}
+
+/**
+ * Convenience wrapper. Returns the full `LiveBalancesWithMeta` payload PLUS
+ * the USD-priced equity rollup. Never throws on price errors — it
+ * under-reports equity and surfaces the missing assets in `priceErrors`
+ * so the UI can show a warning instead of falling back to $0.
+ */
+export async function fetchLiveEquityWithMeta(): Promise<LiveEquityWithMeta> {
+  const meta = await fetchLiveBalancesWithMeta();
+  const usdCash = meta.balances.USD ?? 0;
+
+  const holdings: LiveEquityWithMeta["holdings"]       = {};
+  const priceErrors: LiveEquityWithMeta["priceErrors"] = [];
+  let holdingsUsd = 0;
+
+  // Only non-USD assets with non-dust quantity participate in pricing.
+  const nonUsdAssets: Array<[string, number]> = Object.entries(meta.balances)
+    .filter(([asset, qty]) => asset !== "USD" && qty > DUST_QTY_THRESHOLD);
+
+  // Parallel ticker fetches — the price cache absorbs the bursts so we
+  // don't fan out fresh upstream calls every poll. Settles independently
+  // per asset so one ticker failure doesn't poison the whole rollup.
+  const results = await Promise.all(
+    nonUsdAssets.map(async ([asset, qty]) => {
+      const r = await getCachedSpotPriceUSD(meta.exchange, asset);
+      return { asset, qty, result: r };
+    }),
+  );
+
+  for (const { asset, qty, result } of results) {
+    if (result.source === "error") {
+      priceErrors.push({ asset, qty, error: result.error });
+      continue;
+    }
+    const valueUsd = qty * result.price;
+    holdings[asset] = {
+      qty,
+      priceUsd: result.price,
+      valueUsd,
+      priceSource: result.source,
+    };
+    holdingsUsd += valueUsd;
+  }
+
+  return {
+    ...meta,
+    usdCash,
+    holdingsUsd,
+    totalEquityUsd: usdCash + holdingsUsd,
+    holdings,
+    priceErrors,
+  };
+}
+
 /**
  * Drop in-flight + cached telemetry snapshots. Called from
  * `setSelectedExchange()` so a switch from e.g. Kraken → Coinbase does not

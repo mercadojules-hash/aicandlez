@@ -8,6 +8,7 @@ import {
   previewOrder,
   executeOrder,
   fetchLiveBalancesWithMeta,
+  fetchLiveEquityWithMeta,
   getLiveExchangeState,
   resetSimBalances,
   setSelectedExchange,
@@ -77,28 +78,55 @@ router.get("/exchange/balances", ...requireOperator, async (req, res) => {
   //   • source="error"       → upstream failed AND no usable cache
   if (status.apiConfigured) {
     try {
-      const meta = await fetchLiveBalancesWithMeta();
+      // Equity rollup wrapper. Pulls raw balances via the existing cached/
+      // single-flight `fetchLiveBalancesWithMeta`, then prices each non-USD
+      // asset via the active adapter's `getTicker` (with its own 30s price
+      // cache + stale-on-error fallback). Operator UI uses `totalEquityUsd`
+      // for the KRAKEN EQUITY hero and `usdCash` for the USD CASH cell so
+      // a Kraken account holding $101 of ETH stops rendering as the $0.14
+      // leftover USD float.
+      const equity = await fetchLiveEquityWithMeta();
       res.json({
-        source:   meta.source,
-        balances: meta.balances,
-        exchange: meta.exchange,
-        ageMs:    meta.ageMs,
-        ...(meta.error ? { error: meta.error } : {}),
+        source:         equity.source,
+        balances:       equity.balances,
+        exchange:       equity.exchange,
+        ageMs:          equity.ageMs,
+        usdCash:        equity.usdCash,
+        holdingsUsd:    equity.holdingsUsd,
+        totalEquityUsd: equity.totalEquityUsd,
+        holdings:       equity.holdings,
+        priceErrors:    equity.priceErrors,
+        ...(equity.error ? { error: equity.error } : {}),
       });
       return;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      req.log.error({ err, exchange: status.exchangeName }, "fetchLiveBalances failed (no cache fallback)");
-      res.json({ source: "error", balances: zero, exchange: status.exchangeName, error: msg });
+      req.log.error({ err, exchange: status.exchangeName }, "fetchLiveEquityWithMeta failed (no cache fallback)");
+      res.json({
+        source:         "error",
+        balances:       zero,
+        exchange:       status.exchangeName,
+        usdCash:        0,
+        holdingsUsd:    0,
+        totalEquityUsd: 0,
+        holdings:       {},
+        priceErrors:    [],
+        error:          msg,
+      });
       return;
     }
   }
   // No live keys configured — explicit standby state, NOT the sim hero.
   res.json({
-    source:   "standby",
-    balances: zero,
-    exchange: status.exchangeName,
-    error:    "Exchange API keys not configured",
+    source:         "standby",
+    balances:       zero,
+    exchange:       status.exchangeName,
+    usdCash:        0,
+    holdingsUsd:    0,
+    totalEquityUsd: 0,
+    holdings:       {},
+    priceErrors:    [],
+    error:          "Exchange API keys not configured",
   });
 });
 
