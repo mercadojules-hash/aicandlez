@@ -1,0 +1,98 @@
+We need to STOP redesigning and finish the actual product requirements.
+
+The current portal is still not matching the requested layout or functionality.
+
+REAL remaining issues:
+
+BACKGROUND / CONTRAST
+The chassis still is not black enough.
+
+The background needs to return closer to the original admin portal darkness:
+
+deeper black
+less muddy bronze haze
+less gray-green wash
+
+Right now the rows still visually blend into the chassis instead of separating from it.
+
+The rows should POP against the background.
+
+TOP 20 IS STILL NOT IMPLEMENTED
+I requested:
+TOP 20 LONGS
+TOP 20 SHORTS
+
+What is currently rendered is closer to ~8 visible rows per side.
+
+This is NOT complete.
+
+Need:
+
+proper scroll containers
+fixed-height matrix sections
+independent scrolling inside LONGS and SHORTS
+20 rendered rows each
+
+The matrix itself should scroll internally — not expand infinitely.
+
+BUY / SELL ACTIONS ARE MISSING
+The BUY / SELL controls disappeared.
+
+Those actions need to return:
+
+compact
+clean
+institutional
+visible
+not oversized
+LOWER DASHBOARD LAYOUT IS STILL WRONG
+Below the LONGS section:
+LIVE TRADES panel
+
+To the RIGHT of LIVE TRADES:
+
+TRADE HISTORY panel
+
+Both need:
+
+internal scrolling
+fixed-height containers
+readable telemetry hierarchy
+
+Current lower surfaces still collapse visually.
+
+THE ACTIVE ROWS STILL DO NOT POP ENOUGH
+The latest pass improved readability slightly, but the ACTIVE rows still do not project enough against the background.
+
+Do NOT:
+
+add giant halos
+giant green washes
+cinematic glow systems
+
+DO:
+
+darker chassis
+brighter telemetry
+stronger row separation
+cleaner border contrast
+better row elevation
+stronger readable hierarchy
+MOST IMPORTANT
+STOP doing broad redesign passes.
+
+We are now in:
+PRODUCT COMPLETION MODE.
+
+Focus ONLY on:
+
+implementing missing requirements
+fixing layout structure
+fixing scroll behavior
+fixing row count
+fixing visibility
+restoring missing actions
+
+No more cinematic redesign loops.
+
+Please verify the actual rendering logic and container structure before changing visual styling again.

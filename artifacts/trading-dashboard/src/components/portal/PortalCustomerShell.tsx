@@ -1198,11 +1198,14 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // Hierarchy is functional, not decorative. Goal: scannable
   // density, not theatrical depth.
   const tierBackground = isActive ? "#0C1410" : T.BG_TERMINAL;
-  // One light static drop-shadow so the card sits on the chassis
-  // (not into it). Same shadow for every active tier — hierarchy
-  // is in the border, not the halo.
+  // Pass 7O — active rows lift more decisively against pure-black
+  // chassis. Top-edge highlight pushed 0.025 → 0.06 so the upper
+  // pixel reads as a real bezel highlight; drop deepened so the
+  // row casts a visible shadow on the chassis. No halos, no
+  // dirColor washes — just stronger physical separation between
+  // the elevated plate and the black workspace.
   const tierShadow = isActive
-    ? `0 1px 0 rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.025)`
+    ? `inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.6), 0 2px 0 rgba(0,0,0,0.7), 0 6px 12px rgba(0,0,0,0.45)`
     : undefined;
   const liftTransform = undefined;
   const liftZ = isElite ? 2 : isStrong ? 1 : 0;
@@ -1500,31 +1503,48 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             }}>
             {gatedReason ? `⛔ ${gatedReason}` : opp.reasoning}
           </span>
-          <button
-            onClick={() => ready && onQueue(opp)}
-            disabled={!ready}
-            style={{
-              padding: "4px 12px", fontSize: 10, fontWeight: 700,
-              fontFamily: T.FONT_MONO, letterSpacing: T.TRACK_LABEL,
-              border: `1px solid ${ready ? T.NEON : T.BORDER}`,
-              background: "transparent",
-              color: ready ? T.NEON : T.TEXT_3,
-              cursor: ready ? "pointer" : "not-allowed",
-              transition: "background-color 120ms ease, color 120ms ease",
-              flexShrink: 0,
-              borderRadius: 2,
-            }}
-            onMouseEnter={(e) => {
-              if (!ready) return;
-              e.currentTarget.style.background = T.NEON;
-              e.currentTarget.style.color = "#000";
-            }}
-            onMouseLeave={(e) => {
-              if (!ready) return;
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = T.NEON;
-            }}
-          >QUEUE PAPER</button>
+          {/* Pass 7O — restore explicit BUY/SELL action.
+              7M's "QUEUE PAPER" outlined ghost at 10px disappeared
+              against the chassis. Operators expect to see the action
+              they're committing to (BUY a LONG signal, SELL a SHORT
+              signal) — semantic color, compact but visible.
+              Direction comes from the card; openTrade routes paper
+              accordingly. Disabled state preserved for !ready. */}
+          {(() => {
+            const isLong = opp.direction === "LONG";
+            const actionLabel = isLong ? "BUY" : opp.direction === "SHORT" ? "SELL" : "QUEUE";
+            const actionColor = isLong ? T.NEON : opp.direction === "SHORT" ? T.RED : T.TEXT_3;
+            const actionRgb   = isLong ? "102,255,102" : opp.direction === "SHORT" ? "255,77,77" : "255,255,255";
+            return (
+              <button
+                onClick={() => ready && onQueue(opp)}
+                disabled={!ready}
+                title={ready ? `Paper ${actionLabel} ${opp.symbol} @ ${fmtPrice(opp.entry)}` : "Awaiting signal confirmation"}
+                style={{
+                  padding: "5px 14px", fontSize: 11, fontWeight: 800,
+                  fontFamily: T.FONT_MONO, letterSpacing: "0.10em",
+                  border: `1px solid ${ready ? actionColor : T.BORDER}`,
+                  background: ready ? `rgba(${actionRgb},0.10)` : "transparent",
+                  color: ready ? actionColor : T.TEXT_3,
+                  cursor: ready ? "pointer" : "not-allowed",
+                  transition: "background-color 120ms ease, color 120ms ease",
+                  flexShrink: 0,
+                  borderRadius: 2,
+                  minWidth: 56,
+                }}
+                onMouseEnter={(e) => {
+                  if (!ready) return;
+                  e.currentTarget.style.background = actionColor;
+                  e.currentTarget.style.color = "#000";
+                }}
+                onMouseLeave={(e) => {
+                  if (!ready) return;
+                  e.currentTarget.style.background = `rgba(${actionRgb},0.10)`;
+                  e.currentTarget.style.color = actionColor;
+                }}
+              >{actionLabel}</button>
+            );
+          })()}
         </div>
       </div>
 
@@ -1991,16 +2011,22 @@ const Column = memo(function Column({
     <div style={{
       display: "flex", flexDirection: "column", gap: 14,
       position: "relative", paddingLeft: 12,
-      backgroundImage: `linear-gradient(180deg, ${tintRgba} 0%, rgba(0,0,0,0) 60%)`,
-      borderLeft: leftDivider ? `1px solid rgba(102,255,102,0.08)` : undefined,
+      // Pass 7O — tintRgba gradient REMOVED. The faint green/red
+      // column wash was creating the "muddy bronze haze" users
+      // reported. Columns now sit directly on the BG_BLACK chassis
+      // so the #0C1410 active card plates pop against pure black
+      // without any subtle workspace tint smearing the contrast.
+      borderLeft: leftDivider ? `1px solid rgba(255,255,255,0.04)` : undefined,
     }}>
       <span
         aria-hidden
         style={{
           position: "absolute", left: leftDivider ? 1 : 0, top: 0, bottom: 0,
           width: 1, background: accent,
-          boxShadow: `0 0 6px ${accent}, 0 0 2px ${accent}`,
-          opacity: 0.55, pointerEvents: "none",
+          // 7O — accent rail glow toned (was 0 0 6px + 0 0 2px). Single
+          // 2px glow at lower opacity keeps the column identity hint
+          // without contributing to the chassis haze.
+          opacity: 0.35, pointerEvents: "none",
         }}
       />
       <ColumnHeader title={title} count={opps.length} accent={accent} subLabel={subLabel} />
@@ -2011,16 +2037,19 @@ const Column = memo(function Column({
           // No `display: flex / gap` here — virtualized children are
           // absolutely positioned inside the inner spacer below.
           overflowY: "auto",
-          // Pass 7N — column tall enough to show top-20 without
-          // scrolling on standard viewports. Each row = 124px card +
-          // 8px gap = 132px. 20 active + 8 eval header + 8 eval rows
-          // = ~2900px worst case; on small viewports the
-          // calc(100vh - 280px) keeps the column inside the fold so
-          // we never blow past the page bounds. Previous cap of 1000
-          // was visually truncating the matrix to 7.5 rows and
-          // creating the "incomplete top 20" perception.
-          maxHeight: "min(calc(100vh - 240px), 2900px)",
-          minHeight: 720,
+          // Pass 7O — FIXED height container. User explicitly:
+          // "the matrix itself should scroll internally — not
+          // expand infinitely." 7N's calc(100vh-…) made the column
+          // expand to fill, which pushed the lower dashboard below
+          // the fold and made the page feel never-ending.
+          //
+          // 1320px ≈ 10 rows visible at 132px-per-row pitch. The
+          // virtualizer still mounts all 20 active + 8 eval rows;
+          // operator scrolls inside this container to see the
+          // remaining rank. This is the institutional matrix
+          // pattern (Bloomberg, TradeStation, ThinkOrSwim).
+          height: 1320,
+          maxHeight: 1320,
           paddingRight: 4,
           // `contain: strict` would clip the card hover/glow overlays;
           // `layout` alone gets the perf benefit (paint isolation, no
@@ -2349,7 +2378,7 @@ const PortfolioIntelligence = memo(function PortfolioIntelligence({ now }: { now
   const exitColor   = lastClose && lastClose.pnl >= 0 ? T.NEON : T.RED;
 
   return (
-    <PanelCard title="PORTFOLIO INTEL" height={272}>
+    <PanelCard title="LIVE TRADES" height={360} live>
       <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
           <div>
@@ -2384,8 +2413,16 @@ const PortfolioIntelligence = memo(function PortfolioIntelligence({ now }: { now
 
         {/* Position lifecycle rows — ENTRY phase glows for first 10s,
             then settles into ACTIVE. TP/SL distance + position age make
-            commitment and risk legible. */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: "auto" }}>
+            commitment and risk legible. Pass 7O — slice(0,3) removed
+            + cd-scroll added so the LIVE TRADES panel surfaces every
+            open paper position via internal scroll (fixed panel
+            height = 360, equity curve + header take ~120, leaves
+            ~220px for position rows). */}
+        <div className="cd-scroll" style={{
+          display: "flex", flexDirection: "column", gap: 5,
+          marginTop: "auto", overflowY: "auto", maxHeight: 220,
+          paddingRight: 4,
+        }}>
           {exitFresh && lastClose && (
             <div key={lastClose.id} style={{
               border: `1px solid ${exitColor}55`,
@@ -2405,7 +2442,7 @@ const PortfolioIntelligence = memo(function PortfolioIntelligence({ now }: { now
               </div>
             </div>
           )}
-          {open.slice(0, 3).map(p => {
+          {open.map(p => {
             const ageMs   = Math.max(0, now - p.openedAt);
             const isEntry = ageMs < 10_000;
             const sideCol = p.side === "LONG" ? T.NEON : T.RED;
@@ -2462,7 +2499,11 @@ const PortfolioIntelligence = memo(function PortfolioIntelligence({ now }: { now
 // the realized PnL number. The freshest exit (<6s) carries a subtle
 // inset stroke that decays to nothing — consistent with the existing
 // 7a/7 event-cadence vocabulary.
-const RECENT_EXITS_LIMIT = 8;
+// Pass 7O — limit lifted 8 → 50 since TRADE HISTORY is now a
+// dedicated fixed-height panel with internal scroll. Operator can
+// scan deep into recent execution history without leaving the
+// matrix view.
+const RECENT_EXITS_LIMIT = 50;
 
 function reasonGloss(r: "TP" | "SL" | "MANUAL"): string {
   return r === "TP" ? "TARGET HIT"
@@ -2484,7 +2525,7 @@ const RecentExits = memo(function RecentExits({ now }: { now: number }) {
   const exits = useMemo(() => history.slice(0, RECENT_EXITS_LIMIT), [history]);
 
   return (
-    <PanelCard title="RECENT EXITS" height={208}>
+    <PanelCard title="TRADE HISTORY" height={360}>
       <div className="cd-scroll" style={{
         padding: 10, overflowY: "auto", flex: 1,
         display: "flex", flexDirection: "column", gap: 4,
@@ -3510,22 +3551,39 @@ export function PortalCustomerShell() {
           lastTickAt={engineLastTickAt}
         />
 
+        {/* Pass 7O — lower dashboard restructured per user spec:
+            ROW 1 (directly under matrix): LIVE TRADES + TRADE
+              HISTORY in a dedicated 2-col grid. Both panels have
+              fixed heights with internal scroll so they never
+              collapse visually or expand the page.
+            ROW 2: remaining intelligence panels in an auto-fit
+              grid below. */}
         <section style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          gap: 14,
+          display: "flex", flexDirection: "column", gap: 14,
           paddingTop: 20,
           borderTop: `1px solid ${T.BORDER}`,
         }}>
-          <AIReasoningConsole log={engineStatus?.recentSignalLog} live={engineOnline} />
-          <PortfolioIntelligence now={nowShell} />
-          <SignalPipeline opps={opportunities} pulse={pulse} engine={engineStatus} />
-          <MarketRegime opps={opportunities} />
-          <ExchangeTopology />
-          <RiskHeatmap opps={opportunities} />
-          <AIThroughput engine={engineStatus} pulse={pulse} signalsPerMin={signalsPerMin} />
-          <ExecutionAwareness openCount={openTrades.length} now={nowShell} />
-          <RecentExits now={nowShell} />
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
+            gap: 14,
+          }}>
+            <PortfolioIntelligence now={nowShell} />
+            <RecentExits now={nowShell} />
+          </div>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 14,
+          }}>
+            <AIReasoningConsole log={engineStatus?.recentSignalLog} live={engineOnline} />
+            <SignalPipeline opps={opportunities} pulse={pulse} engine={engineStatus} />
+            <MarketRegime opps={opportunities} />
+            <ExchangeTopology />
+            <RiskHeatmap opps={opportunities} />
+            <AIThroughput engine={engineStatus} pulse={pulse} signalsPerMin={signalsPerMin} />
+            <ExecutionAwareness openCount={openTrades.length} now={nowShell} />
+          </div>
         </section>
       </main>
 
