@@ -1202,7 +1202,10 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // Pass 7R — active plate lifted #0C1410 → #131A15 for stronger
   // readable separation against the pure-black chassis. Neutral
   // luminance bump only; no additional green wash, no glow change.
-  const tierBackground = isActive ? "#131A15" : T.BG_TERMINAL;
+  // Pass 7T — small additional luminance step #131A15 → #181F1A
+  // per user "slightly stronger readable contrast, NOT more glow,
+  // NOT more green". +~5 LUM, hue unchanged.
+  const tierBackground = isActive ? "#181F1A" : T.BG_TERMINAL;
   // Pass 7O — active rows lift more decisively against pure-black
   // chassis. Top-edge highlight pushed 0.025 → 0.06 so the upper
   // pixel reads as a real bezel highlight; drop deepened so the
@@ -2041,7 +2044,19 @@ const Column = memo(function Column({
           // operator scrolls inside this container to see the
           // remaining rank. This is the institutional matrix
           // pattern (Bloomberg, TradeStation, ThinkOrSwim).
-          height: 1320,
+          //
+          // Pass 7T — ADAPTIVE height. The previous fixed 1320 left a
+          // large dead black gap below the matrix when a filter or
+          // category yielded only a few rows (MEME / Hi-Vol / search
+          // narrowing). Now the container collapses to fit the rendered
+          // row count (132px pitch) and stays capped at 1320 so >10
+          // rows still scroll internally. Empty state preserves room
+          // for the IdleScanningPanel via the 280 floor. Lower sections
+          // (ACCOUNT STATUS / LIVE TRADES / HISTORY) rise upward
+          // naturally.
+          height: showList
+            ? Math.min(opps.length, 10) * 132
+            : 280,
           maxHeight: 1320,
           paddingRight: 4,
           // `contain: strict` would clip the card hover/glow overlays;
