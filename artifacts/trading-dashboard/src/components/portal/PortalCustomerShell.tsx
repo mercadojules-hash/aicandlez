@@ -744,7 +744,7 @@ function computeMarketPulse(
  *    crossing into arcade territory.
  */
 function Sparkline({
-  data, color, height = 60, live = false, seedDelayMs = 0,
+  data, color, height = 110, live = false, seedDelayMs = 0,
 }: {
   data: number[];
   color: string;
@@ -778,6 +778,21 @@ function Sparkline({
   const safe   = rawId.replace(/[^a-zA-Z0-9]/g, "");
   const gradId = `spark-grad-${safe}`;
   const tipId  = `spark-tip-${safe}`;
+  // Pass 4.4 — total trace length, used as stroke-dasharray seed for the
+  // continuous flow overlay. Approximate sum of segment lengths gives a
+  // dash pattern that traces the line exactly so dashoffset animation
+  // reads as "energy flowing along the tape" not arbitrary segments.
+  let traceLen = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const dx = pts[i].x - pts[i - 1].x;
+    const dy = pts[i].y - pts[i - 1].y;
+    traceLen += Math.sqrt(dx * dx + dy * dy);
+  }
+  // Sliding-window highlight = 18% of trace, gap = rest. Animation runs
+  // a full dashoffset cycle every 4s when live, deterministic per-card
+  // delay so the grid doesn't sync.
+  const flowDash = Math.max(20, traceLen * 0.18);
+  const flowGap  = Math.max(20, traceLen - flowDash);
   return (
     <svg
       width="100%"
@@ -798,7 +813,19 @@ function Sparkline({
           <stop offset="100%" stopColor={color} stopOpacity="0"   />
         </radialGradient>
       </defs>
-      {/* Mean baseline — dashed, low-opacity reference rail */}
+      {/* Faint background grid hairlines — 4 horizontal divisions for
+          institutional chart vocabulary. Gives the eye reference rails
+          for the trace's vertical excursions. */}
+      {[0.25, 0.5, 0.75].map(t => (
+        <line
+          key={t}
+          x1={0} x2={VBW} y1={VBH * t} y2={VBH * t}
+          stroke="rgba(255,255,255,0.04)"
+          strokeWidth={1}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+      {/* Mean baseline — dashed reference rail, color-tinted */}
       <line
         x1={0} x2={VBW} y1={meanY} y2={meanY}
         stroke={color} strokeOpacity={0.22}
@@ -813,25 +840,47 @@ function Sparkline({
       {/* Soft outer glow stroke */}
       <polyline
         points={points}
-        fill="none" stroke={color} strokeWidth={5}
+        fill="none" stroke={color} strokeWidth={6}
         strokeLinecap="round" strokeLinejoin="round"
         strokeOpacity={0.28}
         vectorEffect="non-scaling-stroke"
-        style={{ filter: `blur(2.5px)` }}
+        style={{ filter: `blur(3px)` }}
       />
       {/* Crisp inner stroke with multi-layer drop-shadow halo */}
       <polyline
         points={points}
-        fill="none" stroke={color} strokeWidth={2.4}
+        fill="none" stroke={color} strokeWidth={2.6}
         strokeLinecap="round" strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
-        style={{ filter: `drop-shadow(0 0 2px ${color}) drop-shadow(0 0 5px ${color}) drop-shadow(0 0 10px ${color})` }}
+        style={{ filter: `drop-shadow(0 0 2px ${color}) drop-shadow(0 0 5px ${color}) drop-shadow(0 0 12px ${color})` }}
       />
+      {/* Pass 4.4 — CONTINUOUS FLOW OVERLAY.
+          A duplicate of the trace stroked with a single bright dash
+          that slides along the line via stroke-dashoffset animation.
+          This is the dominant motion cue: the line itself appears to
+          carry energy, not just sit there. Gated on `live` (signal
+          updated <30s ago); stale cards keep static traces. Tied to
+          telemetry state — not decorative. */}
+      {live && (
+        <polyline
+          points={points}
+          fill="none" stroke={color} strokeWidth={2.6}
+          strokeLinecap="round" strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+          strokeDasharray={`${flowDash} ${flowGap}`}
+          style={{
+            filter: `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 10px ${color})`,
+            animation: `spark-flow 4s linear infinite`,
+            animationDelay: `-${seedDelayMs}ms`,
+            opacity: 0.95,
+          }}
+        />
+      )}
       {/* Leading-edge live marker — only when telemetry is fresh */}
       {live && lastPt && (
         <>
           <circle
-            cx={lastPt.x} cy={lastPt.y} r={5}
+            cx={lastPt.x} cy={lastPt.y} r={6}
             fill={`url(#${tipId})`}
             style={{
               animation: `spark-tip-breathe 1.6s ease-in-out infinite`,
@@ -840,7 +889,7 @@ function Sparkline({
             }}
           />
           <circle
-            cx={lastPt.x} cy={lastPt.y} r={1.6}
+            cx={lastPt.x} cy={lastPt.y} r={2}
             fill={color}
             style={{ filter: `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 6px ${color})` }}
           />
@@ -886,7 +935,13 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
     opp.conf >= 85 ? 1.0 :
     opp.conf >= 70 ? 0.85 :
     opp.conf >= 55 ? 0.6 : 0.4;
-  const railAnim = opp.conf >= 85 ? "rail-pulse 1.8s ease-in-out infinite" : "rail-pulse 2.5s ease-in-out infinite";
+  // Pass 4.4 — rail animation state-gated. Only READY cards with fresh
+  // telemetry pulse; WAITING / GATED / stale cards keep a static rail
+  // honoring the "idle systems stay still" invariant. Glow + opacity
+  // continue to encode conf tier without continuous motion.
+  const railAnim = isReady && isFreshSignal
+    ? (opp.conf >= 85 ? "rail-pulse 1.8s ease-in-out infinite" : "rail-pulse 2.5s ease-in-out infinite")
+    : undefined;
 
   return (
     <article
@@ -895,9 +950,12 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         border: `1px solid ${T.BORDER}`,
         padding: 14,
         paddingLeft: 18,
-        display: "flex", flexDirection: "column", gap: 10,
+        // Pass 4.4 — tightened inter-row gap (10→7) so the chart band
+        // can claim the reclaimed vertical real estate. Every pixel
+        // shaved off the static rows flows downstream into chart height.
+        display: "flex", flexDirection: "column", gap: 7,
         position: "relative", overflow: "hidden",
-        height: 362,
+        height: 388,
         fontFamily: T.FONT_MONO,
         // Deterministic hover cadence — background + border tinted in lock-step.
         transition: `background-color ${T.TX_FAST}, border-color ${T.TX_FAST}`,
@@ -944,21 +1002,26 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         </span>
       </div>
 
-      {/* Middle: confidence ring + MTF + momentum */}
+      {/* Middle: confidence ring + MTF + momentum
+          Pass 4.4 — confidence ring promoted from 96px to 116px and
+          re-weighted as the conviction anchor of the card. Larger
+          ring, thicker stroke, layered halo, bolder number, "AI CONF"
+          micro-label so the eye reads it as institutional conviction,
+          not a thin percentage gauge. */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1 }}>
         <div style={{
           position: "relative", flexShrink: 0,
-          width: 96, height: 96,
+          width: 116, height: 116,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           <ConfidenceRing color={dirColor} value={opp.conf} />
-          {/* v4.1 ring-sweep — single 30° bright arc rotating slowly over static ring. */}
-          {/* Sweep only on READY — communicates "signal has crystallized, awaiting execution".
+          {/* v4.1 ring-sweep — single 30° bright arc rotating slowly over static ring.
+              Sweep only on READY — communicates "signal has crystallized, awaiting execution".
               WAITING / GATED cards keep a static ring. */}
           {isReady && (
             <svg
               aria-hidden
-              width={96} height={96}
+              width={116} height={116}
               style={{
                 position: "absolute", inset: 0, pointerEvents: "none",
                 animation: "ring-sweep 12s linear infinite",
@@ -967,27 +1030,39 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
               }}
             >
               <circle
-                cx={48} cy={48} r={42} fill="none"
-                stroke={dirColor} strokeWidth={2}
-                strokeDasharray="22 242" strokeLinecap="round"
-                style={{ filter: `drop-shadow(0 0 4px ${dirColor})`, opacity: 0.7 }}
+                cx={58} cy={58} r={51} fill="none"
+                stroke={dirColor} strokeWidth={2.5}
+                strokeDasharray="28 292" strokeLinecap="round"
+                style={{ filter: `drop-shadow(0 0 5px ${dirColor})`, opacity: 0.8 }}
               />
             </svg>
           )}
-          <span style={{
+          <div style={{
             position: "absolute", inset: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 36,
-            // Conf-tiered weight + bloom — conviction-grade signals
-            // visibly anchor the focal grid; low-conf stays restrained.
-            fontWeight: opp.conf >= 85 ? 400 : 300,
-            color: dirColor, letterSpacing: T.TRACK_DISPLAY,
-            textShadow:
-              opp.conf >= 85 ? `0 0 16px ${dirColor}, 0 0 8px ${dirColor}` :
-              opp.conf >= 70 ? `0 0 10px ${dirColor}` :
-              opp.conf >= 55 ? `0 0 6px ${dirColor}`  :
-                               "none",
-          }}>{opp.conf}</span>
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            gap: 0, lineHeight: 1,
+          }}>
+            <span style={{
+              fontSize: 44,
+              // Pass 4.4 — always-bold conviction typography. Glow tiered
+              // by conf so high-conviction signals visibly bloom while
+              // low-conf stays legibly restrained.
+              fontWeight: opp.conf >= 70 ? 700 : 600,
+              color: dirColor, letterSpacing: T.TRACK_DISPLAY,
+              fontVariantNumeric: "tabular-nums",
+              textShadow:
+                opp.conf >= 85 ? `0 0 22px ${dirColor}, 0 0 12px ${dirColor}, 0 0 4px ${dirColor}` :
+                opp.conf >= 70 ? `0 0 14px ${dirColor}, 0 0 6px ${dirColor}` :
+                opp.conf >= 55 ? `0 0 8px ${dirColor}`  :
+                                 `0 0 3px ${dirColor}`,
+            }}>{opp.conf}</span>
+            <span style={{
+              fontSize: 8, fontWeight: 700, color: T.TEXT_2,
+              letterSpacing: T.TRACK_LABEL, marginTop: 1,
+              textTransform: "uppercase",
+            }}>AI Conf</span>
+          </div>
         </div>
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1023,8 +1098,10 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
                   <span key={i} style={{
                     width: 5, height: 12,
                     background: lit ? dirColor : "rgba(255,255,255,0.10)",
-                    animation: lit ? "momentum-breathe 3.4s ease-in-out infinite" : undefined,
-                    animationDelay: lit ? `${(i - 1) * 150}ms` : undefined,
+                    // Pass 4.4 — momentum bars only breathe on fresh signals.
+                    // Stale cards keep lit bars but no motion (idle-stays-still).
+                    animation: lit && isFreshSignal ? "momentum-breathe 3.4s ease-in-out infinite" : undefined,
+                    animationDelay: lit && isFreshSignal ? `${(i - 1) * 150}ms` : undefined,
                   }} />
                 );
               })}
@@ -1098,9 +1175,9 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
       <div style={{
         position: "relative",
         width: "100%",
-        height: 60,
+        height: 110,
         marginTop: 2,
-        background: "linear-gradient(180deg, rgba(255,255,255,0.012) 0%, rgba(0,0,0,0) 100%)",
+        background: "linear-gradient(180deg, rgba(255,255,255,0.018) 0%, rgba(0,0,0,0) 70%, rgba(255,255,255,0.012) 100%)",
         borderTop: `1px solid ${T.BORDER}`,
         borderBottom: `1px solid ${T.BORDER}`,
         overflow: "hidden",
@@ -1108,7 +1185,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         <Sparkline
           data={opp.sparkline}
           color={sparkColor}
-          height={60}
+          height={110}
           live={isFreshSignal}
           seedDelayMs={sparkDelayMs}
         />
@@ -1192,40 +1269,106 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   );
 });
 
+/**
+ * ConfidenceRing — Pass 4.4 premium AI conviction ring.
+ *
+ * Scaled from 96×96 → 116×116 to dominate the focal grid alongside the
+ * full-width chart band. Three concentric tiers of identity:
+ *
+ *  1. Outer bloom halo (always rendered, tiered opacity) — gives the
+ *     ring a soft volumetric presence even at low conf.
+ *  2. Static track ring (faint) — base reference rail.
+ *  3. Dual progress arcs: a thick soft underlay (glow) + crisp inner
+ *     stroke — reads as layered conviction, not a thin gauge.
+ *  4. 12 tick marks around the perimeter (every 30°) — institutional
+ *     dial vocabulary; subtle highlight on ticks below the progress
+ *     boundary mirrors the conviction value.
+ *  5. Inner "hairline" ring just inside the progress — gives depth
+ *     without competing with the central numeric.
+ *
+ * Motion policy preserved: ring itself is static; the ring-sweep arc
+ * (mounted by the parent on READY-only) provides the only motion.
+ */
 function ConfidenceRing({ color, value }: { color: string; value: number }) {
-  const r = 42;
-  const c = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(100, value)) / 100;
+  const SIZE = 116;
+  const CX   = SIZE / 2;
+  const r    = 51;
+  const c    = 2 * Math.PI * r;
+  const pct  = Math.max(0, Math.min(100, value)) / 100;
   // Conf-tiered glow intensity — high-conviction signals visibly bloom,
   // low-conviction stay restrained. State-gated motion policy: glow
   // amount encodes confidence tier.
   const glowPx =
-    value >= 85 ? 14 :
-    value >= 70 ? 10 :
-    value >= 55 ? 6  : 3;
-  const ringStroke = value >= 70 ? 2.5 : 2;
-  const showHalo = value >= 85;
+    value >= 85 ? 18 :
+    value >= 70 ? 13 :
+    value >= 55 ? 8  : 4;
+  const ringStroke = value >= 85 ? 4 : value >= 70 ? 3.5 : 3;
+  const haloOpacity =
+    value >= 85 ? 0.45 :
+    value >= 70 ? 0.30 :
+    value >= 55 ? 0.18 : 0.10;
+  // 12-tick dial. Each tick is a short radial mark; ticks beneath the
+  // progress arc are tinted with the color, ticks beyond stay neutral.
+  const ticks = Array.from({ length: 12 }, (_, i) => i);
+  const tickBoundary = pct * 12;
   return (
-    <svg width={96} height={96} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
-      {/* Outer bloom halo — only for conviction-grade signals (>=85). */}
-      {showHalo && (
-        <circle
-          cx={48} cy={48} r={46} fill="none"
-          stroke={color} strokeWidth={1}
-          style={{ filter: `drop-shadow(0 0 8px ${color})`, opacity: 0.35 }}
-        />
-      )}
-      <circle cx={48} cy={48} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={2} />
+    <svg width={SIZE} height={SIZE} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
+      {/* Outer volumetric halo — always rendered, opacity tiered by conf. */}
       <circle
-        cx={48} cy={48} r={r} fill="none"
+        cx={CX} cy={CX} r={r + 6} fill="none"
+        stroke={color} strokeWidth={1}
+        style={{ filter: `drop-shadow(0 0 10px ${color}) drop-shadow(0 0 18px ${color})`, opacity: haloOpacity }}
+      />
+      {/* Dial tick marks — institutional gauge vocabulary. */}
+      {ticks.map(i => {
+        const angle = (i / 12) * 2 * Math.PI - Math.PI / 2;
+        const r1 = r + 8;
+        const r2 = r + 12;
+        const x1 = CX + Math.cos(angle) * r1;
+        const y1 = CX + Math.sin(angle) * r1;
+        const x2 = CX + Math.cos(angle) * r2;
+        const y2 = CX + Math.sin(angle) * r2;
+        const inside = i < tickBoundary;
+        return (
+          <line
+            key={i}
+            x1={x1} y1={y1} x2={x2} y2={y2}
+            stroke={inside ? color : "rgba(255,255,255,0.15)"}
+            strokeWidth={inside ? 1.5 : 1}
+            strokeLinecap="round"
+            style={inside ? { filter: `drop-shadow(0 0 3px ${color})`, opacity: 0.85 } : undefined}
+          />
+        );
+      })}
+      {/* Static track ring — base reference. */}
+      <circle cx={CX} cy={CX} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={ringStroke} />
+      {/* Soft underlay progress — thick blurred glow band. */}
+      <circle
+        cx={CX} cy={CX} r={r} fill="none"
+        stroke={color} strokeWidth={ringStroke + 4}
+        strokeDasharray={`${c * pct} ${c}`}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${CX} ${CX})`}
+        opacity={0.35}
+        style={{ filter: `blur(3px)`, transition: "stroke-dasharray 600ms ease" }}
+      />
+      {/* Crisp inner progress — primary conviction arc. */}
+      <circle
+        cx={CX} cy={CX} r={r} fill="none"
         stroke={color} strokeWidth={ringStroke}
         strokeDasharray={`${c * pct} ${c}`}
         strokeLinecap="round"
-        transform="rotate(-90 48 48)"
+        transform={`rotate(-90 ${CX} ${CX})`}
         style={{
           filter: `drop-shadow(0 0 ${glowPx}px ${color}) drop-shadow(0 0 ${Math.round(glowPx / 2)}px ${color})`,
           transition: "stroke-dasharray 600ms ease",
         }}
+      />
+      {/* Inner depth hairline — gives the ring physical thickness. */}
+      <circle
+        cx={CX} cy={CX} r={r - ringStroke - 2} fill="none"
+        stroke={color} strokeWidth={0.5}
+        opacity={0.20}
       />
     </svg>
   );
@@ -2206,7 +2349,7 @@ export function PortalCustomerShell() {
   }, [opportunities]);
 
   return (
-    <div style={{
+    <div className="cd-portal-root" style={{
       minHeight: "100dvh",
       background: T.BG_BLACK,
       color: T.TEXT_1,
@@ -2252,6 +2395,16 @@ export function PortalCustomerShell() {
           0%   { transform: translateX(-100%); }
           100% { transform: translateX(1200%); }
         }
+        /* Pass 4.4 — spark-flow: continuous energy traveling along the
+           sparkline trace itself via stroke-dashoffset. Cycle length
+           (1200) traverses the full viewBox-width trace per 4s loop,
+           giving the line a live "tape rolling" feel without arcade
+           tint. Gated on the live prop in Sparkline (isFreshSignal,
+           under 30s). */
+        @keyframes spark-flow {
+          0%   { stroke-dashoffset: 0;     }
+          100% { stroke-dashoffset: -1200; }
+        }
         @keyframes ring-sweep {
           0%   { transform: rotate(-90deg); }
           100% { transform: rotate(270deg); }
@@ -2270,16 +2423,21 @@ export function PortalCustomerShell() {
           50%  { opacity: 1.00; }
           100% { opacity: 0.75; }
         }
-        /* Pass 4.1 — honor reduced-motion preference. Holds at the
-           bright phase so state semantics (hot/online/fresh) remain
-           legible without continuous motion. Scope: only the keyframes
-           introduced or amplified in 4.x. */
+        /* Pass 4.4 — reduced-motion umbrella expanded to TRUE portal-
+           wide scope. Holds at the bright phase so state semantics
+           (hot/online/fresh) remain legible without continuous motion.
+           cd-portal-root wraps the entire customer shell; the
+           descendant selector catches every animated surface
+           (DataFeedBanner pulse, command-bar scan, cards, charts, etc.)
+           without requiring each surface to opt-in by classname. */
         @media (prefers-reduced-motion: reduce) {
+          .cd-portal-root *,
           .cd-ribbon *,
           .cd-footer *,
           .cd-scroll * {
             animation-duration: 0.001ms !important;
             animation-iteration-count: 1 !important;
+            transition-duration: 0.001ms !important;
           }
         }
         /* hide scrollbar on horizontal filter pill strip */
