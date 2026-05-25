@@ -13,6 +13,7 @@ import {
   placeLiveCloseOrderForUser,
 } from "./liveUserExecution.js";
 import { CATALOG_BY_ID } from "../services/exchanges/catalog.js";
+import { recordPerformanceFee, resolveFeePolicy } from "./feeLedger.js";
 
 // Compute a fill commission for a live trade leg using the exchange catalog's
 // default taker fee rate. Returns null for paper fills (no broker, no fee).
@@ -88,6 +89,14 @@ export interface UserSimTrade {
   // True when this trade was opened against the exchange's public
   // sandbox/testnet (mirrors the open-side `sim_positions.sandbox` flag).
   sandbox?: boolean;
+  // Platform performance fee (3% of NET realized PnL, charged only on
+  // profitable closes). Deducted from cashBalance + totalRealized on close
+  // and recorded to `performance_fees`. Absent on losing/break-even closes
+  // and on accounts where the fee policy resolves to skip (internal /
+  // complimentary / waived).
+  platformFeeUSD?: number;
+  platformFeeRate?: number;
+  platformFeeSkipReason?: string;
 }
 
 interface UserSimAccount {
@@ -678,6 +687,26 @@ export async function closeUserPosition(
   const effectiveExitFee  = exitBrokerIsUsd  ? brokerExitFee!          : (exitFee  ?? 0);
   const netFees  = effectiveEntryFee + effectiveExitFee;
 
+  // ── Platform performance fee (3% of NET realized PnL on profitable closes)
+  // Computed BEFORE we mutate cash so the user actually receives the net
+  // amount on this close. Guards (internal / complimentary / waiver /
+  // per-user override) live in resolveFeePolicy. Losing or break-even
+  // closes pay no fee. Paper closes are auditied identically to live so
+  // operator telemetry reflects the simulated revenue stream too.
+  const netRealizedForFee = realizedPnL - netFees;
+  let platformFeeUSD = 0;
+  let platformFeeRate = 0;
+  let platformFeeSkipReason: string | undefined;
+  if (netRealizedForFee > 0) {
+    const policy = await resolveFeePolicy(userId);
+    if (policy.skip || policy.rate <= 0) {
+      platformFeeSkipReason = policy.reason ?? "exempt";
+    } else {
+      platformFeeRate = policy.rate;
+      platformFeeUSD  = parseFloat((netRealizedForFee * policy.rate).toFixed(4));
+    }
+  }
+
   const trade: UserSimTrade = {
     id:              tradeId,
     userId,
@@ -693,6 +722,9 @@ export async function closeUserPosition(
     realizedPnLPct:  parseFloat(realizedPnLPct.toFixed(3)),
     durationMs:      exitTime - pos.entryTime,
     closeReason:     isPartial ? `${closeReason}_PARTIAL` : closeReason,
+    platformFeeUSD:  platformFeeUSD > 0 ? platformFeeUSD : undefined,
+    platformFeeRate: platformFeeUSD > 0 ? platformFeeRate : undefined,
+    platformFeeSkipReason,
     exchange:             pos.exchange,
     exchangeOrderId:      pos.exchangeOrderId,
     exchangeCloseOrderId: exchangeCloseOrderId,
@@ -712,8 +744,11 @@ export async function closeUserPosition(
   // Live trades pay broker commission on both legs — deduct from cash and
   // realized PnL so account equity reconciles to the receipt's Net P&L.
   // Paper trades have null fees (no broker) and behave exactly as before.
-  state.account.cashBalance  += closedSizeUSD + realizedPnL - netFees;
-  state.account.totalRealized += realizedPnL - netFees;
+  // Platform performance fee (3% of net realized on profitable closes) is
+  // additionally deducted here so the user receives the net amount (e.g.
+  // +$100 realized → $3 platform fee → +$97 net to account).
+  state.account.cashBalance  += closedSizeUSD + realizedPnL - netFees - platformFeeUSD;
+  state.account.totalRealized += realizedPnL - netFees - platformFeeUSD;
   state.account.totalTrades  += 1;
   if (isPartial) {
     pos.quantity = parseFloat((pos.quantity - closedQty).toFixed(8));
@@ -774,7 +809,41 @@ export async function closeUserPosition(
     persistAccount(state),
   ]);
 
-  logger.info({ userId, positionId, realizedPnL: trade.realizedPnL, closeReason }, "UserSimRegistry: position closed");
+  logger.info(
+    { userId, positionId, realizedPnL: trade.realizedPnL, netFees, platformFeeUSD, platformFeeSkipReason, closeReason },
+    "UserSimRegistry: position closed",
+  );
+
+  // ── Persist platform fee to ledger ─────────────────────────────────────────
+  // Awaited (not fire-and-forget) so the ledger row is durable before this
+  // function returns — otherwise a process crash between cash deduction and
+  // ledger insert would silently lose platform revenue. Pass the resolved
+  // policy rate + feeUSD so per-user perfFeeBpsOverride is honored at the
+  // ledger row (recordPerformanceFee falls back to the platform default if
+  // these aren't provided). Billing-hold enforcement inside
+  // recordPerformanceFee remains async and is reconcilable on the next tick.
+  if (platformFeeUSD > 0) {
+    try {
+      await recordPerformanceFee({
+        tradeId:     trade.id,
+        userId,
+        exchange:    trade.exchange ?? "PAPER",
+        symbol:      trade.symbol,
+        side:        trade.side,
+        realizedPnl: netRealizedForFee,
+        isPaper:     !trade.exchange,
+        feeRate:     platformFeeRate,
+        feeUSD:      platformFeeUSD,
+      });
+    } catch (err) {
+      // Cash has already been deducted from the user account; the ledger
+      // insert failed. Log loud — operator can reconcile from trade history.
+      logger.error(
+        { err, userId, tradeId: trade.id, platformFeeUSD, platformFeeRate },
+        "platform fee ledger insert failed AFTER cash deduction — reconcile manually",
+      );
+    }
+  }
 
   // Live position? Mirror the close into the user's notification feed +
   // push channel — symmetric counterpart to emitFillNotification on open.
