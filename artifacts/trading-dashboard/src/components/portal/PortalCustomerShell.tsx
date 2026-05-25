@@ -1153,19 +1153,42 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // static contrast amplified.
   const isElite  = opp.conf >= 90;
   const isStrong = opp.conf >= 80 && !isElite;
-  // Pass 7d — tier alphas pushed up. ELITE border now reads as a
-  // conf-color frame (not a tint), STRONG sits clearly above neutral.
+  // Pass 7g — ACTIVE SIGNAL DOMINANCE. Two changes from 7d:
+  //   1. Hero borders/backgrounds/shadows now key off `dirColor`
+  //      (LONG = neon-green, SHORT = red) instead of always-green.
+  //      A SHORT ELITE should glow red, not green — directional
+  //      identity reads instantly from across the room.
+  //   2. New `isActiveBaseline` tier (active direction, conf < 80)
+  //      gives the median active rows a subtle dirColor-tinted
+  //      border + faint inset shadow so they "float" above the
+  //      chassis without competing with hero rows. Previously they
+  //      sat on the same neutral T.BORDER as evaluating rows even
+  //      though they're real conviction signals.
+  // EVALUATING (direction === "FLAT") still falls through to
+  // T.BORDER + plain BG_TERMINAL — that wrapper is owned by the
+  // matrix container and intentionally untouched (per 7f→7g rule).
+  const isActive = opp.direction === "LONG" || opp.direction === "SHORT";
+  const isActiveBaseline = isActive && !isStrong && !isElite;
+  // RGB-channel form so we can interpolate alpha against dirColor
+  // (neon green or red) without re-typing the constants below.
+  const dirRgb = isLong ? "102,255,102" : opp.direction === "SHORT" ? "255,77,77" : "168,184,176";
   const tierBorderColor =
-    isElite  ? `rgba(102,255,102,0.78)` :
-    isStrong ? `rgba(102,255,102,0.42)` : T.BORDER;
+    isElite          ? `rgba(${dirRgb},0.82)` :
+    isStrong         ? `rgba(${dirRgb},0.50)` :
+    isActiveBaseline ? `rgba(${dirRgb},0.28)` :
+                       T.BORDER;
   const tierBackground =
-    isElite  ? `linear-gradient(180deg, rgba(102,255,102,0.075) 0%, ${T.BG_TERMINAL} 60%)` :
-    isStrong ? `linear-gradient(180deg, rgba(102,255,102,0.035) 0%, ${T.BG_TERMINAL} 60%)` :
-               T.BG_TERMINAL;
+    isElite          ? `linear-gradient(180deg, rgba(${dirRgb},0.090) 0%, ${T.BG_TERMINAL} 60%)` :
+    isStrong         ? `linear-gradient(180deg, rgba(${dirRgb},0.045) 0%, ${T.BG_TERMINAL} 60%)` :
+    isActiveBaseline ? `linear-gradient(180deg, rgba(${dirRgb},0.020) 0%, ${T.BG_TERMINAL} 70%)` :
+                       T.BG_TERMINAL;
+  // Tier shadow doubles as "lift" depth — outer glow lets the active
+  // card physically float above the matrix.
   const tierShadow =
-    isElite  ? `inset 0 0 28px rgba(102,255,102,0.09), 0 0 22px rgba(102,255,102,0.16)` :
-    isStrong ? `inset 0 0 18px rgba(102,255,102,0.05), 0 0 10px rgba(102,255,102,0.07)` :
-               undefined;
+    isElite          ? `inset 0 0 32px rgba(${dirRgb},0.11), 0 0 28px rgba(${dirRgb},0.22), 0 4px 18px rgba(0,0,0,0.55)` :
+    isStrong         ? `inset 0 0 22px rgba(${dirRgb},0.07), 0 0 14px rgba(${dirRgb},0.12), 0 3px 12px rgba(0,0,0,0.45)` :
+    isActiveBaseline ? `inset 0 0 14px rgba(${dirRgb},0.035), 0 0 7px rgba(${dirRgb},0.07), 0 2px 8px rgba(0,0,0,0.35)` :
+                       undefined;
 
   // Pass 7b — outcome memory. When this symbol has a paper close within
   // the last 5 minutes, surface the outcome inline on the card so the
@@ -1265,18 +1288,26 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             gap: 0, lineHeight: 1,
           }}>
             <span style={{
-              // Pass 7d — typography authority. ELITE numerals push to
-              // 28px / weight 800 with a layered text-shadow so the
-              // conviction score reads as the loudest signal on the
-              // card. STRONG bumped to weight 700 + brighter shadow.
-              fontSize: isElite ? 28 : 26,
-              fontWeight: isElite ? 800 : opp.conf >= 70 ? 700 : 600,
+              // Pass 7g — confidence numeral projection on ACTIVE rows.
+              // ELITE numerals push to 32px / weight 800 (was 28/800);
+              // STRONG bumps to 30px / 800 (was 26/700); active
+              // baseline 60-79 climbs to 28px / 700 (was 26/700) so
+              // every active row reads its conviction at a glance.
+              // EVALUATING (FLAT direction) preserved at 26/600.
+              fontSize:
+                isElite          ? 32 :
+                isStrong         ? 30 :
+                isActiveBaseline ? 28 : 26,
+              fontWeight:
+                isElite          ? 800 :
+                isStrong         ? 800 :
+                isActiveBaseline ? 700 : 600,
               color: confColor, letterSpacing: T.TRACK_DISPLAY,
               fontVariantNumeric: "tabular-nums",
               textShadow:
-                isElite          ? `0 0 18px ${confColor}, 0 0 10px ${confColor}, 0 0 5px ${confColor}, 0 0 2px ${confColor}` :
-                opp.conf >= 85   ? `0 0 14px ${confColor}, 0 0 7px ${confColor}, 0 0 3px ${confColor}` :
-                opp.conf >= 70   ? `0 0 8px ${confColor}, 0 0 4px ${confColor}` :
+                isElite          ? `0 0 22px ${confColor}, 0 0 12px ${confColor}, 0 0 6px ${confColor}, 0 0 2px ${confColor}` :
+                opp.conf >= 85   ? `0 0 16px ${confColor}, 0 0 8px ${confColor}, 0 0 3px ${confColor}` :
+                opp.conf >= 70   ? `0 0 10px ${confColor}, 0 0 5px ${confColor}` :
                 opp.conf >= 55   ? `0 0 4px ${confColor}` :
                                    `0 0 2px ${confColor}`,
             }}>{opp.conf}</span>
@@ -1507,21 +1538,25 @@ function ConfidenceRing({ color, value, size = 78 }: { color: string; value: num
   // must still look quiet — no fake conviction).
   // Pass 7f — baseline ring readability. Sub-80 rings were sinking
   // into the chassis even though they still carry real conviction
-  // information (60-79 amber band). Lifted lower tiers so EVERY ring
-  // reads as alive: glowPx 70-tier 13→18, 55-tier 8→12, base 4→7;
-  // ringStroke 70-tier 3.5→4, base 3→3.4; halo 70-tier 0.38→0.52,
-  // 55-tier 0.24→0.36, base 0.14→0.22. ELITE / STRONG amplitudes
-  // preserved so the hero hierarchy still steps cleanly above.
+  // information (60-79 amber band).
+  // Pass 7g — ACTIVE band amplification. Lifted ELITE 34→40, STRONG
+  // 24→30, 70-tier 18→24 so active rings physically project off the
+  // card surface. Halo bumped in lockstep. 55-tier and base preserved
+  // (those are mostly evaluating cards which sit inside the dimmer
+  // wrapper anyway).
   const glowPx =
-    value >= 90 ? 34 :
-    value >= 85 ? 24 :
-    value >= 70 ? 18 :
+    value >= 90 ? 40 :
+    value >= 85 ? 30 :
+    value >= 70 ? 24 :
     value >= 55 ? 12 : 7;
-  const ringStroke = value >= 90 ? 5 : value >= 85 ? 4.2 : value >= 70 ? 4 : 3.4;
+  const ringStroke =
+    value >= 90 ? 5.5 :
+    value >= 85 ? 4.6 :
+    value >= 70 ? 4.2 : 3.4;
   const haloOpacity =
-    value >= 90 ? 0.85 :
-    value >= 85 ? 0.62 :
-    value >= 70 ? 0.52 :
+    value >= 90 ? 0.95 :
+    value >= 85 ? 0.72 :
+    value >= 70 ? 0.60 :
     value >= 55 ? 0.36 : 0.22;
   // 12-tick dial. Each tick is a short radial mark; ticks beneath the
   // progress arc are tinted with the color, ticks beyond stay neutral.
