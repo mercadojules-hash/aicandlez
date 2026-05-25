@@ -1755,17 +1755,12 @@ function ColumnHeader({ title, count, accent, subLabel }: {
 }
 
 const OpportunityMatrix = memo(function OpportunityMatrix({
-  longs, shorts, evaluatingLongs, evaluatingShorts,
+  longs, shorts,
   onQueue, isLoading, isError, now,
   idleSymbols, lastTickAt,
 }: {
   longs:     OpportunityVM[];
   shorts:    OpportunityVM[];
-  /** Pass 6.1 — FLAT/HOLD signals routed by `lean` into the LONGS
-   *  and SHORTS columns as a dimmed EVALUATING tier. Surfaces the
-   *  engine's in-progress cognition across every scanned asset. */
-  evaluatingLongs:  OpportunityVM[];
-  evaluatingShorts: OpportunityVM[];
   onQueue:   (opp: OpportunityVM) => void;
   isLoading: boolean;
   isError:   boolean;
@@ -1791,12 +1786,11 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
       <Column
         title="TOP LONGS"
         opps={longs}
-        evaluating={evaluatingLongs}
         onQueue={onQueue}
         isLoading={isLoading}
         isError={isError}
         accent="#66FF66"
-        subLabel={`${longs.length} ACTIVE · ${evaluatingLongs.length} EVALUATING · CONFIDENCE-RANKED`}
+        subLabel={`${longs.length} TRACKED · CONFIDENCE-RANKED`}
         tintRgba="rgba(102,255,102,0.015)"
         now={now}
         idleSymbols={idleSymbols}
@@ -1806,12 +1800,11 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
       <Column
         title="TOP SHORTS"
         opps={shorts}
-        evaluating={evaluatingShorts}
         onQueue={onQueue}
         isLoading={isLoading}
         isError={isError}
         accent="#FF4D4D"
-        subLabel={`${shorts.length} ACTIVE · ${evaluatingShorts.length} EVALUATING · CONFIDENCE-RANKED`}
+        subLabel={`${shorts.length} TRACKED · CONFIDENCE-RANKED`}
         tintRgba="rgba(255,77,77,0.015)"
         leftDivider
         now={now}
@@ -1957,16 +1950,11 @@ const IdleScanningPanel = memo(function IdleScanningPanel({
 });
 
 const Column = memo(function Column({
-  title, opps, evaluating, onQueue, isLoading, isError,
+  title, opps, onQueue, isLoading, isError,
   accent, subLabel, tintRgba, leftDivider = false, now,
   idleSymbols, lastTickAt, idleLabel,
 }: {
   title: string; opps: OpportunityVM[]; onQueue: (opp: OpportunityVM) => void;
-  /** Pass 6.1 — FLAT/HOLD signals routed into this column by `lean`.
-   *  Rendered as a dimmed subordinate tier beneath the active opps so
-   *  the user sees the AI's in-progress cognition (every symbol it is
-   *  currently evaluating) instead of a void when no conviction exists. */
-  evaluating: OpportunityVM[];
   isLoading: boolean; isError: boolean;
   accent: string; subLabel: string; tintRgba: string; leftDivider?: boolean;
   now: number;
@@ -2057,7 +2045,7 @@ const Column = memo(function Column({
           contain: "layout",
         }}
       >
-        {isError && !showList && evaluating.length === 0 && (
+        {isError && !showList && (
           <div style={{
             padding: 24, textAlign: "center", color: "#FF4D4D", fontFamily: T.FONT_MONO,
             border: `1px dashed #FF4D4D55`, fontSize: 11,
@@ -2065,12 +2053,7 @@ const Column = memo(function Column({
             ENGINE FEED UNAVAILABLE · /api/engine/status failed · retrying…
           </div>
         )}
-        {/* Pass 6.1 — when no active LONG/SHORT exists in this column
-            AND no evaluating bias is leaning this way, surface the
-            institutional idle-scan intelligence panel instead of a
-            dead box. The engine being healthy + waiting is the most
-            common state; communicate it as such. */}
-        {!isError && !showList && evaluating.length === 0 && (
+        {!isError && !showList && (
           isLoading ? (
             <div style={{
               padding: 24, textAlign: "center", color: T.TEXT_2, fontFamily: T.FONT_MONO,
@@ -2121,73 +2104,12 @@ const Column = memo(function Column({
           </div>
         )}
 
-        {/* Pass 6.1 — EVALUATING tier. Engine HOLDs with a directional
-            lean rendered subordinate to active conviction. Wrapped in a
-            dim/desaturate layer with pointer-events disabled so QUEUE
-            chips can't be pressed (FLAT direction is rejected by
-            `queuePaper` anyway). Communicates "AI is processing these
-            assets but has not committed yet" — exactly how institutional
-            systems behave. */}
-        {evaluating.length > 0 && (
-          <>
-            {/* Pass 7N — EVAL section header rebuilt as an UNMISTAKABLE
-                tier separator. Previous 9px caption read as a quiet
-                footnote, so users mistook the dimmed EVAL rows below
-                it for broken ACTIVE rows. New: 11px loud label,
-                ALL-CAPS, dirColor accent text, solid 2px top rule. */}
-            <div style={{
-              marginTop: showList ? 18 : 0,
-              display: "flex", alignItems: "center", gap: 10,
-              fontFamily: T.FONT_MONO, fontSize: 11, fontWeight: 700,
-              letterSpacing: T.TRACK_TITLE,
-              color: accent,
-              paddingTop: 12, paddingBottom: 8,
-              borderTop: showList ? `2px solid ${accent}33` : "none",
-              textTransform: "uppercase",
-            }}>
-              <span style={{
-                width: 7, height: 7, borderRadius: "50%",
-                background: accent, opacity: 0.85,
-                boxShadow: `0 0 6px ${accent}`,
-                animation: "brand-pulse 1.8s ease-in-out infinite",
-              }} />
-              <span>EVALUATING TIER · {evaluating.length} ASSET{evaluating.length === 1 ? "" : "S"} AWAITING CONFIRMATION</span>
-              <span style={{ flex: 1, height: 1, background: `${accent}22`, marginLeft: 8 }} />
-            </div>
-            <div
-              aria-label="evaluating-tier"
-              aria-hidden
-              inert={"" as unknown as boolean}
-              style={{
-                // Pass 7N — EVAL dimming relaxed. Old 0.55/saturate
-                // 0.65 was calibrated against cinematic-glow ACTIVE
-                // cards (7c era); with 7M's flat Bloomberg-style
-                // ACTIVE rows, those values over-suppressed EVAL
-                // into the "muddy bronze low-contrast collapse"
-                // users mistook for broken styling. New 0.80
-                // opacity + 0.90 saturate keeps EVAL clearly
-                // subordinate to ACTIVE (still dimmer, still
-                // pointer-events: none, still visually distinct)
-                // but readable as a coherent secondary tier.
-                opacity: 0.80,
-                filter: "saturate(0.90)",
-                pointerEvents: "none",
-                display: "flex", flexDirection: "column",
-                gap: CARD_ROW_GAP_PX,
-              }}
-            >
-              {evaluating.map((o, i) => (
-                <OpportunityCard
-                  key={`eval-${o.pair}`}
-                  opp={o}
-                  idx={opps.length + i}
-                  onQueue={onQueue}
-                  now={now}
-                />
-              ))}
-            </div>
-          </>
-        )}
+        {/* Pass 7P — EVALUATING tier render block DELETED. All
+            FLAT-leaning candidates now flow directly into `opps`
+            from PortalCustomerShell's unified filteredLongs /
+            filteredShorts derivation. Removed: dim/desaturate
+            wrapper, EVAL header, pointer-events gate. ~70 lines
+            of two-tier visual hierarchy collapsed into one. */}
       </div>
     </div>
   );
@@ -3175,41 +3097,39 @@ export function PortalCustomerShell() {
   const [disclaimer, setDisclaimer] = useState(false);
   const { gate: disclaimerGate, modal: disclaimerGateModal } = useDisclaimerGate();
 
-  // Pass 4.7 — re-split by direction (LONG/SHORT) from the combined
-  // opportunity stream, then take top 10 by inbound confidence rank
-  // (engine already sorts by score). MAJORS/ALTS asset-class filter
-  // pills still narrow within each column via `filterOpps`.
   const filteredOpps = useMemo(
     () => filterOpps(opportunities, query, filter),
     [opportunities, query, filter],
   );
-  // Pass 6.1a — caps lifted 10 → 20 per side so each column reads
-  // dense / continuously-evaluating instead of sparse. Engine still
-  // ranks by confidence; we just surface more of the depth.
+  // Pass 7P — STABILIZATION. The EVALUATING tier is deleted as a
+  // visual concept. Previously: ACTIVE LONG/SHORT rows were rendered
+  // bright, FLAT-leaning rows were rendered in a dimmed/desaturated
+  // wrapper beneath them. In practice the engine emits very few
+  // concurrent BUY/SELL agreedActions in conservative mode, so the
+  // ACTIVE tier was usually 1-3 rows + 8 dimmed FLAT rows — which
+  // read as "only the top row gets styling." Five passes of card
+  // tuning could not fix what was really a data-classification
+  // problem dressed up as a rendering problem.
+  //
+  // New rule: a LONG card and a FLAT-leaning-LONG card are
+  // indistinguishable in render. Both flow into the same ranked
+  // column. Up to 20 per side, sorted by confidence (engine already
+  // sorted in usePaperSignals). Readiness gating preserved at the
+  // button level (BUY enabled only when readiness === "READY";
+  // otherwise the card renders identically but the action is
+  // "QUEUE" / no-op).
   const filteredLongs  = useMemo(
-    () => filteredOpps.filter(o => o.direction === "LONG").slice(0, 20),
+    () => filteredOpps
+      .filter(o => o.direction === "LONG"
+                || (o.direction === "FLAT" && (o.lean === "LONG" || o.lean === "NEUTRAL")))
+      .slice(0, 20),
     [filteredOpps],
   );
   const filteredShorts = useMemo(
-    () => filteredOpps.filter(o => o.direction === "SHORT").slice(0, 20),
-    [filteredOpps],
-  );
-
-  // Pass 6.1 — EVALUATING tier derivation. FLAT (engine HOLD) opps
-  // routed into a column by their fast/slow TF `lean`. NEUTRAL leans
-  // render in BOTH columns (true "we don't know yet" state). Capped
-  // at 8 per column to keep the dimmed tier subordinate to active
-  // conviction while still feeling substantial. Sorted by confidence.
-  const evaluatingLongs = useMemo(
     () => filteredOpps
-      .filter(o => o.direction === "FLAT" && (o.lean === "LONG" || o.lean === "NEUTRAL"))
-      .slice(0, 8),
-    [filteredOpps],
-  );
-  const evaluatingShorts = useMemo(
-    () => filteredOpps
-      .filter(o => o.direction === "FLAT" && (o.lean === "SHORT" || o.lean === "NEUTRAL"))
-      .slice(0, 8),
+      .filter(o => o.direction === "SHORT"
+                || (o.direction === "FLAT" && (o.lean === "SHORT" || o.lean === "NEUTRAL")))
+      .slice(0, 20),
     [filteredOpps],
   );
 
@@ -3541,8 +3461,6 @@ export function PortalCustomerShell() {
         <OpportunityMatrix
           longs={filteredLongs}
           shorts={filteredShorts}
-          evaluatingLongs={evaluatingLongs}
-          evaluatingShorts={evaluatingShorts}
           onQueue={queuePaper}
           isLoading={isLoading}
           isError={isError}
