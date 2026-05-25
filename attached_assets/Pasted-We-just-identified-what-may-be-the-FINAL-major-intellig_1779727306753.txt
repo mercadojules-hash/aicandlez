@@ -1,0 +1,105 @@
+We just identified what may be the FINAL major intelligence-layer bottleneck before launch:
+
+The issue may no longer be the conviction architecture itself.
+
+The conviction system is finally behaving correctly:
+
+* we now have legitimate 70s/80s
+* ELITE setups are appearing naturally
+* spread is improving
+* polarity/glow hierarchy is working
+
+BUT —
+
+I believe the ASSET UNIVERSE feeding the opportunity scanner is still diluting the AI quality.
+
+Right now the scanner appears to still include:
+
+* low-liquidity assets
+* noisy chop assets
+* weak sideways markets
+* low-structure meme pairs
+* poor trend environments
+* dead-volume assets
+
+That directly affects:
+
+* percentile ranking
+* conviction spread
+* average confidence
+* leaderboard quality
+* signal differentiation
+* perceived AI intelligence
+
+This is NOT a request for fake inflation.
+
+We are NOT:
+
+* hardcoding numbers
+* weakening risk controls
+* modifying execution logic
+* bypassing filters
+
+We ARE improving:
+INPUT QUALITY.
+
+Institutional systems do NOT scan every asset equally.
+They curate opportunity universes.
+
+Please audit:
+
+1. current asset whitelist
+2. scanner inclusion rules
+3. liquidity minimums
+4. volume thresholds
+5. spread/slippage filtering
+6. volatility gating
+7. trend-quality scoring
+8. chop suppression
+9. dead-market suppression
+10. regime filtering
+11. breakout-quality detection
+12. momentum persistence
+13. asset ranking normalization
+
+I think weak/noisy assets are compressing the percentile model.
+
+If mediocre assets are ranking against mediocre assets:
+the engine naturally clusters into:
+
+* 20s
+* 30s
+* 40s
+
+But when stronger assets dominate the candidate pool:
+the engine can naturally produce:
+
+* HIGH
+* STRONG
+* ELITE
+
+WITHOUT fake inflation.
+
+Potential solution:
+Create tiered opportunity universes:
+
+* institutional majors
+* high-liquidity trend assets
+* breakout momentum pool
+* scalp universe
+* high-volatility expansion pool
+* quarantine/low-quality pool
+
+Goal:
+make ELITE setups:
+
+* rare
+* believable
+* exciting
+* trustworthy
+
+while making LOW setups genuinely weak.
+
+We may have finally identified the real source of confidence compression:
+not the scoring layer —
+the QUALITY OF THE ASSETS entering the ranking engine.
