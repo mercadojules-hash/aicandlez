@@ -1496,7 +1496,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           }}>{opp.direction}</span>
           {lastExit && (
             <span
-              title={`Last paper exit on ${shortPair(opp.symbol)}: ${lastExit.reason} · ${lastExit.pnlPct >= 0 ? "+" : ""}${lastExit.pnlPct.toFixed(2)}%`}
+              title={`Last paper exit on ${shortPair(opp.symbol)}: ${lastExit.reason} · ${nz(lastExit.pnlPct) >= 0 ? "+" : ""}${nz(lastExit.pnlPct).toFixed(2)}%`}
               style={{
                 fontSize: 8, fontWeight: 600,
                 color: lastExit.pnl >= 0 ? T.NEON : T.RED,
@@ -1506,7 +1506,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
                 whiteSpace: "nowrap",
               }}
             >
-              ↪ {lastExit.pnl >= 0 ? "+" : "−"}{Math.abs(lastExit.pnlPct).toFixed(2)}% {lastExit.reason}
+              ↪ {nz(lastExit.pnl) >= 0 ? "+" : "−"}{Math.abs(nz(lastExit.pnlPct)).toFixed(2)}% {lastExit.reason}
             </span>
           )}
         </div>
@@ -2368,8 +2368,8 @@ const AIReasoningConsole = memo(function AIReasoningConsole({
             }}>
               <span style={{ color: T.TEXT_2, flexShrink: 0 }}>{time}</span>
               <span style={{ color: T.TEXT_0, flexShrink: 0, width: 44 }}>{shortPair(e.symbol)}</span>
-              <span style={{ color: T.TEXT_1, flex: 1 }}>{e.shortSummary ?? `${d} @ ${e.timeframe} · conf ${e.confidence.toFixed(0)}%`}</span>
-              <span style={{ color: dColor, flexShrink: 0 }}>{delta}{e.confidence.toFixed(0)}%</span>
+              <span style={{ color: T.TEXT_1, flex: 1 }}>{e.shortSummary ?? `${d} @ ${e.timeframe} · conf ${nz(e.confidence).toFixed(0)}%`}</span>
+              <span style={{ color: dColor, flexShrink: 0 }}>{delta}{nz(e.confidence).toFixed(0)}%</span>
             </div>
           );
         })}
@@ -2510,7 +2510,7 @@ const PortfolioIntelligence = memo(function PortfolioIntelligence({ now }: { now
                   EXIT · {shortPair(lastClose.symbol)} · <span style={{ color: T.TEXT_2 }}>{lastClose.reason}</span>
                 </span>
                 <span style={{ color: exitColor }}>
-                  {lastClose.pnl >= 0 ? "+" : "−"}${Math.abs(lastClose.pnl).toFixed(2)}
+                  {nz(lastClose.pnl) >= 0 ? "+" : "−"}${Math.abs(nz(lastClose.pnl)).toFixed(2)}
                 </span>
               </div>
             </div>
@@ -2545,11 +2545,11 @@ const PortfolioIntelligence = memo(function PortfolioIntelligence({ now }: { now
                     <span style={{ color: T.TEXT_3, marginLeft: 6 }}>{formatPositionAge(ageMs)}</span>
                   </span>
                   <span style={{ color: p.pnl >= 0 ? T.NEON : T.RED }}>
-                    {p.pnl >= 0 ? "+" : "−"}${Math.abs(p.pnl).toFixed(2)}
+                    {nz(p.pnl) >= 0 ? "+" : "−"}${Math.abs(nz(p.pnl)).toFixed(2)}
                   </span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: T.TEXT_3, letterSpacing: "0.06em" }}>
-                  <span>TP {toTargetPct >= 0 ? "+" : ""}{toTargetPct.toFixed(2)}% · SL {toStopPct >= 0 ? "+" : ""}{toStopPct.toFixed(2)}%</span>
+                  <span>TP {nz(toTargetPct) >= 0 ? "+" : ""}{nz(toTargetPct).toFixed(2)}% · SL {nz(toStopPct) >= 0 ? "+" : ""}{nz(toStopPct).toFixed(2)}%</span>
                   <span style={{ color: isEntry ? sideCol : T.TEXT_3, letterSpacing: "0.10em" }}>{phaseLabel}</span>
                 </div>
               </div>
@@ -2649,9 +2649,9 @@ const RecentExits = memo(function RecentExits({ now }: { now: number }) {
                   </span>
                 </span>
                 <span style={{ color: pnlColor }}>
-                  {h.pnl >= 0 ? "+" : "−"}${Math.abs(h.pnl).toFixed(2)}
+                  {nz(h.pnl) >= 0 ? "+" : "−"}${Math.abs(nz(h.pnl)).toFixed(2)}
                   <span style={{ color: T.TEXT_3, marginLeft: 6 }}>
-                    ({h.pnl >= 0 ? "+" : ""}{h.pnlPct.toFixed(2)}%)
+                    ({nz(h.pnl) >= 0 ? "+" : ""}{nz(h.pnlPct).toFixed(2)}%)
                   </span>
                 </span>
               </div>
@@ -2814,7 +2814,7 @@ const RiskHeatmap = memo(function RiskHeatmap({ opps }: { opps: OpportunityVM[] 
           return (
             <div
               key={i}
-              title={`${c.sym} · risk ${(c.risk * 100).toFixed(0)}%`}
+              title={`${c.sym} · risk ${(nz(c.risk) * 100).toFixed(0)}%`}
               style={{
                 background: color,
                 opacity: isHot ? undefined : Math.max(0.20, c.risk),
@@ -3078,7 +3078,7 @@ const ExecutionAwareness = memo(function ExecutionAwareness({
         <Kv k="PAPER TRADES (SESSION)" v={String(stats.totalCount)} />
         <Kv k="OPEN POSITIONS" v={`${openCount} / 3`} />
         <Kv k="REALIZED P/L"
-            v={`${stats.realizedPnl >= 0 ? "+" : "−"}$${Math.abs(stats.realizedPnl).toFixed(2)}`}
+            v={`${nz(stats.realizedPnl) >= 0 ? "+" : "−"}$${Math.abs(nz(stats.realizedPnl)).toFixed(2)}`}
             color={stats.realizedPnl >= 0 ? T.NEON : T.RED} />
         <div style={{ height: 1, background: T.BORDER, margin: "4px 0" }} />
         <Kv k="LAST EVENT"

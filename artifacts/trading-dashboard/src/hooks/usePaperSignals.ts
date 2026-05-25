@@ -193,7 +193,8 @@ function reasoningFromBreakdown(b: SymBreakdown): string {
   if (b.fast.shortSummary)   return b.fast.shortSummary;
   if (b.slow.shortSummary)   return b.slow.shortSummary;
   if (b.blockReason)         return b.blockReason;
-  return `${b.agreedAction} bias · conf ${b.avgConfidence.toFixed(0)}%`;
+  const conf = Number(b.avgConfidence);
+  return `${b.agreedAction} bias · conf ${(Number.isFinite(conf) ? conf : 0).toFixed(0)}%`;
 }
 
 function exchangesForSymbol(sym: string): string[] {
