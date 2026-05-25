@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 
 import { authFetch } from "../../lib/authFetch";
+import { PortalExchangeConnectModal } from "../PortalExchangeConnectModal";
 // Pass 7V — brand logo used above search bar (replaces ticker chips row).
 import aiCandlezLogoHorizontal from "@assets/aicandlez-logo-horizontal-master_1779691403317.png";
 import { usePaperSignals, type OpportunityVM } from "../../hooks/usePaperSignals";
@@ -2831,14 +2832,18 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
 /* form so it reads as global state, not a per-panel stat.                  */
 /* ──────────────────────────────────────────────────────────────────────── */
 const GlobalAIConfidenceRing = memo(function GlobalAIConfidenceRing({ value }: { value: number }) {
-  const color = value >= 70 ? T.NEON : value >= 55 ? T.AMBER : T.TEXT_1;
+  // Pass 7X — color logic refined per launch spec:
+  //   0–49  = RED      (low platform conviction)
+  //   50–79 = AMBER    (moderate)
+  //   80+   = NEON     (high system confidence)
+  const color = value >= 80 ? T.NEON : value >= 50 ? T.AMBER : T.RED;
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 14,
       padding: "10px 16px",
-      border: `1px solid rgba(102,255,102,0.28)`,
+      border: `1px solid ${value >= 80 ? "rgba(102,255,102,0.32)" : value >= 50 ? "rgba(255,176,32,0.32)" : "rgba(255,64,64,0.32)"}`,
       background: `linear-gradient(180deg, #0E1A15 0%, ${T.BG_TERMINAL} 100%)`,
-      boxShadow: `0 0 0 1px rgba(102,255,102,0.10), inset 0 1px 0 rgba(102,255,102,0.14), 0 6px 20px rgba(0,0,0,0.55), 0 0 36px rgba(102,255,102,0.08)`,
+      boxShadow: `0 0 0 1px rgba(${value >= 80 ? "102,255,102" : value >= 50 ? "255,176,32" : "255,64,64"},0.12), inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 20px rgba(0,0,0,0.55)`,
       fontFamily: T.FONT_MONO,
     }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
@@ -2847,9 +2852,16 @@ const GlobalAIConfidenceRing = memo(function GlobalAIConfidenceRing({ value }: {
       </div>
       <div style={{ position: "relative", width: 124, height: 124, flexShrink: 0 }}>
         <ConfidenceRing color={color} value={value} size={124} />
-        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-          <span style={{ fontSize: 38, color, fontVariantNumeric: "tabular-nums", fontWeight: 700, lineHeight: 1 }}>{value}</span>
-          <span style={{ fontSize: 9, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL, marginTop: 4 }}>AVG CONF</span>
+        {/* Pass 7X — "AVG CONF" sublabel removed; number enlarged
+            (38→54) and weight bumped (700→800) so the value reads as
+            primary system telemetry, not a stat label. */}
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+          <span style={{
+            fontSize: 54, color,
+            fontVariantNumeric: "tabular-nums",
+            fontWeight: 800, lineHeight: 1,
+            letterSpacing: "-0.04em",
+          }}>{value}</span>
         </div>
       </div>
     </div>
@@ -3216,6 +3228,11 @@ export function PortalCustomerShell() {
   const [account, setAccount] = useState(false);
   const [upgrade, setUpgrade] = useState(false);
   const [disclaimer, setDisclaimer] = useState(false);
+  // Pass 7X — CONNECT EXCHANGE restored to customer header per user
+  // launch-polish directive. Modal is mounted with liveExchangesEnabled
+  // = false so Alpaca/live-only catalog entries stay gated and the
+  // crypto-only paper invariant is preserved.
+  const [connectOpen, setConnectOpen] = useState(false);
   const { gate: disclaimerGate, modal: disclaimerGateModal } = useDisclaimerGate();
 
   const filteredOpps = useMemo(
@@ -3578,7 +3595,8 @@ export function PortalCustomerShell() {
               directly under the toolbar, right-aligned with the
               search region. */}
         <div style={{
-          display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap",
+          display: "flex", gap: 24, alignItems: "flex-start",
+          flexWrap: "wrap", justifyContent: "space-between",
         }}>
           <div style={{ flex: 1, minWidth: 280, maxWidth: 760 }}>
             <SearchBar
@@ -3589,12 +3607,15 @@ export function PortalCustomerShell() {
           </div>
           <div style={{
             display: "flex", flexDirection: "column", gap: 14,
-            alignItems: "flex-end", flexShrink: 0,
+            alignItems: "flex-end", flexShrink: 0, marginLeft: "auto",
           }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
               <ToolbarBtn onClick={() => setAccount(true)}>ACCOUNT</ToolbarBtn>
-              {/* P1 fix (E3): CONNECT EXCHANGE removed from customer surface.
-                  Customer /portal is paper-only. */}
+              {/* Pass 7X — CONNECT EXCHANGE restored as prominent
+                  operational entry point on customer header. Modal
+                  is gated (liveExchangesEnabled=false) so live-only
+                  catalog rows render as LIVE GATED for non-admins. */}
+              <ConnectExchangeBtn onClick={() => setConnectOpen(true)} />
               {plan !== "pro" && <ToolbarBtn variant="brand" onClick={() => setUpgrade(true)}>UPGRADE</ToolbarBtn>}
               <ToolbarBtn onClick={() => setDisclaimer(true)}>DISCLAIMER</ToolbarBtn>
             </div>
@@ -3673,11 +3694,52 @@ export function PortalCustomerShell() {
       <UpgradeModal    open={upgrade}    onClose={() => setUpgrade(false)} gate={disclaimerGate} />
       <AccountModal    open={account}    onClose={() => setAccount(false)} tier={plan} onUpgrade={() => setUpgrade(true)} />
       <DisclaimerModal open={disclaimer} onClose={() => setDisclaimer(false)} />
-      {/* P1 fix (E3): PortalExchangeConnectModal intentionally NOT mounted
-          on the customer surface — its default visible catalog includes
-          Alpaca, which violates the crypto-only paper invariant. */}
+      {/* Pass 7X — PortalExchangeConnectModal restored on customer
+          surface to back the new header CONNECT EXCHANGE button.
+          liveExchangesEnabled=false keeps live-only/Alpaca catalog
+          rows rendered as LIVE GATED (disabled), preserving the
+          crypto-only paper-trading invariant. */}
+      <PortalExchangeConnectModal
+        open={connectOpen}
+        onClose={() => setConnectOpen(false)}
+        liveExchangesEnabled={false}
+      />
       {disclaimerGateModal}
     </div>
+  );
+}
+
+/* Pass 7X — CONNECT EXCHANGE primary header CTA. Larger than ToolbarBtn,
+   neon-bordered with a subtle inner glow + scan sheen so it reads as the
+   primary operational entry on /portal entry. Click → PortalExchangeConnectModal. */
+function ConnectExchangeBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "9px 18px",
+        fontFamily: T.FONT_MONO, fontSize: 12, fontWeight: 800,
+        letterSpacing: T.TRACK_LABEL,
+        background: `linear-gradient(180deg, rgba(102,255,102,0.16) 0%, rgba(102,255,102,0.06) 100%)`,
+        border: `1px solid ${T.NEON}`,
+        color: T.NEON,
+        cursor: "pointer",
+        transition: T.TX_FAST,
+        boxShadow: `0 0 0 1px rgba(102,255,102,0.16), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 24px rgba(102,255,102,0.18)`,
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = `linear-gradient(180deg, rgba(102,255,102,0.24) 0%, rgba(102,255,102,0.10) 100%)`;
+        e.currentTarget.style.boxShadow = `0 0 0 1px rgba(102,255,102,0.28), inset 0 1px 0 rgba(255,255,255,0.12), 0 0 36px rgba(102,255,102,0.28)`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = `linear-gradient(180deg, rgba(102,255,102,0.16) 0%, rgba(102,255,102,0.06) 100%)`;
+        e.currentTarget.style.boxShadow = `0 0 0 1px rgba(102,255,102,0.16), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 24px rgba(102,255,102,0.18)`;
+      }}
+    >
+      CONNECT EXCHANGE
+    </button>
   );
 }
 
