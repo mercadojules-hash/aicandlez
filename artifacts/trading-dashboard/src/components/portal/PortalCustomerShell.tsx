@@ -1172,23 +1172,51 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // RGB-channel form so we can interpolate alpha against dirColor
   // (neon green or red) without re-typing the constants below.
   const dirRgb = isLong ? "102,255,102" : opp.direction === "SHORT" ? "255,77,77" : "168,184,176";
+  // Pass 7h — PERCEPTUAL LEAP. No more micro-tuning. Active rows now
+  // get a true dimensional treatment: solid dirColor frame at high
+  // alpha, real dirColor wash inside the card, MASSIVE outer halo
+  // that darkens the surrounding chassis by contrast, and a 1px
+  // "double-ring" stamped via box-shadow on hero tiers so the frame
+  // reads as engraved metal, not a flat outline. Combined with the
+  // article translateY lift below, active cards physically project
+  // OFF the matrix surface instead of sitting flush with it.
   const tierBorderColor =
-    isElite          ? `rgba(${dirRgb},0.82)` :
-    isStrong         ? `rgba(${dirRgb},0.50)` :
-    isActiveBaseline ? `rgba(${dirRgb},0.28)` :
+    isElite          ? `rgba(${dirRgb},1.00)` :
+    isStrong         ? `rgba(${dirRgb},0.90)` :
+    isActiveBaseline ? `rgba(${dirRgb},0.62)` :
                        T.BORDER;
   const tierBackground =
-    isElite          ? `linear-gradient(180deg, rgba(${dirRgb},0.090) 0%, ${T.BG_TERMINAL} 60%)` :
-    isStrong         ? `linear-gradient(180deg, rgba(${dirRgb},0.045) 0%, ${T.BG_TERMINAL} 60%)` :
-    isActiveBaseline ? `linear-gradient(180deg, rgba(${dirRgb},0.020) 0%, ${T.BG_TERMINAL} 70%)` :
+    isElite          ? `linear-gradient(180deg, rgba(${dirRgb},0.22) 0%, rgba(${dirRgb},0.06) 40%, ${T.BG_TERMINAL} 100%)` :
+    isStrong         ? `linear-gradient(180deg, rgba(${dirRgb},0.14) 0%, rgba(${dirRgb},0.035) 45%, ${T.BG_TERMINAL} 100%)` :
+    isActiveBaseline ? `linear-gradient(180deg, rgba(${dirRgb},0.075) 0%, rgba(${dirRgb},0.018) 50%, ${T.BG_TERMINAL} 100%)` :
                        T.BG_TERMINAL;
-  // Tier shadow doubles as "lift" depth — outer glow lets the active
-  // card physically float above the matrix.
+  // Tier shadow stack (read outer→inner):
+  //  1. `0 0 0 1px ...` — engraved double-ring on hero (zero layout cost)
+  //  2. `0 N px ... rgba(0,0,0,...)` — drop-shadow that gives real depth
+  //     against the dark chassis (chassis itself stays dark)
+  //  3. `0 0 N px rgba(dirRgb,...)` — wide colored halo making the
+  //     card glow into the surrounding empty space
+  //  4. `inset 0 0 N px rgba(dirRgb,...)` — internal bloom so the card
+  //     body reads as energized, not just framed
   const tierShadow =
-    isElite          ? `inset 0 0 32px rgba(${dirRgb},0.11), 0 0 28px rgba(${dirRgb},0.22), 0 4px 18px rgba(0,0,0,0.55)` :
-    isStrong         ? `inset 0 0 22px rgba(${dirRgb},0.07), 0 0 14px rgba(${dirRgb},0.12), 0 3px 12px rgba(0,0,0,0.45)` :
-    isActiveBaseline ? `inset 0 0 14px rgba(${dirRgb},0.035), 0 0 7px rgba(${dirRgb},0.07), 0 2px 8px rgba(0,0,0,0.35)` :
+    isElite          ? `0 0 0 1px rgba(${dirRgb},0.55), 0 14px 40px rgba(0,0,0,0.85), 0 0 80px rgba(${dirRgb},0.70), inset 0 0 60px rgba(${dirRgb},0.26)` :
+    isStrong         ? `0 0 0 1px rgba(${dirRgb},0.40), 0 10px 30px rgba(0,0,0,0.75), 0 0 56px rgba(${dirRgb},0.50), inset 0 0 42px rgba(${dirRgb},0.17)` :
+    isActiveBaseline ? `0 7px 20px rgba(0,0,0,0.60), 0 0 32px rgba(${dirRgb},0.32), inset 0 0 26px rgba(${dirRgb},0.09)` :
                        undefined;
+  // Physical elevation — ELITE rides highest, STRONG and active
+  // baseline step down. Only translateY (no scale) so the grid
+  // alignment stays exact and there's zero layout shift.
+  const liftTransform =
+    isElite          ? "translateY(-4px)" :
+    isStrong         ? "translateY(-3px)" :
+    isActiveBaseline ? "translateY(-1.5px)" :
+                       undefined;
+  // Higher z-index so hero cards visually stack above neighbors
+  // when their halos overlap.
+  const liftZ =
+    isElite          ? 3 :
+    isStrong         ? 2 :
+    isActiveBaseline ? 1 : 0;
 
   // Pass 7b — outcome memory. When this symbol has a paper close within
   // the last 5 minutes, surface the outcome inline on the card so the
@@ -1208,6 +1236,12 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         background: tierBackground,
         border: `1px solid ${tierBorderColor}`,
         boxShadow: tierShadow,
+        // Pass 7h — physical elevation. translateY only, no scale,
+        // so the grid stays pixel-perfect. zIndex lets hero halos
+        // overlap neighbors instead of being clipped under them.
+        transform: liftTransform,
+        zIndex: liftZ,
+        boxSizing: "border-box",
         padding: 8,
         paddingLeft: 18,
         paddingRight: 10,
@@ -1225,7 +1259,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         // transition is slow enough to read as "aging", not "blink".
         opacity: ageOpacity,
         // Deterministic hover cadence — background + border tinted in lock-step.
-        transition: `background-color ${T.TX_FAST}, border-color ${T.TX_FAST}, opacity 600ms ease, box-shadow ${T.TX_MED}`,
+        transition: `background-color ${T.TX_FAST}, border-color ${T.TX_FAST}, opacity 600ms ease, box-shadow ${T.TX_MED}, transform ${T.TX_MED}`,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = T.BORDER_GRN;
@@ -1240,7 +1274,13 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         aria-hidden
         style={{
           position: "absolute", top: 0, bottom: 0, left: 0,
-          width: 3, background: railColor,
+          // Pass 7h — rail width tiered with active dominance.
+          // ELITE 7px, STRONG 5px, active baseline 4px, evaluating 3px.
+          // The rail is the strongest single visual cue that a row
+          // is alive; doubling its width on hero rows makes the
+          // direction read across the room.
+          width: isElite ? 7 : isStrong ? 5 : isActiveBaseline ? 4 : 3,
+          background: railColor,
           boxShadow: railGlow,
           opacity: railOpacity,
           animation: railAnim,
@@ -1407,7 +1447,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             height={70}
             live={isFreshSignal}
             seedDelayMs={sparkDelayMs}
-            intensity={isElite ? "elite" : isStrong ? "strong" : "baseline"}
+            intensity={isElite ? "elite" : isStrong ? "strong" : isActiveBaseline ? "strong" : "baseline"}
           />
           {isLiveTick && (
             <span aria-hidden style={{
