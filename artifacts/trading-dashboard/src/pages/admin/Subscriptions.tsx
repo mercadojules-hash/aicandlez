@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { authFetch } from "@/lib/authFetch";
+import { normalizeAdminActionPayload } from "@/lib/normalizeAdminPayload";
 
 interface SubRow {
   clerkUserId: string;
@@ -356,14 +357,26 @@ function SubscriptionActionModal({
     mutationFn: async (): Promise<unknown> => {
       const userId = row.clerkUserId;
 
+      const postAdminAction = async (
+        path: string,
+        rawBody: Record<string, unknown>,
+      ): Promise<Response> => {
+        const body = normalizeAdminActionPayload(rawBody);
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.debug(`[admin-action] POST /api/admin/users/${userId}/${path}`, body);
+        }
+        return authFetch(`/api/admin/users/${userId}/${path}`, {
+          method: "POST",
+          body:   JSON.stringify(body),
+        });
+      };
+
       if (kind === "cancel") {
         // POST /cancel_subscription — { note, cancelAtPeriodEnd }
-        const res = await authFetch(`/api/admin/users/${userId}/cancel_subscription`, {
-          method: "POST",
-          body:   JSON.stringify({
-            note:              note.trim() || "operator cancel",
-            cancelAtPeriodEnd: cancelAtEnd,
-          }),
+        const res = await postAdminAction("cancel_subscription", {
+          note:              note.trim() || "operator cancel",
+          cancelAtPeriodEnd: cancelAtEnd,
         });
         if (!res.ok) {
           const body = await res.json().catch(() => null) as { error?: string } | null;
@@ -375,12 +388,9 @@ function SubscriptionActionModal({
       if (kind === "extend") {
         // POST /extend_subscription — { note, days } (days ≤ 180).
         // Only enabled when hasStripeSub is true; backend will 409 otherwise.
-        const res = await authFetch(`/api/admin/users/${userId}/extend_subscription`, {
-          method: "POST",
-          body:   JSON.stringify({
-            note: note.trim() || `extend ${days}d`,
-            days: Math.min(180, days),
-          }),
+        const res = await postAdminAction("extend_subscription", {
+          note: note.trim() || `extend ${days}d`,
+          days: Math.min(180, days),
         });
         if (!res.ok) {
           const body = await res.json().catch(() => null) as { error?: string } | null;
@@ -394,12 +404,9 @@ function SubscriptionActionModal({
         // POST /complimentary_subscription — { note, days }.
         // Plan tier is ignored: comp extends the user's *existing* sub.
         // The operator picker for tier in this branch is hidden in the UI.
-        const res = await authFetch(`/api/admin/users/${userId}/complimentary_subscription`, {
-          method: "POST",
-          body:   JSON.stringify({
-            note: note.trim() || `comp ${days}d`,
-            days,
-          }),
+        const res = await postAdminAction("complimentary_subscription", {
+          note: note.trim() || `comp ${days}d`,
+          days,
         });
         if (!res.ok) {
           const body = await res.json().catch(() => null) as { error?: string } | null;
@@ -410,14 +417,11 @@ function SubscriptionActionModal({
 
       // No Stripe sub → create a fresh tiered comp. Super-admin only;
       // a 403 here surfaces a clear operator error in the toast.
-      const res = await authFetch(`/api/admin/users/${userId}/create_complimentary_subscription`, {
-        method: "POST",
-        body:   JSON.stringify({
-          plan:      tier,
-          days,
-          paperOnly: true,
-          note:      note.trim() || `create comp ${days}d ${tier}`,
-        }),
+      const res = await postAdminAction("create_complimentary_subscription", {
+        plan:      tier,
+        days,
+        paperOnly: true,
+        note:      note.trim() || `create comp ${days}d ${tier}`,
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null) as { error?: string } | null;

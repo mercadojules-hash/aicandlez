@@ -1,4 +1,5 @@
 import { authFetch } from "@/lib/authFetch";
+import { normalizeAdminActionPayload } from "@/lib/normalizeAdminPayload";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -357,9 +358,17 @@ function UserIntelligencePanel({
 
   const mutation = useMutation({
     mutationFn: async (args: { path: string; body: Record<string, unknown> }) => {
+      const body = normalizeAdminActionPayload(args.body);
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.debug(
+          `[admin-action] POST /api/admin/users/${user!.clerkUserId}/${args.path}`,
+          body,
+        );
+      }
       const res = await authFetch(`/api/admin/users/${user!.clerkUserId}/${args.path}`, {
         method: "POST",
-        body:   JSON.stringify(args.body),
+        body:   JSON.stringify(body),
       });
       const text = await res.text();
       let json: unknown = null;
