@@ -1070,8 +1070,13 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   const flickerDelayMs = (seed * 17) % 1600;
   const sparkDelayMs   = (seed * 53) % 5000;
   const sweepDelayMs   = (seed * 113) % 12000;
+  // Pass 7c — left rail amplification at the elite tier. ELITE pushes
+  // to 20px glow so the rail reads as a vertical bar of light, not a
+  // hairline. STRONG bumped 14→16 for stronger separation from
+  // BASELINE. Lower tiers preserved.
   const railGlow =
-    opp.conf >= 85 ? `0 0 14px ${railColor}` :
+    opp.conf >= 90 ? `0 0 20px ${railColor}, 0 0 10px ${railColor}` :
+    opp.conf >= 85 ? `0 0 16px ${railColor}` :
     opp.conf >= 70 ? `0 0 10px ${railColor}` :
     opp.conf >= 55 ? `0 0 6px ${railColor}`  :
                      `0 0 3px ${railColor}`;
@@ -1086,6 +1091,29 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   const railAnim = isReady && isFreshSignal
     ? (opp.conf >= 85 ? "rail-pulse 1.8s ease-in-out infinite" : "rail-pulse 2.5s ease-in-out infinite")
     : undefined;
+
+  // Pass 7c — CONVICTION DOMINANCE. The TOP 20 LONGS / SHORTS must
+  // visually command attention; high-conviction signals (>=80, >=90)
+  // get a conf-tier border + a very faint background wash so the
+  // strongest opportunities physically separate from the median and
+  // dominate over the EVALUATING tier. ELITE (>=90) is the loudest;
+  // STRONG (>=80) is a softer step; BASELINE (<80) is the existing
+  // neutral card. No fake conviction — only real engine scores trigger
+  // the higher tiers. Restraint preserved: no animations added, only
+  // static contrast amplified.
+  const isElite  = opp.conf >= 90;
+  const isStrong = opp.conf >= 80 && !isElite;
+  const tierBorderColor =
+    isElite  ? `rgba(102,255,102,0.55)` :
+    isStrong ? `rgba(102,255,102,0.30)` : T.BORDER;
+  const tierBackground =
+    isElite  ? `linear-gradient(180deg, rgba(102,255,102,0.045) 0%, ${T.BG_TERMINAL} 65%)` :
+    isStrong ? `linear-gradient(180deg, rgba(102,255,102,0.022) 0%, ${T.BG_TERMINAL} 65%)` :
+               T.BG_TERMINAL;
+  const tierShadow =
+    isElite  ? `inset 0 0 24px rgba(102,255,102,0.06), 0 0 16px rgba(102,255,102,0.10)` :
+    isStrong ? `inset 0 0 16px rgba(102,255,102,0.035)` :
+               undefined;
 
   // Pass 7b — outcome memory. When this symbol has a paper close within
   // the last 5 minutes, surface the outcome inline on the card so the
@@ -1102,8 +1130,9 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   return (
     <article
       style={{
-        background: T.BG_TERMINAL,
-        border: `1px solid ${T.BORDER}`,
+        background: tierBackground,
+        border: `1px solid ${tierBorderColor}`,
+        boxShadow: tierShadow,
         padding: 8,
         paddingLeft: 18,
         paddingRight: 10,
@@ -1121,17 +1150,15 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         // transition is slow enough to read as "aging", not "blink".
         opacity: ageOpacity,
         // Deterministic hover cadence — background + border tinted in lock-step.
-        transition: `background-color ${T.TX_FAST}, border-color ${T.TX_FAST}, opacity 600ms ease`,
+        transition: `background-color ${T.TX_FAST}, border-color ${T.TX_FAST}, opacity 600ms ease, box-shadow ${T.TX_MED}`,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = T.BORDER_GRN;
-        e.currentTarget.style.background   = "rgba(102,255,102,0.015)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = T.BORDER;
-        // Reset to base background (T.BG_TERMINAL) — must match the
-        // initial style above or first hover causes permanent drift.
-        e.currentTarget.style.background   = T.BG_TERMINAL;
+        // Restore the conviction-tier border on leave so hover never
+        // resets ELITE / STRONG rows back to the neutral border.
+        e.currentTarget.style.borderColor = tierBorderColor;
       }}
     >
       <div
@@ -1416,15 +1443,20 @@ function ConfidenceRing({ color, value, size = 78 }: { color: string; value: num
   // Conf-tiered glow intensity — high-conviction signals visibly bloom,
   // low-conviction stay restrained. State-gated motion policy: glow
   // amount encodes confidence tier.
+  // Pass 7c — top-tier glow + halo amplified. ELITE (>=90) now visibly
+  // blooms beyond STRONG (>=80) so the eye reads the elite tier as
+  // hero conviction. Lower tiers untouched to preserve the discipline
+  // gradient (low conf must still look quiet).
   const glowPx =
-    value >= 85 ? 18 :
+    value >= 90 ? 26 :
+    value >= 85 ? 20 :
     value >= 70 ? 13 :
     value >= 55 ? 8  : 4;
-  const ringStroke = value >= 85 ? 4 : value >= 70 ? 3.5 : 3;
-  // Pass 6.1a — halo tier nudged up (0.45/0.30/0.18/0.10 → 0.55/0.38/
-  // 0.24/0.14) so the ring identity carries through alongside the
-  // brighter sparklines without redesigning geometry.
+  const ringStroke = value >= 90 ? 4.5 : value >= 85 ? 4 : value >= 70 ? 3.5 : 3;
+  // Pass 7c — halo tier raised at the top end. ELITE = 0.70, STRONG =
+  // 0.55. Lower tiers preserved from Pass 6.1a.
   const haloOpacity =
+    value >= 90 ? 0.70 :
     value >= 85 ? 0.55 :
     value >= 70 ? 0.38 :
     value >= 55 ? 0.24 : 0.14;
@@ -1933,12 +1965,18 @@ const Column = memo(function Column({
               aria-hidden
               inert={"" as unknown as boolean}
               style={{
-                // Pass 6.1a / 6.2 — calibrated up from 0.42/sat(0.55).
-                // 0.70 + sat(0.90) keeps the tier clearly subordinate
-                // to active rows while preserving neon energy +
-                // sparkline luminance.
-                opacity: 0.70,
-                filter: "saturate(0.90)",
+                // Pass 7c — EVALUATING recession. Active 80+/90+ rows
+                // now carry conviction-tier borders, glow, and bg
+                // wash; for the hierarchy to read, EVALUATING must
+                // sit clearly below the median active row. Drop
+                // opacity 0.70→0.55 and saturation 0.90→0.65 so
+                // sparkline/ring luminance noticeably calms while
+                // engine HOLDs remain readable as "still alive".
+                // (Historical: Pass 6.1a/6.2 had this at 0.70/0.90;
+                // those tunings predated the conviction-tier border
+                // on ACTIVE cards, so the bands collided visually.)
+                opacity: 0.55,
+                filter: "saturate(0.65)",
                 pointerEvents: "none",
                 display: "flex", flexDirection: "column",
                 gap: CARD_ROW_GAP_PX,
