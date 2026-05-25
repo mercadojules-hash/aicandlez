@@ -1434,10 +1434,12 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         height: 124,
         fontFamily: T.FONT_MONO,
         // Pass 7a — age decay. ageOpacity collapses FRESH→SETTLING→
-        // AGING→EXPIRED into a single multiplier so the whole card
-        // (ring, sparkline, telemetry, action) fades together. 600ms
-        // transition is slow enough to read as "aging", not "blink".
-        opacity: ageOpacity,
+        // AGING→EXPIRED into a single multiplier so the ring, sparkline,
+        // telemetry, action all fade together. 600ms transition.
+        // Launch-finalization — ageOpacity moved OFF the article and
+        // ONTO an inner content wrapper below so it no longer multiplies
+        // down through the absolutely-positioned directional rail. The
+        // rail must stay full-saturation across every age tier.
         // Deterministic hover cadence — background + border tinted in lock-step.
         transition: `background-color ${T.TX_FAST}, border-color ${T.TX_FAST}, opacity 600ms ease, box-shadow ${T.TX_MED}, transform ${T.TX_MED}`,
       }}
@@ -1477,6 +1479,15 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           original "live execution terminal" cadence while preserving
           Pass 4.4/4.5/4.6 visual upgrades (semantic conf color,
           bezier sparkline, layered ring, flow overlay).            */}
+      {/* Launch-finalization — age-decay wrapper. Holds LEFT + RIGHT so
+          ageOpacity dims ring/sparkline/telemetry/actions WITHOUT
+          dimming the absolute-positioned directional rail above. */}
+      <div style={{
+        flex: 1, minWidth: 0,
+        display: "flex", flexDirection: "row",
+        opacity: ageOpacity,
+        transition: "opacity 600ms ease",
+      }}>
       {/* LEFT ANCHOR — symbol · ring · direction pill.
           Pass 7M — reset to clean institutional sizing. No text-
           shadow theatre on the symbol, no oversized conf headline,
@@ -1754,6 +1765,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           })()}
         </div>
       </div>
+      </div>{/* /age-decay wrapper */}
 
     </article>
   );
