@@ -1024,8 +1024,30 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // Animation-gating derivations — every motion must answer
   // "what intelligence state is this communicating?". Idle cards stay still.
   const tickMs        = Math.max(0, now - opp.lastUpdated);
-  const isLiveTick    = tickMs < 10_000;                  // telemetry-flicker
-  const isFreshSignal = tickMs < 30_000;                  // spark-drift dot
+  // Pass 7a — TEMPORAL REALISM. Signals are living market events that
+  // age out of relevance; the tier ladder modulates visual prominence
+  // without ever removing the card abruptly. Continuous market-flow
+  // perception. Tiers (institutional cadence, no arcade tint):
+  //   FRESH    (0-30s)   — full intensity, all motion gates open
+  //   SETTLING (30-90s)  — −8% opacity, animations still allowed
+  //   AGING    (90-180s) — −22% opacity, telemetry animations OFF
+  //   EXPIRED  (>180s)   — −45% opacity, fully static (graceful fade,
+  //                        replaced by newer evaluations when engine
+  //                        re-prioritizes the symbol)
+  const ageTier: "FRESH" | "SETTLING" | "AGING" | "EXPIRED" =
+    tickMs < 30_000  ? "FRESH"    :
+    tickMs < 90_000  ? "SETTLING" :
+    tickMs < 180_000 ? "AGING"    : "EXPIRED";
+  const ageOpacity =
+    ageTier === "FRESH"    ? 1.00 :
+    ageTier === "SETTLING" ? 0.92 :
+    ageTier === "AGING"    ? 0.78 : 0.55;
+  // Existing motion gates rescoped onto the age ladder. `isFreshSignal`
+  // was always meant to mean "FRESH tier" — now it literally does.
+  // `isLiveTick` (<10s heartbeat) still requires FRESH so an AGING card
+  // can never accidentally flicker.
+  const isFreshSignal = ageTier === "FRESH";
+  const isLiveTick    = tickMs < 10_000 && isFreshSignal;
   const isReady       = opp.readiness === "READY";        // ring-sweep crystallization cue
   const rr     = rrRatio(opp.entry, opp.stop, opp.target);
   const gatedReason = opp.readiness === "GATED" && opp.reason ? opp.reason : null;
@@ -1081,8 +1103,13 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         position: "relative", overflow: "hidden",
         height: 142,
         fontFamily: T.FONT_MONO,
+        // Pass 7a — age decay. ageOpacity collapses FRESH→SETTLING→
+        // AGING→EXPIRED into a single multiplier so the whole card
+        // (ring, sparkline, telemetry, action) fades together. 600ms
+        // transition is slow enough to read as "aging", not "blink".
+        opacity: ageOpacity,
         // Deterministic hover cadence — background + border tinted in lock-step.
-        transition: `background-color ${T.TX_FAST}, border-color ${T.TX_FAST}`,
+        transition: `background-color ${T.TX_FAST}, border-color ${T.TX_FAST}, opacity 600ms ease`,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = T.BORDER_GRN;
@@ -2289,16 +2316,79 @@ const AIThroughput = memo(function AIThroughput({
   );
 });
 
-const ExecutionAwareness = memo(function ExecutionAwareness({ openCount }: { openCount: number }) {
+// Pass 7a — EXECUTION TELEMETRY CADENCE. The panel detects deltas on
+// session counters (totalCount / openCount / realizedPnl) and surfaces
+// a brief, restrained acknowledgment that "the system just witnessed
+// an event". Institutional event acknowledgment — single pulse fades
+// after 1.6s. NOT continuous animation, NOT gaming notification.
+type ExecEventKind = "OPEN" | "CLOSE" | "PROFIT" | "LOSS";
+interface ExecEvent { label: string; at: number; kind: ExecEventKind; }
+
+const ExecutionAwareness = memo(function ExecutionAwareness({
+  openCount, now,
+}: {
+  openCount: number;
+  now: number;
+}) {
   const { stats } = usePaperTrades();
+  const prevRef = useRef({
+    totalCount:  stats.totalCount,
+    openCount,
+    realizedPnl: stats.realizedPnl,
+  });
+  const [event, setEvent] = useState<ExecEvent | null>(null);
+  const [pulse, setPulse] = useState(false);
+
+  // Delta detector. Priority: open (new entry) > close (exit) > pnl
+  // realization (close already counted, this is the financial readout).
+  useEffect(() => {
+    const prev = prevRef.current;
+    let next: ExecEvent | null = null;
+    if (stats.totalCount > prev.totalCount) {
+      next = { label: "PAPER ORDER QUEUED", at: Date.now(), kind: "OPEN" };
+    } else if (openCount < prev.openCount) {
+      const n = prev.openCount - openCount;
+      next = { label: `POSITION CLOSED${n > 1 ? ` ×${n}` : ""}`, at: Date.now(), kind: "CLOSE" };
+    } else if (Math.abs(stats.realizedPnl - prev.realizedPnl) > 0.001) {
+      const gained = stats.realizedPnl > prev.realizedPnl;
+      next = { label: gained ? "PROFIT REALIZED" : "LOSS REALIZED", at: Date.now(), kind: gained ? "PROFIT" : "LOSS" };
+    }
+    prevRef.current = { totalCount: stats.totalCount, openCount, realizedPnl: stats.realizedPnl };
+    if (!next) return undefined;
+    setEvent(next);
+    setPulse(true);
+    const t = setTimeout(() => setPulse(false), 1600);
+    return () => clearTimeout(t);
+  }, [stats.totalCount, stats.realizedPnl, openCount]);
+
+  const eventColor =
+    event?.kind === "OPEN"   ? T.NEON  :
+    event?.kind === "CLOSE"  ? T.AMBER :
+    event?.kind === "PROFIT" ? T.NEON  :
+    event?.kind === "LOSS"   ? T.RED   : T.TEXT_2;
+
+  const eventAgeStr = event ? signalAge(event.at, now) : "—";
+
   return (
     <PanelCard title="EXEC AWARENESS" live height={208}>
-      <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10, justifyContent: "center", flex: 1, fontSize: 10 }}>
+      <div style={{
+        padding: 14, display: "flex", flexDirection: "column", gap: 10,
+        justifyContent: "center", flex: 1, fontSize: 10,
+        // Restrained event acknowledgment: 1px inset stroke in the
+        // event's semantic color, fades over 320ms. The panel says
+        // "noted" — it does not celebrate.
+        boxShadow: pulse ? `inset 0 0 0 1px ${eventColor}55, inset 0 0 24px ${eventColor}18` : "none",
+        transition: "box-shadow 320ms ease",
+      }}>
         <Kv k="PAPER TRADES (SESSION)" v={String(stats.totalCount)} />
         <Kv k="OPEN POSITIONS" v={`${openCount} / 3`} />
-        <Kv k="REALIZED P/L" v={`${stats.realizedPnl >= 0 ? "+" : "−"}$${Math.abs(stats.realizedPnl).toFixed(2)}`} color={stats.realizedPnl >= 0 ? T.NEON : T.RED} />
+        <Kv k="REALIZED P/L"
+            v={`${stats.realizedPnl >= 0 ? "+" : "−"}$${Math.abs(stats.realizedPnl).toFixed(2)}`}
+            color={stats.realizedPnl >= 0 ? T.NEON : T.RED} />
         <div style={{ height: 1, background: T.BORDER, margin: "4px 0" }} />
-        <Kv k="CAPACITY" v={`${openCount}/3 PAPER SLOTS USED`} color={T.NEON} />
+        <Kv k="LAST EVENT"
+            v={event ? `${event.label} · ${eventAgeStr}` : "AWAITING ACTIVITY"}
+            color={event ? eventColor : T.TEXT_2} />
       </div>
     </PanelCard>
   );
@@ -2978,7 +3068,7 @@ export function PortalCustomerShell() {
           <ExchangeTopology />
           <RiskHeatmap opps={opportunities} />
           <AIThroughput engine={engineStatus} pulse={pulse} signalsPerMin={signalsPerMin} />
-          <ExecutionAwareness openCount={openTrades.length} />
+          <ExecutionAwareness openCount={openTrades.length} now={nowShell} />
         </section>
       </main>
 
