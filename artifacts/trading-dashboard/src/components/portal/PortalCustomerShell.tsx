@@ -360,6 +360,18 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
             padding: "1px 5px", border: `1px solid rgba(102,255,102,0.30)`,
             borderRadius: 2,
           }}>OPS</span>
+          {/* Launch-finalization build stamp. Confirms the deployed
+              bundle contains the calibrated conviction layer
+              (calibrateRawConfidence + lowered tier thresholds +
+              rail-opacity DOM restructure). Remove once verified. */}
+          <span style={{
+            fontSize: 8, color: "#FFB020", opacity: 0.95,
+            letterSpacing: "0.18em", marginLeft: 4,
+            padding: "1px 5px",
+            border: `1px solid rgba(255,176,32,0.55)`,
+            background: "rgba(255,176,32,0.10)",
+            borderRadius: 2, fontWeight: 700,
+          }}>CONVICTION_V2</span>
         </span>
         <RibbonDivider />
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_1, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
