@@ -461,8 +461,8 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
               type:       "trade",
               symbol:     entry.symbol,
               title:      `Trade Executed — ${symLbl} ${entry.decision}`,
-              body:       `${entry.executedAs === "test" ? "Test" : "Auto"} trade placed · conf ${entry.confidence.toFixed(0)}%`,
-              confidence: entry.confidence,
+              body:       `${entry.executedAs === "test" ? "Test" : "Auto"} trade placed · conf ${(Number.isFinite(Number(entry.confidence)) ? Number(entry.confidence) : 0).toFixed(0)}%`,
+              confidence: Number.isFinite(Number(entry.confidence)) ? Number(entry.confidence) : undefined,
               timestamp:  entry.timestamp,
             });
           }
