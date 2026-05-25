@@ -160,15 +160,19 @@ function NavItem({
 
 // ── Section Divider ───────────────────────────────────────────────────────────
 
-function SectionDivider({ label, collapsed }: { label: string; collapsed: boolean }) {
-  if (collapsed) return <div className="my-2 h-px mx-1" style={{ background: "#0E2030" }} />;
+function SectionDivider({
+  label, collapsed, accent,
+}: { label: string; collapsed: boolean; accent?: string }) {
+  const stroke = accent ? `${accent}40` : "#0E2030";
+  const ink    = accent ?? "#3a5a70";
+  if (collapsed) return <div className="my-2 h-px mx-1" style={{ background: stroke }} />;
   return (
     <div className="flex items-center gap-2 px-2 pt-3 pb-1">
-      <div className="h-px flex-1" style={{ background: "#0E2030" }} />
-      <span className="text-[8px] font-bold font-mono tracking-[0.25em]" style={{ color: "#3a5a70" }}>
+      <div className="h-px flex-1" style={{ background: stroke }} />
+      <span className="text-[8px] font-bold font-mono tracking-[0.25em]" style={{ color: ink }}>
         {label}
       </span>
-      <div className="h-px flex-1" style={{ background: "#0E2030" }} />
+      <div className="h-px flex-1" style={{ background: stroke }} />
     </div>
   );
 }
@@ -518,7 +522,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         {visiblePlatformAdminLinks.length > 0 && (
           <>
-            <SectionDivider label="PLATFORM ADMIN" collapsed={collap} />
+            <SectionDivider label="PLATFORM ADMIN" collapsed={collap} accent="#cc55ff" />
             {visiblePlatformAdminLinks.map(item => (
               <PlatformNavLink
                 key={item.label}
@@ -628,17 +632,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <div className="md:hidden fixed inset-0 z-30 bg-black/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
             )}
 
-            {/* Desktop sidebar */}
+            {/* Desktop sidebar — min-h-0 lets inner <nav flex-1 overflow-y-auto>
+                shrink so the PLATFORM ADMIN section is reachable by scroll
+                when total sidebar density exceeds viewport height. */}
             <aside
-              className={`hidden md:flex ${collapsed ? "w-12" : "w-52"} shrink-0 border-r flex-col transition-all duration-200 overflow-hidden`}
+              className={`hidden md:flex ${collapsed ? "w-12" : "w-52"} shrink-0 border-r flex-col transition-all duration-200 overflow-hidden min-h-0 h-full`}
               style={{ background: "#000508", borderRightColor: "#0a1820" }}
             >
               <SidebarContent collap={collapsed} />
             </aside>
 
-            {/* Mobile sidebar */}
+            {/* Mobile sidebar — outer aside is fixed-positioned so it gets
+                viewport height; the inner <nav> handles scrolling. We do NOT
+                put overflow-y-auto on the aside itself (causes double-scroll
+                and clips items between the header and the nav). */}
             <aside
-              className={`md:hidden fixed inset-y-0 left-0 z-40 w-60 flex-col transition-transform duration-200 ease-out overflow-y-auto flex
+              className={`md:hidden fixed inset-y-0 left-0 z-40 w-60 flex-col transition-transform duration-200 ease-out flex min-h-0
                 ${mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}`}
               style={{ background: "#000810", borderRight: "1px solid #0A1E2E" }}
             >
