@@ -957,13 +957,15 @@ function Sparkline({
         vectorEffect="non-scaling-stroke"
         style={{ filter: `blur(3px)` }}
       />
-      {/* Crisp inner stroke with multi-layer drop-shadow halo */}
+      {/* Crisp inner stroke with multi-layer drop-shadow halo — Pass 6.1a
+          bumped 2/5/12px → 3/7/14px so sparklines read as "live market
+          telemetry" instead of a faint trace against the chassis. */}
       <path
         d={smoothPath}
         fill="none" stroke={color} strokeWidth={2.6}
         strokeLinecap="round" strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
-        style={{ filter: `drop-shadow(0 0 2px ${color}) drop-shadow(0 0 5px ${color}) drop-shadow(0 0 12px ${color})` }}
+        style={{ filter: `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 7px ${color}) drop-shadow(0 0 14px ${color})` }}
       />
       {/* Pass 4.4 — CONTINUOUS FLOW OVERLAY (Pass 4.5: smooth-pathed).
           A duplicate of the trace stroked with a single bright dash
@@ -1363,10 +1365,13 @@ function ConfidenceRing({ color, value, size = 78 }: { color: string; value: num
     value >= 70 ? 13 :
     value >= 55 ? 8  : 4;
   const ringStroke = value >= 85 ? 4 : value >= 70 ? 3.5 : 3;
+  // Pass 6.1a — halo tier nudged up (0.45/0.30/0.18/0.10 → 0.55/0.38/
+  // 0.24/0.14) so the ring identity carries through alongside the
+  // brighter sparklines without redesigning geometry.
   const haloOpacity =
-    value >= 85 ? 0.45 :
-    value >= 70 ? 0.30 :
-    value >= 55 ? 0.18 : 0.10;
+    value >= 85 ? 0.55 :
+    value >= 70 ? 0.38 :
+    value >= 55 ? 0.24 : 0.14;
   // 12-tick dial. Each tick is a short radial mark; ticks beneath the
   // progress arc are tinted with the color, ticks beyond stay neutral.
   const ticks = Array.from({ length: 12 }, (_, i) => i);
@@ -1872,8 +1877,12 @@ const Column = memo(function Column({
               aria-hidden
               inert={"" as unknown as boolean}
               style={{
-                opacity: 0.42,
-                filter: "saturate(0.55)",
+                // Pass 6.1a — calibrated up from 0.42/sat(0.55) which
+                // was dying into the black chassis. 0.68 + sat(0.88)
+                // keeps the tier clearly subordinate to active rows
+                // while preserving neon energy + sparkline luminance.
+                opacity: 0.68,
+                filter: "saturate(0.88)",
                 pointerEvents: "none",
                 display: "flex", flexDirection: "column",
                 gap: CARD_ROW_GAP_PX,
@@ -2587,31 +2596,33 @@ export function PortalCustomerShell() {
     () => filterOpps(opportunities, query, filter),
     [opportunities, query, filter],
   );
+  // Pass 6.1a — caps lifted 10 → 20 per side so each column reads
+  // dense / continuously-evaluating instead of sparse. Engine still
+  // ranks by confidence; we just surface more of the depth.
   const filteredLongs  = useMemo(
-    () => filteredOpps.filter(o => o.direction === "LONG").slice(0, 10),
+    () => filteredOpps.filter(o => o.direction === "LONG").slice(0, 20),
     [filteredOpps],
   );
   const filteredShorts = useMemo(
-    () => filteredOpps.filter(o => o.direction === "SHORT").slice(0, 10),
+    () => filteredOpps.filter(o => o.direction === "SHORT").slice(0, 20),
     [filteredOpps],
   );
 
   // Pass 6.1 — EVALUATING tier derivation. FLAT (engine HOLD) opps
   // routed into a column by their fast/slow TF `lean`. NEUTRAL leans
-  // render in BOTH columns at low opacity (true "we don't know yet"
-  // state). Capped at 6 per column to keep the dimmed tier visually
-  // subordinate to active conviction. Sorted by confidence so the
-  // closest-to-aligning symbols surface first.
+  // render in BOTH columns (true "we don't know yet" state). Capped
+  // at 8 per column to keep the dimmed tier subordinate to active
+  // conviction while still feeling substantial. Sorted by confidence.
   const evaluatingLongs = useMemo(
     () => filteredOpps
       .filter(o => o.direction === "FLAT" && (o.lean === "LONG" || o.lean === "NEUTRAL"))
-      .slice(0, 6),
+      .slice(0, 8),
     [filteredOpps],
   );
   const evaluatingShorts = useMemo(
     () => filteredOpps
       .filter(o => o.direction === "FLAT" && (o.lean === "SHORT" || o.lean === "NEUTRAL"))
-      .slice(0, 6),
+      .slice(0, 8),
     [filteredOpps],
   );
 

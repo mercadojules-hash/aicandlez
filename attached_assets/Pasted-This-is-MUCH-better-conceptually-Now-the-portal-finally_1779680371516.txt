@@ -1,0 +1,140 @@
+This is MUCH better conceptually.
+
+Now the portal finally feels:
+active,
+watching,
+evaluating,
+processing.
+
+The EVALUATING layer was the missing piece.
+
+BUT:
+the visual execution needs adjustment.
+
+Right now it is:
+too faint,
+too muted,
+too low-contrast.
+
+The entire lower-opacity layer is disappearing into the black background.
+
+New direction:
+
+1. INCREASE VISIBILITY OF EVALUATING TIER
+
+Current opacity (~0.42) is too low.
+
+Increase to approximately:
+0.62–0.72 range.
+
+Keep it subordinate —
+but still clearly readable.
+
+2. PRESERVE NEON ENERGY
+
+I actually LIKE the neon-glow direction.
+
+Do NOT flatten it too much.
+
+The current problem is not “too much glow.”
+The problem is:
+the evaluating rows are visually dying into the chassis.
+
+Bring back:
+
+* neon edge glow
+* chart glow
+* confidence-ring energy
+* faint telemetry luminance
+* row separation lighting
+
+Especially:
+the sparklines should glow more.
+
+3. TOP 20 PER SIDE
+
+Approved.
+
+Each side should visibly feel:
+dense,
+alive,
+institutional,
+constantly evaluating markets.
+
+Current row count still feels too sparse.
+
+Goal:
+TOP 20 LONGS
+TOP 20 SHORTS
+
+With:
+ACTIVE SIGNALS first
+then EVALUATING beneath.
+
+4. HIERARCHY ADJUSTMENT
+
+Suggested hierarchy:
+
+ACTIVE SIGNALS:
+
+* brightest
+* strongest glow
+* highest contrast
+* full telemetry
+* vibrant confidence rings
+
+EVALUATING:
+
+* dimmed slightly
+* reduced saturation
+* softer rings
+* calmer glow
+
+But NOT:
+nearly invisible.
+
+5. SPARKLINE ENERGY
+
+The sparklines are now one of the most important visual elements.
+
+Increase:
+
+* glow intensity slightly
+* line clarity
+* movement readability
+* contrast separation
+
+They should feel:
+“live market telemetry.”
+
+6. CONFIDENCE RINGS
+
+Bring back a bit more energy here too.
+
+Especially for:
+
+* active signals
+* high-confidence evaluations
+
+The rings are part of the platform identity now.
+
+7. EMPTY-STATE SUCCESS
+
+The idle/scanning concept was the correct move.
+
+Huge improvement.
+
+The platform finally feels:
+continuously thinking.
+
+That was the missing ingredient.
+
+Now we just need:
+better visual energy calibration.
+
+Not more architecture changes.
+Just:
+contrast,
+density,
+presence,
+and glow balance.
