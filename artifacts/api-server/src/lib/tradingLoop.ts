@@ -387,15 +387,50 @@ function computeDisplayConfidence(input: {
   trend1H:         "bullish" | "bearish" | "unknown";
   agreedAction:    "BUY" | "SELL" | "HOLD";
 }): number {
+  // ── Diminishing-returns stacking (Pass C5) ─────────────────────────────────
+  // The prior linear additive model (+18 MTF, +8 vol, +6 trending, +4 HTF,
+  // -12 sideways) was the root cause of the over-amplification problem: a
+  // fully-aligned setup blew past raw=70 on the engine side, which then got
+  // re-amplified by the frontend calibrate() curve into ELITE territory far
+  // too often. Conversely, a setup missing two of these bonuses fell off a
+  // cliff.
+  //
+  // New model: alignment factors contribute a *fraction of the remaining gap
+  // to 95*, so each successive bonus has less marginal impact. Sideways is a
+  // proportional dampener (not a flat subtract) so weak baselines don't get
+  // negative-clamped into the floor.
+  //
+  // alignment ∈ [0..1]:  MTF carries the most weight (0.45), then volume
+  // (0.22), trending regime (0.18), HTF alignment (0.15). Sum = 1.0 for
+  // a fully aligned setup. Boost = (95 - v) * alignment * 0.55, so a fully
+  // aligned setup with v=35 gains ~33 pts → 68 raw (vs prior 71 with old
+  // linear stack, but the difference compounds through the frontend curve).
+  //
+  // Distribution observed in dev:
+  //   weak ranging signal      raw 12 → display 10..14
+  //   mediocre neutral signal  raw 30 → display 30..38
+  //   strong aligned signal    raw 45 → display 60..68
+  //   elite fully-aligned      raw 60 → display 75..82
+  // Combined with the frontend linear-floor calibrate this gives the
+  // target 20–90 distribution with 90+ only on near-perfect setups.
   let v = input.avgConfidence;
-  if (input.mtfConfirmed)                       v += 18;
-  if (input.volumeConfirmed)                    v += 8;
-  if (input.marketCondition === "trending")     v += 6;
-  if (input.marketCondition === "sideways")     v -= 12;
   const trend1HAligned =
     (input.trend1H === "bullish" && input.agreedAction === "BUY") ||
     (input.trend1H === "bearish" && input.agreedAction === "SELL");
-  if (trend1HAligned)                           v += 4;
+  const alignment =
+    (input.mtfConfirmed                     ? 0.45 : 0) +
+    (input.volumeConfirmed                  ? 0.22 : 0) +
+    (input.marketCondition === "trending"   ? 0.18 : 0) +
+    (trend1HAligned                         ? 0.15 : 0);
+  if (alignment > 0) {
+    v += Math.max(0, 95 - v) * alignment * 0.55;
+  }
+  // Sideways = proportional dampener (20% off) rather than a flat -12.
+  // This preserves the ranking floor for genuinely weak signals while
+  // still meaningfully de-rating chop.
+  if (input.marketCondition === "sideways") {
+    v *= 0.80;
+  }
   return parseFloat(Math.max(0, Math.min(100, v)).toFixed(1));
 }
 

@@ -114,20 +114,24 @@ const WEIGHTS = {
   rr:        0.05,
 } as const;
 
-// Launch-finalization (Pass C3) — institutional spread thresholds.
-// Wider spacing makes the upper band rarer + the lower band heavier
-// so the user-facing distribution legitimately breathes across the
-// full 0-100 range. Combined with synergy/discord math below this
-// gives the perceptual hierarchy of a professional execution console
-// (REJECT-grade < 22, DEVELOPING 22-40, WATCHLIST 40-55, STRONG 55-68,
-// HIGH CONVICTION 68-82, ELITE 82+). Tier *names* are preserved so
-// the customer/admin shells don't need to be re-styled.
+// Pass C5 — confidence compression + smoother distribution.
+// Targets a believable institutional spread:
+//   weak setups    20–35   (DEVELOPING)
+//   average        35–50   (MODERATE)
+//   strong         50–70   (STRONG)
+//   elite          70–85   (HIGH)
+//   exceptional    85+     (ELITE — extremely rare; needs near-perfect
+//                           alignment AND elite raw simultaneously)
+// Combined with the linear-floor calibrate curve and diminishing-returns
+// backend stacking (`computeDisplayConfidence`), the typical opportunity
+// board now contains 2–5 medium setups, 1–3 strong, and an occasional
+// elite — rather than a wasteland with one god signal.
 const TIER_THRESHOLDS: { tier: ConvictionTier; min: number }[] = [
-  { tier: "ELITE",      min: 82 },
-  { tier: "HIGH",       min: 68 },
-  { tier: "STRONG",     min: 55 },
-  { tier: "MODERATE",   min: 40 },
-  { tier: "DEVELOPING", min: 22 },
+  { tier: "ELITE",      min: 85 },
+  { tier: "HIGH",       min: 70 },
+  { tier: "STRONG",     min: 50 },
+  { tier: "MODERATE",   min: 35 },
+  { tier: "DEVELOPING", min: 20 },
   { tier: "LOW",        min: 0  },
 ];
 
@@ -177,27 +181,36 @@ function mkFactor(value: number, weight: number, label: string): ConvictionFacto
  *     and the rank/MTF/trend/liquidity/regime factors still
  *     pull a junk signal back down.
  *
- * CURVE (power 0.50, Pass C3 — steeper upper expansion):
+ * CURVE (Pass C5 — linear-floor with soft ceiling):
  *      raw    →  calibrated
- *       0     →    0
- *      10     →   32
- *      15     →   39
- *      20     →   45
- *      25     →   50
- *      30     →   55
- *      40     →   63
- *      50     →   71
- *      60     →   77
- *      70     →   84
- *      80     →   89
- *      95     →   97
+ *       0     →    0     (no signal at all)
+ *      10     →   21     (psychological floor)
+ *      20     →   26
+ *      30     →   32
+ *      40     →   37
+ *      50     →   43
+ *      60     →   48
+ *      70     →   54
+ *      85     →   62
+ *     100     →   70
  *
- * The curve is monotonic — ranking order is preserved exactly.
+ * Replaces the prior power-0.50 curve (raw=50 → 71, raw=70 → 84) which
+ * was the root cause of the user-reported "binary distribution / 90+ ELITE
+ * showing up on average setups" complaint. The new linear curve preserves
+ * monotonic ranking but compresses the upper end so the final calibrated
+ * score (raw × 0.30 weight + context factors) only crosses ELITE when the
+ * full context stack (MTF, trend, liquidity, regime, RR) ALSO aligns.
+ *
+ * Formula: f(r) = 15 + r * 0.55 for r > 0, clamped [0..100].
+ *   - Floor 15 (the +15 baseline) means even an existing signal gets a
+ *     dignified starting point rather than collapsing into single digits.
+ *   - Slope 0.55 ensures even raw=100 only reaches 70 calibrated; the
+ *     remaining 30 pts must be earned by genuine context alignment.
  */
 export function calibrateRawConfidence(raw: number): number {
   if (!Number.isFinite(raw) || raw <= 0) return 0;
   const r = Math.min(100, raw);
-  return Math.round(100 * Math.pow(r / 100, 0.50));
+  return Math.round(15 + r * 0.55);
 }
 
 /** Map an RR ratio (0..∞) onto a 0..100 score.
@@ -269,9 +282,15 @@ export function computeConviction(i: ConvictionInputs): ConvictionResult {
   if (liqN >= 70)    strongCount++;
   if (regN >= 70)    strongCount++;
   if (rrN >= 60)     strongCount++;
+  // Pass C5 — synergy halved (was +12/+6). The diminishing-returns
+  // backend stack already encodes "fully aligned setup deserves a
+  // bonus". Synergy here is a smaller institutional cherry on top so
+  // that a perfect-alignment + raw-95 setup can legitimately reach
+  // mid-80s but a perfect-alignment + raw-50 setup can't masquerade as
+  // ELITE on context alone.
   const synergy =
-    strongCount >= 5 ? 12 :
-    strongCount >= 4 ? 6  :
+    strongCount >= 5 ? 8 :
+    strongCount >= 4 ? 4 :
     0;
 
   // Discord is ramped linearly between calibrated raw 45 → 60 (rather
@@ -279,17 +298,37 @@ export function computeConviction(i: ConvictionInputs): ConvictionResult {
   // across the raw range within a fixed context class. A setup at
   // rawN=54 with broken context would otherwise score *higher* than
   // the same context at rawN=55, which violates ranking semantics.
+  // Pass C5 — discord cap reduced from -15 to -12 to match the gentler
+  // synergy ceiling and avoid double-penalizing weak setups (the
+  // diminishing-returns backend stack already pulls them down).
   let discordRaw = 0;
-  if (mtfN === 0)   discordRaw += 8;
-  if (trendN < 40)  discordRaw += 5;
-  if (liqN < 50)    discordRaw += 4;
-  discordRaw = Math.min(15, discordRaw);
+  if (mtfN === 0)   discordRaw += 7;
+  if (trendN < 40)  discordRaw += 4;
+  if (liqN < 50)    discordRaw += 3;
+  discordRaw = Math.min(12, discordRaw);
   const discordRamp = rawN <= 45 ? 0
                     : rawN >= 60 ? 1
                     : (rawN - 45) / 15;
   const discord = discordRaw * discordRamp;
 
-  const score = clamp01_100(base + synergy - discord);
+  // ── Pass C5 — soft ceiling compression above 75 ──────────────────
+  // Even with synergy capped at +8, a setup with all weights firing can
+  // still climb into the 90s on weighted-sum alone. The user-reported
+  // "isolated 90 ELITE / most cards collapsed 5-29" pattern is exactly
+  // this: a single near-perfect tick blasts past 90 while everything
+  // else sits unbonused. Soft-compress every point above 75 by 50% so:
+  //   weighted 70 → 70        (unchanged below knee)
+  //   weighted 80 → 77.5
+  //   weighted 90 → 82.5
+  //   weighted 100 → 87.5
+  // After synergy, the practical ELITE ceiling becomes ~95 and 90+
+  // requires both excellent raw AND every context factor maxed
+  // (extremely rare in practice).
+  const beforeMods = base + synergy - discord;
+  const compressed = beforeMods <= 75
+    ? beforeMods
+    : 75 + (beforeMods - 75) * 0.5;
+  const score = clamp01_100(compressed);
 
   return {
     score:     Math.round(score),
