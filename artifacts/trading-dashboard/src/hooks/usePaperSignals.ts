@@ -13,6 +13,12 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "../lib/authFetch";
 import type { EngineStatus, SymBreakdown } from "../components/command/types";
+import {
+  computeConviction,
+  percentileRank,
+  type ConvictionBreakdown,
+  type ConvictionTier,
+} from "../lib/conviction";
 
 const apiBaseUrl: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
@@ -42,8 +48,19 @@ export interface OpportunityVM {
    *  column so the operator sees the AI's in-progress cognition
    *  instead of a dead matrix. NEUTRAL = no directional bias yet. */
   lean:       Lean;
+  /** RAW engine confidence (MTF mean of fast/slow runAIDecision outputs).
+   *  Kept on the VM so the "Why this score?" disclosure can cite it and
+   *  any execution-adjacent logic (queue selectors, risk math) can keep
+   *  reading the raw engine number. The card body now displays
+   *  `convictionScore` instead. */
   conf:       number;
   score:      number;
+  /** USER-FACING calibrated conviction score (0..100). See
+   *  `lib/conviction.ts` for the formula. Real factors only — never
+   *  hardcoded. */
+  convictionScore:     number;
+  convictionTier:      ConvictionTier;
+  convictionBreakdown: ConvictionBreakdown;
   mtf:        [MtfDot, MtfDot, MtfDot, MtfDot];
   readiness:  Readiness;
   reason:     string;
@@ -197,6 +214,57 @@ function reasoningFromBreakdown(b: SymBreakdown): string {
   return `${b.agreedAction} bias · conf ${(Number.isFinite(conf) ? conf : 0).toFixed(0)}%`;
 }
 
+// ── Conviction-input derivations (real engine data, never hardcoded) ────────
+//
+// These translate raw SymBreakdown fields into the 0..100 inputs that
+// `computeConviction()` expects. All of them must derive from observable
+// engine telemetry — never invent a value.
+
+/** Trend-strength composite (0..100). Combines fast/slow EMA signals with
+ *  the 1H trend the engine publishes. Three "votes" align fully → 100;
+ *  fully mixed → 0. */
+function trendStrengthFromBreakdown(b: SymBreakdown): number {
+  const dirOf = (sig: string | undefined): number => {
+    const s = (sig ?? "").toUpperCase();
+    if (s.includes("BULL") || s.includes("UP"))   return 1;
+    if (s.includes("BEAR") || s.includes("DOWN")) return -1;
+    return 0;
+  };
+  const fastVote = dirOf(b.fast.emaSignal);
+  const slowVote = dirOf(b.slow.emaSignal);
+  const h1Vote   = dirOf(b.trend1H);
+  const aligned  = Math.abs(fastVote + slowVote + h1Vote); // 0..3
+  return (aligned / 3) * 100;
+}
+
+/** Liquidity / volume confirmation (0..100). The engine already gates on
+ *  bar-volume >= 85% of 20-bar avg → `volumeConfirmed`. Unconfirmed
+ *  keeps a non-zero floor (35) so a symbol with weak volume but real
+ *  signal can still earn moderate conviction from other factors. */
+function liquidityScoreFromBreakdown(b: SymBreakdown): number {
+  return b.volumeConfirmed ? 100 : 35;
+}
+
+/** Market regime quality (0..100). BREAKOUT / TRENDING are the regimes
+ *  the AI engine performs best in; EXHAUSTED / RANGING are the regimes
+ *  it should be sceptical of. Unknown → 50 (neutral). */
+function regimeScoreFromBreakdown(b: SymBreakdown): number {
+  const c = (b.marketCondition ?? "").toUpperCase();
+  if (c.includes("BREAKOUT"))  return 100;
+  if (c.includes("TRENDING"))  return 80;
+  if (c.includes("EXHAUST"))   return 40;
+  if (c.includes("RANGING") || c.includes("SIDEWAY")) return 20;
+  return 50;
+}
+
+/** Reward / risk ratio = reward distance / risk distance from entry. */
+function computeRRRatio(entry: number, stop: number, target: number): number {
+  const risk   = Math.abs(entry - stop);
+  const reward = Math.abs(target - entry);
+  if (!Number.isFinite(risk) || risk <= 0) return 0;
+  return reward / risk;
+}
+
 function exchangesForSymbol(sym: string): string[] {
   // Crypto-only — static exchange-coverage map (mirrors the mockup chips).
   const universal = ["KRK", "CB", "BIN"];
@@ -244,6 +312,19 @@ function buildHeroPreviewCards(now: number): OpportunityVM[] {
   ): OpportunityVM => {
     const stopPct   = dir === "SHORT" ? +0.02 : -0.02;
     const targetPct = dir === "SHORT" ? -0.04 : +0.04;
+    // Hero preview cards are SYNTHETIC and dev-only — mirror raw conf into
+    // convictionScore so the elite-tier UI still renders correctly in
+    // ?preview=hero, but with an honest breakdown showing the preview
+    // numbers came from a fixed scenario, not live engine data.
+    const fakeBreakdown: ConvictionBreakdown = {
+      raw:       { value: conf, weight: 0.30, contribution: conf * 0.30, label: "Raw engine confidence", verdict: conf >= 80 ? "strong" : "good" },
+      rank:      { value: 100, weight: 0.18, contribution: 18,            label: "Rank vs current signal pool", verdict: "strong" },
+      mtf:       { value: 100, weight: 0.15, contribution: 15,            label: "Multi-timeframe agreement", verdict: "strong" },
+      trend:     { value: 100, weight: 0.12, contribution: 12,            label: "Trend strength (EMA + 1H)", verdict: "strong" },
+      liquidity: { value: 100, weight: 0.10, contribution: 10,            label: "Volume / liquidity", verdict: "strong" },
+      regime:    { value: 100, weight: 0.10, contribution: 10,            label: "Market regime quality", verdict: "strong" },
+      rr:        { value: 50,  weight: 0.05, contribution: 2.5,           label: "Reward-to-risk shape", verdict: "fair" },
+    };
     return {
       symbol:     sym,
       pair:       pairKey,
@@ -254,6 +335,9 @@ function buildHeroPreviewCards(now: number): OpportunityVM[] {
       lean:       dir,
       conf,
       score:      conf,
+      convictionScore:     conf,
+      convictionTier:      conf >= 90 ? "ELITE" : conf >= 70 ? "HIGH" : "STRONG",
+      convictionBreakdown: fakeBreakdown,
       mtf:        dir === "LONG"
         ? ["green", "green", "green", "green"]
         : ["red", "red", "red", "red"],
@@ -314,6 +398,9 @@ export function usePaperSignals() {
       const lastPrice = b.fast.ema9 || b.slow.ema9 || 100;
       const stopPct   = dir === "SHORT" ? +0.02 : -0.02;
       const targetPct = dir === "SHORT" ? -0.04 : +0.04;
+      const entry  = lastPrice;
+      const stop   = lastPrice * (1 + stopPct);
+      const target = lastPrice * (1 + targetPct);
       out.push({
         symbol:     sym,
         pair:       rawSym,
@@ -324,6 +411,21 @@ export function usePaperSignals() {
         lean,
         conf,
         score,
+        // Placeholders — overwritten in the conviction pass below once
+        // every card's raw conf is known (rank percentile needs the
+        // full pool). These default values keep the type system happy
+        // and provide a safe fallback if the second pass throws.
+        convictionScore:     conf,
+        convictionTier:      "MODERATE",
+        convictionBreakdown: computeConviction({
+          rawConfidence:  conf,
+          rankPercentile: 50,
+          mtfAgreed:      b.mtfConfirmed,
+          rrRatio:        computeRRRatio(entry, stop, target),
+          trendStrength:  trendStrengthFromBreakdown(b),
+          liquidityScore: liquidityScoreFromBreakdown(b),
+          regimeScore:    regimeScoreFromBreakdown(b),
+        }).breakdown,
         mtf:        mtfFromBreakdown(b),
         readiness:  readinessFromBreakdown(b),
         reason:     b.blockReason || (b.mtfConfirmed ? "MTF aligned" : "Awaiting confirmation"),
@@ -335,9 +437,9 @@ export function usePaperSignals() {
         reasoning:  reasoningFromBreakdown(b),
         latency:    `${30 + (sym.charCodeAt(0) % 20)}ms`,
         regime:     regimeFromBreakdown(b),
-        entry:      lastPrice,
-        stop:       lastPrice * (1 + stopPct),
-        target:     lastPrice * (1 + targetPct),
+        entry:      entry,
+        stop:       stop,
+        target:     target,
         lastUpdated: b.lastUpdated ?? Date.now(),
       });
     }
@@ -346,7 +448,52 @@ export function usePaperSignals() {
     if (HERO_PREVIEW_ENABLED) {
       out.push(...buildHeroPreviewCards(Date.now()));
     }
-    return out.sort((a, b) => b.conf - a.conf);
+    // ── Conviction pass ──────────────────────────────────────────────
+    // Now that the full pool is built, compute each card's percentile
+    // rank vs every other card's raw conf, then run the calibrated
+    // conviction formula. This is the ONLY place rank-percentile is
+    // computed; we do it client-side so it's always consistent with
+    // exactly what the user is currently seeing on screen.
+    const confPool = out.map(o => o.conf);
+    for (const o of out) {
+      const pct = percentileRank(o.conf, confPool);
+      const rr  = computeRRRatio(o.entry, o.stop, o.target);
+      // Re-derive trend/liquidity/regime per card via a synthetic
+      // SymBreakdown lookup. The breakdown source is the raw payload
+      // from data.symbolBreakdowns; hero-preview cards don't have one,
+      // so we honor whatever values were stamped on them above.
+      const rawB = data.symbolBreakdowns?.[o.pair];
+      if (rawB) {
+        const result = computeConviction({
+          rawConfidence:  o.conf,
+          rankPercentile: pct,
+          mtfAgreed:      rawB.mtfConfirmed,
+          rrRatio:        rr,
+          trendStrength:  trendStrengthFromBreakdown(rawB),
+          liquidityScore: liquidityScoreFromBreakdown(rawB),
+          regimeScore:    regimeScoreFromBreakdown(rawB),
+        });
+        o.convictionScore     = result.score;
+        o.convictionTier      = result.tier;
+        o.convictionBreakdown = result.breakdown;
+      } else {
+        // Preview / synthetic card — rank still derived from the
+        // visible pool but everything else uses the stamped values.
+        const result = computeConviction({
+          rawConfidence:  o.conf,
+          rankPercentile: pct,
+          mtfAgreed:      true,
+          rrRatio:        rr,
+          trendStrength:  100,
+          liquidityScore: 100,
+          regimeScore:    100,
+        });
+        o.convictionScore     = result.score;
+        o.convictionTier      = result.tier;
+        o.convictionBreakdown = result.breakdown;
+      }
+    }
+    return out.sort((a, b) => b.convictionScore - a.convictionScore);
   }, [data]);
 
   const majors = useMemo(

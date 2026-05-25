@@ -931,7 +931,9 @@ function computeMarketPulse(
     if (o.readiness === "READY")        ready++;
     else if (o.readiness === "WAITING") waiting++;
     else if (o.readiness === "GATED")   gated++;
-    confSum += o.conf || 0;
+    // User-facing aggregate uses the calibrated conviction score so the
+    // pulse ribbon's "avg conf" reads in sync with the per-card numbers.
+    confSum += o.convictionScore || 0;
     if (o.vol === "ELEVATED") elevated++;
     else if (o.vol === "LOW VOL") lowVol++;
     if (typeof o.momentum === "number" && o.momentum >= 2) momentumBreadth++;
@@ -1269,7 +1271,18 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // text. This decouples conviction from direction — a LOW-conf LONG
   // and a LOW-conf SHORT both flash RED on the ring even though their
   // direction pills stay green/red respectively.
-  const confColor = opp.conf >= 80 ? T.NEON : opp.conf >= 60 ? T.AMBER : T.RED;
+  // ── Conviction layer (see lib/conviction.ts) ────────────────────────
+  // `conv` is the user-facing calibrated conviction score (0..100) that
+  // drives every visual on this card: ring value, tier color, rail glow,
+  // hero-tier border, font weight. Raw engine confidence stays available
+  // as `opp.conf` for the "Why this score?" disclosure and any execution
+  // gates that need the unmodified number — never use raw conf for what
+  // a customer is meant to read.
+  const conv = opp.convictionScore;
+  const tier = opp.convictionTier;
+  // Color tiers reflect the conviction tier ladder:
+  //   ELITE / HIGH  (>=70) → NEON   STRONG (>=55) → AMBER   below → RED
+  const confColor = conv >= 70 ? T.NEON : conv >= 55 ? T.AMBER : T.RED;
   const dirBg    = isLong ? "rgba(102,255,102,0.10)" : opp.direction === "SHORT" ? "rgba(255,77,77,0.10)" : "rgba(255,176,32,0.10)";
   const dirBorder = isLong ? "rgba(102,255,102,0.30)" : opp.direction === "SHORT" ? "rgba(255,77,77,0.30)" : "rgba(255,176,32,0.30)";
   // Pass 7AA — sparkline color now follows the AI-confidence bucket
@@ -1279,7 +1292,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   //   conf < 80  → AMBER       (medium / low conviction)
   // SHORTs still carry red via the direction pill + railColor; the
   // sparkline itself communicates conviction strength, not side.
-  const sparkColor = opp.conf >= 80 ? T.NEON : T.AMBER;
+  const sparkColor = conv >= 70 ? T.NEON : T.AMBER;
   void dirColor;
   const ready = opp.readiness === "READY";
   const railColor = opp.direction === "SHORT" ? T.RED : T.NEON;
@@ -1293,21 +1306,21 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // hairline. STRONG bumped 14→16 for stronger separation from
   // BASELINE. Lower tiers preserved.
   const railGlow =
-    opp.conf >= 90 ? `0 0 20px ${railColor}, 0 0 10px ${railColor}` :
-    opp.conf >= 85 ? `0 0 16px ${railColor}` :
-    opp.conf >= 70 ? `0 0 10px ${railColor}` :
-    opp.conf >= 55 ? `0 0 6px ${railColor}`  :
-                     `0 0 3px ${railColor}`;
+    conv >= 85 ? `0 0 20px ${railColor}, 0 0 10px ${railColor}` :
+    conv >= 75 ? `0 0 16px ${railColor}` :
+    conv >= 55 ? `0 0 10px ${railColor}` :
+    conv >= 40 ? `0 0 6px ${railColor}`  :
+                 `0 0 3px ${railColor}`;
   const railOpacity =
-    opp.conf >= 85 ? 1.0 :
-    opp.conf >= 70 ? 0.85 :
-    opp.conf >= 55 ? 0.6 : 0.4;
+    conv >= 75 ? 1.0 :
+    conv >= 55 ? 0.85 :
+    conv >= 40 ? 0.6 : 0.4;
   // Pass 4.4 — rail animation state-gated. Only READY cards with fresh
   // telemetry pulse; WAITING / GATED / stale cards keep a static rail
   // honoring the "idle systems stay still" invariant. Glow + opacity
   // continue to encode conf tier without continuous motion.
   const railAnim = isReady && isFreshSignal
-    ? (opp.conf >= 85 ? "rail-pulse 1.8s ease-in-out infinite" : "rail-pulse 2.5s ease-in-out infinite")
+    ? (conv >= 75 ? "rail-pulse 1.8s ease-in-out infinite" : "rail-pulse 2.5s ease-in-out infinite")
     : undefined;
 
   // Pass 7c — CONVICTION DOMINANCE. The TOP 20 LONGS / SHORTS must
@@ -1319,8 +1332,10 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // neutral card. No fake conviction — only real engine scores trigger
   // the higher tiers. Restraint preserved: no animations added, only
   // static contrast amplified.
-  const isElite  = opp.conf >= 90;
-  const isStrong = opp.conf >= 80 && !isElite;
+  // Tier flags drive the dirColor border weight on the row frame.
+  // Mapped against the conviction tier ladder (ELITE >=85, HIGH >=70).
+  const isElite  = tier === "ELITE";
+  const isStrong = tier === "HIGH" && !isElite;
   // Pass 7g — ACTIVE SIGNAL DOMINANCE. Two changes from 7d:
   //   1. Hero borders/backgrounds/shadows now key off `dirColor`
   //      (LONG = neon-green, SHORT = red) instead of always-green.
@@ -1480,7 +1495,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           {opp.symbol}
         </span>
         <div style={{ position: "relative", width: 72, height: 72, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <ConfidenceRing color={confColor} value={opp.conf} size={72} />
+          <ConfidenceRing color={confColor} value={conv} size={72} />
           {isReady && (
             <svg aria-hidden width={72} height={72} style={{
               position: "absolute", inset: 0, pointerEvents: "none",
@@ -1501,18 +1516,45 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             gap: 0, lineHeight: 1,
           }}>
             <span style={{
-              // Pass 7M — uniform sizing. Hierarchy by weight + color,
-              // not by 40px headlines. ELITE/STRONG share 24px wt 800,
-              // ACTIVE/EVAL share 22px wt 700. No text-shadow halos.
-              fontSize: opp.conf >= 80 ? 24 : 22,
-              fontWeight: opp.conf >= 80 ? 800 : 700,
+              // Hierarchy by weight + color. HIGH/ELITE conviction
+              // get the bigger headline. The displayed number is the
+              // calibrated CONVICTION score, not raw engine conf —
+              // see opp.convictionBreakdown for the per-factor "why".
+              fontSize: conv >= 70 ? 24 : 22,
+              fontWeight: conv >= 70 ? 800 : 700,
               color: confColor, letterSpacing: T.TRACK_DISPLAY,
               fontVariantNumeric: "tabular-nums",
-            }}>{opp.conf}</span>
-            <span style={{
-              fontSize: 8, fontWeight: 700, color: T.TEXT_2,
-              letterSpacing: T.TRACK_LABEL, textTransform: "uppercase",
-            }}>AI Conf</span>
+            }}>{conv}</span>
+            <span
+              title={(() => {
+                // Why this score? — per-factor breakdown lifted from
+                // opp.convictionBreakdown. Renders as a native browser
+                // tooltip (no extra layout footprint inside a 124px
+                // card row). Every line is real engine telemetry; no
+                // hardcoded numbers reach this display in production.
+                const b = opp.convictionBreakdown;
+                const row = (f: { label: string; value: number; weight: number; contribution: number; verdict: string }) =>
+                  `${f.label.padEnd(28)} ${String(f.value).padStart(3)}/100  · ${f.verdict.padEnd(8)} · +${f.contribution.toFixed(1)} pts`;
+                return [
+                  `${tier} CONVICTION · ${conv}/100`,
+                  `(raw engine confidence: ${opp.conf})`,
+                  ``,
+                  `Why this score?`,
+                  row(b.raw),
+                  row(b.rank),
+                  row(b.mtf),
+                  row(b.trend),
+                  row(b.liquidity),
+                  row(b.regime),
+                  row(b.rr),
+                ].join("\n");
+              })()}
+              style={{
+                fontSize: 8, fontWeight: 700, color: confColor,
+                letterSpacing: T.TRACK_LABEL, textTransform: "uppercase",
+                cursor: "help",
+              }}
+            >{tier}</span>
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
@@ -1854,7 +1896,7 @@ function filterOpps(opps: OpportunityVM[], query: string, filter: Filt): Opportu
       case "MAJORS":    return o.assetClass === "MAJOR";
       case "ALTS":      return o.assetClass === "ALT";
       case "MEME":      return MEME_UNIVERSE.has(o.symbol);
-      case "HIGH_CONF": return o.conf >= 75;
+      case "HIGH_CONF": return o.convictionScore >= 70;
       case "READY":     return o.readiness === "READY";
       case "LONG":      return o.direction === "LONG";
       case "SHORT":     return o.direction === "SHORT";
