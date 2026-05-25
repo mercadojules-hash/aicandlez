@@ -54,6 +54,7 @@ import internalNotifyRouter from "./internalNotify.js";
 import executionDebugRouter from "./executionDebug.js";
 import userRiskSettingsRouter from "./userRiskSettings.js";
 import adminRiskEventsRouter from "./adminRiskEvents.js";
+import aiDisclaimerRouter from "./aiDisclaimer.js";
 
 const router: IRouter = Router();
 
@@ -63,6 +64,7 @@ router.use(authRouter);
 router.use(userSettingsRouter);
 router.use(userRiskSettingsRouter);
 router.use(adminRiskEventsRouter);
+router.use(aiDisclaimerRouter);
 router.use(aiTradingRouter);
 router.use(userNotificationsRouter);
 router.use(userExchangesRouter);

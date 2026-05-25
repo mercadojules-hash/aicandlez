@@ -12,6 +12,14 @@ export const usersTable = pgTable("users", {
   stripeSubscriptionId:  varchar("stripe_subscription_id", { length: 255 }),
   billingEmail:          varchar("billing_email", { length: 255 }),
   trialEndsAt:           timestamp("trial_ends_at"),
+  // ── AI Trading Disclaimer (eligibility + risk acknowledgement) ───────────────
+  // Customer must affirmatively accept the disclaimer before AI auto-trading
+  // can be enabled. Server-enforced in `placeLiveAutoOrderForUser` (gate 0e)
+  // and in the AI-enable gate. Version-bumped if disclaimer text changes so
+  // existing customers are re-prompted on update.
+  aiDisclaimerAcceptedAt: timestamp("ai_disclaimer_accepted_at"),
+  aiDisclaimerVersion:    varchar("ai_disclaimer_version", { length: 32 }),
+  aiDisclaimerIp:         varchar("ai_disclaimer_ip", { length: 64 }),
   // ── Timestamps ────────────────────────────────────────────────────────────────
   createdAt:             timestamp("created_at").defaultNow().notNull(),
   updatedAt:             timestamp("updated_at").defaultNow().notNull(),

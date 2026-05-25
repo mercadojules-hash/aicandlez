@@ -21,6 +21,7 @@ import { executionStreamBus } from "./executionStreamBus.js";
 import { logsTable, riskThrottleEventsTable } from "@workspace/db";
 import crypto from "crypto";
 import { evaluateRiskGate } from "./riskGate.js";
+import { isAiDisclaimerAccepted } from "./aiDisclaimer.js";
 
 // ── Per-user live execution bridge ────────────────────────────────────────────
 //
@@ -78,7 +79,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity";
+  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted";
   error?:          string;
 }
 
@@ -663,6 +664,44 @@ export async function placeLiveAutoOrderForUser(
           logger.warn({ err, userId }, "liveUserExecution: risk-gate log insert failed");
         }
         return { success: false, userId, errorCode: reasonCode, error: reasonText };
+      }
+    }
+  }
+
+  // 0e. AI Trading eligibility & risk disclaimer. Customer MUST have
+  // affirmatively accepted the current disclaimer (18+, jurisdictional
+  // legality, financial responsibility) before any live AI order is
+  // placed. Server-enforced so a tampered frontend cannot bypass it.
+  // Admin/super-admin bypass — operators are not subject to the consumer
+  // eligibility flow. See `lib/aiDisclaimer.ts`.
+  {
+    const operatorDisclaimer = await isOperatorRole(userId);
+    if (!operatorDisclaimer) {
+      const accepted = await isAiDisclaimerAccepted(userId);
+      if (!accepted) {
+        const msg = "AI trading disclaimer not accepted — open the AI panel and confirm eligibility to continue.";
+        await emitFailureNotification(userId, symbol, side, msg);
+        executionStreamBus.emitEvent({
+          type:     "order_rejected",
+          severity: "warn",
+          symbol, side, mode: "live",
+          gate:     "ai_disclaimer_not_accepted",
+          reason:   "ai_disclaimer_not_accepted",
+          message:  msg,
+          details:  { userId },
+        });
+        try {
+          await db.insert(logsTable).values({
+            id:      crypto.randomUUID(),
+            type:    "trade",
+            level:   "warn",
+            message: `[ai_disclaimer_not_accepted] ${msg}`,
+            details: { userId, symbol, side, sizeUSD, errorCode: "ai_disclaimer_not_accepted" },
+          });
+        } catch (err) {
+          logger.warn({ err, userId }, "liveUserExecution: ai-disclaimer log insert failed");
+        }
+        return { success: false, userId, errorCode: "ai_disclaimer_not_accepted", error: msg };
       }
     }
   }

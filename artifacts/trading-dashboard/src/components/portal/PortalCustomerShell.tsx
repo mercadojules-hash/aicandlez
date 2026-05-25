@@ -41,6 +41,7 @@ import {
 import { authFetch } from "../../lib/authFetch";
 import { PortalExchangeConnectModal } from "../PortalExchangeConnectModal";
 import { AIRiskControlsPanel } from "./AIRiskControlsPanel";
+import { AIDisclaimerModal } from "../AIDisclaimerModal";
 // Pass 7V — brand logo used above search bar (replaces ticker chips row).
 import aiCandlezLogoHorizontal from "@assets/aicandlez-logo-horizontal-master_1779691403317.png";
 import { usePaperSignals, type OpportunityVM } from "../../hooks/usePaperSignals";
@@ -3270,6 +3271,34 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   const { enabled, allowed, isAdmin, setEnabledAsync } = useAiTradingState();
   const engineLabel = engineOnline ? "AI ENGINE · ONLINE" : "AI ENGINE · WARMING UP";
 
+  // ── AI Trading Disclaimer gate ────────────────────────────────────────────
+  // Server-enforced via gate 0e in `placeLiveAutoOrderForUser`; this client
+  // gate is the friendly UX wrapper that surfaces the modal BEFORE a flip
+  // attempt instead of letting the user enable + then have every order
+  // rejected. Admin/super-admin bypass — operators are not subject to the
+  // consumer eligibility flow.
+  const qcDisclaimer = useQueryClient();
+  type DisclaimerResp = {
+    status: { accepted: boolean; needsReaccept: boolean; currentVersion: string };
+    disclaimer: {
+      version: string; title: string; body: string;
+      acknowledgements: readonly string[]; riskDisclosure: string;
+      links: { terms: string; risk: string };
+    };
+  };
+  const disclaimerQ = useQuery<DisclaimerResp>({
+    queryKey: ["ai-disclaimer"],
+    queryFn:  async () => {
+      const r = await authFetch("/api/user/ai-disclaimer");
+      if (!r.ok) throw new Error(`disclaimer fetch ${r.status}`);
+      return r.json() as Promise<DisclaimerResp>;
+    },
+    staleTime: 60_000,
+    enabled:   !isAdmin,
+  });
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
+  const disclaimerAccepted = isAdmin || (disclaimerQ.data?.status.accepted ?? false);
+
   // LOCKED state — subscription required (free user, non-admin).
   // Server-authoritative: `allowed=false` means `resolveAiTradingGate`
   // rejected this user. Clicking opens the upgrade modal; localStorage
@@ -3348,6 +3377,13 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   }
 
   const setEnabled = (next: boolean): void => {
+    // Eligibility/risk disclaimer must be accepted BEFORE we flip AI on.
+    // Server-enforced (gate 0e) regardless; this is the UX wrapper that
+    // surfaces the modal instead of letting orders silently reject.
+    if (next && !disclaimerAccepted) {
+      setShowDisclaimer(true);
+      return;
+    }
     void setEnabledAsync(next).catch((err: Error & { needsUpgrade?: boolean }) => {
       // Race: plan downgraded between hydration and click. Refresh
       // gate state and open upgrade modal.
@@ -3355,9 +3391,30 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
     });
   };
 
+  // Modal element rendered once at component root via React portal-style
+  // mount. Kept inside the bar so wiring stays self-contained.
+  const disclaimerModal = disclaimerQ.data ? (
+    <AIDisclaimerModal
+      open={showDisclaimer}
+      disclaimer={disclaimerQ.data.disclaimer}
+      needsReaccept={disclaimerQ.data.status.needsReaccept}
+      onCancel={() => setShowDisclaimer(false)}
+      onAccepted={() => {
+        setShowDisclaimer(false);
+        void qcDisclaimer.invalidateQueries({ queryKey: ["ai-disclaimer"] });
+        // Now actually flip AI on — same path setEnabled(true) would have
+        // taken if disclaimer had been pre-accepted.
+        void setEnabledAsync(true).catch((err: Error & { needsUpgrade?: boolean }) => {
+          if (err?.needsUpgrade) onUpgrade();
+        });
+      }}
+    />
+  ) : null;
+
   // OFF state — saturated RED. Treat the whole bar as the CTA surface.
   if (!enabled) {
     return (
+      <>
       <button
         type="button"
         onClick={() => setEnabled(true)}
@@ -3437,6 +3494,8 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
           </div>
         </div>
       </button>
+      {disclaimerModal}
+      </>
     );
   }
 
@@ -3445,6 +3504,7 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   // visible so the user can always turn it off in one click), but the
   // dominant visual message is the active green state.
   return (
+    <>
     <section
       style={{
         position: "relative",
@@ -3524,6 +3584,8 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
         </div>
       </div>
     </section>
+    {disclaimerModal}
+    </>
   );
 });
 
