@@ -1180,15 +1180,19 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // reads as engraved metal, not a flat outline. Combined with the
   // article translateY lift below, active cards physically project
   // OFF the matrix surface instead of sitting flush with it.
+  // Pass 7i — ELITE locked at 7h values. STRONG + ACTIVE BASELINE
+  // pushed UP to close the hierarchy gap so the top 20 reads as a
+  // continuous field of live signals (not one hero floating above
+  // faint rows). EVALUATING fall-through (T.BORDER) untouched.
   const tierBorderColor =
     isElite          ? `rgba(${dirRgb},1.00)` :
-    isStrong         ? `rgba(${dirRgb},0.90)` :
-    isActiveBaseline ? `rgba(${dirRgb},0.62)` :
+    isStrong         ? `rgba(${dirRgb},0.96)` :
+    isActiveBaseline ? `rgba(${dirRgb},0.82)` :
                        T.BORDER;
   const tierBackground =
     isElite          ? `linear-gradient(180deg, rgba(${dirRgb},0.22) 0%, rgba(${dirRgb},0.06) 40%, ${T.BG_TERMINAL} 100%)` :
-    isStrong         ? `linear-gradient(180deg, rgba(${dirRgb},0.14) 0%, rgba(${dirRgb},0.035) 45%, ${T.BG_TERMINAL} 100%)` :
-    isActiveBaseline ? `linear-gradient(180deg, rgba(${dirRgb},0.075) 0%, rgba(${dirRgb},0.018) 50%, ${T.BG_TERMINAL} 100%)` :
+    isStrong         ? `linear-gradient(180deg, rgba(${dirRgb},0.18) 0%, rgba(${dirRgb},0.050) 45%, ${T.BG_TERMINAL} 100%)` :
+    isActiveBaseline ? `linear-gradient(180deg, rgba(${dirRgb},0.130) 0%, rgba(${dirRgb},0.032) 50%, ${T.BG_TERMINAL} 100%)` :
                        T.BG_TERMINAL;
   // Tier shadow stack (read outer→inner):
   //  1. `0 0 0 1px ...` — engraved double-ring on hero (zero layout cost)
@@ -1198,18 +1202,26 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   //     card glow into the surrounding empty space
   //  4. `inset 0 0 N px rgba(dirRgb,...)` — internal bloom so the card
   //     body reads as energized, not just framed
+  // Pass 7i — STRONG halo pushed 56→72px, alpha 0.50→0.64, drop
+  // shadow deepened. ACTIVE BASELINE gains its own engraved ring
+  // (0.22 alpha) and halo widens 32→52px / 0.32→0.46 so every
+  // active row carries the same dimensional vocabulary as the
+  // hero — just at lower amplitude. ELITE values frozen.
   const tierShadow =
     isElite          ? `0 0 0 1px rgba(${dirRgb},0.55), 0 14px 40px rgba(0,0,0,0.85), 0 0 80px rgba(${dirRgb},0.70), inset 0 0 60px rgba(${dirRgb},0.26)` :
-    isStrong         ? `0 0 0 1px rgba(${dirRgb},0.40), 0 10px 30px rgba(0,0,0,0.75), 0 0 56px rgba(${dirRgb},0.50), inset 0 0 42px rgba(${dirRgb},0.17)` :
-    isActiveBaseline ? `0 7px 20px rgba(0,0,0,0.60), 0 0 32px rgba(${dirRgb},0.32), inset 0 0 26px rgba(${dirRgb},0.09)` :
+    isStrong         ? `0 0 0 1px rgba(${dirRgb},0.50), 0 12px 34px rgba(0,0,0,0.80), 0 0 72px rgba(${dirRgb},0.64), inset 0 0 52px rgba(${dirRgb},0.22)` :
+    isActiveBaseline ? `0 0 0 1px rgba(${dirRgb},0.28), 0 9px 26px rgba(0,0,0,0.70), 0 0 52px rgba(${dirRgb},0.46), inset 0 0 36px rgba(${dirRgb},0.14)` :
                        undefined;
   // Physical elevation — ELITE rides highest, STRONG and active
   // baseline step down. Only translateY (no scale) so the grid
   // alignment stays exact and there's zero layout shift.
+  // Pass 7i — STRONG -3→-3.5, ACTIVE -1.5→-2.5 to keep the
+  // elevation cascade continuous instead of dropping off a cliff
+  // below ELITE.
   const liftTransform =
     isElite          ? "translateY(-4px)" :
-    isStrong         ? "translateY(-3px)" :
-    isActiveBaseline ? "translateY(-1.5px)" :
+    isStrong         ? "translateY(-3.5px)" :
+    isActiveBaseline ? "translateY(-2.5px)" :
                        undefined;
   // Higher z-index so hero cards visually stack above neighbors
   // when their halos overlap.
@@ -1274,12 +1286,13 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         aria-hidden
         style={{
           position: "absolute", top: 0, bottom: 0, left: 0,
-          // Pass 7h — rail width tiered with active dominance.
-          // ELITE 7px, STRONG 5px, active baseline 4px, evaluating 3px.
-          // The rail is the strongest single visual cue that a row
-          // is alive; doubling its width on hero rows makes the
-          // direction read across the room.
-          width: isElite ? 7 : isStrong ? 5 : isActiveBaseline ? 4 : 3,
+          // Pass 7h/7i — rail width tiered with active dominance.
+          // ELITE 7, STRONG 6, ACTIVE 5, EVALUATING 3. The rail is
+          // the strongest single visual cue that a row is alive;
+          // 7i widens STRONG and ACTIVE so the entire active stack
+          // carries a recognizable directional bar — not just the
+          // hero.
+          width: isElite ? 7 : isStrong ? 6 : isActiveBaseline ? 5 : 3,
           background: railColor,
           boxShadow: railGlow,
           opacity: railOpacity,
