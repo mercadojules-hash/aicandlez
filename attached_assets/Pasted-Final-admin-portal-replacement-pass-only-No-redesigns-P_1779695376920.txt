@@ -1,0 +1,135 @@
+Final admin portal replacement pass only. No redesigns. Preserve the exact stabilized visual language from the customer portal.
+
+Target:
+https://admintrade.aicandlez.com/portal
+
+This is now the REAL operator terminal tied to my Kraken account.
+
+ADMIN PORTAL REQUIREMENTS
+
+1. REMOVE ALL PAPER MODE ELEMENTS
+   Remove:
+
+* PAPER MODE
+* PAPER TRADING
+* paper balances
+* Upgrade
+* Disclaimer
+* subscriber gating
+* all customer onboarding language
+
+This portal is operator/live only.
+
+2. KRAKEN LIVE ACCOUNT INTEGRATION
+   Use my connected Kraken account only.
+
+Header/top telemetry must display LIVE Kraken metrics:
+
+* Account Balance
+* Realized PNL
+* Unrealized PNL
+* Wins / Losses
+* Active Trades
+* Open Positions
+* AI executions
+* Live exchange status
+
+Do NOT show simulated values.
+
+3. KEEP ADMIN TOP TELEMETRY BAR
+   Preserve the operator telemetry strip at the very top:
+
+* active users
+* trades
+* platform telemetry
+* AI execs
+* etc.
+
+That stays because this is the admin/operator dashboard.
+
+4. REPLACE CURRENT ADMIN CENTER AREA
+   The current center section should adopt the stabilized customer matrix structure:
+
+LEFT:
+TOP LONGS (20)
+
+RIGHT:
+TOP SHORTS (20)
+
+Requirements:
+
+* same matrix structure
+* same density
+* same black chassis
+* same sparkline treatment
+* same neon hierarchy
+* same BUY/SELL buttons
+* independent scrolling
+* adaptive height
+* same confidence-ring behavior
+* same confidence-driven sparkline coloring
+
+5. LIVE TRADING ONLY
+   Buttons should route to REAL execution logic.
+
+No paper execution.
+No fake fills.
+No simulated balances.
+
+6. ACCOUNT STATUS BOXES
+   To the LEFT of the AI CONFIDENCE ring, add a matching metrics box showing:
+
+* Kraken Balance
+* Realized PNL
+* Unrealized PNL
+* Wins / Losses
+* Active Trades
+
+This should visually pair with the AI CONFIDENCE ring.
+
+7. AI ENABLE BAR
+   Keep the large AI ENABLE / DISABLE control bar.
+
+Behavior:
+RED:
+AI disabled
+
+GREEN:
+AI actively trading live
+
+Text must clearly state:
+"AI LIVE TRADING ACTIVE"
+or
+"CLICK HERE TO ENABLE LIVE AI TRADING"
+
+8. REMOVE CUSTOMER-ONLY ELEMENTS
+   Remove:
+
+* CONNECT EXCHANGE
+* PRO badges
+* subscription logic
+* ALPACA PAPER ACCOUNT references
+* free trial references
+* paywall flows
+
+9. KRAKEN STATUS
+   Near the search bar show:
+   "KRAKEN LIVE CONNECTED"
+
+in neon green.
+
+10. KEEP THESE VERIFIED INVARIANTS
+    Do NOT break:
+
+* 20 longs + 20 shorts independently
+* internal scrolling
+* adaptive matrix height
+* virtualization
+* BUY + SELL on every row
+* sparkline confidence color transitions
+* confidence ring thresholds
+* black chassis
+* current spacing/density
+
+Before replacing production admin portal:
+verify the REAL Kraken telemetry is actually populating in rendered DOM and not placeholder values.
