@@ -440,7 +440,7 @@ function priceCacheKey(exchange: string, symbol: string): string {
  * `{ price: null, source: "error", error }` so the caller can decide
  * whether to omit the asset from the equity sum.
  */
-async function getCachedSpotPriceUSD(
+export async function getCachedSpotPriceUSD(
   exchange: string,
   asset: string,
 ): Promise<{ price: number; source: "live" | "cached" } | { price: null; source: "error"; error: string }> {

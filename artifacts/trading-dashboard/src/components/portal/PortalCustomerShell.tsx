@@ -40,6 +40,7 @@ import {
 
 import { authFetch } from "../../lib/authFetch";
 import { PortalExchangeConnectModal } from "../PortalExchangeConnectModal";
+import { AIRiskControlsPanel } from "./AIRiskControlsPanel";
 // Pass 7V — brand logo used above search bar (replaces ticker chips row).
 import aiCandlezLogoHorizontal from "@assets/aicandlez-logo-horizontal-master_1779691403317.png";
 import { usePaperSignals, type OpportunityVM } from "../../hooks/usePaperSignals";
@@ -4022,6 +4023,14 @@ export function PortalCustomerShell() {
           slotCap={3}
           onUpgrade={openUpgrade}
         />
+
+        {/* Per-user AI LIVE-trade risk budgeting. Collapsible. Mounted
+            near the ENABLE LIVE bar so customers see capital caps and
+            live exposure metrics where AI execution actually lives.
+            Server enforcement: `lib/riskGate.ts` (gate 0d inside
+            placeLiveAutoOrderForUser). Admin operators bypass — this
+            panel is for customer self-imposed budgets only. */}
+        <AIRiskControlsPanel />
 
         <OpportunityMatrix
           longs={filteredLongs}

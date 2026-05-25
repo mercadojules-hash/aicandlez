@@ -18,8 +18,9 @@ import { NotificationDispatcher } from "../services/notifications/NotificationDi
 import { getTradeLimitVerdict, invalidateTradeLimitCache } from "./tradeLimitEngine.js";
 import { getUserStatusVerdict } from "./userStatusGuard.js";
 import { executionStreamBus } from "./executionStreamBus.js";
-import { logsTable } from "@workspace/db";
+import { logsTable, riskThrottleEventsTable } from "@workspace/db";
 import crypto from "crypto";
+import { evaluateRiskGate } from "./riskGate.js";
 
 // ── Per-user live execution bridge ────────────────────────────────────────────
 //
@@ -77,7 +78,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "concurrent_live_cap_reached";
+  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity";
   error?:          string;
 }
 
@@ -604,6 +605,64 @@ export async function placeLiveAutoOrderForUser(
           logger.warn({ err, userId }, "liveUserExecution: concurrent-cap log insert failed");
         }
         return { success: false, userId, errorCode: "concurrent_live_cap_reached", error: msg };
+      }
+    }
+  }
+
+  // 0d. Per-user AI risk budget. User-defined caps (max per-trade, max
+  // simultaneous, max total allocation, reserve cash) enforced against
+  // a live equity + open-exposure snapshot. Admin/super-admin bypass —
+  // operator path is governed by platform-wide controls (0a–0c), not
+  // a customer's self-imposed budget. See `lib/riskGate.ts`.
+  {
+    const operatorRisk = await isOperatorRole(userId);
+    if (!operatorRisk) {
+      const verdict = await evaluateRiskGate({ userId, intendedSizeUsd: sizeUSD });
+      if (!verdict.allowed) {
+        const { reasonCode, reasonText, snapshot } = verdict;
+        await emitFailureNotification(userId, symbol, side, reasonText);
+        executionStreamBus.emitEvent({
+          type:     "order_rejected",
+          severity: "warn",
+          symbol, side, mode: "live",
+          gate:     reasonCode,
+          reason:   reasonCode,
+          message:  reasonText,
+          details:  { userId, snapshot },
+        });
+        try {
+          const [userRow] = await db
+            .select({ email: usersTable.email })
+            .from(usersTable)
+            .where(eq(usersTable.clerkUserId, userId))
+            .limit(1);
+          await db.insert(riskThrottleEventsTable).values({
+            userId,
+            userEmail:       userRow?.email ?? null,
+            symbol, side,
+            intendedSizeUsd: sizeUSD,
+            equityUsd:       snapshot.equityUsd,
+            openCount:       snapshot.openCount,
+            openNotionalUsd: snapshot.openNotionalUsd,
+            reasonCode,
+            reasonText,
+            snapshot,
+          });
+        } catch (err) {
+          logger.warn({ err, userId }, "liveUserExecution: risk_throttle_events insert failed");
+        }
+        try {
+          await db.insert(logsTable).values({
+            id:      crypto.randomUUID(),
+            type:    "trade",
+            level:   "warn",
+            message: `[${reasonCode}] ${reasonText}`,
+            details: { userId, symbol, side, sizeUSD, snapshot, errorCode: reasonCode },
+          });
+        } catch (err) {
+          logger.warn({ err, userId }, "liveUserExecution: risk-gate log insert failed");
+        }
+        return { success: false, userId, errorCode: reasonCode, error: reasonText };
       }
     }
   }

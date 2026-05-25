@@ -21,4 +21,6 @@ export * from "./userExchangeVisibility";
 export * from "./userCredits";
 export * from "./creditTransactions";
 export * from "./processedStripeEvents";
+export * from "./userRiskSettings";
+export * from "./riskThrottleEvents";
 export * from "../constants/alertKeys";
