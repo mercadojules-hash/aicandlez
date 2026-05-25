@@ -54,6 +54,7 @@ import { useExecutionState } from "../../hooks/useExecutionState";
 // real data without provider wiring.
 import { STARTING_EQUITY, type PaperStats, type PaperTrade, type ClosedPaperTrade } from "../../hooks/usePaperTrades";
 import { useUserRole } from "../../hooks/useUserRole";
+import { SessionEnvBadge } from "./SessionEnvBadge";
 // useDisclaimerGate, AccountModal, UpgradeModal, DisclaimerModal removed on
 // admin path (Phase 1 graduation).
 
@@ -522,14 +523,17 @@ function Phase2PlaceholderModal({ open, intent, onClose }: {
           padding: 28, color: T.TEXT_0,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-          <span style={{
-            width: 8, height: 8, background: T.AMBER, borderRadius: "50%",
-            boxShadow: `0 0 12px ${T.AMBER}`,
-          }} />
-          <span style={{ fontSize: 11, color: T.AMBER, letterSpacing: T.TRACK_TITLE, fontWeight: 800 }}>
-            LIVE EXECUTION · PHASE 2 PENDING
-          </span>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{
+              width: 8, height: 8, background: T.AMBER, borderRadius: "50%",
+              boxShadow: `0 0 12px ${T.AMBER}`,
+            }} />
+            <span style={{ fontSize: 11, color: T.AMBER, letterSpacing: T.TRACK_TITLE, fontWeight: 800 }}>
+              LIVE EXECUTION · PHASE 2 PENDING
+            </span>
+          </div>
+          <SessionEnvBadge size="sm" />
         </div>
         <h2 style={{
           margin: "0 0 12px 0", fontSize: 20, fontWeight: 800,
@@ -537,11 +541,33 @@ function Phase2PlaceholderModal({ open, intent, onClose }: {
         }}>
           {intent.side} {intent.symbol}
         </h2>
+        {/* Safety reassurance — bold, unambiguous. The user must never
+            be uncertain whether this modal placed a real order. */}
+        <div
+          role="status"
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            margin: "0 0 16px 0",
+            padding: "10px 12px",
+            background: "rgba(102,255,102,0.08)",
+            border: `1px solid ${T.NEON}`,
+            boxShadow: `0 0 0 1px rgba(102,255,102,0.18)`,
+            fontFamily: T.FONT_MONO,
+          }}
+        >
+          <span style={{
+            width: 7, height: 7, borderRadius: "50%",
+            background: T.NEON, boxShadow: `0 0 10px ${T.NEON}`,
+          }} />
+          <span style={{ fontSize: 11, fontWeight: 800, color: T.NEON, letterSpacing: T.TRACK_TITLE }}>
+            NO ORDER PLACED · NO FUNDS MOVED
+          </span>
+        </div>
         <p style={{ margin: "0 0 18px 0", fontSize: 13, lineHeight: 1.55, color: T.TEXT_1 }}>
           One-click Kraken execution from the matrix is deferred to Phase 2.
-          No order has been placed. The safety layer (confirm dialog, notional
-          caps, per-symbol cooldown, kill switch, audit log) ships separately
-          before this surface becomes live.
+          The safety layer (confirm dialog, notional caps, per-symbol cooldown,
+          kill switch, audit log) ships separately before this surface becomes
+          live.
         </p>
         <p style={{ margin: "0 0 22px 0", fontSize: 11, lineHeight: 1.55, color: T.TEXT_2, letterSpacing: "0.04em" }}>
           For now, AI auto-execution continues to flow through the existing
@@ -3185,10 +3211,9 @@ const MarketRegime = memo(function MarketRegime({ opps }: { opps: OpportunityVM[
 // section reads as one continuous trading surface, not a strip of
 // admin widgets.
 const AccountStatusStrip = memo(function AccountStatusStrip({
-  pulse, activeSignals, engineOnline,
+  pulse, engineOnline,
 }: {
   pulse:         MarketPulse;
-  activeSignals: number;
   engineOnline:  boolean;
 }) {
   const { stats, history } = useAdminPaperStub();
@@ -3263,11 +3288,17 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
           <Cell k="WIN %"          size={24} v={closedCount > 0 ? `${winPct}%` : "—"} color={winPct >= 50 ? T.NEON : winPct > 0 ? T.AMBER : T.TEXT_2} />
           <Cell k="WINS / LOSSES"  size={24} v={`${wins} / ${losses}`} />
           <Cell k="OPEN TRADES"    size={24} v={openCount.toString()} color={openCount > 0 ? T.NEON : T.TEXT_2} />
-          <Cell k="ACTIVE SIGNALS" size={24} v={activeSignals.toString()} color={activeSignals > 0 ? T.TEXT_0 : T.TEXT_2} />
-          {/* Pass 7Y — QUEUE cell removed from ACCOUNT STATUS per
-              launch spec. Queue depth still surfaces in
-              OperatorPulseRibbon + pulse stream; ACCOUNT STATUS
-              now reads as pure user paper-trading telemetry. */}
+          {/* ACTIVE SIGNALS cell removed per operator request: redundant
+              with the Opportunity Matrix + Signal Pipeline surfaces and
+              added visual noise to the account-status strip. The
+              auto-fit grid (`minmax(140px, 1fr)`) rebalances spacing
+              automatically — no placeholder needed. If a replacement
+              metric is added later, candidates include execution
+              latency, API health, AI confidence avg, exchange heartbeat,
+              signal throughput, execution success %, or live queue
+              depth. Queue depth already surfaces in OperatorPulseRibbon
+              + pulse stream; ACCOUNT STATUS reads as pure user
+              paper-trading telemetry. */}
         </div>
         {/* Pass 7W — AI AVG CONF ring removed from ACCOUNT STATUS.
             Promoted to the global system-intelligence indicator in
@@ -4194,7 +4225,6 @@ function AdminPortalShellInner() {
               engine metrics surface on the customer portal. */}
           <AccountStatusStrip
             pulse={pulse}
-            activeSignals={opportunities.length}
             engineOnline={engineOnline}
           />
           <div style={{

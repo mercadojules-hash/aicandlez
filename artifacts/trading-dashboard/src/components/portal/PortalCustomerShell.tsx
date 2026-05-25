@@ -47,6 +47,7 @@ import { useExecutionState } from "../../hooks/useExecutionState";
 import { usePaperTrades, STARTING_EQUITY } from "../../hooks/usePaperTrades";
 import { useUserRole } from "../../hooks/useUserRole";
 import { useDisclaimerGate } from "../../hooks/useDisclaimerGate";
+import { SessionEnvBadge } from "./SessionEnvBadge";
 import {
   AccountModal, UpgradeModal, DisclaimerModal,
 } from "./modals";
@@ -3680,6 +3681,34 @@ export function PortalCustomerShell() {
     });
   }, [opportunities]);
 
+  // Defense-in-depth role refusal. Portal.tsx already hard-gates the
+  // role dispatch (admin → AdminPortalShell, non-admin →
+  // PortalCustomerShell), so this branch is never taken in normal
+  // flow — it's a belt-and-suspenders refusal in case a future
+  // refactor accidentally renders the customer shell on an admin
+  // session. The customer shell is PAPER-ONLY by invariant and must
+  // never paint for an operator session.
+  //
+  // Placement: AFTER every hook above (useUserRole, useCustomerPlan,
+  // useExecutionState, usePaperSignals, usePaperTrades, useNow1s,
+  // useSignalRate, multiple useMemo/useState/etc.) so the early
+  // return doesn't violate the Rules of Hooks if `isAdmin` flips
+  // mid-session (Clerk role refresh, session swap, super-admin
+  // promotion). Returning null lets the parent's role-aware
+  // re-render swap in the correct shell on the next tick without
+  // flashing customer affordances to an operator.
+  if (isAdmin) {
+    if (typeof console !== "undefined") {
+      // Surface the refusal so a real Portal.tsx regression is
+      // visible in dev/QA rather than silently rendering blank.
+      console.warn(
+        "[PortalCustomerShell] refused render: isAdmin=true. " +
+        "Expected Portal.tsx role gate to dispatch AdminPortalShell.",
+      );
+    }
+    return null;
+  }
+
   return (
     <div className="cd-portal-root" style={{
       minHeight: "100dvh",
@@ -3903,6 +3932,17 @@ export function PortalCustomerShell() {
         now={nowShell}
       />
       <PaperModeBanner />
+      {/* Always-visible session environment badge. Customer surface
+          renders as PAPER; the badge is the user's persistent
+          reassurance that nothing on this page can route to live
+          execution. Pairs with the badge inside any order-related
+          modal so the context never has to be guessed. */}
+      <div style={{
+        display: "flex", justifyContent: "flex-end",
+        padding: "0 16px", marginTop: -4,
+      }}>
+        <SessionEnvBadge size="sm" />
+      </div>
       {engineStatus?.dataFeedHealth && !engineStatus.dataFeedHealth.healthy && (
         <DataFeedBanner health={engineStatus.dataFeedHealth} />
       )}
