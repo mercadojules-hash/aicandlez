@@ -56,12 +56,17 @@ const T = {
   BG_BLACK:    "#000000",
   BG_TERMINAL: "#050A07",
   BG_CARD:     "#070F0B",
-  // Pass 7f — global baseline visibility boost. Borders lifted from
-  // #1A2E22 → #243D2E so row separation is genuinely readable across
-  // the matrix without crossing into "bright chassis" territory.
-  // BORDER_GRN bumped 0.15 → 0.22 in sympathy.
-  BORDER:      "#243D2E",
-  BORDER_GRN:  "rgba(102, 255, 102, 0.22)",
+  // Pass 7f → Pass 7k — lower-surface visibility finalization.
+  // Panel-internal labels/values/separators were still sinking into
+  // the chassis even after 7f. Pushed again: TEXT_2 #7C8E86 →
+  // #A4B5AD (true mid neutral, no longer dim), TEXT_3 #6F8079 →
+  // #93A39B (no longer ghost text), BORDER #243D2E → #2F5040 (panel
+  // internal dividers actually visible), BORDER_GRN 0.22 → 0.34.
+  // Chassis (BG_BLACK/TERMINAL/CARD) still untouched — these are
+  // foreground tokens only. Matrix is unaffected: cards key off
+  // TEXT_0/TEXT_1 + dirColor-tinted borders, not these tokens.
+  BORDER:      "#2F5040",
+  BORDER_GRN:  "rgba(102, 255, 102, 0.34)",
   NEON:        "#66FF66",
   NEON_GLOW:   "rgba(102, 255, 102, 0.45)",
   EMERALD:     "#00C853",
@@ -69,17 +74,9 @@ const T = {
   RED:         "#FF4D4D",
   AMBER:       "#FFB020",
   TEXT_0:      "#FFFFFF",
-  // Pass 7f — typography luminance lift. The information density was
-  // there but the readability wasn't. TEXT_1 (#A8B8B0 → #C5D2CB) is
-  // the workhorse for prices, telemetry values, and reasoning
-  // snippets — needed a real bump. TEXT_2 (#5F706A → #7C8E86) carries
-  // labels and timestamps that were sinking into the chassis. TEXT_3
-  // (#586B63 → #6F8079) lifts NOT-CONNECTED / stage-label rows back
-  // up. Chassis colors (BG_BLACK/TERMINAL/CARD) intentionally
-  // unchanged — only foreground signal energy increases.
   TEXT_1:      "#C5D2CB",
-  TEXT_2:      "#7C8E86",
-  TEXT_3:      "#6F8079",
+  TEXT_2:      "#A4B5AD",
+  TEXT_3:      "#93A39B",
   FONT_MONO:   "'IBM Plex Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace",
   // ── Polish scale (institutional rhythm) ──────────────────────────────
   // Letter-spacing tracks: collapse to 3 tiers + 1 display exception.
@@ -2207,29 +2204,29 @@ function PanelCard({
   return (
     <div style={style}>
       <div style={{
-        padding: 10,
-        borderBottom: `1px solid ${live ? "rgba(102,255,102,0.18)" : T.BORDER}`,
-        // Pass 7j — title bar reads as a slightly darker bezel cap.
-        // LIVE panels carry a stronger neon hairline at the base of
-        // the header so the title section has its own authority and
-        // doesn't get visually swallowed by the body gradient.
-        background: `linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.30) 100%)`,
+        // Pass 7k — title bar pushed to real authority. Padding 10
+        // → 12, title fontSize 11 → 13 / weight 600, live dot 6 →
+        // 9, live underline 0.22 → 0.40. The header now reads as a
+        // proper bezel cap, not a faint label strip.
+        padding: "12px 14px",
+        borderBottom: `1px solid ${live ? "rgba(102,255,102,0.32)" : T.BORDER}`,
+        background: `linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.38) 100%)`,
         boxShadow: live
-          ? `inset 0 -1px 0 rgba(102,255,102,0.22)`
-          : `inset 0 -1px 0 rgba(102,255,102,0.05)`,
+          ? `inset 0 -1px 0 rgba(102,255,102,0.40)`
+          : `inset 0 -1px 0 rgba(102,255,102,0.08)`,
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
         <h3 style={{
-          margin: 0, fontSize: 11, color: T.TEXT_0,
+          margin: 0, fontSize: 13, fontWeight: 600, color: T.TEXT_0,
           letterSpacing: T.TRACK_LABEL,
-          // Pass 7j — title text-shadow strengthened on live panels
-          // (0.18 → 0.28) for crispness against the new bezel.
-          textShadow: live ? `0 0 8px rgba(102,255,102,0.28)` : undefined,
+          textShadow: live
+            ? `0 0 10px rgba(102,255,102,0.42), 0 0 4px rgba(102,255,102,0.30)`
+            : `0 0 4px rgba(0,0,0,0.6)`,
         }}>{title}</h3>
         {live && <span style={{
-          width: 6, height: 6, borderRadius: "50%",
+          width: 9, height: 9, borderRadius: "50%",
           background: T.NEON,
-          boxShadow: `0 0 6px ${T.NEON}, 0 0 12px ${T.NEON_GLOW}`,
+          boxShadow: `0 0 10px ${T.NEON}, 0 0 18px ${T.NEON_GLOW}, 0 0 28px rgba(102,255,102,0.30)`,
           animation: "brand-pulse 1.4s infinite",
         }} />}
       </div>
