@@ -253,6 +253,17 @@
   100% { transform: translateY(400%); opacity: 0; }
 }
 
+/* Pass 4.8 — horizontal sweep used by PaperModeBanner (and other
+   safety-rail strips) to read as a live status indicator. Reduced-
+   motion umbrella on `.cd-portal-root` disables this in the gated
+   prefers-reduced-motion path. */
+@keyframes edge-sweep {
+  0%   { transform: translateX(-100%); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateX(900%); opacity: 0; }
+}
+
 @keyframes feed-row-in {
   from { opacity: 0; transform: translateX(-4px); background: #00f0ff08; }
   to   { opacity: 1; transform: translateX(0);    background: transparent; }

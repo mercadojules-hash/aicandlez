@@ -153,12 +153,21 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
     <header
       style={{
         position: "sticky", top: 0, zIndex: 50,
-        background: T.BG_TERMINAL,
+        // Pass 4.8 — institutional depth gradient on the operator
+        // ribbon so the strip reads as a backlit hardware bezel rather
+        // than a flat panel. Subtle enough to preserve text contrast,
+        // strong enough to give the command center a "live console"
+        // atmosphere on first scan.
+        background: `linear-gradient(180deg, #050A07 0%, ${T.BG_TERMINAL} 60%, #030604 100%)`,
         borderBottom: `1px solid ${T.BORDER}`,
-        padding: "6px 16px",
+        padding: "7px 16px 8px",
         fontFamily: T.FONT_MONO,
         fontSize: 11,
         overflow: "hidden",
+        // Bottom edge glow — single neon hairline that anchors the
+        // ribbon visually to the workspace below. Always-on; reads as
+        // a hardware power-rail indicator.
+        boxShadow: `inset 0 -1px 0 rgba(102,255,102,0.12), 0 1px 0 rgba(102,255,102,0.06)`,
       }}
     >
       <div className="cd-ribbon" style={{
@@ -167,8 +176,19 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
         flexWrap: "nowrap", minWidth: 0, overflow: "hidden",
         whiteSpace: "nowrap",
       }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_0, fontWeight: 700, letterSpacing: "0.18em", flexShrink: 0 }}>
-          <Terminal size={13} color={T.NEON} /> AICANDLEZ
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 7,
+          color: T.TEXT_0, fontWeight: 700, letterSpacing: "0.20em",
+          flexShrink: 0, textShadow: `0 0 6px rgba(102,255,102,0.30)`,
+        }}>
+          <Terminal size={13} color={T.NEON} style={{ filter: `drop-shadow(0 0 4px ${T.NEON_GLOW})` }} />
+          AICANDLEZ
+          <span style={{
+            fontSize: 8, color: T.NEON, opacity: 0.65,
+            letterSpacing: "0.18em", marginLeft: 2,
+            padding: "1px 5px", border: `1px solid rgba(102,255,102,0.30)`,
+            borderRadius: 2,
+          }}>OPS</span>
         </span>
         <RibbonDivider />
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.TEXT_1, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
@@ -195,6 +215,19 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
         </span>
 
         <RibbonDivider prio={2} />
+        {/* Pass 4.8 — AI INTEL cluster. The SIG/MIN → L/S → AVG CONF →
+            QUEUE metrics already lived in the ribbon; this label
+            promotes them as the "AI Intelligence Center" the operator
+            scans first. Subtle bracket framing, no new data wiring. */}
+        <span data-prio="2" aria-hidden style={{
+          display: "inline-flex", alignItems: "center", gap: 5,
+          color: T.NEON, opacity: 0.55,
+          fontSize: 8, letterSpacing: "0.22em",
+          flexShrink: 0,
+        }}>
+          <span style={{ width: 1, height: 10, background: "rgba(102,255,102,0.40)" }} />
+          AI INTEL
+        </span>
         <span
           data-prio="2"
           title={`Signals generated per minute, since session start`}
@@ -264,11 +297,31 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
           <Shield size={10} /> {planLabel}
         </span>
         <span style={{ flex: 1 }} />
-        <span style={{ color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}>PAPER BAL:&nbsp;
-          <span style={{ color: T.TEXT_0 }}>${equityUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-        </span>
-        <span style={{ color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}>REALIZED (1D):&nbsp;
-          <span style={{ color: realizedColor }}>{realizedSign}${Math.abs(realizedToday).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        {/* Pass 4.8 — KPI anchor. Promoted with bracketed visual
+            grouping + larger numeric weight so the operator's right-
+            edge scan lands on capital state. */}
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 10,
+          padding: "3px 10px",
+          background: "linear-gradient(180deg, rgba(102,255,102,0.04) 0%, rgba(0,0,0,0) 100%)",
+          border: `1px solid rgba(102,255,102,0.18)`,
+          borderRadius: 2,
+          flexShrink: 0,
+        }}>
+          <span style={{ color: T.TEXT_3, fontVariantNumeric: "tabular-nums", fontSize: 9, letterSpacing: "0.16em" }}>PAPER BAL</span>
+          <span style={{
+            color: T.TEXT_0, fontVariantNumeric: "tabular-nums",
+            fontSize: 12, fontWeight: 700, letterSpacing: "-0.01em",
+          }}>${equityUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span aria-hidden style={{ width: 1, height: 12, background: "rgba(102,255,102,0.20)" }} />
+          <span style={{ color: T.TEXT_3, fontVariantNumeric: "tabular-nums", fontSize: 9, letterSpacing: "0.16em" }}>REALIZED 1D</span>
+          <span style={{
+            color: realizedColor, fontVariantNumeric: "tabular-nums",
+            fontSize: 12, fontWeight: 700, letterSpacing: "-0.01em",
+            textShadow: realizedToday !== 0 ? `0 0 6px ${realizedColor}33` : undefined,
+          }}>
+            {realizedSign}${Math.abs(realizedToday).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
         </span>
       </div>
     </header>
@@ -291,21 +344,38 @@ function RibbonDivider({ prio }: { prio?: 2 | 3 } = {}) {
 /* ──────────────────────────────────────────────────────────────────────── */
 
 const PaperModeBanner = memo(function PaperModeBanner() {
+  // Pass 4.8 — subtle status-strip shimmer + locked icon glow. Reads
+  // as a live safety rail rather than a static label. Animation gated
+  // by the global reduced-motion umbrella on `.cd-portal-root`.
   return (
     <div style={{
-      padding: "4px 16px",
-      background: "rgba(102,255,102,0.04)",
+      position: "relative",
+      padding: "5px 16px",
+      background: "linear-gradient(90deg, rgba(102,255,102,0.02) 0%, rgba(102,255,102,0.06) 50%, rgba(102,255,102,0.02) 100%)",
       borderBottom: `1px solid ${T.BORDER_GRN}`,
       color: T.TEXT_1,
       fontFamily: T.FONT_MONO,
       fontSize: 10,
-      letterSpacing: "0.20em",
+      letterSpacing: "0.22em",
       textTransform: "uppercase",
       textAlign: "center",
-      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+      display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+      overflow: "hidden",
     }}>
-      <Lock size={11} color={T.NEON} />
-      Paper Execution Mode Active — No real funds at risk
+      <span aria-hidden style={{
+        position: "absolute", top: 0, bottom: 0, left: 0, width: 120,
+        background: "linear-gradient(90deg, transparent 0%, rgba(102,255,102,0.12) 50%, transparent 100%)",
+        animation: "edge-sweep 8s linear infinite",
+        pointerEvents: "none",
+      }} />
+      <Lock size={11} color={T.NEON} style={{ filter: `drop-shadow(0 0 4px ${T.NEON_GLOW})` }} />
+      <span>Paper Execution Mode Active — No real funds at risk</span>
+      <span aria-hidden style={{
+        width: 5, height: 5, borderRadius: "50%",
+        background: T.NEON,
+        boxShadow: `0 0 6px ${T.NEON}, 0 0 12px ${T.NEON_GLOW}`,
+        animation: "brand-pulse 2s ease-in-out infinite",
+      }} />
     </div>
   );
 });
@@ -361,8 +431,16 @@ const DataFeedBanner = memo(function DataFeedBanner({
 /* ──────────────────────────────────────────────────────────────────────── */
 
 type Filt =
-  | "ALL" | "MAJORS" | "ALTS" | "HIGH_CONF" | "READY" | "LONG" | "SHORT" | "WATCHLIST"
+  | "ALL" | "MAJORS" | "ALTS" | "MEME" | "HIGH_CONF" | "READY" | "LONG" | "SHORT" | "WATCHLIST"
   | "LOW_VOL" | "TRENDING" | "BREAKOUT" | "SCALP" | "MOMENTUM";
+
+// Pass 4.8 — meme / high-volatility universe. Filter-only (no engine
+// schema change). DOGE is also in MAJORS per usePaperSignals; that's
+// fine — it surfaces in both depending on selected filter.
+const MEME_UNIVERSE = new Set<string>([
+  "DOGE", "PEPE", "BONK", "WIF", "FLOKI", "BRETT",
+  "POPCAT", "MOG", "TURBO", "BOME", "SHIB", "MEME",
+]);
 
 const SearchBar = memo(function SearchBar({
   query, setQuery, filter, setFilter, suggestionPool,
@@ -378,6 +456,7 @@ const SearchBar = memo(function SearchBar({
     { id: "ALL",       label: "All",                   group: 0 },
     { id: "MAJORS",    label: "Majors",                group: 0 },
     { id: "ALTS",      label: "Alts",                  group: 0 },
+    { id: "MEME",      label: "Meme / Hi-Vol",         group: 0 },
     { id: "HIGH_CONF", label: "High Confidence (≥75)", group: 0 },
     { id: "READY",     label: "Ready to Execute",      group: 0 },
     { id: "LONG",      label: "Long Bias",             group: 0 },
@@ -397,7 +476,7 @@ const SearchBar = memo(function SearchBar({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search crypto asset or AI opportunity… (BTC · ETH · SOL · XRP · DOGE · AVAX · LINK · ADA · SUI · PEPE · FET · TAO)"
+          placeholder="Search crypto asset or AI opportunity… (BTC · ETH · SOL · DOGE · PEPE · WIF · BONK · POPCAT · FLOKI · BRETT · MOG · TURBO)"
           style={{
             width: "100%",
             background: T.BG_TERMINAL,
@@ -1362,6 +1441,7 @@ function filterOpps(opps: OpportunityVM[], query: string, filter: Filt): Opportu
     switch (filter) {
       case "MAJORS":    return o.assetClass === "MAJOR";
       case "ALTS":      return o.assetClass === "ALT";
+      case "MEME":      return MEME_UNIVERSE.has(o.symbol);
       case "HIGH_CONF": return o.conf >= 75;
       case "READY":     return o.readiness === "READY";
       case "LONG":      return o.direction === "LONG";
@@ -2303,7 +2383,14 @@ export function PortalCustomerShell() {
   // cold engine.
   const suggestionPool = useMemo(() => {
     const live = opportunities.map(o => o.symbol);
-    const fallback = ["BTC", "ETH", "SOL", "XRP", "DOGE", "AVAX", "LINK", "ADA", "SUI", "PEPE", "FET", "TAO", "ARB", "ATOM", "MATIC", "INJ"];
+    // Pass 4.8 — chip suggestions skew toward meme / high-volatility
+    // assets alongside majors so the search surface mirrors the new
+    // universe positioning without touching the engine watchlist.
+    const fallback = [
+      "BTC", "ETH", "SOL", "XRP", "AVAX", "LINK", "ADA", "ATOM",
+      "DOGE", "PEPE", "WIF", "BONK", "FLOKI", "BRETT",
+      "POPCAT", "MOG", "TURBO", "BOME", "SHIB",
+    ];
     const seen = new Set<string>();
     return [...live, ...fallback].filter(s => {
       if (seen.has(s)) return false;
