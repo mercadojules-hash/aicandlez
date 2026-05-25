@@ -2510,10 +2510,45 @@ export function PortalCustomerShell() {
            Trough is set high (0.96) so the effect reads as a faint
            idle rhythm, not a status pulse. Reduced-motion umbrella
            below halts it. */
+        /* Pass 5.0 — 0% / 100% frames now match the live panel's
+           static base shadow exactly (architect note from 4.9), so
+           the first animation frame doesn't visibly step up from
+           the inline boxShadow. */
         @keyframes panel-breathe {
-          0%   { box-shadow: inset 0 1px 0 rgba(102,255,102,0.08), inset 0 -1px 0 rgba(0,0,0,0.50), 0 1px 0 rgba(0,0,0,0.60), inset 0 0 18px rgba(102,255,102,0.03); }
-          50%  { box-shadow: inset 0 1px 0 rgba(102,255,102,0.10), inset 0 -1px 0 rgba(0,0,0,0.50), 0 1px 0 rgba(0,0,0,0.60), inset 0 0 28px rgba(102,255,102,0.06); }
-          100% { box-shadow: inset 0 1px 0 rgba(102,255,102,0.08), inset 0 -1px 0 rgba(0,0,0,0.50), 0 1px 0 rgba(0,0,0,0.60), inset 0 0 18px rgba(102,255,102,0.03); }
+          0%   { box-shadow: inset 0 1px 0 rgba(102,255,102,0.08), inset 0 -1px 0 rgba(0,0,0,0.50), 0 1px 0 rgba(0,0,0,0.60), inset 0 0 24px rgba(102,255,102,0.04); }
+          50%  { box-shadow: inset 0 1px 0 rgba(102,255,102,0.10), inset 0 -1px 0 rgba(0,0,0,0.50), 0 1px 0 rgba(0,0,0,0.60), inset 0 0 32px rgba(102,255,102,0.07); }
+          100% { box-shadow: inset 0 1px 0 rgba(102,255,102,0.08), inset 0 -1px 0 rgba(0,0,0,0.50), 0 1px 0 rgba(0,0,0,0.60), inset 0 0 24px rgba(102,255,102,0.04); }
+        }
+        /* Pass 5.0 — workspace-scan: ultra-slow horizontal sweep that
+           crosses the customer workspace every 22s. Communicates
+           "the engine is always scanning" even when zero trades are
+           open and no fills are occurring. Opacity capped at 0.06
+           so the line reads as ambient terminal phosphor, not motion.
+           Reduced-motion umbrella below halts it. */
+        @keyframes workspace-scan {
+          0%   { transform: translateX(-30%); opacity: 0; }
+          10%  { opacity: 0.06; }
+          90%  { opacity: 0.06; }
+          100% { transform: translateX(130%); opacity: 0; }
+        }
+        /* Pass 5.0 — chassis vignette overlay. Pseudo-element on
+           cd-portal-root that darkens the four corners with a soft
+           radial gradient, giving the workspace a backlit terminal
+           bezel feel. Static (no animation) — pure depth. */
+        .cd-portal-root::before {
+          content: "";
+          position: fixed; inset: 0; pointer-events: none; z-index: 0;
+          background:
+            radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%),
+            radial-gradient(ellipse at top, rgba(102,255,102,0.020) 0%, transparent 60%);
+        }
+        .cd-portal-root > * { position: relative; z-index: 1; }
+        /* Pass 5.0 — ambient ultra-wide breathing room. Above 1800px
+           the workspace already centers via maxWidth; this rule adds
+           a touch more horizontal padding so the cards don't feel
+           glued to the chassis edge on 4K / 27" displays. */
+        @media (min-width: 1800px) {
+          .cd-workspace { padding-left: 32px !important; padding-right: 32px !important; }
         }
         /* Pass 4.4 — reduced-motion umbrella expanded to TRUE portal-
            wide scope. Holds at the bright phase so state semantics
@@ -2581,10 +2616,22 @@ export function PortalCustomerShell() {
         <DataFeedBanner health={engineStatus.dataFeedHealth} />
       )}
 
-      <main style={{
+      <main className="cd-workspace" style={{
         flex: 1, width: "100%", maxWidth: 2000, margin: "0 auto",
         padding: "24px 16px", display: "flex", flexDirection: "column", gap: 28,
+        position: "relative",
       }}>
+        {/* Pass 5.0 — ambient workspace scan. A 1px neon hairline
+            sweeps left→right across the workspace every 22s at
+            ~6% opacity, reinforcing "system continuously scanning"
+            even when no trades are open. State-agnostic ambient
+            motion; reduced-motion umbrella halts it. */}
+        <span aria-hidden style={{
+          position: "absolute", top: 0, bottom: 0, left: 0, width: "8%",
+          background: "linear-gradient(90deg, transparent 0%, rgba(102,255,102,0.40) 50%, transparent 100%)",
+          animation: "workspace-scan 22s linear infinite",
+          pointerEvents: "none", zIndex: 0,
+        }} />
         {/* Account / upgrade / disclaimer entry strip */}
         <div style={{
           display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end",
