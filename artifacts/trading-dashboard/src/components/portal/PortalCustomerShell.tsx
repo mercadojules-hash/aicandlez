@@ -310,6 +310,52 @@ const PaperModeBanner = memo(function PaperModeBanner() {
   );
 });
 
+/**
+ * DataFeedBanner — explicit infra-event surfacing when the candle/ticker
+ * pipeline is unhealthy. Replaces the prior failure mode where a stalled
+ * data feed presented as a quietly-empty engine, which read as a UI bug
+ * to operators. State-gated: only mounts when the server flags
+ * `dataFeedHealth.healthy === false`. Source of truth = api-server
+ * `lib/marketData.ts → getDataFeedHealth()`.
+ */
+const DataFeedBanner = memo(function DataFeedBanner({
+  health,
+}: {
+  health: NonNullable<EngineLite["dataFeedHealth"]>;
+}) {
+  const ageSec = health.lastSuccessAt
+    ? Math.floor((Date.now() - health.lastSuccessAt) / 1_000)
+    : null;
+  const ageText = ageSec == null
+    ? "no successful candle fetch since boot"
+    : ageSec < 60
+      ? `last good candle ${ageSec}s ago`
+      : ageSec < 3_600
+        ? `last good candle ${Math.floor(ageSec / 60)}m ago`
+        : `last good candle ${Math.floor(ageSec / 3_600)}h ago`;
+  return (
+    <div style={{
+      padding: "6px 16px",
+      background: "rgba(255,77,77,0.08)",
+      borderBottom: `1px solid rgba(255,77,77,0.45)`,
+      color: "#FF8888",
+      fontFamily: T.FONT_MONO,
+      fontSize: 10,
+      letterSpacing: "0.20em",
+      textTransform: "uppercase",
+      textAlign: "center",
+      display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+    }}>
+      <span style={{
+        width: 6, height: 6, borderRadius: "50%",
+        background: "#FF4D4D", boxShadow: "0 0 6px rgba(255,77,77,0.8)",
+        animation: "brand-pulse 1.4s infinite",
+      }} />
+      Candle Feed Degraded · Engine Paused · {ageText} · {health.primary}={health.primaryStatus} {health.fallback}={health.fallbackStatus}
+    </div>
+  );
+});
+
 /* ──────────────────────────────────────────────────────────────────────── */
 /* Asset Intelligence Search Bar + Filter pills                             */
 /* ──────────────────────────────────────────────────────────────────────── */
@@ -577,6 +623,22 @@ type EngineLite = {
   signalCounts?:      { BUY?: number; SELL?: number; HOLD?: number };
   funnel?:            { total?: number; passedMTF?: number; blockedMTF?: number; executed?: number };
   recentSignalLog?:   ReadonlyArray<ReasoningEntry>;
+  // Pass 4.2 — server-side candle feed health. When healthy === false
+  // the shell renders <DataFeedBanner /> so the empty-engine state is
+  // explicit (infra event) instead of ambiguous (apparent UI bug).
+  dataFeedHealth?: {
+    healthy:             boolean;
+    primary:             string;
+    fallback:            string;
+    primaryStatus:       "ok" | "degraded" | "down";
+    fallbackStatus:      "ok" | "degraded" | "down";
+    lastSuccessAt:       number | null;
+    lastSuccessSource:   string | null;
+    lastFailureAt:       number | null;
+    lastFailureSource:   string | null;
+    lastFailureReason:   string | null;
+    consecutiveFailures: number;
+  };
 };
 
 type MarketPulse = {
@@ -2120,6 +2182,9 @@ export function PortalCustomerShell() {
         now={nowShell}
       />
       <PaperModeBanner />
+      {engineStatus?.dataFeedHealth && !engineStatus.dataFeedHealth.healthy && (
+        <DataFeedBanner health={engineStatus.dataFeedHealth} />
+      )}
 
       <main style={{
         flex: 1, width: "100%", maxWidth: 2000, margin: "0 auto",

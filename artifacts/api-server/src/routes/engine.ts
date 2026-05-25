@@ -14,6 +14,7 @@ import {
   setSelectedExchange,
   getExchangeStatus,
 } from "../lib/exchangeEngine.js";
+import { getDataFeedHealth } from "../lib/marketData.js";
 import { clearAllPositions } from "../lib/simulationEngine.js";
 import { registry } from "../services/exchanges/ExchangeRegistry.js";
 import { db } from "@workspace/db";
@@ -64,6 +65,10 @@ router.get("/engine/status", (_req, res) => {
     lastTrade:          engineStats.lastTrade,
     recentErrors:       engineStats.errors.slice(-5),
     operatorArmed:      _operatorArmed,
+    // Pass 4.2 — data-feed health surfaced so PortalCustomerShell can
+    // render a DataFeedBanner instead of presenting candle-pipeline
+    // outages as ambiguous empty UI state.
+    dataFeedHealth:     getDataFeedHealth(),
   });
 });
 
