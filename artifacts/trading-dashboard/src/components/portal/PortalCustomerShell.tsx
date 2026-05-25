@@ -2042,49 +2042,170 @@ function shortPair(s: string): string {
   return s.replace(/USDT?$/, "").replace(/[-/].*$/, "").toUpperCase();
 }
 
-const PortfolioIntelligence = memo(function PortfolioIntelligence() {
-  const { stats, open } = usePaperTrades();
+// Pass 7 — TRADE LIFECYCLE REALISM. The portfolio panel becomes the
+// commitment/consequence surface: real equity curve driven by stats,
+// position rows aware of ENTRY/ACTIVE lifecycle phases, and a fading
+// EXIT acknowledgment when a position closes. Institutional restraint
+// throughout — no flashy effects, no arcade tints, no PnL flicker.
+const EQUITY_HISTORY_LEN = 60;  // 60 samples × 1Hz = 60s rolling window
+
+function formatPositionAge(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60)    return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60)    return `${m}m${(s % 60).toString().padStart(2, "0")}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h${(m % 60).toString().padStart(2, "0")}m`;
+}
+
+function buildEquityPath(buf: number[], w: number, h: number): { stroke: string; fill: string } {
+  if (buf.length < 2) return { stroke: "", fill: "" };
+  const min = Math.min(...buf);
+  const max = Math.max(...buf);
+  // Pad the range so a flat line sits in the middle instead of hugging
+  // an edge. 0.0002 = 2bps — invisible jitter floor preserves dignity
+  // on a still curve while letting real PnL movement read clearly.
+  const range = Math.max(max - min, min * 0.0002);
+  const pad = 2;  // px top/bottom padding so the line never touches the edge
+  const pts = buf.map((v, i) => {
+    const x = (i / (buf.length - 1)) * w;
+    const y = pad + (h - pad * 2) - ((v - min) / range) * (h - pad * 2);
+    return [x, y] as const;
+  });
+  const stroke = "M" + pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" L");
+  const fill   = stroke + ` L${w.toFixed(1)},${h} L0,${h} Z`;
+  return { stroke, fill };
+}
+
+const PortfolioIntelligence = memo(function PortfolioIntelligence({ now }: { now: number }) {
+  const { stats, open, history } = usePaperTrades();
+
+  // Rolling 60-sample equity buffer, advanced by the shell's 1Hz tick.
+  // Survives across rerenders via useRef; written in useEffect to avoid
+  // render-side mutation. First sample is the current equity so the
+  // curve starts as a flat baseline instead of an empty void.
+  const equityBufRef = useRef<number[]>([stats.equity]);
+  useEffect(() => {
+    const buf = equityBufRef.current;
+    buf.push(stats.equity);
+    if (buf.length > EQUITY_HISTORY_LEN) buf.shift();
+  }, [now, stats.equity]);
+
+  // Curve color tracks net direction from the starting baseline. Above
+  // → neon, below → red, flat → neutral. The fill gradient matches.
+  const curveDelta = stats.equity - STARTING_EQUITY;
+  const curveColor = Math.abs(curveDelta) < 0.01 ? T.TEXT_2 : curveDelta > 0 ? T.NEON : T.RED;
+  const gradId = useId();
+  const { stroke: curveStroke, fill: curveFill } = buildEquityPath(equityBufRef.current, 100, 40);
+
+  // EXIT acknowledgment — surface the most recent close for 8s, then
+  // fade to nothing. Operator gets a brief financial "this just
+  // happened" moment, then the panel returns to forward-looking state.
+  const lastClose  = history[0];
+  const closeAgeMs = lastClose ? Math.max(0, now - lastClose.closedAt) : Infinity;
+  const exitFresh  = lastClose && closeAgeMs < 8_000;
+  const exitOpacity = exitFresh ? Math.max(0, 1 - closeAgeMs / 8_000) : 0;
+  const exitColor   = lastClose && lastClose.pnl >= 0 ? T.NEON : T.RED;
+
   return (
-    <PanelCard title="PORTFOLIO INTEL">
-      <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 14, flex: 1 }}>
+    <PanelCard title="PORTFOLIO INTEL" height={272}>
+      <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
           <div>
             <div style={{ fontSize: 10, color: T.TEXT_2, marginBottom: 3 }}>PAPER EQUITY (USD)</div>
-            <div style={{ fontSize: 20, color: T.TEXT_0 }}>
+            <div style={{ fontSize: 20, color: T.TEXT_0, fontVariantNumeric: "tabular-nums" }}>
               ${stats.equity.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               <span style={{ color: T.TEXT_2 }}>.{(stats.equity % 1).toFixed(2).slice(2)}</span>
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 10, color: T.TEXT_2, marginBottom: 3 }}>REALIZED</div>
-            <div style={{ fontSize: 13, color: stats.realizedPnl >= 0 ? T.NEON : T.RED }}>
+            <div style={{ fontSize: 13, color: stats.realizedPnl >= 0 ? T.NEON : T.RED, fontVariantNumeric: "tabular-nums" }}>
               {stats.realizedPnl >= 0 ? "+" : "−"}${Math.abs(stats.realizedPnl).toFixed(2)}
             </div>
           </div>
         </div>
-        <svg width="100%" height={48} viewBox="0 0 100 40" preserveAspectRatio="none">
-          <path d="M0,35 Q10,38 20,25 T40,15 T60,20 T80,5 T100,10" fill="none" stroke={T.NEON} strokeWidth={1} opacity={0.6} />
+
+        {/* Real equity curve — 60s rolling, redraws each shell tick. */}
+        <svg width="100%" height={40} viewBox="0 0 100 40" preserveAspectRatio="none"
+             style={{ transition: "color 600ms ease" }}>
           <defs>
-            <linearGradient id="port-grad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={T.NEON} />
-              <stop offset="100%" stopColor="transparent" />
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor={curveColor} stopOpacity={0.28} />
+              <stop offset="100%" stopColor={curveColor} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <path d="M0,40 L0,35 Q10,38 20,25 T40,15 T60,20 T80,5 T100,10 L100,40 Z" fill="url(#port-grad)" opacity={0.10} />
+          {curveFill   && <path d={curveFill}   fill={`url(#${gradId})`} />}
+          {curveStroke && <path d={curveStroke} fill="none" stroke={curveColor} strokeWidth={1.2}
+                                strokeLinecap="round" strokeLinejoin="round" opacity={0.85}
+                                style={{ filter: `drop-shadow(0 0 2px ${curveColor}80)` }} />}
         </svg>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: "auto" }}>
-          {open.slice(0, 3).map(p => (
-            <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 10 }}>
-              <span style={{ color: T.TEXT_1 }}>
-                <span style={{ color: p.side === "LONG" ? T.NEON : T.RED }}>{p.side.charAt(0)}</span>&nbsp;{shortPair(p.symbol)}
-              </span>
-              <span style={{ color: p.pnl >= 0 ? T.NEON : T.RED }}>
-                {p.pnl >= 0 ? "+" : "−"}${Math.abs(p.pnl).toFixed(2)}
-              </span>
+
+        {/* Position lifecycle rows — ENTRY phase glows for first 10s,
+            then settles into ACTIVE. TP/SL distance + position age make
+            commitment and risk legible. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: "auto" }}>
+          {exitFresh && lastClose && (
+            <div key={lastClose.id} style={{
+              border: `1px solid ${exitColor}55`,
+              background: `${exitColor}10`,
+              padding: "4px 8px",
+              opacity: exitOpacity,
+              transition: "opacity 320ms ease",
+              fontVariantNumeric: "tabular-nums",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10 }}>
+                <span style={{ color: T.TEXT_1, letterSpacing: "0.10em" }}>
+                  EXIT · {shortPair(lastClose.symbol)} · <span style={{ color: T.TEXT_2 }}>{lastClose.reason}</span>
+                </span>
+                <span style={{ color: exitColor }}>
+                  {lastClose.pnl >= 0 ? "+" : "−"}${Math.abs(lastClose.pnl).toFixed(2)}
+                </span>
+              </div>
             </div>
-          ))}
-          {open.length === 0 && (
-            <div style={{ color: T.TEXT_2, fontSize: 10, fontStyle: "italic" }}>No open paper positions.</div>
+          )}
+          {open.slice(0, 3).map(p => {
+            const ageMs   = Math.max(0, now - p.openedAt);
+            const isEntry = ageMs < 10_000;
+            const sideCol = p.side === "LONG" ? T.NEON : T.RED;
+            // Distance to target/stop as % of current mark. Positive
+            // toTarget = "moving with you"; positive toStop = "still
+            // have room". Both clamped to two decimals so the row never
+            // jitters from sub-bp moves.
+            const dir       = p.side === "LONG" ? 1 : -1;
+            const toTargetPct = ((p.target - p.last) / p.last) * 100 * dir;
+            const toStopPct   = ((p.last   - p.stop) / p.last) * 100 * dir;
+            const phaseLabel = isEntry ? "ENTRY" : "ACTIVE";
+            return (
+              <div key={p.id} style={{
+                padding: "4px 8px",
+                display: "flex", flexDirection: "column", gap: 2,
+                border: `1px solid ${isEntry ? `${sideCol}55` : "transparent"}`,
+                background: isEntry ? `${sideCol}08` : "transparent",
+                // 800ms fade from ENTRY → ACTIVE so the phase change is
+                // perceptible without ever feeling abrupt.
+                transition: "border-color 800ms ease, background-color 800ms ease",
+                fontVariantNumeric: "tabular-nums",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10 }}>
+                  <span style={{ color: T.TEXT_1 }}>
+                    <span style={{ color: sideCol }}>{p.side.charAt(0)}</span>
+                    &nbsp;{shortPair(p.symbol)}
+                    <span style={{ color: T.TEXT_3, marginLeft: 6 }}>{formatPositionAge(ageMs)}</span>
+                  </span>
+                  <span style={{ color: p.pnl >= 0 ? T.NEON : T.RED }}>
+                    {p.pnl >= 0 ? "+" : "−"}${Math.abs(p.pnl).toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: T.TEXT_3, letterSpacing: "0.06em" }}>
+                  <span>TP {toTargetPct >= 0 ? "+" : ""}{toTargetPct.toFixed(2)}% · SL {toStopPct >= 0 ? "+" : ""}{toStopPct.toFixed(2)}%</span>
+                  <span style={{ color: isEntry ? sideCol : T.TEXT_3, letterSpacing: "0.10em" }}>{phaseLabel}</span>
+                </div>
+              </div>
+            );
+          })}
+          {open.length === 0 && !exitFresh && (
+            <div style={{ color: T.TEXT_2, fontSize: 10, fontStyle: "italic", paddingLeft: 2 }}>No open paper positions.</div>
           )}
         </div>
       </div>
@@ -3062,7 +3183,7 @@ export function PortalCustomerShell() {
           borderTop: `1px solid ${T.BORDER}`,
         }}>
           <AIReasoningConsole log={engineStatus?.recentSignalLog} live={engineOnline} />
-          <PortfolioIntelligence />
+          <PortfolioIntelligence now={nowShell} />
           <SignalPipeline opps={opportunities} pulse={pulse} engine={engineStatus} />
           <MarketRegime opps={opportunities} />
           <ExchangeTopology />
