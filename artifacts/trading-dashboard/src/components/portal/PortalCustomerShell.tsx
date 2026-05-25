@@ -1511,7 +1511,7 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
   // of asset class. Restores long/short market polarity tension across
   // the viewport.
   return (
-    <section style={{
+    <section className="cd-matrix" style={{
       display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(520px, 1fr))",
       gap: 20, position: "relative",
     }}>
@@ -2549,6 +2549,45 @@ export function PortalCustomerShell() {
            glued to the chassis edge on 4K / 27" displays. */
         @media (min-width: 1800px) {
           .cd-workspace { padding-left: 32px !important; padding-right: 32px !important; }
+        }
+        /* Pass 5.1 — ULTRA-WIDE CENTER GRAVITY. Above 1900px the
+           workspace was free to grow to its full 2000px maxWidth; on
+           4K/5K monitors this began to drift toward a "stretched
+           dashboard" feel and diluted operator focus. Cap effective
+           width at 1880px to preserve command-center density and
+           keep the telemetry clusters visually connected. The 1800px
+           rule above still applies for 1800-1899px (intermediate
+           ultra-wides where 2000px still reads as cohesive). */
+        @media (min-width: 1900px) {
+          .cd-workspace {
+            max-width: 1880px !important;
+            padding-left: 28px !important;
+            padding-right: 28px !important;
+          }
+        }
+        /* Pass 5.1 — LAPTOP DENSITY TIGHTENING. Between 1280-1440px
+           (13"-15" laptop typical widths) the main 24px/28px padding
+           + section gap left the cards feeling slightly under-dense
+           relative to the available chassis. Tighten to 14px/22px so
+           sparklines stay prominent and telemetry preserves its
+           scanning cadence without crossing into cramped territory.
+           Above 1440 returns to the comfortable default. */
+        @media (min-width: 1280px) and (max-width: 1440px) {
+          .cd-workspace {
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+            gap: 22px !important;
+          }
+        }
+        /* Pass 5.1 — OPPORTUNITY MATRIX COHESION. At laptop widths
+           the 20px column gap read as two detached panels rather
+           than one execution matrix. Tighten to 16px so the LONGS /
+           SHORTS pair reads as a single bipolar surface. */
+        @media (max-width: 1440px) {
+          /* column-gap (not gap) so when the matrix collapses to a
+             single stacked column below ~1040px the vertical breathing
+             between LONGS and SHORTS is preserved at the original 20px. */
+          .cd-matrix { column-gap: 16px !important; }
         }
         /* Pass 4.4 — reduced-motion umbrella expanded to TRUE portal-
            wide scope. Holds at the bright phase so state semantics
