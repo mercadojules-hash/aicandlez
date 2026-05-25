@@ -720,34 +720,132 @@ function computeMarketPulse(
   };
 }
 
-function Sparkline({ data, color }: { data: number[]; color: string }) {
-  const w = 80, h = 36;
+/**
+ * Sparkline — Pass 4.3 cinematic upgrade.
+ *
+ * Promoted from a tiny 80×36 boxed widget into a full-card-width
+ * execution-telemetry band. Renders via viewBox so the SVG fluidly
+ * stretches across whatever container it's dropped into (the card's
+ * dedicated chart row is 100% wide). Three visual layers, all tied to
+ * real telemetry — no decorative motion:
+ *
+ *  1. Mean-baseline reference line (institutional restraint cue —
+ *     gives the line context against where the asset has been).
+ *  2. Area fill gradient (stronger than v4.1: 0.55→0) so the chart
+ *     reads as "filled volume", not "thin line on black".
+ *  3. Stroke layered with multi-blur drop-shadow for cinematic neon
+ *     glow without arcade tint.
+ *
+ * Live-mode (gated by `live` prop, set when tick <10s) adds:
+ *  - leading-edge marker dot at the most recent point with a soft
+ *    radial glow — visually anchors "this is the live tip of the tape"
+ *  - tape-advance shimmer (a vertical light band that crosses the
+ *    chart once every 6s) — communicates active market flow without
+ *    crossing into arcade territory.
+ */
+function Sparkline({
+  data, color, height = 60, live = false, seedDelayMs = 0,
+}: {
+  data: number[];
+  color: string;
+  height?: number;
+  live?: boolean;
+  seedDelayMs?: number;
+}) {
+  // viewBox coords — we'll scale via preserveAspectRatio=none so the
+  // SVG stretches to any container width while the chart line stays
+  // crisp (vector). VBW chosen large enough that per-bar steps don't
+  // round-snap together on long series.
+  const VBW = 320;
+  const VBH = height;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
-  const step = w / Math.max(1, data.length - 1);
-  const points = data.map((v, i) => `${(i * step).toFixed(1)},${(h - ((v - min) / range) * h).toFixed(1)}`).join(" ");
+  const mean = data.reduce((a, b) => a + b, 0) / Math.max(1, data.length);
+  const meanY = (VBH - ((mean - min) / range) * VBH).toFixed(1);
+  const step = VBW / Math.max(1, data.length - 1);
+  const pts  = data.map((v, i) => ({
+    x: i * step,
+    y: VBH - ((v - min) / range) * VBH,
+  }));
+  const points  = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const lastPt  = pts[pts.length - 1];
   // Per-instance unique id — avoids duplicate-DOM-id coupling across many
   // sparklines (architect nit, Pass 4.1). useId() output contains ":" which
   // SVG url(#...) tolerates, but sanitize for safety against future XML
   // serializers.
   const rawId  = useId();
-  const gradId = `spark-grad-${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;
+  const safe   = rawId.replace(/[^a-zA-Z0-9]/g, "");
+  const gradId = `spark-grad-${safe}`;
+  const tipId  = `spark-tip-${safe}`;
   return (
-    <svg width={w} height={h} style={{ overflow: "visible" }}>
+    <svg
+      width="100%"
+      height={height}
+      viewBox={`0 0 ${VBW} ${VBH}`}
+      preserveAspectRatio="none"
+      style={{ overflow: "visible", display: "block" }}
+    >
       <defs>
         <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%"  stopColor={color} stopOpacity="0.40" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
+          <stop offset="0%"   stopColor={color} stopOpacity="0.55" />
+          <stop offset="55%"  stopColor={color} stopOpacity="0.18" />
+          <stop offset="100%" stopColor={color} stopOpacity="0"    />
         </linearGradient>
+        <radialGradient id={tipId} cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stopColor={color} stopOpacity="1"   />
+          <stop offset="60%"  stopColor={color} stopOpacity="0.5" />
+          <stop offset="100%" stopColor={color} stopOpacity="0"   />
+        </radialGradient>
       </defs>
-      <polygon points={`0,${h} ${points} ${w},${h}`} fill={`url(#${gradId})`} />
+      {/* Mean baseline — dashed, low-opacity reference rail */}
+      <line
+        x1={0} x2={VBW} y1={meanY} y2={meanY}
+        stroke={color} strokeOpacity={0.22}
+        strokeWidth={1} strokeDasharray="4 6"
+        vectorEffect="non-scaling-stroke"
+      />
+      {/* Area fill */}
+      <polygon
+        points={`0,${VBH} ${points} ${VBW},${VBH}`}
+        fill={`url(#${gradId})`}
+      />
+      {/* Soft outer glow stroke */}
       <polyline
         points={points}
-        fill="none" stroke={color} strokeWidth={2}
+        fill="none" stroke={color} strokeWidth={5}
         strokeLinecap="round" strokeLinejoin="round"
-        style={{ filter: `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 6px ${color})` }}
+        strokeOpacity={0.28}
+        vectorEffect="non-scaling-stroke"
+        style={{ filter: `blur(2.5px)` }}
       />
+      {/* Crisp inner stroke with multi-layer drop-shadow halo */}
+      <polyline
+        points={points}
+        fill="none" stroke={color} strokeWidth={2.4}
+        strokeLinecap="round" strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+        style={{ filter: `drop-shadow(0 0 2px ${color}) drop-shadow(0 0 5px ${color}) drop-shadow(0 0 10px ${color})` }}
+      />
+      {/* Leading-edge live marker — only when telemetry is fresh */}
+      {live && lastPt && (
+        <>
+          <circle
+            cx={lastPt.x} cy={lastPt.y} r={5}
+            fill={`url(#${tipId})`}
+            style={{
+              animation: `spark-tip-breathe 1.6s ease-in-out infinite`,
+              animationDelay: `-${seedDelayMs}ms`,
+              transformOrigin: `${lastPt.x}px ${lastPt.y}px`,
+            }}
+          />
+          <circle
+            cx={lastPt.x} cy={lastPt.y} r={1.6}
+            fill={color}
+            style={{ filter: `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 6px ${color})` }}
+          />
+        </>
+      )}
     </svg>
   );
 }
@@ -799,7 +897,7 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         paddingLeft: 18,
         display: "flex", flexDirection: "column", gap: 10,
         position: "relative", overflow: "hidden",
-        height: 328,
+        height: 362,
         fontFamily: T.FONT_MONO,
         // Deterministic hover cadence — background + border tinted in lock-step.
         transition: `background-color ${T.TX_FAST}, border-color ${T.TX_FAST}`,
@@ -952,57 +1050,88 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         <PriceCell label="R:R"    value={rr}                   tone={dirColor} align="right" />
       </div>
 
-      {/* Sparkline + details row */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div style={{ position: "relative", width: 80, height: 36 }}>
-          <Sparkline data={opp.sparkline} color={sparkColor} />
-          {/* v4.1 spark-drift scan dot — only when signal has updated within the last 30s.
-              Communicates "this price stream is live"; stale cards keep a static sparkline. */}
-          {isFreshSignal && (
-            <span
-              aria-hidden
-              style={{
-                position: "absolute", top: 16, left: 0,
-                width: 3, height: 3, borderRadius: "50%",
-                background: sparkColor, boxShadow: `0 0 4px ${sparkColor}`,
-                animation: "spark-drift 5s linear infinite",
-                animationDelay: `-${sparkDelayMs}ms`,
-                pointerEvents: "none",
-              }}
-            />
-          )}
+      {/* Meta strip — exchanges · quality · age/latency · score
+          Pulled OUT from underneath the chart so the chart can dominate
+          its own row. Single horizontal line keeps vertical real estate
+          for the telemetry band below. */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: 8, fontSize: 10, color: T.TEXT_2,
+      }}>
+        <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
+          {opp.exchanges.map(ex => (
+            <span key={ex} style={{
+              fontSize: 9, color: T.TEXT_2,
+              background: "rgba(255,255,255,0.05)", padding: "1px 5px", borderRadius: 2,
+            }}>{ex}</span>
+          ))}
+          <span style={{ color: T.TEXT_1, marginLeft: 6 }}>{opp.quality}</span>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-          <div style={{ display: "flex", gap: 3 }}>
-            {opp.exchanges.map(ex => (
-              <span key={ex} style={{
-                fontSize: 9, color: T.TEXT_2,
-                background: "rgba(255,255,255,0.05)", padding: "1px 5px", borderRadius: 2,
-              }}>{ex}</span>
-            ))}
-          </div>
-          <span style={{ fontSize: 10, color: T.TEXT_1 }}>{opp.quality}</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span
-              title={`Signal age ${ageStr} · execution latency ${opp.latency}`}
-              style={{
-                fontSize: 10, color: T.TEXT_2,
-                // Flicker only while telemetry is genuinely live (<10s since update).
-                // Static otherwise — prevents 20 cards from breathing in perpetuity.
-                animation: isLiveTick ? "telemetry-flicker 1.6s ease-in-out infinite" : undefined,
-                animationDelay: isLiveTick ? `-${flickerDelayMs}ms` : undefined,
-                fontVariantNumeric: "tabular-nums",
-              }}>
-              <span style={{ color: T.TEXT_1 }}>{ageStr}</span>
-              <span style={{ opacity: 0.45, margin: "0 4px" }}>·</span>
-              {opp.latency}
-            </span>
-            <span style={{
-              fontSize: 11, background: "rgba(255,255,255,0.08)",
-              color: T.TEXT_0, padding: "1px 6px", borderRadius: 2,
-            }}>{opp.score}</span>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            title={`Signal age ${ageStr} · execution latency ${opp.latency}`}
+            style={{
+              color: T.TEXT_2,
+              // Flicker only while telemetry is genuinely live (<10s since update).
+              // Static otherwise — prevents 20 cards from breathing in perpetuity.
+              animation: isLiveTick ? "telemetry-flicker 1.6s ease-in-out infinite" : undefined,
+              animationDelay: isLiveTick ? `-${flickerDelayMs}ms` : undefined,
+              fontVariantNumeric: "tabular-nums",
+            }}>
+            <span style={{ color: T.TEXT_1 }}>{ageStr}</span>
+            <span style={{ opacity: 0.45, margin: "0 4px" }}>·</span>
+            {opp.latency}
+          </span>
+          <span style={{
+            fontSize: 11, background: "rgba(255,255,255,0.08)",
+            color: T.TEXT_0, padding: "1px 6px", borderRadius: 2,
+          }}>{opp.score}</span>
         </div>
+      </div>
+
+      {/* Pass 4.3 — full-width telemetry chart band.
+          Promoted from a tiny 80x36 boxed sparkline to a dominant row
+          that visually carries the card. Stretches edge-to-edge of the
+          card content box. tape-advance shimmer overlay is gated on
+          isLiveTick (under 10s since last update) so only actively-
+          ticking cards show market motion; stale cards stay still. */}
+      <div style={{
+        position: "relative",
+        width: "100%",
+        height: 60,
+        marginTop: 2,
+        background: "linear-gradient(180deg, rgba(255,255,255,0.012) 0%, rgba(0,0,0,0) 100%)",
+        borderTop: `1px solid ${T.BORDER}`,
+        borderBottom: `1px solid ${T.BORDER}`,
+        overflow: "hidden",
+      }}>
+        <Sparkline
+          data={opp.sparkline}
+          color={sparkColor}
+          height={60}
+          live={isFreshSignal}
+          seedDelayMs={sparkDelayMs}
+        />
+        {/* Tape-advance shimmer — a vertical translucent band that
+            sweeps left-to-right once every 6s, visually communicating
+            "market is actively flowing through this asset". Only
+            mounts when the signal stream is live (under 10s); stale
+            cards keep a static chart. Per-card deterministic delay so
+            the grid does not sync. */}
+        {isLiveTick && (
+          <span
+            aria-hidden
+            style={{
+              position: "absolute", top: 0, bottom: 0, left: 0, width: 80,
+              background: `linear-gradient(90deg, transparent 0%, ${sparkColor} 50%, transparent 100%)`,
+              opacity: 0.10,
+              pointerEvents: "none",
+              animation: "tape-advance 6s linear infinite",
+              animationDelay: `-${sparkDelayMs}ms`,
+              willChange: "transform",
+            }}
+          />
+        )}
       </div>
 
       {/* Footer: readiness + action */}
@@ -2106,6 +2235,22 @@ export function PortalCustomerShell() {
           50%  { opacity: 1; }
           80%  { opacity: 0.5; }
           100% { transform: translateX(77px); opacity: 0; }
+        }
+        /* Pass 4.3 — leading-edge marker pulse on the live tip of the
+           chart tape. Gated on isFreshSignal (under 30s) via the live
+           prop on Sparkline. */
+        @keyframes spark-tip-breathe {
+          0%   { transform: scale(0.85); opacity: 0.65; }
+          50%  { transform: scale(1.25); opacity: 1.00; }
+          100% { transform: scale(0.85); opacity: 0.65; }
+        }
+        /* Pass 4.3 — tape-advance: subtle vertical light band that
+           crosses the chart left→right over 6s, communicating active
+           market flow without arcade tint. Gated on isLiveTick (<10s)
+           via the OpportunityCard render condition. */
+        @keyframes tape-advance {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(1200%); }
         }
         @keyframes ring-sweep {
           0%   { transform: rotate(-90deg); }
