@@ -14,7 +14,8 @@ import {
   setSelectedExchange,
   getExchangeStatus,
 } from "../lib/exchangeEngine.js";
-import { getDataFeedHealth } from "../lib/marketData.js";
+import { getCandles, getDataFeedHealth } from "../lib/marketData.js";
+import { runAIDecision } from "../lib/aiReasoning.js";
 import { clearAllPositions } from "../lib/simulationEngine.js";
 import { registry } from "../services/exchanges/ExchangeRegistry.js";
 import { db } from "@workspace/db";
@@ -413,6 +414,84 @@ router.post("/engine/force-test-trades", ...requireOperator, async (_req, res) =
     results,
     note: `${tradesCreated} test trades inserted into DB (mix of open/closed). Check Trade Journal immediately.`,
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEMP DEBUG TELEMETRY — confidence pipeline forensic endpoint
+// Added during the confidence-compression audit (see CONFIDENCE_AUDIT.md).
+// Returns the full raw-factor breakdown for a single symbol, exposing every
+// number on both timeframes. Note: persistSignal() writes the per-timeframe
+// `decision.confidence` (one row per timeframe), NOT the MTF mean — the mean
+// is only used for the customer-card display, the MTF override gate, and the
+// in-memory engineStats.lastSignal snapshot. Operator-only.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/engine/debug/confidence/:symbol", ...requireOperator, async (req, res) => {
+  const symbol = String(req.params.symbol || "").toUpperCase();
+  if (!symbol) { res.status(400).json({ error: "symbol required" }); return; }
+
+  try {
+    const [candles5m, candles15m] = await Promise.all([
+      getCandles(symbol, "5m", 150),
+      getCandles(symbol, "15m", 150),
+    ]);
+
+    const fast = runAIDecision(symbol, "5m",  candles5m);
+    const slow = runAIDecision(symbol, "15m", candles15m);
+
+    // Reproduce the exact engine math so the response is self-auditing.
+    const explainTF = (d: typeof fast) => {
+      const raw     = Math.abs(d.totalScore) / d.maxScore;          // 0..~1
+      const scaled  = raw * 150;                                    // post-multiplier
+      const clamped = Math.min(98, Math.max(10, scaled));           // clamp(10,98)
+      return {
+        timeframe:       d.timeframe,
+        decision:        d.decision,
+        rawTotalScore:   d.totalScore,
+        maxScore:        d.maxScore,
+        raw,                          // |totalScore| / maxScore
+        rawTimes150:     +scaled.toFixed(2),
+        clampedAt98:     +clamped.toFixed(2),
+        finalConfidence: d.confidence,
+        // Engine sub-scores that drove totalScore. Anything not listed
+        // is folded into totalScore but not individually exposed by
+        // runAIDecision — see aiReasoning.ts:265-308 for the full formula.
+        signals:         d.signals,
+        momentum:        d.momentum,
+        reasoning:       d.reasoning,
+        shortSummary:    d.shortSummary,
+        candlesUsed:     d.candles,
+      };
+    };
+
+    const fastE   = explainTF(fast);
+    const slowE   = explainTF(slow);
+    const avgConf = +((fast.confidence + slow.confidence) / 2).toFixed(1);
+
+    res.json({
+      symbol,
+      now:             Date.now(),
+      pipelineVersion: "aiReasoning.ts v1 (raw*150, clamp 10-98) per timeframe; tradingLoop.ts MTF mean for display only",
+      persistenceNote: "signals.confidence rows store per-timeframe decision.confidence (one row per TF). mtf.avgConfidence below is the customer-card display value, not the DB value.",
+      knownIssues: [
+        "ConfidenceScorer.ts factor-pipeline is DEAD CODE — never imported.",
+        "Decision threshold totalScore>=1.5 maps to confidence=39.5% (compressive).",
+        "MTF mean-of-two further drags single-TF highs toward the weaker TF (display only).",
+        "Hard cap clamps the top end at 98 even when raw*150 would exceed.",
+      ],
+      timeframes: { fast: fastE, slow: slowE },
+      mtf: {
+        agreedAction:    fast.decision === slow.decision ? fast.decision : "HOLD",
+        bothBuy:         fast.decision === "BUY"  && slow.decision === "BUY",
+        bothSell:        fast.decision === "SELL" && slow.decision === "SELL",
+        mtfConfirmed:    (fast.decision === slow.decision) && fast.decision !== "HOLD",
+        avgConfidence:   avgConf,            // <-- value persisted to signals.confidence
+        formula:         "(fast.confidence + slow.confidence) / 2",
+      },
+    });
+  } catch (err) {
+    req.log.error({ err, symbol }, "[engine/debug/confidence] failed");
+    res.status(500).json({ error: (err as Error).message });
+  }
 });
 
 export default router;
