@@ -19,7 +19,15 @@ import { useEffect, useState } from "react";
 import { useUserRole } from "../hooks/useUserRole";
 import { PaperTradesProvider } from "../hooks/usePaperTrades";
 import { PortalCustomerShell } from "../components/portal/PortalCustomerShell";
+import { AdminPortalShell } from "../components/portal/AdminPortalShell";
 import AdminPortalLegacy from "./portal/AdminPortalLegacy";
+
+// Phase 1 admin-portal graduation rollback hatch.
+// Default ON (use the graduated AdminPortalShell). Set
+// `VITE_ADMIN_PORTAL_LEGACY=true` at build-time to fall back to the
+// byte-frozen legacy admin terminal if a regression is found in prod.
+const USE_LEGACY_ADMIN: boolean =
+  (import.meta.env.VITE_ADMIN_PORTAL_LEGACY as string | undefined) === "true";
 
 const N = {
   BG:         "#000000",
@@ -49,7 +57,7 @@ export default function Portal() {
   }
 
   if (isAdmin) {
-    return <AdminPortalLegacy />;
+    return USE_LEGACY_ADMIN ? <AdminPortalLegacy /> : <AdminPortalShell />;
   }
 
   return (
