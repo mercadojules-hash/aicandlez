@@ -450,13 +450,46 @@ export function usePaperSignals() {
     }
     // ── Conviction pass ──────────────────────────────────────────────
     // Now that the full pool is built, compute each card's percentile
-    // rank vs every other card's raw conf, then run the calibrated
-    // conviction formula. This is the ONLY place rank-percentile is
-    // computed; we do it client-side so it's always consistent with
-    // exactly what the user is currently seeing on screen.
-    const confPool = out.map(o => o.conf);
+    // rank vs the COHORT POOL, then run the calibrated conviction
+    // formula. This is the ONLY place rank-percentile is computed;
+    // we do it client-side so it's always consistent with exactly
+    // what the user is currently seeing on screen.
+    //
+    // Option A — input-quality filtering (LOCKED INVARIANT):
+    //   The percentile cohort is restricted to ACTIVE-REGIME assets
+    //   that pass the volume floor. RANGING / EXHAUSTED / LOW-VOL
+    //   symbols still render in the UI (so the operator sees the
+    //   full board) but are EXCLUDED from the ranking pool so they
+    //   cannot dilute the percentile model.
+    //
+    //   Without this filter, a strong breakout on ARB gets ranked
+    //   against ATOM-in-sideways inside the same 15-symbol cohort,
+    //   collapsing percentile spread and starving the calibrated
+    //   conviction layer of the signal it needs to surface ELITE.
+    //
+    //   This is RENDER-LAYER ONLY. The execution path
+    //   (`placeLiveAutoOrderForUser`, `tradingLoop`, riskGate,
+    //   Kraken payload, 2% stop, 3-trade cap, 80% live-exec floor)
+    //   is untouched — it never reads opp.convictionScore or this
+    //   percentile pool. Verified by the launch-risk audit.
+    //
+    // Cohort qualification (must satisfy ALL):
+    //   1. regime ∈ { TRENDING, BREAKOUT }  (excludes RANGING / EXHAUSTED)
+    //   2. vol !== "LOW VOL"                (proxy for volumeConfirmed)
+    //
+    // Non-qualifying opps get rank=0 — combined with the calibrated
+    // layer's weighting (rank carries 0.18) this naturally settles
+    // them into LOW / DEVELOPING without any tier hardcoding.
+    const isActiveCohortMember = (o: OpportunityVM): boolean => {
+      const activeRegime = o.regime === "TRENDING" || o.regime === "BREAKOUT";
+      const volumePasses = o.vol !== "LOW VOL";
+      return activeRegime && volumePasses;
+    };
+    const cohortPool = out.filter(isActiveCohortMember).map(o => o.conf);
     for (const o of out) {
-      const pct = percentileRank(o.conf, confPool);
+      const pct = isActiveCohortMember(o)
+        ? percentileRank(o.conf, cohortPool)
+        : 0;
       const rr  = computeRRRatio(o.entry, o.stop, o.target);
       // Re-derive trend/liquidity/regime per card via a synthetic
       // SymBreakdown lookup. The breakdown source is the raw payload

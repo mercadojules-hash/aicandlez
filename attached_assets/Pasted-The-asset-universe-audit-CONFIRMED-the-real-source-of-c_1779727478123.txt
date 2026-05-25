@@ -1,0 +1,102 @@
+The asset-universe audit CONFIRMED the real source of confidence compression.
+
+We were correct.
+
+The problem is NOT the conviction math anymore.
+
+The actual bottleneck is:
+the percentile model is ranking weak/ranging/dead assets in the SAME cohort as strong breakout assets.
+
+This is compressing:
+
+* average confidence
+* percentile spread
+* leaderboard differentiation
+* ELITE frequency
+* perceived intelligence quality
+
+The audit already proved:
+
+* only 15 symbols exist in the pool
+* no regime-based eviction exists before percentile ranking
+* ranging assets remain inside the rank cohort
+* low-volatility assets remain inside the rank cohort
+* majors and weaker alts compete in the same percentile bucket
+* percentile quantization is too coarse at n=15
+
+This is the exact structural issue.
+
+We are NOT asking for:
+
+* fake inflation
+* hardcoded scores
+* weaker execution rules
+* lower risk controls
+* artificial ELITE generation
+
+We ARE asking for:
+higher-quality percentile cohorts.
+
+IMPLEMENT OPTION A NOW.
+
+Goal:
+ONLY high-quality active-regime assets should participate in percentile ranking.
+
+Before percentileRank() is computed:
+exclude:
+
+* RANGING
+* LOW_VOLATILITY
+* EXHAUSTED
+* dead-volume
+* chop-state
+  assets from the ranking cohort.
+
+Those assets can still:
+
+* render in UI
+* show DEVELOPING/LOW
+* remain visible
+
+BUT:
+they should NOT dilute the percentile universe.
+
+Specifically:
+
+Build the percentile cohort ONLY from:
+
+* TRENDING_UP
+* TRENDING_DOWN
+* BREAKOUT
+* HIGH_VOLATILITY
+  AND assets passing the volume floor.
+
+This is NOT execution logic.
+This is INPUT QUALITY FILTERING for conviction ranking only.
+
+Execution engine must remain untouched:
+
+* stop losses
+* 2% protection
+* Kraken execution
+* risk sizing
+* trade caps
+* live order gates
+* raw confidence math
+* live execution thresholds
+
+DO NOT TOUCH execution.
+
+This is purely:
+
+* ranking hygiene
+* intelligence-layer quality
+* institutional opportunity curation
+
+After Option A:
+we can later expand the asset universe from 15 → 30+ assets.
+
+But FIRST:
+fix the dirty percentile cohort.
+
+This is likely the FINAL major intelligence-layer breakthrough before launch.
