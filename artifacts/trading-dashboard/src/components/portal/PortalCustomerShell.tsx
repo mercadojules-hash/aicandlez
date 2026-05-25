@@ -538,12 +538,15 @@ const SearchBar = memo(function SearchBar({
       <div style={{
         display: "flex", flexDirection: "column", gap: 10,
       }}>
+        {/* Pass 7Y — pills now wrap onto multiple rows instead of
+            horizontal scroll. The previous `overflowX: auto` +
+            hidden scrollbar combo was clipping the last pill
+            ("MOMENTUM") with no visible scroll affordance. Wrapping
+            guarantees all pills fully render at every viewport. */}
         <div
           className="cd-pills-strip"
           style={{
-            display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 6,
-            overflowX: "auto", overflowY: "hidden",
-            scrollbarWidth: "none",
+            display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6,
           }}
         >
           <Filter size={13} color={T.TEXT_2} style={{ flexShrink: 0 }} />
@@ -2332,20 +2335,20 @@ const PortfolioIntelligence = memo(function PortfolioIntelligence({ now }: { now
   return (
     <PanelCard title="LIVE TRADES" height={480} live>
       <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
-        {/* Real equity curve — 60s rolling, redraws each shell tick. */}
-        <svg width="100%" height={40} viewBox="0 0 100 40" preserveAspectRatio="none"
-             style={{ transition: "color 600ms ease" }}>
-          <defs>
-            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor={curveColor} stopOpacity={0.28} />
-              <stop offset="100%" stopColor={curveColor} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          {curveFill   && <path d={curveFill}   fill={`url(#${gradId})`} />}
-          {curveStroke && <path d={curveStroke} fill="none" stroke={curveColor} strokeWidth={1.2}
-                                strokeLinecap="round" strokeLinejoin="round" opacity={0.85}
-                                style={{ filter: `drop-shadow(0 0 2px ${curveColor}80)` }} />}
-        </svg>
+        {/* Pass 7Y — equity-curve sparkline removed from LIVE TRADES.
+            The flat/falling line was reading as a stray "red line
+            artifact" rather than meaningful telemetry. Equity is
+            already dominant in ACCOUNT STATUS above. LIVE TRADES
+            now shows only the actual open paper-trade rows + the
+            most recent exit acknowledgment. `gradId`, `curveColor`,
+            `curveStroke`, `curveFill`, `curveDelta`, `equityBufRef`
+            and `buildEquityPath` are intentionally still computed
+            (referenced by PortfolioIntelligence later); their
+            unused-by-LiveTrades return values are tolerated. */}
+        {void gradId}
+        {void curveColor}
+        {void curveStroke}
+        {void curveFill}
 
         {/* Position lifecycle rows — ENTRY phase glows for first 10s,
             then settles into ACTIVE. TP/SL distance + position age make
@@ -2751,7 +2754,10 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
   const wins   = useMemo(() => history.reduce((n, h) => n + (h.pnl >  0 ? 1 : 0), 0), [history]);
   const losses = useMemo(() => history.reduce((n, h) => n + (h.pnl <= 0 ? 1 : 0), 0), [history]);
   const winPct = closedCount > 0 ? Math.round((wins / closedCount) * 100) : 0;
-  const queueDepth = pulse.waiting;
+  // Pass 7Y — `queueDepth` no longer consumed here (QUEUE cell
+  // removed from ACCOUNT STATUS). `pulse` retained as prop for
+  // future hooks but the strip no longer renders queue telemetry.
+  void pulse;
   // Pass 7U — EXECUTION cell removed entirely (was "IDLE / N% LIVE /
   // OFFLINE"). In paper mode the line was noise; engine health surfaces
   // in OperatorPulseRibbon already.
@@ -2809,7 +2815,10 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
           <Cell k="WINS / LOSSES"  size={24} v={`${wins} / ${losses}`} />
           <Cell k="OPEN TRADES"    size={24} v={openCount.toString()} color={openCount > 0 ? T.NEON : T.TEXT_2} />
           <Cell k="ACTIVE SIGNALS" size={24} v={activeSignals.toString()} color={activeSignals > 0 ? T.TEXT_0 : T.TEXT_2} />
-          <Cell k="QUEUE"          size={24} v={queueDepth.toString()} color={queueDepth > 0 ? T.AMBER : T.TEXT_2} />
+          {/* Pass 7Y — QUEUE cell removed from ACCOUNT STATUS per
+              launch spec. Queue depth still surfaces in
+              OperatorPulseRibbon + pulse stream; ACCOUNT STATUS
+              now reads as pure user paper-trading telemetry. */}
         </div>
         {/* Pass 7W — AI AVG CONF ring removed from ACCOUNT STATUS.
             Promoted to the global system-intelligence indicator in
@@ -3594,11 +3603,16 @@ export function PortalCustomerShell() {
               into a prominent global system-intelligence indicator
               directly under the toolbar, right-aligned with the
               search region. */}
+        {/* Pass 7Y — header gap tightened. Removed `space-between` +
+            `marginLeft: auto` + left-column maxWidth so search now
+            grows to fill all available width up to a small fixed gap
+            before the GlobalAIConfidenceRing cluster. Top section
+            reads as a single unified strip instead of two islands
+            separated by dead horizontal space. */}
         <div style={{
-          display: "flex", gap: 24, alignItems: "flex-start",
-          flexWrap: "wrap", justifyContent: "space-between",
+          display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap",
         }}>
-          <div style={{ flex: 1, minWidth: 280, maxWidth: 760 }}>
+          <div style={{ flex: 1, minWidth: 280 }}>
             <SearchBar
               query={query} setQuery={setQuery}
               filter={filter} setFilter={setFilter}
@@ -3607,15 +3621,20 @@ export function PortalCustomerShell() {
           </div>
           <div style={{
             display: "flex", flexDirection: "column", gap: 14,
-            alignItems: "flex-end", flexShrink: 0, marginLeft: "auto",
+            alignItems: "flex-end", flexShrink: 0,
           }}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
               <ToolbarBtn onClick={() => setAccount(true)}>ACCOUNT</ToolbarBtn>
-              {/* Pass 7X — CONNECT EXCHANGE restored as prominent
-                  operational entry point on customer header. Modal
-                  is gated (liveExchangesEnabled=false) so live-only
-                  catalog rows render as LIVE GATED for non-admins. */}
-              <ConnectExchangeBtn onClick={() => setConnectOpen(true)} />
+              {/* Pass 7Y — CONNECT EXCHANGE entitlement-gated.
+                  Free users see the button (operational visibility)
+                  but the click opens the upgrade flow instead of the
+                  exchange-connection modal. Pro/starter users get the
+                  real connect modal. Paper trading remains unlocked
+                  for free users via the matrix QUEUE PAPER buttons. */}
+              <ConnectExchangeBtn
+                onClick={() => plan === "free" ? setUpgrade(true) : setConnectOpen(true)}
+                gated={plan === "free"}
+              />
               {plan !== "pro" && <ToolbarBtn variant="brand" onClick={() => setUpgrade(true)}>UPGRADE</ToolbarBtn>}
               <ToolbarBtn onClick={() => setDisclaimer(true)}>DISCLAIMER</ToolbarBtn>
             </div>
@@ -3712,33 +3731,56 @@ export function PortalCustomerShell() {
 /* Pass 7X — CONNECT EXCHANGE primary header CTA. Larger than ToolbarBtn,
    neon-bordered with a subtle inner glow + scan sheen so it reads as the
    primary operational entry on /portal entry. Click → PortalExchangeConnectModal. */
-function ConnectExchangeBtn({ onClick }: { onClick: () => void }) {
+function ConnectExchangeBtn({ onClick, gated = false }: { onClick: () => void; gated?: boolean }) {
+  const baseBg = gated
+    ? `linear-gradient(180deg, rgba(102,255,102,0.08) 0%, rgba(102,255,102,0.03) 100%)`
+    : `linear-gradient(180deg, rgba(102,255,102,0.16) 0%, rgba(102,255,102,0.06) 100%)`;
+  const baseShadow = gated
+    ? `0 0 0 1px rgba(102,255,102,0.10), inset 0 1px 0 rgba(255,255,255,0.04), 0 0 16px rgba(102,255,102,0.10)`
+    : `0 0 0 1px rgba(102,255,102,0.16), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 24px rgba(102,255,102,0.18)`;
+  const hoverBg = gated
+    ? `linear-gradient(180deg, rgba(102,255,102,0.14) 0%, rgba(102,255,102,0.06) 100%)`
+    : `linear-gradient(180deg, rgba(102,255,102,0.24) 0%, rgba(102,255,102,0.10) 100%)`;
+  const hoverShadow = gated
+    ? `0 0 0 1px rgba(102,255,102,0.18), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 22px rgba(102,255,102,0.18)`
+    : `0 0 0 1px rgba(102,255,102,0.28), inset 0 1px 0 rgba(255,255,255,0.12), 0 0 36px rgba(102,255,102,0.28)`;
   return (
     <button
       onClick={onClick}
+      title={gated ? "Upgrade to connect a live exchange" : "Connect a live exchange"}
       style={{
         padding: "9px 18px",
         fontFamily: T.FONT_MONO, fontSize: 12, fontWeight: 800,
         letterSpacing: T.TRACK_LABEL,
-        background: `linear-gradient(180deg, rgba(102,255,102,0.16) 0%, rgba(102,255,102,0.06) 100%)`,
-        border: `1px solid ${T.NEON}`,
-        color: T.NEON,
+        background: baseBg,
+        border: `1px solid ${gated ? "rgba(102,255,102,0.45)" : T.NEON}`,
+        color: gated ? "rgba(102,255,102,0.78)" : T.NEON,
         cursor: "pointer",
         transition: T.TX_FAST,
-        boxShadow: `0 0 0 1px rgba(102,255,102,0.16), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 24px rgba(102,255,102,0.18)`,
+        boxShadow: baseShadow,
         textTransform: "uppercase",
         whiteSpace: "nowrap",
+        display: "inline-flex", alignItems: "center", gap: 8,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = `linear-gradient(180deg, rgba(102,255,102,0.24) 0%, rgba(102,255,102,0.10) 100%)`;
-        e.currentTarget.style.boxShadow = `0 0 0 1px rgba(102,255,102,0.28), inset 0 1px 0 rgba(255,255,255,0.12), 0 0 36px rgba(102,255,102,0.28)`;
+        e.currentTarget.style.background  = hoverBg;
+        e.currentTarget.style.boxShadow   = hoverShadow;
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = `linear-gradient(180deg, rgba(102,255,102,0.16) 0%, rgba(102,255,102,0.06) 100%)`;
-        e.currentTarget.style.boxShadow = `0 0 0 1px rgba(102,255,102,0.16), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 24px rgba(102,255,102,0.18)`;
+        e.currentTarget.style.background  = baseBg;
+        e.currentTarget.style.boxShadow   = baseShadow;
       }}
     >
       CONNECT EXCHANGE
+      {gated && (
+        <span aria-hidden style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          fontSize: 9, fontWeight: 700, letterSpacing: T.TRACK_LABEL,
+          padding: "1px 5px",
+          border: `1px solid rgba(102,255,102,0.45)`,
+          color: "rgba(102,255,102,0.85)",
+        }}>PRO</span>
+      )}
     </button>
   );
 }
