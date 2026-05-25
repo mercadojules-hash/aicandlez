@@ -34,7 +34,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAuth } from "@clerk/react";
 import {
   Activity, AlertTriangle, CheckCircle2, Clock, Database, Filter, Globe,
-  LineChart as LineChartIcon, Lock, MonitorPlay, PieChart, Radar, Radio,
+  LineChart as LineChartIcon, Lock, MonitorPlay, PieChart, Power, Radar, Radio,
   Search, Shield, Star, Terminal, Timer,
 } from "lucide-react";
 
@@ -129,6 +129,123 @@ function useCustomerPlan(): Plan {
   });
   const p = data?.plan;
   return p === "starter" || p === "pro" ? p : "free";
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Pass 7Z — Exchange / Account Status Label                                */
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Compact neon label that sits inline to the RIGHT of the search bar      */
+/* and resolves the customer's current trading account context:            */
+/*   - subscribed + connected → connected exchange name (KRAKEN/...)       */
+/*   - subscribed, not connected → "ALPACA PAPER ACCOUNT" (per spec)       */
+/*   - free / non-subscriber → "PAPER TRADING"                             */
+/* Reuses the same React Query key (`user-exchanges`) as `ExchangeTopology` */
+/* so the network call is deduped across both surfaces.                    */
+
+function useConnectedExchangeName(plan: Plan): string | null {
+  const { isSignedIn, getToken } = useAuth();
+  const enabled = (isSignedIn ?? false) && plan !== "free";
+  const { data } = useQuery<{ exchanges: { exchange: string; connected: boolean }[] }>({
+    queryKey: ["user-exchanges"],
+    enabled,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const token = await getToken().catch(() => null);
+      const res = await authFetch(`${apiBaseUrl}/api/user/exchanges`, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("user/exchanges failed");
+      return res.json();
+    },
+  });
+  if (!enabled) return null;
+  const first = (data?.exchanges ?? []).find(e => e.connected);
+  return first ? first.exchange.toUpperCase() : null;
+}
+
+const ExchangeStatusBadge = memo(function ExchangeStatusBadge({ plan }: { plan: Plan }) {
+  const connectedName = useConnectedExchangeName(plan);
+  // Resolve label + tone based on subscription + connection state.
+  // Subscribed-but-unconnected falls back to the broker paper account
+  // label per launch spec; free users always read PAPER TRADING.
+  const { label, tone, sublabel } =
+    plan === "free"
+      ? { label: "PAPER TRADING",         tone: T.TEXT_1, sublabel: "SIMULATED CAPITAL" }
+      : connectedName
+        ? { label: connectedName,         tone: T.NEON,   sublabel: "LIVE EXCHANGE LINKED" }
+        : { label: "ALPACA PAPER ACCOUNT", tone: T.AMBER, sublabel: "AWAITING EXCHANGE CONNECT" };
+  return (
+    <div
+      title={sublabel}
+      style={{
+        display: "inline-flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: 2,
+        padding: "8px 12px",
+        border: `1px solid ${tone === T.NEON ? tone : T.BORDER}`,
+        background: tone === T.NEON
+          ? "rgba(102,255,102,0.06)"
+          : tone === T.AMBER
+            ? "rgba(255,176,32,0.05)"
+            : "rgba(255,255,255,0.02)",
+        boxShadow: tone === T.NEON
+          ? "0 0 12px rgba(102,255,102,0.18), inset 0 1px 0 rgba(255,255,255,0.04)"
+          : "inset 0 1px 0 rgba(255,255,255,0.03)",
+        fontFamily: T.FONT_MONO,
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+        alignSelf: "stretch",
+        justifyContent: "center",
+      }}
+    >
+      <span style={{
+        fontSize: 9, color: T.TEXT_3, letterSpacing: T.TRACK_LABEL,
+      }}>
+        ACCOUNT
+      </span>
+      <span style={{
+        fontSize: 12, color: tone, fontWeight: 700, letterSpacing: T.TRACK_TITLE,
+      }}>
+        {label}
+      </span>
+    </div>
+  );
+});
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Pass 7Z — AI Trading enabled toggle (localStorage-backed)                */
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Customer-side AI auto-trade toggle. Persisted to localStorage so the     */
+/* state survives reloads. Cross-tab sync via the `storage` event so a      */
+/* toggle in one tab updates the bar in every other portal tab.            */
+
+const AI_AUTO_TRADE_LS_KEY = "aicandlez.customer.aiAutoTrade.v1";
+
+function useAiAutoTradeEnabled(): [boolean, (next: boolean) => void] {
+  const read = (): boolean => {
+    if (typeof window === "undefined") return false;
+    try { return window.localStorage.getItem(AI_AUTO_TRADE_LS_KEY) === "1"; }
+    catch { return false; }
+  };
+  const [enabled, setEnabled] = useState<boolean>(read);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === AI_AUTO_TRADE_LS_KEY) setEnabled(e.newValue === "1");
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+  const set = useCallback((next: boolean) => {
+    setEnabled(next);
+    try { window.localStorage.setItem(AI_AUTO_TRADE_LS_KEY, next ? "1" : "0"); }
+    catch { /* ignore quota / disabled storage */ }
+  }, []);
+  return [enabled, set];
 }
 
 const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
@@ -3089,107 +3206,189 @@ function Divider({ prio }: { prio?: 2 | 3 } = {}) {
 /* ENABLE LIVE AI TRADING — aspirational command bar (paper-only, gated)    */
 /* ──────────────────────────────────────────────────────────────────────── */
 
+/* Pass 7Z — bar now has a binary OFF/ON visual identity backed by a
+   real local toggle. OFF state = entire bar reads RED with explicit
+   "CLICK HERE TO ENABLE AI TRADING" call-to-action and a large clickable
+   surface. ON state = entire bar reads GREEN with "AI TRADING ACTIVE /
+   AI CURRENTLY TRADING FOR YOU" messaging. This is the most important
+   conversion + activation control on the customer portal — the visual
+   delta between OFF/ON must be unambiguous. */
+
 const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
-  engineOnline, openPaper, slotCap, onUpgrade,
+  engineOnline, openPaper, slotCap,
 }: {
   engineOnline: boolean;
   openPaper:    number;
   slotCap:      number;
-  onUpgrade:    () => void;
 }) {
+  const [enabled, setEnabled] = useAiAutoTradeEnabled();
   const engineLabel = engineOnline ? "AI ENGINE · ONLINE" : "AI ENGINE · WARMING UP";
-  const engineColor = engineOnline ? T.NEON : T.AMBER;
-  // Scan sweep only when there is paper-slot headroom AND the engine is alive
-  // — i.e. only when this CTA actually represents an actionable upgrade.
-  // At capacity or offline, the bar stays still (no decorative scrolling glow).
-  const hasHeadroom = engineOnline && openPaper < slotCap;
+
+  // OFF state — saturated RED. Treat the whole bar as the CTA surface.
+  if (!enabled) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEnabled(true)}
+        aria-label="Click to enable AI trading"
+        style={{
+          width: "100%",
+          appearance: "none",
+          textAlign: "left",
+          cursor: "pointer",
+          position: "relative",
+          overflow: "hidden",
+          borderTop:    `1px solid ${T.RED}`,
+          borderBottom: `1px solid ${T.RED}`,
+          borderLeft:   "none",
+          borderRight:  "none",
+          background: "linear-gradient(90deg, rgba(255,48,64,0.22) 0%, rgba(255,48,64,0.12) 50%, rgba(255,48,64,0.22) 100%)",
+          boxShadow: "inset 0 0 24px rgba(255,48,64,0.18), 0 0 24px rgba(255,48,64,0.12)",
+          fontFamily: T.FONT_MONO,
+          padding: 0,
+          transition: T.TX_MED,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "linear-gradient(90deg, rgba(255,48,64,0.32) 0%, rgba(255,48,64,0.20) 50%, rgba(255,48,64,0.32) 100%)";
+          e.currentTarget.style.boxShadow  = "inset 0 0 30px rgba(255,48,64,0.28), 0 0 32px rgba(255,48,64,0.22)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "linear-gradient(90deg, rgba(255,48,64,0.22) 0%, rgba(255,48,64,0.12) 50%, rgba(255,48,64,0.22) 100%)";
+          e.currentTarget.style.boxShadow  = "inset 0 0 24px rgba(255,48,64,0.18), 0 0 24px rgba(255,48,64,0.12)";
+        }}
+      >
+        {/* Subtle scan sweep — communicates "ready, awaiting your action". */}
+        <div
+          aria-hidden
+          style={{
+            position: "absolute", top: 0, bottom: 0, left: 0, width: 180,
+            background: "linear-gradient(90deg, transparent 0%, rgba(255,80,96,0.28) 50%, transparent 100%)",
+            animation: "cmdbar-scan 4s linear infinite",
+            pointerEvents: "none",
+          }}
+        />
+        <div style={{
+          position: "relative", zIndex: 1,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 24, padding: "12px 16px",
+        }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <Power size={16} color={T.RED} />
+            <span style={{
+              fontSize: 11, color: T.RED, fontWeight: 800, letterSpacing: "0.20em",
+            }}>AI DISABLED</span>
+          </div>
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "center",
+            flex: 1, minWidth: 0, textAlign: "center",
+          }}>
+            <span style={{
+              color: "#fff", fontSize: 14, fontWeight: 800,
+              letterSpacing: T.TRACK_TITLE, textShadow: "0 0 8px rgba(255,48,64,0.45)",
+            }}>
+              CLICK HERE TO ENABLE AI TRADING
+            </span>
+            <span style={{
+              color: "rgba(255,210,210,0.85)", fontSize: 10, letterSpacing: T.TRACK_LABEL, marginTop: 2,
+            }}>
+              {engineLabel}  ·  AI WILL NOT TRADE FOR YOU UNTIL YOU TURN IT ON
+            </span>
+          </div>
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 10, flexShrink: 0,
+            fontSize: 11, color: "#fff", fontWeight: 700, letterSpacing: T.TRACK_TITLE,
+            padding: "6px 14px",
+            border: `1px solid ${T.RED}`,
+            background: T.RED,
+            boxShadow: "0 0 14px rgba(255,48,64,0.55)",
+          }}>
+            ENABLE AI →
+          </div>
+        </div>
+      </button>
+    );
+  }
+
+  // ON state — saturated GREEN. Bar reads "AI TRADING ACTIVE" + clear
+  // operating sublabel. Compact DISABLE control on the right (still
+  // visible so the user can always turn it off in one click), but the
+  // dominant visual message is the active green state.
   return (
     <section
       style={{
         position: "relative",
         overflow: "hidden",
-        borderTop: `1px solid ${T.NEON}`,
+        borderTop:    `1px solid ${T.NEON}`,
         borderBottom: `1px solid ${T.NEON}`,
-        background: T.BG_TERMINAL,
-        backgroundImage:
-          "linear-gradient(90deg, rgba(102,255,102,0.06) 0%, rgba(102,255,102,0) 50%, rgba(102,255,102,0.06) 100%)",
+        background: "linear-gradient(90deg, rgba(102,255,102,0.20) 0%, rgba(102,255,102,0.10) 50%, rgba(102,255,102,0.20) 100%)",
+        boxShadow: "inset 0 0 24px rgba(102,255,102,0.18), 0 0 24px rgba(102,255,102,0.18)",
         fontFamily: T.FONT_MONO,
       }}
     >
-      {hasHeadroom && (
-        <div
-          aria-hidden
-          style={{
-            position: "absolute", top: 0, bottom: 0, left: 0, width: 140,
-            background:
-              "linear-gradient(90deg, transparent 0%, rgba(102,255,102,0.18) 50%, transparent 100%)",
-            animation: "cmdbar-scan 6s linear infinite",
-            pointerEvents: "none",
-          }}
-        />
-      )}
+      {/* Active scan sweep — "currently running". */}
       <div
+        aria-hidden
         style={{
-          position: "relative", zIndex: 1,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: 24, padding: "10px 16px",
+          position: "absolute", top: 0, bottom: 0, left: 0, width: 200,
+          background: "linear-gradient(90deg, transparent 0%, rgba(102,255,102,0.30) 50%, transparent 100%)",
+          animation: "cmdbar-scan 3s linear infinite",
+          pointerEvents: "none",
         }}
-      >
-        {/* LEFT */}
+      />
+      <div style={{
+        position: "relative", zIndex: 1,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: 24, padding: "12px 16px",
+      }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {/* Static Radar — engine liveness is already pulsing in the top ribbon
-              and in the footer Radio. A third pulse here would be glow spam. */}
-          <Radar size={16} color={engineColor} />
+          <Radar size={16} color={T.NEON} />
           <span style={{
-            fontSize: 11, color: engineColor, fontWeight: 700, letterSpacing: "0.20em",
-          }}>{engineLabel}</span>
+            fontSize: 11, color: T.NEON, fontWeight: 800, letterSpacing: "0.20em",
+          }}>AI ENABLED · {engineLabel.replace("AI ENGINE · ", "")}</span>
         </div>
-
-        {/* CENTER */}
         <div style={{
           display: "flex", flexDirection: "column", alignItems: "center",
           flex: 1, minWidth: 0, textAlign: "center",
         }}>
           <span style={{
-            color: T.TEXT_0, fontSize: 13, fontWeight: 700, letterSpacing: T.TRACK_TITLE,
+            color: "#fff", fontSize: 14, fontWeight: 800,
+            letterSpacing: T.TRACK_TITLE, textShadow: "0 0 8px rgba(102,255,102,0.45)",
           }}>
-            ENABLE LIVE AI TRADING
+            AI TRADING ACTIVE
           </span>
           <span style={{
-            color: T.TEXT_1, fontSize: 10, letterSpacing: T.TRACK_LABEL, marginTop: 2,
+            color: "rgba(214,255,214,0.92)", fontSize: 10, letterSpacing: T.TRACK_LABEL, marginTop: 2,
           }}>
-            PAPER MODE ACTIVE · LIVE EXECUTION GATED · UPGRADE TO UNLOCK PRO QUEUE
+            AI CURRENTLY TRADING FOR YOU  ·  SLOTS {openPaper}/{slotCap}
           </span>
         </div>
-
-        {/* RIGHT */}
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-          <span style={{ fontSize: 10, color: T.TEXT_1, letterSpacing: T.TRACK_LABEL }}>
-            SLOTS:&nbsp;<span style={{ color: T.TEXT_0 }}>{openPaper}/{slotCap}</span>
-          </span>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <button
             type="button"
-            onClick={onUpgrade}
+            onClick={() => setEnabled(false)}
+            aria-label="Disable AI trading"
             style={{
               fontFamily: T.FONT_MONO, fontSize: 10, fontWeight: 700,
               letterSpacing: T.TRACK_TITLE,
               padding: "6px 12px",
-              border: `1px solid ${T.NEON}`,
-              background: "rgba(102,255,102,0.06)",
-              color: T.NEON,
+              border: `1px solid rgba(255,48,64,0.55)`,
+              background: "rgba(255,48,64,0.10)",
+              color: "rgba(255,210,210,0.95)",
               cursor: "pointer",
-              transition: "all 120ms ease",
+              transition: T.TX_FAST,
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = T.NEON;
-              e.currentTarget.style.color = "#000";
+              e.currentTarget.style.background = T.RED;
+              e.currentTarget.style.color = "#fff";
+              e.currentTarget.style.borderColor = T.RED;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(102,255,102,0.06)";
-              e.currentTarget.style.color = T.NEON;
+              e.currentTarget.style.background = "rgba(255,48,64,0.10)";
+              e.currentTarget.style.color = "rgba(255,210,210,0.95)";
+              e.currentTarget.style.borderColor = "rgba(255,48,64,0.55)";
             }}
           >
-            VIEW PRO ACCESS
+            DISABLE
           </button>
         </div>
       </div>
@@ -3619,6 +3818,14 @@ export function PortalCustomerShell() {
               suggestionPool={suggestionPool}
             />
           </div>
+          {/* Pass 7Z — exchange / account status badge. Sits inline
+              to the right of the search bar so the operator can read
+              their active account context at a glance:
+                free          → PAPER TRADING
+                subscribed    → ALPACA PAPER ACCOUNT (no exchange linked)
+                subscribed+   → connected exchange name (KRAKEN, ...)
+              Same React Query key as ExchangeTopology — single fetch. */}
+          <ExchangeStatusBadge plan={plan} />
           <div style={{
             display: "flex", flexDirection: "column", gap: 14,
             alignItems: "flex-end", flexShrink: 0,
@@ -3646,7 +3853,6 @@ export function PortalCustomerShell() {
           engineOnline={engineOnline}
           openPaper={openTrades.length}
           slotCap={3}
-          onUpgrade={openUpgrade}
         />
 
         <OpportunityMatrix
