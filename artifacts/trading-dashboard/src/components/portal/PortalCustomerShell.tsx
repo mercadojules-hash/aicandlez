@@ -1087,6 +1087,18 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
     ? (opp.conf >= 85 ? "rail-pulse 1.8s ease-in-out infinite" : "rail-pulse 2.5s ease-in-out infinite")
     : undefined;
 
+  // Pass 7b — outcome memory. When this symbol has a paper close within
+  // the last 5 minutes, surface the outcome inline on the card so the
+  // operator subconsciously reads the AI's most recent track record on
+  // each name without leaving the matrix. Connects signal → exit at
+  // the card level; institutional restraint (tiny chip, semantic color
+  // only, no animation).
+  const { history: paperHistory } = usePaperTrades();
+  const lastExit = useMemo(() => {
+    const cutoff = now - 300_000;  // 5min memory window
+    return paperHistory.find(h => h.symbol === opp.symbol && h.closedAt >= cutoff);
+  }, [paperHistory, opp.symbol, now]);
+
   return (
     <article
       style={{
@@ -1190,13 +1202,30 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             }}>AI Conf</span>
           </div>
         </div>
-        <span style={{
-          fontSize: 9, padding: "2px 8px",
-          border: `1px solid ${dirBorder}`,
-          background: dirBg,
-          color: dirColor, fontWeight: 700, letterSpacing: "0.10em",
-          borderRadius: 2,
-        }}>{opp.direction}</span>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+          <span style={{
+            fontSize: 9, padding: "2px 8px",
+            border: `1px solid ${dirBorder}`,
+            background: dirBg,
+            color: dirColor, fontWeight: 700, letterSpacing: "0.10em",
+            borderRadius: 2,
+          }}>{opp.direction}</span>
+          {lastExit && (
+            <span
+              title={`Last paper exit on ${shortPair(opp.symbol)}: ${lastExit.reason} · ${lastExit.pnlPct >= 0 ? "+" : ""}${lastExit.pnlPct.toFixed(2)}%`}
+              style={{
+                fontSize: 8, fontWeight: 600,
+                color: lastExit.pnl >= 0 ? T.NEON : T.RED,
+                letterSpacing: "0.06em",
+                fontVariantNumeric: "tabular-nums",
+                opacity: 0.82,
+                whiteSpace: "nowrap",
+              }}
+            >
+              ↪ {lastExit.pnl >= 0 ? "+" : "−"}{Math.abs(lastExit.pnlPct).toFixed(2)}% {lastExit.reason}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* RIGHT MAIN — telemetry meta · chart rail · action strip */}
@@ -2213,6 +2242,100 @@ const PortfolioIntelligence = memo(function PortfolioIntelligence({ now }: { now
   );
 });
 
+// Pass 7b — INSTITUTIONAL MEMORY. The platform now remembers its own
+// consequences. After the 8s EXIT acknowledgment in PortfolioIntelligence
+// fades, the closed trade persists here as a permanent ledger entry the
+// operator can scan to read recent execution history. Restraint policy:
+// monospace, no celebration, neutral row tint, semantic color only on
+// the realized PnL number. The freshest exit (<6s) carries a subtle
+// inset stroke that decays to nothing — consistent with the existing
+// 7a/7 event-cadence vocabulary.
+const RECENT_EXITS_LIMIT = 8;
+
+function reasonGloss(r: "TP" | "SL" | "MANUAL"): string {
+  return r === "TP" ? "TARGET HIT"
+       : r === "SL" ? "STOP HIT"
+       :              "MANUAL CLOSE";
+}
+
+function formatExitAge(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60)    return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60)    return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return `${h}h ago`;
+}
+
+const RecentExits = memo(function RecentExits({ now }: { now: number }) {
+  const { history } = usePaperTrades();
+  const exits = useMemo(() => history.slice(0, RECENT_EXITS_LIMIT), [history]);
+
+  return (
+    <PanelCard title="RECENT EXITS" height={208}>
+      <div className="cd-scroll" style={{
+        padding: 10, overflowY: "auto", flex: 1,
+        display: "flex", flexDirection: "column", gap: 4,
+        fontVariantNumeric: "tabular-nums",
+      }}>
+        {exits.length === 0 ? (
+          <div style={{ color: T.TEXT_2, fontSize: 10, fontStyle: "italic", paddingLeft: 2 }}>
+            No completed positions yet.
+          </div>
+        ) : exits.map((h) => {
+          const ageMs    = Math.max(0, now - h.closedAt);
+          const isFresh  = ageMs < 6_000;
+          const pnlColor = h.pnl >= 0 ? T.NEON : T.RED;
+          const sideCol  = h.side === "LONG" ? T.NEON : T.RED;
+          const reasonCol =
+            h.reason === "TP" ? T.NEON :
+            h.reason === "SL" ? T.RED  : T.TEXT_2;
+          // Fresh-exit inset decays linearly over 6s — same cadence as
+          // the EXIT row in PortfolioIntelligence so the two surfaces
+          // visually hand off the moment between them.
+          const freshOpacity = isFresh ? Math.max(0, 1 - ageMs / 6_000) : 0;
+          return (
+            <div key={h.id} style={{
+              padding: "5px 8px",
+              display: "flex", flexDirection: "column", gap: 2,
+              border: `1px solid ${isFresh ? `rgba(102,255,102,${(freshOpacity * 0.40).toFixed(3)})` : "rgba(255,255,255,0.04)"}`,
+              background: isFresh ? `rgba(102,255,102,${(freshOpacity * 0.05).toFixed(3)})` : "transparent",
+              transition: "border-color 320ms ease, background-color 320ms ease",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10 }}>
+                <span style={{ color: T.TEXT_1 }}>
+                  <span style={{ color: sideCol }}>{h.side.charAt(0)}</span>
+                  &nbsp;{shortPair(h.symbol)}
+                  <span style={{ color: T.TEXT_3, marginLeft: 6, letterSpacing: "0.06em" }}>
+                    {formatExitAge(ageMs)}
+                  </span>
+                </span>
+                <span style={{ color: pnlColor }}>
+                  {h.pnl >= 0 ? "+" : "−"}${Math.abs(h.pnl).toFixed(2)}
+                  <span style={{ color: T.TEXT_3, marginLeft: 6 }}>
+                    ({h.pnl >= 0 ? "+" : ""}{h.pnlPct.toFixed(2)}%)
+                  </span>
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: T.TEXT_3, letterSpacing: "0.06em" }}>
+                <span>
+                  <span style={{ color: reasonCol, letterSpacing: "0.10em" }}>{h.reason}</span>
+                  <span style={{ color: T.TEXT_3, marginLeft: 6 }}>{reasonGloss(h.reason)}</span>
+                </span>
+                <span>
+                  ENTRY ${h.entry.toLocaleString("en-US", { maximumFractionDigits: 4 })}
+                  &nbsp;→&nbsp;
+                  ${h.exit.toLocaleString("en-US", { maximumFractionDigits: 4 })}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </PanelCard>
+  );
+});
+
 const SignalPipeline = memo(function SignalPipeline({
   opps, pulse, engine,
 }: {
@@ -3190,6 +3313,7 @@ export function PortalCustomerShell() {
           <RiskHeatmap opps={opportunities} />
           <AIThroughput engine={engineStatus} pulse={pulse} signalsPerMin={signalsPerMin} />
           <ExecutionAwareness openCount={openTrades.length} now={nowShell} />
+          <RecentExits now={nowShell} />
         </section>
       </main>
 
