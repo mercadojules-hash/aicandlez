@@ -45,6 +45,7 @@ import { AIDisclaimerModal } from "../AIDisclaimerModal";
 // Pass 7V — brand logo used above search bar (replaces ticker chips row).
 import aiCandlezLogoHorizontal from "@assets/aicandlez-logo-horizontal-master_1779691403317.png";
 import { usePaperSignals, type OpportunityVM } from "../../hooks/usePaperSignals";
+import { calibrateRawConfidence } from "../../lib/conviction";
 import { useExecutionState } from "../../hooks/useExecutionState";
 import { usePaperTrades, STARTING_EQUITY } from "../../hooks/usePaperTrades";
 import { useUserRole } from "../../hooks/useUserRole";
@@ -2463,8 +2464,16 @@ const AIReasoningConsole = memo(function AIReasoningConsole({
             }}>
               <span style={{ color: T.TEXT_2, flexShrink: 0 }}>{time}</span>
               <span style={{ color: T.TEXT_0, flexShrink: 0, width: 44 }}>{shortPair(e.symbol)}</span>
-              <span style={{ color: T.TEXT_1, flex: 1 }}>{e.shortSummary ?? `${d} @ ${e.timeframe} · conf ${nz(e.confidence).toFixed(0)}%`}</span>
-              <span style={{ color: dColor, flexShrink: 0 }}>{delta}{nz(e.confidence).toFixed(0)}%</span>
+              {/* Pass C4 — truth-mismatch fix. AIReasoningConsole was
+                  showing raw engine confidence while the cards
+                  above show calibrated convictionScore, producing
+                  "card 70 / log 26" mismatches. Calibrate inline so
+                  the customer reads a coherent number. This is a
+                  display-only calibration (no rank/MTF context) so
+                  it won't exactly match a card's full conviction
+                  score, but it lands in the same band. */}
+              <span style={{ color: T.TEXT_1, flex: 1 }}>{e.shortSummary ?? `${d} @ ${e.timeframe} · conf ${calibrateRawConfidence(nz(e.confidence)).toFixed(0)}%`}</span>
+              <span style={{ color: dColor, flexShrink: 0 }}>{delta}{calibrateRawConfidence(nz(e.confidence)).toFixed(0)}%</span>
             </div>
           );
         })}
@@ -2813,7 +2822,7 @@ const SignalPipeline = memo(function SignalPipeline({
                 {nz(s.count).toLocaleString()}
               </span>
               <span style={{ fontSize: 11, color: T.TEXT_2, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {s.sample ? `${s.sample.symbol} · ${s.sample.conf}%` : "—"}
+                {s.sample ? `${s.sample.symbol} · ${calibrateRawConfidence(s.sample.conf).toFixed(0)}%` : "—"}
               </span>
             </div>
           );

@@ -501,10 +501,20 @@ export function usePaperSignals() {
       return activeRegime && volumePasses && mtfQualifies;
     };
     const cohortPool = out.filter(isActiveCohortMember).map(o => o.conf);
+    const fullPool   = out.map(o => o.conf);
     for (const o of out) {
+      // Pass C4 — non-qualifying opps no longer get a hard rank=0.
+      // Hard-zero combined with rank weight 0.18 was shaving ~18 pts
+      // off ~13 of 15 cards on a typical tick, dragging the entire
+      // distribution into the 20-40 band and making C3 invisible.
+      // Instead, non-qualifying opps get their percentile vs the FULL
+      // pool, dampened to a [0..50] band — they retain differentiation
+      // (so weak setups still rank below merely-mediocre ones) but
+      // cannot reach the top of the cohort. Qualifying opps still
+      // rank against the clean institutional cohort, scaled [0..100].
       const pct = isActiveCohortMember(o)
         ? percentileRank(o.conf, cohortPool)
-        : 0;
+        : percentileRank(o.conf, fullPool) * 0.5;
       const rr  = computeRRRatio(o.entry, o.stop, o.target);
       // Re-derive trend/liquidity/regime per card via a synthetic
       // SymBreakdown lookup. The breakdown source is the raw payload
