@@ -56,8 +56,12 @@ const T = {
   BG_BLACK:    "#000000",
   BG_TERMINAL: "#050A07",
   BG_CARD:     "#070F0B",
-  BORDER:      "#1A2E22",
-  BORDER_GRN:  "rgba(102, 255, 102, 0.15)",
+  // Pass 7f — global baseline visibility boost. Borders lifted from
+  // #1A2E22 → #243D2E so row separation is genuinely readable across
+  // the matrix without crossing into "bright chassis" territory.
+  // BORDER_GRN bumped 0.15 → 0.22 in sympathy.
+  BORDER:      "#243D2E",
+  BORDER_GRN:  "rgba(102, 255, 102, 0.22)",
   NEON:        "#66FF66",
   NEON_GLOW:   "rgba(102, 255, 102, 0.45)",
   EMERALD:     "#00C853",
@@ -65,13 +69,17 @@ const T = {
   RED:         "#FF4D4D",
   AMBER:       "#FFB020",
   TEXT_0:      "#FFFFFF",
-  TEXT_1:      "#A8B8B0",
-  TEXT_2:      "#5F706A",
-  // Pass 4.9 — tertiary label lift. Old value (#3A4842) sank below
-  // useful reading threshold on dense panels (stage labels, exchange
-  // NOT-CONNECTED rows, Kv keys). Lifted to #586B63 to restore
-  // hierarchy without crossing into secondary tone territory.
-  TEXT_3:      "#586B63",
+  // Pass 7f — typography luminance lift. The information density was
+  // there but the readability wasn't. TEXT_1 (#A8B8B0 → #C5D2CB) is
+  // the workhorse for prices, telemetry values, and reasoning
+  // snippets — needed a real bump. TEXT_2 (#5F706A → #7C8E86) carries
+  // labels and timestamps that were sinking into the chassis. TEXT_3
+  // (#586B63 → #6F8079) lifts NOT-CONNECTED / stage-label rows back
+  // up. Chassis colors (BG_BLACK/TERMINAL/CARD) intentionally
+  // unchanged — only foreground signal energy increases.
+  TEXT_1:      "#C5D2CB",
+  TEXT_2:      "#7C8E86",
+  TEXT_3:      "#6F8079",
   FONT_MONO:   "'IBM Plex Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace",
   // ── Polish scale (institutional rhythm) ──────────────────────────────
   // Letter-spacing tracks: collapse to 3 tiers + 1 display exception.
@@ -841,21 +849,28 @@ function Sparkline({
    *  preserves Pass 6.1a tuning so low-conf rows stay restrained. */
   intensity?: "baseline" | "strong" | "elite";
 }) {
+  // Pass 7f — baseline sparkline luminance lift. Even non-hero rows
+  // need readable trace energy at a glance; old baseline (stroke 2.6,
+  // outer glow 0.28) was disappearing into the dark chassis. Bumped
+  // baseline stroke 2.6 → 3.2, outer glow 0.28 → 0.46, halo
+  // drop-shadow blurs widened so the line carries clear presence.
+  // ELITE / STRONG amplitudes preserved relative to baseline so the
+  // hero hierarchy still reads as a step UP, not parity.
   const innerStrokeWidth =
-    intensity === "elite"  ? 3.2 :
-    intensity === "strong" ? 2.9 : 2.6;
+    intensity === "elite"  ? 3.6 :
+    intensity === "strong" ? 3.4 : 3.2;
   const innerStrokeFilter =
     intensity === "elite"
-      ? `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 10px ${color}) drop-shadow(0 0 20px ${color})`
+      ? `drop-shadow(0 0 5px ${color}) drop-shadow(0 0 12px ${color}) drop-shadow(0 0 22px ${color})`
       : intensity === "strong"
-      ? `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 8px ${color}) drop-shadow(0 0 16px ${color})`
-      : `drop-shadow(0 0 3px ${color}) drop-shadow(0 0 7px ${color}) drop-shadow(0 0 14px ${color})`;
+      ? `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 10px ${color}) drop-shadow(0 0 18px ${color})`
+      : `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 9px ${color}) drop-shadow(0 0 16px ${color})`;
   const outerGlowOpacity =
-    intensity === "elite"  ? 0.42 :
-    intensity === "strong" ? 0.34 : 0.28;
+    intensity === "elite"  ? 0.58 :
+    intensity === "strong" ? 0.50 : 0.46;
   const liveStrokeWidth =
-    intensity === "elite"  ? 3.4 :
-    intensity === "strong" ? 3.1 : 2.8;
+    intensity === "elite"  ? 3.8 :
+    intensity === "strong" ? 3.5 : 3.2;
   const liveFilter =
     intensity === "elite"
       ? `drop-shadow(0 0 5px ${color}) drop-shadow(0 0 14px ${color})`
@@ -939,9 +954,12 @@ function Sparkline({
       style={{ overflow: "visible", display: "block" }}
     >
       <defs>
+        {/* Pass 7f — area-fill gradient lifted (0.55→0.72 top,
+            0.18→0.30 mid) so the curve's underside reads as a real
+            envelope, not a faint wash. */}
         <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%"   stopColor={color} stopOpacity="0.55" />
-          <stop offset="55%"  stopColor={color} stopOpacity="0.18" />
+          <stop offset="0%"   stopColor={color} stopOpacity="0.72" />
+          <stop offset="55%"  stopColor={color} stopOpacity="0.30" />
           <stop offset="100%" stopColor={color} stopOpacity="0"    />
         </linearGradient>
         <radialGradient id={tipId} cx="50%" cy="50%" r="50%">
@@ -953,11 +971,14 @@ function Sparkline({
       {/* Faint background grid hairlines — 4 horizontal divisions for
           institutional chart vocabulary. Gives the eye reference rails
           for the trace's vertical excursions. */}
+      {/* Pass 7f — grid hairlines lifted 0.04 → 0.08, mean rail
+          0.22 → 0.38. Reference rails are now actually visible so the
+          eye can read excursion magnitude at a glance. */}
       {[0.25, 0.5, 0.75].map(t => (
         <line
           key={t}
           x1={0} x2={VBW} y1={VBH * t} y2={VBH * t}
-          stroke="rgba(255,255,255,0.04)"
+          stroke="rgba(255,255,255,0.08)"
           strokeWidth={1}
           vectorEffect="non-scaling-stroke"
         />
@@ -965,7 +986,7 @@ function Sparkline({
       {/* Mean baseline — dashed reference rail, color-tinted */}
       <line
         x1={0} x2={VBW} y1={meanY} y2={meanY}
-        stroke={color} strokeOpacity={0.22}
+        stroke={color} strokeOpacity={0.38}
         strokeWidth={1} strokeDasharray="4 6"
         vectorEffect="non-scaling-stroke"
       />
@@ -1484,19 +1505,24 @@ function ConfidenceRing({ color, value, size = 78 }: { color: string; value: num
   // the eye locks onto it; STRONG sits clearly above the median. Lower
   // tiers preserved so the discipline gradient stays intact (low conf
   // must still look quiet — no fake conviction).
+  // Pass 7f — baseline ring readability. Sub-80 rings were sinking
+  // into the chassis even though they still carry real conviction
+  // information (60-79 amber band). Lifted lower tiers so EVERY ring
+  // reads as alive: glowPx 70-tier 13→18, 55-tier 8→12, base 4→7;
+  // ringStroke 70-tier 3.5→4, base 3→3.4; halo 70-tier 0.38→0.52,
+  // 55-tier 0.24→0.36, base 0.14→0.22. ELITE / STRONG amplitudes
+  // preserved so the hero hierarchy still steps cleanly above.
   const glowPx =
     value >= 90 ? 34 :
     value >= 85 ? 24 :
-    value >= 70 ? 13 :
-    value >= 55 ? 8  : 4;
-  const ringStroke = value >= 90 ? 5 : value >= 85 ? 4.2 : value >= 70 ? 3.5 : 3;
-  // Pass 7d — halo raised again at the top. ELITE = 0.85 (volumetric
-  // halo physically present), STRONG = 0.62.
+    value >= 70 ? 18 :
+    value >= 55 ? 12 : 7;
+  const ringStroke = value >= 90 ? 5 : value >= 85 ? 4.2 : value >= 70 ? 4 : 3.4;
   const haloOpacity =
     value >= 90 ? 0.85 :
     value >= 85 ? 0.62 :
-    value >= 70 ? 0.38 :
-    value >= 55 ? 0.24 : 0.14;
+    value >= 70 ? 0.52 :
+    value >= 55 ? 0.36 : 0.22;
   // 12-tick dial. Each tick is a short radial mark; ticks beneath the
   // progress arc are tinted with the color, ticks beyond stay neutral.
   const ticks = Array.from({ length: 12 }, (_, i) => i);

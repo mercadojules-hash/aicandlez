@@ -1,0 +1,113 @@
+Exactly — that’s the real issue now.
+
+Both the LONG and SHORT surfaces are still too visually faint overall.
+
+Even before hero hierarchy:
+the baseline rows themselves are disappearing into the chassis.
+
+Right now:
+
+* sparklines are too dim
+* telemetry text is too low contrast
+* row separation is too weak
+* confidence rings are too muted
+* the panel interiors are swallowing detail
+
+The result:
+you have to strain your eyes to read the market surface.
+
+That’s the actual bottleneck now.
+
+This is no longer:
+architecture,
+layout,
+or hierarchy.
+
+This is:
+VISIBILITY + CONTRAST CALIBRATION.
+
+New direction:
+
+1. GLOBAL BASELINE VISIBILITY BOOST
+
+Not just hero cards.
+
+ALL active rows need:
+
+* brighter telemetry
+* stronger line clarity
+* more readable typography
+* clearer row separation
+* more visible sparkline luminance
+
+Right now the entire matrix is underexposed.
+
+2. SPARKLINES NEED MUCH MORE PRESENCE
+
+They are currently too soft against the black background.
+
+Increase:
+
+* brightness
+* line clarity
+* glow visibility
+* contrast separation
+
+The sparklines should be readable instantly from a distance.
+
+3. CONFIDENCE RINGS NEED STRONGER READABILITY
+
+Even non-hero rings should feel:
+alive,
+visible,
+important.
+
+Currently they visually sink into the dark chassis.
+
+4. ROW SEPARATION IS TOO SUBTLE
+
+The rows blend together too much.
+
+Need:
+
+* slightly stronger borders
+* clearer panel separation
+* better depth layering
+* improved scan readability
+
+5. TYPOGRAPHY IS STILL TOO DARK
+
+Especially:
+
+* prices
+* telemetry labels
+* reasoning snippets
+* timestamps
+* state text
+
+The information density is there —
+but the readability is not.
+
+6. IMPORTANT:
+   DO NOT brighten the chassis itself.
+
+Keep the dark institutional background.
+
+Instead:
+increase foreground signal energy.
+
+That distinction matters.
+
+7. THE GOAL
+
+The operator should be able to instantly scan:
+
+* strongest opportunities
+* market flow
+* evaluation state
+* confidence distribution
+
+without straining visually.
+
+Right now the information exists —
+but it’s hiding inside the darkness.
