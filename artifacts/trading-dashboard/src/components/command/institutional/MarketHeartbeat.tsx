@@ -27,7 +27,7 @@ export function MarketHeartbeat() {
             className="rounded-full"
             style={{
               width: 6, height: 6, background: N.BRAND,
-              boxShadow: `0 0 5px ${N.BRAND}, 0 0 12px ${N.BRAND}50`,
+              boxShadow: `0 0 5px ${N.BRAND}, 0 0 7px ${N.BRAND}50`,
               animation: "neon-pulse 1.4s infinite",
             }}
           />

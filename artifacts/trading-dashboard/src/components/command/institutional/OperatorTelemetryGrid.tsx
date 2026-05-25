@@ -348,7 +348,7 @@ function Panel({
         display: "flex",
         flexDirection: "column",
         minHeight: 180,
-        boxShadow: `inset 0 1px 0 ${accent}08, 0 0 12px ${accent}05`,
+        boxShadow: `inset 0 1px 0 ${accent}08, 0 0 7px ${accent}05`,
       }}
     >
       <div className="flex items-center gap-1.5 mb-2">

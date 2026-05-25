@@ -279,7 +279,7 @@ function PortalModal({
           borderRadius: 8,
           padding: 28,
           fontFamily: N.FONT_MONO,
-          boxShadow: `0 0 17px ${N.BRAND_GLOW}, inset 0 0 17px ${N.BRAND}10`,
+          boxShadow: `0 0 9px ${N.BRAND_GLOW}, inset 0 0 9px ${N.BRAND}10`,
           position: "relative", overflow: "hidden",
           maxHeight: "calc(100dvh - 48px)", overflowY: "auto",
         }}
@@ -812,7 +812,7 @@ function LogoBanner({ tier, isAdmin = false }: { tier: Plan; isAdmin?: boolean }
           width: "auto",
           maxWidth: "min(560px, 86vw)",
           position: "relative", zIndex: 1,
-          filter: `drop-shadow(0 0 6px ${N.BRAND_GLOW}) drop-shadow(0 0 12px ${N.BRAND}30)`,
+          filter: `drop-shadow(0 0 6px ${N.BRAND_GLOW}) drop-shadow(0 0 7px ${N.BRAND}30)`,
         }}
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
       />
@@ -1053,7 +1053,7 @@ function AlpacaReconnectBanner({ lastError }: { lastError: string | null }) {
       borderRadius: 6,
       border: `1px solid ${WARN}55`,
       background: `linear-gradient(180deg, ${WARN}14, ${WARN}06)`,
-      boxShadow: `inset 0 0 10px ${WARN}10`,
+      boxShadow: `inset 0 0 6px ${WARN}10`,
       fontFamily: N.FONT_MONO,
       display: "flex", flexDirection: "column", gap: 8,
     }}>
@@ -1322,7 +1322,7 @@ function ExchangeWarningBanner({
       borderRadius: 6,
       border: `1px solid ${WARN}55`,
       background: `linear-gradient(180deg, ${WARN}14, ${WARN}06)`,
-      boxShadow: `inset 0 0 10px ${WARN}10`,
+      boxShadow: `inset 0 0 6px ${WARN}10`,
       fontFamily: N.FONT_MONO,
       display: "flex", flexDirection: "column", gap: 8,
     }}>
@@ -1404,7 +1404,7 @@ function ExchangeOnboardingBanner({ onConnect }: { onConnect: () => void }) {
       borderRadius: 6,
       border: `1px solid ${N.BRAND}45`,
       background: `linear-gradient(180deg, ${N.BRAND}10, ${N.BRAND}04)`,
-      boxShadow: `inset 0 0 13px ${N.BRAND}10`,
+      boxShadow: `inset 0 0 7px ${N.BRAND}10`,
       display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap",
       fontFamily: N.FONT_MONO,
     }}>
@@ -1553,7 +1553,7 @@ function LiveExecutionBar({
         padding: "14px 18px",
         display: "flex", alignItems: "center", gap: 18,
         overflow: "hidden",
-        boxShadow: locked ? "none" : `inset 0 0 17px ${N.BRAND_GLOW}, 0 0 24px ${N.BRAND}10`,
+        boxShadow: locked ? "none" : `inset 0 0 9px ${N.BRAND_GLOW}, 0 0 24px ${N.BRAND}10`,
       }}>
         {/* Scan sweep — animated edge */}
         {!locked && (
@@ -1779,7 +1779,7 @@ export function UpgradeModal({ open, onClose, gate }: {
           borderRadius: 8,
           padding: 28,
           fontFamily: N.FONT_MONO,
-          boxShadow: `0 0 17px ${N.BRAND_GLOW}, inset 0 0 17px ${N.BRAND}10`,
+          boxShadow: `0 0 9px ${N.BRAND_GLOW}, inset 0 0 9px ${N.BRAND}10`,
           position: "relative", overflow: "hidden",
         }}
       >
@@ -1882,7 +1882,7 @@ function PlanCard({
       onMouseEnter={(e) => {
         if (disabled) return;
         e.currentTarget.style.transform   = "translateY(-1px)";
-        e.currentTarget.style.boxShadow   = `0 0 22px ${data.color}55`;
+        e.currentTarget.style.boxShadow   = `0 0 10px ${data.color}38`;
         e.currentTarget.style.borderColor = data.color;
       }}
       onMouseLeave={(e) => {
@@ -2020,13 +2020,13 @@ function Panel({
               onMouseEnter={(e) => {
                 const el = e.currentTarget;
                 el.style.transform   = "translateY(-1px)";
-                el.style.boxShadow   = `0 0 22px ${N.GOLD}, 0 0 36px ${N.GOLD_GLOW}`;
+                el.style.boxShadow   = `0 0 10px ${N.GOLD}, 0 0 18px ${N.GOLD_GLOW}`;
                 el.style.letterSpacing = "0.22em";
               }}
               onMouseLeave={(e) => {
                 const el = e.currentTarget;
                 el.style.transform   = "translateY(0)";
-                el.style.boxShadow   = `0 0 16px ${N.GOLD_GLOW}`;
+                el.style.boxShadow   = `0 0 8px ${N.GOLD_GLOW}`;
                 el.style.letterSpacing = "0.18em";
               }}
               style={{
@@ -3598,7 +3598,7 @@ function PortalFeesMonthModal({
           borderRadius: 8,
           padding: "18px 20px 22px",
           maxHeight: "84vh", overflowY: "auto",
-          boxShadow: `0 0 17px ${N.BRAND_GLOW}, inset 0 0 8px ${N.BRAND}08`,
+          boxShadow: `0 0 9px ${N.BRAND_GLOW}, inset 0 0 8px ${N.BRAND}08`,
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
@@ -4708,11 +4708,11 @@ function PortalInner() {
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.boxShadow = `0 0 26px ${N.BRAND_GLOW}, 0 0 12px ${N.BRAND}`;
+                  e.currentTarget.style.boxShadow = `0 0 12px ${N.BRAND_GLOW}, 0 0 6px ${N.BRAND}`;
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = `0 0 18px ${N.BRAND_GLOW}`;
+                  e.currentTarget.style.boxShadow = `0 0 8px ${N.BRAND_GLOW}`;
                 }}
               >
                 {tier === "starter" ? "UPGRADE TO PRO" : "START AI TRADING"}

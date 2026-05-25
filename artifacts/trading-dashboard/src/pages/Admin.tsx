@@ -415,7 +415,7 @@ function UserIntelligencePanel({
         position: "fixed", top: 0, right: 0, bottom: 0, width: W, maxWidth: "100vw",
         background: C.bg, borderLeft: `1px solid ${C.border}`, zIndex: 91,
         display: "flex", flexDirection: "column", color: C.text,
-        boxShadow: "-20px 0 60px rgba(0,0,0,0.3)",
+        boxShadow: "-20px 0 60px rgba(0,0,0,0.21)",
       }}>
         {/* Drawer header */}
         <div style={{

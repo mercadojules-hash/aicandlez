@@ -194,14 +194,14 @@ export function OpportunityScanner({ breakdowns }: Props) {
 
               return (
                 <div className="mx-2 mt-2 mb-1.5 rounded-lg overflow-hidden"
-                  style={{ background: "#040608", border: `1px solid ${color}22`, boxShadow: `0 0 16px ${color}08` }}>
+                  style={{ background: "#040608", border: `1px solid ${color}22`, boxShadow: `0 0 9px ${color}08` }}>
 
                   {/* Header row */}
                   <div className="flex items-center justify-between px-3 pt-2.5 pb-2"
                     style={{ borderBottom: `1px solid ${color}12` }}>
                     <div className="flex items-center gap-2">
                       <div style={{ width: 6, height: 6, borderRadius: 2, background: color, boxShadow: `0 0 4px ${color}` }} />
-                      <span className="text-[13px] font-bold font-mono" style={{ color, textShadow: `0 0 10px ${color}60` }}>
+                      <span className="text-[13px] font-bold font-mono" style={{ color, textShadow: `0 0 6px ${color}60` }}>
                         {lbl}
                       </span>
                       <span className="text-[9px] font-mono" style={{ color: `${color}70` }}>/ USDT</span>
@@ -231,7 +231,7 @@ export function OpportunityScanner({ breakdowns }: Props) {
                     {/* Left: big number */}
                     <div className="flex flex-col justify-center px-3 py-2 flex-shrink-0" style={{ minWidth: 90 }}>
                       <div className="font-bold font-mono tabular-nums leading-none"
-                        style={{ fontSize: 38, color, textShadow: `0 0 18px ${color}55`, letterSpacing: "-0.03em" }}>
+                        style={{ fontSize: 38, color, textShadow: `0 0 10px ${color}55`, letterSpacing: "-0.03em" }}>
                         {aiConv.toFixed(0)}
                       </div>
                       <div className="text-[7.5px] font-mono mt-0.5" style={{ color: "#3a5a70", letterSpacing: "0.1em" }}>

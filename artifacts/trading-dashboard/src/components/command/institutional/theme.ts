@@ -43,7 +43,7 @@ export const N = {
   GOLD:      "#FFA500",
   GOLD_BRT:  "#FFC940",
   GOLD_DEEP: "#FF7A00",
-  GOLD_GLOW: "#FFA50080",
+  GOLD_GLOW: "#FFA50040",
 
   /* danger / red — emergency stop / execution-halted state */
   DANGER:      "#FF3344",

@@ -72,7 +72,7 @@ export function PlatformOverview() {
         border: `1px solid ${N.BORDER}`,
         borderRadius: 4,
         padding: "8px 10px",
-        boxShadow: `inset 0 1px 0 ${N.BRAND}08, 0 0 14px ${N.BRAND}06`,
+        boxShadow: `inset 0 1px 0 ${N.BRAND}08, 0 0 8px ${N.BRAND}06`,
       }}
     >
       <div className="flex items-center justify-between mb-2 px-1">

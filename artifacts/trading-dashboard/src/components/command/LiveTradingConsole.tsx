@@ -966,7 +966,7 @@ export function LiveTradingConsole({
                 fontSize: 36,
                 lineHeight: 1,
                 color: "#00f0ff",
-                textShadow: "0 0 9px #00f0ffaa, 0 0 21px #00f0ff44, 0 0 2px #00f0ff",
+                textShadow: "0 0 9px #00f0ffaa, 0 0 12px #00f0ff44, 0 0 2px #00f0ff",
                 letterSpacing: "-0.02em",
               }}>
                 {confidence}

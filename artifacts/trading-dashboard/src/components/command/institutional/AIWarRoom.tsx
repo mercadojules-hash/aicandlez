@@ -621,7 +621,7 @@ export function AIWarRoom() {
           <span style={{
             width: 6, height: 6, borderRadius: "50%",
             background: N.BRAND,
-            boxShadow: `0 0 5px ${N.BRAND}, 0 0 12px ${N.BRAND}50`,
+            boxShadow: `0 0 5px ${N.BRAND}, 0 0 7px ${N.BRAND}50`,
             animation: "warroom-pulse 3s infinite",
           }} />
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.22em", color: N.TEXT_0 }}>

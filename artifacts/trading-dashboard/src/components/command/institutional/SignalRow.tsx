@@ -620,7 +620,7 @@ export function SignalRow({ spec, breakdown }: Props) {
         borderBottom: `1px solid ${N.BORDER}`,
         background: rowBg,
         fontFamily: N.FONT_MONO,
-        boxShadow: `inset 5px 0 0 0 ${dirColor}, inset 5px 0 14px 0 ${dirColor}28`,
+        boxShadow: `inset 6px 0 0 0 ${dirColor}, inset 7px 0 0 0 ${dirColor}cc, inset 8px 0 4px -2px ${dirColor}80`,
         position: "relative",
       }}
       onMouseEnter={e => (e.currentTarget.style.background = rowBgHover)}
@@ -844,7 +844,7 @@ function SizePicker({
               zIndex: 50,
               background: "#050A07",
               border: `1px solid ${N.BRAND}55`,
-              boxShadow: `0 0 12px ${N.BRAND}30, 0 8px 24px rgba(0,0,0,0.36)`,
+              boxShadow: `0 0 7px ${N.BRAND}30, 0 8px 24px rgba(0,0,0,0.252)`,
               borderRadius: 6,
               padding: 8,
               minWidth: 168,

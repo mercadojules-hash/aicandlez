@@ -65,7 +65,7 @@ function PlanCard({
       style={{
         background:   isCurrent ? `${color}08` : "#010C18",
         borderColor:  isCurrent ? `${color}40` : "#0D2035",
-        boxShadow: isCurrent ? `0 0 13px ${color}10` : "none",
+        boxShadow: isCurrent ? `0 0 7px ${color}10` : "none",
       }}
     >
       {isCurrent && (

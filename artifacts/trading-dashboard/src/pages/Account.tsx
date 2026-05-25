@@ -166,7 +166,7 @@ export default function Account() {
               <div className="w-16 h-16 rounded-full overflow-hidden relative"
                 style={{
                   border:    "2px solid #00aaff50",
-                  boxShadow: "0 0 13px #00aaff25, 0 0 26px #00aaff10, 0 0 0 4px #00aaff08",
+                  boxShadow: "0 0 7px #00aaff25, 0 0 14px #00aaff10, 0 0 0 4px #00aaff08",
                 }}>
                 {avatarUrl && !imgError ? (
                   <img
@@ -315,9 +315,9 @@ export default function Account() {
                       <div key={ex.exchange}
                         className="flex items-center gap-3 px-3.5 py-3 rounded border"
                         style={{ background: `${color}14`, borderColor: `${color}66`,
-                          boxShadow: `0 0 13px ${color}30, 0 0 0 1px ${color}28 inset` }}>
+                          boxShadow: `0 0 7px ${color}30, 0 0 0 1px ${color}28 inset` }}>
                         <div className="w-3 h-3 rounded-full flex-shrink-0"
-                          style={{ background: color, boxShadow: `0 0 7px ${color}, 0 0 12px ${color}cc`,
+                          style={{ background: color, boxShadow: `0 0 7px ${color}, 0 0 7px ${color}cc`,
                             animation: "dot-pulse 2.5s ease-in-out infinite" }} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">

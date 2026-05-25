@@ -217,7 +217,7 @@ function ActivePositionRow(p: ActivePositionRowProps) {
         borderBottom: `1px solid ${N.BORDER}`,
         background: rowBg,
         fontFamily: N.FONT_MONO,
-        boxShadow: `inset 5px 0 0 0 ${dirColor}, inset 5px 0 14px 0 ${dirColor}28`,
+        boxShadow: `inset 6px 0 0 0 ${dirColor}, inset 7px 0 0 0 ${dirColor}cc, inset 8px 0 4px -2px ${dirColor}80`,
         position: "relative",
       }}
       onMouseEnter={e => (e.currentTarget.style.background = rowBgHover)}

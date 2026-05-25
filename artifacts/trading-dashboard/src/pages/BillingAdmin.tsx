@@ -592,7 +592,7 @@ export default function BillingAdmin() {
                   style={{
                     background:   "rgba(102,255,102,0.08)",
                     border:       "1px solid rgba(102,255,102,0.35)",
-                    boxShadow: "0 0 16px rgba(102,255,102,0.108)",
+                    boxShadow: "0 0 9px rgba(102,255,102,0.076)",
                   }}
                 >
                   <CheckCircle2 className="w-7 h-7" style={{ color: "#66FF66" }} />

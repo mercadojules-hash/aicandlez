@@ -238,7 +238,7 @@ function StatCell({
         color,
         lineHeight:    1,
         letterSpacing: "-0.02em",
-        textShadow: `0 0 10px ${color}35`,
+        textShadow: `0 0 6px ${color}35`,
         marginBottom:  3,
       }}>
         {value}
