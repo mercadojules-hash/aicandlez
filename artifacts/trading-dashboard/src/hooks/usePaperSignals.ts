@@ -206,6 +206,80 @@ function exchangesForSymbol(sym: string): string[] {
   return universal;
 }
 
+/**
+ * Pass 7e — DEV-ONLY hero preview injector. Gated on `import.meta.env.DEV`
+ * AND the `?preview=hero` query flag, so the synthetic cards CANNOT
+ * reach production builds:
+ *  - `import.meta.env.DEV` is statically `false` in `vite build`, which
+ *    lets the rollup tree-shaker drop both this constant and the
+ *    synthetic-card construction below from the production bundle.
+ *  - The query-flag check is the operational gate within dev builds.
+ *
+ * Purpose: enable visual QA of the conviction-tier hierarchy
+ * (Pass 7c/7d) when the live market is in an evaluation-heavy regime
+ * with no real signals at conf >=80. Injects:
+ *  - One ELITE (conf 94) LONG  on BTC
+ *  - One STRONG (conf 84) SHORT on ETH
+ * Distinct synthetic pair keys (`__PREVIEW_ELITE__` /
+ * `__PREVIEW_STRONG__`) prevent React key collisions with any real
+ * BTCUSD/ETHUSD breakdown returned by the engine.
+ *
+ * Discipline preserved: real conf thresholds and engine gates are
+ * untouched. This injector exists solely so designers/operators can
+ * verify hero-tier rendering in any market regime.
+ */
+const HERO_PREVIEW_ENABLED: boolean =
+  import.meta.env.DEV &&
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("preview") === "hero";
+
+function buildHeroPreviewCards(now: number): OpportunityVM[] {
+  const mk = (
+    sym: string,
+    dir: "LONG" | "SHORT",
+    conf: number,
+    pairKey: string,
+    entry: number,
+  ): OpportunityVM => {
+    const stopPct   = dir === "SHORT" ? +0.02 : -0.02;
+    const targetPct = dir === "SHORT" ? -0.04 : +0.04;
+    return {
+      symbol:     sym,
+      pair:       pairKey,
+      display:    `${sym}/USD`,
+      name:       NAME_MAP[sym] ?? sym,
+      assetClass: MAJORS.has(sym) ? "MAJOR" : "ALT",
+      direction:  dir,
+      lean:       dir,
+      conf,
+      score:      conf,
+      mtf:        dir === "LONG"
+        ? ["green", "green", "green", "green"]
+        : ["red", "red", "red", "red"],
+      readiness:  "READY",
+      reason:     "MTF + Volume confirmed",
+      vol:        "ELEVATED",
+      sparkline:  syntheticSparkline(sym, dir, conf),
+      momentum:   3,
+      quality:    "MTF + Volume confirmed",
+      exchanges:  exchangesForSymbol(sym),
+      reasoning:  dir === "LONG"
+        ? "Strong bullish EMA alignment · 1H trend up · volume surge confirmed"
+        : "Bearish engulfing on 5m+15m · 1H trend down · volume confirmed",
+      latency:    "28ms",
+      regime:     "BREAKOUT",
+      entry,
+      stop:       entry * (1 + stopPct),
+      target:     entry * (1 + targetPct),
+      lastUpdated: now,
+    };
+  };
+  return [
+    mk("BTC", "LONG",  94, "__PREVIEW_ELITE__",  67_000),
+    mk("ETH", "SHORT", 84, "__PREVIEW_STRONG__", 3_400),
+  ];
+}
+
 export function usePaperSignals() {
   const { data, isLoading, isError, error } = useQuery<EngineStatus>({
     queryKey: ["engine-status-portal"],
@@ -265,6 +339,11 @@ export function usePaperSignals() {
         target:     lastPrice * (1 + targetPct),
         lastUpdated: b.lastUpdated ?? Date.now(),
       });
+    }
+    // Pass 7e — dev-only hero preview injection. Tree-shaken from prod
+    // builds via `import.meta.env.DEV` becoming a literal `false`.
+    if (HERO_PREVIEW_ENABLED) {
+      out.push(...buildHeroPreviewCards(Date.now()));
     }
     return out.sort((a, b) => b.conf - a.conf);
   }, [data]);
