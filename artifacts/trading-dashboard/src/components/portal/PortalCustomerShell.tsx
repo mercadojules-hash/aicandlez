@@ -1186,10 +1186,26 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
     isStrong         ? `rgba(${dirRgb},0.96)` :
     isActiveBaseline ? `rgba(${dirRgb},0.82)` :
                        T.BORDER;
+  // Pass 7L — STOP fading into the chassis. The previous gradient
+  // collapsed to `T.BG_TERMINAL` at 100%, meaning ~60% of every
+  // active card was visually identical to the workspace behind it,
+  // which is why the top-20 rows refused to "pop". New approach:
+  //   • Card body sits on an ELEVATED dark plate (#0C1812 LONG /
+  //     #180C0E SHORT) — not chassis. The card is materially
+  //     brighter than the workspace under it.
+  //   • Strong dirColor wash overlays the plate top-to-bottom at
+  //     real alpha (no fade-to-zero). Active rows are saturated
+  //     with directional identity throughout, not just at the top
+  //     edge.
+  //   • EVALUATING (FLAT) fall-through preserved (locked invariant).
+  const tierBaseDark =
+    isLong                       ? "#0C1812" :
+    opp.direction === "SHORT"    ? "#180C0E" :
+                                    T.BG_TERMINAL;
   const tierBackground =
-    isElite          ? `linear-gradient(180deg, rgba(${dirRgb},0.22) 0%, rgba(${dirRgb},0.06) 40%, ${T.BG_TERMINAL} 100%)` :
-    isStrong         ? `linear-gradient(180deg, rgba(${dirRgb},0.18) 0%, rgba(${dirRgb},0.050) 45%, ${T.BG_TERMINAL} 100%)` :
-    isActiveBaseline ? `linear-gradient(180deg, rgba(${dirRgb},0.130) 0%, rgba(${dirRgb},0.032) 50%, ${T.BG_TERMINAL} 100%)` :
+    isElite          ? `linear-gradient(180deg, rgba(${dirRgb},0.32) 0%, rgba(${dirRgb},0.16) 100%), ${tierBaseDark}` :
+    isStrong         ? `linear-gradient(180deg, rgba(${dirRgb},0.26) 0%, rgba(${dirRgb},0.12) 100%), ${tierBaseDark}` :
+    isActiveBaseline ? `linear-gradient(180deg, rgba(${dirRgb},0.18) 0%, rgba(${dirRgb},0.08) 100%), ${tierBaseDark}` :
                        T.BG_TERMINAL;
   // Tier shadow stack (read outer→inner):
   //  1. `0 0 0 1px ...` — engraved double-ring on hero (zero layout cost)
@@ -1251,16 +1267,16 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
         transform: liftTransform,
         zIndex: liftZ,
         boxSizing: "border-box",
-        padding: 8,
-        paddingLeft: 18,
-        paddingRight: 10,
-        // Pass 4.7 — outer article is now a single horizontal row. The
-        // inner flex split (left ring anchor | right telemetry+chart+
-        // action) replaces the previous vertical stack so the chart
-        // becomes the dominant horizontal movement surface.
+        // Pass 7L — real breathing room. Padding 8/18/10 → 12/22/14;
+        // height 142 → 172. The top 20 longs/shorts get +30px of
+        // vertical authority each so the matrix physically dominates
+        // the viewport (was the user's #2 demand).
+        padding: 12,
+        paddingLeft: 22,
+        paddingRight: 14,
         display: "flex", flexDirection: "row", gap: 0,
         position: "relative", overflow: "hidden",
-        height: 142,
+        height: 172,
         fontFamily: T.FONT_MONO,
         // Pass 7a — age decay. ageOpacity collapses FRESH→SETTLING→
         // AGING→EXPIRED into a single multiplier so the whole card
@@ -1308,72 +1324,84 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           bezier sparkline, layered ring, flow overlay).            */}
       {/* LEFT ANCHOR — symbol · ring · direction pill */}
       <div style={{
-        width: 96, flexShrink: 0,
+        // Pass 7L — anchor widened 96 → 116 to accommodate the
+        // larger ring + bigger confidence numeral. Symbol, ring,
+        // and direction pill all project at a higher tier so the
+        // conviction reads from across the room.
+        width: 116, flexShrink: 0,
         display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "space-between",
         gap: 4,
       }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: T.TEXT_0, letterSpacing: "-0.01em" }}>
+        <span style={{
+          fontSize: 16, fontWeight: 800, color: T.TEXT_0,
+          letterSpacing: "-0.01em",
+          textShadow: `0 0 8px rgba(0,0,0,0.7), 0 0 2px rgba(${dirRgb},0.4)`,
+        }}>
           {opp.symbol}
         </span>
-        <div style={{ position: "relative", width: 78, height: 78, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <ConfidenceRing color={confColor} value={opp.conf} size={78} />
+        <div style={{ position: "relative", width: 92, height: 92, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <ConfidenceRing color={confColor} value={opp.conf} size={92} />
           {isReady && (
-            <svg aria-hidden width={78} height={78} style={{
+            <svg aria-hidden width={92} height={92} style={{
               position: "absolute", inset: 0, pointerEvents: "none",
               animation: "ring-sweep 12s linear infinite",
               animationDelay: `-${sweepDelayMs}ms`,
               transformOrigin: "50% 50%",
             }}>
-              <circle cx={39} cy={39} r={34} fill="none"
+              <circle cx={46} cy={46} r={40} fill="none"
                 stroke={confColor} strokeWidth={2}
-                strokeDasharray="19 195" strokeLinecap="round"
-                style={{ filter: `drop-shadow(0 0 4px ${confColor})`, opacity: 0.8 }} />
+                strokeDasharray="22 229" strokeLinecap="round"
+                style={{ filter: `drop-shadow(0 0 4px ${confColor})`, opacity: 0.85 }} />
             </svg>
           )}
           <div style={{
             position: "absolute", inset: 0,
             display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center",
-            gap: 0, lineHeight: 1,
+            gap: 1, lineHeight: 1,
           }}>
             <span style={{
-              // Pass 7g — confidence numeral projection on ACTIVE rows.
-              // ELITE numerals push to 32px / weight 800 (was 28/800);
-              // STRONG bumps to 30px / 800 (was 26/700); active
-              // baseline 60-79 climbs to 28px / 700 (was 26/700) so
-              // every active row reads its conviction at a glance.
-              // EVALUATING (FLAT direction) preserved at 26/600.
+              // Pass 7L — confidence numerals are the single biggest
+              // signal of conviction. Pushed up: ELITE 32→40, STRONG
+              // 30→36, ACTIVE 28→32, EVAL 26→28. This is the headline
+              // number on the screen.
               fontSize:
-                isElite          ? 32 :
-                isStrong         ? 30 :
-                isActiveBaseline ? 28 : 26,
+                isElite          ? 40 :
+                isStrong         ? 36 :
+                isActiveBaseline ? 32 : 28,
               fontWeight:
                 isElite          ? 800 :
                 isStrong         ? 800 :
-                isActiveBaseline ? 700 : 600,
+                isActiveBaseline ? 800 : 700,
               color: confColor, letterSpacing: T.TRACK_DISPLAY,
               fontVariantNumeric: "tabular-nums",
               textShadow:
-                isElite          ? `0 0 22px ${confColor}, 0 0 12px ${confColor}, 0 0 6px ${confColor}, 0 0 2px ${confColor}` :
-                opp.conf >= 85   ? `0 0 16px ${confColor}, 0 0 8px ${confColor}, 0 0 3px ${confColor}` :
-                opp.conf >= 70   ? `0 0 10px ${confColor}, 0 0 5px ${confColor}` :
-                opp.conf >= 55   ? `0 0 4px ${confColor}` :
-                                   `0 0 2px ${confColor}`,
+                isElite          ? `0 0 26px ${confColor}, 0 0 14px ${confColor}, 0 0 7px ${confColor}, 0 0 2px ${confColor}` :
+                opp.conf >= 85   ? `0 0 18px ${confColor}, 0 0 10px ${confColor}, 0 0 4px ${confColor}` :
+                opp.conf >= 70   ? `0 0 12px ${confColor}, 0 0 6px ${confColor}` :
+                opp.conf >= 55   ? `0 0 5px ${confColor}` :
+                                   `0 0 3px ${confColor}`,
             }}>{opp.conf}</span>
             <span style={{
-              fontSize: 7, fontWeight: 700, color: T.TEXT_2,
+              fontSize: 9, fontWeight: 700, color: T.TEXT_1,
               letterSpacing: T.TRACK_LABEL, textTransform: "uppercase",
             }}>AI Conf</span>
           </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
           <span style={{
-            fontSize: 9, padding: "2px 8px",
-            border: `1px solid ${dirBorder}`,
-            background: dirBg,
-            color: dirColor, fontWeight: 700, letterSpacing: "0.10em",
+            // Pass 7L — direction pill is the second-strongest visual
+            // identity cue. Bumped 9px→11, padding 2x8→4x12, fill
+            // alpha 0.10→0.18, border alpha 0.30→0.55, real
+            // dirColor text-shadow. Reads as a proper status chip,
+            // not a faint label.
+            fontSize: 11, padding: "4px 12px",
+            border: `1px solid rgba(${dirRgb},0.55)`,
+            background: `rgba(${dirRgb},0.18)`,
+            color: dirColor, fontWeight: 800, letterSpacing: "0.12em",
             borderRadius: 2,
+            textShadow: `0 0 6px rgba(${dirRgb},0.55)`,
           }}>{opp.direction}</span>
           {lastExit && (
             <span
@@ -1397,19 +1425,20 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
       <div style={{
         flex: 1, minWidth: 0,
         display: "flex", flexDirection: "column",
-        gap: 4, paddingLeft: 12,
+        gap: 6, paddingLeft: 14,
       }}>
         {/* Top meta — REGIME · VOL · MTF dots · momentum · age/latency · score */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 10, color: T.TEXT_2, lineHeight: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <span style={{ fontSize: 9, color: T.TEXT_1, letterSpacing: T.TRACK_LABEL, textTransform: "uppercase", whiteSpace: "nowrap" }}>
-              {opp.regime} <span style={{ opacity: 0.4 }}>·</span> {opp.vol}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 11, color: T.TEXT_1, lineHeight: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: T.TEXT_0, letterSpacing: T.TRACK_LABEL, textTransform: "uppercase", whiteSpace: "nowrap", textShadow: `0 0 4px rgba(0,0,0,0.6)` }}>
+              {opp.regime} <span style={{ opacity: 0.45, color: T.TEXT_2 }}>·</span> <span style={{ color: T.TEXT_1, fontWeight: 500 }}>{opp.vol}</span>
             </span>
             <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
               {opp.mtf.map((m, i) => (
                 <span key={i} title={["5m","15m","1H","4H"][i]} style={{
-                  width: 7, height: 7, borderRadius: 1,
+                  width: 9, height: 9, borderRadius: 1,
                   background: m === "green" ? T.NEON : m === "amber" ? T.AMBER : T.RED,
+                  boxShadow: m === "green" ? `0 0 4px ${T.NEON}` : m === "amber" ? `0 0 4px ${T.AMBER}` : `0 0 4px ${T.RED}`,
                 }} />
               ))}
             </div>
@@ -1418,8 +1447,9 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
                 const lit = i <= opp.momentum;
                 return (
                   <span key={i} style={{
-                    width: 4, height: 10,
+                    width: 5, height: 12,
                     background: lit ? dirColor : "rgba(255,255,255,0.10)",
+                    boxShadow: lit ? `0 0 4px rgba(${dirRgb},0.5)` : undefined,
                     animation: lit && isFreshSignal ? "momentum-breathe 3.4s ease-in-out infinite" : undefined,
                     animationDelay: lit && isFreshSignal ? `${(i - 1) * 150}ms` : undefined,
                   }} />
@@ -1430,25 +1460,31 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           <span
             title={`Signal age ${ageStr} · execution latency ${opp.latency}`}
             style={{
-              fontSize: 10, fontVariantNumeric: "tabular-nums",
-              whiteSpace: "nowrap",
+              fontSize: 11, fontVariantNumeric: "tabular-nums",
+              whiteSpace: "nowrap", color: T.TEXT_1,
               animation: isLiveTick ? "telemetry-flicker 1.6s ease-in-out infinite" : undefined,
               animationDelay: isLiveTick ? `-${flickerDelayMs}ms` : undefined,
             }}>
-            <span style={{ color: T.TEXT_1 }}>{ageStr}</span>
-            <span style={{ opacity: 0.45, margin: "0 3px" }}>·</span>
+            <span style={{ color: T.TEXT_0, fontWeight: 600 }}>{ageStr}</span>
+            <span style={{ opacity: 0.45, margin: "0 4px" }}>·</span>
             {opp.latency}
-            <span style={{ opacity: 0.45, margin: "0 5px" }}>·</span>
-            <span style={{ background: "rgba(255,255,255,0.08)", color: T.TEXT_0, padding: "1px 5px", borderRadius: 2 }}>{opp.score}</span>
+            <span style={{ opacity: 0.45, margin: "0 6px" }}>·</span>
+            <span style={{ background: `rgba(${dirRgb},0.18)`, color: T.TEXT_0, padding: "2px 7px", borderRadius: 2, fontWeight: 700, border: `1px solid rgba(${dirRgb},0.32)` }}>{opp.score}</span>
           </span>
         </div>
 
-        {/* CHART RAIL — dominant horizontal flow */}
+        {/* CHART RAIL — dominant horizontal flow.
+            Pass 7L: was ghost-white-on-nothing (0.022 alpha), reads
+            as a real dirColor-tinted plate with stronger borders so
+            the chart sits inside a recognizable container, not
+            floating in space. Height 70→80. */}
         <div style={{
-          position: "relative", width: "100%", height: 70,
-          background: "linear-gradient(180deg, rgba(255,255,255,0.022) 0%, rgba(0,0,0,0) 65%, rgba(255,255,255,0.014) 100%)",
-          borderTop: `1px solid ${T.BORDER}`,
-          borderBottom: `1px solid ${T.BORDER}`,
+          position: "relative", width: "100%", height: 80,
+          background: isActive
+            ? `linear-gradient(180deg, rgba(${dirRgb},0.08) 0%, rgba(0,0,0,0.30) 100%)`
+            : "linear-gradient(180deg, rgba(255,255,255,0.022) 0%, rgba(0,0,0,0) 65%, rgba(255,255,255,0.014) 100%)",
+          borderTop:    `1px solid ${isActive ? `rgba(${dirRgb},0.32)` : T.BORDER}`,
+          borderBottom: `1px solid ${isActive ? `rgba(${dirRgb},0.32)` : T.BORDER}`,
           overflow: "hidden",
         }}>
           <Sparkline
@@ -1471,51 +1507,61 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           )}
         </div>
 
-        {/* Inline action strip — prices · readiness · reasoning · QUEUE */}
+        {/* Inline action strip — prices · readiness · reasoning · QUEUE.
+            Pass 7L: full typography lift. Was 10/TEXT_2 with italic
+            gray reasoning that disappeared. Now 12/TEXT_1, reasoning
+            de-italicized at weight 500/TEXT_0, prices weight 700,
+            R:R weight 800, QUEUE button bigger with real ready-state
+            fill so the call-to-action actually reads. */}
         <div style={{
-          display: "flex", alignItems: "center", gap: 10,
-          fontSize: 10, color: T.TEXT_2,
+          display: "flex", alignItems: "center", gap: 12,
+          fontSize: 12, color: T.TEXT_1,
           fontVariantNumeric: "tabular-nums", lineHeight: 1, minWidth: 0,
         }}>
           <span style={{ whiteSpace: "nowrap" }}>
-            <span style={{ color: T.TEXT_3, marginRight: 3 }}>E</span>
-            <span style={{ color: T.TEXT_0 }}>{fmtPrice(opp.entry)}</span>
+            <span style={{ color: T.TEXT_2, marginRight: 4, fontWeight: 600 }}>E</span>
+            <span style={{ color: T.TEXT_0, fontWeight: 700 }}>{fmtPrice(opp.entry)}</span>
           </span>
           <span
             title={`Stop ${fmtPrice(opp.stop)} (${pctDelta(opp.entry, opp.stop)} from entry)`}
             style={{ whiteSpace: "nowrap", cursor: "help" }}
           >
-            <span style={{ color: T.TEXT_3, marginRight: 3 }}>S</span>
-            <span style={{ color: T.RED }}>{fmtPrice(opp.stop)}</span>
+            <span style={{ color: T.TEXT_2, marginRight: 4, fontWeight: 600 }}>S</span>
+            <span style={{ color: T.RED, fontWeight: 700 }}>{fmtPrice(opp.stop)}</span>
           </span>
           <span
             title={`Target ${fmtPrice(opp.target)} (${pctDelta(opp.entry, opp.target)} from entry)`}
             style={{ whiteSpace: "nowrap", cursor: "help" }}
           >
-            <span style={{ color: T.TEXT_3, marginRight: 3 }}>T</span>
-            <span style={{ color: T.NEON }}>{fmtPrice(opp.target)}</span>
+            <span style={{ color: T.TEXT_2, marginRight: 4, fontWeight: 600 }}>T</span>
+            <span style={{ color: T.NEON, fontWeight: 700 }}>{fmtPrice(opp.target)}</span>
           </span>
           <span style={{ whiteSpace: "nowrap" }}>
-            <span style={{ color: T.TEXT_3, marginRight: 3 }}>R:R</span>
-            <span style={{ color: dirColor, fontWeight: 600 }}>{rr}</span>
+            <span style={{ color: T.TEXT_2, marginRight: 4, fontWeight: 600 }}>R:R</span>
+            <span style={{ color: dirColor, fontWeight: 800, textShadow: `0 0 4px rgba(${dirRgb},0.5)` }}>{rr}</span>
           </span>
           <span style={{
-            fontSize: 10, fontWeight: 700, whiteSpace: "nowrap",
+            fontSize: 11, fontWeight: 800, whiteSpace: "nowrap",
             color: opp.readiness === "READY" ? T.NEON : opp.readiness === "WAITING" ? T.AMBER : T.TEXT_2,
-            display: "inline-flex", alignItems: "center", gap: 3,
+            display: "inline-flex", alignItems: "center", gap: 4,
+            padding: "3px 8px", borderRadius: 2,
+            border: `1px solid ${opp.readiness === "READY" ? `rgba(102,255,102,0.42)` : opp.readiness === "WAITING" ? `rgba(255,176,32,0.42)` : T.BORDER}`,
+            background: opp.readiness === "READY" ? `rgba(102,255,102,0.10)` : opp.readiness === "WAITING" ? `rgba(255,176,32,0.10)` : "transparent",
+            letterSpacing: T.TRACK_LABEL,
           }}>
-            {opp.readiness === "READY"   && <CheckCircle2 size={10} />}
-            {opp.readiness === "WAITING" && <Timer size={10} />}
-            {opp.readiness === "GATED"   && <Lock size={10} />}
+            {opp.readiness === "READY"   && <CheckCircle2 size={11} />}
+            {opp.readiness === "WAITING" && <Timer size={11} />}
+            {opp.readiness === "GATED"   && <Lock size={11} />}
             {opp.readiness}
           </span>
           <span
             title={gatedReason ? `Gated: ${gatedReason}` : opp.reasoning}
             style={{
               flex: 1, minWidth: 0,
-              fontStyle: "italic",
-              color: gatedReason ? T.AMBER : T.TEXT_2,
+              fontSize: 11, fontWeight: 500,
+              color: gatedReason ? T.AMBER : T.TEXT_0,
               overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
+              textShadow: `0 0 4px rgba(0,0,0,0.6)`,
             }}>
             {gatedReason ? `⛔ ${gatedReason}` : opp.reasoning}
           </span>
@@ -1523,24 +1569,29 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
             onClick={() => ready && onQueue(opp)}
             disabled={!ready}
             style={{
-              padding: "3px 10px", fontSize: 9, fontWeight: 700,
+              padding: "6px 14px", fontSize: 11, fontWeight: 800,
               fontFamily: T.FONT_MONO, letterSpacing: T.TRACK_LABEL,
               border: `1px solid ${ready ? T.NEON : T.BORDER}`,
-              background: "transparent",
+              background: ready ? `rgba(102,255,102,0.18)` : "transparent",
               color: ready ? T.NEON : T.TEXT_3,
+              boxShadow: ready ? `0 0 12px rgba(102,255,102,0.30), inset 0 0 8px rgba(102,255,102,0.10)` : undefined,
+              textShadow: ready ? `0 0 6px rgba(102,255,102,0.6)` : undefined,
               cursor: ready ? "pointer" : "not-allowed",
               transition: "all 120ms ease",
               flexShrink: 0,
+              borderRadius: 2,
             }}
             onMouseEnter={(e) => {
               if (!ready) return;
               e.currentTarget.style.background = T.NEON;
               e.currentTarget.style.color = "#000";
+              e.currentTarget.style.textShadow = "none";
             }}
             onMouseLeave={(e) => {
               if (!ready) return;
-              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.background = "rgba(102,255,102,0.18)";
               e.currentTarget.style.color = T.NEON;
+              e.currentTarget.style.textShadow = `0 0 6px rgba(102,255,102,0.6)`;
             }}
           >QUEUE PAPER</button>
         </div>
