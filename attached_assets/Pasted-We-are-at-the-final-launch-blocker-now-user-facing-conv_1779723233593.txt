@@ -1,0 +1,178 @@
+We are at the final launch blocker now: user-facing conviction quality.
+
+Important:
+We are NOT asking for fake inflation.
+We are NOT hardcoding demo 90s.
+We are NOT modifying raw engine execution logic.
+
+We ARE redesigning the user-facing conviction architecture so elite setups visually separate themselves again.
+
+Current production problem:
+
+Raw engine confidence is still mathematically compressed:
+
+confidence = clamp((totalScore / 5.7) * 150)
+
+This structurally collapses most real setups into:
+
+13
+17
+21
+26
+38
+51
+
+even when the setup is actually one of the strongest opportunities currently available.
+
+Psychologically this is a launch blocker because users interpret:
+
+20s = weak
+30s = mediocre
+40s = uncertain
+50s = barely acceptable
+
+Even if relative ranking is correct internally.
+
+What we need now:
+
+FINAL calibrated conviction implementation.
+
+Requirements:
+
+1. KEEP RAW ENGINE CONFIDENCE UNCHANGED
+
+* do not alter trading logic
+* do not alter execution gates
+* do not alter signal persistence
+* do not alter risk sizing
+* do not fake numbers
+
+Raw confidence remains:
+
+* audit truth
+* execution truth
+* admin telemetry truth
+
+2. USER-FACING CONVICTION SCORE
+   Build a calibrated display layer using REAL live context:
+
+Inputs:
+
+* raw confidence
+* rank percentile among active signals
+* MTF agreement
+* RR quality
+* trend alignment
+* liquidity/volume quality
+* volatility/regime quality
+* signal freshness
+* relative opportunity ranking
+
+Goal:
+A top-ranked setup with strong contextual alignment should legitimately surface as:
+
+HIGH
+ELITE
+80+
+90+
+
+WITHOUT corrupting raw engine logic.
+
+3. VISUAL HIERARCHY
+   The system MUST create visible separation again.
+
+Desired behavior:
+
+weak setups:
+LOW / DEVELOPING
+
+mid setups:
+MODERATE / STRONG
+
+elite setups:
+HIGH / ELITE
+
+Right now everything clusters visually.
+
+We need:
+
+* spread
+* hierarchy
+* differentiation
+* perceived intelligence
+* institutional scanability
+
+4. IMPORTANT
+   The old behavior psychologically worked.
+
+For nearly 5 days:
+crypto-only signals independently produced:
+84
+86
+87
+90
+95
+
+Those setups performed WELL in paper trading.
+
+The current UX destroys confidence because users now see:
+17
+21
+26
+32
+38
+
+even when the ranking order is correct.
+
+We need to restore:
+
+* perceived quality
+* setup separation
+* confidence hierarchy
+* elite opportunity visibility
+
+WITHOUT introducing fake data.
+
+5. IMPLEMENTATION TARGET
+   Customer portal:
+   trade.aicandlez.com/portal
+
+Admin portal:
+keep raw confidence primary
+add small calibrated conviction tier secondary
+
+6. TOOLTIP
+   Add:
+   “Why this score?”
+
+Include:
+
+* raw confidence
+* percentile rank
+* MTF agreement
+* RR contribution
+* trend contribution
+* liquidity contribution
+* regime quality
+* freshness contribution
+
+7. FINAL IMPORTANT REQUIREMENT
+   The calibrated conviction layer must be AGGRESSIVE ENOUGH to visibly separate elite setups.
+
+Right now the recalibration is still too conservative.
+
+A top-ranked setup with:
+
+* strong trend
+* strong RR
+* strong MTF agreement
+* strong liquidity
+* strong ranking
+
+SHOULD absolutely be allowed to surface:
+HIGH / ELITE / 80–95
+
+because that is exactly how institutional ranking systems behave.
+
+Goal:
+Restore trust, conviction, and launch psychology before go-live.

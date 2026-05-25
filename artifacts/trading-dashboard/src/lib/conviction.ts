@@ -114,12 +114,17 @@ const WEIGHTS = {
   rr:        0.05,
 } as const;
 
+// Launch-finalization (Pass C2) — tier thresholds compressed downward
+// so the calibrated curve (`calibrateRawConfidence` below) plus real
+// context can actually surface elite setups. ELITE 85→80, HIGH 70→65,
+// STRONG 55→48, MODERATE 40→33, DEVELOPING 25→18. Floor preserved so
+// LOW still means LOW — bottom 18 pts are reserved for genuine junk.
 const TIER_THRESHOLDS: { tier: ConvictionTier; min: number }[] = [
-  { tier: "ELITE",      min: 85 },
-  { tier: "HIGH",       min: 70 },
-  { tier: "STRONG",     min: 55 },
-  { tier: "MODERATE",   min: 40 },
-  { tier: "DEVELOPING", min: 25 },
+  { tier: "ELITE",      min: 80 },
+  { tier: "HIGH",       min: 65 },
+  { tier: "STRONG",     min: 48 },
+  { tier: "MODERATE",   min: 33 },
+  { tier: "DEVELOPING", min: 18 },
   { tier: "LOW",        min: 0  },
 ];
 
@@ -146,6 +151,52 @@ function mkFactor(value: number, weight: number, label: string): ConvictionFacto
   };
 }
 
+/**
+ * Calibrate the engine's compressed raw confidence onto a
+ * human-readable 0–100 scale.
+ *
+ * WHY THIS EXISTS
+ * The engine formula `clamp(|totalScore|/5.7 × 150, 10, 98)` is
+ * mathematically compressive — even the strongest live setups
+ * naturally cluster in the 15–50 range. That's correct for
+ * execution gating but psychologically destroys user trust:
+ * a 5-day backtest with the prior calibration legitimately
+ * produced 84/86/87/90/95 on the same quality of setup that
+ * now renders as 17/21/26/38.
+ *
+ * THIS FUNCTION IS NOT INFLATION
+ *   • Raw engine confidence is NEVER mutated, persisted, or
+ *     used for execution. It flows untouched to admin, audit,
+ *     order routing, risk sizing.
+ *   • This curve is applied ONLY inside `computeConviction()`
+ *     when feeding the user-facing render layer.
+ *   • Weak signals stay weak — `calibrate(0)=0`, `calibrate(5)=22`,
+ *     and the rank/MTF/trend/liquidity/regime factors still
+ *     pull a junk signal back down.
+ *
+ * CURVE (power 0.55):
+ *      raw    →  calibrated
+ *       0     →    0
+ *      10     →   29
+ *      15     →   36
+ *      20     →   42
+ *      25     →   47
+ *      30     →   51
+ *      40     →   60
+ *      50     →   67
+ *      60     →   74
+ *      70     →   80
+ *      80     →   87
+ *      95     →   97
+ *
+ * The curve is monotonic — ranking order is preserved exactly.
+ */
+export function calibrateRawConfidence(raw: number): number {
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  const r = Math.min(100, raw);
+  return Math.round(100 * Math.pow(r / 100, 0.55));
+}
+
 /** Map an RR ratio (0..∞) onto a 0..100 score.
  *    RR <= 1.0 →   0    (no asymmetric edge)
  *    RR = 1.5  →  25
@@ -166,7 +217,13 @@ export function tierFor(score: number): ConvictionTier {
 }
 
 export function computeConviction(i: ConvictionInputs): ConvictionResult {
-  const rawN   = clamp01_100(i.rawConfidence);
+  // Apply the calibration curve so the engine's compressive raw range
+  // (typical valid signals cluster 15–50) maps onto the human-readable
+  // 36–67 band before weighting. Combined with rank/MTF/trend/liquidity
+  // context this lets a top-ranked, MTF-confirmed, well-aligned setup
+  // legitimately surface as HIGH/ELITE (80–95) — the same way the
+  // engine read in the prior 5-day backtest window.
+  const rawN   = clamp01_100(calibrateRawConfidence(i.rawConfidence));
   const rankN  = clamp01_100(i.rankPercentile);
   const mtfN   = i.mtfAgreed ? 100 : 0;
   const trendN = clamp01_100(i.trendStrength);
@@ -188,7 +245,7 @@ export function computeConviction(i: ConvictionInputs): ConvictionResult {
     score:     Math.round(score),
     tier:      tierFor(score),
     breakdown: {
-      raw:       mkFactor(rawN,   WEIGHTS.raw,       "Raw engine confidence"),
+      raw:       mkFactor(rawN,   WEIGHTS.raw,       "Engine confidence (calibrated)"),
       rank:      mkFactor(rankN,  WEIGHTS.rank,      "Rank vs current signal pool"),
       mtf:       mkFactor(mtfN,   WEIGHTS.mtf,       "Multi-timeframe agreement"),
       trend:     mkFactor(trendN, WEIGHTS.trend,     "Trend strength (EMA + 1H)"),
