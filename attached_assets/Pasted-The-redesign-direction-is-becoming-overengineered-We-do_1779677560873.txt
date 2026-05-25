@@ -1,0 +1,123 @@
+The redesign direction is becoming overengineered. We do NOT need a new layout system. The original portal design already works extremely well visually and structurally.
+
+Reference:
+Current preferred version = the older AICandlez operator portal layout shown before the redesign experiments.
+URL:
+trade.aicandlez.com/portal
+
+The goal now is NOT a full redesign.
+
+We are reverting to the original execution-terminal architecture and simply modernizing the TOP SECTION while preserving the existing signal-grid layout.
+
+DO NOT:
+
+redesign the card architecture
+redesign the signal rows
+redesign the execution grids
+redesign the long/short structure
+redesign the lower telemetry sections
+redesign spacing rhythm
+redesign the visual hierarchy
+
+The original layout already has:
+
+stronger institutional feel
+better execution readability
+better density
+better “Bloomberg / TradingView terminal” energy
+cleaner scan behavior
+superior chart rhythm
+
+The newer redesign feels too fragmented and dashboard-like.
+The original feels like a LIVE AI EXECUTION TERMINAL.
+That is the identity we want.
+
+NEW DIRECTION:
+
+Keep the ORIGINAL portal layout almost entirely intact.
+
+ONLY modify the TOP SECTION.
+
+SPECIFIC CHANGES:
+
+REMOVE “LIVE AI EQUITIES EXECUTION”
+Replace the Equities column completely with:
+MEME COINS
+trending/high-volatility crypto assets
+speculative movers
+
+Examples:
+DOGE
+PEPE
+WIF
+BONK
+FLOKI
+BRETT
+TURBO
+POPCAT
+MOG
+BOME
+
+KEEP THE SAME FORMAT
+Do NOT invent a new card style.
+
+Keep:
+
+same signal-row structure
+same sparkline behavior
+same confidence rings
+same BUY / SELL execution controls
+same long/short segmentation
+same execution telemetry styling
+same glowing terminal aesthetic
+
+Just swap the asset universe.
+
+TOP SECTION REWORK ONLY
+Focus ONLY on:
+header polish
+operator telemetry
+live status strip
+AI intelligence center
+top KPI presentation
+spacing cleanup
+better alignment consistency
+
+The lower execution area is already correct.
+
+KEEP THE “DUAL EXECUTION COLUMN” SYSTEM
+Left:
+CRYPTO EXECUTION
+
+Right:
+MEME COIN EXECUTION
+
+NOT equities.
+
+PRESERVE THE ORIGINAL ENERGY
+The original version feels:
+cinematic
+aggressive
+institutional
+high-frequency
+alive
+
+The redesign accidentally reduced that energy.
+
+We want:
+“AI hedge-fund terminal”
+NOT:
+“generic SaaS analytics dashboard”
+
+PRIORITY TASKS NOW
+Priority is:
+stabilize top section
+improve telemetry readability
+improve spacing consistency
+improve alignment
+improve responsiveness
+improve live execution feel
+
+NOT architectural reinvention.
+
+The original layout direction was the correct one. We are refining it — not replacing it.
