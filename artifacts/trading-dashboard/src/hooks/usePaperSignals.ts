@@ -473,17 +473,32 @@ export function usePaperSignals() {
     //   is untouched — it never reads opp.convictionScore or this
     //   percentile pool. Verified by the launch-risk audit.
     //
-    // Cohort qualification (must satisfy ALL):
+    // Cohort qualification (must satisfy ALL — Pass C3 tightened):
     //   1. regime ∈ { TRENDING, BREAKOUT }  (excludes RANGING / EXHAUSTED)
     //   2. vol !== "LOW VOL"                (proxy for volumeConfirmed)
+    //   3. mtf has at least one green/red dot AND no full-amber row
+    //      (proxy for MTF agreement — institutional-grade cohort only)
+    //
+    // Adding the MTF requirement to the cohort gate is the
+    // institutional-scarcity lever: on a typical tick this drops the
+    // ranking pool from ~15 to ~3–6 genuine institutional setups,
+    // which makes the top card's percentile-100 actually mean
+    // "this is the cleanest opportunity on the board right now"
+    // instead of "least bad of fifteen".
     //
     // Non-qualifying opps get rank=0 — combined with the calibrated
-    // layer's weighting (rank carries 0.18) this naturally settles
-    // them into LOW / DEVELOPING without any tier hardcoding.
+    // layer's weighting (rank carries 0.18) plus the new discord
+    // penalty (up to -15 when raw is strong but context is broken)
+    // this naturally settles them into LOW / DEVELOPING without any
+    // tier hardcoding.
     const isActiveCohortMember = (o: OpportunityVM): boolean => {
       const activeRegime = o.regime === "TRENDING" || o.regime === "BREAKOUT";
       const volumePasses = o.vol !== "LOW VOL";
-      return activeRegime && volumePasses;
+      // MTF qualification: at least one non-amber dot AND not all amber.
+      // The mtf tuple is [5m, 15m, 1H, trend] of MtfDot ("green"|"red"|"amber").
+      const nonAmber = o.mtf.filter(d => d !== "amber").length;
+      const mtfQualifies = nonAmber >= 2;
+      return activeRegime && volumePasses && mtfQualifies;
     };
     const cohortPool = out.filter(isActiveCohortMember).map(o => o.conf);
     for (const o of out) {

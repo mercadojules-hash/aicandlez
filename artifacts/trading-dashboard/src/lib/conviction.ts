@@ -114,17 +114,20 @@ const WEIGHTS = {
   rr:        0.05,
 } as const;
 
-// Launch-finalization (Pass C2) — tier thresholds compressed downward
-// so the calibrated curve (`calibrateRawConfidence` below) plus real
-// context can actually surface elite setups. ELITE 85→80, HIGH 70→65,
-// STRONG 55→48, MODERATE 40→33, DEVELOPING 25→18. Floor preserved so
-// LOW still means LOW — bottom 18 pts are reserved for genuine junk.
+// Launch-finalization (Pass C3) — institutional spread thresholds.
+// Wider spacing makes the upper band rarer + the lower band heavier
+// so the user-facing distribution legitimately breathes across the
+// full 0-100 range. Combined with synergy/discord math below this
+// gives the perceptual hierarchy of a professional execution console
+// (REJECT-grade < 22, DEVELOPING 22-40, WATCHLIST 40-55, STRONG 55-68,
+// HIGH CONVICTION 68-82, ELITE 82+). Tier *names* are preserved so
+// the customer/admin shells don't need to be re-styled.
 const TIER_THRESHOLDS: { tier: ConvictionTier; min: number }[] = [
-  { tier: "ELITE",      min: 80 },
-  { tier: "HIGH",       min: 65 },
-  { tier: "STRONG",     min: 48 },
-  { tier: "MODERATE",   min: 33 },
-  { tier: "DEVELOPING", min: 18 },
+  { tier: "ELITE",      min: 82 },
+  { tier: "HIGH",       min: 68 },
+  { tier: "STRONG",     min: 55 },
+  { tier: "MODERATE",   min: 40 },
+  { tier: "DEVELOPING", min: 22 },
   { tier: "LOW",        min: 0  },
 ];
 
@@ -174,19 +177,19 @@ function mkFactor(value: number, weight: number, label: string): ConvictionFacto
  *     and the rank/MTF/trend/liquidity/regime factors still
  *     pull a junk signal back down.
  *
- * CURVE (power 0.55):
+ * CURVE (power 0.50, Pass C3 — steeper upper expansion):
  *      raw    →  calibrated
  *       0     →    0
- *      10     →   29
- *      15     →   36
- *      20     →   42
- *      25     →   47
- *      30     →   51
- *      40     →   60
- *      50     →   67
- *      60     →   74
- *      70     →   80
- *      80     →   87
+ *      10     →   32
+ *      15     →   39
+ *      20     →   45
+ *      25     →   50
+ *      30     →   55
+ *      40     →   63
+ *      50     →   71
+ *      60     →   77
+ *      70     →   84
+ *      80     →   89
  *      95     →   97
  *
  * The curve is monotonic — ranking order is preserved exactly.
@@ -194,7 +197,7 @@ function mkFactor(value: number, weight: number, label: string): ConvictionFacto
 export function calibrateRawConfidence(raw: number): number {
   if (!Number.isFinite(raw) || raw <= 0) return 0;
   const r = Math.min(100, raw);
-  return Math.round(100 * Math.pow(r / 100, 0.55));
+  return Math.round(100 * Math.pow(r / 100, 0.50));
 }
 
 /** Map an RR ratio (0..∞) onto a 0..100 score.
@@ -219,7 +222,7 @@ export function tierFor(score: number): ConvictionTier {
 export function computeConviction(i: ConvictionInputs): ConvictionResult {
   // Apply the calibration curve so the engine's compressive raw range
   // (typical valid signals cluster 15–50) maps onto the human-readable
-  // 36–67 band before weighting. Combined with rank/MTF/trend/liquidity
+  // 39–77 band before weighting. Combined with rank/MTF/trend/liquidity
   // context this lets a top-ranked, MTF-confirmed, well-aligned setup
   // legitimately surface as HIGH/ELITE (80–95) — the same way the
   // engine read in the prior 5-day backtest window.
@@ -231,7 +234,7 @@ export function computeConviction(i: ConvictionInputs): ConvictionResult {
   const regN   = clamp01_100(i.regimeScore);
   const rrN    = clamp01_100(rrRatioToScore(i.rrRatio));
 
-  const score = clamp01_100(
+  const base = clamp01_100(
     rawN   * WEIGHTS.raw +
     rankN  * WEIGHTS.rank +
     mtfN   * WEIGHTS.mtf +
@@ -240,6 +243,53 @@ export function computeConviction(i: ConvictionInputs): ConvictionResult {
     regN   * WEIGHTS.regime +
     rrN    * WEIGHTS.rr,
   );
+
+  // ── Pass C3 — Synergy bonus / Discord penalty ────────────────────
+  // The weighted sum above is a fair *average*. Institutional
+  // conviction is non-linear: when 4+ factors all align, the setup
+  // earns a confidence boost beyond the average; when raw confidence
+  // is decent but key context disagrees, the setup is sharply
+  // suppressed instead of merely averaged down.
+  //
+  //   • Synergy: count "strong" factors among
+  //     { MTF=100, trend≥70, liquidity≥70, regime≥70, RR-score≥60 }.
+  //     ≥4 strong → +6 ; ≥5 strong → +12.
+  //   • Discord: if calibrated raw ≥55 (the engine likes it) but
+  //     context breaks {!MTF, OR trend<40, OR liquidity<50} →
+  //     subtract 8 per discord, capped at -15. This is the "mediocre
+  //     setups should NOT score high" lever — punishes the conflict
+  //     pattern user identified (strong raw, weak everything else).
+  //
+  // Both modifiers are bounded so weak signals still cap low and
+  // strong signals still cap at 100. Ranking monotonicity is
+  // preserved within each context class.
+  let strongCount = 0;
+  if (mtfN === 100)  strongCount++;
+  if (trendN >= 70)  strongCount++;
+  if (liqN >= 70)    strongCount++;
+  if (regN >= 70)    strongCount++;
+  if (rrN >= 60)     strongCount++;
+  const synergy =
+    strongCount >= 5 ? 12 :
+    strongCount >= 4 ? 6  :
+    0;
+
+  // Discord is ramped linearly between calibrated raw 45 → 60 (rather
+  // than gated at a single threshold) so the function stays monotonic
+  // across the raw range within a fixed context class. A setup at
+  // rawN=54 with broken context would otherwise score *higher* than
+  // the same context at rawN=55, which violates ranking semantics.
+  let discordRaw = 0;
+  if (mtfN === 0)   discordRaw += 8;
+  if (trendN < 40)  discordRaw += 5;
+  if (liqN < 50)    discordRaw += 4;
+  discordRaw = Math.min(15, discordRaw);
+  const discordRamp = rawN <= 45 ? 0
+                    : rawN >= 60 ? 1
+                    : (rawN - 45) / 15;
+  const discord = discordRaw * discordRamp;
+
+  const score = clamp01_100(base + synergy - discord);
 
   return {
     score:     Math.round(score),
