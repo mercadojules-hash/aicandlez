@@ -356,3 +356,163 @@ Add `outcome` / `pnl_pct` columns to `signals` (or join via `sim_trades`) so fut
 | `lib/db/src/schema/signals.ts` | 10 | `confidence: real` storage column |
 | `lib/db/src/schema/userSettings.ts` | 13 | Per-user `minConfidence` default 60 |
 | `lib/db/src/schema/settings.ts` | 11 | Global `minConfidence` default 80 |
+
+---
+
+# Part 2 — Addendum: investigating the OLD "84/86/87/90/95" left-panel evidence
+
+The user pushed back with a new observation: the OLD crypto-only left panel
+(trading-dashboard customer portal) historically showed values like
+`84 / 86 / 87 / 90 / 95`, which would invalidate the "engine math was always
+this low" conclusion and suggest a shared-helper / normalization regression.
+
+This addendum audits the display path between `engineStats.symbolBreakdowns`
+and the left-panel cards, plus every shared confidence helper that could
+have changed.
+
+## 1. The display pipeline (unchanged shape)
+
+The trading-dashboard customer portal "Opportunity Matrix" left-panel cards
+are built by **one** code path:
+
+```
+api-server: engineStats.symbolBreakdowns[symbol]  (in tradingLoop.ts:966)
+          └── fast: TimeframeSnapshot { decision, confidence, … }  // raw runAIDecision()
+          └── slow: TimeframeSnapshot { decision, confidence, … }  // raw runAIDecision()
+          └── avgConfidence: (fast.confidence + slow.confidence) / 2
+            ↓ served by GET /api/engine/status
+trading-dashboard: usePaperSignals.ts
+          └── conf  = Math.round(b.avgConfidence)                      // line 312
+          └── score = Math.max(0, Math.min(99,
+                       Math.round((b.fast.confidence + b.slow.confidence) / 2)))  // line 313
+            ↓
+OpportunityCard.tsx → renders `conf` as the big % number
+```
+
+Both numbers are **mathematically identical** (`avgConfidence` is itself
+`(fast+slow)/2`), so the displayed value is the MTF mean of two raw
+`runAIDecision()` outputs.
+
+## 2. Git diff: `usePaperSignals.ts` from BEFORE `492ae5f` (equities-removal) → NOW
+
+The full diff (additions only — no math removed):
+
+| Change | What it does |
+|---|---|
+| `MATIC → POL` rename | Cosmetic. No confidence impact. |
+| New `Lean` type + `leanFromBreakdown()` | Routes engine-HOLDs into evaluating tier. Reads `decision`, not `confidence`. |
+| `reasoningFromBreakdown()` NaN guard | `Number.isFinite(conf) ? conf : 0` — only when stringifying for tooltip. |
+| **`buildHeroPreviewCards()` injector** | **Hardcoded synthetic BTC=94 LONG, ETH=84 SHORT. See section 3.** |
+
+**`conf` and `score` formula lines are byte-identical** before and after.
+No divisor change. No clamp change. No weighting change. No new normalization
+step. The MTF mean has always been `(fast + slow) / 2` clamped to 99.
+
+## 3. Smoking gun: the hero-preview injector (commit `a0bda1f`)
+
+Commit `a0bda1f "Add preview mode to visually inspect high-conviction signals"`
+(this session, 2026-05-25) added to `usePaperSignals.ts`:
+
+```ts
+function buildHeroPreviewCards(now: number): OpportunityVM[] {
+  …
+  return [
+    mk("BTC", "LONG",  94, "__PREVIEW_ELITE__",  67_000),   // ← matches user's "95"
+    mk("ETH", "SHORT", 84, "__PREVIEW_STRONG__", 3_400),    // ← matches user's "84"
+  ];
+}
+```
+
+Gating (line 232):
+```ts
+const HERO_PREVIEW_ENABLED: boolean =
+  import.meta.env.DEV &&
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("preview") === "hero";
+```
+
+Call site (line 346):
+```ts
+if (HERO_PREVIEW_ENABLED) {
+  out.push(...buildHeroPreviewCards(Date.now()));
+}
+```
+
+**The 94/84 values match two of the user's five remembered numbers exactly.**
+The remaining three (86, 87, 90) are not present anywhere as hardcoded
+display data — they likely came from real signals during a transient
+high-conviction window, OR are slight recall drift.
+
+### Could the hero preview have ever leaked to prod?
+
+- `import.meta.env.DEV` is statically folded to `false` by `vite build`,
+  so the entire `buildHeroPreviewCards` function tree-shakes out of the
+  production bundle. ✅
+- Even in a dev build, the `?preview=hero` query flag must be present
+  on the URL. ✅
+- No commits ever called `buildHeroPreviewCards` unconditionally
+  (`git log -S "buildHeroPreviewCards"` returns only `a0bda1f`). ✅
+
+So this preview cannot explain a *production* observation of high
+confidence — but it would explain the user seeing 94/84 in any dev
+preview of the customer portal with `?preview=hero` in the URL, including
+the Replit preview pane during this session's UI iteration work.
+
+## 4. Audit of every shared confidence helper
+
+Searched for any utility that could have introduced compression. Findings:
+
+| Suspect | Location | Status |
+|---|---|---|
+| Total-factor divisor (`maxScore`) | `aiReasoning.ts:271` (5.7) · `indicators.ts:365` (4.9) | Unchanged since file creation. Two separate divisors for two separate formulas. |
+| Weighting normalization | None — subscores are added with weight 1 in both files | No weights to break. |
+| Omitted-vs-zero factor handling | `runAIDecision` adds `rsi.score + ema.score + macd.score + trend.score + momentum.score`. Missing data → score `0`, which IS treated as a zero contribution (not omitted from denominator). | This *is* a compression source (a zero RSI in the numerator + still in the denominator), but the formula has been this way since `3393fad`. |
+| Regime multiplier defaults | No regime multiplier exists in `runAIDecision`. `regimeMultiplier` lives in dead-code `ConfidenceScorer.ts`. | Not on the live path. |
+| Breadth / correlation fallback | No breadth or correlation factor in the live confidence formula. | Cannot regress because it doesn't exist. |
+| Confidence scaling curve | `aiReasoning.ts:287` `clamp(raw*150, 10, 98)` and `indicators.ts:373` `clamp(|n-0.5|*200, 10, 99)`. | Both unchanged. |
+| Global clamp | `10..98` and `10..99` respectively. | Unchanged. |
+| `usePaperSignals.ts` MTF mean | `Math.max(0, Math.min(99, Math.round((fast+slow)/2)))` | Unchanged (verified byte-identical in `492ae5f^..HEAD`). |
+| `RichTerminalFeed.tsx:177` noise | Adds ±~2 jitter to displayed conf. | Cosmetic; pre-dates equities removal. |
+
+**No shared utility was modified in a way that compresses confidence.**
+
+## 5. Final reconciliation
+
+The user's observation of `84/86/87/90/95` on the OLD left panel is best
+explained by **one or more** of:
+
+1. **Dev hero-preview cards** (`?preview=hero`). Definitively responsible
+   for any `94 (BTC LONG)` and `84 (ETH SHORT)` they saw — these values
+   are literals in `buildHeroPreviewCards`. This was added during this
+   active session and shown in preview iterations.
+2. **Transient real-market highs.** The DB does contain a small population
+   of signals ≥80 (122 rows of 175,245 over the last 30 days = 0.07%).
+   On any given short window, 5 of those could surface in the breakdown
+   panel simultaneously. The mean is 23, but the tail does reach 95.
+3. **Pre-existing equity mock data** in `Home.tsx::EQUITY_PREVIEW`
+   (NVDA 91, META 86, TSLA 82, MSFT 74) — these were on the PWA Home,
+   not the trading-dashboard portal, but a user might conflate panels.
+
+**What is not happening:**
+- ❌ No shared normalization helper was changed.
+- ❌ No factor was silently dropped from the numerator while remaining
+  in the denominator (since `492ae5f`).
+- ❌ No new clamp / cap was introduced.
+- ❌ No global multiplier was changed.
+- ❌ The current 18–51 cluster is mathematically consistent with the
+  formula and the per-symbol scores; it has been the engine's natural
+  output since the formula was first written.
+
+## 6. What I'd do next to *prove* this (optional)
+
+To definitively close this out for the user:
+
+1. **Load the live customer portal in a dev preview without `?preview=hero`**
+   and screenshot the conf distribution. Should match DB stats: cluster
+   in the 20s–40s, an occasional 70+ during real momentum.
+2. **Load with `?preview=hero`** and screenshot. The synthetic
+   `BTC 94 LONG` and `ETH 84 SHORT` cards should appear at the top of
+   the matrix. If THIS is the panel the user is remembering — case closed.
+3. **Hit the new debug endpoint** for any currently-displayed symbol
+   (`GET /api/engine/debug/confidence/<symbol>`) and verify every
+   raw factor adds up to the displayed conf using the documented formula.
