@@ -2754,7 +2754,8 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
   // Pass 7U — EXECUTION cell removed entirely (was "IDLE / N% LIVE /
   // OFFLINE"). In paper mode the line was noise; engine health surfaces
   // in OperatorPulseRibbon already.
-  const confColor  = pulse.avgConf >= 70 ? T.NEON : pulse.avgConf >= 55 ? T.AMBER : T.TEXT_1;
+  // Pass 7W — confColor / pulse.avgConf consumption removed; ring
+  // moved to GlobalAIConfidenceRing in the header.
 
   // Pass 7V — compact $XXXK / $X.XXM formatting per user spec.
   // "$100,000.00" → "$100K"; PNL "+$1,234.56" → "+$1.23K"; under $1K
@@ -2784,7 +2785,7 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
   );
 
   return (
-    <PanelCard title="ACCOUNT STATUS" live height={236}>
+    <PanelCard title="ACCOUNT STATUS" live height={196}>
       <div style={{
         padding: "22px 26px",
         flex: 1,
@@ -2796,7 +2797,7 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
         <div style={{
           flex: 1,
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
           gap: "20px 22px",
           alignItems: "center",
         }}>
@@ -2809,17 +2810,49 @@ const AccountStatusStrip = memo(function AccountStatusStrip({
           <Cell k="ACTIVE SIGNALS" size={24} v={activeSignals.toString()} color={activeSignals > 0 ? T.TEXT_0 : T.TEXT_2} />
           <Cell k="QUEUE"          size={24} v={queueDepth.toString()} color={queueDepth > 0 ? T.AMBER : T.TEXT_2} />
         </div>
-        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, paddingLeft: 26, borderLeft: `1px solid ${T.BORDER}` }}>
-          <div style={{ position: "relative", width: 144, height: 144 }}>
-            <ConfidenceRing color={confColor} value={pulse.avgConf} size={144} />
-            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-              <span style={{ fontSize: 40, color: confColor, fontVariantNumeric: "tabular-nums", fontWeight: 700, lineHeight: 1 }}>{pulse.avgConf}</span>
-              <span style={{ fontSize: 10, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL, marginTop: 6 }}>AI AVG CONF</span>
-            </div>
-          </div>
-        </div>
+        {/* Pass 7W — AI AVG CONF ring removed from ACCOUNT STATUS.
+            Promoted to the global system-intelligence indicator in
+            the header (GlobalAIConfidenceRing under the toolbar).
+            ACCOUNT STATUS now focuses purely on user paper-trading
+            telemetry (equity / PNL / wins / losses / open / signals
+            / queue). `confColor` and `pulse.avgConf` no longer
+            consumed here. */}
       </div>
     </PanelCard>
+  );
+});
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* GlobalAIConfidenceRing — Pass 7W                                         */
+/* Promoted out of ACCOUNT STATUS into the page header. Communicates       */
+/* the platform's aggregate AI conviction across all monitored crypto      */
+/* opportunities — the system intelligence indicator for the entire        */
+/* customer terminal. Larger + more prominent than its previous embedded   */
+/* form so it reads as global state, not a per-panel stat.                  */
+/* ──────────────────────────────────────────────────────────────────────── */
+const GlobalAIConfidenceRing = memo(function GlobalAIConfidenceRing({ value }: { value: number }) {
+  const color = value >= 70 ? T.NEON : value >= 55 ? T.AMBER : T.TEXT_1;
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 14,
+      padding: "10px 16px",
+      border: `1px solid rgba(102,255,102,0.28)`,
+      background: `linear-gradient(180deg, #0E1A15 0%, ${T.BG_TERMINAL} 100%)`,
+      boxShadow: `0 0 0 1px rgba(102,255,102,0.10), inset 0 1px 0 rgba(102,255,102,0.14), 0 6px 20px rgba(0,0,0,0.55), 0 0 36px rgba(102,255,102,0.08)`,
+      fontFamily: T.FONT_MONO,
+    }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+        <span style={{ fontSize: 10, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL, whiteSpace: "nowrap" }}>GLOBAL AI</span>
+        <span style={{ fontSize: 10, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL, whiteSpace: "nowrap" }}>SYSTEM CONF</span>
+      </div>
+      <div style={{ position: "relative", width: 124, height: 124, flexShrink: 0 }}>
+        <ConfidenceRing color={color} value={value} size={124} />
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+          <span style={{ fontSize: 38, color, fontVariantNumeric: "tabular-nums", fontWeight: 700, lineHeight: 1 }}>{value}</span>
+          <span style={{ fontSize: 9, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL, marginTop: 4 }}>AVG CONF</span>
+        </div>
+      </div>
+    </div>
   );
 });
 
@@ -3536,25 +3569,38 @@ export function PortalCustomerShell() {
           animation: "workspace-scan 22s linear infinite",
           pointerEvents: "none", zIndex: 0,
         }} />
-        {/* Account / upgrade / disclaimer entry strip */}
+        {/* Pass 7W — header hierarchy refactor:
+            • Search bar constrained to maxWidth 760 (left column).
+            • Toolbar (ACCOUNT / UPGRADE / DISCLAIMER) moved into
+              right column above the new global AI ring.
+            • AI AVG CONFIDENCE ring promoted out of ACCOUNT STATUS
+              into a prominent global system-intelligence indicator
+              directly under the toolbar, right-aligned with the
+              search region. */}
         <div style={{
-          display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end",
+          display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap",
         }}>
-          <ToolbarBtn onClick={() => setAccount(true)}>ACCOUNT</ToolbarBtn>
-          {/* P1 fix (E3): CONNECT EXCHANGE removed from customer surface.
-              Customer /portal is paper-only; live broker connect (which
-              defaults the visible catalog to Alpaca) belongs to the
-              admintrade. operator terminal, not here. Read-only exchange
-              health remains visible in ExchangeTopology below. */}
-          {plan !== "pro" && <ToolbarBtn variant="brand" onClick={() => setUpgrade(true)}>UPGRADE</ToolbarBtn>}
-          <ToolbarBtn onClick={() => setDisclaimer(true)}>DISCLAIMER</ToolbarBtn>
+          <div style={{ flex: 1, minWidth: 280, maxWidth: 760 }}>
+            <SearchBar
+              query={query} setQuery={setQuery}
+              filter={filter} setFilter={setFilter}
+              suggestionPool={suggestionPool}
+            />
+          </div>
+          <div style={{
+            display: "flex", flexDirection: "column", gap: 14,
+            alignItems: "flex-end", flexShrink: 0,
+          }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end" }}>
+              <ToolbarBtn onClick={() => setAccount(true)}>ACCOUNT</ToolbarBtn>
+              {/* P1 fix (E3): CONNECT EXCHANGE removed from customer surface.
+                  Customer /portal is paper-only. */}
+              {plan !== "pro" && <ToolbarBtn variant="brand" onClick={() => setUpgrade(true)}>UPGRADE</ToolbarBtn>}
+              <ToolbarBtn onClick={() => setDisclaimer(true)}>DISCLAIMER</ToolbarBtn>
+            </div>
+            <GlobalAIConfidenceRing value={pulse.avgConf} />
+          </div>
         </div>
-
-        <SearchBar
-          query={query} setQuery={setQuery}
-          filter={filter} setFilter={setFilter}
-          suggestionPool={suggestionPool}
-        />
 
         <EnableLiveAITradingBar
           engineOnline={engineOnline}
