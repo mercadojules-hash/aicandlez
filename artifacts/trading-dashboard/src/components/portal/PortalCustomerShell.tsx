@@ -67,7 +67,11 @@ const T = {
   TEXT_0:      "#FFFFFF",
   TEXT_1:      "#A8B8B0",
   TEXT_2:      "#5F706A",
-  TEXT_3:      "#3A4842",
+  // Pass 4.9 — tertiary label lift. Old value (#3A4842) sank below
+  // useful reading threshold on dense panels (stage labels, exchange
+  // NOT-CONNECTED rows, Kv keys). Lifted to #586B63 to restore
+  // hierarchy without crossing into secondary tone territory.
+  TEXT_3:      "#586B63",
   FONT_MONO:   "'IBM Plex Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace",
   // ── Polish scale (institutional rhythm) ──────────────────────────────
   // Letter-spacing tracks: collapse to 3 tiers + 1 display exception.
@@ -1690,25 +1694,50 @@ function PanelCard({
 }: {
   title: string; children: ReactNode; span?: number; height?: number; live?: boolean;
 }) {
+  // Pass 4.9 — physical bezel depth. Layered effects:
+  //   • subtle top→bottom gradient on the panel body (lit-from-above)
+  //   • inset top hairline highlight (edge lighting / chrome bevel)
+  //   • inset bottom shadow (anchors the panel to its plane)
+  //   • outer 1px down-shadow (separates from the workspace)
+  //   • live panels carry a very faint inner neon bloom (cycles
+  //     `panel-breathe` over 9s); reduced-motion umbrella halts it
   const style: CSSProperties = {
-    background: T.BG_TERMINAL,
+    background: `linear-gradient(180deg, #0B1612 0%, ${T.BG_TERMINAL} 55%, #050C09 100%)`,
     border: `1px solid ${T.BORDER}`,
     display: "flex", flexDirection: "column",
     height,
     fontFamily: T.FONT_MONO,
     gridColumn: span > 1 ? `span ${span}` : undefined,
+    boxShadow: live
+      ? `inset 0 1px 0 rgba(102,255,102,0.08), inset 0 -1px 0 rgba(0,0,0,0.50), 0 1px 0 rgba(0,0,0,0.60), inset 0 0 24px rgba(102,255,102,0.04)`
+      : `inset 0 1px 0 rgba(255,255,255,0.03), inset 0 -1px 0 rgba(0,0,0,0.50), 0 1px 0 rgba(0,0,0,0.60)`,
+    animation: live ? "panel-breathe 9s ease-in-out infinite" : undefined,
+    position: "relative",
   };
   return (
     <div style={style}>
       <div style={{
-        padding: 10, borderBottom: `1px solid ${T.BORDER}`,
-        background: "rgba(0,0,0,0.40)",
+        padding: 10,
+        borderBottom: `1px solid ${T.BORDER}`,
+        // Pass 4.9 — title bar reads as a slightly darker bezel cap
+        // with a faint neon hairline at its base; reinforces the
+        // "panel bonded to its lit border" feel.
+        background: `linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.30) 100%)`,
+        boxShadow: `inset 0 -1px 0 rgba(102,255,102,0.05)`,
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
-        <h3 style={{ margin: 0, fontSize: 11, color: T.TEXT_0, letterSpacing: T.TRACK_LABEL }}>{title}</h3>
+        <h3 style={{
+          margin: 0, fontSize: 11, color: T.TEXT_0,
+          letterSpacing: T.TRACK_LABEL,
+          // Pass 4.9 — micro text shadow on titles for crispness on
+          // the new gradient bezel; intensity tuned to preserve
+          // monospaced glyph sharpness.
+          textShadow: live ? `0 0 6px rgba(102,255,102,0.18)` : undefined,
+        }}>{title}</h3>
         {live && <span style={{
           width: 6, height: 6, borderRadius: "50%",
-          background: T.NEON, boxShadow: `0 0 8px ${T.NEON_GLOW}`,
+          background: T.NEON,
+          boxShadow: `0 0 6px ${T.NEON}, 0 0 12px ${T.NEON_GLOW}`,
           animation: "brand-pulse 1.4s infinite",
         }} />}
       </div>
@@ -2473,6 +2502,18 @@ export function PortalCustomerShell() {
           0%   { opacity: 0.75; }
           50%  { opacity: 1.00; }
           100% { opacity: 0.75; }
+        }
+        /* Pass 4.9 — panel-breathe: ultra-slow ambient inner-glow
+           oscillation on LIVE panels (AIReasoningConsole,
+           SignalPipeline, AIThroughput, ExecAwareness). Communicates
+           "this surface is actively listening" without arcade tint.
+           Trough is set high (0.96) so the effect reads as a faint
+           idle rhythm, not a status pulse. Reduced-motion umbrella
+           below halts it. */
+        @keyframes panel-breathe {
+          0%   { box-shadow: inset 0 1px 0 rgba(102,255,102,0.08), inset 0 -1px 0 rgba(0,0,0,0.50), 0 1px 0 rgba(0,0,0,0.60), inset 0 0 18px rgba(102,255,102,0.03); }
+          50%  { box-shadow: inset 0 1px 0 rgba(102,255,102,0.10), inset 0 -1px 0 rgba(0,0,0,0.50), 0 1px 0 rgba(0,0,0,0.60), inset 0 0 28px rgba(102,255,102,0.06); }
+          100% { box-shadow: inset 0 1px 0 rgba(102,255,102,0.08), inset 0 -1px 0 rgba(0,0,0,0.50), 0 1px 0 rgba(0,0,0,0.60), inset 0 0 18px rgba(102,255,102,0.03); }
         }
         /* Pass 4.4 — reduced-motion umbrella expanded to TRUE portal-
            wide scope. Holds at the bright phase so state semantics
