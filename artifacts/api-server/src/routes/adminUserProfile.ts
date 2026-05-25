@@ -37,6 +37,16 @@ type AuthReq = Request & { clerkUserId: string };
 
 const NoteSchema = z.string().trim().min(1, "Operator note is required").max(2_000);
 
+/** Format a Zod error so the failing field path is in the message instead
+ *  of being silently dropped (previously the client only saw the generic
+ *  "expected string, received undefined" with no hint which field). */
+function formatZodError(err: z.ZodError): string {
+  const issue = err.issues[0];
+  if (!issue) return "Invalid body";
+  const path = issue.path.join(".") || "(root)";
+  return `${path}: ${issue.message}`;
+}
+
 // ── AI engine settings (operator) ────────────────────────────────────────────
 
 const AiSettingsBody = z.object({
@@ -107,7 +117,14 @@ router.patch("/admin/users/:id/ai-settings", ...requireOperator, async (req, res
   if (!ctx) return;
   const parsed = AiSettingsBody.safeParse(req.body ?? {});
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid body" });
+    // Surface the failing field path so the operator can see exactly which
+    // control was undefined (was previously a generic "expected string,
+    // received undefined" with no field hint).
+    req.log.warn({ issues: parsed.error.issues, body: req.body }, "PATCH ai-settings validation failed");
+    res.status(400).json({
+      error:  formatZodError(parsed.error),
+      issues: parsed.error.issues.map(i => ({ path: i.path.join("."), message: i.message })),
+    });
     return;
   }
   const { note, ...fields } = parsed.data;
@@ -190,7 +207,11 @@ router.patch("/admin/users/:id/billing-overrides", ...requireSuperAdmin, async (
   if (!ctx) return;
   const parsed = BillingOverridesBody.safeParse(req.body ?? {});
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid body" });
+    req.log.warn({ issues: parsed.error.issues, body: req.body }, "PATCH billing-overrides validation failed");
+    res.status(400).json({
+      error:  formatZodError(parsed.error),
+      issues: parsed.error.issues.map(i => ({ path: i.path.join("."), message: i.message })),
+    });
     return;
   }
   const { note, ...fields } = parsed.data;

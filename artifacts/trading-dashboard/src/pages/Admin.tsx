@@ -1159,6 +1159,21 @@ function pickBillingOverrides(u: UserDetailResponse["user"] | null): BillingOver
   };
 }
 
+/** Drop keys whose value is `undefined` before serialization. JSON.stringify
+ *  silently elides them anyway, but Zod-side parsing of explicitly-missing
+ *  optional fields then surfaces as a generic "expected X, received undefined"
+ *  if any *required* field was inadvertently undefined too. Stripping in the
+ *  mutation layer makes the outbound payload exactly what hit the wire and
+ *  prevents controlled-select edge cases (e.g. a Select returning undefined
+ *  on first render) from corrupting the body shape. */
+function stripUndefined(body: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(body)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+}
+
 function shallowEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
   const ka = Object.keys(a); const kb = Object.keys(b);
   if (ka.length !== kb.length) return false;
@@ -1300,9 +1315,17 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
 
   const aiMutation = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
+      const cleanBody = stripUndefined(body);
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.debug(
+          `[admin-profile] PATCH /api/admin/users/${user.clerkUserId}/ai-settings`,
+          cleanBody,
+        );
+      }
       const res = await authFetch(`/api/admin/users/${user.clerkUserId}/ai-settings`, {
         method: "PATCH",
-        body:   JSON.stringify(body),
+        body:   JSON.stringify(cleanBody),
       });
       const text = await res.text();
       let json: unknown = null;
@@ -1364,9 +1387,17 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
 
   const billingMutation = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
+      const cleanBody = stripUndefined(body);
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.debug(
+          `[admin-profile] PATCH /api/admin/users/${user.clerkUserId}/billing-overrides`,
+          cleanBody,
+        );
+      }
       const res = await authFetch(`/api/admin/users/${user.clerkUserId}/billing-overrides`, {
         method: "PATCH",
-        body:   JSON.stringify(body),
+        body:   JSON.stringify(cleanBody),
       });
       const text = await res.text();
       let json: unknown = null;
