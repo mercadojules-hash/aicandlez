@@ -1199,7 +1199,10 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
   // conviction read via BORDER WEIGHT + LEFT-RAIL THICKNESS only.
   // Hierarchy is functional, not decorative. Goal: scannable
   // density, not theatrical depth.
-  const tierBackground = isActive ? "#0C1410" : T.BG_TERMINAL;
+  // Pass 7R — active plate lifted #0C1410 → #131A15 for stronger
+  // readable separation against the pure-black chassis. Neutral
+  // luminance bump only; no additional green wash, no glow change.
+  const tierBackground = isActive ? "#131A15" : T.BG_TERMINAL;
   // Pass 7O — active rows lift more decisively against pure-black
   // chassis. Top-edge highlight pushed 0.025 → 0.06 so the upper
   // pixel reads as a real bezel highlight; drop deepened so the
@@ -2016,7 +2019,7 @@ const Column = memo(function Column({
           // 7O — accent rail glow toned (was 0 0 6px + 0 0 2px). Single
           // 2px glow at lower opacity keeps the column identity hint
           // without contributing to the chassis haze.
-          opacity: 0.35, pointerEvents: "none",
+          opacity: 0.55, pointerEvents: "none",
         }}
       />
       <ColumnHeader title={title} count={opps.length} accent={accent} subLabel={subLabel} />
@@ -2302,7 +2305,7 @@ const PortfolioIntelligence = memo(function PortfolioIntelligence({ now }: { now
   const exitColor   = lastClose && lastClose.pnl >= 0 ? T.NEON : T.RED;
 
   return (
-    <PanelCard title="LIVE TRADES" height={360} live>
+    <PanelCard title="LIVE TRADES" height={480} live>
       <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
           <div>
@@ -2449,7 +2452,7 @@ const RecentExits = memo(function RecentExits({ now }: { now: number }) {
   const exits = useMemo(() => history.slice(0, RECENT_EXITS_LIMIT), [history]);
 
   return (
-    <PanelCard title="TRADE HISTORY" height={360}>
+    <PanelCard title="TRADE HISTORY" height={480}>
       <div className="cd-scroll" style={{
         padding: 10, overflowY: "auto", flex: 1,
         display: "flex", flexDirection: "column", gap: 4,
@@ -3483,6 +3486,13 @@ export function PortalCustomerShell() {
           paddingTop: 20,
           borderTop: `1px solid ${T.BORDER}`,
         }}>
+          {/* Pass 7R — AI THROUGHPUT promoted out of the lower
+              auto-fit grid into a dedicated full-width strip
+              directly under the matrix. Contains the operational
+              telemetry the user asked to surface higher: signals/min,
+              MTF confirmed, exec rate, engine load, correlation
+              blocks. Renders above LIVE TRADES / TRADE HISTORY. */}
+          <AIThroughput engine={engineStatus} pulse={pulse} signalsPerMin={signalsPerMin} />
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
@@ -3491,6 +3501,11 @@ export function PortalCustomerShell() {
             <PortfolioIntelligence now={nowShell} />
             <RecentExits now={nowShell} />
           </div>
+          {/* Pass 7R — RiskHeatmap, MarketRegime, ExecutionAwareness
+              removed per user spec (low-value widgets). PNL / wins /
+              losses surface in PortfolioIntelligence + RecentExits
+              above; execution telemetry surfaces in AIThroughput
+              and OperatorPulseRibbon. */}
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
@@ -3498,11 +3513,7 @@ export function PortalCustomerShell() {
           }}>
             <AIReasoningConsole log={engineStatus?.recentSignalLog} live={engineOnline} />
             <SignalPipeline opps={opportunities} pulse={pulse} engine={engineStatus} />
-            <MarketRegime opps={opportunities} />
             <ExchangeTopology />
-            <RiskHeatmap opps={opportunities} />
-            <AIThroughput engine={engineStatus} pulse={pulse} signalsPerMin={signalsPerMin} />
-            <ExecutionAwareness openCount={openTrades.length} now={nowShell} />
           </div>
         </section>
       </main>
