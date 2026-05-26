@@ -177,18 +177,33 @@ function readinessFromBreakdown(b: SymBreakdown): Readiness {
 }
 
 function volFromBreakdown(b: SymBreakdown): OpportunityVM["vol"] {
+  // POPULATION RESTORE (2026-05-26, Fix A): "LOW VOL" now fires only when
+  // the engine EXPLICITLY classifies the regime as low/quiet. The previous
+  // `!volumeConfirmed → LOW VOL` mapping was binary-thresholded against the
+  // strict 85%-of-20-bar-avg gate, which on a typical tick flipped ~17 of
+  // 19 cards to LOW VOL — collapsing visual density AND excluding them
+  // from the cohort pool (Fix C). Net effect was a near-empty board even
+  // when the engine had real signals. NORMAL is now the institutional
+  // default; ELEVATED still requires confirmed volume.
   const cond = (b.marketCondition ?? "").toUpperCase();
   if (cond.includes("HIGH_VOL") || cond.includes("ELEVATED")) return "ELEVATED";
   if (cond.includes("LOW_VOL")  || cond.includes("QUIET"))    return "LOW VOL";
-  if (!b.volumeConfirmed) return "LOW VOL";
-  if (b.avgConfidence >= 85) return "ELEVATED";
+  if (b.volumeConfirmed && b.avgConfidence >= 75) return "ELEVATED";
   return "NORMAL";
 }
 
 function dotFromDecision(decision: string, confidence: number): MtfDot {
+  // POPULATION RESTORE (2026-05-26, Fix B): colored-dot threshold lowered
+  // 70 → 60 so the MTF strip lights up whenever the engine has a genuine
+  // directional read. Previously the 70 floor required `fast.confidence`
+  // OR `slow.confidence` to individually clear 70 — extremely rare under
+  // CONVICTION_V2 — leaving every card 4-amber even when avgConfidence
+  // and mtfConfirmed clearly favored a side. Not inflation: the
+  // underlying confidence numbers are unchanged; we're only relaxing the
+  // visual classification. HOLD always stays amber.
   const d = (decision ?? "").toUpperCase();
-  if (d === "BUY"  || d === "LONG")  return confidence >= 70 ? "green" : "amber";
-  if (d === "SELL" || d === "SHORT") return confidence >= 70 ? "red"   : "amber";
+  if (d === "BUY"  || d === "LONG")  return confidence >= 60 ? "green" : "amber";
+  if (d === "SELL" || d === "SHORT") return confidence >= 60 ? "red"   : "amber";
   return "amber";
 }
 
@@ -552,7 +567,27 @@ export function usePaperSignals() {
       const mtfQualifies = nonAmber >= 2;
       return activeRegime && volumePasses && mtfQualifies;
     };
-    const cohortPool = out.filter(isActiveCohortMember).map(o => o.conf);
+    // POPULATION RESTORE (2026-05-26, Fix C): cohort floor.
+    //   The locked invariant above stands when the strict institutional
+    //   cohort has >=4 members — in that regime percentile math has
+    //   enough signal to separate ELITE from STRONG. When the strict
+    //   cohort collapses to <4 (modest-market regime, the new normal
+    //   under CONVICTION_V2), percentile math degenerates: every card
+    //   maps to ~50, and the entire board flattens into the same
+    //   conviction band.
+    //
+    //   The fallback expands the ranking pool to "anything not
+    //   EXHAUSTED and not explicitly LOW VOL" so percentile spread is
+    //   preserved. The per-card scaling decision (`isActiveCohortMember`
+    //   below at line ~568) is UNCHANGED — strict-cohort members still
+    //   get full [0..100] scaling; non-members still get the [0..50]
+    //   dampened band. Only the percentile-reference pool widens when
+    //   it would otherwise be empty.
+    const strictCohort = out.filter(isActiveCohortMember);
+    const cohortPool = (strictCohort.length >= 4
+      ? strictCohort
+      : out.filter(o => o.regime !== "EXHAUSTED" && o.vol !== "LOW VOL")
+    ).map(o => o.conf);
     const fullPool   = out.map(o => o.conf);
     for (const o of out) {
       // Pass C4 — non-qualifying opps no longer get a hard rank=0.
