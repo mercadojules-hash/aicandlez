@@ -1,0 +1,170 @@
+The RIGHT-SIDE mockup is the correct direction and should become the PRIMARY implementation target moving forward.
+
+That is the dashboard identity we want for AICandlez.
+
+====================================================
+APPROVED DIRECTION
+==================
+
+Use the RIGHT-SIDE mockup as the foundation for BOTH:
+
+1. User Dashboard
+2. Operator Dashboard
+
+The visual hierarchy, spacing, density, and institutional feel are much stronger there.
+
+====================================================
+WHY THIS VERSION WINS
+=====================
+
+The RIGHT mockup has:
+
+* better signal density
+* cleaner visual rhythm
+* stronger institutional feel
+* better spacing balance
+* more premium telemetry
+* stronger wow factor
+* cleaner chart-strip hierarchy
+* more cinematic terminal energy
+
+It feels:
+
+* alive
+* intelligent
+* premium
+* operator-grade
+* hedge-fund quality
+
+The LEFT mockup feels:
+
+* more experimental
+* less polished
+* less emotionally powerful
+
+====================================================
+NEXT CHANGES
+============
+
+Now refine the RIGHT-SIDE design into the FINAL platform direction.
+
+====================================================
+CRYPTO ONLY CHANGE
+==================
+
+We are NO LONGER doing equities.
+
+Replace:
+
+* Top 10 Equity
+  or
+* Top 20 Equity
+
+with:
+
+TOP 15 LONG CRYPTO SIGNALS
+and
+TOP 15 SHORT CRYPTO SIGNALS
+
+This becomes:
+
+* a crypto-only AI war room
+* stronger polarity
+* more emotional energy
+* more directional intensity
+
+====================================================
+FINAL USER DASHBOARD STRUCTURE
+==============================
+
+CENTER:
+
+* Top 15 LONG crypto signals
+* Top 15 SHORT crypto signals
+* confidence rings
+* long sparkline strips
+* BUY/SELL polarity
+* dense signal population
+
+RIGHT PANEL:
+USER ACTIVITY CENTER
+
+Include:
+
+* connected exchange
+* total equity
+* daily pnl
+* total pnl
+* win rate %
+* amount of trades
+* open trades
+* recent executions
+* recent activity feed
+* realized/unrealized pnl
+* PAPER/LIVE badge
+* upgrade CTA
+
+This section must feel:
+
+* alive
+* intelligent
+* premium
+* AI-managed
+
+====================================================
+FINAL OPERATOR DASHBOARD STRUCTURE
+==================================
+
+Operator dashboard should use the SAME design language as the approved RIGHT mockup BUT add:
+
+* left institutional sidebar
+* operator controls
+* AI execution controls
+* risk telemetry
+* engine state
+* execution overview
+* operator-only tooling
+
+Sidebar styling:
+
+* matte black
+* compact
+* thin green glow
+* institutional spacing
+* NOT oversized SaaS navigation
+
+====================================================
+DESIGN LANGUAGE LOCK
+====================
+
+Keep:
+
+* matte black backgrounds
+* neon green primary glow
+* red bearish polarity
+* long horizontal sparkline strips
+* confidence rings
+* premium spacing
+* cinematic telemetry
+* thin institutional borders
+* tabular typography
+* dense live-terminal atmosphere
+
+This should feel:
+
+* elite
+* expensive
+* institutional
+* AI-native
+* cinematic
+
+====================================================
+NEXT STEP
+=========
+
+Refine the RIGHT-SIDE mockup into:
+
+1. Final User Dashboard mockup
+2. Final Operator Dashboard mockup
+
+Then present both updated refined versions for approval BEFORE production route integration begins.

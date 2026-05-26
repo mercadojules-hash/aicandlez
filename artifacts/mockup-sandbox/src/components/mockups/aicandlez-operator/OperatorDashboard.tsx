@@ -1,622 +1,618 @@
+import { useEffect, useState } from "react";
 import {
-  LayoutDashboard,
-  Radio,
-  Cpu,
-  Flame,
-  Star,
-  Wallet,
-  ListOrdered,
-  FileText,
-  ShieldCheck,
-  LineChart,
-  Globe2,
-  Newspaper,
-  Bell,
-  TrendingUp,
-  Settings,
   Activity,
-  ArrowUpRight,
-  ArrowDownRight,
-  Circle,
+  AlertTriangle,
+  BarChart3,
+  Bell,
+  Brain,
+  Cpu,
+  FlaskConical,
+  Gauge,
+  LayoutDashboard,
+  LineChart,
+  Newspaper,
+  Power,
+  Radio,
+  Settings,
+  ShieldAlert,
+  Sparkles,
+  Star,
+  Target,
+  TrendingUp,
+  Wallet,
   Zap,
 } from "lucide-react";
 
-const BRAND = "#7CFF00";
-const EMERALD = "#00C853";
+const BRAND = "#66FF66";
+const LIME = "#7CFF00";
 const RED = "#FF3B3B";
-const RED_SOFT = "#FF6B6B";
-const HAIR = "rgba(124,255,0,0.10)";
-const HAIR_STRONG = "rgba(124,255,0,0.18)";
+const AMBER = "#FFD23F";
 const BG_0 = "#000000";
 const BG_1 = "#050A07";
 const BG_2 = "#0A1410";
 const BG_3 = "#0F1F18";
-const TXT_MUTED = "rgba(255,255,255,0.65)";
-const TXT_DIM = "rgba(255,255,255,0.40)";
+const HAIR_10 = "rgba(124,255,0,0.10)";
+const HAIR_18 = "rgba(124,255,0,0.18)";
+const TXT_65 = "rgba(255,255,255,0.65)";
+const TXT_40 = "rgba(255,255,255,0.40)";
 
-type Spark = number[];
+type Dir = "LONG" | "SHORT";
 type Signal = {
-  symbol: string;
-  klass: "CRYPTO" | "EQUITY";
-  dir: "LONG" | "SHORT";
+  sym: string;
+  dir: Dir;
+  reason: string;
   price: string;
-  chg: number;
-  vol: string;
+  last5m: string;
+  changePct: number;
   conf: number;
-  spark: Spark;
-  mtf: ("g" | "a" | "r")[];
-  rr: number;
-  entry: string;
-  sl: string;
-  tp: string;
+  spark: number[];
 };
 
-const sp = (seed: number, dir: 1 | -1 = 1): Spark => {
-  const out: number[] = [];
-  let v = 50 + (seed % 10);
-  for (let i = 0; i < 48; i++) {
-    const n = Math.sin(i / 3 + seed) * 6 + Math.cos(i / 1.7 + seed * 0.7) * 3;
-    v += n * 0.4 + dir * 0.35 + (Math.sin(i * 0.9 + seed) > 0.6 ? 1.2 : -0.4);
-    out.push(v);
-  }
-  return out;
-};
-
-const SIGNALS: Signal[] = [
-  { symbol: "BTC",  klass: "CRYPTO", dir: "LONG",  price: "67,482.10", chg:  1.82, vol: "$48.7M", conf: 91, spark: sp(1, 1),  mtf: ["g","g","g"], rr: 2.8, entry: "67,210", sl: "66,640", tp: "68,820" },
-  { symbol: "ETH",  klass: "CRYPTO", dir: "LONG",  price:  "3,584.22", chg:  2.41, vol: "$22.1M", conf: 87, spark: sp(2, 1),  mtf: ["g","g","a"], rr: 2.4, entry:  "3,562", sl:  "3,512", tp:  "3,694" },
-  { symbol: "SOL",  klass: "CRYPTO", dir: "SHORT", price:    "182.44", chg: -1.94, vol: "$12.4M", conf: 84, spark: sp(3,-1), mtf: ["r","r","a"], rr: 2.2, entry:    "182.8", sl:    "186.1", tp:    "175.4" },
-  { symbol: "NVDA", klass: "EQUITY", dir: "LONG",  price:    "138.62", chg:  0.94, vol:  "$8.2M", conf: 82, spark: sp(4, 1),  mtf: ["g","a","g"], rr: 2.6, entry:    "138.2", sl:    "136.5", tp:    "142.1" },
-  { symbol: "XRP",  klass: "CRYPTO", dir: "LONG",  price:      "0.6128", chg:  3.12, vol:  "$6.1M", conf: 79, spark: sp(5, 1),  mtf: ["g","g","g"], rr: 2.1, entry:    "0.6112", sl:    "0.6028", tp:    "0.6310" },
-  { symbol: "ARB",  klass: "CRYPTO", dir: "LONG",  price:      "0.8412", chg:  4.18, vol:  "$5.2M", conf: 88, spark: sp(6, 1),  mtf: ["g","g","g"], rr: 2.9, entry:    "0.8392", sl:    "0.8214", tp:    "0.8915" },
-  { symbol: "AVAX", klass: "CRYPTO", dir: "SHORT", price:     "32.18", chg: -2.21, vol:  "$4.8M", conf: 76, spark: sp(7,-1), mtf: ["r","a","r"], rr: 2.0, entry:     "32.30", sl:     "33.12", tp:     "30.40" },
-  { symbol: "LINK", klass: "CRYPTO", dir: "LONG",  price:     "14.87", chg:  1.42, vol:  "$3.9M", conf: 74, spark: sp(8, 1),  mtf: ["g","a","g"], rr: 2.3, entry:     "14.82", sl:     "14.48", tp:     "15.62" },
-  { symbol: "DOGE", klass: "CRYPTO", dir: "SHORT", price:      "0.1284", chg: -1.06, vol:  "$3.4M", conf: 68, spark: sp(9,-1), mtf: ["a","r","r"], rr: 1.9, entry:    "0.1288", sl:    "0.1320", tp:    "0.1220" },
-  { symbol: "POL",  klass: "CRYPTO", dir: "LONG",  price:      "0.4912", chg:  2.84, vol:  "$2.8M", conf: 81, spark: sp(10,1), mtf: ["g","g","a"], rr: 2.5, entry:    "0.4898", sl:    "0.4810", tp:    "0.5120" },
-  { symbol: "OP",   klass: "CRYPTO", dir: "LONG",  price:      "1.7842", chg:  3.42, vol:  "$2.4M", conf: 77, spark: sp(11,1), mtf: ["g","g","g"], rr: 2.4, entry:    "1.7780", sl:    "1.7420", tp:    "1.8620" },
-  { symbol: "ATOM", klass: "CRYPTO", dir: "SHORT", price:      "6.412", chg: -1.78, vol:  "$1.9M", conf: 72, spark: sp(12,-1),mtf: ["r","a","r"], rr: 2.0, entry:    "6.420", sl:    "6.602", tp:    "6.082" },
-  { symbol: "APT",  klass: "CRYPTO", dir: "LONG",  price:      "8.214", chg:  2.12, vol:  "$1.7M", conf: 74, spark: sp(13,1), mtf: ["g","a","g"], rr: 2.3, entry:    "8.198", sl:    "8.044", tp:    "8.520" },
-  { symbol: "NEAR", klass: "CRYPTO", dir: "LONG",  price:      "5.412", chg:  1.62, vol:  "$1.6M", conf: 71, spark: sp(14,1), mtf: ["g","g","a"], rr: 2.2, entry:    "5.402", sl:    "5.288", tp:    "5.620" },
-  { symbol: "WIF",  klass: "CRYPTO", dir: "SHORT", price:      "1.842", chg: -3.18, vol:  "$1.5M", conf: 69, spark: sp(15,-1),mtf: ["r","r","a"], rr: 1.8, entry:    "1.848", sl:    "1.912", tp:    "1.712" },
-  { symbol: "PEPE", klass: "CRYPTO", dir: "LONG",  price: "0.00001284", chg:  5.42, vol:  "$1.4M", conf: 78, spark: sp(16,1), mtf: ["g","g","g"], rr: 2.7, entry: "0.00001270", sl: "0.00001212", tp: "0.00001420" },
-  { symbol: "FIL",  klass: "CRYPTO", dir: "LONG",  price:      "4.728", chg:  0.84, vol:  "$1.2M", conf: 66, spark: sp(17,1), mtf: ["g","a","a"], rr: 2.1, entry:    "4.720", sl:    "4.622", tp:    "4.910" },
-  { symbol: "AAPL", klass: "EQUITY", dir: "SHORT", price:    "228.42", chg: -0.62, vol:  "$1.2M", conf: 65, spark: sp(18,-1),mtf: ["r","a","a"], rr: 1.9, entry:    "228.7", sl:    "231.0", tp:    "223.4" },
+const LONGS: Signal[] = [
+  { sym: "BTC",  dir: "LONG", reason: "TREND",     price: "$67,284.10", last5m: "$66,910.22", changePct:  1.37, conf: 94, spark: [10,12,11,14,15,14,18,17,20,22,24,26,27,29] },
+  { sym: "ETH",  dir: "LONG", reason: "MOMENTUM",  price: "$3,128.44",  last5m: "$3,084.10",  changePct:  2.18, conf: 91, spark: [5,6,5,7,8,7,9,10,12,11,14,15,17,18] },
+  { sym: "SOL",  dir: "LONG", reason: "BREAKOUT",  price: "$172.65",    last5m: "$168.81",    changePct:  2.27, conf: 89, spark: [9,10,11,10,12,13,14,13,15,16,18,19,20,22] },
+  { sym: "AVAX", dir: "LONG", reason: "TREND",     price: "$39.27",     last5m: "$37.12",     changePct:  1.89, conf: 87, spark: [8,8.4,8.6,9,9.2,9.5,9.7,10,10.4,10.8,11,11.4,11.8,12.2] },
+  { sym: "LINK", dir: "LONG", reason: "MOMENTUM",  price: "$19.74",     last5m: "$18.18",     changePct:  1.71, conf: 85, spark: [11,11.3,11.2,11.6,11.5,11.9,11.8,12.2,12.1,12.5,12.4,12.8,12.7,13.1] },
+  { sym: "INJ",  dir: "LONG", reason: "BREAKOUT",  price: "$28.41",     last5m: "$27.10",     changePct:  2.42, conf: 84, spark: [6,6.4,6.6,7,7.2,7.5,7.7,8,8.4,8.8,9,9.4,9.8,10.2] },
+  { sym: "TIA",  dir: "LONG", reason: "REVERSAL",  price: "$8.92",      last5m: "$8.41",      changePct:  1.94, conf: 82, spark: [4,4.2,4.1,4.4,4.3,4.6,4.5,4.8,4.7,5.0,4.9,5.2,5.1,5.4] },
+  { sym: "SUI",  dir: "LONG", reason: "MOMENTUM",  price: "$1.847",     last5m: "$1.792",     changePct:  1.42, conf: 81, spark: [7,7.2,7.4,7.7,7.9,8.2,8.4,8.7,8.9,9.2,9.4,9.7,9.9,10.2] },
+  { sym: "APT",  dir: "LONG", reason: "TREND",     price: "$7.95",      last5m: "$7.61",      changePct:  1.23, conf: 79, spark: [9,9.1,9.3,9.5,9.6,9.8,9.9,10.1,10.2,10.4,10.5,10.7,10.8,11.0] },
+  { sym: "ARB",  dir: "LONG", reason: "BREAKOUT",  price: "$1.184",     last5m: "$1.142",     changePct:  1.66, conf: 78, spark: [5,5.2,5.4,5.6,5.7,5.9,6.0,6.2,6.3,6.5,6.6,6.8,6.9,7.1] },
+  { sym: "FET",  dir: "LONG", reason: "MOMENTUM",  price: "$2.041",     last5m: "$1.974",     changePct:  1.81, conf: 77, spark: [6,6.1,6.2,6.4,6.5,6.7,6.8,7.0,7.1,7.3,7.4,7.6,7.7,7.9] },
+  { sym: "JUP",  dir: "LONG", reason: "TREND",     price: "$1.082",     last5m: "$1.045",     changePct:  1.34, conf: 76, spark: [4,4.1,4.2,4.4,4.5,4.7,4.8,5.0,5.1,5.3,5.4,5.6,5.7,5.9] },
+  { sym: "RNDR", dir: "LONG", reason: "BREAKOUT",  price: "$7.84",      last5m: "$7.52",      changePct:  1.92, conf: 75, spark: [5,5.1,5.3,5.5,5.6,5.8,5.9,6.1,6.2,6.4,6.5,6.7,6.8,7.0] },
+  { sym: "TAO",  dir: "LONG", reason: "MOMENTUM",  price: "$478.12",    last5m: "$464.20",    changePct:  1.55, conf: 73, spark: [8,8.1,8.2,8.4,8.5,8.7,8.8,9.0,9.1,9.3,9.4,9.6,9.7,9.9] },
+  { sym: "ATOM", dir: "LONG", reason: "REVERSAL",  price: "$8.41",      last5m: "$8.12",      changePct:  1.12, conf: 71, spark: [6,6.1,6.0,6.3,6.2,6.5,6.4,6.7,6.6,6.9,6.8,7.1,7.0,7.3] },
 ];
 
-const TOP_MOVERS = [
-  { sym: "PEPE", chg:  5.42 },
-  { sym: "ARB",  chg:  4.18 },
-  { sym: "OP",   chg:  3.42 },
-  { sym: "XRP",  chg:  3.12 },
-  { sym: "WIF",  chg: -3.18 },
-  { sym: "AVAX", chg: -2.21 },
-  { sym: "SOL",  chg: -1.94 },
-  { sym: "ATOM", chg: -1.78 },
+const SHORTS: Signal[] = [
+  { sym: "WIF",   dir: "SHORT", reason: "TREND",    price: "$2.0840",     last5m: "$2.1920",    changePct: -2.41, conf: 92, spark: [22,21,21.6,20.5,20.2,20.8,19.6,19.2,19.8,18.4,18.0,18.6,17.2,16.8] },
+  { sym: "PEPE",  dir: "SHORT", reason: "MOMENTUM", price: "$0.00001124", last5m: "$0.00001182",changePct: -2.18, conf: 89, spark: [18,17.6,17.8,17.2,17.0,17.4,16.6,16.2,16.4,15.6,15.2,15.4,14.6,14.2] },
+  { sym: "SHIB",  dir: "SHORT", reason: "TREND",    price: "$0.0000241",  last5m: "$0.0000252", changePct: -2.04, conf: 87, spark: [16,15.6,15.8,15.0,14.6,14.8,14.0,13.6,13.8,13.0,12.6,12.8,12.0,11.6] },
+  { sym: "BONK",  dir: "SHORT", reason: "REVERSAL", price: "$0.00001921", last5m: "$0.00002168",changePct: -2.91, conf: 85, spark: [21,20.5,20.7,19.9,19.5,19.7,18.9,18.4,18.6,17.7,17.2,17.4,16.4,16.0] },
+  { sym: "DOGE",  dir: "SHORT", reason: "TREND",    price: "$0.1382",     last5m: "$0.1421",    changePct: -1.84, conf: 84, spark: [17,16.6,16.8,16.2,16.0,16.2,15.6,15.2,15.4,14.6,14.2,14.4,13.6,13.2] },
+  { sym: "FLOKI", dir: "SHORT", reason: "MOMENTUM", price: "$0.000148",   last5m: "$0.000154",  changePct: -2.18, conf: 83, spark: [19,18.5,18.7,18.0,17.6,17.8,17.0,16.6,16.8,16.0,15.6,15.8,15.0,14.6] },
+  { sym: "ORDI",  dir: "SHORT", reason: "TREND",    price: "$32.41",      last5m: "$33.62",     changePct: -1.97, conf: 81, spark: [15,14.7,14.8,14.3,14.1,14.3,13.7,13.4,13.6,13.0,12.7,12.9,12.3,11.9] },
+  { sym: "NEAR",  dir: "SHORT", reason: "MOMENTUM", price: "$6.28",       last5m: "$6.412",     changePct: -1.74, conf: 80, spark: [14,13.7,13.8,13.3,13.1,13.3,12.7,12.4,12.6,12.0,11.7,11.9,11.3,10.9] },
+  { sym: "OP",    dir: "SHORT", reason: "TREND",    price: "$1.2747",     last5m: "$1.3148",    changePct: -1.63, conf: 78, spark: [16,15.6,15.8,15.0,14.6,14.8,14.0,13.6,13.8,13.0,12.6,12.8,12.0,11.6] },
+  { sym: "XRP",   dir: "SHORT", reason: "REVERSAL", price: "$0.5212",     last5m: "$0.5341",    changePct: -1.42, conf: 77, spark: [13,12.8,12.9,12.5,12.3,12.5,11.9,11.7,11.9,11.3,11.1,11.3,10.7,10.3] },
+  { sym: "ADA",   dir: "SHORT", reason: "TREND",    price: "$0.3841",     last5m: "$0.3922",    changePct: -1.28, conf: 76, spark: [12,11.8,11.9,11.5,11.3,11.5,10.9,10.7,10.9,10.3,10.1,10.3,9.7,9.3] },
+  { sym: "JTO",   dir: "SHORT", reason: "MOMENTUM", price: "$2.812",      last5m: "$2.891",     changePct: -1.51, conf: 75, spark: [11,10.7,10.8,10.3,10.1,10.3,9.7,9.4,9.6,9.0,8.7,8.9,8.3,7.9] },
+  { sym: "SEI",   dir: "SHORT", reason: "TREND",    price: "$0.482",      last5m: "$0.493",     changePct: -1.19, conf: 73, spark: [10,9.8,9.9,9.5,9.3,9.5,8.9,8.7,8.9,8.3,8.1,8.3,7.7,7.3] },
+  { sym: "POL",   dir: "SHORT", reason: "REVERSAL", price: "$0.4124",     last5m: "$0.4218",    changePct: -1.04, conf: 71, spark: [9,8.8,8.9,8.5,8.3,8.5,7.9,7.7,7.9,7.3,7.1,7.3,6.7,6.3] },
+  { sym: "FIL",   dir: "SHORT", reason: "MOMENTUM", price: "$4.182",      last5m: "$4.271",     changePct: -1.08, conf: 70, spark: [8,7.8,7.9,7.5,7.3,7.5,6.9,6.7,6.9,6.3,6.1,6.3,5.7,5.3] },
 ];
 
-const REASONING = [
-  { ts: "14:22:08", text: "BTC funding flipped negative on Binance perps — LONG bias confirmed, executor armed @ 67,210." },
-  { ts: "14:21:42", text: "SOL — momentum decay on 15m, structural lower-high. Opened SHORT 0.42 BTC notional." },
-  { ts: "14:20:55", text: "Risk gate: AVAX vol expansion above 4.2σ. Reducing size to 0.5x baseline." },
-  { ts: "14:19:31", text: "ARB L2 rotation volume +218% vs 30d avg. Upgraded conviction 79 → 88." },
+const FILLS = [
+  { t: "14:22:01", sym: "BTC",  dir: "LONG"  as Dir, pnl: +0.42, status: "EXECUTED" },
+  { t: "14:19:48", sym: "ETH",  dir: "LONG"  as Dir, pnl: +0.71, status: "EXECUTED" },
+  { t: "14:14:22", sym: "WIF",  dir: "SHORT" as Dir, pnl: +1.14, status: "EXECUTED" },
+  { t: "14:08:11", sym: "TAO",  dir: "LONG"  as Dir, pnl: -0.12, status: "REJECTED" },
+  { t: "13:54:30", sym: "SOL",  dir: "LONG"  as Dir, pnl: +0.88, status: "EXECUTED" },
+];
+
+const RISK_GRID: { sym: string; score: number }[] = [
+  { sym: "BTC", score: 28 }, { sym: "ETH", score: 32 }, { sym: "SOL", score: 41 }, { sym: "AVAX", score: 55 },
+  { sym: "LINK",score: 38 }, { sym: "ARB", score: 47 }, { sym: "INJ", score: 62 }, { sym: "TIA",  score: 58 },
+  { sym: "WIF", score: 78 }, { sym: "PEPE",score: 84 }, { sym: "BONK",score: 91 }, { sym: "DOGE", score: 66 },
 ];
 
 const EXCHANGES = [
-  { name: "Kraken",   lat:  42, ok: true,  ws: "WS",    fills: 18 },
-  { name: "Coinbase", lat:  38, ok: true,  ws: "WS",    fills: 24 },
-  { name: "Binance",  lat:  51, ok: true,  ws: "WS",    fills: 41 },
-  { name: "Bybit",    lat:  47, ok: true,  ws: "WS",    fills:  9 },
-  { name: "OKX",      lat: 112, ok: false, ws: "REST",  fills:  3 },
+  { name: "Kraken",   ws: "WS",   lat:  84, fills: 142, ok: true  },
+  { name: "Coinbase", ws: "WS",   lat: 112, fills:  98, ok: true  },
+  { name: "Binance",  ws: "WS",   lat:  68, fills: 214, ok: true  },
+  { name: "Bybit",    ws: "WS",   lat:  91, fills:  76, ok: true  },
+  { name: "OKX",      ws: "REST", lat: 168, fills:  41, ok: false },
 ];
 
-const NAV = [
-  { label: "Dashboard",          icon: LayoutDashboard },
-  { label: "Live Trading",       icon: Radio },
-  { label: "AI Engine",          icon: Cpu },
-  { label: "Top Opportunities",  icon: Flame, active: true },
-  { label: "Watchlist",          icon: Star },
-  { label: "Positions",          icon: Wallet },
-  { label: "Orders",             icon: ListOrdered },
-  { label: "Paper Trading",      icon: FileText },
-  { label: "Risk Management",    icon: ShieldCheck },
-  { label: "AI Analytics",       icon: LineChart },
-  { label: "Market Intelligence",icon: Globe2 },
-  { label: "News & Sentiment",   icon: Newspaper },
-  { label: "Alerts",             icon: Bell },
-  { label: "Performance",        icon: TrendingUp },
-  { label: "Settings",           icon: Settings },
+const REASONING = [
+  { t: "14:22:09", msg: "BTC funding flipped negative on Binance perps — LONG bias confirmed" },
+  { t: "14:21:42", msg: "ETH/BTC ratio breaking 0.0466 resistance — rotation into alts forming" },
+  { t: "14:20:18", msg: "WIF order book imbalance 3.2x asks — SHORT entry validated @ 2.084" },
+  { t: "14:19:01", msg: "SOL absorbing $14M sell wall at 172 — accumulation pattern detected" },
 ];
 
-// ─── small visual atoms ────────────────────────────────────────────────────────
-
-function Sparkline({ data, dir }: { data: Spark; dir: "LONG" | "SHORT" }) {
-  const w = 240;
-  const h = 44;
+function Sparkline({ data, color, w = 130, h = 30 }: { data: number[]; color: string; w?: number; h?: number }) {
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
   const step = w / (data.length - 1);
-  const pts = data.map((v, i) => `${(i * step).toFixed(1)},${(h - ((v - min) / range) * h).toFixed(1)}`).join(" ");
-  const color = dir === "LONG" ? BRAND : RED_SOFT;
-  const fillId = `f-${dir}-${data[0].toFixed(2).replace(".","")}`;
+  const pts = data.map((v, i) => `${(i * step).toFixed(2)},${(h - ((v - min) / range) * h).toFixed(2)}`).join(" ");
+  const area = `0,${h} ${pts} ${w},${h}`;
+  const gid = `g-${color.replace("#", "")}-${Math.round(data[0] * 1000)}-${Math.round(data[data.length - 1] * 1000)}`;
   return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="block">
+    <svg width={w} height={h} className="block overflow-visible">
       <defs>
-        <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={gid} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.28" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <polygon points={`0,${h} ${pts} ${w},${h}`} fill={`url(#${fillId})`} />
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.25" />
+      <polygon points={area} fill={`url(#${gid})`} />
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-function ConfRing({ value, dir }: { value: number; dir: "LONG" | "SHORT" }) {
-  const r = 18;
+function ConfRing({ value, color, size = 38 }: { value: number; color: string; size?: number }) {
+  const r = (size - 6) / 2;
   const c = 2 * Math.PI * r;
-  const off = c * (1 - value / 100);
-  const color = dir === "LONG" ? BRAND : RED_SOFT;
+  const off = c - (value / 100) * c;
   return (
-    <div className="relative" style={{ width: 44, height: 44 }}>
-      <svg width="44" height="44" viewBox="0 0 44 44">
-        <circle cx="22" cy="22" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
-        <circle
-          cx="22" cy="22" r={r}
-          fill="none" stroke={color} strokeWidth="3"
-          strokeDasharray={c} strokeDashoffset={off}
-          strokeLinecap="round"
-          transform="rotate(-90 22 22)"
-        />
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth="2.4" fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth="2.4" fill="none" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold tabular-nums" style={{ color: "white" }}>
+      <div className="absolute inset-0 grid place-items-center text-[10px] font-semibold tabular-nums" style={{ color }}>
         {value}
       </div>
     </div>
   );
 }
 
-function MtfDots({ mtf }: { mtf: ("g" | "a" | "r")[] }) {
-  const labels = ["5m", "15m", "1H"];
-  const c = (k: string) => (k === "g" ? BRAND : k === "r" ? RED_SOFT : "#E2C800");
-  return (
-    <div className="flex items-center gap-2">
-      {mtf.map((k, i) => (
-        <div key={i} className="flex items-center gap-1">
-          <span className="text-[9px] uppercase tracking-[0.14em]" style={{ color: TXT_DIM }}>{labels[i]}</span>
-          <span className="inline-block rounded-full" style={{ width: 6, height: 6, background: c(k), boxShadow: `0 0 6px ${c(k)}` }} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Pill({ children, color, bg, border }: { children: React.ReactNode; color: string; bg: string; border: string }) {
-  return (
-    <span className="inline-flex items-center px-1.5 py-[2px] text-[9px] font-semibold uppercase tracking-[0.14em] rounded-sm"
-      style={{ color, background: bg, border: `1px solid ${border}` }}>
-      {children}
-    </span>
-  );
-}
-
-// ─── signal card ───────────────────────────────────────────────────────────────
-
-function SignalCard({ s }: { s: Signal }) {
+function SignalRow({ s }: { s: Signal }) {
   const isLong = s.dir === "LONG";
-  const accent = isLong ? BRAND : RED_SOFT;
-  const chgColor = s.chg >= 0 ? BRAND : RED_SOFT;
+  const color = isLong ? BRAND : RED;
+  const tint = isLong ? "rgba(102,255,102,0.05)" : "rgba(255,59,59,0.04)";
   return (
     <div
-      className="relative flex flex-col"
+      className="relative flex items-center gap-3 px-3 py-2.5"
       style={{
-        background: `linear-gradient(180deg, ${BG_2} 0%, ${BG_1} 100%)`,
-        border: `1px solid ${HAIR}`,
-        borderLeft: `2px solid ${accent}`,
-        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.02)`,
+        background: tint,
+        border: `1px solid ${isLong ? "rgba(102,255,102,0.18)" : "rgba(255,59,59,0.22)"}`,
       }}
     >
-      {/* header */}
-      <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5">
-        <div className="flex items-center gap-2">
-          <span className="text-[15px] font-bold tracking-tight text-white">{s.symbol}</span>
-          <Pill
-            color={s.klass === "CRYPTO" ? BRAND : "#9FD8FF"}
-            bg={s.klass === "CRYPTO" ? "rgba(124,255,0,0.06)" : "rgba(159,216,255,0.06)"}
-            border={s.klass === "CRYPTO" ? HAIR_STRONG : "rgba(159,216,255,0.18)"}
-          >
-            {s.klass}
-          </Pill>
-        </div>
-        <Pill color={accent} bg={isLong ? "rgba(124,255,0,0.08)" : "rgba(255,107,107,0.08)"} border={isLong ? HAIR_STRONG : "rgba(255,107,107,0.22)"}>
-          <span className="flex items-center gap-1">
-            {isLong ? <ArrowUpRight size={9} /> : <ArrowDownRight size={9} />}
-            {s.dir}
-          </span>
-        </Pill>
+      <div
+        className="px-1.5 py-0.5 text-[9px] font-bold tracking-[0.14em]"
+        style={{
+          color,
+          background: isLong ? "rgba(102,255,102,0.08)" : "rgba(255,59,59,0.08)",
+          border: `1px solid ${color}55`,
+        }}
+      >
+        {s.dir}
       </div>
 
-      {/* price */}
-      <div className="px-3 flex items-baseline justify-between">
-        <span className="text-[20px] font-semibold tracking-tight text-white tabular-nums">{s.price}</span>
-        <span className="text-[12px] font-semibold tabular-nums" style={{ color: chgColor }}>
-          {s.chg >= 0 ? "+" : ""}{s.chg.toFixed(2)}%
-        </span>
+      <div className="flex w-[72px] flex-col">
+        <div className="text-[13px] font-bold leading-none tracking-[-0.01em] text-white">{s.sym}</div>
+        <div className="mt-1 text-[8.5px] font-semibold tracking-[0.16em]" style={{ color: TXT_40 }}>
+          {s.reason}
+        </div>
       </div>
 
-      {/* sparkline */}
-      <div className="px-2 pt-1.5">
-        <Sparkline data={s.spark} dir={s.dir} />
+      <div className="flex w-[104px] flex-col">
+        <div className="text-[11px] font-semibold tabular-nums text-white leading-none">{s.price}</div>
+        <div className="mt-1 text-[9px] tabular-nums" style={{ color: TXT_40 }}>5m {s.last5m}</div>
       </div>
 
-      {/* conf + MTF */}
-      <div className="px-3 py-2 flex items-center justify-between" style={{ borderTop: `1px solid ${HAIR}` }}>
-        <div className="flex items-center gap-2">
-          <ConfRing value={s.conf} dir={s.dir} />
-          <div className="flex flex-col leading-tight">
-            <span className="text-[8px] uppercase tracking-[0.16em]" style={{ color: TXT_DIM }}>Conf</span>
-            <span className="text-[10px] font-medium" style={{ color: TXT_MUTED }}>{s.conf}/100</span>
-          </div>
-        </div>
-        <MtfDots mtf={s.mtf} />
+      <div className="flex-1 min-w-0">
+        <Sparkline data={s.spark} color={color} w={110} h={26} />
       </div>
 
-      {/* footer */}
-      <div className="px-3 py-2 grid grid-cols-3 gap-1 text-[9px]" style={{ borderTop: `1px solid ${HAIR}`, background: "rgba(0,0,0,0.25)" }}>
-        <div className="flex flex-col">
-          <span className="uppercase tracking-[0.14em]" style={{ color: TXT_DIM }}>Vol</span>
-          <span className="text-white tabular-nums">{s.vol}</span>
-        </div>
-        <div className="flex flex-col">
-          <span className="uppercase tracking-[0.14em]" style={{ color: TXT_DIM }}>RR</span>
-          <span className="text-white tabular-nums">{s.rr.toFixed(1)}</span>
-        </div>
-        <div className="flex flex-col items-end">
-          <span className="uppercase tracking-[0.14em]" style={{ color: TXT_DIM }}>Entry</span>
-          <span className="text-white tabular-nums">{s.entry}</span>
-        </div>
-        <div className="flex flex-col">
-          <span className="uppercase tracking-[0.14em]" style={{ color: RED_SOFT, opacity: 0.7 }}>SL</span>
-          <span className="text-white tabular-nums">{s.sl}</span>
-        </div>
-        <div className="flex flex-col">
-          <span className="uppercase tracking-[0.14em]" style={{ color: BRAND, opacity: 0.7 }}>TP</span>
-          <span className="text-white tabular-nums">{s.tp}</span>
-        </div>
-        <div className="flex flex-col items-end">
-          <span className="uppercase tracking-[0.14em]" style={{ color: TXT_DIM }}>Edge</span>
-          <span className="tabular-nums" style={{ color: accent }}>+{(s.conf * 0.018).toFixed(2)}σ</span>
+      <div className="flex w-[52px] flex-col items-end">
+        <div className="text-[9px] tracking-[0.14em]" style={{ color: TXT_40 }}>5M</div>
+        <div className="text-[11px] font-semibold tabular-nums" style={{ color }}>
+          {s.changePct > 0 ? "+" : ""}{s.changePct.toFixed(2)}%
         </div>
       </div>
+
+      <button
+        className="px-2 py-1 text-[9.5px] font-bold tracking-[0.16em]"
+        style={{
+          color,
+          border: `1px solid ${color}66`,
+          background: isLong ? "rgba(102,255,102,0.06)" : "rgba(255,59,59,0.06)",
+        }}
+      >
+        {isLong ? "BUY" : "SELL"}
+      </button>
+
+      <ConfRing value={s.conf} color={color} />
     </div>
   );
 }
 
-// ─── right panels ──────────────────────────────────────────────────────────────
-
-function PanelHeader({ title, right }: { title: string; right?: React.ReactNode }) {
+function NavItem({ icon: Icon, label, active, badge }: { icon: any; label: string; active?: boolean; badge?: string }) {
   return (
-    <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: `1px solid ${HAIR}` }}>
-      <span className="text-[10px] uppercase tracking-[0.18em]" style={{ color: TXT_MUTED }}>{title}</span>
+    <button
+      className="relative flex items-center gap-2 px-3 py-[7px] text-[10.5px] font-semibold tracking-[0.10em]"
+      style={{
+        color: active ? BRAND : TXT_65,
+        background: active ? "rgba(102,255,102,0.07)" : "transparent",
+        borderLeft: `2px solid ${active ? BRAND : "transparent"}`,
+        boxShadow: active ? `inset 0 0 22px rgba(102,255,102,0.08)` : undefined,
+      }}
+    >
+      <Icon size={12} />
+      <span>{label.toUpperCase()}</span>
+      {badge && (
+        <span className="ml-auto text-[8.5px] font-bold tabular-nums" style={{ color: BRAND }}>{badge}</span>
+      )}
+    </button>
+  );
+}
+
+function PanelHeader({ icon: Icon, title, right }: { icon: any; title: string; right?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: `1px solid ${HAIR_10}` }}>
+      <div className="flex items-center gap-2">
+        <Icon size={11} style={{ color: BRAND }} />
+        <div className="text-[10px] font-bold tracking-[0.18em] text-white">{title}</div>
+      </div>
       {right}
     </div>
   );
 }
 
-function TopMovers() {
+function KpiChip({ label, value, color = "white", sub }: { label: string; value: string; color?: string; sub?: string }) {
   return (
-    <div style={{ background: BG_2, border: `1px solid ${HAIR}` }}>
-      <PanelHeader title="Top Movers · 1H" right={<span className="text-[9px] tabular-nums" style={{ color: TXT_DIM }}>n=24</span>} />
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 px-3 py-2.5">
-        {TOP_MOVERS.map((m) => {
-          const up = m.chg >= 0;
-          return (
-            <div key={m.sym} className="flex items-center justify-between text-[11px]">
-              <span className="font-semibold text-white">{m.sym}</span>
-              <span className="tabular-nums" style={{ color: up ? BRAND : RED_SOFT }}>
-                {up ? "+" : ""}{m.chg.toFixed(2)}%
-              </span>
-            </div>
-          );
-        })}
-      </div>
+    <div className="flex items-center gap-1.5 px-2.5 py-1" style={{ background: BG_2, border: `1px solid ${HAIR_10}` }}>
+      <span className="text-[9px] tracking-[0.16em]" style={{ color: TXT_40 }}>{label}</span>
+      <span className="text-[11px] font-bold tabular-nums" style={{ color }}>{value}</span>
+      {sub && <span className="text-[9px] font-semibold tabular-nums" style={{ color: BRAND }}>{sub}</span>}
     </div>
   );
 }
 
-function AIReasoning() {
-  return (
-    <div style={{ background: BG_2, border: `1px solid ${HAIR}` }}>
-      <PanelHeader
-        title="AI Reasoning"
-        right={
-          <span className="flex items-center gap-1.5 text-[9px]" style={{ color: BRAND }}>
-            <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: BRAND, boxShadow: `0 0 6px ${BRAND}` }} />
-            STREAM
-          </span>
-        }
-      />
-      <div className="px-3 py-2 space-y-2.5">
-        {REASONING.map((r, i) => (
-          <div key={i} className="flex gap-2">
-            <span className="text-[9px] tabular-nums shrink-0 pt-0.5" style={{ color: TXT_DIM }}>{r.ts}</span>
-            <p className="text-[11px] leading-snug" style={{ color: TXT_MUTED }}>{r.text}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+function riskColor(score: number) {
+  if (score < 35) return BRAND;
+  if (score < 55) return LIME;
+  if (score < 75) return AMBER;
+  return RED;
 }
-
-function RiskHeatmap() {
-  const labels = ["BTC","ETH","SOL","ARB","NVDA","XRP","AVAX","LINK","DOGE","OP","POL","WIF"];
-  const seed = (i: number) => {
-    const v = (Math.sin(i * 1.7) * 50 + 50);
-    return v;
-  };
-  const cell = (v: number) => {
-    if (v > 70) return RED;
-    if (v > 55) return RED_SOFT;
-    if (v > 40) return "#E2C800";
-    if (v > 25) return EMERALD;
-    return BRAND;
-  };
-  return (
-    <div style={{ background: BG_2, border: `1px solid ${HAIR}` }}>
-      <PanelHeader title="Risk Heatmap · 24h VaR" right={<span className="text-[9px]" style={{ color: TXT_DIM }}>$ at risk</span>} />
-      <div className="grid grid-cols-4 gap-[3px] p-3">
-        {labels.map((l, i) => {
-          const v = seed(i);
-          return (
-            <div
-              key={l}
-              className="flex flex-col items-center justify-center py-2"
-              style={{
-                background: `${cell(v)}26`,
-                border: `1px solid ${cell(v)}55`,
-              }}
-            >
-              <span className="text-[10px] font-semibold text-white">{l}</span>
-              <span className="text-[9px] tabular-nums" style={{ color: TXT_MUTED }}>{v.toFixed(0)}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ExchangeTopology() {
-  return (
-    <div style={{ background: BG_2, border: `1px solid ${HAIR}` }}>
-      <PanelHeader title="Exchange Topology" right={<span className="text-[9px]" style={{ color: TXT_DIM }}>5 venues</span>} />
-      <div className="px-3 py-2 space-y-1.5">
-        {EXCHANGES.map((e) => (
-          <div key={e.name} className="grid grid-cols-12 items-center text-[10px] gap-2">
-            <div className="col-span-1">
-              <span className="inline-block rounded-full" style={{ width: 6, height: 6, background: e.ok ? BRAND : RED, boxShadow: `0 0 6px ${e.ok ? BRAND : RED}` }} />
-            </div>
-            <span className="col-span-4 text-white font-medium">{e.name}</span>
-            <span className="col-span-2 text-center tabular-nums" style={{ color: TXT_MUTED }}>{e.ws}</span>
-            <span className="col-span-2 text-right tabular-nums" style={{ color: e.lat > 80 ? RED_SOFT : TXT_MUTED }}>{e.lat}ms</span>
-            <span className="col-span-3 text-right tabular-nums" style={{ color: TXT_MUTED }}>{e.fills} fills</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── sidebar ───────────────────────────────────────────────────────────────────
-
-function Sidebar() {
-  return (
-    <aside
-      className="flex flex-col shrink-0"
-      style={{ width: 228, background: BG_1, borderRight: `1px solid ${HAIR}` }}
-    >
-      {/* logo */}
-      <div className="px-4 py-4 flex items-center gap-2" style={{ borderBottom: `1px solid ${HAIR}` }}>
-        <div className="relative flex items-center justify-center" style={{ width: 26, height: 26 }}>
-          <div className="absolute inset-0 rounded-sm" style={{ background: `${BRAND}22`, border: `1px solid ${HAIR_STRONG}` }} />
-          <Zap size={14} style={{ color: BRAND }} />
-        </div>
-        <div className="flex flex-col leading-none">
-          <span className="text-[13px] font-bold tracking-tight text-white">AICandlez</span>
-          <span className="text-[8px] uppercase tracking-[0.22em]" style={{ color: BRAND }}>Operator</span>
-        </div>
-      </div>
-
-      {/* nav */}
-      <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-[2px]">
-        {NAV.map((n) => {
-          const Icon = n.icon;
-          const active = n.active;
-          return (
-            <div
-              key={n.label}
-              className="relative flex items-center gap-2.5 px-2.5 py-[7px] cursor-default"
-              style={{
-                background: active ? "rgba(124,255,0,0.06)" : "transparent",
-                borderLeft: active ? `2px solid ${BRAND}` : `2px solid transparent`,
-                boxShadow: active ? `inset 0 0 12px rgba(124,255,0,0.10)` : "none",
-              }}
-            >
-              <Icon size={13} style={{ color: active ? BRAND : TXT_MUTED }} />
-              <span className="text-[11.5px]" style={{ color: active ? "white" : TXT_MUTED, fontWeight: active ? 600 : 400 }}>
-                {n.label}
-              </span>
-            </div>
-          );
-        })}
-      </nav>
-
-      {/* engine status */}
-      <div className="m-2 p-2.5" style={{ background: BG_3, border: `1px solid ${HAIR_STRONG}` }}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block rounded-full animate-pulse" style={{ width: 7, height: 7, background: BRAND, boxShadow: `0 0 8px ${BRAND}` }} />
-            <span className="text-[9px] uppercase tracking-[0.18em] font-semibold" style={{ color: BRAND }}>Engine Active</span>
-          </div>
-          <Activity size={11} style={{ color: BRAND }} />
-        </div>
-        <div className="grid grid-cols-2 gap-y-1 text-[9.5px]">
-          <span className="uppercase tracking-[0.12em]" style={{ color: TXT_DIM }}>Uptime</span>
-          <span className="text-right tabular-nums text-white">42d 11h</span>
-          <span className="uppercase tracking-[0.12em]" style={{ color: TXT_DIM }}>Sym/sec</span>
-          <span className="text-right tabular-nums text-white">187</span>
-          <span className="uppercase tracking-[0.12em]" style={{ color: TXT_DIM }}>Last tick</span>
-          <span className="text-right tabular-nums text-white">14:22:09</span>
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-// ─── top bar ───────────────────────────────────────────────────────────────────
-
-function Kpi({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="flex items-center gap-1.5 px-3 h-full" style={{ borderRight: `1px solid ${HAIR}` }}>
-      <span className="text-[9px] uppercase tracking-[0.16em]" style={{ color: TXT_DIM }}>{label}</span>
-      <span className="text-[11px] font-semibold tabular-nums" style={{ color: color || "white" }}>{value}</span>
-    </div>
-  );
-}
-
-function TopBar() {
-  return (
-    <div
-      className="h-10 flex items-center justify-between shrink-0"
-      style={{ background: BG_1, borderBottom: `1px solid ${HAIR}` }}
-    >
-      <div className="flex items-center h-full">
-        <div className="flex items-center gap-1.5 px-3 h-full" style={{ borderRight: `1px solid ${HAIR}` }}>
-          <span className="text-[9px] uppercase tracking-[0.18em]" style={{ color: TXT_DIM }}>Engine</span>
-          <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: BRAND, boxShadow: `0 0 6px ${BRAND}` }} />
-          <span className="text-[11px] font-semibold" style={{ color: BRAND }}>ACTIVE</span>
-        </div>
-        <Kpi label="Open Live" value="3 / 3" />
-        <Kpi label="Sig/min" value="14.2" />
-        <Kpi label="BTC" value="$67,482" color={BRAND} />
-        <Kpi label="ETH" value="$3,584" color={BRAND} />
-        <Kpi label="SOL" value="$182.44" color={RED_SOFT} />
-        <Kpi label="Vol 24h" value="$2.41B" />
-        <Kpi label="Global P&L" value="+$8,412.20" color={BRAND} />
-      </div>
-      <div className="flex items-center gap-3 px-4 h-full">
-        <span className="text-[10px] tabular-nums" style={{ color: TXT_DIM }}>2024-11-14  14:22:09 UTC</span>
-        <span className="flex items-center gap-1 text-[10px]" style={{ color: BRAND }}>
-          <Circle size={6} fill={BRAND} stroke="none" /> LIVE
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ─── bottom status bar ─────────────────────────────────────────────────────────
-
-function BottomStatus() {
-  const Seg = ({ label, value, color }: { label: string; value: string; color?: string }) => (
-    <div className="flex items-center gap-1.5 px-3 h-full" style={{ borderRight: `1px solid ${HAIR}` }}>
-      <span className="text-[9px] uppercase tracking-[0.16em]" style={{ color: TXT_DIM }}>{label}</span>
-      <span className="text-[11px] font-semibold tabular-nums" style={{ color: color || "white" }}>{value}</span>
-    </div>
-  );
-  return (
-    <div
-      className="h-9 flex items-center shrink-0"
-      style={{ background: BG_1, borderTop: `1px solid ${HAIR_STRONG}` }}
-    >
-      <div className="flex items-center gap-2 px-3 h-full" style={{ borderRight: `1px solid ${HAIR}` }}>
-        <span className="inline-block rounded-full animate-pulse" style={{ width: 7, height: 7, background: BRAND, boxShadow: `0 0 8px ${BRAND}` }} />
-        <span className="text-[10px] uppercase tracking-[0.22em] font-semibold" style={{ color: BRAND }}>AI Executor</span>
-        <Pill color={BRAND} bg="rgba(124,255,0,0.08)" border={HAIR_STRONG}>LIVE</Pill>
-      </div>
-      <Seg label="Open" value="3" />
-      <Seg label="Last Fill" value="BTC LONG +0.42%" color={BRAND} />
-      <Seg label="Queue" value="0" />
-      <Seg label="Latency" value="142ms" />
-      <Seg label="Slippage" value="0.04%" />
-      <Seg label="Fees 24h" value="$184.20" />
-      <Seg label="Risk Budget" value="62%" color={BRAND} />
-      <div className="flex-1" />
-      <div className="px-4 flex items-center gap-3 h-full">
-        <span className="text-[10px]" style={{ color: TXT_DIM }}>Build 2.14.7 · region us-east-1 · ws stable</span>
-      </div>
-    </div>
-  );
-}
-
-// ─── root ──────────────────────────────────────────────────────────────────────
 
 export default function OperatorDashboard() {
+  const [now, setNow] = useState(new Date());
+  const [armed, setArmed] = useState(true);
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const clock = now.toISOString().split("T")[1].split(".")[0] + " UTC";
+
+  const nav = [
+    { label: "Dashboard",          icon: LayoutDashboard },
+    { label: "Live Trading",       icon: Radio },
+    { label: "AI Engine",          icon: Cpu },
+    { label: "Top Opportunities",  icon: Target, active: true, badge: "30" },
+    { label: "Watchlist",          icon: Star },
+    { label: "Positions",          icon: Wallet },
+    { label: "Orders",             icon: TrendingUp },
+    { label: "Paper Trading",      icon: FlaskConical },
+    { label: "Risk Management",    icon: ShieldAlert },
+    { label: "AI Analytics",       icon: Brain },
+    { label: "Market Intel",       icon: LineChart },
+    { label: "News & Sentiment",   icon: Newspaper },
+    { label: "Alerts",             icon: Bell },
+    { label: "Performance",        icon: BarChart3 },
+    { label: "Settings",           icon: Settings },
+  ];
+
   return (
     <div
-      className="flex flex-col"
+      className="flex min-h-screen w-full"
       style={{
-        height: "100vh",
-        minHeight: 900,
-        width: "100%",
-        background: BG_0,
+        background: `radial-gradient(1200px 600px at 30% -10%, rgba(102,255,102,0.06), transparent 60%), ${BG_0}`,
         color: "white",
-        fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif',
-        fontFeatureSettings: '"ss01","tnum"',
+        fontFamily: "Inter, system-ui, -apple-system, Segoe UI, sans-serif",
+        fontFeatureSettings: '"tnum"',
       }}
     >
-      {/* subtle scanline overlay */}
-      <div
-        className="pointer-events-none fixed inset-0 z-50"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(0deg, rgba(124,255,0,0.015) 0px, rgba(124,255,0,0.015) 1px, transparent 1px, transparent 3px)",
-        }}
-      />
+      {/* LEFT SIDEBAR */}
+      <aside
+        className="flex w-[228px] shrink-0 flex-col"
+        style={{ background: BG_1, borderRight: `1px solid ${HAIR_10}` }}
+      >
+        <div className="flex items-center gap-2 px-3 py-3" style={{ borderBottom: `1px solid ${HAIR_10}` }}>
+          <div className="grid h-6 w-6 place-items-center" style={{ background: BRAND, color: BG_0 }}>
+            <Zap size={13} strokeWidth={3} />
+          </div>
+          <div className="flex flex-col leading-none">
+            <span className="text-[13px] font-bold tracking-[-0.02em] text-white">AICandlez</span>
+            <span className="mt-1 text-[8.5px] font-bold tracking-[0.24em]" style={{ color: BRAND }}>OPERATOR · v2.14.7</span>
+          </div>
+        </div>
 
-      <div className="flex flex-1 min-h-0">
-        <Sidebar />
+        <div className="flex flex-col py-2">
+          {nav.map((n) => (
+            <NavItem key={n.label} icon={n.icon} label={n.label} active={n.active} badge={n.badge} />
+          ))}
+        </div>
 
-        <div className="flex flex-col flex-1 min-w-0">
-          <TopBar />
+        <div className="mt-auto px-3 pb-3">
+          <div className="flex flex-col gap-2 px-3 py-3" style={{ background: BG_2, border: `1px solid ${HAIR_18}` }}>
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full" style={{ background: BRAND, opacity: 0.6 }} />
+                <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: BRAND, boxShadow: `0 0 8px ${BRAND}` }} />
+              </span>
+              <span className="text-[9.5px] font-bold tracking-[0.18em]" style={{ color: BRAND }}>ENGINE ACTIVE</span>
+            </div>
+            <div className="grid grid-cols-2 gap-y-1 text-[9.5px] tabular-nums">
+              <span style={{ color: TXT_40 }}>UPTIME</span><span className="text-right text-white">42d 11h</span>
+              <span style={{ color: TXT_40 }}>SYM/SEC</span><span className="text-right text-white">187</span>
+              <span style={{ color: TXT_40 }}>LAST TICK</span><span className="text-right text-white">14:22:09</span>
+              <span style={{ color: TXT_40 }}>MODE</span><span className="text-right font-bold" style={{ color: BRAND }}>LIVE</span>
+            </div>
+          </div>
+        </div>
+      </aside>
 
-          <div className="flex flex-1 min-h-0">
-            {/* center grid */}
-            <div className="flex-1 overflow-y-auto p-3" style={{ background: BG_0 }}>
-              <div className="flex items-center justify-between mb-2 px-1">
-                <div className="flex items-center gap-2">
-                  <Flame size={13} style={{ color: BRAND }} />
-                  <span className="text-[11px] uppercase tracking-[0.20em] font-semibold text-white">Top Opportunities</span>
-                  <span className="text-[10px]" style={{ color: TXT_DIM }}>· ranked by composite edge · live</span>
+      {/* RIGHT SIDE */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* TOP BAR */}
+        <div
+          className="flex h-[44px] items-center gap-2 px-3"
+          style={{ background: BG_1, borderBottom: `1px solid ${HAIR_10}` }}
+        >
+          <div className="flex items-center gap-1.5 px-2 py-1" style={{ background: "rgba(102,255,102,0.08)", border: `1px solid ${BRAND}55` }}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: BRAND, boxShadow: `0 0 6px ${BRAND}` }} />
+            <span className="text-[9.5px] font-bold tracking-[0.18em]" style={{ color: BRAND }}>ENGINE ACTIVE</span>
+          </div>
+          <KpiChip label="OPEN LIVE" value="3 / 3" color={BRAND} />
+          <KpiChip label="SIG/MIN" value="4.2" />
+          <KpiChip label="BTC" value="$67,284" sub="+1.92%" />
+          <KpiChip label="ETH" value="$3,128" sub="+1.37%" />
+          <KpiChip label="VOL 24H" value="$84.2B" />
+          <KpiChip label="GLOBAL P&L" value="+$12,481.20" color={BRAND} />
+
+          <div className="ml-auto flex items-center gap-3">
+            <div className="text-[10px] tabular-nums" style={{ color: TXT_65 }}>
+              <span style={{ color: TXT_40 }}>◷ </span>{clock}
+            </div>
+            <div className="flex items-center gap-1.5 px-2 py-1" style={{ border: `1px solid ${BRAND}66`, background: "rgba(102,255,102,0.06)" }}>
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: BRAND, boxShadow: `0 0 6px ${BRAND}` }} />
+              <span className="text-[9.5px] font-bold tracking-[0.18em]" style={{ color: BRAND }}>LIVE</span>
+            </div>
+            <Bell size={13} style={{ color: TXT_65 }} />
+            <div className="grid h-7 w-7 place-items-center text-[10px] font-bold" style={{ background: BG_3, color: BRAND, border: `1px solid ${HAIR_18}` }}>
+              OP
+            </div>
+          </div>
+        </div>
+
+        {/* BODY */}
+        <div className="grid flex-1 gap-3 px-3 py-3" style={{ gridTemplateColumns: "1fr 1fr 340px" }}>
+          {/* LONG COLUMN */}
+          <div className="flex min-w-0 flex-col" style={{ background: BG_1, border: `1px solid ${HAIR_10}` }}>
+            <PanelHeader
+              icon={Activity}
+              title="TOP 15 LONG CRYPTO SIGNALS"
+              right={
+                <div className="flex items-center gap-2 text-[9px]" style={{ color: TXT_40 }}>
+                  <span>AVG CONF <span className="font-bold text-white">81%</span></span>
+                  <button className="px-1.5 py-0.5 text-[8.5px] font-bold tracking-[0.14em]" style={{ color: BRAND, border: `1px solid ${BRAND}55`, background: "rgba(102,255,102,0.06)" }}>EXECUTE ALL</button>
                 </div>
-                <div className="flex items-center gap-2 text-[10px]" style={{ color: TXT_MUTED }}>
-                  <span>{SIGNALS.length} signals</span>
-                  <span style={{ color: TXT_DIM }}>·</span>
-                  <span>{SIGNALS.filter(s => s.dir === "LONG").length} LONG / {SIGNALS.filter(s => s.dir === "SHORT").length} SHORT</span>
-                  <span style={{ color: TXT_DIM }}>·</span>
-                  <span>{SIGNALS.filter(s => s.klass === "EQUITY").length} equity</span>
+              }
+            />
+            <div className="flex flex-col gap-1.5 p-2">
+              {LONGS.map((s) => <SignalRow key={s.sym} s={s} />)}
+            </div>
+          </div>
+
+          {/* SHORT COLUMN */}
+          <div className="flex min-w-0 flex-col" style={{ background: BG_1, border: `1px solid ${HAIR_10}` }}>
+            <PanelHeader
+              icon={Activity}
+              title="TOP 15 SHORT CRYPTO SIGNALS"
+              right={
+                <div className="flex items-center gap-2 text-[9px]" style={{ color: TXT_40 }}>
+                  <span>AVG CONF <span className="font-bold text-white">79%</span></span>
+                  <button className="px-1.5 py-0.5 text-[8.5px] font-bold tracking-[0.14em]" style={{ color: RED, border: `1px solid ${RED}66`, background: "rgba(255,59,59,0.06)" }}>EXECUTE ALL</button>
+                </div>
+              }
+            />
+            <div className="flex flex-col gap-1.5 p-2">
+              {SHORTS.map((s) => <SignalRow key={s.sym} s={s} />)}
+            </div>
+          </div>
+
+          {/* OPERATOR RAIL */}
+          <div className="flex flex-col gap-3">
+            {/* OPERATOR CONTROLS */}
+            <div className="flex flex-col" style={{ background: BG_1, border: `1px solid ${HAIR_18}` }}>
+              <PanelHeader
+                icon={Power}
+                title="OPERATOR CONTROLS"
+                right={<span className="text-[8.5px] font-bold tracking-[0.18em]" style={{ color: BRAND }}>ARMED</span>}
+              />
+              <div className="flex flex-col gap-2.5 px-3 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] tracking-[0.14em]" style={{ color: TXT_65 }}>ARM LIVE</span>
+                  <button
+                    onClick={() => setArmed((v) => !v)}
+                    className="relative h-[18px] w-[36px]"
+                    style={{
+                      background: armed ? "rgba(102,255,102,0.18)" : "rgba(255,255,255,0.06)",
+                      border: `1px solid ${armed ? BRAND : "rgba(255,255,255,0.18)"}`,
+                    }}
+                  >
+                    <span
+                      className="absolute top-[1px] h-[14px] w-[14px] transition-all"
+                      style={{
+                        left: armed ? 19 : 1,
+                        background: armed ? BRAND : "rgba(255,255,255,0.4)",
+                        boxShadow: armed ? `0 0 8px ${BRAND}` : "none",
+                      }}
+                    />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button className="px-2 py-1.5 text-[9.5px] font-bold tracking-[0.14em]" style={{ color: AMBER, border: `1px solid ${AMBER}55`, background: "rgba(255,210,63,0.04)" }}>
+                    PAUSE ENGINE
+                  </button>
+                  <button className="px-2 py-1.5 text-[9.5px] font-bold tracking-[0.14em]" style={{ color: RED, border: `1px solid ${RED}55`, background: "rgba(255,59,59,0.04)" }}>
+                    KILL SWITCH
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between text-[9.5px] tracking-[0.14em]">
+                    <span style={{ color: TXT_65 }}>MIN CONFIDENCE</span>
+                    <span className="font-bold tabular-nums" style={{ color: BRAND }}>60</span>
+                  </div>
+                  <div className="relative h-[4px]" style={{ background: "rgba(255,255,255,0.06)" }}>
+                    <div className="absolute h-full" style={{ width: "60%", background: BRAND }} />
+                    <div className="absolute h-[10px] w-[10px] -top-[3px]" style={{ left: "calc(60% - 5px)", background: BRAND, boxShadow: `0 0 6px ${BRAND}` }} />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[9.5px] tracking-[0.14em]">
+                  <span style={{ color: TXT_65 }}>CONCURRENT CAP</span>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <span
+                        key={n}
+                        className="grid h-[16px] w-[16px] place-items-center text-[9px] font-bold tabular-nums"
+                        style={{
+                          color: n <= 3 ? BG_0 : TXT_40,
+                          background: n <= 3 ? BRAND : "transparent",
+                          border: `1px solid ${n <= 3 ? BRAND : HAIR_18}`,
+                        }}
+                      >
+                        {n}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                {SIGNALS.map((s) => (
-                  <SignalCard key={s.symbol} s={s} />
+            </div>
+
+            {/* AI EXECUTION OVERVIEW */}
+            <div className="flex flex-col" style={{ background: BG_1, border: `1px solid ${HAIR_10}` }}>
+              <PanelHeader icon={Cpu} title="AI EXECUTION OVERVIEW" right={<span className="text-[9px]" style={{ color: TXT_40 }}>LAST 5</span>} />
+              <div className="flex flex-col">
+                {FILLS.map((f, i) => {
+                  const c = f.dir === "LONG" ? BRAND : RED;
+                  const ok = f.status === "EXECUTED";
+                  return (
+                    <div key={i} className="grid grid-cols-[52px_auto_auto_1fr_auto] items-center gap-2 px-3 py-1.5 text-[10px]" style={{ borderTop: `1px solid ${HAIR_10}` }}>
+                      <span className="tabular-nums" style={{ color: TXT_40 }}>{f.t}</span>
+                      <span className="font-bold text-white">{f.sym}</span>
+                      <span className="text-[9px] font-semibold tracking-[0.10em]" style={{ color: c }}>{f.dir}</span>
+                      <span className="text-right font-semibold tabular-nums" style={{ color: f.pnl >= 0 ? BRAND : RED }}>
+                        {f.pnl >= 0 ? "+" : ""}{f.pnl.toFixed(2)}%
+                      </span>
+                      <span className="text-[8.5px] font-bold tracking-[0.14em]" style={{ color: ok ? BRAND : RED }}>{f.status}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* RISK TELEMETRY */}
+            <div className="flex flex-col" style={{ background: BG_1, border: `1px solid ${HAIR_10}` }}>
+              <PanelHeader
+                icon={Gauge}
+                title="RISK TELEMETRY"
+                right={<span className="text-[9px] tabular-nums" style={{ color: TXT_40 }}>VAR 24H <span className="font-semibold text-white">$2,418</span></span>}
+              />
+              <div className="grid grid-cols-4 gap-1 p-2">
+                {RISK_GRID.map((r) => {
+                  const c = riskColor(r.score);
+                  return (
+                    <div
+                      key={r.sym}
+                      className="flex flex-col items-center justify-center gap-0.5 px-1 py-1.5"
+                      style={{ background: `${c}12`, border: `1px solid ${c}55` }}
+                    >
+                      <span className="text-[9.5px] font-bold text-white">{r.sym}</span>
+                      <span className="text-[9px] font-semibold tabular-nums" style={{ color: c }}>{r.score}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex flex-col gap-1 px-3 py-2" style={{ borderTop: `1px solid ${HAIR_10}` }}>
+                <div className="flex items-center justify-between text-[9.5px] tracking-[0.14em]">
+                  <span style={{ color: TXT_65 }}>RISK BUDGET</span>
+                  <span className="font-bold tabular-nums text-white">62% / 100%</span>
+                </div>
+                <div className="h-[5px]" style={{ background: "rgba(255,255,255,0.05)" }}>
+                  <div className="h-full" style={{ width: "62%", background: `linear-gradient(90deg, ${BRAND}, ${AMBER})` }} />
+                </div>
+              </div>
+            </div>
+
+            {/* ENGINE STATE */}
+            <div className="flex flex-col" style={{ background: BG_1, border: `1px solid ${HAIR_10}` }}>
+              <PanelHeader icon={Sparkles} title="ENGINE STATE" />
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 px-3 py-2 text-[9.5px] tabular-nums">
+                <span style={{ color: TXT_65 }}>tradingLoop tick</span><span className="text-right text-white">218ms</span>
+                <span style={{ color: TXT_65 }}>MTF funnel pass</span><span className="text-right" style={{ color: BRAND }}>71%</span>
+                <span style={{ color: TXT_65 }}>volume confirm</span><span className="text-right" style={{ color: BRAND }}>88%</span>
+                <span style={{ color: TXT_65 }}>sideways block</span><span className="text-right text-white">24</span>
+                <span style={{ color: TXT_65 }}>signals/min</span><span className="text-right text-white">4.2</span>
+                <span style={{ color: TXT_65 }}>queue depth</span><span className="text-right text-white">0 / 32</span>
+              </div>
+            </div>
+
+            {/* EXCHANGE TOPOLOGY */}
+            <div className="flex flex-col" style={{ background: BG_1, border: `1px solid ${HAIR_10}` }}>
+              <PanelHeader icon={Radio} title="EXCHANGE TOPOLOGY" right={<span className="text-[9px]" style={{ color: TXT_40 }}>5 VENUES</span>} />
+              <div className="flex flex-col">
+                {EXCHANGES.map((x) => (
+                  <div key={x.name} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-2 px-3 py-1.5 text-[10px]" style={{ borderTop: `1px solid ${HAIR_10}` }}>
+                    <span className="font-semibold text-white">{x.name}</span>
+                    <span className="text-[8.5px] font-bold tracking-[0.14em]" style={{ color: x.ws === "WS" ? BRAND : AMBER }}>{x.ws}</span>
+                    <span className="tabular-nums" style={{ color: TXT_65 }}>{x.lat}ms</span>
+                    <span className="text-[9px] tabular-nums" style={{ color: TXT_40 }}>{x.fills}f</span>
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: x.ok ? BRAND : RED, boxShadow: `0 0 6px ${x.ok ? BRAND : RED}` }} />
+                  </div>
                 ))}
               </div>
             </div>
 
-            {/* right rail */}
-            <aside
-              className="shrink-0 overflow-y-auto p-3 space-y-3"
-              style={{ width: 320, background: BG_1, borderLeft: `1px solid ${HAIR}` }}
-            >
-              <TopMovers />
-              <AIReasoning />
-              <RiskHeatmap />
-              <ExchangeTopology />
-            </aside>
+            {/* AI REASONING */}
+            <div className="flex flex-col" style={{ background: BG_1, border: `1px solid ${HAIR_10}` }}>
+              <PanelHeader
+                icon={Brain}
+                title="AI REASONING STREAM"
+                right={
+                  <div className="flex items-center gap-1 text-[8.5px] font-bold tracking-[0.18em]" style={{ color: BRAND }}>
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: BRAND, boxShadow: `0 0 6px ${BRAND}` }} />
+                    LIVE
+                  </div>
+                }
+              />
+              <div className="flex flex-col">
+                {REASONING.map((r, i) => (
+                  <div key={i} className="flex flex-col gap-1 px-3 py-2" style={{ borderTop: `1px solid ${HAIR_10}` }}>
+                    <div className="text-[9px] tabular-nums tracking-[0.12em]" style={{ color: TXT_40 }}>{r.t}</div>
+                    <div className="text-[10.5px] leading-snug" style={{ color: "rgba(255,255,255,0.86)" }}>{r.msg}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
+        </div>
 
-          <BottomStatus />
+        {/* BOTTOM AI EXECUTOR BAR */}
+        <div
+          className="flex h-[32px] items-center gap-4 px-3 text-[10px] tracking-[0.14em]"
+          style={{ background: BG_1, borderTop: `1px solid ${HAIR_10}`, color: TXT_65 }}
+        >
+          <div className="flex items-center gap-1.5 font-bold" style={{ color: BRAND }}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: BRAND, boxShadow: `0 0 6px ${BRAND}` }} />
+            AI EXECUTOR · LIVE
+          </div>
+          <span>OPEN <span className="font-bold text-white tabular-nums">3</span></span>
+          <span>LAST FILL <span className="font-bold text-white">BTC LONG</span> <span style={{ color: BRAND }} className="font-bold tabular-nums">+0.42%</span></span>
+          <span>QUEUE <span className="font-bold text-white tabular-nums">0</span></span>
+          <span>LATENCY <span className="font-bold text-white tabular-nums">142ms</span></span>
+          <span>SLIPPAGE <span className="font-bold text-white tabular-nums">0.04%</span></span>
+          <span>FEES 24H <span className="font-bold text-white tabular-nums">$184.20</span></span>
+          <span>RISK BUDGET <span className="font-bold tabular-nums" style={{ color: BRAND }}>62%</span></span>
+          <div className="ml-auto flex items-center gap-3">
+            <span style={{ color: TXT_40 }}>BUILD 2.14.7</span>
+            <span style={{ color: TXT_40 }}>region us-east-1</span>
+            <div className="flex items-center gap-1.5">
+              <AlertTriangle size={10} style={{ color: BRAND }} />
+              <span style={{ color: BRAND }} className="font-bold">STABLE</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

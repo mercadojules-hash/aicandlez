@@ -46,39 +46,61 @@ type Signal = {
   spark: number[];
 };
 
-const CRYPTO: Signal[] = [
-  { sym: "BTC",  name: "Bitcoin",  dir: "LONG",  reason: "TREND",      price: "$67,284.10", last5m: "$66,910.22", changePct:  1.37, vol: "$48.7M", conf: 92, spark: [10,12,11,14,15,14,18,17,20,22,24,26,27,29] },
-  { sym: "ETH",  name: "Ethereum", dir: "LONG",  reason: "MOMENTUM",   price: "$3,128.44",  last5m: "$3,084.10",  changePct:  2.18, vol: "$22.4M", conf: 88, spark: [5,6,5,7,8,7,9,10,12,11,14,15,17,18] },
-  { sym: "SOL",  name: "Solana",   dir: "LONG",  reason: "BREAKOUT",   price: "$172.65",    last5m: "$168.81",    changePct:  2.18, vol: "$14.1M", conf: 86, spark: [9,10,11,10,12,13,14,13,15,16,18,19,20,22] },
-  { sym: "AVAX", name: "Avalanche",dir: "LONG",  reason: "TREND",      price: "$39.27",     last5m: "$37.12",     changePct:  1.89, vol: "$8.2M",  conf: 82, spark: [8,8.4,8.6,9,9.2,9.5,9.7,10,10.4,10.8,11,11.4,11.8,12.2] },
-  { sym: "APT",  name: "Aptos",    dir: "LONG",  reason: "REVERSAL",   price: "$7.95",      last5m: "$6.91",      changePct:  1.23, vol: "$4.6M",  conf: 78, spark: [4,4.2,4.1,4.4,4.3,4.6,4.5,4.8,4.7,5.0,4.9,5.2,5.1,5.4] },
-  { sym: "LINK", name: "Chainlink",dir: "LONG",  reason: "MOMENTUM",   price: "$19.74",     last5m: "$18.18",     changePct:  1.07, vol: "$5.1M",  conf: 76, spark: [11,11.3,11.2,11.6,11.5,11.9,11.8,12.2,12.1,12.5,12.4,12.8,12.7,13.1] },
-  { sym: "WIF",  name: "Dogwifhat",dir: "SHORT", reason: "TREND",      price: "$2.0840",    last5m: "$2.1920",    changePct: -2.18, vol: "$3.4M",  conf: 81, spark: [22,21,21.6,20.5,20.2,20.8,19.6,19.2,19.8,18.4,18.0,18.6,17.2,16.8] },
-  { sym: "NEAR", name: "Near",     dir: "SHORT", reason: "MOMENTUM",   price: "$6.28",      last5m: "$6.412",     changePct: -1.97, vol: "$2.9M",  conf: 77, spark: [18,17.6,17.8,17.2,17.0,17.4,16.6,16.2,16.4,15.6,15.2,15.4,14.6,14.2] },
-  { sym: "OP",   name: "Optimism", dir: "SHORT", reason: "TREND",      price: "$1.2747",    last5m: "$1.3148",    changePct: -1.63, vol: "$2.1M",  conf: 74, spark: [16,15.6,15.8,15.0,14.6,14.8,14.0,13.6,13.8,13.0,12.6,12.8,12.0,11.6] },
-  { sym: "BONK", name: "Bonk",     dir: "SHORT", reason: "REVERSAL",   price: "$0.00001921",last5m: "$0.00002168",changePct: -2.21, vol: "$1.8M",  conf: 72, spark: [21,20.5,20.7,19.9,19.5,19.7,18.9,18.4,18.6,17.7,17.2,17.4,16.4,16.0] },
+const LONG_CRYPTO: Signal[] = [
+  { sym: "BTC",   name: "Bitcoin",     dir: "LONG", reason: "TREND",    price: "$67,284.10", last5m: "$66,910.22", changePct: 1.37, vol: "$48.7M", conf: 92, spark: [10,12,11,14,15,14,18,17,20,22,24,26,27,29] },
+  { sym: "ETH",   name: "Ethereum",    dir: "LONG", reason: "MOMENTUM", price: "$3,128.44",  last5m: "$3,084.10",  changePct: 2.18, vol: "$22.4M", conf: 88, spark: [5,6,5,7,8,7,9,10,12,11,14,15,17,18] },
+  { sym: "SOL",   name: "Solana",      dir: "LONG", reason: "BREAKOUT", price: "$172.65",    last5m: "$168.81",    changePct: 2.27, vol: "$14.1M", conf: 86, spark: [9,10,11,10,12,13,14,13,15,16,18,19,20,22] },
+  { sym: "AVAX",  name: "Avalanche",   dir: "LONG", reason: "TREND",    price: "$39.27",     last5m: "$38.54",     changePct: 1.89, vol: "$8.2M",  conf: 84, spark: [8,8.4,8.6,9,9.2,9.5,9.7,10,10.4,10.8,11,11.4,11.8,12.2] },
+  { sym: "LINK",  name: "Chainlink",   dir: "LONG", reason: "MOMENTUM", price: "$19.74",     last5m: "$19.33",     changePct: 2.12, vol: "$5.1M",  conf: 82, spark: [11,11.3,11.2,11.6,11.5,11.9,11.8,12.2,12.1,12.5,12.4,12.8,12.7,13.1] },
+  { sym: "INJ",   name: "Injective",   dir: "LONG", reason: "BREAKOUT", price: "$28.40",     last5m: "$27.65",     changePct: 2.71, vol: "$3.9M",  conf: 81, spark: [9,9.4,9.6,10,10.3,10.7,11.0,11.5,11.7,12.1,12.4,12.8,13.2,13.7] },
+  { sym: "TIA",   name: "Celestia",    dir: "LONG", reason: "TRENDING", price: "$7.82",      last5m: "$7.61",      changePct: 2.76, vol: "$2.6M",  conf: 80, spark: [6,6.2,6.4,6.7,6.9,7.1,7.3,7.5,7.7,7.9,8.0,8.2,8.4,8.6] },
+  { sym: "RNDR",  name: "Render",      dir: "LONG", reason: "MOMENTUM", price: "$8.91",      last5m: "$8.62",      changePct: 3.36, vol: "$4.4M",  conf: 79, spark: [5,5.2,5.5,5.8,6.0,6.3,6.6,6.9,7.1,7.4,7.7,8.0,8.3,8.6] },
+  { sym: "SUI",   name: "Sui",         dir: "LONG", reason: "TREND",    price: "$2.16",      last5m: "$2.11",      changePct: 2.37, vol: "$3.1M",  conf: 78, spark: [7,7.2,7.3,7.5,7.6,7.8,8.0,8.2,8.3,8.5,8.7,8.9,9.1,9.3] },
+  { sym: "APT",   name: "Aptos",       dir: "LONG", reason: "REVERSAL", price: "$7.95",      last5m: "$7.74",      changePct: 2.71, vol: "$4.6M",  conf: 77, spark: [4,4.2,4.1,4.4,4.3,4.6,4.5,4.8,4.7,5.0,4.9,5.2,5.1,5.4] },
+  { sym: "FET",   name: "Fetch.ai",    dir: "LONG", reason: "BREAKOUT", price: "$1.348",     last5m: "$1.298",     changePct: 3.85, vol: "$2.8M",  conf: 76, spark: [6,6.3,6.5,6.8,7.0,7.3,7.5,7.8,8.0,8.3,8.5,8.8,9.0,9.3] },
+  { sym: "ARB",   name: "Arbitrum",    dir: "LONG", reason: "MOMENTUM", price: "$1.072",     last5m: "$1.048",     changePct: 2.29, vol: "$3.7M",  conf: 75, spark: [5,5.1,5.3,5.4,5.6,5.7,5.9,6.0,6.2,6.3,6.5,6.6,6.8,6.9] },
+  { sym: "DOGE",  name: "Dogecoin",    dir: "LONG", reason: "TREND",    price: "$0.1842",    last5m: "$0.1808",    changePct: 1.88, vol: "$6.2M",  conf: 74, spark: [8,8.1,8.3,8.4,8.6,8.7,8.9,9.0,9.2,9.3,9.5,9.6,9.8,9.9] },
+  { sym: "JUP",   name: "Jupiter",     dir: "LONG", reason: "SCALP",    price: "$1.024",     last5m: "$0.998",     changePct: 2.60, vol: "$2.2M",  conf: 73, spark: [4.5,4.6,4.8,4.9,5.1,5.2,5.4,5.5,5.7,5.8,6.0,6.1,6.3,6.4] },
+  { sym: "POL",   name: "Polygon",     dir: "LONG", reason: "REVERSAL", price: "$0.5240",    last5m: "$0.5128",    changePct: 2.18, vol: "$2.0M",  conf: 71, spark: [3,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0,4.1,4.2,4.3] },
 ];
 
-const EQUITY: Signal[] = [
-  { sym: "TSLA", name: "Tesla",    dir: "LONG",  reason: "MOMENTUM",   price: "$248.80",  last5m: "$255.85",  changePct:  8.19, vol: "$1.2B", conf: 94, spark: [12,12.5,12.8,13.4,13.8,14.2,14.8,15.2,15.9,16.4,17.0,17.6,18.2,18.8] },
-  { sym: "NVDA", name: "Nvidia",   dir: "LONG",  reason: "MOMENTUM",   price: "$949.45",  last5m: "$966.72",  changePct:  8.85, vol: "$2.4B", conf: 92, spark: [10,10.4,10.8,11.2,11.6,12.0,12.5,13.0,13.6,14.2,14.8,15.4,16.0,16.6] },
-  { sym: "AMD",  name: "AMD",      dir: "LONG",  reason: "BREAKOUT",   price: "$165.82",  last5m: "$173.20",  changePct:  0.45, vol: "$890M", conf: 89, spark: [9,9.2,9.4,9.7,9.9,10.2,10.4,10.7,10.9,11.2,11.4,11.7,11.9,12.2] },
-  { sym: "AAPL", name: "Apple",    dir: "SHORT", reason: "TREND",      price: "$229.10",  last5m: "$214.50",  changePct: -1.56, vol: "$1.6B", conf: 83, spark: [15,14.8,14.9,14.4,14.2,14.4,13.8,13.6,13.8,13.2,13.0,13.2,12.6,12.2] },
-  { sym: "MSFT", name: "Microsoft",dir: "SHORT", reason: "TREND",      price: "$428.18",  last5m: "$412.36",  changePct: -1.83, vol: "$980M", conf: 80, spark: [14,13.8,13.9,13.5,13.2,13.4,12.8,12.6,12.8,12.2,12.0,12.2,11.6,11.2] },
+const SHORT_CRYPTO: Signal[] = [
+  { sym: "WIF",   name: "Dogwifhat",   dir: "SHORT", reason: "TREND",    price: "$2.0840",    last5m: "$2.1920",     changePct: -4.93, vol: "$3.4M",  conf: 89, spark: [22,21,21.6,20.5,20.2,20.8,19.6,19.2,19.8,18.4,18.0,18.6,17.2,16.8] },
+  { sym: "PEPE",  name: "Pepe",        dir: "SHORT", reason: "MOMENTUM", price: "$0.00000814",last5m: "$0.00000862", changePct: -5.57, vol: "$4.1M",  conf: 87, spark: [24,23.4,23.6,22.7,22.3,22.5,21.4,20.9,21.0,20.0,19.5,19.7,18.6,18.0] },
+  { sym: "BONK",  name: "Bonk",        dir: "SHORT", reason: "REVERSAL", price: "$0.00001921",last5m: "$0.00002068", changePct: -7.11, vol: "$1.8M",  conf: 84, spark: [21,20.5,20.7,19.9,19.5,19.7,18.9,18.4,18.6,17.7,17.2,17.4,16.4,16.0] },
+  { sym: "SHIB",  name: "Shiba Inu",   dir: "SHORT", reason: "TREND",    price: "$0.00001784",last5m: "$0.00001846", changePct: -3.36, vol: "$2.5M",  conf: 83, spark: [19,18.6,18.7,18.0,17.6,17.8,17.1,16.7,16.8,16.0,15.6,15.7,14.9,14.4] },
+  { sym: "FLOKI", name: "Floki",       dir: "SHORT", reason: "MOMENTUM", price: "$0.0001624", last5m: "$0.0001712",  changePct: -5.14, vol: "$1.6M",  conf: 81, spark: [20,19.4,19.6,18.7,18.3,18.5,17.5,17.1,17.3,16.3,15.8,16.0,15.0,14.5] },
+  { sym: "NEAR",  name: "Near",        dir: "SHORT", reason: "MOMENTUM", price: "$6.28",      last5m: "$6.412",      changePct: -2.06, vol: "$2.9M",  conf: 79, spark: [18,17.6,17.8,17.2,17.0,17.4,16.6,16.2,16.4,15.6,15.2,15.4,14.6,14.2] },
+  { sym: "OP",    name: "Optimism",    dir: "SHORT", reason: "TREND",    price: "$1.2747",    last5m: "$1.3148",     changePct: -3.05, vol: "$2.1M",  conf: 78, spark: [16,15.6,15.8,15.0,14.6,14.8,14.0,13.6,13.8,13.0,12.6,12.8,12.0,11.6] },
+  { sym: "ORDI",  name: "Ordinals",    dir: "SHORT", reason: "REVERSAL", price: "$34.18",     last5m: "$35.62",      changePct: -4.04, vol: "$2.4M",  conf: 77, spark: [17,16.6,16.8,16.0,15.7,15.9,15.1,14.7,14.9,14.1,13.7,13.9,13.1,12.6] },
+  { sym: "TAO",   name: "Bittensor",   dir: "SHORT", reason: "TREND",    price: "$418.72",    last5m: "$434.10",     changePct: -3.54, vol: "$3.0M",  conf: 76, spark: [15,14.7,14.8,14.2,13.9,14.1,13.4,13.1,13.2,12.5,12.2,12.3,11.6,11.2] },
+  { sym: "SEI",   name: "Sei",         dir: "SHORT", reason: "MOMENTUM", price: "$0.412",     last5m: "$0.428",      changePct: -3.74, vol: "$1.4M",  conf: 75, spark: [14,13.7,13.8,13.2,12.9,13.1,12.4,12.1,12.2,11.5,11.2,11.3,10.6,10.2] },
+  { sym: "JTO",   name: "Jito",        dir: "SHORT", reason: "SCALP",    price: "$2.84",      last5m: "$2.96",       changePct: -4.05, vol: "$1.2M",  conf: 74, spark: [13,12.7,12.8,12.2,11.9,12.1,11.4,11.1,11.2,10.5,10.2,10.3,9.6,9.2] },
+  { sym: "ATOM",  name: "Cosmos",      dir: "SHORT", reason: "TREND",    price: "$6.48",      last5m: "$6.62",       changePct: -2.11, vol: "$1.8M",  conf: 73, spark: [12,11.8,11.9,11.4,11.1,11.3,10.7,10.4,10.5,9.9,9.6,9.7,9.1,8.7] },
+  { sym: "ADA",   name: "Cardano",     dir: "SHORT", reason: "REVERSAL", price: "$0.3624",    last5m: "$0.3712",     changePct: -2.37, vol: "$3.1M",  conf: 72, spark: [11,10.8,10.9,10.4,10.2,10.4,9.8,9.5,9.6,9.0,8.7,8.8,8.2,7.8] },
+  { sym: "XRP",   name: "Ripple",      dir: "SHORT", reason: "TREND",    price: "$0.5184",    last5m: "$0.5286",     changePct: -1.93, vol: "$4.0M",  conf: 71, spark: [10,9.8,9.9,9.4,9.2,9.4,8.8,8.5,8.6,8.0,7.7,7.8,7.2,6.8] },
+  { sym: "FIL",   name: "Filecoin",    dir: "SHORT", reason: "MOMENTUM", price: "$3.74",      last5m: "$3.86",       changePct: -3.11, vol: "$1.1M",  conf: 70, spark: [9,8.8,8.9,8.4,8.2,8.4,7.8,7.5,7.6,7.0,6.7,6.8,6.2,5.8] },
 ];
 
 const OPEN_TRADES = [
   { sym: "BTC",  dir: "LONG"  as Dir, entry: "$66,810.22", pnl: +1.42 },
-  { sym: "TSLA", dir: "LONG"  as Dir, entry: "$244.18",    pnl: +3.81 },
-  { sym: "WIF",  dir: "SHORT" as Dir, entry: "$2.1820",    pnl: +2.04 },
+  { sym: "SOL",  dir: "LONG"  as Dir, entry: "$168.40",    pnl: +2.51 },
+  { sym: "WIF",  dir: "SHORT" as Dir, entry: "$2.1820",    pnl: +4.49 },
 ];
 
 const EXECUTIONS = [
   { t: "14:22:01", sym: "BTC",  dir: "LONG"  as Dir, msg: "filled @ 67,287",   ok: true },
-  { t: "14:19:48", sym: "TSLA", dir: "LONG"  as Dir, msg: "filled @ 244.18",   ok: true },
+  { t: "14:19:48", sym: "SOL",  dir: "LONG"  as Dir, msg: "filled @ 171.62",   ok: true },
   { t: "14:14:22", sym: "WIF",  dir: "SHORT" as Dir, msg: "filled @ 2.1820",   ok: true },
   { t: "14:08:11", sym: "ETH",  dir: "LONG"  as Dir, msg: "stop moved 3,080",  ok: true },
-  { t: "13:54:30", sym: "SOL",  dir: "LONG"  as Dir, msg: "partial @ 171.40",  ok: true },
+  { t: "13:54:30", sym: "RNDR", dir: "LONG"  as Dir, msg: "partial @ 8.74",    ok: true },
+];
+
+const ACTIVITY = [
+  { t: "14:18:42", msg: "AI raised BTC conviction 79 → 88" },
+  { t: "14:09:14", msg: "Risk gate tripped on AVAX (vol spike)" },
+  { t: "13:50:08", msg: "Auto-rebalance committed · 4 legs" },
+  { t: "13:32:51", msg: "Regime shift detected · TRENDING ↑" },
 ];
 
 function Sparkline({ data, color, w = 130, h = 30 }: { data: number[]; color: string; w?: number; h?: number }) {
@@ -405,16 +427,11 @@ export default function UserDashboard() {
               { label: "ALL", on: true },
               { label: "MAJORS" },
               { label: "MEME" },
-              { label: "AI PICKS" },
-              { label: "HIGH CONFIDENCE ≥75" },
-              { label: "READY TO EXECUTE" },
-              { label: "LONG BIAS" },
-              { label: "SHORT BIAS" },
-              { label: "WATCHLIST" },
-              { label: "LOW VOL" },
-              { label: "TRENDING" },
+              { label: "HIGH CONF ≥75" },
+              { label: "READY" },
               { label: "BREAKOUT" },
               { label: "MOMENTUM" },
+              { label: "TRENDING" },
               { label: "SCALP" },
             ].map((f) => (
               <button
@@ -433,7 +450,7 @@ export default function UserDashboard() {
 
           {/* 2-COLUMN SIGNAL GRID */}
           <div className="grid grid-cols-2 gap-3">
-            {/* CRYPTO */}
+            {/* LONG CRYPTO */}
             <div className="flex flex-col" style={{ background: BG_1, border: `1px solid ${HAIR_10}` }}>
               <div
                 className="flex items-center justify-between px-3 py-2"
@@ -441,63 +458,53 @@ export default function UserDashboard() {
               >
                 <div className="flex items-center gap-2">
                   <Activity size={12} style={{ color: BRAND }} />
-                  <div className="text-[11px] font-bold tracking-[0.18em] text-white">TOP 10 CRYPTO SIGNALS</div>
-                  <span className="text-[9px]" style={{ color: TXT_40 }}>LONG · SHORT · UNLIMITED AI EXECUTION</span>
+                  <div className="text-[11px] font-bold tracking-[0.18em] text-white">TOP 15 LONG CRYPTO SIGNALS</div>
+                  <span className="text-[9px]" style={{ color: TXT_40 }}>long bias · unlimited AI execution</span>
                 </div>
                 <div className="flex items-center gap-1 text-[9px]" style={{ color: TXT_40 }}>
-                  <span>L <span className="text-white font-semibold">12</span></span>
-                  <span>S <span className="text-white font-semibold">8</span></span>
+                  <span>L <span className="font-semibold" style={{ color: BRAND }}>{LONG_CRYPTO.length}</span></span>
                   <button className="ml-2 px-1.5 py-0.5" style={{ color: BRAND, border: `1px solid ${BRAND}55` }}>ALL</button>
-                  <button className="px-1.5 py-0.5" style={{ color: TXT_65, border: `1px solid ${HAIR_18}` }}>LONG</button>
-                  <button className="px-1.5 py-0.5" style={{ color: TXT_65, border: `1px solid ${HAIR_18}` }}>SHORT</button>
+                  <button className="px-1.5 py-0.5" style={{ color: TXT_65, border: `1px solid ${HAIR_18}` }}>MAJ</button>
+                  <button className="px-1.5 py-0.5" style={{ color: TXT_65, border: `1px solid ${HAIR_18}` }}>ALT</button>
                 </div>
               </div>
               <div className="flex flex-col gap-1.5 p-2">
-                {CRYPTO.map((s) => <SignalRow key={s.sym} s={s} />)}
+                {LONG_CRYPTO.map((s) => <SignalRow key={s.sym} s={s} />)}
               </div>
               <div
                 className="px-3 py-2 text-center text-[10px] font-semibold tracking-[0.16em]"
                 style={{ borderTop: `1px solid ${HAIR_10}`, color: BRAND }}
               >
-                VIEW ALL CRYPTO OPPORTUNITIES
+                VIEW ALL LONG OPPORTUNITIES
               </div>
             </div>
 
-            {/* EQUITY */}
+            {/* SHORT CRYPTO */}
             <div className="flex flex-col" style={{ background: BG_1, border: `1px solid ${HAIR_10}` }}>
               <div
                 className="flex items-center justify-between px-3 py-2"
                 style={{ borderBottom: `1px solid ${HAIR_10}` }}
               >
                 <div className="flex items-center gap-2">
-                  <LineChart size={12} style={{ color: BRAND }} />
-                  <div className="text-[11px] font-bold tracking-[0.18em] text-white">TOP 10 EQUITY SIGNALS</div>
-                  <span className="text-[9px]" style={{ color: TXT_40 }}>LONG · SHORT · UNLIMITED AI EXECUTION</span>
+                  <LineChart size={12} style={{ color: RED }} />
+                  <div className="text-[11px] font-bold tracking-[0.18em] text-white">TOP 15 SHORT CRYPTO SIGNALS</div>
+                  <span className="text-[9px]" style={{ color: TXT_40 }}>short bias · unlimited AI execution</span>
                 </div>
                 <div className="flex items-center gap-1 text-[9px]" style={{ color: TXT_40 }}>
-                  <span>L <span className="text-white font-semibold">12</span></span>
-                  <span>S <span className="text-white font-semibold">8</span></span>
-                  <button className="ml-2 px-1.5 py-0.5" style={{ color: BRAND, border: `1px solid ${BRAND}55` }}>ALL</button>
-                  <button className="px-1.5 py-0.5" style={{ color: TXT_65, border: `1px solid ${HAIR_18}` }}>LONG</button>
-                  <button className="px-1.5 py-0.5" style={{ color: TXT_65, border: `1px solid ${HAIR_18}` }}>SHORT</button>
+                  <span>S <span className="font-semibold" style={{ color: RED }}>{SHORT_CRYPTO.length}</span></span>
+                  <button className="ml-2 px-1.5 py-0.5" style={{ color: RED, border: `1px solid ${RED}55` }}>ALL</button>
+                  <button className="px-1.5 py-0.5" style={{ color: TXT_65, border: `1px solid ${HAIR_18}` }}>MAJ</button>
+                  <button className="px-1.5 py-0.5" style={{ color: TXT_65, border: `1px solid ${HAIR_18}` }}>MEME</button>
                 </div>
               </div>
               <div className="flex flex-col gap-1.5 p-2">
-                {EQUITY.map((s) => <SignalRow key={s.sym} s={s} />)}
-                {/* fillers to match crypto height */}
-                {[
-                  { sym: "GOOGL", name: "Alphabet",  dir: "LONG"  as Dir, reason: "REVERSAL", price: "$174.73", last5m: "$182.50", changePct:  0.71, vol: "$680M", conf: 87, spark: [10,10.2,10.4,10.7,10.9,11.2,11.4,11.7,11.9,12.2,12.4,12.7,12.9,13.2] },
-                  { sym: "PLTR",  name: "Palantir",  dir: "LONG"  as Dir, reason: "TREND",    price: "$24.15",  last5m: "$25.48",  changePct:  1.17, vol: "$420M", conf: 86, spark: [11,11.3,11.2,11.6,11.5,11.9,11.8,12.2,12.1,12.5,12.4,12.8,12.7,13.1] },
-                  { sym: "AMZN",  name: "Amazon",    dir: "SHORT" as Dir, reason: "MOMENTUM", price: "$189.32", last5m: "$186.41", changePct: -1.25, vol: "$910M", conf: 76, spark: [15,14.8,14.9,14.4,14.2,14.4,13.8,13.6,13.8,13.2,13.0,13.2,12.6,12.2] },
-                  { sym: "META",  name: "Meta",      dir: "SHORT" as Dir, reason: "TREND",    price: "$504.23", last5m: "$498.13", changePct: -2.23, vol: "$540M", conf: 74, spark: [14,13.8,13.9,13.5,13.2,13.4,12.8,12.6,12.8,12.2,12.0,12.2,11.6,11.2] },
-                  { sym: "NFLX",  name: "Netflix",   dir: "SHORT" as Dir, reason: "MOMENTUM", price: "$561.22", last5m: "$553.10", changePct: -1.83, vol: "$310M", conf: 72, spark: [13,12.9,13.0,12.6,12.4,12.6,12.0,11.8,12.0,11.4,11.2,11.4,10.8,10.4] },
-                ].map((s) => <SignalRow key={s.sym} s={s} />)}
+                {SHORT_CRYPTO.map((s) => <SignalRow key={s.sym} s={s} />)}
               </div>
               <div
                 className="px-3 py-2 text-center text-[10px] font-semibold tracking-[0.16em]"
-                style={{ borderTop: `1px solid ${HAIR_10}`, color: BRAND }}
+                style={{ borderTop: `1px solid ${HAIR_10}`, color: RED }}
               >
-                VIEW ALL EQUITY OPPORTUNITIES
+                VIEW ALL SHORT OPPORTUNITIES
               </div>
             </div>
           </div>
@@ -519,6 +526,34 @@ export default function UserDashboard() {
             </div>
           </div>
 
+          {/* CONNECTED EXCHANGE */}
+          <div
+            className="flex items-center gap-3 px-3 py-2.5"
+            style={{ background: BG_2, border: `1px solid ${HAIR_10}` }}
+          >
+            <div
+              className="grid h-8 w-8 place-items-center text-[11px] font-black tracking-[-0.04em]"
+              style={{ background: "#0B0E14", color: "#7F5CFF", border: `1px solid rgba(127,92,255,0.35)` }}
+            >
+              ₭
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: BRAND, boxShadow: `0 0 6px ${BRAND}` }} />
+                <span className="text-[11px] font-bold tracking-[0.14em] text-white">KRAKEN · CONNECTED</span>
+              </div>
+              <div className="mt-0.5 text-[9px] tracking-[0.10em]" style={{ color: TXT_40 }}>
+                Read-only API · No withdrawals
+              </div>
+            </div>
+            <div
+              className="px-1.5 py-[2px] text-[8.5px] font-bold tracking-[0.16em]"
+              style={{ color: BRAND, border: `1px solid ${BRAND}55`, background: "rgba(102,255,102,0.05)" }}
+            >
+              LIVE
+            </div>
+          </div>
+
           {/* EQUITY CARD */}
           <div
             className="flex flex-col gap-2 px-3 py-3"
@@ -526,7 +561,15 @@ export default function UserDashboard() {
           >
             <div className="flex items-center justify-between">
               <div className="text-[9.5px] font-semibold tracking-[0.18em]" style={{ color: TXT_40 }}>ACCOUNT EQUITY</div>
-              <div className="text-[9px] tracking-[0.12em]" style={{ color: TXT_40 }}>USD</div>
+              <div className="flex items-center gap-2">
+                <div
+                  className="px-1.5 py-[2px] text-[8px] font-bold tracking-[0.18em]"
+                  style={{ color: BRAND, border: `1px solid ${BRAND}55`, background: "rgba(102,255,102,0.05)" }}
+                >
+                  AI MANAGED
+                </div>
+                <div className="text-[9px] tracking-[0.12em]" style={{ color: TXT_40 }}>USD</div>
+              </div>
             </div>
             <div className="text-[28px] font-bold tabular-nums tracking-[-0.04em] leading-none text-white">
               $108,420.16
@@ -538,17 +581,44 @@ export default function UserDashboard() {
             <Sparkline data={[40,41,40,42,43,42,45,46,48,47,50,52,54,56,58,61]} color={BRAND} w={320} h={36} />
           </div>
 
-          {/* Today PNL + Win Rate */}
+          {/* PNL ROW 1 — TODAY / TOTAL */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1 px-3 py-2.5" style={{ background: BG_2, border: `1px solid ${HAIR_10}` }}>
               <div className="text-[9px] font-semibold tracking-[0.18em]" style={{ color: TXT_40 }}>TODAY P&L</div>
-              <div className="text-[18px] font-bold tabular-nums tracking-[-0.03em]" style={{ color: BRAND }}>
+              <div className="text-[16px] font-bold tabular-nums tracking-[-0.03em]" style={{ color: BRAND }}>
                 +$1,284.50
               </div>
-              <div className="text-[9.5px] tabular-nums" style={{ color: TXT_65 }}>
-                +1.20% · 7 trades
-              </div>
+              <div className="text-[9px] tabular-nums" style={{ color: TXT_65 }}>+1.20% · 7 trades</div>
             </div>
+            <div className="flex flex-col gap-1 px-3 py-2.5" style={{ background: BG_2, border: `1px solid ${HAIR_10}` }}>
+              <div className="text-[9px] font-semibold tracking-[0.18em]" style={{ color: TXT_40 }}>TOTAL P&L</div>
+              <div className="text-[16px] font-bold tabular-nums tracking-[-0.03em]" style={{ color: BRAND }}>
+                +$8,420.16
+              </div>
+              <div className="text-[9px] tabular-nums" style={{ color: TXT_65 }}>+8.42% · all-time</div>
+            </div>
+          </div>
+
+          {/* PNL ROW 2 — REALIZED / UNREALIZED */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1 px-3 py-2.5" style={{ background: BG_2, border: `1px solid ${HAIR_10}` }}>
+              <div className="text-[9px] font-semibold tracking-[0.18em]" style={{ color: TXT_40 }}>REALIZED P&L</div>
+              <div className="text-[14px] font-bold tabular-nums tracking-[-0.02em]" style={{ color: BRAND }}>
+                +$6,310.42
+              </div>
+              <div className="text-[9px] tabular-nums" style={{ color: TXT_65 }}>closed positions</div>
+            </div>
+            <div className="flex flex-col gap-1 px-3 py-2.5" style={{ background: BG_2, border: `1px solid ${HAIR_10}` }}>
+              <div className="text-[9px] font-semibold tracking-[0.18em]" style={{ color: TXT_40 }}>UNREALIZED P&L</div>
+              <div className="text-[14px] font-bold tabular-nums tracking-[-0.02em]" style={{ color: BRAND }}>
+                +$2,109.74
+              </div>
+              <div className="text-[9px] tabular-nums" style={{ color: TXT_65 }}>open positions</div>
+            </div>
+          </div>
+
+          {/* WIN RATE / TRADES */}
+          <div className="grid grid-cols-2 gap-3">
             <div className="flex items-center gap-3 px-3 py-2.5" style={{ background: BG_2, border: `1px solid ${HAIR_10}` }}>
               <ConfRing value={68} color={BRAND} size={48} />
               <div className="flex flex-col">
@@ -556,6 +626,11 @@ export default function UserDashboard() {
                 <div className="text-[14px] font-bold tabular-nums tracking-[-0.02em] text-white">68%</div>
                 <div className="text-[9px] tabular-nums" style={{ color: TXT_65 }}>34W / 16L · 30d</div>
               </div>
+            </div>
+            <div className="flex flex-col gap-1 px-3 py-2.5" style={{ background: BG_2, border: `1px solid ${HAIR_10}` }}>
+              <div className="text-[9px] font-semibold tracking-[0.18em]" style={{ color: TXT_40 }}>TRADES</div>
+              <div className="text-[18px] font-bold tabular-nums tracking-[-0.03em] text-white">50</div>
+              <div className="text-[9px] tabular-nums" style={{ color: TXT_65 }}>30d window</div>
             </div>
           </div>
 
@@ -619,6 +694,28 @@ export default function UserDashboard() {
             </div>
             <div className="px-3 py-2 text-center text-[10px] font-semibold tracking-[0.16em]" style={{ borderTop: `1px solid ${HAIR_10}`, color: BRAND }}>
               VIEW FULL FEED
+            </div>
+          </div>
+
+          {/* RECENT ACTIVITY */}
+          <div className="flex flex-col" style={{ background: BG_1, border: `1px solid ${HAIR_10}` }}>
+            <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: `1px solid ${HAIR_10}` }}>
+              <div className="flex items-center gap-2">
+                <Radio size={11} style={{ color: BRAND }} />
+                <div className="text-[10px] font-bold tracking-[0.18em] text-white">RECENT ACTIVITY</div>
+              </div>
+              <div className="flex items-center gap-1.5 text-[9px]" style={{ color: TXT_40 }}>
+                <span className="h-1 w-1 rounded-full" style={{ background: BRAND, boxShadow: `0 0 5px ${BRAND}` }} />
+                AI EVENTS
+              </div>
+            </div>
+            <div className="flex flex-col">
+              {ACTIVITY.map((a, i) => (
+                <div key={i} className="grid grid-cols-[58px_1fr] items-start gap-2 px-3 py-1.5 text-[10px]" style={{ borderTop: `1px solid ${HAIR_10}` }}>
+                  <span className="tabular-nums" style={{ color: TXT_40 }}>{a.t}</span>
+                  <span style={{ color: TXT_65 }} className="leading-snug">{a.msg}</span>
+                </div>
+              ))}
             </div>
           </div>
 
