@@ -138,6 +138,7 @@ router.patch("/admin/users/:id/ai-settings", ...requireOperator, async (req, res
   }
 
   try {
+    req.log.info({ targetId: ctx.targetId, patchKeys: Object.keys(patch), patch }, "PATCH ai-settings about to write");
     // JIT-provision the user_settings row so admins can edit settings for
     // users who haven't booted the portal yet.
     const [existing] = await db.select().from(userSettingsTable)
@@ -184,8 +185,7 @@ router.patch("/admin/users/:id/ai-settings", ...requireOperator, async (req, res
     });
     res.json({ ok: true, after, changedFields });
   } catch (err) {
-    req.log.error({ err }, "PATCH ai-settings failed");
-    res.status(500).json({ error: "Failed to update AI settings" });
+    res.status(500).json(serialize5xx(req, err, "ai-settings", { targetId: ctx.targetId, patch }));
   }
 });
 
@@ -230,10 +230,11 @@ router.patch("/admin/users/:id/billing-overrides", ...requireSuperAdmin, async (
   }
 
   try {
+    req.log.info({ targetId: ctx.targetId, patchKeys: Object.keys(patch), patch }, "PATCH billing-overrides about to write");
     const [before] = await db.select().from(usersTable)
       .where(eq(usersTable.clerkUserId, ctx.targetId)).limit(1);
     if (!before) {
-      res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found", targetId: ctx.targetId });
       return;
     }
     const [after] = await db.update(usersTable)
@@ -264,10 +265,50 @@ router.patch("/admin/users/:id/billing-overrides", ...requireSuperAdmin, async (
     });
     res.json({ ok: true, after: pickBillingFields(after), changedFields });
   } catch (err) {
-    req.log.error({ err }, "PATCH billing-overrides failed");
-    res.status(500).json({ error: "Failed to update billing overrides" });
+    res.status(500).json(serialize5xx(req, err, "billing-overrides", { targetId: ctx.targetId, patch }));
   }
 });
+
+/** Build a verbose 5xx body so the operator sees the real exception in
+ *  the Network tab instead of a generic "Failed to update ...". Captures
+ *  pg/Drizzle structured error fields (`code`, `detail`, `constraint`,
+ *  `column`, `table`, `schema`) when present, plus the request id so we
+ *  can correlate with `req.log.error`. Stack trace is included always —
+ *  these endpoints are super-admin/operator gated, so leaking stack to
+ *  the caller is acceptable and necessary for live ops debugging. */
+function serialize5xx(
+  req: Request,
+  err: unknown,
+  label: string,
+  context: Record<string, unknown>,
+): Record<string, unknown> {
+  const e = err as {
+    name?: string; message?: string; stack?: string;
+    code?: string; detail?: string; constraint?: string;
+    column?: string; table?: string; schema?: string;
+    cause?: unknown;
+  };
+  const causeMessage =
+    e?.cause && typeof e.cause === "object" && "message" in (e.cause as object)
+      ? String((e.cause as { message?: unknown }).message ?? "")
+      : undefined;
+  const body = {
+    error:      `${label} write failed: ${e?.message ?? "unknown error"}`,
+    errorName:  e?.name,
+    pgCode:     e?.code,
+    pgDetail:   e?.detail,
+    pgConstraint: e?.constraint,
+    pgColumn:   e?.column,
+    pgTable:    e?.table,
+    pgSchema:   e?.schema,
+    causeMessage,
+    stack:      e?.stack,
+    requestId:  (req as Request & { id?: string }).id ?? undefined,
+    context,
+  };
+  req.log.error({ err, ...body }, `PATCH ${label} failed`);
+  return body;
+}
 
 function pickBillingFields(row: typeof usersTable.$inferSelect) {
   return {
