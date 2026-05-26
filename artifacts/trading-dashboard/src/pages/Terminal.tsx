@@ -1570,6 +1570,14 @@ function TerminalInner() {
           0%,100% { opacity: 0.45; }
           50%     { opacity: 0.95; }
         }
+        /* AI INVITE — OFF-state breathing for the AUTOTRADE CTA so it
+         * reads as an invitation to arm, not a flat config row. Subtler
+         * cadence and amplitude than aiActivePulse (4.8s vs 3.2s, lower
+         * peak) so the ARMED state remains a clear escalation. */
+        @keyframes aiInvitePulse {
+          0%,100% { box-shadow: 0 0 14px rgba(102,255,102,0.05) inset, 0 0 0 1px rgba(102,255,102,0.04); }
+          50%     { box-shadow: 0 0 22px rgba(102,255,102,0.10) inset, 0 0 0 1px rgba(102,255,102,0.10); }
+        }
 
         /* card hover micro-state — subtle lift, brighter material edge */
         .sigcard { transition: transform 220ms cubic-bezier(.2,.7,.2,1), border-color 220ms ease, box-shadow 220ms ease; }
@@ -1973,15 +1981,23 @@ function TerminalInner() {
               disabled={aiBusy || aiTrading.isLoading}
               className="group relative flex flex-col gap-2 p-3 text-left overflow-hidden"
               style={{
+                /* CONVERSION CTA — must read as an invitation in OFF state,
+                 * not as a forgotten config toggle. Subtle brand-tinted
+                 * background + brand border at 28-α + breathing inset glow
+                 * give it presence without crossing into "already armed"
+                 * territory (which keeps the ARMED state's 66-α border +
+                 * 22px inset as a clear escalation). */
                 background: aiTrading.enabled
                   ? `linear-gradient(180deg, rgba(102,255,102,0.10), rgba(102,255,102,0.02)), ${BG_2}`
-                  : BG_2,
-                border: `1px solid ${aiTrading.enabled ? `${BRAND}66` : HAIR_18}`,
+                  : `linear-gradient(180deg, rgba(102,255,102,0.045), rgba(102,255,102,0.012)), ${BG_2}`,
+                border: `1px solid ${aiTrading.enabled ? `${BRAND}66` : `${BRAND}30`}`,
                 boxShadow: aiTrading.enabled
                   ? `0 0 22px rgba(102,255,102,0.10) inset`
-                  : "none",
+                  : `0 0 14px rgba(102,255,102,0.05) inset, 0 0 0 1px rgba(102,255,102,0.04)`,
                 cursor: aiBusy ? "wait" : "pointer",
-                animation: aiTrading.enabled ? "aiActivePulse 3.2s ease-in-out infinite" : undefined,
+                animation: aiTrading.enabled
+                  ? "aiActivePulse 3.2s ease-in-out infinite"
+                  : "aiInvitePulse 4.8s ease-in-out infinite",
                 opacity: aiBusy && !aiArming ? 0.7 : 1,
                 transition: "border-color 220ms ease, box-shadow 220ms ease, opacity 180ms ease",
               }}
