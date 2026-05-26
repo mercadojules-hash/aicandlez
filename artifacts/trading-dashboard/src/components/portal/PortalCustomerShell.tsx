@@ -31,7 +31,7 @@ import {
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useAuth } from "@clerk/react";
+import { useAuth, useClerk } from "@clerk/react";
 import {
   Activity, AlertTriangle, CheckCircle2, Clock, Database, Filter, Globe,
   LineChart as LineChartIcon, Lock, MonitorPlay, PieChart, Power, Radar, Radio,
@@ -3835,6 +3835,9 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
 export function PortalCustomerShell() {
   const { isAdmin } = useUserRole();
   const plan = useCustomerPlan();
+  // Direct sign-out for the toolbar SIGN OUT button — same useClerk hook
+  // used by AccountModal so revoke + cookie clear behavior is identical.
+  const { signOut: portalSignOut } = useClerk();
   const exec = useExecutionState();
   const engineOnline = !!exec.data?.engine.running;
   const { majors, alts, opportunities, engine, isLoading, isError } = usePaperSignals();
@@ -4344,6 +4347,15 @@ export function PortalCustomerShell() {
           }}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
               <ToolbarBtn onClick={() => setAccount(true)}>ACCOUNT</ToolbarBtn>
+              {/* Direct SIGN OUT — exposes the action that previously
+                  required opening ACCOUNT → SIGN OUT. Mirrors the admin
+                  portal toolbar (AdminPortalLegacy ~L221 / L558) so
+                  every portal surface has a one-click exit. Uses the
+                  same useClerk().signOut as AccountModal to keep
+                  behavior identical (session revoke + Clerk cookie
+                  clear). No redirectUrl override — Clerk's afterSignOutUrl
+                  config handles routing back to the landing page. */}
+              <ToolbarBtn onClick={() => void portalSignOut()}>SIGN OUT</ToolbarBtn>
               {/* Pass 7Y — CONNECT EXCHANGE entitlement-gated.
                   Free users see the button (operational visibility)
                   but the click opens the upgrade flow instead of the
