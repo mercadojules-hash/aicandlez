@@ -1,0 +1,165 @@
+This is now entering flagship territory.
+
+The battlefield composition is working extremely well:
+
+* readability
+* polarity
+* matte-black absorption
+* glow hierarchy
+* battlefield framing
+* right rail integration
+
+The dashboard finally feels:
+
+* intelligent
+* premium
+* emotional
+* cinematic
+* alive
+
+Next refinement pass should focus on:
+POLISH + LIVE AUTOTRADE EXPERIENCE
+without disturbing the locked identity.
+
+====================================================
+HIGH PRIORITY NEXT PASS
+=======================
+
+1. AI AUTOTRADE CONTROL
+
+---
+
+Add directly inside the MY ACCOUNT rail.
+
+Placement:
+
+* below ACCOUNT EQUITY
+  OR
+* below TODAY / WIN RATE metrics
+
+This is now the emotional conversion point of the platform.
+
+Suggested structure:
+
+AI AUTOTRADE
+STATUS: OFF
+
+LIVE STATE:
+AI AUTOTRADE
+STATUS: LIVE
+
+LIVE mode:
+
+* subtle green glow
+* tiny live pulse
+* “AI ACTIVE”
+* premium cinematic feel
+
+DO NOT:
+
+* use generic toggle switches
+* make it feel like admin tooling
+* make it feel like backend infrastructure
+
+Goal:
+“This AI is now managing my portfolio.”
+
+====================================================
+2. BATTLEFIELD SCROLL EXPERIENCE
+================================
+
+Current direction is correct.
+
+KEEP:
+
+* fixed battlefield composition
+* fixed right rail
+* fixed viewport feeling
+
+IMPLEMENT:
+
+* independent LONGS scroll
+* independent SHORTS scroll
+* smooth scrolling
+* subtle fade masks top/bottom
+* hidden/minimal scrollbars
+
+The battlefield should feel like:
+“live market flow”
+
+NOT:
+“scrolling a webpage.”
+
+====================================================
+3. HERO CARD PRIORITY
+=====================
+
+BTC + WIF hero cards are now the emotional anchors.
+
+Preserve:
+
+* stronger glow
+* stronger gradient depth
+* hero scale hierarchy
+* conviction ring dominance
+
+They should ALWAYS visually lead the eye first.
+
+====================================================
+4. RIGHT RAIL LIVE FEEL
+=======================
+
+The right rail is close.
+
+Push it further into:
+“AI-managed live account”
+
+Ideas:
+
+* subtle live pulse on balances
+* tiny staggered feed updates
+* live AI activity entries
+* execution approvals/rejections
+* risk gate activity
+* conviction changes
+
+VERY IMPORTANT:
+keep it premium and restrained.
+
+No noisy admin logs.
+
+====================================================
+5. IMPORTANT DESIGN RULE
+========================
+
+DO NOT:
+
+* brighten the dashboard
+* flatten contrast
+* add generic SaaS widgets
+* add white/light UI
+* clutter the rail
+* reduce black absorption
+
+The matte-black foundation is WHY the neon reads as premium now.
+
+====================================================
+6. TERMINAL IDENTITY
+====================
+
+The platform identity is now:
+
+“AI Trading Battlefield”
+
+Protect that identity at all costs.
+
+This no longer feels like:
+
+* a dashboard
+* a crypto app
+* a spreadsheet
+
+It now feels like:
+an AI-operated trading cockpit.
+
+That is the product signature.
