@@ -875,10 +875,14 @@ function TerminalInner() {
   ], []);
   const idleReasonIdx = Math.floor(now.getTime() / 3000) % idleReasons.length;
   const currentIdleReason = idleReasons[idleReasonIdx];
-  const marketsScanned = engine?.funnel?.total
-    ?? (engine?.symbolBreakdowns ? Object.keys(engine.symbolBreakdowns).length : 0)
-    ?? 19;
-  const gatesPassed = engine?.funnel?.passedMTF ?? 0;
+  /* Honest "right now" metrics — engine.funnel counters are cumulative
+   * across the engine's lifetime (would show 5000+ / 400+), which reads
+   * as noise. Use the *current* monitored symbol set + the *current*
+   * passing-signal count across both columns. */
+  const marketsScanned = (engine?.symbolBreakdowns
+    ? Object.keys(engine.symbolBreakdowns).length
+    : 0) || 19;
+  const gatesPassed = longs.length + shorts.length;
 
   /* AI autotrade — derive max-trade capacity from plan tier. Free=0 disables
    * the toggle path (server gate returns 402 anyway). */
