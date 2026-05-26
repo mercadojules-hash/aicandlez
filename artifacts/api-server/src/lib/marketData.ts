@@ -86,6 +86,21 @@ const COINBASE_SYMBOLS: Record<string, string> = {
   ARBUSD:  "ARB-USD",
   OPUSD:   "OP-USD",
   FILUSD:  "FIL-USD",
+  // CONVICTION_V2 (2026-05-26): meme/micro-cap expansion so the
+  // PortalCustomerShell ALTS column reads as an opportunistic
+  // alt/meme scanner rather than just leftover assets. All four
+  // pairs below were verified HTTP 200 against the Coinbase
+  // public products endpoint at integration time.
+  //
+  // PEPE already in the engine pool (no row needed here — historical
+  // addition lives in a separate code path).
+  //
+  // NOT ADDED: BRETT — verified 404 on both Coinbase and Kraken.
+  // Re-evaluate if either exchange lists it later.
+  WIFUSD:   "WIF-USD",
+  BONKUSD:  "BONK-USD",
+  FLOKIUSD: "FLOKI-USD",
+  TURBOUSD: "TURBO-USD",
 };
 
 // Kraken pair names differ from the spot symbol — BTC is XBT, DOGE is XDG.
@@ -107,6 +122,15 @@ const KRAKEN_SYMBOLS: Record<string, string> = {
   ARBUSD:  "ARBUSD",
   OPUSD:   "OPUSD",
   FILUSD:  "FILUSD",
+  // CONVICTION_V2 (2026-05-26): meme/micro-cap fallback paths so the
+  // engine has a second source if Coinbase candle pulls fail. All four
+  // pairs below were verified live against Kraken's public
+  // AssetPairs endpoint at integration time (no `error` array).
+  // BRETT excluded — not listed on Kraken.
+  WIFUSD:   "WIFUSD",
+  BONKUSD:  "BONKUSD",
+  FLOKIUSD: "FLOKIUSD",
+  TURBOUSD: "TURBOUSD",
 };
 
 // Coinbase candle granularity is seconds; Kraken is minutes.

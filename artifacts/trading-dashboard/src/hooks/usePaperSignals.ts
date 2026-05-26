@@ -109,6 +109,11 @@ const NAME_MAP: Record<string, string> = {
   TAO: "Bittensor", RNDR: "Render", TIA: "Celestia", JTO: "Jito",
   APT: "Aptos", NEAR: "Near", LTC: "Litecoin", BCH: "Bitcoin Cash",
   DOT: "Polkadot", UNI: "Uniswap", AAVE: "Aave", ALGO: "Algorand",
+  // CONVICTION_V2 (2026-05-26): meme/micro-cap display names matching
+  // the new entries in api-server/src/lib/marketData.ts. These flow
+  // into the ALTS column (assetClass = "ALT" since none are in MAJORS).
+  // BRETT deliberately excluded — not listed on Coinbase or Kraken.
+  WIF: "dogwifhat", BONK: "Bonk", FLOKI: "Floki", TURBO: "Turbo",
 };
 
 function shortSymbol(sym: string): string {
