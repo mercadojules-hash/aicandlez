@@ -215,7 +215,7 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
       }}
     >
       {/* ROW 1 — header */}
-      <div className="flex items-center gap-2.5 px-3.5 pt-3">
+      <div className="flex items-center gap-2.5 px-3.5 pt-3.5">
         <div
           className="px-2 py-0.5 text-[10px] font-bold tracking-[0.16em]"
           style={{
@@ -322,7 +322,7 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
       </div>
 
       {/* ROW 3 — micro plan */}
-      <div className="mt-2 flex items-center gap-3 px-3.5 pb-3 pt-2" style={{ borderTop: `1px solid ${borderCol}` }}>
+      <div className="mt-2.5 flex items-center gap-3 px-3.5 pb-3.5 pt-2.5" style={{ borderTop: `1px solid ${borderCol}` }}>
         <div className="flex items-center gap-1 text-[9.5px] tracking-[0.10em]" style={{ color: TXT_40 }}>
           ENTRY <span className="font-semibold tabular-nums" style={{ color: TXT_85 }}>{s.entry}</span>
         </div>
@@ -671,7 +671,7 @@ export default function PersonalTerminal() {
         >
           {/* BATTLEFIELD — matte-black wrapper */}
           <div
-            className="flex min-w-0 flex-col gap-3 p-3"
+            className="flex min-w-0 flex-col gap-4 p-3.5"
             style={{ background: BG_0, border: `1px solid ${HAIR_10}` }}
           >
             <div className="flex items-end justify-between">
@@ -691,9 +691,9 @@ export default function PersonalTerminal() {
               </div>
             </div>
 
-            <div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
+            <div className="grid gap-3.5" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
               {/* LONGS */}
-              <div className="flex min-w-0 flex-col gap-2.5">
+              <div className="flex min-w-0 flex-col gap-3">
                 <div
                   className="flex items-center gap-2.5 px-3 py-2"
                   style={{ background: "rgba(0,200,83,0.05)", border: `1px solid ${HAIR_18}` }}
@@ -716,7 +716,7 @@ export default function PersonalTerminal() {
               </div>
 
               {/* SHORTS */}
-              <div className="flex min-w-0 flex-col gap-2.5">
+              <div className="flex min-w-0 flex-col gap-3">
                 <div
                   className="flex items-center gap-2.5 px-3 py-2"
                   style={{ background: "rgba(255,59,59,0.05)", border: `1px solid ${HAIR_RED_18}` }}
@@ -746,7 +746,7 @@ export default function PersonalTerminal() {
           </div>
 
           {/* RIGHT RAIL — MY ACCOUNT */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3.5">
             <div className="flex items-center justify-between">
               <div className="text-[12px] font-bold tracking-[0.22em] text-white">MY ACCOUNT</div>
               <div
