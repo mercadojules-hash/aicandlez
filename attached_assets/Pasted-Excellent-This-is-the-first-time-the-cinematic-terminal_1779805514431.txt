@@ -1,0 +1,132 @@
+Excellent. This is the first time the cinematic terminal actually feels ALIVE instead of static.
+
+The live hook integration is exactly what I wanted:
+
+* real LONG / SHORT battlefield
+* real conviction flow
+* real account telemetry
+* real open positions
+* real engine state
+
+Most important: the V6 identity stayed intact. That was critical.
+
+Move to Priority 2 now:
+REAL KRAKEN RIGHT-RAIL INTEGRATION
+
+Goals:
+
+* make the right rail feel like a live connected AI trading account
+* preserve the cinematic black/neon identity
+* no redesigns or layout drift
+* no changes to SignalCard hierarchy
+* no changes to the battlefield layout
+* no brightening
+* no “exchange app” look
+* no bloated widgets
+
+# PRIORITY 2 SCOPE
+
+Wire the right rail to REAL telemetry:
+
+1. ACCOUNT BALANCES
+
+---
+
+Replace mocked Kraken-connected balances with:
+
+* real balances from the canonical exchange/account hooks
+* BTC / ETH / USDT / USD values
+* live updating
+* preserve current styling exactly
+
+2. AI ACTIVITY FEED
+
+---
+
+Replace mocked AI activity with:
+
+* recent signal/execution history
+* AI decisions
+* risk gate events
+* conviction changes
+* execution approvals/rejections
+* signal promotions/demotions
+
+Sources can come from:
+
+* /api/signals/history
+* execution logs
+* engine telemetry
+* existing canonical platform hooks
+
+3. LIVE ACCOUNT FEEL
+
+---
+
+The right rail should feel like:
+“AI is actively managing this account in real time.”
+
+NOT:
+
+* static widgets
+* admin logs
+* debug terminal spam
+
+4. VISUAL REQUIREMENTS
+
+---
+
+KEEP EXACTLY:
+
+* matte-black foundation
+* current spacing
+* current hierarchy
+* current typography
+* current glow levels
+* current right-rail widths
+* current green/red polarity
+* current premium feel
+
+DO NOT:
+
+* add white panels
+* add charts everywhere
+* flatten the contrast
+* introduce exchange-style UI clutter
+* add generic SaaS widgets
+
+5. MICRO-MOTION
+
+---
+
+Subtle only:
+
+* live pulse on balance updates
+* tiny activity-feed shimmer
+* staggered feed appearance
+* no noisy animations
+
+6. IMPORTANT
+
+---
+
+This terminal is now:
+
+* emotional
+* cinematic
+* AI-driven
+* premium
+* addictive
+
+Protect the identity at all costs.
+
+The battlefield + right rail relationship is now the product signature.
+
+After Priority 2:
+THEN we do:
+
+* responsiveness validation
+* FPS profiling
+* mobile degradation strategy
+
+But Priority 2 comes first.

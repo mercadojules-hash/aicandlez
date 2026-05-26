@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { usePaperSignals, type OpportunityVM } from "../hooks/usePaperSignals";
 import {
   PaperTradesProvider,
@@ -19,6 +20,49 @@ import {
   STARTING_EQUITY,
 } from "../hooks/usePaperTrades";
 import { useExecutionState } from "../hooks/useExecutionState";
+import { authFetch } from "../lib/authFetch";
+import type { SignalLogEntry } from "../components/command/types";
+
+const apiBaseUrl: string =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+
+/* ── exchange-balances hook (canonical /api/user/exchanges/balances) ─────
+ * Mirrors the AdminPortalLegacy + PortalCustomerShell pattern. 30s poll,
+ * fail-soft. Customer Portal LOCKED INVARIANT: this is presentational
+ * only — customers never route their own orders through this connection;
+ * AICandlez executes via server-side Kraken keys. */
+type BalanceMap = Record<string, { free: number; locked: number; total: number }>;
+interface BalanceConnection {
+  exchange:       string;
+  label:          string | null;
+  tradingMode:    string;
+  ok:             boolean;
+  totalEquityUSD: number;
+  balances:       BalanceMap;
+  lastUpdated:    number;
+  error?:         string;
+}
+interface BalancesResponse {
+  connections:    BalanceConnection[];
+  totalEquityUSD: number;
+  fetchedAt:      number;
+}
+function useExchangeBalances() {
+  return useQuery<BalancesResponse>({
+    queryKey: ["user-exchanges-balances-terminal"],
+    queryFn: async () => {
+      const res = await authFetch(`${apiBaseUrl}/api/user/exchanges/balances`, {
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`balances_${res.status}`);
+      return (await res.json()) as BalancesResponse;
+    },
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    staleTime: 10_000,
+  });
+}
 
 const BRAND = "#66FF66";
 const LIME = "#7CFF00";
@@ -664,6 +708,15 @@ function TerminalInner() {
         @keyframes convictionBreath {
           0%,100% { filter: drop-shadow(0 0 6px var(--ring-glow, rgba(102,255,102,0.55))); }
           50%     { filter: drop-shadow(0 0 14px var(--ring-glow, rgba(102,255,102,0.85))); }
+        }
+        /* P2: subtle live-data motion */
+        @keyframes balanceFlash {
+          0%   { background: rgba(102,255,102,0.10); }
+          100% { background: transparent; }
+        }
+        @keyframes feedFadeIn {
+          0%   { opacity: 0; transform: translateY(-2px); }
+          100% { opacity: 1; transform: translateY(0); }
         }
 
         /* card hover micro-state — subtle lift, brighter material edge */

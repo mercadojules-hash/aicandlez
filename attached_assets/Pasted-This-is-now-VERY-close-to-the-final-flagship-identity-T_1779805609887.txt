@@ -1,0 +1,122 @@
+This is now VERY close to the final flagship identity.
+
+The readability, matte-black balance, and LONG/SHORT battlefield hierarchy are working extremely well now.
+
+The remaining high-priority addition is:
+AI AUTOTRADE CONTROL
+inside the right rail.
+
+====================================================
+GOAL
+====
+
+The terminal now needs the emotional conversion moment:
+
+“Enable AI to trade for me.”
+
+This becomes one of the signature interactions of the entire platform.
+
+====================================================
+PLACEMENT
+=========
+
+Place directly under:
+
+* ACCOUNT EQUITY
+  or
+* beneath the PNL metrics block
+
+inside the existing MY ACCOUNT rail.
+
+DO NOT move the right rail structure.
+
+====================================================
+DESIGN DIRECTION
+================
+
+Style:
+
+* premium cinematic control
+* matte-black foundation
+* subtle neon green live state
+* clean institutional feel
+* NOT a generic toggle switch
+
+Suggested structure:
+
+AI AUTOTRADE
+STATUS: OFF
+
+When enabled:
+
+AI AUTOTRADE
+STATUS: LIVE
+
+LIVE state:
+
+* subtle green glow
+* tiny pulse
+* “AI ACTIVE”
+* premium confidence feel
+
+====================================================
+VERY IMPORTANT
+==============
+
+This should feel like:
+“the AI is now managing my portfolio.”
+
+NOT:
+“I enabled a backend execution setting.”
+
+The emotional tone matters here.
+
+====================================================
+MICROCOPY
+=========
+
+Potential helper copy:
+
+OFF:
+“AI monitoring only”
+
+LIVE:
+“AI actively managing positions”
+
+====================================================
+OPTIONAL MICRO TELEMETRY
+========================
+
+Possible additions:
+
+* MAX TRADES: 3
+* RISK MODE: BALANCED
+* AI MODE: CONSERVATIVE / BALANCED / AGGRESSIVE
+
+BUT:
+keep the right rail clean.
+
+====================================================
+DO NOT
+======
+
+* use generic switches
+* use bright blue UI
+* add white cards
+* make it look like Coinbase
+* clutter the rail
+* add admin/dev wording
+
+====================================================
+MOST IMPORTANT
+==============
+
+Preserve:
+
+* current spacing
+* current hierarchy
+* current matte-black depth
+* current glow levels
+* current cinematic atmosphere
+
+The platform identity is finally locking in.
