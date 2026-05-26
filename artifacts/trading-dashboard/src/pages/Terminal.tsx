@@ -1856,31 +1856,34 @@ function TerminalInner() {
               <div className="text-[32px] font-bold leading-none" style={{ color: BRAND, letterSpacing: "-0.05em", textShadow: `0 0 18px ${BRAND}66` }}>
                 BULL
               </div>
-              {/* Vertical brand-tinted strikeline between regime and
-               *  conviction score — fades top/bottom, mirrors the
-               *  AI-HUNTING column seam. */}
+              {/* BLOOMBERG-STYLE STRIKELINE — solid 3px vertical bar in
+               *  brand-green (regime is bullish). Sharp edges, strong
+               *  glow, full readout height. Reads as a hardware
+               *  delineator, not a CSS hairline. */}
               <span
                 aria-hidden
-                className="self-stretch"
+                className="self-stretch shrink-0"
                 style={{
-                  width: 1,
-                  marginBottom: 4,
-                  background: "linear-gradient(180deg, transparent 0%, rgba(102,255,102,0.55) 50%, transparent 100%)",
-                  boxShadow:  "0 0 6px rgba(102,255,102,0.35)",
+                  width: 3,
+                  marginBottom: 2,
+                  background: BRAND,
+                  boxShadow: `0 0 8px ${BRAND}cc, 0 0 16px ${BRAND}55`,
                 }}
               />
               <div className="text-[28px] font-bold leading-none text-white tabular-nums" style={{ letterSpacing: "-0.04em" }}>
                 73
               </div>
-              {/* Second strikeline before the CONVICTION label so the
-               *  three elements read as a calibrated readout. */}
+              {/* COMPLEMENT STRIKELINE — solid red bar so the readout
+               *  carries the Bloomberg red/green color-coded pair the
+               *  operator's eye expects in an institutional terminal. */}
               <span
                 aria-hidden
-                className="self-stretch"
+                className="self-stretch shrink-0"
                 style={{
-                  width: 1,
-                  marginBottom: 4,
-                  background: "linear-gradient(180deg, transparent 0%, rgba(102,255,102,0.30) 50%, transparent 100%)",
+                  width: 3,
+                  marginBottom: 2,
+                  background: RED,
+                  boxShadow: `0 0 8px ${RED}cc, 0 0 16px ${RED}55`,
                 }}
               />
               <div className="pb-1 text-[10px] font-semibold tracking-[0.20em]" style={{ color: TXT_65 }}>CONVICTION</div>
@@ -1911,7 +1914,14 @@ function TerminalInner() {
          * doesn't. Institutional terminal feel. */}
         <div
           className="grid gap-4 px-4 pb-4 flex-1 min-h-0 overflow-hidden"
-          style={{ gridTemplateColumns: "1fr 340px", paddingTop: 20 }}
+          style={{
+            /* Responsive right rail — allows the MY ACCOUNT column to
+             * shrink to 300px before forcing horizontal overflow, so
+             * AI AUTOTRADE never clips when the operator narrows the
+             * window. Battlefield takes the remaining space. */
+            gridTemplateColumns: "minmax(0,1fr) minmax(300px, 340px)",
+            paddingTop: 20,
+          }}
         >
           {/* BATTLEFIELD — matte-black wrapper */}
           <div
