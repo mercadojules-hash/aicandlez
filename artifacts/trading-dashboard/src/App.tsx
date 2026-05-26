@@ -55,6 +55,8 @@ import AlertsPage from "@/pages/Alerts";
 import DesktopTerminal from "@/pages/DesktopTerminal";
 import InstitutionalTerminal from "@/pages/InstitutionalTerminal";
 import Portal from "@/pages/Portal";
+import Terminal from "@/pages/Terminal";
+import Operator from "@/pages/Operator";
 import { useUserRole } from "@/hooks/useUserRole";
 
 // ── Env ───────────────────────────────────────────────────────────────────────
@@ -423,6 +425,17 @@ function Router() {
             including admin previewing) renders Portal.tsx — the real
             multi-panel trading terminal. NOT admin-only and NOT a redirect. */}
         <Protected><Portal /></Protected>
+      </Route>
+      <Route path="/terminal">
+        {/* Approved customer AI terminal (graduated mockup). Same role gating
+            as /portal — signed-in customer or admin. /portal preserved for
+            rollback safety during validation phase. */}
+        <Protected><Terminal /></Protected>
+      </Route>
+      <Route path="/operator">
+        {/* Approved operator war-room (graduated mockup). Admin-only, same
+            gating as /command. /command preserved for rollback safety. */}
+        <ProtectedAdmin><Operator /></ProtectedAdmin>
       </Route>
       <Route path="/dashboard">
         <Protected><Dashboard /></Protected>

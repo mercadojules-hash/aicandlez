@@ -1,0 +1,171 @@
+This direction is APPROVED.
+
+These refined mockups now capture the correct AICandlez identity:
+
+* institutional
+* cinematic
+* AI-native
+* premium
+* emotionally alive
+* execution-focused
+
+The LONG vs SHORT crypto battlefield layout is the correct strategic move.
+
+====================================================
+APPROVED FOR GRADUATION
+=======================
+
+Proceed with:
+
+* User Dashboard → /terminal
+* Operator Dashboard → /operator
+
+while keeping:
+
+* /portal
+* /command
+
+fully intact for rollback safety during transition.
+
+====================================================
+FINAL APPROVED STRUCTURE
+========================
+
+USER DASHBOARD
+
+* no sidebar
+* premium AI terminal
+* Top 15 LONG crypto
+* Top 15 SHORT crypto
+* USER ACTIVITY CENTER
+* PAPER/LIVE telemetry
+* upgrade CTA
+* AI-managed account feel
+
+OPERATOR DASHBOARD
+
+* institutional sidebar
+* operator controls
+* AI execution telemetry
+* risk heatmap
+* kill switch
+* engine state
+* AI reasoning stream
+* execution overview
+* cinematic operator war room feel
+
+====================================================
+VERY IMPORTANT IMPLEMENTATION NOTES
+===================================
+
+Preserve EXACTLY:
+
+* spacing
+* typography hierarchy
+* confidence ring sizing
+* sparkline proportions
+* glow balance
+* matte-black contrast
+* LONG/SHORT polarity
+* premium density
+* tabular telemetry formatting
+
+Do NOT:
+
+* brighten the UI excessively
+* add retail SaaS styling
+* oversize controls/buttons
+* flatten spacing
+* remove terminal density
+
+====================================================
+SIGNAL CARDS
+============
+
+The current signal row anatomy is APPROVED:
+
+* badge
+* symbol/reason
+* price
+* full-row sparkline
+* % move
+* BUY/SELL actions
+* confidence ring
+
+Keep this structure.
+
+====================================================
+USER ACTIVITY CENTER
+====================
+
+The USER ACTIVITY CENTER is now a core platform feature.
+
+Preserve:
+
+* account equity
+* AI managed feeling
+* recent executions
+* recent activity
+* win rate
+* open trades
+* realized/unrealized pnl
+* exchange state
+* PAPER/LIVE badge
+* upgrade CTA
+
+This section should psychologically feel:
+“the AI is actively running my portfolio.”
+
+====================================================
+OPERATOR CONTROLS
+=================
+
+Keep:
+
+* ARM LIVE
+* PAUSE
+* KILL SWITCH
+* MIN CONF slider
+* concurrent cap
+* AI execution overview
+* risk telemetry
+* engine state
+* exchange topology
+* AI reasoning feed
+
+This should feel:
+
+* high stakes
+* institutional
+* operator-grade
+
+====================================================
+NEXT PHASE
+==========
+
+Proceed with route graduation:
+
+USER:
+trade.aicandlez.com/terminal
+
+OPERATOR:
+admintrade.aicandlez.com/operator
+
+while preserving:
+
+* /portal
+* /command
+
+during the validation phase.
+
+After integration:
+
+1. Validate responsiveness
+2. Validate live telemetry rendering
+3. Validate performance under live updates
+4. Validate confidence-ring animation smoothness
+5. Validate chart-strip rendering
+6. Validate mobile degradation behavior
+7. Validate exchange telemetry updates
+
+Then we will decide final production cutover.
