@@ -2237,7 +2237,7 @@ function TerminalInner() {
                 <div className="text-[10px] font-bold tracking-[0.22em]" style={{ color: TXT_85 }}>LIVE POSITIONS</div>
                 <div className="text-[9px] tracking-[0.18em]" style={{ color: TXT_40 }}>{positions.length} OPEN</div>
               </div>
-              <div className="flex flex-col stream-scroll overflow-y-auto" style={{ maxHeight: 240 }}>
+              <div className="flex flex-col stream-scroll overflow-y-auto" style={{ maxHeight: 320 }}>
                 {positions.map((p, i) => {
                   const isL = p.dir === "LONG";
                   const c = isL ? BRAND : RED;

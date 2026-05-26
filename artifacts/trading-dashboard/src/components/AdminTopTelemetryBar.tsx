@@ -125,21 +125,41 @@ function Cell({
   value: string;
   tone?: "neutral" | "positive" | "negative" | "warn" | "accent";
 }) {
+  /* Brand-aligned tone palette — replaces the prior cyan/lime mix with
+   * AICandlez neon-green for positive/accent so the bar reads as a
+   * single coherent operator surface, not a generic telemetry strip.
+   * Warn/negative kept on their own hues since they carry semantic
+   * weight (amber = caution, red = problem). */
   const color =
-    tone === "positive" ? "#00ff8a" :
-    tone === "negative" ? "#ff3355" :
-    tone === "warn"     ? "#ffaa00" :
-    tone === "accent"   ? "#00f0ff" :
+    tone === "positive" ? "#66FF66" :
+    tone === "negative" ? "#FF3B3B" :
+    tone === "warn"     ? "#FFC83D" :
+    tone === "accent"   ? "#7CFF00" :
                           "#EAF2FF";
+  const glow = tone === "neutral" ? "none" : `0 0 8px ${color}40`;
   return (
-    <div className="flex flex-col gap-0.5 px-3 py-1.5 shrink-0 border-r min-w-[88px]"
-         style={{ borderRightColor: "#0d1e2e" }}>
-      <div className="text-[14px] font-bold font-mono tabular-nums leading-none"
-           style={{ color }}>
+    <div
+      className="relative flex flex-col gap-1 px-3.5 py-1.5 shrink-0 min-w-[96px]"
+      style={{
+        /* Gradient hairline divider — fades at top/bottom so adjacent
+         * cells separate without the harsh full-height stroke that read
+         * as visual noise in the earlier pass. */
+        backgroundImage:    "linear-gradient(180deg, transparent 0%, rgba(102,255,102,0.10) 50%, transparent 100%)",
+        backgroundPosition: "right center",
+        backgroundSize:     "1px 60%",
+        backgroundRepeat:   "no-repeat",
+      }}
+    >
+      <div
+        className="text-[14px] font-bold font-mono tabular-nums leading-none"
+        style={{ color, textShadow: glow }}
+      >
         {value}
       </div>
-      <div className="text-[8px] font-mono uppercase tracking-[0.12em] font-medium"
-           style={{ color: "#5a7a90" }}>
+      <div
+        className="text-[8.5px] font-mono uppercase tracking-[0.18em] font-semibold leading-none"
+        style={{ color: "rgba(122,184,204,0.55)" }}
+      >
         {label}
       </div>
     </div>
@@ -334,28 +354,41 @@ export function AdminTopTelemetryBar() {
   return (
     <>
       <div
-        className="h-10 shrink-0 border-b flex items-center overflow-x-auto whitespace-nowrap sticky top-10 z-40"
+        className="h-11 shrink-0 border-b flex items-center overflow-x-auto whitespace-nowrap sticky top-10 z-40"
         style={{
-          background:        "linear-gradient(180deg, #000508 0%, #000a14 100%)",
-          borderBottomColor: "#0D2035",
-          boxShadow:         "0 1px 0 #00eeff08, 0 2px 8px #00000060",
+          /* Subtle brand-green wash on a near-black base instead of cyan
+           * tinge — ties the bar to the brand palette without competing
+           * with the trading content below. */
+          background:        "linear-gradient(180deg, #000A07 0%, #050F0A 100%)",
+          borderBottomColor: "rgba(102,255,102,0.18)",
+          boxShadow:         "0 1px 0 rgba(102,255,102,0.06), 0 2px 10px rgba(0,0,0,0.6)",
         }}
         role="status"
         aria-label="Operator telemetry"
       >
         {/* Leading status dot + label */}
-        <div className="flex items-center gap-2 px-3 shrink-0 border-r"
-             style={{ borderRightColor: "#0d1e2e" }}>
+        <div
+          className="flex items-center gap-2 px-4 shrink-0"
+          style={{
+            backgroundImage:    "linear-gradient(180deg, transparent 0%, rgba(102,255,102,0.10) 50%, transparent 100%)",
+            backgroundPosition: "right center",
+            backgroundSize:     "1px 60%",
+            backgroundRepeat:   "no-repeat",
+          }}
+        >
           <span
             className="w-1.5 h-1.5 rounded-full"
             style={{
-              background:  isError ? "#ff3355" : data?.engineRunning ? "#00ff8a" : "#ffaa00",
-              boxShadow:   isError ? "0 0 6px #ff335580" : "0 0 6px #00ff8a80",
+              background:  isError ? "#FF3B3B" : data?.engineRunning ? "#66FF66" : "#FFC83D",
+              boxShadow:   isError ? "0 0 8px #FF3B3Baa" : data?.engineRunning ? "0 0 8px #66FF66aa" : "0 0 8px #FFC83Daa",
+              animation:   data?.engineRunning && !isError ? "livePulse 1.8s ease-in-out infinite" : undefined,
             }}
           />
-          <span className="text-[9px] font-bold font-mono uppercase tracking-[0.18em]"
-                style={{ color: isError ? "#ff5566" : "#7ab8cc" }}>
-            {isError ? "Telemetry offline" : "Operator · Live"}
+          <span
+            className="text-[9.5px] font-bold font-mono uppercase tracking-[0.22em]"
+            style={{ color: isError ? "#FF6B6B" : "#66FF66" }}
+          >
+            {isError ? "Telemetry Offline" : "Operator · Live"}
           </span>
         </div>
 
