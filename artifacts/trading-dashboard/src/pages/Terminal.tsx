@@ -1275,9 +1275,11 @@ function TerminalInner() {
      * MUST NEVER see the paper FALLBACK_POSITIONS demo data. */
     if (isAdminAccount) {
       const live = liveState?.positions ?? [];
+      /* No slice cap — admins are operating live capital and must see
+       * every open position. Container scrolls when count exceeds the
+       * visible area (see LIVE POSITIONS panel below). */
       return live
         .filter(p => Math.abs(p.netQty) > 1e-9)
-        .slice(0, 6)
         .map(p => ({
           sym:   p.symbol.replace(/(USDT|USDC|USD)$/i, ""),
           dir:   p.netQty > 0 ? "LONG" as const : "SHORT" as const,
@@ -1290,9 +1292,11 @@ function TerminalInner() {
      * leak FALLBACK_POSITIONS demo data to a yet-to-be-confirmed
      * admin session. */
     if (!isCustomerAccount) return [];
-    /* CUSTOMER — paper store, unchanged. */
+    /* CUSTOMER — paper store. No slice cap: a customer who connects
+     * their exchange and doesn't enable AI Autotrade still needs to
+     * see every holding they're tracking. Container scrolls. */
     if (positionsBootstrap && !openPositions.length) return FALLBACK_POSITIONS;
-    return openPositions.slice(0, 6).map(p => ({
+    return openPositions.map(p => ({
       sym:   p.symbol.replace(/(USDT|USDC|USD)$/i, ""),
       dir:   p.side,
       entry: fmtPrice(p.entry),
@@ -2253,13 +2257,15 @@ function TerminalInner() {
               )}
             </button>
 
-            {/* LIVE POSITIONS */}
+            {/* LIVE POSITIONS — scrollable. ~5 rows visible (≈240px),
+             * scrolls when count exceeds it. Sticky header preserves
+             * the count badge while scrolling through long lists. */}
             <div style={{ background: BG_2, border: `1px solid ${HAIR_10}` }}>
-              <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: `1px solid ${HAIR_10}` }}>
+              <div className="flex items-center justify-between px-3 py-2 sticky top-0 z-10" style={{ borderBottom: `1px solid ${HAIR_10}`, background: BG_2 }}>
                 <div className="text-[10px] font-bold tracking-[0.22em]" style={{ color: TXT_85 }}>LIVE POSITIONS</div>
                 <div className="text-[9px] tracking-[0.18em]" style={{ color: TXT_40 }}>{positions.length} OPEN</div>
               </div>
-              <div className="flex flex-col">
+              <div className="flex flex-col stream-scroll overflow-y-auto" style={{ maxHeight: 240 }}>
                 {positions.map((p, i) => {
                   const isL = p.dir === "LONG";
                   const c = isL ? BRAND : RED;
