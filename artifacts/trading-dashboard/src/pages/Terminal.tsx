@@ -20,6 +20,8 @@ import {
   STARTING_EQUITY,
 } from "../hooks/usePaperTrades";
 import { useExecutionState } from "../hooks/useExecutionState";
+import { useUserRole } from "../hooks/useUserRole";
+import { useLiveExchangeState } from "../hooks/useLiveExchangeState";
 import { authFetch } from "../lib/authFetch";
 import type { SignalLogEntry } from "../components/command/types";
 
@@ -838,6 +840,34 @@ function TerminalInner() {
   const { data: balancesData } = useExchangeBalances();
   const aiTrading = useAiTradingState();
 
+  /* ── ADMIN/OPERATOR vs CUSTOMER world (LOCKED INVARIANT) ─────────────────
+   * Admin sessions on this surface MUST reflect real Kraken telemetry —
+   * never paper. Customer sessions remain paper-only (the conversion
+   * funnel, educational sim, and AI autotrade invitation depend on the
+   * $100k starting equity hero). The two worlds share this file but
+   * never share their MY ACCOUNT data sources.
+   *
+   *   isAdmin → /api/exchange/live-state (Kraken: balances, equity,
+   *             positions, realized/unrealized USD, fill counts).
+   *   !isAdmin → usePaperTrades store (simulated, $100k start).
+   *
+   * `useLiveExchangeState` is gated by `enabled: isAdmin` so customer
+   * sessions never hit the admin-only endpoint (which would 403). Paper
+   * hooks stay mounted for everyone so the customer flow is bit-identical
+   * — admins simply route the displayed values to live Kraken. */
+  const { isAdmin, loading: roleLoading } = useUserRole();
+  const { data: liveState } = useLiveExchangeState({ enabled: isAdmin });
+  /* Three-valued account mode — eliminates the first-paint race where
+   * `isAdmin=false` is the loading-state default and would briefly leak
+   * the paper $100k hero to an admin session before `/api/auth/me`
+   * resolves. While role is unresolved we render a neutral admin-safe
+   * placeholder (zeros, "LIVE · RESOLVING" pill) — NEVER the paper
+   * hero. Only once role is confirmed do we commit to either world. */
+  const accountMode: "admin" | "customer" | "resolving" =
+    roleLoading ? "resolving" : (isAdmin ? "admin" : "customer");
+  const isAdminAccount    = accountMode === "admin";
+  const isCustomerAccount = accountMode === "customer";
+
   /* Bootstrap detector — true only before the first successful engine poll.
    * Once `engine` is non-null we cut over to live data and accept honest
    * empty states ("no qualifying LONGS yet" reads better than stale mock). */
@@ -1238,6 +1268,29 @@ function TerminalInner() {
    * activity; once they have any history, an empty open list reads as the
    * honest "no open positions right now" state. */
   const positions: PositionRow[] = useMemo(() => {
+    /* ADMIN — derive from live Kraken positions (in-memory ledger,
+     * marked to the active ticker). netQty > 0 = LONG; we don't
+     * surface synthetic SHORT entries (spot account semantics).
+     * On standby / no live positions, render empty honestly — admin
+     * MUST NEVER see the paper FALLBACK_POSITIONS demo data. */
+    if (isAdminAccount) {
+      const live = liveState?.positions ?? [];
+      return live
+        .filter(p => Math.abs(p.netQty) > 1e-9)
+        .slice(0, 6)
+        .map(p => ({
+          sym:   p.symbol.replace(/(USDT|USDC|USD)$/i, ""),
+          dir:   p.netQty > 0 ? "LONG" as const : "SHORT" as const,
+          entry: fmtPrice(p.avgEntryUSD),
+          cur:   fmtPrice(p.markPriceUSD),
+          pnl:   p.unrealizedPct,
+        }));
+    }
+    /* RESOLVING — render empty rather than paper fallback so we never
+     * leak FALLBACK_POSITIONS demo data to a yet-to-be-confirmed
+     * admin session. */
+    if (!isCustomerAccount) return [];
+    /* CUSTOMER — paper store, unchanged. */
     if (positionsBootstrap && !openPositions.length) return FALLBACK_POSITIONS;
     return openPositions.slice(0, 6).map(p => ({
       sym:   p.symbol.replace(/(USDT|USDC|USD)$/i, ""),
@@ -1246,7 +1299,7 @@ function TerminalInner() {
       cur:   fmtPrice(p.last),
       pnl:   p.pnlPct,
     }));
-  }, [openPositions]);
+  }, [isAdminAccount, isCustomerAccount, liveState?.positions, openPositions, positionsBootstrap]);
 
   /* ── Priority 2: right-rail live wiring ───────────────────────────────────
    * BALANCES → first ok connection from /api/user/exchanges/balances, top
@@ -1397,16 +1450,46 @@ function TerminalInner() {
     }
   };
 
-  /* Account telemetry — wired from the paper-trade store. */
-  const equityTotal = stats.equity ?? STARTING_EQUITY;
+  /* Account telemetry — split by world.
+   *   ADMIN  → live Kraken (totalEquityUSD, realizedTodayUSD,
+   *            unrealizedTotalUSD). No "MTD" framing because the
+   *            engine ledger doesn't yet carry a month boundary;
+   *            we show today's realized as the headline change.
+   *   CUSTOMER → paper store, unchanged.
+   * Admin defaults to 0 (not STARTING_EQUITY) while liveState is in
+   * flight — the "$100K hero" must never appear on an admin session. */
+  /* Resolving / admin / customer branching. During `resolving` we render
+   * zeros (admin-safe) so the paper hero NEVER appears on a session that
+   * may turn out to be admin. Once accountMode commits, values lock in. */
+  const equityTotal = isAdminAccount
+    ? (liveState?.totalEquityUSD ?? 0)
+    : isCustomerAccount
+      ? (stats.equity ?? STARTING_EQUITY)
+      : 0;
   const equityInt   = Math.floor(equityTotal);
   const equityCents = Math.round((equityTotal - equityInt) * 100).toString().padStart(2, "0");
   const equityIntStr = equityInt.toLocaleString("en-US");
-  const realizedPct  = ((stats.realizedPnl / STARTING_EQUITY) * 100);
-  const realizedPctLabel = `${realizedPct >= 0 ? "+" : ""}${realizedPct.toFixed(2)}% MTD`;
-  const isProfitToday = stats.todayPnl >= 0;
-  const isProfitReal  = stats.realizedPnl >= 0;
-  const isProfitUnreal = stats.unrealizedPnl >= 0;
+  /* Headline % strip — admin uses today's realized USD against current
+   * equity (best available denominator without a cost-basis snapshot);
+   * customer uses the paper store's MTD-since-start framing; resolving
+   * shows a neutral em-dash placeholder. */
+  const headlinePct = isAdminAccount
+    ? (equityTotal > 0 ? ((liveState?.realizedTodayUSD ?? 0) / equityTotal) * 100 : 0)
+    : isCustomerAccount
+      ? ((stats.realizedPnl / STARTING_EQUITY) * 100)
+      : 0;
+  const headlineLabel = !isAdminAccount && !isCustomerAccount
+    ? "— · RESOLVING"
+    : isAdminAccount
+      ? `${headlinePct >= 0 ? "+" : ""}${headlinePct.toFixed(2)}% TODAY`
+      : `${headlinePct >= 0 ? "+" : ""}${headlinePct.toFixed(2)}% MTD`;
+  const realizedPctLabel = headlineLabel; // legacy alias used below
+  const todayPnlValue      = isAdminAccount ? (liveState?.realizedTodayUSD ?? 0)   : isCustomerAccount ? stats.todayPnl      : 0;
+  const realizedPnlValue   = isAdminAccount ? (liveState?.realizedTodayUSD ?? 0)   : isCustomerAccount ? stats.realizedPnl   : 0;
+  const unrealizedPnlValue = isAdminAccount ? (liveState?.unrealizedTotalUSD ?? 0) : isCustomerAccount ? stats.unrealizedPnl : 0;
+  const isProfitToday  = todayPnlValue >= 0;
+  const isProfitReal   = realizedPnlValue >= 0;
+  const isProfitUnreal = unrealizedPnlValue >= 0;
 
   /* Engine status — drives the AI ENGINE · HUNTING pill and the
    * footer "AI · HUNTING N MARKETS" string. */
@@ -1912,12 +1995,52 @@ function TerminalInner() {
           <div className="flex flex-col gap-3.5 min-h-0 overflow-y-auto stream-scroll pr-1 py-2">
             <div className="flex items-center justify-between">
               <div className="text-[12px] font-bold tracking-[0.22em] text-white">MY ACCOUNT</div>
-              <div
-                className="px-2 py-0.5 text-[9px] font-bold tracking-[0.18em]"
-                style={{ color: BRAND, border: `1px solid ${BRAND}66`, background: "rgba(102,255,102,0.06)" }}
-              >
-                PAPER MODE
-              </div>
+              {/* MODE PILL — admin renders LIVE · KRAKEN (or STANDBY when
+               * the live read is unavailable); customer always renders
+               * PAPER MODE. Two worlds, never blended. */}
+              {isAdminAccount ? (
+                <div
+                  className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold tracking-[0.18em]"
+                  style={{
+                    color: liveState?.source === "live" ? BRAND : "#FFC83D",
+                    border: `1px solid ${liveState?.source === "live" ? BRAND : "#FFC83D"}66`,
+                    background: liveState?.source === "live"
+                      ? "rgba(102,255,102,0.06)"
+                      : "rgba(255,200,61,0.06)",
+                  }}
+                >
+                  <span
+                    className="h-1 w-1 rounded-full"
+                    style={{
+                      background: liveState?.source === "live" ? BRAND : "#FFC83D",
+                      boxShadow: liveState?.source === "live" ? `0 0 6px ${BRAND}` : "none",
+                      animation: liveState?.source === "live" ? "livePulse 1.8s ease-in-out infinite" : undefined,
+                    }}
+                  />
+                  {liveState?.source === "live"
+                    ? `LIVE · ${(liveState.exchange ?? "KRAKEN").toUpperCase()}`
+                    : liveState?.source === "error"
+                      ? "LIVE · STALE"
+                      : liveState && liveState.apiConfigured === false
+                        ? "LIVE · KEYS MISSING"
+                        : "LIVE · STANDBY"}
+                </div>
+              ) : isCustomerAccount ? (
+                <div
+                  className="px-2 py-0.5 text-[9px] font-bold tracking-[0.18em]"
+                  style={{ color: BRAND, border: `1px solid ${BRAND}66`, background: "rgba(102,255,102,0.06)" }}
+                >
+                  PAPER MODE
+                </div>
+              ) : (
+                /* RESOLVING — neutral pill, no paper-mode reveal. */
+                <div
+                  className="px-2 py-0.5 text-[9px] font-bold tracking-[0.18em]"
+                  style={{ color: TXT_40, border: `1px solid ${HAIR_18}`, background: "transparent" }}
+                >
+                  · RESOLVING
+                </div>
+              )}
             </div>
 
             {/* EQUITY HERO */}
@@ -1952,7 +2075,9 @@ function TerminalInner() {
                 >
                   {realizedPctLabel}
                 </div>
-                <div className="text-[10px] tracking-[0.14em]" style={{ color: TXT_40 }}>since Jun 1</div>
+                <div className="text-[10px] tracking-[0.14em]" style={{ color: TXT_40 }}>
+                  {isAdminAccount ? "real-time · kraken" : isCustomerAccount ? "since Jun 1" : ""}
+                </div>
               </div>
               <div className="mt-1">
                 <Sparkline data={EQUITY_SPARK} color={BRAND} w={300} h={34} strokeW={1.8} />
@@ -1961,12 +2086,25 @@ function TerminalInner() {
 
             {/* 2-up stats */}
             <div className="grid grid-cols-2 gap-2">
-              <MiniStat label="TODAY"    value={fmtMoneySigned(stats.todayPnl)} color={isProfitToday ? BRAND : RED} />
-              <MiniStat label="WIN RATE" value={`${Math.round(stats.winRate)}%`} color="#fff" />
+              <MiniStat label="TODAY"    value={fmtMoneySigned(todayPnlValue)} color={isProfitToday ? BRAND : RED} />
+              {/* WIN RATE — paper-only metric (the engine's order ledger
+               * doesn't yet compute realized win rate across closed
+               * round-trips). Admin sees FILLS today instead so the
+               * tile remains meaningful telemetry rather than a misleading
+               * 0% on a live account. */}
+              <MiniStat
+                label={isAdminAccount ? "FILLS · TODAY" : "WIN RATE"}
+                value={isAdminAccount
+                  ? String(liveState?.filledToday ?? 0)
+                  : isCustomerAccount
+                    ? `${Math.round(stats.winRate)}%`
+                    : "—"}
+                color="#fff"
+              />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <MiniStat label="REALIZED"   value={fmtMoneySigned(stats.realizedPnl)}   color={isProfitReal   ? BRAND : RED} />
-              <MiniStat label="UNREALIZED" value={fmtMoneySigned(stats.unrealizedPnl)} color={isProfitUnreal ? BRAND : RED} />
+              <MiniStat label="REALIZED"   value={fmtMoneySigned(realizedPnlValue)}   color={isProfitReal   ? BRAND : RED} />
+              <MiniStat label="UNREALIZED" value={fmtMoneySigned(unrealizedPnlValue)} color={isProfitUnreal ? BRAND : RED} />
             </div>
 
             {/* AI AUTOTRADE CONTROL — emotional conversion moment.
