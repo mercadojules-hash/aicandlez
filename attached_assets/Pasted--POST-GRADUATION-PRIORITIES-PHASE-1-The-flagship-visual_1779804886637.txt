@@ -1,0 +1,165 @@
+# POST-GRADUATION PRIORITIES — PHASE 1
+
+The flagship visual identity is now complete enough for launch.
+
+The next phase is NO LONGER visual redesign.
+
+The next phase is:
+
+* realism
+* live behavior
+* production authenticity
+* AI-system believability
+* performance quality
+
+====================================================
+PHASE 1 PRIORITY ORDER
+======================
+
+1. LIVE WEBSOCKET / TELEMETRY INTEGRATION
+2. REAL KRAKEN RENDERING IN RIGHT RAIL
+3. RESPONSIVE VALIDATION
+4. FPS / PERFORMANCE PROFILING
+
+====================================================
+
+1. LIVE WEBSOCKET / TELEMETRY INTEGRATION
+   ====================================================
+
+The terminal now visually FEELS alive.
+
+Now we need it to BE alive.
+
+Wire real live engine data into:
+
+* LONGS / SHORTS cards
+* conviction rings
+* trajectory metrics
+* AI activity feed
+* live positions
+* market pulse
+* scanning hero section
+
+====================================================
+IMPORTANT
+=========
+
+The live updates must feel:
+
+* smooth
+* atmospheric
+* cinematic
+* intelligent
+
+NOT:
+
+* jittery
+* noisy
+* hyperactive
+* constantly re-rendering
+
+====================================================
+UPDATE BEHAVIOR
+===============
+
+We want:
+
+* staggered updates
+* paced telemetry
+* intelligent refresh timing
+* smooth interpolation where possible
+* subtle transition states
+
+The illusion should feel like:
+
+# an autonomous AI system continuously hunting opportunities.
+
+====================================================
+2. REAL KRAKEN RIGHT-RAIL RENDERING
+===================================
+
+Replace mock data in the right rail with real exchange telemetry:
+
+* real balances
+* real positions
+* real unrealized PNL
+* real realized PNL
+* live account equity
+* live position percentages
+* live execution feed
+
+====================================================
+IMPORTANT
+=========
+
+Preserve the current cinematic formatting while replacing only the data source.
+
+Do NOT redesign the right rail.
+
+====================================================
+3. RESPONSIVE VALIDATION
+========================
+
+Stress test:
+
+* 1280 laptop
+* ultrawide
+* smaller desktop
+* tablet landscape
+
+Validate:
+
+* card wrapping
+* action buttons
+* conviction rings
+* right rail integrity
+* LONG/SHORT spacing
+* hero section balance
+
+====================================================
+4. FPS / PERFORMANCE PROFILING
+==============================
+
+Profile:
+
+* atmospheric layers
+* scanlines
+* glow fogging
+* animation loops
+* hero gradients
+* conviction breathing
+* hover states
+
+Goal:
+maintain cinematic atmosphere while ensuring smooth FPS under live telemetry load.
+
+====================================================
+VERY IMPORTANT
+==============
+
+NO further major visual redesigns.
+
+The flagship identity is now LOCKED.
+
+Do NOT:
+
+* redesign the structure
+* flatten the atmosphere
+* brighten the UI
+* increase animation intensity
+* introduce flashy retail behavior
+
+This phase is now:
+
+* production realism
+* performance hardening
+* live-data authenticity
+* cinematic stability
+
+====================================================
+SUCCESS CONDITION
+=================
+
+The terminal should ultimately feel like:
+
+# a real autonomous AI trading system actively hunting markets in real time.

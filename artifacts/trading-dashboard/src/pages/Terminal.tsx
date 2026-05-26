@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   Bell,
@@ -12,6 +12,13 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
+import { usePaperSignals, type OpportunityVM } from "../hooks/usePaperSignals";
+import {
+  PaperTradesProvider,
+  usePaperTrades,
+  STARTING_EQUITY,
+} from "../hooks/usePaperTrades";
+import { useExecutionState } from "../hooks/useExecutionState";
 
 const BRAND = "#66FF66";
 const LIME = "#7CFF00";
@@ -50,7 +57,7 @@ type Signal = {
   spark: number[];
 };
 
-const LONGS: Signal[] = [
+const FALLBACK_LONGS: Signal[] = [
   { sym: "BTC",  dir: "LONG", reason: "BREAKOUT", tag: "MTF aligned · vol surge",   price: "$67,284.10", changePct: 1.92, conf: 91, entry: "67,210", sl: "66,420", tp: "69,180", rr: "2.4R", m5: "up", m15: "up", h1: "up",   spark: [10,11,11,13,12,14,15,14,17,18,20,22,24,26,28,30] },
   { sym: "SOL",  dir: "LONG", reason: "MOMENTUM", tag: "trend continuation",        price: "$172.65",    changePct: 2.27, conf: 87, entry: "171.80", sl: "168.10", tp: "181.40", rr: "2.6R", m5: "up", m15: "up", h1: "up",   spark: [9,10,10,11,12,13,14,13,15,17,18,19,20,22,23,24] },
   { sym: "ETH",  dir: "LONG", reason: "TREND",    tag: "higher highs · clean",       price: "$3,128.44",  changePct: 1.84, conf: 84, entry: "3,118",  sl: "3,070",  tp: "3,260",  rr: "2.0R", m5: "up", m15: "up", h1: "flat", spark: [6,7,7,8,9,8,10,11,12,11,13,14,15,16,17,18] },
@@ -63,7 +70,7 @@ const LONGS: Signal[] = [
   { sym: "FET",  dir: "LONG", reason: "MOMENTUM", tag: "narrative bid",              price: "$1.348",     changePct: 3.85, conf: 73, entry: "1.342",  sl: "1.298",  tp: "1.440",  rr: "2.0R", m5: "up", m15: "up", h1: "flat", spark: [6,7,7,7,8,8,8,9,9,9,10,10,10,11,11,11] },
 ];
 
-const SHORTS: Signal[] = [
+const FALLBACK_SHORTS: Signal[] = [
   { sym: "WIF",   dir: "SHORT", reason: "DISTRIBUTION", tag: "topping pattern · vol", price: "$2.0840",      changePct: -4.93, conf: 87, entry: "2.0880",   sl: "2.1620", tp: "1.9120", rr: "2.4R", m5: "down", m15: "down", h1: "down", spark: [22,22,21,21,20,21,20,19,20,19,18,19,17,17,16,15] },
   { sym: "PEPE",  dir: "SHORT", reason: "MOMENTUM",     tag: "lower lows · MA cross", price: "$0.00000814",  changePct: -5.57, conf: 85, entry: "0.0000082","sl": "0.0000085", tp: "0.0000074", rr: "2.5R", m5: "down", m15: "down", h1: "down", spark: [24,23,23,22,22,22,21,20,21,20,19,19,18,17,16,15] },
   { sym: "BONK",  dir: "SHORT", reason: "REVERSAL",     tag: "exhaustion top",        price: "$0.00001921",  changePct: -7.11, conf: 83, entry: "0.0000193","sl": "0.0000201","tp": "0.0000172", rr: "2.6R", m5: "down", m15: "down", h1: "flat", spark: [21,20,20,19,19,19,18,18,18,17,17,16,16,15,15,14] },
@@ -89,11 +96,92 @@ const CONVICTION_CHIPS = [
   { sym: "SOL",  dir: "LONG"  as Dir, val: 84 },
 ];
 
-const POSITIONS = [
-  { sym: "BTC", dir: "LONG"  as Dir, entry: "66,810", cur: "67,284", pnl: +1.42 },
-  { sym: "SOL", dir: "LONG"  as Dir, entry: "168.40", cur: "172.65", pnl: +2.51 },
-  { sym: "WIF", dir: "SHORT" as Dir, entry: "2.1820", cur: "2.0840", pnl: +4.49 },
+type PositionRow = { sym: string; dir: Dir; entry: string; cur: string; pnl: number };
+const FALLBACK_POSITIONS: PositionRow[] = [
+  { sym: "BTC", dir: "LONG",  entry: "66,810", cur: "67,284", pnl: +1.42 },
+  { sym: "SOL", dir: "LONG",  entry: "168.40", cur: "172.65", pnl: +2.51 },
+  { sym: "WIF", dir: "SHORT", entry: "2.1820", cur: "2.0840", pnl: +4.49 },
 ];
+
+/* ── price formatting helpers (adaptive precision for crypto majors+micro) ── */
+function fmtPrice(n: number): string {
+  if (!Number.isFinite(n) || n === 0) return "—";
+  const abs = Math.abs(n);
+  if (abs >= 1000)  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (abs >= 1)     return n.toFixed(abs >= 100 ? 2 : abs >= 10 ? 2 : 3);
+  if (abs >= 0.01)  return n.toFixed(4);
+  if (abs >= 0.0001) return n.toFixed(6);
+  return n.toFixed(8);
+}
+function fmtPriceUsd(n: number): string {
+  return `$${fmtPrice(n)}`;
+}
+function fmtPctSigned(n: number): string {
+  const s = n >= 0 ? "+" : "";
+  return `${s}${n.toFixed(2)}%`;
+}
+function fmtMoneySigned(n: number): string {
+  const s = n >= 0 ? "+$" : "-$";
+  return `${s}${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+function relAge(ts: number, now: number): string {
+  const sec = Math.max(0, Math.round((now - ts) / 1000));
+  if (sec < 60) return `${sec}s ago`;
+  const m = Math.round(sec / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  return `${h}h ago`;
+}
+
+/** Convert MtfDot ("green"/"amber"/"red") → Signal mtf state. */
+function mtfToState(dot: "green" | "amber" | "red"): "up" | "down" | "flat" {
+  if (dot === "green") return "up";
+  if (dot === "red")   return "down";
+  return "flat";
+}
+
+/** Derive % change from the sparkline (last vs first). Returns 0 if not enough data. */
+function sparkChangePct(spark: number[]): number {
+  if (!spark || spark.length < 2) return 0;
+  const a = spark[0];
+  const b = spark[spark.length - 1];
+  if (!a) return 0;
+  return ((b - a) / a) * 100;
+}
+
+/** Adapt OpportunityVM → existing Signal card shape so the V6 cinematic
+ *  card renderer stays untouched. For FLAT engine signals, `lean` is
+ *  used to route into the correct column at the call site. */
+function vmToSignal(vm: OpportunityVM): Signal {
+  const isLong = vm.direction === "LONG" || (vm.direction === "FLAT" && vm.lean === "LONG");
+  const dir: Dir = isLong ? "LONG" : "SHORT";
+  // Market-direction change: sparkline already encodes true price slope
+  // (down for SHORT setups), so we use it as-is. No polarity inversion.
+  const changePct = sparkChangePct(vm.sparkline);
+  const rrNum = (() => {
+    const reward = Math.abs(vm.target - vm.entry);
+    const risk   = Math.abs(vm.entry - vm.stop);
+    if (!risk) return 0;
+    return reward / risk;
+  })();
+  return {
+    sym:       vm.symbol,
+    dir,
+    reason:    vm.regime,
+    tag:       (vm.reason ?? "").slice(0, 64),
+    price:     fmtPriceUsd(vm.entry),
+    changePct,
+    conf:      Math.round(vm.convictionScore),
+    entry:     fmtPrice(vm.entry),
+    sl:        fmtPrice(vm.stop),
+    tp:        fmtPrice(vm.target),
+    rr:        `${rrNum.toFixed(1)}R`,
+    m5:        mtfToState(vm.mtf[0]),
+    m15:       mtfToState(vm.mtf[1]),
+    h1:        mtfToState(vm.mtf[2]),
+    spark:     vm.sparkline?.length ? vm.sparkline : [10, 10, 10, 10, 10, 10],
+  };
+}
 
 const BALANCES = [
   { asset: "BTC",  qty: "1.842" },
@@ -413,13 +501,95 @@ function MiniStat({ label, value, color = "#fff" }: { label: string; value: stri
   );
 }
 
-export default function Terminal() {
+function TerminalInner() {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
   const clock = now.toISOString().split("T")[1].split(".")[0] + " UTC";
+
+  /* ── live data wiring (Priority 1) ────────────────────────────────────────
+   * Hooks are the canonical sources of truth used by PortalCustomerShell.
+   * Fallback constants preserve the cinematic identity during bootstrap so
+   * the matrix never blanks — once the first poll returns we cut over. */
+  const { majors, alts, engine, isLoading: signalsLoading } = usePaperSignals();
+  const { open: openPositions, stats } = usePaperTrades();
+  const exec = useExecutionState();
+
+  /* Bootstrap detector — true only before the first successful engine poll.
+   * Once `engine` is non-null we cut over to live data and accept honest
+   * empty states ("no qualifying LONGS yet" reads better than stale mock). */
+  const isBootstrap = signalsLoading || engine === null;
+  /* For positions, "no activity ever" (totalCount === 0) is the bootstrap
+   * signal; after the user opens their first paper trade, an empty `open`
+   * list is the truthful state and we render it honestly. */
+  const positionsBootstrap = stats.totalCount === 0;
+
+  /* Split signals into LONG / SHORT columns. `direction` is the engine's
+   * decision; FLAT signals are routed via `lean` so the matrix shows
+   * in-progress cognition rather than a dead column. */
+  const liveSignals = useMemo(() => {
+    const all: OpportunityVM[] = [...majors, ...alts].filter(o => o.executionEligible !== false || o.convictionScore >= 60);
+    const longs = all
+      .filter(o => o.direction === "LONG" || (o.direction === "FLAT" && o.lean === "LONG"))
+      .sort((a, b) => b.convictionScore - a.convictionScore)
+      .slice(0, 10)
+      .map(vmToSignal);
+    const shorts = all
+      .filter(o => o.direction === "SHORT" || (o.direction === "FLAT" && o.lean === "SHORT"))
+      .sort((a, b) => b.convictionScore - a.convictionScore)
+      .slice(0, 10)
+      .map(vmToSignal);
+    return { longs, shorts };
+  }, [majors, alts]);
+
+  const longs  = isBootstrap ? FALLBACK_LONGS  : liveSignals.longs;
+  const shorts = isBootstrap ? FALLBACK_SHORTS : liveSignals.shorts;
+
+  /* Live positions adapter — paper-trading store → row shape used by the
+   * LIVE POSITIONS table. Fallback only while the user has zero lifetime
+   * activity; once they have any history, an empty open list reads as the
+   * honest "no open positions right now" state. */
+  const positions: PositionRow[] = useMemo(() => {
+    if (positionsBootstrap && !openPositions.length) return FALLBACK_POSITIONS;
+    return openPositions.slice(0, 6).map(p => ({
+      sym:   p.symbol.replace(/(USDT|USDC|USD)$/i, ""),
+      dir:   p.side,
+      entry: fmtPrice(p.entry),
+      cur:   fmtPrice(p.last),
+      pnl:   p.pnlPct,
+    }));
+  }, [openPositions]);
+
+  /* Account telemetry — wired from the paper-trade store. */
+  const equityTotal = stats.equity ?? STARTING_EQUITY;
+  const equityInt   = Math.floor(equityTotal);
+  const equityCents = Math.round((equityTotal - equityInt) * 100).toString().padStart(2, "0");
+  const equityIntStr = equityInt.toLocaleString("en-US");
+  const realizedPct  = ((stats.realizedPnl / STARTING_EQUITY) * 100);
+  const realizedPctLabel = `${realizedPct >= 0 ? "+" : ""}${realizedPct.toFixed(2)}% MTD`;
+  const isProfitToday = stats.todayPnl >= 0;
+  const isProfitReal  = stats.realizedPnl >= 0;
+  const isProfitUnreal = stats.unrealizedPnl >= 0;
+
+  /* Engine status — drives the AI ENGINE · HUNTING pill and the
+   * footer "AI · HUNTING N MARKETS" string. */
+  const tickersCount = engine?.symbolBreakdowns ? Object.keys(engine.symbolBreakdowns).length : 0;
+  const engineRunning = exec.data?.engine.running ?? true;
+  const cryptoState   = exec.data?.crypto.state ?? "armed";
+  const huntingLabel = !engineRunning
+    ? "AI ENGINE · OFFLINE"
+    : cryptoState === "halted"
+      ? "AI ENGINE · HALTED"
+      : cryptoState === "executing"
+        ? "AI ENGINE · EXECUTING"
+        : "AI ENGINE · HUNTING";
+  const huntingFooterLabel = !engineRunning
+    ? "AI · OFFLINE"
+    : `AI · HUNTING ${tickersCount || 30} MARKETS`;
+  const lastSignalAt = exec.data?.crypto.lastSignalAt ?? null;
+  const lastSurgeLabel = lastSignalAt ? relAge(lastSignalAt, now.getTime()) : "—";
 
   return (
     <div
@@ -645,15 +815,15 @@ export default function Terminal() {
                   style={{ border: `1px solid ${BRAND}`, animation: "ringBreathSlow 4.8s ease-out infinite" }}
                 />
               </span>
-              <div className="text-[10px] font-bold tracking-[0.30em]" style={{ color: BRAND }}>AI ENGINE · HUNTING</div>
+              <div className="text-[10px] font-bold tracking-[0.30em]" style={{ color: BRAND }}>{huntingLabel}</div>
               <div className="flex items-center gap-1 text-[9.5px] tracking-[0.16em]" style={{ color: TXT_40 }}>
                 <Bot size={11} /> autonomous
               </div>
             </div>
             <div className="text-[30px] font-bold leading-[1.02] text-white" style={{ letterSpacing: "-0.05em" }}>
-              Scanning <span style={{ color: BRAND }}>30 markets</span> · last surge{" "}
-              <span style={{ color: BRAND }}>BTC 82→91</span>
-              <span className="ml-2 text-[14px] font-semibold" style={{ color: TXT_40, letterSpacing: 0 }}>· 3s ago</span>
+              Scanning <span style={{ color: BRAND }}>{tickersCount || 30} markets</span> · last surge{" "}
+              <span style={{ color: BRAND }}>{longs[0]?.sym ?? "—"} {longs[0]?.conf ?? 0}</span>
+              <span className="ml-2 text-[14px] font-semibold" style={{ color: TXT_40, letterSpacing: 0 }}>· {lastSurgeLabel}</span>
             </div>
             <div className="flex items-center gap-2">
               {CONVICTION_CHIPS.map((c) => (
@@ -745,7 +915,7 @@ export default function Terminal() {
                     AI BIAS: <span className="font-bold" style={{ color: BRAND }}>BULLISH</span>
                   </div>
                 </div>
-                {LONGS.map((s, i) => (
+                {longs.map((s, i) => (
                   <SignalCard key={s.sym} s={s} top={i === 0} />
                 ))}
               </div>
@@ -768,7 +938,7 @@ export default function Terminal() {
                     AI BIAS: <span className="font-bold" style={{ color: RED }}>BEARISH</span>
                   </div>
                 </div>
-                {SHORTS.map((s, i) => (
+                {shorts.map((s, i) => (
                   <SignalCard key={s.sym} s={s} top={i === 0} />
                 ))}
               </div>
@@ -806,14 +976,18 @@ export default function Terminal() {
                 className="text-[30px] font-bold leading-none tabular-nums text-white"
                 style={{ letterSpacing: "-0.04em", animation: "equityShimmer 4s ease-in-out infinite" }}
               >
-                $108,420<span style={{ color: TXT_40 }}>.16</span>
+                ${equityIntStr}<span style={{ color: TXT_40 }}>.{equityCents}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div
                   className="px-1.5 py-[1px] text-[10px] font-bold tabular-nums"
-                  style={{ color: BRAND, border: `1px solid ${BRAND}66`, background: "rgba(102,255,102,0.06)" }}
+                  style={{
+                    color: isProfitReal ? BRAND : RED,
+                    border: `1px solid ${(isProfitReal ? BRAND : RED)}66`,
+                    background: isProfitReal ? "rgba(102,255,102,0.06)" : "rgba(255,59,59,0.06)",
+                  }}
                 >
-                  +8.42% MTD
+                  {realizedPctLabel}
                 </div>
                 <div className="text-[10px] tracking-[0.14em]" style={{ color: TXT_40 }}>since Jun 1</div>
               </div>
@@ -824,22 +998,22 @@ export default function Terminal() {
 
             {/* 2-up stats */}
             <div className="grid grid-cols-2 gap-2">
-              <MiniStat label="TODAY"    value="+$1,284.50" color={BRAND} />
-              <MiniStat label="WIN RATE" value="68%"        color="#fff" />
+              <MiniStat label="TODAY"    value={fmtMoneySigned(stats.todayPnl)} color={isProfitToday ? BRAND : RED} />
+              <MiniStat label="WIN RATE" value={`${Math.round(stats.winRate)}%`} color="#fff" />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <MiniStat label="REALIZED"   value="+$6,310.42" color={BRAND} />
-              <MiniStat label="UNREALIZED" value="+$2,109.74" color={BRAND} />
+              <MiniStat label="REALIZED"   value={fmtMoneySigned(stats.realizedPnl)}   color={isProfitReal   ? BRAND : RED} />
+              <MiniStat label="UNREALIZED" value={fmtMoneySigned(stats.unrealizedPnl)} color={isProfitUnreal ? BRAND : RED} />
             </div>
 
             {/* LIVE POSITIONS */}
             <div style={{ background: BG_2, border: `1px solid ${HAIR_10}` }}>
               <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: `1px solid ${HAIR_10}` }}>
                 <div className="text-[10px] font-bold tracking-[0.22em]" style={{ color: TXT_85 }}>LIVE POSITIONS</div>
-                <div className="text-[9px] tracking-[0.18em]" style={{ color: TXT_40 }}>{POSITIONS.length} OPEN</div>
+                <div className="text-[9px] tracking-[0.18em]" style={{ color: TXT_40 }}>{positions.length} OPEN</div>
               </div>
               <div className="flex flex-col">
-                {POSITIONS.map((p, i) => {
+                {positions.map((p, i) => {
                   const isL = p.dir === "LONG";
                   const c = isL ? BRAND : RED;
                   return (
@@ -865,8 +1039,8 @@ export default function Terminal() {
                           {p.entry} → <span className="text-white">{p.cur}</span>
                         </div>
                       </div>
-                      <div className="text-right text-[12px] font-bold tabular-nums" style={{ color: c }}>
-                        +{p.pnl.toFixed(2)}%
+                      <div className="text-right text-[12px] font-bold tabular-nums" style={{ color: p.pnl >= 0 ? c : RED }}>
+                        {p.pnl >= 0 ? "+" : ""}{p.pnl.toFixed(2)}%
                       </div>
                     </div>
                   );
@@ -959,7 +1133,7 @@ export default function Terminal() {
         >
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: BRAND, boxShadow: `0 0 6px ${BRAND}`, animation: "pulseOrb 2.4s ease-in-out infinite" }} />
-            <span style={{ color: BRAND }} className="font-bold">AI · HUNTING 30 MARKETS</span>
+            <span style={{ color: BRAND }} className="font-bold">{huntingFooterLabel}</span>
           </div>
           <span style={{ color: TXT_25 }}>·</span>
           <span>SIGNALS/MIN <span className="font-bold text-white tabular-nums">4.2</span></span>
@@ -971,5 +1145,17 @@ export default function Terminal() {
         </div>
       </div>
     </div>
+  );
+}
+
+/* Default export — wraps the cinematic terminal in `PaperTradesProvider` so
+ * the right-rail account telemetry, LIVE POSITIONS, and queued paper trades
+ * resolve against a real store rather than the inert soft-fallback context.
+ * Matches the canonical mount pattern used by PortalCustomerShell. */
+export default function Terminal() {
+  return (
+    <PaperTradesProvider>
+      <TerminalInner />
+    </PaperTradesProvider>
   );
 }
