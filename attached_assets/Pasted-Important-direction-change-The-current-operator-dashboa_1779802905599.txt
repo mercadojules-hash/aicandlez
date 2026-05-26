@@ -1,0 +1,199 @@
+Important direction change.
+
+The current operator dashboard is GOOD for:
+
+* command center
+* telemetry
+* monitoring
+* admin operations
+* risk management
+
+BUT:
+it is NOT the dashboard I personally want to actively trade on all day.
+
+====================================================
+NEW DIRECTION
+=============
+
+We are now splitting:
+
+1. OPERATOR COMMAND CENTER
+2. PERSONAL TRADING TERMINAL
+
+These are NOT the same product anymore.
+
+====================================================
+
+1. OPERATOR COMMAND CENTER
+   ====================================================
+
+The current institutional telemetry-heavy design is APPROVED for:
+admintrade.aicandlez.com/operator
+
+This remains:
+
+* telemetry dense
+* monitoring focused
+* risk focused
+* operational
+* command-center style
+
+Keep:
+
+* KPI telemetry grid
+* AI throughput
+* engine health
+* exchange topology
+* system monitoring
+* risk telemetry
+* execution overview
+* sidebar navigation
+
+This becomes:
+the AI operations center.
+
+====================================================
+2. PERSONAL TRADING TERMINAL (VERY IMPORTANT)
+=============================================
+
+I want my PERSONAL dashboard to look MUCH CLOSER to the original cinematic design concept.
+
+This is the dashboard I will:
+
+* actively trade on
+* monitor opportunities from
+* emotionally engage with daily
+* showcase publicly
+* use for screenshots/videos/content
+
+This terminal should feel:
+
+* cinematic
+* aggressive
+* premium
+* AI-powered
+* emotionally exciting
+* visually alive
+
+NOT:
+
+* corporate telemetry software
+* admin infrastructure panel
+
+====================================================
+PERSONAL TERMINAL DESIGN LANGUAGE
+=================================
+
+Bring BACK more of:
+
+* the original wow factor
+* the cinematic glow hierarchy
+* the larger signal presence
+* the emotional conviction energy
+* dramatic LONG/SHORT polarity
+* larger confidence emphasis
+* bigger opportunity focus
+* visual excitement
+
+The ORIGINAL concepts had:
+
+* stronger emotional impact
+* stronger AI-hunting feeling
+* stronger signal energy
+* stronger conviction psychology
+
+I want THAT feeling restored.
+
+====================================================
+PERSONAL TERMINAL PRIORITIES
+============================
+
+The PERSONAL trading terminal should prioritize:
+
+1. LIVE OPPORTUNITIES
+2. SIGNAL ENERGY
+3. CONFIDENCE
+4. LONG vs SHORT battle
+5. AI conviction
+6. market movement
+7. emotional engagement
+8. active trading atmosphere
+
+MORE THAN:
+
+* infrastructure telemetry
+* system diagnostics
+* backend statistics
+
+====================================================
+PERSONAL TERMINAL LAYOUT
+========================
+
+Center stage should be:
+
+* Top 15 LONG crypto
+* Top 15 SHORT crypto
+* larger cinematic signal cards
+* stronger sparkline presence
+* more dramatic confidence rings
+* stronger directional polarity
+
+Right rail:
+
+* personal account activity
+* live positions
+* pnl
+* executions
+* win rate
+* exchange balances
+* AI activity feed
+
+Top:
+
+* market pulse
+* AI confidence
+* live BTC/SOL/ETH telemetry
+* active regime
+* signal throughput
+
+====================================================
+VERY IMPORTANT
+==============
+
+Do NOT turn the personal trading terminal into:
+
+* a system monitoring dashboard
+* a telemetry grid wall
+* a devops panel
+
+The PERSONAL terminal should feel:
+
+* elite
+* addictive
+* cinematic
+* exciting
+* premium
+* AI-native
+
+Think:
+“the AI is actively hunting the market in real time.”
+
+====================================================
+NEXT STEP
+=========
+
+Keep:
+
+* current operator command center
+  for /operator
+
+BUT:
+
+Create a NEW PERSONAL TRADING TERMINAL mockup direction inspired MUCH MORE by:
+
+* the original cinematic concepts
+* the earlier wow-factor layouts
+* stronger visual conviction energy
+
+This becomes:
+the flagship trading experience.
