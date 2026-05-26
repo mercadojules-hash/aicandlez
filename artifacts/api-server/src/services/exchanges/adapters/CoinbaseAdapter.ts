@@ -283,11 +283,20 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
         const pem = this.normalisePem(s);
         const kt  = crypto.createPrivateKey(pem).asymmetricKeyType;
         if (kt === "ed25519") return "cdp-uuid-pem";
-        // "ec" (P-256) or anything else falls through to ES256 path.
-        return "cdp-org";
-      } catch {
-        // Malformed PEM — let buildEs256Jwt surface the real OpenSSL error.
-        return "cdp-org";
+        if (kt === "ec")      return "cdp-org";
+        throw new Error(
+          `Coinbase secret: unsupported key type "${kt}". Expected Ed25519 or EC (P-256). ` +
+          `Regenerate the key in Coinbase Advanced Trade and paste the full -----BEGIN/-----END block.`,
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        // Surface a clear, actionable error instead of letting OpenSSL throw
+        // its cryptic "DECODER routines::unsupported" downstream.
+        throw new Error(
+          `Coinbase secret could not be parsed as a private key. ` +
+          `Make sure you copied the entire key including the -----BEGIN PRIVATE KEY----- ` +
+          `and -----END PRIVATE KEY----- lines. (parser said: ${msg})`,
+        );
       }
     }
     if (k.startsWith("organizations/")) return "cdp-org";
