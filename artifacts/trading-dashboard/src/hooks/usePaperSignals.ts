@@ -54,6 +54,13 @@ export interface OpportunityVM {
    *  reading the raw engine number. The card body now displays
    *  `convictionScore` instead. */
   conf:       number;
+  /** EXECUTION confidence — the number the live-execution gate 0f and
+   *  the auto-trade fan-out actually compare against. Equals
+   *  `SymBreakdown.avgConfidence` (untouched by display enrichment).
+   *  Surfaced on the VM so the card can disclose the display↔exec
+   *  delta and never visually imply "87% executable" when the gate
+   *  evaluates 79%. */
+  execConfidence: number;
   score:      number;
   /** USER-FACING calibrated conviction score (0..100). See
    *  `lib/conviction.ts` for the formula. Real factors only — never
@@ -340,6 +347,7 @@ function buildHeroPreviewCards(now: number): OpportunityVM[] {
       direction:  dir,
       lean:       dir,
       conf,
+      execConfidence: conf,
       score:      conf,
       convictionScore:     conf,
       convictionTier:      conf >= 90 ? "ELITE" : conf >= 70 ? "HIGH" : "STRONG",
@@ -423,6 +431,7 @@ export function usePaperSignals() {
         direction:  dir,
         lean,
         conf,
+        execConfidence: Math.round(b.avgConfidence),
         score,
         // Placeholders — overwritten in the conviction pass below once
         // every card's raw conf is known (rank percentile needs the

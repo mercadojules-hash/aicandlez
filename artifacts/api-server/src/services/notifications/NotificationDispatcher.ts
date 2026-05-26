@@ -81,6 +81,45 @@ export async function shouldDeliverAlertToUser(
   }
 }
 
+/**
+ * CONFIDENCE-FLOOR GATE for signal alerts. Returns `{ allowed, threshold }`.
+ *
+ * Mirrors the live-execution gate 0f in `liveUserExecution.ts`: a user with
+ * `user_settings.minConfidence = 85` should never be paged for a 47% signal
+ * — neither push, sound, toast, nor mobile alert. Visibility (the feed) is
+ * intentionally ungated, but ALERTS are an explicit "ping me" contract and
+ * must honor the user's tolerance.
+ *
+ * Missing user-settings row → fall back to the engine BASELINE (60), same
+ * as the execution gate. DB error → fail OPEN (allowed=true) so transient
+ * lookup failure never black-holes critical trade alerts.
+ *
+ * Caller responsibility: invoke this BEFORE invoking `sendToUser` for any
+ * signal-type push. `signalAlert()` below does so automatically.
+ */
+export async function shouldDeliverSignalByConfidence(
+  userId:     string,
+  confidence: number,
+): Promise<{ allowed: boolean; threshold: number }> {
+  const BASELINE = 60;
+  try {
+    const [row] = await db
+      .select({ minConfidence: userSettingsTable.minConfidence })
+      .from(userSettingsTable)
+      .where(eq(userSettingsTable.userId, userId))
+      .limit(1);
+    const threshold =
+      row && typeof row.minConfidence === "number" ? row.minConfidence : BASELINE;
+    return { allowed: confidence >= threshold, threshold };
+  } catch (err) {
+    logger.warn(
+      { err, userId, confidence },
+      "NotificationDispatcher: minConfidence lookup failed; defaulting to deliver",
+    );
+    return { allowed: true, threshold: BASELINE };
+  }
+}
+
 interface DispatchResult {
   userId:       string;
   sent:         number;
@@ -214,6 +253,17 @@ export const NotificationDispatcher = {
 
   /**
    * Quick helper — fire-and-forget signal alert to a user.
+   *
+   * Two-stage gating (both must pass):
+   *   1. CONFIDENCE FLOOR — drop silently if signal confidence is below
+   *      the user's `user_settings.minConfidence`. Mirrors the live-
+   *      execution gate so a user with min=85 is never paged for a 47%
+   *      signal.
+   *   2. ALERT PREFS — `alertKey: "aiSignalAlerts"` is forwarded
+   *      to `sendToUser`, which checks the user's per-alert toggle.
+   *
+   * Both gates emit a `[CONFIDENCE_GATE]` log so the audit telemetry
+   * covers the notification path as well as execution.
    */
   async signalAlert(userId: string, opts: {
     symbol:     string;
@@ -221,6 +271,23 @@ export const NotificationDispatcher = {
     confidence: number;
     price:      string;
   }): Promise<void> {
+    // Stage 1 — confidence floor (silent drop if below user threshold).
+    const { allowed, threshold } = await shouldDeliverSignalByConfidence(userId, opts.confidence);
+    logger.info(
+      {
+        tag:               "CONFIDENCE_GATE",
+        signalConfidence:  opts.confidence,
+        userMinConfidence: threshold,
+        passed:            allowed,
+        symbol:            opts.symbol,
+        userId,
+        executionPath:     "NotificationDispatcher.signalAlert",
+      },
+      "[CONFIDENCE_GATE] notification",
+    );
+    if (!allowed) return;
+
+    // Stage 2 — alertPrefs toggle is enforced inside sendToUser via alertKey.
     const emoji = opts.direction === "BUY" ? "🟢" : "🔴";
     await this.sendToUser(userId, {
       title:     `${emoji} ${opts.direction} Signal — ${opts.symbol}`,
@@ -228,7 +295,8 @@ export const NotificationDispatcher = {
       notifType: "signal",
       tag:       `signal-${opts.symbol}`,
       url:       "/aicandlez-app/",
-      data:      { ...opts },
+      alertKey:  "aiSignalAlerts",
+      data:      { ...opts, userMinConfidence: threshold },
     });
   },
 

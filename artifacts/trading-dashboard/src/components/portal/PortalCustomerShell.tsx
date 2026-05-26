@@ -1579,12 +1579,26 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
                 // tooltip (no extra layout footprint inside a 124px
                 // card row). Every line is real engine telemetry; no
                 // hardcoded numbers reach this display in production.
+                //
+                // DISPLAY vs EXECUTION confidence — the engine maintains
+                // two numbers for every signal. `displayConfidence` (= opp.conf)
+                // is the context-enriched render value (raw + MTF bonus +
+                // volume bonus). `avgConfidence` (= opp.execConfidence) is
+                // the untouched MTF mean and is the ONLY number the live-
+                // execution gate compares against your minConfidence setting.
+                // When they diverge the tooltip surfaces the delta so a
+                // 87% card never silently means "executable at 87%".
                 const b = opp.convictionBreakdown;
                 const row = (f: { label: string; value: number; weight: number; contribution: number; verdict: string }) =>
                   `${f.label.padEnd(28)} ${String(f.value).padStart(3)}/100  · ${f.verdict.padEnd(8)} · +${f.contribution.toFixed(1)} pts`;
+                const execLine =
+                  opp.execConfidence === opp.conf
+                    ? `(engine confidence: ${opp.conf} — display & execution match)`
+                    : `(display confidence: ${opp.conf} · execution confidence: ${opp.execConfidence})\n` +
+                      `Live-execution gate compares your minConfidence against ${opp.execConfidence}, not ${opp.conf}.`;
                 return [
                   `${tier} CONVICTION · ${conv}/100`,
-                  `(raw engine confidence: ${opp.conf})`,
+                  execLine,
                   ``,
                   `Why this score?`,
                   row(b.raw),
@@ -1602,6 +1616,31 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
                 cursor: "help",
               }}
             >{tier}</span>
+            {/* DISPLAY↔EXEC delta badge — only renders when the
+                context-enriched display value materially overstates the
+                number the live-execution gate actually compares. ≥3-pt
+                delta is the visibility threshold (smaller deltas would
+                add noise without changing user decisions). The badge
+                sits BELOW the conviction ring so it cannot be confused
+                with the score itself. */}
+            {opp.execConfidence < opp.conf - 2 && (
+              <span
+                title={
+                  `Live-execution gate evaluates this signal at ${opp.execConfidence}% (avgConfidence), ` +
+                  `not the displayed ${opp.conf}%. Display includes MTF + volume bonuses that the ` +
+                  `execution path intentionally ignores. If your minConfidence is between ${opp.execConfidence + 1} ` +
+                  `and ${opp.conf}, this signal will NOT execute.`
+                }
+                style={{
+                  marginTop: 2,
+                  fontSize: 7, fontWeight: 700,
+                  color: T.TEXT_2,
+                  letterSpacing: T.TRACK_LABEL, textTransform: "uppercase",
+                  cursor: "help",
+                  opacity: 0.85,
+                }}
+              >EXEC {opp.execConfidence}%</span>
+            )}
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
