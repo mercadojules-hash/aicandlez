@@ -2123,25 +2123,24 @@ function TerminalInner() {
               disabled={aiBusy || aiTrading.isLoading}
               className="group relative flex flex-col gap-2 p-3 text-left overflow-hidden"
               style={{
-                /* CONVERSION CTA — must read as an invitation in OFF state,
-                 * not as a forgotten config toggle. Subtle brand-tinted
-                 * background + brand border at 28-α + breathing inset glow
-                 * give it presence without crossing into "already armed"
-                 * territory (which keeps the ARMED state's 66-α border +
-                 * 22px inset as a clear escalation). */
+                /* BRIGHT NEON CTA — same visual weight as the customer
+                 * UNLOCK gradient. OFF = red neon (clear "not running"
+                 * signal); ON = green neon (system live). Bot icon +
+                 * AI AUTOTRADE label render on top in black for max
+                 * contrast against the saturated gradient. */
                 background: aiTrading.enabled
-                  ? `linear-gradient(180deg, rgba(102,255,102,0.10), rgba(102,255,102,0.02)), ${BG_2}`
-                  : `linear-gradient(180deg, rgba(102,255,102,0.045), rgba(102,255,102,0.012)), ${BG_2}`,
-                border: `1px solid ${aiTrading.enabled ? `${BRAND}66` : `${BRAND}30`}`,
+                  ? `linear-gradient(90deg, ${EMERALD}, ${BRAND}, ${LIME})`
+                  : `linear-gradient(90deg, ${RED}, ${RED_SOFT}, ${RED})`,
+                border: `1px solid ${aiTrading.enabled ? BRAND : RED}`,
                 boxShadow: aiTrading.enabled
-                  ? `0 0 22px rgba(102,255,102,0.10) inset`
-                  : `0 0 14px rgba(102,255,102,0.05) inset, 0 0 0 1px rgba(102,255,102,0.04)`,
+                  ? `0 0 22px ${BRAND}66`
+                  : `0 0 22px ${RED}55`,
                 cursor: aiBusy ? "wait" : "pointer",
                 animation: aiTrading.enabled
                   ? "aiActivePulse 3.2s ease-in-out infinite"
                   : "aiInvitePulse 4.8s ease-in-out infinite",
                 opacity: aiBusy && !aiArming ? 0.7 : 1,
-                transition: "border-color 220ms ease, box-shadow 220ms ease, opacity 180ms ease",
+                transition: "background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, opacity 180ms ease",
               }}
             >
               {/* WEAPONS-SYSTEM ARMED HAIRLINE — subtle amber top edge that
@@ -2168,52 +2167,43 @@ function TerminalInner() {
                   }}
                 />
               )}
+              {/* Header row — bot + title + status dot (no ARM/ARMED
+               * text pill; the gradient color itself communicates state). */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <Bot size={12} style={{ color: aiTrading.enabled ? BRAND : TXT_65 }} />
+                  <Bot size={13} strokeWidth={2.6} style={{ color: BG_0 }} />
                   <div
-                    className="text-[10px] font-bold tracking-[0.22em]"
-                    style={{ color: aiTrading.enabled ? "#fff" : TXT_85 }}
+                    className="text-[11px] font-bold tracking-[0.22em]"
+                    style={{ color: BG_0 }}
                   >
                     AI AUTOTRADE
                   </div>
                 </div>
-                <div
-                  className="flex items-center gap-1 px-1.5 py-[2px] text-[9px] font-bold tracking-[0.18em]"
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
                   style={{
-                    color: aiTrading.enabled ? BG_0 : TXT_65,
-                    background: aiTrading.enabled ? BRAND : "transparent",
-                    border: `1px solid ${aiTrading.enabled ? BRAND : HAIR_18}`,
-                    boxShadow: aiTrading.enabled ? `0 0 12px ${BRAND}77` : "none",
+                    background: BG_0,
+                    boxShadow: `0 0 6px ${BG_0}88`,
+                    animation: "livePulse 1.6s ease-in-out infinite",
                   }}
-                >
-                  {aiTrading.enabled && (
-                    <span
-                      className="h-1 w-1 rounded-full"
-                      style={{ background: BG_0, animation: "livePulse 1.8s ease-in-out infinite" }}
-                    />
-                  )}
-                  {aiArming ? "ARMING…" : aiTrading.enabled ? "ARMED" : "ARM"}
-                </div>
+                />
               </div>
               <div
-                className="text-[10.5px] tracking-[0.04em]"
-                style={{ color: aiTrading.enabled ? BRAND : TXT_65 }}
+                className="text-[10.5px] font-bold tracking-[0.04em]"
+                style={{ color: BG_0 }}
               >
                 {aiArming
                   ? "INITIALIZING AI EXECUTION SYSTEM…"
                   : aiTrading.enabled
                   ? "AI EXECUTION ARMED · MANAGING POSITIONS"
-                  : "TAP TO ARM AI EXECUTION"}
+                  : "TAP TO ACTIVATE AI EXECUTION"}
               </div>
               {/* INSTITUTIONAL FRAMING — authorization context, not feature
-               *  toggle. Hairline divider above the control strip so the
-               *  copy reads as a contract the operator is signing. */}
+               *  toggle. Rendered in deep-black-on-neon for legibility
+               *  against the bright gradient. */}
               <div
-                className="text-[8.5px] tracking-[0.22em]"
-                style={{
-                  color: aiTrading.enabled ? "rgba(255,255,255,0.55)" : TXT_40,
-                }}
+                className="text-[8.5px] font-bold tracking-[0.22em]"
+                style={{ color: "rgba(0,0,0,0.65)" }}
               >
                 {aiTrading.enabled
                   ? "INSTITUTIONAL EXECUTION ENGINE · LIVE CAPITAL ROUTED"
@@ -2222,30 +2212,12 @@ function TerminalInner() {
               {/* CONTROL STRIP — values illuminate (brand color + faint glow)
                *  when ARMED to communicate the live risk profile is now
                *  active, not idle config. */}
-              <div className="flex items-center gap-3 text-[8.5px] tracking-[0.18em]" style={{ color: TXT_40 }}>
-                <span>MAX POSITIONS <span
-                  className="font-bold tabular-nums"
-                  style={{
-                    color: aiTrading.enabled ? BRAND : TXT_85,
-                    textShadow: aiTrading.enabled ? `0 0 6px ${BRAND}66` : "none",
-                  }}
-                >{aiMaxTrades || "—"}</span></span>
-                <span style={{ color: TXT_25 }}>·</span>
-                <span>RISK PROFILE <span
-                  className="font-bold"
-                  style={{
-                    color: aiTrading.enabled ? BRAND : TXT_85,
-                    textShadow: aiTrading.enabled ? `0 0 6px ${BRAND}66` : "none",
-                  }}
-                >{aiTrading.plan === "pro" ? "AGGRESSIVE" : aiTrading.plan === "starter" ? "BALANCED" : "CONSERVATIVE"}</span></span>
-                <span style={{ color: TXT_25 }}>·</span>
-                <span>AI CONTROL <span
-                  className="font-bold"
-                  style={{
-                    color: aiTrading.enabled ? BRAND : TXT_85,
-                    textShadow: aiTrading.enabled ? `0 0 6px ${BRAND}66` : "none",
-                  }}
-                >{aiTrading.plan === "pro" ? "HIGH" : aiTrading.plan === "starter" ? "STANDARD" : "OBSERVE"}</span></span>
+              <div className="flex items-center gap-3 text-[8.5px] font-bold tracking-[0.18em]" style={{ color: "rgba(0,0,0,0.55)" }}>
+                <span>MAX POSITIONS <span className="tabular-nums" style={{ color: BG_0 }}>{aiMaxTrades || "—"}</span></span>
+                <span style={{ color: "rgba(0,0,0,0.35)" }}>·</span>
+                <span>RISK <span style={{ color: BG_0 }}>{aiTrading.plan === "pro" ? "AGGRESSIVE" : aiTrading.plan === "starter" ? "BALANCED" : "CONSERVATIVE"}</span></span>
+                <span style={{ color: "rgba(0,0,0,0.35)" }}>·</span>
+                <span>AI <span style={{ color: BG_0 }}>{aiTrading.plan === "pro" ? "HIGH" : aiTrading.plan === "starter" ? "STANDARD" : "OBSERVE"}</span></span>
               </div>
               {aiUpgradeFlash && (
                 <div
