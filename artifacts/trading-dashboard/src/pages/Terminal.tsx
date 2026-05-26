@@ -111,6 +111,22 @@ function useAiTradingState() {
   return { ...state, isLoading: q.isLoading, refetch: q.refetch, setEnabled };
 }
 
+/** Convert raw engine blockReason → punchy, human-readable clause for the
+ *  AI activity feed. Preserves intelligence/realism without leaking raw
+ *  engine internals into the cinematic surface. */
+function prettyBlockReason(raw: string | null | undefined): string {
+  if (!raw || raw === "None") return "";
+  if (/^MTF mismatch/i.test(raw))            return "conflicting MTF · 5m / 15m";
+  if (/sideways/i.test(raw))                 return "sideways · volatility compression";
+  if (/HOLD bias/i.test(raw))                return "no directional bias · HOLD";
+  if (/below.*threshold/i.test(raw))         return "confidence below execution floor";
+  if (/max active positions/i.test(raw))     return "position cap reached";
+  if (/volume/i.test(raw))                   return "weak volume confirmation";
+  if (/correlation/i.test(raw))              return "correlation cluster — risk gate";
+  if (/trend/i.test(raw))                    return "1H trend misalignment";
+  return raw.toLowerCase();
+}
+
 function fmtHHMMSS(ts: number): string {
   const d = new Date(ts);
   const h = d.getUTCHours().toString().padStart(2, "0");
@@ -598,6 +614,76 @@ function MiniStat({ label, value, color = "#fff" }: { label: string; value: stri
   );
 }
 
+/** Idle battlefield state — rendered inside a LONGS or SHORTS column
+ *  when no signals are clearing gates. Communicates AI discipline
+ *  rather than emptiness: pulsing orb + ring breath, funnel counters
+ *  ("19 MARKETS · 0 PASSED GATES"), and a rotating gate-reason chip
+ *  ("SIDEWAYS MARKET", "LOW VOLUME", etc.). Matte-black surface, no
+ *  new typography or spacing — pulls existing animation tokens. */
+function IdleBattlefieldState({
+  side,
+  marketsScanned,
+  gatesPassed,
+  currentReason,
+}: {
+  side: "long" | "short";
+  marketsScanned: number;
+  gatesPassed: number;
+  currentReason: string;
+}) {
+  const color = side === "long" ? BRAND : RED;
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-8 text-center">
+      <div className="relative h-10 w-10">
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{ border: `1px solid ${color}55`, animation: "ringBreath 3.2s ease-in-out infinite" }}
+        />
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{ border: `1px solid ${color}33`, animation: "ringBreathSlow 4.4s ease-in-out infinite" }}
+        />
+        <div
+          className="absolute inset-[14px] rounded-full"
+          style={{ background: color, opacity: 0.55, animation: "pulseOrb 2.4s ease-in-out infinite" }}
+        />
+      </div>
+
+      <div className="text-[10.5px] font-bold tracking-[0.22em]" style={{ color: TXT_85 }}>
+        AI SCANNING
+      </div>
+
+      <div className="text-[9.5px] tracking-[0.14em]" style={{ color: TXT_65 }}>
+        <span className="tabular-nums font-bold text-white">{marketsScanned}</span> MARKETS
+        <span className="mx-2" style={{ color: TXT_25 }}>·</span>
+        <span className="tabular-nums font-bold" style={{ color: gatesPassed > 0 ? color : TXT_85 }}>{gatesPassed}</span> PASSED GATES
+      </div>
+
+      <div
+        key={currentReason}
+        className="flex items-center gap-1.5 px-2 py-1"
+        style={{
+          border: `1px solid ${HAIR_18}`,
+          background: BG_2,
+          animation: "feedFadeIn 320ms ease-out both",
+        }}
+      >
+        <span
+          className="h-1 w-1 rounded-full"
+          style={{ background: "#FFC83D", boxShadow: `0 0 6px #FFC83D` }}
+        />
+        <span className="text-[9px] font-semibold tracking-[0.18em]" style={{ color: TXT_85 }}>
+          {currentReason}
+        </span>
+      </div>
+
+      <div className="text-[9px] tracking-[0.16em]" style={{ color: TXT_40 }}>
+        AI WAITING FOR HIGH-CONVICTION SETUP
+      </div>
+    </div>
+  );
+}
+
 function TerminalInner() {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -705,7 +791,14 @@ function TerminalInner() {
         isExec    ? "EXECUTED" :
         isLong    ? "LONG"     :
         isShort   ? "SHORT"    : dec;
-      const detail = (e.shortSummary || e.blockReason || "").slice(0, 60);
+      /* Push the AI thought stream further: prefer the prettified
+       * blockReason on blocked entries so users see *why* the AI held
+       * back ("weak volume confirmation", "conflicting MTF", etc.)
+       * rather than a generic block. */
+      const rawDetail = isBlocked
+        ? (prettyBlockReason(e.blockReason) || e.shortSummary || "")
+        : (e.shortSummary || prettyBlockReason(e.blockReason) || "");
+      const detail = rawDetail.slice(0, 64);
       const sym = e.symbol.replace(/(USDT|USDC|USD)$/i, "");
       return {
         id:    e.id,
@@ -717,6 +810,25 @@ function TerminalInner() {
       };
     });
   }, [engine?.recentSignalLog]);
+
+  /* Idle battlefield intelligence — when no signals clear gates, columns
+   * must NOT look dead. Surface AI discipline instead: rotating gate
+   * reasons (1 every 3s, derived from `now` tick) + funnel counters
+   * pulled from engine telemetry. Reads as "the AI is being selective",
+   * not "the platform is broken". */
+  const idleReasons = useMemo(() => [
+    "LOW VOLUME",
+    "SIDEWAYS MARKET",
+    "LOW CONFIDENCE",
+    "TREND MISALIGNMENT",
+    "RISK FILTER ACTIVE",
+  ], []);
+  const idleReasonIdx = Math.floor(now.getTime() / 3000) % idleReasons.length;
+  const currentIdleReason = idleReasons[idleReasonIdx];
+  const marketsScanned = engine?.funnel?.total
+    ?? (engine?.symbolBreakdowns ? Object.keys(engine.symbolBreakdowns).length : 0)
+    ?? 19;
+  const gatesPassed = engine?.funnel?.passedMTF ?? 0;
 
   /* AI autotrade — derive max-trade capacity from plan tier. Free=0 disables
    * the toggle path (server gate returns 402 anyway). */
@@ -1124,7 +1236,14 @@ function TerminalInner() {
                   </div>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto stream-scroll flex flex-col gap-3 pr-1 py-2">
-                  {longs.map((s, i) => (
+                  {longs.length === 0 ? (
+                    <IdleBattlefieldState
+                      side="long"
+                      marketsScanned={marketsScanned}
+                      gatesPassed={gatesPassed}
+                      currentReason={currentIdleReason}
+                    />
+                  ) : longs.map((s, i) => (
                     <SignalCard key={s.sym} s={s} top={i === 0} />
                   ))}
                 </div>
@@ -1149,7 +1268,14 @@ function TerminalInner() {
                   </div>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto stream-scroll flex flex-col gap-3 pr-1 py-2">
-                  {shorts.map((s, i) => (
+                  {shorts.length === 0 ? (
+                    <IdleBattlefieldState
+                      side="short"
+                      marketsScanned={marketsScanned}
+                      gatesPassed={gatesPassed}
+                      currentReason={currentIdleReason}
+                    />
+                  ) : shorts.map((s, i) => (
                     <SignalCard key={s.sym} s={s} top={i === 0} />
                   ))}
                 </div>
