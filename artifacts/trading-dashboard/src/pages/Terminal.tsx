@@ -2198,26 +2198,11 @@ function TerminalInner() {
                   ? "AI EXECUTION ARMED · MANAGING POSITIONS"
                   : "TAP TO ACTIVATE AI EXECUTION"}
               </div>
-              {/* INSTITUTIONAL FRAMING — authorization context, not feature
-               *  toggle. Rendered in deep-black-on-neon for legibility
-               *  against the bright gradient. */}
-              <div
-                className="text-[8.5px] font-bold tracking-[0.22em]"
-                style={{ color: "rgba(0,0,0,0.65)" }}
-              >
-                {aiTrading.enabled
-                  ? "INSTITUTIONAL EXECUTION ENGINE · LIVE CAPITAL ROUTED"
-                  : "AUTHORIZE INSTITUTIONAL EXECUTION ENGINE"}
-              </div>
-              {/* CONTROL STRIP — values illuminate (brand color + faint glow)
-               *  when ARMED to communicate the live risk profile is now
-               *  active, not idle config. */}
-              <div className="flex items-center gap-3 text-[8.5px] font-bold tracking-[0.18em]" style={{ color: "rgba(0,0,0,0.55)" }}>
+              {/* CONTROL STRIP — single value (concurrent position cap)
+               *  in deep-black-on-neon for legibility against the
+               *  bright gradient. RISK/AI labels removed per spec. */}
+              <div className="flex items-center gap-2 text-[8.5px] font-bold tracking-[0.18em]" style={{ color: "rgba(0,0,0,0.55)" }}>
                 <span>MAX POSITIONS <span className="tabular-nums" style={{ color: BG_0 }}>{aiMaxTrades || "—"}</span></span>
-                <span style={{ color: "rgba(0,0,0,0.35)" }}>·</span>
-                <span>RISK <span style={{ color: BG_0 }}>{aiTrading.plan === "pro" ? "AGGRESSIVE" : aiTrading.plan === "starter" ? "BALANCED" : "CONSERVATIVE"}</span></span>
-                <span style={{ color: "rgba(0,0,0,0.35)" }}>·</span>
-                <span>AI <span style={{ color: BG_0 }}>{aiTrading.plan === "pro" ? "HIGH" : aiTrading.plan === "starter" ? "STANDARD" : "OBSERVE"}</span></span>
               </div>
               {aiUpgradeFlash && (
                 <div
