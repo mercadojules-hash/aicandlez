@@ -707,7 +707,21 @@ router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<voi
     res.json(payload);
   } catch (err) {
     req.log.error({ err, userId }, "GET /admin/users/:id failed");
-    res.status(500).json({ error: "Failed to load user detail" });
+    // Operator-only route (requireOperator gate above), so it is safe to
+    // surface the underlying error to the response. Render's hosted logs
+    // are not reachable from the agent dev loop; passing the message
+    // back in the body is how the operator captures the actual cause
+    // from their browser DevTools Network tab.
+    const e          = err as { message?: unknown; code?: unknown; name?: unknown; stack?: unknown; constructor?: { name?: string } };
+    const message    = typeof e?.message === "string" ? e.message : String(err);
+    const code       = typeof e?.code    === "string" ? e.code    : undefined;
+    const name       = typeof e?.name    === "string" ? e.name    : e?.constructor?.name;
+    const stackLine0 = typeof e?.stack   === "string" ? e.stack.split("\n").slice(0, 6).join("\n") : undefined;
+    res.status(500).json({
+      error:    "Failed to load user detail",
+      errorDetail: { message, code, name, stack: stackLine0 },
+      userId,
+    });
   }
 });
 
