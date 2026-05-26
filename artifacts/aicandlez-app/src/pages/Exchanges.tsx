@@ -183,7 +183,23 @@ function ConnectModal({
     onError:   (e: unknown) => setErr(e instanceof Error
       ? e.message : "Connection failed. Check your credentials and try again."),
   });
-  const submitConnect = () => disclaimerGate(() => mut.mutate());
+  // Coinbase pre-flight — see PortalExchangeConnectModal for full rationale.
+  // Only validates when the key shape unambiguously indicates a modern CDP
+  // key (`organizations/...`). Legacy HMAC keys are left to the server.
+  const submitConnect = () => {
+    if (ex.id === "Coinbase" && form.apiKey.trim().startsWith("organizations/")) {
+      const s = form.apiSecret.trim();
+      if (s.startsWith("organizations/")) {
+        setErr("It looks like you pasted the API Key Name into the Private Key field. Open the JSON file Coinbase gave you — copy the 'privateKey' value (starts with '-----BEGIN') into the Private Key field below.");
+        return;
+      }
+      if (!s.includes("-----BEGIN") || !s.includes("PRIVATE KEY")) {
+        setErr("Coinbase CDP Private Key must be the full PEM block from your JSON file (starts with '-----BEGIN EC PRIVATE KEY-----' or '-----BEGIN PRIVATE KEY-----'). Open the JSON file Coinbase emailed you and copy the entire 'privateKey' value, including the BEGIN/END lines.");
+        return;
+      }
+    }
+    disclaimerGate(() => mut.mutate());
+  };
 
   const Field = (
     label:    string,
@@ -270,8 +286,43 @@ function ConnectModal({
         )}
 
         {Field("Label (Optional)", "label", ex.name)}
-        {Field("API Key",          "apiKey",    "Paste your API key",    true, "key"   )}
-        {Field("API Secret",       "apiSecret", "Paste your API secret", true, "secret")}
+
+        {/* Coinbase CDP credential guidance — see PortalExchangeConnectModal
+            for full rationale. Eliminates the "pasted key name into both
+            fields" support trap on the PWA. */}
+        {ex.id === "Coinbase" && (
+          <div style={{
+            padding: "10px 12px", marginBottom: 14,
+            background: "rgba(102,255,102,0.05)",
+            border: "1px solid rgba(102,255,102,0.20)",
+            borderRadius: 8,
+            fontSize: 10.5, fontFamily: SANS, color: "rgba(255,255,255,0.86)",
+            lineHeight: 1.55,
+          }}>
+            <div style={{
+              fontFamily: MONO, fontSize: 9, fontWeight: 800,
+              letterSpacing: "0.14em", color: "#66FF66", marginBottom: 6,
+            }}>
+              COINBASE CDP KEY FORMAT
+            </div>
+            Using a new Coinbase CDP key? Coinbase downloads a
+            <b> JSON file</b> with two fields:
+            <div style={{ marginTop: 6, paddingLeft: 8, color: GR }}>
+              • <b style={{ color: W }}>name</b> → paste into <b style={{ color: "#66FF66" }}>API Key Name</b> (starts with <code style={{ fontFamily: MONO }}>organizations/</code>)<br/>
+              • <b style={{ color: W }}>privateKey</b> → paste into <b style={{ color: "#66FF66" }}>Private Key</b> (starts with <code style={{ fontFamily: MONO }}>-----BEGIN</code>)
+            </div>
+            <div style={{ marginTop: 6, fontSize: 9.5, color: "rgba(136,146,164,0.65)", fontStyle: "italic" }}>
+              Legacy HMAC keys (short base64 secret) are also accepted.
+            </div>
+          </div>
+        )}
+
+        {ex.id === "Coinbase"
+          ? Field("API Key Name", "apiKey", "organizations/.../apiKeys/...", true, "key")
+          : Field("API Key",      "apiKey", "Paste your API key",            true, "key")}
+        {ex.id === "Coinbase"
+          ? Field("Private Key", "apiSecret", "-----BEGIN EC PRIVATE KEY-----...", true, "secret")
+          : Field("API Secret",  "apiSecret", "Paste your API secret",             true, "secret")}
         {ex.needsPassphrase && Field("Passphrase", "passphrase", "API passphrase")}
 
         {/* Demo-trading toggle (Bitget today). Routes signed calls to the

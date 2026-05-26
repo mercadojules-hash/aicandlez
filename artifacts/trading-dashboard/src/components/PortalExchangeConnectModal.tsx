@@ -372,6 +372,25 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
   const submitConnect = async () => {
     setSubmitting(true);
     setError(null);
+    // Coinbase pre-flight: only validate when the key looks like a modern
+    // CDP key (starts with `organizations/`). The backend adapter also
+    // supports legacy HMAC and UUID/base64 secrets, so we must NOT block
+    // those formats. The trap we're catching: users paste the CDP `name`
+    // string into BOTH fields, causing OpenSSL `DECODER routines::unsupported`
+    // on the server. Only fire when key shape unambiguously indicates CDP.
+    if (picked.id === "Coinbase" && apiKey.trim().startsWith("organizations/")) {
+      const s = apiSecret.trim();
+      if (s.startsWith("organizations/")) {
+        setError("It looks like you pasted the API Key Name into the Private Key field. Open the JSON file Coinbase gave you — copy the 'privateKey' value (starts with '-----BEGIN') into the Private Key field below.");
+        setSubmitting(false);
+        return;
+      }
+      if (!s.includes("-----BEGIN") || !s.includes("PRIVATE KEY")) {
+        setError("Coinbase CDP Private Key must be the full PEM block from your JSON file (starts with '-----BEGIN EC PRIVATE KEY-----' or '-----BEGIN PRIVATE KEY-----'). Open the JSON file Coinbase emailed you and copy the entire 'privateKey' value, including the BEGIN/END lines.");
+        setSubmitting(false);
+        return;
+      }
+    }
     try {
       const token = await getToken().catch(() => null);
       const r = await authFetch("/api/user/exchanges/connect", {
@@ -807,13 +826,47 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
             <Field label="LABEL (OPTIONAL)" value={label}
                    onChange={setLabel} placeholder={`My ${picked.name}`}
                    disabled={submitting} />
+
+            {/* Coinbase-specific guidance — Coinbase's CDP credential format
+                differs from every other exchange and the field names are
+                confusing. Showing this banner BEFORE the inputs eliminates
+                the "pasted key name into both fields" support trap. */}
+            {picked.id === "Coinbase" && (
+              <div style={{
+                padding: "10px 12px", marginBottom: 12,
+                background: "rgba(102,255,102,0.05)",
+                border: `1px solid ${N.BRAND}33`,
+                borderRadius: 8,
+                fontSize: 10.5, fontFamily: N.FONT_SANS, color: N.TEXT_0,
+                lineHeight: 1.55,
+              }}>
+                <div style={{
+                  fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 800,
+                  letterSpacing: "0.16em", color: N.BRAND, marginBottom: 6,
+                }}>
+                  ◆ COINBASE CDP KEY FORMAT
+                </div>
+                Using a new Coinbase CDP key? Coinbase downloads a
+                <b> JSON file</b> with two fields:
+                <div style={{ marginTop: 6, paddingLeft: 8, color: N.TEXT_1 }}>
+                  • <b style={{ color: N.TEXT_0 }}>name</b> → paste into <b style={{ color: N.BRAND }}>API KEY NAME</b> below (starts with <code style={{ fontFamily: N.FONT_MONO }}>organizations/</code>)<br/>
+                  • <b style={{ color: N.TEXT_0 }}>privateKey</b> → paste into <b style={{ color: N.BRAND }}>PRIVATE KEY</b> below (starts with <code style={{ fontFamily: N.FONT_MONO }}>-----BEGIN</code>)
+                </div>
+                <div style={{ marginTop: 6, fontSize: 9.5, color: N.TEXT_2, fontStyle: "italic" }}>
+                  Legacy HMAC keys (short base64 secret) are also accepted.
+                </div>
+              </div>
+            )}
+
             {/* API Key */}
-            <Field label="API KEY" value={apiKey}
-                   onChange={setApiKey} placeholder="Paste API key"
+            <Field label={picked.id === "Coinbase" ? "API KEY NAME" : "API KEY"} value={apiKey}
+                   onChange={setApiKey}
+                   placeholder={picked.id === "Coinbase" ? "organizations/.../apiKeys/..." : "Paste API key"}
                    monospace required disabled={submitting} />
             {/* API Secret */}
-            <Field label="API SECRET" value={apiSecret}
-                   onChange={setApiSecret} placeholder="Paste API secret"
+            <Field label={picked.id === "Coinbase" ? "PRIVATE KEY" : "API SECRET"} value={apiSecret}
+                   onChange={setApiSecret}
+                   placeholder={picked.id === "Coinbase" ? "-----BEGIN EC PRIVATE KEY-----..." : "Paste API secret"}
                    monospace required masked disabled={submitting} />
             {/* Passphrase */}
             {picked.needsPassphrase && (
