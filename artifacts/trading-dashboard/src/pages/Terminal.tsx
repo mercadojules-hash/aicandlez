@@ -1798,8 +1798,19 @@ function TerminalInner() {
             ))}
           </div>
 
-          {/* AI HUNTING */}
-          <div className="relative flex flex-col justify-center gap-2.5 px-6" style={{ borderRight: `1px solid ${HAIR_10}` }}>
+          {/* AI HUNTING — right edge uses a brand-tinted gradient
+           *  hairline (fades top/bottom) instead of a flat divider so
+           *  the seam between AI HUNTING and MARKET PULSE reads as
+           *  precision instrumentation, not a CSS box border. */}
+          <div
+            className="relative flex flex-col justify-center gap-2.5 px-6"
+            style={{
+              backgroundImage:    "linear-gradient(180deg, transparent 0%, rgba(102,255,102,0.22) 50%, transparent 100%)",
+              backgroundPosition: "right center",
+              backgroundSize:     "1px 70%",
+              backgroundRepeat:   "no-repeat",
+            }}
+          >
             <div className="flex items-center gap-3">
               <span className="relative inline-block h-3 w-3">
                 <span
@@ -1845,9 +1856,33 @@ function TerminalInner() {
               <div className="text-[32px] font-bold leading-none" style={{ color: BRAND, letterSpacing: "-0.05em", textShadow: `0 0 18px ${BRAND}66` }}>
                 BULL
               </div>
+              {/* Vertical brand-tinted strikeline between regime and
+               *  conviction score — fades top/bottom, mirrors the
+               *  AI-HUNTING column seam. */}
+              <span
+                aria-hidden
+                className="self-stretch"
+                style={{
+                  width: 1,
+                  marginBottom: 4,
+                  background: "linear-gradient(180deg, transparent 0%, rgba(102,255,102,0.55) 50%, transparent 100%)",
+                  boxShadow:  "0 0 6px rgba(102,255,102,0.35)",
+                }}
+              />
               <div className="text-[28px] font-bold leading-none text-white tabular-nums" style={{ letterSpacing: "-0.04em" }}>
-                · 73
+                73
               </div>
+              {/* Second strikeline before the CONVICTION label so the
+               *  three elements read as a calibrated readout. */}
+              <span
+                aria-hidden
+                className="self-stretch"
+                style={{
+                  width: 1,
+                  marginBottom: 4,
+                  background: "linear-gradient(180deg, transparent 0%, rgba(102,255,102,0.30) 50%, transparent 100%)",
+                }}
+              />
               <div className="pb-1 text-[10px] font-semibold tracking-[0.20em]" style={{ color: TXT_65 }}>CONVICTION</div>
             </div>
             <div className="relative h-[42px] w-full overflow-hidden">
