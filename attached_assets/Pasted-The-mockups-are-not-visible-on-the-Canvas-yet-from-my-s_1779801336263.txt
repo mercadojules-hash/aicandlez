@@ -1,0 +1,131 @@
+The mockups are not visible on the Canvas yet from my side.
+
+Next step:
+I need both dashboard mockups fully exposed and accessible inside Canvas/Preview so I can visually review and approve them before any integration work begins.
+
+====================================================
+WHAT I NEED NEXT
+================
+
+Please make BOTH mockups fully viewable:
+
+1. OPERATOR DASHBOARD MOCKUP
+2. USER DASHBOARD MOCKUP
+
+inside:
+
+* Canvas
+* iframe preview cards
+* or isolated preview routes
+
+I need clickable/viewable live mockups — not just the implementation summary.
+
+====================================================
+VERY IMPORTANT
+==============
+
+The previews must show:
+
+* full dashboard width
+* real spacing
+* real glow hierarchy
+* signal density
+* confidence rings
+* long/short separation
+* right-side telemetry panels
+* top KPI bar
+* typography hierarchy
+* activity center
+* chart strips
+* bottom bars
+
+I need to FEEL the dashboard experience visually before approval.
+
+====================================================
+OPERATOR DASHBOARD REQUIREMENTS
+===============================
+
+Operator mockup should visibly include:
+
+* left institutional sidebar
+* AI Engine Status block
+* top telemetry bar
+* 15 LONGS / 15 SHORTS crypto layout
+* right-side operator rail
+* risk heatmap
+* exchange topology
+* AI executor bottom bar
+* cinematic operator atmosphere
+
+This should feel like:
+
+* an AI hedge-fund war room
+* elite execution terminal
+* high-stakes operator console
+
+====================================================
+USER DASHBOARD REQUIREMENTS
+===========================
+
+User mockup should visibly include:
+
+* NO left sidebar
+* cleaner institutional layout
+* same premium signal cards
+* same confidence-ring styling
+* USER ACTIVITY CENTER on the right
+* account equity
+* daily pnl
+* win rate
+* recent executions
+* open trades
+* exchange connected state
+* upgrade CTA
+* live telemetry feeling
+
+This should feel:
+
+* premium
+* intelligent
+* alive
+* trustworthy
+* AI-managed
+
+====================================================
+IMPORTANT DESIGN NOTES
+======================
+
+Keep:
+
+* matte black backgrounds
+* neon green/red glow hierarchy
+* thin institutional borders
+* long sparkline strips
+* confidence rings
+* cinematic telemetry
+* premium spacing
+* operator-grade typography
+
+Avoid:
+
+* oversized SaaS UI
+* generic admin styling
+* retail crypto aesthetic
+* crowded spacing
+* flat telemetry
+
+====================================================
+NEXT PHASE AFTER APPROVAL
+=========================
+
+Once I visually approve both mockups:
+
+* User Dashboard graduates to /terminal
+* Operator Dashboard graduates to /operator
+
+while:
+
+* /portal
+* /command
+
+remain intact temporarily for rollback safety.
