@@ -3711,12 +3711,12 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
               color: "#fff", fontSize: 14, fontWeight: 800,
               letterSpacing: T.TRACK_TITLE, textShadow: "0 0 8px rgba(255,48,64,0.27)",
             }}>
-              CLICK HERE TO ENABLE AI TRADING
+              TAP TO ACTIVATE AI TRADING
             </span>
             <span style={{
               color: "rgba(255,210,210,0.85)", fontSize: 10, letterSpacing: T.TRACK_LABEL, marginTop: 2,
             }}>
-              {engineLabel}  ·  AI WILL NOT TRADE FOR YOU UNTIL YOU TURN IT ON
+              {engineLabel}  ·  AI STANDS DOWN UNTIL YOU AUTHORIZE
             </span>
           </div>
           <div style={{
@@ -3727,7 +3727,7 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
             background: T.RED,
             boxShadow: "0 0 14px rgba(255,48,64,0.33)",
           }}>
-            ENABLE AI →
+            ACTIVATE →
           </div>
         </div>
       </button>
@@ -3782,12 +3782,12 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
             color: "#fff", fontSize: 14, fontWeight: 800,
             letterSpacing: T.TRACK_TITLE, textShadow: "0 0 8px rgba(102,255,102,0.27)",
           }}>
-            AI TRADING ACTIVE
+            AI EXECUTION ARMED · MANAGING POSITIONS
           </span>
           <span style={{
             color: "rgba(214,255,214,0.92)", fontSize: 10, letterSpacing: T.TRACK_LABEL, marginTop: 2,
           }}>
-            AI CURRENTLY TRADING FOR YOU  ·  SLOTS {openPaper}/{slotCap}
+            MAX POSITIONS {slotCap}  ·  {openPaper} OPEN
           </span>
         </div>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
@@ -3921,13 +3921,24 @@ export function PortalCustomerShell() {
       if (a.executionEligible !== b.executionEligible) return a.executionEligible ? -1 : 1;
       return b.convictionScore - a.convictionScore;
     });
+  // QUALITY FLOOR — institutional surface; customers should never see
+  // a column packed with 30s/40s "filler" conviction. Tier ladder bumped:
+  //   tier1: executionEligible OR conviction ≥ 60 (was 25)
+  //   tier2: executionEligible OR conviction ≥ 45 (was 10)
+  // Final fallback intentionally floors at ≥ 25 instead of the old
+  // unconditional `ranked.slice` — when the engine truly has nothing
+  // strong, the column shows fewer cards rather than padding with
+  // weak signals (the IdleScanningPanel + AI Market Scanner already
+  // communicate "system surveilling" so an under-filled column reads
+  // as honest confidence, not a UI gap).
   const fillColumn = (pool: OpportunityVM[], targetMin: number, maxCap: number): OpportunityVM[] => {
     const ranked = rankForColumn(pool);
-    const tier1 = ranked.filter(o => o.executionEligible || o.convictionScore >= 25);
+    const tier1  = ranked.filter(o => o.executionEligible || o.convictionScore >= 60);
     if (tier1.length >= targetMin) return tier1.slice(0, maxCap);
-    const tier2 = ranked.filter(o => o.executionEligible || o.convictionScore >= 10);
+    const tier2  = ranked.filter(o => o.executionEligible || o.convictionScore >= 45);
     if (tier2.length >= targetMin) return tier2.slice(0, maxCap);
-    return ranked.slice(0, Math.min(maxCap, Math.max(targetMin, tier2.length)));
+    const tier3  = ranked.filter(o => o.executionEligible || o.convictionScore >= 25);
+    return tier3.slice(0, maxCap);
   };
 
   const filteredMajors = useMemo(
