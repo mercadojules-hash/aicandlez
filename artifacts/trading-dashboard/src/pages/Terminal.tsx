@@ -742,8 +742,19 @@ function TerminalInner() {
     return { longs, shorts };
   }, [majors, alts]);
 
-  const longs  = isBootstrap ? FALLBACK_LONGS  : liveSignals.longs;
-  const shorts = isBootstrap ? FALLBACK_SHORTS : liveSignals.shorts;
+  /* HYDRATION REALISM — do NOT render FALLBACK_LONGS/SHORTS during
+   * bootstrap. Rendering the demo set as real cards and then collapsing
+   * to the live filtered set (~1-2 signals) feels like the AI is hiding
+   * data, flickering, or filtering after the fact. Instead, render []
+   * during bootstrap so the existing IdleBattlefieldState (AI SCANNING)
+   * covers the hydration window. The arrival sweep + top-card ignition
+   * then fire naturally on the first real signal landing — reads as
+   * "the AI just found something significant", not as a UI collapse.
+   * Scarcity stays intact; the battlefield never exposes raw unfiltered
+   * data. (FALLBACK_LONGS/SHORTS constants retained — useful for
+   * mockups / Storybook previews; just not for live render.) */
+  const longs  = isBootstrap ? [] : liveSignals.longs;
+  const shorts = isBootstrap ? [] : liveSignals.shorts;
 
   /* ── Signal arrival ignition (one-shot emotional impact) ─────────────────
    * Scarcity is now the platform's strength — when a signal *does* clear
