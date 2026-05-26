@@ -1,0 +1,114 @@
+Now that admin persistence/hydration is fixed, we need to resume the original AI confidence investigation.
+
+I need a full end-to-end audit of how `minConfidence` actually propagates through the platform.
+
+Trace the complete lifecycle for a user with:
+
+```ts
+minConfidence = 85
+```
+
+Need definitive answers for ALL of these layers:
+
+1. Admin Settings Persistence
+
+* Confirm the saved DB row is:
+  user_settings.min_confidence = 85
+* Confirm hydration returns 85 consistently after reopen/reload.
+
+2. Signal Generation Layer
+
+* Where is confidence initially calculated?
+* Exact formula/components:
+  RSI
+  EMA
+  MACD
+  trend alignment
+  volatility
+  volume
+  regime
+  MTF agreement
+  etc.
+* What is the exact confidence range normalization logic (0–100)?
+
+3. Opportunity Feed Layer
+
+* Are low-confidence signals still emitted to the UI feed?
+* Is minConfidence filtering applied:
+
+  * before feed emission
+  * after feed emission
+  * or only visually client-side?
+
+4. Notification Layer
+
+* Do sound alerts / toast alerts ignore minConfidence?
+* Can users receive alerts for signals below their threshold?
+
+5. Execution Layer (MOST IMPORTANT)
+
+* Where is minConfidence enforced for:
+
+  * auto trading
+  * fan-out execution
+  * manual AI-assisted execution
+* Need exact execution gate path.
+* Need proof that:
+
+```ts
+signal.confidence < user.minConfidence
+```
+
+hard-blocks execution.
+
+6. Exchange Execution Path
+
+* Confirm the confidence gate occurs BEFORE:
+
+  * order construction
+  * exchange adapter routing
+  * risk sizing
+  * live execution.
+
+7. Customer vs Admin Behavior
+
+* Confirm admin/operator bypass behavior if any.
+* Confirm customer accounts cannot accidentally bypass confidence gating.
+
+8. Telemetry / Logging
+   Add temporary logs:
+
+```ts
+[CONFIDENCE_GATE]
+{
+  signalConfidence,
+  userMinConfidence,
+  passed,
+  symbol,
+  userId,
+  executionPath
+}
+```
+
+9. Final Validation Scenario
+   Test with:
+
+```ts
+user.minConfidence = 85
+```
+
+Then verify:
+
+* 47 confidence signal → visible or hidden?
+* 47 confidence signal → alert or silent?
+* 47 confidence signal → executable or blocked?
+* 90 confidence signal → allowed?
+* execution logs prove gate behavior.
+
+I do NOT want assumptions.
+Need a true confidence pipeline audit from:
+signal generation
+→ opportunity feed
+→ alerts
+→ execution gating
+→ exchange routing.

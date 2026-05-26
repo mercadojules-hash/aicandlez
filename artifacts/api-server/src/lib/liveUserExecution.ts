@@ -885,6 +885,28 @@ export async function placeLiveAutoOrderForUser(
       // (b) catches users who have tightened their personal threshold
       // above baseline.
       const subUserThreshold = breakdown.avgConfidence < userMinConfidence;
+
+      // ── [CONFIDENCE_GATE] TELEMETRY (temporary — confidence-pipeline audit)
+      // Emits one structured log per evaluation (pass AND block) so the full
+      // distribution of signalConfidence vs userMinConfidence is observable.
+      // Existing logger.warn below only fires on block; this captures passes
+      // too. Remove once the audit is closed.
+      logger.info(
+        {
+          tag:               "CONFIDENCE_GATE",
+          signalConfidence:  breakdown.avgConfidence,
+          userMinConfidence,
+          passed:            !subUserThreshold && breakdown.executionEligible,
+          symbol,
+          userId,
+          executionPath:     "placeLiveAutoOrderForUser",
+          executionEligible: breakdown.executionEligible,
+          blockReason:       breakdown.executionBlockReason,
+        },
+        "[CONFIDENCE_GATE] eval",
+      );
+
+
       if (!breakdown.executionEligible || subUserThreshold) {
         const reason: string = subUserThreshold && breakdown.executionEligible
           ? "low_confidence"
