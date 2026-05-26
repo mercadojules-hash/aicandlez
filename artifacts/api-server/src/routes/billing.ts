@@ -8,6 +8,7 @@ import { TIER_MAX_SIZE_USD, type TierPlan } from "../lib/tierLimits.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { resolveCustomerAppBaseUrl } from "../lib/customerAppUrl.js";
 import { ensureUserRow } from "../lib/ensureUserRow.js";
+import { isComplimentaryActive } from "../lib/aiTradingGate.js";
 import {
   getUncachableStripeClient,
   getStripePublishableKey,
@@ -233,12 +234,15 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
   try {
     const [user] = await db
       .select({
-        plan:                 usersTable.plan,
-        planStatus:           usersTable.planStatus,
-        stripeCustomerId:     usersTable.stripeCustomerId,
-        stripeSubscriptionId: usersTable.stripeSubscriptionId,
-        trialEndsAt:          usersTable.trialEndsAt,
-        billingEmail:         usersTable.billingEmail,
+        plan:                   usersTable.plan,
+        planStatus:             usersTable.planStatus,
+        stripeCustomerId:       usersTable.stripeCustomerId,
+        stripeSubscriptionId:   usersTable.stripeSubscriptionId,
+        trialEndsAt:            usersTable.trialEndsAt,
+        billingEmail:           usersTable.billingEmail,
+        isComplimentaryAccount: usersTable.isComplimentaryAccount,
+        feeWaiverActive:        usersTable.feeWaiverActive,
+        feeWaiverUntil:         usersTable.feeWaiverUntil,
       })
       .from(usersTable)
       .where(eq(usersTable.clerkUserId, userId))
@@ -259,11 +263,29 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
 
     const planStr    = user.plan       ?? "free";
     const statusStr  = user.planStatus ?? null;
-    const isActive   = planStr === "free" || statusStr === "active" || statusStr === "trialing";
-    const isPaid     = planStr !== "free";
     const isTrialing = statusStr === "trialing";
-    const planLimits = PLAN_FEATURES[planStr]?.limits ?? PLAN_FEATURES["free"]!.limits;
-    const canLiveTrade = planLimits.liveTrading && isActive && isPaid;
+
+    // Complimentary entitlement — operator-granted free access mirrors a paid
+    // subscription. Single source of truth for the rule lives in
+    // `lib/aiTradingGate.ts` so the gate and this endpoint can never drift.
+    // When complimentary is active we project the customer into the `pro`
+    // tier for limits / canLiveTrade / isPaid / isActive purposes; the
+    // underlying `plan` column stays "free" so Stripe state remains
+    // unchanged and downgrading is just a flag flip.
+    const isComplimentary = isComplimentaryActive(user);
+    const effectivePlan: string = isComplimentary && planStr === "free"
+      ? "pro"
+      : planStr;
+    const planLimits = PLAN_FEATURES[effectivePlan]?.limits
+      ?? PLAN_FEATURES["free"]!.limits;
+
+    const isActive = isComplimentary
+      || planStr === "free"
+      || statusStr === "active"
+      || statusStr === "trialing";
+    const isPaid       = isComplimentary || planStr !== "free";
+    const canLiveTrade = isComplimentary
+      || (planLimits.liveTrading && isActive && isPaid);
 
     // Per-trade LIVE order USD cap (mirrors server-side enforcement in
     // routes/userLiveOrder.ts via shared `lib/tierLimits.ts`). Surfacing
@@ -297,12 +319,14 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
       isPaid,
       isTrialing,
       canLiveTrade,
+      isComplimentary,
+      effectivePlan,
       daysUntilTrialEnd,
       liveOrderCapUSD,
       nextTierLiveOrderCapUSD,
       nextTier,
       limits:               planLimits,
-      features:             PLAN_FEATURES[planStr]?.features ?? PLAN_FEATURES["free"]!.features,
+      features:             PLAN_FEATURES[effectivePlan]?.features ?? PLAN_FEATURES["free"]!.features,
     });
   } catch (err) {
     req.log.error({ err }, "GET /billing/subscription failed");

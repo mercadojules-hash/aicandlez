@@ -133,6 +133,8 @@ export interface Subscription {
   isPaid:                boolean;
   isTrialing:            boolean;
   canLiveTrade:          boolean;
+  isComplimentary?:      boolean;
+  effectivePlan?:        string;
   daysUntilTrialEnd:     number | null;
   limits: {
     liveTrading:      boolean;

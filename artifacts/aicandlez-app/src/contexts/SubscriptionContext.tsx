@@ -115,26 +115,40 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   //   • unlimited concurrent trades, live execution enabled
   //   • plan reads as "pro" so any `plan === "pro"` gate (FeatureGate,
   //     UpgradeBanner, etc.) automatically unlocks without special-casing.
+  // Complimentary entitlement — operator-granted free access. Server-side
+  // truth lives in `lib/aiTradingGate.ts::isComplimentaryActive` and is
+  // mirrored into the /billing/subscription payload as `isComplimentary` +
+  // `effectivePlan`. We honor it here exactly like the admin override so
+  // every consumer surface (paywall, upgrade banner, paper-only banner,
+  // limits, canLiveTrade) unlocks without special-casing.
+  const isComplimentary = !isAdmin && data?.isComplimentary === true;
+
   const plan: SubPlan = isAdmin
     ? "pro"
-    : ((data?.plan ?? "free") as SubPlan);
+    : isComplimentary
+      ? ((data?.effectivePlan ?? "pro") as SubPlan)
+      : ((data?.plan ?? "free") as SubPlan);
 
   const planStatus: SubStatus = isAdmin
     ? "active"
-    : ((data?.planStatus ?? null) as SubStatus);
+    : isComplimentary
+      ? "active"
+      : ((data?.planStatus ?? null) as SubStatus);
 
-  const limits = isAdmin
+  const limits = isAdmin || isComplimentary
     ? OPERATOR_LIMITS
     : (data?.limits ?? DEFAULT_LIMITS);
 
-  const isTrialing  = !isAdmin && planStatus === "trialing";
+  const isTrialing  = !isAdmin && !isComplimentary && planStatus === "trialing";
   const isActive    = isAdmin
+    || isComplimentary
     || plan === "free"
     || planStatus === "active"
     || planStatus === "trialing"
     || planStatus === null;
-  const isPaid       = isAdmin || plan !== "free";
+  const isPaid       = isAdmin || isComplimentary || plan !== "free";
   const canLiveTrade = isAdmin
+    || isComplimentary
     || ((limits.liveTrading === true) && isActive && isPaid);
 
   const trialEndsAt = (data as Record<string, unknown> | undefined)?.["trialEndsAt"] as string | null ?? null;
