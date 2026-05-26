@@ -152,6 +152,14 @@ interface EngineStats {
   lastSignal:         { symbol: string; timeframe: string; action: string; confidence: number; price: number; shortSummary: string; mtfConfirmed: boolean } | null;
   lastTrade:          { symbol: string; side: string; sizeUSD: number; price: number; reason: string; mode: string } | null;
   errors:             string[];
+  // CONVICTION_V2 telemetry — rolling ring buffer of the last N
+  // confidence values emitted by `runAIDecision` (per-timeframe raw
+  // confidence, BEFORE MTF averaging). Lets `/api/engine/status` surface
+  // a live distribution (p10/p25/p50/p75/p90 + threshold buckets) so we
+  // can validate the calibration math against real production data.
+  // Ring buffer keeps memory bounded; percentile compute happens on
+  // read at the route (cheap at N=400).
+  confSamples:        number[];
 }
 
 export const engineStats: EngineStats = {
@@ -180,7 +188,50 @@ export const engineStats: EngineStats = {
   lastSignal:         null,
   lastTrade:          null,
   errors:             [],
+  confSamples:        [],
 };
+
+// CONVICTION_V2 — ring buffer cap. 400 ≈ 20–30 min at current symbol
+// rotation, enough resolution for p10–p90 without unbounded growth.
+export const CONF_SAMPLE_CAP = 400;
+
+export function recordConfidenceSample(value: number): void {
+  if (!Number.isFinite(value)) return;
+  engineStats.confSamples.push(value);
+  if (engineStats.confSamples.length > CONF_SAMPLE_CAP) {
+    engineStats.confSamples.shift();
+  }
+}
+
+// Compute distribution on demand. Returns null when sample size is too
+// small for percentile inference (<20). Called by `/api/engine/status`.
+export function computeConfDistribution(): {
+  n:        number;
+  mean:     number;
+  p10: number; p25: number; p50: number; p75: number; p90: number;
+  gte50: number; gte60: number; gte70: number; gte80: number; gte85: number;
+} | null {
+  const xs = engineStats.confSamples;
+  const n  = xs.length;
+  if (n < 20) return null;
+  const sorted = [...xs].sort((a, b) => a - b);
+  const q = (p: number): number => {
+    const idx = Math.min(sorted.length - 1, Math.max(0, Math.floor(p * (sorted.length - 1))));
+    return parseFloat((sorted[idx] ?? 0).toFixed(1));
+  };
+  const mean = parseFloat((xs.reduce((s, v) => s + v, 0) / n).toFixed(1));
+  const pctAtLeast = (t: number): number =>
+    parseFloat(((xs.filter(v => v >= t).length / n) * 100).toFixed(1));
+  return {
+    n, mean,
+    p10: q(0.10), p25: q(0.25), p50: q(0.50), p75: q(0.75), p90: q(0.90),
+    gte50: pctAtLeast(50),
+    gte60: pctAtLeast(60),
+    gte70: pctAtLeast(70),
+    gte80: pctAtLeast(80),
+    gte85: pctAtLeast(85),
+  };
+}
 
 export function setTestMode(enabled: boolean) {
   engineStats.testMode = enabled;
@@ -340,6 +391,11 @@ async function persistSignal(
   engineStats.signalsGenerated++;
   engineStats.funnelTotal++;
   engineStats.lastSignalAt = Date.now();
+  // CONVICTION_V2 telemetry — record every per-TF confidence sample
+  // (pre-MTF averaging). Surfaces as live distribution on
+  // /api/engine/status so we can validate the calibration curve
+  // against real production behaviour.
+  recordConfidenceSample(decision.confidence);
   engineStats.lastSignal = {
     symbol:       decision.symbol,
     timeframe,
@@ -506,7 +562,18 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
 
   const mtfConfirmed  = (bothBuy || bothSell) && trendAligned;
   const agreedAction: "BUY" | "SELL" | "HOLD" = bothBuy ? "BUY" : bothSell ? "SELL" : "HOLD";
-  const avgConfidence = parseFloat(((fast.confidence + slow.confidence) / 2).toFixed(1));
+  // CONVICTION_V2 (2026-05-26): replace symmetric arithmetic mean with a
+  // stronger-TF-weighted blend. Plain `(fast+slow)/2` let a weak TF drag
+  // a confirmed aligned signal under the gate (e.g. 5m=72, 15m=48 → 60,
+  // which evaluates against BASELINE_MIN_CONFIDENCE = 60 as a boundary
+  // miss). The 0.65/0.35 weighting preserves MTF confirmation as a hard
+  // requirement (`mtfConfirmed` above still requires `bothBuy || bothSell`
+  // AND `trendAligned`) while letting the dominant-conviction TF carry
+  // more of the score. The execution floor (LIVE_EXECUTION_MIN_CONFIDENCE
+  // = 80) is unchanged; we are calibrating, not weakening.
+  const hi = Math.max(fast.confidence, slow.confidence);
+  const lo = Math.min(fast.confidence, slow.confidence);
+  const avgConfidence = parseFloat((hi * 0.65 + lo * 0.35).toFixed(1));
 
   // ── Volume confirmation filter ─────────────────────────────────────────────
   let volumeConfirmed = true;

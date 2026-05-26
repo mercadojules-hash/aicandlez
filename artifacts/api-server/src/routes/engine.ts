@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   engineStats,
+  computeConfDistribution,
   startTradingLoop,
   stopTradingLoop,
   getLoopIntervalMs,
@@ -79,6 +80,15 @@ router.get("/engine/status", (_req, res) => {
     // render a DataFeedBanner instead of presenting candle-pipeline
     // outages as ambiguous empty UI state.
     dataFeedHealth:     getDataFeedHealth(),
+    // CONVICTION_V2 — live distribution of per-timeframe signal
+    // confidence (last ≤400 samples, ring-buffered in engineStats).
+    // `null` when sample size is too small to infer percentiles
+    // (<20 samples — usually the first minute after engine start).
+    // Buckets are percentages of samples crossing each threshold:
+    //   gte60 = baseline gate · gte80 = live-execution floor.
+    // Use to validate that the calibrated base curve (aiReasoning.ts)
+    // produces an actually-reachable distribution in production.
+    confDistribution:   computeConfDistribution(),
   });
 });
 
