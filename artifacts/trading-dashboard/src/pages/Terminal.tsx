@@ -1098,34 +1098,79 @@ function TerminalInner() {
     if (mutated) setLifecycleVersion(v => v + 1);
   }, [now, longs, shorts, isBootstrap]);
 
-  /* Display lists — live signals (carrying derived lifecycle) followed
-   * by persisted WEAKENING/INVALIDATED cards (so departures fade
-   * gracefully). Capped at 10/side to preserve scarcity. Live cards
-   * always sort first so TOP SIGNAL stays the highest-conviction live
-   * setup; persisted cards trail in decay order. */
+  /* Display lists — render EVERY tracker entry, not just live ones.
+   *
+   * Earlier version only rendered (a) currently-live signals and
+   * (b) persisted WEAKENING/INVALIDATED cards. That created a
+   * battlefield-starvation bug: when the engine briefly dropped a
+   * signal mid-dwell (transient sideways filter, MTF flicker), the
+   * lifecycle tracker correctly HELD the elevated state for dwell
+   * duration — but `buildDisplay` excluded held-elevated entries,
+   * so the card vanished for 3–8s and only reappeared as
+   * WEAKENING. Battlefield read as empty even while the AI was
+   * holding multiple signals internally.
+   *
+   * Fix: tracker is the source of truth. Render:
+   *   1. Live signals (fresh data — price, conf, sparkline) annotated
+   *      with their tracker state (or derived state if brand new).
+   *   2. Held-past-departure cards (FORMING/CONFIRMED/EXECUTION_READY
+   *      no longer in live set but still within their dwell window)
+   *      using the last-known sig snapshot. Reads as "AI is still
+   *      watching this setup" — the conviction-memory the user
+   *      explicitly asked for.
+   *   3. WEAKENING / INVALIDATED decay cards.
+   *
+   * Sort order is INTENTIONALLY live-first, persisted-second
+   * (not a global rank sort). Reasoning: live signals carry fresh
+   * price + sparkline + conviction every poll; persisted cards
+   * carry a frozen last-known snapshot. Even a held-FORMING live
+   * signal communicates more than a WEAKENING persisted card with
+   * higher peakConf, because the user can watch it move. Within
+   * each group we rank by STATE_RANK then peakConf so the most
+   * actionable card surfaces as TOP SIGNAL. Cap 10/side preserves
+   * scarcity. */
+  const STATE_RANK: Record<LifecycleState, number> = {
+    EXECUTION_READY: 0,
+    CONFIRMED:       1,
+    FORMING:         2,
+    WEAKENING:       3,
+    INVALIDATED:     4,
+    EXECUTED:        5,
+  };
   const buildDisplay = (
     live: Signal[],
     tracker: Map<string, TrackerEntry>,
   ): Signal[] => {
-    const liveSet = new Set(live.map(s => s.sym));
-    const liveWithState: Signal[] = live.map(s => {
+    const liveMap = new Map(live.map(s => [s.sym, s]));
+    const out: Signal[] = [];
+    const seen = new Set<string>();
+
+    // 1. Live signals — fresh data + tracker state if known.
+    for (const s of live) {
       const e = tracker.get(s.sym);
-      return { ...s, lifecycle: e?.state ?? deriveLiveState(s.conf), peakConf: e?.peakConf ?? s.conf };
-    });
+      out.push({
+        ...s,
+        lifecycle: e?.state ?? deriveLiveState(s.conf),
+        peakConf:  e?.peakConf ?? s.conf,
+      });
+      seen.add(s.sym);
+    }
+
+    // 2. Tracker entries not currently live — either held-elevated
+    //    (mid-dwell, awaiting WEAKENING flip) or decaying.
     const persisted: Signal[] = [];
     for (const [sym, e] of tracker.entries()) {
-      if (!liveSet.has(sym) && (e.state === "WEAKENING" || e.state === "INVALIDATED")) {
-        persisted.push(e.sig);
-      }
+      if (seen.has(sym)) continue;
+      if (liveMap.has(sym)) continue;
+      persisted.push(e.sig);
     }
     persisted.sort((a, b) => {
-      // WEAKENING ahead of INVALIDATED; within state, higher peak first
-      const ar = a.lifecycle === "WEAKENING" ? 0 : 1;
-      const br = b.lifecycle === "WEAKENING" ? 0 : 1;
+      const ar = STATE_RANK[a.lifecycle ?? "FORMING"] ?? 99;
+      const br = STATE_RANK[b.lifecycle ?? "FORMING"] ?? 99;
       if (ar !== br) return ar - br;
       return (b.peakConf ?? 0) - (a.peakConf ?? 0);
     });
-    return [...liveWithState, ...persisted].slice(0, 10);
+    return [...out, ...persisted].slice(0, 10);
   };
   /* Recompute when live data changes or tracker mutates. `lifecycleVersion`
    * bumps on every meaningful tracker mutation (promotion to EXECUTION_READY,
