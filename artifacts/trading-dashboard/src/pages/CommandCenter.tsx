@@ -75,7 +75,7 @@ function useOperatorRole(): { isOperator: boolean; isRoleResolved: boolean } {
 import {
   CommandBar, PlatformOverview, OperatorTelemetryGrid, LiveAccountPanel,
   MarketHeartbeat, PositionsRow, LiveControlBar,
-  CryptoSignalsPanel, EquitySignalsPanel,
+  CryptoMajorsSignalsPanel, CryptoAltsMemesPanel,
 } from "@/components/command/institutional";
 import { N } from "@/components/command/institutional/theme";
 import EngineHeartbeat from "@/components/EngineHeartbeat";
@@ -403,17 +403,17 @@ export default function CommandCenter() {
               eligible={cryptoEligible}
               eligibilityReason={cryptoReason}
             />
-            <CryptoSignalsPanel engine={engine} />
+            <CryptoMajorsSignalsPanel engine={engine} />
           </div>
           <div className="flex flex-col gap-2">
             <LiveControlBar
-              assetClass="EQUITIES"
-              state={equitiesState}
-              onToggle={toggleEquitiesLive}
-              eligible={equitiesEligible}
-              eligibilityReason={equitiesReason}
+              assetClass="CRYPTO"
+              state={cryptoState}
+              onToggle={toggleCryptoLive}
+              eligible={cryptoEligible}
+              eligibilityReason={cryptoReason}
             />
-            <EquitySignalsPanel engine={engine} />
+            <CryptoAltsMemesPanel engine={engine} />
           </div>
         </section>
 

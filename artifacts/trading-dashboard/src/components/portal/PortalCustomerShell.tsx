@@ -39,6 +39,12 @@ import {
 } from "lucide-react";
 
 import { authFetch } from "../../lib/authFetch";
+import {
+  LiveControlBar,
+  CryptoMajorsSignalsPanel,
+  CryptoAltsMemesPanel,
+} from "../command/institutional";
+import type { EngineStatus as InstitutionalEngineStatus } from "../command/types";
 import { PortalExchangeConnectModal } from "../PortalExchangeConnectModal";
 import { AIRiskControlsPanel } from "./AIRiskControlsPanel";
 import { AIDisclaimerModal } from "../AIDisclaimerModal";
@@ -4394,35 +4400,40 @@ export function PortalCustomerShell() {
             panel is for customer self-imposed budgets only. */}
         <AIRiskControlsPanel />
 
-        <OpportunityMatrix
-          majors={filteredMajors}
-          alts={filteredAlts}
-          onQueue={queuePaper}
-          isLoading={isLoading}
-          isError={isError}
-          now={nowShell}
-          idleSymbols={idleSymbols}
-          lastTickAt={engineLastTickAt}
-        />
+        {/* ── /portal customer crypto matrix ────────────────────────────── *
+         * Same proven two-column "TOP scroll" formula as /command, but
+         * crypto-only (NO equities) and dressed in PAPER chrome — the
+         * customer surface is PAPER-ONLY by locked invariant. Customer
+         * never sees ARM LIVE on this matrix; admin operators use
+         * /command (same formula, LIVE-armable chrome).
+         *
+         *   LEFT  column → CRYPTO MAJORS (BTC ETH SOL XRP …)
+         *   RIGHT column → ALTS & MEMECOINS (PEPE WIF BONK …)
+         */}
+        <section
+          className="grid gap-2"
+          style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}
+        >
+          <div className="flex flex-col gap-2">
+            <LiveControlBar assetClass="CRYPTO" state="PAPER" />
+            <CryptoMajorsSignalsPanel engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <LiveControlBar assetClass="CRYPTO" state="PAPER" />
+            <CryptoAltsMemesPanel engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} />
+          </div>
+        </section>
 
-        {/* Pass 7O — lower dashboard restructured per user spec:
-            ROW 1 (directly under matrix): LIVE TRADES + TRADE
-              HISTORY in a dedicated 2-col grid. Both panels have
-              fixed heights with internal scroll so they never
-              collapse visually or expand the page.
-            ROW 2: remaining intelligence panels in an auto-fit
-              grid below. */}
+        {/* Compact intelligence footer — keep just the high-value
+            customer panels (PNL / recent exits / portfolio + a single
+            AI reasoning surface) below the dual matrix. The previous
+            heavy widget grid (RiskHeatmap, MarketRegime, etc.) was
+            removed per user feedback: "feels complicated · discouraging". */}
         <section style={{
           display: "flex", flexDirection: "column", gap: 14,
           paddingTop: 20,
           borderTop: `1px solid ${T.BORDER}`,
         }}>
-          {/* Pass 7S — AI THROUGHPUT removed entirely. Replaced with
-              ACCOUNT STATUS strip: customer-facing user activity +
-              account telemetry (paper equity, realized + unrealized
-              PNL, win %, wins/losses, open trades, active signals,
-              queue, exec status, AI avg confidence ring). No internal
-              engine metrics surface on the customer portal. */}
           <AccountStatusStrip
             pulse={pulse}
             activeSignals={opportunities.length}
@@ -4435,20 +4446,6 @@ export function PortalCustomerShell() {
           }}>
             <PortfolioIntelligence now={nowShell} />
             <RecentExits now={nowShell} />
-          </div>
-          {/* Pass 7R — RiskHeatmap, MarketRegime, ExecutionAwareness
-              removed per user spec (low-value widgets). PNL / wins /
-              losses surface in PortfolioIntelligence + RecentExits
-              above; execution telemetry surfaces in AIThroughput
-              and OperatorPulseRibbon. */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: 14,
-          }}>
-            <AIReasoningConsole log={engineStatus?.recentSignalLog} live={engineOnline} />
-            <SignalPipeline opps={opportunities} pulse={pulse} engine={engineStatus} />
-            <ExchangeTopology />
           </div>
         </section>
       </main>

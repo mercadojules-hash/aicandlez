@@ -414,25 +414,7 @@ export function SignalRow({ spec, breakdown }: Props) {
 
   const operatorOrderInFlightRef = useRef(false);
   const fireTrade = (side: "LONG" | "SHORT") => {
-    // ── [BUY-TRACE] entry ───────────────────────────────────────────────────
-    // Hard instrumentation for the live BUY path. Use a unique [BUY-TRACE]
-    // prefix so the user can grep browser console + server log together.
-    // Remove these once the first real Kraken fill is confirmed end-to-end.
-    // eslint-disable-next-line no-alert
-    window.alert("[BUY-TRACE] fireTrade ENTRY reached. side=" + side + " entry=" + entry + " isOperatorRole=" + isOperatorRole + " isCustomerPortal=" + portalMode.isCustomerPortal + " mode=" + portalMode.mode);
-    console.error("[BUY-TRACE] fireTrade ENTRY", {
-      symbol: spec.symbol,
-      side,
-      entry,
-      isOperatorRole,
-      isCustomerPortal: portalMode.isCustomerPortal,
-      mode: portalMode.mode,
-      canUseLive: portalMode.canUseLive,
-      hasExchange: portalMode.hasExchange,
-      paperSandbox: portalMode.paperSandboxEnabled,
-    });
     if (!entry || entry <= 0) {
-      console.error("[BUY-TRACE] fireTrade EXIT — entry<=0 (market feed warming up)");
       toast({
         title: "MARKET FEED WARMING UP",
         description: `${spec.display} — waiting for live price`,
@@ -505,17 +487,16 @@ export function SignalRow({ spec, breakdown }: Props) {
       });
     }
 
-    // Admin / non-customer-portal trees (CommandCenter, /admintrade /portal):
-    // real-only by invariant — route directly through the operator-env Kraken
-    // execution path (`/api/exchange/order/execute`). Path A surgical bridge
-    // so super-admin can manually fire a real Kraken order from a signal row
-    // for live-test validation. Customer-portal trees never reach this branch.
-    // eslint-disable-next-line no-alert
-    window.alert("[BUY-TRACE] BEFORE OPERATOR BRANCH — isOperatorRole=" + isOperatorRole + " isCustomerPortal=" + portalMode.isCustomerPortal + " willEnter=" + (isOperatorRole || !portalMode.isCustomerPortal));
-    if (isOperatorRole || !portalMode.isCustomerPortal) {
-      console.error("[BUY-TRACE] BRANCH = OPERATOR (Kraken env path)");
+    // Admin operator trees (CommandCenter, /admintrade /portal): real-only by
+    // invariant — route directly through the operator-env Kraken execution
+    // path (`/api/exchange/order/execute`). Gate on `isOperatorRole` (from
+    // `useUserRole().isAdmin`) ONLY — never fall back on
+    // `!portalMode.isCustomerPortal`, because customer /portal does not
+    // mount `PortalModeProvider`, which would make a non-admin customer's
+    // BUY click leak into the operator Kraken path. Customer is PAPER-only
+    // by locked invariant — non-admins fall through to `firePaper()`.
+    if (isOperatorRole) {
       if (operatorOrderInFlightRef.current) {
-        console.error("[BUY-TRACE] OPERATOR EXIT — order already in flight");
         toast({
           title: `OPERATOR ORDER IN FLIGHT — ${spec.label}`,
           description: `Wait for the previous ${side} on ${spec.symbol} to settle before sending another.`,
@@ -537,25 +518,17 @@ export function SignalRow({ spec, breakdown }: Props) {
             orderType: "market",
             amountUSD: liveSize,
           };
-          console.error("[BUY-TRACE] EXECUTION FETCH START", { url, payload, tokenPresent: !!token });
-          // eslint-disable-next-line no-alert
-          window.alert("[BUY-TRACE] BEFORE FETCH\nurl=" + url + "\npayload=" + JSON.stringify(payload) + "\nhasToken=" + !!token);
           const res = await authFetch(url, {
             method: "POST",
             credentials: "include",
             headers: {
               "Content-Type": "application/json",
-              "X-BUY-TRACE": "operator-live-order",
               ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
             body: JSON.stringify(payload),
           });
-          console.error("[BUY-TRACE] EXECUTION FETCH RESPONSE", { status: res.status, ok: res.ok });
-          // eslint-disable-next-line no-alert
-          window.alert("[BUY-TRACE] AFTER FETCH status=" + res.status + " ok=" + res.ok);
           if (!res.ok) {
             const body = await res.json().catch(() => ({} as { error?: string }));
-            console.error("[BUY-TRACE] REJECTED body", body);
             toast({
               title: `OPERATOR ORDER REJECTED — ${spec.label}`,
               description: (body as { error?: string }).error ?? `HTTP ${res.status}`,
@@ -565,17 +538,12 @@ export function SignalRow({ spec, breakdown }: Props) {
           const body = (await res.json().catch(() => ({}))) as {
             id?: string; status?: string; fillPrice?: number; avgPrice?: number;
           };
-          console.error("[BUY-TRACE] FILLED body", body);
           const fill = body.fillPrice ?? body.avgPrice;
           toast({
             title: `OPERATOR FILLED — ${spec.label}${fill ? ` @ $${fmt(fill)}` : ""}`,
             description: [side, "KRAKEN", body.status, body.id ? `#${body.id.slice(-8)}` : ""].filter(Boolean).join(" · "),
           });
         } catch (err) {
-          console.error("[BUY-TRACE] FETCH THREW", err);
-          console.error("[BUY-TRACE] FETCH THREW stack:", err instanceof Error ? err.stack : "(no stack)");
-          // eslint-disable-next-line no-alert
-          window.alert("[BUY-TRACE] FETCH EXCEPTION: " + (err instanceof Error ? err.message + " | " + (err.stack ?? "") : String(err)));
           toast({
             title: `OPERATOR ORDER ERROR — ${spec.label}`,
             description: err instanceof Error ? err.message : String(err),
@@ -586,7 +554,6 @@ export function SignalRow({ spec, breakdown }: Props) {
       })();
       return;
     }
-    console.error("[BUY-TRACE] FELL THROUGH past operator branch — going to firePaper/firePaperSim");
 
     firePaper(side, sl, tp);
   };

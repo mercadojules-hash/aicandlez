@@ -11,10 +11,10 @@
  */
 
 import { useMemo, useState } from "react";
-import { Bitcoin, BarChart3, TrendingUp, TrendingDown, Search } from "lucide-react";
+import { Bitcoin, BarChart3, Coins, TrendingUp, TrendingDown, Search } from "lucide-react";
 import type { EngineStatus, SymBreakdown } from "../types";
 import type { TickerSpec } from "./tickers";
-import { CRYPTO_20, EQUITIES_20 } from "./tickers";
+import { CRYPTO_20, EQUITIES_20, CRYPTO_MAJORS_30, CRYPTO_ALTS_MEMES } from "./tickers";
 import { SignalRow } from "./SignalRow";
 import { resolveDirection } from "./signalUtils";
 import { N } from "./theme";
@@ -318,6 +318,48 @@ export function SignalsRow({ engine }: { engine?: EngineStatus }) {
     <section className="grid gap-2 px-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
       <CryptoSignalsPanel engine={engine} />
       <EquitySignalsPanel engine={engine} />
+    </section>
+  );
+}
+
+/* ── Crypto-only dual matrix — used by /portal (customer) + /command (admin) ── *
+ * Left  column = CRYPTO_MAJORS_30 (BTC ETH SOL XRP ADA AVAX … XLM ALGO)
+ * Right column = CRYPTO_ALTS_MEMES (HYPE GRT SNX … PEPE WIF BONK JUP …)
+ * Same row component / same BUY/SELL routing as the original /command grid.
+ */
+export function CryptoMajorsSignalsPanel({ engine }: { engine?: EngineStatus }) {
+  return (
+    <SignalsPanel
+      label="TOP 30 CRYPTO MAJORS"
+      sub="LONG · SHORT · LARGE CAP · AI EXECUTION"
+      icon={<Bitcoin className="w-3.5 h-3.5" />}
+      brand={N.BRAND}
+      tickers={CRYPTO_MAJORS_30}
+      engine={engine}
+      searchPlaceholder="Search Crypto Majors…"
+    />
+  );
+}
+
+export function CryptoAltsMemesPanel({ engine }: { engine?: EngineStatus }) {
+  return (
+    <SignalsPanel
+      label="ALTS & MEMECOINS"
+      sub="LONG · SHORT · HIGH VOL · AI EXECUTION"
+      icon={<Coins className="w-3.5 h-3.5" />}
+      brand={N.BRAND_BRT}
+      tickers={CRYPTO_ALTS_MEMES}
+      engine={engine}
+      searchPlaceholder="Search Alts & Memes…"
+    />
+  );
+}
+
+export function CryptoDualSignalsRow({ engine }: { engine?: EngineStatus }) {
+  return (
+    <section className="grid gap-2 px-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
+      <CryptoMajorsSignalsPanel engine={engine} />
+      <CryptoAltsMemesPanel    engine={engine} />
     </section>
   );
 }

@@ -6,5 +6,8 @@ export { MarketHeartbeat }   from "./MarketHeartbeat";
 export { AIWarRoom }         from "./AIWarRoom";
 export { PositionsRow }      from "./PositionsRow";
 export { LiveControlBar }    from "./LiveControlBar";
-export { SignalsRow, CryptoSignalsPanel, EquitySignalsPanel } from "./SignalsRow";
+export {
+  SignalsRow, CryptoSignalsPanel, EquitySignalsPanel,
+  CryptoDualSignalsRow, CryptoMajorsSignalsPanel, CryptoAltsMemesPanel,
+} from "./SignalsRow";
 export { N as NEON_THEME }   from "./theme";

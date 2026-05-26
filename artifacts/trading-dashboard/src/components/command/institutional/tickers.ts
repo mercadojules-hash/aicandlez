@@ -89,6 +89,31 @@ export const CRYPTO_20: TickerSpec[] = [
   { symbol: "STXUSD",   label: "STX",   display: "STX/USD",   color: "#5546FF", kind: "crypto", name: "Stacks" },
 ];
 
+/* ── Crypto split for /portal + /command dual-column matrix ─────────────── *
+ * MAJORS_30  → left column  (large-cap, "blue chip" cryptos)
+ * ALTS_MEMES → right column (smaller-cap alts + memes)
+ * Both lists are derived from CRYPTO_20 above; no new symbols are
+ * introduced so the engine pool (KRAKEN_SYMBOLS / COINBASE_SYMBOLS) does
+ * not need to change. Symbols missing from the engine pool will simply
+ * render with a "waiting" sparkline until added upstream. */
+export const CRYPTO_MAJORS_30: TickerSpec[] = CRYPTO_20.filter(t =>
+  new Set([
+    "BTCUSD","ETHUSD","SOLUSD","XRPUSD","ADAUSD","AVAXUSD","DOGEUSD","LINKUSD",
+    "DOTUSD","MATICUSD","LTCUSD","BCHUSD","UNIUSD","ATOMUSD","NEARUSD","APTUSD",
+    "ARBUSD","OPUSD","INJUSD","SUIUSD",
+    "TONUSD","TRXUSD","ETCUSD","ICPUSD","FILUSD","HBARUSD","AAVEUSD","MKRUSD",
+    "XLMUSD","ALGOUSD",
+  ]).has(t.symbol),
+);
+
+export const CRYPTO_ALTS_MEMES: TickerSpec[] = CRYPTO_20.filter(t =>
+  new Set([
+    "XMRUSD","HYPEUSD","SANDUSD","MANAUSD","AXSUSD","GRTUSD","SNXUSD","CRVUSD",
+    "COMPUSD","LDOUSD","RNDRUSD","FTMUSD","FETUSD","RUNEUSD","KASUSD",
+    "PEPEUSD","WIFUSD","BONKUSD","JUPUSD","PYTHUSD","TIAUSD","SEIUSD","STXUSD",
+  ]).has(t.symbol),
+);
+
 /* ── Top 20 equity signals (long + short capable) ───────────────────────── */
 export const EQUITIES_20: TickerSpec[] = [
   { symbol: "NVDA",  label: "NVDA",  display: "NVDA",  color: "#76B900", kind: "equity", sector: "Semis"          },
