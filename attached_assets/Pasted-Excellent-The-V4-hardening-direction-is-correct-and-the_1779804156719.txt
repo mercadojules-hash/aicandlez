@@ -1,0 +1,105 @@
+Excellent.
+
+The V4 hardening direction is correct and the overflow fixes are production-grade.
+
+The PEPE overflow issue is fully resolved without compromising the cinematic atmosphere. Great work preserving the emotional identity while hardening the internals.
+
+====================================================
+IMPORTANT VISUAL OBSERVATION
+============================
+
+The TOP TWO cards currently look significantly more premium than the lower cards because of the deeper matte-black card material behind the gradients.
+
+That darker foundation makes:
+
+* the neon glow
+* directional gradients
+* conviction rings
+* sparkline energy
+
+stand out MUCH more strongly.
+
+====================================================
+NEW DIRECTION
+=============
+
+Bring the LOWER cards closer to the same matte-black material depth as the top hero cards.
+
+NOT by:
+
+* increasing brightness
+* increasing glow intensity
+* increasing saturation
+
+BUT by:
+
+* deepening the matte-black base layer
+* increasing contrast separation
+* slightly strengthening card material richness
+
+====================================================
+WHY THIS WORKS
+==============
+
+The top cards currently feel:
+
+* more expensive
+* more cinematic
+* more immersive
+* more premium
+* more “AI-powered”
+
+because the neon is emerging from a darker visual foundation.
+
+That contrast is what creates the premium atmosphere.
+
+====================================================
+IMPORTANT
+=========
+
+Do NOT flatten the card hierarchy.
+
+We STILL want:
+
+* hero cards
+* secondary cards
+* visual pacing
+
+But the lower cards should inherit MORE of the top-card material language.
+
+====================================================
+SUGGESTED DIRECTION
+===================
+
+Explore:
+
+* slightly darker BG layer on lower cards
+* stronger matte-black depth
+* subtle directional tint fogging
+* richer gradient absorption into black
+* deeper contrast under sparklines
+* slightly more cinematic surface texture
+
+Preserve:
+
+* current spacing
+* current glow hierarchy
+* current typography
+* current polarity
+* current breathing room
+
+====================================================
+VERY IMPORTANT
+==============
+
+The platform is now in:
+
+* flagship polish
+* premium material refinement
+* cinematic depth tuning
+
+NOT:
+
+* structural redesign
+
+The identity is now correct.

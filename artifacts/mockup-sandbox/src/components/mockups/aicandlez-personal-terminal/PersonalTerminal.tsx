@@ -195,9 +195,13 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
   const color = isLong ? BRAND : RED;
   const colorSoft = isLong ? EMERALD : RED_SOFT;
   const cardBg = top
-    ? (isLong ? "linear-gradient(180deg, rgba(102,255,102,0.05), rgba(102,255,102,0.015))" : "linear-gradient(180deg, rgba(255,59,59,0.05), rgba(255,59,59,0.015))")
-    : BG_3;
-  const borderCol = isLong ? "rgba(102,255,102,0.20)" : "rgba(255,59,59,0.24)";
+    ? (isLong
+        ? `linear-gradient(180deg, rgba(102,255,102,0.07), rgba(102,255,102,0.02) 55%, rgba(0,0,0,0.55)), ${BG_0}`
+        : `linear-gradient(180deg, rgba(255,59,59,0.07), rgba(255,59,59,0.02) 55%, rgba(0,0,0,0.55)), ${BG_0}`)
+    : (isLong
+        ? `radial-gradient(120% 80% at 50% 0%, rgba(102,255,102,0.025), rgba(0,0,0,0) 60%), linear-gradient(180deg, ${BG_2} 0%, ${BG_1} 55%, ${BG_0} 100%)`
+        : `radial-gradient(120% 80% at 50% 0%, rgba(255,59,59,0.025), rgba(0,0,0,0) 60%), linear-gradient(180deg, ${BG_2} 0%, ${BG_1} 55%, ${BG_0} 100%)`);
+  const borderCol = isLong ? "rgba(102,255,102,0.22)" : "rgba(255,59,59,0.26)";
   const topBorder = isLong ? "rgba(102,255,102,0.55)" : "rgba(255,59,59,0.55)";
   const meta = META[s.sym];
   return (
@@ -207,8 +211,8 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
         background: cardBg,
         border: `1px solid ${top ? topBorder : borderCol}`,
         boxShadow: top
-          ? `0 0 0 1px ${color}22, 0 0 24px ${color}33 inset, inset 0 1px 0 rgba(255,255,255,0.04)`
-          : `inset 0 1px 0 rgba(255,255,255,0.03)`,
+          ? `0 0 0 1px ${color}22, 0 0 28px ${color}3a inset, inset 0 1px 0 rgba(255,255,255,0.05), 0 6px 24px rgba(0,0,0,0.55)`
+          : `inset 0 1px 0 rgba(255,255,255,0.045), inset 0 -40px 60px -30px rgba(0,0,0,0.65), 0 4px 18px rgba(0,0,0,0.45)`,
         animation: top ? "edgePulse 4s ease-in-out infinite" : undefined,
         transform: top ? "scale(1.005)" : undefined,
         transition: "all 180ms ease",
