@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   Bell,
@@ -391,7 +391,7 @@ function MtfDot({ s, color }: { s: "up" | "down" | "flat"; color: string }) {
   return <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: fill, boxShadow: glow }} />;
 }
 
-function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
+function SignalCard({ s, top, ignite }: { s: Signal; top?: boolean; ignite?: boolean }) {
   const isLong = s.dir === "LONG";
   const color = isLong ? BRAND : RED;
   const colorSoft = isLong ? EMERALD : RED_SOFT;
@@ -407,7 +407,7 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
   const meta = META[s.sym];
   return (
     <div
-      className={`sigcard${top ? " sigcard-top" : ""} relative flex min-w-0 flex-col overflow-hidden`}
+      className={`sigcard${top ? " sigcard-top" : ""}${ignite ? (isLong ? " sigcard-ignite-long" : " sigcard-ignite-short") : ""} relative flex min-w-0 flex-col overflow-hidden`}
       style={{
         background: cardBg,
         border: `1px solid ${top ? topBorder : borderCol}`,
@@ -419,6 +419,19 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
           : undefined,
       }}
     >
+      {/* CONVICTION RING IGNITION — one-shot when a brand-new top signal
+       *  arrives. Brief expanding ring + soft glow that decays in ~1.2s,
+       *  then card returns to its breathing edgePulse. Communicates
+       *  "AI found something significant" without spamming motion. */}
+      {ignite && (
+        <div
+          className="pointer-events-none absolute inset-0 z-10"
+          style={{
+            border: `1px solid ${color}`,
+            animation: isLong ? "signalIgnitionLong 1200ms ease-out 1" : "signalIgnitionShort 1200ms ease-out 1",
+          }}
+        />
+      )}
       {/* ROW 1 — header */}
       <div className="flex min-w-0 items-center gap-2.5 px-3.5 pt-3.5">
         <div
@@ -732,6 +745,43 @@ function TerminalInner() {
   const longs  = isBootstrap ? FALLBACK_LONGS  : liveSignals.longs;
   const shorts = isBootstrap ? FALLBACK_SHORTS : liveSignals.shorts;
 
+  /* ── Signal arrival ignition (one-shot emotional impact) ─────────────────
+   * Scarcity is now the platform's strength — when a signal *does* clear
+   * every gate, the surface needs to register it. Track count-up and
+   * top-symbol transitions; bump a counter that re-keys the column
+   * battlefield sweep + sets a timestamp the top card uses to ignite.
+   * Bootstrap is excluded so the fallback set doesn't pre-fire on load. */
+  const prevLongCountRef  = useRef(longs.length);
+  const prevShortCountRef = useRef(shorts.length);
+  const prevTopLongRef    = useRef<string | null>(longs[0]?.sym ?? null);
+  const prevTopShortRef   = useRef<string | null>(shorts[0]?.sym ?? null);
+  const [longArrivalSeq,  setLongArrivalSeq]  = useState(0);
+  const [shortArrivalSeq, setShortArrivalSeq] = useState(0);
+  const [longIgniteAt,    setLongIgniteAt]    = useState(0);
+  const [shortIgniteAt,   setShortIgniteAt]   = useState(0);
+  useEffect(() => {
+    if (isBootstrap) return;
+    const topSym = longs[0]?.sym ?? null;
+    if (longs.length > prevLongCountRef.current || (topSym && topSym !== prevTopLongRef.current)) {
+      setLongArrivalSeq(k => k + 1);
+      setLongIgniteAt(Date.now());
+    }
+    prevLongCountRef.current = longs.length;
+    prevTopLongRef.current   = topSym;
+  }, [longs, isBootstrap]);
+  useEffect(() => {
+    if (isBootstrap) return;
+    const topSym = shorts[0]?.sym ?? null;
+    if (shorts.length > prevShortCountRef.current || (topSym && topSym !== prevTopShortRef.current)) {
+      setShortArrivalSeq(k => k + 1);
+      setShortIgniteAt(Date.now());
+    }
+    prevShortCountRef.current = shorts.length;
+    prevTopShortRef.current   = topSym;
+  }, [shorts, isBootstrap]);
+  const igniteLongTop  = longIgniteAt  > 0 && (now.getTime() - longIgniteAt)  < 1200;
+  const igniteShortTop = shortIgniteAt > 0 && (now.getTime() - shortIgniteAt) < 1200;
+
   /* Live positions adapter — paper-trading store → row shape used by the
    * LIVE POSITIONS table. Fallback only while the user has zero lifetime
    * activity; once they have any history, an empty open list reads as the
@@ -835,15 +885,35 @@ function TerminalInner() {
   const aiMaxTrades = aiTrading.isAdmin ? 99 : aiTrading.plan === "pro" ? 12 : aiTrading.plan === "starter" ? 3 : 0;
   const [aiBusy, setAiBusy] = useState(false);
   const [aiUpgradeFlash, setAiUpgradeFlash] = useState(false);
+  /* aiArming = staged activation; true only while transitioning OFF→ON.
+   * Drives the arming sweep + "ARMING…" copy. Disarming is instant.
+   * Timeout IDs tracked in refs + cleared on unmount to avoid stale
+   * setState after the user navigates away mid-arm. */
+  const [aiArming, setAiArming] = useState(false);
+  const aiArmingTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiUpgradeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (aiArmingTimerRef.current)  clearTimeout(aiArmingTimerRef.current);
+    if (aiUpgradeTimerRef.current) clearTimeout(aiUpgradeTimerRef.current);
+  }, []);
   const toggleAi = async () => {
     if (aiBusy) return;
+    const isArming = !aiTrading.enabled;
     setAiBusy(true);
+    if (isArming) setAiArming(true);
     const result = await aiTrading.setEnabled(!aiTrading.enabled);
     if (result.needsUpgrade) {
       setAiUpgradeFlash(true);
-      setTimeout(() => setAiUpgradeFlash(false), 2400);
+      if (aiUpgradeTimerRef.current) clearTimeout(aiUpgradeTimerRef.current);
+      aiUpgradeTimerRef.current = setTimeout(() => setAiUpgradeFlash(false), 2400);
     }
     setAiBusy(false);
+    if (isArming) {
+      /* Hold the arming sweep ~700ms past response so users feel the
+       * staged activation, not a network blip. */
+      if (aiArmingTimerRef.current) clearTimeout(aiArmingTimerRef.current);
+      aiArmingTimerRef.current = setTimeout(() => setAiArming(false), 700);
+    }
   };
 
   /* Account telemetry — wired from the paper-trade store. */
@@ -980,6 +1050,44 @@ function TerminalInner() {
         @keyframes aiActivePulse {
           0%,100% { box-shadow: 0 0 0 1px rgba(102,255,102,0.55), 0 0 18px rgba(102,255,102,0.18) inset; }
           50%     { box-shadow: 0 0 0 1px rgba(102,255,102,0.85), 0 0 32px rgba(102,255,102,0.32) inset; }
+        }
+
+        /* SIGNAL IGNITION — one-shot expanding conviction ring when a
+         * fresh top signal clears every gate. ~1.2s and done. */
+        @keyframes signalIgnitionLong {
+          0%   { opacity: 0;    transform: scale(0.985); box-shadow: 0 0 0 0 rgba(102,255,102,0.55), 0 0 0 0 rgba(102,255,102,0.85) inset; }
+          25%  { opacity: 1;    transform: scale(1.012); box-shadow: 0 0 0 2px rgba(102,255,102,0.55), 0 0 48px 0 rgba(102,255,102,0.55) inset; }
+          100% { opacity: 0;    transform: scale(1.045); box-shadow: 0 0 0 6px rgba(102,255,102,0.00), 0 0 0 0 rgba(102,255,102,0.00) inset; }
+        }
+        @keyframes signalIgnitionShort {
+          0%   { opacity: 0;    transform: scale(0.985); box-shadow: 0 0 0 0 rgba(255,59,59,0.55), 0 0 0 0 rgba(255,59,59,0.85) inset; }
+          25%  { opacity: 1;    transform: scale(1.012); box-shadow: 0 0 0 2px rgba(255,59,59,0.55), 0 0 48px 0 rgba(255,59,59,0.55) inset; }
+          100% { opacity: 0;    transform: scale(1.045); box-shadow: 0 0 0 6px rgba(255,59,59,0.00), 0 0 0 0 rgba(255,59,59,0.00) inset; }
+        }
+
+        /* COLUMN ARRIVAL SWEEP — soft battlefield wash when a fresh
+         * signal arrives in the column. Rises bottom→top, fades. */
+        @keyframes columnArrivalSweepLong {
+          0%   { opacity: 0;    transform: translateY(10%); }
+          25%  { opacity: 1;    transform: translateY(0); }
+          100% { opacity: 0;    transform: translateY(-6%); }
+        }
+        @keyframes columnArrivalSweepShort {
+          0%   { opacity: 0;    transform: translateY(10%); }
+          25%  { opacity: 1;    transform: translateY(0); }
+          100% { opacity: 0;    transform: translateY(-6%); }
+        }
+
+        /* AI ARMING — staged activation sweep across the AUTOTRADE
+         * control while the toggle request is in flight. Reads as
+         * weapons-system arming, not a generic spinner. */
+        @keyframes aiArmingSweep {
+          0%   { transform: translateX(-110%); }
+          100% { transform: translateX(110%); }
+        }
+        @keyframes aiArmedWarning {
+          0%,100% { opacity: 0.45; }
+          50%     { opacity: 0.95; }
         }
 
         /* card hover micro-state — subtle lift, brighter material edge */
@@ -1218,7 +1326,22 @@ function TerminalInner() {
 
             <div className="grid gap-3.5 flex-1 min-h-0 overflow-hidden" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
               {/* LONGS column — header pinned, signal list independently scrolls */}
-              <div className="flex min-w-0 min-h-0 flex-col gap-3 overflow-hidden">
+              <div className="relative flex min-w-0 min-h-0 flex-col gap-3 overflow-hidden">
+                {/* COLUMN ARRIVAL SWEEP — one-shot green wash up the column
+                 *  when a fresh LONG signal clears every gate. Keyed by
+                 *  longArrivalSeq so it re-fires each arrival. Decays in
+                 *  ~1s; no infinite loop, no noise. */}
+                {longArrivalSeq > 0 && (
+                  <div
+                    key={`long-sweep-${longArrivalSeq}`}
+                    className="pointer-events-none absolute inset-0 z-10"
+                    style={{
+                      background: `linear-gradient(0deg, rgba(102,255,102,0.16), rgba(102,255,102,0.02) 55%, transparent 100%)`,
+                      animation: "columnArrivalSweepLong 1100ms ease-out 1",
+                      mixBlendMode: "screen",
+                    }}
+                  />
+                )}
                 <div
                   className="flex items-center gap-2.5 px-3 py-2 flex-shrink-0"
                   style={{ background: "rgba(0,200,83,0.05)", border: `1px solid ${HAIR_18}` }}
@@ -1244,13 +1367,24 @@ function TerminalInner() {
                       currentReason={currentIdleReason}
                     />
                   ) : longs.map((s, i) => (
-                    <SignalCard key={s.sym} s={s} top={i === 0} />
+                    <SignalCard key={s.sym} s={s} top={i === 0} ignite={i === 0 && igniteLongTop} />
                   ))}
                 </div>
               </div>
 
               {/* SHORTS column — header pinned, signal list independently scrolls */}
-              <div className="flex min-w-0 min-h-0 flex-col gap-3 overflow-hidden">
+              <div className="relative flex min-w-0 min-h-0 flex-col gap-3 overflow-hidden">
+                {shortArrivalSeq > 0 && (
+                  <div
+                    key={`short-sweep-${shortArrivalSeq}`}
+                    className="pointer-events-none absolute inset-0 z-10"
+                    style={{
+                      background: `linear-gradient(0deg, rgba(255,59,59,0.16), rgba(255,59,59,0.02) 55%, transparent 100%)`,
+                      animation: "columnArrivalSweepShort 1100ms ease-out 1",
+                      mixBlendMode: "screen",
+                    }}
+                  />
+                )}
                 <div
                   className="flex items-center gap-2.5 px-3 py-2 flex-shrink-0"
                   style={{ background: "rgba(255,59,59,0.05)", border: `1px solid ${HAIR_RED_18}` }}
@@ -1276,7 +1410,7 @@ function TerminalInner() {
                       currentReason={currentIdleReason}
                     />
                   ) : shorts.map((s, i) => (
-                    <SignalCard key={s.sym} s={s} top={i === 0} />
+                    <SignalCard key={s.sym} s={s} top={i === 0} ignite={i === 0 && igniteShortTop} />
                   ))}
                 </div>
               </div>
@@ -1356,7 +1490,7 @@ function TerminalInner() {
               type="button"
               onClick={toggleAi}
               disabled={aiBusy || aiTrading.isLoading}
-              className="group relative flex flex-col gap-2 p-3 text-left"
+              className="group relative flex flex-col gap-2 p-3 text-left overflow-hidden"
               style={{
                 background: aiTrading.enabled
                   ? `linear-gradient(180deg, rgba(102,255,102,0.10), rgba(102,255,102,0.02)), ${BG_2}`
@@ -1367,10 +1501,34 @@ function TerminalInner() {
                   : "none",
                 cursor: aiBusy ? "wait" : "pointer",
                 animation: aiTrading.enabled ? "aiActivePulse 3.2s ease-in-out infinite" : undefined,
-                opacity: aiBusy ? 0.7 : 1,
+                opacity: aiBusy && !aiArming ? 0.7 : 1,
                 transition: "border-color 220ms ease, box-shadow 220ms ease, opacity 180ms ease",
               }}
             >
+              {/* WEAPONS-SYSTEM ARMED HAIRLINE — subtle amber top edge that
+               *  breathes when live. Reads as power, not panic. */}
+              {aiTrading.enabled && (
+                <div
+                  className="pointer-events-none absolute left-0 right-0 top-0 h-px"
+                  style={{
+                    background: `linear-gradient(90deg, transparent, #FFC83D 35%, #FFC83D 65%, transparent)`,
+                    animation: "aiArmedWarning 2.8s ease-in-out infinite",
+                  }}
+                />
+              )}
+              {/* STAGED ACTIVATION SWEEP — fires once during OFF→ON
+               *  request. Communicates "system arming", not "spinner". */}
+              {aiArming && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 left-0 z-10"
+                  style={{
+                    width: "40%",
+                    background: `linear-gradient(90deg, transparent, ${BRAND}55, transparent)`,
+                    animation: "aiArmingSweep 1100ms ease-out 1",
+                    mixBlendMode: "screen",
+                  }}
+                />
+              )}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Bot size={12} style={{ color: aiTrading.enabled ? BRAND : TXT_65 }} />
@@ -1396,28 +1554,53 @@ function TerminalInner() {
                       style={{ background: BG_0, animation: "livePulse 1.8s ease-in-out infinite" }}
                     />
                   )}
-                  {aiTrading.enabled ? "LIVE" : "OFF"}
+                  {aiArming ? "ARMING…" : aiTrading.enabled ? "ARMED" : "ARM"}
                 </div>
               </div>
               <div
                 className="text-[10.5px] tracking-[0.04em]"
                 style={{ color: aiTrading.enabled ? BRAND : TXT_65 }}
               >
-                {aiTrading.enabled ? "AI actively managing positions" : "AI monitoring only"}
+                {aiArming
+                  ? "INITIALIZING AI EXECUTION SYSTEM…"
+                  : aiTrading.enabled
+                  ? "AI EXECUTION ARMED · MANAGING POSITIONS"
+                  : "TAP TO ARM AI EXECUTION"}
               </div>
+              {/* CONTROL STRIP — values illuminate (brand color + faint glow)
+               *  when ARMED to communicate the live risk profile is now
+               *  active, not idle config. */}
               <div className="flex items-center gap-3 text-[8.5px] tracking-[0.18em]" style={{ color: TXT_40 }}>
-                <span>MAX TRADES <span className="font-bold tabular-nums" style={{ color: TXT_85 }}>{aiMaxTrades || "—"}</span></span>
+                <span>MAX TRADES <span
+                  className="font-bold tabular-nums"
+                  style={{
+                    color: aiTrading.enabled ? BRAND : TXT_85,
+                    textShadow: aiTrading.enabled ? `0 0 6px ${BRAND}66` : "none",
+                  }}
+                >{aiMaxTrades || "—"}</span></span>
                 <span style={{ color: TXT_25 }}>·</span>
-                <span>RISK <span className="font-bold" style={{ color: TXT_85 }}>BALANCED</span></span>
+                <span>RISK <span
+                  className="font-bold"
+                  style={{
+                    color: aiTrading.enabled ? BRAND : TXT_85,
+                    textShadow: aiTrading.enabled ? `0 0 6px ${BRAND}66` : "none",
+                  }}
+                >BALANCED</span></span>
                 <span style={{ color: TXT_25 }}>·</span>
-                <span>MODE <span className="font-bold" style={{ color: TXT_85 }}>{aiTrading.plan === "pro" ? "AGGRESSIVE" : aiTrading.plan === "starter" ? "BALANCED" : "CONSERVATIVE"}</span></span>
+                <span>MODE <span
+                  className="font-bold"
+                  style={{
+                    color: aiTrading.enabled ? BRAND : TXT_85,
+                    textShadow: aiTrading.enabled ? `0 0 6px ${BRAND}66` : "none",
+                  }}
+                >{aiTrading.plan === "pro" ? "AGGRESSIVE" : aiTrading.plan === "starter" ? "BALANCED" : "CONSERVATIVE"}</span></span>
               </div>
               {aiUpgradeFlash && (
                 <div
                   className="text-[9.5px] font-bold tracking-[0.14em]"
                   style={{ color: "#FFC83D" }}
                 >
-                  UPGRADE REQUIRED TO ENABLE AI AUTOTRADE
+                  UPGRADE REQUIRED TO ARM AI EXECUTION
                 </div>
               )}
             </button>
