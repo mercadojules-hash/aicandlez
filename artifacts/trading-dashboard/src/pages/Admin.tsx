@@ -1492,8 +1492,18 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
   });
 
   function submitAi() {
-    if (!aiDirty) return;
+    /* eslint-disable no-console */
+    console.debug("[admin-profile][submitAi] entered", {
+      aiDirty,
+      aiNoteLen: aiNote.length,
+      aiNoteTrimLen: aiNote.trim().length,
+      aiDraft:  structuredClone(aiDraft  as unknown as Record<string, unknown>),
+      aiServer: structuredClone(aiServer as unknown as Record<string, unknown>),
+      sameRef:  (aiDraft as unknown) === (aiServer as unknown),
+    });
+    if (!aiDirty) { console.debug("[admin-profile][submitAi] EARLY-RETURN: not dirty"); return; }
     if (!aiNote.trim()) {
+      console.debug("[admin-profile][submitAi] EARLY-RETURN: empty audit note");
       toast({ title: "Audit note required", description: "Add a short note before saving AI settings.", variant: "destructive" });
       return;
     }
@@ -1501,24 +1511,48 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
     const body: Record<string, unknown> = { note: aiNote.trim() };
     const aiDraftRec  = aiDraft  as unknown as Record<string, unknown>;
     const aiServerRec = aiServer as unknown as Record<string, unknown>;
+    const dirtyKeys: string[] = [];
     for (const k of Object.keys(aiDraftRec)) {
-      if (aiDraftRec[k] !== aiServerRec[k]) body[k] = aiDraftRec[k];
+      if (aiDraftRec[k] !== aiServerRec[k]) { body[k] = aiDraftRec[k]; dirtyKeys.push(k); }
     }
+    console.debug("[admin-profile][submitAi] BODY BUILT", {
+      dirtyKeys,
+      bodyKeys: Object.keys(body),
+      body: structuredClone(body),
+    });
     aiMutation.mutate(body);
+    /* eslint-enable no-console */
   }
   function submitBilling() {
-    if (!billingDirty) return;
+    /* eslint-disable no-console */
+    console.debug("[admin-profile][submitBilling] entered", {
+      billingDirty,
+      billingNoteLen: billingNote.length,
+      billingNoteTrimLen: billingNote.trim().length,
+      billingDraft:  structuredClone(billingDraft  as unknown as Record<string, unknown>),
+      billingServer: structuredClone(billingServer as unknown as Record<string, unknown>),
+      sameRef: (billingDraft as unknown) === (billingServer as unknown),
+    });
+    if (!billingDirty) { console.debug("[admin-profile][submitBilling] EARLY-RETURN: not dirty"); return; }
     if (!billingNote.trim()) {
+      console.debug("[admin-profile][submitBilling] EARLY-RETURN: empty audit note");
       toast({ title: "Audit note required", description: "Add a short note before saving billing overrides.", variant: "destructive" });
       return;
     }
     const body: Record<string, unknown> = { note: billingNote.trim() };
     const bDraftRec  = billingDraft  as unknown as Record<string, unknown>;
     const bServerRec = billingServer as unknown as Record<string, unknown>;
+    const dirtyKeys: string[] = [];
     for (const k of Object.keys(bDraftRec)) {
-      if (bDraftRec[k] !== bServerRec[k]) body[k] = bDraftRec[k];
+      if (bDraftRec[k] !== bServerRec[k]) { body[k] = bDraftRec[k]; dirtyKeys.push(k); }
     }
+    console.debug("[admin-profile][submitBilling] BODY BUILT", {
+      dirtyKeys,
+      bodyKeys: Object.keys(body),
+      body: structuredClone(body),
+    });
     billingMutation.mutate(body);
+    /* eslint-enable no-console */
   }
 
   const aiDisabled      = aiMutation.isPending      || loading;

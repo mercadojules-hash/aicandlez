@@ -1,0 +1,75 @@
+We now have enough diagnostics to isolate the issue.
+
+This is NOT:
+
+Render
+stale deployment
+enum normalization
+backend schema validation
+complimentary toggle component
+
+The frontend itself is serializing the billing PATCH body to {} before fetch().
+
+Confirmed evidence from production console:
+
+[admin-profile] FINAL PAYLOAD (billing-overrides) {}
+
+Observed behavior:
+
+Complimentary visually toggles YES
+Audit note field contains text
+UI enters UNSAVED CHANGES state
+SAVE triggers billing-overrides mutation
+FINAL PAYLOAD logs as empty object
+Backend correctly rejects because note is undefined
+
+So the mutation path is losing state BEFORE the request is sent.
+
+Please deeply inspect the billing save pipeline:
+
+FILES / AREAS:
+
+submitBilling()
+billingDraft state
+billingBaseline state
+dirty diff generation
+payload builder
+stripUndefined()
+mutationFn closure
+useEffect hydration
+object spread ordering
+memoized state reuse
+
+Most likely root cause:
+billingBaseline and billingDraft are sharing object references OR the diff generator is comparing against already-mutated state and stripping everything.
+
+The UI clearly believes there are changes:
+
+toggle updates visually
+UNSAVED CHANGES appears
+
+But payload generation collapses to {}.
+
+Please add these diagnostics IMMEDIATELY before the mutation request:
+
+console.log('billingDraft', structuredClone(billingDraft))
+console.log('billingBaseline', structuredClone(billingBaseline))
+console.log('billingDirtyMap', structuredClone(dirty))
+console.log('payloadBeforeStrip', structuredClone(payload))
+console.log('payloadAfterStrip', structuredClone(cleanBody))
+console.log('sameReference', billingDraft === billingBaseline)
+
+Also verify:
+
+billingBaseline is not mutated during hydration
+draft setters are immutable
+no shallow merge mutates source state
+stripUndefined is not recursively removing valid booleans/nullables
+payload diff does not exclude changed booleans
+complimentary toggle actually writes to billingDraft before save
+
+Critical clue:
+The network request itself is NOT malformed JSON.
+The frontend is literally constructing {} and sending it.
+
+This is now isolated to frontend diff/payload construction logic.
