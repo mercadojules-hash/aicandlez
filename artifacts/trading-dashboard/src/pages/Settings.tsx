@@ -2,6 +2,7 @@ import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useExchangeCatalog } from "@/hooks/useExchangeCatalog";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   Brain,
   Shield,
@@ -859,6 +860,7 @@ function ExchangeConnectionsSection() {
 
 export default function Settings() {
   const qc = useQueryClient();
+  const { isAdmin } = useUserRole();
   const { data, isLoading, isError } = useQuery<UserSettings>({
     queryKey: ["user-settings"],
     queryFn: fetchSettings,
@@ -1094,7 +1096,36 @@ export default function Settings() {
           {/* ── Signal Filters ────────────────────────────────────────── */}
           <Section title="SIGNAL FILTERS" icon={SlidersHorizontal} color="#00aaff">
             <div className="grid gap-3">
-              <ToggleSwitch value={merged.volumeFilter ?? true} onChange={v => set("volumeFilter", v)} label="VOLUME CONFIRMATION" desc="Only trade when current 5m volume ≥ 85% of 20-bar rolling average" />
+              {/* Volume Filter is a MANDATORY platform-wide safety control.
+                  Server enforces this at the execution layer (liveUserExecution.ts
+                  gate 0VOL) AND strips the field from the customer-writable
+                  allowlist (userSettings.ts PUT). For non-admin users, render
+                  a locked-on row so customers understand it is not optional.
+                  Admins keep the live toggle for diagnostic / override. */}
+              {isAdmin ? (
+                <ToggleSwitch value={merged.volumeFilter ?? true} onChange={v => set("volumeFilter", v)} label="VOLUME CONFIRMATION" desc="Only trade when current 5m volume ≥ 85% of 20-bar rolling average · ADMIN OVERRIDE" />
+              ) : (
+                <div
+                  title="Mandatory platform safety control. Prevents trades on low-liquidity bars where slippage, spread manipulation, and thin-order-book volatility can cause poor fills."
+                  className="flex items-start justify-between gap-3 rounded border border-emerald-500/40 bg-emerald-500/[0.06] px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-mono font-bold tracking-[0.18em] text-emerald-400">
+                      🛡 VOLUME CONFIRMATION · MANDATORY SAFETY
+                    </div>
+                    <div className="mt-1 text-[10px] font-mono leading-snug text-emerald-200/60">
+                      Baseline execution safeguard — blocks trades on low-liquidity bars
+                      (current 5m volume must be ≥ 85% of 20-bar rolling average) to
+                      protect against slippage, poor fills, spread manipulation, and
+                      thin-order-book volatility. Always ON for all customer accounts;
+                      applies equally to Kraken, Coinbase, Binance, and paper / sim.
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded border border-emerald-500/60 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-mono font-bold tracking-[0.12em] text-emerald-300">
+                    ON · LOCKED
+                  </span>
+                </div>
+              )}
               <ToggleSwitch value={merged.require1HTrend ?? false} onChange={v => set("require1HTrend", v)} label="1H TREND ALIGNMENT" desc="Require 1H EMA9 to align with signal direction before executing" />
             </div>
             <SelectInput label="PREFERRED EXCHANGE" value={merged.preferredExchange ?? "Alpaca"} options={exchangeOptions} onChange={v => set("preferredExchange", v)} />

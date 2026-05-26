@@ -80,7 +80,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal";
+  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate";
   error?:          string;
 }
 
@@ -495,6 +495,61 @@ export async function placeLiveAutoOrderForUser(
         logger.warn({ err, userId }, "liveUserExecution: customer-disabled log insert failed");
       }
       return { success: false, userId, errorCode: "customer_live_execution_disabled", error: msg };
+    }
+  }
+
+  // 0VOL. MANDATORY volume-confirmation safety gate.
+  //
+  // Volume Filter is a baseline platform safety control for all customer
+  // live execution — it is NOT an opt-in preference. Customers cannot
+  // disable it; the per-user `user_settings.volume_filter` column is
+  // server-locked to `true` (see `routes/userSettings.ts` PUT — the field
+  // is stripped from the customer-writable allowlist). This gate enforces
+  // the same invariant at the execution layer so a leaked client mutation,
+  // a stale cached toggle, or a manual `/api/user/live-order` call cannot
+  // route a customer order through thin order books / low-liquidity bars.
+  //
+  // The check reads the latest 5m breakdown computed by the trading loop
+  // (`engineStats.symbolBreakdowns[symbol]`). Missing breakdowns fail
+  // CLOSED — we refuse to ship a live customer order against a symbol the
+  // engine hasn't analyzed yet rather than allow a slippage-risky fill.
+  //
+  // Admins / super-admins bypass — operator diagnostic flows (and the
+  // global `engineStats.volumeFilter` toggle flipped via /engine/filters)
+  // remain available for override / testing. Sandbox routes also bypass
+  // because public testnets do not carry real liquidity risk.
+  if (!useSandbox) {
+    const operatorVol = await isOperatorRole(userId);
+    if (!operatorVol) {
+      const bd = engineStats.symbolBreakdowns[symbol];
+      const volumeOk = bd?.volumeConfirmed === true;
+      if (!volumeOk) {
+        const reason = bd
+          ? "Volume below 85% of 20-bar average — order rejected by mandatory volume safety gate."
+          : "No recent volume analysis available for this symbol — order rejected by mandatory volume safety gate.";
+        await emitFailureNotification(userId, symbol, side, reason);
+        executionStreamBus.emitEvent({
+          type:     "order_rejected",
+          severity: "warn",
+          symbol, side, sizeUSD, mode: "live",
+          gate:     "volume_safety_gate",
+          reason:   "volume_safety_gate",
+          message:  `Live order REJECTED ${symbol} ${side} $${sizeUSD}: ${reason}`,
+          details:  { userId, hasBreakdown: !!bd, volumeConfirmed: bd?.volumeConfirmed ?? null },
+        });
+        try {
+          await db.insert(logsTable).values({
+            id:      crypto.randomUUID(),
+            type:    "trade",
+            level:   "warn",
+            message: `[volume_safety_gate] ${reason}`,
+            details: { userId, symbol, side, sizeUSD, errorCode: "volume_safety_gate", hasBreakdown: !!bd, volumeConfirmed: bd?.volumeConfirmed ?? null },
+          });
+        } catch (err) {
+          logger.warn({ err, userId }, "liveUserExecution: volume-gate log insert failed");
+        }
+        return { success: false, userId, errorCode: "volume_safety_gate", error: reason };
+      }
     }
   }
 

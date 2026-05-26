@@ -121,7 +121,15 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
     "riskLevel", "positionSizeUSD", "maxTradesPerDay", "maxActivePositions",
     "stopLossPercent", "takeProfitPercent",
     "autoMode", "tradingMode",
-    "volumeFilter", "require1HTrend",
+    // NOTE: `volumeFilter` is intentionally OMITTED from the customer-writable
+    // allowlist. Volume Filter is a MANDATORY platform-wide safety control —
+    // free / starter / customer accounts cannot disable it. The DB column
+    // defaults to `true` (lib/db/src/schema/userSettings.ts), and the
+    // execution layer (`liveUserExecution.ts` gate 0VOL) enforces the same
+    // invariant regardless of the stored value. Admins may still edit the
+    // per-user flag for diagnostic / visibility purposes via the operator
+    // PATCH `/api/admin/users/:id/ai-settings` (`adminUserProfile.ts`).
+    "require1HTrend",
     "preferredExchange",
     "preferredLiveOrderSizeUsd",
     "paperSandboxEnabled",

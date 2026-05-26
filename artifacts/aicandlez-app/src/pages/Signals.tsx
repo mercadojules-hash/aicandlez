@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/react";
 import { api, type SignalBreakdown, type MobileSignalsResponse } from "@/lib/api";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const ACTION_COLOR: Record<string, string> = {
   BUY:  "#00ff8a",
@@ -145,6 +146,7 @@ function FilterToggle({
 export default function Signals() {
   const queryClient = useQueryClient();
   const { isSignedIn } = useUser();
+  const { isAdmin } = useUserRole();
 
   const { data, isLoading, isError } = useQuery<MobileSignalsResponse>({
     queryKey:        ["signal-breakdowns"],
@@ -204,16 +206,46 @@ export default function Signals() {
         {filter && (
           <>
             <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <FilterToggle
-                label="VOL FILTER"
-                on={filter.volumeFilter}
-                color="#00ff8a"
-                disabled={!canToggle || isMutating}
-                onClick={() => filterMutation.mutate({
-                  volumeFilter:   !filter.volumeFilter,
-                  require1HTrend: filter.require1HTrend,
-                })}
-              />
+              {/* Volume Filter is a MANDATORY platform-wide safety control —
+                  customers cannot disable it (enforced server-side in
+                  liveUserExecution.ts gate 0VOL + userSettings.ts allowlist).
+                  Render as a locked-on badge for non-admins; admins keep the
+                  live toggle for diagnostic / override purposes. */}
+              {isAdmin ? (
+                <FilterToggle
+                  label="VOL FILTER"
+                  on={filter.volumeFilter}
+                  color="#00ff8a"
+                  disabled={!canToggle || isMutating}
+                  onClick={() => filterMutation.mutate({
+                    volumeFilter:   !filter.volumeFilter,
+                    require1HTrend: filter.require1HTrend,
+                  })}
+                />
+              ) : (
+                <div
+                  title="Volume Filter is a mandatory platform safety control. It prevents trades on low-liquidity bars where slippage, spread manipulation, and thin-order-book volatility can cause poor fills. Always ON for all customer accounts."
+                  style={{
+                    display:       "inline-flex",
+                    alignItems:    "center",
+                    gap:           4,
+                    padding:       "4px 10px",
+                    background:    "#00ff8a14",
+                    border:        "1px solid #00ff8a55",
+                    borderRadius:  4,
+                    fontSize:      9,
+                    fontFamily:    "monospace",
+                    fontWeight:    700,
+                    color:         "#00ff8a",
+                    letterSpacing: "0.08em",
+                    whiteSpace:    "nowrap",
+                    cursor:        "help",
+                    userSelect:    "none",
+                  }}
+                >
+                  <span aria-hidden>🛡</span> VOL FILTER · MANDATORY
+                </div>
+              )}
               <FilterToggle
                 label="1H TREND"
                 on={filter.require1HTrend}
@@ -225,6 +257,12 @@ export default function Signals() {
                 })}
               />
             </div>
+            {!isAdmin && (
+              <div style={{ marginTop: 6, fontSize: 8, fontFamily: "monospace",
+                color: "#3a6a55", letterSpacing: "0.08em" }}>
+                VOLUME SAFETY GATE ALWAYS ON — PROTECTS AGAINST LOW-LIQUIDITY FILLS
+              </div>
+            )}
             {!isSignedIn && (
               <div style={{ marginTop: 6, fontSize: 8, fontFamily: "monospace",
                 color: "#2a4060", letterSpacing: "0.08em" }}>
