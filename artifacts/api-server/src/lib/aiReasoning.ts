@@ -225,28 +225,23 @@ function buildShortSummary(
   const detected = analysis.patterns.filter((p) => p.detected);
   const parts: string[] = [];
 
-  // RSI condition
   if (rsi.value < 30)      parts.push("RSI oversold");
   else if (rsi.value < 40) parts.push("RSI near oversold");
   else if (rsi.value > 70) parts.push("RSI overbought");
   else if (rsi.value > 60) parts.push("RSI near overbought");
 
-  // EMA crossover
   if (ema.crossover === "golden")      parts.push("golden cross");
   else if (ema.crossover === "death")  parts.push("death cross");
   else if (ema.signal === "bullish")   parts.push("bullish EMA alignment");
   else if (ema.signal === "bearish")   parts.push("bearish EMA alignment");
 
-  // Momentum
   if (momentum.direction === "bullish" && momentum.strength !== "weak") parts.push(`${momentum.strength} upward momentum`);
   if (momentum.direction === "bearish" && momentum.strength !== "weak") parts.push(`${momentum.strength} downward momentum`);
 
-  // Patterns
   for (const p of detected) {
     parts.push(p.name.toLowerCase() + " detected");
   }
 
-  // Trend context
   if (trend.direction !== "neutral") {
     parts.push(`${trend.strength} ${trend.direction} trend`);
   }
@@ -282,26 +277,9 @@ export function runAIDecision(
   else if (totalScore <= -1.5) decision = "SELL";
   else                         decision = "HOLD";
 
-  // Confidence calibration (CONVICTION_V2 — calibrated 2026-05-26).
-  // Pre-calibration formula was `raw * 150` with a 10-floor, which mapped
-  // the BUY/SELL threshold (totalScore=1.5, raw≈0.263) to only 39.5% and
-  // a strong 3-of-4 confluence (totalScore=3.0, raw≈0.526) to 78.9%.
-  // Result: most live signals clustered 30–55%, never reaching the
-  // engine's 60 baseline gate let alone the 80 live-execution floor —
-  // the system felt perpetually hesitant despite valid setups.
-  //
-  // New curve `30 + raw * 110` (with floor 30) maps:
-  //   totalScore 1.5 → 58.9  (was 39.5)  — entry-quality signal
-  //   totalScore 2.0 → 68.6  (was 52.6)  — typical aligned signal
-  //   totalScore 2.5 → 78.2  (was 65.8)  — quality alignment
-  //   totalScore 3.0 → 87.9  (was 78.9)  — high-conviction
-  //   totalScore 3.5 → 97.5  (was 92.1)  — exceptional
-  // Quality signals can now legitimately reach the 80 live floor; weak
-  // signals (totalScore < 1.0) sit in the low-30s instead of single
-  // digits. The execution floor (LIVE_EXECUTION_MIN_CONFIDENCE = 80)
-  // is unchanged — we are calibrating conviction, not weakening it.
+  // Confidence: how far score is from 0, normalized
   const raw        = Math.abs(totalScore) / maxScore;
-  const confidence = parseFloat(Math.min(98, Math.max(30, 30 + raw * 110)).toFixed(1));
+  const confidence = parseFloat(Math.min(98, Math.max(10, raw * 150)).toFixed(1));
 
   const reasoning    = buildReasoning(decision, confidence, analysis, momentum);
   const shortSummary = buildShortSummary(decision, analysis, momentum);
