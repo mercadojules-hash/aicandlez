@@ -4381,15 +4381,23 @@ export function PortalCustomerShell() {
       <UpgradeModal    open={upgrade}    onClose={() => setUpgrade(false)} gate={disclaimerGate} />
       <AccountModal    open={account}    onClose={() => setAccount(false)} tier={plan} onUpgrade={() => setUpgrade(true)} />
       <DisclaimerModal open={disclaimer} onClose={() => setDisclaimer(false)} />
-      {/* Pass 7X — PortalExchangeConnectModal restored on customer
-          surface to back the new header CONNECT EXCHANGE button.
-          liveExchangesEnabled=false keeps live-only/Alpaca catalog
-          rows rendered as LIVE GATED (disabled), preserving the
-          crypto-only paper-trading invariant. */}
+      {/* PortalExchangeConnectModal — `liveExchangesEnabled` unlocks the
+          full live exchange catalog (Kraken, Coinbase, Crypto.com,
+          Binance, Gemini). Previously hard-coded `false` here, which
+          rendered every non-Alpaca tile as LIVE GATED for ALL customers
+          — including operator-granted complimentary users and paying
+          Starter/Pro subscribers who are entitled to live execution.
+          `plan` is already complimentary-aware (see useCustomerPlan
+          above which collapses isComplimentary → effectivePlan), so a
+          simple `plan !== "free"` check correctly admits paid +
+          complimentary users while still gating true free accounts.
+          Admins always unlock. Server-side `requirePlan("starter")` +
+          per-user visibility remain authoritative — UI gate is purely
+          presentational here. */}
       <PortalExchangeConnectModal
         open={connectOpen}
         onClose={() => setConnectOpen(false)}
-        liveExchangesEnabled={false}
+        liveExchangesEnabled={isAdmin || plan !== "free"}
       />
       {disclaimerGateModal}
     </div>
