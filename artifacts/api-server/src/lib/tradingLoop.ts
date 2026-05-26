@@ -176,7 +176,7 @@ export const engineStats: EngineStats = {
   trailingStopHits:   0,
   correlationBlocks:  0,
   testMode:           true,   // enabled by default: modest signals (≥25% confidence) can trade immediately
-  require1HTrend:     false,
+  require1HTrend:     false,   // GATE flag (line ~1247). Default OFF so 1H disagreement doesn't newly block signals if testMode is ever flipped off. Compute is decoupled — see computeMTFDecision where trend1H is always computed for the displayConfidence boost.
   volumeFilter:       true,
   signalCounts:       { BUY: 0, SELL: 0, HOLD: 0 },
   funnelTotal:        0,
@@ -556,8 +556,15 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
   const fastSnap = buildTimeframeSnapshot(fast, candles5m);
   const slowSnap = buildTimeframeSnapshot(slow, candles15m);
 
-  const bothBuy  = fast.decision === "BUY"  && slow.decision === "BUY";
-  const bothSell = fast.decision === "SELL" && slow.decision === "SELL";
+  // CONVICTION_V2 (B): "directional + non-contradicting" MTF agreement.
+  // Old (strict identical): both timeframes had to emit the same BUY/SELL.
+  // That rejected early breakouts where 5m fires BUY but 15m hasn't crossed
+  // the ±1.5 totalScore threshold yet (still HOLD). New: one timeframe must
+  // be directional, the other must not contradict (HOLD is allowed). SELL
+  // on the opposite side still hard-blocks confirmation — contradiction
+  // protection is preserved.
+  const bothBuy  = fast.decision === "BUY"  && slow.decision !== "SELL";
+  const bothSell = fast.decision === "SELL" && slow.decision !== "BUY";
   const trendAligned = Math.sign(fast.totalScore) === Math.sign(slow.totalScore) && fast.totalScore !== 0;
 
   const mtfConfirmed  = (bothBuy || bothSell) && trendAligned;
@@ -588,13 +595,22 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
   const price5m     = candles5m[candles5m.length - 1]?.close ?? 1;
   const emaSpread5m = Math.abs(fastSnap.ema9 - fastSnap.ema21) / price5m;
   const emaSpread15m= Math.abs(slowSnap.ema9 - slowSnap.ema21) / price5m;
+  // CONVICTION_V2 (C): tightened sideways threshold from 0.0015 (0.15%) to
+  // 0.0008 (0.08%) to match modern crypto vol regime. BTC at $77k now needs
+  // only ~$62 EMA9-vs-EMA21 spread to escape sideways instead of ~$116.
+  // Trending threshold (0.30%) unchanged; range between is "neutral".
   const marketCondition: "trending" | "sideways" | "neutral" =
-    emaSpread5m < 0.0015 && emaSpread15m < 0.0015 ? "sideways" :
+    emaSpread5m < 0.0008 && emaSpread15m < 0.0008 ? "sideways" :
     (emaSpread5m >= 0.003 || emaSpread15m >= 0.003) ? "trending" : "neutral";
 
-  // ── 1H trend alignment (optional flag) ───────────────────────────────────
+  // ── 1H trend alignment ─────────────────────────────────────────────────
+  // CONVICTION_V2 (A, revised per architect): compute trend1H UNCONDITIONALLY
+  // so the displayConfidence calculator can award the 1H-alignment boost.
+  // The downstream gate at `trend1HGatePass` (line ~1247) still consults
+  // `engineStats.require1HTrend` (default false) so this compute does NOT
+  // newly block any signal — it only enriches display conviction.
   let trend1H: "bullish" | "bearish" | "unknown" = "unknown";
-  if (engineStats.require1HTrend) {
+  {
     try {
       const candles1h = await getCandles(symbol, "1h", 30);
       if (candles1h.length >= 21) {
