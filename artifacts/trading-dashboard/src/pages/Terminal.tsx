@@ -163,6 +163,18 @@ const TXT_40 = "rgba(255,255,255,0.40)";
 const TXT_25 = "rgba(255,255,255,0.22)";
 
 type Dir = "LONG" | "SHORT";
+/* ── Signal lifecycle states (EXECUTION PSYCHOLOGY PASS) ─────────────────
+ * Signals are no longer stateless filter results — they evolve as the
+ * AI tracks market structure. State derivation (all real, no synthetic):
+ *   FORMING         · in live set, conf < 60 (gates not yet cleared)
+ *   CONFIRMED       · in live set, conf 60-74 (gates cleared, building)
+ *   EXECUTION_READY · in live set, conf >= 75 (institutional climax)
+ *   WEAKENING       · dropped from live set 0-6s ago (confidence retreat)
+ *   INVALIDATED     · dropped from live set 6-12s ago (analytical exit)
+ *   EXECUTED        · matched an open position
+ * WEAKENING/INVALIDATED persist briefly so signals decay gradually
+ * instead of vanishing — preserves the "AI is tracking" trust signal. */
+type LifecycleState = "FORMING" | "CONFIRMED" | "EXECUTION_READY" | "WEAKENING" | "INVALIDATED" | "EXECUTED";
 type Signal = {
   sym: string;
   dir: Dir;
@@ -179,6 +191,13 @@ type Signal = {
   m15: "up" | "down" | "flat";
   h1: "up" | "down" | "flat";
   spark: number[];
+  /** Lifecycle state — derived in Terminal, optional so static fallback
+   *  fixtures don't need to set it. SignalCard renders a subtle pill. */
+  lifecycle?: LifecycleState;
+  /** Peak conviction observed for this signal — used to detect retreat
+   *  (e.g. peak 82 → current 64 reads as WEAKENING even if still in
+   *  the CONFIRMED band by absolute number). */
+  peakConf?: number;
 };
 
 const FALLBACK_LONGS: Signal[] = [
@@ -405,18 +424,32 @@ function SignalCard({ s, top, ignite }: { s: Signal; top?: boolean; ignite?: boo
   const borderCol = isLong ? "rgba(102,255,102,0.22)" : "rgba(255,59,59,0.26)";
   const topBorder = isLong ? "rgba(102,255,102,0.55)" : "rgba(255,59,59,0.55)";
   const meta = META[s.sym];
+  /* DECAY VISUAL — WEAKENING dims the card (~70%) + amber border tint;
+   * INVALIDATED dims further (~40%) + grayscale-ish neutral border.
+   * Real signals (FORMING/CONFIRMED/EXECUTION_READY) render full-bright.
+   * Reads as "the AI just stopped tracking this", not as a broken card. */
+  const isWeakening   = s.lifecycle === "WEAKENING";
+  const isInvalidated = s.lifecycle === "INVALIDATED";
+  const decayOpacity  = isInvalidated ? 0.42 : isWeakening ? 0.72 : 1;
+  const decayBorder   = isInvalidated
+    ? "rgba(255,255,255,0.10)"
+    : isWeakening
+      ? "rgba(255,200,61,0.32)"
+      : (top ? topBorder : borderCol);
   return (
     <div
       className={`sigcard${top ? " sigcard-top" : ""}${ignite ? (isLong ? " sigcard-ignite-long" : " sigcard-ignite-short") : ""} relative flex min-w-0 flex-col overflow-hidden`}
       style={{
         background: cardBg,
-        border: `1px solid ${top ? topBorder : borderCol}`,
-        boxShadow: top
+        border: `1px solid ${decayBorder}`,
+        boxShadow: top && !isWeakening && !isInvalidated
           ? `0 0 0 1px ${color}22, 0 0 28px ${color}3a inset, inset 0 1px 0 rgba(255,255,255,0.05), 0 6px 24px rgba(0,0,0,0.55)`
           : `inset 0 1px 0 rgba(255,255,255,0.045), inset 0 -40px 60px -30px rgba(0,0,0,0.65), 0 4px 18px rgba(0,0,0,0.45)`,
-        animation: top
+        animation: top && !isWeakening && !isInvalidated
           ? (isLong ? "edgePulse 4.2s ease-in-out infinite" : "edgePulseRed 4.6s ease-in-out infinite")
           : undefined,
+        opacity: decayOpacity,
+        transition: "opacity 600ms ease, border-color 600ms ease",
       }}
     >
       {/* CONVICTION RING IGNITION — one-shot when a brand-new top signal
@@ -463,6 +496,44 @@ function SignalCard({ s, top, ignite }: { s: Signal; top?: boolean; ignite?: boo
               <Flame size={9} /> TOP SIGNAL
             </div>
           )}
+          {/* LIFECYCLE STATE PILL — subtle, institutional. Communicates
+           *  "the AI is tracking this signal's evolution" without
+           *  gamifying the surface. WEAKENING/INVALIDATED visually
+           *  damp the card (handled via outer opacity/border below). */}
+          {s.lifecycle && s.lifecycle !== "FORMING" && (() => {
+            const isWeak  = s.lifecycle === "WEAKENING";
+            const isInv   = s.lifecycle === "INVALIDATED";
+            const isReady = s.lifecycle === "EXECUTION_READY";
+            const pillColor = isInv
+              ? "rgba(255,255,255,0.35)"
+              : isWeak
+                ? "#FFC83D"
+                : isReady
+                  ? color
+                  : colorSoft;
+            const pillBorder = isInv
+              ? "rgba(255,255,255,0.20)"
+              : isWeak
+                ? "rgba(255,200,61,0.55)"
+                : isReady
+                  ? `${color}88`
+                  : `${color}44`;
+            const pillBg = isInv
+              ? "transparent"
+              : isWeak
+                ? "rgba(255,200,61,0.06)"
+                : isReady
+                  ? `${color}14`
+                  : "transparent";
+            return (
+              <div
+                className="flex shrink-0 items-center gap-1 px-1.5 py-[2px] text-[8.5px] font-bold tracking-[0.18em]"
+                style={{ color: pillColor, border: `1px solid ${pillBorder}`, background: pillBg }}
+              >
+                {isReady ? "EXECUTION READY" : s.lifecycle}
+              </div>
+            );
+          })()}
           <div
             className="text-[8.5px] font-semibold tabular-nums tracking-[0.14em]"
             style={{ color: TXT_40, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
@@ -793,6 +864,177 @@ function TerminalInner() {
   const igniteLongTop  = longIgniteAt  > 0 && (now.getTime() - longIgniteAt)  < 1200;
   const igniteShortTop = shortIgniteAt > 0 && (now.getTime() - shortIgniteAt) < 1200;
 
+  /* ── SIGNAL LIFECYCLE TRACKER (EXECUTION PSYCHOLOGY PASS) ────────────────
+   * Tracks each signal across polls so the battlefield shows
+   * institutional evolution (FORMING → CONFIRMED → EXECUTION_READY →
+   * WEAKENING → INVALIDATED) instead of cards popping in and out.
+   *
+   *   - WEAKENING persists 6s after a signal drops from the live set
+   *   - INVALIDATED persists for 6s after that, then removed
+   *   - Promotion to EXECUTION_READY (conf >= 75) emits a feed entry
+   *     for the AI ACTIVITY rail — the climax moment
+   *   - All transitions are derived from REAL conviction movement; no
+   *     synthetic / decorative signals are ever injected
+   *
+   * The tracker lives in a ref (mutated in-place) so we don't thrash
+   * React state every poll; a lightweight `lifecycleVersion` counter
+   * drives memo invalidation when meaningful changes occur. */
+  type TrackerEntry = {
+    sig:       Signal;
+    firstSeen: number;
+    lastSeen:  number;
+    peakConf:  number;
+    lastConf:  number;
+    state:     LifecycleState;
+  };
+  type LifecycleTransition = {
+    id:    string;
+    t:     number;
+    sym:   string;
+    dir:   Dir;
+    state: LifecycleState;
+    note:  string;
+  };
+  const longTrackerRef  = useRef<Map<string, TrackerEntry>>(new Map());
+  const shortTrackerRef = useRef<Map<string, TrackerEntry>>(new Map());
+  const [transitions, setTransitions] = useState<LifecycleTransition[]>([]);
+  const [lifecycleVersion, setLifecycleVersion] = useState(0);
+
+  const deriveLiveState = (conf: number): LifecycleState =>
+    conf >= 75 ? "EXECUTION_READY" : conf >= 60 ? "CONFIRMED" : "FORMING";
+
+  /* Update tracker when live signal set changes — adds/promotes entries
+   * and flips departed signals into WEAKENING (one-shot per transition). */
+  useEffect(() => {
+    if (isBootstrap) return;
+    const nowMs = Date.now();
+    const newTransitions: LifecycleTransition[] = [];
+    const updateSide = (live: Signal[], tracker: Map<string, TrackerEntry>, dir: Dir) => {
+      const liveSet = new Set(live.map(s => s.sym));
+      for (const s of live) {
+        const prev = tracker.get(s.sym);
+        const peak = Math.max(prev?.peakConf ?? 0, s.conf);
+        const nextState = deriveLiveState(s.conf);
+        if (prev?.state !== "EXECUTION_READY" && nextState === "EXECUTION_READY") {
+          newTransitions.push({
+            id:    `lc-${dir}-${s.sym}-ready-${nowMs}`,
+            t:     nowMs,
+            sym:   s.sym,
+            dir,
+            state: "EXECUTION_READY",
+            note:  "execution ready · institutional gates cleared",
+          });
+        }
+        tracker.set(s.sym, {
+          sig:       { ...s, lifecycle: nextState, peakConf: peak },
+          firstSeen: prev?.firstSeen ?? nowMs,
+          lastSeen:  nowMs,
+          peakConf:  peak,
+          lastConf:  s.conf,
+          state:     nextState,
+        });
+      }
+      for (const [sym, e] of tracker.entries()) {
+        if (!liveSet.has(sym) && e.state !== "WEAKENING" && e.state !== "INVALIDATED") {
+          e.state = "WEAKENING";
+          e.sig   = { ...e.sig, lifecycle: "WEAKENING" };
+          newTransitions.push({
+            id:    `lc-${dir}-${sym}-weak-${nowMs}`,
+            t:     nowMs,
+            sym,
+            dir,
+            state: "WEAKENING",
+            note:  e.peakConf >= 75
+              ? "weakening · conviction retracting from peak"
+              : "weakening · MTF agreement softening",
+          });
+        }
+      }
+    };
+    updateSide(longs,  longTrackerRef.current,  "LONG");
+    updateSide(shorts, shortTrackerRef.current, "SHORT");
+    if (newTransitions.length) {
+      setTransitions(prev => [...newTransitions, ...prev].slice(0, 24));
+      setLifecycleVersion(v => v + 1);
+    }
+  }, [longs, shorts, isBootstrap]);
+
+  /* Decay tick — promotes WEAKENING → INVALIDATED at 6s, evicts at 12s.
+   * Driven by the existing 1Hz `now` tick so we don't need a new timer. */
+  useEffect(() => {
+    if (isBootstrap) return;
+    const nowMs = now.getTime();
+    const newTransitions: LifecycleTransition[] = [];
+    let mutated = false;
+    const decay = (tracker: Map<string, TrackerEntry>, dir: Dir) => {
+      for (const [sym, e] of tracker.entries()) {
+        const age = nowMs - e.lastSeen;
+        if (age >= 12_000) {
+          tracker.delete(sym);
+          mutated = true;
+          continue;
+        }
+        if (age >= 6_000 && e.state === "WEAKENING") {
+          e.state = "INVALIDATED";
+          e.sig   = { ...e.sig, lifecycle: "INVALIDATED" };
+          mutated = true;
+          newTransitions.push({
+            id:    `lc-${dir}-${sym}-inv-${nowMs}`,
+            t:     nowMs,
+            sym,
+            dir,
+            state: "INVALIDATED",
+            note:  "invalidated · setup no longer institutional-grade",
+          });
+        }
+      }
+    };
+    decay(longTrackerRef.current,  "LONG");
+    decay(shortTrackerRef.current, "SHORT");
+    if (newTransitions.length) {
+      setTransitions(prev => [...newTransitions, ...prev].slice(0, 24));
+    }
+    if (mutated) setLifecycleVersion(v => v + 1);
+  }, [now, isBootstrap]);
+
+  /* Display lists — live signals (carrying derived lifecycle) followed
+   * by persisted WEAKENING/INVALIDATED cards (so departures fade
+   * gracefully). Capped at 10/side to preserve scarcity. Live cards
+   * always sort first so TOP SIGNAL stays the highest-conviction live
+   * setup; persisted cards trail in decay order. */
+  const buildDisplay = (
+    live: Signal[],
+    tracker: Map<string, TrackerEntry>,
+  ): Signal[] => {
+    const liveSet = new Set(live.map(s => s.sym));
+    const liveWithState: Signal[] = live.map(s => {
+      const e = tracker.get(s.sym);
+      return { ...s, lifecycle: e?.state ?? deriveLiveState(s.conf), peakConf: e?.peakConf ?? s.conf };
+    });
+    const persisted: Signal[] = [];
+    for (const [sym, e] of tracker.entries()) {
+      if (!liveSet.has(sym) && (e.state === "WEAKENING" || e.state === "INVALIDATED")) {
+        persisted.push(e.sig);
+      }
+    }
+    persisted.sort((a, b) => {
+      // WEAKENING ahead of INVALIDATED; within state, higher peak first
+      const ar = a.lifecycle === "WEAKENING" ? 0 : 1;
+      const br = b.lifecycle === "WEAKENING" ? 0 : 1;
+      if (ar !== br) return ar - br;
+      return (b.peakConf ?? 0) - (a.peakConf ?? 0);
+    });
+    return [...liveWithState, ...persisted].slice(0, 10);
+  };
+  /* Recompute when live data changes or tracker mutates. `lifecycleVersion`
+   * bumps on every meaningful tracker mutation (promotion to EXECUTION_READY,
+   * WEAKENING flip, INVALIDATED escalation, eviction), so we don't need
+   * `now` as a 1Hz driver — that was redundant recompute churn. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const displayLongs  = useMemo(() => buildDisplay(longs,  longTrackerRef.current),  [longs,  lifecycleVersion]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const displayShorts = useMemo(() => buildDisplay(shorts, shortTrackerRef.current), [shorts, lifecycleVersion]);
+
   /* Live positions adapter — paper-trading store → row shape used by the
    * LIVE POSITIONS table. Fallback only while the user has zero lifetime
    * activity; once they have any history, an empty open list reads as the
@@ -834,9 +1076,32 @@ function TerminalInner() {
   }, [liveConn]);
   const balanceFlashKey = liveConn?.lastUpdated ?? 0;
 
+  /* AI ACTIVITY feed = lifecycle transitions (EXECUTION_READY climax +
+   * WEAKENING/INVALIDATED analytical exits — all derived from real
+   * conviction movement) merged with the engine's own signal log. Local
+   * transitions win on timestamp ties so the rail feels lock-step with
+   * the battlefield it sits next to. */
   const feedRows = useMemo(() => {
     const log: SignalLogEntry[] = engine?.recentSignalLog ?? [];
-    return log.slice(0, 9).map((e) => {
+    const lifecycleRows = transitions.map(tr => {
+      const isReady = tr.state === "EXECUTION_READY";
+      const isWeak  = tr.state === "WEAKENING";
+      const dot = isReady
+        ? (tr.dir === "LONG" ? BRAND : RED)
+        : isWeak
+          ? "#FFC83D"
+          : "rgba(255,255,255,0.45)";
+      const verb = isReady ? "EXEC READY" : tr.state;
+      return {
+        id:    tr.id,
+        t:     fmtHHMMSS(tr.t),
+        msg:   `AI ${verb} ${tr.sym} · ${tr.note}`,
+        dot,
+        fresh: Date.now() - tr.t < 30_000,
+        ts:    tr.t,
+      };
+    });
+    const engineRows = log.slice(0, 9).map((e) => {
       const dec = e.decision.toUpperCase();
       const isLong    = dec.includes("BUY")  || dec.includes("LONG");
       const isShort   = dec.includes("SELL") || dec.includes("SHORT");
@@ -870,7 +1135,10 @@ function TerminalInner() {
         ts:    e.timestamp,
       };
     });
-  }, [engine?.recentSignalLog]);
+    return [...lifecycleRows, ...engineRows]
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, 12);
+  }, [engine?.recentSignalLog, transitions]);
 
   /* Idle battlefield intelligence — when no signals clear gates, columns
    * must NOT look dead. Surface AI discipline instead: rotating gate
@@ -1374,15 +1642,15 @@ function TerminalInner() {
                   </div>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto stream-scroll flex flex-col gap-3 pr-1 py-2">
-                  {longs.length === 0 ? (
+                  {displayLongs.length === 0 ? (
                     <IdleBattlefieldState
                       side="long"
                       marketsScanned={marketsScanned}
                       gatesPassed={gatesPassed}
                       currentReason={currentIdleReason}
                     />
-                  ) : longs.map((s, i) => (
-                    <SignalCard key={s.sym} s={s} top={i === 0} ignite={i === 0 && igniteLongTop} />
+                  ) : displayLongs.map((s, i) => (
+                    <SignalCard key={`${s.sym}-${s.lifecycle ?? "live"}`} s={s} top={i === 0 && s.lifecycle !== "WEAKENING" && s.lifecycle !== "INVALIDATED"} ignite={i === 0 && igniteLongTop && s.lifecycle !== "WEAKENING" && s.lifecycle !== "INVALIDATED"} />
                   ))}
                 </div>
               </div>
@@ -1417,15 +1685,15 @@ function TerminalInner() {
                   </div>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto stream-scroll flex flex-col gap-3 pr-1 py-2">
-                  {shorts.length === 0 ? (
+                  {displayShorts.length === 0 ? (
                     <IdleBattlefieldState
                       side="short"
                       marketsScanned={marketsScanned}
                       gatesPassed={gatesPassed}
                       currentReason={currentIdleReason}
                     />
-                  ) : shorts.map((s, i) => (
-                    <SignalCard key={s.sym} s={s} top={i === 0} ignite={i === 0 && igniteShortTop} />
+                  ) : displayShorts.map((s, i) => (
+                    <SignalCard key={`${s.sym}-${s.lifecycle ?? "live"}`} s={s} top={i === 0 && s.lifecycle !== "WEAKENING" && s.lifecycle !== "INVALIDATED"} ignite={i === 0 && igniteShortTop && s.lifecycle !== "WEAKENING" && s.lifecycle !== "INVALIDATED"} />
                   ))}
                 </div>
               </div>
@@ -1582,11 +1850,24 @@ function TerminalInner() {
                   ? "AI EXECUTION ARMED · MANAGING POSITIONS"
                   : "TAP TO ARM AI EXECUTION"}
               </div>
+              {/* INSTITUTIONAL FRAMING — authorization context, not feature
+               *  toggle. Hairline divider above the control strip so the
+               *  copy reads as a contract the operator is signing. */}
+              <div
+                className="text-[8.5px] tracking-[0.22em]"
+                style={{
+                  color: aiTrading.enabled ? "rgba(255,255,255,0.55)" : TXT_40,
+                }}
+              >
+                {aiTrading.enabled
+                  ? "INSTITUTIONAL EXECUTION ENGINE · LIVE CAPITAL ROUTED"
+                  : "AUTHORIZE INSTITUTIONAL EXECUTION ENGINE"}
+              </div>
               {/* CONTROL STRIP — values illuminate (brand color + faint glow)
                *  when ARMED to communicate the live risk profile is now
                *  active, not idle config. */}
               <div className="flex items-center gap-3 text-[8.5px] tracking-[0.18em]" style={{ color: TXT_40 }}>
-                <span>MAX TRADES <span
+                <span>MAX POSITIONS <span
                   className="font-bold tabular-nums"
                   style={{
                     color: aiTrading.enabled ? BRAND : TXT_85,
@@ -1594,21 +1875,21 @@ function TerminalInner() {
                   }}
                 >{aiMaxTrades || "—"}</span></span>
                 <span style={{ color: TXT_25 }}>·</span>
-                <span>RISK <span
-                  className="font-bold"
-                  style={{
-                    color: aiTrading.enabled ? BRAND : TXT_85,
-                    textShadow: aiTrading.enabled ? `0 0 6px ${BRAND}66` : "none",
-                  }}
-                >BALANCED</span></span>
-                <span style={{ color: TXT_25 }}>·</span>
-                <span>MODE <span
+                <span>RISK PROFILE <span
                   className="font-bold"
                   style={{
                     color: aiTrading.enabled ? BRAND : TXT_85,
                     textShadow: aiTrading.enabled ? `0 0 6px ${BRAND}66` : "none",
                   }}
                 >{aiTrading.plan === "pro" ? "AGGRESSIVE" : aiTrading.plan === "starter" ? "BALANCED" : "CONSERVATIVE"}</span></span>
+                <span style={{ color: TXT_25 }}>·</span>
+                <span>AI CONTROL <span
+                  className="font-bold"
+                  style={{
+                    color: aiTrading.enabled ? BRAND : TXT_85,
+                    textShadow: aiTrading.enabled ? `0 0 6px ${BRAND}66` : "none",
+                  }}
+                >{aiTrading.plan === "pro" ? "HIGH" : aiTrading.plan === "starter" ? "STANDARD" : "OBSERVE"}</span></span>
               </div>
               {aiUpgradeFlash && (
                 <div
