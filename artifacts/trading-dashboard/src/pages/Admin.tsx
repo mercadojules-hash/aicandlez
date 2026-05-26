@@ -1933,11 +1933,45 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
                 ] as const}
                 onChange={(v) => setAiDraft({ ...aiDraft, preferredExchange: v })} />
             </FieldShell>
+            {/* VOLUME FILTER — MANDATORY platform-wide safety control.
+                The per-user `user_settings.volume_filter` column has ZERO
+                execution effect: gate 0VOL in `lib/liveUserExecution.ts`
+                reads `engineStats.symbolBreakdowns[symbol].volumeConfirmed`
+                unconditionally for every non-admin live order (no per-user
+                opt-out path exists), and the customer settings PUT allowlist
+                in `routes/userSettings.ts` strips the field. The trading
+                loop's signal-side `engineStats.volumeFilter` is a separate
+                GLOBAL operator toggle (flipped via /engine/filters, not
+                this drawer). Rendering the stored column as an editable
+                toggle here misled operators into thinking they could
+                disable a safety gate that cannot be disabled. Locked
+                ENFORCED status badge below; stored legacy value surfaced
+                for transparency only. No PATCH is emitted from this field. */}
             <FieldShell label="VOLUME FILTER"
-              dirty={aiDraft.volumeFilter !== aiServer.volumeFilter}
-              disabled={aiDisabled}>
-              <ToggleField value={aiDraft.volumeFilter} disabled={aiDisabled}
-                onChange={(v) => setAiDraft({ ...aiDraft, volumeFilter: v })} />
+              sub={`Engine gate (mandatory) · stored: ${aiServer.volumeFilter ? "ON" : "OFF"} (legacy, ignored at runtime)`}
+              dirty={false}
+              disabled={true}>
+              <div style={{
+                display:        "inline-flex",
+                alignItems:     "center",
+                gap:            6,
+                padding:        "3px 9px",
+                background:     "#00ff8a18",
+                border:         "1px solid #00ff8a66",
+                borderRadius:   3,
+                fontSize:       9,
+                fontFamily:     "monospace",
+                fontWeight:     700,
+                color:          "#00ff8a",
+                letterSpacing:  "0.12em",
+                whiteSpace:     "nowrap",
+                userSelect:     "none",
+              }}
+              title="Volume Filter is a mandatory platform safety control enforced at the execution layer (liveUserExecution.ts gate 0VOL) for every non-admin live order. No customer or admin override path can disable it. The stored per-user column is legacy and has no runtime effect."
+              >
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#00ff8a", boxShadow: "0 0 6px #00ff8a" }} />
+                ENFORCED · MANDATORY
+              </div>
             </FieldShell>
           </div>
 
