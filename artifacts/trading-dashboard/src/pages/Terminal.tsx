@@ -64,6 +64,70 @@ function useExchangeBalances() {
   });
 }
 
+/* ── AI AUTOTRADE state (canonical /api/user/ai-trading/*) ───────────────
+ * Server-backed (`user_settings.autoMode`), gated by `resolveAiTradingGate`
+ * (plan + planStatus + role). Free users can't flip it ON — mutation
+ * returns 402 and the query continues to report enabled=false. Mirrors
+ * PortalCustomerShell's `useAiTradingState`. */
+interface AiTradingState {
+  enabled: boolean;
+  allowed: boolean;
+  plan:    "free" | "starter" | "pro";
+  isAdmin: boolean;
+  reason:  string | null;
+}
+const AI_TRADING_QK = ["ai-trading-state-terminal"] as const;
+function useAiTradingState() {
+  const q = useQuery<AiTradingState>({
+    queryKey: AI_TRADING_QK,
+    queryFn: async () => {
+      const res = await authFetch(`${apiBaseUrl}/api/user/ai-trading/state`);
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      return res.json();
+    },
+    staleTime:            30_000,
+    refetchInterval:      60_000,
+    refetchOnWindowFocus: true,
+  });
+  const state: AiTradingState = q.data ?? {
+    enabled: false, allowed: false, plan: "free", isAdmin: false, reason: null,
+  };
+  const setEnabled = async (next: boolean): Promise<{ ok: boolean; needsUpgrade?: boolean }> => {
+    try {
+      const res = await authFetch(`${apiBaseUrl}/api/user/ai-trading/enable`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ enabled: next }),
+      });
+      if (res.status === 402) return { ok: false, needsUpgrade: true };
+      if (!res.ok) return { ok: false };
+      const data = await res.json();
+      q.refetch();
+      return { ok: !!data.enabled === next };
+    } catch {
+      return { ok: false };
+    }
+  };
+  return { ...state, isLoading: q.isLoading, refetch: q.refetch, setEnabled };
+}
+
+function fmtHHMMSS(ts: number): string {
+  const d = new Date(ts);
+  const h = d.getUTCHours().toString().padStart(2, "0");
+  const m = d.getUTCMinutes().toString().padStart(2, "0");
+  const s = d.getUTCSeconds().toString().padStart(2, "0");
+  return `${h}:${m}:${s}`;
+}
+function fmtBalanceQty(qty: number, asset: string): string {
+  const isFiat = /^(USD|USDT|USDC|EUR|GBP)$/i.test(asset);
+  if (isFiat) {
+    return qty.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  if (qty >= 1)   return qty.toLocaleString("en-US", { maximumFractionDigits: 4 });
+  if (qty >= 0.01) return qty.toFixed(5);
+  return qty.toFixed(8);
+}
+
 const BRAND = "#66FF66";
 const LIME = "#7CFF00";
 const EMERALD = "#00C853";
@@ -227,19 +291,8 @@ function vmToSignal(vm: OpportunityVM): Signal {
   };
 }
 
-const BALANCES = [
-  { asset: "BTC",  qty: "1.842" },
-  { asset: "ETH",  qty: "12.40" },
-  { asset: "USDT", qty: "41,820" },
-];
-
-const FEED = [
-  { t: "14:22:01", msg: "AI RAISED BTC CONVICTION  79→91",  dot: BRAND },
-  { t: "14:21:18", msg: "EXECUTED  BTC LONG  @67,287",       dot: EMERALD },
-  { t: "14:20:42", msg: "AI DETECTED  WIF SHORT SETUP",      dot: BRAND },
-  { t: "14:19:09", msg: "RISK GATE  AVAX vol expansion",     dot: "#FFC83D" },
-  { t: "14:17:51", msg: "AI RAISED SOL CONVICTION  76→84",   dot: BRAND },
-];
+/* BALANCES + FEED constants removed in Priority 2: right-rail is now
+ * wired to /api/user/exchanges/balances + engine.recentSignalLog. */
 
 const EQUITY_SPARK = [82,83,84,85,84,86,87,88,90,91,92,94,95,97,99,101,103,104,106,107,108];
 const PULSE_WAVE = [40,42,38,46,44,50,48,54,52,58,55,62,60,66,64,70,68,72,69,74,71,76,73,78,75,80,76,82,78,84,80,86];
@@ -560,6 +613,8 @@ function TerminalInner() {
   const { majors, alts, engine, isLoading: signalsLoading } = usePaperSignals();
   const { open: openPositions, stats } = usePaperTrades();
   const exec = useExecutionState();
+  const { data: balancesData } = useExchangeBalances();
+  const aiTrading = useAiTradingState();
 
   /* Bootstrap detector — true only before the first successful engine poll.
    * Once `engine` is non-null we cut over to live data and accept honest
@@ -606,6 +661,79 @@ function TerminalInner() {
     }));
   }, [openPositions]);
 
+  /* ── Priority 2: right-rail live wiring ───────────────────────────────────
+   * BALANCES → first ok connection from /api/user/exchanges/balances, top
+   * non-zero assets. If none, render the honest "no broker linked" state
+   * (NOT mock data) — the right rail tells the truth.
+   * AI ACTIVITY FEED → engine.recentSignalLog (unified AI decisions +
+   * promotions/demotions + risk-gate blocks + executions). */
+  const liveConn = useMemo<BalanceConnection | null>(() => {
+    const conns = balancesData?.connections ?? [];
+    return conns.find(c => c.ok) ?? conns[0] ?? null;
+  }, [balancesData]);
+  const balanceRows = useMemo(() => {
+    if (!liveConn?.ok) return [];
+    return Object.entries(liveConn.balances)
+      .filter(([, b]) => b.total > 0)
+      .map(([asset, b]) => ({ asset, qty: b.total }))
+      .sort((a, b) => {
+        // crude USD-ish ordering: fiat first by qty desc, then crypto by qty desc
+        const aFiat = /^(USD|USDT|USDC)$/i.test(a.asset);
+        const bFiat = /^(USD|USDT|USDC)$/i.test(b.asset);
+        if (aFiat !== bFiat) return aFiat ? -1 : 1;
+        return b.qty - a.qty;
+      })
+      .slice(0, 5);
+  }, [liveConn]);
+  const balanceFlashKey = liveConn?.lastUpdated ?? 0;
+
+  const feedRows = useMemo(() => {
+    const log: SignalLogEntry[] = engine?.recentSignalLog ?? [];
+    return log.slice(0, 9).map((e) => {
+      const dec = e.decision.toUpperCase();
+      const isLong    = dec.includes("BUY")  || dec.includes("LONG");
+      const isShort   = dec.includes("SELL") || dec.includes("SHORT");
+      const isExec    = !!e.executedAs;
+      const isBlocked = !!e.blockReason;
+      const dot =
+        isBlocked ? "#FFC83D" :
+        isExec    ? EMERALD   :
+        isLong    ? BRAND     :
+        isShort   ? RED       : "#888";
+      const verb =
+        isBlocked ? "BLOCKED"  :
+        isExec    ? "EXECUTED" :
+        isLong    ? "LONG"     :
+        isShort   ? "SHORT"    : dec;
+      const detail = (e.shortSummary || e.blockReason || "").slice(0, 60);
+      const sym = e.symbol.replace(/(USDT|USDC|USD)$/i, "");
+      return {
+        id:    e.id,
+        t:     fmtHHMMSS(e.timestamp),
+        msg:   detail ? `AI ${verb} ${sym} · ${detail}` : `AI ${verb} ${sym}`,
+        dot,
+        fresh: Date.now() - e.timestamp < 30_000,
+        ts:    e.timestamp,
+      };
+    });
+  }, [engine?.recentSignalLog]);
+
+  /* AI autotrade — derive max-trade capacity from plan tier. Free=0 disables
+   * the toggle path (server gate returns 402 anyway). */
+  const aiMaxTrades = aiTrading.isAdmin ? 99 : aiTrading.plan === "pro" ? 12 : aiTrading.plan === "starter" ? 3 : 0;
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiUpgradeFlash, setAiUpgradeFlash] = useState(false);
+  const toggleAi = async () => {
+    if (aiBusy) return;
+    setAiBusy(true);
+    const result = await aiTrading.setEnabled(!aiTrading.enabled);
+    if (result.needsUpgrade) {
+      setAiUpgradeFlash(true);
+      setTimeout(() => setAiUpgradeFlash(false), 2400);
+    }
+    setAiBusy(false);
+  };
+
   /* Account telemetry — wired from the paper-trade store. */
   const equityTotal = stats.equity ?? STARTING_EQUITY;
   const equityInt   = Math.floor(equityTotal);
@@ -637,7 +765,7 @@ function TerminalInner() {
 
   return (
     <div
-      className="relative min-h-screen w-full overflow-hidden"
+      className="relative h-screen w-full overflow-hidden flex flex-col"
       style={{
         background: BG_0,
         color: "white",
@@ -718,6 +846,29 @@ function TerminalInner() {
           0%   { opacity: 0; transform: translateY(-2px); }
           100% { opacity: 1; transform: translateY(0); }
         }
+        /* P2/P3: institutional stream scrollbars + soft top/bottom fade.
+         * Mask gives the impression that signals are flowing through a
+         * fixed viewport rather than ending in a hard edge. */
+        .stream-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(102,255,102,0.18) transparent;
+          -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+                  mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+          scroll-behavior: smooth;
+        }
+        .stream-scroll::-webkit-scrollbar { width: 6px; }
+        .stream-scroll::-webkit-scrollbar-track { background: transparent; }
+        .stream-scroll::-webkit-scrollbar-thumb {
+          background: rgba(102,255,102,0.18);
+          border-radius: 3px;
+        }
+        .stream-scroll::-webkit-scrollbar-thumb:hover {
+          background: rgba(102,255,102,0.32);
+        }
+        @keyframes aiActivePulse {
+          0%,100% { box-shadow: 0 0 0 1px rgba(102,255,102,0.55), 0 0 18px rgba(102,255,102,0.18) inset; }
+          50%     { box-shadow: 0 0 0 1px rgba(102,255,102,0.85), 0 0 32px rgba(102,255,102,0.32) inset; }
+        }
 
         /* card hover micro-state — subtle lift, brighter material edge */
         .sigcard { transition: transform 220ms cubic-bezier(.2,.7,.2,1), border-color 220ms ease, box-shadow 220ms ease; }
@@ -755,7 +906,7 @@ function TerminalInner() {
         }}
       />
 
-      <div className="relative z-10">
+      <div className="relative z-10 flex flex-1 min-h-0 flex-col">
         {/* TOP BAR */}
         <div
           className="flex h-[56px] items-center gap-5 px-5"
@@ -922,14 +1073,18 @@ function TerminalInner() {
           </div>
         </div>
 
-        {/* MAIN — battlefield + right rail */}
+        {/* MAIN — battlefield + right rail
+         * VIEWPORT-LOCKED: outer container is `h-screen flex-col`, this
+         * grid takes `flex-1 min-h-0` so battlefield + rail fit exactly
+         * in the remaining vertical space. Inner streams scroll, page
+         * doesn't. Institutional terminal feel. */}
         <div
-          className="grid gap-4 px-4 pb-4"
+          className="grid gap-4 px-4 pb-4 flex-1 min-h-0 overflow-hidden"
           style={{ gridTemplateColumns: "1fr 340px", paddingTop: 20 }}
         >
           {/* BATTLEFIELD — matte-black wrapper */}
           <div
-            className="flex min-w-0 flex-col gap-4 p-3.5"
+            className="flex min-w-0 min-h-0 flex-col gap-4 p-3.5 overflow-hidden"
             style={{ background: BG_0, border: `1px solid ${HAIR_10}` }}
           >
             <div className="flex items-end justify-between">
@@ -949,18 +1104,18 @@ function TerminalInner() {
               </div>
             </div>
 
-            <div className="grid gap-3.5" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
-              {/* LONGS */}
-              <div className="flex min-w-0 flex-col gap-3">
+            <div className="grid gap-3.5 flex-1 min-h-0 overflow-hidden" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
+              {/* LONGS column — header pinned, signal list independently scrolls */}
+              <div className="flex min-w-0 min-h-0 flex-col gap-3 overflow-hidden">
                 <div
-                  className="flex items-center gap-2.5 px-3 py-2"
+                  className="flex items-center gap-2.5 px-3 py-2 flex-shrink-0"
                   style={{ background: "rgba(0,200,83,0.05)", border: `1px solid ${HAIR_18}` }}
                 >
                   <div
                     className="grid h-7 min-w-[28px] place-items-center px-1 text-[12px] font-bold"
                     style={{ background: BRAND, color: BG_0, boxShadow: `0 0 12px ${BRAND}88` }}
                   >
-                    15
+                    {longs.length}
                   </div>
                   <div className="text-[13px] font-bold tracking-[0.18em]" style={{ color: BRAND }}>LONGS · ACTIVE</div>
                   <div className="ml-auto flex items-center gap-1.5 text-[9.5px] tracking-[0.16em]" style={{ color: TXT_65 }}>
@@ -968,22 +1123,24 @@ function TerminalInner() {
                     AI BIAS: <span className="font-bold" style={{ color: BRAND }}>BULLISH</span>
                   </div>
                 </div>
-                {longs.map((s, i) => (
-                  <SignalCard key={s.sym} s={s} top={i === 0} />
-                ))}
+                <div className="flex-1 min-h-0 overflow-y-auto stream-scroll flex flex-col gap-3 pr-1 py-2">
+                  {longs.map((s, i) => (
+                    <SignalCard key={s.sym} s={s} top={i === 0} />
+                  ))}
+                </div>
               </div>
 
-              {/* SHORTS */}
-              <div className="flex min-w-0 flex-col gap-3">
+              {/* SHORTS column — header pinned, signal list independently scrolls */}
+              <div className="flex min-w-0 min-h-0 flex-col gap-3 overflow-hidden">
                 <div
-                  className="flex items-center gap-2.5 px-3 py-2"
+                  className="flex items-center gap-2.5 px-3 py-2 flex-shrink-0"
                   style={{ background: "rgba(255,59,59,0.05)", border: `1px solid ${HAIR_RED_18}` }}
                 >
                   <div
                     className="grid h-7 min-w-[28px] place-items-center px-1 text-[12px] font-bold"
                     style={{ background: RED, color: "#fff", boxShadow: `0 0 12px ${RED}88` }}
                   >
-                    15
+                    {shorts.length}
                   </div>
                   <div className="text-[13px] font-bold tracking-[0.18em]" style={{ color: RED }}>SHORTS · ACTIVE</div>
                   <div className="ml-auto flex items-center gap-1.5 text-[9.5px] tracking-[0.16em]" style={{ color: TXT_65 }}>
@@ -991,15 +1148,19 @@ function TerminalInner() {
                     AI BIAS: <span className="font-bold" style={{ color: RED }}>BEARISH</span>
                   </div>
                 </div>
-                {shorts.map((s, i) => (
-                  <SignalCard key={s.sym} s={s} top={i === 0} />
-                ))}
+                <div className="flex-1 min-h-0 overflow-y-auto stream-scroll flex flex-col gap-3 pr-1 py-2">
+                  {shorts.map((s, i) => (
+                    <SignalCard key={s.sym} s={s} top={i === 0} />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* RIGHT RAIL — MY ACCOUNT */}
-          <div className="flex flex-col gap-3.5">
+          {/* RIGHT RAIL — MY ACCOUNT (viewport-locked, scrolls independently
+           * if content exceeds height — preserves account/AI controls
+           * visibility without making the whole page scroll). */}
+          <div className="flex flex-col gap-3.5 min-h-0 overflow-y-auto stream-scroll pr-1 py-2">
             <div className="flex items-center justify-between">
               <div className="text-[12px] font-bold tracking-[0.22em] text-white">MY ACCOUNT</div>
               <div
@@ -1059,6 +1220,82 @@ function TerminalInner() {
               <MiniStat label="UNREALIZED" value={fmtMoneySigned(stats.unrealizedPnl)} color={isProfitUnreal ? BRAND : RED} />
             </div>
 
+            {/* AI AUTOTRADE CONTROL — emotional conversion moment.
+             * NOT a generic toggle. Matte black + neon-green LIVE state
+             * with subtle pulse. Server-backed via /api/user/ai-trading/*.
+             * Free users get a 402 → flash a soft "UPGRADE" hint without
+             * exposing live-execution affordances. Customer-portal locked
+             * invariant respected (paper-only execution downstream). */}
+            <button
+              type="button"
+              onClick={toggleAi}
+              disabled={aiBusy || aiTrading.isLoading}
+              className="group relative flex flex-col gap-2 p-3 text-left"
+              style={{
+                background: aiTrading.enabled
+                  ? `linear-gradient(180deg, rgba(102,255,102,0.10), rgba(102,255,102,0.02)), ${BG_2}`
+                  : BG_2,
+                border: `1px solid ${aiTrading.enabled ? `${BRAND}66` : HAIR_18}`,
+                boxShadow: aiTrading.enabled
+                  ? `0 0 22px rgba(102,255,102,0.10) inset`
+                  : "none",
+                cursor: aiBusy ? "wait" : "pointer",
+                animation: aiTrading.enabled ? "aiActivePulse 3.2s ease-in-out infinite" : undefined,
+                opacity: aiBusy ? 0.7 : 1,
+                transition: "border-color 220ms ease, box-shadow 220ms ease, opacity 180ms ease",
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Bot size={12} style={{ color: aiTrading.enabled ? BRAND : TXT_65 }} />
+                  <div
+                    className="text-[10px] font-bold tracking-[0.22em]"
+                    style={{ color: aiTrading.enabled ? "#fff" : TXT_85 }}
+                  >
+                    AI AUTOTRADE
+                  </div>
+                </div>
+                <div
+                  className="flex items-center gap-1 px-1.5 py-[2px] text-[9px] font-bold tracking-[0.18em]"
+                  style={{
+                    color: aiTrading.enabled ? BG_0 : TXT_65,
+                    background: aiTrading.enabled ? BRAND : "transparent",
+                    border: `1px solid ${aiTrading.enabled ? BRAND : HAIR_18}`,
+                    boxShadow: aiTrading.enabled ? `0 0 12px ${BRAND}77` : "none",
+                  }}
+                >
+                  {aiTrading.enabled && (
+                    <span
+                      className="h-1 w-1 rounded-full"
+                      style={{ background: BG_0, animation: "livePulse 1.8s ease-in-out infinite" }}
+                    />
+                  )}
+                  {aiTrading.enabled ? "LIVE" : "OFF"}
+                </div>
+              </div>
+              <div
+                className="text-[10.5px] tracking-[0.04em]"
+                style={{ color: aiTrading.enabled ? BRAND : TXT_65 }}
+              >
+                {aiTrading.enabled ? "AI actively managing positions" : "AI monitoring only"}
+              </div>
+              <div className="flex items-center gap-3 text-[8.5px] tracking-[0.18em]" style={{ color: TXT_40 }}>
+                <span>MAX TRADES <span className="font-bold tabular-nums" style={{ color: TXT_85 }}>{aiMaxTrades || "—"}</span></span>
+                <span style={{ color: TXT_25 }}>·</span>
+                <span>RISK <span className="font-bold" style={{ color: TXT_85 }}>BALANCED</span></span>
+                <span style={{ color: TXT_25 }}>·</span>
+                <span>MODE <span className="font-bold" style={{ color: TXT_85 }}>{aiTrading.plan === "pro" ? "AGGRESSIVE" : aiTrading.plan === "starter" ? "BALANCED" : "CONSERVATIVE"}</span></span>
+              </div>
+              {aiUpgradeFlash && (
+                <div
+                  className="text-[9.5px] font-bold tracking-[0.14em]"
+                  style={{ color: "#FFC83D" }}
+                >
+                  UPGRADE REQUIRED TO ENABLE AI AUTOTRADE
+                </div>
+              )}
+            </button>
+
             {/* LIVE POSITIONS */}
             <div style={{ background: BG_2, border: `1px solid ${HAIR_10}` }}>
               <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: `1px solid ${HAIR_10}` }}>
@@ -1101,23 +1338,95 @@ function TerminalInner() {
               </div>
             </div>
 
-            {/* EXCHANGE BALANCES */}
+            {/* EXCHANGE BALANCES — real /api/user/exchanges/balances.
+             * Honest empty-state: if no broker is linked, surface the
+             * "CONNECT BROKER" rail rather than mock data. Subtle flash
+             * on each balance update (keyed on connection lastUpdated). */}
             <div style={{ background: BG_2, border: `1px solid ${HAIR_10}` }}>
               <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: `1px solid ${HAIR_10}` }}>
                 <div className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: BRAND, boxShadow: `0 0 6px ${BRAND}` }} />
-                  <div className="text-[10px] font-bold tracking-[0.22em]" style={{ color: TXT_85 }}>KRAKEN · CONNECTED</div>
-                </div>
-                <div className="text-[9px] tracking-[0.18em]" style={{ color: BRAND }}>LIVE</div>
-              </div>
-              <div className="flex flex-col px-3 py-2 gap-1">
-                {BALANCES.map((b) => (
-                  <div key={b.asset} className="flex items-center justify-between text-[10.5px]" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                    <span style={{ color: TXT_65 }}>{b.asset}</span>
-                    <span className="tabular-nums text-white">{b.qty}</span>
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{
+                      background: liveConn?.ok ? BRAND : TXT_40,
+                      boxShadow: liveConn?.ok ? `0 0 6px ${BRAND}` : "none",
+                      animation: liveConn?.ok ? "livePulse 2.4s ease-in-out infinite" : undefined,
+                    }}
+                  />
+                  <div className="text-[10px] font-bold tracking-[0.22em]" style={{ color: TXT_85 }}>
+                    {liveConn?.ok
+                      ? `${liveConn.exchange.toUpperCase()} · CONNECTED`
+                      : !balancesData
+                        ? "BROKER · LOADING"
+                        : (balancesData.connections?.length ?? 0) === 0
+                          ? "NO BROKER LINKED"
+                          : "BROKER · UNAVAILABLE"}
                   </div>
-                ))}
+                </div>
+                <div className="text-[9px] tracking-[0.18em]" style={{ color: liveConn?.ok ? BRAND : TXT_40 }}>
+                  {liveConn?.ok ? "LIVE" : "—"}
+                </div>
               </div>
+              {balanceRows.length > 0 ? (
+                <div
+                  key={balanceFlashKey}
+                  className="flex flex-col px-3 py-2 gap-1"
+                  style={{ animation: "balanceFlash 900ms ease-out 1" }}
+                >
+                  {balanceRows.map((b) => (
+                    <div
+                      key={b.asset}
+                      className="flex items-center justify-between text-[10.5px]"
+                      style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
+                    >
+                      <span style={{ color: TXT_65 }}>{b.asset}</span>
+                      <span className="tabular-nums text-white">{fmtBalanceQty(b.qty, b.asset)}</span>
+                    </div>
+                  ))}
+                  {typeof liveConn?.totalEquityUSD === "number" && liveConn.totalEquityUSD > 0 && (
+                    <div
+                      className="flex items-center justify-between text-[10.5px] mt-1 pt-1.5"
+                      style={{
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                        borderTop: `1px solid ${HAIR_10}`,
+                      }}
+                    >
+                      <span className="tracking-[0.18em] font-bold" style={{ color: TXT_85 }}>TOTAL</span>
+                      <span className="tabular-nums font-bold" style={{ color: BRAND }}>
+                        ${liveConn.totalEquityUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col px-3 py-3 gap-1">
+                  {(() => {
+                    const hasConnections = (balancesData?.connections?.length ?? 0) > 0;
+                    const isLoading = !balancesData;
+                    return (
+                      <>
+                        <div className="text-[9.5px] tracking-[0.16em]" style={{ color: TXT_65 }}>
+                          {isLoading
+                            ? "Fetching account snapshot…"
+                            : hasConnections
+                              ? "Broker linked but snapshot unavailable. Retrying…"
+                              : "Link a broker to see live balances."}
+                        </div>
+                        {!isLoading && !hasConnections && (
+                          <div className="text-[9px] tracking-[0.18em]" style={{ color: TXT_40 }}>
+                            Profile → CONNECTED ACCOUNTS
+                          </div>
+                        )}
+                        {!isLoading && hasConnections && (
+                          <div className="text-[9px] tracking-[0.18em]" style={{ color: "#FFC83D" }}>
+                            CHECK API KEY · 30s POLL
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
 
             {/* AI ACTIVITY FEED */}
@@ -1130,30 +1439,38 @@ function TerminalInner() {
                 <div className="text-[9px] tracking-[0.18em]" style={{ color: TXT_40 }}>LIVE FEED</div>
               </div>
               <div className="flex flex-col">
-                {FEED.map((e, i) => {
-                  const fresh = i < 2;
-                  const timeColor = fresh ? "rgba(255,255,255,0.65)" : TXT_40;
-                  const msgColor = fresh ? "#fff" : TXT_65;
+                {feedRows.length === 0 ? (
+                  <div className="px-3 py-3 text-[9.5px] tracking-[0.16em]" style={{ color: TXT_65 }}>
+                    {engine ? "AI engine warming up — first signals incoming…" : "Connecting to AI engine…"}
+                  </div>
+                ) : feedRows.map((e, i) => {
+                  const timeColor = e.fresh ? "rgba(255,255,255,0.65)" : TXT_40;
+                  const msgColor  = e.fresh ? "#fff" : TXT_65;
                   const rowBg = i === 0 ? "rgba(102,255,102,0.04)" : i === 1 ? "rgba(102,255,102,0.02)" : "transparent";
                   return (
                     <div
-                      key={i}
+                      key={e.id}
                       className="flex items-center gap-2 px-3 py-1.5"
-                      style={{ borderTop: i === 0 ? "none" : `1px solid ${HAIR_10}`, background: rowBg }}
+                      style={{
+                        borderTop: i === 0 ? "none" : `1px solid ${HAIR_10}`,
+                        background: rowBg,
+                        animation: e.fresh ? `feedFadeIn 260ms ease-out ${i * 40}ms both` : undefined,
+                      }}
                     >
                       <span
-                        className="h-1.5 w-1.5 rounded-full"
+                        className="h-1.5 w-1.5 rounded-full flex-shrink-0"
                         style={{ background: e.dot, boxShadow: `0 0 6px ${e.dot}`, animation: i === 0 ? "feedDot 1.6s ease-in-out infinite" : undefined }}
                       />
                       <span
-                        className="text-[9.5px] tabular-nums"
+                        className="text-[9.5px] tabular-nums flex-shrink-0"
                         style={{ color: timeColor, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
                       >
                         {e.t}
                       </span>
                       <span
-                        className="text-[9.5px] font-semibold tracking-[0.10em]"
+                        className="text-[9.5px] font-semibold tracking-[0.06em] truncate"
                         style={{ color: msgColor }}
+                        title={e.msg}
                       >
                         {e.msg}
                       </span>
