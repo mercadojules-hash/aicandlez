@@ -43,6 +43,23 @@ export interface TimeframeSnapshot {
   shortSummary: string;
 }
 
+/**
+ * Engine-wide baseline minimum confidence (LOW-CONFIDENCE FILTER).
+ * Mirrors the `user_settings.min_confidence` default. A signal whose
+ * `avgConfidence` falls below this floor is rendered as INFORMATIONAL
+ * (visually muted, marked LOW CONFIDENCE) and is NEVER routed to live
+ * execution — `placeLiveAutoOrderForUser` gate 0e additionally re-checks
+ * against the caller's per-user `minConfidence`, but the global
+ * `executionEligible` flag here is the canonical UI separator between
+ * "may display" and "may execute".
+ *
+ * Hard invariant before Kraken live rollout: every consumer of
+ * `symbolBreakdowns` that routes to an order placement path MUST gate
+ * on `executionEligible === true`. Display surfaces may still render
+ * the underlying signal but must not surface "TRADE NOW" affordances.
+ */
+export const BASELINE_MIN_CONFIDENCE = 60;
+
 export interface SymbolBreakdown {
   symbol:          string;
   fast:            TimeframeSnapshot;   // 5m
@@ -67,6 +84,21 @@ export interface SymbolBreakdown {
   volumeConfirmed: boolean;
   marketCondition: "trending" | "sideways" | "neutral";
   trend1H:         "bullish" | "bearish" | "unknown";
+  // ── LOW-CONFIDENCE FILTER (separation of visibility vs execution) ────────
+  // `executionEligible === true` is the SINGLE source of truth for whether
+  // this signal may be routed to live execution. It is `true` only when the
+  // signal:
+  //   • has a directional bias (agreedAction !== "HOLD")
+  //   • passes the engine baseline minConfidence (>= BASELINE_MIN_CONFIDENCE)
+  //   • is MTF-confirmed (fast + slow timeframe agreement)
+  //   • is in an active (non-sideways) market regime
+  // When `false`, `executionBlockReason` carries a machine-readable code so
+  // the UI can tag the card LOW CONFIDENCE / NO MTF / SIDEWAYS / HOLD BIAS
+  // without re-deriving the reason from string blockReason. Live-execution
+  // routes (`placeLiveAutoOrderForUser` gate 0e) consume this AND re-check
+  // against per-user minConfidence on top.
+  executionEligible:    boolean;
+  executionBlockReason: "low_confidence" | "no_mtf_agreement" | "sideways" | "hold_bias" | null;
 }
 
 // ── Signal log entry (last-10 circular buffer) ────────────────────────────────
@@ -81,6 +113,11 @@ export interface SignalLogEntry {
   blockReason:  string | null;
   executedAs:   "auto" | "test" | null;
   timestamp:    number;
+  // LOW-CONFIDENCE FILTER — INFORMATIONAL vs EXECUTABLE separator
+  // surfaced in the AI Reasoning Console. Mirrors the same flag on
+  // SymbolBreakdown: `false` means the signal is shown for context
+  // only and never reaches a live order route.
+  executionEligible: boolean;
 }
 
 // ── Engine state ───────────────────────────────────────────────────────────────
@@ -1063,6 +1100,25 @@ async function tick() {
         }
       }
 
+      // LOW-CONFIDENCE FILTER — compute global executionEligible flag.
+      // Priority order matches the live-execution funnel's own ordering so
+      // the reason surfaced on the card matches the reason a manual order
+      // would be rejected with downstream. Resolved against the engine
+      // BASELINE (BASELINE_MIN_CONFIDENCE = 60); per-user execution paths
+      // still re-check the caller's own user_settings.minConfidence in
+      // placeLiveAutoOrderForUser gate 0e.
+      let executionBlockReason: SymbolBreakdown["executionBlockReason"] = null;
+      if (mtf.agreedAction === "HOLD") {
+        executionBlockReason = "hold_bias";
+      } else if (!mtf.mtfConfirmed) {
+        executionBlockReason = "no_mtf_agreement";
+      } else if (mtf.avgConfidence < BASELINE_MIN_CONFIDENCE) {
+        executionBlockReason = "low_confidence";
+      } else if (mtf.marketCondition === "sideways") {
+        executionBlockReason = "sideways";
+      }
+      const executionEligible = executionBlockReason === null;
+
       // Update per-symbol breakdown
       engineStats.symbolBreakdowns[symbol] = {
         symbol,
@@ -1077,6 +1133,8 @@ async function tick() {
         volumeConfirmed:   mtf.volumeConfirmed,
         marketCondition:   mtf.marketCondition,
         trend1H:           mtf.trend1H,
+        executionEligible,
+        executionBlockReason,
       };
 
       logger.info({
@@ -1170,6 +1228,10 @@ async function tick() {
         blockReason:  signalBlockReason,
         executedAs:   null,
         timestamp:    Date.now(),
+        // LOW-CONFIDENCE FILTER — mirrors the SymbolBreakdown flag so the
+        // AI Reasoning Console can render INFORMATIONAL vs EXECUTABLE tags
+        // directly off the wire payload without re-deriving from confidence.
+        executionEligible,
       });
 
       // Pre-autoExecute rejection emit — surfaces gate failures that happen

@@ -35,6 +35,12 @@ export interface SymBreakdown {
   volumeConfirmed: boolean;
   marketCondition: string;
   trend1H:         string;
+  /** LOW-CONFIDENCE FILTER — separation of signal visibility from execution
+   *  eligibility. `false` ⇒ render INFORMATIONAL only (muted + LOW CONFIDENCE
+   *  badge); MUST never reach a live order route. Optional for backward
+   *  compatibility with engines that haven't shipped the field yet. */
+  executionEligible?:    boolean;
+  executionBlockReason?: "low_confidence" | "no_mtf_agreement" | "sideways" | "hold_bias" | null;
 }
 
 export interface SignalLogEntry {
@@ -47,6 +53,9 @@ export interface SignalLogEntry {
   blockReason:  string | null;
   executedAs:   string | null;
   timestamp:    number;
+  /** LOW-CONFIDENCE FILTER — INFORMATIONAL vs EXECUTABLE tag for the
+   *  AI Reasoning Console. Optional for backward compatibility. */
+  executionEligible?: boolean;
 }
 
 export interface EngineStatus {

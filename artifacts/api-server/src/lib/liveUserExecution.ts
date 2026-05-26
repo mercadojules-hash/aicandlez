@@ -22,6 +22,7 @@ import { logsTable, riskThrottleEventsTable } from "@workspace/db";
 import crypto from "crypto";
 import { evaluateRiskGate } from "./riskGate.js";
 import { isAiDisclaimerAccepted } from "./aiDisclaimer.js";
+import { engineStats, BASELINE_MIN_CONFIDENCE } from "./tradingLoop.js";
 
 // ── Per-user live execution bridge ────────────────────────────────────────────
 //
@@ -79,7 +80,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted";
+  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal";
   error?:          string;
 }
 
@@ -753,6 +754,130 @@ export async function placeLiveAutoOrderForUser(
           logger.warn({ err, userId }, "liveUserExecution: ai-disclaimer log insert failed");
         }
         return { success: false, userId, errorCode: "ai_disclaimer_not_accepted", error: msg };
+      }
+    }
+  }
+
+  // 0f. LOW-CONFIDENCE FILTER (hard execution gate).
+  // Separation of signal visibility from execution eligibility — signals
+  // may render in the UI (visually muted, marked LOW CONFIDENCE) but a
+  // signal whose engine `avgConfidence` falls below the caller's
+  // `user_settings.minConfidence` MUST NEVER reach the broker. This is the
+  // canonical pre-Kraken-live invariant. The trading-loop fan-out already
+  // checks per-user minConfidence at the per-symbol level (tradingLoop.ts
+  // ~line 1153) but the manual `POST /api/user/live-order` path bypasses
+  // that funnel — without this gate a customer could click TRADE on a
+  // muted card and route a sub-threshold order. Operators (admin /
+  // super-admin) bypass: the admin terminal commands live execution from
+  // server-side env keys and is not subject to the customer threshold.
+  //
+  // Missing engine breakdown (symbol never analyzed this session) →
+  // fail-closed: refuse the order with a "no_signal" reason so we never
+  // ship an order against a signal we can't verify. Missing user settings
+  // row → fail back to engine BASELINE_MIN_CONFIDENCE (60) so a brand-new
+  // customer is held to the same floor as the platform default.
+  {
+    const operatorConf = await isOperatorRole(userId);
+    if (!operatorConf) {
+      let userMinConfidence = BASELINE_MIN_CONFIDENCE;
+      try {
+        const [settingsRow] = await db
+          .select({ minConfidence: userSettingsTable.minConfidence })
+          .from(userSettingsTable)
+          .where(eq(userSettingsTable.userId, userId))
+          .limit(1);
+        if (settingsRow && typeof settingsRow.minConfidence === "number") {
+          userMinConfidence = settingsRow.minConfidence;
+        }
+      } catch (err) {
+        logger.warn({ err, userId }, "liveUserExecution: minConfidence lookup failed — falling back to engine baseline");
+      }
+
+      const breakdown = engineStats.symbolBreakdowns[symbol];
+      if (!breakdown) {
+        const msg = `No engine signal available for ${symbol} — refusing to route execution against an unverified signal.`;
+        await emitFailureNotification(userId, symbol, side, msg);
+        logger.warn(
+          { userId, symbol, side, threshold: userMinConfidence, reason: "no_signal" },
+          "[execution-gate] blocked low confidence signal",
+        );
+        executionStreamBus.emitEvent({
+          type:     "order_rejected",
+          severity: "warn",
+          symbol, side, mode: "live",
+          gate:     "low_confidence_signal",
+          reason:   "no_signal",
+          message:  msg,
+          details:  { userId, threshold: userMinConfidence, reason: "no_signal" },
+        });
+        try {
+          await db.insert(logsTable).values({
+            id:      crypto.randomUUID(),
+            type:    "trade",
+            level:   "warn",
+            message: `[execution-gate] blocked low confidence signal — ${symbol}: no engine signal (threshold ${userMinConfidence}%)`,
+            details: { userId, symbol, side, threshold: userMinConfidence, reason: "no_signal", errorCode: "low_confidence_signal" },
+          });
+        } catch (err) {
+          logger.warn({ err, userId }, "liveUserExecution: low-confidence log insert failed");
+        }
+        return { success: false, userId, errorCode: "low_confidence_signal", error: msg };
+      }
+
+      // Two-layer check: (a) global executionEligible flag (HOLD bias /
+      // no MTF / sideways / sub-baseline conf), then (b) per-user
+      // minConfidence on top. Layer (a) catches structural blocks; layer
+      // (b) catches users who have tightened their personal threshold
+      // above baseline.
+      const subUserThreshold = breakdown.avgConfidence < userMinConfidence;
+      if (!breakdown.executionEligible || subUserThreshold) {
+        const reason: string = subUserThreshold && breakdown.executionEligible
+          ? "low_confidence"
+          : (breakdown.executionBlockReason ?? "low_confidence");
+        const msg =
+          `LOW CONFIDENCE — ${symbol} signal confidence ${breakdown.avgConfidence.toFixed(1)}% ` +
+          `is below your minimum threshold of ${userMinConfidence}% (reason: ${reason}). ` +
+          `Live execution blocked.`;
+        await emitFailureNotification(userId, symbol, side, msg);
+        logger.warn(
+          {
+            userId,
+            asset:      symbol,
+            confidence: breakdown.avgConfidence,
+            threshold:  userMinConfidence,
+            reason,
+          },
+          "[execution-gate] blocked low confidence signal",
+        );
+        executionStreamBus.emitEvent({
+          type:       "confidence_too_low",
+          severity:   "warn",
+          symbol, side, mode: "live",
+          confidence: breakdown.avgConfidence,
+          gate:       "low_confidence_signal",
+          reason,
+          message:    msg,
+          details:    { userId, confidence: breakdown.avgConfidence, threshold: userMinConfidence, reason },
+        });
+        try {
+          await db.insert(logsTable).values({
+            id:      crypto.randomUUID(),
+            type:    "trade",
+            level:   "warn",
+            message: `[execution-gate] blocked low confidence signal — ${symbol} conf=${breakdown.avgConfidence.toFixed(1)}% threshold=${userMinConfidence}% reason=${reason}`,
+            details: {
+              userId, symbol, side,
+              asset:      symbol,
+              confidence: breakdown.avgConfidence,
+              threshold:  userMinConfidence,
+              reason,
+              errorCode:  "low_confidence_signal",
+            },
+          });
+        } catch (err) {
+          logger.warn({ err, userId }, "liveUserExecution: low-confidence log insert failed");
+        }
+        return { success: false, userId, errorCode: "low_confidence_signal", error: msg };
       }
     }
   }

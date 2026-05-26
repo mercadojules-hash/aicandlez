@@ -77,6 +77,12 @@ export interface OpportunityVM {
   stop:       number;
   target:     number;
   lastUpdated: number;
+  /** LOW-CONFIDENCE FILTER — separation of signal visibility from execution
+   *  eligibility. When `false`, the card renders muted + LOW CONFIDENCE
+   *  badge and any TRADE / QUEUE PAPER affordance must be hidden or
+   *  disabled. Mirrors `SymBreakdown.executionEligible` from the engine. */
+  executionEligible: boolean;
+  executionBlockReason: "low_confidence" | "no_mtf_agreement" | "sideways" | "hold_bias" | null;
 }
 
 const NAME_MAP: Record<string, string> = {
@@ -357,6 +363,10 @@ function buildHeroPreviewCards(now: number): OpportunityVM[] {
       stop:       entry * (1 + stopPct),
       target:     entry * (1 + targetPct),
       lastUpdated: now,
+      // Hero preview cards are synthetic ELITE/STRONG (conf 94 / 84) so
+      // they always exceed the engine baseline and render as EXECUTABLE.
+      executionEligible:    true,
+      executionBlockReason: null,
     };
   };
   return [
@@ -444,6 +454,18 @@ export function usePaperSignals() {
         stop:       stop,
         target:     target,
         lastUpdated: b.lastUpdated ?? Date.now(),
+        // LOW-CONFIDENCE FILTER — pass the engine's executionEligible flag
+        // straight through. Backward-compat fallback for engines that
+        // haven't shipped the field yet: synthesize from the same rules
+        // the engine uses (avgConfidence >= 60, MTF confirmed, non-HOLD,
+        // non-sideways) so the UI never opens a TRADE affordance on a
+        // signal that wouldn't pass gate 0f anyway.
+        executionEligible:
+          typeof b.executionEligible === "boolean"
+            ? b.executionEligible
+            : (b.mtfConfirmed && b.avgConfidence >= 60 && b.agreedAction !== "HOLD" && b.marketCondition !== "sideways"),
+        executionBlockReason:
+          (b.executionBlockReason ?? null) as OpportunityVM["executionBlockReason"],
       });
     }
     // Pass 7e — dev-only hero preview injection. Tree-shaken from prod

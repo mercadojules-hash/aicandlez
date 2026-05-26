@@ -1511,11 +1511,17 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
           bezier sparkline, layered ring, flow overlay).            */}
       {/* Launch-finalization — age-decay wrapper. Holds LEFT + RIGHT so
           ageOpacity dims ring/sparkline/telemetry/actions WITHOUT
-          dimming the absolute-positioned directional rail above. */}
+          dimming the absolute-positioned directional rail above.
+          LOW-CONFIDENCE FILTER — when the engine flags this signal as
+          NOT executionEligible the card stays visible (signal/intel
+          surface) but reads INFORMATIONAL: −38% opacity multiplier
+          stacked on top of the age decay so a muted card is
+          unmistakably distinct from a fresh one. Action buttons are
+          disabled below so opacity is purely a perceptual cue here. */}
       <div style={{
         flex: 1, minWidth: 0,
         display: "flex", flexDirection: "row",
-        opacity: ageOpacity,
+        opacity: ageOpacity * (opp.executionEligible ? 1 : 0.62),
         transition: "opacity 600ms ease",
       }}>
       {/* LEFT ANCHOR — symbol · ring · direction pill.
@@ -1765,25 +1771,60 @@ const OpportunityCard = memo(function OpportunityCard({ opp, onQueue, idx = 0, n
               readiness. Each button routes a paper trade in the
               chosen side; stops/targets mirror around entry when the
               user opts opposite the AI lean. */}
+          {/* LOW-CONFIDENCE FILTER — conditional badge on the inline
+              action strip. Renders ONLY when the engine has flagged
+              this signal as NOT executionEligible. The cards stay
+              visible (informational signal surface) but their action
+              buttons are disabled below so a customer can never route
+              a sub-threshold order from a muted card. No redesign —
+              just a single pill that sits in the existing button slot. */}
+          {!opp.executionEligible && (
+            <span
+              title={
+                opp.executionBlockReason === "hold_bias"        ? "AI bias is HOLD — execution disabled"        :
+                opp.executionBlockReason === "no_mtf_agreement" ? "Multi-timeframe disagreement — execution disabled" :
+                opp.executionBlockReason === "sideways"         ? "Market sideways — execution disabled"        :
+                "Confidence below threshold — execution disabled"
+              }
+              style={{
+                fontSize: 9, fontWeight: 800, letterSpacing: "0.10em",
+                fontFamily: T.FONT_MONO,
+                color: T.AMBER,
+                border: `1px solid ${T.AMBER}`,
+                background: "rgba(255,176,32,0.08)",
+                padding: "3px 7px",
+                borderRadius: 2,
+                flexShrink: 0,
+                whiteSpace: "nowrap",
+              }}
+            >LOW CONFIDENCE</span>
+          )}
           {(() => {
+            const eligible = opp.executionEligible;
             const ActionBtn = ({ side, label, color, rgb }: { side: "LONG" | "SHORT"; label: string; color: string; rgb: string }) => (
               <button
-                onClick={() => onQueue(opp, side)}
-                title={`Paper ${label} ${opp.symbol} @ ${fmtPrice(opp.entry)}`}
+                onClick={() => { if (eligible) onQueue(opp, side); }}
+                disabled={!eligible}
+                title={
+                  eligible
+                    ? `Paper ${label} ${opp.symbol} @ ${fmtPrice(opp.entry)}`
+                    : "Signal below execution threshold — informational only"
+                }
                 style={{
                   padding: "5px 12px", fontSize: 11, fontWeight: 800,
                   fontFamily: T.FONT_MONO, letterSpacing: "0.10em",
-                  border: `1px solid ${color}`,
-                  background: `rgba(${rgb},0.10)`,
-                  color,
-                  cursor: "pointer",
+                  border: `1px solid ${eligible ? color : T.BORDER}`,
+                  background: eligible ? `rgba(${rgb},0.10)` : "transparent",
+                  color: eligible ? color : T.TEXT_2,
+                  cursor: eligible ? "pointer" : "not-allowed",
                   transition: "background-color 120ms ease, color 120ms ease",
                   flexShrink: 0,
                   borderRadius: 2,
                   minWidth: 52,
+                  opacity: eligible ? 1 : 0.55,
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = color; e.currentTarget.style.color = "#000"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = `rgba(${rgb},0.10)`; e.currentTarget.style.color = color; }}
+                onMouseEnter={(e) => { if (eligible) { e.currentTarget.style.background = color; e.currentTarget.style.color = "#000"; } }}
+                onMouseLeave={(e) => { if (eligible) { e.currentTarget.style.background = `rgba(${rgb},0.10)`; e.currentTarget.style.color = color; } }}
               >{label}</button>
             );
             return (
@@ -2464,7 +2505,7 @@ function PanelCard({
   );
 }
 
-type ReasoningEntry = { id: string; symbol: string; timeframe: string; decision: string; confidence: number; shortSummary?: string; timestamp: number };
+type ReasoningEntry = { id: string; symbol: string; timeframe: string; decision: string; confidence: number; shortSummary?: string; timestamp: number; executionEligible?: boolean };
 const AIReasoningConsole = memo(function AIReasoningConsole({
   log: rawLog, live,
 }: {
@@ -2506,6 +2547,29 @@ const AIReasoningConsole = memo(function AIReasoningConsole({
                   it won't exactly match a card's full conviction
                   score, but it lands in the same band. */}
               <span style={{ color: T.TEXT_1, flex: 1 }}>{e.shortSummary ?? `${d} @ ${e.timeframe} · conf ${calibrateRawConfidence(nz(e.confidence)).toFixed(0)}%`}</span>
+              {/* LOW-CONFIDENCE FILTER — terminal-feed disambiguation.
+                  Engine emits BOTH informational and executable signals
+                  into the same log; the operator + customer must read at
+                  a glance whether a line represents an actionable order
+                  candidate or pure intelligence noise. Default `true`
+                  preserves backward-compat when an older engine has not
+                  yet shipped the field. */}
+              {e.executionEligible === false && (
+                <span style={{
+                  color: T.AMBER, flexShrink: 0,
+                  fontSize: 9, fontWeight: 800, letterSpacing: "0.10em",
+                  border: `1px solid ${T.AMBER}`,
+                  padding: "1px 5px", borderRadius: 2,
+                }} title="Signal below execution threshold — INFORMATIONAL only">INFO</span>
+              )}
+              {e.executionEligible !== false && (
+                <span style={{
+                  color: T.NEON, flexShrink: 0,
+                  fontSize: 9, fontWeight: 800, letterSpacing: "0.10em",
+                  border: `1px solid ${T.NEON}`,
+                  padding: "1px 5px", borderRadius: 2,
+                }} title="Signal eligible for live execution">EXEC</span>
+              )}
               <span style={{ color: dColor, flexShrink: 0 }}>{delta}{calibrateRawConfidence(nz(e.confidence)).toFixed(0)}%</span>
             </div>
           );
