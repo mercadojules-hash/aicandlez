@@ -437,13 +437,23 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
 });
 
 // ── GET /admin/users/:id ─────────────────────────────────────────────────────
+// CACHING DELIBERATELY DISABLED on this route. This is operator control
+// infrastructure: every reopen of the User Intelligence Panel must reflect
+// the post-commit DB state. The previous 5s TTL cache caused a hydration
+// bug where saving AI settings (autoMode / tradingMode / preferredExchange
+// / volumeFilter) appeared to "revert" on drawer reopen if any other admin
+// had hit the route within the prior 5s, because cache invalidation only
+// fires when `changedFields > 0` AND the cache is keyed per admin (so
+// admin-A's write does not invalidate admin-B's cached view).
+//
+// We deliberately do NOT call `readCache`/`writeCache` here — the row is
+// always re-queried. The detail panel is opened by hand, has zero
+// auto-polling, and the underlying consolidated query is ~6 round-trips
+// total, so the cache provided no meaningful protection against load
+// anyway. The list endpoint (`GET /admin/users`) keeps its cache.
 router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<void> => {
   const userId = String(req.params["id"] ?? "");
   if (!userId) { res.status(400).json({ error: "Missing user id" }); return; }
-
-  const key = cacheKey(getAdminId(req), req);
-  const cached = readCache(key);
-  if (cached !== null) { res.json(cached); return; }
 
   try {
     // Single consolidated user/header query — pulls user + admin_status +
@@ -692,7 +702,8 @@ router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<voi
       timestamp: Date.now(),
     };
 
-    writeCache(key, payload);
+    // No writeCache here — see header comment on this route. Operator
+    // control infrastructure must never serve a stale row after a PATCH.
     res.json(payload);
   } catch (err) {
     req.log.error({ err, userId }, "GET /admin/users/:id failed");

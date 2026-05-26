@@ -1135,14 +1135,23 @@ interface BillingOverridesForm {
 
 function pickAiSettings(s: Record<string, unknown> | null): AiSettingsForm {
   const r = s ?? {};
+  // Casing-safe enum normalization. Previously `r["tradingMode"] === "live"`
+  // silently downgraded any legacy uppercase row (`"LIVE"`) to `"simulation"`
+  // on read — making admin saves of LIVE appear to revert on drawer reopen
+  // until the row was re-saved. Same hardening applied to riskLevel and
+  // preferredExchange (controlled SelectField needs an exact option match,
+  // otherwise the displayed value falls back to the first option).
+  const tmRaw = typeof r["tradingMode"] === "string" ? r["tradingMode"].toLowerCase() : "";
+  const rlRaw = typeof r["riskLevel"]   === "string" ? r["riskLevel"].toLowerCase()   : "";
+  const peRaw = typeof r["preferredExchange"] === "string" ? r["preferredExchange"].toLowerCase() : "";
   return {
     autoMode:           r["autoMode"]           === true,
-    riskLevel:          (typeof r["riskLevel"]        === "string" ? r["riskLevel"]        : "moderate") as string,
+    riskLevel:          RISK_LEVEL_SET.has(rlRaw) ? rlRaw : "moderate",
     minConfidence:      typeof r["minConfidence"]     === "number" ? r["minConfidence"]      : 60,
     positionSizeUSD:    typeof r["positionSizeUSD"]   === "number" ? r["positionSizeUSD"]    : 20,
     maxActivePositions: typeof r["maxActivePositions"] === "number" ? r["maxActivePositions"] : 3,
-    tradingMode:       (r["tradingMode"] === "live" ? "live" : "simulation") as "simulation" | "live",
-    preferredExchange: typeof r["preferredExchange"] === "string" ? r["preferredExchange"] : "Kraken",
+    tradingMode:        tmRaw === "live" ? "live" : "simulation",
+    preferredExchange:  EXCHANGE_CANONICAL[peRaw] ?? "Kraken",
     volumeFilter:       r["volumeFilter"] === true,
   };
 }
