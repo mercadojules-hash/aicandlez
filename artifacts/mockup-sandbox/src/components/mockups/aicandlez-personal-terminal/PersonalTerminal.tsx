@@ -206,16 +206,16 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
   const meta = META[s.sym];
   return (
     <div
-      className="relative flex min-w-0 flex-col overflow-hidden"
+      className={`sigcard${top ? " sigcard-top" : ""} relative flex min-w-0 flex-col overflow-hidden`}
       style={{
         background: cardBg,
         border: `1px solid ${top ? topBorder : borderCol}`,
         boxShadow: top
           ? `0 0 0 1px ${color}22, 0 0 28px ${color}3a inset, inset 0 1px 0 rgba(255,255,255,0.05), 0 6px 24px rgba(0,0,0,0.55)`
           : `inset 0 1px 0 rgba(255,255,255,0.045), inset 0 -40px 60px -30px rgba(0,0,0,0.65), 0 4px 18px rgba(0,0,0,0.45)`,
-        animation: top ? "edgePulse 4s ease-in-out infinite" : undefined,
-        transform: top ? "scale(1.005)" : undefined,
-        transition: "all 180ms ease",
+        animation: top
+          ? (isLong ? "edgePulse 4.2s ease-in-out infinite" : "edgePulseRed 4.6s ease-in-out infinite")
+          : undefined,
       }}
     >
       {/* ROW 1 — header */}
@@ -273,7 +273,13 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
       {/* ROW 2 — price + sparkline + ring */}
       <div className="flex min-w-0 items-center gap-3 px-3.5 pt-2">
         <div className="flex min-w-0 max-w-[140px] shrink flex-col">
-          <div className="truncate text-[20px] font-bold tabular-nums text-white leading-none" style={{ letterSpacing: "-0.03em" }}>
+          <div
+            className="truncate text-[20px] font-bold tabular-nums text-white leading-none"
+            style={{
+              letterSpacing: "-0.03em",
+              animation: top ? "priceTick 3.2s ease-in-out infinite" : undefined,
+            }}
+          >
             {s.price}
           </div>
           <div className="mt-1.5 flex items-center gap-1.5">
@@ -289,7 +295,10 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
           <Sparkline data={s.spark} color={color} w={260} h={52} strokeW={2} />
         </div>
 
-        <div className="flex shrink-0 flex-col items-center gap-1">
+        <div
+          className="flex shrink-0 flex-col items-center gap-1"
+          style={top ? ({ animation: "convictionBreath 3.6s ease-in-out infinite", "--ring-glow": `${color}aa` } as React.CSSProperties & Record<string, string>) : undefined}
+        >
           <ConvictionRing value={s.conf} color={color} size={62} />
           <div className="text-[8.5px] font-semibold tracking-[0.16em]" style={{ color: colorSoft }}>
             CONVICTION
@@ -426,7 +435,7 @@ export default function PersonalTerminal() {
       <style>{`
         @keyframes pulseOrb {
           0%,100% { transform: scale(1); opacity: 0.85; box-shadow: 0 0 14px ${BRAND}, 0 0 28px ${BRAND}66; }
-          50%     { transform: scale(1.25); opacity: 1;    box-shadow: 0 0 22px ${BRAND}, 0 0 44px ${BRAND}88; }
+          50%     { transform: scale(1.22); opacity: 1;  box-shadow: 0 0 22px ${BRAND}, 0 0 44px ${BRAND}88; }
         }
         @keyframes ringBreath {
           0%,100% { transform: scale(1);   opacity: 0.55; }
@@ -477,6 +486,26 @@ export default function PersonalTerminal() {
         @keyframes livePulse {
           0%,100% { transform: scale(1);   opacity: 0.65; }
           50%     { transform: scale(1.35); opacity: 1;   }
+        }
+        @keyframes priceTick {
+          0%,100% { text-shadow: 0 0 0 transparent; }
+          50%     { text-shadow: 0 0 10px rgba(255,255,255,0.22); }
+        }
+        @keyframes convictionBreath {
+          0%,100% { filter: drop-shadow(0 0 6px var(--ring-glow, rgba(102,255,102,0.55))); }
+          50%     { filter: drop-shadow(0 0 14px var(--ring-glow, rgba(102,255,102,0.85))); }
+        }
+
+        /* card hover micro-state — subtle lift, brighter material edge */
+        .sigcard { transition: transform 220ms cubic-bezier(.2,.7,.2,1), border-color 220ms ease, box-shadow 220ms ease; }
+        .sigcard:hover { transform: translateY(-1px) scale(1.003); }
+        .sigcard-top { transform: scale(1.005); }
+        .sigcard-top:hover { transform: translateY(-1px) scale(1.008); }
+
+        /* honor user motion preference — kill atmospheric loops */
+        @media (prefers-reduced-motion: reduce) {
+          .sigcard, .sigcard:hover { transition: none; transform: none; }
+          [style*="animation"] { animation: none !important; }
         }
       `}</style>
 
@@ -740,12 +769,7 @@ export default function PersonalTerminal() {
                   </div>
                 </div>
                 {SHORTS.map((s, i) => (
-                  <div
-                    key={s.sym}
-                    style={i === 0 ? { animation: "edgePulseRed 4s ease-in-out infinite" } : undefined}
-                  >
-                    <SignalCard s={s} top={i === 0} />
-                  </div>
+                  <SignalCard key={s.sym} s={s} top={i === 0} />
                 ))}
               </div>
             </div>
@@ -815,7 +839,7 @@ export default function PersonalTerminal() {
                 <div className="text-[9px] tracking-[0.18em]" style={{ color: TXT_40 }}>{POSITIONS.length} OPEN</div>
               </div>
               <div className="flex flex-col">
-                {POSITIONS.map((p) => {
+                {POSITIONS.map((p, i) => {
                   const isL = p.dir === "LONG";
                   const c = isL ? BRAND : RED;
                   return (
@@ -831,7 +855,7 @@ export default function PersonalTerminal() {
                       <div className="flex items-center gap-1.5">
                         <span
                           className="h-1.5 w-1.5 rounded-full"
-                          style={{ background: c, boxShadow: `0 0 6px ${c}`, animation: "livePulse 1.8s ease-in-out infinite" }}
+                          style={{ background: c, boxShadow: `0 0 6px ${c}`, animation: `livePulse ${1.8 + i * 0.25}s ease-in-out ${i * 0.3}s infinite` }}
                         />
                         <span className="text-[12px] font-bold text-white" style={{ letterSpacing: "-0.02em" }}>{p.sym}</span>
                       </div>
