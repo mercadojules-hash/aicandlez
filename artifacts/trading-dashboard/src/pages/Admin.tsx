@@ -1327,11 +1327,32 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
   const [aiNote, setAiNote]               = useState("");
   const [billingNote, setBillingNote]     = useState("");
 
+  // ── Mount/unmount + note-clear diagnostics ───────────────────────────────
+  // The user reports billingNote is empty at submit time despite the input
+  // visibly containing text. These traces pinpoint whether the cause is
+  // (a) ProfileTab remount, (b) re-fire of the user-switch useEffect, or
+  // (c) some other setBillingNote("") path.
+  /* eslint-disable no-console */
+  useEffect(() => {
+    console.debug("[admin-profile][ProfileTab] MOUNTED", { clerkUserId: user.clerkUserId });
+    return () => { console.debug("[admin-profile][ProfileTab] UNMOUNTED", { clerkUserId: user.clerkUserId }); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    console.debug("[admin-profile][billingNote CHANGED]", { len: billingNote.length, value: billingNote });
+  }, [billingNote]);
+  useEffect(() => {
+    console.debug("[admin-profile][aiNote CHANGED]", { len: aiNote.length, value: aiNote });
+  }, [aiNote]);
+  /* eslint-enable no-console */
+
   // Re-sync drafts ONLY when the operator switches users. Background refetch
   // identity changes on `aiServer` / `billingServer` MUST NOT clobber in-flight
   // unsaved edits. Post-save draft collapse is handled explicitly in each
   // mutation's onSuccess via setAiDraft(data.after) / setBillingDraft(...).
   useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.debug("[admin-profile][user-switch effect FIRED]", { clerkUserId: user.clerkUserId });
     setAiDraft(pickAiSettings(detail?.settings ?? null));
     setBillingDraft(pickBillingOverrides(detail?.user ?? null));
     setAiNote("");
