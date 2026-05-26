@@ -26,6 +26,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X, Loader2, ShieldCheck, AlertTriangle, Check, Link2Off, FlaskConical } from "lucide-react";
 
 import { authFetch } from "../lib/authFetch";
+import { useDisclaimerGate } from "../hooks/useDisclaimerGate";
 const N = {
   BG_OVERLAY: "rgba(0,0,0,0.86)",
   CARD:       "#0A1410",
@@ -144,6 +145,14 @@ type ConnectedRow = {
 export function PortalExchangeConnectModal({ open, onClose, preselectedExchange, liveExchangesEnabled = false, onConnected }: Props) {
   const { getToken } = useAuth();
   const qc           = useQueryClient();
+  // Risk-disclaimer gate. Server enforces `requireDisclaimer` on
+  // /api/user/exchanges/connect (412 + needsDisclaimer:true) — without
+  // this client-side wire-up the customer sees a red error and no way to
+  // accept. `gate(action)` short-circuits to `action()` when the user
+  // (or admin/super-admin) has already accepted; otherwise it opens the
+  // DisclaimerModal and runs `action` after the POST /api/user/disclaimer
+  // call resolves.
+  const { gate: disclaimerGate, modal: disclaimerModal } = useDisclaimerGate();
 
   // R1 — catalog hydrated from backend (single source of truth).
   // Public endpoint, no auth required.
@@ -358,8 +367,7 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
     (!picked.needsPassphrase || !!passphrase.trim()) &&
     !submitting;
 
-  const handleSubmit = async () => {
-    if (!canSubmit) return;
+  const submitConnect = async () => {
     setSubmitting(true);
     setError(null);
     try {
@@ -398,6 +406,8 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
   };
 
   return (
+    <>
+    {disclaimerModal}
     <div
       role="dialog"
       aria-modal="true"
@@ -882,7 +892,10 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
               </button>
               <button
                 type="button"
-                onClick={handleSubmit}
+                onClick={() => {
+                  if (!canSubmit) return;
+                  disclaimerGate(() => { void submitConnect(); });
+                }}
                 disabled={!canSubmit}
                 style={{
                   flex: 1, padding: "12px 16px", borderRadius: 10,
@@ -909,6 +922,7 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
         )}
       </div>
     </div>
+    </>
   );
 }
 
