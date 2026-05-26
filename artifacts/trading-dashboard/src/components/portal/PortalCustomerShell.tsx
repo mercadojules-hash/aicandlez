@@ -2267,14 +2267,15 @@ const IdleScanningPanel = memo(function IdleScanningPanel({
           boxShadow: `0 0 6px ${accent}`,
           animation: "brand-pulse 1.8s ease-in-out infinite",
         }} />
-        AWAITING {label} ALIGNMENT
+        AI SURVEILLING · AWAITING HIGH-CONVICTION {label} SETUPS
       </div>
 
       <div style={{
         marginTop: 14,
-        fontSize: 11, color: T.TEXT_2, letterSpacing: T.TRACK_LABEL,
+        fontSize: 11, color: T.TEXT_1, letterSpacing: T.TRACK_LABEL,
+        fontWeight: 600,
       }}>
-        AI EVALUATING MARKET STRUCTURE
+        NO QUALIFIED SETUPS MEET EXECUTION THRESHOLD
       </div>
 
       {/* Rotating symbol focus — the user sees the engine sweeping its
@@ -2310,10 +2311,11 @@ const IdleScanningPanel = memo(function IdleScanningPanel({
 
       <div style={{
         marginTop: 6,
-        fontSize: 9, color: T.TEXT_2, opacity: 0.45,
+        fontSize: 9, color: T.TEXT_2, opacity: 0.55,
         letterSpacing: T.TRACK_LABEL,
+        fontStyle: "italic",
       }}>
-        NO QUALIFYING {label} OPPORTUNITY · CRITERIA NOT YET MET
+        MONITORING LIVE MARKETS FOR INSTITUTIONAL-GRADE ENTRIES
       </div>
     </div>
   );
@@ -3921,24 +3923,32 @@ export function PortalCustomerShell() {
       if (a.executionEligible !== b.executionEligible) return a.executionEligible ? -1 : 1;
       return b.convictionScore - a.convictionScore;
     });
-  // QUALITY FLOOR — institutional surface; customers should never see
-  // a column packed with 30s/40s "filler" conviction. Tier ladder bumped:
-  //   tier1: executionEligible OR conviction ≥ 60 (was 25)
-  //   tier2: executionEligible OR conviction ≥ 45 (was 10)
-  // Final fallback intentionally floors at ≥ 25 instead of the old
-  // unconditional `ranked.slice` — when the engine truly has nothing
-  // strong, the column shows fewer cards rather than padding with
-  // weak signals (the IdleScanningPanel + AI Market Scanner already
-  // communicate "system surveilling" so an under-filled column reads
-  // as honest confidence, not a UI gap).
+  // QUALITY FLOOR (CONVICTION_V3) — customer surface trades quantity
+  // for perceived quality. We surface ONLY tier1 (≥60) and tier2 (≥45)
+  // setups. Tier3 fallback (≥25 filler) was REMOVED 2026-05-26 because
+  // it made the platform read as "AI struggling to find trades" during
+  // low-conviction market regimes. The premium read is "AI waiting for
+  // quality" — fewer cards + IdleScanningPanel empty-state is the
+  // intended visual when nothing qualifies. Scarcity > density.
+  //
+  // `targetMin` is now an aspirational floor (preferred minimum), not
+  // a guarantee. If tier1 alone meets it, ship tier1. Otherwise unify
+  // tier1 + tier2 and ship whatever qualifies (still capped at maxCap).
+  // When NOTHING in the pool clears ≥45, return an empty array — the
+  // Column renders <IdleScanningPanel /> instead of padding with weak
+  // setups.
+  //
+  // executionEligible always passes (engine has explicitly flagged the
+  // row as ready-to-fire; bypassing conviction is intentional).
+  //
+  // Admin/operator surfaces have their own derivation and are NOT
+  // affected by this floor — operators still see full telemetry.
   const fillColumn = (pool: OpportunityVM[], targetMin: number, maxCap: number): OpportunityVM[] => {
     const ranked = rankForColumn(pool);
     const tier1  = ranked.filter(o => o.executionEligible || o.convictionScore >= 60);
     if (tier1.length >= targetMin) return tier1.slice(0, maxCap);
-    const tier2  = ranked.filter(o => o.executionEligible || o.convictionScore >= 45);
-    if (tier2.length >= targetMin) return tier2.slice(0, maxCap);
-    const tier3  = ranked.filter(o => o.executionEligible || o.convictionScore >= 25);
-    return tier3.slice(0, maxCap);
+    const qualified = ranked.filter(o => o.executionEligible || o.convictionScore >= 45);
+    return qualified.slice(0, maxCap);
   };
 
   const filteredMajors = useMemo(
