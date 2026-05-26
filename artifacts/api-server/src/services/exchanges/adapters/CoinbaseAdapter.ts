@@ -263,14 +263,34 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
 
   /**
    * Key format detection:
-   *   "organizations/…" prefix  → CDP org key  → ES256 JWT (ECDSA P-256)
-   *   UUID (36 chars), 64-byte decoded secret  → new CDP key → EdDSA JWT (Ed25519)
-   *   anything else             → legacy HMAC-SHA256
+   *   PEM secret (-----BEGIN…) → introspect actual key material:
+   *       ed25519  → EdDSA JWT (PKCS#8-wrapped Ed25519, new Coinbase format)
+   *       ec       → ES256 JWT (SEC1/PKCS#8 ECDSA P-256, CDP org key)
+   *   UUID (36 chars) + 64-byte base64 secret → EdDSA JWT (raw Ed25519 seed)
+   *   "organizations/…" key id (legacy heuristic) → ES256 JWT
+   *   anything else → legacy HMAC-SHA256
+   *
+   * Routing PEM purely on `-----BEGIN` substring was unsafe — newer
+   * Coinbase Advanced Trade keys are Ed25519 in a `-----BEGIN PRIVATE KEY-----`
+   * PKCS#8 wrapper, and feeding them to crypto.createSign("SHA256") (ES256
+   * path) throws `error:1E08010C:DECODER routines::unsupported`.
    */
-  private get keyType(): "cdp-org" | "cdp-uuid" | "hmac" {
+  private get keyType(): "cdp-org" | "cdp-uuid-pem" | "cdp-uuid" | "hmac" {
     const k = this.config.apiKey  ?? "";
     const s = this.config.apiSecret ?? "";
-    if (k.startsWith("organizations/") || s.includes("-----BEGIN")) return "cdp-org";
+    if (s.includes("-----BEGIN")) {
+      try {
+        const pem = this.normalisePem(s);
+        const kt  = crypto.createPrivateKey(pem).asymmetricKeyType;
+        if (kt === "ed25519") return "cdp-uuid-pem";
+        // "ec" (P-256) or anything else falls through to ES256 path.
+        return "cdp-org";
+      } catch {
+        // Malformed PEM — let buildEs256Jwt surface the real OpenSSL error.
+        return "cdp-org";
+      }
+    }
+    if (k.startsWith("organizations/")) return "cdp-org";
     if (/^[0-9a-f-]{36}$/.test(k) && Buffer.from(s, "base64").length === 64) return "cdp-uuid";
     return "hmac";
   }
@@ -338,7 +358,7 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
   }
 
   /**
-   * EdDSA JWT for new CDP UUID keys.
+   * EdDSA JWT for new CDP UUID keys (raw 64-byte base64 secret format).
    * Secret is base64-encoded 64 bytes: [0..31] = Ed25519 private seed, [32..63] = public key.
    */
   private buildEdDsaJwt(method: string, path: string): string {
@@ -348,6 +368,21 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
       key:    { kty: "OKP", crv: "Ed25519", d: rawBytes.slice(0, 32).toString("base64url"), x: rawBytes.slice(32).toString("base64url") },
       format: "jwk",
     });
+    return this.signEdDsaJwt(keyName, privKey, method, path);
+  }
+
+  /**
+   * EdDSA JWT for PEM-wrapped Ed25519 keys (PKCS#8 -----BEGIN PRIVATE KEY-----).
+   * This is the format Coinbase Advanced Trade now ships by default.
+   */
+  private buildEdDsaJwtFromPem(method: string, path: string): string {
+    const keyName = this.config.apiKey!;
+    const pem     = this.normalisePem(this.config.apiSecret!);
+    const privKey = crypto.createPrivateKey(pem);
+    return this.signEdDsaJwt(keyName, privKey, method, path);
+  }
+
+  private signEdDsaJwt(keyName: string, privKey: crypto.KeyObject, method: string, path: string): string {
     const nonce   = crypto.randomBytes(16).toString("hex");
     const now     = Math.floor(Date.now() / 1000);
 
@@ -378,6 +413,9 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
     const type = this.keyType;
     if (type === "cdp-org") {
       return { Authorization: `Bearer ${this.buildEs256Jwt(method, path)}`, "Content-Type": "application/json" };
+    }
+    if (type === "cdp-uuid-pem") {
+      return { Authorization: `Bearer ${this.buildEdDsaJwtFromPem(method, path)}`, "Content-Type": "application/json" };
     }
     if (type === "cdp-uuid") {
       return { Authorization: `Bearer ${this.buildEdDsaJwt(method, path)}`, "Content-Type": "application/json" };
