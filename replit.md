@@ -230,7 +230,18 @@ Single source of truth = `EXCHANGE_CATALOG`. Per-user visibility via
 `user_exchange_visibility` (presentational only).
 
 **Live exchange secrets:** `KRAKEN_API_KEY`, `KRAKEN_API_SECRET`,
-`EXCHANGE_LIVE_ENABLED=true`.
+`COINBASE_API_KEY`, `COINBASE_API_SECRET`, `EXCHANGE_LIVE_ENABLED=true`.
+
+**Operator multi-exchange routing:** `_selectedExchange` in
+`exchangeEngine.ts` is the single source of truth for which broker
+`executeOrder()` and `placeLiveAutoOrder()` route through. Priority
+order on boot: Kraken → Coinbase → CryptoDotCom → Binance → Gemini →
+Alpaca (first one with env keys wins). Admin operator switches per-
+session via the `CommandBar` exchange switcher (`POST /api/exchange/select`
+→ `setSelectedExchange()`); this also clears the balances cache so
+the next poll cannot serve stale data from the prior exchange. Per-
+order routing is not exposed today — every order from `/command`
+fires against `_selectedExchange` until the operator switches.
 
 ---
 
