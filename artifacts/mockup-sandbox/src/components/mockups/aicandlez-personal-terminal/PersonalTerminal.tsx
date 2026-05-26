@@ -202,7 +202,7 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
   const meta = META[s.sym];
   return (
     <div
-      className="relative flex flex-col"
+      className="relative flex min-w-0 flex-col overflow-hidden"
       style={{
         background: cardBg,
         border: `1px solid ${top ? topBorder : borderCol}`,
@@ -215,9 +215,9 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
       }}
     >
       {/* ROW 1 — header */}
-      <div className="flex items-center gap-2.5 px-3.5 pt-3.5">
+      <div className="flex min-w-0 items-center gap-2.5 px-3.5 pt-3.5">
         <div
-          className="px-2 py-0.5 text-[10px] font-bold tracking-[0.16em]"
+          className="shrink-0 px-2 py-0.5 text-[10px] font-bold tracking-[0.16em]"
           style={{
             color,
             background: isLong ? "rgba(0,200,83,0.12)" : "rgba(255,59,59,0.10)",
@@ -227,16 +227,16 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
         >
           {s.dir}
         </div>
-        <div className="text-[26px] font-bold leading-none text-white" style={{ letterSpacing: "-0.04em" }}>
+        <div className="shrink-0 text-[26px] font-bold leading-none text-white" style={{ letterSpacing: "-0.04em" }}>
           {s.sym}
         </div>
-        <div className="text-[10px] font-semibold tracking-[0.14em]" style={{ color: TXT_65 }}>
+        <div className="shrink-0 text-[10px] font-semibold tracking-[0.14em]" style={{ color: TXT_65 }}>
           {s.reason}
         </div>
-        <div className="text-[9.5px] tracking-[0.10em]" style={{ color: TXT_40 }}>
+        <div className="min-w-0 flex-1 truncate text-[9.5px] tracking-[0.10em]" style={{ color: TXT_40 }}>
           · {s.tag}
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {top && (
             <div
               className="flex items-center gap-1 px-1.5 py-0.5 text-[8.5px] font-bold tracking-[0.18em]"
@@ -256,7 +256,7 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
 
       {/* AI THESIS LINE */}
       <div
-        className="px-3.5 pt-1 text-[9.5px]"
+        className="truncate px-3.5 pt-1 text-[9.5px]"
         style={{
           color: TXT_65,
           letterSpacing: "0.12em",
@@ -267,9 +267,9 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
       </div>
 
       {/* ROW 2 — price + sparkline + ring */}
-      <div className="flex items-center gap-3 px-3.5 pt-2">
-        <div className="flex w-[120px] shrink-0 flex-col">
-          <div className="text-[20px] font-bold tabular-nums text-white leading-none" style={{ letterSpacing: "-0.03em" }}>
+      <div className="flex min-w-0 items-center gap-3 px-3.5 pt-2">
+        <div className="flex min-w-0 max-w-[140px] shrink flex-col">
+          <div className="truncate text-[20px] font-bold tabular-nums text-white leading-none" style={{ letterSpacing: "-0.03em" }}>
             {s.price}
           </div>
           <div className="mt-1.5 flex items-center gap-1.5">
@@ -285,7 +285,7 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
           <Sparkline data={s.spark} color={color} w={260} h={52} strokeW={2} />
         </div>
 
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex shrink-0 flex-col items-center gap-1">
           <ConvictionRing value={s.conf} color={color} size={62} />
           <div className="text-[8.5px] font-semibold tracking-[0.16em]" style={{ color: colorSoft }}>
             CONVICTION
@@ -322,28 +322,30 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
       </div>
 
       {/* ROW 3 — micro plan */}
-      <div className="mt-2.5 flex items-center gap-3 px-3.5 pb-3.5 pt-2.5" style={{ borderTop: `1px solid ${borderCol}` }}>
-        <div className="flex items-center gap-1 text-[9.5px] tracking-[0.10em]" style={{ color: TXT_40 }}>
-          ENTRY <span className="font-semibold tabular-nums" style={{ color: TXT_85 }}>{s.entry}</span>
+      <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-2 px-3.5 pb-3.5 pt-2.5" style={{ borderTop: `1px solid ${borderCol}` }}>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1.5">
+          <div className="flex shrink-0 items-center gap-1 text-[9.5px] tracking-[0.10em]" style={{ color: TXT_40 }}>
+            ENTRY <span className="font-semibold tabular-nums" style={{ color: TXT_85 }}>{s.entry}</span>
+          </div>
+          <div className="flex shrink-0 items-center gap-1 text-[9.5px] tracking-[0.10em]" style={{ color: TXT_40 }}>
+            SL <span className="font-semibold tabular-nums" style={{ color: RED_SOFT }}>{s.sl}</span>
+          </div>
+          <div className="flex shrink-0 items-center gap-1 text-[9.5px] tracking-[0.10em]" style={{ color: TXT_40 }}>
+            TP <span className="font-semibold tabular-nums" style={{ color: BRAND }}>{s.tp}</span>
+          </div>
+          <div className="flex shrink-0 items-center gap-1 text-[9.5px] tracking-[0.10em]" style={{ color: TXT_40 }}>
+            RR <span className="font-semibold tabular-nums" style={{ color: TXT_85 }}>{s.rr}</span>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="text-[8.5px] tracking-[0.14em]" style={{ color: TXT_40 }}>5m</span>
+            <MtfDot s={s.m5} color={color} />
+            <span className="ml-1 text-[8.5px] tracking-[0.14em]" style={{ color: TXT_40 }}>15m</span>
+            <MtfDot s={s.m15} color={color} />
+            <span className="ml-1 text-[8.5px] tracking-[0.14em]" style={{ color: TXT_40 }}>1H</span>
+            <MtfDot s={s.h1} color={color} />
+          </div>
         </div>
-        <div className="flex items-center gap-1 text-[9.5px] tracking-[0.10em]" style={{ color: TXT_40 }}>
-          SL <span className="font-semibold tabular-nums" style={{ color: RED_SOFT }}>{s.sl}</span>
-        </div>
-        <div className="flex items-center gap-1 text-[9.5px] tracking-[0.10em]" style={{ color: TXT_40 }}>
-          TP <span className="font-semibold tabular-nums" style={{ color: BRAND }}>{s.tp}</span>
-        </div>
-        <div className="flex items-center gap-1 text-[9.5px] tracking-[0.10em]" style={{ color: TXT_40 }}>
-          RR <span className="font-semibold tabular-nums" style={{ color: TXT_85 }}>{s.rr}</span>
-        </div>
-        <div className="ml-1 flex items-center gap-1.5">
-          <span className="text-[8.5px] tracking-[0.14em]" style={{ color: TXT_40 }}>5m</span>
-          <MtfDot s={s.m5} color={color} />
-          <span className="ml-1 text-[8.5px] tracking-[0.14em]" style={{ color: TXT_40 }}>15m</span>
-          <MtfDot s={s.m15} color={color} />
-          <span className="ml-1 text-[8.5px] tracking-[0.14em]" style={{ color: TXT_40 }}>1H</span>
-          <MtfDot s={s.h1} color={color} />
-        </div>
-        <div className="ml-auto flex flex-col items-end gap-0.5">
+        <div className="ml-auto flex shrink-0 flex-col items-end gap-0.5">
           {top && (
             <div
               className="text-[8.5px] font-bold tracking-[0.18em]"
@@ -353,7 +355,7 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
             </div>
           )}
           <button
-            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold tracking-[0.18em]"
+            className="flex shrink-0 items-center gap-1.5 px-3 py-1 text-[11px] font-bold tracking-[0.18em]"
             style={{
               color: isLong ? BG_0 : "#fff",
               background: isLong ? color : "rgba(255,59,59,0.92)",
