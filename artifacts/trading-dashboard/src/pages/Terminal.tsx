@@ -424,32 +424,84 @@ function SignalCard({ s, top, ignite }: { s: Signal; top?: boolean; ignite?: boo
   const borderCol = isLong ? "rgba(102,255,102,0.22)" : "rgba(255,59,59,0.26)";
   const topBorder = isLong ? "rgba(102,255,102,0.55)" : "rgba(255,59,59,0.55)";
   const meta = META[s.sym];
-  /* DECAY VISUAL — WEAKENING dims the card (~70%) + amber border tint;
-   * INVALIDATED dims further (~40%) + grayscale-ish neutral border.
-   * Real signals (FORMING/CONFIRMED/EXECUTION_READY) render full-bright.
-   * Reads as "the AI just stopped tracking this", not as a broken card. */
+  /* ── TACTICAL VISUAL HIERARCHY ───────────────────────────────────────────
+   * Stronger conviction commands more eye attention — not through clutter,
+   * through opacity / glow intensity / motion energy / contrast.
+   *
+   *   EXECUTION_READY → dominant (full opacity, brand halo even when not
+   *                     top, faster pulse cadence when top)
+   *   CONFIRMED       → present  (full opacity, neutral institutional)
+   *   FORMING         → recessive (0.88 opacity, no halo, no pulse —
+   *                     reads as "early thesis, not yet confirmed")
+   *   WEAKENING       → deteriorating (0.62 opacity, amber border, all
+   *                     animation suppressed)
+   *   INVALIDATED     → dead (0.38 opacity, grayscale, no motion, neutral
+   *                     border — the card visibly "left the battlefield")
+   *
+   * Decay-state styling layers ON TOP of the live tier — so a WEAKENING
+   * EXECUTION_READY still reads as "the climax thesis breaking down",
+   * not as a generic dimmed card. */
+  const isReady       = s.lifecycle === "EXECUTION_READY";
+  const isForming     = s.lifecycle === "FORMING";
   const isWeakening   = s.lifecycle === "WEAKENING";
   const isInvalidated = s.lifecycle === "INVALIDATED";
-  const decayOpacity  = isInvalidated ? 0.42 : isWeakening ? 0.72 : 1;
-  const decayBorder   = isInvalidated
-    ? "rgba(255,255,255,0.10)"
-    : isWeakening
-      ? "rgba(255,200,61,0.32)"
-      : (top ? topBorder : borderCol);
+  const isLive        = !isWeakening && !isInvalidated;
+  const tierOpacity   = isInvalidated ? 0.38
+                      : isWeakening   ? 0.62
+                      : isForming     ? 0.88
+                      :                 1.0;
+  const tierFilter    = isInvalidated ? "grayscale(0.55) saturate(0.45)" : "none";
+  const tierBorder    = isInvalidated ? "rgba(255,255,255,0.08)"
+                      : isWeakening   ? "rgba(255,200,61,0.30)"
+                      : isReady       ? (top ? topBorder : `${color}55`)
+                      : (top ? topBorder : borderCol);
+  /* Box-shadow hierarchy — EXECUTION_READY gets brand halo even when
+   * not top (so the conviction climax visually owns its spot in the
+   * column), top compounds it. Live non-ready cards keep institutional
+   * inset shadow; decay cards strip the halo. */
+  const tierShadow = !isLive
+    ? `inset 0 1px 0 rgba(255,255,255,0.03), 0 2px 10px rgba(0,0,0,0.4)`
+    : top && isReady
+      ? `0 0 0 1px ${color}44, 0 0 36px ${color}55 inset, inset 0 1px 0 rgba(255,255,255,0.07), 0 8px 28px rgba(0,0,0,0.6)`
+      : top
+        ? `0 0 0 1px ${color}22, 0 0 28px ${color}3a inset, inset 0 1px 0 rgba(255,255,255,0.05), 0 6px 24px rgba(0,0,0,0.55)`
+        : isReady
+          ? `0 0 0 1px ${color}22, 0 0 18px ${color}26 inset, inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 18px rgba(0,0,0,0.45)`
+          : `inset 0 1px 0 rgba(255,255,255,0.045), inset 0 -40px 60px -30px rgba(0,0,0,0.65), 0 4px 18px rgba(0,0,0,0.45)`;
+  /* Motion energy — reserved for TOP cards only so the column has ONE
+   * focal point of breathing animation. Non-top EXECUTION_READY
+   * differentiates via static halo + brand border (see tierShadow /
+   * tierBorder above) — without this restriction, the `edgePulse`
+   * keyframes animate box-shadow directly and would override the
+   * static halo we just built, AND multiple non-top EXEC_READY cards
+   * would phase-sync into a column-wide breathing wave. Static
+   * presence reads as conviction; orchestrated motion reads as the
+   * AI's prime candidate this moment.
+   *   top + EXECUTION_READY → fastest (3.4s) — conviction climax
+   *   top                   → standard (4.2s) — TOP signal of column
+   *   everything else       → still — institutional restraint */
+  const tierAnimation = !isLive || isForming
+    ? undefined
+    : top && isReady
+      ? (isLong ? "edgePulse 3.4s ease-in-out infinite" : "edgePulseRed 3.6s ease-in-out infinite")
+      : top
+        ? (isLong ? "edgePulse 4.2s ease-in-out infinite" : "edgePulseRed 4.6s ease-in-out infinite")
+        : undefined;
+  // Suppress the "TOP SIGNAL" badge + arrival ignition on decaying cards
+  // even if they're at index 0 of the persisted set (defense in depth —
+  // column rendering already gates these, but locality matters here too).
+  const showTopBadge = !!top && isLive;
   return (
     <div
-      className={`sigcard${top ? " sigcard-top" : ""}${ignite ? (isLong ? " sigcard-ignite-long" : " sigcard-ignite-short") : ""} relative flex min-w-0 flex-col overflow-hidden`}
+      className={`sigcard${top && isLive ? " sigcard-top" : ""}${ignite && isLive ? (isLong ? " sigcard-ignite-long" : " sigcard-ignite-short") : ""} relative flex min-w-0 flex-col overflow-hidden`}
       style={{
         background: cardBg,
-        border: `1px solid ${decayBorder}`,
-        boxShadow: top && !isWeakening && !isInvalidated
-          ? `0 0 0 1px ${color}22, 0 0 28px ${color}3a inset, inset 0 1px 0 rgba(255,255,255,0.05), 0 6px 24px rgba(0,0,0,0.55)`
-          : `inset 0 1px 0 rgba(255,255,255,0.045), inset 0 -40px 60px -30px rgba(0,0,0,0.65), 0 4px 18px rgba(0,0,0,0.45)`,
-        animation: top && !isWeakening && !isInvalidated
-          ? (isLong ? "edgePulse 4.2s ease-in-out infinite" : "edgePulseRed 4.6s ease-in-out infinite")
-          : undefined,
-        opacity: decayOpacity,
-        transition: "opacity 600ms ease, border-color 600ms ease",
+        border: `1px solid ${tierBorder}`,
+        boxShadow: tierShadow,
+        animation: tierAnimation,
+        opacity: tierOpacity,
+        filter: tierFilter,
+        transition: "opacity 600ms ease, border-color 600ms ease, filter 600ms ease, box-shadow 600ms ease",
       }}
     >
       {/* CONVICTION RING IGNITION — one-shot when a brand-new top signal
@@ -488,7 +540,7 @@ function SignalCard({ s, top, ignite }: { s: Signal; top?: boolean; ignite?: boo
           · {s.tag}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {top && (
+          {showTopBadge && (
             <div
               className="flex items-center gap-1 px-1.5 py-0.5 text-[8.5px] font-bold tracking-[0.18em]"
               style={{ color, border: `1px solid ${color}88`, background: `${color}14` }}
