@@ -1419,6 +1419,38 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
   const aiDirty      = seedReady && !shallowEqual(aiDraft as unknown as Record<string, unknown>,           aiServer as unknown as Record<string, unknown>);
   const billingDirty = seedReady && !shallowEqual(billingDraft as unknown as Record<string, unknown>,      billingServer as unknown as Record<string, unknown>);
 
+  // ── DIRTY-STATE TRACE (temporary) ─────────────────────────────────────
+  // Logs on every render — captures whether aiDraft mutates after a field
+  // edit and whether shallowEqual sees a diff. Reproduce by opening the
+  // drawer for any user and changing MIN CONFIDENCE 85 → 90; share the
+  // console output. Remove once root cause confirmed.
+  /* eslint-disable no-console */
+  useEffect(() => {
+    const draftRec  = aiDraft  as unknown as Record<string, unknown>;
+    const serverRec = aiServer as unknown as Record<string, unknown>;
+    const perKeyDiff: Record<string, { draft: unknown; server: unknown; equal: boolean }> = {};
+    const allKeys = new Set([...Object.keys(draftRec), ...Object.keys(serverRec)]);
+    for (const k of allKeys) {
+      perKeyDiff[k] = {
+        draft:  draftRec[k],
+        server: serverRec[k],
+        equal:  draftRec[k] === serverRec[k],
+      };
+    }
+    console.debug("[admin-profile][DIRTY-TRACE]", {
+      seedReady,
+      seededForUserRef: seededForUserRef.current,
+      clerkUserId:      user.clerkUserId,
+      aiDirty,
+      shallowEqualResult: shallowEqual(draftRec, serverRec),
+      sameObjectRef:      (aiDraft as unknown) === (aiServer as unknown),
+      aiDraft:            structuredClone(draftRec),
+      aiServer:           structuredClone(serverRec),
+      perKeyDiff,
+    });
+  }, [aiDraft, aiServer, aiDirty, seedReady, user.clerkUserId]);
+  /* eslint-enable no-console */
+
   // ── Mutations ────────────────────────────────────────────────────────────
   const detailKey = ["admin-user-detail", user.clerkUserId] as const;
   const listKey   = ["admin-users"] as const;
@@ -1874,7 +1906,19 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
                 disabled={aiDisabled}
                 onChange={(v) => {
                   const n = Number(v); if (!Number.isFinite(n)) return;
-                  setAiDraft({ ...aiDraft, minConfidence: Math.max(0, Math.min(100, n)) });
+                  const clamped = Math.max(0, Math.min(100, n));
+                  /* eslint-disable no-console */
+                  console.debug("[admin-profile][minConfidence ONCHANGE]", {
+                    raw:               v,
+                    parsed:            n,
+                    clamped,
+                    aiDraftBefore:     structuredClone(aiDraft as unknown as Record<string, unknown>),
+                    aiServerSnapshot:  structuredClone(aiServer as unknown as Record<string, unknown>),
+                    aiDisabled,
+                    seedReady,
+                  });
+                  /* eslint-enable no-console */
+                  setAiDraft({ ...aiDraft, minConfidence: clamped });
                 }} />
             </FieldShell>
             <FieldShell label="POS SIZE (USD)"
