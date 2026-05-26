@@ -2443,19 +2443,25 @@ function TerminalInner() {
               </div>
             </div>
 
-            {/* UPGRADE CTA */}
-            <button
-              className="mt-1 flex items-center justify-center gap-2 px-3 py-3 text-[11px] font-bold tracking-[0.20em]"
-              style={{
-                color: BG_0,
-                background: `linear-gradient(90deg, ${EMERALD}, ${BRAND}, ${LIME})`,
-                boxShadow: `0 0 22px ${BRAND}66`,
-                border: `1px solid ${BRAND}`,
-              }}
-            >
-              <Zap size={13} strokeWidth={3} />
-              UNLOCK 12 CONCURRENT AI TRADES
-            </button>
+            {/* UPGRADE CTA — CUSTOMER ONLY. Admin/operator sessions
+             * already have unlimited concurrency and the AI AUTOTRADE
+             * ARM control above; surfacing a Pro upsell to an admin
+             * is noise. Also suppressed during `resolving` so it never
+             * flashes on what might turn out to be an admin session. */}
+            {isCustomerAccount && (
+              <button
+                className="mt-1 flex items-center justify-center gap-2 px-3 py-3 text-[11px] font-bold tracking-[0.20em]"
+                style={{
+                  color: BG_0,
+                  background: `linear-gradient(90deg, ${EMERALD}, ${BRAND}, ${LIME})`,
+                  boxShadow: `0 0 22px ${BRAND}66`,
+                  border: `1px solid ${BRAND}`,
+                }}
+              >
+                <Zap size={13} strokeWidth={3} />
+                UNLOCK 12 CONCURRENT AI TRADES
+              </button>
+            )}
           </div>
         </div>
 
