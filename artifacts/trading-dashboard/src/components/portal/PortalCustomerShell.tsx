@@ -3894,31 +3894,48 @@ export function PortalCustomerShell() {
   // button level (BUY enabled only when readiness === "READY";
   // otherwise the card renders identically but the action is
   // "QUEUE" / no-op).
-  // CONVICTION_V2 (2026-05-26): partition by ASSET CLASS (Majors / Alts)
-  // rather than DIRECTION (Long / Short). Direction is preserved as an
-  // inline badge on each OpportunityCard. Both columns:
-  //   • Sorted by convictionScore desc (already sorted in usePaperSignals).
-  //   • "Strongest first" — filter out obvious filler so weak setups
-  //     don't dilute the dashboard. Rule: keep if executionEligible OR
-  //     convictionScore >= 40. Sub-40 + non-eligible items are
-  //     dead-air and were the main driver of the "balanced inventory"
-  //     feel the calibration is meant to eliminate.
-  //   • Capped at top 12 per column — curated, not exhaustive.
-  const STRONG_ENOUGH = (o: OpportunityVM): boolean =>
-    o.executionEligible || o.convictionScore >= 40;
+  // CONVICTION_V2 (2026-05-26, revised): partition by ASSET CLASS
+  // (Majors / Alts) with ADAPTIVE FILL. Earlier iteration used a hard
+  // floor of `executionEligible || convictionScore >= 40` which
+  // suppressed too aggressively — the engine was alive and evaluating
+  // but cards were heavily under-rendered, reading as "dead" instead of
+  // "curated." Goal restated: surface the STRONGEST AVAILABLE
+  // opportunities, never "only perfect opportunities."
+  //
+  // Layered fill (per column):
+  //   Tier 1 (preferred): executionEligible OR convictionScore >= 25
+  //   Tier 2 (fallback):  executionEligible OR convictionScore >= 10
+  //   Tier 3 (always):    top N regardless of conviction
+  // We advance to the next tier only when the previous tier returns
+  // fewer than `targetMin` cards. MAJORS targetMin = 4 (smaller pool,
+  // BTC/ETH/SOL/XRP/LINK/AVAX = 6 max), ALTS targetMin = 6 (~14 alts).
+  //
+  // Ranking inside every tier: executionEligible cards always sort
+  // first (so live-executable setups stay top of column even when an
+  // unranked dead-card is force-included to hit `targetMin`), then by
+  // convictionScore desc. `usePaperSignals` already sorts by
+  // conviction, so the re-sort is a belt-and-suspenders guarantee
+  // around the executionEligible-first invariant.
+  const rankForColumn = (pool: OpportunityVM[]): OpportunityVM[] =>
+    [...pool].sort((a, b) => {
+      if (a.executionEligible !== b.executionEligible) return a.executionEligible ? -1 : 1;
+      return b.convictionScore - a.convictionScore;
+    });
+  const fillColumn = (pool: OpportunityVM[], targetMin: number, maxCap: number): OpportunityVM[] => {
+    const ranked = rankForColumn(pool);
+    const tier1 = ranked.filter(o => o.executionEligible || o.convictionScore >= 25);
+    if (tier1.length >= targetMin) return tier1.slice(0, maxCap);
+    const tier2 = ranked.filter(o => o.executionEligible || o.convictionScore >= 10);
+    if (tier2.length >= targetMin) return tier2.slice(0, maxCap);
+    return ranked.slice(0, Math.min(maxCap, Math.max(targetMin, tier2.length)));
+  };
 
   const filteredMajors = useMemo(
-    () => filteredOpps
-      .filter(o => o.assetClass === "MAJOR")
-      .filter(STRONG_ENOUGH)
-      .slice(0, 12),
+    () => fillColumn(filteredOpps.filter(o => o.assetClass === "MAJOR"), 4, 12),
     [filteredOpps],
   );
   const filteredAlts = useMemo(
-    () => filteredOpps
-      .filter(o => o.assetClass === "ALT")
-      .filter(STRONG_ENOUGH)
-      .slice(0, 12),
+    () => fillColumn(filteredOpps.filter(o => o.assetClass === "ALT"), 6, 12),
     [filteredOpps],
   );
 

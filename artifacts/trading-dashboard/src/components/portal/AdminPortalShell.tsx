@@ -3994,28 +3994,43 @@ function AdminPortalShellInner() {
   // button level (BUY enabled only when readiness === "READY";
   // otherwise the card renders identically but the action is
   // "QUEUE" / no-op).
-  // CONVICTION_V2 (2026-05-26): mirror PortalCustomerShell derivation.
-  // Partition by ASSET CLASS (Majors / Alts), not DIRECTION. Both
-  // columns sorted by convictionScore desc (usePaperSignals ranks
-  // ahead of us), filtered to strong-enough setups only:
-  //   keep iff executionEligible OR convictionScore >= 40.
-  // Sub-40 + non-eligible = dead-air filler. Capped at top 12 per
-  // column. Direction preserved as inline OpportunityCard badge.
-  const STRONG_ENOUGH = (o: OpportunityVM): boolean =>
-    o.executionEligible || o.convictionScore >= 40;
+  // CONVICTION_V2 (2026-05-26, revised): mirror PortalCustomerShell
+  // adaptive-fill derivation. Earlier iteration used a hard floor of
+  // `executionEligible || convictionScore >= 40` which suppressed too
+  // aggressively. Goal restated: "strongest available opportunities,"
+  // never "only perfect opportunities."
+  //
+  // Layered fill per column (advance to next tier only when previous
+  // returns fewer than `targetMin`):
+  //   Tier 1: executionEligible OR convictionScore >= 25
+  //   Tier 2: executionEligible OR convictionScore >= 10
+  //   Tier 3: top N raw (always shows something)
+  //
+  // Ranking inside every tier: executionEligible first, then by
+  // convictionScore desc. Guarantees live-executable setups stay top
+  // of column even when an unranked dead-card is force-included to
+  // hit targetMin. MAJORS targetMin=4 (pool of 6), ALTS targetMin=6
+  // (pool of ~14).
+  const rankForColumn = (pool: OpportunityVM[]): OpportunityVM[] =>
+    [...pool].sort((a, b) => {
+      if (a.executionEligible !== b.executionEligible) return a.executionEligible ? -1 : 1;
+      return b.convictionScore - a.convictionScore;
+    });
+  const fillColumn = (pool: OpportunityVM[], targetMin: number, maxCap: number): OpportunityVM[] => {
+    const ranked = rankForColumn(pool);
+    const tier1 = ranked.filter(o => o.executionEligible || o.convictionScore >= 25);
+    if (tier1.length >= targetMin) return tier1.slice(0, maxCap);
+    const tier2 = ranked.filter(o => o.executionEligible || o.convictionScore >= 10);
+    if (tier2.length >= targetMin) return tier2.slice(0, maxCap);
+    return ranked.slice(0, Math.min(maxCap, Math.max(targetMin, tier2.length)));
+  };
 
   const filteredMajors = useMemo(
-    () => filteredOpps
-      .filter(o => o.assetClass === "MAJOR")
-      .filter(STRONG_ENOUGH)
-      .slice(0, 12),
+    () => fillColumn(filteredOpps.filter(o => o.assetClass === "MAJOR"), 4, 12),
     [filteredOpps],
   );
   const filteredAlts = useMemo(
-    () => filteredOpps
-      .filter(o => o.assetClass === "ALT")
-      .filter(STRONG_ENOUGH)
-      .slice(0, 12),
+    () => fillColumn(filteredOpps.filter(o => o.assetClass === "ALT"), 6, 12),
     [filteredOpps],
   );
 
