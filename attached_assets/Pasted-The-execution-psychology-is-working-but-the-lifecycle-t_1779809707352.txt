@@ -1,0 +1,139 @@
+The execution psychology is working, but the lifecycle timing is too aggressive right now.
+
+Current behavior:
+
+one signal appears
+immediately transitions
+disappears too quickly
+battlefield feels visually empty most of the time
+
+The issue is NOT the scarcity philosophy.
+
+The issue is:
+the persistence window is too short for human perception.
+
+A user needs enough dwell time to:
+
+notice the signal
+emotionally process it
+read the reasoning
+understand the AI state transition
+feel anticipation
+
+Right now the lifecycle cadence is happening faster than the eye can comfortably absorb.
+
+ADJUSTMENTS NEEDED
+EXTEND LIFECYCLE DWELL TIMES
+
+Increase minimum visible duration for:
+
+FORMING
+CONFIRMED
+EXECUTION READY
+WEAKENING
+
+Especially EXECUTION READY.
+
+Recommendation:
+
+FORMING: ~2.5–4s
+CONFIRMED: ~4–6s
+EXECUTION READY: ~6–10s minimum
+WEAKENING: ~3–5s fade/decay
+
+The signal should feel like:
+“the AI has conviction”
+
+not:
+“a transient notification.”
+
+DO NOT REMOVE SIGNALS IMMEDIATELY AFTER GATE FAILURE
+
+Instead:
+transition them into:
+
+WEAKENING
+INVALIDATED
+CONDITIONS LOST
+THESIS BROKEN
+
+Let the battlefield breathe.
+
+A disappearing signal should feel analytical,
+not like a rerender.
+
+PRESERVE BATTLEFIELD MEMORY
+
+Even when the AI loses conviction:
+the battlefield should retain visual history briefly.
+
+Example:
+
+dimmed card
+faded sparkline
+ring losing intensity
+muted typography
+
+This creates:
+continuity + psychological realism.
+
+EXECUTION READY SHOULD DOMINATE ATTENTION
+
+When a signal reaches EXECUTION READY:
+
+keep it alive longer
+stronger persistence
+stronger visual weight
+slower decay
+
+This is the “AI conviction climax.”
+
+KEEP SCARCITY
+
+Do NOT:
+
+increase signal quantity artificially
+weaken filters
+repopulate with fake opportunities
+
+Scarcity is correct.
+
+The issue is:
+signal lifespan and transition pacing.
+
+AI FEED IS EXCELLENT NOW
+
+The AI ACTIVITY feed finally feels:
+
+intelligent
+analytical
+institutional
+alive
+
+Keep building on that.
+
+Especially:
+
+HOLD reasoning
+rejection explanations
+volatility filters
+MTF conflict explanations
+position-cap logic
+
+That reasoning layer is becoming one of the strongest parts of the product.
+
+GOAL
+
+The battlefield should feel like:
+
+a live institutional war room
+an AI observing market structure continuously
+selective high-conviction engagement
+persistent analytical memory
+disciplined execution
+
+NOT:
+a flashing signal board.
+
+The core philosophy is now correct.
+Now the timing and persistence need refinement.

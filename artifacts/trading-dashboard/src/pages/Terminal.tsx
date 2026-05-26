@@ -864,28 +864,45 @@ function TerminalInner() {
   const igniteLongTop  = longIgniteAt  > 0 && (now.getTime() - longIgniteAt)  < 1200;
   const igniteShortTop = shortIgniteAt > 0 && (now.getTime() - shortIgniteAt) < 1200;
 
-  /* ── SIGNAL LIFECYCLE TRACKER (EXECUTION PSYCHOLOGY PASS) ────────────────
+  /* ── SIGNAL LIFECYCLE TRACKER (EXECUTION PSYCHOLOGY PASS — v2) ───────────
    * Tracks each signal across polls so the battlefield shows
    * institutional evolution (FORMING → CONFIRMED → EXECUTION_READY →
-   * WEAKENING → INVALIDATED) instead of cards popping in and out.
+   * WEAKENING → INVALIDATED) with HUMAN-PERCEPTION dwell times.
    *
-   *   - WEAKENING persists 6s after a signal drops from the live set
-   *   - INVALIDATED persists for 6s after that, then removed
-   *   - Promotion to EXECUTION_READY (conf >= 75) emits a feed entry
-   *     for the AI ACTIVITY rail — the climax moment
-   *   - All transitions are derived from REAL conviction movement; no
-   *     synthetic / decorative signals are ever injected
+   * Earlier version transitioned the moment the engine's conviction
+   * shifted, which read as flicker — the user could see the state
+   * change but couldn't emotionally process the signal before it
+   * moved on. v2 adds:
    *
-   * The tracker lives in a ref (mutated in-place) so we don't thrash
-   * React state every poll; a lightweight `lifecycleVersion` counter
-   * drives memo invalidation when meaningful changes occur. */
+   *   1. MIN_DWELL_MS per state — even if conviction drops or the
+   *      signal leaves the live set, the UI HOLDS the current state
+   *      until dwell elapsed, then transitions. Gives the eye time
+   *      to read the card and the AI feed entry.
+   *   2. Promotion-only updates inside the update effect. Demotions
+   *      and departures are handled exclusively by the decay effect
+   *      (which respects dwell budgets).
+   *   3. EXEC_READY_DECAY_BONUS — signals that reached the conviction
+   *      climax get +3s on both WEAKENING and INVALIDATED so the user
+   *      gets to feel the analytical exit, not a sudden disappear.
+   *
+   *   Total memory budget after departure:
+   *     FORMING signal:         3s hold + 4s weak + 5s inv = 12s
+   *     CONFIRMED signal:       5s hold + 4s weak + 5s inv = 14s
+   *     EXECUTION_READY signal: 8s hold + 7s weak + 8s inv = 23s
+   *
+   * All transitions remain derived from REAL conviction movement; no
+   * synthetic / decorative signals are ever injected. */
   type TrackerEntry = {
-    sig:       Signal;
-    firstSeen: number;
-    lastSeen:  number;
-    peakConf:  number;
-    lastConf:  number;
-    state:     LifecycleState;
+    sig:            Signal;
+    firstSeen:      number;
+    lastSeen:       number;
+    peakConf:       number;
+    lastConf:       number;
+    state:          LifecycleState;
+    /** When the current state was entered — used by min-dwell logic */
+    stateEnteredAt: number;
+    /** Was this signal ever EXECUTION_READY? Earns decay bonus. */
+    wasExecReady:   boolean;
   };
   type LifecycleTransition = {
     id:    string;
@@ -900,21 +917,69 @@ function TerminalInner() {
   const [transitions, setTransitions] = useState<LifecycleTransition[]>([]);
   const [lifecycleVersion, setLifecycleVersion] = useState(0);
 
+  /* Min dwell — signal HOLDS its current state for at least this long
+   * before allowed to demote or transition to WEAKENING. Tuned to
+   * human-perception spec from the EXECUTION PSYCHOLOGY brief. */
+  const MIN_DWELL_MS: Record<LifecycleState, number> = {
+    FORMING:         3_000,
+    CONFIRMED:       5_000,
+    EXECUTION_READY: 8_000,
+    WEAKENING:       4_000,
+    INVALIDATED:     5_000,
+    EXECUTED:        0,
+  };
+  /* Bonus dwell granted to ex-EXECUTION_READY signals when decaying —
+   * applied to both WEAKENING and INVALIDATED. Reads as "conviction
+   * climax leaves a longer trail in the AI's memory." */
+  const EXEC_READY_DECAY_BONUS = 3_000;
+  const PROMOTE_ORDER: Record<string, number> = { FORMING: 0, CONFIRMED: 1, EXECUTION_READY: 2 };
+
   const deriveLiveState = (conf: number): LifecycleState =>
     conf >= 75 ? "EXECUTION_READY" : conf >= 60 ? "CONFIRMED" : "FORMING";
 
-  /* Update tracker when live signal set changes — adds/promotes entries
-   * and flips departed signals into WEAKENING (one-shot per transition). */
+  /* PROMOTION-ONLY update effect — runs when the live signal set changes.
+   * Adds new entries, updates lastSeen/peakConf, allows PROMOTIONS
+   * (FORMING→CONFIRMED→EXECUTION_READY) immediately, but BLOCKS
+   * demotions and departure-flips. All downward state movement is
+   * owned by the decay effect so MIN_DWELL_MS is respected uniformly. */
   useEffect(() => {
     if (isBootstrap) return;
     const nowMs = Date.now();
     const newTransitions: LifecycleTransition[] = [];
+    let mutated = false;
     const updateSide = (live: Signal[], tracker: Map<string, TrackerEntry>, dir: Dir) => {
-      const liveSet = new Set(live.map(s => s.sym));
       for (const s of live) {
         const prev = tracker.get(s.sym);
         const peak = Math.max(prev?.peakConf ?? 0, s.conf);
-        const nextState = deriveLiveState(s.conf);
+        const derivedState = deriveLiveState(s.conf);
+        let nextState: LifecycleState;
+        let stateEnteredAt = prev?.stateEnteredAt ?? nowMs;
+        const wasExecReady =
+          !!prev?.wasExecReady ||
+          derivedState === "EXECUTION_READY" ||
+          prev?.state === "EXECUTION_READY";
+
+        if (!prev) {
+          nextState = derivedState;
+          stateEnteredAt = nowMs;
+        } else if (prev.state === "WEAKENING" || prev.state === "INVALIDATED") {
+          // Signal returned to live set — resurrect to derived state.
+          nextState = derivedState;
+          stateEnteredAt = nowMs;
+        } else {
+          const prevOrder = PROMOTE_ORDER[prev.state] ?? -1;
+          const newOrder  = PROMOTE_ORDER[derivedState] ?? -1;
+          if (newOrder > prevOrder) {
+            // Promotion — always allowed, resets dwell timer.
+            nextState = derivedState;
+            stateEnteredAt = nowMs;
+          } else {
+            // Demotion blocked here — decay effect will handle it
+            // once dwell elapses (or signal re-strengthens).
+            nextState = prev.state;
+          }
+        }
+
         if (prev?.state !== "EXECUTION_READY" && nextState === "EXECUTION_READY") {
           newTransitions.push({
             id:    `lc-${dir}-${s.sym}-ready-${nowMs}`,
@@ -925,77 +990,113 @@ function TerminalInner() {
             note:  "execution ready · institutional gates cleared",
           });
         }
+        if (prev?.state !== nextState) mutated = true;
         tracker.set(s.sym, {
-          sig:       { ...s, lifecycle: nextState, peakConf: peak },
-          firstSeen: prev?.firstSeen ?? nowMs,
-          lastSeen:  nowMs,
-          peakConf:  peak,
-          lastConf:  s.conf,
-          state:     nextState,
+          sig:            { ...s, lifecycle: nextState, peakConf: peak },
+          firstSeen:      prev?.firstSeen ?? nowMs,
+          lastSeen:       nowMs,
+          peakConf:       peak,
+          lastConf:       s.conf,
+          state:          nextState,
+          stateEnteredAt,
+          wasExecReady,
         });
       }
-      for (const [sym, e] of tracker.entries()) {
-        if (!liveSet.has(sym) && e.state !== "WEAKENING" && e.state !== "INVALIDATED") {
-          e.state = "WEAKENING";
-          e.sig   = { ...e.sig, lifecycle: "WEAKENING" };
-          newTransitions.push({
-            id:    `lc-${dir}-${sym}-weak-${nowMs}`,
-            t:     nowMs,
-            sym,
-            dir,
-            state: "WEAKENING",
-            note:  e.peakConf >= 75
-              ? "weakening · conviction retracting from peak"
-              : "weakening · MTF agreement softening",
-          });
-        }
-      }
+      // Departures handled by decay effect — do NOT flip to WEAKENING here.
     };
     updateSide(longs,  longTrackerRef.current,  "LONG");
     updateSide(shorts, shortTrackerRef.current, "SHORT");
-    if (newTransitions.length) {
-      setTransitions(prev => [...newTransitions, ...prev].slice(0, 24));
-      setLifecycleVersion(v => v + 1);
-    }
+    if (newTransitions.length) setTransitions(prev => [...newTransitions, ...prev].slice(0, 24));
+    if (mutated || newTransitions.length) setLifecycleVersion(v => v + 1);
   }, [longs, shorts, isBootstrap]);
 
-  /* Decay tick — promotes WEAKENING → INVALIDATED at 6s, evicts at 12s.
-   * Driven by the existing 1Hz `now` tick so we don't need a new timer. */
+  /* DECAY effect — dwell-aware. Runs on every 1Hz tick and also when
+   * the live set changes. Owns ALL downward state movement so the
+   * MIN_DWELL_MS contract holds regardless of how fast the engine
+   * thrashes its conviction. */
   useEffect(() => {
     if (isBootstrap) return;
     const nowMs = now.getTime();
     const newTransitions: LifecycleTransition[] = [];
     let mutated = false;
-    const decay = (tracker: Map<string, TrackerEntry>, dir: Dir) => {
+    const decay = (live: Signal[], tracker: Map<string, TrackerEntry>, dir: Dir) => {
+      const liveMap = new Map(live.map(s => [s.sym, s]));
       for (const [sym, e] of tracker.entries()) {
-        const age = nowMs - e.lastSeen;
-        if (age >= 12_000) {
-          tracker.delete(sym);
-          mutated = true;
-          continue;
+        const liveSig = liveMap.get(sym);
+        const timeInState = nowMs - e.stateEnteredAt;
+        /* IN-LIVE DEMOTION — signal is still in the live set but its
+         * derived state is lower than the held state. Step down one
+         * level (EXECUTION_READY→CONFIRMED→FORMING) once min dwell
+         * elapsed, so the card visibly tracks the AI's loss of
+         * conviction even before the engine drops it entirely.
+         * Update effect blocks demotions outright; this is where
+         * downward live movement actually happens. */
+        if (liveSig) {
+          const derived = deriveLiveState(liveSig.conf);
+          const prevOrder = PROMOTE_ORDER[e.state] ?? -1;
+          const newOrder  = PROMOTE_ORDER[derived]  ?? -1;
+          if (newOrder >= 0 && newOrder < prevOrder && timeInState >= MIN_DWELL_MS[e.state]) {
+            // Step down exactly one rung so the user feels the
+            // decay rather than a snap to FORMING.
+            const stepped: LifecycleState = prevOrder === 2 ? "CONFIRMED" : "FORMING";
+            e.state          = stepped;
+            e.stateEnteredAt = nowMs;
+            e.sig            = { ...e.sig, lifecycle: stepped };
+            mutated = true;
+          }
+          continue; // live signals only handled by this demotion branch
         }
-        if (age >= 6_000 && e.state === "WEAKENING") {
-          e.state = "INVALIDATED";
-          e.sig   = { ...e.sig, lifecycle: "INVALIDATED" };
-          mutated = true;
-          newTransitions.push({
-            id:    `lc-${dir}-${sym}-inv-${nowMs}`,
-            t:     nowMs,
-            sym,
-            dir,
-            state: "INVALIDATED",
-            note:  "invalidated · setup no longer institutional-grade",
-          });
+        const bonus = e.wasExecReady ? EXEC_READY_DECAY_BONUS : 0;
+        if (e.state === "INVALIDATED") {
+          if (timeInState >= MIN_DWELL_MS.INVALIDATED + bonus) {
+            tracker.delete(sym);
+            mutated = true;
+          }
+        } else if (e.state === "WEAKENING") {
+          if (timeInState >= MIN_DWELL_MS.WEAKENING + bonus) {
+            e.state          = "INVALIDATED";
+            e.stateEnteredAt = nowMs;
+            e.sig            = { ...e.sig, lifecycle: "INVALIDATED" };
+            mutated = true;
+            newTransitions.push({
+              id:    `lc-${dir}-${sym}-inv-${nowMs}`,
+              t:     nowMs,
+              sym,
+              dir,
+              state: "INVALIDATED",
+              note:  e.wasExecReady
+                ? "invalidated · thesis broken"
+                : "invalidated · conditions lost",
+            });
+          }
+        } else {
+          // FORMING / CONFIRMED / EXECUTION_READY departed live set —
+          // hold current state until min dwell, then flip to WEAKENING.
+          if (timeInState >= MIN_DWELL_MS[e.state]) {
+            const wasExec = e.state === "EXECUTION_READY";
+            e.state          = "WEAKENING";
+            e.stateEnteredAt = nowMs;
+            e.sig            = { ...e.sig, lifecycle: "WEAKENING" };
+            mutated = true;
+            newTransitions.push({
+              id:    `lc-${dir}-${sym}-weak-${nowMs}`,
+              t:     nowMs,
+              sym,
+              dir,
+              state: "WEAKENING",
+              note:  wasExec
+                ? "weakening · conviction retracting from peak"
+                : "weakening · conditions deteriorating",
+            });
+          }
         }
       }
     };
-    decay(longTrackerRef.current,  "LONG");
-    decay(shortTrackerRef.current, "SHORT");
-    if (newTransitions.length) {
-      setTransitions(prev => [...newTransitions, ...prev].slice(0, 24));
-    }
+    decay(longs,  longTrackerRef.current,  "LONG");
+    decay(shorts, shortTrackerRef.current, "SHORT");
+    if (newTransitions.length) setTransitions(prev => [...newTransitions, ...prev].slice(0, 24));
     if (mutated) setLifecycleVersion(v => v + 1);
-  }, [now, isBootstrap]);
+  }, [now, longs, shorts, isBootstrap]);
 
   /* Display lists — live signals (carrying derived lifecycle) followed
    * by persisted WEAKENING/INVALIDATED cards (so departures fade
