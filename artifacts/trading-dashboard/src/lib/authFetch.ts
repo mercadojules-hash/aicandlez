@@ -166,6 +166,20 @@ export async function authFetch(
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
+  // ── Content-Type guard ───────────────────────────────────────────────
+  // express.json() only parses requests with `Content-Type:
+  // application/json`. fetch() defaults to `text/plain;charset=UTF-8`
+  // when given a string body and no explicit Content-Type, so the server
+  // silently sees `req.body = {}` and every Zod schema field comes back
+  // as `undefined` ("expected boolean, received undefined" etc.).
+  // Auto-set it when the caller passed a string body and didn't override.
+  if (
+    typeof init.body === "string" &&
+    init.body.length > 0 &&
+    !headers.has("Content-Type")
+  ) {
+    headers.set("Content-Type", "application/json");
+  }
 
   const resolved = resolveUrl(input);
   const response = await fetch(resolved, { ...init, credentials: "include", headers });
