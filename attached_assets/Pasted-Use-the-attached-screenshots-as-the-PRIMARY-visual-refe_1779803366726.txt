@@ -1,0 +1,142 @@
+Use the attached screenshots as the PRIMARY visual reference moving forward.
+
+This is now the correct flagship AICandlez trading-terminal direction.
+
+====================================================
+IMPORTANT DIRECTION CHANGE
+==========================
+
+We are now intentionally separating:
+
+1. PERSONAL TRADING TERMINAL
+2. OPERATOR COMMAND CENTER
+
+These are now DIFFERENT experiences with different emotional goals.
+
+====================================================
+
+1. PERSONAL TRADING TERMINAL
+   ====================================================
+
+The attached cinematic terminal screenshots are now the PRIMARY direction for:
+trade.aicandlez.com/terminal
+
+This is the dashboard I will:
+
+* actively trade from daily
+* monitor opportunities from
+* showcase publicly
+* use for screenshots/videos/content
+* emotionally engage with
+
+This terminal should prioritize:
+
+* opportunity hunting
+* conviction
+* AI activity
+* LONG vs SHORT warfare
+* emotional energy
+* cinematic feel
+* live market atmosphere
+
+MORE than:
+
+* infrastructure telemetry
+* backend statistics
+* system diagnostics
+
+====================================================
+THE FEELING WE WANT
+===================
+
+This terminal should feel:
+
+* addictive
+* elite
+* alive
+* premium
+* cinematic
+* AI-native
+* aggressive
+* opportunity-rich
+
+Think:
+“the AI is actively hunting the market in real time.”
+
+====================================================
+MOST IMPORTANT AREAS TO PRESERVE
+================================
+
+1. LIVE OPPORTUNITY BATTLEFIELD
+   Excellent.
+   Keep this as a major emotional anchor.
+
+2. LONG vs SHORT warfare
+   The red/green battle effect is critical.
+   Do NOT tone this down.
+
+3. Larger conviction rings
+   Conviction now FEELS important.
+   Keep this emphasis.
+
+4. Scanning / market-surge hero section
+   “Scanning 30 markets · last surge BTC 82→91”
+   is one of the strongest parts of the platform now.
+
+5. Personal account rail
+   This now feels:
+
+* premium
+* AI-managed
+* trustworthy
+* personal
+
+====================================================
+OPERATOR COMMAND CENTER
+=======================
+
+The telemetry-heavy institutional operator layout is STILL approved for:
+admintrade.aicandlez.com/operator
+
+That experience should remain:
+
+* operational
+* monitoring focused
+* execution focused
+* telemetry dense
+* infrastructure aware
+
+So:
+
+* DO NOT merge these two identities together again.
+* They now serve different purposes intentionally.
+
+====================================================
+FINAL REFINEMENTS
+=================
+
+Continue refining the PERSONAL terminal direction shown in the screenshots.
+
+Focus on:
+
+* stronger cinematic atmosphere
+* opportunity focus
+* emotional engagement
+* AI-hunting feel
+* premium spacing
+* matte-black contrast
+* stronger signal storytelling
+
+Avoid drifting back toward:
+
+* telemetry-wall layouts
+* devops aesthetics
+* infrastructure-heavy grids
+* generic admin dashboard feeling
+
+====================================================
+NEXT STEP
+=========
+
+Continue iterating the PERSONAL trading terminal mockups using these screenshots as the PRIMARY reference before final production graduation into:
+/terminal

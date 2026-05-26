@@ -112,6 +112,30 @@ const FEED = [
 const EQUITY_SPARK = [82,83,84,85,84,86,87,88,90,91,92,94,95,97,99,101,103,104,106,107,108];
 const PULSE_WAVE = [40,42,38,46,44,50,48,54,52,58,55,62,60,66,64,70,68,72,69,74,71,76,73,78,75,80,76,82,78,84,80,86];
 
+type Meta = { thesis: string; age: string; traj: number[]; rising: boolean };
+const META: Record<string, Meta> = {
+  BTC:   { thesis: "EMA9>21 cross · vol 2.4x avg · MTF 5m/15m/1H aligned",        age: "3s ago",  traj: [72, 79, 86, 91], rising: true },
+  SOL:   { thesis: "trend continuation · VWAP reclaim · liquidity sweep below",   age: "11s ago", traj: [70, 76, 82, 87], rising: true },
+  ETH:   { thesis: "higher highs · 200MA stack · order block hold",               age: "24s ago", traj: [74, 78, 81, 84], rising: true },
+  INJ:   { thesis: "range expansion · BB squeeze release · vol 1.9x",             age: "38s ago", traj: [68, 74, 78, 82], rising: true },
+  AVAX:  { thesis: "demand zone hold · RSI 54 reset · 4H bullish",                age: "52s ago", traj: [72, 75, 78, 80], rising: true },
+  LINK:  { thesis: "VWAP reclaim · CVD positive · 5m momentum thrust",            age: "1m ago",  traj: [70, 73, 76, 79], rising: true },
+  TIA:   { thesis: "compression release · ATR pop · MTF 5m/15m bullish",          age: "1m ago",  traj: [69, 72, 75, 77], rising: true },
+  SUI:   { thesis: "MA stack bullish · range high break · vol 1.6x",              age: "2m ago",  traj: [70, 72, 74, 76], rising: true },
+  APT:   { thesis: "bullish div · RSI 38 reset · liquidity below swept",          age: "2m ago",  traj: [66, 70, 72, 74], rising: true },
+  FET:   { thesis: "narrative bid · 5m breakout · vol 2.1x avg",                  age: "3m ago",  traj: [65, 68, 71, 73], rising: true },
+  WIF:   { thesis: "topping pattern · vol divergence · MTF 5m/15m/1H bearish",    age: "8s ago",  traj: [70, 76, 82, 87], rising: true },
+  PEPE:  { thesis: "lower lows · 21MA cross down · CVD negative",                 age: "16s ago", traj: [72, 77, 81, 85], rising: true },
+  BONK:  { thesis: "exhaustion top · RSI bear div · liquidity sweep above",       age: "29s ago", traj: [70, 74, 79, 83], rising: true },
+  SHIB:  { thesis: "channel breakdown · 5m supply rejection · vol 1.7x",          age: "44s ago", traj: [70, 74, 77, 81], rising: true },
+  DOGE:  { thesis: "rejection at supply · MTF 5m/15m bearish · OBV down",         age: "1m ago",  traj: [68, 72, 75, 79], rising: true },
+  FLOKI: { thesis: "MACD bear cross · 4H trend down · vol 1.5x",                  age: "1m ago",  traj: [69, 72, 75, 78], rising: true },
+  ORDI:  { thesis: "bear flag · MTF aligned bearish · liquidity above swept",     age: "2m ago",  traj: [68, 71, 74, 76], rising: true },
+  NEAR:  { thesis: "supply rejection · RSI bear div · 1H downtrend",              age: "2m ago",  traj: [66, 69, 71, 74], rising: true },
+  OP:    { thesis: "MTF bearish · range low break · vol 1.4x avg",                age: "3m ago",  traj: [65, 68, 70, 73], rising: true },
+  XRP:   { thesis: "double top · MACD divergence · 4H supply rejection",          age: "3m ago",  traj: [64, 66, 68, 71], rising: true },
+};
+
 function Sparkline({
   data, color, w, h, strokeW = 1.8,
 }: { data: number[]; color: string; w: number; h: number; strokeW?: number }) {
@@ -170,23 +194,28 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
   const isLong = s.dir === "LONG";
   const color = isLong ? BRAND : RED;
   const colorSoft = isLong ? EMERALD : RED_SOFT;
-  const tint = isLong ? "rgba(102,255,102,0.04)" : "rgba(255,59,59,0.035)";
+  const cardBg = top
+    ? (isLong ? "linear-gradient(180deg, rgba(102,255,102,0.05), rgba(102,255,102,0.015))" : "linear-gradient(180deg, rgba(255,59,59,0.05), rgba(255,59,59,0.015))")
+    : BG_3;
   const borderCol = isLong ? "rgba(102,255,102,0.20)" : "rgba(255,59,59,0.24)";
   const topBorder = isLong ? "rgba(102,255,102,0.55)" : "rgba(255,59,59,0.55)";
+  const meta = META[s.sym];
   return (
     <div
       className="relative flex flex-col"
       style={{
-        background: tint,
+        background: cardBg,
         border: `1px solid ${top ? topBorder : borderCol}`,
-        boxShadow: top ? `0 0 0 1px ${color}22, 0 0 24px ${color}33 inset` : "none",
+        boxShadow: top
+          ? `0 0 0 1px ${color}22, 0 0 24px ${color}33 inset, inset 0 1px 0 rgba(255,255,255,0.04)`
+          : `inset 0 1px 0 rgba(255,255,255,0.03)`,
         animation: top ? "edgePulse 4s ease-in-out infinite" : undefined,
         transform: top ? "scale(1.005)" : undefined,
         transition: "all 180ms ease",
       }}
     >
       {/* ROW 1 — header */}
-      <div className="flex items-center gap-2.5 px-3.5 pt-2.5">
+      <div className="flex items-center gap-2.5 px-3.5 pt-3">
         <div
           className="px-2 py-0.5 text-[10px] font-bold tracking-[0.16em]"
           style={{
@@ -216,11 +245,29 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
               <Flame size={9} /> TOP SIGNAL
             </div>
           )}
+          <div
+            className="text-[8.5px] font-semibold tabular-nums tracking-[0.14em]"
+            style={{ color: TXT_40, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
+          >
+            {meta?.age ?? "live"}
+          </div>
         </div>
       </div>
 
+      {/* AI THESIS LINE */}
+      <div
+        className="px-3.5 pt-1 text-[9.5px]"
+        style={{
+          color: TXT_65,
+          letterSpacing: "0.12em",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+        }}
+      >
+        {meta?.thesis ?? `${s.reason.toLowerCase()} · ${s.tag}`}
+      </div>
+
       {/* ROW 2 — price + sparkline + ring */}
-      <div className="flex items-center gap-3 px-3.5 pt-1.5">
+      <div className="flex items-center gap-3 px-3.5 pt-2">
         <div className="flex w-[120px] shrink-0 flex-col">
           <div className="text-[20px] font-bold tabular-nums text-white leading-none" style={{ letterSpacing: "-0.03em" }}>
             {s.price}
@@ -246,8 +293,36 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
         </div>
       </div>
 
+      {/* TRAJECTORY MICRO-ROW */}
+      <div className="flex items-center gap-2 px-3.5 pt-2">
+        <span className="text-[8.5px] tracking-[0.18em]" style={{ color: TXT_40 }}>TRAJECTORY</span>
+        <div className="flex items-center gap-1.5">
+          {(meta?.traj ?? [s.conf - 9, s.conf - 6, s.conf - 3, s.conf]).map((v, i, arr) => {
+            const last = i === arr.length - 1;
+            const rising = arr[arr.length - 1] > arr[0];
+            const filled = last || v >= arr[arr.length - 1] - 4;
+            return (
+              <span
+                key={i}
+                className="inline-block rounded-full"
+                style={{
+                  width: last ? 6 : 5,
+                  height: last ? 6 : 5,
+                  background: filled ? color : "rgba(255,255,255,0.12)",
+                  boxShadow: last && rising ? `0 0 8px ${color}` : "none",
+                  opacity: filled ? (last ? 1 : 0.7) : 1,
+                }}
+              />
+            );
+          })}
+        </div>
+        <span className="text-[8.5px] tabular-nums tracking-[0.14em]" style={{ color: colorSoft }}>
+          {meta?.traj ? `${meta.traj[0]}→${meta.traj[meta.traj.length - 1]}` : ""}
+        </span>
+      </div>
+
       {/* ROW 3 — micro plan */}
-      <div className="mt-2 flex items-center gap-3 px-3.5 pb-2.5 pt-1.5" style={{ borderTop: `1px solid ${borderCol}` }}>
+      <div className="mt-2 flex items-center gap-3 px-3.5 pb-3 pt-2" style={{ borderTop: `1px solid ${borderCol}` }}>
         <div className="flex items-center gap-1 text-[9.5px] tracking-[0.10em]" style={{ color: TXT_40 }}>
           ENTRY <span className="font-semibold tabular-nums" style={{ color: TXT_85 }}>{s.entry}</span>
         </div>
@@ -268,19 +343,29 @@ function SignalCard({ s, top }: { s: Signal; top?: boolean }) {
           <span className="ml-1 text-[8.5px] tracking-[0.14em]" style={{ color: TXT_40 }}>1H</span>
           <MtfDot s={s.h1} color={color} />
         </div>
-        <button
-          className="ml-auto flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold tracking-[0.18em]"
-          style={{
-            color: isLong ? BG_0 : "#fff",
-            background: isLong ? color : "rgba(255,59,59,0.92)",
-            border: `1px solid ${color}`,
-            boxShadow: top ? `0 0 14px ${color}88` : `0 0 6px ${color}55`,
-            transition: "all 180ms ease",
-          }}
-        >
-          {isLong ? <Target size={11} strokeWidth={3} /> : <Crosshair size={11} strokeWidth={3} />}
-          {isLong ? "BUY" : "SELL"}
-        </button>
+        <div className="ml-auto flex flex-col items-end gap-0.5">
+          {top && (
+            <div
+              className="text-[8.5px] font-bold tracking-[0.18em]"
+              style={{ color }}
+            >
+              {isLong ? "HUNT INITIATED" : "EXECUTION ARMED"}
+            </div>
+          )}
+          <button
+            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold tracking-[0.18em]"
+            style={{
+              color: isLong ? BG_0 : "#fff",
+              background: isLong ? color : "rgba(255,59,59,0.92)",
+              border: `1px solid ${color}`,
+              boxShadow: top ? `0 0 14px ${color}88` : `0 0 6px ${color}55`,
+              transition: "all 180ms ease",
+            }}
+          >
+            {isLong ? <Target size={11} strokeWidth={3} /> : <Crosshair size={11} strokeWidth={3} />}
+            {isLong ? "BUY" : "SELL"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -337,6 +422,14 @@ export default function PersonalTerminal() {
           0%,100% { transform: scale(1); opacity: 0.85; box-shadow: 0 0 14px ${BRAND}, 0 0 28px ${BRAND}66; }
           50%     { transform: scale(1.25); opacity: 1;    box-shadow: 0 0 22px ${BRAND}, 0 0 44px ${BRAND}88; }
         }
+        @keyframes ringBreath {
+          0%,100% { transform: scale(1);   opacity: 0.55; }
+          50%     { transform: scale(1.7); opacity: 0;   }
+        }
+        @keyframes ringBreathSlow {
+          0%,100% { transform: scale(1);   opacity: 0.35; }
+          50%     { transform: scale(2.2); opacity: 0;   }
+        }
         @keyframes edgePulse {
           0%,100% { box-shadow: 0 0 0 1px ${BRAND}22, 0 0 18px ${BRAND}22 inset; }
           50%     { box-shadow: 0 0 0 1px ${BRAND}55, 0 0 36px ${BRAND}44 inset; }
@@ -353,26 +446,54 @@ export default function PersonalTerminal() {
           0%,100% { opacity: .55; }
           50%     { opacity: 1; }
         }
+        @keyframes heroSweep {
+          0%   { transform: translateX(-30%); opacity: 0; }
+          15%  { opacity: 1; }
+          85%  { opacity: 1; }
+          100% { transform: translateX(130%); opacity: 0; }
+        }
+        @keyframes scanBar {
+          0%   { transform: translateX(-10%); opacity: 0; }
+          10%  { opacity: 1; }
+          90%  { opacity: 1; }
+          100% { transform: translateX(110%); opacity: 0; }
+        }
+        @keyframes sparkRise {
+          0%   { transform: translateY(0);     opacity: 0; }
+          15%  { opacity: 0.5; }
+          85%  { opacity: 0.5; }
+          100% { transform: translateY(-140px); opacity: 0; }
+        }
+        @keyframes equityShimmer {
+          0%,100% { text-shadow: 0 0 6px rgba(102,255,102,0.10); }
+          50%     { text-shadow: 0 0 14px rgba(102,255,102,0.40); }
+        }
+        @keyframes livePulse {
+          0%,100% { transform: scale(1);   opacity: 0.65; }
+          50%     { transform: scale(1.35); opacity: 1;   }
+        }
       `}</style>
 
-      {/* RADIAL VIGNETTES */}
+      {/* RADIAL VIGNETTES — deepened */}
       <div
         className="pointer-events-none fixed inset-0 z-0"
         style={{
           background: `
-            radial-gradient(720px 480px at 0% 0%, rgba(102,255,102,0.06), transparent 60%),
-            radial-gradient(820px 520px at 100% 100%, rgba(102,255,102,0.05), transparent 60%),
-            radial-gradient(1400px 680px at 50% -10%, rgba(102,255,102,0.04), transparent 70%)
+            radial-gradient(820px 540px at 0% 0%, rgba(102,255,102,0.09), transparent 62%),
+            radial-gradient(920px 580px at 100% 100%, rgba(102,255,102,0.075), transparent 62%),
+            radial-gradient(1500px 760px at 50% -12%, rgba(102,255,102,0.06), transparent 72%),
+            radial-gradient(900px 600px at 50% 110%, rgba(0,0,0,0.55), transparent 70%)
           `,
         }}
       />
-      {/* SCANLINES */}
+      {/* SCANLINES — slightly more present on gutters */}
       <div
         className="pointer-events-none fixed inset-0 z-0"
         style={{
           backgroundImage:
-            "repeating-linear-gradient(0deg, rgba(124,255,0,0.035) 0px, rgba(124,255,0,0.035) 1px, transparent 1px, transparent 3px)",
+            "repeating-linear-gradient(0deg, rgba(124,255,0,0.055) 0px, rgba(124,255,0,0.055) 1px, transparent 1px, transparent 3px)",
           mixBlendMode: "overlay",
+          opacity: 0.85,
         }}
       />
 
@@ -435,22 +556,66 @@ export default function PersonalTerminal() {
 
         {/* HERO BAND */}
         <div
-          className="grid items-stretch"
+          className="relative grid items-stretch overflow-hidden"
           style={{ gridTemplateColumns: "3fr 2fr", height: 140, background: BG_1, borderBottom: `1px solid ${HAIR_10}` }}
         >
+          {/* HERO LIGHT SWEEP — single slow drift */}
+          <div
+            className="pointer-events-none absolute inset-0 overflow-hidden"
+            style={{ gridColumn: "1 / -1" }}
+          >
+            <div
+              className="absolute top-0 h-full"
+              style={{
+                width: "30%",
+                left: 0,
+                background: "linear-gradient(90deg, transparent, rgba(102,255,102,0.06), transparent)",
+                animation: "heroSweep 18s linear infinite",
+              }}
+            />
+          </div>
+          {/* CONVICTION SPARK RAIN — extremely subtle */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ gridColumn: "1 / -1" }}>
+            {[12, 26, 41, 58, 73, 88].map((leftPct, i) => (
+              <span
+                key={i}
+                className="absolute rounded-full"
+                style={{
+                  left: `${leftPct}%`,
+                  bottom: 0,
+                  width: 2,
+                  height: 2,
+                  background: BRAND,
+                  boxShadow: `0 0 4px ${BRAND}`,
+                  animation: `sparkRise ${9 + i}s linear ${i * 1.4}s infinite`,
+                }}
+              />
+            ))}
+          </div>
+
           {/* AI HUNTING */}
           <div className="relative flex flex-col justify-center gap-2.5 px-6" style={{ borderRight: `1px solid ${HAIR_10}` }}>
             <div className="flex items-center gap-3">
-              <span
-                className="inline-block h-3 w-3 rounded-full"
-                style={{ background: BRAND, animation: "pulseOrb 2.4s ease-in-out infinite" }}
-              />
+              <span className="relative inline-block h-3 w-3">
+                <span
+                  className="absolute inset-0 rounded-full"
+                  style={{ background: BRAND, animation: "pulseOrb 2.4s ease-in-out infinite" }}
+                />
+                <span
+                  className="absolute inset-0 rounded-full"
+                  style={{ border: `1px solid ${BRAND}`, animation: "ringBreath 2.4s ease-out infinite" }}
+                />
+                <span
+                  className="absolute inset-0 rounded-full"
+                  style={{ border: `1px solid ${BRAND}`, animation: "ringBreathSlow 4.8s ease-out infinite" }}
+                />
+              </span>
               <div className="text-[10px] font-bold tracking-[0.30em]" style={{ color: BRAND }}>AI ENGINE · HUNTING</div>
               <div className="flex items-center gap-1 text-[9.5px] tracking-[0.16em]" style={{ color: TXT_40 }}>
                 <Bot size={11} /> autonomous
               </div>
             </div>
-            <div className="text-[28px] font-bold leading-none text-white" style={{ letterSpacing: "-0.04em" }}>
+            <div className="text-[30px] font-bold leading-[1.02] text-white" style={{ letterSpacing: "-0.05em" }}>
               Scanning <span style={{ color: BRAND }}>30 markets</span> · last surge{" "}
               <span style={{ color: BRAND }}>BTC 82→91</span>
               <span className="ml-2 text-[14px] font-semibold" style={{ color: TXT_40, letterSpacing: 0 }}>· 3s ago</span>
@@ -485,14 +650,30 @@ export default function PersonalTerminal() {
                 <Sparkline data={PULSE_WAVE} color={BRAND} w={600} h={42} strokeW={1.8} />
                 <Sparkline data={PULSE_WAVE} color={BRAND} w={600} h={42} strokeW={1.8} />
               </div>
+              {/* SCAN BAR — sweeps across waveform every ~3s */}
+              <div
+                className="pointer-events-none absolute top-1/2 h-px"
+                style={{
+                  left: 0,
+                  width: "12%",
+                  background: `linear-gradient(90deg, transparent, ${BRAND}4D, transparent)`,
+                  animation: "scanBar 3s linear infinite",
+                }}
+              />
             </div>
           </div>
         </div>
 
         {/* MAIN — battlefield + right rail */}
-        <div className="grid gap-4 px-4 py-4" style={{ gridTemplateColumns: "1fr 340px" }}>
-          {/* BATTLEFIELD */}
-          <div className="flex min-w-0 flex-col gap-3">
+        <div
+          className="grid gap-4 px-4 pb-4"
+          style={{ gridTemplateColumns: "1fr 340px", paddingTop: 20 }}
+        >
+          {/* BATTLEFIELD — matte-black wrapper */}
+          <div
+            className="flex min-w-0 flex-col gap-3 p-3"
+            style={{ background: BG_0, border: `1px solid ${HAIR_10}` }}
+          >
             <div className="flex items-end justify-between">
               <div>
                 <div className="text-[26px] font-bold text-white" style={{ letterSpacing: "-0.04em" }}>
@@ -591,7 +772,10 @@ export default function PersonalTerminal() {
                   <Bot size={10} /> AI MANAGED
                 </div>
               </div>
-              <div className="text-[30px] font-bold leading-none tabular-nums text-white" style={{ letterSpacing: "-0.04em" }}>
+              <div
+                className="text-[30px] font-bold leading-none tabular-nums text-white"
+                style={{ letterSpacing: "-0.04em", animation: "equityShimmer 4s ease-in-out infinite" }}
+              >
                 $108,420<span style={{ color: TXT_40 }}>.16</span>
               </div>
               <div className="flex items-center gap-2">
@@ -639,7 +823,10 @@ export default function PersonalTerminal() {
                       }}
                     >
                       <div className="flex items-center gap-1.5">
-                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: c, boxShadow: `0 0 6px ${c}` }} />
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ background: c, boxShadow: `0 0 6px ${c}`, animation: "livePulse 1.8s ease-in-out infinite" }}
+                        />
                         <span className="text-[12px] font-bold text-white" style={{ letterSpacing: "-0.02em" }}>{p.sym}</span>
                       </div>
                       <div className="flex flex-col">
@@ -686,27 +873,36 @@ export default function PersonalTerminal() {
                 <div className="text-[9px] tracking-[0.18em]" style={{ color: TXT_40 }}>LIVE FEED</div>
               </div>
               <div className="flex flex-col">
-                {FEED.map((e, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 px-3 py-1.5"
-                    style={{ borderTop: i === 0 ? "none" : `1px solid ${HAIR_10}` }}
-                  >
-                    <span
-                      className="h-1.5 w-1.5 rounded-full"
-                      style={{ background: e.dot, boxShadow: `0 0 6px ${e.dot}`, animation: i === 0 ? "feedDot 1.6s ease-in-out infinite" : undefined }}
-                    />
-                    <span
-                      className="text-[9.5px] tabular-nums"
-                      style={{ color: TXT_40, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
+                {FEED.map((e, i) => {
+                  const fresh = i < 2;
+                  const timeColor = fresh ? "rgba(255,255,255,0.65)" : TXT_40;
+                  const msgColor = fresh ? "#fff" : TXT_65;
+                  const rowBg = i === 0 ? "rgba(102,255,102,0.04)" : i === 1 ? "rgba(102,255,102,0.02)" : "transparent";
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2 px-3 py-1.5"
+                      style={{ borderTop: i === 0 ? "none" : `1px solid ${HAIR_10}`, background: rowBg }}
                     >
-                      {e.t}
-                    </span>
-                    <span className="text-[9.5px] font-semibold tracking-[0.10em]" style={{ color: TXT_85 }}>
-                      {e.msg}
-                    </span>
-                  </div>
-                ))}
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ background: e.dot, boxShadow: `0 0 6px ${e.dot}`, animation: i === 0 ? "feedDot 1.6s ease-in-out infinite" : undefined }}
+                      />
+                      <span
+                        className="text-[9.5px] tabular-nums"
+                        style={{ color: timeColor, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
+                      >
+                        {e.t}
+                      </span>
+                      <span
+                        className="text-[9.5px] font-semibold tracking-[0.10em]"
+                        style={{ color: msgColor }}
+                      >
+                        {e.msg}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
