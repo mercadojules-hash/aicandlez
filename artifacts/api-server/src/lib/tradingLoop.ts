@@ -175,7 +175,7 @@ export const engineStats: EngineStats = {
   mtfBlockCount:      0,
   trailingStopHits:   0,
   correlationBlocks:  0,
-  testMode:           true,   // enabled by default: modest signals (≥25% confidence) can trade immediately
+  testMode:           false,  // OFF by default: strict MTF + volume + confidence-gate confirmation required (safe for live-money paths). Flip ON via POST /api/engine/testmode for dev-only signal flooding.
   require1HTrend:     false,   // GATE flag (line ~1247). Default OFF so 1H disagreement doesn't newly block signals if testMode is ever flipped off. Compute is decoupled — see computeMTFDecision where trend1H is always computed for the displayConfidence boost.
   volumeFilter:       true,
   signalCounts:       { BUY: 0, SELL: 0, HOLD: 0 },
