@@ -1,0 +1,207 @@
+We are now moving into the FINAL dashboard redesign phase for AICandlez.
+
+IMPORTANT:
+The attached/generated dashboard design image is now the PRIMARY visual reference for implementation.
+
+This is the direction we are moving toward.
+
+====================================================
+GOAL
+====
+
+Create:
+
+1. Operator/Admin Dashboard
+2. User Dashboard
+
+Both dashboards should visually match the attached reference design with:
+
+* the same institutional terminal aesthetic
+* same spacing
+* same glow hierarchy
+* same chart-strip layout
+* same premium “wow factor”
+* same confidence-ring styling
+* same typography rhythm
+* same cinematic AI trading feel
+
+This should feel like:
+
+* Bloomberg Terminal
+* institutional AI execution platform
+* elite hedge-fund operator console
+  NOT:
+* a retail crypto dashboard
+* a generic SaaS admin panel
+
+====================================================
+
+1. OPERATOR / ADMIN DASHBOARD
+   ====================================================
+
+The Operator Dashboard SHOULD INCLUDE:
+
+* left-side navigation panel
+* operator controls
+* AI execution controls
+* live system telemetry
+* risk controls
+* internal admin/operator tooling
+
+The LEFT SIDEBAR should visually match the attached reference:
+
+* dark matte black
+* thin neon green highlights
+* premium spacing
+* subtle glow
+* compact institutional navigation
+* NOT oversized retail buttons
+
+Sidebar sections:
+
+* Dashboard
+* Live Trading
+* AI Engine
+* Top Opportunities
+* Watchlist
+* Positions
+* Orders
+* Paper Trading
+* Risk Management
+* AI Analytics
+* Market Intelligence
+* News & Sentiment
+* Alerts
+* Performance
+* Settings
+
+Bottom sidebar section:
+
+* AI execution status
+* engine state
+* risk level
+* daily pnl
+* capital at risk
+
+====================================================
+2. USER DASHBOARD
+=================
+
+The USER dashboard should use:
+
+* the SAME exact layout language
+* SAME visual hierarchy
+* SAME cards
+* SAME charts
+* SAME wow factor
+* SAME terminal aesthetic
+
+BUT:
+
+* NO LEFT SIDEBAR
+* cleaner simplified layout
+* focused on user trading experience
+
+The user dashboard should still feel:
+
+* premium
+* institutional
+* cinematic
+* high-end AI terminal
+
+====================================================
+USER RIGHT-SIDE PANEL (VERY IMPORTANT)
+======================================
+
+The right-side panel for USERS should become the user activity center.
+
+It should display:
+
+* exchange connected
+* account equity
+* daily PNL
+* total PNL
+* win rate %
+* amount of trades
+* open trades
+* recent activity feed
+* open positions
+* recent executions
+* realized/unrealized pnl
+* live account telemetry
+
+This area should feel:
+
+* alive
+* active
+* premium
+* trustworthy
+* operator-grade
+
+The user should instantly feel:
+“the AI is actively trading my account.”
+
+====================================================
+SIGNAL BOARD REQUIREMENTS
+=========================
+
+Maintain:
+
+* long vertical institutional cards
+* mini chart strips
+* confidence rings
+* LONG/SHORT polarity
+* crypto + equities separation
+* Top 20 crypto signals
+* Top equity signals
+* green/red directional contrast
+* dense signal population
+
+The dashboard should always feel:
+
+* alive
+* scanning
+* moving
+* opportunity-rich
+
+====================================================
+VERY IMPORTANT
+==============
+
+Users should KEEP the same trading limitations and permissions they already currently have:
+
+* current execution restrictions
+* current free/pro limitations
+* current AI execution limitations
+* current paper/live restrictions
+* current account permissions
+
+This redesign is VISUAL + UX only.
+Do NOT alter backend permissions/business logic.
+
+====================================================
+DESIGN RULES
+============
+
+Design language:
+
+* matte black backgrounds
+* neon green primary glow
+* subtle red accents for bearish signals
+* high contrast
+* premium spacing
+* thin borders
+* glass/institutional feel
+* cinematic telemetry
+* no oversized retail UI
+* no cartoon SaaS styling
+
+This MUST feel:
+
+* elite
+* expensive
+* cinematic
+* institutional
+* AI-native
+
+The attached design image should be treated as the primary implementation target.
