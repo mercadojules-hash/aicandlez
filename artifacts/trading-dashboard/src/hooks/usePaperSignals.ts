@@ -24,19 +24,23 @@ const apiBaseUrl: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
 
 /** Hardcoded majors universe — everything else returned by the engine is an alt.
- *  CONVICTION_V2 (2026-05-26): tightened to the six undisputed institutional
- *  high-caps (BTC, ETH, SOL, XRP, LINK, AVAX). Previously included ADA, DOGE,
- *  POL, ATOM — those now flow into the ALT column where they belong as
- *  opportunistic / mid-cap setups. Tightening the MAJORS column protects the
- *  "top-of-book conviction" reading: when BTC/ETH/SOL fire a high-conviction
- *  signal it should not be visually adjacent to ADA-tier liquidity.
+ *  CONVICTION_V2 (2026-05-26, density revision): re-expanded to ten
+ *  institutional / recognizable / large-cap names. The previous six-symbol
+ *  tightening (BTC/ETH/SOL/XRP/LINK/AVAX only) read as "sparse" even after
+ *  adaptive-fill kicked in — the left column was load-bearing on too few
+ *  symbols to reliably surface ranked conviction. MAJORS is intended to
+ *  represent "institutional / recognizable / large-cap opportunities," not
+ *  the six undisputed top-of-book names; ADA, DOGE, POL (née MATIC), and
+ *  ATOM all meet that bar and route back to MAJORS. LTC is a candidate for
+ *  the next expansion once it's added to `KRAKEN_SYMBOLS`/`COINBASE_SYMBOLS`
+ *  in `api-server/src/lib/marketData.ts`.
  *
- *  Meme/micro-cap expansion (PEPE, WIF, BONK, FLOKI, BRETT, TURBO) requires
- *  matching `KRAKEN_SYMBOLS`/`COINBASE_SYMBOLS` additions in
- *  `api-server/src/lib/marketData.ts` first; only PEPE is currently scanned.
- *  Tracked as a separate backend ticket. */
+ *  Meme / opportunistic micro-caps (PEPE, WIF, BONK, FLOKI, TURBO) stay in
+ *  ALTS where their volatility profile and visual treatment match. Target
+ *  steady-state density: ~10–12 MAJORS, ~10–14 ALTS. */
 export const MAJORS = new Set<string>([
   "BTC", "ETH", "SOL", "XRP", "LINK", "AVAX",
+  "ADA", "DOGE", "POL", "ATOM",
 ]);
 
 export type Direction = "LONG" | "SHORT" | "FLAT";
