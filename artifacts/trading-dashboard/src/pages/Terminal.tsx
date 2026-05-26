@@ -428,7 +428,7 @@ function SignalCard({ s, top, ignite }: { s: Signal; top?: boolean; ignite?: boo
           className="pointer-events-none absolute inset-0 z-10"
           style={{
             border: `1px solid ${color}`,
-            animation: isLong ? "signalIgnitionLong 1200ms ease-out 1" : "signalIgnitionShort 1200ms ease-out 1",
+            animation: isLong ? "signalIgnitionLong 1200ms ease-out 1 forwards" : "signalIgnitionShort 1200ms ease-out 1 forwards",
           }}
         />
       )}
@@ -1341,7 +1341,7 @@ function TerminalInner() {
                     className="pointer-events-none absolute inset-0 z-10"
                     style={{
                       background: `linear-gradient(0deg, rgba(102,255,102,0.16), rgba(102,255,102,0.02) 55%, transparent 100%)`,
-                      animation: "columnArrivalSweepLong 1100ms ease-out 1",
+                      animation: "columnArrivalSweepLong 1100ms ease-out 1 forwards",
                       mixBlendMode: "screen",
                     }}
                   />
@@ -1384,7 +1384,7 @@ function TerminalInner() {
                     className="pointer-events-none absolute inset-0 z-10"
                     style={{
                       background: `linear-gradient(0deg, rgba(255,59,59,0.16), rgba(255,59,59,0.02) 55%, transparent 100%)`,
-                      animation: "columnArrivalSweepShort 1100ms ease-out 1",
+                      animation: "columnArrivalSweepShort 1100ms ease-out 1 forwards",
                       mixBlendMode: "screen",
                     }}
                   />
