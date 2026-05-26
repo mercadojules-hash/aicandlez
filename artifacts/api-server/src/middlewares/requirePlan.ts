@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { isComplimentaryActive } from "../lib/aiTradingGate.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // requirePlan — gate routes behind a minimum subscription plan.
@@ -45,9 +46,12 @@ export function requirePlan(minimum: Plan) {
     try {
       const [user] = await db
         .select({
-          plan:       usersTable.plan,
-          planStatus: usersTable.planStatus,
-          role:       usersTable.role,
+          plan:                   usersTable.plan,
+          planStatus:             usersTable.planStatus,
+          role:                   usersTable.role,
+          isComplimentaryAccount: usersTable.isComplimentaryAccount,
+          feeWaiverActive:        usersTable.feeWaiverActive,
+          feeWaiverUntil:         usersTable.feeWaiverUntil,
         })
         .from(usersTable)
         .where(eq(usersTable.clerkUserId, userId))
@@ -57,6 +61,21 @@ export function requirePlan(minimum: Plan) {
       // Operators are not customers. They never see paywalls / upgrade prompts
       // and retain full Kraken LIVE access on admintrade.aicandlez.com.
       if (user?.role === "admin" || user?.role === "super-admin") {
+        next();
+        return;
+      }
+
+      // ── Complimentary bypass ──────────────────────────────────────────────
+      // Operator-granted complimentary accounts (is_complimentary_account=true
+      // OR an active fee waiver) mirror a paid `pro` subscription for
+      // entitlement purposes. Without this bypass, complimentary users
+      // pass `resolveAiTradingGate` (AI auto-trade allowed) but still 402
+      // on `/user/exchanges/connect` — leaving them unable to wire their
+      // Coinbase / Kraken / Binance keys. Source of truth for the
+      // complimentary predicate is `isComplimentaryActive` (also used by
+      // `resolveAiTradingGate` and `/billing/subscription` so the three
+      // surfaces never disagree).
+      if (user && isComplimentaryActive(user)) {
         next();
         return;
       }
