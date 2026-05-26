@@ -278,12 +278,29 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
   /**
    * Reconstruct a valid PEM EC private key from however the secret is stored.
    * Handles:
-   *   1. Full PEM (has "-----BEGIN") — normalise escaped newlines
-   *   2. Bare base64 DER — wrap with SEC1 EC PRIVATE KEY header/footer
+   *   1. Full multi-line PEM — normalise escaped newlines, pass through
+   *   2. Single-line PEM (browser paste into <input> strips newlines) —
+   *      detect header/footer, extract body, rewrap with real newlines
+   *   3. PKCS#8 header ("-----BEGIN PRIVATE KEY-----") — preserved
+   *   4. Bare base64 DER — wrap with SEC1 EC PRIVATE KEY header/footer
    */
   private normalisePem(raw: string): string {
+    // Step 1: normalise literal "\n" escapes to real newlines, trim outer whitespace.
     const s = raw.replace(/\\n/g, "\n").trim();
-    if (s.startsWith("-----")) return s;
+
+    // Step 2: detect PEM header/footer regardless of whitespace style.
+    //   Matches: -----BEGIN <LABEL>-----   …body…   -----END <LABEL>-----
+    //   The body may be split by real newlines OR spaces OR nothing.
+    const m = s.match(/-----BEGIN ([A-Z0-9 ]+?)-----([\s\S]+?)-----END \1-----/);
+    if (m) {
+      const label = m[1]!;                          // e.g. "EC PRIVATE KEY" or "PRIVATE KEY"
+      const body  = m[2]!.replace(/\s+/g, "");       // strip ALL whitespace from body
+      const lines: string[] = [];
+      for (let i = 0; i < body.length; i += 64) lines.push(body.slice(i, i + 64));
+      return `-----BEGIN ${label}-----\n${lines.join("\n")}\n-----END ${label}-----\n`;
+    }
+
+    // Step 3: no header → assume bare base64 DER, wrap as SEC1 EC private key.
     const b64 = s.replace(/\s+/g, "");
     const lines: string[] = [];
     for (let i = 0; i < b64.length; i += 64) lines.push(b64.slice(i, i + 64));
