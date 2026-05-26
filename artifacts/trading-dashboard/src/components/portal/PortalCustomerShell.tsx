@@ -89,7 +89,12 @@ const T = {
   BORDER:      "#2A3D33",
   BORDER_GRN:  "rgba(102, 255, 102, 0.24)",
   NEON:        "#66FF66",
-  NEON_GLOW:   "rgba(102, 255, 102, 0.45)",
+  // CONVICTION_V2 (2026-05-26): glow alpha boosted 0.45 → 0.70 so neon
+  // halos read as aggressive AI-found energy rather than the previous
+  // muted institutional dusting. Used everywhere via T.NEON_GLOW so the
+  // whole portal lifts in lock-step — confidence rings, status dots,
+  // direction badges, sweep gradients.
+  NEON_GLOW:   "rgba(102, 255, 102, 0.70)",
   EMERALD:     "#00C853",
   LIME:        "#7CFF00",
   RED:         "#FF4D4D",
@@ -2112,12 +2117,12 @@ function ColumnHeader({ title, count, accent, subLabel }: {
 }
 
 const OpportunityMatrix = memo(function OpportunityMatrix({
-  longs, shorts,
+  majors, alts,
   onQueue, isLoading, isError, now,
   idleSymbols, lastTickAt,
 }: {
-  longs:     OpportunityVM[];
-  shorts:    OpportunityVM[];
+  majors:    OpportunityVM[];
+  alts:      OpportunityVM[];
   onQueue:   (opp: OpportunityVM, side: "LONG" | "SHORT") => void;
   isLoading: boolean;
   isError:   boolean;
@@ -2132,42 +2137,50 @@ const OpportunityMatrix = memo(function OpportunityMatrix({
   /** Engine `lastTickAt` (ms epoch) for the idle-panel "last scan" line. */
   lastTickAt:  number | null;
 }) {
-  // Pass 4.7 — split by DIRECTION (longs green / shorts red) instead
-  // of asset class. Restores long/short market polarity tension across
-  // the viewport.
+  // CONVICTION_V2 (2026-05-26): partition by ASSET CLASS (Majors / Alts)
+  // instead of DIRECTION (Longs / Shorts). The L/S split forced a
+  // balanced-inventory framing — "here are the longs AND the shorts" —
+  // which diluted conviction and surfaced weak filler to keep both
+  // columns populated. Asset-class split restores the original
+  // "Top Signals" feel: curated, emotionally energetic, AI-discovered
+  // setups. Direction is preserved as an inline LONG/SHORT/FLAT badge
+  // on each OpportunityCard (rendered around line ~1665), so polarity
+  // is per-row, not per-column. Both columns share the same neon accent
+  // so the dashboard reads as "the AI's best ideas" rather than
+  // "market polarity dashboard".
   return (
     <section className="cd-matrix" style={{
       display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(520px, 1fr))",
       gap: 20, position: "relative",
     }}>
       <Column
-        title="TOP LONGS"
-        opps={longs}
+        title="MAJORS"
+        opps={majors}
         onQueue={onQueue}
         isLoading={isLoading}
         isError={isError}
         accent="#66FF66"
-        subLabel={`${longs.length} TRACKED · CONFIDENCE-RANKED`}
-        tintRgba="rgba(102,255,102,0.015)"
+        subLabel={`${majors.length} HIGH-CAP · CONVICTION-RANKED`}
+        tintRgba="rgba(102,255,102,0.025)"
         now={now}
         idleSymbols={idleSymbols}
         lastTickAt={lastTickAt}
-        idleLabel="LONG"
+        idleLabel="MAJOR"
       />
       <Column
-        title="TOP SHORTS"
-        opps={shorts}
+        title="ALTS"
+        opps={alts}
         onQueue={onQueue}
         isLoading={isLoading}
         isError={isError}
-        accent="#FF4D4D"
-        subLabel={`${shorts.length} TRACKED · CONFIDENCE-RANKED`}
-        tintRgba="rgba(255,77,77,0.015)"
+        accent="#7CFF00"
+        subLabel={`${alts.length} OPPORTUNISTIC · CONVICTION-RANKED`}
+        tintRgba="rgba(124,255,0,0.025)"
         leftDivider
         now={now}
         idleSymbols={idleSymbols}
         lastTickAt={lastTickAt}
-        idleLabel="SHORT"
+        idleLabel="ALT"
       />
     </section>
   );
@@ -2475,10 +2488,11 @@ const Column = memo(function Column({
 
         {/* Pass 7P — EVALUATING tier render block DELETED. All
             FLAT-leaning candidates now flow directly into `opps`
-            from PortalCustomerShell's unified filteredLongs /
-            filteredShorts derivation. Removed: dim/desaturate
-            wrapper, EVAL header, pointer-events gate. ~70 lines
-            of two-tier visual hierarchy collapsed into one. */}
+            from PortalCustomerShell's unified asset-class-partitioned
+            derivation (CONVICTION_V2: filteredMajors / filteredAlts).
+            Removed: dim/desaturate wrapper, EVAL header, pointer-events
+            gate. ~70 lines of two-tier visual hierarchy collapsed
+            into one. */}
       </div>
     </div>
   );
@@ -3880,18 +3894,31 @@ export function PortalCustomerShell() {
   // button level (BUY enabled only when readiness === "READY";
   // otherwise the card renders identically but the action is
   // "QUEUE" / no-op).
-  const filteredLongs  = useMemo(
+  // CONVICTION_V2 (2026-05-26): partition by ASSET CLASS (Majors / Alts)
+  // rather than DIRECTION (Long / Short). Direction is preserved as an
+  // inline badge on each OpportunityCard. Both columns:
+  //   • Sorted by convictionScore desc (already sorted in usePaperSignals).
+  //   • "Strongest first" — filter out obvious filler so weak setups
+  //     don't dilute the dashboard. Rule: keep if executionEligible OR
+  //     convictionScore >= 40. Sub-40 + non-eligible items are
+  //     dead-air and were the main driver of the "balanced inventory"
+  //     feel the calibration is meant to eliminate.
+  //   • Capped at top 12 per column — curated, not exhaustive.
+  const STRONG_ENOUGH = (o: OpportunityVM): boolean =>
+    o.executionEligible || o.convictionScore >= 40;
+
+  const filteredMajors = useMemo(
     () => filteredOpps
-      .filter(o => o.direction === "LONG"
-                || (o.direction === "FLAT" && (o.lean === "LONG" || o.lean === "NEUTRAL")))
-      .slice(0, 20),
+      .filter(o => o.assetClass === "MAJOR")
+      .filter(STRONG_ENOUGH)
+      .slice(0, 12),
     [filteredOpps],
   );
-  const filteredShorts = useMemo(
+  const filteredAlts = useMemo(
     () => filteredOpps
-      .filter(o => o.direction === "SHORT"
-                || (o.direction === "FLAT" && (o.lean === "SHORT" || o.lean === "NEUTRAL")))
-      .slice(0, 20),
+      .filter(o => o.assetClass === "ALT")
+      .filter(STRONG_ENOUGH)
+      .slice(0, 12),
     [filteredOpps],
   );
 
@@ -4318,8 +4345,8 @@ export function PortalCustomerShell() {
         <AIRiskControlsPanel />
 
         <OpportunityMatrix
-          longs={filteredLongs}
-          shorts={filteredShorts}
+          majors={filteredMajors}
+          alts={filteredAlts}
           onQueue={queuePaper}
           isLoading={isLoading}
           isError={isError}

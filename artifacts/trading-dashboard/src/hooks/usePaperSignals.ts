@@ -24,10 +24,19 @@ const apiBaseUrl: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
 
 /** Hardcoded majors universe — everything else returned by the engine is an alt.
- *  Pass 6.2: MATIC → POL (Polygon 2.0 rebrand). MAJORS list unchanged in size;
- *  newly-added ATOM-tier alts (NEAR, APT, ARB, OP, FIL) flow into the ALT column. */
+ *  CONVICTION_V2 (2026-05-26): tightened to the six undisputed institutional
+ *  high-caps (BTC, ETH, SOL, XRP, LINK, AVAX). Previously included ADA, DOGE,
+ *  POL, ATOM — those now flow into the ALT column where they belong as
+ *  opportunistic / mid-cap setups. Tightening the MAJORS column protects the
+ *  "top-of-book conviction" reading: when BTC/ETH/SOL fire a high-conviction
+ *  signal it should not be visually adjacent to ADA-tier liquidity.
+ *
+ *  Meme/micro-cap expansion (PEPE, WIF, BONK, FLOKI, BRETT, TURBO) requires
+ *  matching `KRAKEN_SYMBOLS`/`COINBASE_SYMBOLS` additions in
+ *  `api-server/src/lib/marketData.ts` first; only PEPE is currently scanned.
+ *  Tracked as a separate backend ticket. */
 export const MAJORS = new Set<string>([
-  "BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "AVAX", "LINK", "POL", "ATOM",
+  "BTC", "ETH", "SOL", "XRP", "LINK", "AVAX",
 ]);
 
 export type Direction = "LONG" | "SHORT" | "FLAT";
