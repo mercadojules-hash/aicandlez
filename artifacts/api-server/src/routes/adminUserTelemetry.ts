@@ -31,8 +31,8 @@
  */
 
 import { Router, type Request } from "express";
-import { db } from "@workspace/db";
-import { sql } from "drizzle-orm";
+import { db, userSettingsTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { getTradeLimitVerdict } from "../lib/tradeLimitEngine.js";
 
@@ -484,6 +484,32 @@ router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<voi
 
     if (!headerRow) { res.status(404).json({ error: "User not found" }); return; }
 
+    // JIT-provision user_settings so the admin panel never sees `null` for
+    // a user who hasn't booted the portal yet. Without this, the read path
+    // returns `settings: null`, the operator UI falls back to in-memory
+    // defaults (60% conf / moderate / 20 USD / etc.), and a subsequent
+    // PATCH from the panel would write defaults over the user's *actual*
+    // (unread) preferences. Mirrors the bootstrap pattern in
+    // `userSettings.ts:getOrCreateSettings` (idempotent via
+    // `onConflictDoNothing`, race-safe via re-select).
+    // FK is safe: we already confirmed the parent `users` row exists via
+    // `headerRow` above. Only runs on cache-miss + null-settings path; the
+    // 5s telemetry cache absorbs repeated drawer opens.
+    let settingsJson: unknown = headerRow["settings_json"] ?? null;
+    if (settingsJson == null) {
+      const [inserted] = await db.insert(userSettingsTable)
+        .values({ userId })
+        .onConflictDoNothing()
+        .returning();
+      if (inserted) {
+        settingsJson = inserted;
+      } else {
+        const [existing] = await db.select().from(userSettingsTable)
+          .where(eq(userSettingsTable.userId, userId)).limit(1);
+        settingsJson = existing ?? null;
+      }
+    }
+
     // Fan-out the multi-row reads in parallel — each is user_id-indexed.
     const [
       positionsRows, closedRows, connectionsRows, auditRows, eventRows,
@@ -607,7 +633,7 @@ router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<voi
         revenueShareBps:        Number(headerRow["revenue_share_bps"] ?? 0),
         billingOverrideNotes:   headerRow["billing_override_notes"] ?? null,
       },
-      settings:    headerRow["settings_json"] ?? null,
+      settings:    settingsJson,
       simAccount:  headerRow["sim_account_json"] ?? null,
       positions,
       closedTrades: closed,

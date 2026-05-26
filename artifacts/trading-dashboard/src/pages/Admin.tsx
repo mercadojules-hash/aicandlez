@@ -1,6 +1,6 @@
 import { authFetch } from "@/lib/authFetch";
 import { normalizeAdminActionPayload } from "@/lib/normalizeAdminPayload";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Users, Zap, DollarSign, Activity, TrendingUp, Shield,
@@ -1346,22 +1346,69 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
   }, [aiNote]);
   /* eslint-enable no-console */
 
-  // Re-sync drafts ONLY when the operator switches users. Background refetch
-  // identity changes on `aiServer` / `billingServer` MUST NOT clobber in-flight
-  // unsaved edits. Post-save draft collapse is handled explicitly in each
-  // mutation's onSuccess via setAiDraft(data.after) / setBillingDraft(...).
+  // ── Draft seeding lifecycle ───────────────────────────────────────────
+  // PREVIOUS BUG (fixed): the seed effect was keyed on `[user.clerkUserId]`
+  // alone. When the operator switched users, react-query immediately
+  // invalidated `detail` to `undefined` (no `keepPreviousData`), the
+  // effect fired in the same tick, and `pickAiSettings(undefined ?? null)`
+  // wrote the *factory defaults* into the draft. The next time
+  // `detail.settings` arrived for the NEW user, nothing re-seeded the
+  // draft — so the inputs kept showing the defaults while `aiServer`
+  // (the dirty-diff baseline) silently held the user's real values.
+  // Operator saw "settings reset", and a save in that window would write
+  // defaults over the real persisted values.
+  //
+  // FIX (Pass A): two effects + a per-user seed-once ref.
+  //   1. On `[user.clerkUserId]` — clear notes immediately and arm the
+  //      seed ref. DO NOT touch drafts here (no fresh data yet).
+  //   2. On `[user.clerkUserId, detail]` — once the fresh detail payload
+  //      for THIS user has arrived and we haven't seeded for them yet,
+  //      seed drafts from the authoritative server snapshot exactly once.
+  //
+  // Background refetches (same user, same `clerkUserId`) leave drafts
+  // alone — the ref already marks this user as seeded — so in-flight
+  // unsaved edits are never clobbered. Post-save draft collapse stays in
+  // each mutation's `onSuccess`.
+  const seededForUserRef = useRef<string | null>(null);
+
   useEffect(() => {
     // eslint-disable-next-line no-console
     console.debug("[admin-profile][user-switch effect FIRED]", { clerkUserId: user.clerkUserId });
-    setAiDraft(pickAiSettings(detail?.settings ?? null));
-    setBillingDraft(pickBillingOverrides(detail?.user ?? null));
     setAiNote("");
     setBillingNote("");
+    seededForUserRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.clerkUserId]);
 
-  const aiDirty      = !shallowEqual(aiDraft as unknown as Record<string, unknown>,           aiServer as unknown as Record<string, unknown>);
-  const billingDirty = !shallowEqual(billingDraft as unknown as Record<string, unknown>,      billingServer as unknown as Record<string, unknown>);
+  useEffect(() => {
+    if (!detail) return;
+    if (seededForUserRef.current === user.clerkUserId) return;
+    // eslint-disable-next-line no-console
+    console.debug("[admin-profile][draft-seed effect FIRED]", { clerkUserId: user.clerkUserId, hasSettings: detail.settings != null });
+    setAiDraft(pickAiSettings(detail.settings ?? null));
+    setBillingDraft(pickBillingOverrides(detail.user ?? null));
+    seededForUserRef.current = user.clerkUserId;
+  }, [user.clerkUserId, detail]);
+
+  // ── Seed-readiness gate ───────────────────────────────────────────────
+  // `seedReady = true` ONLY after the seed effect has fired for the current
+  // user (ref now equals their id) AND we still have their detail in hand.
+  // The ref check at render time works because the seed effect calls
+  // setAiDraft/setBillingDraft, which triggers the next render — by which
+  // time the ref is updated. Until ready:
+  //   - dirty flags are forced false (so the Save bar stays inert and the
+  //     operator never sees a spurious "unsaved changes" indicator from
+  //     stale pre-seed drafts diffed against a freshly-arrived aiServer)
+  //   - submitAi/submitBilling hard-return (defense-in-depth: even if
+  //     something else triggered them, no overwrite of real persisted
+  //     settings is possible from stale draft state)
+  // Belt-and-suspenders for the architect-flagged residual race:
+  // detail-fetch error keeps `detail === undefined`, so seedReady stays
+  // false forever, edits stay blocked, no overwrite path exists.
+  const seedReady = detail != null && seededForUserRef.current === user.clerkUserId;
+
+  const aiDirty      = seedReady && !shallowEqual(aiDraft as unknown as Record<string, unknown>,           aiServer as unknown as Record<string, unknown>);
+  const billingDirty = seedReady && !shallowEqual(billingDraft as unknown as Record<string, unknown>,      billingServer as unknown as Record<string, unknown>);
 
   // ── Mutations ────────────────────────────────────────────────────────────
   const detailKey = ["admin-user-detail", user.clerkUserId] as const;
@@ -1566,6 +1613,7 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
       aiServer: structuredClone(aiServer as unknown as Record<string, unknown>),
       sameRef:  (aiDraft as unknown) === (aiServer as unknown),
     });
+    if (!seedReady) { console.debug("[admin-profile][submitAi] EARLY-RETURN: seed not ready"); return; }
     if (!aiDirty) { console.debug("[admin-profile][submitAi] EARLY-RETURN: not dirty"); return; }
     if (!aiNote.trim()) {
       console.debug("[admin-profile][submitAi] EARLY-RETURN: empty audit note");
@@ -1598,6 +1646,7 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
       billingServer: structuredClone(billingServer as unknown as Record<string, unknown>),
       sameRef: (billingDraft as unknown) === (billingServer as unknown),
     });
+    if (!seedReady) { console.debug("[admin-profile][submitBilling] EARLY-RETURN: seed not ready"); return; }
     if (!billingDirty) { console.debug("[admin-profile][submitBilling] EARLY-RETURN: not dirty"); return; }
     if (!billingNote.trim()) {
       console.debug("[admin-profile][submitBilling] EARLY-RETURN: empty audit note");
