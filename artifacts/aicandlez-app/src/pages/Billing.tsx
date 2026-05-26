@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { api, type Subscription, type SimAccount } from "@/lib/api";
+import { api, getEffectivePlan, type Subscription, type SimAccount } from "@/lib/api";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 
@@ -154,7 +154,10 @@ const PLANS: PlanMeta[] = [
 function statusBadge(plan: PlanId, current: PlanId, sub: Subscription | undefined):
   { text: string; bg: string; border: string; color: string } | null
 {
-  if (!sub?.isActive && plan !== "free") return null;
+  // Complimentary accounts surface as active even when Stripe `isActive`
+  // is false (no real subscription) — they're entitled to the same
+  // ACTIVE / PRO ACTIVE badge that paying customers see.
+  if (!sub?.isActive && !sub?.isComplimentary && plan !== "free") return null;
   if (plan === current) {
     if (plan === "free") {
       return { text: "CURRENT PLAN", bg: "rgba(255,255,255,0.06)",
@@ -274,8 +277,12 @@ export default function Billing() {
     onSuccess:  ({ url }) => { window.location.href = url; },
   });
 
-  const currentPlan = (sub?.plan ?? "free") as PlanId;
-  const isPaidActive = sub?.isActive && currentPlan !== "free";
+  // Effective plan — operator-granted complimentary users render as
+  // their entitled tier (typically "pro") instead of the raw Stripe
+  // "free" so the active-tier badge and the upgrade ladder both
+  // reflect what the backend actually unlocks.
+  const currentPlan = getEffectivePlan(sub) as PlanId;
+  const isPaidActive = (sub?.isActive || sub?.isComplimentary === true) && currentPlan !== "free";
 
   // ── Wallet derived values ──────────────────────────────────────────────────
   const health      = wallet?.health;

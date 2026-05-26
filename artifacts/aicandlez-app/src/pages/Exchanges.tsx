@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { api, type Subscription } from "@/lib/api";
+import { api, getEffectivePlan, type Subscription } from "@/lib/api";
 import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useExchangeCatalog } from "@/hooks/useExchangeCatalog";
@@ -450,7 +450,15 @@ export default function Exchanges() {
   // (cookie-only fetches silently 401 on Safari ITP cross-subdomain and would
   // demote operators to a paid-gate state on this page).
   const { isAdmin: isOperator } = useUserRole();
-  const isPaid     = sub?.plan === "starter" || sub?.plan === "pro";
+  // Use effective plan, NOT raw `sub?.plan` — complimentary users carry
+  // `plan: "free"` from Stripe but `isComplimentary: true` from the
+  // operator-grant gate. Without this collapse, CONNECT EXCHANGE
+  // routes complimentary customers to the upgrade paywall even though
+  // backend `requirePlan("starter")` lets them through (the operator
+  // grant bypasses requirePlan too). See `getEffectivePlan` in
+  // lib/api.ts for the full rationale.
+  const effectivePlan = getEffectivePlan(sub);
+  const isPaid     = effectivePlan === "starter" || effectivePlan === "pro";
   const canConnect = isOperator || isPaid;
 
   const handleConnectClick = (ex: ExchangeEntry) => {

@@ -125,7 +125,11 @@ function fmtUtc(d: Date): string {
 
 function useCustomerPlan(): Plan {
   const { isSignedIn, getToken } = useAuth();
-  const { data } = useQuery<{ plan?: string }>({
+  const { data } = useQuery<{
+    plan?:            string;
+    isComplimentary?: boolean;
+    effectivePlan?:   string;
+  }>({
     queryKey: ["billing-subscription-portal-shell"],
     enabled:  isSignedIn ?? false,
     refetchInterval: 60_000,
@@ -141,7 +145,15 @@ function useCustomerPlan(): Plan {
       return res.json();
     },
   });
-  const p = data?.plan;
+  // Operator-granted complimentary entitlement collapses onto the
+  // effective tier — without this every downstream consumer of
+  // `useCustomerPlan()` (ExchangeStatusBadge label, OperatorPulseRibbon
+  // tier text, useConnectedExchangeName fetch-enable gate at line ~161,
+  // etc.) would render those users as FREE/PAPER MODE despite the
+  // backend AI gate granting full live access.
+  const p = data?.isComplimentary
+    ? (data?.effectivePlan ?? "pro")
+    : data?.plan;
   return p === "starter" || p === "pro" ? p : "free";
 }
 

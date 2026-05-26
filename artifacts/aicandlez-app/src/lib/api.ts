@@ -148,6 +148,34 @@ export interface Subscription {
   features:    string[];
 }
 
+/**
+ * Resolve the customer's EFFECTIVE plan tier across every consumer of
+ * `/billing/subscription` — collapses the "raw plan vs complimentary
+ * entitlement" split so a single check (`effectivePlan === "pro"`) is
+ * always correct.
+ *
+ * Backend mirrors the operator-granted complimentary entitlement onto
+ * the subscription payload as `isComplimentary === true` while leaving
+ * `plan` set to the raw Stripe value (often "free"). Every UI gate
+ * that reads `sub?.plan` directly will mis-classify those users as
+ * FREE — paywall flashes, CONNECT EXCHANGE button routes to upgrade,
+ * tier badge reads "FREE", etc. Always read through this helper
+ * unless you have an explicit reason to inspect the raw Stripe plan
+ * (e.g. billing-portal CTA, downgrade flow).
+ *
+ * `SubscriptionContext` does this derivation internally; callers that
+ * hold the raw query result must use this helper to stay in sync.
+ */
+export function getEffectivePlan(
+  sub: Subscription | undefined | null,
+): "free" | "starter" | "pro" {
+  if (!sub) return "free";
+  const raw = sub.isComplimentary
+    ? (sub.effectivePlan ?? "pro")
+    : (sub.plan ?? "free");
+  return raw === "starter" || raw === "pro" ? raw : "free";
+}
+
 export interface Plan {
   id:            string;
   name:          string;

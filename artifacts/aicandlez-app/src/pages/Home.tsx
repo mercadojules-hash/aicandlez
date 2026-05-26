@@ -10,6 +10,7 @@ import aicandlezLogoMaster from "../assets/aicandlez-logo-master.png";
 import aicandlezIconMaster from "../assets/aicandlez-icon-master.png";
 import {
   api,
+  getEffectivePlan,
   type MobileStatus, type Portfolio, type SimAccount,
   type Subscription, type SignalBreakdown, type MobileSignalsResponse,
   type MobileTickersResponse, type MobileTicker,
@@ -638,9 +639,10 @@ export default function Home() {
     : brokerConnected
       ? (brokerStatus === "live_active" ? "Alpaca · Live" : "Alpaca · Paper")
       : "AI Sim Allocation";
-  const plan = (sub?.plan ?? "free").toLowerCase();
-  const planLabel = (plan.includes("active") || plan.includes("paid") || plan.includes("live"))
-    ? "Pro" : "Trial";
+  // Effective plan — complimentary accounts surface as their entitled
+  // tier so the Home hero shows "Pro" instead of "Trial" for them.
+  const plan = getEffectivePlan(sub);
+  const planLabel = plan === "pro" || plan === "starter" ? "Pro" : "Trial";
 
   const breakdowns: Record<string, SignalBreakdown> = signalsData?.breakdowns ?? {};
   const tickerMap: Record<string, MobileTicker> = useMemo(() => {

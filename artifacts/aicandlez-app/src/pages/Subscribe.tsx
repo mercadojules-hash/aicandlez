@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { api, type Plan, type Subscription } from "@/lib/api";
+import { api, getEffectivePlan, type Plan, type Subscription } from "@/lib/api";
 import { useDisclaimerGate } from "@/hooks/useDisclaimerGate";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -99,7 +99,10 @@ export default function Subscribe() {
     onSuccess:  ({ url }) => { window.location.href = url; },
   });
 
-  const currentPlan = sub?.plan ?? "free";
+  // Effective plan — complimentary users have the Pro tier highlighted
+  // as ACTIVE (not "UPGRADE") so they don't see a stale upsell CTA for
+  // a tier they already have.
+  const currentPlan = getEffectivePlan(sub);
   const plansById   = new Map((plansData?.plans ?? []).map(p => [p.id, p]));
   const orderedPlans = ORDER.map(id => plansById.get(id)).filter(Boolean) as Plan[];
 
@@ -107,7 +110,7 @@ export default function Subscribe() {
   // For an AI Trading user, Pro shows "UPGRADE", AI Trading shows "ACTIVE".
   // For a Pro user, AI Trading shows "DOWNGRADE", Pro shows "ACTIVE".
   function badgeFor(planId: string): { text: string; tone: "neutral" | "active" | "upgrade" } {
-    if (planId === currentPlan && sub?.isActive) return { text: "ACTIVE", tone: "active" };
+    if (planId === currentPlan && (sub?.isActive || sub?.isComplimentary)) return { text: "ACTIVE", tone: "active" };
     if (planId === "free")                       return { text: "FREE",   tone: "neutral" };
     const order = ORDER.indexOf(planId);
     const cur   = ORDER.indexOf(currentPlan);

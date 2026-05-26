@@ -87,7 +87,16 @@ const N = {
 
 type Step = "choose" | "exchange_cta" | "connect" | "intro" | "done";
 
-interface ApiSubscription { plan?: string; status?: string }
+interface ApiSubscription {
+  plan?:            string;
+  status?:          string;
+  /** Operator-granted complimentary entitlement — when true the user
+   *  has the same access as a paying customer even though `plan` may
+   *  read as "free" from Stripe. Mirrors the backend `/billing/
+   *  subscription` payload and must be honored by every gate. */
+  isComplimentary?: boolean;
+  effectivePlan?:   string;
+}
 interface ApiExchangeRow  { exchange: string; connected: boolean }
 interface ApiExchanges    { exchanges: ApiExchangeRow[] }
 
@@ -128,7 +137,14 @@ export function OnboardingFlow() {
   });
   const exchangeOauthEnabled = oauthCfg.data?.enabled === true;
 
-  const hasLiveSub = !!sub.data && (sub.data.plan === "starter" || sub.data.plan === "pro");
+  // Honor the complimentary entitlement: operator-granted users skip
+  // the upgrade-to-subscribe onboarding step exactly like a paying
+  // customer. Reading raw `plan` here would re-trigger the paywall
+  // flow on every /portal mount for those accounts.
+  const effectivePlan = sub.data?.isComplimentary
+    ? (sub.data?.effectivePlan ?? "pro")
+    : sub.data?.plan;
+  const hasLiveSub = !!sub.data && (effectivePlan === "starter" || effectivePlan === "pro");
   const connectedCount = (exchanges.data?.exchanges ?? []).filter(e => e.connected).length;
   const introSeen = typeof window !== "undefined" && localStorage.getItem(LS_INTRO_SEEN) === "1";
 

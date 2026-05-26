@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useClerk } from "@clerk/react";
 import { useLocation } from "wouter";
-import { api, type Portfolio, type Subscription, type SimAccount, type SimTrade } from "@/lib/api";
+import { api, getEffectivePlan, type Portfolio, type Subscription, type SimAccount, type SimTrade } from "@/lib/api";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
@@ -1411,8 +1411,15 @@ export default function Profile() {
     const simTrades = simTradesData?.trades ?? [];
 
     const tv        = portfolio?.totalValue ?? simAcc?.balance ?? 100_000;
-    const plan      = sub?.plan ?? "free";
-    const isActive  = sub?.isActive ?? (plan === "free");
+    // Effective plan collapses the complimentary-entitlement split so
+    // the tier card, concurrent-cap meter, and upgrade CTA all read
+    // the same truth that SubscriptionContext / requirePlan / the AI
+    // gate already enforce server-side. Raw `sub?.plan` would render
+    // a complimentary user as FREE here and re-introduce the paywall.
+    const plan      = getEffectivePlan(sub);
+    const isActive  = sub?.isComplimentary === true
+      ? true
+      : (sub?.isActive ?? (plan === "free"));
 
     const realized  = simAcc?.totalRealized ?? (simAcc as { realizedPnL?: number } | undefined)?.realizedPnL ?? 0;
     const fees      = +(realized * 0.03).toFixed(2);

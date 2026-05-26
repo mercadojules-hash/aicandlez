@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useClerk, useUser } from "@clerk/react";
-import { api, type Subscription, type ConsentStatus } from "@/lib/api";
+import { api, getEffectivePlan, type Subscription, type ConsentStatus } from "@/lib/api";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -61,8 +61,14 @@ export default function Account() {
     free:    "#3a6080",
   };
 
-  const plan  = sub?.plan ?? "free";
+  // Effective plan — collapses complimentary entitlement so the badge,
+  // limits panel, and customer-portal CTA all surface "PRO" instead of
+  // a misleading "FREE" for operator-granted accounts.
+  const plan  = getEffectivePlan(sub);
   const color = planColor[plan] ?? "#3a6080";
+  const statusLabel = sub?.isComplimentary
+    ? "COMPLIMENTARY"
+    : (sub?.planStatus?.toUpperCase() ?? "FREE TIER");
 
   const initials = user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0]?.toUpperCase() ?? "A";
 
@@ -113,10 +119,10 @@ export default function Account() {
             </span>
             <span style={{
               fontSize: 9, fontFamily: "monospace",
-              color: sub?.planStatus === "active" ? "#00ff8a" : "#ffaa00",
+              color: (sub?.isComplimentary || sub?.planStatus === "active") ? "#00ff8a" : "#ffaa00",
               letterSpacing: "0.08em",
             }}>
-              {sub?.planStatus?.toUpperCase() ?? "FREE TIER"}
+              {statusLabel}
             </span>
           </div>
         </div>
