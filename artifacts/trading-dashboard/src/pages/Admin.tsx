@@ -1512,6 +1512,50 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
     },
   });
 
+  // ── Complimentary access (dedicated, isolated mutation) ────────────────
+  // Bypasses the generalized /billing-overrides validator entirely. The
+  // existing COMPLIMENTARY toggle in the billing grid stays in the UI; when
+  // submitBilling detects it as dirty it routes to this endpoint instead of
+  // bundling it into /billing-overrides. Same audit note, separate route,
+  // separate schema, separate audit action — so a future bug in this flow
+  // can't cascade into fee/revenue/internal-acct mutations.
+  const compMutation = useMutation({
+    mutationFn: async (params: { complimentary: boolean; auditNote: string }) => {
+      const body: Record<string, unknown> = {
+        complimentary: params.complimentary,
+        auditNote:     params.auditNote,
+      };
+      // eslint-disable-next-line no-console
+      console.debug("[admin-profile] FINAL PAYLOAD (complimentary)", body);
+      const res = await authFetch(`/api/admin/users/${user.clerkUserId}/complimentary`, {
+        method: "PATCH",
+        body:   JSON.stringify(body),
+      });
+      const text = await res.text();
+      let json: unknown = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) {
+        // eslint-disable-next-line no-console
+        console.warn("[admin-profile] PATCH complimentary failed", { status: res.status, response: json, sent: body });
+        const err = (json as { error?: string; failingFields?: string[] } | null);
+        const fields = err?.failingFields?.join(", ");
+        throw new Error(fields ? `${fields}: ${err?.error}` : (err?.error ?? `HTTP ${res.status}`));
+      }
+      return json as { ok: true; user: { isComplimentaryAccount: boolean; feeWaiverUntil: string | null } };
+    },
+    onError: (err: Error) => {
+      toast({
+        title:       "Complimentary save failed",
+        description: err.message,
+        variant:     "destructive",
+      });
+    },
+    // No onSuccess here — submitBilling owns the aggregate-success
+    // semantics (note clearing, draft collapse, query invalidation) so
+    // that a complimentary-succeeds-but-billing-fails outcome doesn't
+    // prematurely wipe the operator's audit note before retry.
+  });
+
   function submitAi() {
     /* eslint-disable no-console */
     console.debug("[admin-profile][submitAi] entered", {
@@ -1560,24 +1604,82 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
       toast({ title: "Audit note required", description: "Add a short note before saving billing overrides.", variant: "destructive" });
       return;
     }
-    const body: Record<string, unknown> = { note: billingNote.trim() };
+    const auditNote  = billingNote.trim();
     const bDraftRec  = billingDraft  as unknown as Record<string, unknown>;
     const bServerRec = billingServer as unknown as Record<string, unknown>;
-    const dirtyKeys: string[] = [];
+
+    // Split dirty fields by destination route. `isComplimentaryAccount` is
+    // owned by the isolated /complimentary endpoint; every other billing
+    // override field continues to use the generalized /billing-overrides
+    // route. Same audit note is forwarded to both so the operator only
+    // has to write it once.
+    //
+    // SEQUENCING (not parallel): both routes can touch `feeWaiverActive`
+    // (complimentary force-mirrors it; billing-overrides also exposes it
+    // as a direct field). Running them concurrently would make final
+    // column state last-write-wins / nondeterministic. We run
+    // complimentary FIRST, then billing-overrides — so any manual
+    // fee-waiver edit in the same save takes precedence over the
+    // complimentary-driven mirror, preserving operator intent.
+    const compDirty = bDraftRec["isComplimentaryAccount"] !== bServerRec["isComplimentaryAccount"];
+    const generalBody: Record<string, unknown> = { note: auditNote };
+    const generalDirtyKeys: string[] = [];
     for (const k of Object.keys(bDraftRec)) {
-      if (bDraftRec[k] !== bServerRec[k]) { body[k] = bDraftRec[k]; dirtyKeys.push(k); }
+      if (k === "isComplimentaryAccount") continue;
+      if (bDraftRec[k] !== bServerRec[k]) {
+        generalBody[k] = bDraftRec[k];
+        generalDirtyKeys.push(k);
+      }
     }
     console.debug("[admin-profile][submitBilling] BODY BUILT", {
-      dirtyKeys,
-      bodyKeys: Object.keys(body),
-      body: structuredClone(body),
+      compDirty,
+      generalDirtyKeys,
+      generalBodyKeys: Object.keys(generalBody),
+      generalBody: structuredClone(generalBody),
     });
-    billingMutation.mutate(body);
+    if (!compDirty && generalDirtyKeys.length === 0) {
+      console.debug("[admin-profile][submitBilling] EARLY-RETURN: nothing to dispatch");
+      return;
+    }
+
+    void (async () => {
+      let compOk = !compDirty;
+      if (compDirty) {
+        try {
+          await compMutation.mutateAsync({
+            complimentary: bDraftRec["isComplimentaryAccount"] === true,
+            auditNote,
+          });
+          compOk = true;
+        } catch {
+          // compMutation.onError already toasted. Abort the chain so a
+          // partial save can't run on a stale assumption.
+          return;
+        }
+      }
+      if (generalDirtyKeys.length > 0) {
+        // billingMutation.onSuccess handles its own toast + note clear +
+        // invalidation + draft collapse for the general path.
+        try { await billingMutation.mutateAsync(generalBody); } catch { /* onError toasted */ }
+        return;
+      }
+      // Complimentary-only save — billingMutation didn't run, so do its
+      // success-side work here.
+      if (compOk) {
+        qc.invalidateQueries({ queryKey: detailKey });
+        qc.invalidateQueries({ queryKey: listKey });
+        setBillingNote("");
+        toast({
+          title:       bDraftRec["isComplimentaryAccount"] ? "Complimentary access granted" : "Complimentary access revoked",
+          description: "Audit-logged.",
+        });
+      }
+    })();
     /* eslint-enable no-console */
   }
 
   const aiDisabled      = aiMutation.isPending      || loading;
-  const billingDisabled = billingMutation.isPending || loading || !isSuperAdmin;
+  const billingDisabled = billingMutation.isPending || compMutation.isPending || loading || !isSuperAdmin;
 
   return (
     <div>
@@ -1669,11 +1771,11 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
       {isSuperAdmin && billingDirty && (
         <NoteRow note={billingNote} setNote={setBillingNote}
           placeholder="Why are you changing billing for this user?"
-          disabled={billingMutation.isPending} />
+          disabled={billingMutation.isPending || compMutation.isPending} />
       )}
       <SaveResetBar
         dirty={billingDirty}
-        saving={billingMutation.isPending}
+        saving={billingMutation.isPending || compMutation.isPending}
         onSave={submitBilling}
         onReset={() => { setBillingDraft(billingServer); setBillingNote(""); }}
         disabled={!isSuperAdmin}

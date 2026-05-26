@@ -120,11 +120,7 @@ router.patch("/admin/users/:id/ai-settings", ...requireOperator, async (req, res
     // Surface the failing field path so the operator can see exactly which
     // control was undefined (was previously a generic "expected string,
     // received undefined" with no field hint).
-    req.log.warn({ issues: parsed.error.issues, body: req.body }, "PATCH ai-settings validation failed");
-    res.status(400).json({
-      error:  formatZodError(parsed.error),
-      issues: parsed.error.issues.map(i => ({ path: i.path.join("."), message: i.message })),
-    });
+    res.status(400).json(serialize4xx(req, parsed.error, "ai-settings"));
     return;
   }
   const { note, ...fields } = parsed.data;
@@ -207,11 +203,7 @@ router.patch("/admin/users/:id/billing-overrides", ...requireSuperAdmin, async (
   if (!ctx) return;
   const parsed = BillingOverridesBody.safeParse(req.body ?? {});
   if (!parsed.success) {
-    req.log.warn({ issues: parsed.error.issues, body: req.body }, "PATCH billing-overrides validation failed");
-    res.status(400).json({
-      error:  formatZodError(parsed.error),
-      issues: parsed.error.issues.map(i => ({ path: i.path.join("."), message: i.message })),
-    });
+    res.status(400).json(serialize4xx(req, parsed.error, "billing-overrides"));
     return;
   }
   const { note, ...fields } = parsed.data;
@@ -268,6 +260,143 @@ router.patch("/admin/users/:id/billing-overrides", ...requireSuperAdmin, async (
     res.status(500).json(serialize5xx(req, err, "billing-overrides", { targetId: ctx.targetId, patch }));
   }
 });
+
+// ── Complimentary access (super-admin) ────────────────────────────────────
+//
+// Dedicated, isolated mutation for the complimentary-access toggle. This
+// route exists separately from the generalized /billing-overrides route
+// because the latter mixes 7+ optional fields, a shared note schema, and a
+// generic diff/audit serializer — which made it hard to debug a single
+// "complimentary on/off" change. This route only knows about three fields,
+// updates three columns directly, and audits with a single action label.
+//
+// Columns written:
+//   - users.is_complimentary_account = complimentary
+//   - users.fee_waiver_active        = complimentary  (mirrors so fees stop)
+//   - users.fee_waiver_until         = expiresAt      (null = indefinite)
+//
+// Audit action: `set_complimentary` / `unset_complimentary`.
+
+const ComplimentaryBody = z.object({
+  complimentary: z.boolean(),
+  auditNote:     z.string().trim().min(1, "Audit note is required").max(2_000),
+  expiresAt:     z.union([z.string().datetime(), z.null()]).optional(),
+});
+
+router.patch("/admin/users/:id/complimentary", ...requireSuperAdmin, async (req, res): Promise<void> => {
+  const ctx = resolveActor(req, res);
+  if (!ctx) return;
+
+  const parsed = ComplimentaryBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json(serialize4xx(req, parsed.error, "complimentary"));
+    return;
+  }
+  const { complimentary, auditNote, expiresAt } = parsed.data;
+  const feeWaiverUntil = !complimentary
+    ? null
+    : expiresAt === undefined ? undefined
+    : expiresAt === null      ? null
+    : new Date(expiresAt);
+
+  try {
+    req.log.info(
+      { targetId: ctx.targetId, complimentary, expiresAt },
+      "PATCH complimentary about to write",
+    );
+    const [before] = await db.select().from(usersTable)
+      .where(eq(usersTable.clerkUserId, ctx.targetId)).limit(1);
+    if (!before) {
+      res.status(404).json({ error: "User not found", targetId: ctx.targetId });
+      return;
+    }
+
+    const setPatch: Record<string, unknown> = {
+      isComplimentaryAccount: complimentary,
+      feeWaiverActive:        complimentary,
+      updatedAt:              new Date(),
+    };
+    // Only write feeWaiverUntil when caller actually specified it (or when
+    // turning complimentary OFF — then clear the waiver-until row too).
+    if (feeWaiverUntil !== undefined) setPatch["feeWaiverUntil"] = feeWaiverUntil;
+
+    const [after] = await db.update(usersTable)
+      .set(setPatch)
+      .where(eq(usersTable.clerkUserId, ctx.targetId))
+      .returning();
+
+    await writeAudit({
+      actorId:  ctx.actorId,
+      targetId: ctx.targetId,
+      action:   complimentary ? "set_complimentary" : "unset_complimentary",
+      payload:  {
+        note: auditNote,
+        before: {
+          isComplimentaryAccount: before.isComplimentaryAccount,
+          feeWaiverActive:        before.feeWaiverActive,
+          feeWaiverUntil:         before.feeWaiverUntil,
+        },
+        after: {
+          isComplimentaryAccount: after.isComplimentaryAccount,
+          feeWaiverActive:        after.feeWaiverActive,
+          feeWaiverUntil:         after.feeWaiverUntil,
+        },
+        expiresAt: expiresAt ?? null,
+      },
+    });
+
+    res.json({
+      ok: true,
+      user: {
+        clerkUserId:            after.clerkUserId,
+        isComplimentaryAccount: after.isComplimentaryAccount,
+        feeWaiverActive:        after.feeWaiverActive,
+        feeWaiverUntil:         after.feeWaiverUntil,
+      },
+    });
+  } catch (err) {
+    res.status(500).json(serialize5xx(req, err, "complimentary", {
+      targetId: ctx.targetId, complimentary, expiresAt,
+    }));
+  }
+});
+
+/** Build a verbose 4xx body for Zod validation failures so the operator
+ *  sees the EXACT field that was undefined/wrong-type instead of a
+ *  generic "expected string, received undefined" with no field hint.
+ *  Returns: error (formatted summary), issues (path+code+message+received),
+ *  fields (set of failing field paths), incomingBody (raw req.body),
+ *  fieldTypes (key → typeof for every top-level key the server saw). */
+function serialize4xx(
+  req: Request,
+  err: z.ZodError,
+  label: string,
+): Record<string, unknown> {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const fieldTypes: Record<string, string> = {};
+  for (const k of Object.keys(body)) {
+    const v = body[k];
+    fieldTypes[k] = v === null ? "null" : Array.isArray(v) ? "array" : typeof v;
+  }
+  const issues = err.issues.map(i => ({
+    path:     i.path.join(".") || "(root)",
+    code:     i.code,
+    message:  i.message,
+    received: (i as unknown as { received?: unknown }).received,
+    expected: (i as unknown as { expected?: unknown }).expected,
+  }));
+  const failingFields = Array.from(new Set(issues.map(i => i.path)));
+  const responseBody = {
+    error:        formatZodError(err),
+    failingFields,
+    issues,
+    incomingBody: body,
+    fieldTypes,
+    requestId:    (req as Request & { id?: string }).id ?? undefined,
+  };
+  req.log.warn({ ...responseBody }, `PATCH ${label} validation failed`);
+  return responseBody;
+}
 
 /** Build a verbose 5xx body so the operator sees the real exception in
  *  the Network tab instead of a generic "Failed to update ...". Captures
