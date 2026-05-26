@@ -504,9 +504,12 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       {/* Operator chrome — toasts, WS pip, sound toggle. Hidden on /portal. */}
       {!isPortal && (
         <>
-          {/* Toast stack — fixed top-right */}
-          <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none w-[320px] max-w-[calc(100vw-2rem)]">
-            <div className="pointer-events-auto flex justify-end items-center gap-2 mb-1">
+          {/* Toast stack — fixed BOTTOM-LEFT so it never overlaps the
+           *  Terminal right rail (MY ACCOUNT + AI AUTOTRADE), which is
+           *  the operator's primary execution surface. Top-right was
+           *  burying live AI controls under SELL signal toasts. */}
+          <div className="fixed bottom-4 left-4 z-[9999] flex flex-col-reverse gap-2 pointer-events-none w-[320px] max-w-[calc(100vw-2rem)]">
+            <div className="pointer-events-auto flex justify-start items-center gap-2 mt-1">
               <WsIndicator connected={wsConnected} />
               {alerts.length > 0 && (
                 <button
@@ -523,9 +526,11 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
             ))}
           </div>
 
-          {/* Persistent sound toggle — always visible in corner when no alerts */}
+          {/* Persistent sound toggle — bottom-LEFT corner when no alerts,
+           *  mirroring the toast stack's new home so it stays clear of
+           *  the right-rail account controls. */}
           {alerts.length === 0 && (
-            <div className="fixed bottom-20 right-4 z-[9998] flex flex-col gap-2 items-end">
+            <div className="fixed bottom-4 left-4 z-[9998] flex flex-col gap-2 items-start">
               <WsIndicator connected={wsConnected} />
               <button
                 onClick={toggleSound}
