@@ -43,8 +43,15 @@ export function DisclaimerModal({ open, submitting, error, onAccept, onCancel }:
       aria-modal="true"
       aria-labelledby="disclaimer-title-dashboard"
       onClick={(e) => { if (e.target === e.currentTarget && !submitting) onCancel(); }}
-      className="fixed inset-0 z-[9999] flex items-center justify-center px-4 py-6 overflow-y-auto"
       style={{
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        zIndex: 10000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px 16px",
+        overflowY: "auto",
         background: "rgba(0,0,0,0.88)",
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
@@ -52,8 +59,13 @@ export function DisclaimerModal({ open, submitting, error, onAccept, onCancel }:
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-lg rounded-2xl p-6 overflow-y-auto"
         style={{
+          position: "relative",
+          width: "100%",
+          maxWidth: 512,
+          borderRadius: 16,
+          padding: 24,
+          overflowY: "auto",
           maxHeight: "calc(100vh - 48px)",
           background: "linear-gradient(160deg, #0F1F18 0%, #0A1410 70%)",
           border: "1px solid rgba(102,255,102,0.32)",
