@@ -26,7 +26,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X, Loader2, ShieldCheck, AlertTriangle, Check, Link2Off, FlaskConical } from "lucide-react";
 
 import { authFetch } from "../lib/authFetch";
-import { useDisclaimerGate } from "../hooks/useDisclaimerGate";
+import { DisclaimerModal } from "./DisclaimerModal";
+import type { DisclaimerAcks } from "@workspace/db/constants/disclaimer";
 const N = {
   BG_OVERLAY: "rgba(0,0,0,0.86)",
   CARD:       "#0A1410",
@@ -145,14 +146,15 @@ type ConnectedRow = {
 export function PortalExchangeConnectModal({ open, onClose, preselectedExchange, liveExchangesEnabled = false, onConnected }: Props) {
   const { getToken } = useAuth();
   const qc           = useQueryClient();
-  // Risk-disclaimer gate. Server enforces `requireDisclaimer` on
-  // /api/user/exchanges/connect (412 + needsDisclaimer:true) — without
-  // this client-side wire-up the customer sees a red error and no way to
-  // accept. `gate(action)` short-circuits to `action()` when the user
-  // (or admin/super-admin) has already accepted; otherwise it opens the
-  // DisclaimerModal and runs `action` after the POST /api/user/disclaimer
-  // call resolves.
-  const { gate: disclaimerGate, modal: disclaimerModal } = useDisclaimerGate();
+  // Inline disclaimer state — owned by this modal so the flow is
+  // transparent and we don't rely on the shared `useDisclaimerGate`
+  // hook which has been observed silently failing to render its modal
+  // in some browser configurations (Chrome + cross-subdomain + Clerk).
+  // Trigger is server-driven: POST /api/user/exchanges/connect returns
+  // 412 + needsDisclaimer:true when the customer hasn't accepted.
+  const [discOpen,       setDiscOpen]       = useState(false);
+  const [discSubmitting, setDiscSubmitting] = useState(false);
+  const [discError,      setDiscError]      = useState<string | null>(null);
 
   // R1 — catalog hydrated from backend (single source of truth).
   // Public endpoint, no auth required.
@@ -388,7 +390,15 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
           ...(demoSupported ? { demoMode } : {}),
         }),
       });
-      const data = await r.json().catch(() => ({} as { error?: string }));
+      const data = await r.json().catch(() => ({} as Record<string, unknown>));
+      // 412 + needsDisclaimer:true → server says customer must accept the
+      // risk disclaimer before any credentialed mutation. Open the
+      // disclaimer modal; the accept handler will retry submitConnect.
+      if (r.status === 412 && (data as { needsDisclaimer?: boolean }).needsDisclaimer === true) {
+        setDiscError(null);
+        setDiscOpen(true);
+        return;
+      }
       if (!r.ok) {
         throw new Error((data as { error?: string }).error
           ?? `Connection failed (HTTP ${r.status}). Check your credentials and try again.`);
@@ -405,9 +415,47 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
     }
   };
 
+  // Disclaimer accept → POST /api/user/disclaimer with all 6 acks → on
+  // success close the disclaimer modal and immediately retry the
+  // connect POST so the customer doesn't have to click again.
+  const acceptDisclaimer = async (acks: DisclaimerAcks) => {
+    setDiscSubmitting(true);
+    setDiscError(null);
+    try {
+      const token = await getToken().catch(() => null);
+      const r = await authFetch("/api/user/disclaimer", {
+        method:      "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(acks),
+      });
+      const data = await r.json().catch(() => ({} as { error?: string }));
+      if (!r.ok) {
+        throw new Error((data as { error?: string }).error
+          ?? `Failed to record acceptance (HTTP ${r.status}).`);
+      }
+      setDiscOpen(false);
+      // Retry the connect now that the server-side disclaimer gate is satisfied.
+      await submitConnect();
+    } catch (e) {
+      setDiscError(e instanceof Error ? e.message : "Failed to record acceptance.");
+    } finally {
+      setDiscSubmitting(false);
+    }
+  };
+
   return (
     <>
-    {disclaimerModal}
+    <DisclaimerModal
+      open={discOpen}
+      submitting={discSubmitting}
+      error={discError}
+      onAccept={(acks) => { void acceptDisclaimer(acks); }}
+      onCancel={() => { if (!discSubmitting) { setDiscOpen(false); setDiscError(null); } }}
+    />
     <div
       role="dialog"
       aria-modal="true"
@@ -892,10 +940,7 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (!canSubmit) return;
-                  disclaimerGate(() => { void submitConnect(); });
-                }}
+                onClick={() => { if (canSubmit) void submitConnect(); }}
                 disabled={!canSubmit}
                 style={{
                   flex: 1, padding: "12px 16px", borderRadius: 10,
