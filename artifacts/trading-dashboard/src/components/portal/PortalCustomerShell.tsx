@@ -5626,7 +5626,7 @@ export function PortalCustomerShell() {
           above the battlefield — as the primary PAPER → LIVE
           conversion surface; it is NOT operator ARM LIVE.) */}
       <CustomerTopHeader
-        isExchangeConnected={false}
+        isExchangeConnected={(runtimeState?.connectedExchanges ?? []).some(c => c.status === "active")}
         plan={plan}
         onConnect={() => plan === "free" ? setUpgrade(true) : setConnectOpen(true)}
         onSignOut={() => void portalSignOut()}
