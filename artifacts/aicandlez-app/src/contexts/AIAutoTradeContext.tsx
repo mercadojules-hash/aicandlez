@@ -14,7 +14,7 @@
  *                   `enabled` only flips after the server confirms.
  */
 import { authFetch } from "@/lib/authFetch";
-import { getArmedForLive } from "@/hooks/useArmedForLive";
+import { getArmedForLive, setArmedForLive } from "@/hooks/useArmedForLive";
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 
 type Plan = "free" | "starter" | "pro";
@@ -105,8 +105,17 @@ export function AIAutoTradeProvider({ children }: { children: ReactNode }) {
 
     // Enabling — server is authoritative. If it rejects with 402,
     // surface `needsUpgrade` so the caller routes to /subscribe.
-    // Task #200: forward the per-session ARM flag so the server can
-    // reject with 412 runtime_not_armed when runtime resolves live.
+    //
+    // Auto-arm the per-session live gate (May 2026): ACTIVATE AI
+    // TRADING is now the single customer-facing arming surface. The
+    // separate ARM LIVE chip on the runtime switcher was removed
+    // because the double-arm flow (pick exchange → ARM → ACTIVATE)
+    // was operationally confusing. The disclaimer gate enforced on
+    // the server is the user's authorization step; arming is an
+    // internal infrastructure detail. Safe-by-construction: server
+    // still enforces env kill switch + subscription + disclaimer +
+    // runtime gates regardless of this flag.
+    setArmedForLive(true);
     try {
       const res = await authFetch("/api/user/ai-trading/enable", {
         method:  "POST",
@@ -118,9 +127,14 @@ export function AIAutoTradeProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (res.status === 412) {
-        // runtime_not_armed — keep AI off; the RuntimeSwitcher ARM
-        // button is the user's recovery path. Fail-quiet here since
-        // the gate UI lives elsewhere.
+        // runtime_not_armed — defensive only since May 2026 because
+        // we set `armedForLive=true` above before this POST. Hitting
+        // it means a client/server desync; clear the local flag so
+        // the next ACTIVATE click re-arms cleanly, and keep AI off.
+        // (PWA surfaces failure via `needsUpgrade`-style hooks; we
+        // intentionally don't toast here to avoid coupling this
+        // context to a UI lib.)
+        setArmedForLive(false);
         return;
       }
       if (!res.ok) return;

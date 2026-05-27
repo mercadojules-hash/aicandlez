@@ -632,11 +632,12 @@ function RuntimeReadyStep({ plan, onStart }: { plan: string; onStart: () => void
         </div>
       </div>
 
-      {/* ARM LIVE explainer */}
+      {/* Live activation explainer — ARM LIVE chip was removed
+          (May 2026); ACTIVATE AI TRADING is the single arming surface. */}
       <ReadyRow
         Icon={Zap}
-        title={isLive ? "Live execution requires ARM" : "Live execution will require ARM"}
-        body="Every real-money order goes through three gates: server kill-switch, runtime ready check, and an explicit per-session ARM you click in the portal. This prevents accidental live trades — paper trading runs immediately, no ARM needed."
+        title={isLive ? "Live execution starts on ACTIVATE" : "Live execution will start on ACTIVATE"}
+        body="Real-money orders only route after you tap ACTIVATE AI TRADING in the portal. Until then, every signal is paper. Refreshing the page resets the authorization, so you always get an explicit confirm before any session of live trading."
       />
       <ReadyRow
         Icon={Cpu}

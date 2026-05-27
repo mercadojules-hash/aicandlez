@@ -472,15 +472,16 @@ export function SignalRow({ spec, breakdown }: Props) {
       portalMode.canUseLive &&
       portalMode.hasExchange
     ) {
-      // Task #200 — per-session ARM gate. Live BUY clicks are blocked
-      // until the user explicitly arms via the RuntimeSwitcher button.
-      // Page refresh resets `armedForLive` to false by design. This is
-      // a UX gate; the env kill switch + per-order gates on the server
-      // remain the security boundary.
+      // Per-session live gate. Live BUY clicks are blocked until the
+      // user activates AI trading at least once this session (the
+      // ACTIVATE AI TRADING bar auto-arms; see PortalCustomerShell
+      // `runActivation`). Page refresh resets `armedForLive` to false
+      // by design. This is a UX gate; the env kill switch + per-order
+      // gates on the server remain the security boundary.
       if (!armedForLive) {
         toast({
-          title:       "LIVE EXECUTION NOT ARMED",
-          description: "Tap ARM LIVE in the runtime row to enable real-money orders.",
+          title:       "LIVE EXECUTION NOT AUTHORIZED",
+          description: "Tap ACTIVATE AI TRADING in the portal to authorize real-money orders for this session.",
         });
         return;
       }

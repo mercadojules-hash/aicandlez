@@ -162,7 +162,11 @@ router.post("/user/ai-trading/enable", requireAuth, async (req, res): Promise<vo
           userId, runtimeExch, surface: "ai_trading_enable",
         }, "[AUTO_PROMOTION_BLOCKED] runtime_not_armed");
         res.status(412).json({
-          error:      "Live execution is not armed — tap ARM LIVE to enable real-money AI auto-trading.",
+          // Customer-facing copy: ARM LIVE chip was removed (May 2026);
+          // ACTIVATE AI TRADING auto-arms before posting this endpoint.
+          // Hitting this branch means client/server desync — instruct
+          // the user to retry the ACTIVATE click.
+          error:      "Couldn't authorize live execution. Tap ACTIVATE AI TRADING again to retry; refresh the page if it keeps failing.",
           errorCode:  "runtime_not_armed",
           needsArm:   true,
           runtimeExch,

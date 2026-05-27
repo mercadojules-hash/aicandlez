@@ -12,9 +12,9 @@
  * this to the user the first time they pick a live chip.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { useRuntimeState, useSetRuntimeExchange } from "../hooks/useRuntimeState";
-import { useArmedForLive, setArmedForLive } from "../hooks/useArmedForLive";
+import { setArmedForLive } from "../hooks/useArmedForLive";
 
 const C = {
   BG:            "#000",
@@ -22,7 +22,6 @@ const C = {
   BORDER_ACTIVE: "rgba(102,255,102,0.55)",
   BRAND:         "#66FF66",
   BRAND_GLOW:    "rgba(102,255,102,0.35)",
-  GOLD:          "#FFB020",
   TEXT_0:        "#E8F5EC",
   TEXT_2:        "#5F706A",
   DANGER:        "rgba(255,90,108,0.85)",
@@ -33,27 +32,15 @@ const FONT_MONO = "'SF Mono','JetBrains Mono','Roboto Mono',Consolas,monospace";
 export function RuntimeSwitcher() {
   const { data: state, isLoading } = useRuntimeState();
   const { setRuntimeExchange, isPending } = useSetRuntimeExchange();
-  const armed = useArmedForLive();
-  const [liveTeaser, setLiveTeaser] = useState<string | null>(null);
-  const teaserTimer = useRef<number | null>(null);
 
+  // Auto-disarm when runtime flips back to paper. Customer-facing
+  // ARM LIVE chip was removed (May 2026) — ACTIVATE AI TRADING in the
+  // AI bar is now the single arming surface — but the per-session flag
+  // can still be set from a prior ACTIVATE in this session and must
+  // reset on paper.
   useEffect(() => {
-    if (state?.mode === "paper" && armed) setArmedForLive(false);
-  }, [state?.mode, armed]);
-
-  const onArmToggle = () => {
-    if (armed) { setArmedForLive(false); return; }
-    const exch = state?.activeExchange?.toUpperCase() ?? "your exchange";
-    const ok = typeof window === "undefined" ? true : window.confirm(
-      `ARM LIVE on ${exch}?\n\nReal-money AI orders will route to ${exch} ` +
-      `for the rest of this session. Refreshing disarms automatically.`,
-    );
-    if (ok) setArmedForLive(true);
-  };
-
-  useEffect(() => {
-    return () => { if (teaserTimer.current) window.clearTimeout(teaserTimer.current); };
-  }, []);
+    if (state?.mode === "paper") setArmedForLive(false);
+  }, [state?.mode]);
 
   if (isLoading || !state) {
     return (
@@ -75,16 +62,9 @@ export function RuntimeSwitcher() {
     })),
   ];
 
-  function onSelect(chipKey: string, isLive: boolean) {
+  function onSelect(chipKey: string, _isLive: boolean) {
     if (isPending) return;
     setRuntimeExchange(chipKey === "paper" ? "paper" : chipKey);
-    if (isLive) {
-      setLiveTeaser(chipKey.toUpperCase());
-      if (teaserTimer.current) window.clearTimeout(teaserTimer.current);
-      teaserTimer.current = window.setTimeout(() => setLiveTeaser(null), 5_500);
-    } else {
-      setLiveTeaser(null);
-    }
   }
 
   return (
@@ -98,7 +78,7 @@ export function RuntimeSwitcher() {
             aria-checked={chip.active}
             disabled={isPending}
             title={chip.live
-              ? `${chip.label} — display only. Live execution is not yet armed; orders continue as paper.`
+              ? `${chip.label} — runtime display. Orders continue as paper until you tap ACTIVATE AI TRADING in the portal.`
               : "Paper trading — simulated capital, no real orders."}
             onClick={() => onSelect(chip.key, chip.live)}
             style={{
@@ -122,34 +102,6 @@ export function RuntimeSwitcher() {
           </button>
         ))}
       </div>
-      {state.mode === "live" && state.activeExchange && (
-        <button
-          type="button"
-          onClick={onArmToggle}
-          title={armed
-            ? "Live execution armed. Tap to disarm."
-            : "Arm live execution for this session. Refresh disarms automatically."}
-          style={{
-            ...chipBaseStyle,
-            borderColor: armed ? C.BORDER_ACTIVE : `${C.GOLD}66`,
-            color:       armed ? C.BRAND : C.GOLD,
-            background:  armed ? "rgba(102,255,102,0.08)" : `${C.GOLD}14`,
-            boxShadow:   armed ? `0 0 12px ${C.BRAND_GLOW}` : `0 0 8px ${C.GOLD}33`,
-          }}
-        >
-          <span aria-hidden style={{
-            width: 5, height: 5, borderRadius: "50%",
-            background: armed ? C.BRAND : C.GOLD,
-            boxShadow:  armed ? `0 0 6px ${C.BRAND}` : `0 0 5px ${C.GOLD}`,
-          }} />
-          {armed ? "ARMED" : "ARM LIVE"}
-        </button>
-      )}
-      {liveTeaser && !armed && (
-        <span role="status" style={teaserStyle}>
-          ● LIVE: {liveTeaser} — DISPLAY ONLY · ARM TO ROUTE REAL ORDERS
-        </span>
-      )}
     </div>
   );
 }
@@ -188,11 +140,3 @@ const chipBaseStyle: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-const teaserStyle: React.CSSProperties = {
-  width: "100%",
-  fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700,
-  color: C.GOLD, letterSpacing: "0.10em",
-  padding: "4px 8px",
-  border: `1px solid ${C.GOLD}55`, borderRadius: 3,
-  background: `${C.GOLD}10`,
-};

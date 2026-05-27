@@ -144,7 +144,7 @@ export function SubscriptionModal() {
               Paper trading stays free
             </div>
             <div style={{ fontSize: 9, fontFamily: SANS, color: GR, lineHeight: 1.6 }}>
-              Subscribe to unlock AI autotrading, ARM LIVE execution, and premium analytics. Cancel anytime.
+              Subscribe to unlock AI autotrading, live execution on your connected exchange, and premium analytics. Cancel anytime.
             </div>
           </div>
 

@@ -30,7 +30,7 @@ import {
   memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode, type CSSProperties,
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getArmedForLive } from "@/hooks/useArmedForLive";
+import { getArmedForLive, setArmedForLive } from "@/hooks/useArmedForLive";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAuth, useClerk, useUser } from "@clerk/react";
 import {
@@ -3830,10 +3830,16 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
     const fallback = err.serverMessage ?? err.message ?? "Unknown activation failure.";
     switch (code) {
       case "runtime_not_armed":
+        // Defensive-only since May 2026: ACTIVATE AI TRADING now
+        // auto-arms the per-session live gate before posting the
+        // enable request (see `runActivation`). Hitting this code
+        // means the auto-arm flag was lost between client and
+        // server (stale tab, race with disclaimer accept). Tell the
+        // user to retry — the next click re-arms and re-posts.
         return {
           code,
-          title:  "Live execution is not armed",
-          detail: "Tap ARM LIVE in the runtime switcher to authorize real-money AI execution, then try again.",
+          title:  "Couldn't authorize live execution",
+          detail: "Tap ACTIVATE AI TRADING again to retry. If it keeps failing, refresh the page and try once more.",
         };
       case "subscription_required":
       case "plan_lacks_ai_auto_trade":
@@ -3958,6 +3964,20 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   const runActivation = (next: boolean): void => {
     setActivationError(null);
     setActivating(true);
+    // Auto-arm the per-session live gate when enabling. ACTIVATE AI
+    // TRADING is now the single customer-facing arming surface — the
+    // separate ARM LIVE chip on the runtime switcher was removed in
+    // May 2026 because the double-arm flow (pick exchange → ARM →
+    // ACTIVATE) was operationally confusing. Disclaimer acceptance
+    // upstream of this call is the user's authorization step; arming
+    // is now an internal infrastructure detail.
+    //
+    // Safe-by-construction: the server still enforces
+    // `CUSTOMER_LIVE_EXECUTION_ENABLED` env kill switch, subscription
+    // gate, disclaimer gate, and runtime resolution (paper mode → no
+    // live orders regardless of this flag). Setting it on `next=false`
+    // is a no-op since live execution gates don't run on disable.
+    if (next) setArmedForLive(true);
     void setEnabledAsync(next)
       .then(() => { setActivationError(null); })
       .catch((err: Error & { status?: number; errorCode?: string; needsUpgrade?: boolean; serverMessage?: string }) => {

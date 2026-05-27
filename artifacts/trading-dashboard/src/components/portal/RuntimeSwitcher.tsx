@@ -25,7 +25,7 @@ import {
   useSetRuntimeExchange,
   type RuntimeConnection,
 } from "../../hooks/useRuntimeState";
-import { useArmedForLive, setArmedForLive } from "../../hooks/useArmedForLive";
+import { setArmedForLive } from "../../hooks/useArmedForLive";
 
 const C = {
   BG:           "#000",
@@ -33,7 +33,6 @@ const C = {
   BORDER_ACTIVE:"rgba(102,255,102,0.55)",
   BRAND:        "#66FF66",
   BRAND_GLOW:   "rgba(102,255,102,0.35)",
-  GOLD:         "#FFB020",
   TEXT_0:       "#E8F5EC",
   TEXT_2:       "#5F706A",
   DANGER:       "rgba(255,90,108,0.85)",
@@ -44,33 +43,16 @@ const FONT_MONO = "'JetBrains Mono','SF Mono','Roboto Mono',ui-monospace,monospa
 export function RuntimeSwitcher() {
   const { data: state, isLoading } = useRuntimeState();
   const { setRuntimeExchange, isPending } = useSetRuntimeExchange();
-  const armed = useArmedForLive();
-  const [liveTeaser, setLiveTeaser] = useState<string | null>(null);
-  const teaserTimer = useRef<number | null>(null);
 
-  // Task #200 — auto-disarm when runtime flips back to paper so the
-  // user cannot stay "armed" while looking at the paper sim.
+  // Auto-disarm when runtime flips back to paper so the per-session
+  // live gate cannot stay "armed" while looking at the paper sim.
+  // The customer-facing ARM LIVE chip was removed (May 2026) — ACTIVATE
+  // AI TRADING is now the single arming surface — but this defensive
+  // reset still matters for the SignalRow customer LIVE BUY path and
+  // any flag set by a prior ACTIVATE in this session.
   useEffect(() => {
-    if (state?.mode === "paper" && armed) setArmedForLive(false);
-  }, [state?.mode, armed]);
-
-  const onArmToggle = () => {
-    if (armed) {
-      setArmedForLive(false);
-      return;
-    }
-    const exch = state?.activeExchange?.toUpperCase() ?? "your exchange";
-    const ok = typeof window === "undefined" ? true : window.confirm(
-      `ARM LIVE on ${exch}?\n\n` +
-      `Real-money orders will route to ${exch} for the rest of this session. ` +
-      `Refreshing the page automatically disarms.`,
-    );
-    if (ok) setArmedForLive(true);
-  };
-
-  useEffect(() => {
-    return () => { if (teaserTimer.current) window.clearTimeout(teaserTimer.current); };
-  }, []);
+    if (state?.mode === "paper") setArmedForLive(false);
+  }, [state?.mode]);
 
   if (isLoading || !state) {
     return (
@@ -96,18 +78,9 @@ export function RuntimeSwitcher() {
     })),
   ];
 
-  function onSelect(chipKey: string, isLive: boolean) {
+  function onSelect(chipKey: string, _isLive: boolean) {
     if (isPending) return;
     setRuntimeExchange(chipKey === "paper" ? "paper" : chipKey);
-    if (isLive) {
-      // Live execution is not yet armed (Task #200). Tell the user the
-      // chip flipped the display only — orders will continue as paper.
-      setLiveTeaser(chipKey.toUpperCase());
-      if (teaserTimer.current) window.clearTimeout(teaserTimer.current);
-      teaserTimer.current = window.setTimeout(() => setLiveTeaser(null), 5_500);
-    } else {
-      setLiveTeaser(null);
-    }
   }
 
   return (
@@ -116,7 +89,7 @@ export function RuntimeSwitcher() {
       {chips.map(chip => {
         const unhealthy = chip.live && chip.conn ? !chip.conn.ok : false;
         const tooltip = chip.live
-          ? `${chip.label} — display only. Live execution remains gated by the platform safety lock; orders continue as paper until live execution is armed.`
+          ? `${chip.label} — runtime display. Orders continue as paper until you tap ACTIVATE AI TRADING in the portal (server kill-switch, subscription, disclaimer, and runtime gates still apply).`
           : "Paper trading — simulated capital, no real orders.";
         return (
           <button
@@ -147,41 +120,6 @@ export function RuntimeSwitcher() {
           </button>
         );
       })}
-      {state.mode === "live" && state.activeExchange && (
-        <button
-          type="button"
-          onClick={onArmToggle}
-          title={armed
-            ? "Live execution armed for this session. Click to disarm."
-            : "Arm live execution for this session. Refresh disarms automatically."}
-          style={{
-            ...chipBaseStyle,
-            marginLeft: 4,
-            borderColor: armed ? C.BORDER_ACTIVE : `${C.GOLD}66`,
-            color:       armed ? C.BRAND : C.GOLD,
-            background:  armed ? "rgba(102,255,102,0.08)" : `${C.GOLD}14`,
-            boxShadow:   armed ? `0 0 14px ${C.BRAND_GLOW}` : `0 0 10px ${C.GOLD}33`,
-          }}
-        >
-          <span aria-hidden style={{
-            width: 5, height: 5, borderRadius: "50%",
-            background: armed ? C.BRAND : C.GOLD,
-            boxShadow:  armed ? `0 0 6px ${C.BRAND}` : `0 0 5px ${C.GOLD}`,
-          }} />
-          {armed ? "ARMED · TAP TO DISARM" : "ARM LIVE"}
-        </button>
-      )}
-      {liveTeaser && !armed && (
-        <span role="status" style={{
-          marginLeft: 8, fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700,
-          color: C.GOLD, letterSpacing: "0.10em",
-          padding: "4px 8px",
-          border: `1px solid ${C.GOLD}55`, borderRadius: 3,
-          background: `${C.GOLD}10`,
-        }}>
-          ● LIVE: {liveTeaser} — DISPLAY ONLY · ARM TO ROUTE REAL ORDERS
-        </span>
-      )}
     </div>
   );
 }
