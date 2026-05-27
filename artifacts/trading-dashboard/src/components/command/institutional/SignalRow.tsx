@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Line, LineChart, ResponsiveContainer, YAxis } from "recharts";
-import { Zap } from "lucide-react";
+import { Zap, ChevronDown, Sparkles, Activity, Target as TargetIcon, CheckCircle2 } from "lucide-react";
 import type { SymBreakdown } from "../types";
 import type { TickerSpec, SignalType } from "./tickers";
 import { useLiveCandles } from "./useLiveCandles";
@@ -258,7 +258,7 @@ export function SignalRow({ spec, breakdown }: Props) {
   // to firePaperSim (pure local paper trade, no POST). Gating on the actual
   // role fixes that and keeps the customer-portal branch untouched for
   // non-admin users.
-  const { isAdmin: isOperatorRole } = useUserRole();
+  const { isAdmin: isOperatorRole, loading: roleLoading } = useUserRole();
   const { getToken }  = useAuth();
   const qc            = useQueryClient();
   const liveFallbackToastedRef = useRef(false);
@@ -560,6 +560,114 @@ export function SignalRow({ spec, breakdown }: Props) {
   const change24hPos = change24h >= 0;
   const confColor  = conf >= 78 ? N.BRAND : conf >= 62 ? N.BRAND_DEEP : N.WARN;
 
+  // ── Phase 3 — AI Insights drawer (customer-only) ────────────────────────
+  // The drawer renders ONLY when the viewer is NOT an admin/operator, so
+  // /command admin terminal stays byte-identical (locked invariant). The
+  // gate uses `isOperatorRole` from useUserRole(), the same SoT used by
+  // the BUY routing matrix above.
+  //
+  // Admin-safe default during role load: `useUserRole()` resolves async,
+  // so during the loading window `isOperatorRole` is false for ALL viewers
+  // (including admins). Without gating on `roleLoading`, an admin row on
+  // /command would briefly render the WHY toggle + click handler before
+  // role resolves, violating the byte-identical invariant. Treat unknown
+  // role as operator (most conservative) until resolved.
+  const insightsEnabled = !roleLoading && !isOperatorRole;
+  const [insightsOpen, setInsightsOpen] = useState(false);
+
+  // AI reasoning lines — synthesized from real breakdown signals (EMA, RSI,
+  // MTF alignment, volume, regime, 1H trend). Each line is the AI's voice
+  // explaining one observation. Falls back to confidence-tier prose when
+  // breakdown is unavailable (early load / paper-only symbols).
+  const insightLines = useMemo(() => {
+    const lines: { tone: "bull" | "bear" | "neutral"; text: string }[] = [];
+    const bias = direction === "LONG" ? "bullish" : "bearish";
+    const tone: "bull" | "bear" = direction === "LONG" ? "bull" : "bear";
+    if (breakdown) {
+      if (breakdown.mtfConfirmed) {
+        lines.push({
+          tone,
+          text: `Multi-timeframe alignment confirmed — 15m and 1H both ${bias}.`,
+        });
+      } else {
+        lines.push({
+          tone: "neutral",
+          text: `Timeframes diverging — 15m and 1H not yet aligned.`,
+        });
+      }
+      if (breakdown.fast?.rsi != null) {
+        const rsi = Math.round(breakdown.fast.rsi);
+        if (direction === "LONG" && rsi < 40) {
+          lines.push({ tone, text: `15m RSI at ${rsi} — momentum reset, room to run.` });
+        } else if (direction === "LONG" && rsi > 65) {
+          lines.push({ tone: "neutral", text: `15m RSI at ${rsi} — extended, wait for pullback.` });
+        } else if (direction === "SHORT" && rsi > 60) {
+          lines.push({ tone, text: `15m RSI at ${rsi} — overbought, distribution risk.` });
+        } else {
+          lines.push({ tone: "neutral", text: `15m RSI at ${rsi} — balanced range.` });
+        }
+      }
+      if (breakdown.fast?.emaSignal) {
+        lines.push({ tone, text: `EMA stack on 15m: ${breakdown.fast.emaSignal}.` });
+      }
+      if (breakdown.volumeConfirmed) {
+        lines.push({ tone, text: `Volume confirms participation — institutional flow detected.` });
+      } else {
+        lines.push({ tone: "neutral", text: `Volume below 20-bar average — conviction tentative.` });
+      }
+      if (breakdown.marketCondition) {
+        lines.push({
+          tone: "neutral",
+          text: `Regime: ${breakdown.marketCondition.toLowerCase()}.`,
+        });
+      }
+      if (breakdown.trend1H) {
+        lines.push({
+          tone: breakdown.trend1H.toLowerCase().includes(bias) ? tone : "neutral",
+          text: `1H trend reads ${breakdown.trend1H.toLowerCase()}.`,
+        });
+      }
+      if (breakdown.executionBlockReason) {
+        const reasonMap: Record<string, string> = {
+          low_confidence:    "Conviction below execution threshold — observing.",
+          no_mtf_agreement:  "Awaiting timeframe agreement before execution.",
+          sideways:          "Chop filter active — sideways range blocking entries.",
+          hold_bias:         "AI holding bias — no edge to press right now.",
+        };
+        const text = reasonMap[breakdown.executionBlockReason] ?? "Execution gated by safety filter.";
+        lines.push({ tone: "neutral", text });
+      }
+    } else {
+      // Fallback when breakdown hasn't arrived yet — keep voice consistent
+      // with confidence band so the drawer never feels empty.
+      if (conf >= 78) {
+        lines.push({ tone, text: `High-conviction ${bias} setup — AI is leaning in.` });
+      } else if (conf >= 62) {
+        lines.push({ tone: "neutral", text: `Mid-conviction ${bias} watch — building thesis.` });
+      } else {
+        lines.push({ tone: "neutral", text: `Low conviction — AI is monitoring, not committing.` });
+      }
+      lines.push({ tone: "neutral", text: `Awaiting full multi-timeframe read.` });
+    }
+    return lines.slice(0, 5);
+  }, [breakdown, direction, conf]);
+
+  // Signal Lifecycle stages — derived deterministically from breakdown.
+  // DETECTED is always reached when a row renders. CONFIRMED requires MTF
+  // alignment. EXECUTING requires the engine to mark this signal as
+  // execution-eligible. EXIT is "pending" until a trade closes (we don't
+  // wire per-row trade state here to keep the change additive-only).
+  const lifecycle = useMemo(() => {
+    const mtfOk        = !!breakdown?.mtfConfirmed;
+    const execEligible = !!breakdown?.executionEligible;
+    return [
+      { key: "DETECTED",  active: true,         done: true },
+      { key: "CONFIRMED", active: mtfOk,        done: mtfOk },
+      { key: "EXECUTING", active: execEligible, done: false },
+      { key: "EXIT",      active: false,        done: false },
+    ] as const;
+  }, [breakdown]);
+
   // Tinted left-edge background blends from direction color → black
   const rowBg = `linear-gradient(90deg, ${dirColor}0F 0%, ${N.SURFACE_1} 32%)`;
   const rowBgHover = `linear-gradient(90deg, ${dirColor}1A 0%, ${N.SURFACE_2} 38%)`;
@@ -577,6 +685,7 @@ export function SignalRow({ spec, breakdown }: Props) {
   const dash = (conf / 100) * circ;
 
   return (
+    <div style={{ borderBottom: `1px solid ${N.BORDER}` }}>
     <div
       className="grid items-center transition-colors"
       style={{
@@ -584,14 +693,25 @@ export function SignalRow({ spec, breakdown }: Props) {
         gap: 10,
         padding: "10px 12px 10px 14px",
         minHeight: 72,
-        borderBottom: `1px solid ${N.BORDER}`,
         background: rowBg,
         fontFamily: N.FONT_MONO,
         boxShadow: `inset 6px 0 0 0 ${dirColor}, inset 7px 0 0 0 ${dirColor}cc, inset 8px 0 4px -2px ${dirColor}80`,
         position: "relative",
+        cursor: insightsEnabled ? "pointer" : "default",
       }}
       onMouseEnter={e => (e.currentTarget.style.background = rowBgHover)}
       onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
+      onClick={(e) => {
+        // Only the bare row chrome toggles the drawer — buttons inside
+        // (BUY/SELL/⚡/SizePicker) stop propagation by virtue of their own
+        // onClick handlers firing first and React's event bubbling: we
+        // gate explicitly on the target being the wrapper so clicks on
+        // interactive children never accidentally toggle.
+        if (!insightsEnabled) return;
+        const t = e.target as HTMLElement;
+        if (t.closest("button") || t.closest("a") || t.closest("input")) return;
+        setInsightsOpen(v => !v);
+      }}
     >
       {/* ── LEFT: header (badge + ticker + type) over (entry/SL/TP) ── */}
       <div className="flex flex-col" style={{ gap: 6 }}>
@@ -729,6 +849,205 @@ export function SignalRow({ spec, breakdown }: Props) {
             }}>
             {conf}
           </span>
+        </div>
+        {insightsEnabled && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setInsightsOpen(v => !v); }}
+            aria-label={insightsOpen ? "Hide AI insights" : "Show AI insights"}
+            aria-expanded={insightsOpen}
+            title="WHY THIS SIGNAL?"
+            style={{
+              marginTop: 4, padding: "2px 6px", borderRadius: 4,
+              background: insightsOpen ? `${N.BRAND}22` : "transparent",
+              border: `1px solid ${N.BORDER}`,
+              color: insightsOpen ? N.BRAND : N.TEXT_3,
+              fontFamily: N.FONT_MONO, fontSize: 8, fontWeight: 800,
+              letterSpacing: "0.16em",
+              display: "inline-flex", alignItems: "center", gap: 3,
+              cursor: "pointer", transition: "all 160ms ease",
+            }}
+          >
+            WHY
+            <ChevronDown
+              size={9}
+              style={{
+                transform: insightsOpen ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 200ms ease",
+              }}
+            />
+          </button>
+        )}
+      </div>
+    </div>
+    {insightsEnabled && insightsOpen && (
+      <SignalInsightsDrawer
+        direction={direction}
+        confidence={conf}
+        confColor={confColor}
+        dirColor={dirColor}
+        insightLines={insightLines}
+        lifecycle={lifecycle}
+        symbol={spec.label}
+      />
+    )}
+    </div>
+  );
+}
+
+// ── SignalInsightsDrawer (Phase 3) ────────────────────────────────────────
+// Customer-only AI reasoning + signal lifecycle timeline. Rendered below the
+// row when the user clicks WHY. Animates open with a fade+slide so the
+// reveal feels intentional, not noisy. Admin /command never mounts this.
+function SignalInsightsDrawer({
+  direction, confidence, confColor, dirColor, insightLines, lifecycle, symbol,
+}: {
+  direction:    "LONG" | "SHORT";
+  confidence:   number;
+  confColor:    string;
+  dirColor:     string;
+  insightLines: ReadonlyArray<{ tone: "bull" | "bear" | "neutral"; text: string }>;
+  lifecycle:    ReadonlyArray<{ key: string; active: boolean; done: boolean }>;
+  symbol:       string;
+}) {
+  const toneColor = (t: "bull" | "bear" | "neutral") =>
+    t === "bull" ? N.LONG : t === "bear" ? N.SHORT : N.TEXT_2;
+  return (
+    <div
+      style={{
+        background: `linear-gradient(180deg, rgba(102,255,102,0.04) 0%, rgba(0,0,0,0.4) 100%)`,
+        borderTop: `1px solid ${dirColor}30`,
+        padding: "12px 18px 14px",
+        fontFamily: N.FONT_MONO,
+        animation: "sr-insights-in 240ms ease-out",
+      }}
+    >
+      <style>{`
+        @keyframes sr-insights-in {
+          from { opacity: 0; transform: translateY(-4px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes sr-stage-pulse {
+          0%,100% { box-shadow: 0 0 0 0 currentColor; }
+          50%     { box-shadow: 0 0 0 4px transparent; }
+        }
+      `}</style>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}
+           className="cd-insights-grid">
+        {/* WHY column */}
+        <div>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 6, marginBottom: 8,
+          }}>
+            <Sparkles size={11} style={{ color: N.BRAND }} />
+            <span style={{
+              fontSize: 9.5, fontWeight: 800, letterSpacing: "0.22em",
+              color: N.BRAND, textShadow: `0 0 4px ${N.BRAND}40`,
+            }}>
+              WHY THIS SIGNAL?
+            </span>
+            <span style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: "0.16em",
+              color: confColor, marginLeft: "auto",
+              padding: "1px 6px", borderRadius: 3,
+              background: `${confColor}14`, border: `1px solid ${confColor}50`,
+            }}>
+              {direction} · AI {confidence}%
+            </span>
+          </div>
+          <ul style={{
+            listStyle: "none", margin: 0, padding: 0,
+            display: "flex", flexDirection: "column", gap: 6,
+          }}>
+            {insightLines.map((l, i) => (
+              <li key={i} style={{
+                display: "flex", alignItems: "flex-start", gap: 8,
+                fontSize: 11.5, lineHeight: 1.45, color: N.TEXT_1,
+              }}>
+                <span style={{
+                  width: 4, height: 4, borderRadius: 4,
+                  background: toneColor(l.tone),
+                  boxShadow: `0 0 4px ${toneColor(l.tone)}`,
+                  marginTop: 6, flex: "0 0 auto",
+                }} />
+                <span>{l.text}</span>
+              </li>
+            ))}
+          </ul>
+          <div style={{
+            marginTop: 10, fontSize: 9, letterSpacing: "0.16em",
+            color: N.TEXT_3, fontWeight: 700,
+          }}>
+            AI READ · {symbol} · NOT FINANCIAL ADVICE
+          </div>
+        </div>
+
+        {/* Lifecycle column */}
+        <div>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 6, marginBottom: 10,
+          }}>
+            <Activity size={11} style={{ color: N.BRAND }} />
+            <span style={{
+              fontSize: 9.5, fontWeight: 800, letterSpacing: "0.22em",
+              color: N.BRAND, textShadow: `0 0 4px ${N.BRAND}40`,
+            }}>
+              SIGNAL LIFECYCLE
+            </span>
+          </div>
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 0, alignItems: "center",
+          }}>
+            {lifecycle.map((s, i) => {
+              const color = s.done ? N.BRAND : s.active ? dirColor : N.TEXT_3;
+              const ringBg = s.done ? N.BRAND : s.active ? dirColor : "transparent";
+              return (
+                <div key={s.key} style={{
+                  display: "flex", flexDirection: "column", alignItems: "center",
+                  position: "relative",
+                }}>
+                  {/* connector line to next */}
+                  {i < lifecycle.length - 1 && (
+                    <span aria-hidden style={{
+                      position: "absolute", top: 8, left: "60%", width: "80%", height: 1,
+                      background: lifecycle[i + 1].active || lifecycle[i + 1].done
+                        ? `linear-gradient(90deg, ${color}, ${N.BRAND})`
+                        : `${N.BORDER}`,
+                    }} />
+                  )}
+                  <span style={{
+                    width: 16, height: 16, borderRadius: 16,
+                    background: ringBg,
+                    border: `1.5px solid ${color}`,
+                    boxShadow: s.active && !s.done
+                      ? `0 0 0 3px ${dirColor}22, 0 0 8px ${dirColor}80`
+                      : s.done ? `0 0 6px ${N.BRAND}60` : "none",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: s.done || s.active ? "#000" : "transparent",
+                    position: "relative", zIndex: 1,
+                  }}>
+                    {s.done ? <CheckCircle2 size={10} strokeWidth={3} /> : null}
+                  </span>
+                  <span style={{
+                    marginTop: 6, fontSize: 8.5, fontWeight: 800,
+                    letterSpacing: "0.18em", color: color,
+                    textShadow: s.active || s.done ? `0 0 4px ${color}80` : "none",
+                  }}>
+                    {s.key}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{
+            marginTop: 10, display: "flex", alignItems: "center", gap: 6,
+            fontSize: 9, letterSpacing: "0.14em", color: N.TEXT_3, fontWeight: 700,
+          }}>
+            <TargetIcon size={9} />
+            EXIT FIRES AT TARGET OR STOP — TRACKED IN MY ACCOUNT
+          </div>
         </div>
       </div>
     </div>

@@ -5139,6 +5139,19 @@ export function PortalCustomerShell() {
             customer invariant). */}
         <LiveControlBar assetClass="CRYPTO" state="PAPER" />
 
+        {/* Phase 3 — Today's Intelligence Panel. Customer-only social
+            proof + performance storytelling above the battlefield.
+            Sources: paperStats (today's PnL, win rate), paperHistory
+            (today's closed trades), engineStatus (active signals + avg
+            conviction). NEVER mounted on /command — this entire shell
+            isn't reached from /command. */}
+        <TodaysIntelligencePanel
+          todayPnl={paperStats.todayPnl}
+          equity={paperStats.equity || STARTING_EQUITY}
+          history={paperHistory}
+          engine={engineStatus}
+        />
+
         {/* Battlefield body — dual crypto matrix on the left,
             MY ACCOUNT rail (380px) on the right with PERFORMANCE
             chart + LIVE TRADES + TRADE HISTORY + AI ACTIVITY. */}
@@ -5219,6 +5232,155 @@ export function PortalCustomerShell() {
         onAlerts={() => setAccount(true)}
         onSignOut={() => void portalSignOut()}
       />
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Phase 3 — TodaysIntelligencePanel                                          */
+/* Customer-only social-proof + storytelling band that sits above the         */
+/* battlefield matrix. Reads paper trade history (today only), live engine    */
+/* status, and computes win-rate + total realized + best signal. Designed     */
+/* to make the customer feel "I have access to institutional-grade AI" — not  */
+/* "I'm looking at engineering telemetry." Admin /command never reaches this  */
+/* file, so the panel never appears on the operator surface.                  */
+/* ──────────────────────────────────────────────────────────────────────── */
+function TodaysIntelligencePanel({
+  todayPnl, equity, history, engine,
+}: {
+  todayPnl: number;
+  equity:   number;
+  history:  ReadonlyArray<{ symbol: string; display: string; pnl: number; pnlPct: number; closedAt: number }>;
+  engine:   EngineLite | undefined;
+}) {
+  const today = useMemo(() => {
+    const now    = new Date();
+    const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const closedToday = history.filter(h => h.closedAt >= cutoff);
+    const wins   = closedToday.filter(h => h.pnl > 0);
+    const losses = closedToday.filter(h => h.pnl < 0);
+    const realized = closedToday.reduce((s, h) => s + h.pnl, 0);
+    const winRate  = closedToday.length > 0
+      ? Math.round((wins.length / closedToday.length) * 100)
+      : null;
+    const best = closedToday.reduce<{ display: string; pnl: number; pnlPct: number } | null>(
+      (acc, h) => (acc && acc.pnl >= h.pnl) ? acc : { display: h.display, pnl: h.pnl, pnlPct: h.pnlPct },
+      null,
+    );
+    return { count: closedToday.length, wins: wins.length, losses: losses.length, realized, winRate, best };
+  }, [history]);
+
+  const signalsActive = engine?.signalsGenerated ?? 0;
+  const engineLive    = !!engine?.running;
+  const pnlPct        = equity > 0 ? (todayPnl / equity) * 100 : 0;
+  const pnlColor      = todayPnl >= 0 ? T.NEON : "#ff6b6b";
+
+  return (
+    <section
+      aria-label="Today's intelligence"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+        gap: 10,
+        padding: "12px 14px",
+        background: "linear-gradient(180deg, rgba(102,255,102,0.045) 0%, rgba(0,0,0,0.55) 100%)",
+        border: `1px solid ${T.NEON}28`,
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 0 24px rgba(102,255,102,0.08)`,
+        borderRadius: 6,
+        fontFamily: T.FONT_MONO,
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* ambient hairline sweep */}
+      <span aria-hidden style={{
+        position: "absolute", top: 0, left: 0, height: 1, width: "100%",
+        background: `linear-gradient(90deg, transparent, ${T.NEON}80, transparent)`,
+        animation: "ti-sweep 8s linear infinite",
+      }} />
+      <style>{`
+        @keyframes ti-sweep {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        @keyframes ti-pulse {
+          0%,100% { opacity: 0.9; }
+          50%     { opacity: 0.4; }
+        }
+      `}</style>
+
+      <TIMetric
+        label="TODAY'S PAPER PNL"
+        primary={`${todayPnl >= 0 ? "+" : ""}$${Math.abs(todayPnl).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+        secondary={`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}% on equity`}
+        color={pnlColor}
+        glow
+      />
+      <TIMetric
+        label="WIN RATE TODAY"
+        primary={today.winRate != null ? `${today.winRate}%` : "—"}
+        secondary={today.count > 0
+          ? `${today.wins}W · ${today.losses}L · ${today.count} closed`
+          : "No closed trades yet today"}
+        color={today.winRate != null && today.winRate >= 50 ? T.NEON : "#FFC857"}
+      />
+      <TIMetric
+        label="TOP SIGNAL TODAY"
+        primary={today.best ? today.best.display : "—"}
+        secondary={today.best
+          ? `${today.best.pnl >= 0 ? "+" : ""}$${today.best.pnl.toFixed(2)} · ${today.best.pnlPct >= 0 ? "+" : ""}${today.best.pnlPct.toFixed(2)}%`
+          : "Waiting for first close"}
+        color={today.best && today.best.pnl >= 0 ? T.NEON : T.TEXT_2}
+      />
+      <TIMetric
+        label="AI SIGNALS ACTIVE"
+        primary={signalsActive > 0 ? signalsActive.toLocaleString() : "—"}
+        secondary={engineLive ? "Engine live · scanning" : "Engine warming up"}
+        color={engineLive ? T.NEON : T.TEXT_2}
+        pulse={engineLive}
+      />
+    </section>
+  );
+}
+
+function TIMetric({
+  label, primary, secondary, color, glow, pulse,
+}: {
+  label:      string;
+  primary:    string;
+  secondary:  string;
+  color:      string;
+  glow?:      boolean;
+  pulse?:     boolean;
+}) {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", gap: 3,
+      padding: "6px 10px",
+      borderLeft: `2px solid ${color}40`,
+      position: "relative",
+    }}>
+      <span style={{
+        fontSize: 8.5, fontWeight: 800, letterSpacing: "0.22em",
+        color: T.TEXT_3, textTransform: "uppercase",
+      }}>
+        {label}
+      </span>
+      <span style={{
+        fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em",
+        color, lineHeight: 1.1,
+        textShadow: glow ? `0 0 8px ${color}80` : "none",
+        fontVariantNumeric: "tabular-nums",
+        animation: pulse ? "ti-pulse 1.6s ease-in-out infinite" : "none",
+      }}>
+        {primary}
+      </span>
+      <span style={{
+        fontSize: 10, fontWeight: 600, letterSpacing: "0.06em",
+        color: T.TEXT_2, lineHeight: 1.3,
+      }}>
+        {secondary}
+      </span>
     </div>
   );
 }
