@@ -1114,14 +1114,17 @@ function ToggleField({
 // ── Editable form state shapes ───────────────────────────────────────────────
 
 interface AiSettingsForm {
-  autoMode:           boolean;
-  riskLevel:          string;
-  minConfidence:      number;
-  positionSizeUSD:    number;
-  maxActivePositions: number;
-  tradingMode:        "simulation" | "live";
-  preferredExchange:  string;
-  volumeFilter:       boolean;
+  autoMode:              boolean;
+  riskLevel:             string;
+  minConfidence:         number;
+  positionSizeUSD:       number;
+  maxActivePositions:    number;
+  tradingMode:           "simulation" | "live";
+  preferredExchange:     string;
+  // `""` = auto (server stores NULL) — aggregator falls back to auto-promotion.
+  // Any other value = explicit exchange ID, or `"paper"` to pin into paper.
+  activeRuntimeExchange: string;
+  volumeFilter:          boolean;
 }
 
 interface BillingOverridesForm {
@@ -1144,15 +1147,20 @@ function pickAiSettings(s: Record<string, unknown> | null): AiSettingsForm {
   const tmRaw = typeof r["tradingMode"] === "string" ? r["tradingMode"].toLowerCase() : "";
   const rlRaw = typeof r["riskLevel"]   === "string" ? r["riskLevel"].toLowerCase()   : "";
   const peRaw = typeof r["preferredExchange"] === "string" ? r["preferredExchange"].toLowerCase() : "";
+  // activeRuntimeExchange: server returns `null` (auto), `"paper"`, or an
+  // exchange ID. Normalize to `""` for the auto/null case so the controlled
+  // <select> always has an exact option match.
+  const areRaw = typeof r["activeRuntimeExchange"] === "string" ? r["activeRuntimeExchange"] : "";
   return {
-    autoMode:           r["autoMode"]           === true,
-    riskLevel:          RISK_LEVEL_SET.has(rlRaw) ? rlRaw : "moderate",
-    minConfidence:      typeof r["minConfidence"]     === "number" ? r["minConfidence"]      : 60,
-    positionSizeUSD:    typeof r["positionSizeUSD"]   === "number" ? r["positionSizeUSD"]    : 20,
-    maxActivePositions: typeof r["maxActivePositions"] === "number" ? r["maxActivePositions"] : 3,
-    tradingMode:        tmRaw === "live" ? "live" : "simulation",
-    preferredExchange:  EXCHANGE_CANONICAL[peRaw] ?? "Kraken",
-    volumeFilter:       r["volumeFilter"] === true,
+    autoMode:              r["autoMode"]           === true,
+    riskLevel:             RISK_LEVEL_SET.has(rlRaw) ? rlRaw : "moderate",
+    minConfidence:         typeof r["minConfidence"]     === "number" ? r["minConfidence"]      : 60,
+    positionSizeUSD:       typeof r["positionSizeUSD"]   === "number" ? r["positionSizeUSD"]    : 20,
+    maxActivePositions:    typeof r["maxActivePositions"] === "number" ? r["maxActivePositions"] : 3,
+    tradingMode:           tmRaw === "live" ? "live" : "simulation",
+    preferredExchange:     EXCHANGE_CANONICAL[peRaw] ?? "Kraken",
+    activeRuntimeExchange: areRaw,
+    volumeFilter:          r["volumeFilter"] === true,
   };
 }
 
@@ -1212,6 +1220,13 @@ function normalizeAiPayload(body: Record<string, unknown>): Record<string, unkno
   if ("preferredExchange" in out) {
     const v = typeof out.preferredExchange === "string" ? out.preferredExchange.toLowerCase() : "";
     out.preferredExchange = EXCHANGE_CANONICAL[v] ?? "Kraken";
+  }
+  // activeRuntimeExchange: empty string in the form == AUTO == server NULL.
+  // Server schema is z.union([z.string().min(1), z.null()]) so the empty
+  // string would 400. Convert here so the form contract stays "string only".
+  if ("activeRuntimeExchange" in out) {
+    const v = out.activeRuntimeExchange;
+    out.activeRuntimeExchange = typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
   }
   return out;
 }
@@ -1932,6 +1947,53 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
                   { label: "KUCOIN",   value: "KuCoin" },
                 ] as const}
                 onChange={(v) => setAiDraft({ ...aiDraft, preferredExchange: v })} />
+            </FieldShell>
+            {/* ACTIVE RUNTIME EXCHANGE — operator override of the customer's
+                CustomerTradingRuntimeContext source-of-truth column. Empty
+                string == AUTO (server stores NULL, aggregator runs the
+                auto-promotion rule). `"paper"` == sticky paper-only override.
+                Otherwise the exact exchange ID flips the customer to that
+                live runtime (subject to the three independent gates: env
+                kill-switch, liveReady, ARM). */}
+            <FieldShell label="ACTIVE RUNTIME EXCHANGE"
+              sub={aiDraft.activeRuntimeExchange === ""
+                ? "AUTO — aggregator picks based on healthy connections"
+                : aiDraft.activeRuntimeExchange === "paper"
+                ? "PAPER-ONLY — sticky override, ignores live connections"
+                : `LIVE → ${aiDraft.activeRuntimeExchange} (subject to ARM gate)`}
+              dirty={aiDraft.activeRuntimeExchange !== aiServer.activeRuntimeExchange}
+              disabled={aiDisabled}>
+              <SelectField
+                value={aiDraft.activeRuntimeExchange}
+                disabled={aiDisabled}
+                options={(() => {
+                  // Derive from the user's actual connections so the controlled
+                  // <select> always has an exact option match for the stored
+                  // value — including legacy/adapter-specific IDs (Alpaca, etc.)
+                  // that the hardcoded list would miss. Also include the
+                  // currently-stored value if it doesn't match any connection
+                  // (e.g. the connection was revoked) so the select can still
+                  // render it instead of silently falling back to AUTO.
+                  const base = [
+                    { label: "AUTO (NULL)", value: "" },
+                    { label: "PAPER (PIN)", value: "paper" },
+                  ];
+                  const conns = (detail?.exchangeConnections ?? []).map(c => ({
+                    label: `${c.exchange.toUpperCase()}${c.status === "active" ? "" : ` (${c.status.toUpperCase()})`}`,
+                    value: c.exchange,
+                  }));
+                  // Dedup by value, then ensure stored value is representable.
+                  const seen = new Set(base.map(o => o.value));
+                  for (const o of conns) if (!seen.has(o.value)) { base.push(o); seen.add(o.value); }
+                  const stored = aiDraft.activeRuntimeExchange;
+                  if (stored && !seen.has(stored)) {
+                    base.push({ label: `${stored.toUpperCase()} (STORED · NO CONN)`, value: stored });
+                  }
+                  return base;
+                })()}
+                color={aiDraft.activeRuntimeExchange === "paper" ? "#00aaff"
+                  : aiDraft.activeRuntimeExchange === "" ? "#7a9eb8" : "#ff8844"}
+                onChange={(v) => setAiDraft({ ...aiDraft, activeRuntimeExchange: v })} />
             </FieldShell>
             {/* VOLUME FILTER — MANDATORY platform-wide safety control.
                 The per-user `user_settings.volume_filter` column has ZERO

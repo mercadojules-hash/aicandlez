@@ -486,6 +486,7 @@ router.get("/admin/users/:id", ...requireOperator, async (req, res): Promise<voi
           'volumeFilter',               s.volume_filter,
           'require1HTrend',             s.require_1h_trend,
           'preferredExchange',          s.preferred_exchange,
+          'activeRuntimeExchange',      s.active_runtime_exchange,
           'preferredLiveOrderSizeUsd',  s.preferred_live_order_size_usd,
           'paperSandboxEnabled',        s.paper_sandbox_enabled,
           'notificationsTradeExec',     s.notifications_trade_exec,

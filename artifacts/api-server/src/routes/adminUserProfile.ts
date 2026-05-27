@@ -59,8 +59,21 @@ const AiSettingsBody = z.object({
   minConfidence:      z.number().min(0).max(100).optional(),
   positionSizeUSD:    z.number().min(1).max(1_000_000).optional(),
   maxActivePositions: z.number().int().min(0).max(100).optional(),
+  // NOTE — daily trade cap is intentionally NOT here. The enforcement gate
+  // `tradeLimitEngine.getTradeLimitVerdict` reads from
+  // `user_trade_limits.cap_tier` (see `resolveCap` + `UNLIMITED_TRADE_LIMIT_CAP`),
+  // not from `user_settings.max_trades_per_day` (vestigial). The operator
+  // surface for cap edits is `POST /admin/users/:id/override_trade_limit`,
+  // exposed in the ACTIONS tab → "Override Trade Limits" panel.
   tradingMode:        z.enum(["simulation", "live"]).optional(),
   preferredExchange:  z.string().trim().min(1).max(50).optional(),
+  // Operator override of the customer's runtime exchange selection (the
+  // column that CustomerTradingRuntimeContext hydrates from). `null` clears
+  // the choice → aggregator falls back to the auto-promotion rule. Any
+  // non-empty string is treated as an explicit exchange ID (or `"paper"` to
+  // pin the customer into paper-only). See userSettings.ts column comment
+  // for the full state machine.
+  activeRuntimeExchange: z.union([z.string().trim().min(1).max(50), z.null()]).optional(),
   volumeFilter:       z.boolean().optional(),
 });
 
@@ -187,7 +200,7 @@ router.patch("/admin/users/:id/ai-settings", ...requireOperator, async (req, res
       // `payload`).
       const RISK_FIELDS     = new Set(["riskLevel", "minConfidence", "volumeFilter"]);
       const POSITION_FIELDS = new Set(["positionSizeUSD", "maxActivePositions"]);
-      const RUNTIME_FIELDS  = new Set(["tradingMode", "preferredExchange", "autoMode"]);
+      const RUNTIME_FIELDS  = new Set(["tradingMode", "preferredExchange", "autoMode", "activeRuntimeExchange"]);
 
       const buckets: Array<{ action: string; fields: string[] }> = [
         { action: "USER_RISK_OVERRIDE",     fields: changedFields.filter(k => RISK_FIELDS.has(k)) },
@@ -233,7 +246,30 @@ router.patch("/admin/users/:id/ai-settings", ...requireOperator, async (req, res
         },
       }, tx);
 
-      return { kind: "ok" as const, after, changedFields };
+      // Canonical operator-override umbrella row. Single source of truth for
+      // downstream SIEM filters / alerts that want "any operator override
+      // applied" without enumerating bucket actions. Carries the full diff
+      // (changes map = {field: {previousValue, newValue}}) so a single row
+      // is self-sufficient for forensics. Lives alongside the legacy
+      // `update_ai_settings` row above — both will fire for the same write
+      // until the legacy consumers migrate.
+      await writeAudit({
+        actorId:  ctx.actorId,
+        targetId: ctx.targetId,
+        action:   "OPERATOR_OVERRIDE_UPDATED",
+        payload:  {
+          note,
+          operatorId:    ctx.actorId,
+          targetUserId:  ctx.targetId,
+          changedFields,
+          changes: Object.fromEntries(changedFields.map(k => [k, {
+            previousValue: beforeRec[k] ?? null,
+            newValue:      afterRec[k]  ?? null,
+          }])),
+        },
+      }, tx);
+
+      return { kind: "ok" as const, after, changedFields, beforeRec, afterRec };
     });
 
     if (txOut.kind === "missing") {
@@ -241,11 +277,37 @@ router.patch("/admin/users/:id/ai-settings", ...requireOperator, async (req, res
       return;
     }
     if (txOut.kind === "noop") {
+      req.log.info({
+        tag:           "OPERATOR_OVERRIDE_UPDATED",
+        outcome:       "noop",
+        operatorId:    ctx.actorId,
+        targetUserId:  ctx.targetId,
+        changedFields: [],
+      }, "[OPERATOR_OVERRIDE_UPDATED] no-op (patch matched current state)");
       res.json({ ok: true, after: txOut.after, changedFields: [] });
       return;
     }
+    req.log.info({
+      tag:           "OPERATOR_OVERRIDE_UPDATED",
+      outcome:       "applied",
+      operatorId:    ctx.actorId,
+      targetUserId:  ctx.targetId,
+      changedFields: txOut.changedFields,
+      changes:       Object.fromEntries(txOut.changedFields.map(k => [k, {
+        previousValue: txOut.beforeRec[k] ?? null,
+        newValue:      txOut.afterRec[k]  ?? null,
+      }])),
+    }, "[OPERATOR_OVERRIDE_UPDATED] applied");
     res.json({ ok: true, after: txOut.after, changedFields: txOut.changedFields });
   } catch (err) {
+    req.log.error({
+      tag:          "OPERATOR_OVERRIDE_UPDATED",
+      outcome:      "failed",
+      operatorId:   ctx.actorId,
+      targetUserId: ctx.targetId,
+      patchKeys:    Object.keys(patch),
+      err,
+    }, "[OPERATOR_OVERRIDE_UPDATED] failed");
     res.status(500).json(serialize5xx(req, err, "ai-settings", { targetId: ctx.targetId, patch }));
   }
 });
