@@ -437,24 +437,68 @@ router.post("/billing/checkout", requireAuth, requireDisclaimer, async (req, res
     // Sprint 1 P1-ON-01: JIT-provision before read.
     await ensureUserRow(userId);
     const [user] = await db
-      .select({ email: usersTable.email, billingEmail: usersTable.billingEmail })
+      .select({
+        email:                usersTable.email,
+        billingEmail:         usersTable.billingEmail,
+        plan:                 usersTable.plan,
+        planStatus:           usersTable.planStatus,
+        stripeSubscriptionId: usersTable.stripeSubscriptionId,
+      })
       .from(usersTable)
       .where(eq(usersTable.clerkUserId, userId))
       .limit(1);
 
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
+    // Already-subscribed guard. The customer-side onboarding funnel
+    // collapsed when a paid user could re-hit checkout and end up on
+    // the Billing page instead of runtime setup (and risk a duplicate
+    // purchase). Treat `active` AND `trialing` as paid here — existing
+    // trialing customers (pre-trial-removal) must not be charged twice
+    // either. We hand back a 409 with an explicit `redirectTo` hint so
+    // the client can route them straight into runtime setup.
+    const statusStr = (user.planStatus ?? "").toLowerCase();
+    const isAlreadySubscribed =
+      !!user.stripeSubscriptionId &&
+      (statusStr === "active" || statusStr === "trialing") &&
+      user.plan !== "free";
+
+    if (isAlreadySubscribed) {
+      req.log.info(
+        { tag: "CHECKOUT_BLOCKED_ALREADY_SUBSCRIBED", plan: user.plan, planStatus: statusStr },
+        "[checkout] blocked — user already has an active subscription",
+      );
+      res.status(409).json({
+        error:      "Subscription already active",
+        errorCode:  "already_subscribed",
+        plan:       user.plan,
+        planStatus: statusStr,
+        redirectTo: "/portal?checkout=success",
+      });
+      return;
+    }
+
     const customerId = await ensureStripeCustomer(userId, user.billingEmail ?? user.email);
     const stripe     = await getUncachableStripeClient();
 
     // Task #162 Phase B: derive return host from request Origin (allow-listed)
-    // so PWA checkout returns land on the customer host (app./trade.) — not
+    // so checkout returns land on the customer host (app./trade.) — not
     // api.aicandlez.com (WEBHOOK_BASE_URL) which 404s. Falls back to
     // CUSTOMER_APP_BASE_URL env, then the legacy WEBHOOK_BASE_URL chain.
-    // The return path is *server-controlled* (`/billing?success=1` /
-    // `/billing?canceled=1`) — client-provided successUrl/cancelUrl are
-    // intentionally ignored to enforce the canonical billing-return
-    // contract regardless of which call site initiates checkout.
+    // The return path is *server-controlled* — client-provided
+    // successUrl/cancelUrl are intentionally ignored to enforce the
+    // canonical billing-return contract regardless of which call site
+    // initiates checkout.
+    //
+    // Post-checkout activation funnel: success_url now lands on the
+    // customer portal with `?checkout=success`, which the global
+    // `<OnboardingFlow>` mounted in App.tsx auto-detects and opens
+    // (path-choice → connect exchange → intro). The legacy
+    // `/billing?success=1` path silently dropped the user back into
+    // the Billing page with no runtime guidance — confusing enough
+    // that one paying customer thought their payment had failed.
+    // Cancel still returns to /billing so the user lands where they
+    // came from and can try again.
     const baseUrl = resolveCustomerAppBaseUrl(req.get("origin") ?? undefined);
 
     const session = await stripe.checkout.sessions.create({
@@ -462,7 +506,7 @@ router.post("/billing/checkout", requireAuth, requireDisclaimer, async (req, res
       payment_method_types: ["card"],
       line_items:           [{ price: priceId, quantity: 1 }],
       mode:                 "subscription",
-      success_url:          `${baseUrl}/billing?success=1`,
+      success_url:          `${baseUrl}/portal?checkout=success`,
       cancel_url:           `${baseUrl}/billing?canceled=1`,
       allow_promotion_codes: true,
       subscription_data: {

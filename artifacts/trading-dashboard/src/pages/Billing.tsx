@@ -43,10 +43,17 @@ const PLAN_COLORS: Record<string, string> = {
 // ── Plan Card ─────────────────────────────────────────────────────────────────
 
 function PlanCard({
-  plan, current, billing, onUpgrade, loading,
+  plan, current, billing, onUpgrade, onManage, hasActiveSub, loading,
 }: {
   plan: Plan; current: string; billing: "monthly" | "yearly";
-  onUpgrade: (priceId: string) => void; loading: boolean;
+  onUpgrade: (priceId: string) => void;
+  /** Invoked when the user has an active sub on a *different* paid plan and
+   *  needs to swap via the Stripe billing portal (the server-side
+   *  `already_subscribed` guard blocks a second checkout). */
+  onManage: () => void;
+  /** True when subscription is active OR trialing on any paid plan. */
+  hasActiveSub: boolean;
+  loading: boolean;
 }) {
   const isCurrent = plan.id === current;
   const Icon      = PLAN_ICONS[plan.id] ?? Zap;
@@ -135,6 +142,27 @@ function PlanCard({
         >
           Your base plan
         </div>
+      ) : hasActiveSub ? (
+        // User already has an active sub on a *different* paid plan.
+        // Server returns 409 `already_subscribed` to a second checkout,
+        // so route plan swaps through the Stripe billing portal where
+        // proration is handled cleanly.
+        <button
+          onClick={onManage}
+          disabled={loading}
+          className="w-full py-2 rounded font-mono text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all"
+          style={{
+            background: `${color}10`,
+            border:     `1px solid ${color}40`,
+            color,
+            opacity:    loading ? 0.6 : 1,
+          }}
+        >
+          {loading
+            ? <><Loader2 className="w-3 h-3 animate-spin" /> Opening…</>
+            : <><ExternalLink className="w-3 h-3" /> Switch to {plan.name} in Portal</>
+          }
+        </button>
       ) : (
         <button
           onClick={() => priceId && onUpgrade(priceId)}
@@ -177,11 +205,15 @@ export default function Billing() {
   const [error,        setError]        = useState<string | null>(null);
   const [, setLocation] = useLocation();
 
-  // Detect success/cancel query params
+  // Detect success/cancel query params. Note: the canonical Stripe
+  // success_url now lands on `/portal?checkout=success` (handled by
+  // the global <OnboardingFlow>), so the legacy `/billing?success=1`
+  // path only fires from older sessions or a manual hit. We still
+  // refetch subscription state so an active user who lands here sees
+  // accurate plan + entitlement info.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("success")) {
-      // Refetch subscription after successful checkout
+    if (params.get("success") || params.get("checkout") === "success") {
       setTimeout(loadSubscription, 2000);
     }
   }, []);
@@ -232,9 +264,17 @@ export default function Billing() {
         headers:     { "Content-Type": "application/json", ...(await authHeader()) },
         body:        JSON.stringify({ priceId }),
       });
-      const data = await r.json() as { url?: string; error?: string };
+      const data = await r.json() as {
+        url?: string; error?: string;
+        errorCode?: string; redirectTo?: string;
+      };
       if (r.ok && data.url) {
         window.location.href = data.url;
+      } else if (r.status === 409 && data.errorCode === "already_subscribed") {
+        // Server rejected a duplicate purchase. Route the user straight
+        // into runtime setup — that's the actual next step, and where
+        // they expected to land after the original checkout.
+        setLocation(data.redirectTo ?? "/portal?checkout=success");
       } else {
         const friendly =
           r.status === 401 ? "Your session expired. Please sign in again to continue."
@@ -275,8 +315,15 @@ export default function Billing() {
 
   const currentPlan = subscription?.plan ?? "free";
   const params      = new URLSearchParams(window.location.search);
-  const checkoutOk  = params.get("success") === "1";
+  const checkoutOk  = params.get("success") === "1" || params.get("checkout") === "success";
   const checkoutCancel = params.get("canceled") === "1";
+  // Treat trialing as paid here (entitlement-equivalent) so existing
+  // trialing customers also see the runtime-setup CTA instead of an
+  // upgrade prompt they can't act on.
+  const hasActiveSub = !!subscription &&
+    (subscription.isActive === true || subscription.isTrialing === true) &&
+    subscription.plan !== "free";
+  const goToRuntimeSetup = () => setLocation("/portal?checkout=success");
 
   return (
     <div
@@ -302,11 +349,32 @@ export default function Billing() {
         {/* Success / cancel banners */}
         {checkoutOk && (
           <div
-            className="flex items-center gap-2 px-4 py-3 rounded border font-mono text-[11px]"
-            style={{ background: "#0a1a0a", borderColor: "#00ff8a30", color: "#00ff8a" }}
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded border"
+            style={{ background: "#0a1a0a", borderColor: "#00ff8a30" }}
           >
-            <Check className="w-3.5 h-3.5 shrink-0" />
-            Subscription activated! Your plan will update shortly.
+            <div className="flex items-start gap-2">
+              <Check className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "#00ff8a" }} />
+              <div>
+                <div className="font-mono text-[11px] font-bold tracking-wider" style={{ color: "#00ff8a" }}>
+                  SUBSCRIPTION ACTIVE — SET UP YOUR TRADING RUNTIME
+                </div>
+                <div className="font-mono text-[10px] mt-1" style={{ color: "#7ac9a0" }}>
+                  Connect a regulated crypto exchange to unlock live AI execution. Paper trading stays available either way.
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={goToRuntimeSetup}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 rounded font-mono text-[10px] font-bold tracking-wider shrink-0 transition-all"
+              style={{
+                background: "linear-gradient(135deg,#00C853 0%,#66FF66 55%,#7CFF00 100%)",
+                border: "1px solid #66FF66",
+                color: "#001b06",
+                boxShadow: "0 8px 24px rgba(102,255,102,0.30), 0 1px 0 rgba(255,255,255,0.45) inset",
+              }}
+            >
+              CONTINUE TO RUNTIME SETUP <ChevronRight className="w-3 h-3" />
+            </button>
           </div>
         )}
         {checkoutCancel && (
@@ -345,17 +413,23 @@ export default function Billing() {
           ) : null
         )}
 
-        {/* Current subscription banner */}
+        {/* Current subscription banner. When active (and not already on
+            the post-checkout success banner above), surface the
+            runtime-setup CTA prominently so users who hit /billing
+            directly while subscribed are still funneled into setup
+            rather than fishing for the right link. Avoids
+            double-stacking when `checkoutOk` already shows the same
+            CTA in green. */}
         {subscription && subscription.stripeSubscriptionId && (
           <div
-            className="flex items-center justify-between gap-4 px-4 py-3 rounded border"
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded border"
             style={{ background: "#010C18", borderColor: "#0D2035" }}
           >
             <div>
               <div className="font-mono text-[9px] font-bold tracking-wider mb-0.5" style={{ color: "#4a6a80" }}>
                 ACTIVE SUBSCRIPTION
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Star className="w-3 h-3" style={{ color: "#00aaff" }} />
                 <span className="font-mono text-[12px] font-bold" style={{ color: "#EAF2FF" }}>
                   {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)} Plan
@@ -372,18 +446,34 @@ export default function Billing() {
                 </span>
               </div>
             </div>
-            <button
-              onClick={handlePortal}
-              disabled={loadingPlan === "portal"}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded border font-mono text-[10px] transition-all"
-              style={{ background: "#020E1C", borderColor: "#1a3a50", color: "#7ab8cc" }}
-            >
-              {loadingPlan === "portal"
-                ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <ExternalLink className="w-3 h-3" />
-              }
-              Manage Billing
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {hasActiveSub && !checkoutOk && (
+                <button
+                  onClick={goToRuntimeSetup}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded font-mono text-[10px] font-bold tracking-wider transition-all"
+                  style={{
+                    background: "linear-gradient(135deg,#00C853 0%,#66FF66 55%,#7CFF00 100%)",
+                    border: "1px solid #66FF66",
+                    color: "#001b06",
+                    boxShadow: "0 6px 18px rgba(102,255,102,0.28), 0 1px 0 rgba(255,255,255,0.45) inset",
+                  }}
+                >
+                  SET UP TRADING RUNTIME <ChevronRight className="w-3 h-3" />
+                </button>
+              )}
+              <button
+                onClick={handlePortal}
+                disabled={loadingPlan === "portal"}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded border font-mono text-[10px] transition-all"
+                style={{ background: "#020E1C", borderColor: "#1a3a50", color: "#7ab8cc" }}
+              >
+                {loadingPlan === "portal"
+                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                  : <ExternalLink className="w-3 h-3" />
+                }
+                Manage Billing
+              </button>
+            </div>
           </div>
         )}
 
@@ -439,6 +529,8 @@ export default function Billing() {
                 current={currentPlan}
                 billing={billing}
                 onUpgrade={handleUpgrade}
+                onManage={handlePortal}
+                hasActiveSub={hasActiveSub}
                 loading={loadingPlan !== null && loadingPlan !== "portal"}
               />
             ))}
