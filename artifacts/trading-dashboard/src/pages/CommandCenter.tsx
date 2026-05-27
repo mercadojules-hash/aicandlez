@@ -84,17 +84,648 @@ import EngineHeartbeat from "@/components/EngineHeartbeat";
 import LiveExecutionStream from "@/components/LiveExecutionStream";
 import { Zap, TrendingUp, TrendingDown, Activity } from "lucide-react";
 
-/* ── TOP CONVICTION PULSE strip ──────────────────────────────────────────────
- * Slim institutional read of the top 5 highest-avgConfidence signals across
- * BOTH crypto matrix columns (CRYPTO_MAJORS_30 + CRYPTO_ALTS_MEMES). Sits
- * ABOVE the dual matrix in Row 1. Read-only — no click handlers, no order
- * routing. Per user direction: "thin and institutional, not a hero card".
- * Renders nothing until at least one breakdown crosses the 70% conviction
- * floor (avoids a flat empty strip during engine warmup). */
+/* ── BATTLEFIELD COMPOSITION (operator /command surface) ─────────────────────
+ * Per user direction: restore the OLD command-center emotional composition
+ * (Scanning hero · Market Pulse gauge · LIVE OPPORTUNITY BATTLEFIELD framing
+ * · MY ACCOUNT rail · AI ACTIVITY feed) powered by the NEW engine + new
+ * dual crypto matrix (no equities — locked invariant preserved) + new
+ * confidence sorting + new tier hierarchy.
+ *
+ * Architecture below: ScanningHero (chip strip with tier styling) +
+ * MarketPulseGauge (BULL/BEAR conviction read) live above the BattlefieldHeader,
+ * which sits above a 3-column row (matrix-left · matrix-right · MyAccountRail
+ * with AiActivityFeed below). All read-only / presentational; execution path
+ * untouched. */
 const PULSE_MIN_CONFIDENCE = 70;
 const PULSE_MAX_ITEMS      = 5;
 const PULSE_UNIVERSE = [...CRYPTO_MAJORS_30, ...CRYPTO_ALTS_MEMES];
+const PULSE_SYMBOL_SET = new Set(PULSE_UNIVERSE.map(t => t.symbol));
 
+/* Tier helper — single source of truth for ELITE / STRONG / ACTIVE styling
+ * driving border, glow, font weight, dot size. Used by both ScanningHero
+ * chips and any future tier-aware surface. */
+type Tier = "ELITE" | "STRONG" | "ACTIVE";
+function convictionTier(conf: number): Tier {
+  return conf >= 90 ? "ELITE" : conf >= 80 ? "STRONG" : "ACTIVE";
+}
+function tierStyle(tier: Tier, dirColor: string) {
+  if (tier === "ELITE") return {
+    border:     `1px solid ${dirColor}cc`,
+    bg:         `linear-gradient(180deg, ${dirColor}33 0%, ${dirColor}10 100%)`,
+    shadow:     `0 0 10px ${dirColor}55, inset 0 0 8px ${dirColor}33`,
+    tickerWt:   900 as const,
+    tickerSize: 12,
+    confSize:   12,
+    confShadow: `0 0 7px ${dirColor}, 0 0 14px ${dirColor}80`,
+    dotSize:    6,
+    padding:    "5px 9px",
+  };
+  if (tier === "STRONG") return {
+    border:     `1px solid ${dirColor}66`,
+    bg:         `linear-gradient(180deg, ${dirColor}1c 0%, transparent 100%)`,
+    shadow:     `inset 0 0 6px ${dirColor}1f`,
+    tickerWt:   800 as const,
+    tickerSize: 11,
+    confSize:   11,
+    confShadow: `0 0 4px ${dirColor}66`,
+    dotSize:    5,
+    padding:    "4px 8px",
+  };
+  return {
+    border:     `1px solid ${dirColor}30`,
+    bg:         "transparent",
+    shadow:     "none",
+    tickerWt:   700 as const,
+    tickerSize: 10.5,
+    confSize:   10.5,
+    confShadow: "none",
+    dotSize:    4,
+    padding:    "3px 7px",
+  };
+}
+
+/* Shared selector — top N highest-conviction crypto signals, filtered to
+ * the matrix universe, deduped, sorted desc. Drives ScanningHero chips and
+ * any future conviction-aware composition. */
+function useTopConviction(
+  engine: EngineStatus | undefined,
+  minConfidence: number,
+  maxItems: number,
+) {
+  const breakdowns = engine?.symbolBreakdowns ?? {};
+  return useMemo(() => {
+    const rows: Array<{
+      symbol: string; display: string; conf: number; dir: "LONG" | "SHORT";
+    }> = [];
+    for (const t of PULSE_UNIVERSE) {
+      const b = breakdowns[t.symbol];
+      const conf = b?.avgConfidence ?? 0;
+      if (conf < minConfidence) continue;
+      rows.push({
+        symbol:  t.symbol,
+        display: t.display ?? t.label ?? t.symbol,
+        conf:    Math.round(conf),
+        dir:     resolveDirection(t.symbol, b),
+      });
+    }
+    rows.sort((a, b) => b.conf - a.conf);
+    return rows.slice(0, maxItems);
+  }, [breakdowns, minConfidence, maxItems]);
+}
+
+/* ── ScanningHero ────────────────────────────────────────────────────────────
+ * Left side of the hero row. Mirrors the legacy "Scanning N markets · last
+ * surge — X · Ys ago" hero from the old battlefield, but the high-conviction
+ * chip strip on the right uses the new tier system. Replaces the prior
+ * standalone TopConvictionPulse strip per the restored composition. */
+function ScanningHero({ engine }: { engine?: EngineStatus }) {
+  const chips = useTopConviction(engine, PULSE_MIN_CONFIDENCE, PULSE_MAX_ITEMS);
+  const trackedCount = useMemo(
+    () => Object.keys(engine?.symbolBreakdowns ?? {}).filter(s => PULSE_SYMBOL_SET.has(s)).length,
+    [engine?.symbolBreakdowns],
+  );
+  const lastSignalAgo = useMemo(() => {
+    if (!engine?.lastSignalAt) return "—";
+    const sec = Math.max(0, Math.round((Date.now() - engine.lastSignalAt) / 1000));
+    if (sec < 60)  return `${sec}s ago`;
+    if (sec < 3600)return `${Math.floor(sec / 60)}m ago`;
+    return `${Math.floor(sec / 3600)}h ago`;
+  }, [engine?.lastSignalAt]);
+  const surgeCount = engine?.signalCounts
+    ? engine.signalCounts.BUY + engine.signalCounts.SELL
+    : 0;
+  const isHunting = (engine?.running ?? false) && !(engine?.killSwitch ?? false);
+
+  return (
+    <div
+      role="region"
+      aria-label="AI engine scanning hero"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        padding: "10px 14px",
+        border: `1px solid ${N.BRAND}33`,
+        borderRadius: 4,
+        background: `linear-gradient(90deg, ${N.BRAND}10 0%, ${N.BG} 75%, ${N.BRAND}06 100%)`,
+        boxShadow: `inset 0 0 18px ${N.BRAND}10`,
+        fontFamily: N.FONT_MONO,
+        minHeight: 92,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{
+          width: 6, height: 6, borderRadius: "50%",
+          background: isHunting ? N.BRAND_BRT : N.TEXT_3,
+          boxShadow: isHunting ? `0 0 6px ${N.BRAND}, 0 0 12px ${N.BRAND}80` : "none",
+          animation: isHunting ? "cd-pulse-dot 1400ms ease-in-out infinite" : undefined,
+        }} />
+        <span style={{
+          fontSize: 9.5, fontWeight: 800, color: N.BRAND_BRT,
+          letterSpacing: "0.28em", textShadow: `0 0 6px ${N.BRAND}55`,
+        }}>
+          AI ENGINE
+        </span>
+        <span style={{ fontSize: 9, color: N.TEXT_3, letterSpacing: "0.18em" }}>
+          · {isHunting ? "HUNTING" : "STANDBY"} · AUTONOMOUS
+        </span>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+        <span style={{
+          fontSize: 22, fontWeight: 800, color: N.TEXT_0,
+          letterSpacing: "-0.02em",
+        }}>
+          Scanning <span style={{ color: N.BRAND_BRT }}>{trackedCount || PULSE_UNIVERSE.length}</span> markets
+        </span>
+        <span style={{
+          fontSize: 14, fontWeight: 700, color: N.TEXT_1,
+          letterSpacing: "0.02em",
+        }}>
+          · last surge — <span style={{ color: N.BRAND_BRT, fontWeight: 800 }}>{surgeCount}</span>
+        </span>
+        <span style={{ fontSize: 10, color: N.TEXT_3, letterSpacing: "0.14em" }}>
+          {lastSignalAgo}
+        </span>
+      </div>
+
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8,
+        flexWrap: "wrap", marginTop: 2,
+      }}>
+        {chips.length === 0 ? (
+          <span style={{
+            fontSize: 9.5, color: N.TEXT_3,
+            letterSpacing: "0.22em", fontWeight: 700,
+          }}>
+            · AWAITING {PULSE_MIN_CONFIDENCE}%+ SIGNALS · LIVE CONVICTION STREAM
+          </span>
+        ) : (
+          chips.map((r, i) => {
+            const dirColor = r.dir === "LONG" ? N.LONG : N.SHORT;
+            const DirIcon  = r.dir === "LONG" ? TrendingUp : TrendingDown;
+            const tier     = convictionTier(r.conf);
+            const isTop    = i === 0;
+            const isEliteTop = isTop && tier === "ELITE";
+            const ts = tierStyle(tier, dirColor);
+            return (
+              <span
+                key={r.symbol}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: ts.padding,
+                  background: ts.bg,
+                  border: ts.border,
+                  borderRadius: 3,
+                  boxShadow: isEliteTop
+                    ? `${ts.shadow}, 0 0 18px ${dirColor}77`
+                    : ts.shadow,
+                  animation: isEliteTop
+                    ? "cd-pulse-halo 1800ms ease-in-out infinite"
+                    : undefined,
+                }}
+              >
+                <span aria-hidden style={{
+                  width: ts.dotSize, height: ts.dotSize, borderRadius: "50%",
+                  background: dirColor,
+                  boxShadow: tier === "ELITE"
+                    ? `0 0 8px ${dirColor}, 0 0 16px ${dirColor}cc`
+                    : tier === "STRONG"
+                    ? `0 0 6px ${dirColor}, 0 0 12px ${dirColor}80`
+                    : `0 0 3px ${dirColor}80`,
+                  animation: isTop ? "cd-pulse-dot 1400ms ease-in-out infinite" : undefined,
+                }} />
+                <span style={{
+                  fontSize: ts.tickerSize, fontWeight: ts.tickerWt,
+                  color: tier === "ACTIVE" ? N.TEXT_1 : N.TEXT_0,
+                  letterSpacing: "0.08em",
+                }}>{r.display}</span>
+                <DirIcon size={tier === "ELITE" ? 11 : 10} style={{ color: dirColor }} />
+                <span style={{
+                  fontSize: ts.confSize,
+                  fontWeight: tier === "ELITE" ? 900 : 800,
+                  color: dirColor,
+                  letterSpacing: "0.04em",
+                  textShadow: ts.confShadow,
+                }}>{r.conf}</span>
+              </span>
+            );
+          })
+        )}
+      </div>
+      <style>{`
+        @keyframes cd-pulse-dot {
+          0%, 100% { transform: scale(1);   opacity: 1;   }
+          50%      { transform: scale(1.5); opacity: 0.55;}
+        }
+        @keyframes cd-pulse-halo {
+          0%, 100% { filter: brightness(1)    saturate(1);   }
+          50%      { filter: brightness(1.18) saturate(1.15);}
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/* ── MarketPulseGauge ────────────────────────────────────────────────────────
+ * Right side of the hero row. BULL/BEAR/NEUTRAL bias + conviction% derived
+ * from the engine's BUY/SELL/HOLD signal distribution (last loop pass).
+ * Mirrors the legacy "MARKET PULSE | BULL 73 CONVICTION" panel using new
+ * engine data only — no legacy backend code path. */
+function MarketPulseGauge({ engine }: { engine?: EngineStatus }) {
+  const { bias, conviction } = useMemo(() => {
+    const c = engine?.signalCounts ?? { BUY: 0, SELL: 0, HOLD: 0 };
+    const total = c.BUY + c.SELL + c.HOLD;
+    if (total === 0) return { bias: "NEUTRAL" as const, conviction: 0 };
+    const directional = c.BUY + c.SELL;
+    if (directional === 0) return { bias: "NEUTRAL" as const, conviction: 0 };
+    const bullPct = (c.BUY / directional) * 100;
+    if (bullPct >= 55)  return { bias: "BULL"    as const, conviction: Math.round(bullPct) };
+    if (bullPct <= 45)  return { bias: "BEAR"    as const, conviction: Math.round(100 - bullPct) };
+    return                     { bias: "NEUTRAL" as const, conviction: 50 };
+  }, [engine?.signalCounts]);
+
+  const biasColor =
+    bias === "BULL" ? N.LONG :
+    bias === "BEAR" ? N.SHORT :
+                      N.TEXT_2;
+
+  return (
+    <div
+      role="region"
+      aria-label="Market pulse"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        padding: "10px 14px",
+        border: `1px solid ${biasColor}40`,
+        borderRadius: 4,
+        background: `linear-gradient(90deg, ${biasColor}10 0%, ${N.BG} 80%)`,
+        boxShadow: `inset 0 0 16px ${biasColor}14`,
+        fontFamily: N.FONT_MONO,
+        minHeight: 92,
+      }}
+    >
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+        <Activity size={12} style={{
+          color: biasColor,
+          filter: `drop-shadow(0 0 4px ${biasColor})`,
+        }} />
+        <span style={{
+          fontSize: 9.5, fontWeight: 800, color: biasColor,
+          letterSpacing: "0.28em", textShadow: `0 0 6px ${biasColor}55`,
+        }}>
+          MARKET PULSE
+        </span>
+      </div>
+
+      <div style={{
+        display: "flex", alignItems: "baseline", gap: 10,
+        flex: 1, justifyContent: "flex-end",
+      }}>
+        <span style={{
+          fontSize: 30, fontWeight: 900, color: biasColor,
+          letterSpacing: "0.04em",
+          textShadow: `0 0 8px ${biasColor}66, 0 0 16px ${biasColor}44`,
+          lineHeight: 1,
+        }}>
+          {bias}
+        </span>
+        <span style={{
+          fontSize: 22, fontWeight: 800, color: N.TEXT_0,
+          letterSpacing: "-0.02em",
+        }}>
+          | {conviction}
+        </span>
+        <span style={{
+          fontSize: 9, fontWeight: 700, color: N.TEXT_2,
+          letterSpacing: "0.24em",
+        }}>
+          CONVICTION
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ── BattlefieldHeader ───────────────────────────────────────────────────────
+ * Composition framing band that separates the hero row from the matrix +
+ * rail. Read-only status chips reflect actual engine + execution state. */
+function BattlefieldHeader({
+  engine, cryptoActive,
+}: { engine?: EngineStatus; cryptoActive: boolean }) {
+  const marketCount = PULSE_UNIVERSE.length;
+  const riskActive  = !(engine?.killSwitch ?? false);
+  const execArmed   = cryptoActive;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        padding: "8px 14px",
+        border: `1px solid ${N.BORDER_HI}`,
+        borderRadius: 4,
+        background: `linear-gradient(90deg, ${N.SURFACE_1} 0%, ${N.BG} 60%, ${N.SURFACE_1} 100%)`,
+        fontFamily: N.FONT_MONO,
+      }}
+    >
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <span style={{
+          fontSize: 14, fontWeight: 900, color: N.TEXT_0,
+          letterSpacing: "0.20em",
+        }}>
+          LIVE OPPORTUNITY
+        </span>
+        <span style={{
+          fontSize: 14, fontWeight: 900, color: N.BRAND_BRT,
+          letterSpacing: "0.20em",
+          textShadow: `0 0 8px ${N.BRAND}66, 0 0 16px ${N.BRAND}33`,
+        }}>
+          BATTLEFIELD
+        </span>
+        <span style={{
+          fontSize: 9, fontWeight: 700, color: N.TEXT_3,
+          letterSpacing: "0.22em",
+        }}>
+          · {marketCount} MARKETS · AI RANKED BY CONVICTION
+        </span>
+      </div>
+
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+        <StatusChip
+          label="RISK GATES"
+          value={riskActive ? "ACTIVE" : "BYPASSED"}
+          color={riskActive ? N.BRAND_BRT : N.DANGER_BRT}
+        />
+        <StatusChip
+          label="EXEC"
+          value={execArmed ? "ARMED" : "STANDBY"}
+          color={execArmed ? N.GOLD_BRT : N.TEXT_2}
+        />
+      </div>
+    </div>
+  );
+}
+
+function StatusChip({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 5,
+      padding: "3px 7px",
+      border: `1px solid ${color}55`,
+      borderRadius: 3,
+      background: `${color}10`,
+      fontFamily: N.FONT_MONO,
+    }}>
+      <span style={{
+        width: 5, height: 5, borderRadius: "50%",
+        background: color,
+        boxShadow: `0 0 5px ${color}, 0 0 10px ${color}80`,
+      }} />
+      <span style={{ fontSize: 8.5, fontWeight: 700, color: N.TEXT_2, letterSpacing: "0.18em" }}>{label}</span>
+      <span style={{ fontSize: 8.5, fontWeight: 800, color, letterSpacing: "0.14em" }}>{value}</span>
+    </span>
+  );
+}
+
+/* ── MyAccountRail ───────────────────────────────────────────────────────────
+ * Compact vertical equity card for the right rail. Pulls from the same
+ * liveBalance + trades feed as LiveAccountPanel but stacks the read for a
+ * narrow column. */
+function MyAccountRail({
+  exchangeStatus, liveBalance, trades,
+}: {
+  exchangeStatus?: ExchangeStatus;
+  liveBalance?:    LiveBalance;
+  trades:          Trade[];
+}) {
+  const isLive = (exchangeStatus?.mode === "kraken") && (liveBalance?.source === "live");
+  const usd    = isLive ? (liveBalance?.balances?.USD ?? 0) : 0;
+  const stats = useMemo(() => {
+    const safe = Array.isArray(trades) ? trades : [];
+    const liveOnly = safe.filter(t => {
+      const m = (t.mode ?? "").toLowerCase();
+      const s = ((t as { source?: string }).source ?? "").toLowerCase();
+      return m === "live" || s === "live";
+    });
+    const closed = liveOnly.filter(t => t.status?.toLowerCase() !== "open");
+    const open   = liveOnly.filter(t => t.status?.toLowerCase() === "open");
+    const realized   = closed.reduce((s, t) => s + (t.pnl ?? 0), 0);
+    const unrealized = open.reduce((s, t) => s + (t.pnl ?? 0), 0);
+    const today = closed.filter(t => {
+      if (!t.closedAt) return false;
+      return new Date(t.closedAt).toDateString() === new Date().toDateString();
+    });
+    const todayPnl = today.reduce((s, t) => s + (t.pnl ?? 0), 0);
+    return { realized, unrealized, todayPnl, fillsToday: today.length, openCount: open.length };
+  }, [trades]);
+
+  const eq = (n: number) => `${n >= 0 ? "+" : "-"}$${Math.abs(n).toFixed(2)}`;
+  const pctToday = usd > 0 ? (stats.todayPnl / usd) * 100 : 0;
+
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column",
+      border: `1px solid ${N.BORDER_HI}`,
+      borderRadius: 4,
+      background: N.SURFACE_1,
+      fontFamily: N.FONT_MONO,
+      overflow: "hidden",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "7px 10px",
+        borderBottom: `1px solid ${N.BORDER}`,
+        background: `linear-gradient(180deg, ${N.BRAND}08 0%, ${N.BG} 100%)`,
+      }}>
+        <span style={{
+          fontSize: 9.5, fontWeight: 800, color: N.TEXT_0,
+          letterSpacing: "0.24em",
+        }}>MY ACCOUNT</span>
+        <span style={{
+          fontSize: 8.5, fontWeight: 700,
+          color: isLive ? N.BRAND_BRT : N.TEXT_3,
+          letterSpacing: "0.16em",
+          padding: "2px 6px",
+          border: `1px solid ${isLive ? N.BRAND : N.BORDER_HI}`,
+          borderRadius: 3,
+          background: isLive ? `${N.BRAND}10` : "transparent",
+        }}>
+          ● {isLive ? "LIVE · KRAKEN" : "STANDBY"}
+        </span>
+      </div>
+
+      <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+        <span style={{ fontSize: 8.5, color: N.TEXT_3, letterSpacing: "0.22em", fontWeight: 700 }}>EQUITY</span>
+        <span style={{
+          fontSize: 26, fontWeight: 900, color: N.TEXT_0,
+          letterSpacing: "-0.02em", lineHeight: 1,
+        }}>
+          ${usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        <span style={{
+          fontSize: 10, fontWeight: 700,
+          color: pctToday >= 0 ? N.LONG : N.SHORT,
+          letterSpacing: "0.04em",
+        }}>
+          {pctToday >= 0 ? "+" : ""}{pctToday.toFixed(2)}% TODAY · real-time · kraken
+        </span>
+      </div>
+
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 1,
+        background: N.BORDER,
+        borderTop: `1px solid ${N.BORDER}`,
+      }}>
+        <RailMetric label="TODAY"      value={eq(stats.todayPnl)} color={stats.todayPnl >= 0 ? N.LONG : N.SHORT} />
+        <RailMetric label="FILLS · TODAY" value={String(stats.fillsToday)} color={N.TEXT_0} />
+        <RailMetric label="REALIZED"   value={eq(stats.realized)} color={stats.realized >= 0 ? N.LONG : N.SHORT} />
+        <RailMetric label="UNREALIZED" value={eq(stats.unrealized)} color={stats.unrealized >= 0 ? N.LONG : N.SHORT} />
+      </div>
+
+      <div style={{ padding: 8, borderTop: `1px solid ${N.BORDER}` }}>
+        <AiAutotradeBar />
+      </div>
+
+      <div style={{
+        padding: "8px 10px",
+        borderTop: `1px solid ${N.BORDER}`,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <span style={{ fontSize: 9, fontWeight: 800, color: N.TEXT_1, letterSpacing: "0.22em" }}>
+          LIVE POSITIONS
+        </span>
+        <span style={{ fontSize: 9, fontWeight: 700, color: N.TEXT_3, letterSpacing: "0.16em" }}>
+          {stats.openCount} OPEN
+        </span>
+      </div>
+      {stats.openCount === 0 && (
+        <div style={{
+          padding: "8px 10px 10px",
+          fontSize: 9, color: N.TEXT_3, letterSpacing: "0.14em", fontWeight: 700,
+        }}>
+          · NO BROKER LINKED · Link a broker to see live balances.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RailMetric({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div style={{
+      background: N.SURFACE_1,
+      padding: "8px 10px",
+      display: "flex", flexDirection: "column", gap: 3,
+    }}>
+      <span style={{ fontSize: 8, color: N.TEXT_3, letterSpacing: "0.2em", fontWeight: 700 }}>
+        {label}
+      </span>
+      <span style={{
+        fontSize: 12, fontWeight: 800, color,
+        letterSpacing: "0.02em",
+        fontFamily: N.FONT_MONO,
+      }}>{value}</span>
+    </div>
+  );
+}
+
+/* ── AiActivityFeed ──────────────────────────────────────────────────────────
+ * Right-rail live feed of recent AI signal events sourced from
+ * engine.recentSignalLog. Replaces the legacy "AI ACTIVITY" feed using new
+ * engine data only — no /api/admin/execution/stream coupling. */
+function AiActivityFeed({ engine }: { engine?: EngineStatus }) {
+  const rows = useMemo(() => {
+    const log = engine?.recentSignalLog ?? [];
+    return [...log]
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 14);
+  }, [engine?.recentSignalLog]);
+
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column",
+      border: `1px solid ${N.BORDER_HI}`,
+      borderRadius: 4,
+      background: N.SURFACE_1,
+      fontFamily: N.FONT_MONO,
+      overflow: "hidden",
+      maxHeight: 380,
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "7px 10px",
+        borderBottom: `1px solid ${N.BORDER}`,
+        background: `linear-gradient(180deg, ${N.BRAND}08 0%, ${N.BG} 100%)`,
+      }}>
+        <span style={{
+          fontSize: 9.5, fontWeight: 800, color: N.TEXT_0,
+          letterSpacing: "0.24em",
+        }}>AI ACTIVITY</span>
+        <span style={{
+          fontSize: 8.5, fontWeight: 700, color: N.BRAND_BRT,
+          letterSpacing: "0.18em",
+        }}>LIVE FEED</span>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto" }} className="cd-scroll">
+        {rows.length === 0 ? (
+          <div style={{
+            padding: 14, fontSize: 9, color: N.TEXT_3,
+            letterSpacing: "0.18em", fontWeight: 700, textAlign: "center",
+          }}>
+            · AWAITING ENGINE SIGNALS
+          </div>
+        ) : rows.map(r => {
+          const ts = new Date(r.timestamp);
+          const hh = String(ts.getHours()).padStart(2, "0");
+          const mm = String(ts.getMinutes()).padStart(2, "0");
+          const ss = String(ts.getSeconds()).padStart(2, "0");
+          const isBlocked = !!r.blockReason;
+          const color = isBlocked ? N.WARN : r.decision === "BUY" ? N.LONG : r.decision === "SELL" ? N.SHORT : N.TEXT_2;
+          const verb  = isBlocked ? "BLOCKED" : (r.executedAs ?? r.decision);
+          return (
+            <div key={r.id} style={{
+              padding: "5px 10px",
+              borderBottom: `1px solid ${N.BORDER}`,
+              display: "flex", alignItems: "center", gap: 8,
+              fontSize: 9.5, color: N.TEXT_1,
+              letterSpacing: "0.02em",
+            }}>
+              <span style={{ color: N.TEXT_3, fontSize: 8.5, fontWeight: 700, flexShrink: 0 }}>
+                {hh}:{mm}:{ss}
+              </span>
+              <span style={{
+                color, fontWeight: 800, fontSize: 8.5, letterSpacing: "0.14em",
+                flexShrink: 0, minWidth: 50,
+              }}>
+                AI {verb}
+              </span>
+              <span style={{ color: N.TEXT_0, fontWeight: 700, flexShrink: 0 }}>
+                {r.symbol}
+              </span>
+              <span style={{
+                color: N.TEXT_3, fontSize: 8.5,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>
+                · {isBlocked ? r.blockReason : (r.shortSummary || `${r.decision} ${r.timeframe}`)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── Legacy slim chip strip — kept as fallback export, no longer rendered.
+ * ScanningHero supersedes it with the same chip rendering inline. */
 function TopConvictionPulse({ engine }: { engine?: EngineStatus }) {
   const breakdowns = engine?.symbolBreakdowns ?? {};
   const ranked = useMemo(() => {
@@ -641,22 +1272,29 @@ export default function CommandCenter() {
           <PlatformOverview />
         </div>
 
-        {/* Row 1 — DUAL CRYPTO SIGNALS MATRIX (above the fold)
-            Hoisted above operator deep-telemetry so the dense signal flow
-            is the first thing the operator sees on /command, not the
-            sparse empty Fees/Users/Positions panels. Each control bar
-            sits DIRECTLY ABOVE its own signal panel.  */}
-        {/* Top conviction pulse — slim institutional read of the strongest
-            5 signals across both matrix columns. Sits above the dual matrix
-            so the operator sees 80-90%+ opportunities at a glance without
-            scanning. Read-only; no execution affordances. */}
-        <div className="px-2">
-          <TopConvictionPulse engine={engine} />
-        </div>
-
+        {/* Row 1 — BATTLEFIELD HERO (Scanning + Market Pulse)
+            Restored OLD composition powered by NEW engine. Replaces the
+            prior standalone TopConvictionPulse strip; chip tier hierarchy
+            now lives inside ScanningHero. */}
         <section
           className="grid gap-1.5 px-2"
-          style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}
+          style={{ gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 1fr)" }}
+        >
+          <ScanningHero    engine={engine} />
+          <MarketPulseGauge engine={engine} />
+        </section>
+
+        {/* Row 2 — BATTLEFIELD framing band */}
+        <div className="px-2">
+          <BattlefieldHeader engine={engine} cryptoActive={cryptoState === "LIVE"} />
+        </div>
+
+        {/* Row 3 — BATTLEFIELD: dual crypto matrix + MY ACCOUNT / AI ACTIVITY rail
+            LEFT = TOP CRYPTO MAJORS · RIGHT = ALTS & MEMECOINS · RAIL = account+feed
+            (Crypto-only locked invariant preserved — no equities.) */}
+        <section
+          className="grid gap-1.5 px-2"
+          style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) 296px", alignItems: "start" }}
         >
           <div className="flex flex-col gap-1.5">
             <AiAutotradeBar />
@@ -680,10 +1318,19 @@ export default function CommandCenter() {
             />
             <CryptoAltsMemesPanel engine={engine} />
           </div>
+          <div className="flex flex-col gap-1.5">
+            <MyAccountRail
+              exchangeStatus={exchangeStatus}
+              liveBalance={liveBalance}
+              trades={tradesArr}
+            />
+            <AiActivityFeed engine={engine} />
+          </div>
         </section>
 
-        {/* Row 2 — My live Kraken account (immediate proof-of-performance
-            kept high so balance/PnL stays near the matrix) */}
+        {/* Row 4 — Full-width LiveAccountPanel (deep equity/PnL breakdown
+            kept below the battlefield; MyAccountRail above gives the
+            at-a-glance read, this gives the full institutional decompose) */}
         <div className="px-2">
           <LiveAccountPanel
             engine={engine}
