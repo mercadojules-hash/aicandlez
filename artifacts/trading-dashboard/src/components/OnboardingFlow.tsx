@@ -1,31 +1,40 @@
 /**
- * OnboardingFlow — post-checkout live-trading onboarding for trade.aicandlez.com.
+ * OnboardingFlow — post-checkout runtime-activation funnel for trade.aicandlez.com.
  *
  * Triggered by `?checkout=success` query param appearing on any route (the
  * Stripe success URL strips the param after detection so the modal opens
  * exactly once). Renders a 3-step wizard:
  *
- *   1. choose       — TWO paths:
- *                       PRIMARY  : Create / Fund a regulated crypto exchange
- *                                  account (Kraken, Binance, or Coinbase)
- *                       SECONDARY: Connect an existing exchange (paste API keys)
- *   2. exchange_cta — Explainer + external CTA to the primary exchange sign-up +
- *                     "I've got my keys" button that advances to step 3 with the
- *                     primary exchange preselected.
- *   3. connect      — Hosted via PortalExchangeConnectModal (exchange picker
- *                     + key paste + server-side test + AES-256 encryption).
- *   4. intro        — One-time "manual + AI trading" explainer modal. Persists
- *                     `acl_first_live_intro_seen_v1` to localStorage.
+ *   1. choose  — "Choose Your Trading Runtime" decision screen with TWO
+ *                explicit paths so users understand the architecture:
+ *
+ *                  BEGINNER / RECOMMENDED   → Use Alpaca
+ *                    Alpaca brokerage account, deposit USD directly, AI
+ *                    trades on your behalf. When the Alpaca OAuth provider
+ *                    is configured we open the one-click popup; otherwise
+ *                    we route to `connect` with `preselect="Alpaca"` so the
+ *                    user can't accidentally pick a different exchange.
+ *
+ *                  ADVANCED                 → Connect Existing Exchange
+ *                    Coinbase / Kraken / Crypto.com / Binance via API keys.
+ *                    Bring your own liquidity & advanced runtime switching.
+ *                    Routes to `connect` with no preselect so the user
+ *                    picks from the catalog.
+ *
+ *   2. connect — Hosted via PortalExchangeConnectModal (exchange picker
+ *                + key paste + server-side test + AES-256 encryption).
+ *   3. ready   — "Runtime Ready" confirmation. Pulls live data from
+ *                `useRuntimeState` (active runtime label, hydrated equity),
+ *                explains the ARM LIVE gate, and CTAs into the portal.
+ *                Persists `acl_first_live_intro_seen_v1` to localStorage so
+ *                a returning customer skips straight to "done".
  *
  * Bypass behavior:
  *   - If `?checkout=success` is present AND user already has >=1 connected
- *     exchange AND intro modal seen → skip to "done" (close immediately).
- *   - If connected but intro not seen → jump straight to "intro".
- *
- * Modularity / future extension:
- *   - The primary-exchange path currently uses an external CTA. The
- *     `OnboardingProvider` shape below is the extension surface for upgrading
- *     to a Broker-API / OAuth / direct-funding flow without touching the UI.
+ *     exchange AND the ready/intro modal has been seen → skip to "done"
+ *     (close immediately).
+ *   - If connected but never confirmed → jump straight to "ready" so the
+ *     user gets the runtime confirmation even on a re-entry.
  *
  * Compliance copy (LOCKED — do not modify without legal review):
  *   - "Funds remain inside your regulated crypto exchange account."
@@ -37,34 +46,17 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { X, ExternalLink, ShieldCheck, Sparkles, Lock, ArrowRight, Check, Cpu, Hand } from "lucide-react";
+import { X, ShieldCheck, Sparkles, ArrowRight, Check, Cpu, Zap, TrendingUp, Wallet } from "lucide-react";
 import { PortalExchangeConnectModal } from "./PortalExchangeConnectModal";
+import { useRuntimeState, runtimeLabel } from "../hooks/useRuntimeState";
 
 import { authFetch } from "../lib/authFetch";
-// ── Provider extension surface ───────────────────────────────────────────────
-//
-// Today: external CTA → user opens the primary exchange sign-up, returns,
-// pastes API keys. Future: swap `type: "external_cta"` for `"oauth"` /
-// `"broker_api"` and the step 2 renderer below dispatches to the new
-// handler. No UI tree changes.
-interface OnboardingProvider {
-  id:           string;
-  label:        string;
-  type:         "external_cta" | "oauth" | "broker_api";
-  externalUrl?: string;
-}
-const PRIMARY_EXCHANGE_PROVIDER: OnboardingProvider = {
-  id:          "Kraken",
-  label:       "Kraken",
-  type:        "external_cta",
-  externalUrl: "https://www.kraken.com/sign-up",
-};
 
-// Server-driven config for the in-app one-click exchange OAuth handshake.
-// When `enabled === true`, the CTA in step 2 swaps from "open exchange sign-up
-// in a new tab" to a one-click OAuth popup that stores tokens via the existing
-// CredentialVault. When disabled (env vars missing in dev / older deploys),
-// we fall back to the proven external CTA without any UI churn.
+// Server-driven config for the in-app one-click Alpaca OAuth handshake.
+// When `enabled === true`, the Alpaca card opens a one-click OAuth popup
+// that stores tokens via CredentialVault. When disabled (env vars missing
+// in dev / older deploys), we fall back to the manual connect modal with
+// Alpaca preselected — no UI churn.
 interface ExchangeOauthConfig { enabled: boolean; authorizeUrl?: string; scope?: string }
 
 const LS_INTRO_SEEN = "acl_first_live_intro_seen_v1";
@@ -85,7 +77,7 @@ const N = {
   FONT_SANS:  "'SF Pro Display','Inter',system-ui,-apple-system,sans-serif",
 };
 
-type Step = "choose" | "exchange_cta" | "connect" | "intro" | "done";
+type Step = "choose" | "connect" | "ready" | "done";
 
 interface ApiSubscription {
   plan?:            string;
@@ -171,7 +163,7 @@ export function OnboardingFlow() {
     if (exchanges.isLoading || sub.isLoading) return;
     setBypassResolved(true);
     if (connectedCount > 0 && introSeen) { setStep("done"); return; }
-    if (connectedCount > 0 && !introSeen) { setStep("intro"); return; }
+    if (connectedCount > 0 && !introSeen) { setStep("ready"); return; }
     // else: sit on the path-chooser (default render).
   }, [step, bypassResolved, exchanges.isLoading, sub.isLoading, connectedCount, introSeen]);
 
@@ -185,7 +177,7 @@ export function OnboardingFlow() {
   // ── One-click primary-exchange OAuth popup ───────────────────────────────
   // Opens the exchange-hosted consent screen in a popup. The server callback
   // route posts the result back via `window.postMessage`. On success, we
-  // advance straight to the "intro" step — same terminal state as the
+  // advance straight to the "ready" step — same terminal state as the
   // pasted-keys path.
   const startExchangeOauth = () => {
     if (!exchangeOauthEnabled || !oauthCfg.data?.authorizeUrl) return;
@@ -207,7 +199,8 @@ export function OnboardingFlow() {
         queryClient.invalidateQueries({ queryKey: ["onboarding-exchanges"] });
         queryClient.invalidateQueries({ queryKey: ["user-exchanges"] });
         queryClient.invalidateQueries({ queryKey: ["exchange-connections"] });
-        setStep("intro");
+        queryClient.invalidateQueries({ queryKey: ["runtime-state"] });
+        setStep("ready");
       } else {
         setOauthError(data.error ?? "The exchange did not authorize the connection.");
       }
@@ -217,14 +210,17 @@ export function OnboardingFlow() {
 
   const close = () => setStep("done");
   const advanceFromConnect = () => {
-    // Refresh every surface that renders connection state.
+    // Refresh every surface that renders connection state — including
+    // runtime-state so the "Runtime Ready" screen shows the freshly-
+    // hydrated equity instead of pre-connect zeros.
     queryClient.invalidateQueries({ queryKey: ["onboarding-exchanges"] });
     queryClient.invalidateQueries({ queryKey: ["user-exchanges"] });
     queryClient.invalidateQueries({ queryKey: ["exchange-connections"] });
     queryClient.invalidateQueries({ queryKey: ["onboarding-sub"] });
-    setStep("intro");
+    queryClient.invalidateQueries({ queryKey: ["runtime-state"] });
+    setStep("ready");
   };
-  const dismissIntro = () => {
+  const dismissReady = () => {
     try { localStorage.setItem(LS_INTRO_SEEN, "1"); } catch { /* localStorage may be disabled */ }
     setStep("done");
   };
@@ -233,23 +229,20 @@ export function OnboardingFlow() {
 
   return (
     <>
-      {step === "choose"     && <ChooseStep
+      {step === "choose" && <ChooseStep
         hasLiveSub={hasLiveSub}
-        oauthEnabled={exchangeOauthEnabled}
         oauthError={oauthError}
         onClose={close}
-        onPickPrimary={() => {
-          // When the in-app OAuth provider is configured, skip the external
-          // CTA explainer entirely — one click is the whole point.
+        onPickAlpaca={() => {
+          // Alpaca path — when the in-app OAuth provider is configured we
+          // launch the one-click popup; otherwise fall through to the
+          // manual connect modal with Alpaca preselected so the user
+          // can't accidentally pick a different exchange mid-flow.
           if (exchangeOauthEnabled) { startExchangeOauth(); return; }
-          setStep("exchange_cta");
+          setPreselect("Alpaca");
+          setStep("connect");
         }}
         onPickExisting={() => { setPreselect(undefined); setStep("connect"); }}
-      />}
-      {step === "exchange_cta" && <ExchangeCtaStep
-        onClose={close}
-        onBack={() => setStep("choose")}
-        onContinue={() => { setPreselect(PRIMARY_EXCHANGE_PROVIDER.id); setStep("connect"); }}
       />}
       {step === "connect" && <PortalExchangeConnectModal
         open
@@ -257,9 +250,9 @@ export function OnboardingFlow() {
         preselectedExchange={preselect}
         onConnected={advanceFromConnect}
       />}
-      {step === "intro" && <IntroStep
+      {step === "ready" && <RuntimeReadyStep
         plan={sub.data?.plan ?? "starter"}
-        onDone={dismissIntro}
+        onStart={dismissReady}
       />}
     </>
   );
@@ -325,83 +318,113 @@ function ModalShell({ children, onClose, maxWidth = 560 }: {
   );
 }
 
-// ─── Step 1: Choose path ─────────────────────────────────────────────────────
-function ChooseStep({ hasLiveSub, oauthEnabled, oauthError, onClose, onPickPrimary, onPickExisting }: {
-  hasLiveSub: boolean; oauthEnabled: boolean; oauthError: string;
+// ─── Step 1: Choose Your Trading Runtime ─────────────────────────────────────
+// Two explicit cards so users understand the architecture before they click:
+//   - Alpaca       → brokerage path (beginner / recommended)
+//   - Existing     → external exchange APIs (advanced)
+// This replaces the older "regulated-exchange external CTA vs paste keys"
+// framing which conflated "brokerage" and "external exchange" into one
+// vague primary card.
+function ChooseStep({ hasLiveSub, oauthError, onClose, onPickAlpaca, onPickExisting }: {
+  hasLiveSub: boolean; oauthError: string;
   onClose: () => void;
-  onPickPrimary: () => void; onPickExisting: () => void;
+  onPickAlpaca: () => void; onPickExisting: () => void;
 }) {
   return (
-    <ModalShell onClose={onClose} maxWidth={640}>
-      <div style={{ marginBottom: 22, paddingRight: 32 }}>
+    <ModalShell onClose={onClose} maxWidth={680}>
+      <div style={{ marginBottom: 20, paddingRight: 32 }}>
         <div style={{
           fontFamily: N.FONT_MONO, fontSize: 9.5, fontWeight: 800,
           letterSpacing: "0.20em", textTransform: "uppercase",
           color: N.BRAND, marginBottom: 8,
           textShadow: `0 0 8px ${N.BRAND_GLOW}`,
         }}>
-          ◆ Welcome to AICandlez Live Trading
+          ◆ Step 1 of 3 · Activate Your Runtime
         </div>
         <h2 style={{
           fontSize: 22, fontWeight: 800, color: N.TEXT_0,
           letterSpacing: -0.4, margin: 0, lineHeight: 1.2,
         }}>
-          Choose how you want to start
+          Choose Your Trading Runtime
         </h2>
         <p style={{
           fontSize: 13, color: N.TEXT_1, lineHeight: 1.55,
           marginTop: 8, marginBottom: 0,
         }}>
           {hasLiveSub
-            ? "Your subscription is active. Pick a path below — your funds always stay in your own regulated crypto exchange account."
-            : "Pick a path below. Your funds always stay in your own regulated crypto exchange account, never with AICandlez."}
+            ? "Your subscription is active. Pick the path that fits — you can always add the other later from Settings."
+            : "Pick the path that fits — you can always add the other later from Settings. Your funds stay in your own account; AICandlez never holds customer money."}
         </p>
       </div>
 
-      {/* PRIMARY: Regulated crypto exchange */}
+      {/* PRIMARY: Alpaca (beginner / recommended) */}
       <button
         type="button"
-        onClick={onPickPrimary}
+        onClick={onPickAlpaca}
         style={{
           display: "block", width: "100%", textAlign: "left",
           padding: "20px 22px", marginBottom: 14,
-          background: `linear-gradient(135deg, rgba(102,255,102,0.12) 0%, rgba(0,200,83,0.08) 100%)`,
+          background: `linear-gradient(135deg, rgba(102,255,102,0.13) 0%, rgba(0,200,83,0.08) 100%)`,
           border: `1.5px solid ${N.BRAND}`,
           borderRadius: 14,
           boxShadow: `0 0 28px rgba(102,255,102,0.22), 0 0 0 1px rgba(102,255,102,0.16) inset`,
           cursor: "pointer", transition: "all 140ms ease",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
           <div style={{
             padding: "3px 9px", borderRadius: 999,
             background: N.BRAND, color: "#001b06",
             fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 800,
             letterSpacing: "0.16em",
           }}>
-            {oauthEnabled ? "ONE-CLICK · RECOMMENDED" : "RECOMMENDED FOR BEGINNERS"}
+            BEGINNER · RECOMMENDED
+          </div>
+          <div style={{
+            padding: "2px 8px", borderRadius: 999,
+            background: "rgba(102,255,102,0.10)",
+            border: `1px solid ${N.BRAND}55`,
+            color: N.BRAND,
+            fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 700,
+            letterSpacing: "0.14em",
+          }}>
+            BROKERAGE
           </div>
         </div>
         <div style={{
-          fontSize: 17, fontWeight: 800, color: N.TEXT_0,
-          letterSpacing: -0.3, marginBottom: 4,
+          fontSize: 18, fontWeight: 800, color: N.TEXT_0,
+          letterSpacing: -0.3, marginBottom: 6,
         }}>
-          {oauthEnabled
-            ? "Connect Your Crypto Exchange in One Click"
-            : "Create / Fund a Regulated Crypto Exchange Account"}
+          Use Alpaca
         </div>
-        <div style={{ fontSize: 12.5, color: N.TEXT_1, lineHeight: 1.55 }}>
-          {oauthEnabled
-            ? "Sign in to your exchange (or sign up in seconds) and authorize AICandlez to place trades on your behalf. No API keys to copy. Your funds stay at the exchange."
-            : "Open a regulated crypto exchange account at Kraken, Binance, or Coinbase, fund it directly, then connect it back to AICandlez. Withdrawal permissions are never requested."}
-        </div>
+        <ul style={{
+          margin: 0, padding: 0, listStyle: "none",
+          fontSize: 12.5, color: N.TEXT_1, lineHeight: 1.7,
+        }}>
+          <li style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <Check size={12} color={N.BRAND} strokeWidth={2.6} style={{ flexShrink: 0, marginTop: 4 }} />
+            <span>Deposit USD directly — no separate exchange account needed</span>
+          </li>
+          <li style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <Check size={12} color={N.BRAND} strokeWidth={2.6} style={{ flexShrink: 0, marginTop: 4 }} />
+            <span>Simplest setup, one-click connect when available</span>
+          </li>
+          <li style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <Check size={12} color={N.BRAND} strokeWidth={2.6} style={{ flexShrink: 0, marginTop: 4 }} />
+            <span>AI trades on your behalf inside your Alpaca account</span>
+          </li>
+          <li style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <Check size={12} color={N.BRAND} strokeWidth={2.6} style={{ flexShrink: 0, marginTop: 4 }} />
+            <span>Best for users new to crypto trading</span>
+          </li>
+        </ul>
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 6,
-          marginTop: 12, color: N.BRAND,
+          marginTop: 14, color: N.BRAND,
           fontFamily: N.FONT_MONO, fontSize: 11, fontWeight: 800,
-          letterSpacing: "0.16em",
+          letterSpacing: "0.18em",
         }}>
-          {oauthEnabled ? "CONNECT EXCHANGE" : "GET STARTED"} <ArrowRight size={13} strokeWidth={2.4} />
+          SET UP ALPACA <ArrowRight size={13} strokeWidth={2.4} />
         </div>
       </button>
 
@@ -417,7 +440,7 @@ function ChooseStep({ hasLiveSub, oauthEnabled, oauthError, onClose, onPickPrima
         </div>
       )}
 
-      {/* SECONDARY: Connect existing */}
+      {/* SECONDARY: Connect Existing Exchange (advanced) */}
       <button
         type="button"
         onClick={onPickExisting}
@@ -430,24 +453,62 @@ function ChooseStep({ hasLiveSub, oauthEnabled, oauthError, onClose, onPickPrima
           cursor: "pointer", transition: "all 140ms ease",
         }}
       >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+          <div style={{
+            padding: "3px 9px", borderRadius: 999,
+            background: "rgba(255,255,255,0.06)",
+            border: `1px solid ${N.BORDER}`,
+            color: N.TEXT_0,
+            fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 800,
+            letterSpacing: "0.16em",
+          }}>
+            ADVANCED USERS
+          </div>
+          <div style={{
+            padding: "2px 8px", borderRadius: 999,
+            background: "rgba(255,255,255,0.04)",
+            border: `1px solid ${N.BORDER}`,
+            color: N.TEXT_1,
+            fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 700,
+            letterSpacing: "0.14em",
+          }}>
+            EXTERNAL EXCHANGE
+          </div>
+        </div>
         <div style={{
-          fontSize: 15, fontWeight: 700, color: N.TEXT_0,
-          letterSpacing: -0.2, marginBottom: 4,
+          fontSize: 16, fontWeight: 700, color: N.TEXT_0,
+          letterSpacing: -0.2, marginBottom: 6,
         }}>
-          Connect Your Existing Exchange
+          Connect Existing Exchange
         </div>
-        <div style={{ fontSize: 12, color: N.TEXT_1, lineHeight: 1.55 }}>
-          Already trade on Kraken, Binance, or Coinbase? Paste your read +
-          trade API keys (withdrawal permissions never requested) to enable
-          live execution.
-        </div>
+        <ul style={{
+          margin: 0, padding: 0, listStyle: "none",
+          fontSize: 12, color: N.TEXT_1, lineHeight: 1.7,
+        }}>
+          <li style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <ArrowRight size={11} color={N.TEXT_1} strokeWidth={2.4} style={{ flexShrink: 0, marginTop: 4 }} />
+            <span>Use existing Coinbase / Kraken / Crypto.com / Binance balances</span>
+          </li>
+          <li style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <ArrowRight size={11} color={N.TEXT_1} strokeWidth={2.4} style={{ flexShrink: 0, marginTop: 4 }} />
+            <span>Connect via read + trade API keys (withdrawals never requested)</span>
+          </li>
+          <li style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <ArrowRight size={11} color={N.TEXT_1} strokeWidth={2.4} style={{ flexShrink: 0, marginTop: 4 }} />
+            <span>Bring your own liquidity — funds stay at the exchange</span>
+          </li>
+          <li style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <ArrowRight size={11} color={N.TEXT_1} strokeWidth={2.4} style={{ flexShrink: 0, marginTop: 4 }} />
+            <span>Advanced runtime switching between connected venues</span>
+          </li>
+        </ul>
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 6,
-          marginTop: 10, color: N.TEXT_0,
-          fontFamily: N.FONT_MONO, fontSize: 10.5, fontWeight: 700,
-          letterSpacing: "0.16em",
+          marginTop: 12, color: N.TEXT_0,
+          fontFamily: N.FONT_MONO, fontSize: 11, fontWeight: 700,
+          letterSpacing: "0.18em",
         }}>
-          ENTER API KEYS <ArrowRight size={12} strokeWidth={2.2} />
+          CONNECT EXCHANGE <ArrowRight size={12} strokeWidth={2.2} />
         </div>
       </button>
 
@@ -461,7 +522,7 @@ function ChooseStep({ hasLiveSub, oauthEnabled, oauthError, onClose, onPickPrima
         <ShieldCheck size={14} color={N.BRAND} style={{ flexShrink: 0, marginTop: 1 }} />
         <div style={{ fontSize: 11, color: N.TEXT_1, lineHeight: 1.5 }}>
           AICandlez <strong style={{ color: N.TEXT_0 }}>never holds your funds</strong>.
-          Your balance stays in your regulated crypto exchange account at all
+          Your balance stays in your own brokerage or exchange account at all
           times. Withdrawal permissions are never requested.
         </div>
       </div>
@@ -469,16 +530,25 @@ function ChooseStep({ hasLiveSub, oauthEnabled, oauthError, onClose, onPickPrima
   );
 }
 
-// ─── Step 2: Crypto exchange external CTA ────────────────────────────────────
-// Only reached when the OAuth provider is *not* configured — the ChooseStep
-// short-circuits straight to `startExchangeOauth()` otherwise. This step keeps
-// the "sign up at your crypto exchange, then come back and paste API keys"
-// path alive as the fallback.
-function ExchangeCtaStep({ onClose, onBack, onContinue }: {
-  onClose: () => void; onBack: () => void; onContinue: () => void;
-}) {
+// ─── Step 3: Runtime Ready ───────────────────────────────────────────────────
+// Final confirmation after a successful connect (or re-entry for a user
+// who already connected previously). Pulls live data from `useRuntimeState`
+// so the equity & runtime label match what /portal will render the moment
+// the user clicks through. Explains the ARM LIVE gate so the next click in
+// the portal isn't a surprise.
+function RuntimeReadyStep({ plan, onStart }: { plan: string; onStart: () => void }) {
+  const { data: runtime, isLoading } = useRuntimeState();
+  const label    = runtimeLabel(runtime);
+  const isLive   = runtime?.mode === "live";
+  const equityN  = runtime?.totalEquityUSD ?? 0;
+  const equity   = equityN.toLocaleString("en-US", {
+    style: "currency", currency: "USD", maximumFractionDigits: 2,
+  });
+  const exchange = runtime?.activeExchange ?? null;
+  const aiLimit  = plan === "pro" ? 12 : 3;
+
   return (
-    <ModalShell onClose={onClose}>
+    <ModalShell onClose={onStart} maxWidth={600}>
       <div style={{ marginBottom: 18, paddingRight: 32 }}>
         <div style={{
           fontFamily: N.FONT_MONO, fontSize: 9.5, fontWeight: 800,
@@ -486,146 +556,92 @@ function ExchangeCtaStep({ onClose, onBack, onContinue }: {
           color: N.BRAND, marginBottom: 8,
           textShadow: `0 0 8px ${N.BRAND_GLOW}`,
         }}>
-          ◆ Step 1 of 2 · Open Your Exchange Account
-        </div>
-        <h2 style={{
-          fontSize: 20, fontWeight: 800, color: N.TEXT_0,
-          letterSpacing: -0.3, margin: 0, lineHeight: 1.25,
-        }}>
-          Create &amp; fund a regulated crypto exchange account
-        </h2>
-      </div>
-
-      <ol style={{
-        margin: 0, padding: "0 0 0 22px",
-        fontSize: 13, color: N.TEXT_1, lineHeight: 1.65,
-      }}>
-        <li>Sign up at <strong style={{ color: N.TEXT_0 }}>kraken.com</strong>, <strong style={{ color: N.TEXT_0 }}>binance.com</strong>, or <strong style={{ color: N.TEXT_0 }}>coinbase.com</strong> and complete regulated KYC.</li>
-        <li><strong style={{ color: N.TEXT_0 }}>Fund your exchange account</strong> directly. Your money stays at the exchange — AICandlez never touches it.</li>
-        <li>Inside the exchange, generate <strong style={{ color: N.TEXT_0 }}>API keys</strong> (Read + Trade only · withdrawals disabled).</li>
-        <li>Come back here, paste your API key &amp; secret, and start trading.</li>
-      </ol>
-
-      <a
-        href={PRIMARY_EXCHANGE_PROVIDER.externalUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 8,
-          marginTop: 18, padding: "12px 18px", borderRadius: 10,
-          background: `linear-gradient(135deg, ${N.BRAND_DEEP} 0%, ${N.BRAND} 55%, ${N.BRAND_BRGT} 100%)`,
-          border: `1px solid ${N.BRAND}`,
-          color: "#001b06",
-          fontFamily: N.FONT_MONO, fontSize: 11.5, fontWeight: 800,
-          letterSpacing: "0.16em", textTransform: "uppercase",
-          textDecoration: "none",
-          boxShadow: `0 10px 28px rgba(102,255,102,0.30), 0 1px 0 rgba(255,255,255,0.45) inset`,
-        }}
-      >
-        Open Kraken <ExternalLink size={13} strokeWidth={2.4} />
-      </a>
-
-      <div style={{
-        marginTop: 18, padding: "12px 14px",
-        background: "rgba(102,255,102,0.04)",
-        border: `1px solid ${N.BRAND}28`,
-        borderRadius: 10,
-        fontSize: 11.5, color: N.TEXT_1, lineHeight: 1.55,
-      }}>
-        <div style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 6 }}>
-          <Lock size={13} color={N.BRAND} style={{ flexShrink: 0, marginTop: 2 }} />
-          <div><strong style={{ color: N.TEXT_0 }}>Funds remain inside your regulated crypto exchange account.</strong></div>
-        </div>
-        <div style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 6 }}>
-          <ShieldCheck size={13} color={N.BRAND} style={{ flexShrink: 0, marginTop: 2 }} />
-          <div>AICandlez never holds customer money. We only place trades using your read + trade API key.</div>
-        </div>
-        <div style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
-          <Sparkles size={13} color={N.BRAND} style={{ flexShrink: 0, marginTop: 2 }} />
-          <div>You may disconnect at any time. Withdrawal permissions are never requested.</div>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-        <button
-          type="button"
-          onClick={onBack}
-          style={{
-            padding: "12px 16px",
-            background: "rgba(255,255,255,0.04)",
-            border: `1px solid ${N.BORDER}`,
-            borderRadius: 10,
-            color: N.TEXT_1,
-            fontFamily: N.FONT_MONO, fontSize: 11, fontWeight: 700,
-            letterSpacing: "0.14em", textTransform: "uppercase",
-            cursor: "pointer",
-          }}
-        >
-          ← Back
-        </button>
-        <button
-          type="button"
-          onClick={onContinue}
-          style={{
-            flex: 1, padding: "12px 16px", borderRadius: 10,
-            background: `linear-gradient(135deg, ${N.BRAND_DEEP} 0%, ${N.BRAND} 55%, ${N.BRAND_BRGT} 100%)`,
-            border: `1px solid ${N.BRAND}`,
-            color: "#001b06",
-            fontFamily: N.FONT_MONO, fontSize: 11.5, fontWeight: 800,
-            letterSpacing: "0.16em", textTransform: "uppercase",
-            cursor: "pointer",
-            boxShadow: `0 10px 28px rgba(102,255,102,0.30), 0 1px 0 rgba(255,255,255,0.45) inset`,
-            display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
-          }}
-        >
-          I&apos;ve got my API keys → enter them
-        </button>
-      </div>
-    </ModalShell>
-  );
-}
-
-// ─── Step 4: First-time live intro ───────────────────────────────────────────
-function IntroStep({ plan, onDone }: { plan: string; onDone: () => void }) {
-  const aiLimit = plan === "pro" ? 12 : 3;
-  return (
-    <ModalShell onClose={onDone} maxWidth={580}>
-      <div style={{ marginBottom: 18, paddingRight: 32 }}>
-        <div style={{
-          fontFamily: N.FONT_MONO, fontSize: 9.5, fontWeight: 800,
-          letterSpacing: "0.20em", textTransform: "uppercase",
-          color: N.BRAND, marginBottom: 8,
-          textShadow: `0 0 8px ${N.BRAND_GLOW}`,
-        }}>
-          ◆ You&apos;re Live · Quick Tour
+          ◆ Step 3 of 3 · Runtime Ready
         </div>
         <h2 style={{
           fontSize: 22, fontWeight: 800, color: N.TEXT_0,
           letterSpacing: -0.4, margin: 0, lineHeight: 1.2,
         }}>
-          Two ways to trade
+          Your trading runtime is active
         </h2>
       </div>
 
-      <IntroRow
-        Icon={Hand}
-        title="Trade manually"
-        body="Buy and sell any supported asset yourself, on your schedule. AI signals stay visible so you can confirm or override every move."
+      {/* Hero runtime panel — institutional readout, not a marketing card */}
+      <div style={{
+        padding: "18px 20px", marginBottom: 14,
+        background: `linear-gradient(135deg, rgba(102,255,102,0.10) 0%, rgba(0,200,83,0.06) 100%)`,
+        border: `1.5px solid ${N.BRAND}`,
+        borderRadius: 14,
+        boxShadow: `0 0 22px rgba(102,255,102,0.18), 0 0 0 1px rgba(102,255,102,0.14) inset`,
+      }}>
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "baseline",
+          marginBottom: 12, gap: 12, flexWrap: "wrap",
+        }}>
+          <div>
+            <div style={{
+              fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 800,
+              letterSpacing: "0.20em", color: N.TEXT_1, marginBottom: 4,
+            }}>
+              ACTIVE RUNTIME
+            </div>
+            <div style={{
+              fontFamily: N.FONT_MONO, fontSize: 18, fontWeight: 800,
+              letterSpacing: "0.06em", color: N.BRAND_BRGT,
+              textShadow: `0 0 12px ${N.BRAND_GLOW}`,
+            }}>
+              {isLoading ? "—" : label}
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{
+              fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 800,
+              letterSpacing: "0.20em", color: N.TEXT_1, marginBottom: 4,
+            }}>
+              HYDRATED EQUITY
+            </div>
+            <div style={{
+              fontFamily: N.FONT_MONO, fontSize: 18, fontWeight: 800,
+              letterSpacing: "-0.02em", color: N.TEXT_0,
+            }}>
+              {isLoading ? "—" : equity}
+            </div>
+          </div>
+        </div>
+        <div style={{
+          fontSize: 11.5, color: N.TEXT_1, lineHeight: 1.55,
+          paddingTop: 10, borderTop: `1px solid ${N.BRAND}22`,
+          display: "flex", gap: 8, alignItems: "flex-start",
+        }}>
+          <Wallet size={12} color={N.BRAND} style={{ flexShrink: 0, marginTop: 2 }} />
+          <span>
+            {isLive && exchange
+              ? <>Balances synced from <strong style={{ color: N.TEXT_0 }}>{exchange}</strong>. Your funds remain at the exchange — AICandlez never holds customer money.</>
+              : <>Paper mode is active. Connect a live exchange any time from Settings to enable real-money execution.</>}
+          </span>
+        </div>
+      </div>
+
+      {/* ARM LIVE explainer */}
+      <ReadyRow
+        Icon={Zap}
+        title={isLive ? "Live execution requires ARM" : "Live execution will require ARM"}
+        body="Every real-money order goes through three gates: server kill-switch, runtime ready check, and an explicit per-session ARM you click in the portal. This prevents accidental live trades — paper trading runs immediately, no ARM needed."
       />
-      <IntroRow
+      <ReadyRow
         Icon={Cpu}
-        title="Let AI trade for you"
-        body={`Auto Trade executes high-confidence signals on your behalf — up to ${aiLimit} concurrent trades on your ${plan === "pro" ? "AI Trading Pro" : "AI Trading"} plan. You can pause or stop AI anytime from the Portal.`}
+        title="AI Auto Trade is ready"
+        body={`Your ${plan === "pro" ? "AI Trading Pro" : "AI Trading"} plan can run up to ${aiLimit} concurrent AI trades. Start it from the portal whenever you're ready — pause or stop any time.`}
       />
-      <IntroRow
-        Icon={ShieldCheck}
-        title="You always keep custody"
-        body="Funds remain in your own regulated crypto exchange account. AICandlez never holds customer money and withdrawal permissions are never requested."
+      <ReadyRow
+        Icon={TrendingUp}
+        title="Manual trading is always on"
+        body="High-confidence AI signals stay visible on every surface. Confirm one yourself or override the AI at any point."
       />
 
       <button
         type="button"
-        onClick={onDone}
+        onClick={onStart}
         style={{
           width: "100%", marginTop: 20, padding: "14px 16px", borderRadius: 12,
           background: `linear-gradient(135deg, ${N.BRAND_DEEP} 0%, ${N.BRAND} 55%, ${N.BRAND_BRGT} 100%)`,
@@ -638,13 +654,13 @@ function IntroStep({ plan, onDone }: { plan: string; onDone: () => void }) {
           display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
         }}
       >
-        <Check size={14} strokeWidth={2.6} /> Enter the Portal
+        <Sparkles size={14} strokeWidth={2.6} /> Start AI Trading
       </button>
     </ModalShell>
   );
 }
 
-function IntroRow({ Icon, title, body }: {
+function ReadyRow({ Icon, title, body }: {
   Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number; style?: React.CSSProperties }>;
   title: string; body: string;
 }) {
