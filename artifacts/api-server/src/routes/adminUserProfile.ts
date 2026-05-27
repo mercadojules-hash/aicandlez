@@ -138,51 +138,113 @@ router.patch("/admin/users/:id/ai-settings", ...requireOperator, async (req, res
 
   try {
     req.log.info({ targetId: ctx.targetId, patchKeys: Object.keys(patch), patch }, "PATCH ai-settings about to write");
-    // JIT-provision the user_settings row so admins can edit settings for
-    // users who haven't booted the portal yet.
-    const [existing] = await db.select().from(userSettingsTable)
-      .where(eq(userSettingsTable.userId, ctx.targetId)).limit(1);
-    let before = existing;
-    if (!before) {
-      [before] = await db.insert(userSettingsTable).values({ userId: ctx.targetId })
-        .onConflictDoNothing().returning();
+
+    // All-or-nothing: the user_settings update + every audit row commit in
+    // a single transaction so a mid-sequence audit failure cannot leave a
+    // mutated settings row with a partial audit trail (architect review
+    // flagged the sequential-await path as non-atomic). Drizzle's tx
+    // rolls back the settings update if any audit insert throws.
+    const txOut = await db.transaction(async (tx) => {
+      // JIT-provision the user_settings row so admins can edit settings
+      // for users who haven't booted the portal yet.
+      const [existing] = await tx.select().from(userSettingsTable)
+        .where(eq(userSettingsTable.userId, ctx.targetId)).limit(1);
+      let before = existing;
       if (!before) {
-        [before] = await db.select().from(userSettingsTable)
-          .where(eq(userSettingsTable.userId, ctx.targetId)).limit(1);
+        [before] = await tx.insert(userSettingsTable).values({ userId: ctx.targetId })
+          .onConflictDoNothing().returning();
+        if (!before) {
+          [before] = await tx.select().from(userSettingsTable)
+            .where(eq(userSettingsTable.userId, ctx.targetId)).limit(1);
+        }
       }
-    }
-    if (!before) {
+      if (!before) {
+        return { kind: "missing" as const };
+      }
+
+      const [after] = await tx.update(userSettingsTable)
+        .set({ ...patch, updatedAt: new Date() })
+        .where(eq(userSettingsTable.userId, ctx.targetId))
+        .returning();
+
+      const changedFields = diffChanged(
+        before as unknown as Record<string, unknown>,
+        after as unknown as Record<string, unknown>,
+      ).filter(k => k !== "updatedAt");
+
+      if (changedFields.length === 0) {
+        return { kind: "noop" as const, after };
+      }
+
+      // Categorize the changed fields into the three operator-control
+      // audit buckets called out in the runtime-risk-control spec. One
+      // row per non-empty category so SIEM filters on action label
+      // produce a clean per-bucket history (RISK / POSITION / RUNTIME).
+      // Each row mirrors operatorId + targetUserId + per-field
+      // previousValue/newValue inside the payload (matches the
+      // manual_plan_override / stripe_resync pattern — row columns alone
+      // are not enough for downstream consumers that only ingest
+      // `payload`).
+      const RISK_FIELDS     = new Set(["riskLevel", "minConfidence", "volumeFilter"]);
+      const POSITION_FIELDS = new Set(["positionSizeUSD", "maxActivePositions"]);
+      const RUNTIME_FIELDS  = new Set(["tradingMode", "preferredExchange", "autoMode"]);
+
+      const buckets: Array<{ action: string; fields: string[] }> = [
+        { action: "USER_RISK_OVERRIDE",     fields: changedFields.filter(k => RISK_FIELDS.has(k)) },
+        { action: "USER_POSITION_OVERRIDE", fields: changedFields.filter(k => POSITION_FIELDS.has(k)) },
+        { action: "USER_RUNTIME_OVERRIDE",  fields: changedFields.filter(k => RUNTIME_FIELDS.has(k)) },
+      ];
+      const beforeRec = before as Record<string, unknown>;
+      const afterRec  = after  as unknown as Record<string, unknown>;
+      for (const { action, fields } of buckets) {
+        if (fields.length === 0) continue;
+        await writeAudit({
+          actorId:  ctx.actorId,
+          targetId: ctx.targetId,
+          action,
+          payload: {
+            note,
+            operatorId:    ctx.actorId,
+            targetUserId:  ctx.targetId,
+            changedFields: fields,
+            changes: Object.fromEntries(fields.map(k => [k, {
+              previousValue: beforeRec[k] ?? null,
+              newValue:      afterRec[k]  ?? null,
+            }])),
+          },
+        }, tx);
+      }
+      // Backwards-compatible umbrella row so existing dashboards
+      // filtering on `update_ai_settings` keep working (and any field
+      // that doesn't fit a bucket — none today, but future schema
+      // additions won't silently lose their audit trail). Legacy — to be
+      // deprecated once consumers migrate to USER_*_OVERRIDE actions.
+      await writeAudit({
+        actorId:  ctx.actorId,
+        targetId: ctx.targetId,
+        action:   "update_ai_settings",
+        payload:  {
+          note,
+          operatorId:   ctx.actorId,
+          targetUserId: ctx.targetId,
+          changedFields,
+          before: Object.fromEntries(changedFields.map(k => [k, beforeRec[k]])),
+          after:  Object.fromEntries(changedFields.map(k => [k, afterRec[k]])),
+        },
+      }, tx);
+
+      return { kind: "ok" as const, after, changedFields };
+    });
+
+    if (txOut.kind === "missing") {
       res.status(404).json({ error: "User settings row could not be provisioned" });
       return;
     }
-
-    const [after] = await db.update(userSettingsTable)
-      .set({ ...patch, updatedAt: new Date() })
-      .where(eq(userSettingsTable.userId, ctx.targetId))
-      .returning();
-
-    const changedFields = diffChanged(
-      before as unknown as Record<string, unknown>,
-      after as unknown as Record<string, unknown>,
-    ).filter(k => k !== "updatedAt");
-
-    if (changedFields.length === 0) {
-      res.json({ ok: true, after, changedFields: [] });
+    if (txOut.kind === "noop") {
+      res.json({ ok: true, after: txOut.after, changedFields: [] });
       return;
     }
-
-    await writeAudit({
-      actorId:  ctx.actorId,
-      targetId: ctx.targetId,
-      action:   "update_ai_settings",
-      payload:  {
-        note,
-        changedFields,
-        before: Object.fromEntries(changedFields.map(k => [k, (before as Record<string, unknown>)[k]])),
-        after:  Object.fromEntries(changedFields.map(k => [k, (after as unknown as Record<string, unknown>)[k]])),
-      },
-    });
-    res.json({ ok: true, after, changedFields });
+    res.json({ ok: true, after: txOut.after, changedFields: txOut.changedFields });
   } catch (err) {
     res.status(500).json(serialize5xx(req, err, "ai-settings", { targetId: ctx.targetId, patch }));
   }
