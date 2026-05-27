@@ -1,0 +1,121 @@
+We need a focused root-cause investigation on the exchange onboarding/API connection flow. No redesigns. No speculative fixes. Trace the actual failure path.
+
+Problem:
+After adding exchange API credentials (earlier today during Coinbase/Kraken onboarding testing), the flow fails before completion and throws errors instead of successfully validating/saving the exchange connection.
+
+We need a real diagnostic pass.
+
+Scope:
+Customer exchange onboarding flow only.
+Do NOT touch /command or unrelated trading systems.
+
+Likely surfaces involved:
+
+* exchange onboarding modal
+* Connected Accounts flow
+* exchange credential validation
+* API verification handshake
+* authFetch
+* backend exchange routes
+* encrypted credential storage
+* customer_exchange_connections table/model
+* live/paper entitlement checks
+* environment variable resolution
+* exchange adapter validation
+
+What I need from this pass:
+
+1. TRACE THE ENTIRE FLOW
+   From:
+   customer submits API key/secret
+   → frontend validation
+   → authFetch
+   → backend route
+   → exchange adapter handshake
+   → persistence
+   → success/failure state
+
+I want the exact stage where it fails.
+
+2. ADD STRUCTURED LOGGING
+   Add temporary scoped logs ONLY for the onboarding flow.
+
+Need logs for:
+
+* frontend payload shape
+* route hit confirmation
+* auth/session verification
+* exchange selected
+* API validation response
+* exchange adapter response
+* DB save result
+* final returned UI state
+
+Use clear prefixes like:
+[EXCHANGE_ONBOARDING]
+[EXCHANGE_VALIDATE]
+[EXCHANGE_SAVE]
+[EXCHANGE_AUTH]
+
+3. VERIFY EXCHANGE REQUIREMENTS
+   Check whether the current onboarding expects fields that Coinbase/Kraken are not supplying.
+
+Potential issues:
+
+* passphrase required/not required
+* malformed secret encoding
+* missing permissions/scopes
+* timestamp drift
+* wrong API version
+* paper/live mismatch
+* sandbox endpoint mismatch
+* malformed auth headers
+* encrypted secret decode failure
+* env mismatch between frontend/backend
+
+4. VERIFY CUSTOMER ROLE GATING
+   Ensure the onboarding flow is not incorrectly blocked by:
+
+* FREE/STARTER/PRO entitlement logic
+* PAPER-only customer enforcement
+* customer_live_execution_disabled
+* missing exchange permissions
+* authFetch token expiration
+* Clerk session mismatch
+
+5. VERIFY SAVE/PERSISTENCE
+   We previously saw symptoms where settings appeared saved but reverted later.
+
+Investigate:
+
+* optimistic UI save only
+* DB transaction rollback
+* stale cache overwrite
+* failed persistence masked as success
+* missing await on save path
+* race condition after validation
+* hydration overwrite on reload
+
+6. OUTPUT REQUIRED
+   Do NOT immediately patch blindly.
+
+First provide:
+
+* exact failure point
+* affected files
+* whether issue is frontend/backend/auth/db/exchange-adapter
+* reproduction steps
+* safest fix path
+
+Then patch surgically.
+
+Goal:
+The onboarding flow must feel bulletproof and premium:
+
+* add API
+* validate
+* persist
+* reconnect after refresh
+* no disappearing state
+* no silent failures
+* no fake success states
