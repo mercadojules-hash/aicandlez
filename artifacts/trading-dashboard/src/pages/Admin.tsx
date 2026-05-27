@@ -77,10 +77,33 @@ interface AdminUsersResponse {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtDollar(n: number) {
+// Null-safe numeric coercion. Returns `fallback` for null/undefined/NaN/non-finite.
+// Defensive helper for operator surfaces — admin panel must never hard-crash
+// after a successful mutation refetches a partially-null payload.
+function safeNum(n: unknown, fallback = 0): number {
+  if (n === null || n === undefined) return fallback;
+  const v = typeof n === "number" ? n : Number(n);
+  return Number.isFinite(v) ? v : fallback;
+}
+
+function fmtDollar(n: number | null | undefined): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
   if (Math.abs(n) >= 1_000_000) return `${n < 0 ? "-" : ""}$${(Math.abs(n) / 1_000_000).toFixed(2)}M`;
   if (Math.abs(n) >= 1_000)     return `${n < 0 ? "-" : ""}$${(Math.abs(n) / 1_000).toFixed(1)}K`;
   return `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(0)}`;
+}
+
+// Format an MRR-style value with two decimals + "/mo" suffix.
+// Null/undefined/NaN → "—/mo" so admin layout stays stable.
+function fmtMrr(n: number | null | undefined): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "—/mo";
+  return `$${n.toFixed(2)}/mo`;
+}
+
+// Format a 0-100 percent value with `decimals` precision. Null-safe.
+function fmtPct(n: number | null | undefined, decimals = 1): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
+  return `${n.toFixed(decimals)}%`;
 }
 
 function fmtAgo(ms: number | null): string {
@@ -467,7 +490,7 @@ function UserIntelligencePanel({
           <SummaryCell label="PLAN" value={user.plan.toUpperCase()} color={planColor(user.plan)} />
           <SummaryCell label="STATUS" value={user.adminStatus.toUpperCase()} color={statusColor(user.adminStatus)} />
           <SummaryCell label="ROLE" value={user.role.toUpperCase()} color={user.role === "admin" || user.role === "super-admin" ? "#cc55ff" : "#7a9eb8"} />
-          <SummaryCell label="MRR" value={`$${user.mrrUsd.toFixed(2)}/mo`} color="#00ff8a" />
+          <SummaryCell label="MRR" value={fmtMrr(user.mrrUsd)} color="#00ff8a" />
           <SummaryCell label="EXCHANGES" value={`${user.exchangeActive} / ${user.exchangeTotal}`} color={user.hasLiveExchange ? "#ff8844" : "#00aaff"} />
           <SummaryCell label="TRADE CAP" value={user.tradeCapTier ? `${user.tradeCapTier}` : "—"} color="#ffaa00" />
           <SummaryCell label="24H TRADES" value={`${user.tradeLimit.used24h}${user.tradeLimit.remaining !== null ? ` / ${user.tradeLimit.capTier}` : ""}`} color={user.tradeLimit.blocked ? "#ff3355" : "#00aaff"} />
@@ -1773,8 +1796,8 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
       <TabSectionLabel icon={DollarSign}>REVENUE ATTRIBUTION</TabSectionLabel>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
         <MetricCell label="LIFETIME REV" value={fmtDollar(user.revenueGenerated)} color="#00ff8a" />
-        <MetricCell label="MRR"          value={`${fmtDollar(user.mrrUsd)}/mo`}    color={user.mrrUsd > 0 ? "#00ff8a" : TAB_C.dim} />
-        <MetricCell label="PERF FEES"    value={fmtDollar(user.feesGenerated)}     color={user.feesGenerated > 0 ? "#00ff8a" : TAB_C.dim} />
+        <MetricCell label="MRR"          value={fmtMrr(user.mrrUsd)}               color={safeNum(user.mrrUsd) > 0 ? "#00ff8a" : TAB_C.dim} />
+        <MetricCell label="PERF FEES"    value={fmtDollar(user.feesGenerated)}     color={safeNum(user.feesGenerated) > 0 ? "#00ff8a" : TAB_C.dim} />
         <MetricCell label="EQUITY"       value={fmtDollar(user.equityUsd)} />
         <MetricCell label="TRIAL ENDS"   value={user.trialEndsAt ? fmtIsoAgo(user.trialEndsAt) : "—"} />
         <MetricCell label="DERIVED COMP" value={user.isComplimentary ? "TRIALING" : "—"}
@@ -3227,7 +3250,7 @@ export default function Admin() {
           <StatCard icon={Activity}   label="Open Positions"   value={platformMetrics.openPos.toString()}          sub="Platform-wide"                                     color="#7b68ee" />
           <StatCard icon={BarChart2}  label="Trades 24h"       value={platformMetrics.tradesToday.toLocaleString()} sub={`${platformMetrics.tradesAll.toLocaleString()} lifetime`} color="#00f0ff" />
           <StatCard icon={DollarSign} label="Fees Lifetime"    value={fmtDollar(platformMetrics.totalFees)}        sub="From perf fees"                                    color="#ffaa00" />
-          <StatCard icon={TrendingUp} label="Platform Win %"   value={`${platformMetrics.winRate.toFixed(1)}%`}    sub="Across all users"                                  color={platformMetrics.winRate >= 50 ? "#00ff8a" : "#ff3355"} />
+          <StatCard icon={TrendingUp} label="Platform Win %"   value={fmtPct(platformMetrics.winRate, 1)}          sub="Across all users"                                  color={safeNum(platformMetrics.winRate) >= 50 ? "#00ff8a" : "#ff3355"} />
           <StatCard icon={Zap}        label="Engine Signals"   value={(engine?.signalsGenerated ?? 0).toLocaleString()} sub={engine?.running ? "Engine active" : "Engine stopped"} color={engine?.running ? "#ff8844" : "#4a6a80"} />
         </div>
 
@@ -3501,21 +3524,26 @@ export default function Admin() {
 
                     {/* Win Rate */}
                     <td className="px-3 py-2.5">
-                      {u.winRate !== null ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-10 h-1 rounded overflow-hidden flex-shrink-0" style={{ background: "#0d1e2e" }}>
-                            <div className="h-full rounded"
-                              style={{
-                                width: `${Math.min(100, Math.max(0, u.winRate))}%`,
-                                background: u.winRate >= 60 ? "#00ff8a" : u.winRate >= 50 ? "#ffaa00" : "#ff3355",
-                                opacity: 0.75,
-                              }} />
-                          </div>
-                          <span className="text-[9px] font-bold font-mono"
-                            style={{ color: u.winRate >= 60 ? "#00ff8a" : u.winRate >= 50 ? "#ffaa00" : "#ff3355" }}>
-                            {u.winRate.toFixed(0)}%
-                          </span>
-                        </div>
+                      {u.winRate !== null && Number.isFinite(u.winRate) ? (
+                        (() => {
+                          const wr = safeNum(u.winRate);
+                          return (
+                            <div className="flex items-center gap-2">
+                              <div className="w-10 h-1 rounded overflow-hidden flex-shrink-0" style={{ background: "#0d1e2e" }}>
+                                <div className="h-full rounded"
+                                  style={{
+                                    width: `${Math.min(100, Math.max(0, wr))}%`,
+                                    background: wr >= 60 ? "#00ff8a" : wr >= 50 ? "#ffaa00" : "#ff3355",
+                                    opacity: 0.75,
+                                  }} />
+                              </div>
+                              <span className="text-[9px] font-bold font-mono"
+                                style={{ color: wr >= 60 ? "#00ff8a" : wr >= 50 ? "#ffaa00" : "#ff3355" }}>
+                                {wr.toFixed(0)}%
+                              </span>
+                            </div>
+                          );
+                        })()
                       ) : (
                         <span className="text-[9px] font-mono" style={{ color: "#3a5a70" }}>—</span>
                       )}
@@ -3523,8 +3551,8 @@ export default function Admin() {
 
                     {/* MRR */}
                     <td className="px-3 py-2.5">
-                      <span className="text-[10px] font-bold font-mono" style={{ color: u.mrrUsd > 0 ? "#00ff8a" : "#4a6a80" }}>
-                        {u.mrrUsd > 0 ? `$${u.mrrUsd.toFixed(0)}` : "—"}
+                      <span className="text-[10px] font-bold font-mono" style={{ color: safeNum(u.mrrUsd) > 0 ? "#00ff8a" : "#4a6a80" }}>
+                        {safeNum(u.mrrUsd) > 0 ? `$${safeNum(u.mrrUsd).toFixed(0)}` : "—"}
                       </span>
                     </td>
 
