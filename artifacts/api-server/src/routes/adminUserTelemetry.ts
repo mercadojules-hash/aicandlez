@@ -31,13 +31,63 @@
  */
 
 import { Router, type Request } from "express";
-import { db, userSettingsTable } from "@workspace/db";
+import { db, userSettingsTable, getPlanDefaultCap } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { getTradeLimitVerdict } from "../lib/tradeLimitEngine.js";
 
 const router = Router();
 const requireOperator = [requireAuth, requireRole(["admin", "super-admin"])];
+
+// ── Effective trade-cap resolver (list endpoint) ─────────────────────────────
+// Mirrors tradeLimitEngine.resolveCap() so the operator grid + list rows
+// hydrate from identical math, just sourced from in-SQL columns instead
+// of a per-row engine call. Single source of truth for the "what number
+// renders in the TRADE CAP card / `n / cap` usage cell".
+//
+// Priority order (same as engine):
+//   1. operator override active     → row.cap_tier (−1 = UNLIMITED)
+//   2. operator override expired    → plan default
+//   3. usePlanDefault=true / no row → plan default
+//
+// `getPlanDefaultCap` falls back to FREE for unknown / legacy plan strings,
+// so a missing/garbled `users.plan` never returns NaN.
+type ListEffectiveCap = {
+  effectiveCap:   number;
+  planDefaultCap: number;
+  source:         "plan-default" | "operator-override";
+};
+function resolveListEffectiveCap(
+  r: Record<string, unknown>,
+  nowMs: number,
+): ListEffectiveCap {
+  const planDefaultCap   = getPlanDefaultCap(
+    typeof r["plan"] === "string" ? (r["plan"] as string) : null,
+  );
+  const rawCapTier       = r["trade_cap_tier_raw"];
+  const usePlanDefaultRaw = r["trade_use_plan_default"];
+  const overrideExpiresAt = r["trade_cap_override_expires_at"];
+
+  // No override row at all → plan default.
+  if (rawCapTier === null || rawCapTier === undefined) {
+    return { effectiveCap: planDefaultCap, planDefaultCap, source: "plan-default" };
+  }
+  // Operator chose "use plan default" (the flag is the authoritative
+  // discriminator per the schema doc) → plan default, ignore cap_tier.
+  if (usePlanDefaultRaw !== false) {
+    return { effectiveCap: planDefaultCap, planDefaultCap, source: "plan-default" };
+  }
+  // Override window elapsed → revert to plan default. Permanent overrides
+  // set overrideExpiresAt=NULL, which never trips this branch.
+  if (overrideExpiresAt && new Date(String(overrideExpiresAt)).getTime() < nowMs) {
+    return { effectiveCap: planDefaultCap, planDefaultCap, source: "plan-default" };
+  }
+  return {
+    effectiveCap:   Number(rawCapTier),
+    planDefaultCap,
+    source:         "operator-override",
+  };
+}
 
 // ── In-memory cache ──────────────────────────────────────────────────────────
 const CACHE_TTL_MS = 5_000;
@@ -269,7 +319,16 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         COALESCE(conn.exchange_active, 0)                        AS exchange_active,
         COALESCE(conn.exchange_error, 0)                         AS exchange_error,
         COALESCE(conn.has_live_exchange, false)                  AS has_live_exchange,
-        COALESCE(tl.cap_tier, 50)                                AS trade_cap_tier,
+        -- Raw operator-override row. JS shaping below resolves the
+        -- EFFECTIVE cap from these three fields + u.plan via
+        -- getPlanDefaultCap(), mirroring tradeLimitEngine.resolveCap().
+        -- Returning the raw row (NULL when missing) means the JS layer
+        -- can faithfully distinguish "no override" (→ plan default)
+        -- from "operator picked 50" (→ explicit override). The legacy
+        -- COALESCE(..., 50) silently collapsed both into "50" — which
+        -- is why PRO users were rendering 50 in the operator grid.
+        tl.cap_tier                                              AS trade_cap_tier_raw,
+        tl.use_plan_default                                      AS trade_use_plan_default,
         tl.override_expires_at                                   AS trade_cap_override_expires_at,
         COALESCE(o24.used_24h, 0)                                AS used_24h,
         COALESCE(td.today_count, 0)                              AS trades_today,
@@ -359,25 +418,30 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         exchangeActive:      Number(r["exchange_active"] ?? 0),
         exchangeError:       Number(r["exchange_error"] ?? 0),
         hasLiveExchange:     Boolean(r["has_live_exchange"]),
-        tradeCapTier:        Number(r["trade_cap_tier"] ?? 50),
+        // tradeCapTier in the list payload = EFFECTIVE cap (the number
+        // the operator grid's "TRADE CAP" cell renders). Resolution
+        // mirrors tradeLimitEngine.resolveCap() — see the IIFE below.
+        tradeCapTier:        resolveListEffectiveCap(r, now).effectiveCap,
         tradesToday:         Number(r["trades_today"] ?? 0),
         equityUsd:           Number(r["cash_balance"] ?? 0),
-        // Trade-limit engine-equivalent telemetry, derived in-SQL so the
-        // list endpoint never N+1s the engine per row.
+        // Trade-limit engine-equivalent telemetry, derived in-SQL +
+        // resolveListEffectiveCap() so the list endpoint never N+1s
+        // the engine per row. Shape matches the per-user verdict
+        // (source + planDefaultCap) so the drawer + grid hydrate
+        // from a single canonical schema.
         tradeLimit: (() => {
-          const cap = Number(r["trade_cap_tier"] ?? 50);
+          const { effectiveCap, planDefaultCap, source } =
+            resolveListEffectiveCap(r, now);
           const used = Number(r["used_24h"] ?? 0);
-          const override = r["trade_cap_override_expires_at"];
-          const effectiveCap = cap === -1 ? -1
-            : (override && new Date(String(override)).getTime() < now) ? 50
-            : cap;
           const remaining = effectiveCap === -1
             ? Number.POSITIVE_INFINITY
             : Math.max(0, effectiveCap - used);
           const blocked = effectiveCap !== -1 && used >= effectiveCap;
           return {
-            used24h:   used,
-            capTier:   effectiveCap,
+            used24h:        used,
+            capTier:        effectiveCap,
+            source,
+            planDefaultCap,
             remaining: remaining === Number.POSITIVE_INFINITY ? null : remaining,
             blocked,
             reason:    blocked ? "trade_limit_exhausted" as const : "ok" as const,

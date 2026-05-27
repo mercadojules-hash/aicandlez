@@ -34,6 +34,12 @@ vi.mock("@workspace/db", () => ({
   userTradeLimitsTable: { userId: "user_id", capTier: "cap_tier", overrideExpiresAt: "override_expires_at" },
   DEFAULT_TRADE_LIMIT_CAP: 50,
   UNLIMITED_TRADE_LIMIT_CAP: -1,
+  PLAN_DEFAULT_TRADE_LIMIT_CAP: { free: 50, starter: 100, pro: 200 },
+  getPlanDefaultCap: (plan: string | null | undefined): number => {
+    if (plan === "starter") return 100;
+    if (plan === "pro")     return 200;
+    return 50;
+  },
 }));
 
 vi.mock("../../middlewares/requireAuth.js", () => ({
