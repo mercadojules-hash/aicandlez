@@ -1573,22 +1573,8 @@ function ActionPill({
 }: { label: string; color: string; active: boolean; onClick?: () => void }) {
   const [flashing, setFlashing] = useState(false);
   const handle = () => {
-    console.error("[BUY-TRACE] ActionPill CLICK", { label, active, hasOnClick: typeof onClick });
     setFlashing(true);
-    try {
-      if (!onClick) {
-        // eslint-disable-next-line no-alert
-        window.alert("[BUY-TRACE] FATAL — ActionPill onClick prop is UNDEFINED for " + label);
-      } else {
-        onClick();
-        // eslint-disable-next-line no-alert
-        window.alert("[BUY-TRACE] ActionPill onClick() RETURNED CLEANLY for " + label + " — if fireTrade alerts did not fire, the wrapper arrow never reached fireTrade.");
-      }
-    } catch (err) {
-      // eslint-disable-next-line no-alert
-      window.alert("[BUY-TRACE] EXCEPTION inside onClick for " + label + ": " + (err instanceof Error ? err.message + " | " + (err.stack ?? "") : String(err)));
-      console.error("[BUY-TRACE] EXCEPTION in onClick", err);
-    }
+    onClick?.();
     setTimeout(() => setFlashing(false), 480);
   };
   return (
