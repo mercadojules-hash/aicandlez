@@ -593,6 +593,43 @@ export default function Trade() {
     onSuccess:  () => qc.invalidateQueries({ queryKey: ["mobile-status"] }),
   });
 
+  // ── AI trade-size + liquidity guard ───────────────────────────────────────
+  // Server-side truth from `GET /api/user/ai-trading/liquidity` (see
+  // `routes/userAiLiquidity.ts`). The picker writes `preferredLiveOrderSizeUsd`
+  // back to `/api/user/settings`; the backend `liveUserExecution.ts` gate
+  // 0LIQ enforces both the plan-tier max-open and the cash cushion against
+  // the same numbers — the UI just mirrors what the server already knows.
+  type LiquidityStatus = {
+    plan:                "free" | "starter" | "pro";
+    isAdmin:             boolean;
+    tradeSizeUsd:        number;
+    allowedTradeSizes:   readonly number[];
+    planMaxOpen:         number;
+    openLiveCount:       number;
+    remainingSlots:      number;
+    availableCashUsd:    number;
+    requiredCashUsd:     number;
+    liquidityProtected:  boolean;
+    planCapacityReached: boolean;
+    message:             string | null;
+  };
+  const { data: liquidity } = useQuery<LiquidityStatus>({
+    queryKey:        ["user-ai-liquidity"],
+    queryFn:         () => api.get("/user/ai-trading/liquidity"),
+    refetchInterval: 10_000,
+    staleTime:       5_000,
+  });
+  const tradeSizeMutation = useMutation({
+    mutationFn: (n: number) => api.put("/user/settings", { preferredLiveOrderSizeUsd: n }),
+    onSuccess:  () => {
+      qc.invalidateQueries({ queryKey: ["user-ai-liquidity"] });
+      qc.invalidateQueries({ queryKey: ["mobile-status"] });
+    },
+  });
+  const SIZE_PRESETS = [10, 20, 50, 100] as const;
+  const activeSize   = liquidity?.tradeSizeUsd ?? 10;
+  const planLabel    = liquidity?.plan === "pro" ? "PRO" : liquidity?.plan === "starter" ? "STARTER" : "FREE";
+
   return (
     <div className="page-enter" style={{ background:BG, minHeight:"100%", paddingBottom:28 }}>
 
@@ -637,6 +674,78 @@ export default function Trade() {
       <EnableLiveCTA style={{ padding: "4px 12px 10px" }}/>
 
       <div style={{ padding:"0 12px" }}>
+
+        {/* ── AI Trade Size picker + Liquidity Guard status ────────────────── */}
+        <div style={{
+          background: "rgba(255,255,255,0.02)",
+          border: `1px solid ${E}`,
+          borderRadius: 12,
+          padding: "12px 14px",
+          marginBottom: 12,
+        }}>
+          <div style={{
+            display:"flex", justifyContent:"space-between", alignItems:"center",
+            marginBottom: 10,
+          }}>
+            <span style={{ fontSize:9, color:GR, fontFamily:SANS, fontWeight:700,
+              letterSpacing:"0.14em", textTransform:"uppercase" as const }}>
+              AI Trade Size
+            </span>
+            <span style={{ fontSize:9, color:DIM, fontFamily:MONO,
+              letterSpacing:"0.08em" }}>
+              {planLabel} · {liquidity?.openLiveCount ?? 0}/{liquidity?.planMaxOpen ?? 0} OPEN
+            </span>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:6 }}>
+            {SIZE_PRESETS.map(n => {
+              const selected = activeSize === n;
+              return (
+                <button
+                  key={n}
+                  onClick={() => tradeSizeMutation.mutate(n)}
+                  disabled={tradeSizeMutation.isPending}
+                  style={{
+                    padding:"10px 0",
+                    borderRadius:10,
+                    cursor: tradeSizeMutation.isPending ? "wait" : "pointer",
+                    fontFamily:MONO, fontSize:13, fontWeight:700,
+                    color: selected ? "#000" : W,
+                    background: selected ? G : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${selected ? G : E}`,
+                    transition:"all 120ms ease",
+                  }}
+                >
+                  ${n}
+                </button>
+              );
+            })}
+          </div>
+          {(liquidity?.liquidityProtected || liquidity?.planCapacityReached) && (
+            <div style={{
+              marginTop:10,
+              padding:"8px 10px",
+              borderRadius:8,
+              border:`1px solid ${liquidity.liquidityProtected ? "rgba(255,148,0,0.30)" : "rgba(255,51,85,0.30)"}`,
+              background: liquidity.liquidityProtected ? "rgba(255,148,0,0.06)" : "rgba(255,51,85,0.06)",
+              display:"flex", alignItems:"flex-start", gap:8,
+            }}>
+              <div style={{
+                width:6, height:6, borderRadius:"50%", marginTop:5,
+                background: liquidity.liquidityProtected ? O : R, flexShrink:0,
+              }}/>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:9, fontFamily:SANS, fontWeight:800,
+                  letterSpacing:"0.12em", textTransform:"uppercase" as const,
+                  color: liquidity.liquidityProtected ? O : R, marginBottom:3 }}>
+                  {liquidity.liquidityProtected ? "Liquidity Protected" : "Plan Capacity Reached"}
+                </div>
+                <div style={{ fontSize:11, fontFamily:SANS, color:GR, lineHeight:1.35 }}>
+                  {liquidity.message ?? "AI paused new entries to preserve fee/cash cushion."}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* ── Control buttons ──────────────────────────────────────────────── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14 }}>

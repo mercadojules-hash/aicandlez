@@ -39,6 +39,15 @@ import {
 } from "lucide-react";
 
 import { authFetch } from "../../lib/authFetch";
+
+// Mirrors `components/command/institutional/SignalRow.tsx` apiBaseUrl —
+// kept local to avoid pulling SignalRow's full module graph into the shell
+// just for a single string prefix. Cross-host calls (`admintrade./trade.`
+// → `api.aicandlez.com`) require the absolute origin; same-origin dev
+// returns an empty string and the request stays relative.
+const apiBaseUrl: string = (
+  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? ""
+).replace(/\/$/, "");
 import {
   LiveControlBar,
   CryptoMajorsSignalsPanel,
@@ -4980,6 +4989,44 @@ export function PortalCustomerShell() {
   // promotion). Returning null lets the parent's role-aware
   // re-render swap in the correct shell on the next tick without
   // flashing customer affordances to an operator.
+  // AI Trading Liquidity Guard status — polled from the same
+  // `/api/user/ai-trading/liquidity` endpoint the PWA uses, so the
+  // status strip below mirrors exactly what the execution-side gate
+  // (`liveUserExecution.ts` 0LIQ) would compute right now. Customer
+  // shell only — admins never reach this render branch (the early
+  // return below catches them), but the query still runs for the
+  // brief moment before that — `enabled: !isAdmin` keeps it quiet
+  // on admin sessions.
+  const { getToken: liqGetToken } = useAuth();
+  const { data: liquidityStatus } = useQuery<{
+    plan:                "free" | "starter" | "pro";
+    tradeSizeUsd:        number;
+    planMaxOpen:         number;
+    openLiveCount:       number;
+    remainingSlots:      number;
+    liquidityProtected:  boolean;
+    planCapacityReached: boolean;
+    message:             string | null;
+  } | null>({
+    queryKey: ["portal-customer-liquidity"],
+    enabled:  !isAdmin,
+    refetchInterval: 10_000,
+    staleTime:       5_000,
+    queryFn: async () => {
+      try {
+        const token = await liqGetToken().catch(() => null);
+        const res = await authFetch(`${apiBaseUrl}/api/user/ai-trading/liquidity`, {
+          credentials: "include",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch {
+        return null;
+      }
+    },
+  });
+
   // DEV-only escape hatch — when Portal.tsx intentionally renders the
   // customer shell for an admin via `?previewCustomer=1`, suppress the
   // defense-in-depth refusal so the cinematic battlefield is visible
@@ -5429,6 +5476,77 @@ export function PortalCustomerShell() {
           }
         }
       `}</style>
+      {/* AI Trading Liquidity Guard status strip — customer-only, mirrors
+          server-side `/api/user/ai-trading/liquidity`. Surfaces selected
+          trade size, plan-tier open/cap, and the LIQUIDITY PROTECTED
+          state when the execution-side 0LIQ gate would block new entries.
+          Single horizontal row; does not disturb the two-column scroll
+          formula below. Hidden until the first poll lands. */}
+      {liquidityStatus && (
+        <div style={{
+          margin:      "8px 12px 0",
+          padding:     "8px 12px",
+          borderRadius: 6,
+          border:      `1px solid ${liquidityStatus.liquidityProtected
+            ? "rgba(255,148,0,0.35)"
+            : liquidityStatus.planCapacityReached
+              ? "rgba(255,80,80,0.35)"
+              : "#1A2E22"}`,
+          background:  liquidityStatus.liquidityProtected
+            ? "rgba(255,148,0,0.05)"
+            : liquidityStatus.planCapacityReached
+              ? "rgba(255,80,80,0.05)"
+              : "rgba(0,0,0,0.45)",
+          display:     "flex", alignItems:"center", gap: 18,
+          fontFamily:  T.FONT_MONO ?? "'IBM Plex Mono', monospace",
+          fontSize:    10,
+          letterSpacing: "0.10em",
+          textTransform: "uppercase" as const,
+          color:       T.TEXT_2 ?? "#9AA39C",
+          flexWrap:    "wrap",
+        }}>
+          <span>
+            <span style={{ color: T.TEXT_3 ?? "#6B7771", marginRight: 6 }}>TRADE SIZE</span>
+            <span style={{ color: T.BRAND ?? "#66FF66", fontWeight: 700 }}>
+              ${liquidityStatus.tradeSizeUsd}
+            </span>
+          </span>
+          <span>
+            <span style={{ color: T.TEXT_3 ?? "#6B7771", marginRight: 6 }}>
+              {liquidityStatus.plan === "pro" ? "PRO" : liquidityStatus.plan === "starter" ? "STARTER" : "FREE"} OPEN
+            </span>
+            <span style={{ color: T.TEXT_1 ?? "#E6EDE9", fontWeight: 700 }}>
+              {liquidityStatus.openLiveCount}/{liquidityStatus.planMaxOpen}
+            </span>
+          </span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{
+              color: liquidityStatus.liquidityProtected
+                ? "#FF9400"
+                : liquidityStatus.planCapacityReached
+                  ? "#FF5050"
+                  : (T.TEXT_3 ?? "#6B7771"),
+              marginRight: 6,
+            }}>
+              LIQUIDITY
+            </span>
+            <span style={{
+              color: liquidityStatus.liquidityProtected
+                ? "#FF9400"
+                : liquidityStatus.planCapacityReached
+                  ? "#FF5050"
+                  : (T.BRAND ?? "#66FF66"),
+              fontWeight: 700,
+            }}>
+              {liquidityStatus.liquidityProtected
+                ? "PROTECTED · " + (liquidityStatus.message ?? "AI paused new entries to preserve fee/cash cushion.")
+                : liquidityStatus.planCapacityReached
+                  ? "PLAN CAPACITY REACHED"
+                  : "OK"}
+            </span>
+          </span>
+        </div>
+      )}
       {/* Pass 8.0 — CUSTOMER cinematic dashboard.
           Everything ABOVE the LIVE OPPORTUNITY BATTLEFIELD is now a
           single premium top header: brand + PAPER chip + big

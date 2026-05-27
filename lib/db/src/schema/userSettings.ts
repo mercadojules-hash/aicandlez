@@ -31,7 +31,14 @@ export const userSettingsTable = pgTable("user_settings", {
   // SignalRow size picker. Persisted server-side so the preference carries
   // across browsers/devices. Per-tier cap is still enforced independently
   // by /api/user/live-order; this value is advisory storage only.
-  preferredLiveOrderSizeUsd: real("preferred_live_order_size_usd").notNull().default(100),
+  // Allowed customer preset set is {10, 20, 50, 100}. Default = $10 (smallest
+  // preset) — the safety design point: a brand-new starter customer's AI
+  // sessions begin at the smallest position the liquidity guard can fully
+  // cushion across all 3 starter slots. Existing rows with legacy values
+  // (e.g. 100) remain valid since 100 is in the preset set; the PUT
+  // /user/settings allowlist rejects writes outside the preset set so the
+  // column drifts back into the allowed range over time.
+  preferredLiveOrderSizeUsd: real("preferred_live_order_size_usd").notNull().default(10),
 
   // When ON, paper-mode BUY/SELL on the customer Portal routes real orders
   // through the connected exchange's public sandbox / testnet (via the

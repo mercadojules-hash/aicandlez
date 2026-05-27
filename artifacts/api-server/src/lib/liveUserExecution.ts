@@ -23,6 +23,14 @@ import crypto from "crypto";
 import { evaluateRiskGate } from "./riskGate.js";
 import { isAiDisclaimerAccepted } from "./aiDisclaimer.js";
 import { engineStats, BASELINE_MIN_CONFIDENCE } from "./tradingLoop.js";
+import { resolveAiTradingGate } from "./aiTradingGate.js";
+import {
+  ALLOWED_TRADE_SIZES,
+  DEFAULT_TRADE_SIZE_USD,
+  coerceTradeSizeToPreset,
+  evaluateLiquidityGuard,
+} from "./liquidityGuard.js";
+import { simAccountsTable } from "@workspace/db";
 
 // ── Per-user live execution bridge ────────────────────────────────────────────
 //
@@ -80,7 +88,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate";
+  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached";
   error?:          string;
 }
 
@@ -462,7 +470,12 @@ export async function listLiveExecutionUsers(): Promise<Array<{ userId: string; 
 export async function placeLiveAutoOrderForUser(
   req: LiveUserOrderRequest,
 ): Promise<LiveUserOrderResult> {
-  const { userId, symbol, side, sizeUSD, useSandbox = false } = req;
+  const { userId, symbol, side, useSandbox = false } = req;
+  // `sizeUSD` is reassigned below by the customer trade-size clamp (after the
+  // 0PRE kill switch) so every downstream gate (0VOL log payloads, 0d risk
+  // gate, 0LIQ liquidity guard, the final order placement) sees the
+  // user-preferred size — not whatever the AI fan-out caller proposed.
+  let sizeUSD = req.sizeUSD;
 
   // 0PRE. Customer-portal live-execution kill switch (Task #157).
   // The customer portal is paper-only; non-admin live execution is hard-
@@ -495,6 +508,40 @@ export async function placeLiveAutoOrderForUser(
         logger.warn({ err, userId }, "liveUserExecution: customer-disabled log insert failed");
       }
       return { success: false, userId, errorCode: "customer_live_execution_disabled", error: msg };
+    }
+  }
+
+  // 0SIZE. Customer trade-size enforcement (after kill switch, before all
+  // downstream gates). The AI trading loop fan-out passes a globally-uniform
+  // sizeUSD (engine default), but the customer chooses their per-trade size
+  // in the PWA + Portal picker which writes `preferredLiveOrderSizeUsd` to
+  // `user_settings`. We clamp the incoming sizeUSD to MIN(requested,
+  // preferred) so the customer's pick is the upper bound the AI is ever
+  // allowed to spend per entry — and so the liquidity guard math (0LIQ
+  // below) operates on the actual size that will be sent to the broker.
+  // Operators (admin / super-admin) bypass — the operator terminal calls
+  // `placeLiveAutoOrder` (no userId), not this function, but a manual
+  // admin-as-user call should not be artificially capped.
+  {
+    const operatorSize = await isOperatorRole(userId);
+    if (!operatorSize) {
+      let preferred: number = DEFAULT_TRADE_SIZE_USD;
+      try {
+        const [row] = await db
+          .select({ size: userSettingsTable.preferredLiveOrderSizeUsd })
+          .from(userSettingsTable)
+          .where(eq(userSettingsTable.userId, userId))
+          .limit(1);
+        preferred = coerceTradeSizeToPreset(row?.size);
+      } catch (err) {
+        logger.warn({ err, userId }, "liveUserExecution: trade-size lookup failed — using default preset");
+      }
+      // Clamp to MIN: caller's request is treated as an upper bound (the
+      // engine may have legacy callers proposing $50/$100), but the
+      // customer's preferred size always wins when smaller. We never
+      // UP-size — the customer's pick is the ceiling.
+      const requested = Number.isFinite(sizeUSD) && sizeUSD > 0 ? sizeUSD : preferred;
+      sizeUSD = Math.min(requested, preferred);
     }
   }
 
@@ -713,6 +760,111 @@ export async function placeLiveAutoOrderForUser(
           logger.warn({ err, userId }, "liveUserExecution: concurrent-cap log insert failed");
         }
         return { success: false, userId, errorCode: "concurrent_live_cap_reached", error: msg };
+      }
+    }
+  }
+
+  // 0LIQ. Customer AI Liquidity Cushion + Plan-tier Max-open guard.
+  //
+  // After the platform-wide concurrent cap (0c) but BEFORE the per-user
+  // risk budget (0d). Two failure modes, both customer-protective:
+  //
+  //   (a) plan_max_positions_reached — user's open LIVE position count
+  //       already meets the plan-tier ceiling (starter=3, pro=12, free=0).
+  //       Even with infinite cash, the AI cannot open another entry.
+  //
+  //   (b) liquidity_protected — user does have an open slot, but their
+  //       available cash is below the required floor to safely fund the
+  //       REMAINING slots at their chosen trade size + round-trip fees +
+  //       a small safety cushion. The AI pauses new entries to preserve
+  //       the fee/cash cushion. Existing positions are untouched.
+  //
+  // Operator (admin / super-admin) bypass — operator tooling is not subject
+  // to plan-tier caps. Sandbox routes ALSO bypass: testnets don't consume
+  // real cash, so the liquidity floor is meaningless there. The math lives
+  // in `lib/liquidityGuard.ts` so this gate and `GET /user/ai-trading/
+  // liquidity` (read-only UI status feed) cannot drift.
+  if (!useSandbox) {
+    const operatorLiq = await isOperatorRole(userId);
+    if (!operatorLiq) {
+      try {
+        const [gate, openLiveRow, cashRow] = await Promise.all([
+          resolveAiTradingGate(userId),
+          db.select({ n: sql<number>`count(*)::int` })
+            .from(simPositionsTable)
+            .where(and(
+              eq(simPositionsTable.userId, userId),
+              isNotNull(simPositionsTable.exchange),
+            )),
+          db.select({ cash: simAccountsTable.cashBalance })
+            .from(simAccountsTable)
+            .where(eq(simAccountsTable.userId, userId))
+            .limit(1),
+        ]);
+
+        const verdict = evaluateLiquidityGuard({
+          plan:             gate.plan,
+          openLiveCount:    Number(openLiveRow[0]?.n ?? 0),
+          tradeSizeUsd:     sizeUSD,
+          availableCashUsd: Number(cashRow[0]?.cash ?? 0),
+        });
+
+        if (!verdict.ok) {
+          const errCode = verdict.reasonCode === "plan_max_positions_reached"
+            ? ("plan_max_positions_reached" as const)
+            : ("liquidity_protected" as const);
+          const userFacing = errCode === "liquidity_protected"
+            ? "LIQUIDITY PROTECTED — AI paused new entries to preserve fee/cash cushion."
+            : (verdict.message ?? "Plan capacity reached for AI positions.");
+          await emitFailureNotification(userId, symbol, side, userFacing);
+          executionStreamBus.emitEvent({
+            type:     "order_rejected",
+            severity: "warn",
+            symbol, side, sizeUSD, mode: "live",
+            gate:     errCode,
+            reason:   errCode,
+            message:  userFacing,
+            details:  {
+              userId,
+              plan:             gate.plan,
+              planMaxOpen:      verdict.planMaxOpen,
+              remainingSlots:   verdict.remainingSlots,
+              tradeSizeUsd:     sizeUSD,
+              availableCashUsd: verdict.availableCashUsd,
+              requiredCashUsd:  verdict.requiredCashUsd,
+            },
+          });
+          try {
+            await db.insert(logsTable).values({
+              id:      crypto.randomUUID(),
+              type:    "trade",
+              level:   "warn",
+              message: `[${errCode}] ${userFacing}`,
+              details: {
+                userId, symbol, side, sizeUSD,
+                errorCode:        errCode,
+                plan:             gate.plan,
+                planMaxOpen:      verdict.planMaxOpen,
+                remainingSlots:   verdict.remainingSlots,
+                availableCashUsd: verdict.availableCashUsd,
+                requiredCashUsd:  verdict.requiredCashUsd,
+                allowedTradeSizes: ALLOWED_TRADE_SIZES,
+              },
+            });
+          } catch (err) {
+            logger.warn({ err, userId }, "liveUserExecution: 0LIQ log insert failed");
+          }
+          return { success: false, userId, errorCode: errCode, error: userFacing };
+        }
+      } catch (err) {
+        // Fail-CLOSED: any DB lookup failure during liquidity evaluation
+        // is treated as "cannot safely authorize a new live entry right
+        // now". This matches the rest of the user-side gates (0a2 AI
+        // flag, 0a status guard).
+        logger.error({ err, userId, symbol, side }, "liveUserExecution: 0LIQ evaluation failed — failing closed");
+        const msg = "LIQUIDITY PROTECTED — AI paused new entries to preserve fee/cash cushion.";
+        await emitFailureNotification(userId, symbol, side, msg);
+        return { success: false, userId, errorCode: "liquidity_protected", error: msg };
       }
     }
   }

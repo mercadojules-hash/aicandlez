@@ -4,6 +4,7 @@ import { userSettingsTable, userConsentsTable, usersTable, DISCLAIMER_VERSION, A
 import { and, desc, eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { resolveAiTradingGate } from "../lib/aiTradingGate.js";
+import { ALLOWED_TRADE_SIZES, DEFAULT_TRADE_SIZE_USD, isAllowedTradeSize } from "../lib/liquidityGuard.js";
 import type { Request } from "express";
 
 const router = Router();
@@ -34,7 +35,7 @@ function defaultSettings(userId: string) {
     volumeFilter:                true,
     require1HTrend:              false,
     preferredExchange:           "Kraken",
-    preferredLiveOrderSizeUsd:   100,
+    preferredLiveOrderSizeUsd:   DEFAULT_TRADE_SIZE_USD,
     paperSandboxEnabled:         false,
     notificationsTradeExec:      true,
     notificationsSignals:        false,
@@ -175,6 +176,21 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
         return;
       }
       patch[k] = v;
+    } else if (k === "preferredLiveOrderSizeUsd") {
+      // Customer AI trade-size preset whitelist. Mirrors the picker in
+      // the PWA + Portal: only {10, 20, 50, 100} land on disk. Any other
+      // value (legacy 250, free-form 7, "$10", etc.) is rejected so the
+      // liquidity guard math (`lib/liquidityGuard.ts`) always operates
+      // on a known-good size. Numeric strings ("20") are coerced first.
+      const n = typeof v === "string" ? Number(v) : v;
+      if (!isAllowedTradeSize(n)) {
+        res.status(400).json({
+          error:   `preferredLiveOrderSizeUsd must be one of ${ALLOWED_TRADE_SIZES.join(", ")}`,
+          allowed: ALLOWED_TRADE_SIZES,
+        });
+        return;
+      }
+      patch[k] = n;
     } else {
       patch[k] = v;
     }
