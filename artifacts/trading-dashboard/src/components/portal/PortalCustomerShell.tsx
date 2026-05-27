@@ -34,8 +34,8 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAuth, useClerk, useUser } from "@clerk/react";
 import {
   Activity, AlertTriangle, Bell, CheckCircle2, Clock, Database, Filter, Globe,
-  LineChart as LineChartIcon, Lock, MonitorPlay, PieChart, Power, Radar, Radio,
-  Search, Shield, Star, Terminal, Timer,
+  LineChart as LineChartIcon, Link2, Lock, LogOut, MonitorPlay, PieChart, Power,
+  Radar, Radio, Search, Shield, Star, Target, Terminal, Timer, User as UserIcon,
 } from "lucide-react";
 
 import { authFetch } from "../../lib/authFetch";
@@ -4321,7 +4321,7 @@ function CustomerTopHeader({
         : { label: "FREE",    color: N.TEXT_2 };
 
   return (
-    <div style={{
+    <div className="cd-customer-top-header" style={{
       display: "flex", alignItems: "center", gap: 12, padding: "14px 20px",
       borderBottom: `1px solid ${N.BORDER}`,
       background: `linear-gradient(180deg, ${N.SURFACE_1} 0%, ${N.BG} 100%)`,
@@ -4350,7 +4350,7 @@ function CustomerTopHeader({
       {/* CONNECT EXCHANGE — primary CTA. Copy updated from
           "ENABLE LIVE AI TRADING" → "CONNECT EXCHANGE TO ENABLE LIVE TRADING"
           (sounds onboarding-friendly, not arcade/dangerous). */}
-      <button onClick={onConnect} style={{
+      <button className="cd-customer-cta" onClick={onConnect} style={{
         display: "inline-flex", alignItems: "center", gap: 10,
         padding: "11px 22px",
         border: `1px solid ${N.BRAND}`,
@@ -4395,7 +4395,7 @@ function CustomerTopHeader({
       </button>
 
       {/* TIER chip */}
-      <span style={{
+      <span className="cd-customer-tier" style={{
         fontSize: 9.5, fontWeight: 800, color: tierMeta.color,
         letterSpacing: "0.22em",
         padding: "6px 10px", borderRadius: 3,
@@ -4430,7 +4430,7 @@ function CustomerTopHeader({
             <img src={avatarUrl} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : initials}
         </span>
-        <span style={{
+        <span className="cd-customer-user-name" style={{
           fontSize: 10.5, fontWeight: 700, letterSpacing: "0.14em",
           color: N.TEXT_1, maxWidth: 140, overflow: "hidden",
           textOverflow: "ellipsis", whiteSpace: "nowrap",
@@ -4440,7 +4440,9 @@ function CustomerTopHeader({
         </span>
       </button>
 
-      <CustomerHeaderBtn onClick={onDisclaimer}>DISCLAIMER</CustomerHeaderBtn>
+      <span className="cd-customer-disclaimer" style={{ display: "inline-flex" }}>
+        <CustomerHeaderBtn onClick={onDisclaimer}>DISCLAIMER</CustomerHeaderBtn>
+      </span>
       <CustomerHeaderBtn onClick={onSignOut} variant="muted">SIGN OUT</CustomerHeaderBtn>
     </div>
   );
@@ -4958,6 +4960,139 @@ export function PortalCustomerShell() {
           .cd-ribbon [data-prio="2"],
           .cd-footer [data-prio="2"] { display: none !important; }
         }
+
+        /* ───────────────────────── PHASE 1 — RESPONSIVE BATTLEFIELD ────────
+           Mobile-first collapse rules. Customer /portal only — admin /command
+           does NOT use .cd-customer-* selectors, so the operator terminal is
+           untouched.
+
+           Breakpoints:
+             ≤1024px  → right rail (MY ACCOUNT + LIVE TRADES + HISTORY + AI)
+                       drops UNDER the signals matrix (was 380px sidecar).
+             ≤768px   → tighten workspace padding, reduce header padding,
+                       enlarge tap targets to 44px (WCAG touch min), make
+                       CONNECT CTA full-width, reserve bottom padding for
+                       sticky mobile nav.
+             ≤720px   → collapse the 2-col MAJORS/ALTS matrix to single
+                       column (stacked, full-width panels).
+             ≤480px   → hide tier chip + DISCLAIMER text in header to keep
+                       the strip from wrapping into 3+ rows on phones.
+           ─────────────────────────────────────────────────────────────── */
+        .cd-customer-battlefield-grid {
+          grid-template-columns: minmax(0, 1fr) 380px;
+        }
+        @media (max-width: 1024px) {
+          .cd-customer-battlefield-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+          .cd-customer-battlefield-aside {
+            width: 100% !important;
+          }
+        }
+        @media (max-width: 768px) {
+          .cd-workspace {
+            padding: 12px 10px !important;
+            gap: 12px !important;
+            /* sticky nav clearance — safe-area aware so iOS notch
+               devices don't occlude the last content row. */
+            padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;
+          }
+          .cd-customer-top-header {
+            padding: 10px 12px !important;
+            gap: 8px !important;
+          }
+          .cd-customer-top-header .cd-customer-cta {
+            flex: 1 0 100% !important;
+            order: 99;
+            padding: 14px 18px !important;
+            font-size: 11px !important;
+            justify-content: center;
+            min-height: 48px;
+          }
+          .cd-customer-top-header button,
+          .cd-customer-top-header [role="button"] {
+            min-height: 40px;
+          }
+        }
+        @media (max-width: 720px) {
+          .cd-customer-battlefield-matrix {
+            grid-template-columns: 1fr !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .cd-customer-top-header .cd-customer-tier,
+          .cd-customer-top-header .cd-customer-disclaimer {
+            display: none !important;
+          }
+          .cd-customer-top-header .cd-customer-user-name {
+            display: none !important;
+          }
+        }
+
+        /* ───────────────────────── MOBILE STICKY BOTTOM NAV ──────────────
+           Hidden on tablet+ (default display:none). Becomes a 5-tab strip
+           on phones — Signals (scroll to top) · Account · Connect · Alerts
+           · Sign out. Built INSIDE PortalCustomerShell only; admin terminal
+           never renders it. Safe-area inset honored for iOS notch devices. */
+        .cd-mobile-bottom-nav { display: none; }
+        @media (max-width: 768px) {
+          .cd-mobile-bottom-nav {
+            display: flex;
+            position: fixed;
+            left: 0; right: 0; bottom: 0;
+            z-index: 60;
+            padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0px));
+            background: linear-gradient(180deg, rgba(5,10,7,0.92) 0%, rgba(0,0,0,0.98) 100%);
+            border-top: 1px solid rgba(102,255,102,0.18);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 -8px 24px rgba(0,0,0,0.6), 0 -1px 0 rgba(102,255,102,0.08);
+            justify-content: space-around;
+            align-items: stretch;
+            gap: 4px;
+          }
+          .cd-mobile-bottom-nav button {
+            flex: 1;
+            min-height: 52px;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            color: rgba(180,200,190,0.78);
+            font-family: ${T.FONT_MONO};
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            transition: all 120ms ease;
+          }
+          .cd-mobile-bottom-nav button:active {
+            background: rgba(102,255,102,0.10);
+            border-color: rgba(102,255,102,0.35);
+            color: rgb(102,255,102);
+          }
+          .cd-mobile-bottom-nav .cd-mn-primary {
+            color: rgb(102,255,102);
+            background: rgba(102,255,102,0.10);
+            border-color: rgba(102,255,102,0.35);
+            box-shadow: 0 0 18px rgba(102,255,102,0.25);
+          }
+        }
+
+        /* Right-rail panel tightening on tablet — when rail drops under the
+           matrix, the 4 stacked panels would each be full-width and very
+           tall. Lay them out in 2 columns on tablet, single col on phone. */
+        @media (max-width: 1024px) and (min-width: 721px) {
+          .cd-customer-battlefield-aside {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 10px !important;
+          }
+        }
       `}</style>
       {/* Pass 8.0 — CUSTOMER cinematic dashboard.
           Everything ABOVE the LIVE OPPORTUNITY BATTLEFIELD is now a
@@ -5008,9 +5143,8 @@ export function PortalCustomerShell() {
             MY ACCOUNT rail (380px) on the right with PERFORMANCE
             chart + LIVE TRADES + TRADE HISTORY + AI ACTIVITY. */}
         <section
-          className="grid"
+          className="grid cd-customer-battlefield-grid"
           style={{
-            gridTemplateColumns: "minmax(0, 1fr) 380px",
             gap: 14, alignItems: "start",
           }}
         >
@@ -5032,7 +5166,7 @@ export function PortalCustomerShell() {
             <CryptoAltsMemesPanel    engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} />
           </div>
 
-          <aside style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <aside className="cd-customer-battlefield-aside" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <MyAccountRailPaper
               equityUsd={paperStats.equity || STARTING_EQUITY}
               todayPnl={paperStats.todayPnl}
@@ -5072,7 +5206,59 @@ export function PortalCustomerShell() {
         liveExchangesEnabled={isAdmin || plan !== "free"}
       />
       {disclaimerGateModal}
+
+      {/* MOBILE BOTTOM NAV — visible ≤768px only (CSS-gated via
+          .cd-mobile-bottom-nav media query). Customer-only; admin
+          /command never mounts PortalCustomerShell so this never
+          renders for operators. Five primary actions, all
+          touch-optimized (52px min-height, large hit areas). */}
+      <MobileBottomNav
+        onSignals={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        onConnect={() => plan === "free" ? setUpgrade(true) : setConnectOpen(true)}
+        onAccount={() => setAccount(true)}
+        onAlerts={() => setAccount(true)}
+        onSignOut={() => void portalSignOut()}
+      />
     </div>
+  );
+}
+
+/* MobileBottomNav — sticky bottom tab strip for phones. Hidden on
+   tablet/desktop via `.cd-mobile-bottom-nav` media query (display:none
+   above 768px). Primary action (CONNECT) is visually elevated via
+   .cd-mn-primary. */
+function MobileBottomNav({
+  onSignals, onConnect, onAccount, onAlerts, onSignOut,
+}: {
+  onSignals:  () => void;
+  onConnect:  () => void;
+  onAccount:  () => void;
+  onAlerts:   () => void;
+  onSignOut:  () => void;
+}) {
+  return (
+    <nav className="cd-mobile-bottom-nav" aria-label="Customer portal navigation">
+      <button onClick={onSignals} aria-label="Signals">
+        <Target size={18} />
+        <span>SIGNALS</span>
+      </button>
+      <button onClick={onAccount} aria-label="Account">
+        <UserIcon size={18} />
+        <span>ACCOUNT</span>
+      </button>
+      <button onClick={onConnect} aria-label="Connect exchange" className="cd-mn-primary">
+        <Link2 size={20} />
+        <span>CONNECT</span>
+      </button>
+      <button onClick={onAlerts} aria-label="Alerts">
+        <Bell size={18} />
+        <span>ALERTS</span>
+      </button>
+      <button onClick={onSignOut} aria-label="Sign out">
+        <LogOut size={18} />
+        <span>EXIT</span>
+      </button>
+    </nav>
   );
 }
 
