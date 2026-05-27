@@ -4105,7 +4105,13 @@ function CustomerBlotterShell({
       display: "flex", flexDirection: "column",
       border: `1px solid ${N.BORDER_HI}`, borderRadius: 5,
       background: N.SURFACE_1, fontFamily: N.FONT_MONO, overflow: "hidden",
-      maxHeight: 360, boxShadow: `inset 0 0 24px ${accent}08`,
+      // Phase 8.1 — AI ACTIVITY panel was removed from the right rail so the
+      // customer surface stays focused on SIGNALS → ACCOUNT → TRADES (not
+      // backend engine telemetry). Vertical real estate the feed used to
+      // consume is redistributed here: 360 → 560 gives LIVE TRADES + TRADE
+      // HISTORY ~6-7 visible rows each before internal scroll. /command is
+      // untouched — this shell is only mounted by PortalCustomerShell.
+      maxHeight: 560, boxShadow: `inset 0 0 24px ${accent}08`,
     }}>
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -4186,79 +4192,11 @@ function CustomerBlotterRow({
   );
 }
 
-function CustomerAiActivityFeed({ engine }: { engine?: EngineLite }) {
-  const rows = useMemo(() => {
-    const log = engine?.recentSignalLog ?? [];
-    return [...log]
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, 14);
-  }, [engine?.recentSignalLog]);
-
-  return (
-    <div style={{
-      display: "flex", flexDirection: "column",
-      border: `1px solid ${N.BORDER_HI}`, borderRadius: 5,
-      background: N.SURFACE_1, fontFamily: N.FONT_MONO, overflow: "hidden",
-      flex: 1, minHeight: 280, maxHeight: 380,
-      boxShadow: `inset 0 0 24px ${N.BRAND}08`,
-    }}>
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "11px 14px",
-        borderBottom: `1px solid ${N.BORDER}`,
-        background: `linear-gradient(180deg, ${N.BRAND}0d 0%, ${N.BG} 100%)`,
-      }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: N.TEXT_0, letterSpacing: "0.26em" }}>
-          AI ACTIVITY
-        </span>
-        <span style={{
-          fontSize: 10, fontWeight: 700, color: N.BRAND_BRT,
-          letterSpacing: "0.20em", textShadow: `0 0 6px ${N.BRAND}55`,
-        }}>● LIVE FEED</span>
-      </div>
-      <div style={{ flex: 1, overflowY: "auto" }} className="cd-scroll">
-        {rows.length === 0 ? (
-          <div style={{
-            padding: 18, fontSize: 10.5, color: N.TEXT_3,
-            letterSpacing: "0.20em", fontWeight: 700, textAlign: "center",
-          }}>· AWAITING ENGINE SIGNALS</div>
-        ) : rows.map(r => {
-          const ts = new Date(r.timestamp);
-          const hh = String(ts.getHours()).padStart(2, "0");
-          const mm = String(ts.getMinutes()).padStart(2, "0");
-          const ss = String(ts.getSeconds()).padStart(2, "0");
-          const color = r.decision === "BUY" ? N.LONG : r.decision === "SELL" ? N.SHORT : N.TEXT_2;
-          const verb  = r.decision;
-          return (
-            <div key={r.id} style={{
-              padding: "9px 14px", borderBottom: `1px solid ${N.BORDER}`,
-              display: "flex", alignItems: "center", gap: 10,
-              fontSize: 11, color: N.TEXT_1, letterSpacing: "0.02em",
-            }}>
-              <span style={{ color: N.TEXT_3, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                {hh}:{mm}:{ss}
-              </span>
-              <span style={{
-                color, fontWeight: 800, fontSize: 10, letterSpacing: "0.16em",
-                flexShrink: 0, minWidth: 62,
-                textShadow: color !== N.TEXT_2 ? `0 0 4px ${color}55` : "none",
-              }}>AI {verb}</span>
-              <span style={{ color: N.TEXT_0, fontWeight: 800, fontSize: 11.5, flexShrink: 0 }}>
-                {r.symbol}
-              </span>
-              <span style={{
-                color: N.TEXT_3, fontSize: 10,
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}>
-                · {r.shortSummary || `${r.decision} ${r.timeframe} · ${Math.round(r.confidence)}%`}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+// Phase 8.1 — CustomerAiActivityFeed was deleted along with its call site
+// in the customer right rail. Backend engine telemetry no longer belongs
+// on the customer surface (SIGNALS → ACCOUNT → TRADES focus). /command's
+// own AiActivityFeed (separate component in components/command/) is
+// unaffected and continues to render for operators.
 
 /* Premium customer top header — replaces the operator pulse ribbon
  * + admin telemetry + heavy toolbar with a minimal cinematic strip:
@@ -4764,6 +4702,55 @@ export function PortalCustomerShell() {
             rgba(0,0,0,0.62) 100%
           );
         }
+        /* Phase 8.1 — TEN-ROW VIEWPORT LOCK (customer /portal only).
+           Each battlefield column (MAJORS + ALTS) shows exactly the
+           top ~10 conviction-ranked rows before internal scroll. Was
+           maxHeight:940 in SignalsRow.tsx (shared with /command), which
+           pushed the right-rail ACCOUNT / LIVE TRADES / TRADE HISTORY
+           well below the fold on 13–15" laptop heights and buried the
+           account telemetry. Override is scoped to
+           .cd-customer-battlefield-matrix .blotter-scroll so /command
+           keeps its 940px height untouched (admin operators want to
+           see the full universe at a glance, customers want focus).
+           780px = 10 SignalRow heights (72px minHeight each in shared
+           SignalRow.tsx) + 2 GroupDividers (~30px each, LONG SETUPS /
+           SHORT SETUPS) = 720 + 60 = 780. Confidence DESC sort + 5pt
+           bucket stability guard upstream remain authoritative for
+           which rows make the cut. On ≤720px (single-column matrix)
+           the cap is relaxed to 680px (~8 rows) so the stacked panels
+           don't dominate the phone viewport. Virtualization /
+           DOM-keeping behavior in SignalRow is unchanged — only the
+           visible viewport is constrained. */
+        .cd-customer-battlefield-matrix .blotter-scroll {
+          max-height: 780px !important;
+          overflow-y: auto !important;
+        }
+        @media (max-width: 720px) {
+          .cd-customer-battlefield-matrix .blotter-scroll {
+            max-height: 680px !important;
+          }
+        }
+        /* Phase 8.1 — MAJORS HEADER RENAME (customer /portal only).
+           The shared SignalsRow.tsx hardcodes label="TOP 30 CRYPTO MAJORS"
+           on the left panel (CryptoMajorsSignalsPanel). That file is
+           also consumed by /command, which must stay byte-identical, so
+           the rename is done VISUALLY here via a customer-only wrapper
+           class. The original label span (rendered at SignalsPanel
+           header > first child div > 2nd span — icon, label, sub trio)
+           is collapsed via font-size:0 and the replacement string is
+           injected with ::before, preserving the exact typography:
+           text-[11px] / font-bold / tracking-[0.22em] / TEXT_0.
+           No source file other than PortalCustomerShell.tsx is touched. */
+        .cd-customer-majors-panel header > div:first-child > span:nth-child(2) {
+          font-size: 0 !important;
+        }
+        .cd-customer-majors-panel header > div:first-child > span:nth-child(2)::before {
+          content: "TOP 30 CRYPTOS";
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.22em;
+          color: ${N.TEXT_0};
+        }
         @keyframes rail-pulse {
           0%   { opacity: 0.70; }
           50%  { opacity: 1.00; }
@@ -4973,8 +4960,10 @@ export function PortalCustomerShell() {
            untouched.
 
            Breakpoints:
-             ≤1024px  → right rail (MY ACCOUNT + LIVE TRADES + HISTORY + AI)
+             ≤1024px  → right rail (MY ACCOUNT + LIVE TRADES + HISTORY)
                        drops UNDER the signals matrix (was 380px sidecar).
+                       Phase 8.1 — AI ACTIVITY panel removed; rail is
+                       now 3 panels (was 4).
              ≤768px   → tighten workspace padding, reduce header padding,
                        enlarge tap targets to 44px (WCAG touch min), make
                        CONNECT CTA full-width, reserve bottom padding for
@@ -5214,7 +5203,15 @@ export function PortalCustomerShell() {
 
         {/* Battlefield body — dual crypto matrix on the left,
             MY ACCOUNT rail (380px) on the right with PERFORMANCE
-            chart + LIVE TRADES + TRADE HISTORY + AI ACTIVITY. */}
+            chart + LIVE TRADES + TRADE HISTORY.
+
+            Phase 8.1 — AI ACTIVITY panel removed from the customer rail.
+            Customer portal emphasis is SIGNALS → ACCOUNT → TRADES;
+            backend engine telemetry stays on the operator surface only.
+            The freed vertical space is redistributed into LIVE TRADES
+            and TRADE HISTORY (CustomerBlotterShell maxHeight 360 → 560).
+            /command continues to render its own AiActivityFeed —
+            this removal is scoped strictly to PortalCustomerShell. */}
         <section
           className={`grid cd-customer-battlefield-grid${eliteActive ? " cd-elite-glow" : ""}`}
           style={{
@@ -5233,8 +5230,23 @@ export function PortalCustomerShell() {
                 (high confidence ≥80) read at full intensity, bottom rows
                 (low confidence) gracefully fade — making confidence
                 dominance read pre-attentively. /command admin terminal
-                does NOT use this wrapper, so it remains untouched. */}
-            <CryptoMajorsSignalsPanel engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} />
+                does NOT use this wrapper, so it remains untouched.
+
+                Phase 8.1 — each column is locked to a 10-row visible
+                viewport via CSS (.cd-customer-battlefield-matrix
+                .blotter-scroll max-height override). Internal scroll
+                kicks in after row 10 so the right-rail account /
+                trades telemetry stays above the fold on laptop heights.
+
+                Phase 8.1 — the MAJORS panel header label "TOP 30 CRYPTO
+                MAJORS" (set inside the shared SignalsRow.tsx, used by
+                /command as well) is replaced VISUALLY ONLY for the
+                customer surface via the `.cd-customer-majors-panel`
+                wrapper below. The underlying CryptoMajorsSignalsPanel
+                JSX and /command rendering stay byte-identical. */}
+            <div className="cd-customer-majors-panel">
+              <CryptoMajorsSignalsPanel engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} />
+            </div>
             {/* ALTS & MEMECOINS — same sort contract. */}
             <CryptoAltsMemesPanel    engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} />
           </div>
@@ -5252,7 +5264,6 @@ export function PortalCustomerShell() {
             />
             <CustomerBlotterPanelOpen rows={openTrades} />
             <CustomerBlotterPanelHistory rows={paperHistory} />
-            <CustomerAiActivityFeed engine={engineStatus} />
           </aside>
         </section>
       </main>
