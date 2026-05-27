@@ -4809,9 +4809,22 @@ export function PortalCustomerShell() {
   // ARM gate is in place. Until then, the chip switcher updates the
   // visible runtime label (`runtimeLabel(state)`) — but it does NOT
   // flip the execution bar into a state that implies armed routing.
-  void runtimeState;
   const { majors, alts, opportunities, engine, isLoading, isError } = usePaperSignals();
   const { stats: paperStats, openTrade, open: openTrades, history: paperHistory } = usePaperTrades();
+  // Task #205 — equity hydration. When runtime aggregator reports the
+  // customer is in LIVE mode against a healthy exchange connection, the
+  // headline equity surfaces MUST reflect the broker total (e.g.
+  // Coinbase USD + USDC + crypto valued in USD) instead of the paper-sim
+  // $100,000 starting balance. `runtimeState.totalEquityUSD` already
+  // aggregates active connection balances on the server side
+  // (loadBalanceForRow → CoinbaseAdapter.getAccount). In PAPER mode the
+  // existing `paperStats.equity` (falling back to STARTING_EQUITY for a
+  // brand-new sim) remains the source of truth. PNL/wins/losses cells
+  // remain paper-derived for now — wiring live trade history is a
+  // separate Task #206 follow-up.
+  const isLiveRuntime = runtimeState?.mode === "live";
+  const liveTotalUsd  = runtimeState?.totalEquityUSD ?? 0;
+  const displayEquity = isLiveRuntime ? liveTotalUsd : (paperStats.equity || STARTING_EQUITY);
 
   // Pass 3.3: ONE shell-level 1Hz tick — passed as a prop to
   // `OperatorPulseRibbon`, `OpportunityMatrix`, and
@@ -5789,7 +5802,7 @@ export function PortalCustomerShell() {
           openPaper={openTrades.length}
           slotCap={plan === "pro" ? 12 : plan === "starter" ? 3 : 3}
           onUpgrade={() => setUpgrade(true)}
-          equityUsd={paperStats.equity || STARTING_EQUITY}
+          equityUsd={displayEquity}
         />
 
         {/* Battlefield body — dual crypto matrix on the left,
@@ -5844,7 +5857,7 @@ export function PortalCustomerShell() {
 
           <aside className="cd-customer-battlefield-aside" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <MyAccountRailPaper
-              equityUsd={paperStats.equity || STARTING_EQUITY}
+              equityUsd={displayEquity}
               todayPnl={paperStats.todayPnl}
               realized={paperStats.realizedPnl}
               unrealized={paperStats.unrealizedPnl}
