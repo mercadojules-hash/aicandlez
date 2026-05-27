@@ -71,6 +71,8 @@ import { calibrateRawConfidence } from "../../lib/conviction";
 import { useExecutionState } from "../../hooks/useExecutionState";
 import { usePaperTrades, STARTING_EQUITY } from "../../hooks/usePaperTrades";
 import { useUserRole } from "../../hooks/useUserRole";
+import { useRuntimeState, runtimeLabel } from "../../hooks/useRuntimeState";
+import { RuntimeSwitcher } from "./RuntimeSwitcher";
 import { useDisclaimerGate } from "../../hooks/useDisclaimerGate";
 import { SessionEnvBadge } from "./SessionEnvBadge";
 import {
@@ -197,10 +199,14 @@ const ExchangeStatusBadge = memo(function ExchangeStatusBadge({ plan }: { plan: 
   const connectedName = useConnectedExchangeName(plan);
   const { label, tone } =
     plan === "free"
+      // Task #199 — explicit runtime labels. We still read
+      // useConnectedExchangeName() so non-subscribers see the same
+      // tone shifts, but the active text comes from the runtime
+      // aggregator: "PAPER MODE" / "LIVE: KRAKEN" / "LIVE: COINBASE".
       ? { label: "PAPER MODE",                       tone: T.TEXT_1 }
       : connectedName
-        ? { label: `${connectedName} CONNECTED`,     tone: T.NEON   }
-        : { label: "ALPACA PAPER",                   tone: T.AMBER  };
+        ? { label: `LIVE: ${connectedName}`,         tone: T.NEON   }
+        : { label: "PAPER MODE",                     tone: T.AMBER  };
   // Match telemetry chip language: small dot + uppercase mono label.
   const dotShadow = tone === T.NEON  ? `0 0 6px ${T.NEON}`
                   : tone === T.AMBER ? `0 0 5px ${T.AMBER}`
@@ -4117,7 +4123,39 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
  * unlocks via PortalExchangeConnectModal (CONNECT TO AN EXCHANGE CTA).
  */
 
+/**
+ * Task #199 — explicit-label chip rendered in the customer top header.
+ * Reads the same `useRuntimeState` cache as the battlefield header,
+ * so both surfaces flip in lockstep when the switcher toggles.
+ * "PAPER MODE" → gold; "LIVE: KRAKEN" → neon green.
+ */
+function CustomerTopHeaderRuntimeChip() {
+  const { data: runtimeState } = useRuntimeState();
+  const isLive = runtimeState?.mode === "live";
+  const label  = runtimeLabel(runtimeState);
+  const color  = isLive ? N.BRAND_BRT : N.GOLD_BRT;
+  return (
+    <span style={{
+      marginLeft: 10, fontSize: 9.5, fontWeight: 700, color,
+      letterSpacing: "0.22em",
+      padding: "4px 10px", borderRadius: 3,
+      border: `1px solid ${color}55`,
+      background: `${color}10`,
+      textShadow: isLive ? `0 0 6px ${N.BRAND}66` : "none",
+      whiteSpace: "nowrap",
+    }}>
+      ● {label}
+    </span>
+  );
+}
+
 function CustomerBattlefieldHeader({ engine: _engine, entitled = false }: { engine?: EngineLite; entitled?: boolean }) {
+  // Task #199 — MODE chip now derives from the runtime aggregator
+  // instead of the entitlement boolean, so the visible mode matches
+  // the runtime switcher selection. Falls back to PAPER on initial
+  // load — never asserts LIVE before the aggregator has resolved.
+  const { data: runtimeState } = useRuntimeState();
+  const modeValue = runtimeLabel(runtimeState).replace(/^LIVE: /, "LIVE · ");
   // Customer surface is PAPER-only — risk gates always render ACTIVE
   // (no killSwitch concept exposed to customers; admin operator
   // controls live in /command).
@@ -4155,8 +4193,8 @@ function CustomerBattlefieldHeader({ engine: _engine, entitled = false }: { engi
         />
         <CustomerStatusChip
           label="MODE"
-          value={entitled ? "LIVE READY" : "PAPER"}
-          color={entitled ? N.BRAND_BRT : N.GOLD_BRT}
+          value={modeValue}
+          color={runtimeState?.mode === "live" ? N.BRAND_BRT : (entitled ? N.BRAND_BRT : N.GOLD_BRT)}
         />
       </div>
     </div>
@@ -4576,26 +4614,15 @@ function CustomerTopHeader({
         <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.22em", color: N.TEXT_0 }}>
           AI<span style={{ color: N.BRAND_BRT, textShadow: `0 0 12px ${N.BRAND}` }}>CANDLEZ</span>
         </span>
-        {plan === "free" ? (
-          <span style={{
-            marginLeft: 10, fontSize: 9.5, fontWeight: 700, color: N.GOLD_BRT,
-            letterSpacing: "0.22em",
-            padding: "4px 10px", borderRadius: 3,
-            border: `1px solid ${N.GOLD_BRT}55`, background: `${N.GOLD_BRT}10`,
-          }}>
-            ● PAPER {isExchangeConnected ? "· EXCHANGE LINKED" : "MODE"}
-          </span>
-        ) : (
-          <span style={{
-            marginLeft: 10, fontSize: 9.5, fontWeight: 700, color: N.BRAND_BRT,
-            letterSpacing: "0.22em",
-            padding: "4px 10px", borderRadius: 3,
-            border: `1px solid ${N.BRAND_BRT}55`, background: `${N.BRAND}10`,
-            textShadow: `0 0 6px ${N.BRAND}66`,
-          }}>
-            ● {isExchangeConnected ? "LIVE READY · EXCHANGE LINKED" : "LIVE READY"}
-          </span>
-        )}
+        {/* Task #199 — top-header status chip now reflects the runtime
+            switcher selection. "PAPER MODE" or "LIVE: KRAKEN" — same
+            string consumed by every other customer surface. */}
+        <CustomerTopHeaderRuntimeChip />
+        {/* `plan` and `isExchangeConnected` are retained as upstream
+            props for future entitlement-aware copy but no longer drive
+            the visible mode chip. */}
+        {void plan}
+        {void isExchangeConnected}
       </div>
 
       <div style={{ flex: 1 }} />
@@ -4747,6 +4774,14 @@ export function PortalCustomerShell() {
   const { signOut: portalSignOut } = useClerk();
   const exec = useExecutionState();
   const engineOnline = !!exec.data?.engine.running;
+  // Task #199 — single shell-level subscription to the runtime aggregator.
+  // Child components (battlefield header, top header, ExchangeStatusBadge)
+  // pull from the same React Query cache via useRuntimeState(), so no
+  // extra network is incurred. `runtimeMode` drives the LiveControlBar
+  // state below; "live" only flips the displayed runtime context, not
+  // order routing (kill switch + Task #200 gate still apply).
+  const { data: runtimeState } = useRuntimeState();
+  const runtimeMode: "paper" | "live" = runtimeState?.mode ?? "paper";
   const { majors, alts, opportunities, engine, isLoading, isError } = usePaperSignals();
   const { stats: paperStats, openTrade, open: openTrades, history: paperHistory } = usePaperTrades();
 
@@ -5593,12 +5628,22 @@ export function PortalCustomerShell() {
             the page, exactly per direction. */}
         <CustomerBattlefieldHeader engine={engineStatus} entitled={entitled} />
 
+        {/* Task #199 — Runtime switcher chip row. Mounted only on the
+            customer shell (admin shell never imports it), preserving
+            the byte-identical admin invariant. Selecting a live chip
+            flips display only — orders remain paper until Task #200's
+            safe-execution gate ships. */}
+        <RuntimeSwitcher />
+
         {/* Unified LIVE AI CRYPTO EXECUTION bar — single bar spanning
-            both columns (PAPER, readonly, no ARM LIVE per locked
-            customer invariant). */}
+            both columns. State derives from the runtime context (Task
+            #199): "paper" → PAPER capital language; "live" → LIVE
+            display, but real BUY routing is still gated by the
+            server-side kill switch + Task #200's safe-execution gate
+            (the customer ARM LIVE control is intentionally absent). */}
         <LiveControlBar
           assetClass="CRYPTO"
-          state="PAPER"
+          state={runtimeMode === "live" ? "LIVE" : "PAPER"}
           customerEntitled={entitled}
           leadingSlot={
             /* Hero brand mark — transparent, no boxed treatment, sized to

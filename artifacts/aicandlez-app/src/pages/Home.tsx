@@ -17,6 +17,7 @@ import {
   type SimTrade,
 } from "@/lib/api";
 import { CryptoIcon } from "@/components/CryptoIcon";
+import { useRuntimeState } from "@/hooks/useRuntimeState";
 import { OnboardingPanel } from "@/components/OnboardingPanel";
 import { TradeDetailSheet } from "@/components/TradeDetailSheet";
 
@@ -558,6 +559,10 @@ export default function Home() {
   const { openOnboarding, status: brokerStatus, equity: alpacaEquity, buyingPower: alpacaBP } =
     useBrokerConnection();
   const { user } = useUser();
+  // Task #199 — shared runtime aggregator. Drives `tv` (Capital Under AI
+  // Management hero) when the user picks a live exchange via the chip
+  // switcher in App.tsx Shell.
+  const { data: runtimeState } = useRuntimeState();
 
   const { data: status }    = useQuery<MobileStatus>({
     queryKey: ["mobile-status"], queryFn: () => api.get("/mobile/status"), refetchInterval: 5_000 });
@@ -620,13 +625,22 @@ export default function Home() {
   const isLive   = engine?.mode === "live";
   const brokerConnected = brokerStatus === "paper_active" || brokerStatus === "live_active";
   const exchangeConnected = liveExchangeOk.length > 0;
-  // Real-money priority: connected exchange balances first (Kraken etc),
-  // then Alpaca, then simulated portfolio.
-  const tv       = exchangeConnected
-    ? liveExchangeEquity
-    : brokerConnected
-      ? (alpacaEquity > 0 ? alpacaEquity : (portfolio?.totalValue ?? 100_000))
-      : (portfolio?.totalValue ?? 100_000);
+  // Task #199 — when the runtime switcher resolves to "live" with a
+  // specific exchange, prefer that exchange's equity directly from
+  // the aggregator. Falls through to the existing real-money priority
+  // ladder (live exchange → Alpaca → sim) when the user is still on
+  // paper or the runtime state hasn't hydrated yet.
+  const runtimeLiveExchange = runtimeState?.mode === "live" ? runtimeState.activeExchange : null;
+  const runtimeLiveConn = runtimeLiveExchange
+    ? (runtimeState?.connectedExchanges ?? []).find(c => c.exchange === runtimeLiveExchange && c.ok)
+    : null;
+  const tv       = runtimeLiveConn
+    ? runtimeLiveConn.totalEquityUSD
+    : exchangeConnected
+      ? liveExchangeEquity
+      : brokerConnected
+        ? (alpacaEquity > 0 ? alpacaEquity : (portfolio?.totalValue ?? 100_000))
+        : (portfolio?.totalValue ?? 100_000);
   const pnl      = portfolio?.openPnL     ?? 0;
   const pnlPct   = tv > 0 ? (pnl/tv*100) : 0;
   const cashAvail = exchangeConnected && liveExchangeUsdFree > 0

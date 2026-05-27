@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRuntimeState, runtimeLabel } from "@/hooks/useRuntimeState";
 import { useLocation, useSearch } from "wouter";
 import { api, type LiveEligibility } from "@/lib/api";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
@@ -200,6 +201,12 @@ function RequiresConsentScreen() {
 
 // ── Screen: fully eligible — live controls ─────────────────────────────────────
 function LiveActiveScreen({ eligibility }: { eligibility: LiveEligibility }) {
+  // Task #199 — explicit runtime label. Live page previously read its
+  // mode from local eligibility state; now it reflects the shared
+  // runtime aggregator so the chip switcher in App.tsx Shell stays
+  // authoritative across every PWA surface.
+  const { data: runtimeState } = useRuntimeState();
+  const runtimeLabelText = runtimeLabel(runtimeState);
   // R1.5 — connected-exchange chip list hydrates from catalog hook.
   const activeExchanges = useActiveExchanges();
   const queryClient = useQueryClient();
@@ -235,7 +242,7 @@ function LiveActiveScreen({ eligibility }: { eligibility: LiveEligibility }) {
             boxShadow: isLive ? "0 0 10px #00ff8a" : "0 0 8px #ffaa00" }} />
           <div style={{ fontSize: 9, fontFamily: "monospace", color: "#2a4060",
             letterSpacing: "0.2em" }}>
-            {isLive ? "LIVE MODE ACTIVE" : "PAPER MODE"}
+            {runtimeLabelText}
           </div>
         </div>
         <div style={{ fontSize: 20, fontFamily: "monospace", fontWeight: 700, color: "#e8f4ff" }}>

@@ -11,6 +11,7 @@ import { useUserProfile, type UserProfile } from "@/contexts/UserProfileContext"
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { PageHeader } from "@/components/PageHeader";
 import { useFeedbackPrefs, ALERT_DEFINITIONS, type AlertKey } from "@/lib/feedback";
+import { useRuntimeState, runtimeLabel } from "@/hooks/useRuntimeState";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 // Aligned with the Signals/Crypto/Equities neon-green system.
@@ -1244,6 +1245,10 @@ export default function Profile() {
   const [location, setLocation] = useLocation();
   const { openOnboarding } = useBrokerConnection();
   const qc                 = useQueryClient();
+  // Task #199 — runtime label for the Simulation Performance header.
+  // Reads the same shared aggregator cache as the chip switcher in
+  // App.tsx Shell; flips to "LIVE: KRAKEN" when the user picks live.
+  const { data: runtimeStateForLabel } = useRuntimeState();
 
   // Auto-open the broker connection wizard when the user lands on
   // /settings/exchanges (the canonical exchange-onboarding path used by
@@ -1656,7 +1661,7 @@ export default function Profile() {
               <div style={{ width:5, height:5, borderRadius:"50%", background:"rgba(255,148,0,0.90)", flexShrink:0 }}/>
               <span style={{ fontSize:9, fontFamily:SANS, fontWeight:600,
                 color:"rgba(255,148,0,0.85)", letterSpacing:"0.08em" }}>
-                PAPER MODE — Simulated profits · Switch to Live to withdraw
+                {runtimeLabel(runtimeStateForLabel)} — Simulated profits · Switch to Live to withdraw
               </span>
             </div>
             {[

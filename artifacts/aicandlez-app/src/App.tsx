@@ -5,6 +5,7 @@ import {
 } from "@clerk/react";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { BottomNav } from "@/components/BottomNav";
+import { RuntimeSwitcher } from "@/components/RuntimeSwitcher";
 import { BillingHoldBanner } from "@/components/BillingHoldBanner";
 import { ApiBaseUrlBanner } from "@/components/ApiBaseUrlBanner";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
@@ -461,6 +462,11 @@ function Shell() {
         <div style={{ display: "flex", flexDirection: "column", height: "100dvh",
           maxWidth: 480, margin: "0 auto", background: "#000000", overflow: "hidden" }}>
           <GlobalBillingHoldIndicator />
+          {/* Task #199 — persistent runtime switcher above all PWA
+              pages. PWA is customer-only by product invariant, so no
+              role gating is needed here (admin uses the trading-
+              dashboard surface). */}
+          <RuntimeSwitcher />
           <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden",
             paddingTop: "env(safe-area-inset-top, 0px)" }}>
             <Pages />
