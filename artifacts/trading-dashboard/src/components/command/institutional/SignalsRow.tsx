@@ -29,9 +29,15 @@ interface PanelProps {
   tickers:           TickerSpec[];
   engine?:           EngineStatus;
   searchPlaceholder: string;
+  /* Customer-only typography mode (Phase 8.3 refinement). When true,
+     drops the small `· LONG · SHORT · …` helper tag beside the title
+     and renders the section title at a larger, higher-contrast,
+     wider-tracked weight so it visually dominates the panel header.
+     Default false → /command rendering is byte-identical. */
+  dominantTitle?:    boolean;
 }
 
-function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlaceholder }: PanelProps) {
+function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlaceholder, dominantTitle }: PanelProps) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [query,  setQuery]  = useState("");
   const [focused, setFocused] = useState(false);
@@ -106,15 +112,41 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlacehol
         }}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <span style={{ color: brand, display: "inline-flex", filter: `drop-shadow(0 0 4px ${brand}60)` }}>
+          <span style={{
+            color: brand, display: "inline-flex",
+            /* Slightly stronger icon glow under dominant title — matches the bolder type weight */
+            filter: dominantTitle ? `drop-shadow(0 0 6px ${brand}88)` : `drop-shadow(0 0 4px ${brand}60)`,
+          }}>
             {icon}
           </span>
-          <span className="text-[11px] font-bold tracking-[0.22em]" style={{ color: N.TEXT_0 }}>
-            {label}
-          </span>
-          <span className="text-[8.5px] font-semibold tracking-[0.14em]" style={{ color: N.TEXT_3 }}>
-            · {sub}
-          </span>
+          {dominantTitle ? (
+            /* Customer-only Phase 8.3: title dominates the header.
+               Helper sub-tag (`· LONG · SHORT · LARGE CAP · AI EXECUTION`)
+               removed entirely to free horizontal space. Wider tracking,
+               slightly larger size, brand neon hue — institutional, not arcade. */
+            <span
+              style={{
+                color: brand,
+                fontSize: 14,
+                fontWeight: 900,
+                letterSpacing: "0.28em",
+                textShadow: `0 0 8px ${brand}55`,
+                whiteSpace: "nowrap",
+                lineHeight: 1,
+              }}
+            >
+              {label}
+            </span>
+          ) : (
+            <>
+              <span className="text-[11px] font-bold tracking-[0.22em]" style={{ color: N.TEXT_0 }}>
+                {label}
+              </span>
+              <span className="text-[8.5px] font-semibold tracking-[0.14em]" style={{ color: N.TEXT_3 }}>
+                · {sub}
+              </span>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -344,21 +376,22 @@ export function SignalsRow({ engine }: { engine?: EngineStatus }) {
  * Right column = CRYPTO_ALTS_MEMES (HYPE GRT SNX … PEPE WIF BONK JUP …)
  * Same row component / same BUY/SELL routing as the original /command grid.
  */
-export function CryptoMajorsSignalsPanel({ engine }: { engine?: EngineStatus }) {
+export function CryptoMajorsSignalsPanel({ engine, dominantTitle }: { engine?: EngineStatus; dominantTitle?: boolean }) {
   return (
     <SignalsPanel
-      label="TOP 30 CRYPTO MAJORS"
+      label={dominantTitle ? "TOP 30 CRYPTOS" : "TOP 30 CRYPTO MAJORS"}
       sub="LONG · SHORT · LARGE CAP · AI EXECUTION"
       icon={<Bitcoin className="w-3.5 h-3.5" />}
       brand={N.BRAND}
       tickers={CRYPTO_MAJORS_30}
       engine={engine}
       searchPlaceholder="Search Crypto Majors…"
+      dominantTitle={dominantTitle}
     />
   );
 }
 
-export function CryptoAltsMemesPanel({ engine }: { engine?: EngineStatus }) {
+export function CryptoAltsMemesPanel({ engine, dominantTitle }: { engine?: EngineStatus; dominantTitle?: boolean }) {
   return (
     <SignalsPanel
       label="ALTS & MEMECOINS"
@@ -368,6 +401,7 @@ export function CryptoAltsMemesPanel({ engine }: { engine?: EngineStatus }) {
       tickers={CRYPTO_ALTS_MEMES}
       engine={engine}
       searchPlaceholder="Search Alts & Memes…"
+      dominantTitle={dominantTitle}
     />
   );
 }

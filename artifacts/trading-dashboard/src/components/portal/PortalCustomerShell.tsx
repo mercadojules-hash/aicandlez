@@ -5312,10 +5312,10 @@ export function PortalCustomerShell() {
                 wrapper below. The underlying CryptoMajorsSignalsPanel
                 JSX and /command rendering stay byte-identical. */}
             <div className="cd-customer-majors-panel">
-              <CryptoMajorsSignalsPanel engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} />
+              <CryptoMajorsSignalsPanel engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} dominantTitle />
             </div>
             {/* ALTS & MEMECOINS — same sort contract. */}
-            <CryptoAltsMemesPanel    engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} />
+            <CryptoAltsMemesPanel    engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} dominantTitle />
           </div>
 
           <aside className="cd-customer-battlefield-aside" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
