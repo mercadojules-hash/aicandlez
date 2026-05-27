@@ -512,6 +512,15 @@ export type BalanceConnection = {
   tradingMode:    string;
   ok:             boolean;
   totalEquityUSD: number;
+  /** Optional USD/stablecoin split (e.g. USD + USDC on Coinbase) — see
+   *  StandardAccount.usdBreakdown. Absent for adapters that don't
+   *  distinguish; UI MUST fall back to totalEquityUSD when undefined. */
+  usdBreakdown?:  {
+    cash:             number;
+    stablecoin:       number;
+    total:            number;
+    stablecoinAssets: string[];
+  };
   balances:       Record<string, { free: number; locked: number; total: number }>;
   lastUpdated:    number;
   error?:         string;
@@ -733,6 +742,7 @@ export async function loadBalanceForRow(
       ...base,
       ok:             true,
       totalEquityUSD: account.totalEquityUSD,
+      ...(account.usdBreakdown ? { usdBreakdown: account.usdBreakdown } : {}),
       balances:       account.balances,
       lastUpdated:    account.lastUpdated,
     };

@@ -143,15 +143,53 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
       3, 500, "getAccount",
     );
     const balances: Record<string, ReturnType<typeof emptyAccount>["balances"][string]> = {};
-    let usd = 0;
+
+    // Coinbase users commonly park trading capital in USDC rather than USD
+    // — Advanced Trade settles spot orders against either side of the
+    // book, so USDC is genuinely deployable buying power. The previous
+    // implementation summed only `currency === "USD"`, which silently
+    // understated equity (real-world report: $39 USD + $604 USDC reported
+    // as $39, breaking the user's trust in the runtime equity display).
+    //
+    // Scope of USD-pegged stables counted here is intentionally narrow
+    // (USDC only). Wider stables (USDT/DAI/PYUSD) can de-peg and need
+    // a price check before being treated as 1:1 deployable equity — out
+    // of scope for this conservative first pass. The `usdBreakdown`
+    // field surfaces the split so the UI can render USD Cash / USDC
+    // Collateral / Total Deployable Equity separately.
+    const STABLECOIN_ASSETS = new Set(["USDC"]);
+    let cash             = 0;
+    let stablecoin       = 0;
+    const stablecoinHit: Set<string> = new Set();
     for (const acc of data.accounts ?? []) {
       const asset  = acc.currency;
       const avail  = parseFloat(acc.available_balance.value);
       const hold   = parseFloat(acc.hold.value);
       balances[asset] = { free: avail, locked: hold, total: avail + hold };
-      if (asset === "USD") usd += avail + hold;
+      if (asset === "USD") {
+        cash += avail + hold;
+      } else if (STABLECOIN_ASSETS.has(asset)) {
+        const amt = avail + hold;
+        if (amt > 0) {
+          stablecoin += amt;
+          stablecoinHit.add(asset);
+        }
+      }
     }
-    return { exchange: "Coinbase", balances, totalEquityUSD: usd, positions: [], lastUpdated: Date.now() };
+    const totalEquityUSD = cash + stablecoin;
+    return {
+      exchange: "Coinbase",
+      balances,
+      totalEquityUSD,
+      usdBreakdown: {
+        cash,
+        stablecoin,
+        total:            totalEquityUSD,
+        stablecoinAssets: Array.from(stablecoinHit).sort(),
+      },
+      positions:   [],
+      lastUpdated: Date.now(),
+    };
   }
 
   async placeOrder(req: PlaceOrderRequest): Promise<StandardOrder> {

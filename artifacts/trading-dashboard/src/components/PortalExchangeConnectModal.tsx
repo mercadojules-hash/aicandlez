@@ -1404,6 +1404,34 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
               </div>
             )}
 
+            {/* Coinbase USDC collateral notice — Coinbase Advanced Trade
+                settles spot orders against either USD or USDC. AICandlez
+                counts your USD cash AND USDC balance as deployable
+                equity so the dashboard reflects what's actually
+                tradeable, not just the fiat slice. */}
+            {picked.id === "Coinbase" && (
+              <div style={{
+                padding: "10px 12px", marginBottom: 12,
+                background: "rgba(0,200,83,0.04)",
+                border: `1px solid ${N.BRAND}22`,
+                borderRadius: 8,
+                fontSize: 10.5, fontFamily: N.FONT_SANS, color: N.TEXT_0,
+                lineHeight: 1.55,
+              }}>
+                <div style={{
+                  fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 800,
+                  letterSpacing: "0.16em", color: N.BRAND, marginBottom: 6,
+                }}>
+                  ◆ USDC COUNTS AS DEPLOYABLE EQUITY
+                </div>
+                Coinbase may use <b>USDC as trading collateral</b>. Your
+                <b> USD cash</b> and <b>USDC balance</b> are both counted
+                toward your total deployable equity, so the dashboard
+                matches what Advanced Trade can actually route into spot
+                orders.
+              </div>
+            )}
+
             {/* API Key */}
             <Field label={picked.id === "Coinbase" ? "API KEY NAME" : "API KEY"} value={apiKey}
                    onChange={setApiKey}

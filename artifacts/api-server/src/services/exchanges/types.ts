@@ -62,10 +62,37 @@ export interface AssetBalance {
   total:  number;
 }
 
+/**
+ * Optional split of `totalEquityUSD` between USD fiat cash and USD-pegged
+ * stablecoin collateral (USDC today; future stables can be added per
+ * exchange). When present, the UI can render "USD Cash / USDC Collateral /
+ * Total Deployable Equity" instead of a single anonymous USD figure.
+ *
+ * Surfaced because Coinbase users routinely park trading capital as USDC
+ * rather than USD, and the previous "USD-only" sum silently understated
+ * their deployable equity (e.g. $39 cash + $604 USDC reported as $39).
+ *
+ * Adapters that haven't migrated yet leave this undefined; consumers MUST
+ * fall back to `totalEquityUSD` as the single source of truth and treat
+ * `usdBreakdown` purely as a presentational enrichment.
+ */
+export interface UsdBreakdown {
+  /** Native USD fiat balance (free + locked). */
+  cash:             number;
+  /** Sum of USD-pegged stablecoin balances counted toward equity (free + locked). */
+  stablecoin:       number;
+  /** cash + stablecoin — should equal the USD portion of `totalEquityUSD`. */
+  total:            number;
+  /** Asset tickers contributing to `stablecoin` (e.g. ["USDC"]). */
+  stablecoinAssets: string[];
+}
+
 export interface StandardAccount {
   exchange:       string;
   balances:       Record<string, AssetBalance>;  // keyed by asset (BTC, ETH, USDT, …)
   totalEquityUSD: number;
+  /** Optional USD/stablecoin split for adapters that distinguish them. */
+  usdBreakdown?:  UsdBreakdown;
   positions:      StandardPosition[];
   lastUpdated:    number;
 }
