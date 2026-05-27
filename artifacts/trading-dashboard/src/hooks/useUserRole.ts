@@ -32,14 +32,26 @@ interface UseUserRoleResult {
   email:        string | null;
 }
 
+// ── DEV-ONLY auth bypass ─────────────────────────────────────────────────────
+// Set VITE_DEV_BYPASS_AUTH=true in the trading-dashboard workflow env to
+// short-circuit Clerk + /api/auth/me on .replit.dev preview origins where
+// cross-origin Clerk cookies don't work. Hard-gated on import.meta.env.DEV
+// so it CANNOT leak into a production bundle (Vite tree-shakes the branch
+// when DEV === false). Treats the session as a synthetic super-admin so
+// every ProtectedAdmin route mounts immediately.
+const DEV_BYPASS_AUTH =
+  import.meta.env.DEV &&
+  ((import.meta.env["VITE_DEV_BYPASS_AUTH"] as string | undefined)?.toLowerCase() === "true");
+
 export function useUserRole(): UseUserRoleResult {
   const { isLoaded, isSignedIn, user } = useUser();
   const { getToken } = useAuth();
-  const [role,    setRole]    = useState<UserRole | null>(null);
-  const [email,   setEmail]   = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [role,    setRole]    = useState<UserRole | null>(DEV_BYPASS_AUTH ? "super-admin" : null);
+  const [email,   setEmail]   = useState<string | null>(DEV_BYPASS_AUTH ? "dev-bypass@aicandlez.local" : null);
+  const [loading, setLoading] = useState<boolean>(!DEV_BYPASS_AUTH);
 
   useEffect(() => {
+    if (DEV_BYPASS_AUTH) return;
     if (!isLoaded) return;
     if (!isSignedIn) {
       setRole(null);

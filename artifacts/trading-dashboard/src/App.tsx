@@ -296,7 +296,18 @@ function HomeRoute() {
 // renders consistently. Do NOT compose AdminOnly here — that would make
 // /portal admin-only and trap non-admin customers in a redirect loop
 // (AdminOnly → /portal → Protected → AdminOnly → …).
+// DEV-ONLY auth bypass — see useUserRole.ts. When enabled, every Protected /
+// ProtectedAdmin route mounts immediately without waiting on Clerk, so the
+// .replit.dev preview origin (where cross-origin Clerk cookies don't work)
+// can render the operator dashboard for visual inspection during development.
+// Gated on import.meta.env.DEV so the entire branch is tree-shaken out of
+// production bundles.
+const DEV_BYPASS_AUTH =
+  import.meta.env.DEV &&
+  ((import.meta.env["VITE_DEV_BYPASS_AUTH"] as string | undefined)?.toLowerCase() === "true");
+
 function Protected({ children }: { children: React.ReactNode }) {
+  if (DEV_BYPASS_AUTH) return <Layout>{children}</Layout>;
   return (
     <>
       <ClerkLoading><FullPageLoader /></ClerkLoading>
@@ -326,6 +337,7 @@ function AdminOnly({ children }: { children: React.ReactNode }) {
 }
 
 function ProtectedAdmin({ children }: { children: React.ReactNode }) {
+  if (DEV_BYPASS_AUTH) return <Layout>{children}</Layout>;
   return (
     <>
       <ClerkLoading><FullPageLoader /></ClerkLoading>
