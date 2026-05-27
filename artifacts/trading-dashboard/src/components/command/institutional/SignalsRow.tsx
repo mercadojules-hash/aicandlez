@@ -57,6 +57,16 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlacehol
       if (resolveDirection(t.symbol, b) === "LONG") longs.push({ spec: t, breakdown: b });
       else                                          shorts.push({ spec: t, breakdown: b });
     }
+    // Sort by AI confidence DESC so the 80-90%+ momentum surfaces at the
+    // top of each group (LONG / SHORT). Tickers without a breakdown yet
+    // fall to the bottom of their section. Original ticker order preserved
+    // only as a stable tiebreaker via Array.sort stability.
+    const byConfidenceDesc = (
+      a: { breakdown?: SymBreakdown },
+      b: { breakdown?: SymBreakdown },
+    ) => (b.breakdown?.avgConfidence ?? -1) - (a.breakdown?.avgConfidence ?? -1);
+    longs.sort(byConfidenceDesc);
+    shorts.sort(byConfidenceDesc);
     return { longs, shorts };
   }, [tickers, breakdowns, query]);
 
