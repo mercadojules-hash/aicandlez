@@ -122,22 +122,6 @@ export function useLiveCandles({
         });
     };
 
-    // ── [BUY-TRACE TEMP] ──────────────────────────────────────────────────
-    // Candle polling is suppressed in dev while we trace the BUY → Kraken
-    // execution path. The 400 spam from /api/candles was flooding the
-    // Network tab and obscuring the single execute request we care about.
-    // Synthetic anchors still drive the sparkline so the UI stays alive.
-    // Remove this guard the moment the first real Kraken fill is confirmed.
-    const BUY_TRACE_SUPPRESS_CANDLE_POLL = import.meta.env.DEV;
-    if (BUY_TRACE_SUPPRESS_CANDLE_POLL) {
-      const synth = makeWalk(anchor, limit, Math.random() * 6);
-      baseRef.current = synth;
-      setPoints(synth);
-      setLivePrice(synth[synth.length - 1].close);
-      setState("synthetic");
-      return () => { cancelled = true; };
-    }
-
     fetchOnce();
     const id = setInterval(fetchOnce, pollMs);
     return () => { cancelled = true; clearInterval(id); };

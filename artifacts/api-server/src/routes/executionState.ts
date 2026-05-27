@@ -20,7 +20,7 @@
  *   - "armed"     → engine running, not halted, no recent exec activity.
  *
  * Never touches the Kraken bridge, execution queue, auth middleware,
- * operator routing, or BUY-TRACE diagnostics. Pure telemetry projection.
+ * or operator routing. Pure telemetry projection.
  */
 
 import { Router, type Request, type Response } from "express";

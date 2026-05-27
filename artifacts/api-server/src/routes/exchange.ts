@@ -205,50 +205,7 @@ router.post("/exchange/order/preview", ...requireOperator, async (req, res) => {
 });
 
 // ── Execute order ─────────────────────────────────────────────────────────────
-// ── [BUY-TRACE PRE-AUTH] ────────────────────────────────────────────────────
-// Runs BEFORE requireAuth so we can see exactly what arrives on the wire
-// when the operator BUY click 401s. Logs:
-//   • method + path
-//   • presence + length of Authorization header
-//   • cookie header presence
-//   • clerk auth state extracted by @clerk/express (what getAuth sees)
-// If `auth.userId` is present here but requireAuth still 401s, the bug is
-// in requireAuth. If `auth.userId` is null here, the bug is upstream
-// (clerkMiddleware misconfigured for this host / token rejected).
-router.post("/exchange/order/execute", async (req, _res, next) => {
-  // eslint-disable-next-line no-console
-  const { getAuth } = await import("@clerk/express");
-  const auth = getAuth(req);
-  const authHeader = req.header("authorization") ?? "";
-  // eslint-disable-next-line no-console
-  console.error("[BUY-TRACE PRE-AUTH]", {
-    marker:           req.header("x-buy-trace") ?? null,
-    method:           req.method,
-    path:             req.originalUrl,
-    host:             req.header("host"),
-    xForwardedHost:   req.header("x-forwarded-host"),
-    xForwardedProto:  req.header("x-forwarded-proto"),
-    origin:           req.header("origin") ?? null,
-    referer:          req.header("referer") ?? null,
-    hasAuthHeader:    authHeader.startsWith("Bearer "),
-    authHeaderLen:    authHeader.length,
-    authTokenPrefix:  authHeader.startsWith("Bearer ") ? authHeader.slice(7, 25) + "…" : null,
-    hasCookie:        !!req.header("cookie"),
-    cookieHasSession: (req.header("cookie") ?? "").includes("__session"),
-    clerkAuthUserId:  auth?.userId ?? null,
-    clerkSessionId:   auth?.sessionId ?? null,
-    clerkSessionClaimsUserId: (auth?.sessionClaims as { userId?: string } | undefined)?.userId ?? null,
-  });
-  next();
-}, ...requireOperator, async (req, res) => {
-  // Loud console.error so the line is impossible to miss in workflow logs
-  // even if pino formatting hides structured fields. Mirrors req.log calls.
-  // eslint-disable-next-line no-console
-  console.error("[BUY-TRACE SERVER] HIT /api/exchange/order/execute", {
-    marker: req.header("x-buy-trace") ?? null,
-    userId: (req as unknown as { auth?: { userId?: string } }).auth?.userId ?? null,
-    body: req.body,
-  });
+router.post("/exchange/order/execute", ...requireOperator, async (req, res) => {
   const { symbol, side, orderType, amountUSD, limitPrice } = req.body as {
     symbol:     string;
     side:       OrderSide;
@@ -256,37 +213,16 @@ router.post("/exchange/order/execute", async (req, _res, next) => {
     amountUSD:  number;
     limitPrice?: number;
   };
-  req.log.info(
-    { tag: "BUY-TRACE", phase: "route-entry", marker: req.header("x-buy-trace") ?? null, symbol, side, orderType, amountUSD, limitPrice },
-    "[BUY-TRACE] /api/exchange/order/execute ENTRY",
-  );
   if (!symbol || !side || !orderType || !amountUSD) {
-    // eslint-disable-next-line no-console
-    console.error("[BUY-TRACE SERVER] VALIDATION FAIL", { symbol, side, orderType, amountUSD });
-    req.log.warn({ tag: "BUY-TRACE", phase: "validation-fail" }, "[BUY-TRACE] payload invalid");
     res.status(400).json({ error: "symbol, side, orderType, amountUSD are required" });
     return;
   }
   try {
-    // eslint-disable-next-line no-console
-    console.error("[BUY-TRACE SERVER] CALLING executeOrder", { symbol, side, orderType, amountUSD, limitPrice });
     const order = await executeOrder(symbol, side, orderType, amountUSD, limitPrice);
-    // eslint-disable-next-line no-console
-    console.error("[BUY-TRACE SERVER] executeOrder OK", order);
-    req.log.info(
-      { tag: "BUY-TRACE", phase: "executor-success", order },
-      "[BUY-TRACE] executeOrder returned",
-    );
     res.json(order);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Execution failed";
-    const stack = err instanceof Error ? err.stack : "(no stack)";
-    // eslint-disable-next-line no-console
-    console.error("[BUY-TRACE SERVER] executeOrder THREW", { msg, stack, raw: err });
-    req.log.error(
-      { tag: "BUY-TRACE", phase: "executor-throw", err: msg, stack },
-      "[BUY-TRACE] executeOrder threw",
-    );
+    req.log.error({ err: msg }, "executeOrder failed");
     res.status(502).json({ error: msg });
   }
 });

@@ -293,15 +293,18 @@ export function SignalRow({ spec, breakdown }: Props) {
     }
   }, [showSizePicker, capInfo.capUSD, liveSize, setLiveSize]);
 
-  /** Mirror a paper open into the server-side sim so dashboard panels see it. */
+  /**
+   * Mirror a paper open into the server-side sim so dashboard panels +
+   * post-refresh hydration see it. Best-effort, but failures are surfaced
+   * once per row so persistence gaps are visible instead of silent.
+   */
+  const mirrorWarnedRef = useRef(false);
   const mirrorPaperToServer = async (
     sym: string, side: "BUY" | "SELL",
   ) => {
     try {
       const token = await getToken().catch(() => null);
-      // Conservative fixed notional matches the live-order endpoint default.
-      // Server route /api/simulation/order expects { symbol, side, sizeUSD }.
-      await authFetch(`${apiBaseUrl}/api/simulation/order`, {
+      const res = await authFetch(`${apiBaseUrl}/api/simulation/order`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -310,7 +313,27 @@ export function SignalRow({ spec, breakdown }: Props) {
         },
         body: JSON.stringify({ symbol: sym, side, sizeUSD: 100 }),
       });
-    } catch { /* paper mirror is best-effort */ }
+      if (!res.ok && !mirrorWarnedRef.current) {
+        mirrorWarnedRef.current = true;
+        const body = await res.json().catch(() => ({} as { error?: string }));
+        toast({
+          title: "PAPER TRADE NOT PERSISTED",
+          description: `Server rejected mirror (HTTP ${res.status}): ${
+            (body as { error?: string }).error ?? "trade visible locally only; will be lost on refresh"
+          }`,
+        });
+      }
+    } catch (err) {
+      if (!mirrorWarnedRef.current) {
+        mirrorWarnedRef.current = true;
+        toast({
+          title: "PAPER TRADE NOT PERSISTED",
+          description: `Mirror to server failed: ${
+            err instanceof Error ? err.message : "unknown error"
+          } — trade visible locally only; will be lost on refresh`,
+        });
+      }
+    }
   };
 
   /** Submit a real-money order through the user's connected exchange. */
