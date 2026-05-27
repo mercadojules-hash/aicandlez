@@ -52,6 +52,7 @@ import { AIRiskControlsPanel } from "./AIRiskControlsPanel";
 import { AIDisclaimerModal } from "../AIDisclaimerModal";
 // Pass 7V — brand logo used above search bar (replaces ticker chips row).
 import aiCandlezLogoHorizontal from "@assets/aicandlez-logo-horizontal-master_1779691403317.png";
+import aiCandlezLogoBrandCell from "@assets/aicandlez-logo-horizontal-master_1779871004819.png";
 import { usePaperSignals, type OpportunityVM } from "../../hooks/usePaperSignals";
 import { useCustomerPlan, type Plan, UPGRADE_EVENT } from "../../hooks/useCustomerPlan";
 import { toast } from "@/hooks/use-toast";
@@ -5460,6 +5461,43 @@ function TodaysIntelligencePanel({
         color={engineLive ? T.NEON : T.TEXT_2}
         pulse={engineLive}
       />
+
+      {/* Phase 8.2 — branded telemetry anchor. Lives inside the metrics
+          grid (same `auto-fit minmax(190px)` row) so it scales with the
+          telemetry HUD rather than the page header. Subtle institutional
+          glow only; no floating-banner treatment. Logo height is locked
+          to metric-cell rhythm via clamp() so it gracefully reduces on
+          tablet/mobile without clipping. */}
+      <div
+        aria-label="AICandlez"
+        className="cd-customer-brand-cell"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "8px 12px",
+          borderRadius: 4,
+          background: "linear-gradient(180deg, rgba(102,255,102,0.06) 0%, rgba(0,0,0,0.35) 100%)",
+          border: `1px solid ${T.NEON}22`,
+          boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 0 12px rgba(102,255,102,0.06)`,
+          minHeight: 60,
+          overflow: "hidden",
+        }}
+      >
+        <img
+          src={aiCandlezLogoBrandCell}
+          alt="AICandlez"
+          draggable={false}
+          style={{
+            height: "clamp(28px, 4.2vw, 44px)",
+            width: "auto",
+            maxWidth: "100%",
+            objectFit: "contain",
+            filter: "drop-shadow(0 0 6px rgba(102,255,102,0.22))",
+            userSelect: "none",
+          }}
+        />
+      </div>
 
       {/* Phase 4 — emotional performance storytelling caption. Spans the
           full grid width via `gridColumn: 1 / -1`. Composes 2-3 narrative
