@@ -400,7 +400,7 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
 //
 // Empty `connections: []` is the "no live connection" signal the Portal/PWA
 // use to fall back to the simulated balance hero.
-type BalanceConnection = {
+export type BalanceConnection = {
   exchange:       string;
   label:          string | null;
   tradingMode:    string;
@@ -588,7 +588,7 @@ async function emitConnectionTestFailureNotification(
   }
 }
 
-async function loadBalanceForRow(
+export async function loadBalanceForRow(
   userId: string,
   row: typeof userExchangeConnectionsTable.$inferSelect,
 ): Promise<BalanceConnection> {

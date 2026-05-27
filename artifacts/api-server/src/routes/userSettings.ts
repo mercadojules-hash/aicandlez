@@ -35,6 +35,7 @@ function defaultSettings(userId: string) {
     volumeFilter:                true,
     require1HTrend:              false,
     preferredExchange:           "Kraken",
+    activeRuntimeExchange:       null as string | null,
     preferredLiveOrderSizeUsd:   DEFAULT_TRADE_SIZE_USD,
     paperSandboxEnabled:         false,
     notificationsTradeExec:      true,
@@ -132,6 +133,7 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
     // PATCH `/api/admin/users/:id/ai-settings` (`adminUserProfile.ts`).
     "require1HTrend",
     "preferredExchange",
+    "activeRuntimeExchange",
     "preferredLiveOrderSizeUsd",
     "paperSandboxEnabled",
     "notificationsTradeExec", "notificationsSignals", "notificationsRiskAlerts",

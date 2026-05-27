@@ -27,6 +27,31 @@ export const userSettingsTable = pgTable("user_settings", {
 
   preferredExchange:  varchar("preferred_exchange", { length: 50 }).notNull().default("Kraken"),
 
+  // CUSTOMER RUNTIME CONTEXT — Task #198 foundation column. Source of
+  // truth for which trading runtime the customer's portal/PWA is
+  // currently scoped to:
+  //   - `null`        — no explicit choice. Aggregator
+  //                     (`GET /api/user/runtime-state`) applies the
+  //                     auto-promotion rule: if the user has exactly
+  //                     one active live connection, mode becomes
+  //                     `"live"` against that exchange; otherwise
+  //                     mode stays `"paper"`.
+  //   - `"paper"`     — explicit user opt-out. Aggregator returns
+  //                     mode=`"paper"` even when active live
+  //                     connections exist. Used by the "I want to
+  //                     stay in paper" toggle.
+  //   - <exchange id> — explicit preferred live exchange. Aggregator
+  //                     returns mode=`"live"`, activeExchange=this
+  //                     ONLY if the connection is healthy
+  //                     (`status="active"` AND no fresh
+  //                     `lastBalanceFetchError`). Otherwise
+  //                     liveReady=false, mode falls back to "paper".
+  // Real-money execution is still gated independently by the env
+  // flag `CUSTOMER_LIVE_EXECUTION_ENABLED` and the explicit ARM
+  // step (Task #200 will reserve `runtime_not_armed` errorCode for
+  // that gate). This column never bypasses either gate.
+  activeRuntimeExchange: varchar("active_runtime_exchange", { length: 50 }),
+
   // Customer's preferred per-trade LIVE notional, picked in the Portal
   // SignalRow size picker. Persisted server-side so the preference carries
   // across browsers/devices. Per-tier cap is still enforced independently

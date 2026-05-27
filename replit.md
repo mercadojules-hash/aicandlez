@@ -100,24 +100,43 @@ Two systems sharing `trading-dashboard`. Every `/portal` change must be
 role-gated; never merge the two worlds.
 
 ### CUSTOMER (`trade./portal`, non-admin)
-- **PAPER mode ONLY.** No LIVE affordances exposed.
-- Real-money execution operated by AICandlez through admin terminal using
-  server-side env Kraken keys. Customers do not route their own orders.
-- Server-side kill switch `customer_live_execution_disabled` enforced in
-  `placeLiveAutoOrderForUser`, `POST /api/user/live-order`, and
-  `tradingLoop` customer fan-out. Default off; flips only when
-  `CUSTOMER_LIVE_EXECUTION_ENABLED=true`. Admin/super-admin bypass.
-- No PAPER/LIVE toggle, no `LiveExecutionBar`, no ARM LIVE. Static
-  "PAPER MODE" banner only.
-- Onboarding + upgrade funnels + tier gates unlock **paper capacity + AI
-  features**, NOT live execution.
-- `user_exchange_connections` + ConnectModal mounted for forward
-  compatibility, not load-bearing.
-- `PaperTradesProvider` mounted, gated `!isAdmin`.
-- **`PortalCustomerShell` does NOT mount `PortalModeProvider`** —
-  intentional. `SignalRow` operator branch is therefore gated strictly on
-  `isOperatorRole` (never on `!isCustomerPortal`), so customer BUY clicks
-  always fall through to `firePaper()`.
+- **Runtime mode = paper by default; customers may opt into a connected
+  exchange runtime.** Source of truth = `CustomerTradingRuntimeContext`
+  (spec: `.local/docs/customer-runtime-context-spec.md`) hydrated from
+  `GET /api/user/runtime-state`. Modes: `"paper"` (simulated hero +
+  paper trades feed) or `"live"` (live equity + live BUY routing,
+  subject to ARM).
+- Auto-promotion rule: when `user_settings.activeRuntimeExchange IS
+  NULL` AND the user has exactly ONE healthy active connection
+  (status="active", balance poll ok=true), aggregator resolves
+  `mode="live"`, `activeExchange=<that one>`. Two healthy connections
+  → stay paper until user picks (Task #199 switcher UI). Any non-OK
+  state → stay paper. Explicit `"paper"` override is sticky — even
+  with one healthy connection, customer stays paper until they pick
+  an exchange.
+- Server-side kill switch `customer_live_execution_disabled` is
+  **unchanged** — enforced in `placeLiveAutoOrderForUser`,
+  `POST /api/user/live-order`, and `tradingLoop` customer fan-out.
+  Default off; flips only when `CUSTOMER_LIVE_EXECUTION_ENABLED=true`.
+  Admin/super-admin bypass. The runtime mode flipping to `"live"`
+  gives the UI permission to render live affordances; it does NOT
+  bypass this env flag, which still gates real money independently.
+- ARM gate (Task #200, errorCode `runtime_not_armed`) sits between
+  `liveReady=true` and execution. Three independent checks must all
+  pass for a live order to ship: (1) env kill switch off, (2)
+  `liveReady=true` from aggregator, (3) explicit per-session ARM.
+- Onboarding + upgrade funnels + tier gates unlock **paper capacity, AI
+  features, AND eligibility to connect a live exchange** (still gated
+  by the three checks above for actual execution).
+- `user_exchange_connections` + ConnectModal are load-bearing under
+  this policy. Per-connection telemetry
+  (`lastBalanceFetchAt`/`lastBalanceFetchError`) is surfaced through
+  the aggregator so the portal can render "balances last synced 12s
+  ago" / sync-failed banners.
+- `PaperTradesProvider` remains mounted, gated `!isAdmin`, used
+  whenever `mode === "paper"`.
+- Customer telemetry + trade history MUST tag rows with mode
+  (`PAPER`/`LIVE`) — unchanged.
 
 ### ADMIN (`admintrade./portal`, admin/super-admin)
 - **Real-only.** No paper, no `PaperTradesProvider`, no simulation.
