@@ -1,0 +1,117 @@
+We discovered a major UX/state issue in the customer exchange onboarding flow.
+
+CURRENT PROBLEM
+User successfully connected Coinbase (OAuth/API succeeded), but the customer battlefield remained in PAPER mode and continued displaying simulated balances/equity.
+
+The modal correctly shows:
+“Coinbase - PAPER”
+which proves the connection persisted, BUT the UI/runtime never transitioned from paper simulation → live exchange context automatically.
+
+This creates dangerous ambiguity because users think the exchange failed even though auth succeeded.
+
+We need a full exchange-runtime normalization pass.
+
+GOALS
+
+1. AUTO-SWITCH TO LIVE EXCHANGE AFTER SUCCESSFUL CONNECTION
+When an exchange connection succeeds:
+- immediately invalidate/refetch exchange state
+- switch runtime from paper mode → live exchange mode automatically
+- replace simulated equity with real balances
+- update account telemetry
+- remove “paper sim” labels
+- show active exchange badge (Coinbase/Kraken/etc)
+
+Customer should NEVER need a refresh after successful exchange auth.
+
+2. MULTI-EXCHANGE ACCOUNT SWITCHER
+Add a persistent exchange selector/switcher in customer portal header.
+
+Example:
+[ PAPER ] [ KRAKEN ] [ COINBASE ]
+
+Requirements:
+- user can switch runtime context instantly
+- selected exchange persists across refresh/session
+- active exchange drives:
+  - balances
+  - execution routing
+  - AI execution source
+  - telemetry
+  - live readiness state
+- paper mode remains selectable intentionally
+
+3. EXPLICIT ACCOUNT MODE STATE
+Right now the UX is ambiguous.
+
+Need explicit runtime labels:
+- PAPER MODE
+- LIVE: KRAKEN
+- LIVE: COINBASE
+
+Displayed in:
+- top status strip
+- account panel
+- execution CTA region
+
+4. CENTRALIZED RUNTIME SOURCE OF TRUTH
+We likely have fragmented state.
+
+Create a unified customer execution runtime store:
+Example:
+CustomerTradingRuntimeContext
+
+Should contain:
+- mode: paper | live
+- activeExchange
+- connectedExchanges[]
+- balances
+- equity
+- liveReady
+- exchangeConnectionState
+
+All battlefield/account/execution components should derive from THIS instead of local paper defaults.
+
+5. AUTO-PROMOTION RULE
+If:
+- at least one exchange is connected
+AND
+- credentials validated
+AND
+- balances fetched successfully
+
+Then:
+AUTO SWITCH to that exchange unless the user explicitly selected PAPER mode.
+
+6. SAFE EXECUTION GUARDS
+Even after auto-switch:
+- DO NOT auto-enable AI trading
+- DO NOT auto-place trades
+- execution still requires explicit user activation
+
+This is ONLY a runtime/account-context switch.
+
+7. DEBUGGING / OBSERVABILITY
+Add structured logs:
+[CUSTOMER_RUNTIME]
+[EXCHANGE_CONNECTED]
+[RUNTIME_SWITCH]
+[BALANCE_SYNC]
+[LIVE_READY]
+
+Need to trace:
+- why paper fallback occurred
+- why exchange balances were ignored
+- whether runtime hydration failed
+
+8. EXPECTED FINAL UX
+Flow should become:
+
+Connect Coinbase →
+OAuth/API succeeds →
+runtime auto-switches →
+real balances appear →
+header shows LIVE: COINBASE →
+paper account disappears unless intentionally selected.
+
+This should feel seamless and institutional-grade.
