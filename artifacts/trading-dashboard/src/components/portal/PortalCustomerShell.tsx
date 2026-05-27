@@ -4443,7 +4443,7 @@ function CustomerStatusChip({ label, value, color }: { label: string; value: str
 
 function MyAccountRailPaper({
   equityUsd, todayPnl, realized, unrealized, fillsToday, openCount,
-  history, engine, entitled = false,
+  history, engine, entitled = false, liveMode = false, liveExchange = null,
 }: {
   equityUsd:   number;
   todayPnl:    number;
@@ -4456,6 +4456,12 @@ function MyAccountRailPaper({
   /* Phase 8.4 — when true (starter/pro), softens header chip + MODE
      metric from "PAPER" gold to "LIVE READY" neon brand. */
   entitled?:   boolean;
+  /* Task #206 — when the runtime aggregator resolves the customer to
+     LIVE against a healthy exchange, swap the "paper sim" hero
+     subtitle for the actual broker name so the equity surface stops
+     misclassifying real capital as simulated. */
+  liveMode?:     boolean;
+  liveExchange?: string | null;
 }) {
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -4545,7 +4551,7 @@ function MyAccountRailPaper({
           fontSize: 12, fontWeight: 700,
           color: pctToday >= 0 ? N.LONG : N.SHORT, letterSpacing: "0.04em",
         }}>
-          {pctToday >= 0 ? "+" : ""}{pctToday.toFixed(2)}% TODAY · paper sim
+          {pctToday >= 0 ? "+" : ""}{pctToday.toFixed(2)}% TODAY · {liveMode ? `live · ${(liveExchange ?? "broker").toLowerCase()}` : "paper sim"}
         </span>
       </div>
 
@@ -4637,6 +4643,8 @@ function CustomerBlotterPanelOpen({ rows, entitled = false }: {
   rows: ReadonlyArray<{
     id: string; symbol: string; display: string; side: "LONG" | "SHORT";
     entry: number; last: number; pnl: number; pnlPct: number;
+    /* Per-row execution origin — see CustomerBlotterRow. */
+    origin?: string;
   }>;
   /* Phase 8.4 — entitled customers see "● LIVE READY" badge.
      Server kill switch + concurrent caps still gate real fills. */
@@ -4652,7 +4660,8 @@ function CustomerBlotterPanelOpen({ rows, entitled = false }: {
         return (
           <CustomerBlotterRow key={t.id}
             symbol={t.symbol} side={t.side} sideColor={sideColor}
-            entry={t.entry} other={t.last} pnl={t.pnl} pnlPct={t.pnlPct} pnlColor={pnlColor} />
+            entry={t.entry} other={t.last} pnl={t.pnl} pnlPct={t.pnlPct} pnlColor={pnlColor}
+            origin={t.origin} />
         );
       })}
     </CustomerBlotterShell>
@@ -4663,6 +4672,7 @@ function CustomerBlotterPanelHistory({ rows }: {
   rows: ReadonlyArray<{
     id: string; symbol: string; display: string; side: "LONG" | "SHORT";
     entry: number; exit: number; pnl: number; pnlPct: number;
+    origin?: string;
   }>;
 }) {
   return (
@@ -4674,7 +4684,8 @@ function CustomerBlotterPanelHistory({ rows }: {
         return (
           <CustomerBlotterRow key={t.id}
             symbol={t.symbol} side={t.side} sideColor={sideColor}
-            entry={t.entry} other={t.exit} pnl={t.pnl} pnlPct={t.pnlPct} pnlColor={pnlColor} />
+            entry={t.entry} other={t.exit} pnl={t.pnl} pnlPct={t.pnlPct} pnlColor={pnlColor}
+            origin={t.origin} />
         );
       })}
     </CustomerBlotterShell>
@@ -4745,13 +4756,22 @@ function CustomerBlotterShell({
 }
 
 function CustomerBlotterRow({
-  symbol, side, sideColor, entry, other, pnl, pnlPct, pnlColor,
+  symbol, side, sideColor, entry, other, pnl, pnlPct, pnlColor, origin,
 }: {
   symbol: string; side: "LONG" | "SHORT"; sideColor: string;
   entry: number; other: number; pnl: number; pnlPct: number; pnlColor: string;
+  /* Per-row execution origin chip. "PAPER" for simulated rows;
+     uppercased exchange name (e.g. "COINBASE") for real broker fills.
+     Renders next to the symbol so the customer can never confuse a
+     paper-sim row with a real-money position regardless of runtime
+     mode. Undefined = no chip (back-compat). */
+  origin?: string;
 }) {
   const fmtUsd = (n: number) => `${n >= 0 ? "+" : "-"}$${Math.abs(n).toFixed(2)}`;
   const fmtPct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+  const isLiveOrigin = !!origin && origin !== "PAPER";
+  const chipColor = isLiveOrigin ? N.BRAND_BRT : N.GOLD_BRT;
+  const chipLabel = isLiveOrigin ? `LIVE · ${origin}` : "PAPER";
   return (
     <div style={{
       display: "grid",
@@ -4760,7 +4780,20 @@ function CustomerBlotterRow({
       padding: "10px 16px", borderBottom: `1px solid ${N.BORDER}`,
       fontSize: 12.5,
     }}>
-      <span style={{ color: N.TEXT_0, fontWeight: 800, letterSpacing: "0.04em", fontSize: 13 }}>{symbol}</span>
+      <span style={{ display: "inline-flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+        <span style={{ color: N.TEXT_0, fontWeight: 800, letterSpacing: "0.04em", fontSize: 13 }}>{symbol}</span>
+        {origin && (
+          <span style={{
+            fontSize: 8.5, fontWeight: 800, letterSpacing: "0.16em",
+            color: chipColor,
+            padding: "1px 5px", borderRadius: 2,
+            border: `1px solid ${chipColor}55`, background: `${chipColor}10`,
+            alignSelf: "flex-start",
+          }}>
+            {chipLabel}
+          </span>
+        )}
+      </span>
       <span style={{
         color: sideColor, fontWeight: 800,
         fontSize: 11, letterSpacing: "0.16em",
@@ -5032,6 +5065,83 @@ export function PortalCustomerShell() {
   const isLiveRuntime = runtimeState?.mode === "live";
   const liveTotalUsd  = runtimeState?.totalEquityUSD ?? 0;
   const displayEquity = isLiveRuntime ? liveTotalUsd : (paperStats.equity || STARTING_EQUITY);
+  const liveExchange  = isLiveRuntime ? (runtimeState?.activeExchange ?? null) : null;
+
+  // Task #206 — Live-vs-paper execution classification consistency.
+  // The customer blotter previously rendered ONLY rows from the
+  // in-memory `usePaperTrades` store. When the runtime aggregator
+  // resolved the customer to LIVE and the engine fired a real
+  // broker order (e.g. PEPEUSD LONG on Coinbase via
+  // placeLiveAutoOrderForUser), the position landed in server
+  // `sim_positions WHERE exchange='coinbase'` and was never surfaced
+  // here — the visible blotter remained an empty paper feed, while
+  // a different surface counted the open position, producing the
+  // "labeled paper sim but live ran" confusion. We now pull the
+  // canonical account summary (which serializes per-position
+  // `exchange`) from `/api/simulation/account` whenever we're in
+  // LIVE runtime, and use those rows for the OPEN panel instead of
+  // the paper store. Each row carries an `origin` chip the customer
+  // sees on every line. Paper rows continue to feed from
+  // `usePaperTrades` when runtime is "paper".
+  type ServerSimPosition = {
+    id:               string | number;
+    symbol:           string;
+    side:             string;
+    entryPrice:       number;
+    currentPrice?:    number;
+    unrealizedPnL?:   number;
+    unrealizedPnLPct?: number;
+    exchange?:        string | null;
+  };
+  type ServerAccountSummary = {
+    equity:        number;
+    positionCount: number;
+    positions:     ServerSimPosition[];
+  };
+  const { data: serverAccount } = useQuery<ServerAccountSummary>({
+    queryKey:        ["customer-simulation-account"],
+    queryFn:         async () => {
+      const resp = await authFetch("/api/simulation/account");
+      if (!resp.ok) throw new Error(`/api/simulation/account ${resp.status}`);
+      return (await resp.json()) as ServerAccountSummary;
+    },
+    refetchInterval: 8_000,
+    staleTime:       4_000,
+    enabled:         isLiveRuntime,
+    retry:           false,
+  });
+  const liveOpenRows = useMemo(() => {
+    if (!isLiveRuntime) return [] as Array<{
+      id: string; symbol: string; display: string; side: "LONG" | "SHORT";
+      entry: number; last: number; pnl: number; pnlPct: number; origin: string;
+    }>;
+    return (serverAccount?.positions ?? [])
+      .filter(p => p.exchange != null && p.exchange !== "")
+      .map(p => {
+        const rawSide = String(p.side ?? "").toUpperCase();
+        const side: "LONG" | "SHORT" = rawSide === "SHORT" || rawSide === "SELL" ? "SHORT" : "LONG";
+        return {
+          id:      String(p.id),
+          symbol:  p.symbol,
+          display: p.symbol,
+          side,
+          entry:   Number(p.entryPrice) || 0,
+          last:    Number(p.currentPrice ?? p.entryPrice) || 0,
+          pnl:     Number(p.unrealizedPnL ?? 0),
+          pnlPct:  Number(p.unrealizedPnLPct ?? 0),
+          origin:  String(p.exchange ?? "").toUpperCase(),
+        };
+      });
+  }, [isLiveRuntime, serverAccount]);
+  // Paper rows always carry the PAPER origin chip so they're never
+  // visually confused with broker fills, even if a future change
+  // ever mixes the two feeds.
+  const paperOpenRows = useMemo(
+    () => openTrades.map(t => ({ ...t, origin: "PAPER" })),
+    [openTrades],
+  );
+  const blotterOpenRows = isLiveRuntime ? liveOpenRows : paperOpenRows;
+  const blotterOpenCount = blotterOpenRows.length;
 
   // Pass 3.3: ONE shell-level 1Hz tick — passed as a prop to
   // `OperatorPulseRibbon`, `OpportunityMatrix`, and
@@ -6069,12 +6179,14 @@ export function PortalCustomerShell() {
               realized={paperStats.realizedPnl}
               unrealized={paperStats.unrealizedPnl}
               fillsToday={paperHistory.filter(t => new Date(t.closedAt).toDateString() === new Date().toDateString()).length}
-              openCount={openTrades.length}
+              openCount={blotterOpenCount}
               history={paperHistory}
               engine={engineStatus}
               entitled={entitled}
+              liveMode={isLiveRuntime}
+              liveExchange={liveExchange}
             />
-            <CustomerBlotterPanelOpen rows={openTrades} entitled={entitled} />
+            <CustomerBlotterPanelOpen rows={blotterOpenRows} entitled={entitled} />
             <CustomerBlotterPanelHistory rows={paperHistory} />
           </aside>
         </section>
