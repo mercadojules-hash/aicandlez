@@ -66,7 +66,7 @@ import { AIDisclaimerModal } from "../AIDisclaimerModal";
 import aiCandlezLogoHorizontal from "@assets/aicandlez-logo-horizontal-master_1779691403317.png";
 import aiCandlezLogoBrandCell from "@assets/aicandlez-logo-horizontal-master_1779871004819.png";
 import { usePaperSignals, type OpportunityVM } from "../../hooks/usePaperSignals";
-import { useCustomerPlan, type Plan, UPGRADE_EVENT } from "../../hooks/useCustomerPlan";
+import { useCustomerPlan, useCustomerEntitlement, type Plan, UPGRADE_EVENT } from "../../hooks/useCustomerPlan";
 import { toast } from "@/hooks/use-toast";
 import { calibrateRawConfidence } from "../../lib/conviction";
 import { useExecutionState } from "../../hooks/useExecutionState";
@@ -4783,6 +4783,12 @@ function CustomerHeaderBtn({
 export function PortalCustomerShell() {
   const { isAdmin } = useUserRole();
   const plan = useCustomerPlan();
+  // Richer entitlement projection — `isPaid` correctly recognizes
+  // complimentary, trialing, and freshly-paid-but-cache-stale customers
+  // that the bare `plan === "free"` string check would mis-lock out of
+  // the Connect Exchange flow. Backed by the same shared cache as
+  // `useCustomerPlan` so this adds no extra network traffic.
+  const { isPaid } = useCustomerEntitlement();
   // Phase 8.4 — subscription-aware copy gate. STARTER / PRO customers
   // see softened LIVE READY language across the battlefield (header chip,
   // MyAccount header + MODE metric, LiveControlBar CTA + pill, blotter
@@ -5641,7 +5647,7 @@ export function PortalCustomerShell() {
       <CustomerTopHeader
         isExchangeConnected={(runtimeState?.connectedExchanges ?? []).some(c => c.status === "active")}
         plan={plan}
-        onConnect={() => plan === "free" ? setUpgrade(true) : setConnectOpen(true)}
+        onConnect={() => !isPaid ? setUpgrade(true) : setConnectOpen(true)}
         onSignOut={() => void portalSignOut()}
         onAccount={() => setAccount(true)}
         onDisclaimer={() => setDisclaimer(true)}
@@ -5892,7 +5898,7 @@ export function PortalCustomerShell() {
       <PortalExchangeConnectModal
         open={connectOpen}
         onClose={() => setConnectOpen(false)}
-        liveExchangesEnabled={isAdmin || plan !== "free"}
+        liveExchangesEnabled={isAdmin || isPaid}
       />
       {disclaimerGateModal}
 
@@ -5903,7 +5909,7 @@ export function PortalCustomerShell() {
           touch-optimized (52px min-height, large hit areas). */}
       <MobileBottomNav
         onSignals={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        onConnect={() => plan === "free" ? setUpgrade(true) : setConnectOpen(true)}
+        onConnect={() => !isPaid ? setUpgrade(true) : setConnectOpen(true)}
         onAccount={() => setAccount(true)}
         onAlerts={() => setAccount(true)}
         onSignOut={() => void portalSignOut()}

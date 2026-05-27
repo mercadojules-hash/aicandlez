@@ -25,18 +25,41 @@ export type Plan = "free" | "starter" | "pro";
 const apiBaseUrl: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
 
-export function useCustomerPlan(): Plan {
+// Shared cache key — every customer-shell surface (useCustomerPlan,
+// useCustomerEntitlement, SignalRow) reads from this single query so
+// invalidations from OnboardingFlow / Billing.tsx settle every consumer
+// in lockstep. Do not split this key without also updating
+// OnboardingFlow's `?checkout=success` invalidation list, or paying
+// customers will see stale `plan="free"` after Stripe redirects them
+// back into the portal (P0 — gates the Connect Exchange CTA).
+export const BILLING_SUBSCRIPTION_QUERY_KEY = ["billing-subscription-portal-shell"] as const;
+
+interface SubscriptionPayload {
+  plan?:            string;
+  planStatus?:      string | null;
+  isComplimentary?: boolean;
+  effectivePlan?:   string;
+  isActive?:        boolean;
+  isPaid?:          boolean;
+  canLiveTrade?:    boolean;
+}
+
+function useSubscriptionQuery() {
   const { isSignedIn, getToken } = useAuth();
-  const { data } = useQuery<{
-    plan?:            string;
-    isComplimentary?: boolean;
-    effectivePlan?:   string;
-  }>({
-    queryKey: ["billing-subscription-portal-shell"],
+  return useQuery<SubscriptionPayload>({
+    queryKey: BILLING_SUBSCRIPTION_QUERY_KEY,
     enabled:  isSignedIn ?? false,
-    refetchInterval: 60_000,
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
+    // 60s background poll + 30s stale window — same as Phase 6. We additionally
+    // refetch on window focus + every mount so that returning from Stripe
+    // checkout (which navigates away and back) hydrates the fresh entitlement
+    // immediately rather than waiting up to a minute for the poll to wake.
+    // Without this the Connect Exchange CTA opens the UpgradeModal on the
+    // first click after a successful checkout because the cached
+    // `plan="free"` is still in memory.
+    refetchInterval:      60_000,
+    staleTime:            30_000,
+    refetchOnWindowFocus: true,
+    refetchOnMount:       "always",
     queryFn: async () => {
       const token = await getToken().catch(() => null);
       const res = await authFetch(`${apiBaseUrl}/api/billing/subscription`, {
@@ -47,6 +70,10 @@ export function useCustomerPlan(): Plan {
       return res.json();
     },
   });
+}
+
+export function useCustomerPlan(): Plan {
+  const { data } = useSubscriptionQuery();
   // Operator-granted complimentary entitlement collapses onto the effective
   // tier — without this every consumer renders complimentary users as FREE
   // despite the backend AI gate granting full live access.
@@ -54,6 +81,42 @@ export function useCustomerPlan(): Plan {
     ? (data?.effectivePlan ?? "pro")
     : data?.plan;
   return p === "starter" || p === "pro" ? p : "free";
+}
+
+export interface CustomerEntitlement {
+  plan:         Plan;
+  /** Server-derived: true for any paid plan OR complimentary grant. Use this
+   *  (not `plan !== "free"`) for any gate that asks "is this user entitled
+   *  to a paid feature?" — it correctly handles the complimentary,
+   *  trialing, and brief webhook-race windows where `plan` may still read
+   *  as "free" while the server already considers the user paid. */
+  isPaid:       boolean;
+  /** True when the user's subscription is in a billable state
+   *  (active / trialing / complimentary). Free-but-active users included. */
+  isActive:     boolean;
+  /** True when the user is entitled to live trading at the tier level.
+   *  Server-side execution still gates on the kill switch + ARM. */
+  canLiveTrade: boolean;
+  isLoading:    boolean;
+}
+
+/**
+ * Rich entitlement projection backed by the same shared cache as
+ * `useCustomerPlan`. Use this for any UI gate that should grant access on
+ * payment / complimentary state — `plan === "free"` is a brittle proxy that
+ * mis-locks paying customers during webhook races, complimentary grants,
+ * and trialing windows.
+ */
+export function useCustomerEntitlement(): CustomerEntitlement {
+  const { data, isLoading } = useSubscriptionQuery();
+  const plan = useCustomerPlan();
+  return {
+    plan,
+    isPaid:       data?.isPaid       === true || data?.isComplimentary === true || plan !== "free",
+    isActive:     data?.isActive     === true,
+    canLiveTrade: data?.canLiveTrade === true,
+    isLoading,
+  };
 }
 
 // Phase 6 — Upgrade event bridge.

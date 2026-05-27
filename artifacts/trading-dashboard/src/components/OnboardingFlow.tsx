@@ -151,9 +151,17 @@ export function OnboardingFlow() {
       {}, "",
       url.pathname + (cleanQuery ? `?${cleanQuery}` : "") + url.hash,
     );
+    // Stripe webhook updates `users.plan` server-side, but every
+    // customer-shell surface (PortalCustomerShell, SignalRow, etc.)
+    // caches the pre-checkout `plan="free"` payload for up to 60s
+    // under `BILLING_SUBSCRIPTION_QUERY_KEY`. Force a refetch on
+    // re-entry so the Connect Exchange CTA, tier gates, and runtime
+    // banner all hydrate to the freshly-paid entitlement immediately.
+    queryClient.invalidateQueries({ queryKey: ["billing-subscription-portal-shell"] });
+    queryClient.invalidateQueries({ queryKey: ["onboarding-sub"] });
     setBypassResolved(false);
     setStep("choose");
-  }, [isSignedIn]);
+  }, [isSignedIn, queryClient]);
 
   // ── Bypass: when opened, jump to the right step once. `bypassResolved`
   // latches the decision so query-disable on close cannot reopen the flow.
@@ -200,6 +208,7 @@ export function OnboardingFlow() {
         queryClient.invalidateQueries({ queryKey: ["user-exchanges"] });
         queryClient.invalidateQueries({ queryKey: ["exchange-connections"] });
         queryClient.invalidateQueries({ queryKey: ["runtime-state"] });
+        queryClient.invalidateQueries({ queryKey: ["billing-subscription-portal-shell"] });
         setStep("ready");
       } else {
         setOauthError(data.error ?? "The exchange did not authorize the connection.");
@@ -217,6 +226,7 @@ export function OnboardingFlow() {
     queryClient.invalidateQueries({ queryKey: ["user-exchanges"] });
     queryClient.invalidateQueries({ queryKey: ["exchange-connections"] });
     queryClient.invalidateQueries({ queryKey: ["onboarding-sub"] });
+    queryClient.invalidateQueries({ queryKey: ["billing-subscription-portal-shell"] });
     queryClient.invalidateQueries({ queryKey: ["runtime-state"] });
     setStep("ready");
   };
