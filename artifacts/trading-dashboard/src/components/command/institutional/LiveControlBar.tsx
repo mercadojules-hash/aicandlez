@@ -240,20 +240,30 @@ export function LiveControlBar({
 
         {/* LEFT — icon + label + sublabel */}
         <div className="flex items-center" style={{ gap: 16, pointerEvents: "none", zIndex: 1 }}>
-          <span style={{
-            width: 50, height: 50, borderRadius: 6,
-            background: isExecuting ? `${color}22` : isArmedRdy ? `${color}1a` : isHalted ? `${color}18` : "#050905",
-            border: `1.5px solid ${color}${isExecuting ? "" : isArmedRdy ? "88" : isHalted ? "70" : "40"}`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: isExecuting
-              ? `0 0 18px ${color}70, inset 0 0 12px ${color}40`
-              : isArmedRdy
-              ? `0 0 14px ${color}60, inset 0 0 10px ${color}30`
-              : "none",
-            flexShrink: 0,
-          }}>
-            {leadingSlot != null ? leadingSlot : (
-              isHalted
+          {leadingSlot != null ? (
+            /* Customer hero-brand mode — no boxed treatment. The slot renders
+               transparent, vertically centered, with its own breathing room
+               so a brand mark / logo can act as the terminal anchor. */
+            <span style={{
+              display: "flex", alignItems: "center", justifyContent: "flex-start",
+              flexShrink: 0, paddingRight: 4,
+            }}>
+              {leadingSlot}
+            </span>
+          ) : (
+            <span style={{
+              width: 50, height: 50, borderRadius: 6,
+              background: isExecuting ? `${color}22` : isArmedRdy ? `${color}1a` : isHalted ? `${color}18` : "#050905",
+              border: `1.5px solid ${color}${isExecuting ? "" : isArmedRdy ? "88" : isHalted ? "70" : "40"}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: isExecuting
+                ? `0 0 18px ${color}70, inset 0 0 12px ${color}40`
+                : isArmedRdy
+                ? `0 0 14px ${color}60, inset 0 0 10px ${color}30`
+                : "none",
+              flexShrink: 0,
+            }}>
+              {isHalted
                 ? <OctagonAlert size={24} style={{ color, filter: `drop-shadow(0 0 4px ${color})` }} />
                 : isExecuting
                 ? <Activity     size={24} style={{ color: colorBrt, animation: "neon-pulse 1.1s infinite", filter: `drop-shadow(0 0 4px ${color})` }} />
@@ -261,9 +271,9 @@ export function LiveControlBar({
                 ? <ShieldCheck  size={24} style={{ color: colorBrt, filter: `drop-shadow(0 0 4px ${color})` }} />
                 : blocked
                 ? <Ban          size={24} style={{ color: N.TEXT_3 }} />
-                : <Zap          size={24} style={{ color }} />
-            )}
-          </span>
+                : <Zap          size={24} style={{ color }} />}
+            </span>
+          )}
 
           <div className="flex flex-col items-start">
             <span style={{

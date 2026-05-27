@@ -5147,17 +5147,22 @@ export function PortalCustomerShell() {
           assetClass="CRYPTO"
           state="PAPER"
           leadingSlot={
+            /* Hero brand mark — transparent, no boxed treatment, sized to
+               act as the primary terminal anchor. clamp() keeps it
+               prominent on desktop / ultrawide and gracefully tucks on
+               mobile without clipping. */
             <img
               src={aiCandlezLogoBrandCell}
               alt="AICandlez"
               draggable={false}
               style={{
-                height: 34,
+                height: "clamp(40px, 4.6vw, 64px)",
                 width: "auto",
-                maxWidth: 44,
+                maxWidth: "clamp(140px, 18vw, 240px)",
                 objectFit: "contain",
-                filter: "drop-shadow(0 0 6px rgba(102,255,102,0.45))",
+                filter: "drop-shadow(0 0 10px rgba(102,255,102,0.45)) drop-shadow(0 0 22px rgba(102,255,102,0.18))",
                 userSelect: "none",
+                display: "block",
               }}
             />
           }
@@ -5177,13 +5182,13 @@ export function PortalCustomerShell() {
           history={paperHistory}
         />
 
-        <TodaysIntelligencePanel
-          todayPnl={paperStats.todayPnl}
-          equity={paperStats.equity || STARTING_EQUITY}
-          history={paperHistory}
-          engine={engineStatus}
-          opportunities={opportunities}
-        />
+        {/* Phase 8.3 refinement — TodaysIntelligencePanel unmounted.
+            The previous text-heavy telemetry row (TODAY'S PAPER PNL /
+            WIN RATE / TOP SIGNAL / AI SIGNALS) diluted the cinematic
+            impact of the battlefield. Its data now surfaces inside the
+            LiveIntelligenceBand widgets below (GLOBAL AI CONFIDENCE,
+            SIGNAL PRESSURE, LONG/SHORT FLOW, etc.). The component
+            definition is preserved further down for one-line rollback. */}
 
         {/* Phase 4 — AI Personality Narrator + Phase 5 risk posture pill.
             Conversational intelligence strip rotates contextual
@@ -5990,14 +5995,13 @@ function WelcomeBackBanner({
 }
 
 /* ──────────────────────────────────────────────────────────────────────── */
-/* Phase 8.3 — LiveIntelligenceBand                                           */
-/* Cinematic 6-widget HUD that replaces the static CredibilityStrip. Every   */
-/* widget is SVG, hand-rolled (no chart libs), and driven by real telemetry  */
-/* already in scope: opportunities (per-symbol conviction + direction),      */
-/* engine.signalsGenerated (rate), paperHistory (closed PnL), openCount.     */
-/* CSS keyframes only — no requestAnimationFrame loop, no GPU abuse. Widgets */
-/* reduce intensity / fall back to "ARMING" copy when there's no live data.  */
-/* Customer-only — never reached from /command.                               */
+/* Phase 8.3 refinement — LiveIntelligenceBand (1:1 cinematic modules)        */
+/* 6 perfect-square SVG telemetry modules with circular framing. Driven      */
+/* entirely by real telemetry already in scope (opportunities, engine,       */
+/* signalsPerMin, paperHistory, openCount). CSS keyframes only — no rAF,     */
+/* no chart libs. Order: GLOBAL AI CONFIDENCE (trust anchor) → CONVICTION    */
+/* RADAR (upgraded sweep) → SIGNAL PRESSURE → LONG/SHORT FLOW → BREAKOUT     */
+/* PROBABILITY → MARKET HEAT. Customer-only — never reached from /command.   */
 /* ──────────────────────────────────────────────────────────────────────── */
 function LiveIntelligenceBand({
   opportunities, engine, signalsPerMin, openCount, history,
@@ -6014,6 +6018,8 @@ function LiveIntelligenceBand({
     const n = opportunities.length;
     let longs = 0, shorts = 0, sumConv = 0, eliteCount = 0;
     let best: OpportunityVM | null = null;
+    let bestLong: OpportunityVM | null = null;
+    let bestShort: OpportunityVM | null = null;
     for (const o of opportunities) {
       const c = o.convictionScore ?? 0;
       if (o.direction === "LONG")  longs++;
@@ -6021,33 +6027,62 @@ function LiveIntelligenceBand({
       sumConv += c;
       if (c >= 80) eliteCount++;
       if (!best || (best.convictionScore ?? 0) < c) best = o;
+      if (o.direction === "LONG"  && (!bestLong  || (bestLong.convictionScore  ?? 0) < c)) bestLong  = o;
+      if (o.direction === "SHORT" && (!bestShort || (bestShort.convictionScore ?? 0) < c)) bestShort = o;
     }
     const avgConv = n > 0 ? sumConv / n : 0;
     const breakoutPct = n > 0 ? Math.round((eliteCount / n) * 100) : 0;
-    // Direction flow ratios (avoid divide-by-zero).
     const flowDenom = Math.max(longs + shorts, 1);
     const longPct  = Math.round((longs  / flowDenom) * 100);
     const shortPct = 100 - longPct;
-    // Today's win count for the top-pulse caption.
+    // GLOBAL AI CONFIDENCE = max(highest long, highest short) — directional ambidextrous trust signal.
+    const globalConf = Math.round(Math.max(bestLong?.convictionScore ?? 0, bestShort?.convictionScore ?? 0));
+    const globalConfSrc: OpportunityVM | null =
+      (bestLong  && (bestLong.convictionScore  ?? 0) >= (bestShort?.convictionScore ?? 0)) ? bestLong  :
+      (bestShort && (bestShort.convictionScore ?? 0) >  (bestLong?.convictionScore  ?? 0)) ? bestShort :
+      best;
     const today0 = new Date(); today0.setHours(0, 0, 0, 0);
     const todayWins = history.filter(h => h.closedAt >= today0.getTime() && h.pnl > 0).length;
-    return { n, longs, shorts, avgConv, eliteCount, breakoutPct, longPct, shortPct, best: best as OpportunityVM | null, todayWins };
+    return {
+      n, longs, shorts, avgConv, eliteCount, breakoutPct, longPct, shortPct,
+      best: best as OpportunityVM | null, bestLong: bestLong as OpportunityVM | null,
+      bestShort: bestShort as OpportunityVM | null, globalConf,
+      globalConfSrc: globalConfSrc as OpportunityVM | null, todayWins,
+    };
   }, [opportunities, history]);
 
+  // Tier color for GLOBAL AI CONFIDENCE.
+  const confTier =
+    m.globalConf >= 90 ? { c: T.NEON,    label: "ELITE"   } :
+    m.globalConf >= 75 ? { c: "#7CFF00", label: "STRONG"  } :
+    m.globalConf >= 60 ? { c: "#FFC857", label: "MODERATE"} :
+    m.globalConf > 0   ? { c: "#ff6b6b", label: "LOW"     } :
+                         { c: T.TEXT_3,  label: "ARMING"  };
+
   // Signal-pressure gauge — clamp 0..30 sig/min onto a 0..100% height.
+  // Pressure gauge — 0..30 sig/min → arc fill 0..100%.
   const pressurePct = Math.min(100, Math.max(0, (signalsPerMin / 30) * 100));
-  // Heat intensity tint based on avg conviction.
-  const heatColor =
+  const pressureColor =
+    pressurePct >= 75 ? T.NEON :
+    pressurePct >= 50 ? "#7CFF00" :
+    pressurePct >= 25 ? "#FFC857" :
+                        "#ff6b6b";
+  const heatTier =
+    m.avgConv >= 75 ? "HOT"    :
+    m.avgConv >= 60 ? "ACTIVE" :
+    m.avgConv >= 45 ? "MIXED"  :
+                      "QUIET";
+  const heatTierColor =
     m.avgConv >= 75 ? T.NEON :
     m.avgConv >= 60 ? "#7CFF00" :
     m.avgConv >= 45 ? "#FFC857" :
                       "#9aa39c";
 
-  // Top 18 symbols by conviction for the heat grid (6x3).
+  // Top 12 conviction targets, ranked, for the radial heat array.
   const heatCells = useMemo(() => {
     return [...opportunities]
       .sort((a, b) => (b.convictionScore ?? 0) - (a.convictionScore ?? 0))
-      .slice(0, 18);
+      .slice(0, 12);
   }, [opportunities]);
 
   return (
@@ -6055,166 +6090,329 @@ function LiveIntelligenceBand({
       aria-label="Live intelligence"
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-        gap: 10,
-        padding: "12px 14px",
-        background: "linear-gradient(180deg, rgba(102,255,102,0.05) 0%, rgba(0,0,0,0.6) 100%)",
-        border: `1px solid ${T.NEON}28`,
-        borderRadius: 6,
-        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 0 22px rgba(102,255,102,0.06)`,
+        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+        gap: 14,
+        padding: "16px 16px",
+        background: "linear-gradient(180deg, rgba(102,255,102,0.05) 0%, rgba(0,0,0,0.7) 100%)",
+        border: `1px solid ${T.NEON}33`,
+        borderRadius: 8,
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 0 28px rgba(102,255,102,0.08)`,
         fontFamily: T.FONT_MONO,
         position: "relative",
         overflow: "hidden",
       }}
     >
       <style>{`
-        @keyframes lib-radar-sweep { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes lib-pressure-fill { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } }
-        @keyframes lib-flow-glow { 0%,100% { filter: drop-shadow(0 0 3px var(--lib-c)); } 50% { filter: drop-shadow(0 0 8px var(--lib-c)); } }
-        @keyframes lib-ring-glow { 0%,100% { stroke-opacity: 0.9; } 50% { stroke-opacity: 0.55; } }
-        @keyframes lib-heat-blink { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
-        @keyframes lib-pulse-dot { 0%,100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.18); opacity: 1; } }
+        @keyframes lib-radar-sweep    { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes lib-ring-pulse     { 0%,100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.025); } }
+        @keyframes lib-confidence-glow{ 0%,100% { text-shadow: 0 0 14px var(--lib-c), 0 0 28px var(--lib-c); } 50% { text-shadow: 0 0 22px var(--lib-c), 0 0 40px var(--lib-c); } }
+        @keyframes lib-arc-glow       { 0%,100% { stroke-opacity: 0.9; } 50% { stroke-opacity: 0.55; } }
+        @keyframes lib-blip-pop       { 0% { r: 1; opacity: 0.2; } 60% { opacity: 1; } 100% { r: 2.4; opacity: 0; } }
+        @keyframes lib-heat-blink     { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+        @keyframes lib-flow-glow      { 0%,100% { filter: drop-shadow(0 0 4px var(--lib-c)); } 50% { filter: drop-shadow(0 0 10px var(--lib-c)); } }
+        @keyframes lib-spinner        { 0% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -120; } }
       `}</style>
 
-      {/* 1. CONVICTION RADAR — sweep + opportunity dots placed by direction */}
-      <LIBCell label="CONVICTION RADAR" sub={live ? `${m.n} TRACKED` : "ARMING"}>
-        <svg viewBox="0 0 100 100" style={{ width: "100%", height: 92 }}>
+      {/* ────────────────────────────────────────────────────────────── */}
+      {/* BOX 1 — GLOBAL AI CONFIDENCE (trust anchor)                    */}
+      {/* Always surfaces the single highest active conviction across   */}
+      {/* both LONG and SHORT opportunities. Huge centered number with  */}
+      {/* concentric rings + tier color. This is the page's perceived-  */}
+      {/* intelligence anchor. */}
+      {/* ────────────────────────────────────────────────────────────── */}
+      <LIBCell label="GLOBAL AI CONFIDENCE" sub={live ? confTier.label : "ARMING"} accent={confTier.c}>
+        <svg viewBox="0 0 100 100" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
           <defs>
-            <radialGradient id="lib-radar-grad" cx="50%" cy="50%" r="50%">
-              <stop offset="0%"   stopColor={T.NEON} stopOpacity="0.18" />
-              <stop offset="100%" stopColor={T.NEON} stopOpacity="0" />
+            <radialGradient id="lib-conf-grad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%"   stopColor={confTier.c} stopOpacity="0.22" />
+              <stop offset="70%"  stopColor={confTier.c} stopOpacity="0.05" />
+              <stop offset="100%" stopColor={confTier.c} stopOpacity="0" />
             </radialGradient>
           </defs>
-          <circle cx="50" cy="50" r="46" fill="url(#lib-radar-grad)" />
-          <circle cx="50" cy="50" r="46" fill="none" stroke={`${T.NEON}33`} strokeWidth="0.6" />
-          <circle cx="50" cy="50" r="30" fill="none" stroke={`${T.NEON}22`} strokeWidth="0.4" />
-          <circle cx="50" cy="50" r="14" fill="none" stroke={`${T.NEON}22`} strokeWidth="0.4" />
-          {/* sweep wedge */}
-          <g style={{ transformOrigin: "50px 50px", animation: live ? "lib-radar-sweep 4s linear infinite" : "none" }}>
-            <path d="M50,50 L50,4 A46,46 0 0,1 92,38 Z" fill={`${T.NEON}26`} />
-            <line x1="50" y1="50" x2="50" y2="4" stroke={T.NEON} strokeWidth="0.8" />
+          <circle cx="50" cy="50" r="48" fill="url(#lib-conf-grad)" />
+          <circle cx="50" cy="50" r="44" fill="none" stroke={`${confTier.c}22`} strokeWidth="0.4" />
+          <circle cx="50" cy="50" r="36" fill="none" stroke={`${confTier.c}33`} strokeWidth="0.5" />
+          {/* Conviction arc — main ring filled proportionally to globalConf */}
+          <circle
+            cx="50" cy="50" r="40" fill="none"
+            stroke={`${confTier.c}18`} strokeWidth="3"
+          />
+          <circle
+            cx="50" cy="50" r="40" fill="none"
+            stroke={confTier.c} strokeWidth="3" strokeLinecap="round"
+            strokeDasharray={`${(m.globalConf / 100) * (2 * Math.PI * 40)} 999`}
+            transform="rotate(-90 50 50)"
+            style={{
+              filter: `drop-shadow(0 0 6px ${confTier.c})`,
+              transition: "stroke-dasharray 800ms ease",
+              animation: live && m.globalConf > 0 ? "lib-arc-glow 2.6s ease-in-out infinite" : "none",
+            }}
+          />
+          {/* Inner pulsing halo */}
+          <circle cx="50" cy="50" r="28" fill="none" stroke={`${confTier.c}55`} strokeWidth="0.6"
+            style={{ transformOrigin: "50px 50px", animation: live && m.globalConf > 0 ? "lib-ring-pulse 3.2s ease-in-out infinite" : "none" }} />
+        </svg>
+        <div style={{
+          position: "relative", zIndex: 1,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          width: "100%", height: "100%",
+        }}>
+          <span
+            style={{
+              ["--lib-c" as string]: confTier.c,
+              fontSize: "clamp(44px, 5.4vw, 72px)",
+              fontWeight: 900,
+              color: confTier.c,
+              lineHeight: 1,
+              fontVariantNumeric: "tabular-nums",
+              letterSpacing: "-0.04em",
+              animation: live && m.globalConf >= 60 ? "lib-confidence-glow 2.6s ease-in-out infinite" : "none",
+              textShadow: `0 0 14px ${confTier.c}88, 0 0 28px ${confTier.c}55`,
+            }}
+          >
+            {m.globalConf > 0 ? m.globalConf : "—"}
+          </span>
+          <span style={{
+            fontSize: 9, fontWeight: 800, letterSpacing: "0.22em",
+            color: T.TEXT_3, marginTop: 4,
+          }}>
+            {m.globalConfSrc
+              ? `${m.globalConfSrc.display} · ${m.globalConfSrc.direction}`
+              : "AWAITING SETUP"}
+          </span>
+        </div>
+      </LIBCell>
+
+      {/* ────────────────────────────────────────────────────────────── */}
+      {/* BOX 2 — CONVICTION RADAR (upgraded)                            */}
+      {/* Larger sweep wedge, dual concentric grid, brighter dots, blip */}
+      {/* pop animation on the top-3 conviction targets. Direction      */}
+      {/* mapped to hemisphere (LONG=upper / SHORT=lower).              */}
+      {/* ────────────────────────────────────────────────────────────── */}
+      <LIBCell label="CONVICTION RADAR" sub={live ? `${m.n} TRACKED` : "ARMING"}>
+        <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", position: "absolute", inset: 0 }}>
+          <defs>
+            <radialGradient id="lib-radar-grad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%"   stopColor={T.NEON} stopOpacity="0.24" />
+              <stop offset="60%"  stopColor={T.NEON} stopOpacity="0.06" />
+              <stop offset="100%" stopColor={T.NEON} stopOpacity="0" />
+            </radialGradient>
+            <linearGradient id="lib-radar-sweep-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%"   stopColor={T.NEON} stopOpacity="0" />
+              <stop offset="100%" stopColor={T.NEON} stopOpacity="0.55" />
+            </linearGradient>
+          </defs>
+          {/* Range rings */}
+          <circle cx="50" cy="50" r="48" fill="url(#lib-radar-grad)" />
+          <circle cx="50" cy="50" r="48" fill="none" stroke={`${T.NEON}3a`} strokeWidth="0.6" />
+          <circle cx="50" cy="50" r="36" fill="none" stroke={`${T.NEON}22`} strokeWidth="0.4" />
+          <circle cx="50" cy="50" r="24" fill="none" stroke={`${T.NEON}22`} strokeWidth="0.4" />
+          <circle cx="50" cy="50" r="12" fill="none" stroke={`${T.NEON}33`} strokeWidth="0.4" />
+          {/* Crosshair */}
+          <line x1="50" y1="2"  x2="50" y2="98" stroke={`${T.NEON}18`} strokeWidth="0.3" />
+          <line x1="2"  y1="50" x2="98" y2="50" stroke={`${T.NEON}18`} strokeWidth="0.3" />
+          {/* Sweep wedge — larger 90° arc with gradient trail */}
+          <g style={{ transformOrigin: "50px 50px", animation: live ? "lib-radar-sweep 3.4s linear infinite" : "none" }}>
+            <path d="M50,50 L50,2 A48,48 0 0,1 98,50 Z" fill="url(#lib-radar-sweep-grad)" opacity="0.85" />
+            <line x1="50" y1="50" x2="50" y2="2" stroke={T.NEON} strokeWidth="1" style={{ filter: `drop-shadow(0 0 3px ${T.NEON})` }} />
           </g>
-          {/* opportunity blips — angle by direction, radius by (100 - conviction) so high conviction = closer to center */}
-          {opportunities.slice(0, 24).map((o, i) => {
+          {/* Opportunity blips — angle/dir, radius=high-conv-near-center */}
+          {opportunities.slice(0, 28).map((o, i) => {
             const conv = o.convictionScore ?? 0;
-            const r = 46 - (conv * 0.38);
-            const baseAngle = o.direction === "SHORT" ? 210 : 30;
-            const ang = (baseAngle + (i * 13)) % 360;
+            const r = 46 - (conv * 0.4);
+            // LONG = upper hemisphere (270°..90° through top), SHORT = lower
+            const baseAngle = o.direction === "SHORT" ? 100 : 260;
+            const ang = (baseAngle + (i * 17)) % 360;
             const rad = (ang * Math.PI) / 180;
             const x = 50 + Math.cos(rad) * r;
             const y = 50 + Math.sin(rad) * r;
             const color = conv >= 80 ? T.NEON : conv >= 60 ? "#7CFF00" : "#FFC857";
-            return <circle key={o.symbol + i} cx={x} cy={y} r={conv >= 80 ? 1.6 : 1.1} fill={color} opacity={conv >= 60 ? 1 : 0.55} />;
+            return (
+              <g key={o.symbol + i}>
+                {conv >= 80 && live && (
+                  <circle cx={x} cy={y} r="1" fill="none" stroke={color} strokeWidth="0.5"
+                    style={{ animation: `lib-blip-pop ${2.4 + (i % 4) * 0.3}s ease-out infinite`, transformOrigin: `${x}px ${y}px` }} />
+                )}
+                <circle cx={x} cy={y} r={conv >= 80 ? 1.8 : conv >= 60 ? 1.3 : 0.9}
+                  fill={color} opacity={conv >= 60 ? 1 : 0.55}
+                  style={{ filter: conv >= 80 ? `drop-shadow(0 0 2px ${color})` : "none" }} />
+              </g>
+            );
           })}
+          {/* Center dot */}
+          <circle cx="50" cy="50" r="1.4" fill={T.NEON} style={{ filter: `drop-shadow(0 0 3px ${T.NEON})` }} />
         </svg>
       </LIBCell>
 
-      {/* 2. SIGNAL PRESSURE — vertical bar gauge */}
-      <LIBCell label="SIGNAL PRESSURE" sub={live ? `${signalsPerMin >= 10 ? signalsPerMin.toFixed(0) : signalsPerMin.toFixed(1)} / MIN` : "OFFLINE"}>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 92, padding: "4px 6px" }}>
-          {[0,1,2,3,4,5,6,7].map(col => {
-            const threshold = (col + 1) * 12.5;
-            const lit = pressurePct >= threshold;
-            const colColor =
-              col >= 6 ? T.NEON :
-              col >= 4 ? "#7CFF00" :
-              col >= 2 ? "#FFC857" :
-                         "#ff6b6b";
-            return (
-              <div key={col} style={{
-                flex: 1,
-                height: `${20 + col * 10}%`,
-                background: lit ? colColor : `${colColor}22`,
-                borderRadius: 1,
-                boxShadow: lit ? `0 0 6px ${colColor}` : "none",
-                animation: lit && live ? `lib-pressure-fill ${1.4 + col * 0.18}s ease-in-out infinite` : "none",
-                transition: "background 220ms",
-              }} />
-            );
+      {/* ────────────────────────────────────────────────────────────── */}
+      {/* BOX 3 — SIGNAL PRESSURE (radial gauge)                         */}
+      {/* ────────────────────────────────────────────────────────────── */}
+      <LIBCell label="SIGNAL PRESSURE" sub={live ? `${signalsPerMin >= 10 ? signalsPerMin.toFixed(0) : signalsPerMin.toFixed(1)} / MIN` : "OFFLINE"} accent={pressureColor}>
+        <svg viewBox="0 0 100 100" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+          {/* Background ring */}
+          <circle cx="50" cy="50" r="40" fill="none" stroke={`${pressureColor}1a`} strokeWidth="6" />
+          {/* Tick marks every 30° */}
+          {Array.from({ length: 12 }).map((_, i) => {
+            const a = (i * 30 - 90) * Math.PI / 180;
+            const x1 = 50 + Math.cos(a) * 44;
+            const y1 = 50 + Math.sin(a) * 44;
+            const x2 = 50 + Math.cos(a) * 47;
+            const y2 = 50 + Math.sin(a) * 47;
+            const lit = (i / 12) * 100 <= pressurePct;
+            return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={lit ? pressureColor : `${pressureColor}33`} strokeWidth="0.8" />;
           })}
-        </div>
-      </LIBCell>
-
-      {/* 3. LONG / SHORT FLOW — bidirectional bar */}
-      <LIBCell label="LONG / SHORT FLOW" sub={`${m.longs}L · ${m.shorts}S`}>
-        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 6, height: 92, padding: "0 4px" }}>
-          {/* Long bar */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 28, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", color: T.NEON }}>LONG</span>
-            <div style={{ flex: 1, height: 10, background: `${T.NEON}10`, borderRadius: 2, overflow: "hidden", position: "relative" }}>
-              <div style={{
-                ["--lib-c" as string]: T.NEON,
-                width: `${m.longPct}%`, height: "100%",
-                background: `linear-gradient(90deg, ${T.NEON}55, ${T.NEON})`,
-                boxShadow: `0 0 8px ${T.NEON}`,
-                transition: "width 600ms ease",
-                animation: live && m.longs > 0 ? "lib-flow-glow 2.6s ease-in-out infinite" : "none",
-              }} />
-            </div>
-            <span style={{ width: 28, textAlign: "right", fontSize: 10, color: T.TEXT_1, fontVariantNumeric: "tabular-nums" }}>{m.longPct}%</span>
-          </div>
-          {/* Short bar */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 28, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", color: "#ff6b6b" }}>SHRT</span>
-            <div style={{ flex: 1, height: 10, background: "#ff6b6b10", borderRadius: 2, overflow: "hidden", position: "relative" }}>
-              <div style={{
-                ["--lib-c" as string]: "#ff6b6b",
-                width: `${m.shortPct}%`, height: "100%",
-                background: "linear-gradient(90deg, #ff6b6b55, #ff6b6b)",
-                boxShadow: "0 0 8px #ff6b6b",
-                transition: "width 600ms ease",
-                animation: live && m.shorts > 0 ? "lib-flow-glow 2.6s ease-in-out infinite" : "none",
-              }} />
-            </div>
-            <span style={{ width: 28, textAlign: "right", fontSize: 10, color: T.TEXT_1, fontVariantNumeric: "tabular-nums" }}>{m.shortPct}%</span>
-          </div>
-          {/* Open positions footer */}
-          <div style={{ fontSize: 8.5, letterSpacing: "0.16em", color: T.TEXT_3, textAlign: "center", marginTop: 2 }}>
-            {openCount} OPEN PAPER
-          </div>
-        </div>
-      </LIBCell>
-
-      {/* 4. BREAKOUT PROBABILITY RING */}
-      <LIBCell label="BREAKOUT PROBABILITY" sub={live ? `${m.eliteCount} ≥ 80 CONV` : "—"}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 92, position: "relative" }}>
-          <svg viewBox="0 0 100 100" style={{ width: 92, height: 92 }}>
-            <circle cx="50" cy="50" r="38" fill="none" stroke={`${T.NEON}18`} strokeWidth="7" />
-            <circle
-              cx="50" cy="50" r="38" fill="none"
-              stroke={T.NEON} strokeWidth="7" strokeLinecap="round"
-              strokeDasharray={`${(m.breakoutPct / 100) * (2 * Math.PI * 38)} 999`}
-              transform="rotate(-90 50 50)"
-              style={{
-                filter: `drop-shadow(0 0 4px ${T.NEON})`,
-                transition: "stroke-dasharray 700ms ease",
-                animation: live && m.breakoutPct > 0 ? "lib-ring-glow 2.8s ease-in-out infinite" : "none",
-              }}
-            />
-          </svg>
-          <div style={{
-            position: "absolute",
-            display: "flex", flexDirection: "column", alignItems: "center",
-            fontFamily: T.FONT_MONO,
-          }}>
-            <span style={{ fontSize: 22, fontWeight: 800, color: T.NEON, lineHeight: 1, textShadow: `0 0 8px ${T.NEON}55`, fontVariantNumeric: "tabular-nums" }}>
-              {m.breakoutPct}%
-            </span>
-            <span style={{ fontSize: 8, letterSpacing: "0.18em", color: T.TEXT_3, marginTop: 2 }}>ELITE BAND</span>
-          </div>
-        </div>
-      </LIBCell>
-
-      {/* 5. MARKET HEAT — 6×3 grid of dots colored by per-symbol conviction */}
-      <LIBCell label="MARKET HEAT" sub={live ? `AVG CONV ${m.avgConv.toFixed(0)}` : "WARMING"}>
+          {/* Filled arc */}
+          <circle
+            cx="50" cy="50" r="40" fill="none"
+            stroke={pressureColor} strokeWidth="6" strokeLinecap="round"
+            strokeDasharray={`${(pressurePct / 100) * (2 * Math.PI * 40)} 999`}
+            transform="rotate(-90 50 50)"
+            style={{
+              filter: `drop-shadow(0 0 6px ${pressureColor})`,
+              transition: "stroke-dasharray 600ms ease",
+              animation: live && pressurePct > 0 ? "lib-arc-glow 2.4s ease-in-out infinite" : "none",
+            }}
+          />
+        </svg>
         <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(6, 1fr)",
-          gridTemplateRows: "repeat(3, 1fr)",
-          gap: 4, height: 92, padding: "6px 4px",
+          position: "relative", zIndex: 1,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          width: "100%", height: "100%",
         }}>
-          {Array.from({ length: 18 }, (_, i) => {
+          <span style={{
+            fontSize: "clamp(28px, 3.6vw, 44px)", fontWeight: 900,
+            color: pressureColor, lineHeight: 1,
+            fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em",
+            textShadow: `0 0 10px ${pressureColor}66`,
+          }}>
+            {signalsPerMin >= 10 ? signalsPerMin.toFixed(0) : signalsPerMin.toFixed(1)}
+          </span>
+          <span style={{ fontSize: 9, letterSpacing: "0.22em", color: T.TEXT_3, marginTop: 4 }}>
+            SIG / MIN
+          </span>
+        </div>
+      </LIBCell>
+
+      {/* ────────────────────────────────────────────────────────────── */}
+      {/* BOX 4 — LONG / SHORT FLOW (split ring)                         */}
+      {/* ────────────────────────────────────────────────────────────── */}
+      <LIBCell label="LONG / SHORT FLOW" sub={`${openCount} OPEN`}>
+        <svg viewBox="0 0 100 100" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+          <circle cx="50" cy="50" r="40" fill="none" stroke={`${T.NEON}18`} strokeWidth="6" />
+          {/* LONG arc — top half */}
+          <circle
+            cx="50" cy="50" r="40" fill="none"
+            stroke={T.NEON} strokeWidth="6" strokeLinecap="round"
+            strokeDasharray={`${(m.longPct / 100) * (Math.PI * 40)} 999`}
+            transform="rotate(-180 50 50)"
+            style={{
+              filter: `drop-shadow(0 0 6px ${T.NEON})`,
+              ["--lib-c" as string]: T.NEON,
+              transition: "stroke-dasharray 600ms ease",
+              animation: live && m.longs > 0 ? "lib-flow-glow 2.6s ease-in-out infinite" : "none",
+            }}
+          />
+          {/* SHORT arc — bottom half (reversed direction) */}
+          <circle
+            cx="50" cy="50" r="40" fill="none"
+            stroke="#ff6b6b" strokeWidth="6" strokeLinecap="round"
+            strokeDasharray={`${(m.shortPct / 100) * (Math.PI * 40)} 999`}
+            transform="rotate(0 50 50) scale(1 -1) translate(0 -100)"
+            style={{
+              filter: "drop-shadow(0 0 6px #ff6b6b)",
+              ["--lib-c" as string]: "#ff6b6b",
+              transition: "stroke-dasharray 600ms ease",
+              animation: live && m.shorts > 0 ? "lib-flow-glow 2.6s ease-in-out infinite" : "none",
+            }}
+          />
+        </svg>
+        <div style={{
+          position: "relative", zIndex: 1,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          width: "100%", height: "100%", gap: 4,
+        }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <span style={{ fontSize: 22, fontWeight: 900, color: T.NEON, lineHeight: 1, fontVariantNumeric: "tabular-nums", textShadow: `0 0 8px ${T.NEON}66` }}>
+                {m.longs}
+              </span>
+              <span style={{ fontSize: 8, letterSpacing: "0.22em", color: T.NEON, marginTop: 2 }}>LONG</span>
+            </div>
+            <span style={{ fontSize: 18, color: T.TEXT_3 }}>·</span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <span style={{ fontSize: 22, fontWeight: 900, color: "#ff6b6b", lineHeight: 1, fontVariantNumeric: "tabular-nums", textShadow: "0 0 8px #ff6b6b66" }}>
+                {m.shorts}
+              </span>
+              <span style={{ fontSize: 8, letterSpacing: "0.22em", color: "#ff6b6b", marginTop: 2 }}>SHORT</span>
+            </div>
+          </div>
+          <span style={{ fontSize: 8, letterSpacing: "0.22em", color: T.TEXT_3, marginTop: 4 }}>
+            {m.longPct}% / {m.shortPct}%
+          </span>
+        </div>
+      </LIBCell>
+
+      {/* ────────────────────────────────────────────────────────────── */}
+      {/* BOX 5 — BREAKOUT PROBABILITY                                   */}
+      {/* ────────────────────────────────────────────────────────────── */}
+      <LIBCell label="BREAKOUT PROBABILITY" sub={live ? `${m.eliteCount} ≥ 80 CONV` : "—"}>
+        <svg viewBox="0 0 100 100" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+          <defs>
+            <radialGradient id="lib-break-grad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%"   stopColor={T.NEON} stopOpacity="0.18" />
+              <stop offset="100%" stopColor={T.NEON} stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <circle cx="50" cy="50" r="42" fill="url(#lib-break-grad)" />
+          <circle cx="50" cy="50" r="40" fill="none" stroke={`${T.NEON}18`} strokeWidth="7" />
+          <circle
+            cx="50" cy="50" r="40" fill="none"
+            stroke={T.NEON} strokeWidth="7" strokeLinecap="round"
+            strokeDasharray={`${(m.breakoutPct / 100) * (2 * Math.PI * 40)} 999`}
+            transform="rotate(-90 50 50)"
+            style={{
+              filter: `drop-shadow(0 0 6px ${T.NEON})`,
+              transition: "stroke-dasharray 700ms ease",
+              animation: live && m.breakoutPct > 0 ? "lib-arc-glow 2.8s ease-in-out infinite" : "none",
+            }}
+          />
+          {/* Inner dashed reference ring */}
+          <circle cx="50" cy="50" r="28" fill="none" stroke={`${T.NEON}33`} strokeWidth="0.4" strokeDasharray="1 3" />
+        </svg>
+        <div style={{
+          position: "relative", zIndex: 1,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          width: "100%", height: "100%",
+        }}>
+          <span style={{
+            fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 900,
+            color: T.NEON, lineHeight: 1,
+            fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em",
+            textShadow: `0 0 12px ${T.NEON}66`,
+          }}>
+            {m.breakoutPct}%
+          </span>
+          <span style={{ fontSize: 9, letterSpacing: "0.22em", color: T.TEXT_3, marginTop: 4 }}>
+            ELITE BAND
+          </span>
+        </div>
+      </LIBCell>
+
+      {/* ────────────────────────────────────────────────────────────── */}
+      {/* BOX 6 — MARKET HEAT (radial conviction array)                  */}
+      {/* Top 12 by conviction placed around a clock face. Color tier +  */}
+      {/* selective blink for elite (≥75) cells.                         */}
+      {/* ────────────────────────────────────────────────────────────── */}
+      <LIBCell label="MARKET HEAT" sub={live ? `AVG ${m.avgConv.toFixed(0)} · ${heatTier}` : "WARMING"} accent={heatTierColor}>
+        <svg viewBox="0 0 100 100" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+          <circle cx="50" cy="50" r="44" fill="none" stroke={`${T.NEON}22`} strokeWidth="0.4" />
+          <circle cx="50" cy="50" r="30" fill="none" stroke={`${T.NEON}1a`} strokeWidth="0.4" strokeDasharray="1 2" />
+          {Array.from({ length: 12 }).map((_, i) => {
             const cell = heatCells[i];
+            const a = (i * 30 - 90) * Math.PI / 180;
+            const x = 50 + Math.cos(a) * 36;
+            const y = 50 + Math.sin(a) * 36;
             const conv = cell?.convictionScore ?? 0;
             const filled = !!cell;
             const cellColor =
@@ -6224,75 +6422,90 @@ function LiveIntelligenceBand({
               filled     ? "#9aa39c"   :
                            "#2a2f2a";
             return (
-              <div key={i} title={cell ? `${cell.display} ${conv.toFixed(0)}` : ""} style={{
-                background: filled ? cellColor : "transparent",
-                border: filled ? "none" : `1px dashed ${T.NEON}22`,
-                borderRadius: 2,
-                boxShadow: filled && conv >= 60 ? `0 0 4px ${cellColor}` : "none",
-                opacity: filled ? (conv >= 60 ? 1 : 0.7) : 0.4,
-                animation: filled && live && conv >= 75 ? `lib-heat-blink ${1.8 + (i % 5) * 0.25}s ease-in-out infinite` : "none",
-              }} />
+              <g key={i}>
+                {filled && (
+                  <line x1="50" y1="50" x2={x} y2={y}
+                    stroke={`${cellColor}33`} strokeWidth="0.4" />
+                )}
+                <circle cx={x} cy={y}
+                  r={filled ? (conv >= 80 ? 4 : conv >= 60 ? 3.4 : 2.8) : 2}
+                  fill={filled ? cellColor : "transparent"}
+                  stroke={filled ? "none" : `${T.NEON}33`}
+                  strokeDasharray={filled ? "" : "1 1"}
+                  opacity={filled ? (conv >= 60 ? 1 : 0.75) : 0.4}
+                  style={{
+                    filter: filled && conv >= 60 ? `drop-shadow(0 0 3px ${cellColor})` : "none",
+                    animation: filled && live && conv >= 75
+                      ? `lib-heat-blink ${1.8 + (i % 5) * 0.25}s ease-in-out infinite`
+                      : "none",
+                  }} />
+                {filled && conv >= 80 && (
+                  <circle cx={x} cy={y} r="6" fill="none" stroke={cellColor} strokeWidth="0.4" opacity="0.6"
+                    style={{ animation: `lib-ring-pulse ${2.4 + (i % 3) * 0.4}s ease-in-out infinite`, transformOrigin: `${x}px ${y}px` }} />
+                )}
+              </g>
             );
           })}
-        </div>
-        <div style={{ fontSize: 8, letterSpacing: "0.16em", color: heatColor, textAlign: "center", marginTop: 2 }}>
-          {m.avgConv >= 75 ? "HOT" : m.avgConv >= 60 ? "ACTIVE" : m.avgConv >= 45 ? "MIXED" : "QUIET"}
-        </div>
-      </LIBCell>
-
-      {/* 6. TOP CONVICTION PULSE */}
-      <LIBCell label="TOP CONVICTION" sub={m.todayWins > 0 ? `${m.todayWins} WIN${m.todayWins === 1 ? "" : "S"} TODAY` : "AWAITING CLOSE"}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 92, gap: 4 }}>
-          {m.best ? (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{
-                  width: 10, height: 10, borderRadius: 10,
-                  background: (m.best.convictionScore ?? 0) >= 80 ? T.NEON : "#FFC857",
-                  boxShadow: `0 0 8px ${(m.best.convictionScore ?? 0) >= 80 ? T.NEON : "#FFC857"}`,
-                  animation: live ? "lib-pulse-dot 1.4s ease-in-out infinite" : "none",
-                }} />
-                <span style={{ fontSize: 14, fontWeight: 800, color: T.TEXT_0, letterSpacing: "0.08em" }}>
-                  {m.best.display}
-                </span>
-              </div>
-              <span style={{ fontSize: 26, fontWeight: 800, color: T.NEON, lineHeight: 1, fontVariantNumeric: "tabular-nums", textShadow: `0 0 10px ${T.NEON}66` }}>
-                {(m.best.convictionScore ?? 0).toFixed(0)}
-              </span>
-              <span style={{ fontSize: 8.5, letterSpacing: "0.18em", color: m.best.direction === "SHORT" ? "#ff6b6b" : T.NEON }}>
-                {m.best.direction} CONVICTION
-              </span>
-            </>
-          ) : (
-            <span style={{ fontSize: 11, letterSpacing: "0.18em", color: T.TEXT_3 }}>SCANNING…</span>
-          )}
-        </div>
+          {/* Center reading */}
+          <text x="50" y="48" textAnchor="middle"
+            style={{ fontFamily: T.FONT_MONO, fontSize: 18, fontWeight: 800, fill: heatTierColor }}>
+            {m.avgConv.toFixed(0)}
+          </text>
+          <text x="50" y="60" textAnchor="middle"
+            style={{ fontFamily: T.FONT_MONO, fontSize: 5.5, letterSpacing: "0.3em", fill: T.TEXT_3 }}>
+            AVG CONV
+          </text>
+        </svg>
       </LIBCell>
     </section>
   );
 }
 
-function LIBCell({ label, sub, children }: { label: string; sub: string; children: React.ReactNode }) {
+/* Square 1:1 cell with circular framing background. Header + sub overlay     */
+/* the top edge; the children render absolutely-positioned to use the full    */
+/* square (essential for SVG modules that want to fill the cell).             */
+function LIBCell({
+  label, sub, children, accent,
+}: {
+  label: string; sub: string; children: React.ReactNode; accent?: string;
+}) {
+  const ring = accent ?? T.NEON;
   return (
     <div style={{
-      display: "flex", flexDirection: "column",
-      padding: "8px 10px",
-      background: "rgba(0,0,0,0.45)",
-      border: `1px solid ${T.NEON}1f`,
-      borderRadius: 4,
-      minHeight: 138,
+      position: "relative",
+      aspectRatio: "1 / 1",
+      minHeight: 180,
+      background: "radial-gradient(circle at center, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.55) 100%)",
+      border: `1px solid ${ring}28`,
+      borderRadius: 8,
       overflow: "hidden",
+      boxShadow: `inset 0 0 18px rgba(0,0,0,0.55), 0 0 14px ${ring}1a`,
     }}>
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "baseline",
-        fontSize: 9, fontWeight: 800, letterSpacing: "0.16em",
-        color: T.TEXT_3, marginBottom: 4,
-      }}>
-        <span>{label}</span>
-        <span style={{ color: T.TEXT_2, letterSpacing: "0.12em" }}>{sub}</span>
-      </div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+      {/* corner brackets */}
+      {(["tl","tr","bl","br"] as const).map(corner => {
+        const pos: React.CSSProperties =
+          corner === "tl" ? { top: 6, left: 6,  borderTop:    `1px solid ${ring}66`, borderLeft:  `1px solid ${ring}66` } :
+          corner === "tr" ? { top: 6, right: 6, borderTop:    `1px solid ${ring}66`, borderRight: `1px solid ${ring}66` } :
+          corner === "bl" ? { bottom: 6, left: 6,  borderBottom: `1px solid ${ring}66`, borderLeft:  `1px solid ${ring}66` } :
+                            { bottom: 6, right: 6, borderBottom: `1px solid ${ring}66`, borderRight: `1px solid ${ring}66` };
+        return <span key={corner} aria-hidden style={{ position: "absolute", width: 10, height: 10, ...pos }} />;
+      })}
+      {/* children fill the square (SVG widgets, overlay content) */}
+      <div style={{ position: "absolute", inset: 0 }}>
         {children}
+      </div>
+      {/* header bar overlays the top of the square */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0,
+        display: "flex", justifyContent: "space-between", alignItems: "baseline",
+        padding: "10px 14px 0",
+        fontSize: 9, fontWeight: 800, letterSpacing: "0.18em",
+        color: T.TEXT_3,
+        pointerEvents: "none",
+        zIndex: 2,
+      }}>
+        <span style={{ background: "rgba(0,0,0,0.65)", padding: "2px 6px", borderRadius: 2 }}>{label}</span>
+        <span style={{ color: ring, letterSpacing: "0.14em", background: "rgba(0,0,0,0.65)", padding: "2px 6px", borderRadius: 2 }}>{sub}</span>
       </div>
     </div>
   );

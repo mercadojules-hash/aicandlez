@@ -1,0 +1,123 @@
+Phase 8.3 refinement pass — tighten the Live Intelligence Band into a true premium AI telemetry surface.
+
+Current state assessment:
+The foundation is strong, but the first two rows above the intelligence widgets are still consuming too much vertical space and diluting the cinematic impact.
+
+Requested changes:
+
+1. REMOVE the TWO telemetry rows directly above the Live Intelligence Band
+   Delete:
+
+* TODAY'S PAPER PNL
+* WIN RATE TODAY
+* TOP SIGNAL TODAY
+* AI SIGNALS ACTIVE
+* VERIFIED PAPER PNL
+* ROLLING 7D WIN RATE
+* MEDIAN HOLD
+* AI EVALUATED TODAY
+* etc.
+
+The intelligence widgets themselves should become the primary telemetry layer.
+
+2. Upgrade the intelligence widgets into true 1:1 cinematic telemetry modules
+   Every widget should:
+
+* live inside a PERFECT SQUARE (1:1)
+* centered composition
+* circular framing/ring treatment around visualization
+* stronger visual hierarchy
+* premium “institutional AI radar” feel
+
+Think:
+Bloomberg × Iron Man HUD × AI trading terminal.
+
+3. Reorder widgets
+   The RADAR should become BOX #2.
+
+NEW BOX ORDER:
+
+BOX 1 → GLOBAL AI CONFIDENCE
+BOX 2 → CONVICTION RADAR
+Then remaining telemetry widgets after those.
+
+4. BOX #1 specification — GLOBAL AI CONFIDENCE
+   This becomes the TRUST anchor of the entire battlefield.
+
+Behavior:
+
+* Always display the HIGHEST AI CONFIDENCE currently active from either LONG or SHORT opportunities.
+* Example:
+
+  * if highest active setup = 93
+  * display HUGE bold “93”
+* This creates immediate trust + perceived intelligence quality.
+
+Visual direction:
+
+* massive centered confidence number
+* circular ring around it
+* subtle animated glow pulse
+* label beneath:
+  “GLOBAL AI CONFIDENCE”
+* color by conviction tier:
+
+  * 90+ neon green
+  * 75–89 lime
+  * 60–74 amber
+  * below 60 muted/red
+
+Data source:
+
+* derive from current opportunities[] already feeding the battlefield
+* MUST be real live market telemetry
+* no fake/demo values
+
+5. Upgrade the radar itself (BOX #2)
+   Current radar is promising but needs to feel more premium.
+
+Requested enhancements:
+
+* larger sweep arc
+* smoother rotational motion
+* brighter target pings
+* layered rings/grid
+* more dynamic plotting
+* stronger sense of active scanning
+* maintain lightweight SVG/CSS approach
+* still no requestAnimationFrame abuse
+
+The radar should immediately catch the eye.
+
+6. Keep all modules live/reactive
+   Every module must continue responding to:
+
+* real market movement
+* live conviction changes
+* active opportunity flow
+* long/short distribution
+* breakout probability
+* etc.
+
+7. Preserve all architectural constraints
+   DO NOT:
+
+* touch /command
+* touch shared operator density
+* introduce chart libraries
+* introduce fake animations disconnected from telemetry
+* increase page clutter
+
+Customer-only refinement inside PortalCustomerShell / LiveIntelligenceBand.
+
+Success criteria:
+
+* user lands on page and immediately sees:
+
+  * giant live confidence score
+  * cinematic radar sweep
+  * reactive AI telemetry grid
+* battlefield feels premium and alive
+* stronger emotional “wow” response
+* reduced text-heavy clutter
+* cleaner visual hierarchy
