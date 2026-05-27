@@ -62,6 +62,19 @@ export const userExchangeConnectionsTable = pgTable(
     // Last error message from a failed test (sanitised, no key data)
     lastError: text("last_error"),
 
+    // Last successful per-user background `getAccount` poll. Drives the
+    // "balances last synced 12s ago" hint in the PWA / Portal exchange
+    // chip. Updated by `loadBalanceForRow` in routes/userExchanges.ts on
+    // every poll (success OR failure — failure also populates
+    // `lastBalanceFetchError` and emits a user_notifications row). Null
+    // until the first poll completes — frontend renders "—" in that case.
+    lastBalanceFetchAt:   timestamp("last_balance_fetch_at",   { withTimezone: true }),
+    // Last error string from a failed background balance poll. Cleared
+    // on the next successful poll. Distinct from `lastError` (which is
+    // owned by the connection-test path) so the two failure modes
+    // remain individually observable in the operator drawer.
+    lastBalanceFetchError: text("last_balance_fetch_error"),
+
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

@@ -7,6 +7,7 @@ import { BinanceAdapter, BINANCE_CONFIG } from "../services/exchanges/adapters/B
 import { CryptoDotComAdapter, CRYPTOCOM_CONFIG } from "../services/exchanges/adapters/CryptoDotComAdapter.js";
 import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
 import { executionStreamBus } from "./executionStreamBus.js";
+import { logger } from "./logger.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -156,17 +157,20 @@ function pickPreferredExchange(): string {
   return "Alpaca";
 }
 
-// Boot-time selection. Runs once at module load. Logging is via console.info
-// (this module is shared between Express request paths and worker code, so
-// we don't have `req.log` here — the singleton logger from `lib/logger.ts`
-// would create a circular import. Replit's workflow log captures stdout.)
+// Boot-time selection. Runs once at module load. Logging uses the shared
+// pino singleton (`lib/logger.ts`) — this module is shared between Express
+// request paths and worker code so `req.log` is not available here, but
+// the structured singleton is fine (no circular import: logger.ts has no
+// dependency on exchangeEngine).
 _selectedExchange = pickPreferredExchange();
-console.info(
-  `[exchangeEngine] boot: selectedExchange=${_selectedExchange} ` +
-  `liveEnabled=${process.env["EXCHANGE_LIVE_ENABLED"] === "true"} ` +
-  `configured=[${getConfiguredExchanges().join(",") || "none"}] ` +
-  `apiConfigured=${isExchangeConfigured(_selectedExchange)}`,
-);
+logger.info({
+  tag:           "BALANCE_FETCH",
+  event:         "boot",
+  exchange:      _selectedExchange,
+  liveEnabled:   process.env["EXCHANGE_LIVE_ENABLED"] === "true",
+  configured:    getConfiguredExchanges(),
+  apiConfigured: isExchangeConfigured(_selectedExchange),
+}, "[BALANCE_FETCH] exchangeEngine boot");
 
 function isApiConfigured(): boolean {
   return isExchangeConfigured(_selectedExchange);
@@ -181,7 +185,8 @@ function isLiveCapable(): boolean {
 // ── Live balances ─────────────────────────────────────────────────────────────
 
 export async function fetchLiveBalances(): Promise<Balances> {
-  console.info(`[exchangeEngine] fetchLiveBalances: selectedExchange=${_selectedExchange}`);
+  const t0 = Date.now();
+  logger.info({ tag: "BALANCE_FETCH", event: "start", exchange: _selectedExchange }, "[BALANCE_FETCH] start");
   if (_selectedExchange === "Kraken") {
     if (!isExchangeConfigured("Kraken")) {
       throw new Error("Kraken API credentials are not configured (KRAKEN_API_KEY / KRAKEN_API_SECRET missing)");
@@ -198,11 +203,25 @@ export async function fetchLiveBalances(): Promise<Balances> {
       const btc = account.balances["BTC"]?.total ?? 0;
       const eth = account.balances["ETH"]?.total ?? 0;
       const sol = account.balances["SOL"]?.total ?? 0;
-      console.info(`[exchangeEngine] Kraken account OK: USD=${usd} BTC=${btc} ETH=${eth} SOL=${sol}`);
+      logger.info({
+        tag:         "BALANCE_FETCH",
+        event:       "ok",
+        exchange:    "Kraken",
+        assetCount:  Object.keys(account.balances).length,
+        latencyMs:   Date.now() - t0,
+        errorCode:   null,
+      }, "[BALANCE_FETCH] Kraken account ok");
       return { USD: usd, BTC: btc, ETH: eth, SOL: sol };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[exchangeEngine] Kraken getAccount FAILED: ${msg}`);
+      logger.error({
+        tag:       "BALANCE_FETCH",
+        event:     "fail",
+        exchange:  "Kraken",
+        latencyMs: Date.now() - t0,
+        errorCode: "adapter_getAccount_throw",
+        err:       msg,
+      }, "[BALANCE_FETCH] Kraken getAccount failed");
       throw err;
     }
   }
@@ -298,6 +317,23 @@ const BALANCES_FRESH_MS        = 20_000;
 const BALANCES_STALE_MS        = 5 * 60 * 1000;
 const BALANCES_ERROR_COOLDOWN_MS = 20_000;
 
+// ── Staleness telemetry ─────────────────────────────────────────────────────
+// Bumped every time `fetchLiveBalancesWithMeta` serves a stale-on-error
+// snapshot. The frontend reads this via the existing live-state payload
+// so the operator pill can render "STALE × N" instead of silently
+// serving cached numbers. `_lastStaleEvent` is the most recent stale
+// event for the currently-selected exchange and surfaces the upstream
+// error string to the operator drawer.
+let _staleEventCount = 0;
+let _lastStaleEvent: { exchange: string; ageMs: number; error: string; at: number } | null = null;
+
+export function getBalanceStalenessStats(): {
+  staleEventCount: number;
+  lastStaleEvent:  { exchange: string; ageMs: number; error: string; at: number } | null;
+} {
+  return { staleEventCount: _staleEventCount, lastStaleEvent: _lastStaleEvent };
+}
+
 export type LiveBalancesSource = "live" | "cached" | "stale-error";
 export interface LiveBalancesWithMeta {
   balances: Balances;
@@ -378,9 +414,16 @@ export async function fetchLiveBalancesWithMeta(): Promise<LiveBalancesWithMeta>
     // exchanges.
     if (slot.cache && Date.now() - slot.cache.fetchedAt < BALANCES_STALE_MS) {
       const ageMs = Date.now() - slot.cache.fetchedAt;
-      console.warn(
-        `[exchangeEngine] fetchLiveBalances upstream failed for ${exchange}; serving stale cache ageMs=${ageMs} err=${msg}`,
-      );
+      _staleEventCount += 1;
+      _lastStaleEvent  = { exchange, ageMs, error: msg, at: Date.now() };
+      logger.warn({
+        tag:       "BALANCE_FETCH",
+        event:     "stale_cache_served",
+        exchange,
+        ageMs,
+        errorCode: "upstream_failed_stale_served",
+        err:       msg,
+      }, "[BALANCE_FETCH] serving stale cache after upstream failure");
       return {
         balances: slot.cache.balances,
         exchange,
@@ -392,9 +435,14 @@ export async function fetchLiveBalancesWithMeta(): Promise<LiveBalancesWithMeta>
 
     // No cache available — bubble error to caller (route renders source="error").
     // The negative cache above will absorb subsequent polls for the cooldown.
-    console.warn(
-      `[exchangeEngine] fetchLiveBalances failed for ${exchange} with no cache; negative-caching for ${BALANCES_ERROR_COOLDOWN_MS}ms err=${msg}`,
-    );
+    logger.warn({
+      tag:           "BALANCE_FETCH",
+      event:         "fail_no_cache",
+      exchange,
+      cooldownMs:    BALANCES_ERROR_COOLDOWN_MS,
+      errorCode:     "upstream_failed_no_cache",
+      err:           msg,
+    }, "[BALANCE_FETCH] upstream failed with no cache — negative-caching");
     throw err;
   }
 }
@@ -488,12 +536,25 @@ export async function getCachedSpotPriceUSD(
     // on how long a price stays "useful enough" — the equity hero just
     // needs SOMETHING believable. If even that's missing, return error.
     if (cached) {
-      console.warn(
-        `[exchangeEngine] getCachedSpotPriceUSD ${symbol} upstream failed; serving stale cache ageMs=${now - cached.fetchedAt} err=${msg}`,
-      );
+      logger.warn({
+        tag:       "BALANCE_FETCH",
+        event:     "spot_price_stale_served",
+        exchange,
+        symbol,
+        ageMs:     now - cached.fetchedAt,
+        errorCode: "spot_upstream_failed_stale_served",
+        err:       msg,
+      }, "[BALANCE_FETCH] spot price upstream failed — serving stale cache");
       return { price: cached.price, source: "cached" };
     }
-    console.warn(`[exchangeEngine] getCachedSpotPriceUSD ${symbol} failed with no cache: ${msg}`);
+    logger.warn({
+      tag:       "BALANCE_FETCH",
+      event:     "spot_price_fail_no_cache",
+      exchange,
+      symbol,
+      errorCode: "spot_upstream_failed_no_cache",
+      err:       msg,
+    }, "[BALANCE_FETCH] spot price upstream failed with no cache");
     return { price: null, source: "error", error: msg };
   }
 }

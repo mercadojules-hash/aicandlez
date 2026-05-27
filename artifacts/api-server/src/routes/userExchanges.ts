@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { userExchangeConnectionsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { userExchangeConnectionsTable, userNotificationsTable } from "@workspace/db";
+import { eq, and, or, isNull, ne } from "drizzle-orm";
+import { logger } from "../lib/logger.js";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { requireDisclaimer } from "../middlewares/requireDisclaimer.js";
 import { requirePlan } from "../middlewares/requirePlan.js";
@@ -99,19 +100,21 @@ async function runConnectionTest(
 
 function safeRow(row: typeof userExchangeConnectionsTable.$inferSelect) {
   return {
-    id:              row.id,
-    exchange:        row.exchange,
-    label:           row.label,
-    status:          row.status,
-    isDefault:       row.isDefault,
-    tradingMode:     row.tradingMode,
-    demoMode:        row.demoMode,
-    permissions:     row.permissions,
-    lastVerifiedAt:  row.lastVerifiedAt,
-    lastError:       row.lastError,
-    createdAt:       row.createdAt,
-    updatedAt:       row.updatedAt,
-    meta:            CATALOG_BY_ID[row.exchange] ?? null,
+    id:                    row.id,
+    exchange:              row.exchange,
+    label:                 row.label,
+    status:                row.status,
+    isDefault:             row.isDefault,
+    tradingMode:           row.tradingMode,
+    demoMode:              row.demoMode,
+    permissions:           row.permissions,
+    lastVerifiedAt:        row.lastVerifiedAt,
+    lastError:             row.lastError,
+    lastBalanceFetchAt:    row.lastBalanceFetchAt,
+    lastBalanceFetchError: row.lastBalanceFetchError,
+    createdAt:             row.createdAt,
+    updatedAt:             row.updatedAt,
+    meta:                  CATALOG_BY_ID[row.exchange] ?? null,
   };
 }
 
@@ -331,7 +334,50 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
       req.log.info({ userId, exchange, rowId: row.id, status: 200 }, "[EXCHANGE_SAVE] complete");
     }
 
-    res.json({ ok: true, connection: row ? safeRow(row) : null, permissions: testResult.permissions });
+    // ── Inline balance hydration ─────────────────────────────────────────
+    // Run one balance poll BEFORE we respond so the frontend can render the
+    // connected balance immediately without waiting for the next poll
+    // cycle. This also primes `lastBalanceFetchAt` + clears
+    // `lastBalanceFetchError` on the row we just inserted. Failures here
+    // do NOT fail the /connect call — the credentials passed the validate
+    // step so the connection is genuinely saved; the snapshot is just
+    // best-effort eye-candy and `persistBalancePollResult` already drops a
+    // user_notifications row on failure. Re-read the row AFTER the poll so
+    // the snapshot reflects the updated `lastBalanceFetchAt`.
+    let balanceSnapshot: BalanceConnection | null = null;
+    let refreshedRow:    typeof row | null         = row ?? null;
+    if (row) {
+      const hydrationStart = Date.now();
+      try {
+        balanceSnapshot = await loadBalanceForRow(userId, row);
+        req.log.info({
+          userId,
+          exchange,
+          ok:         balanceSnapshot.ok,
+          assetCount: Object.keys(balanceSnapshot.balances).length,
+          durationMs: Date.now() - hydrationStart,
+        }, "[EXCHANGE_CONNECTED] inline balance hydration complete");
+      } catch (err) {
+        req.log.warn({
+          userId, exchange,
+          err:        (err as Error).message,
+          durationMs: Date.now() - hydrationStart,
+        }, "[EXCHANGE_CONNECTED] inline balance hydration FAILED (non-fatal)");
+      }
+      const [reread] = await db
+        .select()
+        .from(userExchangeConnectionsTable)
+        .where(eq(userExchangeConnectionsTable.id, row.id))
+        .limit(1);
+      if (reread) refreshedRow = reread;
+    }
+
+    res.json({
+      ok:              true,
+      connection:      refreshedRow ? safeRow(refreshedRow) : null,
+      permissions:     testResult.permissions,
+      balanceSnapshot: balanceSnapshot ?? null,
+    });
   } catch (err) {
     req.log.error({ userId, exchange, err: (err as Error).message }, "[EXCHANGE_SAVE] db upsert FAILED (returning 500)");
     res.status(500).json({ error: "Failed to save connection" });
@@ -365,6 +411,113 @@ type BalanceConnection = {
   error?:         string;
 };
 
+// Persists per-poll telemetry to user_exchange_connections so the frontend
+// can render "balances last synced 12s ago" and so the operator drawer
+// surfaces the most recent adapter error. On transition (previous poll OK
+// or different error → new error), also drops a `user_notifications` row
+// tagged `exchange_balance_sync_failed` so the customer is told ONCE per
+// failure mode, not on every 5s poll. No push channel — task scope is the
+// in-app feed only.
+async function persistBalancePollResult(
+  userId: string,
+  row: typeof userExchangeConnectionsTable.$inferSelect,
+  outcome: { ok: true; assetCount: number; latencyMs: number }
+         | { ok: false; error: string;     latencyMs: number },
+): Promise<void> {
+  const now = new Date();
+  try {
+    if (outcome.ok) {
+      await db
+        .update(userExchangeConnectionsTable)
+        .set({
+          lastBalanceFetchAt:    now,
+          lastBalanceFetchError: null,
+          updatedAt:             now,
+        })
+        .where(eq(userExchangeConnectionsTable.id, row.id));
+      logger.info({
+        tag:        "BALANCE_SYNC",
+        event:      "ok",
+        userId,
+        exchange:   row.exchange,
+        assetCount: outcome.assetCount,
+        latencyMs:  outcome.latencyMs,
+        errorCode:  null,
+      }, "[BALANCE_SYNC] poll ok");
+      return;
+    }
+    // Refresh-only update for the timestamp — never races, always wins.
+    // Telemetry MUST advance even when the error string hasn't changed,
+    // otherwise "balances last synced" would freeze on the first failure.
+    await db
+      .update(userExchangeConnectionsTable)
+      .set({ lastBalanceFetchAt: now, updatedAt: now })
+      .where(eq(userExchangeConnectionsTable.id, row.id));
+    logger.warn({
+      tag:       "BALANCE_SYNC",
+      event:     "fail",
+      userId,
+      exchange:  row.exchange,
+      latencyMs: outcome.latencyMs,
+      errorCode: "adapter_getAccount_throw",
+      err:       outcome.error,
+    }, "[BALANCE_SYNC] poll failed");
+
+    // Transition-gated update: write the new error string ONLY if it
+    // differs from what's currently in the DB. The conditional WHERE makes
+    // this atomic against concurrent /balances polls — only one writer
+    // can transition the row, and only that writer's `.returning()`
+    // yields a row id. Subsequent racing polls see rowCount=0 here and
+    // suppress the notification, so the customer is told once per
+    // failure mode regardless of poll concurrency.
+    const transitioned = await db
+      .update(userExchangeConnectionsTable)
+      .set({ lastBalanceFetchError: outcome.error })
+      .where(
+        and(
+          eq(userExchangeConnectionsTable.id, row.id),
+          or(
+            isNull(userExchangeConnectionsTable.lastBalanceFetchError),
+            ne(userExchangeConnectionsTable.lastBalanceFetchError, outcome.error),
+          ),
+        ),
+      )
+      .returning({ id: userExchangeConnectionsTable.id });
+    if (transitioned.length === 0) return;
+    try {
+      await db.insert(userNotificationsTable).values({
+        userId,
+        type:    "exchange_balance_sync_failed",
+        title:   `${row.exchange} balances could not be synced`,
+        message: `We couldn't refresh your ${row.exchange} balances. The connection is still saved — we'll keep retrying. Error: ${outcome.error}`,
+        data:    {
+          exchange:  row.exchange,
+          errorCode: "adapter_getAccount_throw",
+          error:     outcome.error,
+        },
+        read:    false,
+      });
+    } catch (notifErr) {
+      logger.warn({
+        tag:      "BALANCE_SYNC",
+        event:    "notification_insert_failed",
+        userId,
+        exchange: row.exchange,
+        err:      notifErr instanceof Error ? notifErr.message : String(notifErr),
+      }, "[BALANCE_SYNC] failed to persist user_notifications row");
+    }
+  } catch (err) {
+    // Telemetry write must never block the user's poll. Log + swallow.
+    logger.warn({
+      tag:      "BALANCE_SYNC",
+      event:    "telemetry_persist_failed",
+      userId,
+      exchange: row.exchange,
+      err:      err instanceof Error ? err.message : String(err),
+    }, "[BALANCE_SYNC] telemetry update failed");
+  }
+}
+
 async function loadBalanceForRow(
   userId: string,
   row: typeof userExchangeConnectionsTable.$inferSelect,
@@ -378,16 +531,28 @@ async function loadBalanceForRow(
     balances:       {},
     lastUpdated:    0,
   };
+  const t0 = Date.now();
   let creds = vault.decryptBlob(userId, row.encryptedBlob);
-  if (!creds) return { ...base, error: "Failed to decrypt stored credentials" };
+  if (!creds) {
+    const errMsg = "Failed to decrypt stored credentials";
+    await persistBalancePollResult(userId, row, { ok: false, error: errMsg, latencyMs: Date.now() - t0 });
+    return { ...base, error: errMsg };
+  }
   try {
     creds = await ensureFreshAlpacaCreds(userId, row, creds);
   } catch (err) {
-    return { ...base, error: (err as Error).message };
+    const errMsg = (err as Error).message;
+    await persistBalancePollResult(userId, row, { ok: false, error: errMsg, latencyMs: Date.now() - t0 });
+    return { ...base, error: errMsg };
   }
   try {
     const adapter = makeAdapter(row.exchange, creds, { demoMode: row.demoMode });
     const account = await adapter.getAccount();
+    await persistBalancePollResult(userId, row, {
+      ok:         true,
+      assetCount: Object.keys(account.balances).length,
+      latencyMs:  Date.now() - t0,
+    });
     return {
       ...base,
       ok:             true,
@@ -396,7 +561,9 @@ async function loadBalanceForRow(
       lastUpdated:    account.lastUpdated,
     };
   } catch (err) {
-    return { ...base, error: (err as Error).message };
+    const errMsg = (err as Error).message;
+    await persistBalancePollResult(userId, row, { ok: false, error: errMsg, latencyMs: Date.now() - t0 });
+    return { ...base, error: errMsg };
   }
 }
 
