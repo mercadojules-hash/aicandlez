@@ -5177,6 +5177,7 @@ export function PortalCustomerShell() {
           history={paperHistory}
           openCount={openTrades.length}
           posture={portalPosture}
+          plan={plan}
         />
 
         {/* Phase 5 — Performance Credibility strip. Discipline-forward
@@ -5187,6 +5188,21 @@ export function PortalCustomerShell() {
           history={paperHistory}
           engine={engineStatus}
         />
+
+        {/* Phase 7 — Elite Intelligence Chip. Renders ONLY when an
+            opportunity has crossed 90 conviction (`eliteActive`). For
+            PRO: full readout of the top elite — symbol, score,
+            direction, "TRACKING" verb. For FREE/STARTER: subtle
+            "ELITE MOMENT DETECTED" pill with a "PRO unlocks deeper
+            view" CTA. Communicates exclusivity without casino energy.
+            Mounts above the battlefield so the escalation reads in
+            sequence with the elite border glow. */}
+        {eliteActive && (
+          <EliteIntelligenceChip
+            opportunities={opportunities}
+            plan={plan}
+          />
+        )}
 
         {/* Phase 4 — Notification Intelligence dispatcher. Headless;
             mounts toast watchers for ELITE signals, conviction threshold
@@ -5460,14 +5476,23 @@ function TodaysIntelligencePanel({
 /* observant, disciplined. Never meme-y, never chatty. Customer-only.         */
 /* ──────────────────────────────────────────────────────────────────────── */
 function AINarratorStrip({
-  opportunities, engine, history, openCount, posture,
+  opportunities, engine, history, openCount, posture, plan,
 }: {
   opportunities: ReadonlyArray<OpportunityVM>;
   engine:        EngineLite | undefined;
   history:       ReadonlyArray<{ symbol: string; display: string; pnl: number; pnlPct: number; closedAt: number }>;
   openCount:     number;
   posture:       "RISK-ON" | "DEFENSIVE" | "NEUTRAL" | "LOW-VOL";
+  plan:          Plan;
 }) {
+  // Phase 7 — Plan-aware narrator.
+  // FREE/STARTER hear a clean institutional line. PRO hears the same
+  // observation enriched with multi-timeframe + volatility-regime context
+  // ("strengthening across 15m/1H while volatility compression breaks
+  // upward"). This is a perceived-intelligence differentiator, not a
+  // gate — the underlying observation is the same; PRO just gets the
+  // technical "why" appended.
+  const isPro = plan === "pro";
   const lines = useMemo<string[]>(() => {
     const out: string[] = [];
     if (!engine?.running) {
@@ -5476,16 +5501,37 @@ function AINarratorStrip({
     }
     // Highest conviction story
     const top = [...opportunities].sort((a, b) => (b.convictionScore ?? 0) - (a.convictionScore ?? 0))[0];
-    if (top && (top.convictionScore ?? 0) >= 80) {
-      out.push(`AI sees strong conviction on ${top.symbol} — ${Math.round(top.convictionScore ?? 0)} across multiple timeframes.`);
-    } else if (top && (top.convictionScore ?? 0) >= 65) {
-      out.push(`AI tracking ${top.symbol} — conviction building toward confirmation.`);
+    const topConv = top ? Math.round(top.convictionScore ?? 0) : 0;
+    if (top && topConv >= 80) {
+      const base = `AI sees strong conviction on ${top.symbol} — ${topConv} across multiple timeframes.`;
+      out.push(isPro
+        ? `${base} 15m/1H trend aligned with ${top.direction === "LONG" ? "expanding upside" : "downside pressure"} — volatility regime supports continuation.`
+        : base);
+    } else if (top && topConv >= 65) {
+      const base = `AI tracking ${top.symbol} — conviction building toward confirmation.`;
+      out.push(isPro
+        ? `${base} Early-stage momentum on the 15m; awaiting 1H confirmation before elevating to high-conviction.`
+        : base);
     }
     // Phase 5 — risk intelligence prose (institutional, restrained).
-    if      (posture === "RISK-ON")    out.push("Market regime shifting toward risk-on behavior.");
-    else if (posture === "DEFENSIVE")  out.push("AI currently defensive — sellers pressing across majors.");
-    else if (posture === "LOW-VOL")    out.push("Low-volatility environment detected — waiting for expansion.");
-    else                                out.push("Two-sided tape — selective opportunities forming on both sides.");
+    // Phase 7 — PRO sees the second-order driver appended.
+    if (posture === "RISK-ON") {
+      out.push(isPro
+        ? "Market regime shifting toward risk-on behavior — breadth expanding, volatility compression breaking upward."
+        : "Market regime shifting toward risk-on behavior.");
+    } else if (posture === "DEFENSIVE") {
+      out.push(isPro
+        ? "AI currently defensive — sellers pressing across majors, correlation tightening to the downside."
+        : "AI currently defensive — sellers pressing across majors.");
+    } else if (posture === "LOW-VOL") {
+      out.push(isPro
+        ? "Low-volatility environment detected — waiting for expansion. Compression regimes historically resolve directionally."
+        : "Low-volatility environment detected — waiting for expansion.");
+    } else {
+      out.push(isPro
+        ? "Two-sided tape — selective opportunities forming on both sides. Cross-asset correlation contained."
+        : "Two-sided tape — selective opportunities forming on both sides.");
+    }
     // Engine funnel narration
     if ((engine?.tradesBlocked ?? 0) >= 3) {
       out.push(`Risk gates elevated — ${engine?.tradesBlocked} setups filtered today.`);
@@ -5508,7 +5554,7 @@ function AINarratorStrip({
       out.push("AI scanning — awaiting high-conviction setup.");
     }
     return out;
-  }, [opportunities, engine?.running, engine?.tradesBlocked, history, openCount, posture]);
+  }, [opportunities, engine?.running, engine?.tradesBlocked, history, openCount, posture, isPro]);
 
   const postureColor =
     posture === "RISK-ON"   ? T.NEON :
@@ -5612,6 +5658,139 @@ function AINarratorStrip({
           }
         }
       `}</style>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Phase 7 — EliteIntelligenceChip                                            */
+/* Mounts above the battlefield ONLY when an opportunity has crossed 90       */
+/* conviction (eliteActive). For PRO: full readout of the top elite           */
+/* (symbol, score, direction, posture verb). For FREE/STARTER: subtle         */
+/* "ELITE MOMENT DETECTED" pill + intelligence-first CTA back to the          */
+/* shell's UpgradeModal via the same UPGRADE_EVENT bridge used by SignalRow.  */
+/* Customer-only by virtue of being rendered only inside PortalCustomerShell. */
+/* ──────────────────────────────────────────────────────────────────────── */
+function EliteIntelligenceChip({
+  opportunities, plan,
+}: {
+  opportunities: ReadonlyArray<OpportunityVM>;
+  plan:          Plan;
+}) {
+  const isPro = plan === "pro";
+  const topElite = useMemo(() => {
+    let best: OpportunityVM | undefined;
+    let bestScore = -1;
+    for (const o of opportunities) {
+      const s = o.convictionScore ?? 0;
+      if (s >= 90 && s > bestScore) { best = o; bestScore = s; }
+    }
+    return best;
+  }, [opportunities]);
+  if (!topElite) return null;
+
+  const dirColor = topElite.direction === "LONG" ? "#00C853" : "#ff6b6b";
+  const score    = Math.round(topElite.convictionScore ?? 0);
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "8px 14px",
+        background: "linear-gradient(90deg, rgba(102,255,102,0.06) 0%, rgba(0,0,0,0.55) 60%)",
+        border: `1px solid ${T.NEON}40`,
+        borderRadius: 6,
+        fontFamily: T.FONT_MONO,
+        boxShadow: `0 0 14px ${T.NEON}22`,
+      }}
+    >
+      <span aria-hidden style={{
+        width: 6, height: 6, borderRadius: "50%",
+        background: T.NEON,
+        boxShadow: `0 0 8px ${T.NEON}`,
+        flexShrink: 0,
+      }} />
+      <span style={{
+        fontSize: 9.5, fontWeight: 800, letterSpacing: "0.22em",
+        color: T.NEON, textShadow: `0 0 6px ${T.NEON}80`,
+        flexShrink: 0,
+      }}>
+        ◆ ELITE INTELLIGENCE
+      </span>
+      {isPro ? (
+        <>
+          <span style={{
+            fontSize: 9, fontWeight: 800, letterSpacing: "0.18em",
+            color: dirColor,
+            padding: "2px 6px", borderRadius: 3,
+            background: `${dirColor}14`,
+            border: `1px solid ${dirColor}55`,
+            textShadow: `0 0 4px ${dirColor}50`,
+          }}>
+            {topElite.direction} · {score}
+          </span>
+          <span style={{
+            fontSize: 12, fontWeight: 600, letterSpacing: "0.02em",
+            color: T.TEXT_2, lineHeight: 1.35, minWidth: 0,
+          }}>
+            AI tracking <strong style={{ color: T.TEXT_1, fontWeight: 800 }}>{topElite.symbol}</strong>
+            {" "}— conviction {score}, multi-timeframe alignment locked.
+            Early-stage{" "}
+            {topElite.direction === "LONG" ? "upside expansion" : "downside pressure"}.
+          </span>
+        </>
+      ) : (
+        <>
+          <span style={{
+            fontSize: 9, fontWeight: 800, letterSpacing: "0.18em",
+            color: T.TEXT_3,
+            padding: "2px 6px", borderRadius: 3,
+            background: "transparent",
+            border: `1px solid ${T.NEON}30`,
+          }}>
+            LOCKED · PRO
+          </span>
+          <span style={{
+            fontSize: 12, fontWeight: 600, letterSpacing: "0.02em",
+            color: T.TEXT_2, lineHeight: 1.35, minWidth: 0,
+            filter: "blur(0.5px)",
+            opacity: 0.85,
+          }}>
+            ELITE moment detected — full conviction trajectory + regime
+            commentary available on PRO.
+          </span>
+          <button
+            type="button"
+            onClick={() => { try { window.dispatchEvent(new CustomEvent(UPGRADE_EVENT)); } catch { /* noop */ } }}
+            aria-label="Unlock PRO elite intelligence"
+            style={{
+              marginLeft: "auto",
+              fontFamily: T.FONT_MONO,
+              fontSize: 9, fontWeight: 800, letterSpacing: "0.20em",
+              color: T.NEON, textShadow: `0 0 4px ${T.NEON}80`,
+              background: "rgba(0,0,0,0.55)",
+              border: `1px solid ${T.NEON}60`,
+              borderRadius: 3,
+              padding: "4px 10px",
+              cursor: "pointer",
+              transition: "border-color 160ms ease, box-shadow 160ms ease",
+              flexShrink: 0,
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = T.NEON;
+              e.currentTarget.style.boxShadow   = `0 0 10px ${T.NEON}60`;
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = `${T.NEON}60`;
+              e.currentTarget.style.boxShadow   = "none";
+            }}
+          >
+            UNLOCK
+          </button>
+        </>
+      )}
     </div>
   );
 }

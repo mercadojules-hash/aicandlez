@@ -1,0 +1,103 @@
+Phase 6 is approved.
+
+This was the correct monetization direction because you turned the paywall into:
+“exclusive intelligence access”
+instead of:
+“feature restriction.”
+
+That distinction is extremely important psychologically.
+
+Major wins:
+• The PRO Intelligence Layer feels premium and restrained
+• Blurred advanced reasoning is the correct upgrade mechanic
+• The lock itself communicates value without aggressive selling
+• Deterministic analysis was the right engineering decision — no randomness/flicker preserves trust
+• The upgrade-event bridge was a clean architecture choice
+• Keeping the PRO section full-width under WHY/LIFECYCLE gives it proper importance
+• React Query dedupe avoiding extra billing fetches was the correct optimization
+
+Most important:
+The platform now communicates:
+“The AI knows more than you currently have access to.”
+
+That creates curiosity and perceived sophistication without cheap marketing tactics.
+
+The tone discipline is holding extremely well:
+
+* institutional
+* intelligence-first
+* restrained
+* premium
+* analytical
+
+NOT:
+
+* casino crypto UI
+* spammy upsells
+* noisy paywall funnels
+
+Proceed next with:
+Phase 7 — Premium Alerting + Elite Intelligence Exclusivity
+
+Priority scope:
+
+1. PRO-only ELITE Signal Layer
+   FREE users:
+
+* see ELITE moments happen
+* but with reduced detail
+
+PRO users:
+
+* full ELITE reasoning
+* advanced trajectory analysis
+* volatility/regime commentary
+* early-stage conviction movement
+
+2. PRO Push Notification Intelligence
+   Use the existing VAPID wiring:
+
+* ELITE signal detected
+* ACTIVE → STRONG
+* STRONG → ELITE
+* AI closed profitable trade
+* volatility regime shift
+
+But:
+FREE:
+
+* delayed/basic
+  PRO:
+* instant/deeper/contextual
+
+3. Elite Battlefield Presence
+   When ELITE conviction occurs:
+
+* stronger battlefield atmospheric response
+* subtle cinematic escalation
+* more “institutional urgency”
+* but still restrained
+
+No flashing casino effects.
+
+4. Plan-aware AI Narrator
+   FREE:
+   “ETH momentum strengthening.”
+
+PRO:
+“ETH momentum strengthening across 15m/1H while volatility compression breaks upward.”
+
+This is a powerful perceived-intelligence differentiator.
+
+5. Long-term product positioning
+   You are now building:
+   AI Trading Intelligence Platform
+   —not—
+   just a signal app.
+
+Continue preserving:
+• /command frozen
+• customer-only scope
+• PortalCustomerShell.tsx isolation
+• institutional UX language
+• restrained monetization psychology
