@@ -196,17 +196,24 @@ function useConnectedExchangeName(plan: Plan): string | null {
      subscribed    → "ALPACA PAPER" (no exchange linked)
      subscribed +  → "<EXCHANGE> CONNECTED" (or " LIVE" if live keys)   */
 const ExchangeStatusBadge = memo(function ExchangeStatusBadge({ plan }: { plan: Plan }) {
+  // Task #199 — badge is now fully runtime-driven. The connected-name
+  // hook is still called for backwards-compatible tone shifts (subscribed
+  // user with no exchange linked = amber prompt), but the visible label
+  // comes from `runtimeLabel(state)` so toggling the chip switcher
+  // (PAPER → KRAKEN → COINBASE) updates this badge in lockstep with
+  // every other mode label on the surface.
+  const { data: runtimeState } = useRuntimeState();
   const connectedName = useConnectedExchangeName(plan);
-  const { label, tone } =
+  const isLive = runtimeState?.mode === "live";
+  const label = runtimeLabel(runtimeState);
+  const tone: string =
     plan === "free"
-      // Task #199 — explicit runtime labels. We still read
-      // useConnectedExchangeName() so non-subscribers see the same
-      // tone shifts, but the active text comes from the runtime
-      // aggregator: "PAPER MODE" / "LIVE: KRAKEN" / "LIVE: COINBASE".
-      ? { label: "PAPER MODE",                       tone: T.TEXT_1 }
-      : connectedName
-        ? { label: `LIVE: ${connectedName}`,         tone: T.NEON   }
-        : { label: "PAPER MODE",                     tone: T.AMBER  };
+      ? T.TEXT_1
+      : isLive
+        ? T.NEON
+        : connectedName
+          ? T.TEXT_1
+          : T.AMBER;
   // Match telemetry chip language: small dot + uppercase mono label.
   const dotShadow = tone === T.NEON  ? `0 0 6px ${T.NEON}`
                   : tone === T.AMBER ? `0 0 5px ${T.AMBER}`
@@ -4781,7 +4788,14 @@ export function PortalCustomerShell() {
   // state below; "live" only flips the displayed runtime context, not
   // order routing (kill switch + Task #200 gate still apply).
   const { data: runtimeState } = useRuntimeState();
-  const runtimeMode: "paper" | "live" = runtimeState?.mode ?? "paper";
+  // Note: `LiveControlBar.state` intentionally stays "PAPER" on the
+  // customer surface even when the runtime switcher is set to LIVE.
+  // The bar's "LIVE" state copy is execution-semantic ("EXECUTING /
+  // LIVE ORDERS FIRING") and that contract holds only once Task #200's
+  // ARM gate is in place. Until then, the chip switcher updates the
+  // visible runtime label (`runtimeLabel(state)`) — but it does NOT
+  // flip the execution bar into a state that implies armed routing.
+  void runtimeState;
   const { majors, alts, opportunities, engine, isLoading, isError } = usePaperSignals();
   const { stats: paperStats, openTrade, open: openTrades, history: paperHistory } = usePaperTrades();
 
@@ -5643,7 +5657,7 @@ export function PortalCustomerShell() {
             (the customer ARM LIVE control is intentionally absent). */}
         <LiveControlBar
           assetClass="CRYPTO"
-          state={runtimeMode === "live" ? "LIVE" : "PAPER"}
+          state="PAPER"
           customerEntitled={entitled}
           leadingSlot={
             /* Hero brand mark — transparent, no boxed treatment, sized to
