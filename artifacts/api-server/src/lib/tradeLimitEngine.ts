@@ -15,8 +15,17 @@
 // intentionally uncapped — operators never appear in `sim_*` tables.
 //
 // A small 5s per-user cache keeps the trading loop and stream emitters
-// from hammering the DB. The cap itself is sourced from
-// `user_trade_limits` (default tier = 50, sentinel -1 = unlimited).
+// from hammering the DB. The cap itself is resolved from two sources,
+// in priority order:
+//
+//   1. user_trade_limits row with `usePlanDefault=false` and a non-
+//      expired `overrideExpiresAt` (or null expiry = permanent) →
+//      operator override.  `capTier === -1` = UNLIMITED.
+//   2. Otherwise → plan default from `PLAN_DEFAULT_TRADE_LIMIT_CAP`
+//      keyed by `users.plan` (free=50, starter=100, pro=200).
+//
+// Source is surfaced in the verdict so the operator drawer can render
+// PLAN DEFAULT / OPERATOR OVERRIDE badges without a second round-trip.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { db } from "@workspace/db";
@@ -24,16 +33,26 @@ import {
   simPositionsTable,
   simTradesTable,
   userTradeLimitsTable,
-  DEFAULT_TRADE_LIMIT_CAP,
+  usersTable,
   UNLIMITED_TRADE_LIMIT_CAP,
+  getPlanDefaultCap,
 } from "@workspace/db";
 import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { logger } from "./logger.js";
+
+export type TradeLimitSource = "plan-default" | "operator-override";
 
 export interface TradeLimitVerdict {
   userId:         string;
   used24h:        number;
   capTier:        number;       // -1 sentinel = unlimited
+  /** Effective cap source — drives the PLAN DEFAULT / OPERATOR OVERRIDE
+   *  badge in the operator drawer. */
+  source:         TradeLimitSource;
+  /** Cap that the user would receive from their plan tier alone, ignoring
+   *  any operator override. Exposed so the drawer can show what the
+   *  override is overriding (e.g. "OVERRIDE: 200 · PLAN DEFAULT: 100"). */
+  planDefaultCap: number;
   remaining:      number;       // Number.POSITIVE_INFINITY when unlimited
   windowResetsAt: number;       // epoch ms — earliest open that would age out
   blocked:        boolean;
@@ -51,34 +70,56 @@ export function __resetTradeLimitCacheForTests(): void {
   cache.clear();
 }
 
-/** Invalidate a single user's cached verdict (call right after recording a new live open). */
+/** Invalidate a single user's cached verdict (call right after recording
+ *  a new live open OR after an operator writes an override). */
 export function invalidateTradeLimitCache(userId: string): void {
   cache.delete(userId);
 }
 
-async function resolveCap(userId: string): Promise<number> {
+interface ResolvedCap {
+  capTier:        number;
+  source:         TradeLimitSource;
+  planDefaultCap: number;
+}
+
+async function resolveCap(userId: string): Promise<ResolvedCap> {
   try {
+    // Single round-trip: LEFT JOIN user_trade_limits onto users so the
+    // plan lookup and the override lookup happen together. Missing
+    // user row (shouldn't happen at runtime — requireAuth enforces it)
+    // falls through to the FREE plan default.
     const [row] = await db
       .select({
+        plan:              usersTable.plan,
         capTier:           userTradeLimitsTable.capTier,
+        usePlanDefault:    userTradeLimitsTable.usePlanDefault,
         overrideExpiresAt: userTradeLimitsTable.overrideExpiresAt,
       })
-      .from(userTradeLimitsTable)
-      .where(eq(userTradeLimitsTable.userId, userId))
+      .from(usersTable)
+      .leftJoin(userTradeLimitsTable, eq(userTradeLimitsTable.userId, usersTable.clerkUserId))
+      .where(eq(usersTable.clerkUserId, userId))
       .limit(1);
-    if (!row) return DEFAULT_TRADE_LIMIT_CAP;
-    // Expired override → fall back to default cap; operators are expected
-    // to set the row's capTier explicitly when they want a permanent bump.
-    if (row.overrideExpiresAt && row.overrideExpiresAt.getTime() < Date.now()) {
-      return DEFAULT_TRADE_LIMIT_CAP;
+
+    const planDefaultCap = getPlanDefaultCap(row?.plan ?? null);
+
+    if (!row || row.capTier === null || row.usePlanDefault !== false) {
+      // No row, no override flag set, or operator explicitly chose
+      // "use plan default" → plan tier wins.
+      return { capTier: planDefaultCap, source: "plan-default", planDefaultCap };
     }
-    return row.capTier ?? DEFAULT_TRADE_LIMIT_CAP;
+    if (row.overrideExpiresAt && row.overrideExpiresAt.getTime() < Date.now()) {
+      // Override window elapsed → revert to plan default. Operators
+      // who want a permanent bump set overrideExpiresAt = null.
+      return { capTier: planDefaultCap, source: "plan-default", planDefaultCap };
+    }
+    return { capTier: row.capTier, source: "operator-override", planDefaultCap };
   } catch (err) {
     logger.warn(
       { userId, err: err instanceof Error ? err.message : String(err) },
-      "tradeLimitEngine: cap lookup failed — defaulting to 50",
+      "tradeLimitEngine: cap lookup failed — defaulting to FREE plan default",
     );
-    return DEFAULT_TRADE_LIMIT_CAP;
+    const fallback = getPlanDefaultCap(null);
+    return { capTier: fallback, source: "plan-default", planDefaultCap: fallback };
   }
 }
 
@@ -133,10 +174,12 @@ export function buildVerdict(args: {
   userId:            string;
   used24h:           number;
   capTier:           number;
+  source:            TradeLimitSource;
+  planDefaultCap:    number;
   oldestOpenEpochMs: number | null;
   nowMs:             number;
 }): TradeLimitVerdict {
-  const { userId, used24h, capTier, oldestOpenEpochMs, nowMs } = args;
+  const { userId, used24h, capTier, source, planDefaultCap, oldestOpenEpochMs, nowMs } = args;
   const unlimited = capTier === UNLIMITED_TRADE_LIMIT_CAP;
   const remaining = unlimited
     ? Number.POSITIVE_INFINITY
@@ -151,6 +194,8 @@ export function buildVerdict(args: {
     userId,
     used24h,
     capTier,
+    source,
+    planDefaultCap,
     remaining,
     windowResetsAt,
     blocked,
@@ -162,12 +207,14 @@ export async function getTradeLimitVerdict(userId: string): Promise<TradeLimitVe
   const now = Date.now();
   const cached = cache.get(userId);
   if (cached && cached.expiresAt > now) return cached.verdict;
-  const cap = await resolveCap(userId);
+  const resolved = await resolveCap(userId);
   const { count, oldestOpenEpochMs } = await countLiveOpensInWindow(userId, now - WINDOW_MS);
   const verdict = buildVerdict({
     userId,
     used24h:           count,
-    capTier:           cap,
+    capTier:           resolved.capTier,
+    source:            resolved.source,
+    planDefaultCap:    resolved.planDefaultCap,
     oldestOpenEpochMs,
     nowMs:             now,
   });

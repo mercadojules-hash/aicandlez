@@ -48,6 +48,7 @@ import {
   ADMIN_STATUSES,
   TRADE_LIMIT_CAP_TIERS,
   DEFAULT_TRADE_LIMIT_CAP,
+  getPlanDefaultCap,
   type AdminStatus,
 } from "@workspace/db";
 import { isSuperAdminEmail } from "../lib/adminAllowlist.js";
@@ -93,14 +94,27 @@ const NoteSchema = z
 const StatusBodySchema = z.object({ note: NoteSchema, reason: z.string().trim().max(500).optional() });
 
 const TradeLimitBodySchema = z.object({
-  note:      NoteSchema,
-  capTier:   z.number().int().refine(
-    (v: number) => (TRADE_LIMIT_CAP_TIERS as readonly number[]).includes(v),
-    { message: `capTier must be one of ${TRADE_LIMIT_CAP_TIERS.join(", ")}` },
-  ),
+  note:           NoteSchema,
+  // When `usePlanDefault=true`, `capTier` is optional and the persisted
+  // row mirrors the user's current plan default (cosmetic — engine
+  // ignores capTier whenever usePlanDefault=true). When `usePlanDefault`
+  // is omitted or false, `capTier` is REQUIRED and must be one of the
+  // tier values (or -1 for UNLIMITED).
+  usePlanDefault: z.boolean().optional(),
+  capTier:        z
+    .number()
+    .int()
+    .refine(
+      (v: number) => (TRADE_LIMIT_CAP_TIERS as readonly number[]).includes(v),
+      { message: `capTier must be one of ${TRADE_LIMIT_CAP_TIERS.join(", ")}` },
+    )
+    .optional(),
   // Optional ISO-8601 string; null clears the expiry (permanent bump).
-  expiresAt: z.union([z.string().datetime(), z.null()]).optional(),
-});
+  expiresAt:      z.union([z.string().datetime(), z.null()]).optional(),
+}).refine(
+  (v) => v.usePlanDefault === true || typeof v.capTier === "number",
+  { message: "capTier is required unless usePlanDefault is true", path: ["capTier"] },
+);
 
 const CancelSubBodySchema = z.object({
   note:                NoteSchema,
@@ -293,34 +307,150 @@ router.post("/admin/users/:id/override_trade_limit", ...requireOperator, async (
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid body" });
     return;
   }
-  const { note, capTier, expiresAt } = parsed.data;
+  const { note, capTier, expiresAt, usePlanDefault } = parsed.data;
   try {
-    const [before] = await db.select().from(userTradeLimitsTable)
-      .where(eq(userTradeLimitsTable.userId, ctx.targetId)).limit(1);
-    const expiresDate = expiresAt ? new Date(expiresAt) : null;
-    const now = new Date();
-    await db.insert(userTradeLimitsTable).values({
-      userId:            ctx.targetId,
-      capTier,
-      overrideExpiresAt: expiresDate,
-      createdAt:         now,
-      updatedAt:         now,
-    }).onConflictDoUpdate({
-      target: userTradeLimitsTable.userId,
-      set: { capTier, overrideExpiresAt: expiresDate, updatedAt: now },
+    // Resolve the user's plan up front so PLAN-DEFAULT writes mirror the
+    // current tier into `capTier` (cosmetic; engine ignores capTier when
+    // usePlanDefault=true, but a coherent row makes audit + telemetry
+    // reads straightforward).
+    const [userRow] = await db
+      .select({ plan: usersTable.plan })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, ctx.targetId))
+      .limit(1);
+    if (!userRow) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    const planDefaultCap = getPlanDefaultCap(userRow.plan);
+
+    const willUsePlanDefault = usePlanDefault === true;
+    // When reverting to plan default we clear the expiry (it only ever
+    // applied to active overrides) and stamp the row's capTier with the
+    // current plan default for snapshot consistency.
+    const nextCapTier   = willUsePlanDefault ? planDefaultCap : (capTier as number);
+    const nextExpiresAt = willUsePlanDefault ? null : (expiresAt ? new Date(expiresAt) : null);
+    const now           = new Date();
+
+    // Wrap the row upsert + both audit inserts in a single transaction so
+    // a partial failure cannot leave persisted state without its audit
+    // trail (or, conversely, audit rows describing a write that didn't
+    // commit). `writeAudit` accepts an executor for exactly this case.
+    const txResult = await db.transaction(async (tx) => {
+      const [beforeRow] = await tx.select().from(userTradeLimitsTable)
+        .where(eq(userTradeLimitsTable.userId, ctx.targetId)).limit(1);
+
+      await tx.insert(userTradeLimitsTable).values({
+        userId:            ctx.targetId,
+        capTier:           nextCapTier,
+        usePlanDefault:    willUsePlanDefault,
+        overrideExpiresAt: nextExpiresAt,
+        createdAt:         now,
+        updatedAt:         now,
+      }).onConflictDoUpdate({
+        target: userTradeLimitsTable.userId,
+        set: {
+          capTier:           nextCapTier,
+          usePlanDefault:    willUsePlanDefault,
+          overrideExpiresAt: nextExpiresAt,
+          updatedAt:         now,
+        },
+      });
+      const [afterRow] = await tx.select().from(userTradeLimitsTable)
+        .where(eq(userTradeLimitsTable.userId, ctx.targetId)).limit(1);
+
+      // Compute the per-field diff for the canonical OPERATOR_OVERRIDE_UPDATED
+      // audit row. Mirrors the bucket pattern in adminUserProfile.ts so a
+      // single SIEM filter on the umbrella action catches every operator
+      // risk-control mutation regardless of which endpoint applied it.
+      const prevCapTier        = beforeRow?.capTier        ?? null;
+      const prevUsePlanDefault = beforeRow?.usePlanDefault ?? null;
+      const prevExpiresAt      = beforeRow?.overrideExpiresAt
+        ? beforeRow.overrideExpiresAt.toISOString()
+        : null;
+      const nextExpiresAtIso   = nextExpiresAt ? nextExpiresAt.toISOString() : null;
+      const txChanges: Record<string, { previousValue: unknown; newValue: unknown }> = {};
+      if (prevCapTier !== nextCapTier) {
+        txChanges["capTier"] = { previousValue: prevCapTier, newValue: nextCapTier };
+      }
+      if (prevUsePlanDefault !== willUsePlanDefault) {
+        txChanges["usePlanDefault"] = { previousValue: prevUsePlanDefault, newValue: willUsePlanDefault };
+      }
+      if (prevExpiresAt !== nextExpiresAtIso) {
+        txChanges["overrideExpiresAt"] = { previousValue: prevExpiresAt, newValue: nextExpiresAtIso };
+      }
+      const txChangedFields = Object.keys(txChanges);
+
+      // Legacy audit row — preserved for back-compat with dashboards that
+      // filter on `set_trade_limit`.
+      await writeAudit({
+        actorId:  ctx.actorId,
+        targetId: ctx.targetId,
+        action:   "set_trade_limit",
+        payload:  {
+          note,
+          before:         beforeRow ?? null,
+          after:          afterRow  ?? null,
+          capTier:        nextCapTier,
+          usePlanDefault: willUsePlanDefault,
+          expiresAt:      nextExpiresAtIso,
+        },
+      }, tx);
+
+      // Canonical operator-override umbrella row (only when something
+      // actually changed; matches adminUserProfile.ts no-op semantics).
+      if (txChangedFields.length > 0) {
+        await writeAudit({
+          actorId:  ctx.actorId,
+          targetId: ctx.targetId,
+          action:   "OPERATOR_OVERRIDE_UPDATED",
+          payload:  {
+            note,
+            operatorId:    ctx.actorId,
+            targetUserId:  ctx.targetId,
+            bucket:        "TRADE_LIMIT",
+            changedFields: txChangedFields,
+            changes:       txChanges,
+          },
+        }, tx);
+      }
+
+      return { after: afterRow ?? null, changedFields: txChangedFields, changes: txChanges };
     });
-    const [after] = await db.select().from(userTradeLimitsTable)
-      .where(eq(userTradeLimitsTable.userId, ctx.targetId)).limit(1);
-    await writeAudit({
-      actorId:  ctx.actorId,
-      targetId: ctx.targetId,
-      action:   "set_trade_limit",
-      payload:  { note, before: before ?? null, after: after ?? null, capTier, expiresAt: expiresAt ?? null },
-    });
+
+    const { after, changedFields, changes } = txResult;
+
+    if (changedFields.length > 0) {
+      req.log.info({
+        tag:           "OPERATOR_OVERRIDE_UPDATED",
+        outcome:       "applied",
+        bucket:        "TRADE_LIMIT",
+        operatorId:    ctx.actorId,
+        targetUserId:  ctx.targetId,
+        changedFields,
+        changes,
+      }, "[OPERATOR_OVERRIDE_UPDATED] applied (trade limit)");
+    } else {
+      req.log.info({
+        tag:           "OPERATOR_OVERRIDE_UPDATED",
+        outcome:       "noop",
+        bucket:        "TRADE_LIMIT",
+        operatorId:    ctx.actorId,
+        targetUserId:  ctx.targetId,
+      }, "[OPERATOR_OVERRIDE_UPDATED] no-op (patch matched current state)");
+    }
+
     invalidateTradeLimitCache(ctx.targetId);
-    res.json({ ok: true, after: after ?? null });
+    res.json({ ok: true, after: after ?? null, changedFields });
   } catch (err) {
-    req.log.error({ err }, "admin set_trade_limit failed");
+    req.log.error({
+      tag:          "OPERATOR_OVERRIDE_UPDATED",
+      outcome:      "failed",
+      bucket:       "TRADE_LIMIT",
+      operatorId:   ctx.actorId,
+      targetUserId: ctx.targetId,
+      err,
+    }, "admin set_trade_limit failed");
     res.status(500).json({ error: "Failed to update trade limit" });
   }
 });

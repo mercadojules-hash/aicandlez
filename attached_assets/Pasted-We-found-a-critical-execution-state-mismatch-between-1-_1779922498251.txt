@@ -1,0 +1,98 @@
+We found a critical execution-state mismatch between:
+
+1. AI live execution engine
+2. Manual signal BUY actions
+3. LiveTrades persistence UI
+
+Current observed behavior:
+
+* AI EXECUTION ARMED = LIVE
+* Coinbase runtime connected
+* Unrealized PnL updates live
+* OPEN positions count increments
+* Yet:
+
+  * Live Trades panel remains empty
+  * manual-selected trades show “paper sim”
+  * toast shows:
+    PAPER TRADE NOT PERSISTED
+    Unsupported symbol: GRTUSD
+
+This confirms the execution layer and UI persistence layer are diverging.
+
+Likely root cause:
+
+Manual BUY buttons are still routed through:
+
+* legacy paper-trading mutation
+  OR
+* old ticker normalization path
+
+while AI execution itself already uses the live Coinbase adapter.
+
+Required fixes:
+
+1. Unify execution routing
+   Manual BUY/SELL actions must use the SAME execution path as:
+
+* AI auto-execution
+* live persistence
+* positions store
+* pnl engine
+
+No separate paper mutation path.
+
+2. Normalize Coinbase symbols
+   Need centralized symbol mapper:
+
+* GRTUSD
+* PEPEUSD
+* XRPUSD
+  etc.
+
+mapped correctly into Coinbase-supported spot/perp identifiers before execution.
+
+3. LiveTrades hydration
+   The Live Trades panel must hydrate from the SAME source powering:
+
+* OPEN positions count
+* unrealized pnl
+* active positions
+
+Right now those are clearly disconnected.
+
+4. Remove remaining “paper sim” labels
+   Customer runtime is now LIVE-only armed through ACTIVATE AI TRADING.
+   Any remaining:
+
+* “paper sim”
+* “paper trade”
+* “not persisted”
+  labels in customer live mode indicate stale legacy rendering paths.
+
+5. Add structured logs
+   Need:
+
+* [MANUAL_TRADE_REQUEST]
+* [MANUAL_TRADE_EXECUTED]
+* [MANUAL_TRADE_REJECTED]
+  with:
+* normalized symbol
+* exchange
+* execution mode
+* persistence result
+* positionId
+
+6. Acceptance criteria
+
+When user manually clicks BUY:
+
+* trade executes live
+* position persists
+* Live Trades panel updates
+* OPEN count increments
+* Unrealized PnL reflects position
+* no paper labels anywhere
+* no unsupported symbol errors
+
+Right now the backend execution appears partially successful, but the UI/runtime state graph is fragmented.

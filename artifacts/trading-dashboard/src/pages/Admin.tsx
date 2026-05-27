@@ -327,6 +327,12 @@ interface UserDetailResponse {
   tradeLimit: {
     used24h: number;
     capTier: number;
+    /** "plan-default" | "operator-override" — drives the PLAN DEFAULT /
+     *  OPERATOR OVERRIDE badge in the Trade Limits section. */
+    source?: "plan-default" | "operator-override";
+    /** Cap the user would get from their plan tier alone. Surfaced next
+     *  to the effective cap when an operator override is active. */
+    planDefaultCap?: number;
     remaining: number | null;
     blocked: boolean;
     reason: string;
@@ -1150,6 +1156,14 @@ interface AiSettingsForm {
   volumeFilter:          boolean;
 }
 
+/** Trade-limit override form. `usePlanDefault=true` means "follow the plan
+ *  tier" (engine ignores `capTier`); otherwise `capTier` is the explicit
+ *  operator override (−1 = UNLIMITED). */
+interface TradeLimitForm {
+  usePlanDefault: boolean;
+  capTier:        number; // 50 | 100 | 200 | -1
+}
+
 interface BillingOverridesForm {
   perfFeeBpsOverride:     number | null;
   feeWaiverActive:        boolean;
@@ -1184,6 +1198,17 @@ function pickAiSettings(s: Record<string, unknown> | null): AiSettingsForm {
     preferredExchange:     EXCHANGE_CANONICAL[peRaw] ?? "Kraken",
     activeRuntimeExchange: areRaw,
     volumeFilter:          r["volumeFilter"] === true,
+  };
+}
+
+function pickTradeLimit(tl: UserDetailResponse["tradeLimit"] | null): TradeLimitForm {
+  // No verdict yet (404 / first render) → assume plan-default so the picker
+  // doesn't visually flash "OPERATOR OVERRIDE" before the row arrives.
+  if (!tl) return { usePlanDefault: true, capTier: 50 };
+  const isOverride = tl.source === "operator-override";
+  return {
+    usePlanDefault: !isOverride,
+    capTier:        typeof tl.capTier === "number" ? tl.capTier : 50,
   };
 }
 
@@ -1365,14 +1390,17 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
     user.sessionStatus === "idle"    ? "#ffaa00" : TAB_C.faint;
 
   // ── Server snapshots (re-derived whenever detail changes) ────────────────
-  const aiServer      = useMemo(() => pickAiSettings(detail?.settings ?? null),       [detail?.settings]);
-  const billingServer = useMemo(() => pickBillingOverrides(u),                        [u]);
+  const aiServer         = useMemo(() => pickAiSettings(detail?.settings ?? null),     [detail?.settings]);
+  const billingServer    = useMemo(() => pickBillingOverrides(u),                       [u]);
+  const tradeLimitServer = useMemo(() => pickTradeLimit(detail?.tradeLimit ?? null),    [detail?.tradeLimit]);
 
   // ── Local dirty state ────────────────────────────────────────────────────
-  const [aiDraft, setAiDraft]             = useState<AiSettingsForm>(aiServer);
-  const [billingDraft, setBillingDraft]   = useState<BillingOverridesForm>(billingServer);
-  const [aiNote, setAiNote]               = useState("");
-  const [billingNote, setBillingNote]     = useState("");
+  const [aiDraft, setAiDraft]                     = useState<AiSettingsForm>(aiServer);
+  const [billingDraft, setBillingDraft]           = useState<BillingOverridesForm>(billingServer);
+  const [tradeLimitDraft, setTradeLimitDraft]    = useState<TradeLimitForm>(tradeLimitServer);
+  const [aiNote, setAiNote]                       = useState("");
+  const [billingNote, setBillingNote]             = useState("");
+  const [tradeLimitNote, setTradeLimitNote]      = useState("");
 
   // ── Mount/unmount + note-clear diagnostics ───────────────────────────────
   // The user reports billingNote is empty at submit time despite the input
@@ -1423,6 +1451,7 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
     console.debug("[admin-profile][user-switch effect FIRED]", { clerkUserId: user.clerkUserId });
     setAiNote("");
     setBillingNote("");
+    setTradeLimitNote("");
     seededForUserRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.clerkUserId]);
@@ -1434,6 +1463,7 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
     console.debug("[admin-profile][draft-seed effect FIRED]", { clerkUserId: user.clerkUserId, hasSettings: detail.settings != null });
     setAiDraft(pickAiSettings(detail.settings ?? null));
     setBillingDraft(pickBillingOverrides(detail.user ?? null));
+    setTradeLimitDraft(pickTradeLimit(detail.tradeLimit ?? null));
     seededForUserRef.current = user.clerkUserId;
   }, [user.clerkUserId, detail]);
 
@@ -1454,8 +1484,9 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
   // false forever, edits stay blocked, no overwrite path exists.
   const seedReady = detail != null && seededForUserRef.current === user.clerkUserId;
 
-  const aiDirty      = seedReady && !shallowEqual(aiDraft as unknown as Record<string, unknown>,           aiServer as unknown as Record<string, unknown>);
-  const billingDirty = seedReady && !shallowEqual(billingDraft as unknown as Record<string, unknown>,      billingServer as unknown as Record<string, unknown>);
+  const aiDirty          = seedReady && !shallowEqual(aiDraft as unknown as Record<string, unknown>,           aiServer as unknown as Record<string, unknown>);
+  const billingDirty     = seedReady && !shallowEqual(billingDraft as unknown as Record<string, unknown>,      billingServer as unknown as Record<string, unknown>);
+  const tradeLimitDirty  = seedReady && !shallowEqual(tradeLimitDraft as unknown as Record<string, unknown>,   tradeLimitServer as unknown as Record<string, unknown>);
 
   // ── Mutations ────────────────────────────────────────────────────────────
   const detailKey = ["admin-user-detail", user.clerkUserId] as const;
@@ -1650,6 +1681,76 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
     // prematurely wipe the operator's audit note before retry.
   });
 
+  // ── Trade-limit override mutation ────────────────────────────────────────
+  // Targets the existing POST /override_trade_limit endpoint with the new
+  // `usePlanDefault` field. Server emits both `set_trade_limit` (legacy)
+  // and `OPERATOR_OVERRIDE_UPDATED` (umbrella) audit rows; client only
+  // needs to invalidate the detail key on success.
+  const tradeLimitMutation = useMutation({
+    mutationFn: async (body: Record<string, unknown>) => {
+      // eslint-disable-next-line no-console
+      console.debug("[admin-profile] FINAL PAYLOAD (override_trade_limit)", body);
+      const res = await authFetch(`/api/admin/users/${user.clerkUserId}/override_trade_limit`, {
+        method: "POST",
+        body:   JSON.stringify(body),
+      });
+      const text = await res.text();
+      let json: unknown = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) {
+        const err = (json as { error?: string } | null);
+        throw new Error(err?.error ?? `HTTP ${res.status}`);
+      }
+      return json as { ok: true; after: Record<string, unknown> | null; changedFields: string[] };
+    },
+    onError: (err: Error) => {
+      toast({
+        title:       "Trade limit save failed",
+        description: err.message,
+        variant:     "destructive",
+      });
+    },
+    onSuccess: (data) => {
+      const n = data.changedFields.length;
+      toast({
+        title:       "Trade limit saved",
+        description: n === 0
+          ? "No changes to apply."
+          : `${n} field${n === 1 ? "" : "s"} updated and audit-logged.`,
+      });
+      setTradeLimitNote("");
+      // Refetch detail so `tradeLimit.source`/`capTier`/`planDefaultCap`
+      // collapse back to authoritative server state (verdict cache was
+      // server-side invalidated by the route).
+      qc.invalidateQueries({ queryKey: detailKey });
+      qc.invalidateQueries({ queryKey: listKey });
+    },
+  });
+
+  function submitTradeLimit() {
+    if (!seedReady) return;
+    if (!tradeLimitDirty) return;
+    if (!tradeLimitNote.trim()) {
+      toast({
+        title:       "Audit note required",
+        description: "Add a short note before saving trade-limit overrides.",
+        variant:     "destructive",
+      });
+      return;
+    }
+    const body: Record<string, unknown> = {
+      note:           tradeLimitNote.trim(),
+      usePlanDefault: tradeLimitDraft.usePlanDefault,
+    };
+    // Only send capTier on the override path. On plan-default path the
+    // server fills it from the user's current tier; sending a stale
+    // value would be confusing in the audit row.
+    if (!tradeLimitDraft.usePlanDefault) {
+      body["capTier"] = tradeLimitDraft.capTier;
+    }
+    tradeLimitMutation.mutate(body);
+  }
+
   function submitAi() {
     /* eslint-disable no-console */
     console.debug("[admin-profile][submitAi] entered", {
@@ -1774,8 +1875,9 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
     /* eslint-enable no-console */
   }
 
-  const aiDisabled      = aiMutation.isPending      || loading;
-  const billingDisabled = billingMutation.isPending || compMutation.isPending || loading || !isSuperAdmin;
+  const aiDisabled         = aiMutation.isPending      || loading;
+  const billingDisabled    = billingMutation.isPending || compMutation.isPending || loading || !isSuperAdmin;
+  const tradeLimitDisabled = tradeLimitMutation.isPending || loading;
 
   return (
     <div>
@@ -1877,6 +1979,129 @@ function ProfileTab({ user, detail, loading, isSuperAdmin }: {
         disabled={!isSuperAdmin}
         disabledReason={!isSuperAdmin ? "Super-admin only" : undefined}
       />
+
+      {/* ── TRADE LIMITS (editable, operator) ──────────────────────────
+          Plan-default tier ladder + per-user override. The engine
+          (`tradeLimitEngine.resolveCap`) reads `usePlanDefault` first;
+          when true the row's `capTier` is ignored and the cap comes from
+          `PLAN_DEFAULT_TRADE_LIMIT_CAP[users.plan]` (free=50, starter=100,
+          pro=200). Override path persists `usePlanDefault=false` and the
+          chosen tier (-1 = UNLIMITED). Saves emit two audit rows:
+          legacy `set_trade_limit` + canonical `OPERATOR_OVERRIDE_UPDATED`. */}
+      <TabSectionLabel icon={Zap}>TRADE LIMITS</TabSectionLabel>
+      {loading && !detail ? <TabLoading /> : (() => {
+        const tl              = detail?.tradeLimit ?? null;
+        const serverSource    = tl?.source ?? "plan-default";
+        const planDefaultCap  = typeof tl?.planDefaultCap === "number" ? tl.planDefaultCap : 50;
+        const effectiveCap    = typeof tl?.capTier === "number" ? tl.capTier : planDefaultCap;
+        const used24h         = typeof tl?.used24h === "number" ? tl.used24h : 0;
+        const isUnlimited     = effectiveCap === -1;
+        const sourceBadgeBg   = serverSource === "operator-override" ? "#ff884420" : "#7a9eb820";
+        const sourceBadgeBd   = serverSource === "operator-override" ? "#ff884466" : "#7a9eb866";
+        const sourceBadgeCol  = serverSource === "operator-override" ? "#ff8844"   : "#7a9eb8";
+        const sourceLabel     = serverSource === "operator-override" ? "OPERATOR OVERRIDE" : "PLAN DEFAULT";
+        const planLabel       = String(u?.plan ?? "free").toUpperCase();
+
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: 8 }}>
+              {/* EFFECTIVE CAP cell — number + source badge */}
+              <div style={{
+                background: EDIT_CELL_BG, border: `1px solid ${TAB_C.border}`,
+                borderRadius: 4, padding: "8px 10px", display: "flex",
+                flexDirection: "column", gap: 4, minWidth: 0,
+              }}>
+                <div style={{
+                  fontSize: 8, fontFamily: "monospace", fontWeight: 700,
+                  color: TAB_C.faint, letterSpacing: "0.1em",
+                }}>EFFECTIVE CAP / 24H</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <div style={{
+                    fontSize: 16, fontFamily: "monospace", fontWeight: 700,
+                    color: isUnlimited ? "#cc55ff" : TAB_C.text, lineHeight: 1.1,
+                  }}>{isUnlimited ? "∞ UNLIMITED" : `${effectiveCap}`}</div>
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    padding: "2px 6px", borderRadius: 3,
+                    background: sourceBadgeBg, border: `1px solid ${sourceBadgeBd}`,
+                    fontSize: 8, fontFamily: "monospace", fontWeight: 700,
+                    color: sourceBadgeCol, letterSpacing: "0.1em",
+                  }}>{sourceLabel}</span>
+                </div>
+                <div style={{ fontSize: 8, fontFamily: "monospace", color: TAB_C.dim }}>
+                  plan={planLabel} · default={planDefaultCap}/day
+                </div>
+              </div>
+
+              <MetricCell
+                label="USED · ROLLING 24H"
+                value={`${used24h}${isUnlimited ? "" : ` / ${effectiveCap}`}`}
+                color={!isUnlimited && used24h >= effectiveCap ? "#ff3355"
+                  : used24h > 0 ? "#ffaa00" : TAB_C.text} />
+
+              <MetricCell
+                label="PLAN DEFAULT (TIER)"
+                value={`${planDefaultCap}/day`}
+                sub={`free=50 · starter=100 · pro=200`} />
+            </div>
+
+            {/* Picker row — PLAN DEFAULT | 50 | 100 | 200 | UNLIMITED */}
+            <div style={{
+              display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap",
+            }}>
+              {([
+                { key: "default", label: "PLAN DEFAULT", cap: planDefaultCap, usePlanDefault: true },
+                { key: "50",      label: "50 / DAY",     cap: 50,             usePlanDefault: false },
+                { key: "100",     label: "100 / DAY",    cap: 100,            usePlanDefault: false },
+                { key: "200",     label: "200 / DAY",    cap: 200,            usePlanDefault: false },
+                { key: "unlim",   label: "UNLIMITED",    cap: -1,             usePlanDefault: false },
+              ] as const).map(opt => {
+                const selected = tradeLimitDraft.usePlanDefault === opt.usePlanDefault
+                  && (opt.usePlanDefault || tradeLimitDraft.capTier === opt.cap);
+                const accentCol = opt.usePlanDefault ? "#7a9eb8"
+                  : opt.cap === -1 ? "#cc55ff"
+                  : opt.cap === 200 ? "#00ff8a"
+                  : opt.cap === 100 ? "#39FF14" : "#ffaa00";
+                return (
+                  <button key={opt.key}
+                    type="button"
+                    disabled={tradeLimitDisabled}
+                    onClick={() => setTradeLimitDraft({
+                      usePlanDefault: opt.usePlanDefault,
+                      capTier:        opt.usePlanDefault ? planDefaultCap : opt.cap,
+                    })}
+                    style={{
+                      flex: "1 1 0", minWidth: 90,
+                      padding: "8px 10px",
+                      background: selected ? `${accentCol}22` : EDIT_CELL_BG,
+                      border: `1px solid ${selected ? accentCol : TAB_C.border}`,
+                      borderRadius: 4,
+                      fontSize: 10, fontFamily: "monospace", fontWeight: 700,
+                      color: selected ? accentCol : TAB_C.dim,
+                      letterSpacing: "0.1em",
+                      cursor: tradeLimitDisabled ? "not-allowed" : "pointer",
+                      transition: "border-color 120ms ease, background 120ms ease, color 120ms ease",
+                    }}>
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {tradeLimitDirty && (
+              <NoteRow note={tradeLimitNote} setNote={setTradeLimitNote}
+                placeholder="Why are you changing this user's trade-cap policy?"
+                disabled={tradeLimitMutation.isPending} />
+            )}
+            <SaveResetBar
+              dirty={tradeLimitDirty}
+              saving={tradeLimitMutation.isPending}
+              onSave={submitTradeLimit}
+              onReset={() => { setTradeLimitDraft(tradeLimitServer); setTradeLimitNote(""); }}
+            />
+          </>
+        );
+      })()}
 
       {/* ── AI ENGINE SETTINGS (editable, operator) ───────────────────── */}
       <TabSectionLabel icon={Cpu}>AI ENGINE SETTINGS</TabSectionLabel>
