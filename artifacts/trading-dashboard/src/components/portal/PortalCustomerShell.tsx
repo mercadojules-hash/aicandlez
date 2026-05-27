@@ -6903,18 +6903,39 @@ function LIBCell({
       <div style={{ position: "absolute", inset: 0 }}>
         {children}
       </div>
-      {/* header bar overlays the top of the square */}
+      {/* Header bar overlays the top of the square. Phase 8.6 refinement:
+          titles stay COMPACT (fontSize 9, same baseline) — visual dominance
+          remains on the radar / confidence number / breakout %. Refinements
+          are readability-only: brighter ink (TEXT_3 → TEXT_1) for contrast,
+          opaque chip bg (0.65 → 0.92) so labels stop hazing into the radar
+          behind them, wider tracking (+0.04em) so the HUD feel reads as an
+          instrument marker rather than a header, tighter top padding
+          (10 → 7) to shrink the gutter, and explicit antialiasing +
+          textRendering for sub-pixel sharpness. */}
       <div style={{
         position: "absolute", top: 0, left: 0, right: 0,
         display: "flex", justifyContent: "space-between", alignItems: "baseline",
-        padding: "10px 14px 0",
-        fontSize: 9, fontWeight: 800, letterSpacing: "0.18em",
-        color: T.TEXT_3,
+        padding: "7px 12px 0",
+        fontSize: 9, fontWeight: 800, letterSpacing: "0.22em",
+        color: T.TEXT_1,
         pointerEvents: "none",
         zIndex: 2,
+        WebkitFontSmoothing: "antialiased",
+        MozOsxFontSmoothing: "grayscale",
+        textRendering: "geometricPrecision",
       }}>
-        <span style={{ background: "rgba(0,0,0,0.65)", padding: "2px 6px", borderRadius: 2 }}>{label}</span>
-        <span style={{ color: ring, letterSpacing: "0.14em", background: "rgba(0,0,0,0.65)", padding: "2px 6px", borderRadius: 2 }}>{sub}</span>
+        <span style={{
+          background: "rgba(0,0,0,0.92)",
+          padding: "2px 7px", borderRadius: 2,
+          border: `1px solid ${ring}1f`,
+        }}>{label}</span>
+        <span style={{
+          color: ring,
+          letterSpacing: "0.18em",
+          background: "rgba(0,0,0,0.92)",
+          padding: "2px 7px", borderRadius: 2,
+          border: `1px solid ${ring}33`,
+        }}>{sub}</span>
       </div>
     </div>
   );
