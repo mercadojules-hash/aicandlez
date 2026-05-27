@@ -80,6 +80,52 @@ import {
 import { N } from "@/components/command/institutional/theme";
 import EngineHeartbeat from "@/components/EngineHeartbeat";
 import LiveExecutionStream from "@/components/LiveExecutionStream";
+import { Zap } from "lucide-react";
+
+/* ── AI AUTOTRADE bar (operator-grade, red activation strip) ─────────────────
+ * Sits above each LIVE AI CRYPTO EXECUTION bar in Row 1. Pulled from the
+ * customer /portal MY ACCOUNT card per design direction — adapted for the
+ * operator surface: no upgrade flow, no subscription gating, just a static
+ * red activation strip that announces "AI AUTOTRADE — TO ACTIVATE AI
+ * EXECUTION". Full column width, matches the matrix panels exactly. */
+function AiAutotradeBar() {
+  return (
+    <div
+      role="presentation"
+      style={{
+        width: "100%",
+        position: "relative",
+        overflow: "hidden",
+        border: `1px solid ${N.DANGER}66`,
+        borderRadius: 4,
+        background: `linear-gradient(90deg, ${N.DANGER}1a 0%, ${N.DANGER}22 50%, ${N.DANGER}1a 100%)`,
+        boxShadow: `inset 0 0 18px ${N.DANGER}1f, 0 0 14px ${N.DANGER}22`,
+        padding: "10px 14px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        fontFamily: N.FONT_MONO,
+      }}
+    >
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+        <Zap size={14} style={{ color: N.DANGER_BRT, filter: `drop-shadow(0 0 4px ${N.DANGER})` }} />
+        <span style={{
+          fontSize: 12, fontWeight: 800, color: N.DANGER_BRT,
+          letterSpacing: "0.24em", textShadow: `0 0 6px ${N.DANGER}66`,
+        }}>
+          AI AUTOTRADE
+        </span>
+      </div>
+      <span style={{
+        fontSize: 10, fontWeight: 700, color: `${N.DANGER_BRT}cc`,
+        letterSpacing: "0.22em",
+      }}>
+        TO ACTIVATE AI EXECUTION
+      </span>
+    </div>
+  );
+}
 
 import { authFetch } from "../lib/authFetch";
 import type {
@@ -364,6 +410,7 @@ export default function CommandCenter() {
           style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}
         >
           <div className="flex flex-col gap-2">
+            <AiAutotradeBar />
             <LiveControlBar
               assetClass="CRYPTO"
               state={cryptoState}
@@ -374,6 +421,7 @@ export default function CommandCenter() {
             <CryptoMajorsSignalsPanel engine={engine} />
           </div>
           <div className="flex flex-col gap-2">
+            <AiAutotradeBar />
             <LiveControlBar
               assetClass="CRYPTO"
               state={cryptoState}
