@@ -91,7 +91,12 @@ import { Zap, TrendingUp, TrendingDown, Activity } from "lucide-react";
  * routing. Per user direction: "thin and institutional, not a hero card".
  * Renders nothing until at least one breakdown crosses the 70% conviction
  * floor (avoids a flat empty strip during engine warmup). */
-const PULSE_MIN_CONFIDENCE = 70;
+// TEMP VISUAL QA: lowered 70 → 30 so all three tiers (ELITE / STRONG /
+// ACTIVE) render against current sub-50% live engine output. Revert to 70
+// after user signs off on the tier hierarchy. DOES NOT affect execution
+// threshold (80% live floor stays enforced server-side in riskGate /
+// KrakenAdapter / placeLiveAutoOrderForUser). Visual gating only.
+const PULSE_MIN_CONFIDENCE = 30;
 const PULSE_MAX_ITEMS      = 5;
 const PULSE_UNIVERSE = [...CRYPTO_MAJORS_30, ...CRYPTO_ALTS_MEMES];
 
