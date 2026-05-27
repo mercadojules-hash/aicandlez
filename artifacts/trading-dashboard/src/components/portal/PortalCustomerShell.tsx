@@ -4714,22 +4714,28 @@ export function PortalCustomerShell() {
            .cd-customer-battlefield-matrix .blotter-scroll so /command
            keeps its 940px height untouched (admin operators want to
            see the full universe at a glance, customers want focus).
-           780px = 10 SignalRow heights (72px minHeight each in shared
-           SignalRow.tsx) + 2 GroupDividers (~30px each, LONG SETUPS /
-           SHORT SETUPS) = 720 + 60 = 780. Confidence DESC sort + 5pt
-           bucket stability guard upstream remain authoritative for
-           which rows make the cut. On ≤720px (single-column matrix)
-           the cap is relaxed to 680px (~8 rows) so the stacked panels
-           don't dominate the phone viewport. Virtualization /
-           DOM-keeping behavior in SignalRow is unchanged — only the
-           visible viewport is constrained. */
+           Phase 8.1 follow-up — production measurement showed the
+           original 72px row estimate was wrong; the actual rendered
+           SignalRow (confidence ring + mini sparkline + BUY/SELL
+           controls + padding) lands closer to ~108-118px per row, so
+           780px was only clearing ~6 visible rows. 10 rows × ~115px
+           + 2 GroupDividers (~30px each, LONG SETUPS / SHORT SETUPS)
+           ≈ 1210px. Cap raised to 1220px so 10 full rows render
+           cleanly before scroll engages, with a hair of breathing
+           room. Confidence DESC sort + 5pt bucket stability guard
+           upstream remain authoritative for which rows make the cut.
+           On ≤720px (single-column matrix) the cap drops to 1080px
+           so the stacked phone viewport still shows ~9 rows without
+           dominating the screen. Virtualization / DOM-keeping behavior
+           in SignalRow is unchanged — only the visible viewport is
+           constrained. */
         .cd-customer-battlefield-matrix .blotter-scroll {
-          max-height: 780px !important;
+          max-height: 1220px !important;
           overflow-y: auto !important;
         }
         @media (max-width: 720px) {
           .cd-customer-battlefield-matrix .blotter-scroll {
-            max-height: 680px !important;
+            max-height: 1080px !important;
           }
         }
         /* Phase 8.1 — MAJORS HEADER RENAME (customer /portal only).
@@ -5097,9 +5103,11 @@ export function PortalCustomerShell() {
           CONNECT TO AN EXCHANGE CTA + ACCOUNT / DISCLAIMER / SIGN OUT.
           No operator pulse ribbon, no admin telemetry, no engine
           throughput strip, no SearchBar, no AI ring, no
-          EnableLiveAITradingBar, no AIRiskControlsPanel, no
-          OperatorTelemetryStrip. This is a customer-facing surface,
-          not an internal operator terminal. */}
+          AIRiskControlsPanel, no OperatorTelemetryStrip. This is a
+          customer-facing surface, not an internal operator terminal.
+          (EnableLiveAITradingBar is mounted further down — directly
+          above the battlefield — as the primary PAPER → LIVE
+          conversion surface; it is NOT operator ARM LIVE.) */}
       <CustomerTopHeader
         isExchangeConnected={false}
         plan={plan}
@@ -5201,6 +5209,27 @@ export function PortalCustomerShell() {
         <SignalNotificationDispatcher
           opportunities={opportunities}
           engine={engineStatus}
+        />
+
+        {/* Phase 8.1 follow-up — ENABLE LIVE AI TRADING conversion strip.
+            Customer onboarding UX directly above the battlefield. The
+            bar has three visual states (driven by useAiTradingState):
+              · LOCKED (free, non-admin) → amber UPGRADE TO ENABLE AI
+                TRADING surface, click → upgrade modal
+              · OFF (entitled but disabled) → saturated red CLICK TO
+                ENABLE AI TRADING surface
+              · ON → green AI CURRENTLY TRADING FOR YOU surface
+            This is NOT operator ARM LIVE — it's the customer paper-side
+            conversion lever (server gate `customer_live_execution_
+            disabled` still blocks real-money fills on the customer
+            surface; admin operator path is wholly separate). PAPER
+            posture, customer scope, no LIVE execution toggles, no
+            operator telemetry leakage. */}
+        <EnableLiveAITradingBar
+          engineOnline={!!engineStatus?.running}
+          openPaper={openTrades.length}
+          slotCap={plan === "pro" ? 12 : plan === "starter" ? 3 : 3}
+          onUpgrade={() => setUpgrade(true)}
         />
 
         {/* Battlefield body — dual crypto matrix on the left,
