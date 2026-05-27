@@ -6213,12 +6213,28 @@ export function PortalCustomerShell() {
           </div>
 
           <aside className="cd-customer-battlefield-aside" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* 2026-05 unification — when runtime resolves to LIVE,
+                hydrate realized/unrealized/today PnL from `serverAccount`
+                (single source of truth shared with `blotterOpenCount` +
+                `blotterOpenRows`). Previously these props always read
+                from `paperStats`, causing the divergence symptom: OPEN
+                count > 0 from `blotterOpenRows` while UNREALIZED/REALIZED
+                stuck at $0 because `usePaperTrades()` only tracks the
+                local paper store. Paper runtime is unchanged. */}
             <MyAccountRailPaper
               equityUsd={displayEquity}
-              todayPnl={paperStats.todayPnl}
-              realized={paperStats.realizedPnl}
-              unrealized={paperStats.unrealizedPnl}
-              fillsToday={paperHistory.filter(t => new Date(t.closedAt).toDateString() === new Date().toDateString()).length}
+              todayPnl={isLiveRuntime
+                ? (serverAccount?.positions ?? []).reduce((s, p) => s + Number(p.unrealizedPnL ?? 0), 0)
+                : paperStats.todayPnl}
+              realized={isLiveRuntime
+                ? Number(serverAccount?.totalRealized ?? 0)
+                : paperStats.realizedPnl}
+              unrealized={isLiveRuntime
+                ? (serverAccount?.positions ?? []).reduce((s, p) => s + Number(p.unrealizedPnL ?? 0), 0)
+                : paperStats.unrealizedPnl}
+              fillsToday={isLiveRuntime
+                ? Number(serverAccount?.totalTrades ?? 0)
+                : paperHistory.filter(t => new Date(t.closedAt).toDateString() === new Date().toDateString()).length}
               openCount={blotterOpenCount}
               history={paperHistory}
               engine={engineStatus}

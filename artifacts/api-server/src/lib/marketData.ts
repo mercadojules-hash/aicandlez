@@ -101,6 +101,47 @@ const COINBASE_SYMBOLS: Record<string, string> = {
   BONKUSD:  "BONK-USD",
   FLOKIUSD: "FLOKI-USD",
   TURBOUSD: "TURBO-USD",
+  // 2026-05 unification pass — backfill the customer-facing universe
+  // surfaced by CRYPTO_MAJORS_30 + CRYPTO_ALTS_MEMES so the legacy
+  // BUY pill no longer throws `Unsupported symbol: GRTUSD/PEPEUSD/...`
+  // before reaching the adapter. Symbols not listed on Coinbase
+  // (XMR/KAS/RUNE/HYPE/FTM) are intentionally omitted — the server
+  // `getSupportedExchanges()` helper returns a structured
+  // `unsupported_symbol` error pointing the user at Kraken.
+  DOTUSD:   "DOT-USD",
+  LTCUSD:   "LTC-USD",
+  BCHUSD:   "BCH-USD",
+  UNIUSD:   "UNI-USD",
+  INJUSD:   "INJ-USD",
+  SUIUSD:   "SUI-USD",
+  TONUSD:   "TON-USD",
+  TRXUSD:   "TRX-USD",
+  ETCUSD:   "ETC-USD",
+  ICPUSD:   "ICP-USD",
+  HBARUSD:  "HBAR-USD",
+  AAVEUSD:  "AAVE-USD",
+  MKRUSD:   "MKR-USD",
+  XLMUSD:   "XLM-USD",
+  ALGOUSD:  "ALGO-USD",
+  SANDUSD:  "SAND-USD",
+  MANAUSD:  "MANA-USD",
+  AXSUSD:   "AXS-USD",
+  GRTUSD:   "GRT-USD",
+  SNXUSD:   "SNX-USD",
+  CRVUSD:   "CRV-USD",
+  COMPUSD:  "COMP-USD",
+  LDOUSD:   "LDO-USD",
+  RNDRUSD:  "RENDER-USD",  // Coinbase rebranded RNDR → RENDER
+  FETUSD:   "FET-USD",
+  PEPEUSD:  "PEPE-USD",
+  JUPUSD:   "JUP-USD",
+  PYTHUSD:  "PYTH-USD",
+  TIAUSD:   "TIA-USD",
+  SEIUSD:   "SEI-USD",
+  STXUSD:   "STX-USD",
+  // MATIC was rebranded to POL — alias both keys to POL-USD so legacy
+  // MATICUSD references keep working.
+  MATICUSD: "POL-USD",
 };
 
 // Kraken pair names differ from the spot symbol — BTC is XBT, DOGE is XDG.
@@ -131,7 +172,82 @@ const KRAKEN_SYMBOLS: Record<string, string> = {
   BONKUSD:  "BONKUSD",
   FLOKIUSD: "FLOKIUSD",
   TURBOUSD: "TURBOUSD",
+  // 2026-05 unification pass — Kraken-side mirror of the Coinbase
+  // backfill, plus the Coinbase-unsupported pairs (XMR/RUNE/KAS/HYPE/FTM)
+  // so the customer universe always has at least one live venue.
+  DOTUSD:   "DOTUSD",
+  LTCUSD:   "LTCUSD",
+  BCHUSD:   "BCHUSD",
+  UNIUSD:   "UNIUSD",
+  INJUSD:   "INJUSD",
+  SUIUSD:   "SUIUSD",
+  TONUSD:   "TONUSD",
+  TRXUSD:   "TRXUSD",
+  ETCUSD:   "ETCUSD",
+  ICPUSD:   "ICPUSD",
+  HBARUSD:  "HBARUSD",
+  AAVEUSD:  "AAVEUSD",
+  MKRUSD:   "MKRUSD",
+  XLMUSD:   "XLMUSD",
+  ALGOUSD:  "ALGOUSD",
+  SANDUSD:  "SANDUSD",
+  MANAUSD:  "MANAUSD",
+  AXSUSD:   "AXSUSD",
+  GRTUSD:   "GRTUSD",
+  SNXUSD:   "SNXUSD",
+  CRVUSD:   "CRVUSD",
+  COMPUSD:  "COMPUSD",
+  LDOUSD:   "LDOUSD",
+  RNDRUSD:  "RENDERUSD",  // Kraken also rebranded RNDR → RENDER
+  FETUSD:   "FETUSD",
+  PEPEUSD:  "PEPEUSD",
+  JUPUSD:   "JUPUSD",
+  PYTHUSD:  "PYTHUSD",
+  TIAUSD:   "TIAUSD",
+  SEIUSD:   "SEIUSD",
+  STXUSD:   "STXUSD",
+  MATICUSD: "POLUSD",
+  // Coinbase-unsupported pairs — Kraken-only venues.
+  XMRUSD:   "XMRUSD",
+  RUNEUSD:  "RUNEUSD",
+  KASUSD:   "KASUSD",
+  FTMUSD:   "FTMUSD",
+  // HYPE is not on Kraken either at time of writing — intentionally
+  // omitted; `getSupportedExchanges("HYPEUSD")` returns [] and the
+  // server emits `unsupported_symbol`.
 };
+
+// ── Cross-venue symbol-support helpers (2026-05 unification) ─────────────
+//
+// The customer-portal manual BUY pill needs to (a) reject GRTUSD/PEPEUSD/etc
+// before they reach the adapter with a generic "Unsupported symbol" string,
+// and (b) tell the user WHICH venue can fill the order so they can re-route.
+// Both maps above are the single source of truth.
+
+export type LiveVenue = "coinbase" | "kraken";
+
+export function isSymbolSupportedOn(symbol: string, venue: LiveVenue): boolean {
+  const sym = symbol.trim().toUpperCase();
+  if (venue === "coinbase") return Object.prototype.hasOwnProperty.call(COINBASE_SYMBOLS, sym);
+  if (venue === "kraken")   return Object.prototype.hasOwnProperty.call(KRAKEN_SYMBOLS,   sym);
+  return false;
+}
+
+export function getSupportedExchanges(symbol: string): LiveVenue[] {
+  const out: LiveVenue[] = [];
+  if (isSymbolSupportedOn(symbol, "coinbase")) out.push("coinbase");
+  if (isSymbolSupportedOn(symbol, "kraken"))   out.push("kraken");
+  return out;
+}
+
+/** Normalize a legacy `<SYM>USD` symbol to the venue-native product id.
+ *  Returns null when the symbol is unsupported on the given venue. */
+export function normalizeSymbolForVenue(symbol: string, venue: LiveVenue): string | null {
+  const sym = symbol.trim().toUpperCase();
+  if (venue === "coinbase") return COINBASE_SYMBOLS[sym] ?? null;
+  if (venue === "kraken")   return KRAKEN_SYMBOLS[sym]   ?? null;
+  return null;
+}
 
 // Coinbase candle granularity is seconds; Kraken is minutes.
 const COINBASE_GRANULARITY_SEC: Record<string, number> = {

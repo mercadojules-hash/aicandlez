@@ -17,6 +17,7 @@ import { requireAuth } from "../middlewares/requireAuth.js";
 import { placeLiveAutoOrderForUser, isCustomerLiveExecutionEnabled } from "../lib/liveUserExecution.js";
 import { registerLiveUserFill } from "../lib/userSimRegistry.js";
 import { TIER_MAX_SIZE_USD, type TierPlan } from "../lib/tierLimits.js";
+import { getSupportedExchanges } from "../lib/marketData.js";
 
 type Plan = TierPlan;
 const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, enterprise: 3 };
@@ -134,6 +135,32 @@ router.post(
     }
     const sizeUSD = requestedSize;
 
+    // [MANUAL_TRADE_REQUEST] — structured request log so on-call can
+    // grep one tag across the manual-BUY funnel + correlate against
+    // [MANUAL_TRADE_EXECUTED]/[MANUAL_TRADE_REJECTED] for the same
+    // request. `runtime` is "live" or "sandbox"; the actual exchange
+    // is unknown until `placeLiveAutoOrderForUser` resolves it.
+    req.log.info(
+      {
+        tag:               "MANUAL_TRADE_REQUEST",
+        userId,
+        normalizedSymbol:  parsed.symbol,
+        side:              parsed.side,
+        sizeUSD,
+        runtime:           parsed.useSandbox ? "sandbox" : "live",
+        // Unknown at request time — resolved by placeLiveAutoOrderForUser.
+        // Kept as a null placeholder for grep-friendly schema uniformity
+        // across REQUEST/EXECUTED/REJECTED tags.
+        exchange:          null,
+        persistenceResult: null,
+        positionId:        null,
+        rejectionReason:   null,
+        isOperator,
+        userPlan,
+      },
+      "[MANUAL_TRADE_REQUEST] manual customer order received",
+    );
+
     try {
       const result = await placeLiveAutoOrderForUser({
         userId,
@@ -145,16 +172,38 @@ router.post(
 
       if (!result.success) {
         req.log.warn(
-          { userId, symbol: parsed.symbol, side: parsed.side, errorCode: result.errorCode, error: result.error },
-          "userLiveOrder: placement failed",
+          {
+            tag:               "MANUAL_TRADE_REJECTED",
+            userId,
+            normalizedSymbol:  parsed.symbol,
+            exchange:          result.exchange,
+            runtime:           parsed.useSandbox ? "sandbox" : "live",
+            persistenceResult: "skipped",
+            positionId:        null,
+            rejectionReason:   result.errorCode ?? "unknown",
+            error:             result.error,
+          },
+          "[MANUAL_TRADE_REJECTED] placement failed",
         );
-        res.status(409).json({
-          ok:        false,
-          errorCode: result.errorCode,
-          error:     result.error,
+        // unsupported_symbol → 400 (client error). Everything else → 409.
+        const status = result.errorCode === "unsupported_symbol" ? 400 : 409;
+        res.status(status).json({
+          ok:                 false,
+          errorCode:          result.errorCode,
+          error:              result.error,
+          exchange:           result.exchange,
+          // Echo supportedExchanges so the client can render
+          // "Not on Coinbase — try Kraken" without re-deriving.
+          supportedExchanges: result.errorCode === "unsupported_symbol"
+            ? getSupportedExchanges(parsed.symbol)
+            : undefined,
         });
         return;
       }
+
+      // Track persistence outcome for the [MANUAL_TRADE_EXECUTED] log
+      // emitted below. Flipped to "failed" inside the mirror catch.
+      let persistenceResult: "persisted" | "failed" | "skipped" = "persisted";
 
       // Mirror the live fill into the user's sim registry (cache + DB) so the
       // position appears immediately in the customer's portal panels
@@ -192,11 +241,35 @@ router.post(
         }
       } catch (mirrorErr) {
         // Mirror failure is non-fatal — the broker order is still placed.
+        persistenceResult = "failed";
         req.log.warn(
-          { userId, symbol: parsed.symbol, err: mirrorErr instanceof Error ? mirrorErr.message : String(mirrorErr) },
-          "userLiveOrder: registerLiveUserFill failed (broker fill still placed)",
+          {
+            tag:               "MANUAL_TRADE_EXECUTED",
+            userId,
+            normalizedSymbol:  parsed.symbol,
+            exchange:          result.exchange,
+            runtime:           parsed.useSandbox ? "sandbox" : "live",
+            persistenceResult,
+            positionId:        null,
+            err:               mirrorErr instanceof Error ? mirrorErr.message : String(mirrorErr),
+          },
+          "[MANUAL_TRADE_EXECUTED] registerLiveUserFill failed (broker fill still placed)",
         );
       }
+
+      req.log.info(
+        {
+          tag:               "MANUAL_TRADE_EXECUTED",
+          userId,
+          normalizedSymbol:  parsed.symbol,
+          exchange:          result.exchange,
+          runtime:           parsed.useSandbox ? "sandbox" : "live",
+          persistenceResult,
+          positionId:        result.exchangeOrderId ?? null,
+          fillPrice:         result.fillPrice,
+        },
+        "[MANUAL_TRADE_EXECUTED] broker fill confirmed",
+      );
 
       res.json({
         ok:              true,
@@ -208,8 +281,33 @@ router.post(
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      req.log.error({ userId, err: msg }, "userLiveOrder: unexpected error");
-      res.status(500).json({ ok: false, error: msg });
+      // Unexpected throws from the adapter (e.g. legacy "Unsupported
+      // symbol: X" raised inside marketData.ts before the pre-check
+      // catches them) are normalized into a structured rejection so the
+      // client can react. Defaults to 500 for true infra failures.
+      const isUnsupported = /^Unsupported symbol:/.test(msg);
+      req.log.error(
+        {
+          tag:               "MANUAL_TRADE_REJECTED",
+          userId,
+          normalizedSymbol:  parsed.symbol,
+          exchange:          null,
+          runtime:           parsed.useSandbox ? "sandbox" : "live",
+          persistenceResult: "skipped",
+          positionId:        null,
+          rejectionReason:   isUnsupported ? "unsupported_symbol" : "internal_error",
+          error:             msg,
+        },
+        "[MANUAL_TRADE_REJECTED] unexpected error",
+      );
+      res.status(isUnsupported ? 400 : 500).json({
+        ok:                 false,
+        errorCode:          isUnsupported ? "unsupported_symbol" : "internal_error",
+        error:              msg,
+        supportedExchanges: isUnsupported
+          ? getSupportedExchanges(parsed.symbol)
+          : undefined,
+      });
     }
   },
 );

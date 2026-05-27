@@ -343,8 +343,10 @@ export function SignalRow({ spec, breakdown }: Props) {
   ): Promise<{
     ok: boolean;
     error?: string;
-    fillPrice?: number;
+    errorCode?: string;
+    supportedExchanges?: string[];
     exchange?: string;
+    fillPrice?: number;
     exchangeOrderId?: string;
     dryRun?: boolean;
   }> => {
@@ -360,8 +362,22 @@ export function SignalRow({ spec, breakdown }: Props) {
         body: JSON.stringify({ symbol: sym, side, sizeUSD, useSandbox }),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        return { ok: false, error: (body as { error?: string }).error ?? `HTTP ${res.status}` };
+        // Propagate the structured error envelope so the LIVE-rejection
+        // path can render the supported-venue hint ("supported on KRAKEN")
+        // and so [MANUAL_TRADE_REJECTED] logs carry a real rejectionReason.
+        const body = (await res.json().catch(() => ({}))) as {
+          error?:              string;
+          errorCode?:          string;
+          supportedExchanges?: string[];
+          exchange?:           string;
+        };
+        return {
+          ok:                 false,
+          error:              body.error ?? `HTTP ${res.status}`,
+          errorCode:          body.errorCode,
+          supportedExchanges: body.supportedExchanges,
+          exchange:           body.exchange,
+        };
       }
       const body = (await res.json().catch(() => ({}))) as {
         fillPrice?: number;
@@ -485,25 +501,59 @@ export function SignalRow({ spec, breakdown }: Props) {
         });
         return;
       }
+      // [MANUAL_TRADE_REQUEST] — client-side structured log so on-call can
+      // grep the funnel across browser sessions when triaging customer
+      // reports. Mirrors the server tag emitted in /api/user/live-order.
+      console.info("[MANUAL_TRADE_REQUEST]", {
+        symbol:    spec.symbol,
+        side,
+        sizeUSD:   liveSize,
+        runtime:   "LIVE",
+        exchange:  null, // unknown until server resolves user's connection
+        confidence: conf,
+      });
       toast({
         title: `LIVE ORDER SUBMITTED — ${spec.label}`,
         description: `${side} · routing to your connected exchange · $${liveSize} notional · AI ${conf}%`,
       });
       void submitLive(spec.symbol, side === "LONG" ? "BUY" : "SELL", liveSize).then(r => {
         if (!r.ok) {
-          // Real exchange rejected (no connection, decrypt failed, etc.).
-          // Mirror the order into PAPER so the user still sees feedback, and
-          // surface a one-shot toast explaining why.
-          if (!liveFallbackToastedRef.current) {
-            liveFallbackToastedRef.current = true;
-            toast({
-              title: "LIVE ORDER FAILED — FELL BACK TO PAPER",
-              description: r.error ?? "Live exchange rejected the order",
-            });
-          }
-          firePaper(side, sl, tp);
+          // 2026-05 unification — NEVER silently fall back to PAPER when the
+          // customer is in LIVE runtime with an armed exchange. Surface the
+          // server's structured error verbatim. Falling back to PAPER here
+          // is the bug that produced "PAPER TRADE NOT PERSISTED" toasts and
+          // ghost local-only trades that disappeared on refresh.
+          const errCode = (r as { errorCode?: string }).errorCode;
+          const supported = (r as { supportedExchanges?: string[] }).supportedExchanges ?? [];
+          const supportedHint = errCode === "unsupported_symbol" && supported.length > 0
+            ? ` · supported on ${supported.join(", ").toUpperCase()}`
+            : "";
+          console.error("[MANUAL_TRADE_REJECTED]", {
+            symbol:           spec.symbol,
+            side,
+            runtime:          "LIVE",
+            exchange:         (r as { exchange?: string }).exchange ?? null,
+            persistenceResult: "skipped",
+            positionId:       null,
+            rejectionReason:  errCode ?? "unknown",
+            error:            r.error,
+          });
+          toast({
+            variant: "destructive",
+            title: `LIVE ORDER REJECTED — ${spec.label}`,
+            description: (r.error ?? "Live exchange rejected the order") + supportedHint,
+          });
           return;
         }
+        console.info("[MANUAL_TRADE_EXECUTED]", {
+          symbol:            spec.symbol,
+          side,
+          runtime:           "LIVE",
+          exchange:          r.exchange ?? null,
+          persistenceResult: "persisted",
+          positionId:        r.exchangeOrderId ?? null,
+          fillPrice:         r.fillPrice,
+        });
         // Real-time fill confirmation. Surface broker fill price, exchange,
         // and order id so the customer has closure on the real-money action.
         const exch = (r.exchange ?? "exchange").toUpperCase();

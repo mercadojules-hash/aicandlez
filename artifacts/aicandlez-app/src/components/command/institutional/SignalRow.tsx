@@ -126,8 +126,10 @@ export function SignalRow({ spec, breakdown }: Props) {
   ): Promise<{
     ok: boolean;
     error?: string;
-    fillPrice?: number;
+    errorCode?: string;
+    supportedExchanges?: string[];
     exchange?: string;
+    fillPrice?: number;
     exchangeOrderId?: string;
     dryRun?: boolean;
   }> => {
@@ -138,8 +140,21 @@ export function SignalRow({ spec, breakdown }: Props) {
         body: JSON.stringify({ symbol: sym, side, sizeUSD }),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        return { ok: false, error: (body as { error?: string }).error ?? `HTTP ${res.status}` };
+        // Propagate structured error envelope so LIVE-reject UI can
+        // render supported-venue hints + structured rejection logs.
+        const body = (await res.json().catch(() => ({}))) as {
+          error?:              string;
+          errorCode?:          string;
+          supportedExchanges?: string[];
+          exchange?:           string;
+        };
+        return {
+          ok:                 false,
+          error:              body.error ?? `HTTP ${res.status}`,
+          errorCode:          body.errorCode,
+          supportedExchanges: body.supportedExchanges,
+          exchange:           body.exchange,
+        };
       }
       const body = (await res.json().catch(() => ({}))) as {
         fillPrice?: number;
@@ -189,22 +204,55 @@ export function SignalRow({ spec, breakdown }: Props) {
     // LIVE routing — when the customer has a paid plan + live-active broker.
     // Free / paper / disconnected users continue on the paper path.
     if (canRouteLive) {
+      // [MANUAL_TRADE_REQUEST] — mirror of trading-dashboard SignalRow.
+      console.info("[MANUAL_TRADE_REQUEST]", {
+        symbol:     spec.symbol,
+        side,
+        sizeUSD:    100,
+        runtime:    "LIVE",
+        exchange:   null,
+        confidence: conf,
+      });
       toast({
         title: `LIVE ORDER SUBMITTED — ${spec.label}`,
         description: `${side} · routing to your connected exchange · AI ${conf}%`,
       });
       void submitLive(spec.symbol, side === "LONG" ? "BUY" : "SELL", 100).then(r => {
         if (!r.ok) {
-          if (!liveFallbackToastedRef.current) {
-            liveFallbackToastedRef.current = true;
-            toast({
-              title: "LIVE ORDER FAILED — FELL BACK TO PAPER",
-              description: r.error ?? "Live exchange rejected the order",
-            });
-          }
-          firePaper(side, sl, tp);
+          // 2026-05 unification — never silently fall back to PAPER in
+          // LIVE runtime. Surface the structured server error so the
+          // customer knows the order didn't fill.
+          const errCode = (r as { errorCode?: string }).errorCode;
+          const supported = (r as { supportedExchanges?: string[] }).supportedExchanges ?? [];
+          const supportedHint = errCode === "unsupported_symbol" && supported.length > 0
+            ? ` · supported on ${supported.join(", ").toUpperCase()}`
+            : "";
+          console.error("[MANUAL_TRADE_REJECTED]", {
+            symbol:            spec.symbol,
+            side,
+            runtime:           "LIVE",
+            exchange:          (r as { exchange?: string }).exchange ?? null,
+            persistenceResult: "skipped",
+            positionId:        null,
+            rejectionReason:   errCode ?? "unknown",
+            error:             r.error,
+          });
+          toast({
+            variant: "destructive",
+            title: `LIVE ORDER REJECTED — ${spec.label}`,
+            description: (r.error ?? "Live exchange rejected the order") + supportedHint,
+          });
           return;
         }
+        console.info("[MANUAL_TRADE_EXECUTED]", {
+          symbol:            spec.symbol,
+          side,
+          runtime:           "LIVE",
+          exchange:          r.exchange ?? null,
+          persistenceResult: "persisted",
+          positionId:        r.exchangeOrderId ?? null,
+          fillPrice:         r.fillPrice,
+        });
         // Real-time fill confirmation — broker fill price, exchange, order id.
         const exch = (r.exchange ?? "exchange").toUpperCase();
         const orderIdShort = r.exchangeOrderId

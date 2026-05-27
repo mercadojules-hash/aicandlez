@@ -12,7 +12,7 @@ import { ensureFreshAlpacaCreds } from "../services/exchanges/AlpacaTokenRefresh
 import { hasSandbox, makeAdapter } from "../services/exchanges/adapterFactory.js";
 import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
 import type { StandardOrder } from "../services/exchanges/types.js";
-import { getTicker } from "./marketData.js";
+import { getTicker, getSupportedExchanges, isSymbolSupportedOn, type LiveVenue } from "./marketData.js";
 import { logger } from "./logger.js";
 import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
 import { getTradeLimitVerdict, invalidateTradeLimitCache } from "./tradeLimitEngine.js";
@@ -88,7 +88,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached";
+  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached";
   error?:          string;
 }
 
@@ -1243,6 +1243,37 @@ export async function placeLiveAutoOrderForUser(
     const msg = `${row.exchange} has no public sandbox — paper-mode order falls back to internal simulator`;
     return { success: false, userId, exchange: row.exchange, errorCode: "no_sandbox", error: msg };
   }
+
+  // 2026-05 unification — pre-check symbol support against the routed
+  // venue BEFORE building the adapter, so customers see a structured
+  // `unsupported_symbol` errorCode + list of venues that DO carry the
+  // pair (e.g. GRTUSD on Coinbase succeeds now; XMRUSD on Coinbase
+  // returns `supportedExchanges:["kraken"]`). Without this the request
+  // would hit the adapter and surface a generic "Unsupported symbol"
+  // string the client couldn't act on. Only enforced for the two
+  // venues we have symbol tables for; other exchanges (Binance/OKX/
+  // KuCoin) fall through to the adapter's own validation.
+  if (row.exchange === "coinbase" || row.exchange === "kraken") {
+    const venue: LiveVenue = row.exchange;
+    if (!isSymbolSupportedOn(symbol, venue)) {
+      const supported = getSupportedExchanges(symbol);
+      const msg = supported.length > 0
+        ? `${symbol} is not listed on ${venue} — try ${supported.join(" or ")}`
+        : `${symbol} is not listed on any supported venue`;
+      logger.warn(
+        { userId, symbol, exchange: row.exchange, supportedExchanges: supported },
+        "placeLiveAutoOrderForUser: unsupported_symbol pre-check",
+      );
+      return {
+        success:   false,
+        userId,
+        exchange:  row.exchange,
+        errorCode: "unsupported_symbol",
+        error:     msg,
+      };
+    }
+  }
+
   let adapter: BaseExchangeAdapter;
   try {
     adapter = makeAdapter(row.exchange, creds, { testnet: useSandbox, demoMode: row.demoMode });
