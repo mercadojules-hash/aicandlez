@@ -23,7 +23,10 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { X, Loader2, ShieldCheck, AlertTriangle, Check, Link2Off, FlaskConical } from "lucide-react";
+import {
+  X, Loader2, ShieldCheck, AlertTriangle, Check, Link2Off, FlaskConical,
+  ArrowRight, ArrowLeft, Lock, Zap, KeyRound, BookOpen, Sparkles,
+} from "lucide-react";
 
 import { authFetch } from "../lib/authFetch";
 import { DisclaimerModal } from "./DisclaimerModal";
@@ -114,6 +117,107 @@ type CatalogRow = {
 // connect time. Currently empty — kept as an extension surface (e.g. if
 // Bitget is ever re-added it would expose a `PAPTRADING: 1` REST header).
 const DEMO_TRADING_EXCHANGES = new Set<string>();
+
+// Phase 2 — Cinematic onboarding. Per-exchange brand metadata + per-exchange
+// step-by-step API key walkthrough. Keep copy concise; this surfaces inside
+// the modal's CREDENTIALS step under "How to get your API key". Only the
+// "featured" set (Kraken / Coinbase / Binance / Alpaca) gets walkthroughs
+// today; other exchanges fall back to the security note alone.
+type ExchangeMeta = {
+  /** Brand accent color (used for tile glow + walkthrough icon). */
+  accent:        string;
+  /** Short tagline shown under the name on the choose-step cards. */
+  tagline:       string;
+  /** Optional URL to open in a new tab for the user to start the API-key flow. */
+  apiUrl?:       string;
+  /** Step-by-step instructions for the credentials walkthrough panel. */
+  walkthrough?:  string[];
+  /** Required permission scopes the user must enable (audit checklist). */
+  requiredPerms?: string[];
+};
+const EXCHANGE_META: Record<string, ExchangeMeta> = {
+  Kraken: {
+    accent: "#7B6CF7",
+    tagline: "Largest US-regulated crypto exchange",
+    apiUrl: "https://www.kraken.com/u/security/api",
+    walkthrough: [
+      "Log in to Kraken and open Settings → API",
+      "Click 'Add key' and name it 'AICandlez'",
+      "Enable: Query Funds, Query Open Orders, Create & Modify Orders",
+      "Leave Withdraw Funds UNCHECKED — we never request it",
+      "Copy the API Key and Private Key below",
+    ],
+    requiredPerms: ["Query funds", "Query orders", "Create & modify orders"],
+  },
+  Coinbase: {
+    accent: "#3B82F6",
+    tagline: "Public US exchange · institutional-grade liquidity",
+    apiUrl: "https://www.coinbase.com/settings/api",
+    walkthrough: [
+      "Log in to Coinbase and open Advanced Trade → API",
+      "Create a new CDP key (modern) or HMAC key (legacy)",
+      "Permissions: View accounts, Trade — never Transfer",
+      "Download the JSON file Coinbase emails you",
+      "Paste 'name' into API KEY NAME and 'privateKey' into PRIVATE KEY",
+    ],
+    requiredPerms: ["View accounts", "Trade"],
+  },
+  Binance: {
+    accent: "#F0B90B",
+    tagline: "World's deepest crypto orderbook",
+    apiUrl: "https://www.binance.com/en/my/settings/api-management",
+    walkthrough: [
+      "Log in to Binance and open API Management",
+      "Click 'Create API' → 'System generated'",
+      "Enable: Enable Reading, Enable Spot & Margin Trading",
+      "DISABLE Enable Withdrawals and IP-restrict the key",
+      "Copy the API Key and Secret Key below",
+    ],
+    requiredPerms: ["Enable Reading", "Spot & Margin Trading"],
+  },
+  Alpaca: {
+    accent: "#FFE600",
+    tagline: "US-friendly · paper trading included",
+    apiUrl: "https://app.alpaca.markets/paper/dashboard/overview",
+    walkthrough: [
+      "Sign up for Alpaca and open Paper Trading dashboard",
+      "Generate paper-account API keys in the right rail",
+      "Copy the Key ID and Secret Key below",
+      "Live trading requires KYC + an upgrade to a brokerage account",
+    ],
+    requiredPerms: ["Paper account access"],
+  },
+  CryptoDotCom: {
+    accent: "#0033AD",
+    tagline: "Mobile-first exchange · 100M+ users",
+    walkthrough: [
+      "Log in to Crypto.com Exchange (not the App)",
+      "Open Profile → API Keys → Create New Key",
+      "Enable: Spot Trading, Account Information",
+      "Leave Withdraw OFF",
+      "Copy the API Key and Secret below",
+    ],
+    requiredPerms: ["Spot Trading", "Account Information"],
+  },
+  Gemini: {
+    accent: "#00DCFA",
+    tagline: "NYDFS-licensed US exchange",
+    apiUrl: "https://exchange.gemini.com/settings/api",
+    walkthrough: [
+      "Log in to Gemini and open Settings → API",
+      "Create a new Master API key",
+      "Scopes: Trader (Auditor is read-only — choose Trader)",
+      "Withdrawals: leave DISABLED",
+      "Copy the API Key and Secret below",
+    ],
+    requiredPerms: ["Trader scope"],
+  },
+};
+/** Featured-card lineup on the CHOOSE step (large branded cards at top). */
+const FEATURED_EXCHANGE_IDS = ["Kraken", "Coinbase", "Binance"] as const;
+function getExchangeMeta(id: string): ExchangeMeta {
+  return EXCHANGE_META[id] ?? { accent: "#66FF66", tagline: "Trading account" };
+}
 
 interface Props {
   open:    boolean;
@@ -306,6 +410,22 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
   const [success,    setSuccess]    = useState(false);
+  // Phase 2 — cinematic multi-step flow.
+  //   "choose"      → exchange selection (featured cards + paper/live compare)
+  //   "credentials" → per-exchange walkthrough + key form
+  // Preselected exchanges (e.g. OnboardingFlow locking to Alpaca) skip
+  // CHOOSE and land directly on CREDENTIALS. Success/disconnect/already-
+  // connected branches are NOT step-gated — they preempt the multi-step
+  // render entirely (preserving the existing behavior).
+  const [step, setStep] = useState<"choose" | "credentials">(
+    preselectedExchange ? "credentials" : "choose"
+  );
+  // Keep step in sync with preselection changes (mirrors picked-sync effect).
+  useEffect(() => {
+    if (preselectedExchange) setStep("credentials");
+    else if (open) setStep("choose");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselectedExchange, open]);
   // Demo-trading toggle only applies to exchanges whose adapter honours the
   // demoMode flag (Bitget today). Reset when the user switches exchanges so
   // the flag never carries over from a previous picker selection.
@@ -322,6 +442,7 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
     setSubmitting(false);
     setConfirmDisconnect(false); setDisconnecting(false);
     setDisconnectError(null); setDisconnectDone(false);
+    setStep(preselectedExchange ? "credentials" : "choose");
   };
 
   // Close button MUST stay local — never navigate, never push history.
@@ -475,7 +596,43 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
       onAccept={(acks) => { void acceptDisclaimer(acks); }}
       onCancel={() => { if (!discSubmitting) { setDiscOpen(false); setDiscError(null); } }}
     />
+    <style>{`
+      /* Phase 2 — cinematic onboarding modal. Mobile-first fullscreen
+         experience (no rounded corners, no margins, edge-to-edge) so the
+         flow feels like a native app sheet rather than a cramped web
+         dialog. Desktop keeps the centered card. */
+      @keyframes pec-fade-in {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes pec-glow-pulse {
+        0%, 100% { box-shadow: 0 0 24px rgba(102,255,102,0.30), 0 0 0 1px rgba(102,255,102,0.45) inset; }
+        50%      { box-shadow: 0 0 48px rgba(102,255,102,0.60), 0 0 0 1px rgba(102,255,102,0.85) inset; }
+      }
+      @keyframes pec-mode-flip {
+        0%   { transform: rotateX(0deg);  opacity: 1; }
+        45%  { transform: rotateX(90deg); opacity: 0; }
+        55%  { transform: rotateX(-90deg); opacity: 0; }
+        100% { transform: rotateX(0deg);  opacity: 1; }
+      }
+      .pec-step { animation: pec-fade-in 220ms ease both; }
+      .pec-success-badge { animation: pec-glow-pulse 1600ms ease-in-out infinite; }
+      .pec-mode-flip { animation: pec-mode-flip 900ms cubic-bezier(.6,.2,.2,1) both; transform-style: preserve-3d; }
+      @media (max-width: 640px) {
+        .pec-overlay { padding: 0 !important; align-items: stretch !important; }
+        .pec-shell {
+          max-width: 100% !important;
+          max-height: 100vh !important;
+          min-height: 100vh !important;
+          border-radius: 0 !important;
+          padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(20px + env(safe-area-inset-bottom, 0px)) !important;
+          border-left: 0 !important;
+          border-right: 0 !important;
+        }
+      }
+    `}</style>
     <div
+      className="pec-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="portal-exchange-title"
@@ -492,10 +649,11 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
       }}
     >
       <div
+        className="pec-shell"
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "relative",
-          width: "100%", maxWidth: 520,
+          width: "100%", maxWidth: 560,
           maxHeight: "calc(100vh - 40px)",
           overflowY: "auto",
           background: `linear-gradient(160deg, ${N.CARD_HI} 0%, ${N.CARD} 70%)`,
@@ -696,36 +854,218 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
             border: `1px solid ${N.BRAND}40`,
             borderRadius: 12,
           }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: "50%",
-              background: `${N.BRAND}22`, border: `2px solid ${N.BRAND}`,
-              boxShadow: `0 0 20px ${N.BRAND_GLOW}`,
-              display: "inline-flex", alignItems: "center", justifyContent: "center",
-              marginBottom: 14,
-            }}>
-              <Check size={28} color={N.BRAND} strokeWidth={3} />
+            <div
+              className="pec-success-badge"
+              style={{
+                width: 64, height: 64, borderRadius: "50%",
+                background: `${N.BRAND}22`, border: `2px solid ${N.BRAND}`,
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                marginBottom: 16,
+              }}
+            >
+              <Check size={32} color={N.BRAND} strokeWidth={3} />
+            </div>
+            {/* PAPER → LIVE CONNECTED transition. The mode chip flips 3D
+                so customers feel the unlock viscerally. The "from" label
+                is intentional even when the connected mode is paper —
+                it communicates "you've left the simulator" regardless. */}
+            <div
+              className="pec-mode-flip"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 10,
+                padding: "6px 14px", borderRadius: 999,
+                background: "rgba(0,0,0,0.4)",
+                border: `1px solid ${N.BRAND}55`,
+                marginBottom: 10,
+              }}
+            >
+              <span style={{
+                fontFamily: N.FONT_MONO, fontSize: 10, fontWeight: 700,
+                letterSpacing: "0.18em", color: N.TEXT_2,
+                textDecoration: "line-through",
+              }}>PAPER</span>
+              <ArrowRight size={12} color={N.BRAND} />
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 5,
+                fontFamily: N.FONT_MONO, fontSize: 10.5, fontWeight: 900,
+                letterSpacing: "0.20em", color: N.BRAND,
+                textShadow: `0 0 10px ${N.BRAND_GLOW}`,
+              }}>
+                <Sparkles size={11} /> LIVE CONNECTED
+              </span>
             </div>
             <div style={{
               fontFamily: N.FONT_MONO, fontSize: 14, fontWeight: 900,
               color: N.BRAND, letterSpacing: "0.18em",
               textShadow: `0 0 14px ${N.BRAND_GLOW}, 0 0 28px ${N.BRAND_GLOW}`,
             }}>
-              EXCHANGE CONNECTED
+              {picked.name.toUpperCase()} CONNECTED
             </div>
-            <div style={{ fontSize: 14, color: N.TEXT_0, marginTop: 8, fontWeight: 700,
-              letterSpacing: 0.2 }}>
-              {picked.name} <span style={{ color: N.TEXT_1, fontWeight: 500 }}>ready for trading</span>
+            <div style={{ fontSize: 13, color: N.TEXT_0, marginTop: 8, fontWeight: 600,
+              letterSpacing: 0.1 }}>
+              Encrypted · withdrawal-locked · ready for AI execution
             </div>
           </div>
-        ) : (
-          <>
-            {/* Exchange picker */}
+        ) : step === "choose" ? (
+          /* ═══════════════ STEP 1 · CHOOSE ═══════════════════════════
+             Cinematic onboarding entry. Renders:
+               • Hero header + paper-vs-live comparison strip
+               • Featured exchange cards (Kraken / Coinbase / Binance)
+                 with brand-accent glow rings
+               • Compact grid of remaining catalog exchanges
+               • Security pledge ("Funds cannot be withdrawn")
+             Tapping any enabled tile sets `picked` and advances to
+             CREDENTIALS. The simulation pseudo-entry is not selectable. */
+          <div className="pec-step">
+            {/* PAPER vs LIVE comparison — sets expectations upfront so
+                customers understand the platform is paper-by-default and
+                live execution requires an exchange connection. */}
+            <div style={{
+              display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
+              marginBottom: 16,
+            }}>
+              <div style={{
+                padding: "12px 12px",
+                background: "rgba(255,255,255,0.03)",
+                border: `1px solid ${N.BORDER}`,
+                borderRadius: 10,
+              }}>
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 800,
+                  letterSpacing: "0.18em", color: N.TEXT_1, marginBottom: 8,
+                }}>
+                  <FlaskConical size={11} /> PAPER · DEFAULT
+                </div>
+                <div style={{ fontSize: 11, color: N.TEXT_0, lineHeight: 1.5, fontWeight: 600 }}>
+                  Simulated trades on live market data
+                </div>
+                <div style={{ fontSize: 10, color: N.TEXT_1, lineHeight: 1.5, marginTop: 4 }}>
+                  $100,000 starting capital · zero risk · no setup
+                </div>
+              </div>
+              <div style={{
+                padding: "12px 12px",
+                background: `linear-gradient(160deg, ${N.BRAND}10 0%, ${N.BRAND}04 100%)`,
+                border: `1px solid ${N.BRAND}55`,
+                borderRadius: 10,
+                boxShadow: `0 0 18px ${N.BRAND_GLOW}`,
+              }}>
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 800,
+                  letterSpacing: "0.18em", color: N.BRAND, marginBottom: 8,
+                  textShadow: `0 0 8px ${N.BRAND_GLOW}`,
+                }}>
+                  <Zap size={11} /> LIVE · UNLOCK
+                </div>
+                <div style={{ fontSize: 11, color: N.TEXT_0, lineHeight: 1.5, fontWeight: 600 }}>
+                  Real orders on your exchange account
+                </div>
+                <div style={{ fontSize: 10, color: N.TEXT_1, lineHeight: 1.5, marginTop: 4 }}>
+                  Connect Kraken, Coinbase, or Binance to enable
+                </div>
+              </div>
+            </div>
+
+            {/* Featured cards — Kraken / Coinbase / Binance, large
+                branded tiles. Filtered to those present + connectable in
+                the live catalog; gracefully drops off in customer-gated
+                mode (Alpaca-only) so customers don't see locked tiles
+                marketed as primary. */}
+            {(() => {
+              const featured = FEATURED_EXCHANGE_IDS
+                .map(id => allExchanges.find(e => e.id === id))
+                .filter((e): e is Exchange => !!e && !e.disabled);
+              if (featured.length === 0) return null;
+              return (
+                <>
+                  <div style={{
+                    fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 700,
+                    letterSpacing: "0.18em", color: N.TEXT_1, marginBottom: 8,
+                  }}>
+                    ◆ FEATURED EXCHANGES
+                  </div>
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: `repeat(${featured.length}, 1fr)`,
+                    gap: 8, marginBottom: 18,
+                  }}>
+                    {featured.map(ex => {
+                      const meta    = getExchangeMeta(ex.id);
+                      const isConn  = !!ex.connected;
+                      return (
+                        <button
+                          key={ex.id}
+                          type="button"
+                          onClick={() => { setPicked(ex); setError(null); setStep("credentials"); }}
+                          style={{
+                            position: "relative",
+                            padding: "16px 10px 14px",
+                            background: `linear-gradient(160deg, ${meta.accent}18 0%, ${meta.accent}06 100%)`,
+                            border: `1.5px solid ${meta.accent}66`,
+                            borderRadius: 12,
+                            cursor: "pointer",
+                            textAlign: "left",
+                            color: N.TEXT_0,
+                            transition: "all 160ms ease",
+                            boxShadow: `0 0 22px ${meta.accent}33, inset 0 1px 0 rgba(255,255,255,0.06)`,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = "translateY(-2px)";
+                            e.currentTarget.style.boxShadow = `0 8px 36px ${meta.accent}55, inset 0 1px 0 rgba(255,255,255,0.10)`;
+                            e.currentTarget.style.borderColor = meta.accent;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.boxShadow = `0 0 22px ${meta.accent}33, inset 0 1px 0 rgba(255,255,255,0.06)`;
+                            e.currentTarget.style.borderColor = `${meta.accent}66`;
+                          }}
+                        >
+                          <div style={{
+                            width: 36, height: 36, borderRadius: 9,
+                            background: `linear-gradient(160deg, ${meta.accent} 0%, ${meta.accent}99 100%)`,
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            fontFamily: N.FONT_SANS, fontSize: 16, fontWeight: 900,
+                            color: "#000", marginBottom: 10,
+                            boxShadow: `0 4px 14px ${meta.accent}55`,
+                          }}>
+                            {ex.name.charAt(0)}
+                          </div>
+                          <div style={{ fontSize: 13.5, fontWeight: 800, letterSpacing: -0.2 }}>
+                            {ex.name}
+                          </div>
+                          <div style={{ fontSize: 10, color: N.TEXT_1, marginTop: 3, lineHeight: 1.4 }}>
+                            {meta.tagline}
+                          </div>
+                          {isConn && (
+                            <div style={{
+                              position: "absolute", top: 8, right: 8,
+                              fontFamily: N.FONT_MONO, fontSize: 8, fontWeight: 900,
+                              letterSpacing: "0.14em", color: N.BRAND,
+                              padding: "2px 6px",
+                              border: `1px solid ${N.BRAND}55`,
+                              background: `${N.BRAND}14`,
+                              borderRadius: 4,
+                              textShadow: `0 0 6px ${N.BRAND_GLOW}`,
+                            }}>● LIVE</div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              );
+            })()}
+
+            {/* All exchanges grid (existing picker, kept for completeness:
+                Alpaca paper-onboarding, Gemini, Crypto.com, simulation, etc.) */}
             <div style={{
               fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 700,
               letterSpacing: "0.16em", color: N.TEXT_1,
               marginBottom: 8,
             }}>
-              EXCHANGE
+              ALL EXCHANGES
             </div>
             <div style={{
               display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6,
@@ -776,6 +1116,7 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
                       if (isDisabled || isSim) return;
                       setPicked(ex);
                       setError(null);
+                      setStep("credentials");
                     }}
                     disabled={isDisabled || isSim}
                     title={ex.comingSoonNote ?? ex.name}
@@ -820,6 +1161,197 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
                   </button>
                 );
               })}
+            </div>
+
+            {/* Security pledge — locked invariant: AICandlez never requests
+                withdrawal permissions. Always rendered, always visible. */}
+            <div style={{
+              display: "flex", gap: 10, alignItems: "flex-start",
+              padding: "12px 12px", marginTop: 4,
+              background: "rgba(102,255,102,0.04)",
+              border: `1px solid ${N.BRAND}33`,
+              borderRadius: 10,
+            }}>
+              <Lock size={14} color={N.BRAND} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: 10.5, color: N.TEXT_0, lineHeight: 1.55 }}>
+                <strong>Funds cannot be withdrawn.</strong>{" "}
+                <span style={{ color: N.TEXT_1 }}>
+                  AICandlez never requests withdrawal permissions on any
+                  exchange. Keys are encrypted with AES-256-GCM and only
+                  authorize reads + trades on your account.
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ═══════════════ STEP 2 · CREDENTIALS ═══════════════════════
+             Back button → CHOOSE (unless preselected/locked); per-
+             exchange walkthrough panel; existing API key form.
+             Preselected exchanges (e.g. OnboardingFlow Alpaca lock) hide
+             the back button so the user can't change exchanges mid-flow. */
+          <div className="pec-step">
+            {/* Back row + locked-exchange chip */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8, marginBottom: 14,
+            }}>
+              {!preselectedExchange && (
+                <button
+                  type="button"
+                  onClick={() => { setStep("choose"); setError(null); }}
+                  disabled={submitting}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "7px 10px", borderRadius: 8,
+                    background: "rgba(255,255,255,0.04)",
+                    border: `1px solid ${N.BORDER}`,
+                    color: N.TEXT_1,
+                    fontFamily: N.FONT_MONO, fontSize: 10, fontWeight: 700,
+                    letterSpacing: "0.14em", textTransform: "uppercase",
+                    cursor: submitting ? "wait" : "pointer",
+                  }}
+                >
+                  <ArrowLeft size={11} /> Back
+                </button>
+              )}
+              <div style={{
+                flex: 1, display: "inline-flex", alignItems: "center", gap: 8,
+                padding: "7px 10px", borderRadius: 8,
+                background: `linear-gradient(160deg, ${getExchangeMeta(picked.id).accent}18 0%, ${getExchangeMeta(picked.id).accent}06 100%)`,
+                border: `1px solid ${getExchangeMeta(picked.id).accent}55`,
+              }}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: 5,
+                  background: `linear-gradient(160deg, ${getExchangeMeta(picked.id).accent} 0%, ${getExchangeMeta(picked.id).accent}99 100%)`,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: N.FONT_SANS, fontSize: 11, fontWeight: 900, color: "#000",
+                }}>
+                  {picked.name.charAt(0)}
+                </div>
+                <div style={{ fontSize: 12, color: N.TEXT_0, fontWeight: 700, letterSpacing: -0.1 }}>
+                  {picked.name}
+                </div>
+                {preselectedExchange && (
+                  <Lock size={11} color={N.TEXT_2} style={{ marginLeft: "auto" }} />
+                )}
+              </div>
+            </div>
+
+            {/* Per-exchange walkthrough — only shown when meta has content.
+                Renders the numbered API-key creation steps + required
+                permission checklist + "Open API page" deep link. */}
+            {(() => {
+              const meta = getExchangeMeta(picked.id);
+              if (!meta.walkthrough?.length) return null;
+              return (
+                <div style={{
+                  padding: "14px 14px",
+                  background: "rgba(255,255,255,0.025)",
+                  border: `1px solid ${N.BORDER}`,
+                  borderRadius: 12,
+                  marginBottom: 14,
+                }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    marginBottom: 10,
+                  }}>
+                    <BookOpen size={13} color={meta.accent} />
+                    <div style={{
+                      flex: 1,
+                      fontFamily: N.FONT_MONO, fontSize: 9.5, fontWeight: 800,
+                      letterSpacing: "0.18em", color: N.TEXT_0,
+                    }}>
+                      HOW TO GET YOUR API KEY
+                    </div>
+                    {meta.apiUrl && (
+                      <a
+                        href={meta.apiUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          padding: "4px 8px", borderRadius: 6,
+                          background: `${meta.accent}18`,
+                          border: `1px solid ${meta.accent}55`,
+                          color: meta.accent,
+                          fontFamily: N.FONT_MONO, fontSize: 9, fontWeight: 800,
+                          letterSpacing: "0.14em", textTransform: "uppercase",
+                          textDecoration: "none",
+                        }}
+                      >
+                        Open <ArrowRight size={10} />
+                      </a>
+                    )}
+                  </div>
+                  <ol style={{
+                    margin: 0, padding: 0, listStyle: "none",
+                    display: "flex", flexDirection: "column", gap: 8,
+                  }}>
+                    {meta.walkthrough.map((s, i) => (
+                      <li key={i} style={{
+                        display: "flex", gap: 10, alignItems: "flex-start",
+                        fontSize: 11.5, color: N.TEXT_0, lineHeight: 1.5,
+                      }}>
+                        <span style={{
+                          flexShrink: 0,
+                          width: 18, height: 18, borderRadius: "50%",
+                          background: `${meta.accent}22`,
+                          border: `1px solid ${meta.accent}66`,
+                          color: meta.accent,
+                          fontFamily: N.FONT_MONO, fontSize: 10, fontWeight: 900,
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          marginTop: 1,
+                        }}>{i + 1}</span>
+                        <span>{s}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  {meta.requiredPerms?.length ? (
+                    <div style={{
+                      marginTop: 12, paddingTop: 10,
+                      borderTop: `1px dashed ${N.BORDER}`,
+                    }}>
+                      <div style={{
+                        fontFamily: N.FONT_MONO, fontSize: 8.5, fontWeight: 800,
+                        letterSpacing: "0.16em", color: N.TEXT_1, marginBottom: 6,
+                      }}>
+                        REQUIRED PERMISSIONS
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                        {meta.requiredPerms.map(p => (
+                          <span key={p} style={{
+                            display: "inline-flex", alignItems: "center", gap: 4,
+                            padding: "3px 7px", borderRadius: 5,
+                            background: `${N.BRAND}10`,
+                            border: `1px solid ${N.BRAND}40`,
+                            color: N.TEXT_0,
+                            fontFamily: N.FONT_MONO, fontSize: 9.5, fontWeight: 700,
+                          }}>
+                            <Check size={9} color={N.BRAND} strokeWidth={3} /> {p}
+                          </span>
+                        ))}
+                        <span style={{
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          padding: "3px 7px", borderRadius: 5,
+                          background: "rgba(255,100,120,0.08)",
+                          border: "1px solid rgba(255,100,120,0.35)",
+                          color: "rgba(255,180,190,0.95)",
+                          fontFamily: N.FONT_MONO, fontSize: 9.5, fontWeight: 700,
+                        }}>
+                          <X size={9} strokeWidth={3} /> Withdrawals · never
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()}
+
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              fontFamily: N.FONT_MONO, fontSize: 9.5, fontWeight: 800,
+              letterSpacing: "0.18em", color: N.TEXT_1, marginBottom: 8,
+            }}>
+              <KeyRound size={11} /> ENTER CREDENTIALS
             </div>
 
             {/* Label */}
@@ -1016,7 +1548,7 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
                 {submitting ? "Connecting…" : "Connect Exchange"}
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
