@@ -1479,19 +1479,11 @@ export default function CommandCenter() {
           <PlatformOverview />
         </div>
 
-        {/* Row 1 — BATTLEFIELD HERO (Scanning + Market Pulse)
-            Restored OLD composition powered by NEW engine. Replaces the
-            prior standalone TopConvictionPulse strip; chip tier hierarchy
-            now lives inside ScanningHero. */}
-        <section
-          className="grid gap-1.5 px-2"
-          style={{ gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 1fr)" }}
-        >
-          <ScanningHero    engine={engine} />
-          <MarketPulseGauge engine={engine} />
-        </section>
-
-        {/* Row 2 — BATTLEFIELD framing band */}
+        {/* Row 1 — BATTLEFIELD framing band (hero row removed per direction —
+            Scanning + Market Pulse were consuming premium vertical real
+            estate without operational value. Battlefield + execution bar
+            now sit immediately above the matrix for a focused execution
+            terminal feel.) */}
         <div className="px-2">
           <BattlefieldHeader engine={engine} cryptoActive={cryptoState === "LIVE"} />
         </div>
