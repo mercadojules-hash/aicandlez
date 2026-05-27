@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { userSettingsTable, userConsentsTable, usersTable, DISCLAIMER_VERSION, ALERT_KEYS, type AlertKey, type AlertPrefs } from "@workspace/db";
+import { userSettingsTable, userConsentsTable, userExchangeConnectionsTable, usersTable, DISCLAIMER_VERSION, ALERT_KEYS, type AlertKey, type AlertPrefs } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { resolveAiTradingGate } from "../lib/aiTradingGate.js";
@@ -146,7 +146,51 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   for (const [k, v] of Object.entries(body)) {
     if (!allowed.has(k)) continue;
-    if (k === "alertPrefs") {
+    if (k === "activeRuntimeExchange") {
+      // Task #204 gate: only allow `null`, the literal `"paper"` opt-in,
+      // or an exchange the user already has a `status="active"`
+      // connection for. This prevents onboarding (or any future client
+      // surface) from pre-stamping `activeRuntimeExchange` with a value
+      // like "Alpaca" before any real exchange connection exists —
+      // which would otherwise block Task #200's auto-promotion with
+      // `[AUTO_PROMOTION_BLOCKED reason=existing_choice]` forever.
+      //
+      // The legitimate writers are unaffected: the runtime switcher
+      // (Task #199) only offers exchanges the user has connected, and
+      // the auto-promote path in `userExchanges.ts` writes directly to
+      // the DB (bypassing this route).
+      if (v === null || v === "paper") {
+        patch[k] = v;
+      } else if (typeof v === "string" && v.length > 0) {
+        const [conn] = await db
+          .select({ id: userExchangeConnectionsTable.id })
+          .from(userExchangeConnectionsTable)
+          .where(and(
+            eq(userExchangeConnectionsTable.userId, userId),
+            eq(userExchangeConnectionsTable.exchange, v),
+            eq(userExchangeConnectionsTable.status, "active"),
+          ))
+          .limit(1);
+        if (!conn) {
+          req.log.warn({
+            userId, attemptedExchange: v,
+            tag: "RUNTIME_WRITE_REJECTED",
+            reason: "no_active_connection",
+          }, "[RUNTIME_WRITE_REJECTED] PUT /user/settings refused activeRuntimeExchange");
+          res.status(409).json({
+            error:     `Cannot set activeRuntimeExchange to "${v}": no active connection for that exchange.`,
+            errorCode: "no_active_connection",
+          });
+          return;
+        }
+        patch[k] = v;
+      } else {
+        res.status(400).json({
+          error: "activeRuntimeExchange must be null, 'paper', or a connected exchange id",
+        });
+        return;
+      }
+    } else if (k === "alertPrefs") {
       // Sanitize: only persist known AlertKeys with boolean values, and
       // merge with the existing row so partial patches don't wipe other
       // keys. We always merge (not replace) so a phone toggling one alert
