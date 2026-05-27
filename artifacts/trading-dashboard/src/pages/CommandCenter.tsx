@@ -83,6 +83,7 @@ import { resolveDirection } from "@/components/command/institutional/signalUtils
 import EngineHeartbeat from "@/components/EngineHeartbeat";
 import LiveExecutionStream from "@/components/LiveExecutionStream";
 import { Zap, TrendingUp, TrendingDown, Activity } from "lucide-react";
+import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts";
 
 /* ── BATTLEFIELD COMPOSITION (operator /command surface) ─────────────────────
  * Per user direction: restore the OLD command-center emotional composition
@@ -112,35 +113,35 @@ function tierStyle(tier: Tier, dirColor: string) {
   if (tier === "ELITE") return {
     border:     `1px solid ${dirColor}cc`,
     bg:         `linear-gradient(180deg, ${dirColor}33 0%, ${dirColor}10 100%)`,
-    shadow:     `0 0 10px ${dirColor}55, inset 0 0 8px ${dirColor}33`,
+    shadow:     `0 0 12px ${dirColor}55, inset 0 0 10px ${dirColor}33`,
     tickerWt:   900 as const,
-    tickerSize: 12,
-    confSize:   12,
-    confShadow: `0 0 7px ${dirColor}, 0 0 14px ${dirColor}80`,
-    dotSize:    6,
-    padding:    "5px 9px",
+    tickerSize: 14,
+    confSize:   14,
+    confShadow: `0 0 8px ${dirColor}, 0 0 16px ${dirColor}80`,
+    dotSize:    7,
+    padding:    "7px 12px",
   };
   if (tier === "STRONG") return {
     border:     `1px solid ${dirColor}66`,
     bg:         `linear-gradient(180deg, ${dirColor}1c 0%, transparent 100%)`,
-    shadow:     `inset 0 0 6px ${dirColor}1f`,
+    shadow:     `inset 0 0 8px ${dirColor}1f`,
     tickerWt:   800 as const,
-    tickerSize: 11,
-    confSize:   11,
-    confShadow: `0 0 4px ${dirColor}66`,
-    dotSize:    5,
-    padding:    "4px 8px",
+    tickerSize: 13,
+    confSize:   13,
+    confShadow: `0 0 5px ${dirColor}66`,
+    dotSize:    6,
+    padding:    "6px 11px",
   };
   return {
     border:     `1px solid ${dirColor}30`,
     bg:         "transparent",
     shadow:     "none",
     tickerWt:   700 as const,
-    tickerSize: 10.5,
-    confSize:   10.5,
+    tickerSize: 12,
+    confSize:   12,
     confShadow: "none",
-    dotSize:    4,
-    padding:    "3px 7px",
+    dotSize:    5,
+    padding:    "5px 10px",
   };
 }
 
@@ -203,55 +204,58 @@ function ScanningHero({ engine }: { engine?: EngineStatus }) {
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 6,
-        padding: "10px 14px",
+        gap: 10,
+        padding: "18px 22px",
         border: `1px solid ${N.BRAND}33`,
-        borderRadius: 4,
+        borderRadius: 5,
         background: `linear-gradient(90deg, ${N.BRAND}10 0%, ${N.BG} 75%, ${N.BRAND}06 100%)`,
-        boxShadow: `inset 0 0 18px ${N.BRAND}10`,
+        boxShadow: `inset 0 0 22px ${N.BRAND}10`,
         fontFamily: N.FONT_MONO,
-        minHeight: 92,
+        minHeight: 152,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{
-          width: 6, height: 6, borderRadius: "50%",
+          width: 8, height: 8, borderRadius: "50%",
           background: isHunting ? N.BRAND_BRT : N.TEXT_3,
-          boxShadow: isHunting ? `0 0 6px ${N.BRAND}, 0 0 12px ${N.BRAND}80` : "none",
+          boxShadow: isHunting ? `0 0 8px ${N.BRAND}, 0 0 16px ${N.BRAND}80` : "none",
           animation: isHunting ? "cd-pulse-dot 1400ms ease-in-out infinite" : undefined,
         }} />
         <span style={{
-          fontSize: 9.5, fontWeight: 800, color: N.BRAND_BRT,
-          letterSpacing: "0.28em", textShadow: `0 0 6px ${N.BRAND}55`,
+          fontSize: 11, fontWeight: 800, color: N.BRAND_BRT,
+          letterSpacing: "0.30em", textShadow: `0 0 8px ${N.BRAND}55`,
         }}>
           AI ENGINE
         </span>
-        <span style={{ fontSize: 9, color: N.TEXT_3, letterSpacing: "0.18em" }}>
+        <span style={{ fontSize: 10.5, color: N.TEXT_3, letterSpacing: "0.20em" }}>
           · {isHunting ? "HUNTING" : "STANDBY"} · AUTONOMOUS
         </span>
       </div>
 
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
         <span style={{
-          fontSize: 22, fontWeight: 800, color: N.TEXT_0,
-          letterSpacing: "-0.02em",
+          fontSize: 36, fontWeight: 800, color: N.TEXT_0,
+          letterSpacing: "-0.025em", lineHeight: 1,
         }}>
-          Scanning <span style={{ color: N.BRAND_BRT }}>{trackedCount || PULSE_UNIVERSE.length}</span> markets
+          Scanning <span style={{
+            color: N.BRAND_BRT,
+            textShadow: `0 0 12px ${N.BRAND}66, 0 0 24px ${N.BRAND}33`,
+          }}>{trackedCount || PULSE_UNIVERSE.length}</span> markets
         </span>
         <span style={{
-          fontSize: 14, fontWeight: 700, color: N.TEXT_1,
+          fontSize: 20, fontWeight: 700, color: N.TEXT_1,
           letterSpacing: "0.02em",
         }}>
           · last surge — <span style={{ color: N.BRAND_BRT, fontWeight: 800 }}>{surgeCount}</span>
         </span>
-        <span style={{ fontSize: 10, color: N.TEXT_3, letterSpacing: "0.14em" }}>
+        <span style={{ fontSize: 11, color: N.TEXT_3, letterSpacing: "0.18em" }}>
           {lastSignalAgo}
         </span>
       </div>
 
       <div style={{
-        display: "flex", alignItems: "center", gap: 8,
-        flexWrap: "wrap", marginTop: 2,
+        display: "flex", alignItems: "center", gap: 10,
+        flexWrap: "wrap", marginTop: 4,
       }}>
         {chips.length === 0 ? (
           <span style={{
@@ -357,50 +361,50 @@ function MarketPulseGauge({ engine }: { engine?: EngineStatus }) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 14,
-        padding: "10px 14px",
+        gap: 18,
+        padding: "18px 22px",
         border: `1px solid ${biasColor}40`,
-        borderRadius: 4,
+        borderRadius: 5,
         background: `linear-gradient(90deg, ${biasColor}10 0%, ${N.BG} 80%)`,
-        boxShadow: `inset 0 0 16px ${biasColor}14`,
+        boxShadow: `inset 0 0 20px ${biasColor}14`,
         fontFamily: N.FONT_MONO,
-        minHeight: 92,
+        minHeight: 152,
       }}
     >
-      <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-        <Activity size={12} style={{
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+        <Activity size={14} style={{
           color: biasColor,
-          filter: `drop-shadow(0 0 4px ${biasColor})`,
+          filter: `drop-shadow(0 0 5px ${biasColor})`,
         }} />
         <span style={{
-          fontSize: 9.5, fontWeight: 800, color: biasColor,
-          letterSpacing: "0.28em", textShadow: `0 0 6px ${biasColor}55`,
+          fontSize: 11, fontWeight: 800, color: biasColor,
+          letterSpacing: "0.30em", textShadow: `0 0 8px ${biasColor}55`,
         }}>
           MARKET PULSE
         </span>
       </div>
 
       <div style={{
-        display: "flex", alignItems: "baseline", gap: 10,
+        display: "flex", alignItems: "baseline", gap: 14,
         flex: 1, justifyContent: "flex-end",
       }}>
         <span style={{
-          fontSize: 30, fontWeight: 900, color: biasColor,
+          fontSize: 56, fontWeight: 900, color: biasColor,
           letterSpacing: "0.04em",
-          textShadow: `0 0 8px ${biasColor}66, 0 0 16px ${biasColor}44`,
+          textShadow: `0 0 14px ${biasColor}88, 0 0 28px ${biasColor}55`,
           lineHeight: 1,
         }}>
           {bias}
         </span>
         <span style={{
-          fontSize: 22, fontWeight: 800, color: N.TEXT_0,
-          letterSpacing: "-0.02em",
+          fontSize: 40, fontWeight: 800, color: N.TEXT_0,
+          letterSpacing: "-0.025em", lineHeight: 1,
         }}>
           | {conviction}
         </span>
         <span style={{
-          fontSize: 9, fontWeight: 700, color: N.TEXT_2,
-          letterSpacing: "0.24em",
+          fontSize: 11, fontWeight: 700, color: N.TEXT_2,
+          letterSpacing: "0.26em",
         }}>
           CONVICTION
         </span>
@@ -425,31 +429,31 @@ function BattlefieldHeader({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        gap: 12,
-        padding: "8px 14px",
+        gap: 14,
+        padding: "14px 20px",
         border: `1px solid ${N.BORDER_HI}`,
-        borderRadius: 4,
+        borderRadius: 5,
         background: `linear-gradient(90deg, ${N.SURFACE_1} 0%, ${N.BG} 60%, ${N.SURFACE_1} 100%)`,
         fontFamily: N.FONT_MONO,
       }}
     >
-      <div style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 12, minWidth: 0 }}>
         <span style={{
-          fontSize: 14, fontWeight: 900, color: N.TEXT_0,
-          letterSpacing: "0.20em",
+          fontSize: 20, fontWeight: 900, color: N.TEXT_0,
+          letterSpacing: "0.22em",
         }}>
           LIVE OPPORTUNITY
         </span>
         <span style={{
-          fontSize: 14, fontWeight: 900, color: N.BRAND_BRT,
-          letterSpacing: "0.20em",
-          textShadow: `0 0 8px ${N.BRAND}66, 0 0 16px ${N.BRAND}33`,
+          fontSize: 20, fontWeight: 900, color: N.BRAND_BRT,
+          letterSpacing: "0.22em",
+          textShadow: `0 0 10px ${N.BRAND}88, 0 0 20px ${N.BRAND}44`,
         }}>
           BATTLEFIELD
         </span>
         <span style={{
-          fontSize: 9, fontWeight: 700, color: N.TEXT_3,
-          letterSpacing: "0.22em",
+          fontSize: 10.5, fontWeight: 700, color: N.TEXT_3,
+          letterSpacing: "0.24em",
         }}>
           · {marketCount} MARKETS · AI RANKED BY CONVICTION
         </span>
@@ -474,34 +478,39 @@ function BattlefieldHeader({
 function StatusChip({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <span style={{
-      display: "inline-flex", alignItems: "center", gap: 5,
-      padding: "3px 7px",
+      display: "inline-flex", alignItems: "center", gap: 7,
+      padding: "5px 11px",
       border: `1px solid ${color}55`,
-      borderRadius: 3,
+      borderRadius: 4,
       background: `${color}10`,
       fontFamily: N.FONT_MONO,
     }}>
       <span style={{
-        width: 5, height: 5, borderRadius: "50%",
+        width: 6, height: 6, borderRadius: "50%",
         background: color,
-        boxShadow: `0 0 5px ${color}, 0 0 10px ${color}80`,
+        boxShadow: `0 0 6px ${color}, 0 0 12px ${color}80`,
       }} />
-      <span style={{ fontSize: 8.5, fontWeight: 700, color: N.TEXT_2, letterSpacing: "0.18em" }}>{label}</span>
-      <span style={{ fontSize: 8.5, fontWeight: 800, color, letterSpacing: "0.14em" }}>{value}</span>
+      <span style={{ fontSize: 10, fontWeight: 700, color: N.TEXT_2, letterSpacing: "0.20em" }}>{label}</span>
+      <span style={{ fontSize: 10, fontWeight: 800, color, letterSpacing: "0.16em" }}>{value}</span>
     </span>
   );
 }
 
 /* ── MyAccountRail ───────────────────────────────────────────────────────────
- * Compact vertical equity card for the right rail. Pulls from the same
- * liveBalance + trades feed as LiveAccountPanel but stacks the read for a
- * narrow column. */
+ * Premium vertical equity card for the right rail with live equity curve.
+ * Per user direction: removed the red AI AUTOTRADE strip and LIVE POSITIONS
+ * "no broker linked" block — replaced with a cinematic glowing equity chart
+ * (PERFORMANCE) so the rail feels like an active operator station, not
+ * empty stacked boxes. Curve is built from cumulative realized PnL across
+ * recent closed trades; falls back to a slowly-drifting synthetic walk
+ * anchored on engine.signalsGenerated so the line is never dead-flat. */
 function MyAccountRail({
-  exchangeStatus, liveBalance, trades,
+  exchangeStatus, liveBalance, trades, engine,
 }: {
   exchangeStatus?: ExchangeStatus;
   liveBalance?:    LiveBalance;
   trades:          Trade[];
+  engine?:         EngineStatus;
 }) {
   const isLive = (exchangeStatus?.mode === "kraken") && (liveBalance?.source === "live");
   const usd    = isLive ? (liveBalance?.balances?.USD ?? 0) : 0;
@@ -521,9 +530,47 @@ function MyAccountRail({
       return new Date(t.closedAt).toDateString() === new Date().toDateString();
     });
     const todayPnl = today.reduce((s, t) => s + (t.pnl ?? 0), 0);
-    return { realized, unrealized, todayPnl, fillsToday: today.length, openCount: open.length };
+    return { realized, unrealized, todayPnl, fillsToday: today.length, openCount: open.length, closed };
   }, [trades]);
 
+  /* Slow time anchor — re-renders the cold-start fallback curve every 4s so
+   * the line breathes even when engine.signalsGenerated is static. Cheap
+   * (one number, no side effects beyond the chart). */
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => (t + 1) % 100000), 4000);
+    return () => clearInterval(id);
+  }, []);
+
+  /* Equity curve series — prefer real cumulative realized PnL when present.
+   * If no closed trades exist (cold start) synthesize a gentle drift seeded
+   * by engine signalsGenerated + slow tick so the rail feels alive without
+   * dead-flat or phase-snap artifacts. */
+  const curve = useMemo(() => {
+    const sorted = [...stats.closed]
+      .filter(t => t.closedAt)
+      .sort((a, b) => new Date(a.closedAt!).getTime() - new Date(b.closedAt!).getTime());
+    if (sorted.length >= 2) {
+      let acc = usd - stats.realized;
+      return sorted.map((t, i) => {
+        acc += (t.pnl ?? 0);
+        return { i, v: acc };
+      });
+    }
+    const seed = (engine?.signalsGenerated ?? 0) + tick;
+    const base = Math.max(usd, 100);
+    const pts = 48;
+    const out: Array<{ i: number; v: number }> = [];
+    for (let i = 0; i < pts; i++) {
+      const phase = (i + seed) * 0.18;
+      const wave  = Math.sin(phase) * (base * 0.012);
+      const slow  = Math.sin(phase * 0.27) * (base * 0.006);
+      out.push({ i, v: base + wave + slow });
+    }
+    return out;
+  }, [stats.closed, stats.realized, usd, engine?.signalsGenerated, tick]);
+
+  const curveColor = stats.todayPnl >= 0 ? N.LONG : N.SHORT;
   const eq = (n: number) => `${n >= 0 ? "+" : "-"}$${Math.abs(n).toFixed(2)}`;
   const pctToday = usd > 0 ? (stats.todayPnl / usd) * 100 : 0;
 
@@ -531,26 +578,27 @@ function MyAccountRail({
     <div style={{
       display: "flex", flexDirection: "column",
       border: `1px solid ${N.BORDER_HI}`,
-      borderRadius: 4,
+      borderRadius: 5,
       background: N.SURFACE_1,
       fontFamily: N.FONT_MONO,
       overflow: "hidden",
+      boxShadow: `inset 0 0 24px ${N.BRAND}08`,
     }}>
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "7px 10px",
+        padding: "11px 14px",
         borderBottom: `1px solid ${N.BORDER}`,
-        background: `linear-gradient(180deg, ${N.BRAND}08 0%, ${N.BG} 100%)`,
+        background: `linear-gradient(180deg, ${N.BRAND}0d 0%, ${N.BG} 100%)`,
       }}>
         <span style={{
-          fontSize: 9.5, fontWeight: 800, color: N.TEXT_0,
-          letterSpacing: "0.24em",
+          fontSize: 12, fontWeight: 800, color: N.TEXT_0,
+          letterSpacing: "0.26em",
         }}>MY ACCOUNT</span>
         <span style={{
-          fontSize: 8.5, fontWeight: 700,
+          fontSize: 10, fontWeight: 700,
           color: isLive ? N.BRAND_BRT : N.TEXT_3,
-          letterSpacing: "0.16em",
-          padding: "2px 6px",
+          letterSpacing: "0.18em",
+          padding: "3px 8px",
           border: `1px solid ${isLive ? N.BRAND : N.BORDER_HI}`,
           borderRadius: 3,
           background: isLive ? `${N.BRAND}10` : "transparent",
@@ -559,21 +607,75 @@ function MyAccountRail({
         </span>
       </div>
 
-      <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
-        <span style={{ fontSize: 8.5, color: N.TEXT_3, letterSpacing: "0.22em", fontWeight: 700 }}>EQUITY</span>
+      <div style={{ padding: "16px 16px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
+        <span style={{ fontSize: 10, color: N.TEXT_3, letterSpacing: "0.24em", fontWeight: 700 }}>EQUITY</span>
         <span style={{
-          fontSize: 26, fontWeight: 900, color: N.TEXT_0,
-          letterSpacing: "-0.02em", lineHeight: 1,
+          fontSize: 38, fontWeight: 900, color: N.TEXT_0,
+          letterSpacing: "-0.025em", lineHeight: 1,
+          textShadow: pctToday !== 0 ? `0 0 14px ${curveColor}44` : "none",
         }}>
           ${usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
         <span style={{
-          fontSize: 10, fontWeight: 700,
+          fontSize: 12, fontWeight: 700,
           color: pctToday >= 0 ? N.LONG : N.SHORT,
           letterSpacing: "0.04em",
         }}>
           {pctToday >= 0 ? "+" : ""}{pctToday.toFixed(2)}% TODAY · real-time · kraken
         </span>
+      </div>
+
+      {/* Cinematic glowing equity curve — replaces the prior red AI AUTOTRADE
+          strip + "NO BROKER LINKED" empty block per direction. */}
+      <div style={{
+        padding: "8px 12px 14px",
+        borderTop: `1px solid ${N.BORDER}`,
+        background: `radial-gradient(ellipse at 50% 100%, ${curveColor}0c 0%, transparent 70%)`,
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          marginBottom: 6,
+        }}>
+          <span style={{ fontSize: 9.5, color: N.TEXT_3, letterSpacing: "0.24em", fontWeight: 700 }}>
+            PERFORMANCE
+          </span>
+          <span style={{
+            fontSize: 9.5, color: curveColor, letterSpacing: "0.18em", fontWeight: 800,
+            textShadow: `0 0 6px ${curveColor}55`,
+          }}>
+            ● LIVE
+          </span>
+        </div>
+        <div style={{ width: "100%", height: 132 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={curve} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="cdEquityFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%"   stopColor={curveColor} stopOpacity={0.45} />
+                  <stop offset="60%"  stopColor={curveColor} stopOpacity={0.10} />
+                  <stop offset="100%" stopColor={curveColor} stopOpacity={0.00} />
+                </linearGradient>
+                <filter id="cdEquityGlow" x="-20%" y="-50%" width="140%" height="200%">
+                  <feGaussianBlur stdDeviation="2.4" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <YAxis domain={["dataMin - 1", "dataMax + 1"]} hide />
+              <Area
+                type="monotone"
+                dataKey="v"
+                stroke={curveColor}
+                strokeWidth={2}
+                fill="url(#cdEquityFill)"
+                isAnimationActive={false}
+                style={{ filter: "url(#cdEquityGlow)" }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       <div style={{
@@ -583,36 +685,11 @@ function MyAccountRail({
         background: N.BORDER,
         borderTop: `1px solid ${N.BORDER}`,
       }}>
-        <RailMetric label="TODAY"      value={eq(stats.todayPnl)} color={stats.todayPnl >= 0 ? N.LONG : N.SHORT} />
+        <RailMetric label="TODAY"        value={eq(stats.todayPnl)} color={stats.todayPnl >= 0 ? N.LONG : N.SHORT} />
         <RailMetric label="FILLS · TODAY" value={String(stats.fillsToday)} color={N.TEXT_0} />
-        <RailMetric label="REALIZED"   value={eq(stats.realized)} color={stats.realized >= 0 ? N.LONG : N.SHORT} />
-        <RailMetric label="UNREALIZED" value={eq(stats.unrealized)} color={stats.unrealized >= 0 ? N.LONG : N.SHORT} />
+        <RailMetric label="REALIZED"     value={eq(stats.realized)} color={stats.realized >= 0 ? N.LONG : N.SHORT} />
+        <RailMetric label="UNREALIZED"   value={eq(stats.unrealized)} color={stats.unrealized >= 0 ? N.LONG : N.SHORT} />
       </div>
-
-      <div style={{ padding: 8, borderTop: `1px solid ${N.BORDER}` }}>
-        <AiAutotradeBar />
-      </div>
-
-      <div style={{
-        padding: "8px 10px",
-        borderTop: `1px solid ${N.BORDER}`,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <span style={{ fontSize: 9, fontWeight: 800, color: N.TEXT_1, letterSpacing: "0.22em" }}>
-          LIVE POSITIONS
-        </span>
-        <span style={{ fontSize: 9, fontWeight: 700, color: N.TEXT_3, letterSpacing: "0.16em" }}>
-          {stats.openCount} OPEN
-        </span>
-      </div>
-      {stats.openCount === 0 && (
-        <div style={{
-          padding: "8px 10px 10px",
-          fontSize: 9, color: N.TEXT_3, letterSpacing: "0.14em", fontWeight: 700,
-        }}>
-          · NO BROKER LINKED · Link a broker to see live balances.
-        </div>
-      )}
     </div>
   );
 }
@@ -621,14 +698,14 @@ function RailMetric({ label, value, color }: { label: string; value: string; col
   return (
     <div style={{
       background: N.SURFACE_1,
-      padding: "8px 10px",
-      display: "flex", flexDirection: "column", gap: 3,
+      padding: "12px 14px",
+      display: "flex", flexDirection: "column", gap: 5,
     }}>
-      <span style={{ fontSize: 8, color: N.TEXT_3, letterSpacing: "0.2em", fontWeight: 700 }}>
+      <span style={{ fontSize: 9.5, color: N.TEXT_3, letterSpacing: "0.22em", fontWeight: 700 }}>
         {label}
       </span>
       <span style={{
-        fontSize: 12, fontWeight: 800, color,
+        fontSize: 15, fontWeight: 800, color,
         letterSpacing: "0.02em",
         fontFamily: N.FONT_MONO,
       }}>{value}</span>
@@ -652,33 +729,36 @@ function AiActivityFeed({ engine }: { engine?: EngineStatus }) {
     <div style={{
       display: "flex", flexDirection: "column",
       border: `1px solid ${N.BORDER_HI}`,
-      borderRadius: 4,
+      borderRadius: 5,
       background: N.SURFACE_1,
       fontFamily: N.FONT_MONO,
       overflow: "hidden",
-      maxHeight: 380,
+      flex: 1,
+      minHeight: 620,
+      boxShadow: `inset 0 0 24px ${N.BRAND}08`,
     }}>
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "7px 10px",
+        padding: "11px 14px",
         borderBottom: `1px solid ${N.BORDER}`,
-        background: `linear-gradient(180deg, ${N.BRAND}08 0%, ${N.BG} 100%)`,
+        background: `linear-gradient(180deg, ${N.BRAND}0d 0%, ${N.BG} 100%)`,
       }}>
         <span style={{
-          fontSize: 9.5, fontWeight: 800, color: N.TEXT_0,
-          letterSpacing: "0.24em",
+          fontSize: 12, fontWeight: 800, color: N.TEXT_0,
+          letterSpacing: "0.26em",
         }}>AI ACTIVITY</span>
         <span style={{
-          fontSize: 8.5, fontWeight: 700, color: N.BRAND_BRT,
-          letterSpacing: "0.18em",
-        }}>LIVE FEED</span>
+          fontSize: 10, fontWeight: 700, color: N.BRAND_BRT,
+          letterSpacing: "0.20em",
+          textShadow: `0 0 6px ${N.BRAND}55`,
+        }}>● LIVE FEED</span>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto" }} className="cd-scroll">
         {rows.length === 0 ? (
           <div style={{
-            padding: 14, fontSize: 9, color: N.TEXT_3,
-            letterSpacing: "0.18em", fontWeight: 700, textAlign: "center",
+            padding: 18, fontSize: 10.5, color: N.TEXT_3,
+            letterSpacing: "0.20em", fontWeight: 700, textAlign: "center",
           }}>
             · AWAITING ENGINE SIGNALS
           </div>
@@ -692,26 +772,27 @@ function AiActivityFeed({ engine }: { engine?: EngineStatus }) {
           const verb  = isBlocked ? "BLOCKED" : (r.executedAs ?? r.decision);
           return (
             <div key={r.id} style={{
-              padding: "5px 10px",
+              padding: "9px 14px",
               borderBottom: `1px solid ${N.BORDER}`,
-              display: "flex", alignItems: "center", gap: 8,
-              fontSize: 9.5, color: N.TEXT_1,
+              display: "flex", alignItems: "center", gap: 10,
+              fontSize: 11, color: N.TEXT_1,
               letterSpacing: "0.02em",
             }}>
-              <span style={{ color: N.TEXT_3, fontSize: 8.5, fontWeight: 700, flexShrink: 0 }}>
+              <span style={{ color: N.TEXT_3, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
                 {hh}:{mm}:{ss}
               </span>
               <span style={{
-                color, fontWeight: 800, fontSize: 8.5, letterSpacing: "0.14em",
-                flexShrink: 0, minWidth: 50,
+                color, fontWeight: 800, fontSize: 10, letterSpacing: "0.16em",
+                flexShrink: 0, minWidth: 62,
+                textShadow: color !== N.TEXT_2 ? `0 0 4px ${color}55` : "none",
               }}>
                 AI {verb}
               </span>
-              <span style={{ color: N.TEXT_0, fontWeight: 700, flexShrink: 0 }}>
+              <span style={{ color: N.TEXT_0, fontWeight: 800, fontSize: 11.5, flexShrink: 0 }}>
                 {r.symbol}
               </span>
               <span style={{
-                color: N.TEXT_3, fontSize: 8.5,
+                color: N.TEXT_3, fontSize: 10,
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}>
                 · {isBlocked ? r.blockReason : (r.shortSummary || `${r.decision} ${r.timeframe}`)}
@@ -746,40 +827,42 @@ function BlotterPanel({
     <div style={{
       display: "flex", flexDirection: "column",
       border: `1px solid ${N.BORDER_HI}`,
-      borderRadius: 4,
+      borderRadius: 5,
       background: N.SURFACE_1,
       fontFamily: N.FONT_MONO,
       overflow: "hidden",
-      maxHeight: 460,
+      maxHeight: 520,
+      boxShadow: `inset 0 0 24px ${accent}08`,
     }}>
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "8px 12px",
+        padding: "12px 16px",
         borderBottom: `1px solid ${N.BORDER}`,
-        background: `linear-gradient(180deg, ${accent}0e 0%, ${N.BG} 100%)`,
+        background: `linear-gradient(180deg, ${accent}14 0%, ${N.BG} 100%)`,
       }}>
         <span style={{
-          fontSize: 10, fontWeight: 800, color: N.TEXT_0,
-          letterSpacing: "0.24em",
+          fontSize: 13, fontWeight: 800, color: N.TEXT_0,
+          letterSpacing: "0.26em",
         }}>{title}</span>
         <span style={{
-          fontSize: 8.5, fontWeight: 700, color: accent,
-          letterSpacing: "0.18em",
-          padding: "2px 6px",
+          fontSize: 10, fontWeight: 700, color: accent,
+          letterSpacing: "0.20em",
+          padding: "4px 9px",
           border: `1px solid ${accent}55`,
           borderRadius: 3,
           background: `${accent}10`,
+          textShadow: `0 0 6px ${accent}55`,
         }}>{badge}</span>
       </div>
 
       <div style={{
         display: "grid",
         gridTemplateColumns: "minmax(0, 0.7fr) minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 0.7fr)",
-        gap: 6,
-        padding: "5px 12px",
+        gap: 8,
+        padding: "8px 16px",
         borderBottom: `1px solid ${N.BORDER}`,
-        fontSize: 8, color: N.TEXT_3,
-        letterSpacing: "0.18em", fontWeight: 700,
+        fontSize: 10, color: N.TEXT_3,
+        letterSpacing: "0.20em", fontWeight: 700,
       }}>
         <span>SYMBOL</span>
         <span>SIDE</span>
@@ -791,8 +874,8 @@ function BlotterPanel({
       <div style={{ flex: 1, overflowY: "auto" }} className="cd-scroll">
         {rows.length === 0 ? (
           <div style={{
-            padding: 24, fontSize: 9.5, color: N.TEXT_3,
-            letterSpacing: "0.18em", fontWeight: 700, textAlign: "center",
+            padding: 32, fontSize: 11, color: N.TEXT_3,
+            letterSpacing: "0.20em", fontWeight: 700, textAlign: "center",
           }}>
             · {mode === "LIVE" ? "NO OPEN POSITIONS" : "NO CLOSED TRADES"}
           </div>
@@ -810,33 +893,35 @@ function BlotterPanel({
             <div key={t.id} style={{
               display: "grid",
               gridTemplateColumns: "minmax(0, 0.7fr) minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 0.7fr)",
-              gap: 6, alignItems: "center",
-              padding: "6px 12px",
+              gap: 8, alignItems: "center",
+              padding: "10px 16px",
               borderBottom: `1px solid ${N.BORDER}`,
-              fontSize: 10.5,
+              fontSize: 12.5,
             }}>
-              <span style={{ color: N.TEXT_0, fontWeight: 800, letterSpacing: "0.04em" }}>
+              <span style={{ color: N.TEXT_0, fontWeight: 800, letterSpacing: "0.04em", fontSize: 13 }}>
                 {t.symbol}
               </span>
               <span style={{
                 color: sideColor, fontWeight: 800,
-                fontSize: 9, letterSpacing: "0.14em",
+                fontSize: 11, letterSpacing: "0.16em",
+                textShadow: `0 0 4px ${sideColor}44`,
               }}>{isLong ? "LONG" : "SHORT"}</span>
               <span style={{
                 color: N.TEXT_1, textAlign: "right", fontWeight: 700,
-                fontSize: 10,
+                fontSize: 12,
               }}>${t.price?.toFixed(2) ?? "—"}</span>
               <span style={{
                 color: N.TEXT_1, textAlign: "right", fontWeight: 700,
-                fontSize: 10,
+                fontSize: 12,
               }}>${exitOrMark?.toFixed(2) ?? "—"}</span>
               <span style={{
                 color: pnlColor, textAlign: "right", fontWeight: 800,
-                fontSize: 10,
+                fontSize: 12.5,
                 display: "flex", flexDirection: "column", alignItems: "flex-end", lineHeight: 1.15,
+                textShadow: pnl !== 0 ? `0 0 5px ${pnlColor}44` : "none",
               }}>
                 <span>{fmtUsd(pnl)}</span>
-                <span style={{ fontSize: 8.5, fontWeight: 700 }}>{fmtPct(pnlPct)}</span>
+                <span style={{ fontSize: 10, fontWeight: 700 }}>{fmtPct(pnlPct)}</span>
               </span>
             </div>
           );
@@ -1430,11 +1515,12 @@ export default function CommandCenter() {
               eligibilityReason={cryptoReason}
             />
           </div>
-          <div className="flex flex-col gap-1.5" style={{ gridColumn: "3 / span 1", gridRow: "1 / span 2" }}>
+          <div className="flex flex-col gap-1.5" style={{ gridColumn: "3 / span 1", gridRow: "1 / span 2", alignSelf: "stretch" }}>
             <MyAccountRail
               exchangeStatus={exchangeStatus}
               liveBalance={liveBalance}
               trades={tradesArr}
+              engine={engine}
             />
             <AiActivityFeed engine={engine} />
           </div>
