@@ -354,43 +354,11 @@ export default function CommandCenter() {
           <PlatformOverview />
         </div>
 
-        {/* Row 0b — Operator deep-layer telemetry (admin-only)
-            Latency · Funnel · Live Execution Stream · Fees · Subscriptions */}
-        {isOperator && <OperatorTelemetryGrid />}
-
-        {/* Row 0c — Live Execution Debugging (admin-only)
-            Engine heartbeat + Safe Test Mode controls + real-time execution
-            stream from executionStreamBus. The operator must NEVER be blind
-            during live execution. */}
-        {isOperator && (
-          <section className="px-2 grid gap-2" style={{ gridTemplateColumns: "minmax(420px, 1fr) minmax(0, 2fr)" }}>
-            <EngineHeartbeat />
-            <LiveExecutionStream />
-          </section>
-        )}
-
-        {/* Row 1 — My live Kraken account */}
-        <div className="px-2">
-          <LiveAccountPanel
-            engine={engine}
-            exchangeStatus={exchangeStatus}
-            liveBalance={liveBalance}
-            trades={tradesArr}
-          />
-        </div>
-
-        {/* Row 2 — Market Heartbeat */}
-        <MarketHeartbeat />
-
-        {/* Row 3 — Positions blotter */}
-        <PositionsRow
-          positions={livePositions}
-          openTrades={openTrades}
-          closedTrades={closedTrades}
-        />
-
-        {/* Row 4 — Bar+Panel pairs, side-by-side. Each control bar sits
-            DIRECTLY ABOVE its own signal panel (per asset class). */}
+        {/* Row 1 — DUAL CRYPTO SIGNALS MATRIX (above the fold)
+            Hoisted above operator deep-telemetry so the dense signal flow
+            is the first thing the operator sees on /command, not the
+            sparse empty Fees/Users/Positions panels. Each control bar
+            sits DIRECTLY ABOVE its own signal panel.  */}
         <section
           className="grid gap-2 px-2 mt-1"
           style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}
@@ -416,6 +384,45 @@ export default function CommandCenter() {
             <CryptoAltsMemesPanel engine={engine} />
           </div>
         </section>
+
+        {/* Row 2 — My live Kraken account (immediate proof-of-performance
+            kept high so balance/PnL stays near the matrix) */}
+        <div className="px-2">
+          <LiveAccountPanel
+            engine={engine}
+            exchangeStatus={exchangeStatus}
+            liveBalance={liveBalance}
+            trades={tradesArr}
+          />
+        </div>
+
+        {/* Row 3 — Positions blotter (live operator activity) */}
+        <PositionsRow
+          positions={livePositions}
+          openTrades={openTrades}
+          closedTrades={closedTrades}
+        />
+
+        {/* Row 4 — Market Heartbeat (BTC/ETH/SOL macro context) */}
+        <MarketHeartbeat />
+
+        {/* Row 5 — Operator deep-layer telemetry (admin-only)
+            Latency · Funnel · Live Execution Stream · Fees · Subscriptions ·
+            Cross-tenant positions/trades. Moved BELOW the signals matrix +
+            account/blotter so the empty-when-idle panels never dominate
+            the above-the-fold view. */}
+        {isOperator && <OperatorTelemetryGrid />}
+
+        {/* Row 6 — Live Execution Debugging (admin-only)
+            Engine heartbeat + Safe Test Mode controls + real-time execution
+            stream from executionStreamBus. The operator must NEVER be blind
+            during live execution. */}
+        {isOperator && (
+          <section className="px-2 grid gap-2" style={{ gridTemplateColumns: "minmax(420px, 1fr) minmax(0, 2fr)" }}>
+            <EngineHeartbeat />
+            <LiveExecutionStream />
+          </section>
+        )}
 
         <footer
           className="px-3 py-2 flex items-center justify-between text-[8.5px] font-bold tracking-[0.22em]"
