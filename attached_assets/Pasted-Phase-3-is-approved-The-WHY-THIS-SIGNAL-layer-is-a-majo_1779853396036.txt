@@ -1,0 +1,91 @@
+Phase 3 is approved.
+
+The WHY THIS SIGNAL layer is a major product upgrade because it transforms the experience from:
+“signal dashboard”
+into:
+“AI intelligence platform.”
+
+That psychological shift is extremely important.
+
+Big wins from this phase:
+• AI reasoning drawer creates trust + transparency
+• Lifecycle timeline adds institutional execution feel
+• Today’s Intelligence Panel adds emotional engagement
+• The async admin-safe role gate fix was the correct call
+• Preserving /command byte-identical was critical
+
+Most important:
+The customer now feels like they are interacting with:
+an intelligent trading system
+—not—
+raw signal telemetry.
+
+Proceed to Phase 4:
+AI Personality + Notification Intelligence Layer
+
+Priority scope:
+
+1. AI Personality Narrator
+   Add lightweight conversational intelligence:
+   Examples:
+
+* “AI sees momentum strengthening on ETH across 15m and 1H.”
+* “BTC volatility increasing — waiting for confirmation.”
+* “SOL rejected at resistance; conviction weakening.”
+* “Market regime shifting toward risk-on behavior.”
+
+Goal:
+Make the AI feel alive and observant without becoming gimmicky.
+
+2. Browser-side Notification Intelligence
+   Real-time premium notifications:
+
+* “New ELITE signal detected”
+* “BTC crossed 82% conviction”
+* “ETH moved from ACTIVE → STRONG”
+* “AI closed SOL trade in profit”
+* “Market entering high-volatility regime”
+
+Priority:
+Elegant, premium, sparse.
+Avoid spam.
+
+3. Confidence History Mini-Charts
+   Per ticker:
+
+* confidence over time
+* tiny historical conviction movement
+* trend strengthening vs weakening
+
+This dramatically increases perceived sophistication.
+
+4. Emotional Performance Storytelling
+   Transform stats into narrative:
+
+* “AI has detected 42 opportunities today”
+* “Highest conviction today: ETH 91”
+* “Win streak: 5”
+* “Most active sector: Layer 1s”
+
+Goal:
+Make the platform feel intelligent and dynamic even during slow market periods.
+
+5. Maintain STRICT product tone
+   The AI should feel:
+
+* institutional
+* analytical
+* observant
+* disciplined
+
+NOT:
+
+* meme-y
+* chatty
+* over-humanized
+
+Continue keeping ALL customer-facing evolution isolated inside:
+PortalCustomerShell.tsx
+and customer-scoped components only.
+
+Keep /command frozen.

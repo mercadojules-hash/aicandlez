@@ -53,6 +53,7 @@ import { AIDisclaimerModal } from "../AIDisclaimerModal";
 // Pass 7V — brand logo used above search bar (replaces ticker chips row).
 import aiCandlezLogoHorizontal from "@assets/aicandlez-logo-horizontal-master_1779691403317.png";
 import { usePaperSignals, type OpportunityVM } from "../../hooks/usePaperSignals";
+import { toast } from "@/hooks/use-toast";
 import { calibrateRawConfidence } from "../../lib/conviction";
 import { useExecutionState } from "../../hooks/useExecutionState";
 import { usePaperTrades, STARTING_EQUITY } from "../../hooks/usePaperTrades";
@@ -5150,6 +5151,26 @@ export function PortalCustomerShell() {
           equity={paperStats.equity || STARTING_EQUITY}
           history={paperHistory}
           engine={engineStatus}
+          opportunities={opportunities}
+        />
+
+        {/* Phase 4 — AI Personality Narrator. Conversational intelligence
+            strip rotates contextual observations derived from live engine
+            + opportunity state. Customer-only. Sparse, premium, never
+            chatty. */}
+        <AINarratorStrip
+          opportunities={opportunities}
+          engine={engineStatus}
+          history={paperHistory}
+          openCount={openTrades.length}
+        />
+
+        {/* Phase 4 — Notification Intelligence dispatcher. Headless;
+            mounts toast watchers for ELITE signals, conviction threshold
+            crossings, and high-volatility regime shifts. Customer-only. */}
+        <SignalNotificationDispatcher
+          opportunities={opportunities}
+          engine={engineStatus}
         />
 
         {/* Battlefield body — dual crypto matrix on the left,
@@ -5246,12 +5267,13 @@ export function PortalCustomerShell() {
 /* file, so the panel never appears on the operator surface.                  */
 /* ──────────────────────────────────────────────────────────────────────── */
 function TodaysIntelligencePanel({
-  todayPnl, equity, history, engine,
+  todayPnl, equity, history, engine, opportunities,
 }: {
   todayPnl: number;
   equity:   number;
   history:  ReadonlyArray<{ symbol: string; display: string; pnl: number; pnlPct: number; closedAt: number }>;
   engine:   EngineLite | undefined;
+  opportunities: ReadonlyArray<OpportunityVM>;
 }) {
   const today = useMemo(() => {
     const now    = new Date();
@@ -5267,8 +5289,26 @@ function TodaysIntelligencePanel({
       (acc, h) => (acc && acc.pnl >= h.pnl) ? acc : { display: h.display, pnl: h.pnl, pnlPct: h.pnlPct },
       null,
     );
-    return { count: closedToday.length, wins: wins.length, losses: losses.length, realized, winRate, best };
+    // Phase 4 storytelling: trailing win streak from most-recent closes.
+    let streak = 0;
+    const ordered = [...history].sort((a, b) => b.closedAt - a.closedAt);
+    for (const h of ordered) {
+      if (h.pnl > 0) streak++; else break;
+    }
+    return {
+      count: closedToday.length, wins: wins.length, losses: losses.length,
+      realized, winRate, best, streak,
+    };
   }, [history]);
+
+  // Phase 4 — highest-conviction opportunity right now (across all opps).
+  const topConv = useMemo(() => {
+    if (!opportunities.length) return null;
+    return opportunities.reduce<OpportunityVM>((acc, o) =>
+      (o.convictionScore ?? 0) > (acc.convictionScore ?? 0) ? o : acc,
+      opportunities[0],
+    );
+  }, [opportunities]);
 
   const signalsActive = engine?.signalsGenerated ?? 0;
   const engineLive    = !!engine?.running;
@@ -5339,8 +5379,258 @@ function TodaysIntelligencePanel({
         color={engineLive ? T.NEON : T.TEXT_2}
         pulse={engineLive}
       />
+
+      {/* Phase 4 — emotional performance storytelling caption. Spans the
+          full grid width via `gridColumn: 1 / -1`. Composes 2-3 narrative
+          beats: opportunities scanned · highest conviction · win streak. */}
+      <div style={{
+        gridColumn: "1 / -1",
+        marginTop: 4,
+        paddingTop: 8,
+        borderTop: `1px dashed ${T.NEON}22`,
+        display: "flex", flexWrap: "wrap", gap: "4px 14px",
+        fontSize: 10, fontWeight: 600, letterSpacing: "0.06em",
+        color: T.TEXT_2, lineHeight: 1.5,
+      }}>
+        {opportunities.length > 0 && (
+          <span>
+            <span style={{ color: T.TEXT_3, letterSpacing: "0.16em", fontWeight: 800 }}>
+              AI HAS DETECTED{" "}
+            </span>
+            <span style={{ color: T.NEON, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+              {opportunities.length}
+            </span>
+            <span style={{ color: T.TEXT_2 }}> opportunities today</span>
+          </span>
+        )}
+        {topConv && (
+          <span>
+            <span style={{ color: T.TEXT_3, letterSpacing: "0.16em", fontWeight: 800 }}>
+              HIGHEST CONVICTION{" "}
+            </span>
+            <span style={{ color: T.NEON, fontWeight: 800 }}>{topConv.symbol}</span>
+            <span style={{ color: T.TEXT_2 }}> · </span>
+            <span style={{ color: T.NEON, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+              {Math.round(topConv.convictionScore ?? 0)}
+            </span>
+          </span>
+        )}
+        {today.streak >= 2 && (
+          <span>
+            <span style={{ color: T.TEXT_3, letterSpacing: "0.16em", fontWeight: 800 }}>
+              WIN STREAK{" "}
+            </span>
+            <span style={{ color: T.NEON, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+              {today.streak}
+            </span>
+          </span>
+        )}
+      </div>
     </section>
   );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Phase 4 — AINarratorStrip                                                  */
+/* Conversational AI personality. Rotates contextual observations derived     */
+/* from live engine + opportunity state. Institutional tone — analytical,    */
+/* observant, disciplined. Never meme-y, never chatty. Customer-only.         */
+/* ──────────────────────────────────────────────────────────────────────── */
+function AINarratorStrip({
+  opportunities, engine, history, openCount,
+}: {
+  opportunities: ReadonlyArray<OpportunityVM>;
+  engine:        EngineLite | undefined;
+  history:       ReadonlyArray<{ symbol: string; display: string; pnl: number; pnlPct: number; closedAt: number }>;
+  openCount:     number;
+}) {
+  const lines = useMemo<string[]>(() => {
+    const out: string[] = [];
+    if (!engine?.running) {
+      out.push("AI engine warming up — synchronizing market data.");
+      return out;
+    }
+    // Highest conviction story
+    const top = [...opportunities].sort((a, b) => (b.convictionScore ?? 0) - (a.convictionScore ?? 0))[0];
+    if (top && (top.convictionScore ?? 0) >= 80) {
+      out.push(`AI sees strong conviction on ${top.symbol} — ${Math.round(top.convictionScore ?? 0)} across multiple timeframes.`);
+    } else if (top && (top.convictionScore ?? 0) >= 65) {
+      out.push(`AI tracking ${top.symbol} — conviction building toward confirmation.`);
+    }
+    // Volatility / regime
+    const longCount  = opportunities.filter(o => o.direction === "LONG").length;
+    const shortCount = opportunities.filter(o => o.direction === "SHORT").length;
+    if (longCount > 0 || shortCount > 0) {
+      if (longCount > shortCount * 1.8) {
+        out.push("Market regime shifting toward risk-on behavior.");
+      } else if (shortCount > longCount * 1.8) {
+        out.push("Defensive posture — sellers pressing across majors.");
+      } else {
+        out.push("Two-sided tape — selective opportunities forming on both sides.");
+      }
+    }
+    // Recent close storytelling
+    const recent = history[0];
+    if (recent && Date.now() - recent.closedAt < 30 * 60 * 1000) {
+      if (recent.pnl > 0) {
+        out.push(`AI closed ${recent.display} in profit (+${recent.pnlPct.toFixed(2)}%).`);
+      } else {
+        out.push(`AI exited ${recent.display} — risk discipline maintained.`);
+      }
+    }
+    // Active execution
+    if (openCount > 0) {
+      out.push(`${openCount} active position${openCount > 1 ? "s" : ""} under management.`);
+    }
+    // Quality fallback
+    if (out.length === 0) {
+      out.push("AI scanning — awaiting high-conviction setup.");
+    }
+    return out;
+  }, [opportunities, engine?.running, history, openCount]);
+
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    if (lines.length <= 1) return;
+    const t = setInterval(() => setIdx(i => (i + 1) % lines.length), 6000);
+    return () => clearInterval(t);
+  }, [lines.length]);
+  const current = lines[Math.min(idx, lines.length - 1)] ?? "";
+
+  return (
+    <div
+      aria-label="AI narrator"
+      aria-live="polite"
+      style={{
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "8px 14px",
+        background: "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(102,255,102,0.025) 100%)",
+        border: `1px solid ${T.NEON}1f`,
+        borderRadius: 6,
+        fontFamily: T.FONT_MONO,
+        position: "relative", overflow: "hidden",
+      }}
+    >
+      <span aria-hidden style={{
+        width: 6, height: 6, borderRadius: "50%",
+        background: T.NEON,
+        boxShadow: `0 0 8px ${T.NEON}cc`,
+        animation: "ai-narr-pulse 1.8s ease-in-out infinite",
+        flexShrink: 0,
+      }} />
+      <span style={{
+        fontSize: 9, fontWeight: 800, letterSpacing: "0.22em",
+        color: T.TEXT_3, textTransform: "uppercase", flexShrink: 0,
+      }}>
+        AI · NARRATOR
+      </span>
+      <span
+        key={current}
+        style={{
+          fontSize: 12, fontWeight: 600, letterSpacing: "0.02em",
+          color: T.TEXT_2, lineHeight: 1.35,
+          animation: "ai-narr-in 380ms ease-out both",
+          minWidth: 0,
+        }}
+      >
+        {current}
+      </span>
+      <style>{`
+        @keyframes ai-narr-pulse {
+          0%,100% { opacity: 1;   transform: scale(1); }
+          50%     { opacity: 0.4; transform: scale(0.85); }
+        }
+        @keyframes ai-narr-in {
+          0%   { opacity: 0; transform: translateY(3px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Phase 4 — SignalNotificationDispatcher                                     */
+/* Headless. Watches engine + opportunity state and dispatches sparse,        */
+/* premium toasts for ELITE signal detection, conviction threshold            */
+/* crossings (80, 90), and direction flips. Heavily deduped + cooldown'd     */
+/* per symbol so the stream stays quiet enough to feel premium.               */
+/* ──────────────────────────────────────────────────────────────────────── */
+function SignalNotificationDispatcher({
+  opportunities, engine,
+}: {
+  opportunities: ReadonlyArray<OpportunityVM>;
+  engine:        EngineLite | undefined;
+}) {
+  // Per-symbol last-notified state. Module-scoped via ref so it survives
+  // re-renders without leaking memory across pages.
+  const stateRef = useRef<Map<string, { conv: number; dir: string; lastAt: number }>>(new Map());
+  const bootedRef = useRef(false);
+
+  useEffect(() => {
+    if (!engine?.running) return;
+    // Skip the first pass so we don't blast a wall of toasts on mount.
+    if (!bootedRef.current) {
+      bootedRef.current = true;
+      for (const o of opportunities) {
+        stateRef.current.set(o.symbol, {
+          conv: o.convictionScore ?? 0,
+          dir:  o.direction,
+          lastAt: 0,
+        });
+      }
+      return;
+    }
+    const now = Date.now();
+    const COOLDOWN_MS = 90_000; // 90s per-symbol cooldown
+    let emitted = 0;
+    const MAX_PER_TICK = 2;     // never spam more than 2 toasts per refresh
+
+    for (const o of opportunities) {
+      if (emitted >= MAX_PER_TICK) break;
+      const prev = stateRef.current.get(o.symbol);
+      const conv = o.convictionScore ?? 0;
+      const dir  = o.direction;
+      if (!prev) {
+        stateRef.current.set(o.symbol, { conv, dir, lastAt: 0 });
+        continue;
+      }
+      const sinceLast = now - prev.lastAt;
+      if (sinceLast < COOLDOWN_MS) {
+        stateRef.current.set(o.symbol, { conv, dir, lastAt: prev.lastAt });
+        continue;
+      }
+
+      let title: string | null = null;
+      let description = "";
+
+      // ELITE: crossed 90
+      if (prev.conv < 90 && conv >= 90) {
+        title = `${o.symbol} · ELITE signal detected`;
+        description = `Conviction ${Math.round(conv)} · ${dir}`;
+      }
+      // STRONG: crossed 80 (but not 90 in same tick)
+      else if (prev.conv < 80 && conv >= 80) {
+        title = `${o.symbol} crossed ${Math.round(conv)} conviction`;
+        description = `AI tracking ${dir} setup`;
+      }
+      // Direction flip on a high-conviction name
+      else if (prev.dir !== dir && conv >= 70) {
+        title = `${o.symbol} flipped ${dir}`;
+        description = `Conviction holding at ${Math.round(conv)}`;
+      }
+
+      if (title) {
+        toast({ title, description });
+        emitted++;
+        stateRef.current.set(o.symbol, { conv, dir, lastAt: now });
+      } else {
+        stateRef.current.set(o.symbol, { conv, dir, lastAt: prev.lastAt });
+      }
+    }
+  }, [opportunities, engine?.running]);
+
+  return null;
 }
 
 function TIMetric({

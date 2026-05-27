@@ -652,6 +652,36 @@ export function SignalRow({ spec, breakdown }: Props) {
     return lines.slice(0, 5);
   }, [breakdown, direction, conf]);
 
+  // ── Confidence history ring buffer (Phase 4) ───────────────────────────
+  // Captures the last 24 conviction samples per row so the drawer can show
+  // "trend strengthening vs weakening" without server support. Persists
+  // for the lifetime of this row instance — resets on remount, which is
+  // acceptable since the drawer is read-only/observational. Sampled at the
+  // 5s cadence of breakdown updates from the engine.
+  const confHistRef = useRef<number[]>([]);
+  useEffect(() => {
+    // Phase 4 micro-hardening: skip sampling entirely when insights are not
+    // available (admin /command rows during/after role hydration), so the
+    // operator surface incurs zero bookkeeping cost.
+    if (!insightsEnabled) return;
+    const buf = confHistRef.current;
+    if (buf[buf.length - 1] !== conf) {
+      buf.push(conf);
+      if (buf.length > 24) buf.shift();
+    }
+  }, [conf, insightsEnabled]);
+  const confHistory = confHistRef.current.slice();
+  const confTrend: "STRENGTHENING" | "WEAKENING" | "STEADY" = useMemo(() => {
+    if (confHistory.length < 4) return "STEADY";
+    const a = confHistory.slice(0, Math.ceil(confHistory.length / 2));
+    const b = confHistory.slice(Math.ceil(confHistory.length / 2));
+    const avg = (xs: number[]) => xs.reduce((s, n) => s + n, 0) / xs.length;
+    const delta = avg(b) - avg(a);
+    if (delta >= 2)  return "STRENGTHENING";
+    if (delta <= -2) return "WEAKENING";
+    return "STEADY";
+  }, [confHistory]);
+
   // Signal Lifecycle stages — derived deterministically from breakdown.
   // DETECTED is always reached when a row renders. CONFIRMED requires MTF
   // alignment. EXECUTING requires the engine to mark this signal as
@@ -889,6 +919,8 @@ export function SignalRow({ spec, breakdown }: Props) {
         insightLines={insightLines}
         lifecycle={lifecycle}
         symbol={spec.label}
+        confHistory={confHistory}
+        confTrend={confTrend}
       />
     )}
     </div>
@@ -901,6 +933,7 @@ export function SignalRow({ spec, breakdown }: Props) {
 // reveal feels intentional, not noisy. Admin /command never mounts this.
 function SignalInsightsDrawer({
   direction, confidence, confColor, dirColor, insightLines, lifecycle, symbol,
+  confHistory, confTrend,
 }: {
   direction:    "LONG" | "SHORT";
   confidence:   number;
@@ -909,7 +942,25 @@ function SignalInsightsDrawer({
   insightLines: ReadonlyArray<{ tone: "bull" | "bear" | "neutral"; text: string }>;
   lifecycle:    ReadonlyArray<{ key: string; active: boolean; done: boolean }>;
   symbol:       string;
+  confHistory:  ReadonlyArray<number>;
+  confTrend:    "STRENGTHENING" | "WEAKENING" | "STEADY";
 }) {
+  const trendColor =
+    confTrend === "STRENGTHENING" ? N.LONG :
+    confTrend === "WEAKENING"     ? N.SHORT :
+                                    N.TEXT_2;
+  // Sparkline geometry — fixed width, plotted across last N conf samples.
+  const SPARK_W = 120;
+  const SPARK_H = 28;
+  const sparkPts = confHistory.length >= 2 ? confHistory : [confidence, confidence];
+  const sMin = Math.min(...sparkPts, 0);
+  const sMax = Math.max(...sparkPts, 100);
+  const sRange = Math.max(sMax - sMin, 1);
+  const sparkPath = sparkPts.map((c, i) => {
+    const x = (i / (sparkPts.length - 1 || 1)) * SPARK_W;
+    const y = SPARK_H - ((c - sMin) / sRange) * SPARK_H;
+    return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
   const toneColor = (t: "bull" | "bear" | "neutral") =>
     t === "bull" ? N.LONG : t === "bear" ? N.SHORT : N.TEXT_2;
   return (
@@ -932,6 +983,40 @@ function SignalInsightsDrawer({
           50%     { box-shadow: 0 0 0 4px transparent; }
         }
       `}</style>
+
+      {/* Phase 4 — conviction trend strip. Compact sparkline of last 24
+          confidence samples + STRENGTHENING/WEAKENING/STEADY chip. */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10, marginBottom: 12,
+        paddingBottom: 10, borderBottom: `1px dashed ${N.BORDER}`,
+      }}>
+        <span style={{
+          fontSize: 9.5, fontWeight: 800, letterSpacing: "0.22em",
+          color: N.TEXT_3, textTransform: "uppercase",
+        }}>
+          CONVICTION
+        </span>
+        <svg width={SPARK_W} height={SPARK_H} style={{ display: "block" }}>
+          <path d={sparkPath} fill="none" stroke={trendColor}
+            strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round"
+            style={{ filter: `drop-shadow(0 0 3px ${trendColor}90)` }} />
+        </svg>
+        <span style={{
+          fontSize: 9, fontWeight: 800, letterSpacing: "0.18em",
+          color: trendColor, padding: "2px 6px", borderRadius: 3,
+          background: `${trendColor}14`, border: `1px solid ${trendColor}50`,
+          textShadow: `0 0 4px ${trendColor}50`,
+        }}>
+          {confTrend}
+        </span>
+        <span style={{
+          marginLeft: "auto",
+          fontSize: 9, fontWeight: 700, letterSpacing: "0.14em",
+          color: N.TEXT_3,
+        }}>
+          {confHistory.length}/24 SAMPLES
+        </span>
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}
            className="cd-insights-grid">
