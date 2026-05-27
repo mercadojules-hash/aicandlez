@@ -4616,7 +4616,23 @@ export function PortalCustomerShell() {
   // promotion). Returning null lets the parent's role-aware
   // re-render swap in the correct shell on the next tick without
   // flashing customer affordances to an operator.
-  if (isAdmin) {
+  // DEV-only escape hatch — when Portal.tsx intentionally renders the
+  // customer shell for an admin via `?previewCustomer=1`, suppress the
+  // defense-in-depth refusal so the cinematic battlefield is visible
+  // in dev preview. Compile-time gated by `import.meta.env.DEV`, so
+  // production bundle still hard-refuses admin sessions here.
+  const isDevCustomerPreview =
+    import.meta.env.DEV &&
+    typeof window !== "undefined" &&
+    (() => {
+      try {
+        return new URLSearchParams(window.location.search).get("previewCustomer") === "1";
+      } catch {
+        return false;
+      }
+    })();
+
+  if (isAdmin && !isDevCustomerPreview) {
     if (typeof console !== "undefined") {
       // Surface the refusal so a real Portal.tsx regression is
       // visible in dev/QA rather than silently rendering blank.

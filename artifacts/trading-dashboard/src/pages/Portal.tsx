@@ -29,6 +29,38 @@ import AdminPortalLegacy from "./portal/AdminPortalLegacy";
 const USE_LEGACY_ADMIN: boolean =
   (import.meta.env.VITE_ADMIN_PORTAL_LEGACY as string | undefined) === "true";
 
+/**
+ * DEV-ONLY customer-shell preview bypass.
+ *
+ * When running `import.meta.env.DEV === true` AND the current URL carries
+ * `?previewCustomer=1`, /portal renders `PortalCustomerShell` regardless
+ * of the signed-in user's role. This lets an admin operator visually
+ * verify the customer cinematic battlefield composition in a dev
+ * session without needing to sign out / sign in as a non-admin test
+ * user.
+ *
+ * Production safety:
+ *  • Compile-time gated by `import.meta.env.DEV` — Vite strips the
+ *    entire branch from the prod bundle (dead code elimination).
+ *  • Does NOT touch real auth: `useUserRole()` still resolves the
+ *    actual role from `/api/auth/me`, server-side endpoints still
+ *    enforce role checks, no Clerk session is mutated.
+ *  • Does NOT affect /command — that route is rendered by a separate
+ *    page component.
+ *  • Read-only flag: nothing is persisted; refresh without the query
+ *    param restores the normal admin → AdminPortalShell dispatch.
+ */
+function shouldForceCustomerPreview(): boolean {
+  if (!import.meta.env.DEV) return false;
+  if (typeof window === "undefined") return false;
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    return sp.get("previewCustomer") === "1";
+  } catch {
+    return false;
+  }
+}
+
 const N = {
   BG:         "#000000",
   BORDER:     "rgba(255,255,255,0.08)",
@@ -56,14 +88,44 @@ export default function Portal() {
     return gateTimedOut ? <SkeletonChrome /> : <ResolvingSession />;
   }
 
-  if (isAdmin) {
+  // DEV-only customer preview bypass — see `shouldForceCustomerPreview`
+  // above for the full safety contract. Strictly dead-code in prod.
+  const forceCustomerPreview = shouldForceCustomerPreview();
+
+  if (isAdmin && !forceCustomerPreview) {
     return USE_LEGACY_ADMIN ? <AdminPortalLegacy /> : <AdminPortalShell />;
   }
 
   return (
     <PaperTradesProvider>
+      {forceCustomerPreview && import.meta.env.DEV && <DevCustomerPreviewBadge />}
       <PortalCustomerShell />
     </PaperTradesProvider>
+  );
+}
+
+/**
+ * Floating dev-only badge that appears whenever the customer-shell
+ * preview bypass is active. Visible reminder that the rendered surface
+ * is NOT the real role-resolved view, so it cannot be mistaken for a
+ * production regression. Dead-stripped in prod via `import.meta.env.DEV`.
+ */
+function DevCustomerPreviewBadge() {
+  return (
+    <div style={{
+      position: "fixed", top: 8, right: 8, zIndex: 9999,
+      padding: "6px 12px",
+      border: "1px solid rgba(255,193,7,0.55)",
+      borderRadius: 4,
+      background: "rgba(255,193,7,0.10)",
+      color: "#FFC107",
+      fontFamily: "JetBrains Mono, ui-monospace, monospace",
+      fontSize: 10, fontWeight: 800, letterSpacing: "0.20em",
+      textShadow: "0 0 6px rgba(255,193,7,0.55)",
+      pointerEvents: "none",
+    }}>
+      ● DEV · CUSTOMER PREVIEW
+    </div>
   );
 }
 
