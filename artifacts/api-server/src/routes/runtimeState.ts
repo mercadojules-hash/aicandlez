@@ -110,7 +110,42 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
     // Reuse Task #197's hydration path. One poll per row; failures
     // degrade per-connection (loadBalanceForRow returns ok=false with
     // an error field — it never throws here).
-    const snapshots = await Promise.all(rows.map(r => loadBalanceForRow(userId, r)));
+    // Task #205 — per-exchange observability. Wrap each row's balance
+    // poll so we emit a structured [RUNTIME_BALANCE_REFRESH] /
+    // [RUNTIME_BALANCE_FAILED] log carrying { userId, exchange,
+    // adapter, equityUsd, healthy, latencyMs }. The aggregate
+    // [RUNTIME_HYDRATED] line below still summarizes the whole
+    // request; these per-row lines let us trace "which adapter
+    // produced what equity for which user" without re-deriving from
+    // upstream DB columns.
+    const snapshots = await Promise.all(rows.map(async (r) => {
+      const t1 = Date.now();
+      const snap = await loadBalanceForRow(userId, r);
+      const latencyMs = Date.now() - t1;
+      if (snap.ok) {
+        logger.info({
+          tag:       "RUNTIME_BALANCE_REFRESH",
+          userId,
+          exchange:  r.exchange,
+          adapter:   r.exchange,
+          equityUsd: snap.totalEquityUSD,
+          healthy:   true,
+          latencyMs,
+        }, "[RUNTIME_BALANCE_REFRESH] per-exchange poll ok");
+      } else {
+        logger.warn({
+          tag:       "RUNTIME_BALANCE_FAILED",
+          userId,
+          exchange:  r.exchange,
+          adapter:   r.exchange,
+          equityUsd: 0,
+          healthy:   false,
+          error:     snap.error ?? null,
+          latencyMs,
+        }, "[RUNTIME_BALANCE_FAILED] per-exchange poll failed");
+      }
+      return snap;
+    }));
     const connectedExchanges = rows.map((r, i) => shapeConnection(r, snapshots[i]!));
 
     const totalEquityUSD = connectedExchanges
@@ -158,17 +193,19 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
     };
 
     logger.info({
-      tag:           "RUNTIME_STATE",
-      event:         "ok",
+      tag:             "RUNTIME_HYDRATED",
       userId,
       mode,
       activeExchange,
+      runtime:         mode === "live" ? (activeExchange ?? "paper") : "paper",
+      equityUsd:       totalEquityUSD,
+      healthy:         liveReady,
       connectionCount: connectedExchanges.length,
-      healthyLive:   healthyLive.length,
+      healthyLive:     healthyLive.length,
       autoPromoted,
       liveReady,
-      latencyMs:     Date.now() - t0,
-    }, "[RUNTIME_STATE] aggregator ok");
+      latencyMs:       Date.now() - t0,
+    }, "[RUNTIME_HYDRATED] aggregator ok");
 
     res.json(payload);
   } catch (err) {

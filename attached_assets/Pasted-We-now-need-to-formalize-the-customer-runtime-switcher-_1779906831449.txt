@@ -1,0 +1,179 @@
+We now need to formalize the customer runtime switcher UX and eliminate the remaining ambiguity between PAPER mode and connected exchanges.
+
+GOAL
+
+After a subscriber connects one or more exchanges (Coinbase, Kraken, future exchanges), the customer portal must visibly expose runtime-selection buttons/chips so the user can explicitly switch account context.
+
+This becomes the canonical runtime architecture for all future exchange integrations.
+
+REQUIRED BEHAVIOR
+
+1. Runtime switcher row
+
+Add a persistent runtime switcher in the CUSTOMER portal header:
+
+[PAPER] [COINBASE] [KRAKEN]
+
+Only show exchanges that are:
+
+* connected
+* authenticated
+* healthy
+* balance-hydrated successfully
+
+Examples:
+
+Only Coinbase connected:
+[PAPER] [COINBASE]
+
+Coinbase + Kraken connected:
+[PAPER] [COINBASE] [KRAKEN]
+
+2. Runtime selection behavior
+
+Selecting a runtime must immediately re-derive:
+
+* equity
+* balances
+* account hero
+* mode labels
+* AI status labels
+* trade sizing
+* liquidity guard calculations
+* account telemetry
+* execution context
+
+Examples:
+
+PAPER:
+
+* simulated equity
+* paper trades
+* paper counters
+* paper PnL
+
+COINBASE:
+
+* real Coinbase balances/equity
+* LIVE: COINBASE labels
+* Coinbase-derived sizing
+* Coinbase liquidity context
+
+KRAKEN:
+
+* real Kraken balances/equity
+* LIVE: KRAKEN labels
+* Kraken-derived sizing
+* Kraken liquidity context
+
+3. Runtime persistence
+
+Persist selected runtime in:
+
+user_settings.active_runtime_exchange
+
+Allowed values:
+
+* paper
+* coinbase
+* kraken
+
+Future-safe for additional exchanges.
+
+4. Runtime hydration
+
+When switching runtimes:
+
+* invalidate runtime query immediately
+* refetch balances immediately
+* no manual refresh required
+* optimistic UI acceptable
+* loading state acceptable
+* stale balance fallback NOT acceptable
+
+5. SAFETY RULES (CRITICAL)
+
+Switching runtime ONLY changes account context.
+
+It must NOT:
+
+* auto-enable live execution
+* auto-arm execution
+* auto-place orders
+* bypass risk gates
+* bypass liquidity guard
+* bypass ARM LIVE
+
+LIVE execution still requires:
+
+* ARM LIVE
+* runtime_not_armed protections
+* CUSTOMER_LIVE_EXECUTION_ENABLED gate
+* kill-switch pass
+* explicit execution path
+
+6. UI REQUIREMENTS
+
+* active runtime highlighted neon green
+* inactive chips dimmed
+* mobile responsive
+* mounted ONLY on customer portal
+* admin shell remains BYTE-IDENTICAL
+* no runtime switcher in admin surfaces
+
+7. Important fix to eliminate ambiguity
+
+Current issue:
+Users can successfully connect Coinbase while still visually remaining in PAPER mode with fake $100,000 equity shown simultaneously with LIVE labels.
+
+The runtime switcher + runtime hydration must eliminate this ambiguity completely by making runtime state:
+
+* explicit
+* visible
+* user-controlled
+* deterministic
+
+8. Observability
+
+Add structured logs:
+
+[RUNTIME_SELECTED]
+[RUNTIME_HYDRATED]
+[RUNTIME_BALANCE_REFRESH]
+[RUNTIME_BALANCE_FAILED]
+
+Include:
+
+* userId
+* runtime
+* exchange
+* equityUsd
+* healthy flag
+* hydration latency
+* source adapter
+
+9. Architectural constraints
+
+Maintain the locked invariant:
+
+* admin runtime remains isolated
+* customer runtime remains isolated
+* no admin/customer execution bleed
+* runtime switcher affects ONLY customer surfaces
+
+10. Important implementation note
+
+Do NOT hardcode exchange names in rendering logic.
+
+The switcher should derive from:
+runtimeState.connectedExchanges
+
+This must scale cleanly for:
+
+* Binance
+* Bybit
+* OKX
+* Robinhood
+* Interactive Brokers
+* future adapters
+  without additional UI rewrites.

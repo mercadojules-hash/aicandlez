@@ -317,6 +317,21 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
       .set(patch)
       .where(eq(userSettingsTable.userId, userId))
       .returning();
+    // Task #205 — runtime selection observability. Emit a structured
+    // [RUNTIME_SELECTED] line whenever the customer flips
+    // `activeRuntimeExchange` (paper / exchange id / cleared). Paired
+    // with the [RUNTIME_HYDRATED] aggregator log on the subsequent
+    // GET /user/runtime-state so we can correlate "user picked X" →
+    // "aggregator resolved Y" without re-deriving from row diffs.
+    if ("activeRuntimeExchange" in patch) {
+      const chosen = patch.activeRuntimeExchange;
+      req.log.info({
+        tag:      "RUNTIME_SELECTED",
+        userId,
+        runtime:  chosen === null ? "auto" : chosen,
+        exchange: chosen === null || chosen === "paper" ? null : chosen,
+      }, "[RUNTIME_SELECTED] customer switched runtime");
+    }
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "PUT /user/settings failed");
