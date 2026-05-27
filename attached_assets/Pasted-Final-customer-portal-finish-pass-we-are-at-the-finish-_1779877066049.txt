@@ -1,0 +1,126 @@
+Final customer portal finish pass — we are at the finish line. Please make these targeted fixes only. No architecture changes.
+
+Scope:
+
+* Customer portal only
+* PortalCustomerShell / customer-scoped components only
+* /command untouched
+* Preserve the current visual layout
+
+1. Add trade-size selection before AI trading can run
+
+Before a customer enables AI trading, they need to choose how much the AI is allowed to trade per position.
+
+Add a clear “Trade Size” control near the ENABLE LIVE AI TRADING bar or inside that activation flow.
+
+Required preset options:
+
+* $10
+* $20
+* $50
+* $100
+
+Default:
+
+* $10 for starter/free testing
+
+Behavior:
+
+* Starter plan should allow only 3 consecutive/open AI trades
+* Pro can use the existing higher plan limits
+* Trade size must be checked against available equity/liquidity before allowing new trades
+
+Important risk rule:
+The AI must freeze/stop opening new positions BEFORE liquidity is depleted.
+
+Add a liquidity cushion:
+
+* available cash must cover:
+  trade size × remaining allowed open slots
+  plus estimated fees
+  plus a safety cushion
+* if available liquidity is too low:
+  block new entries
+  show status:
+  “LIQUIDITY PROTECTED”
+  “AI paused new entries to preserve fee/cash cushion”
+* existing positions can still be monitored/closed according to current logic
+
+This is critical for trust. The AI should never spend the user down to zero.
+
+2. Fix HIGHEST LIVE CONFIDENCE calculation
+
+Current bug:
+The HIGHEST LIVE CONFIDENCE module is still showing the wrong asset/value.
+
+Example:
+
+* PEPE is visibly 94 in the battlefield
+* HIGHEST LIVE CONFIDENCE shows NEAR 55
+
+Required behavior:
+The module must ALWAYS display the maximum conviction from ALL active opportunities shown in the battlefield.
+
+Use the same final rendered opportunity source as the visible TOP 30 CRYPTOS and ALTS & MEMECOINS rows.
+
+It must scan across:
+
+* crypto column
+* alts/memecoins column
+* longs
+* shorts
+
+Expected:
+If PEPE = 94 and it is highest:
+
+* display 94
+* display PEPE
+* display correct LONG/SHORT direction
+
+Do not use a separate filtered source that excludes memecoins/alts.
+Do not average.
+Do not use stale cached value.
+No throttled lag.
+
+This is the platform trust anchor and must match what users see below.
+
+3. Change the account number font
+
+Current issue:
+The $100,000.00 account number uses a font where the zeros have lines/slashes through them. I do not like that style for the customer account balance.
+
+Change the large account balance number font only.
+
+Goal:
+
+* clean premium financial number style
+* no slashed zeros
+* highly readable
+* still bold and institutional
+
+Keep the rest of the terminal typography intact if needed.
+Only adjust the customer account balance display font.
+
+4. Keep current wins intact
+
+Do not undo:
+
+* larger logo in LIVE AI strip
+* 1:1 intelligence modules
+* radar as second box
+* HIGHEST LIVE CONFIDENCE as first box
+* ENABLE LIVE AI TRADING strip
+* TOP 30 CRYPTOS / ALTS & MEMECOINS dominant headers
+* right rail ending after TRADE HISTORY
+* customer paper/live separation
+* /command isolation
+
+Verification checklist:
+
+* trade size selector appears before enabling AI trading
+* liquidity cushion blocks unsafe new entries
+* Starter max open trades = 3
+* HIGHEST LIVE CONFIDENCE matches the highest visible confidence row, including PEPE/alts/memecoins
+* account balance zeros no longer have slash/line styling
+* typecheck passes
+* /command untouched

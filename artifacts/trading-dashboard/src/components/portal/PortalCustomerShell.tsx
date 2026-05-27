@@ -45,6 +45,8 @@ import {
   CryptoAltsMemesPanel,
 } from "../command/institutional";
 import { N } from "../command/institutional/theme";
+import { CRYPTO_MAJORS_30, CRYPTO_ALTS_MEMES } from "../command/institutional/tickers";
+import { hashSymbol, resolveDirection } from "../command/institutional/signalUtils";
 import type { EngineStatus as InstitutionalEngineStatus } from "../command/types";
 import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts";
 import { PortalExchangeConnectModal } from "../PortalExchangeConnectModal";
@@ -3483,16 +3485,230 @@ function Divider({ prio }: { prio?: 2 | 3 } = {}) {
    conversion + activation control on the customer portal — the visual
    delta between OFF/ON must be unambiguous. */
 
+/* ── Trade size selector + liquidity cushion (Phase 8.5) ──────────────────
+ * Customers pick how much AI is allowed to deploy per entry BEFORE arming
+ * live trading. Selection persists per-browser via localStorage so it
+ * survives reloads. Sizes are intentionally small ($10–$100) so beta
+ * customers can stress-test multi-position behavior without putting real
+ * capital at risk on the first arming.
+ *
+ * Liquidity cushion (`computeLiquidityState`) projects the WORST-case
+ * cash demand if every remaining slot fills at the chosen size, plus an
+ * estimated maker/taker fee (0.5%) and a hard $20 / 5% safety cushion.
+ * If the user's projected available cash can't cover that, NEW entries
+ * are blocked at the UI ("LIQUIDITY PROTECTED") so the AI can never
+ * spend the account down to zero. Existing positions are unaffected —
+ * monitoring + closing logic runs normally.                              */
+const TRADE_SIZES_USD = [10, 20, 50, 100] as const;
+type TradeSizeUsd = typeof TRADE_SIZES_USD[number];
+const TRADE_SIZE_LS_KEY = "aicandlez.tradeSizeUsd";
+const DEFAULT_TRADE_SIZE_USD: TradeSizeUsd = 10;
+
+function readTradeSizeUsd(): TradeSizeUsd {
+  try {
+    const raw = window.localStorage.getItem(TRADE_SIZE_LS_KEY);
+    if (!raw) return DEFAULT_TRADE_SIZE_USD;
+    const n = Number(raw);
+    return (TRADE_SIZES_USD as readonly number[]).includes(n)
+      ? (n as TradeSizeUsd)
+      : DEFAULT_TRADE_SIZE_USD;
+  } catch {
+    return DEFAULT_TRADE_SIZE_USD;
+  }
+}
+
+/** Clamp any server-side `positionSizeUSD` down to the nearest supported
+ *  preset (always rounding DOWN so we never silently grow a customer's
+ *  per-entry notional). $20 stored server-side → $20 chip; $25 → $20;
+ *  $5 → $10 (smallest preset). Anything ≥$100 saturates at $100. */
+function clampToPreset(raw: unknown): TradeSizeUsd {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return DEFAULT_TRADE_SIZE_USD;
+  let best: TradeSizeUsd = TRADE_SIZES_USD[0];
+  for (const candidate of TRADE_SIZES_USD) {
+    if (n >= candidate) best = candidate;
+  }
+  return best;
+}
+
+function useTradeSizeUsd(): [TradeSizeUsd, (n: TradeSizeUsd) => void] {
+  // Bootstrap from localStorage first so the chip never flashes the
+  // default value while the network round-trip resolves. Server hydration
+  // overrides this once /user/settings responds.
+  const [size, setSize] = useState<TradeSizeUsd>(() => readTradeSizeUsd());
+
+  // Hydrate from server: `positionSizeUSD` is the authoritative SoT
+  // because it's the value the AI execution layer (server-side
+  // `liveUserExecution.ts` + tradingLoop) consults when sizing fills.
+  // localStorage is only a UX accelerator. We snap to the nearest preset
+  // so admin-set non-preset values don't strand the picker in a
+  // mismatched state. Cross-tab edits are still picked up on next mount.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await authFetch("/api/user/settings");
+        if (!res.ok) return;
+        const json = await res.json() as { positionSizeUSD?: unknown };
+        if (cancelled) return;
+        const snapped = clampToPreset(json.positionSizeUSD);
+        setSize(snapped);
+        try { window.localStorage.setItem(TRADE_SIZE_LS_KEY, String(snapped)); } catch { /* ignore */ }
+      } catch {
+        /* Settings fetch failures fall through to localStorage value —
+           the chip stays interactive and a later mutation will repair. */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const update = useCallback((n: TradeSizeUsd) => {
+    // Optimistic local update so the chip is instant; PUT in the
+    // background. The server is authoritative — if the PUT fails the
+    // next mount/hydrate will snap us back to the stored value.
+    setSize(n);
+    try { window.localStorage.setItem(TRADE_SIZE_LS_KEY, String(n)); } catch { /* ignore */ }
+    void authFetch("/api/user/settings", {
+      method:  "PUT",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ positionSizeUSD: n }),
+    }).catch(() => {
+      /* Network/transport failure — leave optimistic state in place;
+         the user can re-tap or the next hydrate will reconcile. */
+    });
+  }, []);
+
+  return [size, update];
+}
+
+interface LiquidityState {
+  /** Per-entry size selected by the customer (USD). */
+  tradeSize:      TradeSizeUsd;
+  /** Slots still available to the AI before hitting the plan cap. */
+  remainingSlots: number;
+  /** Estimated cash the AI would need to fill every remaining slot. */
+  required:       number;
+  /** Cash projected to remain after currently-open slots reserve capital. */
+  available:      number;
+  /** True when new entries must be blocked to preserve the safety cushion. */
+  blocked:        boolean;
+}
+
+function computeLiquidityState(
+  tradeSize: TradeSizeUsd,
+  openPaper: number,
+  slotCap:   number,
+  equityUsd: number,
+): LiquidityState {
+  const remainingSlots = Math.max(0, slotCap - openPaper);
+  // Worst-case fee envelope across remaining slots (round-trip ≈ 0.5%).
+  const fees   = tradeSize * remainingSlots * 0.005;
+  // Hard safety cushion: max(5% of projected deployment, $20 floor).
+  const safety = Math.max(20, tradeSize * remainingSlots * 0.05);
+  const required  = tradeSize * remainingSlots + fees + safety;
+  // Reserve capital already deployed in currently-open AI slots.
+  const reserved  = openPaper * tradeSize;
+  const available = Math.max(0, equityUsd - reserved);
+  const blocked   = remainingSlots > 0 && available < required;
+  return { tradeSize, remainingSlots, required, available, blocked };
+}
+
+function TradeSizeStrip({
+  value, onChange, disabled, liquidity,
+}: {
+  value:     TradeSizeUsd;
+  onChange:  (n: TradeSizeUsd) => void;
+  disabled:  boolean;
+  liquidity: LiquidityState;
+}) {
+  const subline = liquidity.blocked
+    ? `LIQUIDITY PROTECTED  ·  AI paused new entries to preserve fee/cash cushion`
+    : `AI risks up to $${liquidity.tradeSize} per entry  ·  ${liquidity.remainingSlots} slot${liquidity.remainingSlots === 1 ? "" : "s"} available  ·  cushion ${liquidity.available >= liquidity.required ? "OK" : "LOW"}`;
+  const sublineColor = liquidity.blocked
+    ? T.AMBER
+    : liquidity.available >= liquidity.required
+      ? "rgba(214,255,214,0.85)"
+      : T.AMBER;
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      gap: 16, padding: "10px 16px",
+      borderTop:    `1px solid ${N.BORDER}`,
+      borderLeft:   "none",
+      borderRight:  "none",
+      borderBottom: `1px solid ${N.BORDER_HI}`,
+      background: `linear-gradient(180deg, ${N.SURFACE_2} 0%, ${N.BG} 100%)`,
+      fontFamily: T.FONT_MONO,
+    }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+        <span style={{
+          fontSize: 10, fontWeight: 800, color: N.TEXT_2,
+          letterSpacing: "0.24em",
+        }}>
+          TRADE SIZE PER ENTRY
+        </span>
+        <span style={{
+          fontSize: 9.5, fontWeight: 700, color: sublineColor,
+          letterSpacing: "0.12em", whiteSpace: "nowrap",
+          overflow: "hidden", textOverflow: "ellipsis",
+        }}>
+          {subline}
+        </span>
+      </div>
+      <div role="radiogroup" aria-label="Trade size per entry" style={{
+        display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0,
+      }}>
+        {TRADE_SIZES_USD.map((n) => {
+          const active = n === value;
+          return (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              disabled={disabled}
+              onClick={() => { if (!disabled) onChange(n); }}
+              style={{
+                fontFamily: T.FONT_MONO, fontSize: 11, fontWeight: 800,
+                letterSpacing: "0.10em",
+                padding: "6px 12px",
+                minWidth: 56,
+                color:      active ? "#0A0A0A" : N.TEXT_1,
+                background: active ? T.NEON   : "rgba(102,255,102,0.06)",
+                border:     `1px solid ${active ? T.NEON : `${T.NEON}44`}`,
+                borderRadius: 3,
+                cursor:     disabled ? "not-allowed" : "pointer",
+                opacity:    disabled && !active ? 0.55 : 1,
+                boxShadow:  active ? `0 0 10px ${T.NEON}66` : "none",
+                transition: T.TX_FAST,
+              }}
+            >
+              ${n}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
-  engineOnline, openPaper, slotCap, onUpgrade,
+  engineOnline, openPaper, slotCap, onUpgrade, equityUsd,
 }: {
   engineOnline: boolean;
   openPaper:    number;
   slotCap:      number;
   onUpgrade:    () => void;
+  /** Current paper-sim equity — feeds the liquidity cushion projection. */
+  equityUsd:    number;
 }) {
   const { enabled, allowed, isAdmin, setEnabledAsync } = useAiTradingState();
   const engineLabel = engineOnline ? "AI ENGINE · ONLINE" : "AI ENGINE · WARMING UP";
+  const [tradeSize, setTradeSize] = useTradeSizeUsd();
+  const liquidity = useMemo(
+    () => computeLiquidityState(tradeSize, openPaper, slotCap, equityUsd),
+    [tradeSize, openPaper, slotCap, equityUsd],
+  );
 
   // ── AI Trading Disclaimer gate ────────────────────────────────────────────
   // Server-enforced via gate 0e in `placeLiveAutoOrderForUser`; this client
@@ -3600,6 +3816,14 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   }
 
   const setEnabled = (next: boolean): void => {
+    // Liquidity cushion gate — never let the customer arm new AI entries
+    // when projected cash can't cover the worst-case fill of every
+    // remaining slot at the chosen trade size. UI-side mirror of the
+    // intent enforced server-side by per-user capital checks; disabling
+    // still works freely so the customer can always pull out.
+    if (next && liquidity.blocked) {
+      return;
+    }
     // Eligibility/risk disclaimer must be accepted BEFORE we flip AI on.
     // Server-enforced (gate 0e) regardless; this is the UX wrapper that
     // surfaces the modal instead of letting orders silently reject.
@@ -3635,37 +3859,66 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   ) : null;
 
   // OFF state — saturated RED. Treat the whole bar as the CTA surface.
+  // Phase 8.5: when the liquidity cushion would be breached by enabling
+  // new entries, the bar flips to amber LIQUIDITY PROTECTED and the
+  // click handler becomes a no-op (server-side capital checks remain
+  // authoritative). Trade-size strip stays interactive so the user can
+  // pick a smaller size to clear the protection state.
   if (!enabled) {
+    const offTone   = liquidity.blocked ? T.AMBER : T.RED;
+    const offBgLow  = liquidity.blocked
+      ? "linear-gradient(90deg, rgba(255,176,32,0.22) 0%, rgba(255,176,32,0.12) 50%, rgba(255,176,32,0.22) 100%)"
+      : "linear-gradient(90deg, rgba(255,48,64,0.22) 0%, rgba(255,48,64,0.12) 50%, rgba(255,48,64,0.22) 100%)";
+    const offBgHi   = liquidity.blocked
+      ? "linear-gradient(90deg, rgba(255,176,32,0.32) 0%, rgba(255,176,32,0.20) 50%, rgba(255,176,32,0.32) 100%)"
+      : "linear-gradient(90deg, rgba(255,48,64,0.32) 0%, rgba(255,48,64,0.20) 50%, rgba(255,48,64,0.32) 100%)";
+    const offShadowLow = liquidity.blocked
+      ? "inset 0 0 24px rgba(255,176,32,0.108), 0 0 24px rgba(255,176,32,0.072)"
+      : "inset 0 0 24px rgba(255,48,64,0.108), 0 0 24px rgba(255,48,64,0.072)";
+    const offShadowHi  = liquidity.blocked
+      ? "inset 0 0 30px rgba(255,176,32,0.28), 0 0 32px rgba(255,176,32,0.22)"
+      : "inset 0 0 30px rgba(255,48,64,0.28), 0 0 32px rgba(255,48,64,0.22)";
     return (
       <>
+      <TradeSizeStrip
+        value={tradeSize}
+        onChange={setTradeSize}
+        disabled={false}
+        liquidity={liquidity}
+      />
       <button
         type="button"
         onClick={() => setEnabled(true)}
-        aria-label="Click to enable AI trading"
+        aria-label={liquidity.blocked
+          ? "Liquidity protection active — new AI entries blocked"
+          : "Click to enable AI trading"}
+        aria-disabled={liquidity.blocked}
         style={{
           width: "100%",
           appearance: "none",
           textAlign: "left",
-          cursor: "pointer",
+          cursor: liquidity.blocked ? "not-allowed" : "pointer",
           position: "relative",
           overflow: "hidden",
-          borderTop:    `1px solid ${T.RED}`,
-          borderBottom: `1px solid ${T.RED}`,
+          borderTop:    `1px solid ${offTone}`,
+          borderBottom: `1px solid ${offTone}`,
           borderLeft:   "none",
           borderRight:  "none",
-          background: "linear-gradient(90deg, rgba(255,48,64,0.22) 0%, rgba(255,48,64,0.12) 50%, rgba(255,48,64,0.22) 100%)",
-          boxShadow: "inset 0 0 24px rgba(255,48,64,0.108), 0 0 24px rgba(255,48,64,0.072)",
+          background: offBgLow,
+          boxShadow: offShadowLow,
           fontFamily: T.FONT_MONO,
           padding: 0,
           transition: T.TX_MED,
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "linear-gradient(90deg, rgba(255,48,64,0.32) 0%, rgba(255,48,64,0.20) 50%, rgba(255,48,64,0.32) 100%)";
-          e.currentTarget.style.boxShadow  = "inset 0 0 30px rgba(255,48,64,0.28), 0 0 32px rgba(255,48,64,0.22)";
+          if (liquidity.blocked) return;
+          e.currentTarget.style.background = offBgHi;
+          e.currentTarget.style.boxShadow  = offShadowHi;
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = "linear-gradient(90deg, rgba(255,48,64,0.22) 0%, rgba(255,48,64,0.12) 50%, rgba(255,48,64,0.22) 100%)";
-          e.currentTarget.style.boxShadow  = "inset 0 0 24px rgba(255,48,64,0.18), 0 0 24px rgba(255,48,64,0.12)";
+          if (liquidity.blocked) return;
+          e.currentTarget.style.background = offBgLow;
+          e.currentTarget.style.boxShadow  = offShadowLow;
         }}
       >
         {/* Subtle scan sweep — communicates "ready, awaiting your action". */}
@@ -3684,10 +3937,10 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
           gap: 24, padding: "12px 16px",
         }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-            <Power size={16} color={T.RED} />
+            <Power size={16} color={offTone} />
             <span style={{
-              fontSize: 11, color: T.RED, fontWeight: 800, letterSpacing: "0.20em",
-            }}>AI DISABLED</span>
+              fontSize: 11, color: offTone, fontWeight: 800, letterSpacing: "0.20em",
+            }}>{liquidity.blocked ? "AI PAUSED" : "AI DISABLED"}</span>
           </div>
           <div style={{
             display: "flex", flexDirection: "column", alignItems: "center",
@@ -3695,25 +3948,36 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
           }}>
             <span style={{
               color: "#fff", fontSize: 14, fontWeight: 800,
-              letterSpacing: T.TRACK_TITLE, textShadow: "0 0 8px rgba(255,48,64,0.27)",
+              letterSpacing: T.TRACK_TITLE,
+              textShadow: liquidity.blocked
+                ? "0 0 8px rgba(255,176,32,0.27)"
+                : "0 0 8px rgba(255,48,64,0.27)",
             }}>
-              TAP TO ACTIVATE AI TRADING
+              {liquidity.blocked ? "LIQUIDITY PROTECTED" : "TAP TO ACTIVATE AI TRADING"}
             </span>
             <span style={{
-              color: "rgba(255,210,210,0.85)", fontSize: 10, letterSpacing: T.TRACK_LABEL, marginTop: 2,
+              color: liquidity.blocked
+                ? "rgba(255,235,200,0.85)"
+                : "rgba(255,210,210,0.85)",
+              fontSize: 10, letterSpacing: T.TRACK_LABEL, marginTop: 2,
             }}>
-              {engineLabel}  ·  AI STANDS DOWN UNTIL YOU AUTHORIZE
+              {liquidity.blocked
+                ? "AI paused new entries to preserve fee/cash cushion"
+                : `${engineLabel}  ·  AI STANDS DOWN UNTIL YOU AUTHORIZE`}
             </span>
           </div>
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 10, flexShrink: 0,
-            fontSize: 11, color: "#fff", fontWeight: 700, letterSpacing: T.TRACK_TITLE,
+            fontSize: 11, color: liquidity.blocked ? "#0A0A0A" : "#fff",
+            fontWeight: 700, letterSpacing: T.TRACK_TITLE,
             padding: "6px 14px",
-            border: `1px solid ${T.RED}`,
-            background: T.RED,
-            boxShadow: "0 0 14px rgba(255,48,64,0.33)",
+            border: `1px solid ${offTone}`,
+            background: offTone,
+            boxShadow: liquidity.blocked
+              ? "0 0 14px rgba(255,176,32,0.33)"
+              : "0 0 14px rgba(255,48,64,0.33)",
           }}>
-            ACTIVATE →
+            {liquidity.blocked ? "PROTECTED" : "ACTIVATE →"}
           </div>
         </div>
       </button>
@@ -3728,6 +3992,17 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   // dominant visual message is the active green state.
   return (
     <>
+    {/* Trade size stays visible (read-only) while AI is armed so the
+        customer always sees the per-entry size their slots are sized to
+        and the live cushion health. Picker is disabled — to change size
+        the user must DISABLE first (intentional: prevents accidentally
+        re-sizing an in-flight position cohort). */}
+    <TradeSizeStrip
+      value={tradeSize}
+      onChange={setTradeSize}
+      disabled={true}
+      liquidity={liquidity}
+    />
     <section
       style={{
         position: "relative",
@@ -3771,9 +4046,13 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
             AI EXECUTION ARMED · MANAGING POSITIONS
           </span>
           <span style={{
-            color: "rgba(214,255,214,0.92)", fontSize: 10, letterSpacing: T.TRACK_LABEL, marginTop: 2,
+            color: liquidity.blocked ? T.AMBER : "rgba(214,255,214,0.92)",
+            fontSize: 10, letterSpacing: T.TRACK_LABEL, marginTop: 2,
           }}>
-            MAX POSITIONS {slotCap}  ·  {openPaper} OPEN
+            MAX POSITIONS {slotCap}  ·  {openPaper} OPEN  ·  ${tradeSize}/ENTRY
+            {liquidity.blocked
+              ? "  ·  LIQUIDITY PROTECTED · NEW ENTRIES PAUSED"
+              : ""}
           </span>
         </div>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
@@ -3971,7 +4250,19 @@ function MyAccountRailPaper({
       <div style={{ padding: "16px 16px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
         <span style={{ fontSize: 10, color: N.TEXT_3, letterSpacing: "0.24em", fontWeight: 700 }}>EQUITY</span>
         <span style={{
-          fontSize: 38, fontWeight: 900, color: N.TEXT_0,
+          /* Phase 8.5 — account-balance font swap. Replaces the
+             default terminal mono (slashed-zero glyph) with a clean
+             premium financial sans so the customer's primary account
+             number reads as bank/brokerage statement, not engine
+             telemetry. Tabular-nums keeps digits monospaced; the
+             explicit `'zero' 0` feature flag disables the slashed-zero
+             OpenType variant on fonts that ship it (e.g. system mono
+             fallbacks on certain Linux installs). Scope is intentional
+             — every other terminal number stays on N.FONT_MONO. */
+          fontFamily: "'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
+          fontVariantNumeric: "tabular-nums lining-nums",
+          fontFeatureSettings: "'tnum' 1, 'lnum' 1, 'zero' 0, 'ss01' 0",
+          fontSize: 38, fontWeight: 800, color: N.TEXT_0,
           letterSpacing: "-0.025em", lineHeight: 1,
           textShadow: pctToday !== 0 ? `0 0 14px ${curveColor}44` : "none",
         }}>
@@ -5303,6 +5594,7 @@ export function PortalCustomerShell() {
           openPaper={openTrades.length}
           slotCap={plan === "pro" ? 12 : plan === "starter" ? 3 : 3}
           onUpgrade={() => setUpgrade(true)}
+          equityUsd={paperStats.equity || STARTING_EQUITY}
         />
 
         {/* Battlefield body — dual crypto matrix on the left,
@@ -6087,39 +6379,48 @@ function LiveIntelligenceBand({
     const longPct  = Math.round((longs  / flowDenom) * 100);
     const shortPct = 100 - longPct;
 
-    /* ── GLOBAL AI CONFIDENCE — trust anchor.
-       Must ALWAYS equal the highest AI confidence currently rendered
-       anywhere in the battlefield. Reads BOTH sources:
-         (a) opportunities[].convictionScore  (calibrated promoted set)
-         (b) engine.symbolBreakdowns[*].avgConfidence  (raw per-ticker
-             confidence the SignalsPanel rows surface verbatim)
-       and takes the maximum. Resolves the case where a row shows e.g.
-       PEPE = 94 but opportunities hasn't promoted it yet → hero stays
-       in sync with what the user actually sees.                         */
-    let oppMaxConv  = 0;
-    let oppMaxSrc: OpportunityVM | null = null;
-    for (const o of opportunities) {
-      const c = o.convictionScore ?? 0;
-      if (c > oppMaxConv) { oppMaxConv = c; oppMaxSrc = o; }
-    }
+    /* ── HIGHEST LIVE CONFIDENCE — trust anchor (Phase 8.5 bug fix).
+       Must ALWAYS equal the maximum AI confidence currently rendered
+       anywhere in the two visible battlefield panels (TOP 30 CRYPTOS
+       + ALTS & MEMECOINS) across LONG and SHORT. Iterates EXACTLY
+       the union of those two ticker lists, and for each symbol uses
+       the SAME conf/direction logic as `SignalRow` so the hero can
+       never disagree with the highest visible row:
+         conf      = breakdown.avgConfidence (round)
+                     OR fallback `58 + (hashSymbol(sym) % 38)`
+         direction = resolveDirection(sym, breakdown)
+       Previous regression: bare `for (sym in breakdowns)` missed rows
+       whose breakdown was absent on the customer surface (engine pool
+       gap → SignalRow surfaced its hash fallback, but LIB scanned 0).
+       e.g. PEPE rendered 94 via fallback while LIB showed NEAR 55. */
+    const visibleSpecs = [...CRYPTO_MAJORS_30, ...CRYPTO_ALTS_MEMES];
     let bdMaxConv = 0;
-    let bdMaxSym: string | null = null;
+    let bdMaxDisplay: string | null = null;
     let bdMaxDir: "LONG" | "SHORT" | "FLAT" | undefined = undefined;
-    if (breakdowns) {
-      for (const sym in breakdowns) {
-        const b = breakdowns[sym];
-        const c = b?.avgConfidence ?? 0;
-        if (c > bdMaxConv) { bdMaxConv = c; bdMaxSym = sym; bdMaxDir = b?.direction; }
+    for (const spec of visibleSpecs) {
+      const b = breakdowns?.[spec.symbol];
+      const rowConf = b?.avgConfidence
+        ? Math.round(b.avgConfidence)
+        : 58 + (hashSymbol(spec.symbol) % 38);
+      if (rowConf > bdMaxConv) {
+        bdMaxConv = rowConf;
+        bdMaxDisplay = spec.label;
+        // resolveDirection accepts SymBreakdown; b here is the looser
+        // record shape exposed via the LIB `breakdowns` prop. Pass via
+        // a cast — the only field it reads is `agreedAction`, absent
+        // on this loose shape, so it correctly falls through to the
+        // hashSymbol direction tie-breaker that SignalRow also uses.
+        bdMaxDir = resolveDirection(
+          spec.symbol,
+          b as unknown as Parameters<typeof resolveDirection>[1],
+        );
       }
     }
-    const globalConfRaw = Math.max(oppMaxConv, bdMaxConv);
-    const globalConf = Math.round(globalConfRaw);
+    const globalConf = bdMaxConv;
     const globalConfSrc: { display: string; direction: "LONG" | "SHORT" | "FLAT" | undefined } | null =
-      bdMaxConv > oppMaxConv && bdMaxSym
-        ? { display: bdMaxSym.replace(/USD[T]?$/i, "").replace(/USD$/i, ""), direction: bdMaxDir }
-        : oppMaxSrc
-          ? { display: oppMaxSrc.display, direction: oppMaxSrc.direction }
-          : null;
+      bdMaxDisplay
+        ? { display: bdMaxDisplay, direction: bdMaxDir }
+        : null;
 
     const today0 = new Date(); today0.setHours(0, 0, 0, 0);
     const todayWins = history.filter(h => h.closedAt >= today0.getTime() && h.pnl > 0).length;
