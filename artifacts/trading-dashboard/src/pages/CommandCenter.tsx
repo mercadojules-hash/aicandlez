@@ -724,6 +724,128 @@ function AiActivityFeed({ engine }: { engine?: EngineStatus }) {
   );
 }
 
+/* ── BlotterPanel ────────────────────────────────────────────────────────────
+ * Compact vertical-scroll blotter for either LIVE (open) or HISTORY (closed)
+ * trades. Renders directly underneath the dual matrix per restored battlefield
+ * composition. Read-only; no execution affordances. */
+function BlotterPanel({
+  title, accent, badge, rows, mode,
+}: {
+  title:  string;
+  accent: string;
+  badge:  string;
+  rows:   Trade[];
+  mode:   "LIVE" | "HISTORY";
+}) {
+  const fmtUsd = (n: number) =>
+    `${n >= 0 ? "+" : "-"}$${Math.abs(n).toFixed(2)}`;
+  const fmtPct = (n: number) =>
+    `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column",
+      border: `1px solid ${N.BORDER_HI}`,
+      borderRadius: 4,
+      background: N.SURFACE_1,
+      fontFamily: N.FONT_MONO,
+      overflow: "hidden",
+      maxHeight: 460,
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "8px 12px",
+        borderBottom: `1px solid ${N.BORDER}`,
+        background: `linear-gradient(180deg, ${accent}0e 0%, ${N.BG} 100%)`,
+      }}>
+        <span style={{
+          fontSize: 10, fontWeight: 800, color: N.TEXT_0,
+          letterSpacing: "0.24em",
+        }}>{title}</span>
+        <span style={{
+          fontSize: 8.5, fontWeight: 700, color: accent,
+          letterSpacing: "0.18em",
+          padding: "2px 6px",
+          border: `1px solid ${accent}55`,
+          borderRadius: 3,
+          background: `${accent}10`,
+        }}>{badge}</span>
+      </div>
+
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 0.7fr) minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 0.7fr)",
+        gap: 6,
+        padding: "5px 12px",
+        borderBottom: `1px solid ${N.BORDER}`,
+        fontSize: 8, color: N.TEXT_3,
+        letterSpacing: "0.18em", fontWeight: 700,
+      }}>
+        <span>SYMBOL</span>
+        <span>SIDE</span>
+        <span style={{ textAlign: "right" }}>ENTRY</span>
+        <span style={{ textAlign: "right" }}>{mode === "LIVE" ? "MARK" : "EXIT"}</span>
+        <span style={{ textAlign: "right" }}>PNL</span>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto" }} className="cd-scroll">
+        {rows.length === 0 ? (
+          <div style={{
+            padding: 24, fontSize: 9.5, color: N.TEXT_3,
+            letterSpacing: "0.18em", fontWeight: 700, textAlign: "center",
+          }}>
+            · {mode === "LIVE" ? "NO OPEN POSITIONS" : "NO CLOSED TRADES"}
+          </div>
+        ) : rows.map(t => {
+          const side    = (t.side ?? "").toUpperCase();
+          const isLong  = side === "BUY" || side === "LONG";
+          const sideColor = isLong ? N.LONG : N.SHORT;
+          const pnl     = t.pnl ?? 0;
+          const pnlPct  = t.pnlPercent ?? 0;
+          const pnlColor = pnl > 0 ? N.LONG : pnl < 0 ? N.SHORT : N.TEXT_2;
+          const exitOrMark = mode === "LIVE"
+            ? (t.exitPrice ?? t.price)
+            : (t.exitPrice ?? 0);
+          return (
+            <div key={t.id} style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 0.7fr) minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 0.7fr)",
+              gap: 6, alignItems: "center",
+              padding: "6px 12px",
+              borderBottom: `1px solid ${N.BORDER}`,
+              fontSize: 10.5,
+            }}>
+              <span style={{ color: N.TEXT_0, fontWeight: 800, letterSpacing: "0.04em" }}>
+                {t.symbol}
+              </span>
+              <span style={{
+                color: sideColor, fontWeight: 800,
+                fontSize: 9, letterSpacing: "0.14em",
+              }}>{isLong ? "LONG" : "SHORT"}</span>
+              <span style={{
+                color: N.TEXT_1, textAlign: "right", fontWeight: 700,
+                fontSize: 10,
+              }}>${t.price?.toFixed(2) ?? "—"}</span>
+              <span style={{
+                color: N.TEXT_1, textAlign: "right", fontWeight: 700,
+                fontSize: 10,
+              }}>${exitOrMark?.toFixed(2) ?? "—"}</span>
+              <span style={{
+                color: pnlColor, textAlign: "right", fontWeight: 800,
+                fontSize: 10,
+                display: "flex", flexDirection: "column", alignItems: "flex-end", lineHeight: 1.15,
+              }}>
+                <span>{fmtUsd(pnl)}</span>
+                <span style={{ fontSize: 8.5, fontWeight: 700 }}>{fmtPct(pnlPct)}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ── Legacy slim chip strip — kept as fallback export, no longer rendered.
  * ScanningHero supersedes it with the same chip rendering inline. */
 function TopConvictionPulse({ engine }: { engine?: EngineStatus }) {
@@ -1290,13 +1412,15 @@ export default function CommandCenter() {
         </div>
 
         {/* Row 3 — BATTLEFIELD: dual crypto matrix + MY ACCOUNT / AI ACTIVITY rail
-            LEFT = TOP CRYPTO MAJORS · RIGHT = ALTS & MEMECOINS · RAIL = account+feed
+            LEFT col = TOP CRYPTO MAJORS · MID col = ALTS & MEMECOINS · RAIL = account+feed
+            Single unified AiAutotradeBar + LiveControlBar spans both matrix
+            columns (one execution state for the entire battlefield).
             (Crypto-only locked invariant preserved — no equities.) */}
         <section
           className="grid gap-1.5 px-2"
           style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) 296px", alignItems: "start" }}
         >
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5" style={{ gridColumn: "1 / span 2" }}>
             <AiAutotradeBar />
             <LiveControlBar
               assetClass="CRYPTO"
@@ -1305,20 +1429,8 @@ export default function CommandCenter() {
               eligible={cryptoEligible}
               eligibilityReason={cryptoReason}
             />
-            <CryptoMajorsSignalsPanel engine={engine} />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <AiAutotradeBar />
-            <LiveControlBar
-              assetClass="CRYPTO"
-              state={cryptoState}
-              onToggle={toggleCryptoLive}
-              eligible={cryptoEligible}
-              eligibilityReason={cryptoReason}
-            />
-            <CryptoAltsMemesPanel engine={engine} />
-          </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5" style={{ gridColumn: "3 / span 1", gridRow: "1 / span 2" }}>
             <MyAccountRail
               exchangeStatus={exchangeStatus}
               liveBalance={liveBalance}
@@ -1326,47 +1438,37 @@ export default function CommandCenter() {
             />
             <AiActivityFeed engine={engine} />
           </div>
+          <div style={{ gridColumn: "1 / span 1", gridRow: "2 / span 1" }}>
+            <CryptoMajorsSignalsPanel engine={engine} />
+          </div>
+          <div style={{ gridColumn: "2 / span 1", gridRow: "2 / span 1" }}>
+            <CryptoAltsMemesPanel engine={engine} />
+          </div>
         </section>
 
-        {/* Row 4 — Full-width LiveAccountPanel (deep equity/PnL breakdown
-            kept below the battlefield; MyAccountRail above gives the
-            at-a-glance read, this gives the full institutional decompose) */}
-        <div className="px-2">
-          <LiveAccountPanel
-            engine={engine}
-            exchangeStatus={exchangeStatus}
-            liveBalance={liveBalance}
-            trades={tradesArr}
+        {/* Row 4 — LIVE TRADES + TRADE HISTORY blotters (only content beneath
+            the dual matrix per restored composition). Vertical-scroll only;
+            no other analytics, no deep equity decompose, no operator
+            telemetry below this point. */}
+        <section
+          className="grid gap-1.5 px-2"
+          style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", alignItems: "start" }}
+        >
+          <BlotterPanel
+            title="20 LIVE TRADES"
+            accent={N.BRAND_BRT}
+            badge={`${openTrades.length} OPEN`}
+            rows={openTrades.slice(0, 20)}
+            mode="LIVE"
           />
-        </div>
-
-        {/* Row 3 — Positions blotter (live operator activity) */}
-        <PositionsRow
-          positions={livePositions}
-          openTrades={openTrades}
-          closedTrades={closedTrades}
-        />
-
-        {/* Row 4 — Market Heartbeat (BTC/ETH/SOL macro context) */}
-        <MarketHeartbeat />
-
-        {/* Row 5 — Operator deep-layer telemetry (admin-only)
-            Latency · Funnel · Live Execution Stream · Fees · Subscriptions ·
-            Cross-tenant positions/trades. Moved BELOW the signals matrix +
-            account/blotter so the empty-when-idle panels never dominate
-            the above-the-fold view. */}
-        {isOperator && <OperatorTelemetryGrid />}
-
-        {/* Row 6 — Live Execution Debugging (admin-only)
-            Engine heartbeat + Safe Test Mode controls + real-time execution
-            stream from executionStreamBus. The operator must NEVER be blind
-            during live execution. */}
-        {isOperator && (
-          <section className="px-2 grid gap-2" style={{ gridTemplateColumns: "minmax(420px, 1fr) minmax(0, 2fr)" }}>
-            <EngineHeartbeat />
-            <LiveExecutionStream />
-          </section>
-        )}
+          <BlotterPanel
+            title="TRADE HISTORY"
+            accent={N.GOLD_BRT}
+            badge={`${closedTrades.length} CLOSED`}
+            rows={closedTrades.slice(0, 50)}
+            mode="HISTORY"
+          />
+        </section>
 
         <footer
           className="px-3 py-2 flex items-center justify-between text-[8.5px] font-bold tracking-[0.22em]"
