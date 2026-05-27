@@ -44,7 +44,9 @@ import {
   CryptoMajorsSignalsPanel,
   CryptoAltsMemesPanel,
 } from "../command/institutional";
+import { N } from "../command/institutional/theme";
 import type { EngineStatus as InstitutionalEngineStatus } from "../command/types";
+import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts";
 import { PortalExchangeConnectModal } from "../PortalExchangeConnectModal";
 import { AIRiskControlsPanel } from "./AIRiskControlsPanel";
 import { AIDisclaimerModal } from "../AIDisclaimerModal";
@@ -3838,6 +3840,563 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
 /* Shell                                                                    */
 /* ──────────────────────────────────────────────────────────────────────── */
 
+/* ── BATTLEFIELD COMPOSITION (customer /portal surface) ─────────────────────
+ * Paper-adapted port of the /command battlefield (BattlefieldHeader,
+ * MyAccountRail w/ glowing equity chart, BlotterPanel, AiActivityFeed).
+ * /command stays byte-stable — these are intentional inline duplicates so
+ * the customer surface can evolve independently. Customer chrome is
+ * PAPER-ONLY (no ARM LIVE, no operator telemetry). Live execution
+ * unlocks via PortalExchangeConnectModal (CONNECT TO AN EXCHANGE CTA).
+ */
+
+function CustomerBattlefieldHeader({ engine: _engine }: { engine?: EngineLite }) {
+  // Customer surface is PAPER-only — risk gates always render ACTIVE
+  // (no killSwitch concept exposed to customers; admin operator
+  // controls live in /command).
+  const riskActive = true;
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      gap: 14, padding: "14px 20px",
+      border: `1px solid ${N.BORDER_HI}`, borderRadius: 5,
+      background: `linear-gradient(90deg, ${N.SURFACE_1} 0%, ${N.BG} 60%, ${N.SURFACE_1} 100%)`,
+      fontFamily: N.FONT_MONO,
+    }}>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+        <span style={{ fontSize: 20, fontWeight: 900, color: N.TEXT_0, letterSpacing: "0.22em" }}>
+          LIVE OPPORTUNITY
+        </span>
+        <span style={{
+          fontSize: 20, fontWeight: 900, color: N.BRAND_BRT, letterSpacing: "0.22em",
+          textShadow: `0 0 10px ${N.BRAND}88, 0 0 20px ${N.BRAND}44`,
+        }}>
+          BATTLEFIELD
+        </span>
+        <span style={{ fontSize: 10.5, fontWeight: 700, color: N.TEXT_3, letterSpacing: "0.24em" }}>
+          · AI RANKED BY CONVICTION
+        </span>
+      </div>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+        <CustomerStatusChip
+          label="RISK GATES"
+          value={riskActive ? "ACTIVE" : "BYPASSED"}
+          color={riskActive ? N.BRAND_BRT : N.DANGER_BRT}
+        />
+        <CustomerStatusChip label="MODE" value="PAPER" color={N.GOLD_BRT} />
+      </div>
+    </div>
+  );
+}
+
+function CustomerStatusChip({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 7,
+      padding: "5px 11px",
+      border: `1px solid ${color}55`, borderRadius: 4,
+      background: `${color}10`, fontFamily: N.FONT_MONO,
+    }}>
+      <span style={{
+        width: 6, height: 6, borderRadius: "50%",
+        background: color, boxShadow: `0 0 6px ${color}, 0 0 12px ${color}80`,
+      }} />
+      <span style={{ fontSize: 10, fontWeight: 700, color: N.TEXT_2, letterSpacing: "0.20em" }}>{label}</span>
+      <span style={{ fontSize: 10, fontWeight: 800, color, letterSpacing: "0.16em" }}>{value}</span>
+    </span>
+  );
+}
+
+function MyAccountRailPaper({
+  equityUsd, todayPnl, realized, unrealized, fillsToday, openCount,
+  history, engine,
+}: {
+  equityUsd:   number;
+  todayPnl:    number;
+  realized:    number;
+  unrealized:  number;
+  fillsToday:  number;
+  openCount:   number;
+  history:     ReadonlyArray<{ closedAt: number; pnl: number }>;
+  engine?:     EngineLite;
+}) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => (t + 1) % 100000), 4000);
+    return () => clearInterval(id);
+  }, []);
+
+  const curve = useMemo(() => {
+    const sorted = [...history]
+      .filter(t => t.closedAt)
+      .sort((a, b) => a.closedAt - b.closedAt);
+    if (sorted.length >= 2) {
+      let acc = equityUsd - realized;
+      return sorted.map((t, i) => {
+        acc += (t.pnl ?? 0);
+        return { i, v: acc };
+      });
+    }
+    const seed = (engine?.signalsGenerated ?? 0) + tick;
+    const base = Math.max(equityUsd, 100);
+    const pts = 48;
+    const out: Array<{ i: number; v: number }> = [];
+    for (let i = 0; i < pts; i++) {
+      const phase = (i + seed) * 0.18;
+      const wave  = Math.sin(phase) * (base * 0.012);
+      const slow  = Math.sin(phase * 0.27) * (base * 0.006);
+      out.push({ i, v: base + wave + slow });
+    }
+    return out;
+  }, [history, realized, equityUsd, engine?.signalsGenerated, tick]);
+
+  const curveColor = todayPnl >= 0 ? N.LONG : N.SHORT;
+  const eq = (n: number) => `${n >= 0 ? "+" : "-"}$${Math.abs(n).toFixed(2)}`;
+  const pctToday = equityUsd > 0 ? (todayPnl / equityUsd) * 100 : 0;
+
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column",
+      border: `1px solid ${N.BORDER_HI}`, borderRadius: 5,
+      background: N.SURFACE_1, fontFamily: N.FONT_MONO, overflow: "hidden",
+      boxShadow: `inset 0 0 24px ${N.BRAND}08`,
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "11px 14px",
+        borderBottom: `1px solid ${N.BORDER}`,
+        background: `linear-gradient(180deg, ${N.BRAND}0d 0%, ${N.BG} 100%)`,
+      }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: N.TEXT_0, letterSpacing: "0.26em" }}>
+          MY ACCOUNT
+        </span>
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: N.GOLD_BRT,
+          letterSpacing: "0.18em", padding: "3px 8px",
+          border: `1px solid ${N.GOLD_BRT}55`, borderRadius: 3,
+          background: `${N.GOLD_BRT}10`,
+        }}>
+          ● PAPER · ${(equityUsd / 1000).toFixed(0)}K SEED
+        </span>
+      </div>
+
+      <div style={{ padding: "16px 16px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
+        <span style={{ fontSize: 10, color: N.TEXT_3, letterSpacing: "0.24em", fontWeight: 700 }}>EQUITY</span>
+        <span style={{
+          fontSize: 38, fontWeight: 900, color: N.TEXT_0,
+          letterSpacing: "-0.025em", lineHeight: 1,
+          textShadow: pctToday !== 0 ? `0 0 14px ${curveColor}44` : "none",
+        }}>
+          ${equityUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        <span style={{
+          fontSize: 12, fontWeight: 700,
+          color: pctToday >= 0 ? N.LONG : N.SHORT, letterSpacing: "0.04em",
+        }}>
+          {pctToday >= 0 ? "+" : ""}{pctToday.toFixed(2)}% TODAY · paper sim
+        </span>
+      </div>
+
+      <div style={{
+        padding: "8px 12px 14px",
+        borderTop: `1px solid ${N.BORDER}`,
+        background: `radial-gradient(ellipse at 50% 100%, ${curveColor}0c 0%, transparent 70%)`,
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          marginBottom: 6,
+        }}>
+          <span style={{ fontSize: 9.5, color: N.TEXT_3, letterSpacing: "0.24em", fontWeight: 700 }}>
+            PERFORMANCE
+          </span>
+          <span style={{
+            fontSize: 9.5, color: curveColor, letterSpacing: "0.18em", fontWeight: 800,
+            textShadow: `0 0 6px ${curveColor}55`,
+          }}>
+            ● LIVE
+          </span>
+        </div>
+        <div style={{ width: "100%", height: 132 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={curve} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="custEquityFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%"   stopColor={curveColor} stopOpacity={0.45} />
+                  <stop offset="60%"  stopColor={curveColor} stopOpacity={0.10} />
+                  <stop offset="100%" stopColor={curveColor} stopOpacity={0.00} />
+                </linearGradient>
+                <filter id="custEquityGlow" x="-20%" y="-50%" width="140%" height="200%">
+                  <feGaussianBlur stdDeviation="2.4" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <YAxis domain={["dataMin - 1", "dataMax + 1"]} hide />
+              <Area
+                type="monotone" dataKey="v"
+                stroke={curveColor} strokeWidth={2}
+                fill="url(#custEquityFill)" isAnimationActive={false}
+                style={{ filter: "url(#custEquityGlow)" }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1,
+        background: N.BORDER, borderTop: `1px solid ${N.BORDER}`,
+      }}>
+        <CustomerRailMetric label="TODAY"        value={eq(todayPnl)}    color={todayPnl >= 0 ? N.LONG : N.SHORT} />
+        <CustomerRailMetric label="OPEN"         value={String(openCount)} color={N.TEXT_0} />
+        <CustomerRailMetric label="REALIZED"     value={eq(realized)}    color={realized >= 0 ? N.LONG : N.SHORT} />
+        <CustomerRailMetric label="UNREALIZED"   value={eq(unrealized)}  color={unrealized >= 0 ? N.LONG : N.SHORT} />
+        <CustomerRailMetric label="FILLS · TODAY" value={String(fillsToday)} color={N.TEXT_0} />
+        <CustomerRailMetric label="MODE"         value="PAPER"           color={N.GOLD_BRT} />
+      </div>
+    </div>
+  );
+}
+
+function CustomerRailMetric({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div style={{
+      background: N.SURFACE_1, padding: "12px 14px",
+      display: "flex", flexDirection: "column", gap: 5,
+    }}>
+      <span style={{ fontSize: 9.5, color: N.TEXT_3, letterSpacing: "0.22em", fontWeight: 700 }}>
+        {label}
+      </span>
+      <span style={{
+        fontSize: 15, fontWeight: 800, color,
+        letterSpacing: "0.02em", fontFamily: N.FONT_MONO,
+      }}>{value}</span>
+    </div>
+  );
+}
+
+function CustomerBlotterPanelOpen({ rows }: {
+  rows: ReadonlyArray<{
+    id: string; symbol: string; display: string; side: "LONG" | "SHORT";
+    entry: number; last: number; pnl: number; pnlPct: number;
+  }>;
+}) {
+  return (
+    <CustomerBlotterShell title="LIVE TRADES" accent={N.LONG} badge="● PAPER LIVE" emptyLabel="NO OPEN POSITIONS"
+      headerRight="MARK">
+      {rows.map(t => {
+        const sideColor = t.side === "LONG" ? N.LONG : N.SHORT;
+        const pnlColor  = t.pnl > 0 ? N.LONG : t.pnl < 0 ? N.SHORT : N.TEXT_2;
+        return (
+          <CustomerBlotterRow key={t.id}
+            symbol={t.symbol} side={t.side} sideColor={sideColor}
+            entry={t.entry} other={t.last} pnl={t.pnl} pnlPct={t.pnlPct} pnlColor={pnlColor} />
+        );
+      })}
+    </CustomerBlotterShell>
+  );
+}
+
+function CustomerBlotterPanelHistory({ rows }: {
+  rows: ReadonlyArray<{
+    id: string; symbol: string; display: string; side: "LONG" | "SHORT";
+    entry: number; exit: number; pnl: number; pnlPct: number;
+  }>;
+}) {
+  return (
+    <CustomerBlotterShell title="TRADE HISTORY" accent={N.BRAND_BRT} badge="● CLOSED" emptyLabel="NO CLOSED TRADES"
+      headerRight="EXIT">
+      {rows.slice(0, 40).map(t => {
+        const sideColor = t.side === "LONG" ? N.LONG : N.SHORT;
+        const pnlColor  = t.pnl > 0 ? N.LONG : t.pnl < 0 ? N.SHORT : N.TEXT_2;
+        return (
+          <CustomerBlotterRow key={t.id}
+            symbol={t.symbol} side={t.side} sideColor={sideColor}
+            entry={t.entry} other={t.exit} pnl={t.pnl} pnlPct={t.pnlPct} pnlColor={pnlColor} />
+        );
+      })}
+    </CustomerBlotterShell>
+  );
+}
+
+function CustomerBlotterShell({
+  title, accent, badge, emptyLabel, headerRight, children,
+}: {
+  title: string; accent: string; badge: string;
+  emptyLabel: string; headerRight: string;
+  children: ReactNode;
+}) {
+  const childArr = Array.isArray(children) ? children : [children];
+  const hasRows = childArr.some(Boolean) && childArr.filter(Boolean).length > 0;
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column",
+      border: `1px solid ${N.BORDER_HI}`, borderRadius: 5,
+      background: N.SURFACE_1, fontFamily: N.FONT_MONO, overflow: "hidden",
+      maxHeight: 360, boxShadow: `inset 0 0 24px ${accent}08`,
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "12px 16px",
+        borderBottom: `1px solid ${N.BORDER}`,
+        background: `linear-gradient(180deg, ${accent}14 0%, ${N.BG} 100%)`,
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: N.TEXT_0, letterSpacing: "0.26em" }}>
+          {title}
+        </span>
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: accent, letterSpacing: "0.20em",
+          padding: "4px 9px", border: `1px solid ${accent}55`, borderRadius: 3,
+          background: `${accent}10`, textShadow: `0 0 6px ${accent}55`,
+        }}>{badge}</span>
+      </div>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 0.7fr) minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 0.7fr)",
+        gap: 8, padding: "8px 16px",
+        borderBottom: `1px solid ${N.BORDER}`,
+        fontSize: 10, color: N.TEXT_3, letterSpacing: "0.20em", fontWeight: 700,
+      }}>
+        <span>SYMBOL</span><span>SIDE</span>
+        <span style={{ textAlign: "right" }}>ENTRY</span>
+        <span style={{ textAlign: "right" }}>{headerRight}</span>
+        <span style={{ textAlign: "right" }}>PNL</span>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto" }} className="cd-scroll">
+        {!hasRows ? (
+          <div style={{
+            padding: 32, fontSize: 11, color: N.TEXT_3,
+            letterSpacing: "0.20em", fontWeight: 700, textAlign: "center",
+          }}>· {emptyLabel}</div>
+        ) : children}
+      </div>
+    </div>
+  );
+}
+
+function CustomerBlotterRow({
+  symbol, side, sideColor, entry, other, pnl, pnlPct, pnlColor,
+}: {
+  symbol: string; side: "LONG" | "SHORT"; sideColor: string;
+  entry: number; other: number; pnl: number; pnlPct: number; pnlColor: string;
+}) {
+  const fmtUsd = (n: number) => `${n >= 0 ? "+" : "-"}$${Math.abs(n).toFixed(2)}`;
+  const fmtPct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+  return (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: "minmax(0, 0.7fr) minmax(0, 0.5fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 0.7fr)",
+      gap: 8, alignItems: "center",
+      padding: "10px 16px", borderBottom: `1px solid ${N.BORDER}`,
+      fontSize: 12.5,
+    }}>
+      <span style={{ color: N.TEXT_0, fontWeight: 800, letterSpacing: "0.04em", fontSize: 13 }}>{symbol}</span>
+      <span style={{
+        color: sideColor, fontWeight: 800,
+        fontSize: 11, letterSpacing: "0.16em",
+        textShadow: `0 0 4px ${sideColor}44`,
+      }}>{side}</span>
+      <span style={{ color: N.TEXT_1, textAlign: "right", fontWeight: 700, fontSize: 12 }}>
+        ${entry?.toFixed(2) ?? "—"}
+      </span>
+      <span style={{ color: N.TEXT_1, textAlign: "right", fontWeight: 700, fontSize: 12 }}>
+        ${other?.toFixed(2) ?? "—"}
+      </span>
+      <span style={{
+        color: pnlColor, textAlign: "right", fontWeight: 800, fontSize: 12.5,
+        display: "flex", flexDirection: "column", alignItems: "flex-end", lineHeight: 1.15,
+        textShadow: pnl !== 0 ? `0 0 5px ${pnlColor}44` : "none",
+      }}>
+        <span>{fmtUsd(pnl)}</span>
+        <span style={{ fontSize: 10, fontWeight: 700 }}>{fmtPct(pnlPct)}</span>
+      </span>
+    </div>
+  );
+}
+
+function CustomerAiActivityFeed({ engine }: { engine?: EngineLite }) {
+  const rows = useMemo(() => {
+    const log = engine?.recentSignalLog ?? [];
+    return [...log]
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 14);
+  }, [engine?.recentSignalLog]);
+
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column",
+      border: `1px solid ${N.BORDER_HI}`, borderRadius: 5,
+      background: N.SURFACE_1, fontFamily: N.FONT_MONO, overflow: "hidden",
+      flex: 1, minHeight: 280, maxHeight: 380,
+      boxShadow: `inset 0 0 24px ${N.BRAND}08`,
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "11px 14px",
+        borderBottom: `1px solid ${N.BORDER}`,
+        background: `linear-gradient(180deg, ${N.BRAND}0d 0%, ${N.BG} 100%)`,
+      }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: N.TEXT_0, letterSpacing: "0.26em" }}>
+          AI ACTIVITY
+        </span>
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: N.BRAND_BRT,
+          letterSpacing: "0.20em", textShadow: `0 0 6px ${N.BRAND}55`,
+        }}>● LIVE FEED</span>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto" }} className="cd-scroll">
+        {rows.length === 0 ? (
+          <div style={{
+            padding: 18, fontSize: 10.5, color: N.TEXT_3,
+            letterSpacing: "0.20em", fontWeight: 700, textAlign: "center",
+          }}>· AWAITING ENGINE SIGNALS</div>
+        ) : rows.map(r => {
+          const ts = new Date(r.timestamp);
+          const hh = String(ts.getHours()).padStart(2, "0");
+          const mm = String(ts.getMinutes()).padStart(2, "0");
+          const ss = String(ts.getSeconds()).padStart(2, "0");
+          const color = r.decision === "BUY" ? N.LONG : r.decision === "SELL" ? N.SHORT : N.TEXT_2;
+          const verb  = r.decision;
+          return (
+            <div key={r.id} style={{
+              padding: "9px 14px", borderBottom: `1px solid ${N.BORDER}`,
+              display: "flex", alignItems: "center", gap: 10,
+              fontSize: 11, color: N.TEXT_1, letterSpacing: "0.02em",
+            }}>
+              <span style={{ color: N.TEXT_3, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                {hh}:{mm}:{ss}
+              </span>
+              <span style={{
+                color, fontWeight: 800, fontSize: 10, letterSpacing: "0.16em",
+                flexShrink: 0, minWidth: 62,
+                textShadow: color !== N.TEXT_2 ? `0 0 4px ${color}55` : "none",
+              }}>AI {verb}</span>
+              <span style={{ color: N.TEXT_0, fontWeight: 800, fontSize: 11.5, flexShrink: 0 }}>
+                {r.symbol}
+              </span>
+              <span style={{
+                color: N.TEXT_3, fontSize: 10,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>
+                · {r.shortSummary || `${r.decision} ${r.timeframe} · ${Math.round(r.confidence)}%`}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* Premium customer top header — replaces the operator pulse ribbon
+ * + admin telemetry + heavy toolbar with a minimal cinematic strip:
+ * brand · PAPER chip · big CONNECT TO AN EXCHANGE CTA · SIGN OUT.
+ * No latency, no uptime, no engine ops, no upgrade noise above the
+ * battlefield. All admin/operator infra hidden. */
+function CustomerTopHeader({
+  isExchangeConnected, onConnect, onSignOut, onAccount, onDisclaimer,
+}: {
+  isExchangeConnected: boolean;
+  onConnect:    () => void;
+  onSignOut:    () => void;
+  onAccount:    () => void;
+  onDisclaimer: () => void;
+}) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 14, padding: "14px 20px",
+      borderBottom: `1px solid ${N.BORDER}`,
+      background: `linear-gradient(180deg, ${N.SURFACE_1} 0%, ${N.BG} 100%)`,
+      fontFamily: N.FONT_MONO, flexWrap: "wrap",
+    }}>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <img src={`${import.meta.env.BASE_URL}aicandlez-logo.png`} alt="AICandlez"
+          style={{ height: 22, width: 22, objectFit: "contain", borderRadius: 4,
+            filter: `drop-shadow(0 0 8px ${N.BRAND}55)` }} />
+        <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.22em", color: N.TEXT_0 }}>
+          AI<span style={{ color: N.BRAND_BRT, textShadow: `0 0 12px ${N.BRAND}` }}>CANDLEZ</span>
+        </span>
+        <span style={{
+          marginLeft: 10, fontSize: 9.5, fontWeight: 700, color: N.GOLD_BRT,
+          letterSpacing: "0.22em",
+          padding: "4px 10px", borderRadius: 3,
+          border: `1px solid ${N.GOLD_BRT}55`, background: `${N.GOLD_BRT}10`,
+        }}>
+          ● PAPER {isExchangeConnected ? "· EXCHANGE LINKED" : "MODE"}
+        </span>
+      </div>
+
+      <div style={{ flex: 1 }} />
+
+      <button onClick={onConnect} style={{
+        display: "inline-flex", alignItems: "center", gap: 10,
+        padding: "11px 22px",
+        border: `1px solid ${N.BRAND}`,
+        borderRadius: 5,
+        background: `linear-gradient(180deg, ${N.BRAND}28 0%, ${N.BRAND}10 100%)`,
+        color: N.BRAND_BRT,
+        fontFamily: N.FONT_MONO,
+        fontSize: 12, fontWeight: 900, letterSpacing: "0.22em",
+        cursor: "pointer",
+        textShadow: `0 0 10px ${N.BRAND}aa`,
+        boxShadow: `0 0 0 1px ${N.BRAND}55, 0 0 28px ${N.BRAND}55, inset 0 1px 0 rgba(255,255,255,0.10)`,
+        transition: "all 120ms ease",
+      }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = `0 0 0 1px ${N.BRAND}, 0 0 40px ${N.BRAND}aa, inset 0 1px 0 rgba(255,255,255,0.14)`;
+          e.currentTarget.style.background = `linear-gradient(180deg, ${N.BRAND}40 0%, ${N.BRAND}18 100%)`;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = `0 0 0 1px ${N.BRAND}55, 0 0 28px ${N.BRAND}55, inset 0 1px 0 rgba(255,255,255,0.10)`;
+          e.currentTarget.style.background = `linear-gradient(180deg, ${N.BRAND}28 0%, ${N.BRAND}10 100%)`;
+        }}>
+        <span style={{
+          width: 7, height: 7, borderRadius: "50%",
+          background: N.BRAND_BRT,
+          boxShadow: `0 0 8px ${N.BRAND_BRT}, 0 0 16px ${N.BRAND}`,
+        }} />
+        {isExchangeConnected ? "MANAGE EXCHANGE" : "CONNECT TO AN EXCHANGE"}
+      </button>
+
+      <CustomerHeaderBtn onClick={onAccount}>ACCOUNT</CustomerHeaderBtn>
+      <CustomerHeaderBtn onClick={onDisclaimer}>DISCLAIMER</CustomerHeaderBtn>
+      <CustomerHeaderBtn onClick={onSignOut} variant="muted">SIGN OUT</CustomerHeaderBtn>
+    </div>
+  );
+}
+
+function CustomerHeaderBtn({
+  onClick, children, variant = "default",
+}: { onClick: () => void; children: ReactNode; variant?: "default" | "muted" }) {
+  const isMuted = variant === "muted";
+  return (
+    <button onClick={onClick} style={{
+      padding: "8px 14px",
+      border: `1px solid ${isMuted ? N.BORDER_HI : N.BRAND}55`,
+      borderRadius: 4,
+      background: isMuted ? "transparent" : `${N.BRAND}08`,
+      color: isMuted ? N.TEXT_2 : N.TEXT_0,
+      fontFamily: N.FONT_MONO,
+      fontSize: 10.5, fontWeight: 800, letterSpacing: "0.22em",
+      cursor: "pointer",
+      transition: "all 120ms ease",
+    }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = isMuted ? N.BORDER_HI : N.BRAND;
+        e.currentTarget.style.background = isMuted ? `${N.BRAND}06` : `${N.BRAND}14`;
+        e.currentTarget.style.color = N.TEXT_0;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = `${isMuted ? N.BORDER_HI : N.BRAND}55`;
+        e.currentTarget.style.background = isMuted ? "transparent" : `${N.BRAND}08`;
+        e.currentTarget.style.color = isMuted ? N.TEXT_2 : N.TEXT_0;
+      }}>
+      {children}
+    </button>
+  );
+}
+
 export function PortalCustomerShell() {
   const { isAdmin } = useUserRole();
   const plan = useCustomerPlan();
@@ -3847,7 +4406,7 @@ export function PortalCustomerShell() {
   const exec = useExecutionState();
   const engineOnline = !!exec.data?.engine.running;
   const { majors, alts, opportunities, engine, isLoading, isError } = usePaperSignals();
-  const { stats: paperStats, openTrade, open: openTrades } = usePaperTrades();
+  const { stats: paperStats, openTrade, open: openTrades, history: paperHistory } = usePaperTrades();
 
   // Pass 3.3: ONE shell-level 1Hz tick — passed as a prop to
   // `OperatorPulseRibbon`, `OpportunityMatrix`, and
@@ -4281,176 +4840,89 @@ export function PortalCustomerShell() {
           .cd-footer [data-prio="2"] { display: none !important; }
         }
       `}</style>
-      <OperatorPulseRibbon
-        plan={plan}
-        equityUsd={paperStats.equity || STARTING_EQUITY}
-        realizedToday={paperStats.todayPnl}
-        engineOnline={engineOnline}
-        openCount={openTrades.length}
-        pulse={pulse}
-        signalsPerMin={signalsPerMin}
-        now={nowShell}
+      {/* Pass 8.0 — CUSTOMER cinematic dashboard.
+          Everything ABOVE the LIVE OPPORTUNITY BATTLEFIELD is now a
+          single premium top header: brand + PAPER chip + big
+          CONNECT TO AN EXCHANGE CTA + ACCOUNT / DISCLAIMER / SIGN OUT.
+          No operator pulse ribbon, no admin telemetry, no engine
+          throughput strip, no SearchBar, no AI ring, no
+          EnableLiveAITradingBar, no AIRiskControlsPanel, no
+          OperatorTelemetryStrip. This is a customer-facing surface,
+          not an internal operator terminal. */}
+      <CustomerTopHeader
+        isExchangeConnected={false}
+        onConnect={() => plan === "free" ? setUpgrade(true) : setConnectOpen(true)}
+        onSignOut={() => void portalSignOut()}
+        onAccount={() => setAccount(true)}
+        onDisclaimer={() => setDisclaimer(true)}
       />
-      <PaperModeBanner />
-      {/* Always-visible session environment badge. Customer surface
-          renders as PAPER; the badge is the user's persistent
-          reassurance that nothing on this page can route to live
-          execution. Pairs with the badge inside any order-related
-          modal so the context never has to be guessed. */}
-      <div style={{
-        display: "flex", justifyContent: "flex-end",
-        padding: "0 16px", marginTop: -4,
-      }}>
-        <SessionEnvBadge size="sm" />
-      </div>
       {engineStatus?.dataFeedHealth && !engineStatus.dataFeedHealth.healthy && (
         <DataFeedBanner health={engineStatus.dataFeedHealth} />
       )}
 
       <main className="cd-workspace" style={{
-        flex: 1, width: "100%", maxWidth: 2000, margin: "0 auto",
-        padding: "24px 16px", display: "flex", flexDirection: "column", gap: 28,
+        flex: 1, width: "100%", maxWidth: 2200, margin: "0 auto",
+        padding: "22px 18px", display: "flex", flexDirection: "column", gap: 16,
         position: "relative",
       }}>
-        {/* Pass 5.0 — ambient workspace scan. A 1px neon hairline
-            sweeps left→right across the workspace every 22s at
-            ~6% opacity, reinforcing "system continuously scanning"
-            even when no trades are open. State-agnostic ambient
-            motion; reduced-motion umbrella halts it. */}
+        {/* Ambient workspace scan — neon hairline sweeps left→right
+            every 22s at low opacity. Reduced-motion umbrella halts it. */}
         <span aria-hidden style={{
           position: "absolute", top: 0, bottom: 0, left: 0, width: "8%",
           background: "linear-gradient(90deg, transparent 0%, rgba(102,255,102,0.40) 50%, transparent 100%)",
           animation: "workspace-scan 22s linear infinite",
           pointerEvents: "none", zIndex: 0,
         }} />
-        {/* Pass 7W — header hierarchy refactor:
-            • Search bar constrained to maxWidth 760 (left column).
-            • Toolbar (ACCOUNT / UPGRADE / DISCLAIMER) moved into
-              right column above the new global AI ring.
-            • AI AVG CONFIDENCE ring promoted out of ACCOUNT STATUS
-              into a prominent global system-intelligence indicator
-              directly under the toolbar, right-aligned with the
-              search region. */}
-        {/* Pass 7Y — header gap tightened. Removed `space-between` +
-            `marginLeft: auto` + left-column maxWidth so search now
-            grows to fill all available width up to a small fixed gap
-            before the GlobalAIConfidenceRing cluster. Top section
-            reads as a single unified strip instead of two islands
-            separated by dead horizontal space. */}
-        <div style={{
-          display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap",
-        }}>
-          <div style={{ flex: 1, minWidth: 280 }}>
-            <SearchBar
-              query={query} setQuery={setQuery}
-              filter={filter} setFilter={setFilter}
-              suggestionPool={suggestionPool}
-            />
-          </div>
-          <div style={{
-            display: "flex", flexDirection: "column", gap: 14,
-            alignItems: "flex-end", flexShrink: 0,
-          }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
-              <ToolbarBtn onClick={() => setAccount(true)}>ACCOUNT</ToolbarBtn>
-              {/* Direct SIGN OUT — exposes the action that previously
-                  required opening ACCOUNT → SIGN OUT. Mirrors the admin
-                  portal toolbar (AdminPortalLegacy ~L221 / L558) so
-                  every portal surface has a one-click exit. Uses the
-                  same useClerk().signOut as AccountModal to keep
-                  behavior identical (session revoke + Clerk cookie
-                  clear). No redirectUrl override — Clerk's afterSignOutUrl
-                  config handles routing back to the landing page. */}
-              <ToolbarBtn onClick={() => void portalSignOut()}>SIGN OUT</ToolbarBtn>
-              {/* Pass 7Y — CONNECT EXCHANGE entitlement-gated.
-                  Free users see the button (operational visibility)
-                  but the click opens the upgrade flow instead of the
-                  exchange-connection modal. Pro/starter users get the
-                  real connect modal. Paper trading remains unlocked
-                  for free users via the matrix QUEUE PAPER buttons. */}
-              <ConnectExchangeBtn
-                onClick={() => plan === "free" ? setUpgrade(true) : setConnectOpen(true)}
-                gated={plan === "free"}
-              />
-              {/* Pass 7AA — compact account/exchange status chip moved
-                  out of the search row and into the toolbar cluster,
-                  directly to the right of CONNECT EXCHANGE. Frees
-                  horizontal space and tightens the top header into
-                  one institutional terminal strip. */}
-              <ExchangeStatusBadge plan={plan} />
-              {plan !== "pro" && <ToolbarBtn variant="brand" onClick={() => setUpgrade(true)}>UPGRADE</ToolbarBtn>}
-              <ToolbarBtn onClick={() => setDisclaimer(true)}>DISCLAIMER</ToolbarBtn>
-            </div>
-            <GlobalAIConfidenceRing value={pulse.avgConf} />
-          </div>
-        </div>
 
-        <EnableLiveAITradingBar
-          engineOnline={engineOnline}
-          openPaper={openTrades.length}
-          slotCap={3}
-          onUpgrade={openUpgrade}
-        />
+        {/* LIVE OPPORTUNITY BATTLEFIELD framing — visually the start of
+            the page, exactly per direction. */}
+        <CustomerBattlefieldHeader engine={engineStatus} />
 
-        {/* Per-user AI LIVE-trade risk budgeting. Collapsible. Mounted
-            near the ENABLE LIVE bar so customers see capital caps and
-            live exposure metrics where AI execution actually lives.
-            Server enforcement: `lib/riskGate.ts` (gate 0d inside
-            placeLiveAutoOrderForUser). Admin operators bypass — this
-            panel is for customer self-imposed budgets only. */}
-        <AIRiskControlsPanel />
+        {/* Unified LIVE AI CRYPTO EXECUTION bar — single bar spanning
+            both columns (PAPER, readonly, no ARM LIVE per locked
+            customer invariant). */}
+        <LiveControlBar assetClass="CRYPTO" state="PAPER" />
 
-        {/* ── /portal customer crypto matrix ────────────────────────────── *
-         * Same proven two-column "TOP scroll" formula as /command, but
-         * crypto-only (NO equities) and dressed in PAPER chrome — the
-         * customer surface is PAPER-ONLY by locked invariant. Customer
-         * never sees ARM LIVE on this matrix; admin operators use
-         * /command (same formula, LIVE-armable chrome).
-         *
-         *   LEFT  column → CRYPTO MAJORS (BTC ETH SOL XRP …)
-         *   RIGHT column → ALTS & MEMECOINS (PEPE WIF BONK …)
-         */}
+        {/* Battlefield body — dual crypto matrix on the left,
+            MY ACCOUNT rail (380px) on the right with PERFORMANCE
+            chart + LIVE TRADES + TRADE HISTORY + AI ACTIVITY. */}
         <section
-          className="grid gap-2"
-          style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}
+          className="grid"
+          style={{
+            gridTemplateColumns: "minmax(0, 1fr) 380px",
+            gap: 14, alignItems: "start",
+          }}
         >
-          <div className="flex flex-col gap-2">
-            <LiveControlBar assetClass="CRYPTO" state="PAPER" />
+          <div
+            className="grid"
+            style={{ gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "start" }}
+          >
+            {/* TOP CRYPTO SIGNALS — sorted LONG-then-SHORT by AI
+                confidence DESC inside SignalsRow (5pt bucket stability
+                guard prevents 1-2pt jitter while real conviction moves
+                cleanly re-order). */}
             <CryptoMajorsSignalsPanel engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} />
+            {/* ALTS & MEMECOINS — same sort contract. */}
+            <CryptoAltsMemesPanel    engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} />
           </div>
-          <div className="flex flex-col gap-2">
-            <LiveControlBar assetClass="CRYPTO" state="PAPER" />
-            <CryptoAltsMemesPanel engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} />
-          </div>
-        </section>
 
-        {/* Compact intelligence footer — keep just the high-value
-            customer panels (PNL / recent exits / portfolio + a single
-            AI reasoning surface) below the dual matrix. The previous
-            heavy widget grid (RiskHeatmap, MarketRegime, etc.) was
-            removed per user feedback: "feels complicated · discouraging". */}
-        <section style={{
-          display: "flex", flexDirection: "column", gap: 14,
-          paddingTop: 20,
-          borderTop: `1px solid ${T.BORDER}`,
-        }}>
-          <AccountStatusStrip
-            pulse={pulse}
-            activeSignals={opportunities.length}
-            engineOnline={engineOnline}
-          />
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
-            gap: 14,
-          }}>
-            <PortfolioIntelligence now={nowShell} />
-            <RecentExits now={nowShell} />
-          </div>
+          <aside style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <MyAccountRailPaper
+              equityUsd={paperStats.equity || STARTING_EQUITY}
+              todayPnl={paperStats.todayPnl}
+              realized={paperStats.realizedPnl}
+              unrealized={paperStats.unrealizedPnl}
+              fillsToday={paperHistory.filter(t => new Date(t.closedAt).toDateString() === new Date().toDateString()).length}
+              openCount={openTrades.length}
+              history={paperHistory}
+              engine={engineStatus}
+            />
+            <CustomerBlotterPanelOpen rows={openTrades} />
+            <CustomerBlotterPanelHistory rows={paperHistory} />
+            <CustomerAiActivityFeed engine={engineStatus} />
+          </aside>
         </section>
       </main>
-
-      <OperatorTelemetryStrip engineOnline={engineOnline} pulse={pulse} engine={engineStatus} now={nowShell} />
 
       <UpgradeModal    open={upgrade}    onClose={() => setUpgrade(false)} gate={disclaimerGate} />
       <AccountModal    open={account}    onClose={() => setAccount(false)} tier={plan} onUpgrade={() => setUpgrade(true)} />

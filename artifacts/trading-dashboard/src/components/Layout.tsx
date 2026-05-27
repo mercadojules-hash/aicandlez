@@ -452,6 +452,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [collapsed,  setCollapsed]  = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const handleNavigate = () => setMobileOpen(false);
+  // Customer cinematic dashboard at /portal is a self-contained shell —
+  // it owns its own header, CONNECT EXCHANGE CTA, SIGN OUT, PAPER chrome,
+  // and battlefield composition. Suppress the global Layout sidebar +
+  // admin top telemetry strip on this route so customers never see
+  // operator infrastructure (admin modules, Platform Admin, AdminTopTelemetryBar)
+  // — even when an admin previews the customer route on the admin host.
+  // Admin terminal at /command is untouched (locked invariant).
+  const isCustomerPortalRoute = location.startsWith("/portal");
 
   useEffect(() => {
     const h = () => { if (window.innerWidth >= 768) setMobileOpen(false); };
@@ -613,7 +621,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           never show platform-wide operator vitals, even if an admin signs
           in there. Telemetry lives exclusively on admintrade. */}
       <ApiBaseUrlBanner />
-      {IS_ADMIN_HOST && isAdmin && <AdminTopTelemetryBar />}
+      {IS_ADMIN_HOST && isAdmin && !isCustomerPortalRoute && <AdminTopTelemetryBar />}
 
       {/* Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
@@ -626,7 +634,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             Trade Journal / Validation / Sentiment AI / Multi-Asset Chart
             / Exchange / Command Center / Desktop Terminal / Institutional
             Terminal / Signal Debug / System Verification navigation. */}
-        {IS_ADMIN_HOST && (
+        {IS_ADMIN_HOST && !isCustomerPortalRoute && (
           <>
             {mobileOpen && (
               <div className="md:hidden fixed inset-0 z-30 bg-black/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
