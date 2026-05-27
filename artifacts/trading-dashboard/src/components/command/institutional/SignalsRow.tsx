@@ -60,11 +60,18 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlacehol
     // Sort by AI confidence DESC so the 80-90%+ momentum surfaces at the
     // top of each group (LONG / SHORT). Tickers without a breakdown yet
     // fall to the bottom of their section. Original ticker order preserved
-    // only as a stable tiebreaker via Array.sort stability.
+    // as a stable tiebreaker via Array.sort stability.
+    //
+    // STABILITY GUARD: bucket confidence into 5-pt bins before comparing
+    // so 87/89 sort identically and the matrix doesn't jitter every tick
+    // when the engine wiggles by 1-2 pts. Real movement (e.g. 79→81 or
+    // 84→90) still re-orders cleanly because it crosses a bucket boundary.
+    const bucket = (c?: number) =>
+      c == null ? -1 : Math.floor(c / 5);
     const byConfidenceDesc = (
       a: { breakdown?: SymBreakdown },
       b: { breakdown?: SymBreakdown },
-    ) => (b.breakdown?.avgConfidence ?? -1) - (a.breakdown?.avgConfidence ?? -1);
+    ) => bucket(b.breakdown?.avgConfidence) - bucket(a.breakdown?.avgConfidence);
     longs.sort(byConfidenceDesc);
     shorts.sort(byConfidenceDesc);
     return { longs, shorts };

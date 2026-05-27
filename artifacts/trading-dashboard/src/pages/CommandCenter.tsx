@@ -163,7 +163,7 @@ function TopConvictionPulse({ engine }: { engine?: EngineStatus }) {
         display: "flex",
         alignItems: "center",
         gap: 10,
-        padding: "8px 12px",
+        padding: "7px 12px",
         border: `1px solid ${N.BRAND}33`,
         borderRadius: 4,
         background: `linear-gradient(90deg, ${N.BRAND}0d 0%, ${N.BG} 70%, ${N.BRAND}08 100%)`,
@@ -196,11 +196,57 @@ function TopConvictionPulse({ engine }: { engine?: EngineStatus }) {
       <div style={{
         flex: 1, minWidth: 0,
         display: "flex", alignItems: "center",
-        gap: 10, overflow: "hidden",
+        gap: 8, overflow: "hidden",
       }}>
         {ranked.map((r, i) => {
           const dirColor = r.dir === "LONG" ? N.LONG : N.SHORT;
           const DirIcon  = r.dir === "LONG" ? TrendingUp : TrendingDown;
+          // Conviction tier — emotional contrast between elite / strong /
+          // active setups. Drives border weight, glow intensity, font weight,
+          // and dot size so the operator's eye locks onto 90%+ instantly.
+          const tier: "ELITE" | "STRONG" | "ACTIVE" =
+            r.conf >= 90 ? "ELITE" :
+            r.conf >= 80 ? "STRONG" :
+                           "ACTIVE";
+          const isTop = i === 0;
+          const isEliteTop = isTop && tier === "ELITE";
+
+          const tierStyle = {
+            ELITE: {
+              border:      `1px solid ${dirColor}cc`,
+              bg:          `linear-gradient(180deg, ${dirColor}33 0%, ${dirColor}10 100%)`,
+              shadow:      `0 0 10px ${dirColor}55, inset 0 0 8px ${dirColor}33`,
+              tickerWt:    900 as const,
+              tickerSize:  12,
+              confSize:    12,
+              confShadow:  `0 0 7px ${dirColor}, 0 0 14px ${dirColor}80`,
+              dotSize:     6,
+              padding:     "5px 9px",
+            },
+            STRONG: {
+              border:      `1px solid ${dirColor}66`,
+              bg:          `linear-gradient(180deg, ${dirColor}1c 0%, transparent 100%)`,
+              shadow:      `inset 0 0 6px ${dirColor}1f`,
+              tickerWt:    800 as const,
+              tickerSize:  11,
+              confSize:    11,
+              confShadow:  `0 0 4px ${dirColor}66`,
+              dotSize:     5,
+              padding:     "4px 8px",
+            },
+            ACTIVE: {
+              border:      `1px solid ${dirColor}30`,
+              bg:          "transparent",
+              shadow:      "none",
+              tickerWt:    700 as const,
+              tickerSize:  10.5,
+              confSize:    10.5,
+              confShadow:  "none",
+              dotSize:     4,
+              padding:     "3px 7px",
+            },
+          }[tier];
+
           return (
             <span
               key={r.symbol}
@@ -208,35 +254,50 @@ function TopConvictionPulse({ engine }: { engine?: EngineStatus }) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 6,
-                padding: "4px 8px",
-                background: `linear-gradient(180deg, ${dirColor}14 0%, transparent 100%)`,
-                border: `1px solid ${dirColor}40`,
+                padding: tierStyle.padding,
+                background: tierStyle.bg,
+                border: tierStyle.border,
                 borderRadius: 3,
                 flexShrink: 0,
                 position: "relative",
+                boxShadow: isEliteTop
+                  ? `${tierStyle.shadow}, 0 0 18px ${dirColor}77`
+                  : tierStyle.shadow,
+                animation: isEliteTop
+                  ? "cd-pulse-halo 1800ms ease-in-out infinite"
+                  : undefined,
               }}
             >
-              {/* tiny pulse dot — animated when this is the #1 conviction */}
+              {/* Pulse dot — animated on #1, larger + brighter on ELITE */}
               <span
                 aria-hidden
                 style={{
-                  width: 5, height: 5, borderRadius: "50%",
+                  width: tierStyle.dotSize, height: tierStyle.dotSize,
+                  borderRadius: "50%",
                   background: dirColor,
-                  boxShadow: `0 0 6px ${dirColor}, 0 0 12px ${dirColor}80`,
-                  animation: i === 0 ? "cd-pulse-dot 1400ms ease-in-out infinite" : undefined,
+                  boxShadow: tier === "ELITE"
+                    ? `0 0 8px ${dirColor}, 0 0 16px ${dirColor}cc`
+                    : tier === "STRONG"
+                    ? `0 0 6px ${dirColor}, 0 0 12px ${dirColor}80`
+                    : `0 0 3px ${dirColor}80`,
+                  animation: isTop ? "cd-pulse-dot 1400ms ease-in-out infinite" : undefined,
                 }}
               />
               <span style={{
-                fontSize: 11, fontWeight: 800, color: N.TEXT_0,
+                fontSize: tierStyle.tickerSize,
+                fontWeight: tierStyle.tickerWt,
+                color: tier === "ACTIVE" ? N.TEXT_1 : N.TEXT_0,
                 letterSpacing: "0.08em",
               }}>
                 {r.display}
               </span>
-              <DirIcon size={10} style={{ color: dirColor }} />
+              <DirIcon size={tier === "ELITE" ? 11 : 10} style={{ color: dirColor }} />
               <span style={{
-                fontSize: 11, fontWeight: 800, color: dirColor,
+                fontSize: tierStyle.confSize,
+                fontWeight: tier === "ELITE" ? 900 : 800,
+                color: dirColor,
                 letterSpacing: "0.04em",
-                textShadow: `0 0 4px ${dirColor}66`,
+                textShadow: tierStyle.confShadow,
               }}>
                 {r.conf}
               </span>
@@ -245,11 +306,17 @@ function TopConvictionPulse({ engine }: { engine?: EngineStatus }) {
         })}
       </div>
       {/* Inline keyframes — scoped to this strip so we don't bleed into the
-          global animation lib. */}
+          global animation lib. cd-pulse-halo only fires on the #1 conviction
+          when it crosses into ELITE (≥90), per the "subtle movement on only
+          the strongest signal" directive. */}
       <style>{`
         @keyframes cd-pulse-dot {
           0%, 100% { transform: scale(1);   opacity: 1;   }
           50%      { transform: scale(1.5); opacity: 0.55;}
+        }
+        @keyframes cd-pulse-halo {
+          0%, 100% { filter: brightness(1)    saturate(1);   }
+          50%      { filter: brightness(1.18) saturate(1.15);}
         }
       `}</style>
     </div>
@@ -566,7 +633,7 @@ export default function CommandCenter() {
         onSelectLive={selectLive}
       />
 
-      <main className="flex-1 flex flex-col gap-2 py-2"
+      <main className="flex-1 flex flex-col gap-1.5 py-1.5"
             style={{ maxWidth: 1880, width: "100%", margin: "0 auto" }}>
 
         {/* Row 0 — Global platform telemetry */}
@@ -588,10 +655,10 @@ export default function CommandCenter() {
         </div>
 
         <section
-          className="grid gap-2 px-2 mt-1"
+          className="grid gap-1.5 px-2"
           style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}
         >
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <AiAutotradeBar />
             <LiveControlBar
               assetClass="CRYPTO"
@@ -602,7 +669,7 @@ export default function CommandCenter() {
             />
             <CryptoMajorsSignalsPanel engine={engine} />
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <AiAutotradeBar />
             <LiveControlBar
               assetClass="CRYPTO"
