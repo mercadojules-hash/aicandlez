@@ -14,6 +14,7 @@
  * high-stakes, visually intentional, communicates state instantly.
  */
 
+import type { ReactNode } from "react";
 import { Zap, OctagonAlert, Activity, Ban, ShieldCheck } from "lucide-react";
 import { N } from "./theme";
 
@@ -49,6 +50,13 @@ interface Props {
   eligible?:           boolean;
   /** Optional sub-label addendum when not eligible (e.g. "MAX 72% · NEED 80%"). */
   eligibilityReason?:  string;
+  /**
+   * Optional override for the leading 50×50 icon tile (left of the label).
+   * Customer portal passes the AICandlez logo here so the bar doubles as
+   * the brand anchor for the live-intelligence strip. /command call sites
+   * omit it and keep the default state-driven icon (Zap / Activity / etc).
+   */
+  leadingSlot?:        ReactNode;
 }
 
 const KEYFRAMES = `
@@ -80,6 +88,7 @@ export function LiveControlBar({
   onToggle,
   eligible = true,
   eligibilityReason,
+  leadingSlot,
 }: Props) {
   // Visual buckets: LIVE/EXECUTING share the gold pulsing treatment;
   // PAUSED/HALTED share the red emergency-stop treatment; ARMED is the
@@ -243,15 +252,17 @@ export function LiveControlBar({
               : "none",
             flexShrink: 0,
           }}>
-            {isHalted
-              ? <OctagonAlert size={24} style={{ color, filter: `drop-shadow(0 0 4px ${color})` }} />
-              : isExecuting
-              ? <Activity     size={24} style={{ color: colorBrt, animation: "neon-pulse 1.1s infinite", filter: `drop-shadow(0 0 4px ${color})` }} />
-              : isArmedRdy
-              ? <ShieldCheck  size={24} style={{ color: colorBrt, filter: `drop-shadow(0 0 4px ${color})` }} />
-              : blocked
-              ? <Ban          size={24} style={{ color: N.TEXT_3 }} />
-              : <Zap          size={24} style={{ color }} />}
+            {leadingSlot != null ? leadingSlot : (
+              isHalted
+                ? <OctagonAlert size={24} style={{ color, filter: `drop-shadow(0 0 4px ${color})` }} />
+                : isExecuting
+                ? <Activity     size={24} style={{ color: colorBrt, animation: "neon-pulse 1.1s infinite", filter: `drop-shadow(0 0 4px ${color})` }} />
+                : isArmedRdy
+                ? <ShieldCheck  size={24} style={{ color: colorBrt, filter: `drop-shadow(0 0 4px ${color})` }} />
+                : blocked
+                ? <Ban          size={24} style={{ color: N.TEXT_3 }} />
+                : <Zap          size={24} style={{ color }} />
+            )}
           </span>
 
           <div className="flex flex-col items-start">

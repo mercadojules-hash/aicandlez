@@ -5143,7 +5143,25 @@ export function PortalCustomerShell() {
         {/* Unified LIVE AI CRYPTO EXECUTION bar — single bar spanning
             both columns (PAPER, readonly, no ARM LIVE per locked
             customer invariant). */}
-        <LiveControlBar assetClass="CRYPTO" state="PAPER" />
+        <LiveControlBar
+          assetClass="CRYPTO"
+          state="PAPER"
+          leadingSlot={
+            <img
+              src={aiCandlezLogoBrandCell}
+              alt="AICandlez"
+              draggable={false}
+              style={{
+                height: 34,
+                width: "auto",
+                maxWidth: 44,
+                objectFit: "contain",
+                filter: "drop-shadow(0 0 6px rgba(102,255,102,0.45))",
+                userSelect: "none",
+              }}
+            />
+          }
+        />
 
         {/* Phase 3 — Today's Intelligence Panel. Customer-only social
             proof + performance storytelling above the battlefield.
@@ -5180,13 +5198,20 @@ export function PortalCustomerShell() {
           plan={plan}
         />
 
-        {/* Phase 5 — Performance Credibility strip. Discipline-forward
-            trust indicators: verified paper performance, rolling 7d win
-            rate, median hold duration, AI funnel (evaluated/entered),
-            and risk gates triggered today. Customer-only. */}
-        <CredibilityStrip
-          history={paperHistory}
+        {/* Phase 8.3 — LIVE INTELLIGENCE BAND. Replaces the static
+            CredibilityStrip with 6 compact SVG widgets that animate
+            against real telemetry: conviction radar (opportunities),
+            signal pressure (signalsPerMin), long/short flow (direction
+            split), breakout probability ring (% ≥ 80 conviction),
+            market heat dots (avg conviction), top conviction pulse
+            (best opportunity). All SVG, no chart libs, no GPU abuse.
+            Customer-only — never reached from /command. */}
+        <LiveIntelligenceBand
+          opportunities={opportunities}
           engine={engineStatus}
+          signalsPerMin={signalsPerMin}
+          openCount={openTrades.length}
+          history={paperHistory}
         />
 
         {/* Phase 7 — Elite Intelligence Chip. Renders ONLY when an
@@ -5461,43 +5486,6 @@ function TodaysIntelligencePanel({
         color={engineLive ? T.NEON : T.TEXT_2}
         pulse={engineLive}
       />
-
-      {/* Phase 8.2 — branded telemetry anchor. Lives inside the metrics
-          grid (same `auto-fit minmax(190px)` row) so it scales with the
-          telemetry HUD rather than the page header. Subtle institutional
-          glow only; no floating-banner treatment. Logo height is locked
-          to metric-cell rhythm via clamp() so it gracefully reduces on
-          tablet/mobile without clipping. */}
-      <div
-        aria-label="AICandlez"
-        className="cd-customer-brand-cell"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "8px 12px",
-          borderRadius: 4,
-          background: "linear-gradient(180deg, rgba(102,255,102,0.06) 0%, rgba(0,0,0,0.35) 100%)",
-          border: `1px solid ${T.NEON}22`,
-          boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 0 12px rgba(102,255,102,0.06)`,
-          minHeight: 60,
-          overflow: "hidden",
-        }}
-      >
-        <img
-          src={aiCandlezLogoBrandCell}
-          alt="AICandlez"
-          draggable={false}
-          style={{
-            height: "clamp(28px, 4.2vw, 44px)",
-            width: "auto",
-            maxWidth: "100%",
-            objectFit: "contain",
-            filter: "drop-shadow(0 0 6px rgba(102,255,102,0.22))",
-            userSelect: "none",
-          }}
-        />
-      </div>
 
       {/* Phase 4 — emotional performance storytelling caption. Spans the
           full grid width via `gridColumn: 1 / -1`. Composes 2-3 narrative
@@ -6002,11 +5990,318 @@ function WelcomeBackBanner({
 }
 
 /* ──────────────────────────────────────────────────────────────────────── */
-/* Phase 5 — CredibilityStrip                                                 */
-/* Institutional trust indicators — verified paper performance, rolling 7d   */
-/* win rate, median hold duration, AI funnel (evaluated/entered), and risk   */
-/* gates triggered today. Discipline-forward language ("AI avoided",          */
-/* "Risk gates filtered"). Customer-only.                                     */
+/* Phase 8.3 — LiveIntelligenceBand                                           */
+/* Cinematic 6-widget HUD that replaces the static CredibilityStrip. Every   */
+/* widget is SVG, hand-rolled (no chart libs), and driven by real telemetry  */
+/* already in scope: opportunities (per-symbol conviction + direction),      */
+/* engine.signalsGenerated (rate), paperHistory (closed PnL), openCount.     */
+/* CSS keyframes only — no requestAnimationFrame loop, no GPU abuse. Widgets */
+/* reduce intensity / fall back to "ARMING" copy when there's no live data.  */
+/* Customer-only — never reached from /command.                               */
+/* ──────────────────────────────────────────────────────────────────────── */
+function LiveIntelligenceBand({
+  opportunities, engine, signalsPerMin, openCount, history,
+}: {
+  opportunities: ReadonlyArray<OpportunityVM>;
+  engine:        EngineLite | undefined;
+  signalsPerMin: number;
+  openCount:     number;
+  history:       ReadonlyArray<{ symbol: string; display: string; pnl: number; pnlPct: number; closedAt: number; openedAt: number }>;
+}) {
+  const live = !!engine?.running;
+
+  const m = useMemo(() => {
+    const n = opportunities.length;
+    let longs = 0, shorts = 0, sumConv = 0, eliteCount = 0;
+    let best: OpportunityVM | null = null;
+    for (const o of opportunities) {
+      const c = o.convictionScore ?? 0;
+      if (o.direction === "LONG")  longs++;
+      if (o.direction === "SHORT") shorts++;
+      sumConv += c;
+      if (c >= 80) eliteCount++;
+      if (!best || (best.convictionScore ?? 0) < c) best = o;
+    }
+    const avgConv = n > 0 ? sumConv / n : 0;
+    const breakoutPct = n > 0 ? Math.round((eliteCount / n) * 100) : 0;
+    // Direction flow ratios (avoid divide-by-zero).
+    const flowDenom = Math.max(longs + shorts, 1);
+    const longPct  = Math.round((longs  / flowDenom) * 100);
+    const shortPct = 100 - longPct;
+    // Today's win count for the top-pulse caption.
+    const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+    const todayWins = history.filter(h => h.closedAt >= today0.getTime() && h.pnl > 0).length;
+    return { n, longs, shorts, avgConv, eliteCount, breakoutPct, longPct, shortPct, best: best as OpportunityVM | null, todayWins };
+  }, [opportunities, history]);
+
+  // Signal-pressure gauge — clamp 0..30 sig/min onto a 0..100% height.
+  const pressurePct = Math.min(100, Math.max(0, (signalsPerMin / 30) * 100));
+  // Heat intensity tint based on avg conviction.
+  const heatColor =
+    m.avgConv >= 75 ? T.NEON :
+    m.avgConv >= 60 ? "#7CFF00" :
+    m.avgConv >= 45 ? "#FFC857" :
+                      "#9aa39c";
+
+  // Top 18 symbols by conviction for the heat grid (6x3).
+  const heatCells = useMemo(() => {
+    return [...opportunities]
+      .sort((a, b) => (b.convictionScore ?? 0) - (a.convictionScore ?? 0))
+      .slice(0, 18);
+  }, [opportunities]);
+
+  return (
+    <section
+      aria-label="Live intelligence"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+        gap: 10,
+        padding: "12px 14px",
+        background: "linear-gradient(180deg, rgba(102,255,102,0.05) 0%, rgba(0,0,0,0.6) 100%)",
+        border: `1px solid ${T.NEON}28`,
+        borderRadius: 6,
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 0 22px rgba(102,255,102,0.06)`,
+        fontFamily: T.FONT_MONO,
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <style>{`
+        @keyframes lib-radar-sweep { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes lib-pressure-fill { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } }
+        @keyframes lib-flow-glow { 0%,100% { filter: drop-shadow(0 0 3px var(--lib-c)); } 50% { filter: drop-shadow(0 0 8px var(--lib-c)); } }
+        @keyframes lib-ring-glow { 0%,100% { stroke-opacity: 0.9; } 50% { stroke-opacity: 0.55; } }
+        @keyframes lib-heat-blink { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+        @keyframes lib-pulse-dot { 0%,100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.18); opacity: 1; } }
+      `}</style>
+
+      {/* 1. CONVICTION RADAR — sweep + opportunity dots placed by direction */}
+      <LIBCell label="CONVICTION RADAR" sub={live ? `${m.n} TRACKED` : "ARMING"}>
+        <svg viewBox="0 0 100 100" style={{ width: "100%", height: 92 }}>
+          <defs>
+            <radialGradient id="lib-radar-grad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%"   stopColor={T.NEON} stopOpacity="0.18" />
+              <stop offset="100%" stopColor={T.NEON} stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <circle cx="50" cy="50" r="46" fill="url(#lib-radar-grad)" />
+          <circle cx="50" cy="50" r="46" fill="none" stroke={`${T.NEON}33`} strokeWidth="0.6" />
+          <circle cx="50" cy="50" r="30" fill="none" stroke={`${T.NEON}22`} strokeWidth="0.4" />
+          <circle cx="50" cy="50" r="14" fill="none" stroke={`${T.NEON}22`} strokeWidth="0.4" />
+          {/* sweep wedge */}
+          <g style={{ transformOrigin: "50px 50px", animation: live ? "lib-radar-sweep 4s linear infinite" : "none" }}>
+            <path d="M50,50 L50,4 A46,46 0 0,1 92,38 Z" fill={`${T.NEON}26`} />
+            <line x1="50" y1="50" x2="50" y2="4" stroke={T.NEON} strokeWidth="0.8" />
+          </g>
+          {/* opportunity blips — angle by direction, radius by (100 - conviction) so high conviction = closer to center */}
+          {opportunities.slice(0, 24).map((o, i) => {
+            const conv = o.convictionScore ?? 0;
+            const r = 46 - (conv * 0.38);
+            const baseAngle = o.direction === "SHORT" ? 210 : 30;
+            const ang = (baseAngle + (i * 13)) % 360;
+            const rad = (ang * Math.PI) / 180;
+            const x = 50 + Math.cos(rad) * r;
+            const y = 50 + Math.sin(rad) * r;
+            const color = conv >= 80 ? T.NEON : conv >= 60 ? "#7CFF00" : "#FFC857";
+            return <circle key={o.symbol + i} cx={x} cy={y} r={conv >= 80 ? 1.6 : 1.1} fill={color} opacity={conv >= 60 ? 1 : 0.55} />;
+          })}
+        </svg>
+      </LIBCell>
+
+      {/* 2. SIGNAL PRESSURE — vertical bar gauge */}
+      <LIBCell label="SIGNAL PRESSURE" sub={live ? `${signalsPerMin >= 10 ? signalsPerMin.toFixed(0) : signalsPerMin.toFixed(1)} / MIN` : "OFFLINE"}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 92, padding: "4px 6px" }}>
+          {[0,1,2,3,4,5,6,7].map(col => {
+            const threshold = (col + 1) * 12.5;
+            const lit = pressurePct >= threshold;
+            const colColor =
+              col >= 6 ? T.NEON :
+              col >= 4 ? "#7CFF00" :
+              col >= 2 ? "#FFC857" :
+                         "#ff6b6b";
+            return (
+              <div key={col} style={{
+                flex: 1,
+                height: `${20 + col * 10}%`,
+                background: lit ? colColor : `${colColor}22`,
+                borderRadius: 1,
+                boxShadow: lit ? `0 0 6px ${colColor}` : "none",
+                animation: lit && live ? `lib-pressure-fill ${1.4 + col * 0.18}s ease-in-out infinite` : "none",
+                transition: "background 220ms",
+              }} />
+            );
+          })}
+        </div>
+      </LIBCell>
+
+      {/* 3. LONG / SHORT FLOW — bidirectional bar */}
+      <LIBCell label="LONG / SHORT FLOW" sub={`${m.longs}L · ${m.shorts}S`}>
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 6, height: 92, padding: "0 4px" }}>
+          {/* Long bar */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 28, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", color: T.NEON }}>LONG</span>
+            <div style={{ flex: 1, height: 10, background: `${T.NEON}10`, borderRadius: 2, overflow: "hidden", position: "relative" }}>
+              <div style={{
+                ["--lib-c" as string]: T.NEON,
+                width: `${m.longPct}%`, height: "100%",
+                background: `linear-gradient(90deg, ${T.NEON}55, ${T.NEON})`,
+                boxShadow: `0 0 8px ${T.NEON}`,
+                transition: "width 600ms ease",
+                animation: live && m.longs > 0 ? "lib-flow-glow 2.6s ease-in-out infinite" : "none",
+              }} />
+            </div>
+            <span style={{ width: 28, textAlign: "right", fontSize: 10, color: T.TEXT_1, fontVariantNumeric: "tabular-nums" }}>{m.longPct}%</span>
+          </div>
+          {/* Short bar */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 28, fontSize: 9, fontWeight: 800, letterSpacing: "0.12em", color: "#ff6b6b" }}>SHRT</span>
+            <div style={{ flex: 1, height: 10, background: "#ff6b6b10", borderRadius: 2, overflow: "hidden", position: "relative" }}>
+              <div style={{
+                ["--lib-c" as string]: "#ff6b6b",
+                width: `${m.shortPct}%`, height: "100%",
+                background: "linear-gradient(90deg, #ff6b6b55, #ff6b6b)",
+                boxShadow: "0 0 8px #ff6b6b",
+                transition: "width 600ms ease",
+                animation: live && m.shorts > 0 ? "lib-flow-glow 2.6s ease-in-out infinite" : "none",
+              }} />
+            </div>
+            <span style={{ width: 28, textAlign: "right", fontSize: 10, color: T.TEXT_1, fontVariantNumeric: "tabular-nums" }}>{m.shortPct}%</span>
+          </div>
+          {/* Open positions footer */}
+          <div style={{ fontSize: 8.5, letterSpacing: "0.16em", color: T.TEXT_3, textAlign: "center", marginTop: 2 }}>
+            {openCount} OPEN PAPER
+          </div>
+        </div>
+      </LIBCell>
+
+      {/* 4. BREAKOUT PROBABILITY RING */}
+      <LIBCell label="BREAKOUT PROBABILITY" sub={live ? `${m.eliteCount} ≥ 80 CONV` : "—"}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 92, position: "relative" }}>
+          <svg viewBox="0 0 100 100" style={{ width: 92, height: 92 }}>
+            <circle cx="50" cy="50" r="38" fill="none" stroke={`${T.NEON}18`} strokeWidth="7" />
+            <circle
+              cx="50" cy="50" r="38" fill="none"
+              stroke={T.NEON} strokeWidth="7" strokeLinecap="round"
+              strokeDasharray={`${(m.breakoutPct / 100) * (2 * Math.PI * 38)} 999`}
+              transform="rotate(-90 50 50)"
+              style={{
+                filter: `drop-shadow(0 0 4px ${T.NEON})`,
+                transition: "stroke-dasharray 700ms ease",
+                animation: live && m.breakoutPct > 0 ? "lib-ring-glow 2.8s ease-in-out infinite" : "none",
+              }}
+            />
+          </svg>
+          <div style={{
+            position: "absolute",
+            display: "flex", flexDirection: "column", alignItems: "center",
+            fontFamily: T.FONT_MONO,
+          }}>
+            <span style={{ fontSize: 22, fontWeight: 800, color: T.NEON, lineHeight: 1, textShadow: `0 0 8px ${T.NEON}55`, fontVariantNumeric: "tabular-nums" }}>
+              {m.breakoutPct}%
+            </span>
+            <span style={{ fontSize: 8, letterSpacing: "0.18em", color: T.TEXT_3, marginTop: 2 }}>ELITE BAND</span>
+          </div>
+        </div>
+      </LIBCell>
+
+      {/* 5. MARKET HEAT — 6×3 grid of dots colored by per-symbol conviction */}
+      <LIBCell label="MARKET HEAT" sub={live ? `AVG CONV ${m.avgConv.toFixed(0)}` : "WARMING"}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(6, 1fr)",
+          gridTemplateRows: "repeat(3, 1fr)",
+          gap: 4, height: 92, padding: "6px 4px",
+        }}>
+          {Array.from({ length: 18 }, (_, i) => {
+            const cell = heatCells[i];
+            const conv = cell?.convictionScore ?? 0;
+            const filled = !!cell;
+            const cellColor =
+              conv >= 80 ? T.NEON      :
+              conv >= 60 ? "#7CFF00"   :
+              conv >= 45 ? "#FFC857"   :
+              filled     ? "#9aa39c"   :
+                           "#2a2f2a";
+            return (
+              <div key={i} title={cell ? `${cell.display} ${conv.toFixed(0)}` : ""} style={{
+                background: filled ? cellColor : "transparent",
+                border: filled ? "none" : `1px dashed ${T.NEON}22`,
+                borderRadius: 2,
+                boxShadow: filled && conv >= 60 ? `0 0 4px ${cellColor}` : "none",
+                opacity: filled ? (conv >= 60 ? 1 : 0.7) : 0.4,
+                animation: filled && live && conv >= 75 ? `lib-heat-blink ${1.8 + (i % 5) * 0.25}s ease-in-out infinite` : "none",
+              }} />
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 8, letterSpacing: "0.16em", color: heatColor, textAlign: "center", marginTop: 2 }}>
+          {m.avgConv >= 75 ? "HOT" : m.avgConv >= 60 ? "ACTIVE" : m.avgConv >= 45 ? "MIXED" : "QUIET"}
+        </div>
+      </LIBCell>
+
+      {/* 6. TOP CONVICTION PULSE */}
+      <LIBCell label="TOP CONVICTION" sub={m.todayWins > 0 ? `${m.todayWins} WIN${m.todayWins === 1 ? "" : "S"} TODAY` : "AWAITING CLOSE"}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 92, gap: 4 }}>
+          {m.best ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{
+                  width: 10, height: 10, borderRadius: 10,
+                  background: (m.best.convictionScore ?? 0) >= 80 ? T.NEON : "#FFC857",
+                  boxShadow: `0 0 8px ${(m.best.convictionScore ?? 0) >= 80 ? T.NEON : "#FFC857"}`,
+                  animation: live ? "lib-pulse-dot 1.4s ease-in-out infinite" : "none",
+                }} />
+                <span style={{ fontSize: 14, fontWeight: 800, color: T.TEXT_0, letterSpacing: "0.08em" }}>
+                  {m.best.display}
+                </span>
+              </div>
+              <span style={{ fontSize: 26, fontWeight: 800, color: T.NEON, lineHeight: 1, fontVariantNumeric: "tabular-nums", textShadow: `0 0 10px ${T.NEON}66` }}>
+                {(m.best.convictionScore ?? 0).toFixed(0)}
+              </span>
+              <span style={{ fontSize: 8.5, letterSpacing: "0.18em", color: m.best.direction === "SHORT" ? "#ff6b6b" : T.NEON }}>
+                {m.best.direction} CONVICTION
+              </span>
+            </>
+          ) : (
+            <span style={{ fontSize: 11, letterSpacing: "0.18em", color: T.TEXT_3 }}>SCANNING…</span>
+          )}
+        </div>
+      </LIBCell>
+    </section>
+  );
+}
+
+function LIBCell({ label, sub, children }: { label: string; sub: string; children: React.ReactNode }) {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column",
+      padding: "8px 10px",
+      background: "rgba(0,0,0,0.45)",
+      border: `1px solid ${T.NEON}1f`,
+      borderRadius: 4,
+      minHeight: 138,
+      overflow: "hidden",
+    }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "baseline",
+        fontSize: 9, fontWeight: 800, letterSpacing: "0.16em",
+        color: T.TEXT_3, marginBottom: 4,
+      }}>
+        <span>{label}</span>
+        <span style={{ color: T.TEXT_2, letterSpacing: "0.12em" }}>{sub}</span>
+      </div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Phase 5 — CredibilityStrip (RETIRED from mount — kept for rollback only)   */
+/* Replaced by LiveIntelligenceBand. Function preserved so a one-line revert  */
+/* in the mount site fully restores the old strip without re-implementation.  */
 /* ──────────────────────────────────────────────────────────────────────── */
 function CredibilityStrip({
   history, engine,

@@ -1,0 +1,93 @@
+Next customer battlefield enhancement request — elevate the portal from “clean trading UI” into a true cinematic live-intelligence surface with reactive visual telemetry.
+
+Core direction:
+Replace the current 3 static metric rows ABOVE the “UPGRADE TO ENABLE AI TRADING” strip with a live radar/chart intelligence band inspired by institutional AI terminals.
+
+Reference aesthetic:
+Use the attached neon HUD/radar dashboard reference as inspiration ONLY for energy, motion density, and cinematic feel — not for exact layout replication.
+
+Requested structural changes:
+
+1. REMOVE the current 3 stacked telemetry rows above:
+
+* VERIFIED PAPER PNL
+* ROLLING 7D WIN RATE
+* MEDIAN HOLD
+* AI EVALUATED TODAY
+* etc.
+
+Those rows currently feel too static and text-heavy.
+
+2. REPLACE that vertical space with:
+   A horizontal strip/grid of LIVE animated intelligence widgets:
+
+* 6–8 compact radar/chart modules across
+* must feel alive
+* real market-driven movement
+* visually impressive at first glance
+* cinematic “WOW factor”
+
+Examples of acceptable modules:
+
+* rotating conviction radar
+* live volatility pulse
+* BTC/ETH dominance oscillator
+* AI signal pressure gauge
+* market heat pulse
+* liquidity wave graph
+* trend momentum scanner
+* sentiment flow radar
+* breakout probability ring
+* correlation matrix pulse
+
+Critical requirement:
+These are NOT fake decorative animations.
+
+They must:
+
+* connect to live telemetry / market data already available in platform state
+* respond to actual market movement
+* animate/react based on real changing values
+* continuously feel “alive”
+
+Implementation preference:
+
+* lightweight canvas/SVG/react-motion animations
+* avoid heavy GPU abuse
+* preserve FPS stability
+* no giant chart libraries unless already present
+* institutional black/neon aesthetic preserved
+
+Branding change:
+Move the primary AICandlez logo UP one level into the same container as:
+“AI CRYPTO PAPER TRADING • ACTIVE”
+
+Specific request:
+
+* place logo on LEFT side of that row
+* remove the current bolt/lightning icon from that line
+* logo becomes the visual anchor for the entire live trading strip
+* current tiny top-left logo can remain minimal/subtle
+
+Design constraints:
+
+* no increase to overall page clutter
+* battlefield must remain readable
+* preserve conversion CTA hierarchy
+* maintain customer-only isolation
+* /command operator shell untouched
+* responsive behavior preserved
+
+Success criteria:
+When a user lands on customer /portal:
+
+* immediate visual impact
+* platform feels alive
+* market feels active before user even scrolls
+* charts/radars visibly reacting in real-time
+* stronger premium AI-terminal identity
+* noticeable “this is different” emotional response
+
+Important:
+This is a VISUAL INTELLIGENCE LAYER enhancement — not a layout rewrite.
+Preserve the existing battlefield architecture and conversion funnel.
