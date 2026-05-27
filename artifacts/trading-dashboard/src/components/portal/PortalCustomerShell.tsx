@@ -31,9 +31,9 @@ import {
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useAuth, useClerk } from "@clerk/react";
+import { useAuth, useClerk, useUser } from "@clerk/react";
 import {
-  Activity, AlertTriangle, CheckCircle2, Clock, Database, Filter, Globe,
+  Activity, AlertTriangle, Bell, CheckCircle2, Clock, Database, Filter, Globe,
   LineChart as LineChartIcon, Lock, MonitorPlay, PieChart, Power, Radar, Radio,
   Search, Shield, Star, Terminal, Timer,
 } from "lucide-react";
@@ -4295,21 +4295,39 @@ function CustomerAiActivityFeed({ engine }: { engine?: EngineLite }) {
  * No latency, no uptime, no engine ops, no upgrade noise above the
  * battlefield. All admin/operator infra hidden. */
 function CustomerTopHeader({
-  isExchangeConnected, onConnect, onSignOut, onAccount, onDisclaimer,
+  isExchangeConnected, plan, onConnect, onSignOut, onAccount, onDisclaimer, onNotifications,
 }: {
   isExchangeConnected: boolean;
-  onConnect:    () => void;
-  onSignOut:    () => void;
-  onAccount:    () => void;
-  onDisclaimer: () => void;
+  plan: Plan;
+  onConnect:       () => void;
+  onSignOut:       () => void;
+  onAccount:       () => void;
+  onDisclaimer:    () => void;
+  onNotifications: () => void;
 }) {
+  const { user, isLoaded } = useUser();
+  const displayName = user?.firstName
+    ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}`
+    : user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ?? "Trader";
+  const initials = (user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0] ?? "T").toUpperCase();
+  const avatarUrl = user?.imageUrl;
+
+  // Subscription tier chip — color-scaled by plan tier.
+  const tierMeta =
+    plan === "pro"
+      ? { label: "PRO",     color: N.GOLD_BRT }
+      : plan === "starter"
+        ? { label: "STARTER", color: N.BRAND_BRT }
+        : { label: "FREE",    color: N.TEXT_2 };
+
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: 14, padding: "14px 20px",
+      display: "flex", alignItems: "center", gap: 12, padding: "14px 20px",
       borderBottom: `1px solid ${N.BORDER}`,
       background: `linear-gradient(180deg, ${N.SURFACE_1} 0%, ${N.BG} 100%)`,
       fontFamily: N.FONT_MONO, flexWrap: "wrap",
     }}>
+      {/* BRAND + ACCOUNT STATUS (PAPER/EXCHANGE) */}
       <div style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
         <img src={`${import.meta.env.BASE_URL}aicandlez-logo.png`} alt="AICandlez"
           style={{ height: 22, width: 22, objectFit: "contain", borderRadius: 4,
@@ -4329,6 +4347,9 @@ function CustomerTopHeader({
 
       <div style={{ flex: 1 }} />
 
+      {/* CONNECT EXCHANGE — primary CTA. Copy updated from
+          "ENABLE LIVE AI TRADING" → "CONNECT EXCHANGE TO ENABLE LIVE TRADING"
+          (sounds onboarding-friendly, not arcade/dangerous). */}
       <button onClick={onConnect} style={{
         display: "inline-flex", alignItems: "center", gap: 10,
         padding: "11px 22px",
@@ -4356,10 +4377,69 @@ function CustomerTopHeader({
           background: N.BRAND_BRT,
           boxShadow: `0 0 8px ${N.BRAND_BRT}, 0 0 16px ${N.BRAND}`,
         }} />
-        {isExchangeConnected ? "MANAGE EXCHANGE" : "CONNECT TO AN EXCHANGE"}
+        {isExchangeConnected ? "MANAGE EXCHANGE" : "CONNECT EXCHANGE TO ENABLE LIVE TRADING"}
       </button>
 
-      <CustomerHeaderBtn onClick={onAccount}>ACCOUNT</CustomerHeaderBtn>
+      {/* NOTIFICATIONS bell */}
+      <button onClick={onNotifications} title="Notifications" style={{
+        width: 34, height: 34, borderRadius: 4,
+        border: `1px solid ${N.BORDER_HI}`,
+        background: "transparent",
+        color: N.TEXT_2,
+        cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
+        transition: "all 120ms ease",
+      }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = N.BRAND; e.currentTarget.style.color = N.TEXT_0; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = N.BORDER_HI; e.currentTarget.style.color = N.TEXT_2; }}>
+        <Bell size={14} />
+      </button>
+
+      {/* TIER chip */}
+      <span style={{
+        fontSize: 9.5, fontWeight: 800, color: tierMeta.color,
+        letterSpacing: "0.22em",
+        padding: "6px 10px", borderRadius: 3,
+        border: `1px solid ${tierMeta.color}55`,
+        background: `${tierMeta.color}10`,
+        fontFamily: N.FONT_MONO,
+      }}>
+        {tierMeta.label}
+      </span>
+
+      {/* USER PROFILE — avatar + name, click → account modal */}
+      <button onClick={onAccount} title={displayName} style={{
+        display: "inline-flex", alignItems: "center", gap: 8,
+        padding: "5px 10px 5px 5px",
+        border: `1px solid ${N.BORDER_HI}`,
+        borderRadius: 999,
+        background: "transparent",
+        cursor: "pointer",
+        transition: "all 120ms ease",
+      }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = N.BRAND; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = N.BORDER_HI; }}>
+        <span style={{
+          width: 24, height: 24, borderRadius: "50%", overflow: "hidden",
+          border: `1px solid ${N.BRAND}55`,
+          background: `linear-gradient(135deg, ${N.BRAND}25, ${N.GOLD_BRT}15)`,
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          color: N.BRAND_BRT, fontSize: 10, fontWeight: 900, fontFamily: N.FONT_MONO,
+          boxShadow: `0 0 8px ${N.BRAND}30`,
+        }}>
+          {avatarUrl && isLoaded ? (
+            <img src={avatarUrl} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : initials}
+        </span>
+        <span style={{
+          fontSize: 10.5, fontWeight: 700, letterSpacing: "0.14em",
+          color: N.TEXT_1, maxWidth: 140, overflow: "hidden",
+          textOverflow: "ellipsis", whiteSpace: "nowrap",
+          fontFamily: N.FONT_MONO,
+        }}>
+          {displayName}
+        </span>
+      </button>
+
       <CustomerHeaderBtn onClick={onDisclaimer}>DISCLAIMER</CustomerHeaderBtn>
       <CustomerHeaderBtn onClick={onSignOut} variant="muted">SIGN OUT</CustomerHeaderBtn>
     </div>
@@ -4653,6 +4733,29 @@ export function PortalCustomerShell() {
       display: "flex", flexDirection: "column",
     }}>
       <style>{`
+        /* Customer-only confidence dominance. Rows inside SignalsRow are
+           already sorted by AI confidence DESC, so a top→bottom vertical
+           fade naturally makes the 80–90%+ signals at the top visually
+           dominate while sub-50 signals at the bottom feel gracefully
+           muted. Scoped to .cd-customer-battlefield-matrix so the admin
+           /command terminal (which renders the same SignalsRow without
+           this wrapper) is unaffected. */
+        .cd-customer-battlefield-matrix .blotter-scroll {
+          -webkit-mask-image: linear-gradient(
+            180deg,
+            #000 0%,
+            #000 55%,
+            rgba(0,0,0,0.82) 80%,
+            rgba(0,0,0,0.62) 100%
+          );
+                  mask-image: linear-gradient(
+            180deg,
+            #000 0%,
+            #000 55%,
+            rgba(0,0,0,0.82) 80%,
+            rgba(0,0,0,0.62) 100%
+          );
+        }
         @keyframes rail-pulse {
           0%   { opacity: 0.70; }
           50%  { opacity: 1.00; }
@@ -4867,10 +4970,12 @@ export function PortalCustomerShell() {
           not an internal operator terminal. */}
       <CustomerTopHeader
         isExchangeConnected={false}
+        plan={plan}
         onConnect={() => plan === "free" ? setUpgrade(true) : setConnectOpen(true)}
         onSignOut={() => void portalSignOut()}
         onAccount={() => setAccount(true)}
         onDisclaimer={() => setDisclaimer(true)}
+        onNotifications={() => setAccount(true)}
       />
       {engineStatus?.dataFeedHealth && !engineStatus.dataFeedHealth.healthy && (
         <DataFeedBanner health={engineStatus.dataFeedHealth} />
@@ -4910,13 +5015,18 @@ export function PortalCustomerShell() {
           }}
         >
           <div
-            className="grid"
+            className="grid cd-customer-battlefield-matrix"
             style={{ gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "start" }}
           >
             {/* TOP CRYPTO SIGNALS — sorted LONG-then-SHORT by AI
                 confidence DESC inside SignalsRow (5pt bucket stability
                 guard prevents 1-2pt jitter while real conviction moves
-                cleanly re-order). */}
+                cleanly re-order). The `.cd-customer-battlefield-matrix`
+                wrapper applies a customer-only vertical mask: top rows
+                (high confidence ≥80) read at full intensity, bottom rows
+                (low confidence) gracefully fade — making confidence
+                dominance read pre-attentively. /command admin terminal
+                does NOT use this wrapper, so it remains untouched. */}
             <CryptoMajorsSignalsPanel engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} />
             {/* ALTS & MEMECOINS — same sort contract. */}
             <CryptoAltsMemesPanel    engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} />

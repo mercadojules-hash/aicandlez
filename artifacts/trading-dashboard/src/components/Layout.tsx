@@ -570,7 +570,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-[100dvh] flex flex-col bg-[#000508] text-foreground dark">
 
-      {/* Top bar */}
+      {/* Top bar — suppressed entirely on customer /portal. PortalCustomerShell
+          owns its own premium top strip (brand · PAPER · NOTIFICATIONS · TIER ·
+          USER · CONNECT EXCHANGE · ACCOUNT · SIGN OUT). Customers must never
+          see operator system status (API/WS/ENGINE/KILL pills, MOD XX
+          designation, sidebar toggles). */}
+      {!isCustomerPortalRoute && (
       <header
         className="h-10 shrink-0 border-b flex items-center px-3 justify-between sticky top-0 z-50"
         style={{
@@ -615,12 +620,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         <SystemStatusBar />
       </header>
+      )}
 
       {/* Operator telemetry strip — admin/super-admin only AND only on the
           operator host. The customer terminal at trade.aicandlez.com must
           never show platform-wide operator vitals, even if an admin signs
           in there. Telemetry lives exclusively on admintrade. */}
-      <ApiBaseUrlBanner />
+      {!isCustomerPortalRoute && <ApiBaseUrlBanner />}
       {IS_ADMIN_HOST && isAdmin && !isCustomerPortalRoute && <AdminTopTelemetryBar />}
 
       {/* Body */}
