@@ -77,9 +77,6 @@ import {
   AccountModal, UpgradeModal, DisclaimerModal,
 } from "./modals";
 
-const apiBaseUrl: string =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
-
 // ── Theme tokens (mirrors mockup `_group.css`) ─────────────────────────────
 /* nz — coerce any value (null/undefined/NaN/string) to a finite number.
    Guards every render-time .toLocaleString() / .toFixed() / arithmetic on
@@ -3558,9 +3555,16 @@ function useTradeSizeUsd(): [TradeSizeUsd, (n: TradeSizeUsd) => void] {
       try {
         const res = await authFetch("/api/user/settings");
         if (!res.ok) return;
-        const json = await res.json() as { positionSizeUSD?: unknown };
+        const json = await res.json() as { preferredLiveOrderSizeUsd?: unknown; positionSizeUSD?: unknown };
         if (cancelled) return;
-        const snapped = clampToPreset(json.positionSizeUSD);
+        // SoT for AI live-entry sizing is `preferredLiveOrderSizeUsd` (the
+        // value `liveUserExecution.ts` 0SIZE clamps against and that
+        // `/user/ai-trading/liquidity` reflects). Legacy `positionSizeUSD`
+        // is read as a fallback only for users created before the preset
+        // field landed.
+        const snapped = clampToPreset(
+          json.preferredLiveOrderSizeUsd ?? json.positionSizeUSD,
+        );
         setSize(snapped);
         try { window.localStorage.setItem(TRADE_SIZE_LS_KEY, String(snapped)); } catch { /* ignore */ }
       } catch {
@@ -3580,7 +3584,7 @@ function useTradeSizeUsd(): [TradeSizeUsd, (n: TradeSizeUsd) => void] {
     void authFetch("/api/user/settings", {
       method:  "PUT",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ positionSizeUSD: n }),
+      body:    JSON.stringify({ preferredLiveOrderSizeUsd: n }),
     }).catch(() => {
       /* Network/transport failure — leave optimistic state in place;
          the user can re-tap or the next hydrate will reconcile. */
@@ -5498,24 +5502,24 @@ export function PortalCustomerShell() {
               ? "rgba(255,80,80,0.05)"
               : "rgba(0,0,0,0.45)",
           display:     "flex", alignItems:"center", gap: 18,
-          fontFamily:  T.FONT_MONO ?? "'IBM Plex Mono', monospace",
+          fontFamily:  T.FONT_MONO,
           fontSize:    10,
           letterSpacing: "0.10em",
           textTransform: "uppercase" as const,
-          color:       T.TEXT_2 ?? "#9AA39C",
+          color:       T.TEXT_2,
           flexWrap:    "wrap",
         }}>
           <span>
-            <span style={{ color: T.TEXT_3 ?? "#6B7771", marginRight: 6 }}>TRADE SIZE</span>
-            <span style={{ color: T.BRAND ?? "#66FF66", fontWeight: 700 }}>
+            <span style={{ color: T.TEXT_3, marginRight: 6 }}>TRADE SIZE</span>
+            <span style={{ color: T.NEON, fontWeight: 700 }}>
               ${liquidityStatus.tradeSizeUsd}
             </span>
           </span>
           <span>
-            <span style={{ color: T.TEXT_3 ?? "#6B7771", marginRight: 6 }}>
+            <span style={{ color: T.TEXT_3, marginRight: 6 }}>
               {liquidityStatus.plan === "pro" ? "PRO" : liquidityStatus.plan === "starter" ? "STARTER" : "FREE"} OPEN
             </span>
-            <span style={{ color: T.TEXT_1 ?? "#E6EDE9", fontWeight: 700 }}>
+            <span style={{ color: T.TEXT_1, fontWeight: 700 }}>
               {liquidityStatus.openLiveCount}/{liquidityStatus.planMaxOpen}
             </span>
           </span>
@@ -5525,7 +5529,7 @@ export function PortalCustomerShell() {
                 ? "#FF9400"
                 : liquidityStatus.planCapacityReached
                   ? "#FF5050"
-                  : (T.TEXT_3 ?? "#6B7771"),
+                  : (T.TEXT_3),
               marginRight: 6,
             }}>
               LIQUIDITY
@@ -5535,7 +5539,7 @@ export function PortalCustomerShell() {
                 ? "#FF9400"
                 : liquidityStatus.planCapacityReached
                   ? "#FF5050"
-                  : (T.BRAND ?? "#66FF66"),
+                  : (T.NEON),
               fontWeight: 700,
             }}>
               {liquidityStatus.liquidityProtected

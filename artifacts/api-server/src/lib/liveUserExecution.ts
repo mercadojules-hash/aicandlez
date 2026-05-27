@@ -864,6 +864,36 @@ export async function placeLiveAutoOrderForUser(
         logger.error({ err, userId, symbol, side }, "liveUserExecution: 0LIQ evaluation failed — failing closed");
         const msg = "LIQUIDITY PROTECTED — AI paused new entries to preserve fee/cash cushion.";
         await emitFailureNotification(userId, symbol, side, msg);
+        // Mirror the normal 0LIQ reject sinks so fail-closed events are
+        // visible on the execution stream + logsTable, not only the
+        // server-side logger. Without these, a transient DB hiccup would
+        // silently block customer entries with no operator-visible
+        // telemetry trail.
+        executionStreamBus.emitEvent({
+          type:     "order_rejected",
+          severity: "warn",
+          symbol, side, sizeUSD, mode: "live",
+          gate:     "liquidity_protected",
+          reason:   "liquidity_protected",
+          message:  msg,
+          details:  { userId, failClosed: true, err: String(err) },
+        });
+        try {
+          await db.insert(logsTable).values({
+            id:      crypto.randomUUID(),
+            type:    "trade",
+            level:   "warn",
+            message: `[liquidity_protected] ${msg} (fail-closed)`,
+            details: {
+              userId, symbol, side, sizeUSD,
+              errorCode:  "liquidity_protected",
+              failClosed: true,
+              err:        String(err),
+            },
+          });
+        } catch (logErr) {
+          logger.warn({ err: logErr, userId }, "liveUserExecution: 0LIQ fail-closed log insert failed");
+        }
         return { success: false, userId, errorCode: "liquidity_protected", error: msg };
       }
     }
