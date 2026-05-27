@@ -1,0 +1,64 @@
+Need a full production deployment verification and cache invalidation audit for the FINAL AICandlez frontend.
+
+Current issue:
+The newest battlefield UI exists locally/dev preview, but production at https://trade.aicandlez.com/portal is still intermittently serving the older frontend design/layout. I need to guarantee that the FINAL frontend bundle is the one being served globally.
+
+Please perform ALL of the following systematically:
+
+1. VERIFY ACTIVE DEPLOYMENT
+
+* Confirm latest deployment SHA matches the newest commit on main
+* Confirm deployment completed successfully
+* Confirm no rollback occurred
+* Confirm production is pointing to newest artifact/build output
+
+2. FORCE CLEAN FRONTEND REBUILD
+   Delete all stale frontend caches/build artifacts before rebuilding:
+
+* node_modules/.vite
+* dist
+* build
+* .cache
+* any temporary Vite/Replit deployment cache
+
+Then perform a completely fresh production build.
+
+3. VERIFY VITE BUILD HASHES
+
+* Ensure newly generated JS/CSS asset hashes differ from prior deployment
+* Confirm index.html references the newest hashed bundle files
+* Confirm no stale manifest references exist
+
+4. VERIFY DEPLOYMENT TARGET
+   Audit deployment configuration and confirm:
+
+* production domain points to newest frontend deployment
+* no old static bucket/artifact is attached
+* no duplicated deployment targets exist
+* no stale preview deployment is mapped to production
+
+5. CDN / CACHE INVALIDATION
+   Perform full cache invalidation:
+
+* Replit deployment cache
+* static asset cache
+* edge cache
+* CDN propagation cache if applicable
+
+6. VERIFY LIVE PRODUCTION RESPONSE
+   After deployment:
+
+* open production URL directly
+* confirm newest battlefield UI is rendered
+* confirm old yellow-card execution layout no longer appears
+* verify latest asset hashes are being served from production
+
+7. REPORT BACK WITH:
+
+* deployed commit SHA
+* deployed build timestamp
+* active frontend asset hashes
+* confirmation production is serving newest UI globally
+* any remaining propagation delays if applicable
+
+This deployment should be treated as FINAL production promotion for the current battlefield redesign.
