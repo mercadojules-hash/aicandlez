@@ -2169,6 +2169,243 @@ function EntitlementsTab({ clerkUserId }: { clerkUserId: string }) {
   const qc = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  return (
+    <div>
+      <PlanRecoverySection clerkUserId={clerkUserId} />
+      <EntitlementsExchangeSection
+        clerkUserId={clerkUserId}
+        busyId={busyId}
+        setBusyId={setBusyId}
+      />
+    </div>
+  );
+}
+
+// ── PLAN RECOVERY (super-admin) ──────────────────────────────────────────────
+// Operator entitlement-recovery surface. Used when Stripe billed the
+// customer but local provisioning didn't fire (webhook missed, sub-sync
+// silently skipped, etc.) leaving them blocked on PLAN=FREE despite a
+// paid Stripe subscription.
+//
+// Two routes:
+//   POST /api/admin/users/:id/plan-override   — direct local override
+//   POST /api/admin/users/:id/stripe-resync   — pull from Stripe SoT
+//
+// Both are super-admin-only and audit-logged with previousPlan/newPlan.
+function PlanRecoverySection({ clerkUserId }: { clerkUserId: string }) {
+  const qc = useQueryClient();
+  const { isSuperAdmin } = useUserRole();
+  const [plan, setPlan] = useState<"free" | "starter" | "pro">("starter");
+  const [note, setNote] = useState("");
+
+  type RecoveryResult = {
+    user?: { plan?: string; planStatus?: string; stripeSubscriptionId?: string | null };
+    previousPlan?: string;
+    candidateCount?: number;
+    stripe?: { subscriptionId?: string | null; status?: string; priceId?: string | null } | null;
+  };
+
+  function refreshUserViews() {
+    qc.invalidateQueries({ queryKey: ["admin-user-detail", clerkUserId] });
+    qc.invalidateQueries({ queryKey: ["admin-users"] });
+    qc.invalidateQueries({ queryKey: ["billing-subscription-portal-shell"] });
+    qc.invalidateQueries({ queryKey: ["customer-entitlement"] });
+  }
+
+  const overrideMutation = useMutation({
+    mutationFn: async (args: { plan: "free" | "starter" | "pro"; note: string }) => {
+      const res = await authFetch(`/api/admin/users/${clerkUserId}/plan-override`, {
+        method: "POST",
+        body:   JSON.stringify(args),
+      });
+      const text = await res.text();
+      let json: unknown = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) throw new Error((json as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
+      return json as RecoveryResult;
+    },
+    onSuccess: (out) => {
+      refreshUserViews();
+      const prev = out.previousPlan ?? "—";
+      const next = out.user?.plan ?? "—";
+      toast({
+        title:       "Plan override applied",
+        description: `${prev.toUpperCase()} → ${next.toUpperCase()} · audit-logged.`,
+      });
+      setNote("");
+    },
+    onError: (err: Error) => toast({ title: "Override failed", description: err.message }),
+  });
+
+  const resyncMutation = useMutation({
+    mutationFn: async (args: { note: string }) => {
+      const res = await authFetch(`/api/admin/users/${clerkUserId}/stripe-resync`, {
+        method: "POST",
+        body:   JSON.stringify(args),
+      });
+      const text = await res.text();
+      let json: unknown = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) throw new Error((json as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
+      return json as RecoveryResult;
+    },
+    onSuccess: (out) => {
+      refreshUserViews();
+      const next   = out.user?.plan ?? "—";
+      const status = out.user?.planStatus ?? "—";
+      const subId  = out.user?.stripeSubscriptionId ?? null;
+      toast({
+        title:       "Stripe resync complete",
+        description: subId
+          ? `${next.toUpperCase()} · ${status} · sub ${subId.slice(-10)}`
+          : `No live Stripe subscription found (set to ${next.toUpperCase()}).`,
+      });
+      setNote("");
+    },
+    onError: (err: Error) => toast({ title: "Resync failed", description: err.message }),
+  });
+
+  const isPending = overrideMutation.isPending || resyncMutation.isPending;
+  const disabled  = isPending || !isSuperAdmin;
+
+  function handleApplyOverride() {
+    const trimmed = note.trim();
+    if (!trimmed) { toast({ title: "Note required", description: "Audit-trail note cannot be empty." }); return; }
+    if (!window.confirm(`Override local plan to ${plan.toUpperCase()}? This does NOT touch Stripe.`)) return;
+    overrideMutation.mutate({ plan, note: trimmed });
+  }
+
+  function handleResync() {
+    const trimmed = note.trim();
+    if (!trimmed) { toast({ title: "Note required", description: "Audit-trail note cannot be empty." }); return; }
+    if (!window.confirm("Resync local entitlement from Stripe? Reads the customer's live subscription and writes plan/status locally.")) return;
+    resyncMutation.mutate({ note: trimmed });
+  }
+
+  const planBtn = (value: "free" | "starter" | "pro", label: string) => {
+    const active = plan === value;
+    return (
+      <button
+        key={value}
+        type="button"
+        disabled={disabled}
+        onClick={() => setPlan(value)}
+        style={{
+          flex: 1, padding: "8px 6px", fontSize: 10, fontFamily: "monospace",
+          fontWeight: 700, letterSpacing: "0.12em",
+          background:    active ? "#04140a" : "#000814",
+          border: `1px solid ${active ? "#00ff8a" : TAB_C.border}`,
+          color:         active ? "#00ff8a" : TAB_C.dim,
+          borderRadius: 3, cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.5 : 1,
+        }}
+      >
+        {label}
+      </button>
+    );
+  };
+
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <TabSectionLabel icon={Eye}>ENTITLEMENT RECOVERY</TabSectionLabel>
+      <div style={{
+        fontSize: 9, fontFamily: "monospace", color: TAB_C.dim,
+        padding: "0 2px 10px", lineHeight: 1.5,
+      }}>
+        Super-admin recovery layer for failed Stripe provisioning. Use
+        PLAN OVERRIDE to set the local plan directly without touching
+        Stripe. Use STRIPE RESYNC to read the customer's live Stripe
+        subscription and rewrite local entitlement to match. Both
+        audit-logged as <span style={{ color: "#cc55ff" }}>MANUAL_PLAN_OVERRIDE</span> /{" "}
+        <span style={{ color: "#cc55ff" }}>STRIPE_RESYNC</span> with
+        previousPlan / newPlan.
+        {!isSuperAdmin && (
+          <div style={{ marginTop: 6, color: "#ff8844" }}>
+            ⚠ Requires super-admin role. Controls disabled.
+          </div>
+        )}
+      </div>
+
+      <div style={{
+        background: "#000814", border: `1px solid ${TAB_C.border}`,
+        borderRadius: 4, padding: 12,
+      }}>
+        <div style={{
+          fontSize: 9, fontFamily: "monospace", color: TAB_C.faint,
+          letterSpacing: "0.18em", marginBottom: 6,
+        }}>PLAN</div>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          {planBtn("free",    "FREE")}
+          {planBtn("starter", "STARTER · $39.99")}
+          {planBtn("pro",     "PRO · $79.99")}
+        </div>
+
+        <div style={{
+          fontSize: 9, fontFamily: "monospace", color: TAB_C.faint,
+          letterSpacing: "0.18em", marginBottom: 6,
+        }}>AUDIT NOTE (required)</div>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          disabled={disabled}
+          placeholder="e.g. Stripe checkout succeeded $39.99 2026-05-27 but webhook didn't fire — restoring entitlement."
+          rows={2}
+          style={{
+            width: "100%", padding: "8px 10px", fontSize: 10, fontFamily: "monospace",
+            background: "#000", color: TAB_C.text,
+            border: `1px solid ${TAB_C.border}`, borderRadius: 3,
+            resize: "vertical", outline: "none", marginBottom: 10,
+          }}
+        />
+
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={handleApplyOverride}
+            title={isSuperAdmin ? undefined : "Requires super-admin role"}
+            style={{
+              flex: "1 1 180px", padding: "9px 12px",
+              fontSize: 10, fontFamily: "monospace", fontWeight: 700,
+              letterSpacing: "0.14em", cursor: disabled ? "not-allowed" : "pointer",
+              background: "#04140a", border: "1px solid #00ff8a55", color: "#00ff8a",
+              borderRadius: 3, opacity: disabled ? 0.4 : 1,
+            }}
+          >
+            {overrideMutation.isPending ? "APPLYING…" : `APPLY PLAN OVERRIDE → ${plan.toUpperCase()}`}
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={handleResync}
+            title={isSuperAdmin
+              ? "Read live Stripe subscription for this customer and rewrite local plan/status/sub-id"
+              : "Requires super-admin role"}
+            style={{
+              flex: "1 1 180px", padding: "9px 12px",
+              fontSize: 10, fontFamily: "monospace", fontWeight: 700,
+              letterSpacing: "0.14em", cursor: disabled ? "not-allowed" : "pointer",
+              background: "#0a0418", border: "1px solid #cc55ff55", color: "#cc55ff",
+              borderRadius: 3, opacity: disabled ? 0.4 : 1,
+            }}
+          >
+            {resyncMutation.isPending ? "RESYNCING…" : "RESYNC FROM STRIPE"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EntitlementsExchangeSection({
+  clerkUserId, busyId, setBusyId,
+}: {
+  clerkUserId: string;
+  busyId: string | null;
+  setBusyId: (id: string | null) => void;
+}) {
+  const qc = useQueryClient();
+
   const visibilityQuery = useQuery<{ exchanges: VisibilityRow[]; timestamp: number }>({
     queryKey: ["admin-user-exchange-visibility", clerkUserId],
     enabled:  Boolean(clerkUserId),

@@ -28,6 +28,9 @@ import {
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { __invalidateAdminUserTelemetryCache } from "./adminUserTelemetry.js";
 import { executionStreamBus } from "../lib/executionStreamBus.js";
+import { getUncachableStripeClient } from "../stripeClient.js";
+import { resolvePriceIdForPlan } from "../lib/adminBillingActions.js";
+import type Stripe from "stripe";
 
 const router = Router();
 const requireOperator   = [requireAuth, requireRole(["admin", "super-admin"])];
@@ -438,6 +441,346 @@ function serialize5xx(
   req.log.error({ err, ...body }, `PATCH ${label} failed`);
   return body;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Manual plan override (super-admin) — operator entitlement recovery layer
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Purpose: when a Stripe checkout succeeds but our local entitlement
+// provisioning fails (webhook missed / sub sync silently skipped / Clerk
+// email mismatch on customer lookup), the customer is left as PLAN=FREE
+// even though Stripe is billing them. The customer cannot connect an
+// exchange because every gate reads from `users.plan`. This route is the
+// recovery hatch: super-admins flip the local plan to match what Stripe
+// already believes, without re-billing the customer.
+//
+// Mutates ONLY the local `users` row (plan, planStatus, optional
+// trialEndsAt). Does NOT touch Stripe — that's `/stripe-resync` below.
+// Audit row uses action="manual_plan_override" with previousPlan/newPlan
+// in payload so the recovery is fully traceable.
+
+const PLAN_ENUM = z.enum(["free", "starter", "pro"]);
+const PLAN_STATUS_ENUM = z.enum([
+  "none", "active", "trialing", "past_due", "canceled", "unpaid", "incomplete", "incomplete_expired",
+]);
+
+const PlanOverrideBody = z.object({
+  note:        NoteSchema,
+  plan:        PLAN_ENUM,
+  planStatus:  PLAN_STATUS_ENUM.optional(),
+  trialEndsAt: z.union([z.string().datetime(), z.null()]).optional(),
+});
+
+router.post("/admin/users/:id/plan-override", ...requireSuperAdmin, async (req, res): Promise<void> => {
+  const ctx = resolveActor(req, res);
+  if (!ctx) return;
+  const parsed = PlanOverrideBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json(serialize4xx(req, parsed.error, "plan-override"));
+    return;
+  }
+  const { note, plan, planStatus, trialEndsAt } = parsed.data;
+
+  try {
+    const [before] = await db.select().from(usersTable)
+      .where(eq(usersTable.clerkUserId, ctx.targetId)).limit(1);
+    if (!before) {
+      res.status(404).json({ error: "User not found", targetId: ctx.targetId });
+      return;
+    }
+
+    // Default planStatus by tier when caller omits — keeps the gate
+    // helpers in billing.ts honest (`isActive` requires status to be
+    // active/trialing for paid tiers, or free).
+    const resolvedStatus: string = planStatus
+      ?? (plan === "free" ? "none" : "active");
+
+    const patch: Record<string, unknown> = {
+      plan,
+      planStatus: resolvedStatus,
+      updatedAt:  new Date(),
+    };
+    if (trialEndsAt !== undefined) {
+      patch["trialEndsAt"] = trialEndsAt === null ? null : new Date(trialEndsAt);
+    }
+
+    const [after] = await db.update(usersTable)
+      .set(patch)
+      .where(eq(usersTable.clerkUserId, ctx.targetId))
+      .returning();
+
+    await writeAudit({
+      actorId:  ctx.actorId,
+      targetId: ctx.targetId,
+      action:   "manual_plan_override",
+      payload:  {
+        // Mirror the row columns into the payload as well so audit
+        // consumers reading payload-only (exports, downstream tools)
+        // still see operator + target context.
+        operatorId:         ctx.actorId,
+        targetUserId:       ctx.targetId,
+        note,
+        previousPlan:       before.plan,
+        previousPlanStatus: before.planStatus,
+        newPlan:            after.plan,
+        newPlanStatus:      after.planStatus,
+        trialEndsAt:        trialEndsAt ?? null,
+        // Capture for forensics — if a manual override was needed because
+        // the webhook never ran, the Stripe IDs help reconcile later.
+        stripeCustomerId:     after.stripeCustomerId ?? null,
+        stripeSubscriptionId: after.stripeSubscriptionId ?? null,
+      },
+    });
+
+    res.json({
+      ok: true,
+      user: {
+        clerkUserId:          after.clerkUserId,
+        plan:                 after.plan,
+        planStatus:           after.planStatus,
+        trialEndsAt:          after.trialEndsAt,
+        stripeCustomerId:     after.stripeCustomerId,
+        stripeSubscriptionId: after.stripeSubscriptionId,
+      },
+      previousPlan:       before.plan,
+      previousPlanStatus: before.planStatus,
+    });
+  } catch (err) {
+    res.status(500).json(serialize5xx(req, err, "plan-override", {
+      targetId: ctx.targetId, plan, planStatus,
+    }));
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stripe resync (super-admin) — entitlement recovery from Stripe SoT
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Reconciles the local `users` row against Stripe's view of the customer.
+// Resolution order for the customer:
+//   1. `users.stripeCustomerId` if set
+//   2. Lookup by `users.billingEmail` then `users.email` via
+//      `stripe.customers.list({email})` — handles the case where checkout
+//      created a fresh customer that we never linked back.
+//
+// Once the customer is resolved we pick the most-recent non-terminal
+// subscription (active > trialing > past_due > anything-not-canceled),
+// derive the plan from the price ID using the same env mapping the
+// checkout route uses (`resolvePriceIdForPlan`), and write back to the
+// local users row. Audit action = "stripe_resync" with a snapshot of the
+// before/after entitlement + the Stripe IDs that were discovered.
+
+const StripeResyncBody = z.object({
+  note: NoteSchema,
+});
+
+interface ResolvedStripeState {
+  customerId:     string;
+  subscriptionId: string | null;
+  plan:           "free" | "starter" | "pro";
+  planStatus:     string;
+  trialEndsAt:    Date | null;
+  subscription:   Stripe.Subscription | null;
+}
+
+/** Reverse `resolvePriceIdForPlan` using the same env vars. Falls back to
+ *  null when the price ID doesn't match either configured tier — caller
+ *  must decide whether to keep the existing local plan or downgrade. */
+function planFromPriceId(priceId: string | null | undefined): "starter" | "pro" | null {
+  if (!priceId) return null;
+  if (priceId === resolvePriceIdForPlan("starter")) return "starter";
+  if (priceId === resolvePriceIdForPlan("pro"))     return "pro";
+  return null;
+}
+
+/** Subscriptions Stripe considers "alive enough to bill". */
+const LIVE_SUB_STATUSES = new Set<string>([
+  "active", "trialing", "past_due", "unpaid", "incomplete",
+]);
+
+router.post("/admin/users/:id/stripe-resync", ...requireSuperAdmin, async (req, res): Promise<void> => {
+  const ctx = resolveActor(req, res);
+  if (!ctx) return;
+  const parsed = StripeResyncBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json(serialize4xx(req, parsed.error, "stripe-resync"));
+    return;
+  }
+  const { note } = parsed.data;
+
+  try {
+    const [before] = await db.select().from(usersTable)
+      .where(eq(usersTable.clerkUserId, ctx.targetId)).limit(1);
+    if (!before) {
+      res.status(404).json({ error: "User not found", targetId: ctx.targetId });
+      return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+
+    // 1) Resolve customer — local link first, then email lookup.
+    let customerId: string | null = before.stripeCustomerId ?? null;
+    const lookupEmails: string[] = [];
+    if (before.billingEmail) lookupEmails.push(before.billingEmail);
+    if (before.email && before.email !== before.billingEmail) lookupEmails.push(before.email);
+
+    if (!customerId) {
+      for (const email of lookupEmails) {
+        const list = await stripe.customers.list({ email, limit: 10 });
+        if (list.data.length > 0) {
+          // Prefer the customer whose metadata.clerkUserId already matches
+          // (defensive: if the checkout path tagged the customer with our
+          // clerk id, that's the canonical record). Otherwise take the
+          // most recent.
+          const tagged = list.data.find(c => (c.metadata ?? {})["clerkUserId"] === ctx.targetId);
+          customerId = (tagged ?? list.data[0])?.id ?? null;
+          if (customerId) break;
+        }
+      }
+    }
+
+    if (!customerId) {
+      res.status(404).json({
+        error:    "No Stripe customer found for this user (checked local link + billing/auth email lookup).",
+        searched: { stripeCustomerId: before.stripeCustomerId, emails: lookupEmails },
+      });
+      return;
+    }
+
+    // 2) Find the best subscription for this customer.
+    const subsList = await stripe.subscriptions.list({
+      customer: customerId,
+      status:   "all",
+      limit:    20,
+    });
+    const liveSubs = subsList.data.filter(s => LIVE_SUB_STATUSES.has(s.status));
+    const statusRank: Record<string, number> = {
+      active: 0, trialing: 1, past_due: 2, unpaid: 3, incomplete: 4,
+    };
+    liveSubs.sort((a, b) => {
+      const ra = statusRank[a.status] ?? 99;
+      const rb = statusRank[b.status] ?? 99;
+      if (ra !== rb) return ra - rb;
+      return (b.created ?? 0) - (a.created ?? 0);
+    });
+    const bestSub: Stripe.Subscription | null = liveSubs[0] ?? null;
+
+    // 3) Derive plan + planStatus + trialEndsAt from the best sub.
+    const resolved: ResolvedStripeState = {
+      customerId,
+      subscriptionId: bestSub?.id ?? null,
+      plan:           "free",
+      planStatus:     "none",
+      trialEndsAt:    null,
+      subscription:   bestSub,
+    };
+    if (bestSub) {
+      const firstItem = bestSub.items.data[0];
+      const priceId   = firstItem?.price?.id ?? null;
+      const tierPlan  = planFromPriceId(priceId);
+      if (!tierPlan) {
+        // Refuse to silently downgrade a paying customer when the price
+        // ID doesn't map to our configured STARTER/PRO env vars (legacy
+        // price, alt-currency price, or env misconfig). Bail with an
+        // explicit reconciliation error so the operator can either fix
+        // STRIPE_PRICE_* env or use MANUAL PLAN OVERRIDE.
+        res.status(409).json({
+          error: "Stripe subscription price ID does not match STRIPE_PRICE_STARTER_MONTHLY or STRIPE_PRICE_PRO_MONTHLY — refusing to auto-derive plan. Use manual plan override.",
+          stripe: {
+            subscriptionId: bestSub.id,
+            status:         bestSub.status,
+            priceId,
+          },
+          currentLocalPlan: before.plan,
+        });
+        return;
+      }
+      resolved.plan        = tierPlan;
+      resolved.planStatus  = bestSub.status;
+      resolved.trialEndsAt = bestSub.trial_end ? new Date(bestSub.trial_end * 1000) : null;
+    }
+
+    // 4) Write back — preserve fields we didn't resolve.
+    const [after] = await db.update(usersTable)
+      .set({
+        stripeCustomerId:     resolved.customerId,
+        stripeSubscriptionId: resolved.subscriptionId,
+        plan:                 resolved.plan,
+        planStatus:           resolved.planStatus,
+        trialEndsAt:          resolved.trialEndsAt,
+        updatedAt:            new Date(),
+      })
+      .where(eq(usersTable.clerkUserId, ctx.targetId))
+      .returning();
+
+    await writeAudit({
+      actorId:  ctx.actorId,
+      targetId: ctx.targetId,
+      action:   "stripe_resync",
+      payload:  {
+        operatorId:         ctx.actorId,
+        targetUserId:       ctx.targetId,
+        note,
+        previousPlan:       before.plan,
+        previousPlanStatus: before.planStatus,
+        newPlan:            after.plan,
+        newPlanStatus:      after.planStatus,
+        before: {
+          stripeCustomerId:     before.stripeCustomerId,
+          stripeSubscriptionId: before.stripeSubscriptionId,
+          plan:                 before.plan,
+          planStatus:           before.planStatus,
+          trialEndsAt:          before.trialEndsAt,
+        },
+        after: {
+          stripeCustomerId:     after.stripeCustomerId,
+          stripeSubscriptionId: after.stripeSubscriptionId,
+          plan:                 after.plan,
+          planStatus:           after.planStatus,
+          trialEndsAt:          after.trialEndsAt,
+        },
+        stripe: bestSub
+          ? {
+              subscriptionId: bestSub.id,
+              status:         bestSub.status,
+              priceId:        bestSub.items.data[0]?.price?.id ?? null,
+              created:        bestSub.created,
+              candidateCount: liveSubs.length,
+            }
+          : { subscriptionId: null, candidateCount: 0, reason: "no live subscription on customer" },
+        customerSearch: {
+          localLink: before.stripeCustomerId,
+          emails:    lookupEmails,
+          resolved:  customerId,
+        },
+      },
+    });
+
+    res.json({
+      ok: true,
+      user: {
+        clerkUserId:          after.clerkUserId,
+        plan:                 after.plan,
+        planStatus:           after.planStatus,
+        trialEndsAt:          after.trialEndsAt,
+        stripeCustomerId:     after.stripeCustomerId,
+        stripeSubscriptionId: after.stripeSubscriptionId,
+      },
+      previousPlan:       before.plan,
+      previousPlanStatus: before.planStatus,
+      stripe: bestSub
+        ? {
+            subscriptionId: bestSub.id,
+            status:         bestSub.status,
+            priceId:        bestSub.items.data[0]?.price?.id ?? null,
+          }
+        : null,
+      candidateCount: liveSubs.length,
+    });
+  } catch (err) {
+    res.status(500).json(serialize5xx(req, err, "stripe-resync", { targetId: ctx.targetId }));
+  }
+});
 
 function pickBillingFields(row: typeof usersTable.$inferSelect) {
   return {
