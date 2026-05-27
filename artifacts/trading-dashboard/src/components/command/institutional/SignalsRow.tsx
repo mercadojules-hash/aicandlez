@@ -120,17 +120,21 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlacehol
             {icon}
           </span>
           {dominantTitle ? (
-            /* Customer-only Phase 8.3: title dominates the header.
-               Helper sub-tag (`· LONG · SHORT · LARGE CAP · AI EXECUTION`)
-               removed entirely to free horizontal space. Wider tracking,
-               slightly larger size, brand neon hue — institutional, not arcade. */
+            /* Customer-only Phase 8.4: titles MUST visually dominate the
+               panel header and use the SAME color treatment across both
+               panels (TOP 30 CRYPTOS / ALTS & MEMECOINS) so they read as
+               peer "market sector" anchors, not utility text. Locked to
+               N.BRAND_BRT (high-contrast neon) regardless of per-panel
+               `brand` tint; bumped to 16px / weight 900 / 0.32em tracking
+               with a slightly stronger textShadow. Helper sub-tag (·LONG·
+               SHORT·LARGE CAP·AI EXECUTION) stays removed. */
             <span
               style={{
-                color: brand,
-                fontSize: 14,
+                color: N.BRAND_BRT,
+                fontSize: 16,
                 fontWeight: 900,
-                letterSpacing: "0.28em",
-                textShadow: `0 0 8px ${brand}55`,
+                letterSpacing: "0.32em",
+                textShadow: `0 0 10px ${N.BRAND}66, 0 0 18px ${N.BRAND}28`,
                 whiteSpace: "nowrap",
                 lineHeight: 1,
               }}

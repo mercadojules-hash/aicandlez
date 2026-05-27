@@ -57,6 +57,16 @@ interface Props {
    * omit it and keep the default state-driven icon (Zap / Activity / etc).
    */
   leadingSlot?:        ReactNode;
+  /**
+   * Phase 8.4 — customer subscription-aware copy override. When the
+   * customer plan = STARTER or PRO (`customerEntitled === true`) AND
+   * `state === "PAPER"`, the bar swaps its sim language for a premium
+   * "ENABLE LIVE AI CRYPTO TRADING" CTA and a "LIVE READY" pill. This
+   * is UX intelligence only — no LIVE execution wiring changes;
+   * server-side kill switch + concurrent caps still govern fills.
+   * Default false. /command never passes this prop → byte-identical.
+   */
+  customerEntitled?:   boolean;
 }
 
 const KEYFRAMES = `
@@ -89,6 +99,7 @@ export function LiveControlBar({
   eligible = true,
   eligibilityReason,
   leadingSlot,
+  customerEntitled = false,
 }: Props) {
   // Visual buckets: LIVE/EXECUTING share the gold pulsing treatment;
   // PAUSED/HALTED share the red emergency-stop treatment; ARMED is the
@@ -133,11 +144,21 @@ export function LiveControlBar({
     isHalted    ? N.DANGER_BRT :
                   N.TEXT_1;
 
+  // Phase 8.4 — customer subscription-aware label override. When the
+  // customer is entitled (starter/pro) and the bar is in PAPER state,
+  // surface a premium "ENABLE LIVE AI CRYPTO TRADING" CTA instead of the
+  // simulation copy. This is UX only — `onToggle` is still omitted on
+  // the customer surface so the bar remains read-only; real-money fills
+  // remain server-gated by the kill switch + concurrent caps.
+  const isCustomerLiveReady = isPaper && customerEntitled;
+
   const label =
     isExecuting
       ? `LIVE AI ${assetClass} EXECUTION · EXECUTING`
       : isArmedRdy
       ? `LIVE AI ${assetClass} EXECUTION · ARMED`
+      : isCustomerLiveReady
+      ? `ENABLE LIVE AI ${assetClass} TRADING`
       : isPaper
       ? `AI ${assetClass} PAPER TRADING · ACTIVE`
       : blocked
@@ -151,6 +172,8 @@ export function LiveControlBar({
       ? `EXECUTION ENGINE ENGAGED · LIVE ORDERS FIRING${readOnly ? "" : " · CLICK TO HALT"}`
       : isArmedRdy
       ? `ENGINE ARMED · AWAITING NEXT SIGNAL${readOnly ? "" : " · CLICK TO HALT"}`
+      : isCustomerLiveReady
+      ? `AI MONITORS MARKETS CONTINUOUSLY · NEW POSITIONS PAUSE WHEN DISABLED`
       : isPaper
       ? `SIMULATED ALPACA EXECUTION · $100,000 PAPER CAPITAL · REAL MARKET DATA`
       : blocked
@@ -335,7 +358,7 @@ export function LiveControlBar({
               ? `0 0 10px ${color}45, inset 0 0 6px ${color}22`
               : "none",
           }}>
-            {PILL_LABEL[state]}
+            {isCustomerLiveReady ? "LIVE READY" : PILL_LABEL[state]}
           </span>
         </div>
       </button>

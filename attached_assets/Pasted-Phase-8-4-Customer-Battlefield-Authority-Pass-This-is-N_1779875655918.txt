@@ -1,0 +1,229 @@
+Phase 8.4 — Customer Battlefield Authority Pass
+
+This is NOT a redesign.
+This is a precision refinement pass to strengthen:
+
+* trust
+* visual hierarchy
+* premium AI identity
+* conversion clarity
+* subscription-state intelligence
+
+Keep architecture intact.
+Customer-only.
+Absolutely NO /command crossover.
+
+────────────────────────
+
+1. REMOVE tiny top-left logo icon
+   ────────────────────────
+
+Current issue:
+The tiny icon/logo at the very top-left of the page is now redundant and visually weak.
+
+Requested change:
+
+* REMOVE the tiny icon graphic only
+* KEEP the “AICandlez” text wordmark
+* Preserve top-left alignment and spacing
+* Cleaner institutional header
+
+Goal:
+Reduce duplicate branding clutter now that the large hero logo exists in the LIVE AI strip.
+
+────────────────────────
+2. Battlefield headers must dominate visually
+────────────────────────
+
+Current issue:
+TOP 30 CRYPTOS and ALTS & MEMECOINS are still too visually weak.
+
+Required changes:
+
+* Increase font size noticeably
+* Increase font weight
+* Increase tracking slightly
+* BOTH headers must use the SAME color treatment
+* Match visual hierarchy
+* Remove ALL tiny helper labels beside them:
+
+  * LONG
+  * SHORT
+  * LARGE CAP
+  * AI EXECUTION
+  * etc.
+
+These labels are cluttering the header and weakening authority.
+
+Goal:
+The headers should feel like:
+
+* market sectors
+* institutional categories
+* dominant battlefield anchors
+
+NOT tiny utility text.
+
+────────────────────────
+3. GLOBAL AI CONFIDENCE → HIGHEST LIVE CONFIDENCE
+────────────────────────
+
+Critical trust fix.
+
+The current module still behaves incorrectly conceptually.
+
+Remove:
+“GLOBAL AI CONFIDENCE”
+
+Replace with:
+“HIGHEST LIVE CONFIDENCE”
+
+Behavior:
+The number MUST ALWAYS equal:
+max(opportunities[].conviction)
+
+Across:
+
+* LONG
+* SHORT
+* ALL visible opportunities
+
+NO separate telemetry source.
+NO stale value.
+NO averaging.
+NO throttling.
+
+Example:
+If PEPE = 94 and that is the highest active setup:
+→ module MUST display 94.
+
+If a 97 appears:
+→ instantly becomes 97.
+
+If highest drops to 88:
+→ updates to 88.
+
+This module is now the TRUST ANCHOR of the entire platform.
+
+Visual adjustments:
+
+* reduce current glow intensity by ~50%
+* sharpen number clarity
+* less haze
+* more premium/crisp
+* subtle pulse only
+
+Add tasteful elite state:
+When conviction ≥ 90:
+
+* small ELITE SIGNAL micro-label
+* thin elite outer ring
+* restrained premium effect
+  NOT flashy arcade styling.
+
+Subtitle should display:
+SYMBOL · LONG/SHORT
+
+using the ACTUAL highest conviction asset.
+
+────────────────────────
+4. Subscription-aware PAPER/LIVE intelligence
+────────────────────────
+
+Right now PAPER appears everywhere regardless of subscription state.
+
+The UI must become plan-aware.
+
+Current issue:
+We have ~5 different PAPER labels/badges/surfaces.
+
+Required behavior:
+If user plan = FREE:
+
+* current PAPER surfaces remain
+* upgrade CTA remains locked/amber
+
+If user plan = STARTER or PRO:
+
+* UI reflects live-trading eligibility state
+* reduce PAPER dominance across the interface
+* shift tone from “simulation” toward “live-ready”
+
+Specific changes:
+
+A) LIVE AI TRADING BAR
+When entitled (starter/pro):
+
+Current:
+UPGRADE TO ENABLE AI TRADING
+
+Replace with a LARGE clear CTA:
+ENABLE LIVE AI TRADING
+
+Tone:
+premium
+powerful
+trustworthy
+NOT alarming
+
+Subtext examples (choose strongest wording):
+
+* “AI will continue monitoring and trading until disabled.”
+* “New positions pause immediately when disabled.”
+* “AI monitors markets continuously while enabled.”
+* “Disable anytime to stop new entries.”
+
+Goal:
+Users should feel:
+“I now unlocked the real AI.”
+
+B) PAPER badges throughout UI
+If entitled:
+
+* reduce repetitive PAPER labels
+* convert some to:
+
+  * LIVE READY
+  * AI READY
+  * LIVE ENABLED (when active)
+  * READY FOR LIVE EXECUTION
+
+Do NOT fake live trading.
+Server kill switch still governs execution.
+
+This is UX intelligence only.
+
+────────────────────────
+5. Preserve all invariants
+────────────────────────
+
+DO NOT:
+
+* touch /command
+* touch admin/operator telemetry
+* introduce chart libraries
+* alter battlefield architecture
+* increase clutter
+* break responsive behavior
+
+Customer-only inside:
+PortalCustomerShell
+LiveIntelligenceBand
+subscription-aware customer UI state
+
+────────────────────────
+6. Success criteria
+────────────────────────
+
+Landing experience should now communicate:
+
+* premium AI terminal
+* institutional confidence
+* live market intelligence
+* strong trust anchor
+* clear upgrade path
+* live-trading readiness
+* cleaner hierarchy
+* stronger visual authority
+
+without losing battlefield readability.

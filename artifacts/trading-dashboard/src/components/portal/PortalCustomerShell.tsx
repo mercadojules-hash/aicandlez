@@ -3825,10 +3825,13 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
  * unlocks via PortalExchangeConnectModal (CONNECT TO AN EXCHANGE CTA).
  */
 
-function CustomerBattlefieldHeader({ engine: _engine }: { engine?: EngineLite }) {
+function CustomerBattlefieldHeader({ engine: _engine, entitled = false }: { engine?: EngineLite; entitled?: boolean }) {
   // Customer surface is PAPER-only — risk gates always render ACTIVE
   // (no killSwitch concept exposed to customers; admin operator
   // controls live in /command).
+  // Phase 8.4 — when the customer plan is STARTER or PRO (`entitled`),
+  // the MODE chip softens from "PAPER" (gold) to "LIVE READY" (neon
+  // brand). Server kill switch + concurrent caps still gate real fills.
   const riskActive = true;
   return (
     <div style={{
@@ -3858,7 +3861,11 @@ function CustomerBattlefieldHeader({ engine: _engine }: { engine?: EngineLite })
           value={riskActive ? "ACTIVE" : "BYPASSED"}
           color={riskActive ? N.BRAND_BRT : N.DANGER_BRT}
         />
-        <CustomerStatusChip label="MODE" value="PAPER" color={N.GOLD_BRT} />
+        <CustomerStatusChip
+          label="MODE"
+          value={entitled ? "LIVE READY" : "PAPER"}
+          color={entitled ? N.BRAND_BRT : N.GOLD_BRT}
+        />
       </div>
     </div>
   );
@@ -3884,7 +3891,7 @@ function CustomerStatusChip({ label, value, color }: { label: string; value: str
 
 function MyAccountRailPaper({
   equityUsd, todayPnl, realized, unrealized, fillsToday, openCount,
-  history, engine,
+  history, engine, entitled = false,
 }: {
   equityUsd:   number;
   todayPnl:    number;
@@ -3894,6 +3901,9 @@ function MyAccountRailPaper({
   openCount:   number;
   history:     ReadonlyArray<{ closedAt: number; pnl: number }>;
   engine?:     EngineLite;
+  /* Phase 8.4 — when true (starter/pro), softens header chip + MODE
+     metric from "PAPER" gold to "LIVE READY" neon brand. */
+  entitled?:   boolean;
 }) {
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -3946,12 +3956,15 @@ function MyAccountRailPaper({
           MY ACCOUNT
         </span>
         <span style={{
-          fontSize: 10, fontWeight: 700, color: N.GOLD_BRT,
+          fontSize: 10, fontWeight: 700,
+          color: entitled ? N.BRAND_BRT : N.GOLD_BRT,
           letterSpacing: "0.18em", padding: "3px 8px",
-          border: `1px solid ${N.GOLD_BRT}55`, borderRadius: 3,
-          background: `${N.GOLD_BRT}10`,
+          border: `1px solid ${entitled ? N.BRAND_BRT : N.GOLD_BRT}55`,
+          borderRadius: 3,
+          background: entitled ? `${N.BRAND}12` : `${N.GOLD_BRT}10`,
+          textShadow: entitled ? `0 0 6px ${N.BRAND}55` : "none",
         }}>
-          ● PAPER · ${(equityUsd / 1000).toFixed(0)}K SEED
+          ● {entitled ? "LIVE READY" : "PAPER"} · ${(equityUsd / 1000).toFixed(0)}K SEED
         </span>
       </div>
 
@@ -4029,7 +4042,11 @@ function MyAccountRailPaper({
         <CustomerRailMetric label="REALIZED"     value={eq(realized)}    color={realized >= 0 ? N.LONG : N.SHORT} />
         <CustomerRailMetric label="UNREALIZED"   value={eq(unrealized)}  color={unrealized >= 0 ? N.LONG : N.SHORT} />
         <CustomerRailMetric label="FILLS · TODAY" value={String(fillsToday)} color={N.TEXT_0} />
-        <CustomerRailMetric label="MODE"         value="PAPER"           color={N.GOLD_BRT} />
+        <CustomerRailMetric
+          label="MODE"
+          value={entitled ? "LIVE READY" : "PAPER"}
+          color={entitled ? N.BRAND_BRT : N.GOLD_BRT}
+        />
       </div>
     </div>
   );
@@ -4052,14 +4069,18 @@ function CustomerRailMetric({ label, value, color }: { label: string; value: str
   );
 }
 
-function CustomerBlotterPanelOpen({ rows }: {
+function CustomerBlotterPanelOpen({ rows, entitled = false }: {
   rows: ReadonlyArray<{
     id: string; symbol: string; display: string; side: "LONG" | "SHORT";
     entry: number; last: number; pnl: number; pnlPct: number;
   }>;
+  /* Phase 8.4 — entitled customers see "● LIVE READY" badge.
+     Server kill switch + concurrent caps still gate real fills. */
+  entitled?: boolean;
 }) {
   return (
-    <CustomerBlotterShell title="LIVE TRADES" accent={N.LONG} badge="● PAPER LIVE" emptyLabel="NO OPEN POSITIONS"
+    <CustomerBlotterShell title="LIVE TRADES" accent={N.LONG}
+      badge={entitled ? "● LIVE READY" : "● PAPER LIVE"} emptyLabel="NO OPEN POSITIONS"
       headerRight="MARK">
       {rows.map(t => {
         const sideColor = t.side === "LONG" ? N.LONG : N.SHORT;
@@ -4243,22 +4264,34 @@ function CustomerTopHeader({
       background: `linear-gradient(180deg, ${N.SURFACE_1} 0%, ${N.BG} 100%)`,
       fontFamily: N.FONT_MONO, flexWrap: "wrap",
     }}>
-      {/* BRAND + ACCOUNT STATUS (PAPER/EXCHANGE) */}
+      {/* BRAND + ACCOUNT STATUS — Phase 8.4: tiny logo icon removed; the
+          large hero brand mark now lives inside the LIVE AI strip. Wordmark
+          remains as the primary text anchor here. Status chip is now plan-
+          aware (FREE → PAPER, STARTER/PRO → LIVE READY). */}
       <div style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-        <img src={`${import.meta.env.BASE_URL}aicandlez-logo.png`} alt="AICandlez"
-          style={{ height: 22, width: 22, objectFit: "contain", borderRadius: 4,
-            filter: `drop-shadow(0 0 8px ${N.BRAND}55)` }} />
         <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.22em", color: N.TEXT_0 }}>
           AI<span style={{ color: N.BRAND_BRT, textShadow: `0 0 12px ${N.BRAND}` }}>CANDLEZ</span>
         </span>
-        <span style={{
-          marginLeft: 10, fontSize: 9.5, fontWeight: 700, color: N.GOLD_BRT,
-          letterSpacing: "0.22em",
-          padding: "4px 10px", borderRadius: 3,
-          border: `1px solid ${N.GOLD_BRT}55`, background: `${N.GOLD_BRT}10`,
-        }}>
-          ● PAPER {isExchangeConnected ? "· EXCHANGE LINKED" : "MODE"}
-        </span>
+        {plan === "free" ? (
+          <span style={{
+            marginLeft: 10, fontSize: 9.5, fontWeight: 700, color: N.GOLD_BRT,
+            letterSpacing: "0.22em",
+            padding: "4px 10px", borderRadius: 3,
+            border: `1px solid ${N.GOLD_BRT}55`, background: `${N.GOLD_BRT}10`,
+          }}>
+            ● PAPER {isExchangeConnected ? "· EXCHANGE LINKED" : "MODE"}
+          </span>
+        ) : (
+          <span style={{
+            marginLeft: 10, fontSize: 9.5, fontWeight: 700, color: N.BRAND_BRT,
+            letterSpacing: "0.22em",
+            padding: "4px 10px", borderRadius: 3,
+            border: `1px solid ${N.BRAND_BRT}55`, background: `${N.BRAND}10`,
+            textShadow: `0 0 6px ${N.BRAND}66`,
+          }}>
+            ● {isExchangeConnected ? "LIVE READY · EXCHANGE LINKED" : "LIVE READY"}
+          </span>
+        )}
       </div>
 
       <div style={{ flex: 1 }} />
@@ -4398,6 +4431,13 @@ function CustomerHeaderBtn({
 export function PortalCustomerShell() {
   const { isAdmin } = useUserRole();
   const plan = useCustomerPlan();
+  // Phase 8.4 — subscription-aware copy gate. STARTER / PRO customers
+  // see softened LIVE READY language across the battlefield (header chip,
+  // MyAccount header + MODE metric, LiveControlBar CTA + pill, blotter
+  // badge). Real-money execution remains gated by the server-side
+  // `customer_live_execution_disabled` kill switch and the global
+  // `LIVE_EXECUTION_CONCURRENT_CAP` — these UX shifts do not enable fills.
+  const entitled = plan === "starter" || plan === "pro";
   // Direct sign-out for the toolbar SIGN OUT button — same useClerk hook
   // used by AccountModal so revoke + cookie clear behavior is identical.
   const { signOut: portalSignOut } = useClerk();
@@ -4754,16 +4794,12 @@ export function PortalCustomerShell() {
            injected with ::before, preserving the exact typography:
            text-[11px] / font-bold / tracking-[0.22em] / TEXT_0.
            No source file other than PortalCustomerShell.tsx is touched. */
-        .cd-customer-majors-panel header > div:first-child > span:nth-child(2) {
-          font-size: 0 !important;
-        }
-        .cd-customer-majors-panel header > div:first-child > span:nth-child(2)::before {
-          content: "TOP 30 CRYPTOS";
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.22em;
-          color: ${N.TEXT_0};
-        }
+        /* Phase 8.4 — the legacy font-size:0 / ::before rename override
+           is REMOVED. SignalsRow now emits "TOP 30 CRYPTOS" directly
+           under the dominantTitle branch and renders it with the new
+           battlefield authority typography (16px, neon N.BRAND_BRT,
+           0.32em tracking). Keeping the override would clobber that
+           treatment and break visual parity with ALTS & MEMECOINS. */
         @keyframes rail-pulse {
           0%   { opacity: 0.70; }
           50%  { opacity: 1.00; }
@@ -5142,7 +5178,7 @@ export function PortalCustomerShell() {
 
         {/* LIVE OPPORTUNITY BATTLEFIELD framing — visually the start of
             the page, exactly per direction. */}
-        <CustomerBattlefieldHeader engine={engineStatus} />
+        <CustomerBattlefieldHeader engine={engineStatus} entitled={entitled} />
 
         {/* Unified LIVE AI CRYPTO EXECUTION bar — single bar spanning
             both columns (PAPER, readonly, no ARM LIVE per locked
@@ -5150,6 +5186,7 @@ export function PortalCustomerShell() {
         <LiveControlBar
           assetClass="CRYPTO"
           state="PAPER"
+          customerEntitled={entitled}
           leadingSlot={
             /* Hero brand mark — transparent, no boxed treatment, sized to
                act as the primary terminal anchor. clamp() keeps it
@@ -5328,8 +5365,9 @@ export function PortalCustomerShell() {
               openCount={openTrades.length}
               history={paperHistory}
               engine={engineStatus}
+              entitled={entitled}
             />
-            <CustomerBlotterPanelOpen rows={openTrades} />
+            <CustomerBlotterPanelOpen rows={openTrades} entitled={entitled} />
             <CustomerBlotterPanelHistory rows={paperHistory} />
           </aside>
         </section>
@@ -6157,38 +6195,40 @@ function LiveIntelligenceBand({
       `}</style>
 
       {/* ────────────────────────────────────────────────────────────── */}
-      {/* BOX 1 — GLOBAL AI CONFIDENCE (trust anchor)                    */}
-      {/* Always surfaces the single highest active conviction across   */}
-      {/* both LONG and SHORT opportunities. Huge centered number with  */}
-      {/* concentric rings + tier color. This is the page's perceived-  */}
-      {/* intelligence anchor. */}
+      {/* BOX 1 — HIGHEST LIVE CONFIDENCE (Phase 8.4 trust anchor)       */}
+      {/* Renamed from "GLOBAL AI CONFIDENCE". The number MUST ALWAYS    */}
+      {/* equal max(opportunities[].conviction) across LONG/SHORT, and  */}
+      {/* (because the SignalsPanel rows actually render from           */}
+      {/* engine.symbolBreakdowns) we also take the max against         */}
+      {/* breakdowns so the hero never lags a row the user can see.     */}
+      {/* Glow toned ~50% from 8.3 pass for crisper readability.        */}
       {/* ────────────────────────────────────────────────────────────── */}
-      <LIBCell label="GLOBAL AI CONFIDENCE" sub={live ? confTier.label : "ARMING"} accent={confTier.c}>
+      <LIBCell label="HIGHEST LIVE CONFIDENCE" sub={live ? confTier.label : "ARMING"} accent={confTier.c}>
         <svg viewBox="0 0 100 100" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
           <defs>
-            {/* Background wash — toned 40-50% from prior pass for crispness */}
+            {/* Background wash — toned further (~50%) for crispness */}
             <radialGradient id="lib-conf-grad" cx="50%" cy="50%" r="50%">
-              <stop offset="0%"   stopColor={confTier.c} stopOpacity="0.12" />
-              <stop offset="70%"  stopColor={confTier.c} stopOpacity="0.025" />
+              <stop offset="0%"   stopColor={confTier.c} stopOpacity="0.07" />
+              <stop offset="70%"  stopColor={confTier.c} stopOpacity="0.015" />
               <stop offset="100%" stopColor={confTier.c} stopOpacity="0" />
             </radialGradient>
           </defs>
           <circle cx="50" cy="50" r="48" fill="url(#lib-conf-grad)" />
-          <circle cx="50" cy="50" r="44" fill="none" stroke={`${confTier.c}18`} strokeWidth="0.4" />
-          <circle cx="50" cy="50" r="36" fill="none" stroke={`${confTier.c}22`} strokeWidth="0.4" />
+          <circle cx="50" cy="50" r="44" fill="none" stroke={`${confTier.c}14`} strokeWidth="0.4" />
+          <circle cx="50" cy="50" r="36" fill="none" stroke={`${confTier.c}1a`} strokeWidth="0.4" />
           {/* Conviction arc — main ring filled proportionally to globalConf */}
           <circle
             cx="50" cy="50" r="40" fill="none"
-            stroke={`${confTier.c}14`} strokeWidth="2.4"
+            stroke={`${confTier.c}10`} strokeWidth="2.2"
           />
           <circle
             cx="50" cy="50" r="40" fill="none"
-            stroke={confTier.c} strokeWidth="2.4" strokeLinecap="round"
+            stroke={confTier.c} strokeWidth="2.2" strokeLinecap="round"
             strokeDasharray={`${(m.globalConf / 100) * (2 * Math.PI * 40)} 999`}
             transform="rotate(-90 50 50)"
             style={{
-              /* Halved arc drop-shadow — crisper edge */
-              filter: `drop-shadow(0 0 3px ${confTier.c}aa)`,
+              /* Arc drop-shadow halved again — sharper edge */
+              filter: `drop-shadow(0 0 2px ${confTier.c}88)`,
               transition: "stroke-dasharray 800ms ease",
               animation: live && m.globalConf > 0 ? "lib-arc-glow 2.6s ease-in-out infinite" : "none",
             }}
@@ -6218,9 +6258,10 @@ function LiveIntelligenceBand({
               lineHeight: 1,
               fontVariantNumeric: "tabular-nums",
               letterSpacing: "-0.045em",
-              /* Halved glow — sharper, more readable, institutional */
+              /* Phase 8.4 — glow halved again. The number now reads almost
+                 like a printed weight with just a soft neon halo. */
               animation: live && m.globalConf >= 60 ? "lib-confidence-glow 3s ease-in-out infinite" : "none",
-              textShadow: `0 0 6px ${confTier.c}99, 0 0 12px ${confTier.c}44`,
+              textShadow: `0 0 4px ${confTier.c}66, 0 0 8px ${confTier.c}22`,
             }}
           >
             {m.globalConf > 0 ? m.globalConf : "—"}
