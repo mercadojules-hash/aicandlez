@@ -1,0 +1,112 @@
+We are now in FINAL STABILIZATION MODE for customer exchange onboarding. No redesigns, no architecture changes, no new UI systems. We are debugging the CONNECT EXCHANGE flow only.
+
+Current production state:
+- Customer portal UI is now production-grade and visually approved
+- Live intelligence widgets are approved
+- Customer/operator separation invariant is LOCKED
+- /command must remain byte-identical
+- Focus ONLY on exchange onboarding reliability
+
+We traced the likely failures already. I need a SURGICAL diagnostic + fix pass.
+
+PRIMARY USER ISSUE:
+After entering exchange API credentials (Kraken/Coinbase), onboarding sometimes:
+- throws validation/auth errors
+- appears saved but later disappears
+- fails during “connection test”
+- gets stuck before completion
+
+We already identified likely root causes:
+
+1. Kraken nonce drift
+2. Coinbase Ed25519 PEM parsing
+3. Missing frontend cache invalidation after successful save
+4. Retry logic masking true Coinbase parse errors
+
+YOUR TASK:
+Apply ONLY Step 1 + Step 4 right now.
+
+-----------------------------------
+STEP 1 — STRUCTURED ONBOARDING LOGGING
+-----------------------------------
+
+Add structured pino logs inside:
+artifacts/api-server/src/routes/userExchanges.ts
+
+I want:
+[EXCHANGE_ONBOARDING]
+[EXCHANGE_VALIDATE]
+[EXCHANGE_SAVE]
+
+Capture:
+- exchange
+- userId
+- demoMode
+- apiKeyPrefix (first 4 chars only)
+- apiKey length
+- secret length
+- whether secret contains BEGIN PRIVATE KEY
+- middleware pass/fail
+- getTicker start/end/duration
+- getAccount start/end/duration
+- vault encrypt success/failure
+- DB insert success/failure
+- final response code
+
+DO NOT log secrets.
+
+Need exact failure visibility.
+
+-----------------------------------
+STEP 4 — FRONTEND CACHE INVALIDATION AUDIT
+-----------------------------------
+
+Audit:
+PortalExchangeConnectModal.tsx
+
+After successful connect:
+VERIFY the modal invalidates/refetches the SAME query key used by the account list UI.
+
+Potential issue:
+- optimistic UI appears saved
+- parent query hydrates stale data
+- exchange “disappears”
+
+If missing:
+Add proper invalidateQueries/refetchQueries on success.
+
+-----------------------------------
+IMPORTANT CONSTRAINTS
+-----------------------------------
+
+DO NOT:
+- redesign onboarding
+- touch customer battlefield
+- touch widgets
+- touch /command
+- add new dependencies
+- refactor adapters yet
+- modify exchange execution logic yet
+
+DO:
+- keep fixes surgical
+- preserve all current UI
+- preserve customer/operator isolation
+- preserve existing auth + disclaimer gates
+
+-----------------------------------
+AFTER PATCH
+-----------------------------------
+
+Run:
+pnpm --filter @workspace/trading-dashboard run typecheck
+
+Then give me:
+1. exact files changed
+2. exact logs added
+3. whether cache invalidation was missing
+4. how to reproduce and inspect the next failure cleanly
+
+NO speculative architecture discussion.
+NO redesign suggestions.
+ONLY onboarding stabilization.

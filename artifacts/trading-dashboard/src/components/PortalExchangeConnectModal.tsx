@@ -543,6 +543,20 @@ export function PortalExchangeConnectModal({ open, onClose, preselectedExchange,
         throw new Error((data as { error?: string }).error
           ?? `Connection failed (HTTP ${r.status}). Check your credentials and try again.`);
       }
+      // Step 4 — cache invalidation. Mirrors the disconnect path (L474-477)
+      // so every surface watching exchange state refreshes in lockstep with
+      // a successful connect: Portal status pills + ExchangeTopology
+      // (`user-exchanges`), legacy admin views (`exchange-connections`),
+      // OnboardingFlow checklist (`onboarding-exchanges`), AdminPortalLegacy
+      // status panel (`portal-exchanges-status`). Without this, the modal's
+      // own query refetched at staleTime=15s but the parent surface still
+      // rendered the pre-connect "not connected" pill — the "appeared saved
+      // but later disappears" symptom in the bug report.
+      qc.invalidateQueries({ queryKey: ["user-exchanges"] });
+      qc.invalidateQueries({ queryKey: ["admin-exchange-connections"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-exchanges"] });
+      qc.invalidateQueries({ queryKey: ["portal-exchanges-status"] });
+      qc.invalidateQueries({ queryKey: ["user-exchanges-balances"] });
       setSuccess(true);
       onConnected?.();
       setTimeout(() => { reset(); onClose(); }, 1500);

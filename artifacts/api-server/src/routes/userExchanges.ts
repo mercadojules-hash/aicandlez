@@ -40,22 +40,52 @@ type AuthReq = Request & { clerkUserId: string };
 // 2. Test private endpoint (getAccount) → confirms credentials work
 // Never tests or requests withdrawal permissions.
 
-async function runConnectionTest(exchange: string, creds: ExchangeCredentials, demoMode = false) {
-  const adapter = makeAdapter(exchange, creds, { demoMode });
+async function runConnectionTest(
+  exchange: string,
+  creds:    ExchangeCredentials,
+  demoMode  = false,
+  log?:     { info: (o: object, m: string) => void; warn: (o: object, m: string) => void },
+) {
+  // [EXCHANGE_VALIDATE] step-level instrumentation. Adapter construction
+  // can THROW synchronously (Coinbase keyType getter rejects malformed PEM
+  // before any network call), so we time it separately from the network
+  // probes. Each step logs start/end/duration so root-cause attribution is
+  // unambiguous in the log stream.
+  const tStart = Date.now();
+  let adapter: ReturnType<typeof makeAdapter>;
+  try {
+    adapter = makeAdapter(exchange, creds, { demoMode });
+    log?.info({ exchange, step: "makeAdapter", durationMs: Date.now() - tStart, outcome: "ok" }, "[EXCHANGE_VALIDATE] step");
+  } catch (err) {
+    log?.warn({ exchange, step: "makeAdapter", durationMs: Date.now() - tStart, outcome: "throw", err: (err as Error).message }, "[EXCHANGE_VALIDATE] step");
+    throw err;
+  }
 
-  // Step 1 — public ticker (network check)
-  await adapter.getTicker("BTCUSD");
+  // Step 1 — public ticker (network check). Throws → propagates → 422.
+  const tTicker = Date.now();
+  try {
+    await adapter.getTicker("BTCUSD");
+    log?.info({ exchange, step: "getTicker", durationMs: Date.now() - tTicker, outcome: "ok" }, "[EXCHANGE_VALIDATE] step");
+  } catch (err) {
+    log?.warn({ exchange, step: "getTicker", durationMs: Date.now() - tTicker, outcome: "throw", err: (err as Error).message }, "[EXCHANGE_VALIDATE] step");
+    throw err;
+  }
 
-  // Step 2 — private account endpoint (auth check)
+  // Step 2 — private account endpoint (auth check). Errors are caught and
+  // surfaced via testResult.error (NOT thrown) so the caller can still
+  // return a clean 422 with the adapter's error message verbatim.
   let read  = false;
   let trade = false;
   let errorMsg: string | undefined;
+  const tAccount = Date.now();
   try {
     await adapter.getAccount();
     read  = true;
     trade = true;   // read access on exchange account implies trading key scope
+    log?.info({ exchange, step: "getAccount", durationMs: Date.now() - tAccount, outcome: "ok" }, "[EXCHANGE_VALIDATE] step");
   } catch (err) {
     errorMsg = (err as Error).message;
+    log?.warn({ exchange, step: "getAccount", durationMs: Date.now() - tAccount, outcome: "throw", err: errorMsg }, "[EXCHANGE_VALIDATE] step");
   }
 
   return {
@@ -131,6 +161,26 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
     demoMode?:   boolean;
   };
 
+  // [EXCHANGE_ONBOARDING] — entry. Capture payload SHAPE only (never keys/secrets).
+  // Includes apiKeyPrefix (first 4 chars, hint-only), lengths, and PEM detection
+  // so we can tell at a glance which Coinbase key format the user pasted
+  // (CDP-org / Ed25519-PEM / UUID+base64 / legacy-HMAC) before the adapter
+  // even runs. By design `requireAuth → requirePlan → requireDisclaimer` have
+  // already passed when we reach this line — so the very first log line
+  // implicitly confirms all three gates cleared.
+  req.log.info({
+    userId,
+    exchange,
+    demoMode:            demoMode === true,
+    apiKeyPrefix:        typeof apiKey === "string" ? apiKey.slice(0, 4) : null,
+    apiKeyLen:           typeof apiKey === "string" ? apiKey.length : 0,
+    apiSecretLen:        typeof apiSecret === "string" ? apiSecret.length : 0,
+    secretIsPem:         typeof apiSecret === "string" && apiSecret.includes("BEGIN PRIVATE KEY"),
+    hasPassphrase:       !!passphrase,
+    labelProvided:       !!label,
+    gatesPassed:         "auth+plan+disclaimer",
+  }, "[EXCHANGE_ONBOARDING] connect received");
+
   // demoMode is Bitget-only — it routes signed calls to Bitget's
   // demo-trading wallet via the `PAPTRADING: 1` header. Silently coerce to
   // false for every other exchange so a stale frontend flag can't accidentally
@@ -140,22 +190,26 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
   // ── Validate input ────────────────────────────────────────────────────────
 
   if (!exchange || !apiKey || !apiSecret) {
+    req.log.warn({ userId, exchange, status: 400, reason: "missing_fields" }, "[EXCHANGE_ONBOARDING] reject");
     res.status(400).json({ error: "exchange, apiKey, and apiSecret are required" });
     return;
   }
   if (!CONNECTABLE_EXCHANGE_IDS.has(exchange)) {
+    req.log.warn({ userId, exchange, status: 400, reason: "unsupported_exchange" }, "[EXCHANGE_ONBOARDING] reject");
     res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
     return;
   }
 
   const meta = CATALOG_BY_ID[exchange]!;
   if (meta.requiresPassphrase && !passphrase) {
+    req.log.warn({ userId, exchange, status: 400, reason: "missing_passphrase" }, "[EXCHANGE_ONBOARDING] reject");
     res.status(400).json({ error: `${exchange} requires a passphrase` });
     return;
   }
 
   // Basic format checks — prevent obviously invalid keys from hitting the exchange
   if (apiKey.trim().length < 8 || apiSecret.trim().length < 8) {
+    req.log.warn({ userId, exchange, status: 400, reason: "key_too_short" }, "[EXCHANGE_ONBOARDING] reject");
     res.status(400).json({ error: "API key and secret must be at least 8 characters" });
     return;
   }
@@ -163,12 +217,32 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
   const creds: ExchangeCredentials = { apiKey: apiKey.trim(), apiSecret: apiSecret.trim(), passphrase: passphrase?.trim(), label };
 
   // ── Test connection ───────────────────────────────────────────────────────
+  // [EXCHANGE_VALIDATE] wraps runConnectionTest with per-step timing so we
+  // can attribute slow / hung calls to either Kraken /0/private/Balance,
+  // Coinbase /api/v3/brokerage/accounts, the public ticker probe, or the
+  // adapter-construction itself (Coinbase keyType getter throws here on
+  // malformed PEM before the network call).
   let testResult: { ok: boolean; permissions: { read: boolean; trade: boolean; withdraw: false }; error?: string };
+  const validateStart = Date.now();
+  req.log.info({ userId, exchange, demoMode: demoModeFlag }, "[EXCHANGE_VALIDATE] start");
   try {
-    req.log.info({ userId, exchange, demoMode: demoModeFlag }, "userExchanges: testing connection");
-    testResult = await runConnectionTest(exchange, creds, demoModeFlag);
+    testResult = await runConnectionTest(exchange, creds, demoModeFlag, req.log);
+    req.log.info({
+      userId,
+      exchange,
+      durationMs:  Date.now() - validateStart,
+      readOk:      testResult.ok,
+      permissions: testResult.permissions,
+      adapterErr:  testResult.error ?? null,
+    }, "[EXCHANGE_VALIDATE] complete");
   } catch (err) {
-    req.log.warn({ userId, exchange, err: (err as Error).message }, "userExchanges: connection test failed");
+    req.log.warn({
+      userId,
+      exchange,
+      durationMs: Date.now() - validateStart,
+      err:        (err as Error).message,
+      stage:      "runConnectionTest_throw",
+    }, "[EXCHANGE_VALIDATE] threw (returning 422)");
     res.status(422).json({
       ok:    false,
       error: `Connection test failed: ${(err as Error).message}`,
@@ -177,7 +251,10 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
   }
 
   if (!testResult.ok) {
-    req.log.warn({ userId, exchange }, "userExchanges: credentials rejected (no read access)");
+    req.log.warn({
+      userId, exchange,
+      adapterErr: testResult.error ?? null,
+    }, "[EXCHANGE_VALIDATE] credentials rejected (no read access, returning 422)");
     res.status(422).json({
       ok:    false,
       error: testResult.error ?? "Credentials could not authenticate with the exchange. Check your API key and secret.",
@@ -186,10 +263,24 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
   }
 
   // ── Encrypt + persist ─────────────────────────────────────────────────────
-  const encryptedBlob = vault.encryptBlob(userId, creds);
+  // [EXCHANGE_SAVE] wraps vault encrypt + DB upsert + readback. Vault failure
+  // throws synchronously (caught by the outer try) so we log encrypt-ok
+  // explicitly before the insert, then row-id after the readback. Readback
+  // returning null is the only path that yields `ok:true, connection:null`
+  // (fake-success edge) — log it as warn so we can spot it.
+  let encryptedBlob: string;
+  try {
+    encryptedBlob = vault.encryptBlob(userId, creds);
+    req.log.info({ userId, exchange, blobLen: encryptedBlob.length }, "[EXCHANGE_SAVE] vault encrypt ok");
+  } catch (err) {
+    req.log.error({ userId, exchange, err: (err as Error).message }, "[EXCHANGE_SAVE] vault encrypt FAILED");
+    res.status(500).json({ error: "Failed to encrypt credentials" });
+    return;
+  }
 
   try {
     const now = new Date();
+    const insertStart = Date.now();
     await db
       .insert(userExchangeConnectionsTable)
       .values({
@@ -218,9 +309,9 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
           updatedAt:      now,
         },
       });
+    req.log.info({ userId, exchange, durationMs: Date.now() - insertStart }, "[EXCHANGE_SAVE] db upsert ok");
 
     auditLogger.append(userId, "CREDENTIAL_STORED", { exchange }, { exchange });
-    req.log.info({ userId, exchange }, "userExchanges: credentials stored successfully");
 
     // Return the updated row (safe, no raw creds)
     const [row] = await db
@@ -234,9 +325,15 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
       )
       .limit(1);
 
+    if (!row) {
+      req.log.warn({ userId, exchange }, "[EXCHANGE_SAVE] readback returned NO ROW (fake-success edge)");
+    } else {
+      req.log.info({ userId, exchange, rowId: row.id, status: 200 }, "[EXCHANGE_SAVE] complete");
+    }
+
     res.json({ ok: true, connection: row ? safeRow(row) : null, permissions: testResult.permissions });
   } catch (err) {
-    req.log.error({ err }, "userExchanges: failed to persist connection");
+    req.log.error({ userId, exchange, err: (err as Error).message }, "[EXCHANGE_SAVE] db upsert FAILED (returning 500)");
     res.status(500).json({ error: "Failed to save connection" });
   }
 });
@@ -401,7 +498,7 @@ router.post("/user/exchanges/:exchange/test", requireAuth, requirePlan("starter"
 
   let testResult: { ok: boolean; permissions: { read: boolean; trade: boolean; withdraw: false }; error?: string };
   try {
-    testResult = await runConnectionTest(exchange, creds, row.demoMode);
+    testResult = await runConnectionTest(exchange, creds, row.demoMode, req.log);
   } catch (err) {
     const errorMsg = (err as Error).message;
     await db
