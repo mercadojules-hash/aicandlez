@@ -887,6 +887,10 @@ type EngineLite = {
   // Pass 4.2 — server-side candle feed health. When healthy === false
   // the shell renders <DataFeedBanner /> so the empty-engine state is
   // explicit (infra event) instead of ambiguous (apparent UI bug).
+  /* Per-symbol AI confidence breakdowns surfaced by the engine and
+     read by SignalsPanel rows + LiveIntelligenceBand hero. Loose shape
+     to avoid coupling to lib/conviction's SymBreakdown re-export. */
+  symbolBreakdowns?: Readonly<Record<string, { avgConfidence?: number; direction?: "LONG" | "SHORT" | "FLAT" } | undefined>>;
   dataFeedHealth?: {
     healthy:             boolean;
     primary:             string;
@@ -5214,6 +5218,7 @@ export function PortalCustomerShell() {
         <LiveIntelligenceBand
           opportunities={opportunities}
           engine={engineStatus}
+          breakdowns={engineStatus?.symbolBreakdowns}
           signalsPerMin={signalsPerMin}
           openCount={openTrades.length}
           history={paperHistory}
@@ -6004,10 +6009,18 @@ function WelcomeBackBanner({
 /* PROBABILITY → MARKET HEAT. Customer-only — never reached from /command.   */
 /* ──────────────────────────────────────────────────────────────────────── */
 function LiveIntelligenceBand({
-  opportunities, engine, signalsPerMin, openCount, history,
+  opportunities, engine, breakdowns, signalsPerMin, openCount, history,
 }: {
   opportunities: ReadonlyArray<OpportunityVM>;
   engine:        EngineLite | undefined;
+  /* Server-side per-symbol breakdowns (`engine.symbolBreakdowns`). This is
+     the SAME source `CryptoMajorsSignalsPanel` / `CryptoAltsMemesPanel`
+     read from to render per-row AI confidence. We accept it explicitly so
+     GLOBAL AI CONFIDENCE never lags behind a row visibly displaying a
+     higher number (e.g. PEPE = 94 in panel while opportunities hasn't yet
+     promoted it). Loose record type avoids coupling to a SymBreakdown
+     re-export from lib/conviction in this file. */
+  breakdowns?:   Readonly<Record<string, { avgConfidence?: number; direction?: "LONG" | "SHORT" | "FLAT" } | undefined>>;
   signalsPerMin: number;
   openCount:     number;
   history:       ReadonlyArray<{ symbol: string; display: string; pnl: number; pnlPct: number; closedAt: number; openedAt: number }>;
@@ -6035,21 +6048,50 @@ function LiveIntelligenceBand({
     const flowDenom = Math.max(longs + shorts, 1);
     const longPct  = Math.round((longs  / flowDenom) * 100);
     const shortPct = 100 - longPct;
-    // GLOBAL AI CONFIDENCE = max(highest long, highest short) — directional ambidextrous trust signal.
-    const globalConf = Math.round(Math.max(bestLong?.convictionScore ?? 0, bestShort?.convictionScore ?? 0));
-    const globalConfSrc: OpportunityVM | null =
-      (bestLong  && (bestLong.convictionScore  ?? 0) >= (bestShort?.convictionScore ?? 0)) ? bestLong  :
-      (bestShort && (bestShort.convictionScore ?? 0) >  (bestLong?.convictionScore  ?? 0)) ? bestShort :
-      best;
+
+    /* ── GLOBAL AI CONFIDENCE — trust anchor.
+       Must ALWAYS equal the highest AI confidence currently rendered
+       anywhere in the battlefield. Reads BOTH sources:
+         (a) opportunities[].convictionScore  (calibrated promoted set)
+         (b) engine.symbolBreakdowns[*].avgConfidence  (raw per-ticker
+             confidence the SignalsPanel rows surface verbatim)
+       and takes the maximum. Resolves the case where a row shows e.g.
+       PEPE = 94 but opportunities hasn't promoted it yet → hero stays
+       in sync with what the user actually sees.                         */
+    let oppMaxConv  = 0;
+    let oppMaxSrc: OpportunityVM | null = null;
+    for (const o of opportunities) {
+      const c = o.convictionScore ?? 0;
+      if (c > oppMaxConv) { oppMaxConv = c; oppMaxSrc = o; }
+    }
+    let bdMaxConv = 0;
+    let bdMaxSym: string | null = null;
+    let bdMaxDir: "LONG" | "SHORT" | "FLAT" | undefined = undefined;
+    if (breakdowns) {
+      for (const sym in breakdowns) {
+        const b = breakdowns[sym];
+        const c = b?.avgConfidence ?? 0;
+        if (c > bdMaxConv) { bdMaxConv = c; bdMaxSym = sym; bdMaxDir = b?.direction; }
+      }
+    }
+    const globalConfRaw = Math.max(oppMaxConv, bdMaxConv);
+    const globalConf = Math.round(globalConfRaw);
+    const globalConfSrc: { display: string; direction: "LONG" | "SHORT" | "FLAT" | undefined } | null =
+      bdMaxConv > oppMaxConv && bdMaxSym
+        ? { display: bdMaxSym.replace(/USD[T]?$/i, "").replace(/USD$/i, ""), direction: bdMaxDir }
+        : oppMaxSrc
+          ? { display: oppMaxSrc.display, direction: oppMaxSrc.direction }
+          : null;
+
     const today0 = new Date(); today0.setHours(0, 0, 0, 0);
     const todayWins = history.filter(h => h.closedAt >= today0.getTime() && h.pnl > 0).length;
     return {
       n, longs, shorts, avgConv, eliteCount, breakoutPct, longPct, shortPct,
       best: best as OpportunityVM | null, bestLong: bestLong as OpportunityVM | null,
       bestShort: bestShort as OpportunityVM | null, globalConf,
-      globalConfSrc: globalConfSrc as OpportunityVM | null, todayWins,
+      globalConfSrc, todayWins,
     };
-  }, [opportunities, history]);
+  }, [opportunities, breakdowns, history]);
 
   // Tier color for GLOBAL AI CONFIDENCE.
   const confTier =
@@ -6105,7 +6147,8 @@ function LiveIntelligenceBand({
       <style>{`
         @keyframes lib-radar-sweep    { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @keyframes lib-ring-pulse     { 0%,100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.025); } }
-        @keyframes lib-confidence-glow{ 0%,100% { text-shadow: 0 0 14px var(--lib-c), 0 0 28px var(--lib-c); } 50% { text-shadow: 0 0 22px var(--lib-c), 0 0 40px var(--lib-c); } }
+        @keyframes lib-confidence-glow{ 0%,100% { text-shadow: 0 0 6px var(--lib-c), 0 0 12px var(--lib-c-soft); } 50% { text-shadow: 0 0 9px var(--lib-c), 0 0 16px var(--lib-c-soft); } }
+        @keyframes lib-elite-pulse    { 0%,100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.04); } }
         @keyframes lib-arc-glow       { 0%,100% { stroke-opacity: 0.9; } 50% { stroke-opacity: 0.55; } }
         @keyframes lib-blip-pop       { 0% { r: 1; opacity: 0.2; } 60% { opacity: 1; } 100% { r: 2.4; opacity: 0; } }
         @keyframes lib-heat-blink     { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
@@ -6123,34 +6166,42 @@ function LiveIntelligenceBand({
       <LIBCell label="GLOBAL AI CONFIDENCE" sub={live ? confTier.label : "ARMING"} accent={confTier.c}>
         <svg viewBox="0 0 100 100" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
           <defs>
+            {/* Background wash — toned 40-50% from prior pass for crispness */}
             <radialGradient id="lib-conf-grad" cx="50%" cy="50%" r="50%">
-              <stop offset="0%"   stopColor={confTier.c} stopOpacity="0.22" />
-              <stop offset="70%"  stopColor={confTier.c} stopOpacity="0.05" />
+              <stop offset="0%"   stopColor={confTier.c} stopOpacity="0.12" />
+              <stop offset="70%"  stopColor={confTier.c} stopOpacity="0.025" />
               <stop offset="100%" stopColor={confTier.c} stopOpacity="0" />
             </radialGradient>
           </defs>
           <circle cx="50" cy="50" r="48" fill="url(#lib-conf-grad)" />
-          <circle cx="50" cy="50" r="44" fill="none" stroke={`${confTier.c}22`} strokeWidth="0.4" />
-          <circle cx="50" cy="50" r="36" fill="none" stroke={`${confTier.c}33`} strokeWidth="0.5" />
+          <circle cx="50" cy="50" r="44" fill="none" stroke={`${confTier.c}18`} strokeWidth="0.4" />
+          <circle cx="50" cy="50" r="36" fill="none" stroke={`${confTier.c}22`} strokeWidth="0.4" />
           {/* Conviction arc — main ring filled proportionally to globalConf */}
           <circle
             cx="50" cy="50" r="40" fill="none"
-            stroke={`${confTier.c}18`} strokeWidth="3"
+            stroke={`${confTier.c}14`} strokeWidth="2.4"
           />
           <circle
             cx="50" cy="50" r="40" fill="none"
-            stroke={confTier.c} strokeWidth="3" strokeLinecap="round"
+            stroke={confTier.c} strokeWidth="2.4" strokeLinecap="round"
             strokeDasharray={`${(m.globalConf / 100) * (2 * Math.PI * 40)} 999`}
             transform="rotate(-90 50 50)"
             style={{
-              filter: `drop-shadow(0 0 6px ${confTier.c})`,
+              /* Halved arc drop-shadow — crisper edge */
+              filter: `drop-shadow(0 0 3px ${confTier.c}aa)`,
               transition: "stroke-dasharray 800ms ease",
               animation: live && m.globalConf > 0 ? "lib-arc-glow 2.6s ease-in-out infinite" : "none",
             }}
           />
-          {/* Inner pulsing halo */}
-          <circle cx="50" cy="50" r="28" fill="none" stroke={`${confTier.c}55`} strokeWidth="0.6"
-            style={{ transformOrigin: "50px 50px", animation: live && m.globalConf > 0 ? "lib-ring-pulse 3.2s ease-in-out infinite" : "none" }} />
+          {/* ELITE ≥90 — restrained outer accent ring + soft pulse */}
+          {m.globalConf >= 90 && (
+            <>
+              <circle cx="50" cy="50" r="46" fill="none" stroke={confTier.c} strokeWidth="0.5"
+                strokeDasharray="2 3" opacity="0.55" />
+              <circle cx="50" cy="50" r="44" fill="none" stroke={confTier.c} strokeWidth="0.6"
+                style={{ transformOrigin: "50px 50px", animation: live ? "lib-elite-pulse 2.8s ease-in-out infinite" : "none" }} />
+            </>
+          )}
         </svg>
         <div style={{
           position: "relative", zIndex: 1,
@@ -6160,26 +6211,42 @@ function LiveIntelligenceBand({
           <span
             style={{
               ["--lib-c" as string]: confTier.c,
-              fontSize: "clamp(44px, 5.4vw, 72px)",
+              ["--lib-c-soft" as string]: `${confTier.c}55`,
+              fontSize: "clamp(46px, 5.6vw, 74px)",
               fontWeight: 900,
               color: confTier.c,
               lineHeight: 1,
               fontVariantNumeric: "tabular-nums",
-              letterSpacing: "-0.04em",
-              animation: live && m.globalConf >= 60 ? "lib-confidence-glow 2.6s ease-in-out infinite" : "none",
-              textShadow: `0 0 14px ${confTier.c}88, 0 0 28px ${confTier.c}55`,
+              letterSpacing: "-0.045em",
+              /* Halved glow — sharper, more readable, institutional */
+              animation: live && m.globalConf >= 60 ? "lib-confidence-glow 3s ease-in-out infinite" : "none",
+              textShadow: `0 0 6px ${confTier.c}99, 0 0 12px ${confTier.c}44`,
             }}
           >
             {m.globalConf > 0 ? m.globalConf : "—"}
           </span>
+          {/* Source row — symbol · direction */}
           <span style={{
             fontSize: 9, fontWeight: 800, letterSpacing: "0.22em",
-            color: T.TEXT_3, marginTop: 4,
+            color: T.TEXT_3, marginTop: 6,
           }}>
             {m.globalConfSrc
-              ? `${m.globalConfSrc.display} · ${m.globalConfSrc.direction}`
+              ? `${m.globalConfSrc.display}${m.globalConfSrc.direction ? ` · ${m.globalConfSrc.direction}` : ""}`
               : "AWAITING SETUP"}
           </span>
+          {/* ELITE micro-label — restrained, only when ≥90 */}
+          {m.globalConf >= 90 && (
+            <span style={{
+              fontSize: 8, fontWeight: 900, letterSpacing: "0.32em",
+              color: confTier.c, marginTop: 4,
+              padding: "1px 6px",
+              border: `1px solid ${confTier.c}55`,
+              borderRadius: 2,
+              background: `${confTier.c}10`,
+            }}>
+              ELITE SIGNAL
+            </span>
+          )}
         </div>
       </LIBCell>
 

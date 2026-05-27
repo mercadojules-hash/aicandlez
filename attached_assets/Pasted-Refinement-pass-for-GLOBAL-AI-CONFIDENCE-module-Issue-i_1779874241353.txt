@@ -1,0 +1,83 @@
+Refinement pass for GLOBAL AI CONFIDENCE module:
+
+Issue identified:
+The GLOBAL AI CONFIDENCE box is currently showing a stale/lower value than the actual highest active battlefield conviction.
+
+Example from current production screenshot:
+
+* Highest visible active setup = PEPE at 94 conviction
+* GLOBAL AI CONFIDENCE is still displaying ~60
+* This breaks trust continuity because the hero confidence metric must ALWAYS reflect the strongest live signal on-screen.
+
+Required fix:
+GLOBAL AI CONFIDENCE must derive from:
+max(opportunities[].conviction)
+
+Across BOTH:
+
+* LONG setups
+* SHORT setups
+
+No filtering mismatch.
+No stale memoization.
+No throttled value lag.
+No separate telemetry source.
+
+The displayed hero confidence number should ALWAYS equal the highest currently active conviction visible anywhere in the battlefield.
+
+Expected behavior:
+
+* If highest active opportunity = 94
+  → HERO module instantly displays 94
+* If highest drops to 88
+  → HERO updates to 88
+* If a new 97 appears
+  → HERO becomes 97 immediately
+
+This module is now the TRUST anchor of the entire platform.
+
+Visual refinement request:
+The glow intensity around the confidence number is currently too aggressive.
+
+Adjustments:
+
+* reduce bloom/glow by ~40–50%
+* sharpen readability
+* keep premium neon aesthetic
+* prioritize crispness over haze
+* number should feel authoritative, not blurry
+
+Desired look:
+
+* bold institutional confidence display
+* clean luminous edge
+* subtle pulse only
+* easier readability on dark backgrounds
+
+Additional refinement:
+When confidence ≥90:
+
+* add subtle “ELITE” state treatment
+* NOT giant text
+* maybe:
+
+  * small elite ring accent
+  * thin outer neon pulse
+  * tiny “ELITE SIGNAL” micro-label
+* tasteful, restrained
+
+Constraints remain:
+
+* customer-only
+* no fake/demo values
+* /command untouched
+* maintain SVG/CSS lightweight approach
+* preserve existing layout architecture
+
+Verification after patch:
+
+* hero confidence ALWAYS matches highest visible battlefield conviction
+* PEPE 94 example correctly surfaces as 94
+* glow noticeably cleaner/crisper
+* radar remains second module
+* no performance regression
