@@ -53,6 +53,7 @@ import { AIDisclaimerModal } from "../AIDisclaimerModal";
 // Pass 7V — brand logo used above search bar (replaces ticker chips row).
 import aiCandlezLogoHorizontal from "@assets/aicandlez-logo-horizontal-master_1779691403317.png";
 import { usePaperSignals, type OpportunityVM } from "../../hooks/usePaperSignals";
+import { useCustomerPlan, type Plan, UPGRADE_EVENT } from "../../hooks/useCustomerPlan";
 import { toast } from "@/hooks/use-toast";
 import { calibrateRawConfidence } from "../../lib/conviction";
 import { useExecutionState } from "../../hooks/useExecutionState";
@@ -123,7 +124,10 @@ const T = {
   TX_MED:        "200ms ease",
 } as const;
 
-type Plan = "free" | "starter" | "pro";
+// `Plan` type + `useCustomerPlan` hook moved to ../../hooks/useCustomerPlan
+// (Phase 6) so customer-scoped surfaces nested deep in the matrix tree
+// (e.g. SignalRow's PRO AI ANALYSIS drawer) can consume plan-awareness
+// without creating a circular import back through this shell.
 
 /* ──────────────────────────────────────────────────────────────────────── */
 /* Operator Pulse Ribbon                                                    */
@@ -135,40 +139,6 @@ type Plan = "free" | "starter" | "pro";
 
 function fmtUtc(d: Date): string {
   return `${d.toISOString().split("T")[1]?.split(".")[0]} UTC`;
-}
-
-function useCustomerPlan(): Plan {
-  const { isSignedIn, getToken } = useAuth();
-  const { data } = useQuery<{
-    plan?:            string;
-    isComplimentary?: boolean;
-    effectivePlan?:   string;
-  }>({
-    queryKey: ["billing-subscription-portal-shell"],
-    enabled:  isSignedIn ?? false,
-    refetchInterval: 60_000,
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
-    queryFn: async () => {
-      const token = await getToken().catch(() => null);
-      const res = await authFetch(`${apiBaseUrl}/api/billing/subscription`, {
-        credentials: "include",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error("billing/subscription failed");
-      return res.json();
-    },
-  });
-  // Operator-granted complimentary entitlement collapses onto the
-  // effective tier — without this every downstream consumer of
-  // `useCustomerPlan()` (ExchangeStatusBadge label, OperatorPulseRibbon
-  // tier text, useConnectedExchangeName fetch-enable gate at line ~161,
-  // etc.) would render those users as FREE/PAPER MODE despite the
-  // backend AI gate granting full live access.
-  const p = data?.isComplimentary
-    ? (data?.effectivePlan ?? "pro")
-    : data?.plan;
-  return p === "starter" || p === "pro" ? p : "free";
 }
 
 /* ──────────────────────────────────────────────────────────────────────── */
@@ -4676,6 +4646,22 @@ export function PortalCustomerShell() {
 
   // Stable handler refs for memo'd CTAs.
   const openUpgrade = useCallback(() => setUpgrade(true), []);
+
+  // Phase 6 — Cross-tree upgrade bridge.
+  //
+  // SignalRow lives several memoized layers below this shell (matrix →
+  // panel → row), so its PRO AI ANALYSIS lock CTA cannot reach
+  // `setUpgrade` by prop without forcing every intermediate to re-render
+  // when the setter identity changes. Instead the row dispatches a
+  // window CustomEvent (`UPGRADE_EVENT`) and the shell listens once.
+  // Zero prop plumbing, zero context rebuilds, customer-only because
+  // PortalCustomerShell is the only mount point that subscribes.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (): void => setUpgrade(true);
+    window.addEventListener(UPGRADE_EVENT, handler);
+    return () => window.removeEventListener(UPGRADE_EVENT, handler);
+  }, []);
 
   // Surface the customer shell only on the customer surface. The Portal
   // dispatcher already gates on `isAdmin`, so this is purely defensive.

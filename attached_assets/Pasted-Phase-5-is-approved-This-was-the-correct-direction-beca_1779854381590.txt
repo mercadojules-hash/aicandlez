@@ -1,0 +1,125 @@
+Phase 5 is approved.
+
+This was the correct direction because you focused on:
+trust
+discipline
+risk-awareness
+retention psychology
+
+instead of fake hype.
+
+That restraint is exactly what makes the platform now feel credible.
+
+Major wins:
+• Welcome-back banner creates continuity + re-engagement
+• Performance credibility strip adds institutional legitimacy
+• “AI avoided X setups” and risk-gate storytelling dramatically increase trust
+• Risk posture layer makes the AI feel disciplined instead of reckless
+• Elite battlefield escalation creates emotional significance around rare 90%+ events
+• Preserving /command byte-identical continues to be the correct architectural discipline
+
+Most important:
+The platform now communicates:
+“the AI filters aggressively”
+—not—
+“the AI trades everything.”
+
+That is critical for long-term trust and conversion.
+
+Proceed next with the deferred:
+Phase 6 — Subscription Positioning + Premium Intelligence Layer
+
+This is now the correct monetization phase.
+
+Priority scope:
+
+1. PRO AI ANALYSIS Layer
+   Inside WHY THIS SIGNAL:
+
+* FREE users see partial reasoning
+* advanced reasoning blurred/locked
+* “PRO AI ANALYSIS” section
+* upgrade CTA integrated naturally
+
+Examples:
+FREE:
+“ETH momentum strengthening…”
+
+PRO:
+• multi-timeframe alignment breakdown
+• volatility regime analysis
+• confidence trajectory
+• correlation risk assessment
+• AI trade probability commentary
+
+2. Elite Signal Locking
+   Certain:
+
+* ELITE alerts
+* advanced confidence analytics
+* deeper WHY layers
+* premium notifications
+
+should become PRO-tier surfaces.
+
+3. Upgrade Psychology
+   The upgrade prompts should feel:
+   institutional
+   exclusive
+   intelligence-focused
+
+NOT:
+cheap upsells.
+
+Avoid:
+
+* flashing banners
+* aggressive marketing
+* casino energy
+
+Use:
+
+* subtle locked intelligence
+* blurred advanced analytics
+* “unlock deeper AI reasoning”
+* “PRO intelligence layer”
+
+4. Plan-aware personalization
+   Thread:
+   useCustomerPlan
+   through customer-scoped surfaces only.
+
+FREE:
+
+* basic signals
+* basic WHY
+* paper trading
+
+PRO:
+
+* deeper intelligence
+* elite alerts
+* advanced analytics
+* live AI execution unlock path
+
+5. Preserve the tone
+   This is VERY important now.
+
+The platform should continue feeling:
+
+* disciplined
+* premium
+* institutional
+* intelligence-first
+
+NOT:
+
+* retail pump-chasing
+* meme-y
+* over-marketed
+
+Continue:
+• PortalCustomerShell.tsx isolation
+• customer-scoped components only
+• /command frozen
+• no admin leakage
