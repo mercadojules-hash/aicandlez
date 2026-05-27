@@ -734,7 +734,8 @@ function AiActivityFeed({ engine }: { engine?: EngineStatus }) {
       fontFamily: N.FONT_MONO,
       overflow: "hidden",
       flex: 1,
-      minHeight: 620,
+      minHeight: 320,
+      maxHeight: 460,
       boxShadow: `inset 0 0 24px ${N.BRAND}08`,
     }}>
       <div style={{
@@ -831,7 +832,7 @@ function BlotterPanel({
       background: N.SURFACE_1,
       fontFamily: N.FONT_MONO,
       overflow: "hidden",
-      maxHeight: 520,
+      maxHeight: 460,
       boxShadow: `inset 0 0 24px ${accent}08`,
     }}>
       <div style={{
@@ -1488,17 +1489,20 @@ export default function CommandCenter() {
           <BattlefieldHeader engine={engine} cryptoActive={cryptoState === "LIVE"} />
         </div>
 
-        {/* Row 3 — BATTLEFIELD: dual crypto matrix + MY ACCOUNT / AI ACTIVITY rail
-            LEFT col = TOP CRYPTO MAJORS · MID col = ALTS & MEMECOINS · RAIL = account+feed
-            Single unified AiAutotradeBar + LiveControlBar spans both matrix
-            columns (one execution state for the entire battlefield).
+        {/* Row 3 — BATTLEFIELD: dual crypto matrix + RIGHT OPERATOR RAIL
+            LEFT col = TOP CRYPTO MAJORS · MID col = ALTS & MEMECOINS
+            RAIL = MY ACCOUNT (incl. PERFORMANCE chart) → LIVE TRADES →
+            TRADE HISTORY → AI ACTIVITY. Per direction: red AiAutotradeBar
+            removed entirely; LIVE TRADES + TRADE HISTORY moved up into
+            the rail so the surface stops growing infinitely downward
+            and the rail reads as a real operator station. Single
+            unified LiveControlBar spans both matrix columns.
             (Crypto-only locked invariant preserved — no equities.) */}
         <section
           className="grid gap-1.5 px-2"
-          style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) 296px", alignItems: "start" }}
+          style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) 380px", alignItems: "start" }}
         >
           <div className="flex flex-col gap-1.5" style={{ gridColumn: "1 / span 2" }}>
-            <AiAutotradeBar />
             <LiveControlBar
               assetClass="CRYPTO"
               state={cryptoState}
@@ -1514,6 +1518,20 @@ export default function CommandCenter() {
               trades={tradesArr}
               engine={engine}
             />
+            <BlotterPanel
+              title="LIVE TRADES"
+              accent={N.BRAND_BRT}
+              badge={`${openTrades.length} OPEN`}
+              rows={openTrades.slice(0, 50)}
+              mode="LIVE"
+            />
+            <BlotterPanel
+              title="TRADE HISTORY"
+              accent={N.GOLD_BRT}
+              badge={`${closedTrades.length} CLOSED`}
+              rows={closedTrades.slice(0, 100)}
+              mode="HISTORY"
+            />
             <AiActivityFeed engine={engine} />
           </div>
           <div style={{ gridColumn: "1 / span 1", gridRow: "2 / span 1" }}>
@@ -1522,30 +1540,6 @@ export default function CommandCenter() {
           <div style={{ gridColumn: "2 / span 1", gridRow: "2 / span 1" }}>
             <CryptoAltsMemesPanel engine={engine} />
           </div>
-        </section>
-
-        {/* Row 4 — LIVE TRADES + TRADE HISTORY blotters (only content beneath
-            the dual matrix per restored composition). Vertical-scroll only;
-            no other analytics, no deep equity decompose, no operator
-            telemetry below this point. */}
-        <section
-          className="grid gap-1.5 px-2"
-          style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", alignItems: "start" }}
-        >
-          <BlotterPanel
-            title="20 LIVE TRADES"
-            accent={N.BRAND_BRT}
-            badge={`${openTrades.length} OPEN`}
-            rows={openTrades.slice(0, 20)}
-            mode="LIVE"
-          />
-          <BlotterPanel
-            title="TRADE HISTORY"
-            accent={N.GOLD_BRT}
-            badge={`${closedTrades.length} CLOSED`}
-            rows={closedTrades.slice(0, 50)}
-            mode="HISTORY"
-          />
         </section>
 
         <footer
