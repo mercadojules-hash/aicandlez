@@ -4108,10 +4108,12 @@ function CustomerBlotterShell({
       // Phase 8.1 — AI ACTIVITY panel was removed from the right rail so the
       // customer surface stays focused on SIGNALS → ACCOUNT → TRADES (not
       // backend engine telemetry). Vertical real estate the feed used to
-      // consume is redistributed here: 360 → 560 gives LIVE TRADES + TRADE
-      // HISTORY ~6-7 visible rows each before internal scroll. /command is
-      // untouched — this shell is only mounted by PortalCustomerShell.
-      maxHeight: 560, boxShadow: `inset 0 0 24px ${accent}08`,
+      // consume is redistributed here: 360 → 720 gives LIVE TRADES + TRADE
+      // HISTORY ~10 visible rows each before internal scroll (matches the
+      // battlefield column row-cap, so the eye reads the entire rail at
+      // the same density). /command is untouched — this shell is only
+      // mounted by PortalCustomerShell.
+      maxHeight: 720, boxShadow: `inset 0 0 24px ${accent}08`,
     }}>
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
