@@ -283,32 +283,60 @@ function useAiTradingState() {
     refetchOnWindowFocus: true,
   });
 
-  const mut = useMutation<AiTradingState, Error & { needsUpgrade?: boolean }, boolean>({
+  // Structured activation error — every non-2xx response is mapped into
+  // this shape so the UI can surface a human-readable reason instead of
+  // silently failing the click. Production bug (May 2026) was the
+  // catch handler only checking `needsUpgrade`; every other failure
+  // (400/403/500/network) animated the button and did nothing visible.
+  type ActivationError = Error & {
+    status?:       number;
+    errorCode?:    string;
+    needsUpgrade?: boolean;
+    serverMessage?: string;
+  };
+
+  const mut = useMutation<AiTradingState, ActivationError, boolean>({
     mutationFn: async (enabled: boolean) => {
       // Forward the per-session ARM flag so the server can reject a
       // stale-client "AI on" flip with 412 runtime_not_armed when the
       // user's runtime resolves live. `getArmedForLive()` reads the
       // module-scoped store at call time (not via closure) so the
       // value is fresh on every mutation.
-      const res = await authFetch("/api/user/ai-trading/enable", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ enabled, armedForLive: getArmedForLive() }),
-      });
-      if (res.status === 402) {
-        const err = Object.assign(new Error("needs_upgrade"), { needsUpgrade: true });
+      let res: Response;
+      try {
+        res = await authFetch("/api/user/ai-trading/enable", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ enabled, armedForLive: getArmedForLive() }),
+        });
+      } catch (netErr) {
+        const err = Object.assign(
+          new Error("Network error — could not reach activation service."),
+          { errorCode: "network_error", serverMessage: netErr instanceof Error ? netErr.message : String(netErr) },
+        ) as ActivationError;
         throw err;
       }
-      if (res.status === 412) {
-        const body = await res.json().catch(() => ({} as { errorCode?: string }));
-        const err  = Object.assign(
-          new Error((body as { error?: string }).error ?? "runtime_not_armed"),
-          { errorCode: (body as { errorCode?: string }).errorCode ?? "runtime_not_armed" },
-        );
-        throw err;
-      }
-      if (!res.ok) throw new Error(`status ${res.status}`);
-      return res.json();
+      if (res.ok) return res.json();
+      // Parse the structured failure body (server returns { error, errorCode? }).
+      const body = await res.json().catch(() => ({} as Record<string, unknown>));
+      const serverMessage =
+        typeof (body as { error?: unknown }).error === "string"
+          ? ((body as { error: string }).error)
+          : undefined;
+      const errorCode =
+        typeof (body as { errorCode?: unknown }).errorCode === "string"
+          ? ((body as { errorCode: string }).errorCode)
+          : undefined;
+      const err = Object.assign(
+        new Error(serverMessage ?? `Activation failed (HTTP ${res.status})`),
+        {
+          status:         res.status,
+          errorCode,
+          serverMessage,
+          needsUpgrade:   res.status === 402,
+        },
+      ) as ActivationError;
+      throw err;
     },
     onSuccess: (data) => { qc.setQueryData(AI_TRADING_QK, data); },
   });
@@ -3778,6 +3806,73 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const disclaimerAccepted = isAdmin || (disclaimerQ.data?.status.accepted ?? false);
 
+  // Activation error banner — surfaces every non-2xx response from
+  // POST /user/ai-trading/enable so the user sees WHY the ACTIVATE
+  // click did nothing. Production bug (May 2026) was that errors
+  // other than `needsUpgrade` were silently swallowed; the bar
+  // animated but no feedback ever appeared.
+  type ActivationFailure = {
+    code:   string;
+    title:  string;
+    detail: string;
+  };
+  const [activationError, setActivationError] = useState<ActivationFailure | null>(null);
+  const [activating, setActivating] = useState(false);
+
+  // Maps the server's errorCode / HTTP status to a human-readable
+  // (title, detail) pair. Falls back to the raw server message so
+  // operators triaging a production incident always have something
+  // concrete to grep for in support tickets.
+  const mapActivationError = (err: {
+    status?: number; errorCode?: string; serverMessage?: string; message?: string;
+  }): ActivationFailure => {
+    const code = err.errorCode ?? (err.status ? `http_${err.status}` : "unknown");
+    const fallback = err.serverMessage ?? err.message ?? "Unknown activation failure.";
+    switch (code) {
+      case "runtime_not_armed":
+        return {
+          code,
+          title:  "Live execution is not armed",
+          detail: "Tap ARM LIVE in the runtime switcher to authorize real-money AI execution, then try again.",
+        };
+      case "subscription_required":
+      case "plan_lacks_ai_auto_trade":
+      case "http_402":
+        return {
+          code,
+          title:  "Subscription required",
+          detail: "Your current plan doesn't include AI auto-trading. Upgrade to Starter or Pro to activate.",
+        };
+      case "network_error":
+        return {
+          code,
+          title:  "Connection problem",
+          detail: "Could not reach the activation service. Check your network and try again.",
+        };
+      case "http_401":
+      case "http_403":
+        return {
+          code,
+          title:  "Session expired",
+          detail: "Your sign-in expired. Refresh the page and sign in again to activate AI trading.",
+        };
+      case "http_500":
+      case "http_502":
+      case "http_503":
+        return {
+          code,
+          title:  "Server error",
+          detail: "AICandlez couldn't activate AI trading right now. Try again in a moment — if it persists, contact support.",
+        };
+      default:
+        return {
+          code,
+          title:  "Activation failed",
+          detail: fallback,
+        };
+    }
+  };
+
   // LOCKED state — subscription required (free user, non-admin).
   // Server-authoritative: `allowed=false` means `resolveAiTradingGate`
   // rejected this user. Clicking opens the upgrade modal; localStorage
@@ -3855,7 +3950,45 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
     );
   }
 
+  // Shared activation runner — every call site (main bar click,
+  // disclaimer onAccepted) goes through this so error surfacing,
+  // loading state, and pending-lock are uniform. Architect-flagged
+  // regression: disclaimer accept path used to bypass error mapping
+  // and silently swallow non-`needsUpgrade` failures.
+  const runActivation = (next: boolean): void => {
+    setActivationError(null);
+    setActivating(true);
+    void setEnabledAsync(next)
+      .then(() => { setActivationError(null); })
+      .catch((err: Error & { status?: number; errorCode?: string; needsUpgrade?: boolean; serverMessage?: string }) => {
+        // Race: plan downgraded between hydration and click. Refresh
+        // gate state and open upgrade modal.
+        if (err?.needsUpgrade) {
+          onUpgrade();
+          return;
+        }
+        // Every other failure (400/401/403/412/500/network) MUST be
+        // surfaced — silent fail was the production bug we're patching.
+        const failure = mapActivationError(err);
+        setActivationError(failure);
+        // Structured client-side log so the operator console / Sentry
+        // hookup (when wired) sees the rejection alongside server logs.
+        // eslint-disable-next-line no-console
+        console.warn("[ARM_LIVE_REJECTED]", {
+          status:        err?.status,
+          errorCode:     err?.errorCode,
+          serverMessage: err?.serverMessage,
+          code:          failure.code,
+        });
+      })
+      .finally(() => { setActivating(false); });
+  };
+
   const setEnabled = (next: boolean): void => {
+    // Pending-lock — block duplicate concurrent submissions while a
+    // prior activation is still in flight. The aria-busy/aria-disabled
+    // semantics on the button mirror this server-truth.
+    if (activating) return;
     // Liquidity cushion gate — never let the customer arm new AI entries
     // when projected cash can't cover the worst-case fill of every
     // remaining slot at the chosen trade size. UI-side mirror of the
@@ -3871,12 +4004,57 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
       setShowDisclaimer(true);
       return;
     }
-    void setEnabledAsync(next).catch((err: Error & { needsUpgrade?: boolean }) => {
-      // Race: plan downgraded between hydration and click. Refresh
-      // gate state and open upgrade modal.
-      if (err?.needsUpgrade) onUpgrade();
-    });
+    runActivation(next);
   };
+
+  // Reusable visible error banner — rendered above the OFF-state bar
+  // so the user always sees WHY an activation attempt did nothing.
+  // Dismissible (X) so the bar can be retried with a clean surface.
+  const errorBanner = activationError ? (
+    <div
+      role="alert"
+      style={{
+        padding: "10px 14px",
+        borderTop:    `1px solid ${T.RED}`,
+        borderBottom: `1px solid ${T.RED}66`,
+        background: "linear-gradient(90deg, rgba(255,48,64,0.18) 0%, rgba(255,48,64,0.10) 100%)",
+        boxShadow:  "inset 0 0 18px rgba(255,48,64,0.10)",
+        display: "flex", alignItems: "flex-start", gap: 10,
+        fontFamily: T.FONT_MONO,
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          color: T.RED, fontSize: 10, fontWeight: 800,
+          letterSpacing: "0.18em", marginBottom: 4,
+        }}>
+          ◆ {activationError.title.toUpperCase()}
+        </div>
+        <div style={{
+          color: "rgba(255,210,210,0.92)", fontSize: 12, lineHeight: 1.45,
+          fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+        }}>
+          {activationError.detail}
+        </div>
+        <div style={{
+          marginTop: 4, color: "rgba(255,180,180,0.55)",
+          fontSize: 9, letterSpacing: "0.14em",
+        }}>
+          CODE · {activationError.code}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => setActivationError(null)}
+        aria-label="Dismiss activation error"
+        style={{
+          appearance: "none", border: "none", background: "transparent",
+          color: "rgba(255,180,180,0.7)", cursor: "pointer",
+          fontSize: 16, lineHeight: 1, padding: 2,
+        }}
+      >×</button>
+    </div>
+  ) : null;
 
   // Modal element rendered once at component root via React portal-style
   // mount. Kept inside the bar so wiring stays self-contained.
@@ -3889,11 +4067,11 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
       onAccepted={() => {
         setShowDisclaimer(false);
         void qcDisclaimer.invalidateQueries({ queryKey: ["ai-disclaimer"] });
-        // Now actually flip AI on — same path setEnabled(true) would have
-        // taken if disclaimer had been pre-accepted.
-        void setEnabledAsync(true).catch((err: Error & { needsUpgrade?: boolean }) => {
-          if (err?.needsUpgrade) onUpgrade();
-        });
+        // Route through the shared activation runner so error mapping,
+        // loading state, and the visible error banner all behave
+        // identically to the main bar click path. Architect-flagged:
+        // previously this swallowed every non-upgrade failure.
+        runActivation(true);
       }}
     />
   ) : null;
@@ -3926,13 +4104,15 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
         disabled={false}
         liquidity={liquidity}
       />
+      {errorBanner}
       <button
         type="button"
         onClick={() => setEnabled(true)}
         aria-label={liquidity.blocked
           ? "Liquidity protection active — new AI entries blocked"
-          : "Click to enable AI trading"}
-        aria-disabled={liquidity.blocked}
+          : (activating ? "Activating AI trading…" : "Click to enable AI trading")}
+        aria-disabled={liquidity.blocked || activating}
+        aria-busy={activating}
         style={{
           width: "100%",
           appearance: "none",
@@ -4043,6 +4223,7 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
       disabled={true}
       liquidity={liquidity}
     />
+    {errorBanner}
     <section
       style={{
         position: "relative",

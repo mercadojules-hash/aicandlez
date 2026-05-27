@@ -1,0 +1,102 @@
+We found a production LIVE activation bug in the customer portal.
+
+Current state:
+
+* Coinbase connected successfully
+* LIVE: COINBASE runtime active
+* equity hydration working (~$643)
+* onboarding + disclaimer completed
+* ACTIVATE AI TRADING button visible
+
+But clicking ACTIVATE does nothing.
+
+Safari console shows repeated:
+HTTP 400 responses from api.aicandlez.com
+
+This means the frontend mutation is firing, but the backend is rejecting the ARM/LIVE activation request.
+
+Critical issue:
+The UI fails silently.
+The customer receives no visible explanation.
+
+We need immediate diagnostics + surfaced failure states.
+
+Required fixes:
+
+1. Surface activation failures in UI
+   If ARM LIVE fails:
+   show explicit toast/banner/modal:
+
+Examples:
+
+* "Live execution entitlement missing"
+* "Kill switch active"
+* "Runtime not armed"
+* "Exchange unhealthy"
+* "Onboarding incomplete"
+* "Disclaimer acceptance missing"
+* "Insufficient deployable equity"
+
+2. Add structured activation logs
+   Need logs:
+   [ARM_LIVE_REQUEST]
+   [ARM_LIVE_ACCEPTED]
+   [ARM_LIVE_REJECTED]
+
+with:
+
+* userId
+* runtime
+* exchange
+* equityUsd
+* reason
+* entitlement state
+* liveReady
+* killSwitch
+* runtimeArmed
+
+3. Audit the endpoint
+   Investigate:
+   POST /api/engine/live-trading
+
+Likely returning 400.
+
+Need:
+
+* exact rejection reason
+* exact validator failing
+* exact payload received
+
+4. Frontend observability
+   Current UX appears broken because:
+
+* button animates
+* no visible error
+* user assumes AI activated
+* nothing actually armed
+
+Need:
+
+* loading state
+* success confirmation
+* failure confirmation
+* disabled state while pending
+
+5. Verify Coinbase runtime compatibility
+   Need to confirm:
+
+* ARM flow supports LIVE: COINBASE
+* runtime switcher state correctly propagates into activation endpoint
+* disclaimer acceptance persists server-side
+* CUSTOMER_LIVE_EXECUTION_ENABLED is true for paid users
+
+6. Add emergency operator visibility
+   Operator console should expose:
+
+* runtime armed state
+* activation failures
+* last rejection reason
+* entitlement state
+* kill switch state
+
+This is now blocking real customer onboarding and must be treated as a production-severity issue.
