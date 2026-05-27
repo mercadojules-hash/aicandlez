@@ -4509,6 +4509,25 @@ export function PortalCustomerShell() {
   const engineStatus: EngineLite | undefined = engine ?? undefined;
 
   const signalsPerMin = useSignalRate(engineStatus?.signalsGenerated);
+
+  // Phase 5 — shell-level derived intelligence state. Cheap O(n) reductions
+  // across opportunities; memoized so prop identity is stable for
+  // AINarratorStrip + battlefield wrapper consumers.
+  const eliteActive: boolean = useMemo(
+    () => opportunities.some(o => (o.convictionScore ?? 0) >= 90),
+    [opportunities],
+  );
+  const portalPosture: "RISK-ON" | "DEFENSIVE" | "NEUTRAL" | "LOW-VOL" = useMemo(() => {
+    if (!opportunities.length) return "NEUTRAL";
+    const longs  = opportunities.filter(o => o.direction === "LONG").length;
+    const shorts = opportunities.filter(o => o.direction === "SHORT").length;
+    const avgConv = opportunities.reduce((s, o) => s + (o.convictionScore ?? 0), 0) / opportunities.length;
+    if (avgConv < 45) return "LOW-VOL";
+    if (longs  > shorts * 1.8) return "RISK-ON";
+    if (shorts > longs  * 1.8) return "DEFENSIVE";
+    return "NEUTRAL";
+  }, [opportunities]);
+
   const pulse = useMemo(
     () => computeMarketPulse(opportunities, engineStatus),
     [opportunities, engineStatus],
@@ -5146,6 +5165,14 @@ export function PortalCustomerShell() {
             (today's closed trades), engineStatus (active signals + avg
             conviction). NEVER mounted on /command — this entire shell
             isn't reached from /command. */}
+        {/* Phase 5 — Welcome-Back retention banner. Compares localStorage
+            lastSeenAt with current opps/history. Renders only when away
+            ≥ 30min, auto-dismisses after 12s. Customer-only. */}
+        <WelcomeBackBanner
+          opportunities={opportunities}
+          history={paperHistory}
+        />
+
         <TodaysIntelligencePanel
           todayPnl={paperStats.todayPnl}
           equity={paperStats.equity || STARTING_EQUITY}
@@ -5154,15 +5181,25 @@ export function PortalCustomerShell() {
           opportunities={opportunities}
         />
 
-        {/* Phase 4 — AI Personality Narrator. Conversational intelligence
-            strip rotates contextual observations derived from live engine
-            + opportunity state. Customer-only. Sparse, premium, never
-            chatty. */}
+        {/* Phase 4 — AI Personality Narrator + Phase 5 risk posture pill.
+            Conversational intelligence strip rotates contextual
+            observations derived from live engine + opportunity state.
+            Customer-only. Sparse, premium, never chatty. */}
         <AINarratorStrip
           opportunities={opportunities}
           engine={engineStatus}
           history={paperHistory}
           openCount={openTrades.length}
+          posture={portalPosture}
+        />
+
+        {/* Phase 5 — Performance Credibility strip. Discipline-forward
+            trust indicators: verified paper performance, rolling 7d win
+            rate, median hold duration, AI funnel (evaluated/entered),
+            and risk gates triggered today. Customer-only. */}
+        <CredibilityStrip
+          history={paperHistory}
+          engine={engineStatus}
         />
 
         {/* Phase 4 — Notification Intelligence dispatcher. Headless;
@@ -5177,7 +5214,7 @@ export function PortalCustomerShell() {
             MY ACCOUNT rail (380px) on the right with PERFORMANCE
             chart + LIVE TRADES + TRADE HISTORY + AI ACTIVITY. */}
         <section
-          className="grid cd-customer-battlefield-grid"
+          className={`grid cd-customer-battlefield-grid${eliteActive ? " cd-elite-glow" : ""}`}
           style={{
             gap: 14, alignItems: "start",
           }}
@@ -5437,12 +5474,13 @@ function TodaysIntelligencePanel({
 /* observant, disciplined. Never meme-y, never chatty. Customer-only.         */
 /* ──────────────────────────────────────────────────────────────────────── */
 function AINarratorStrip({
-  opportunities, engine, history, openCount,
+  opportunities, engine, history, openCount, posture,
 }: {
   opportunities: ReadonlyArray<OpportunityVM>;
   engine:        EngineLite | undefined;
   history:       ReadonlyArray<{ symbol: string; display: string; pnl: number; pnlPct: number; closedAt: number }>;
   openCount:     number;
+  posture:       "RISK-ON" | "DEFENSIVE" | "NEUTRAL" | "LOW-VOL";
 }) {
   const lines = useMemo<string[]>(() => {
     const out: string[] = [];
@@ -5457,17 +5495,14 @@ function AINarratorStrip({
     } else if (top && (top.convictionScore ?? 0) >= 65) {
       out.push(`AI tracking ${top.symbol} — conviction building toward confirmation.`);
     }
-    // Volatility / regime
-    const longCount  = opportunities.filter(o => o.direction === "LONG").length;
-    const shortCount = opportunities.filter(o => o.direction === "SHORT").length;
-    if (longCount > 0 || shortCount > 0) {
-      if (longCount > shortCount * 1.8) {
-        out.push("Market regime shifting toward risk-on behavior.");
-      } else if (shortCount > longCount * 1.8) {
-        out.push("Defensive posture — sellers pressing across majors.");
-      } else {
-        out.push("Two-sided tape — selective opportunities forming on both sides.");
-      }
+    // Phase 5 — risk intelligence prose (institutional, restrained).
+    if      (posture === "RISK-ON")    out.push("Market regime shifting toward risk-on behavior.");
+    else if (posture === "DEFENSIVE")  out.push("AI currently defensive — sellers pressing across majors.");
+    else if (posture === "LOW-VOL")    out.push("Low-volatility environment detected — waiting for expansion.");
+    else                                out.push("Two-sided tape — selective opportunities forming on both sides.");
+    // Engine funnel narration
+    if ((engine?.tradesBlocked ?? 0) >= 3) {
+      out.push(`Risk gates elevated — ${engine?.tradesBlocked} setups filtered today.`);
     }
     // Recent close storytelling
     const recent = history[0];
@@ -5487,7 +5522,13 @@ function AINarratorStrip({
       out.push("AI scanning — awaiting high-conviction setup.");
     }
     return out;
-  }, [opportunities, engine?.running, history, openCount]);
+  }, [opportunities, engine?.running, engine?.tradesBlocked, history, openCount, posture]);
+
+  const postureColor =
+    posture === "RISK-ON"   ? T.NEON :
+    posture === "DEFENSIVE" ? "#ff6b6b" :
+    posture === "LOW-VOL"   ? "#FFC857" :
+                              T.TEXT_2;
 
   const [idx, setIdx] = useState(0);
   useEffect(() => {
@@ -5524,6 +5565,20 @@ function AINarratorStrip({
       }}>
         AI · NARRATOR
       </span>
+      {/* Phase 5 — risk posture pill. Tiny chip surfacing the AI's
+          current market posture (RISK-ON / DEFENSIVE / LOW-VOL /
+          NEUTRAL). Color-coded; never alarmist. */}
+      <span style={{
+        fontSize: 9, fontWeight: 800, letterSpacing: "0.18em",
+        color: postureColor,
+        padding: "2px 6px", borderRadius: 3,
+        background: `${postureColor}14`,
+        border: `1px solid ${postureColor}50`,
+        textShadow: `0 0 4px ${postureColor}50`,
+        flexShrink: 0,
+      }}>
+        POSTURE · {posture}
+      </span>
       <span
         key={current}
         style={{
@@ -5544,8 +5599,254 @@ function AINarratorStrip({
           0%   { opacity: 0; transform: translateY(3px); }
           100% { opacity: 1; transform: translateY(0); }
         }
+        /* Phase 5 — Elite Signal Event Moment. Applied to the customer
+           battlefield section when any opportunity crosses 90 conviction.
+           Subtle, cinematic, never gaudy. */
+        .cd-elite-glow {
+          position: relative;
+          border-radius: 8px;
+          box-shadow:
+            0 0 0 1px ${T.NEON}55,
+            0 0 24px ${T.NEON}30,
+            inset 0 0 18px ${T.NEON}10;
+          animation: cd-elite-pulse 2.4s ease-in-out infinite;
+        }
+        @keyframes cd-elite-pulse {
+          0%,100% {
+            box-shadow:
+              0 0 0 1px ${T.NEON}55,
+              0 0 18px ${T.NEON}28,
+              inset 0 0 14px ${T.NEON}0d;
+          }
+          50% {
+            box-shadow:
+              0 0 0 1px ${T.NEON}88,
+              0 0 36px ${T.NEON}48,
+              inset 0 0 22px ${T.NEON}14;
+          }
+        }
       `}</style>
     </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Phase 5 — WelcomeBackBanner                                                */
+/* Retention hook. Persists lastSeenAt in localStorage and renders a brief    */
+/* banner when the customer returns after ≥30 min. Composes 1-2 narrative     */
+/* beats from current opportunities + closed-while-away trades. Auto-hides    */
+/* after 12s. Customer-only — never reachable from /command.                  */
+/* ──────────────────────────────────────────────────────────────────────── */
+const WB_KEY = "aicandlez:lastSeenAt";
+const WB_AWAY_MIN_MS = 30 * 60 * 1000;
+function WelcomeBackBanner({
+  opportunities, history,
+}: {
+  opportunities: ReadonlyArray<OpportunityVM>;
+  history:       ReadonlyArray<{ symbol: string; display: string; pnl: number; pnlPct: number; closedAt: number }>;
+}) {
+  const [snapshot, setSnapshot] = useState<{ awayMs: number; closedAway: number; profitAway: number; newElite: number } | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+
+  // One-shot read on mount; immediately update timestamp so a refresh
+  // within the same session doesn't re-trigger the banner.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(WB_KEY);
+      const now = Date.now();
+      const last = raw ? Number(raw) : NaN;
+      localStorage.setItem(WB_KEY, String(now));
+      if (!Number.isFinite(last)) return;
+      const awayMs = now - last;
+      if (awayMs < WB_AWAY_MIN_MS) return;
+      const closedWhileAway = history.filter(h => h.closedAt >= last && h.closedAt <= now);
+      const profitAway = closedWhileAway.reduce((s, h) => s + Math.max(h.pnl, 0), 0);
+      const newElite = opportunities.filter(o => (o.convictionScore ?? 0) >= 85).length;
+      // Only show if there's anything actually worth surfacing.
+      if (closedWhileAway.length === 0 && newElite === 0) return;
+      setSnapshot({ awayMs, closedAway: closedWhileAway.length, profitAway, newElite });
+    } catch {
+      /* localStorage unavailable (SSR / privacy mode) — silently skip */
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!snapshot || dismissed) return;
+    const t = setTimeout(() => setDismissed(true), 12_000);
+    return () => clearTimeout(t);
+  }, [snapshot, dismissed]);
+
+  if (!snapshot || dismissed) return null;
+
+  const awayLabel = (() => {
+    const hours = Math.floor(snapshot.awayMs / (60 * 60 * 1000));
+    if (hours >= 24) return `${Math.floor(hours / 24)}d`;
+    if (hours >= 1)  return `${hours}h`;
+    return `${Math.floor(snapshot.awayMs / 60000)}m`;
+  })();
+
+  return (
+    <div role="status" aria-live="polite" style={{
+      display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+      padding: "8px 12px",
+      background: "linear-gradient(180deg, rgba(102,255,102,0.08) 0%, rgba(0,0,0,0.55) 100%)",
+      border: `1px solid ${T.NEON}38`,
+      boxShadow: `0 0 18px rgba(102,255,102,0.10)`,
+      borderRadius: 6,
+      fontFamily: T.FONT_MONO,
+      animation: "wb-in 420ms ease-out both",
+    }}>
+      <span style={{
+        fontSize: 9, fontWeight: 800, letterSpacing: "0.22em",
+        color: T.NEON, textShadow: `0 0 6px ${T.NEON}80`,
+      }}>
+        WELCOME BACK · {awayLabel} AWAY
+      </span>
+      {snapshot.newElite > 0 && (
+        <span style={{ fontSize: 11, color: T.TEXT_2, fontWeight: 600 }}>
+          <span style={{ color: T.NEON, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+            {snapshot.newElite}
+          </span>{" "}
+          high-conviction setup{snapshot.newElite > 1 ? "s" : ""} active
+        </span>
+      )}
+      {snapshot.closedAway > 0 && (
+        <span style={{ fontSize: 11, color: T.TEXT_2, fontWeight: 600 }}>
+          AI closed{" "}
+          <span style={{ color: T.NEON, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+            {snapshot.closedAway}
+          </span>{" "}
+          trade{snapshot.closedAway > 1 ? "s" : ""}
+          {snapshot.profitAway > 0 && (
+            <>
+              {" · "}
+              <span style={{ color: T.NEON, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                +${snapshot.profitAway.toFixed(2)}
+              </span>{" "}
+              realized
+            </>
+          )}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        aria-label="Dismiss welcome back banner"
+        style={{
+          marginLeft: "auto",
+          background: "transparent",
+          border: `1px solid ${T.TEXT_3}40`,
+          color: T.TEXT_3,
+          padding: "3px 8px",
+          borderRadius: 3,
+          fontSize: 9, fontWeight: 800, letterSpacing: "0.18em",
+          cursor: "pointer",
+          fontFamily: T.FONT_MONO,
+        }}
+      >
+        DISMISS
+      </button>
+      <style>{`
+        @keyframes wb-in {
+          0%   { opacity: 0; transform: translateY(-4px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Phase 5 — CredibilityStrip                                                 */
+/* Institutional trust indicators — verified paper performance, rolling 7d   */
+/* win rate, median hold duration, AI funnel (evaluated/entered), and risk   */
+/* gates triggered today. Discipline-forward language ("AI avoided",          */
+/* "Risk gates filtered"). Customer-only.                                     */
+/* ──────────────────────────────────────────────────────────────────────── */
+function CredibilityStrip({
+  history, engine,
+}: {
+  history: ReadonlyArray<{ symbol: string; display: string; pnl: number; pnlPct: number; closedAt: number; openedAt: number }>;
+  engine:  EngineLite | undefined;
+}) {
+  const c = useMemo(() => {
+    const now = Date.now();
+    const cutoff7d = now - 7 * 24 * 60 * 60 * 1000;
+    const recent = history.filter(h => h.closedAt >= cutoff7d);
+    const wins7d = recent.filter(h => h.pnl > 0).length;
+    const winRate7d = recent.length > 0 ? Math.round((wins7d / recent.length) * 100) : null;
+    const verifiedPnl = history.reduce((s, h) => s + h.pnl, 0);
+    // Median hold duration across all closed trades (robust to outliers).
+    const holds = history
+      .map(h => h.closedAt - h.openedAt)
+      .filter(d => d > 0)
+      .sort((a, b) => a - b);
+    const medHoldMs = holds.length > 0 ? holds[Math.floor(holds.length / 2)] : null;
+    const evaluated = engine?.signalsGenerated ?? 0;
+    const entered   = engine?.tradesExecuted   ?? 0;
+    const blocked   = (engine?.tradesBlocked ?? 0)
+                    + (engine?.mtfBlockCount ?? 0)
+                    + (engine?.correlationBlocks ?? 0);
+    return { winRate7d, recentCount: recent.length, verifiedPnl, medHoldMs, evaluated, entered, blocked };
+  }, [history, engine?.signalsGenerated, engine?.tradesExecuted, engine?.tradesBlocked, engine?.mtfBlockCount, engine?.correlationBlocks]);
+
+  const holdLabel = (() => {
+    if (c.medHoldMs == null) return "—";
+    const m = Math.round(c.medHoldMs / 60000);
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    return `${h}h ${m % 60}m`;
+  })();
+
+  const pnlColor = c.verifiedPnl >= 0 ? T.NEON : "#ff6b6b";
+
+  return (
+    <section
+      aria-label="Performance credibility"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+        gap: 10,
+        padding: "10px 14px",
+        background: "rgba(0,0,0,0.45)",
+        border: `1px solid ${T.NEON}22`,
+        borderRadius: 6,
+        fontFamily: T.FONT_MONO,
+      }}
+    >
+      <TIMetric
+        label="VERIFIED PAPER P&L"
+        primary={`${c.verifiedPnl >= 0 ? "+" : ""}$${Math.abs(c.verifiedPnl).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+        secondary={`${history.length} trade${history.length === 1 ? "" : "s"} on record`}
+        color={pnlColor}
+      />
+      <TIMetric
+        label="ROLLING 7D WIN RATE"
+        primary={c.winRate7d != null ? `${c.winRate7d}%` : "—"}
+        secondary={c.recentCount > 0
+          ? `${c.recentCount} closed · last 7 days`
+          : "No 7d sample yet"}
+        color={c.winRate7d != null && c.winRate7d >= 50 ? T.NEON : T.TEXT_2}
+      />
+      <TIMetric
+        label="MEDIAN HOLD"
+        primary={holdLabel}
+        secondary="Time-in-trade discipline"
+        color={T.TEXT_2}
+      />
+      <TIMetric
+        label="AI EVALUATED TODAY"
+        primary={c.evaluated > 0 ? c.evaluated.toLocaleString() : "—"}
+        secondary={c.evaluated > 0 ? `${c.entered} entered · ${Math.max(c.evaluated - c.entered, 0)} skipped` : "Warming up"}
+        color={T.TEXT_2}
+      />
+      <TIMetric
+        label="RISK GATES TRIGGERED"
+        primary={c.blocked > 0 ? c.blocked.toLocaleString() : "0"}
+        secondary={c.blocked > 0 ? "setups filtered today" : "No filters needed yet"}
+        color={c.blocked > 0 ? "#FFC857" : T.TEXT_2}
+      />
+    </section>
   );
 }
 

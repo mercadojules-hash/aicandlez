@@ -1,0 +1,94 @@
+Phase 4 is approved.
+
+This is a major evolution in product maturity.
+
+The platform is now transitioning from:
+“dashboard with signals”
+to:
+“living AI trading intelligence system.”
+
+The most important success of this phase is restraint:
+the AI personality layer sounds institutional and analytical instead of gimmicky.
+
+That was the correct tone choice.
+
+Major wins:
+• rotating intelligence narration creates perceived awareness
+• sparse premium notifications preserve signal importance
+• confidence-history sparkline dramatically increases sophistication
+• emotional storytelling makes slow markets still feel alive
+• cooldown + cap logic on notifications was absolutely necessary
+• keeping /command byte-identical continues to be the correct architectural discipline
+
+The product is now beginning to feel:
+Bloomberg × TradingView × AI intelligence layer
+
+instead of:
+crypto signal website.
+
+Proceed to Phase 5:
+Trust, Conversion, and Retention Layer
+
+Priority scope:
+
+1. Performance Credibility Layer
+   Add believable institutional trust indicators:
+
+* verified paper performance
+* rolling win rate
+* average hold duration
+* “AI avoided X low-confidence setups”
+* “risk gates prevented N trades today”
+
+Goal:
+Show discipline, not just profits.
+
+2. AI Risk Intelligence
+   Surface controlled caution:
+
+* “AI currently defensive”
+* “Low-volatility environment detected”
+* “Momentum weakening across majors”
+* “Risk gates elevated”
+
+This increases trust dramatically.
+
+3. Elite Signal Event Moments
+   When 90%+ conviction occurs:
+
+* subtle battlefield glow escalation
+* cinematic pulse effect
+* stronger toast
+* optional soft sound cue (future)
+
+The platform should emotionally signal:
+“something important just happened.”
+
+4. Retention Hooks
+   Add lightweight “return triggers”:
+
+* “3 new high-conviction setups since your last session”
+* “ETH moved from ACTIVE → ELITE”
+* “AI closed 4 profitable trades while away”
+
+Goal:
+increase re-engagement.
+
+5. Subscription Positioning Layer
+   Start preparing upgrade psychology:
+
+* blurred PRO-only insights
+* locked elite analytics
+* “PRO AI ANALYSIS”
+* advanced WHY breakdowns
+* elite conviction alerts
+
+Important:
+Keep the tone premium and restrained.
+Never drift into casino-energy crypto UI.
+
+Continue:
+• customer-only scope
+• PortalCustomerShell.tsx isolation
+• /command frozen
+• institutional-first UX language
