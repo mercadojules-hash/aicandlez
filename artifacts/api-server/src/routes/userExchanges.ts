@@ -427,11 +427,16 @@ async function persistBalancePollResult(
   const now = new Date();
   try {
     if (outcome.ok) {
+      // Successful poll clears BOTH the balance-fetch error AND the
+      // shared `lastError` mirror so the operator drawer / connection
+      // chip return to a clean state. Status stays whatever the
+      // connect-test path set — we never silently flip `status`.
       await db
         .update(userExchangeConnectionsTable)
         .set({
           lastBalanceFetchAt:    now,
           lastBalanceFetchError: null,
+          lastError:             null,
           updatedAt:             now,
         })
         .where(eq(userExchangeConnectionsTable.id, row.id));
@@ -446,12 +451,22 @@ async function persistBalancePollResult(
       }, "[BALANCE_SYNC] poll ok");
       return;
     }
-    // Refresh-only update for the timestamp — never races, always wins.
-    // Telemetry MUST advance even when the error string hasn't changed,
-    // otherwise "balances last synced" would freeze on the first failure.
+    // Refresh-only update for the timestamp + mirror error into the
+    // shared `lastError` column so the operator drawer / existing
+    // connection chip surfaces this failure too. `lastError` was
+    // historically owned only by the connect-test path, but the task
+    // contract requires the connection row itself to reflect the
+    // underlying adapter failure regardless of which path observed it.
+    // This write is unconditional (always-win) because telemetry MUST
+    // advance even when the error string hasn't changed — otherwise
+    // "balances last synced" would freeze on the first failure.
     await db
       .update(userExchangeConnectionsTable)
-      .set({ lastBalanceFetchAt: now, updatedAt: now })
+      .set({
+        lastBalanceFetchAt: now,
+        lastError:          outcome.error,
+        updatedAt:          now,
+      })
       .where(eq(userExchangeConnectionsTable.id, row.id));
     logger.warn({
       tag:       "BALANCE_SYNC",
@@ -515,6 +530,61 @@ async function persistBalancePollResult(
       exchange: row.exchange,
       err:      err instanceof Error ? err.message : String(err),
     }, "[BALANCE_SYNC] telemetry update failed");
+  }
+}
+
+// Drops a `user_notifications` row on connect-test re-validation
+// failures (`POST /user/exchanges/:exchange/test`). Uses the same
+// `exchange_balance_sync_failed` type as the background poll path so the
+// in-app feed renders all exchange-health alerts under one category, and
+// dedupes against the connection row's current `lastError` to avoid
+// spamming when the user retries the same broken credential repeatedly.
+// `errorCode` distinguishes the failure-mode classes
+// (`runConnectionTest_throw` vs `runConnectionTest_no_read_access`) in
+// the notification payload for downstream filtering.
+async function emitConnectionTestFailureNotification(
+  userId:    string,
+  row:       typeof userExchangeConnectionsTable.$inferSelect,
+  errorMsg:  string,
+  errorCode: "runConnectionTest_throw" | "runConnectionTest_no_read_access",
+  log:       { warn: (o: object, m: string) => void },
+): Promise<void> {
+  // Dedupe: if the row's previous `lastError` already matched this
+  // message, the user has already been notified about this exact
+  // failure mode — suppress. The connect-test path writes `lastError`
+  // BEFORE calling this helper, so we compare against the snapshot we
+  // captured at the start of the request (passed in via `row`).
+  if (row.lastError && row.lastError === errorMsg) return;
+  try {
+    await db.insert(userNotificationsTable).values({
+      userId,
+      type:    "exchange_balance_sync_failed",
+      title:   `${row.exchange} connection test failed`,
+      message: `We couldn't re-validate your ${row.exchange} credentials. The connection is still saved, but it can't be used until the issue is resolved. Error: ${errorMsg}`,
+      data:    {
+        exchange:  row.exchange,
+        errorCode,
+        error:     errorMsg,
+        source:    "connect_test",
+      },
+      read:    false,
+    });
+    logger.warn({
+      tag:       "EXCHANGE_CONNECTED",
+      event:     "test_failure_notified",
+      userId,
+      exchange:  row.exchange,
+      errorCode,
+      err:       errorMsg,
+    }, "[EXCHANGE_CONNECTED] connection-test failure notification persisted");
+  } catch (notifErr) {
+    log.warn({
+      tag:      "EXCHANGE_CONNECTED",
+      event:    "test_failure_notify_failed",
+      userId,
+      exchange: row.exchange,
+      err:      notifErr instanceof Error ? notifErr.message : String(notifErr),
+    }, "[EXCHANGE_CONNECTED] failed to persist test-failure notification row");
   }
 }
 
@@ -677,6 +747,7 @@ router.post("/user/exchanges/:exchange/test", requireAuth, requirePlan("starter"
           eq(userExchangeConnectionsTable.exchange, exchange),
         )
       );
+    await emitConnectionTestFailureNotification(userId, row, errorMsg, "runConnectionTest_throw", req.log);
     res.json({ ok: false, error: errorMsg });
     return;
   }
@@ -697,6 +768,16 @@ router.post("/user/exchanges/:exchange/test", requireAuth, requirePlan("starter"
         eq(userExchangeConnectionsTable.exchange, exchange),
       )
     );
+
+  if (!testResult.ok) {
+    await emitConnectionTestFailureNotification(
+      userId,
+      row,
+      testResult.error ?? "Credentials could not authenticate with the exchange.",
+      "runConnectionTest_no_read_access",
+      req.log,
+    );
+  }
 
   req.log.info({ userId, exchange, ok: testResult.ok }, "userExchanges: connection re-tested");
   res.json({ ok: testResult.ok, permissions: testResult.permissions, error: testResult.error });
