@@ -15,7 +15,7 @@
  */
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/react";
 import { LiveConsentModal, useLiveConsent } from "@/components/ConsentGate";
 
@@ -78,9 +78,183 @@ import {
   CryptoMajorsSignalsPanel, CryptoAltsMemesPanel,
 } from "@/components/command/institutional";
 import { N } from "@/components/command/institutional/theme";
+import { CRYPTO_MAJORS_30, CRYPTO_ALTS_MEMES } from "@/components/command/institutional/tickers";
+import { resolveDirection } from "@/components/command/institutional/signalUtils";
 import EngineHeartbeat from "@/components/EngineHeartbeat";
 import LiveExecutionStream from "@/components/LiveExecutionStream";
-import { Zap } from "lucide-react";
+import { Zap, TrendingUp, TrendingDown, Activity } from "lucide-react";
+
+/* ── TOP CONVICTION PULSE strip ──────────────────────────────────────────────
+ * Slim institutional read of the top 5 highest-avgConfidence signals across
+ * BOTH crypto matrix columns (CRYPTO_MAJORS_30 + CRYPTO_ALTS_MEMES). Sits
+ * ABOVE the dual matrix in Row 1. Read-only — no click handlers, no order
+ * routing. Per user direction: "thin and institutional, not a hero card".
+ * Renders nothing until at least one breakdown crosses the 70% conviction
+ * floor (avoids a flat empty strip during engine warmup). */
+const PULSE_MIN_CONFIDENCE = 70;
+const PULSE_MAX_ITEMS      = 5;
+const PULSE_UNIVERSE = [...CRYPTO_MAJORS_30, ...CRYPTO_ALTS_MEMES];
+
+function TopConvictionPulse({ engine }: { engine?: EngineStatus }) {
+  const breakdowns = engine?.symbolBreakdowns ?? {};
+  const ranked = useMemo(() => {
+    const seen = new Set<string>();
+    const rows: Array<{
+      symbol: string; display: string; conf: number; dir: "LONG" | "SHORT";
+    }> = [];
+    for (const t of PULSE_UNIVERSE) {
+      if (seen.has(t.symbol)) continue;
+      seen.add(t.symbol);
+      const b = breakdowns[t.symbol];
+      const conf = b?.avgConfidence ?? 0;
+      if (conf < PULSE_MIN_CONFIDENCE) continue;
+      rows.push({
+        symbol:  t.symbol,
+        display: t.display ?? t.label ?? t.symbol,
+        conf:    Math.round(conf),
+        dir:     resolveDirection(t.symbol, b),
+      });
+    }
+    rows.sort((a, b) => b.conf - a.conf);
+    return rows.slice(0, PULSE_MAX_ITEMS);
+  }, [breakdowns]);
+
+  // Engine hasn't surfaced any 70%+ breakdowns yet — render a low-key
+  // placeholder so the strip's vertical reservation is consistent and the
+  // matrix below doesn't reflow when the first conviction lands.
+  if (ranked.length === 0) {
+    return (
+      <div
+        role="status"
+        aria-label="Top conviction pulse — awaiting signals"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "8px 14px",
+          border: `1px solid ${N.BORDER}`,
+          borderRadius: 4,
+          background: `linear-gradient(90deg, ${N.SURFACE_1} 0%, ${N.BG} 100%)`,
+          fontFamily: N.FONT_MONO,
+        }}
+      >
+        <Activity size={12} style={{ color: N.TEXT_3 }} />
+        <span style={{
+          fontSize: 10, fontWeight: 800, color: N.TEXT_2,
+          letterSpacing: "0.24em",
+        }}>
+          TOP CONVICTION PULSE
+        </span>
+        <span style={{
+          fontSize: 9, fontWeight: 700, color: N.TEXT_3,
+          letterSpacing: "0.18em",
+        }}>
+          · AWAITING 70%+ SIGNALS
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role="region"
+      aria-label="Top conviction pulse"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 12px",
+        border: `1px solid ${N.BRAND}33`,
+        borderRadius: 4,
+        background: `linear-gradient(90deg, ${N.BRAND}0d 0%, ${N.BG} 70%, ${N.BRAND}08 100%)`,
+        boxShadow: `inset 0 0 16px ${N.BRAND}10`,
+        fontFamily: N.FONT_MONO,
+        overflow: "hidden",
+      }}
+    >
+      <div style={{
+        display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0,
+      }}>
+        <Activity size={12} style={{
+          color: N.BRAND_BRT,
+          filter: `drop-shadow(0 0 4px ${N.BRAND})`,
+        }} />
+        <span style={{
+          fontSize: 10, fontWeight: 800, color: N.BRAND_BRT,
+          letterSpacing: "0.24em", textShadow: `0 0 6px ${N.BRAND}55`,
+        }}>
+          TOP CONVICTION PULSE
+        </span>
+        <span style={{
+          fontSize: 9, fontWeight: 700, color: N.TEXT_3,
+          letterSpacing: "0.18em",
+        }}>
+          · TOP {ranked.length}
+        </span>
+      </div>
+
+      <div style={{
+        flex: 1, minWidth: 0,
+        display: "flex", alignItems: "center",
+        gap: 10, overflow: "hidden",
+      }}>
+        {ranked.map((r, i) => {
+          const dirColor = r.dir === "LONG" ? N.LONG : N.SHORT;
+          const DirIcon  = r.dir === "LONG" ? TrendingUp : TrendingDown;
+          return (
+            <span
+              key={r.symbol}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "4px 8px",
+                background: `linear-gradient(180deg, ${dirColor}14 0%, transparent 100%)`,
+                border: `1px solid ${dirColor}40`,
+                borderRadius: 3,
+                flexShrink: 0,
+                position: "relative",
+              }}
+            >
+              {/* tiny pulse dot — animated when this is the #1 conviction */}
+              <span
+                aria-hidden
+                style={{
+                  width: 5, height: 5, borderRadius: "50%",
+                  background: dirColor,
+                  boxShadow: `0 0 6px ${dirColor}, 0 0 12px ${dirColor}80`,
+                  animation: i === 0 ? "cd-pulse-dot 1400ms ease-in-out infinite" : undefined,
+                }}
+              />
+              <span style={{
+                fontSize: 11, fontWeight: 800, color: N.TEXT_0,
+                letterSpacing: "0.08em",
+              }}>
+                {r.display}
+              </span>
+              <DirIcon size={10} style={{ color: dirColor }} />
+              <span style={{
+                fontSize: 11, fontWeight: 800, color: dirColor,
+                letterSpacing: "0.04em",
+                textShadow: `0 0 4px ${dirColor}66`,
+              }}>
+                {r.conf}
+              </span>
+            </span>
+          );
+        })}
+      </div>
+      {/* Inline keyframes — scoped to this strip so we don't bleed into the
+          global animation lib. */}
+      <style>{`
+        @keyframes cd-pulse-dot {
+          0%, 100% { transform: scale(1);   opacity: 1;   }
+          50%      { transform: scale(1.5); opacity: 0.55;}
+        }
+      `}</style>
+    </div>
+  );
+}
 
 /* ── AI AUTOTRADE bar (operator-grade, red activation strip) ─────────────────
  * Sits above each LIVE AI CRYPTO EXECUTION bar in Row 1. Pulled from the
@@ -405,6 +579,14 @@ export default function CommandCenter() {
             is the first thing the operator sees on /command, not the
             sparse empty Fees/Users/Positions panels. Each control bar
             sits DIRECTLY ABOVE its own signal panel.  */}
+        {/* Top conviction pulse — slim institutional read of the strongest
+            5 signals across both matrix columns. Sits above the dual matrix
+            so the operator sees 80-90%+ opportunities at a glance without
+            scanning. Read-only; no execution affordances. */}
+        <div className="px-2">
+          <TopConvictionPulse engine={engine} />
+        </div>
+
         <section
           className="grid gap-2 px-2 mt-1"
           style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}
