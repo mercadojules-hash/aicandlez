@@ -72,7 +72,7 @@ import { calibrateRawConfidence } from "../../lib/conviction";
 import { useExecutionState } from "../../hooks/useExecutionState";
 import { usePaperTrades, STARTING_EQUITY } from "../../hooks/usePaperTrades";
 import { useUserRole } from "../../hooks/useUserRole";
-import { useRuntimeState, runtimeLabel } from "../../hooks/useRuntimeState";
+import { useRuntimeState, runtimeLabel, RUNTIME_STATE_QUERY_KEY } from "../../hooks/useRuntimeState";
 import { RuntimeSwitcher } from "./RuntimeSwitcher";
 import { useDisclaimerGate } from "../../hooks/useDisclaimerGate";
 import { SessionEnvBadge } from "./SessionEnvBadge";
@@ -5042,6 +5042,7 @@ export function PortalCustomerShell() {
   // state below; "live" only flips the displayed runtime context, not
   // order routing (kill switch + Task #200 gate still apply).
   const { data: runtimeState } = useRuntimeState();
+  const qc = useQueryClient();
   // Note: `LiveControlBar.state` intentionally stays "PAPER" on the
   // customer surface even when the runtime switcher is set to LIVE.
   // The bar's "LIVE" state copy is execution-semantic ("EXECUTING /
@@ -5096,6 +5097,8 @@ export function PortalCustomerShell() {
   type ServerAccountSummary = {
     equity:        number;
     positionCount: number;
+    totalTrades:   number;
+    totalRealized: number;
     positions:     ServerSimPosition[];
   };
   const { data: serverAccount } = useQuery<ServerAccountSummary>({
@@ -5110,6 +5113,43 @@ export function PortalCustomerShell() {
     enabled:         isLiveRuntime,
     retry:           false,
   });
+
+  // Task #207 — post-close equity reconciliation. In LIVE runtime the
+  // headline equity surface reads `runtimeState.totalEquityUSD`, which
+  // is a snapshot of broker-polled balances (Coinbase/Kraken/etc).
+  // After a position closes — engine-driven OR manual — `closeUserPosition`
+  // submits the real broker close and credits the user's broker cash, but
+  // nothing invalidates the `["runtime-state"]` query, so the equity card
+  // stays stale for up to its 30s refetch interval while realized PnL +
+  // trade history (driven by /api/simulation/account, 8s poll) already
+  // reflect the new ledger.
+  //
+  // `loadBalanceForRow` has no server-side cache (it always calls
+  // `adapter.getAccount()` fresh), so invalidating runtime-state
+  // triggers a fresh broker poll that returns the new cash balance.
+  // We trip the invalidation whenever the server-reported `totalTrades`
+  // count increments — this catches every close path (manual button,
+  // SL/TP hit, engine timer) without needing to subscribe to each
+  // close handler individually. `totalRealized` is watched in tandem
+  // so partial-fill reconciliations that don't bump trade count still
+  // refresh equity.
+  const lastReconciledRef = useRef<{ totalTrades: number; totalRealized: number } | null>(null);
+  useEffect(() => {
+    if (!isLiveRuntime || !serverAccount) return;
+    const cur = {
+      totalTrades:   serverAccount.totalTrades   ?? 0,
+      totalRealized: serverAccount.totalRealized ?? 0,
+    };
+    const prev = lastReconciledRef.current;
+    if (prev === null) {
+      lastReconciledRef.current = cur;
+      return;
+    }
+    if (cur.totalTrades !== prev.totalTrades || cur.totalRealized !== prev.totalRealized) {
+      lastReconciledRef.current = cur;
+      void qc.invalidateQueries({ queryKey: RUNTIME_STATE_QUERY_KEY });
+    }
+  }, [isLiveRuntime, serverAccount, qc]);
   const liveOpenRows = useMemo(() => {
     if (!isLiveRuntime) return [] as Array<{
       id: string; symbol: string; display: string; side: "LONG" | "SHORT";

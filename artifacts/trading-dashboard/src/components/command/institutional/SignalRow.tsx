@@ -521,6 +521,11 @@ export function SignalRow({ spec, breakdown }: Props) {
         // appears without waiting for the 4s poll.
         void qc.invalidateQueries({ queryKey: ["customer-simulation-account"] });
         void qc.invalidateQueries({ queryKey: ["customer-simulation-trades"] });
+        // Task #207 — also refresh broker-balance snapshot so headline
+        // equity reflects the cash debit from the BUY-side fill (Coinbase
+        // USD balance dropped by ~$liveSize). Mirrors the post-close
+        // reconciliation effect in PortalCustomerShell.
+        void qc.invalidateQueries({ queryKey: ["runtime-state"] });
       });
       return;
     }
