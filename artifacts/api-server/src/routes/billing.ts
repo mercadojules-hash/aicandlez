@@ -466,8 +466,16 @@ router.post("/billing/checkout", requireAuth, requireDisclaimer, async (req, res
       cancel_url:           `${baseUrl}/billing?canceled=1`,
       allow_promotion_codes: true,
       subscription_data: {
-        trial_period_days: 7,
-        metadata:          { clerkUserId: userId },
+        // The 7-day Stripe trial was removed: the customer portal now
+        // provides paper trading + exchange-connection testing as the
+        // free experience, so the Stripe trial became redundant UX
+        // noise ("am I in a trial or in paper?"). Paid subscription
+        // unlocks AI autotrading + ARM LIVE + premium analytics —
+        // existing customers still mid-trial keep their trial via
+        // Stripe (this only affects NEW checkout sessions). Webhooks,
+        // billing portal, and entitlement gates (`planStatus ===
+        // "trialing"` is still treated as paid) are unchanged.
+        metadata: { clerkUserId: userId },
       },
     });
 

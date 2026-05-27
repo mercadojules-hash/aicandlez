@@ -25,8 +25,8 @@ const FEATURES = [
 
 const REASON_COPY: Record<NonNullable<PaywallReason>, { title: string; sub: string }> = {
   trial_expired: {
-    title: "Your free trial has ended",
-    sub:   "Subscribe to keep using AICandlez.",
+    title: "Subscribe to unlock AI trading",
+    sub:   "Paper trading stays free. Subscribe to enable AI autotrading.",
   },
   live_trading: {
     title: "Live trading requires a subscription",
@@ -132,7 +132,7 @@ export function SubscriptionModal() {
             + {PERFORMANCE_FEE_LABEL} performance fee on profitable closed trades
           </div>
 
-          {/* Trial note */}
+          {/* Plan note — paper trading is free, subscription unlocks AI */}
           <div style={{
             padding: "10px 14px",
             background: "rgba(0,229,255,0.04)",
@@ -141,10 +141,10 @@ export function SubscriptionModal() {
           }}>
             <div style={{ fontSize: 10, fontFamily: SANS, fontWeight: 600,
               color: "rgba(0,229,255,0.80)", marginBottom: 2 }}>
-              7 days free to start
+              Paper trading stays free
             </div>
             <div style={{ fontSize: 9, fontFamily: SANS, color: GR, lineHeight: 1.6 }}>
-              Full access from day one. Cancel before day 7 and you won't be charged.
+              Subscribe to unlock AI autotrading, ARM LIVE execution, and premium analytics. Cancel anytime.
             </div>
           </div>
 

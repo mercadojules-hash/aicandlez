@@ -8,15 +8,17 @@ const BRAND        = "#66FF66";
 const BRAND_BRIGHT = "#7CFF00";
 const W            = "#ffffff";
 const GR           = "#8892a4";
-const O            = "#ff9400";
 const R            = "#ff3355";
 
 export function UpgradeBanner() {
+  // NOTE: Stripe 7-day trial was removed from new checkout sessions.
+  // Free experience IS paper mode now. We still treat `isTrialing` as
+  // paid for entitlement gating (existing customers mid-trial), but we
+  // no longer render "trial ending / N days remaining" customer copy.
   const {
     plan,
     isPaid,
     isTrialing,
-    daysUntilTrialEnd,
     planStatus,
     isLoading,
     showPaywall,
@@ -32,8 +34,8 @@ export function UpgradeBanner() {
     return null;
   }
 
-  // Active paid (non-trialing) — no banner unless billing requires attention
-  if (isPaid && planStatus === "active" && !isTrialing && plan !== "starter") {
+  // Active paid (incl. trialing — treat as active) — no banner unless billing requires attention
+  if (isPaid && (planStatus === "active" || isTrialing) && plan !== "starter") {
     return null;
   }
 
@@ -73,62 +75,10 @@ export function UpgradeBanner() {
     );
   }
 
-  // Trial expired (trialing status but 0 days left)
-  if (isTrialing && daysUntilTrialEnd === 0) {
-    return (
-      <BannerShell bg="rgba(255,51,85,0.08)" border="rgba(255,51,85,0.28)">
-        <div style={{ fontSize: 11, lineHeight: 1 }}>🚨</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: R, marginBottom: 2 }}>
-            Trial ended
-          </div>
-          <div style={{ fontSize: 10, color: GR }}>Subscribe to keep full access to AI trading</div>
-        </div>
-        <BannerBtn color={R} border="rgba(255,51,85,0.40)" onClick={() => showPaywall("trial_expired")}>
-          Subscribe
-        </BannerBtn>
-      </BannerShell>
-    );
-  }
-
-  // Trial expiring soon (1-3 days)
-  if (isTrialing && daysUntilTrialEnd !== null && daysUntilTrialEnd <= 3) {
-    const urgent = daysUntilTrialEnd <= 1;
-    return (
-      <BannerShell bg="rgba(255,148,0,0.07)" border="rgba(255,148,0,0.30)">
-        <div style={{ fontSize: 11 }}>{urgent ? "🔥" : "⚠️"}</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: O, marginBottom: 2 }}>
-            {urgent
-              ? "Trial ends tomorrow — subscribe now"
-              : `Trial ends in ${daysUntilTrialEnd} days`}
-          </div>
-          <div style={{ fontSize: 10, color: GR }}>Don't lose access to AI trading</div>
-        </div>
-        <BannerBtn color={O} border="rgba(255,148,0,0.45)" onClick={() => showPaywall("trial_expired")}>
-          Subscribe
-        </BannerBtn>
-      </BannerShell>
-    );
-  }
-
-  // Trial active — low urgency (4+ days)
-  if (isTrialing && daysUntilTrialEnd !== null && daysUntilTrialEnd >= 4) {
-    return (
-      <BannerShell bg="rgba(102,255,102,0.04)" border="rgba(102,255,102,0.16)">
-        <div style={{ fontSize: 11 }}>⏱</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: BRAND, marginBottom: 2 }}>
-            AI Paper Trial — {daysUntilTrialEnd} days remaining
-          </div>
-          <div style={{ fontSize: 10, color: GR }}>Subscribe to unlock live AI trading</div>
-        </div>
-        <BannerBtn color={BRAND} border="rgba(102,255,102,0.32)" onClick={() => navigate("/billing")}>
-          Subscribe
-        </BannerBtn>
-      </BannerShell>
-    );
-  }
+  // Trial countdown banners removed (Stripe 7-day trial removed from new
+  // checkout). Existing trialing customers are silently treated as paid
+  // via the early-return above — no "N days remaining / trial ended"
+  // copy is shown anywhere customer-facing.
 
   // ───────────────────────────────────────────────────────────────────────────
   // STARTER — single subtle "Upgrade to Pro" line, no locked/unlock language

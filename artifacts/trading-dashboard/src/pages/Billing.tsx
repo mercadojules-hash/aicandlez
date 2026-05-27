@@ -104,7 +104,7 @@ function PlanCard({
               </div>
             )}
             <div className="font-mono text-[8px] mt-1" style={{ color: "#3a5a70" }}>
-              7-day free AI paper trading trial
+              Cancel anytime · paper trading stays free
             </div>
           </>
         )}
@@ -295,7 +295,7 @@ export default function Billing() {
             Choose your plan
           </h1>
           <p className="font-mono text-[11px] mt-1" style={{ color: "#4a6a80" }}>
-            Start with a 7-day free AI paper trading trial. Cancel anytime.
+            Paper trading is free. Subscribe to unlock AI autotrading and live execution. Cancel anytime.
           </p>
         </div>
 
@@ -330,33 +330,11 @@ export default function Billing() {
           </div>
         )}
 
-        {/* Trial countdown / status banner */}
+        {/* Billing-status banner. Trial countdown removed — existing
+            trialing customers are treated as active for entitlements,
+            no customer-facing countdown is shown. */}
         {subscription && (
-          subscription.isTrialing ? (
-            <div
-              className="flex items-center justify-between gap-4 px-4 py-3 rounded border"
-              style={{
-                background:   (subscription.daysUntilTrialEnd ?? 99) <= 3 ? "#1a0d0a" : "#011018",
-                borderColor:  (subscription.daysUntilTrialEnd ?? 99) <= 3 ? "#ff884430" : "#00aaff25",
-              }}
-            >
-              <div>
-                <div className="font-mono text-[9px] font-bold tracking-wider mb-0.5"
-                  style={{ color: (subscription.daysUntilTrialEnd ?? 99) <= 3 ? "#ff8844" : "#00aaff" }}>
-                  TRIAL ACTIVE
-                </div>
-                <div className="font-mono text-[12px] font-bold" style={{ color: "#EAF2FF" }}>
-                  {subscription.daysUntilTrialEnd === 0
-                    ? "Trial ends today"
-                    : `${subscription.daysUntilTrialEnd ?? 0} days remaining`}
-                </div>
-              </div>
-              <div className="font-mono text-[9px] font-bold px-3 py-1.5 rounded"
-                style={{ background: "#00aaff15", border: "1px solid #00aaff30", color: "#00aaff" }}>
-                Subscribe now
-              </div>
-            </div>
-          ) : !subscription.isActive && subscription.plan !== "free" ? (
+          !subscription.isActive && !subscription.isTrialing && subscription.plan !== "free" ? (
             <div
               className="flex items-center gap-2 px-4 py-3 rounded border font-mono text-[11px]"
               style={{ background: "#1a0d0d", borderColor: "#ff445530", color: "#ff8844" }}
