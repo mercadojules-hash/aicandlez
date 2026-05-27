@@ -64,8 +64,9 @@ router.get("/user/ai-trading/state", requireAuth, async (req, res): Promise<void
 });
 
 router.post("/user/ai-trading/enable", requireAuth, async (req, res): Promise<void> => {
-  const userId  = (req as AuthReq).clerkUserId;
-  const desired = req.body?.enabled === true;
+  const userId         = (req as AuthReq).clerkUserId;
+  const desired        = req.body?.enabled === true;
+  const armedForLive   = req.body?.armedForLive === true;
 
   try {
     const gate = await resolveAiTradingGate(userId);
@@ -81,6 +82,44 @@ router.post("/user/ai-trading/enable", requireAuth, async (req, res): Promise<vo
         reason:       gate.reason,
       });
       return;
+    }
+
+    // Task #200 — runtime ARM gate. When the user's runtime context
+    // resolves to live (activeRuntimeExchange is a real exchange id,
+    // not null/"paper"), enabling AI auto-trade requires the client to
+    // forward an explicit `armedForLive=true` flag from the per-session
+    // ARM LIVE button. Admin/super-admin bypass — operator tooling is
+    // governed by separate controls. The env kill switch
+    // `CUSTOMER_LIVE_EXECUTION_ENABLED` remains the final server-side
+    // gate at execution time regardless of this flag.
+    if (desired && !gate.isAdmin) {
+      try {
+        const [s] = await db
+          .select({ activeRuntimeExchange: userSettingsTable.activeRuntimeExchange })
+          .from(userSettingsTable)
+          .where(eq(userSettingsTable.userId, userId))
+          .limit(1);
+        const runtimeExch = s?.activeRuntimeExchange ?? null;
+        const wouldBeLive = !!(runtimeExch && runtimeExch !== "paper");
+        if (wouldBeLive && !armedForLive) {
+          req.log.warn({
+            tag: "AUTO_PROMOTION_BLOCKED",
+            reason: "runtime_not_armed",
+            userId, runtimeExch, surface: "ai_trading_enable",
+          }, "[AUTO_PROMOTION_BLOCKED] runtime_not_armed");
+          res.status(412).json({
+            error:      "Live execution is not armed — tap ARM LIVE to enable real-money AI auto-trading.",
+            errorCode:  "runtime_not_armed",
+            needsArm:   true,
+            runtimeExch,
+          });
+          return;
+        }
+      } catch (err) {
+        req.log.warn({
+          userId, err: err instanceof Error ? err.message : String(err),
+        }, "ai-trading/enable: runtime lookup failed (allowing — env kill switch is final gate)");
+      }
     }
 
     // JIT-provision parent rows so the FK chain holds even on a fresh

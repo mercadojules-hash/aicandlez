@@ -14,6 +14,7 @@
  *                   `enabled` only flips after the server confirms.
  */
 import { authFetch } from "@/lib/authFetch";
+import { getArmedForLive } from "@/hooks/useArmedForLive";
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 
 type Plan = "free" | "starter" | "pro";
@@ -104,14 +105,22 @@ export function AIAutoTradeProvider({ children }: { children: ReactNode }) {
 
     // Enabling — server is authoritative. If it rejects with 402,
     // surface `needsUpgrade` so the caller routes to /subscribe.
+    // Task #200: forward the per-session ARM flag so the server can
+    // reject with 412 runtime_not_armed when runtime resolves live.
     try {
       const res = await authFetch("/api/user/ai-trading/enable", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ enabled: true }),
+        body:    JSON.stringify({ enabled: true, armedForLive: getArmedForLive() }),
       });
       if (res.status === 402) {
         setNeedsUpgrade(true);
+        return;
+      }
+      if (res.status === 412) {
+        // runtime_not_armed — keep AI off; the RuntimeSwitcher ARM
+        // button is the user's recovery path. Fail-quiet here since
+        // the gate UI lives elsewhere.
         return;
       }
       if (!res.ok) return;

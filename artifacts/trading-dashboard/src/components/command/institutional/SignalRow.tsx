@@ -24,6 +24,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePortalMode } from "@/contexts/PortalModeContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCustomerPlan, openUpgrade, type Plan } from "@/hooks/useCustomerPlan";
+import { useArmedForLive } from "@/hooks/useArmedForLive";
 
 import { authFetch } from "../../../lib/authFetch";
 // API base URL — mirrors Portal.tsx resolution so production cross-origin
@@ -450,6 +451,7 @@ export function SignalRow({ spec, breakdown }: Props) {
   };
 
   const operatorOrderInFlightRef = useRef(false);
+  const armedForLive = useArmedForLive();
   const fireTrade = (side: "LONG" | "SHORT") => {
     if (!entry || entry <= 0) {
       toast({
@@ -470,6 +472,18 @@ export function SignalRow({ spec, breakdown }: Props) {
       portalMode.canUseLive &&
       portalMode.hasExchange
     ) {
+      // Task #200 — per-session ARM gate. Live BUY clicks are blocked
+      // until the user explicitly arms via the RuntimeSwitcher button.
+      // Page refresh resets `armedForLive` to false by design. This is
+      // a UX gate; the env kill switch + per-order gates on the server
+      // remain the security boundary.
+      if (!armedForLive) {
+        toast({
+          title:       "LIVE EXECUTION NOT ARMED",
+          description: "Tap ARM LIVE in the runtime row to enable real-money orders.",
+        });
+        return;
+      }
       toast({
         title: `LIVE ORDER SUBMITTED — ${spec.label}`,
         description: `${side} · routing to your connected exchange · $${liveSize} notional · AI ${conf}%`,

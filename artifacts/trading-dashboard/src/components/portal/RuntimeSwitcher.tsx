@@ -25,6 +25,7 @@ import {
   useSetRuntimeExchange,
   type RuntimeConnection,
 } from "../../hooks/useRuntimeState";
+import { useArmedForLive, setArmedForLive } from "../../hooks/useArmedForLive";
 
 const C = {
   BG:           "#000",
@@ -43,8 +44,29 @@ const FONT_MONO = "'JetBrains Mono','SF Mono','Roboto Mono',ui-monospace,monospa
 export function RuntimeSwitcher() {
   const { data: state, isLoading } = useRuntimeState();
   const { setRuntimeExchange, isPending } = useSetRuntimeExchange();
+  const armed = useArmedForLive();
   const [liveTeaser, setLiveTeaser] = useState<string | null>(null);
   const teaserTimer = useRef<number | null>(null);
+
+  // Task #200 — auto-disarm when runtime flips back to paper so the
+  // user cannot stay "armed" while looking at the paper sim.
+  useEffect(() => {
+    if (state?.mode === "paper" && armed) setArmedForLive(false);
+  }, [state?.mode, armed]);
+
+  const onArmToggle = () => {
+    if (armed) {
+      setArmedForLive(false);
+      return;
+    }
+    const exch = state?.activeExchange?.toUpperCase() ?? "your exchange";
+    const ok = typeof window === "undefined" ? true : window.confirm(
+      `ARM LIVE on ${exch}?\n\n` +
+      `Real-money orders will route to ${exch} for the rest of this session. ` +
+      `Refreshing the page automatically disarms.`,
+    );
+    if (ok) setArmedForLive(true);
+  };
 
   useEffect(() => {
     return () => { if (teaserTimer.current) window.clearTimeout(teaserTimer.current); };
@@ -125,7 +147,31 @@ export function RuntimeSwitcher() {
           </button>
         );
       })}
-      {liveTeaser && (
+      {state.mode === "live" && state.activeExchange && (
+        <button
+          type="button"
+          onClick={onArmToggle}
+          title={armed
+            ? "Live execution armed for this session. Click to disarm."
+            : "Arm live execution for this session. Refresh disarms automatically."}
+          style={{
+            ...chipBaseStyle,
+            marginLeft: 4,
+            borderColor: armed ? C.BORDER_ACTIVE : `${C.GOLD}66`,
+            color:       armed ? C.BRAND : C.GOLD,
+            background:  armed ? "rgba(102,255,102,0.08)" : `${C.GOLD}14`,
+            boxShadow:   armed ? `0 0 14px ${C.BRAND_GLOW}` : `0 0 10px ${C.GOLD}33`,
+          }}
+        >
+          <span aria-hidden style={{
+            width: 5, height: 5, borderRadius: "50%",
+            background: armed ? C.BRAND : C.GOLD,
+            boxShadow:  armed ? `0 0 6px ${C.BRAND}` : `0 0 5px ${C.GOLD}`,
+          }} />
+          {armed ? "ARMED · TAP TO DISARM" : "ARM LIVE"}
+        </button>
+      )}
+      {liveTeaser && !armed && (
         <span role="status" style={{
           marginLeft: 8, fontFamily: FONT_MONO, fontSize: 9, fontWeight: 700,
           color: C.GOLD, letterSpacing: "0.10em",
@@ -133,7 +179,7 @@ export function RuntimeSwitcher() {
           border: `1px solid ${C.GOLD}55`, borderRadius: 3,
           background: `${C.GOLD}10`,
         }}>
-          ● LIVE: {liveTeaser} — DISPLAY ONLY · ORDERS STILL PAPER
+          ● LIVE: {liveTeaser} — DISPLAY ONLY · ARM TO ROUTE REAL ORDERS
         </span>
       )}
     </div>

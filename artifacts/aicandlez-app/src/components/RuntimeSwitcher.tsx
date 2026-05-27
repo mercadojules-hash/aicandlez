@@ -14,6 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRuntimeState, useSetRuntimeExchange } from "../hooks/useRuntimeState";
+import { useArmedForLive, setArmedForLive } from "../hooks/useArmedForLive";
 
 const C = {
   BG:            "#000",
@@ -32,8 +33,23 @@ const FONT_MONO = "'SF Mono','JetBrains Mono','Roboto Mono',Consolas,monospace";
 export function RuntimeSwitcher() {
   const { data: state, isLoading } = useRuntimeState();
   const { setRuntimeExchange, isPending } = useSetRuntimeExchange();
+  const armed = useArmedForLive();
   const [liveTeaser, setLiveTeaser] = useState<string | null>(null);
   const teaserTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (state?.mode === "paper" && armed) setArmedForLive(false);
+  }, [state?.mode, armed]);
+
+  const onArmToggle = () => {
+    if (armed) { setArmedForLive(false); return; }
+    const exch = state?.activeExchange?.toUpperCase() ?? "your exchange";
+    const ok = typeof window === "undefined" ? true : window.confirm(
+      `ARM LIVE on ${exch}?\n\nReal-money AI orders will route to ${exch} ` +
+      `for the rest of this session. Refreshing disarms automatically.`,
+    );
+    if (ok) setArmedForLive(true);
+  };
 
   useEffect(() => {
     return () => { if (teaserTimer.current) window.clearTimeout(teaserTimer.current); };
@@ -106,9 +122,32 @@ export function RuntimeSwitcher() {
           </button>
         ))}
       </div>
-      {liveTeaser && (
+      {state.mode === "live" && state.activeExchange && (
+        <button
+          type="button"
+          onClick={onArmToggle}
+          title={armed
+            ? "Live execution armed. Tap to disarm."
+            : "Arm live execution for this session. Refresh disarms automatically."}
+          style={{
+            ...chipBaseStyle,
+            borderColor: armed ? C.BORDER_ACTIVE : `${C.GOLD}66`,
+            color:       armed ? C.BRAND : C.GOLD,
+            background:  armed ? "rgba(102,255,102,0.08)" : `${C.GOLD}14`,
+            boxShadow:   armed ? `0 0 12px ${C.BRAND_GLOW}` : `0 0 8px ${C.GOLD}33`,
+          }}
+        >
+          <span aria-hidden style={{
+            width: 5, height: 5, borderRadius: "50%",
+            background: armed ? C.BRAND : C.GOLD,
+            boxShadow:  armed ? `0 0 6px ${C.BRAND}` : `0 0 5px ${C.GOLD}`,
+          }} />
+          {armed ? "ARMED" : "ARM LIVE"}
+        </button>
+      )}
+      {liveTeaser && !armed && (
         <span role="status" style={teaserStyle}>
-          ● LIVE: {liveTeaser} — DISPLAY ONLY · ORDERS STILL PAPER
+          ● LIVE: {liveTeaser} — DISPLAY ONLY · ARM TO ROUTE REAL ORDERS
         </span>
       )}
     </div>

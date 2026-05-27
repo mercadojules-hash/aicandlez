@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { userExchangeConnectionsTable, userNotificationsTable } from "@workspace/db";
+import { userExchangeConnectionsTable, userNotificationsTable, userSettingsTable, usersTable } from "@workspace/db";
+import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
 import { eq, and, or, isNull, ne } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { requireAuth } from "../middlewares/requireAuth.js";
@@ -372,11 +373,116 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
       if (reread) refreshedRow = reread;
     }
 
+    // ── Auto-promotion (Task #200) ───────────────────────────────────────
+    // When the user has no explicit runtime preference AND this connection
+    // produced healthy balances, flip `activeRuntimeExchange` to this
+    // exchange so the runtime aggregator resolves mode="live" on the next
+    // poll. The flip is display-only — real-money execution still requires
+    // (1) the env kill switch, (2) aggregator liveReady, and (3) the
+    // per-session ARM gate (Task #200).
+    //
+    // Auto-promotion is SUPPRESSED when:
+    //   - activeRuntimeExchange === "paper"           (explicit user opt-out)
+    //   - activeRuntimeExchange === "<some exchange>" (already chosen)
+    //   - balance snapshot missing or ok=false        (validation_failed)
+    // Each suppression emits [AUTO_PROMOTION_BLOCKED reason=...] so the
+    // decision is fully traceable in logs.
+    let autoPromoted = false;
+    try {
+      const [settingsRow] = await db
+        .select({ activeRuntimeExchange: userSettingsTable.activeRuntimeExchange })
+        .from(userSettingsTable)
+        .where(eq(userSettingsTable.userId, userId))
+        .limit(1);
+      const existing = settingsRow?.activeRuntimeExchange ?? null;
+      const balancesOk = !!(balanceSnapshot && balanceSnapshot.ok);
+
+      if (existing === "paper") {
+        req.log.info({
+          tag: "AUTO_PROMOTION_BLOCKED", reason: "explicit_paper_choice",
+          userId, exchange,
+        }, "[AUTO_PROMOTION_BLOCKED] explicit_paper_choice");
+      } else if (existing && existing !== "paper") {
+        req.log.info({
+          tag: "AUTO_PROMOTION_BLOCKED", reason: "existing_choice",
+          userId, exchange, existing,
+        }, "[AUTO_PROMOTION_BLOCKED] existing_choice");
+      } else if (!balancesOk) {
+        req.log.info({
+          tag: "AUTO_PROMOTION_BLOCKED", reason: "no_balances",
+          userId, exchange,
+          balanceError: balanceSnapshot?.error ?? null,
+        }, "[AUTO_PROMOTION_BLOCKED] no_balances");
+      } else {
+        // JIT-provision parent rows (same defensive pattern as
+        // aiTrading.ts) so the FK chain holds for a fresh user.
+        await db
+          .insert(usersTable)
+          .values({ clerkUserId: userId, email: "", role: "user" })
+          .onConflictDoNothing();
+        await db
+          .insert(userSettingsTable)
+          .values({ userId, activeRuntimeExchange: exchange })
+          .onConflictDoUpdate({
+            target: userSettingsTable.userId,
+            set:    { activeRuntimeExchange: exchange, updatedAt: new Date() },
+          });
+        autoPromoted = true;
+        req.log.info({
+          tag: "RUNTIME_SWITCH", reason: "auto_promote_on_connect",
+          userId, exchange, from: null, to: exchange,
+        }, "[RUNTIME_SWITCH] auto_promote_on_connect");
+        req.log.info({
+          tag: "LIVE_READY", userId, exchange, source: "connect_handler",
+        }, "[LIVE_READY] runtime now resolves live for this user");
+
+        // In-app + push notification — gated by `runtimeAutoPromoted`
+        // alert pref (defaults ON). Fire-and-forget; failure doesn't
+        // affect the connect response.
+        const exchUpper = exchange.toUpperCase();
+        try {
+          await db.insert(userNotificationsTable).values({
+            userId,
+            type:    "runtime_auto_promoted",
+            title:   `Now trading on ${exchUpper}`,
+            message: `Your ${exchUpper} connection is live. Paper trading is preserved — switch back any time from the runtime chip row.`,
+            data:    { exchange, autoPromoted: true },
+            read:    false,
+          });
+        } catch (err) {
+          req.log.warn({
+            userId, exchange,
+            err: err instanceof Error ? err.message : String(err),
+          }, "userExchanges: failed to persist runtime_auto_promoted notification");
+        }
+        void NotificationDispatcher.sendToUser(userId, {
+          title:     `Now trading on ${exchUpper}`,
+          body:      `Your ${exchUpper} connection is live. Paper account preserved — switch back any time.`,
+          notifType: "system",
+          tag:       `runtime-auto-promoted-${exchange}`,
+          url:       "/aicandlez-app/",
+          alertKey:  "runtimeAutoPromoted",
+          data:      { exchange, kind: "runtime_auto_promoted" },
+        }).catch((err) => {
+          req.log.warn({
+            userId, exchange,
+            err: err instanceof Error ? err.message : String(err),
+          }, "userExchanges: push dispatch failed for runtime_auto_promoted");
+        });
+      }
+    } catch (err) {
+      req.log.warn({
+        userId, exchange,
+        err: err instanceof Error ? err.message : String(err),
+      }, "[AUTO_PROMOTION_BLOCKED] reason=lookup_failed (non-fatal)");
+    }
+
     res.json({
       ok:              true,
       connection:      refreshedRow ? safeRow(refreshedRow) : null,
       permissions:     testResult.permissions,
       balanceSnapshot: balanceSnapshot ?? null,
+      autoPromoted,
     });
   } catch (err) {
     req.log.error({ userId, exchange, err: (err as Error).message }, "[EXCHANGE_SAVE] db upsert FAILED (returning 500)");

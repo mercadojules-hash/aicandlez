@@ -30,6 +30,7 @@ import {
   memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode, type CSSProperties,
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getArmedForLive } from "@/hooks/useArmedForLive";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAuth, useClerk, useUser } from "@clerk/react";
 import {
@@ -284,13 +285,26 @@ function useAiTradingState() {
 
   const mut = useMutation<AiTradingState, Error & { needsUpgrade?: boolean }, boolean>({
     mutationFn: async (enabled: boolean) => {
+      // Forward the per-session ARM flag so the server can reject a
+      // stale-client "AI on" flip with 412 runtime_not_armed when the
+      // user's runtime resolves live. `getArmedForLive()` reads the
+      // module-scoped store at call time (not via closure) so the
+      // value is fresh on every mutation.
       const res = await authFetch("/api/user/ai-trading/enable", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ enabled }),
+        body:    JSON.stringify({ enabled, armedForLive: getArmedForLive() }),
       });
       if (res.status === 402) {
         const err = Object.assign(new Error("needs_upgrade"), { needsUpgrade: true });
+        throw err;
+      }
+      if (res.status === 412) {
+        const body = await res.json().catch(() => ({} as { errorCode?: string }));
+        const err  = Object.assign(
+          new Error((body as { error?: string }).error ?? "runtime_not_armed"),
+          { errorCode: (body as { errorCode?: string }).errorCode ?? "runtime_not_armed" },
+        );
         throw err;
       }
       if (!res.ok) throw new Error(`status ${res.status}`);

@@ -27,6 +27,7 @@ export const ALERT_DEFINITIONS = [
   { key: "marketScannerAlerts",    label: "Market Scanner Alerts",     sub: "Major scanner state changes",                          defaultOn: false },
   { key: "volatilityAlerts",       label: "Volatility Alerts",         sub: "Sudden volatility spikes",                             defaultOn: false },
   { key: "portfolioAlerts",        label: "Portfolio Performance",     sub: "Daily P&L summary + milestones",                       defaultOn: false },
+  { key: "runtimeAutoPromoted",    label: "Runtime Auto-Promotion",    sub: "Trading runtime auto-flipped to a connected exchange", defaultOn: true  },
 ] as const;
 
 export type AlertKey = (typeof ALERT_DEFINITIONS)[number]["key"];
