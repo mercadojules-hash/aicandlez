@@ -26,6 +26,14 @@ export type ExecStreamType =
   | "order_rejected"
   | "position_persisted"
   | "position_persist_failed"
+  // Phase 2 (Task #207) — position-store SoT events. Additive: emitted
+  // by `lib/positionStore.ts` alongside the existing legacy write path.
+  // No consumers yet; cutover happens in Phase 2 Step 5 behind
+  // `POSITION_STORE_UNIFIED`. Until then these are pure telemetry.
+  | "position_opened"
+  | "position_filled"
+  | "position_closed"
+  | "pnl_tick"
   | "dashboard_hydrated"
   | "exchange_latency_warning"
   | "websocket_disconnected"

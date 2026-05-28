@@ -42,6 +42,7 @@ import {
   type LiveUserOrderRequest,
   type LiveUserOrderResult,
 } from "./liveUserExecution.js";
+import { notifyFillExecuted } from "./positionStore.js";
 
 /** Where a customer order originated. Recorded on the canonical
  *  `[EXECUTION_GATEWAY_*]` log tags so manual + AI funnels become
@@ -189,6 +190,24 @@ export async function executeCustomerOrder(
       },
       "[EXECUTION_GATEWAY_EXECUTED] customer order filled",
     );
+    // Phase 2 (Task #207) — telemetry-only notify into positionStore.
+    // No DB write here: the legacy mirror in `userLiveOrder.ts` /
+    // `tradingLoop.ts` is still the authoritative writer. This emits
+    // the canonical `position_filled` stream event so consumers can
+    // subscribe immediately ahead of the Step-5 cutover.
+    notifyFillExecuted({
+      trigger,
+      userId:          legacyReq.userId,
+      symbol:          legacyReq.symbol,
+      side:            legacyReq.side,
+      sizeUSD:         legacyReq.sizeUSD,
+      fillPrice:       legacyResult.fillPrice ?? null,
+      quantity:        legacyResult.quantity ?? null,
+      exchange:        legacyResult.exchange ?? null,
+      exchangeOrderId: legacyResult.exchangeOrderId ?? null,
+      sandbox:         legacyReq.useSandbox === true,
+      dryRun:          legacyResult.dryRun === true,
+    });
   }
 
   return { ...legacyResult, trigger };
