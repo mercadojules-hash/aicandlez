@@ -1,0 +1,127 @@
+We now have a confirmed symbol-normalization + exchange-market support bug.
+
+Latest reproduced failure:
+
+PAPER TRADE NOT PERSISTED
+
+Failed to fetch price:
+Ticker feed unavailable for MKRUSD
+
+Coinbase:
+HTTP 400:
+api.exchange.coinbase.com/products/MKR-USD/stats
+
+Kraken:
+Unknown asset pair
+
+This confirms the runtime is still inconsistently handling:
+
+* UI symbols
+* exchange product IDs
+* ticker feeds
+* persistence routing
+
+Current observed flow appears to be:
+
+1. UI emits:
+   MKRUSD
+
+2. execution layer attempts:
+   Coinbase ticker fetch
+
+3. symbol normalization fails/incomplete
+
+4. fallback attempts Kraken
+
+5. Kraken rejects pair
+
+6. persistence aborts
+
+7. UI emits:
+   PAPER TRADE NOT PERSISTED
+
+Required architecture fix:
+
+1. Centralized symbol registry
+   Need one canonical source of truth for:
+
+* UI symbol
+* normalized base/quote
+* Coinbase product ID
+* Kraken pair ID
+* supported exchanges
+
+Example:
+{
+ui: "MKRUSD",
+base: "MKR",
+quote: "USD",
+coinbase: "MKR-USD",
+kraken: "MKR/USD",
+supportedExchanges: ["coinbase"]
+}
+
+2. Pre-execution validation
+   Before:
+
+* ticker fetch
+* order submit
+* persistence
+
+validate:
+
+* exchange supports pair
+* normalized symbol exists
+* market type supported
+
+3. No blind exchange fallback
+   Do NOT:
+
+* fail Coinbase
+* then blindly try Kraken
+
+Execution should remain bound to the active runtime exchange unless explicitly multi-routed.
+
+4. Unified ticker service
+   Need one normalized ticker adapter:
+   getTicker(normalizedSymbol, exchange)
+
+instead of raw endpoint construction throughout the codebase.
+
+5. Persistence rules
+   Trade persistence must not depend on legacy paper fallback paths.
+
+If LIVE execution succeeds:
+
+* persist position
+* hydrate Live Trades
+* hydrate pnl
+* hydrate history
+
+even if secondary ticker enrichment fails.
+
+6. Acceptance criteria
+
+Manual BUY on:
+
+* MKR
+* PEPE
+* XRP
+* GRT
+* AVAX
+
+should:
+
+* normalize correctly
+* validate against runtime exchange
+* execute
+* persist
+* hydrate Live Trades
+* update PnL
+
+with:
+
+* no PAPER TRADE NOT PERSISTED
+* no exchange fallback confusion
+* no unsupported symbol errors
+* no stale paper labels

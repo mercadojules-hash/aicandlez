@@ -1,0 +1,103 @@
+New regression discovered after execution-state changes.
+
+Observed behavior:
+
+1. Manual BUY interactions are inconsistent
+
+* some assets throw execution errors
+* some partially execute
+* persistence still fragmented
+
+2. Position size controls are no longer reliably interactive
+   The following controls intermittently do nothing:
+
+* $10
+* $20
+* $50
+* $100
+
+Important:
+The pills visually render as enabled but clicks are ignored or stale.
+
+This strongly suggests a frontend execution-state lock or overlay interception problem introduced during the runtime/activation refactor.
+
+Likely causes to audit immediately:
+
+* stuck mutation pending state
+* stale isExecuting/isActivating flag
+* pointer-events:none inherited on container
+* invisible overlay intercepting clicks
+* z-index collision from LIVE status banners
+* runtime transition state never resolving
+* websocket reconnect gate locking execution controls
+* React Query optimistic state not clearing
+* execution mutex not releasing after failed persistence
+
+Required audit:
+
+1. Inspect every disabled condition on:
+
+* BUY buttons
+* SELL buttons
+* trade-size pills
+
+2. Trace:
+   canExecuteTrade
+   isExecuting
+   isActivating
+   isTransitioning
+   executionLocked
+   runtimePending
+   mutation.isPending
+
+across:
+
+* PortalCustomerShell
+* SignalRow
+* RuntimeSwitcher
+* LiveControlBar
+* AIAutoTradeContext
+* execution hooks
+
+3. Verify no parent container applies:
+   pointer-events:none
+   opacity-disabled overlays
+   absolute overlays with z-index interception
+
+4. Add temporary structured logs:
+   [MANUAL_BUY_CLICK]
+   [SIZE_SELECT]
+   [EXECUTION_LOCK_STATE]
+
+including:
+{
+symbol,
+selectedSize,
+runtimeMode,
+exchange,
+isExecuting,
+isPending,
+disabledReason
+}
+
+5. Acceptance criteria
+
+Customer should always be able to:
+
+* select size instantly
+* switch sizes instantly
+* click BUY instantly
+
+when:
+
+* LIVE READY
+* AI ENABLED
+* runtime LIVE
+* no active mutation pending
+
+No dead-click states.
+No hidden overlays.
+No stale disabled controls.
+No execution lock after failed persistence.
+
+This is now a frontend runtime-state synchronization problem, not just an exchange API issue.

@@ -64,7 +64,6 @@ export const CRYPTO_20: TickerSpec[] = [
   { symbol: "FILUSD",   label: "FIL",   display: "FIL/USD",   color: "#0090FF", kind: "crypto", name: "Filecoin" },
   { symbol: "HBARUSD",  label: "HBAR",  display: "HBAR/USD",  color: "#222222", kind: "crypto", name: "Hedera" },
   { symbol: "AAVEUSD",  label: "AAVE",  display: "AAVE/USD",  color: "#B6509E", kind: "crypto", name: "Aave" },
-  { symbol: "MKRUSD",   label: "MKR",   display: "MKR/USD",   color: "#1AAB9B", kind: "crypto", name: "Maker",         aliases: ["dai"] },
   { symbol: "ALGOUSD",  label: "ALGO",  display: "ALGO/USD",  color: "#000000", kind: "crypto", name: "Algorand" },
   { symbol: "SANDUSD",  label: "SAND",  display: "SAND/USD",  color: "#00ADEF", kind: "crypto", name: "The Sandbox" },
   { symbol: "MANAUSD",  label: "MANA",  display: "MANA/USD",  color: "#FF2D55", kind: "crypto", name: "Decentraland" },

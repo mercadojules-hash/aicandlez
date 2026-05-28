@@ -120,7 +120,9 @@ const COINBASE_SYMBOLS: Record<string, string> = {
   ICPUSD:   "ICP-USD",
   HBARUSD:  "HBAR-USD",
   AAVEUSD:  "AAVE-USD",
-  MKRUSD:   "MKR-USD",
+  // MKR removed 2026-05-28 — Coinbase Exchange returns HTTP 400 on both
+  // /products/MKR-USD/stats and /ticker (delisted from the Exchange
+  // product surface). Re-add only after a live HTTP 200 verification.
   XLMUSD:   "XLM-USD",
   ALGOUSD:  "ALGO-USD",
   SANDUSD:  "SAND-USD",
@@ -187,7 +189,10 @@ const KRAKEN_SYMBOLS: Record<string, string> = {
   ICPUSD:   "ICPUSD",
   HBARUSD:  "HBARUSD",
   AAVEUSD:  "AAVEUSD",
-  MKRUSD:   "MKRUSD",
+  // MKR removed 2026-05-28 — Kraken public Ticker rejects pair=MKRUSD
+  // with EQuery:Unknown asset pair (MKR not listed on Kraken at time
+  // of writing). Re-add only after curl verification against
+  // /0/public/Ticker?pair=<correct-name>.
   XLMUSD:   "XLMUSD",
   ALGOUSD:  "ALGOUSD",
   SANDUSD:  "SANDUSD",

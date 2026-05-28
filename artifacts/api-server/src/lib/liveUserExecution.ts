@@ -1187,6 +1187,37 @@ export async function placeLiveAutoOrderForUser(
     return { success: false, userId, exchange: row.exchange, errorCode: "exchange_reject", error: msg };
   }
 
+  // 2.5 Pre-execution venue symbol-support check (hoisted above getTicker
+  // per 2026-05-28 fix). Symbols removed from the registry (e.g. MKRUSD
+  // after Coinbase delisting + Kraken not-listed) must return the
+  // structured `unsupported_symbol` errorCode rather than a downstream
+  // `price_unavailable` from the failing ticker call — clients key off
+  // errorCode to render the "supported on X" hint. Only enforced for
+  // venues with a symbol table; other exchanges fall through to the
+  // adapter's own validation (see step 5 — that block is now redundant
+  // for the coinbase/kraken case but kept as a defense-in-depth guard).
+  if (row.exchange === "coinbase" || row.exchange === "kraken") {
+    const venue: LiveVenue = row.exchange;
+    if (!isSymbolSupportedOn(symbol, venue)) {
+      const supported = getSupportedExchanges(symbol);
+      const msg = supported.length > 0
+        ? `${symbol} is not listed on ${venue} — try ${supported.join(" or ")}`
+        : `${symbol} is not listed on any supported venue`;
+      logger.warn(
+        { userId, symbol, exchange: row.exchange, supportedExchanges: supported },
+        "placeLiveAutoOrderForUser: unsupported_symbol pre-check (pre-ticker)",
+      );
+      await emitFailureNotification(userId, symbol, side, msg, row.exchange);
+      return {
+        success:   false,
+        userId,
+        exchange:  row.exchange,
+        errorCode: "unsupported_symbol",
+        error:     msg,
+      };
+    }
+  }
+
   // 3. Reference price → base quantity
   let referencePrice: number;
   try {
