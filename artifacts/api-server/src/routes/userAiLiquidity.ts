@@ -41,22 +41,44 @@ type AuthReq = Request & { clerkUserId: string };
 
 const router: IRouter = Router();
 
-async function countUserOpenLivePositions(userId: string): Promise<number> {
+async function countUserOpenPositionsByMode(userId: string): Promise<{
+  openLive:  number;
+  openPaper: number;
+  openTotal: number;
+}> {
   try {
     const [row] = await db
-      .select({ n: sql<number>`count(*)::int` })
+      .select({
+        live:  sql<number>`count(*) filter (where ${simPositionsTable.exchange} is not null)::int`,
+        paper: sql<number>`count(*) filter (where ${simPositionsTable.exchange} is null)::int`,
+        total: sql<number>`count(*)::int`,
+      })
       .from(simPositionsTable)
-      .where(and(
-        eq(simPositionsTable.userId, userId),
-        isNotNull(simPositionsTable.exchange),
-      ));
-    return Number(row?.n ?? 0);
+      .where(eq(simPositionsTable.userId, userId));
+    return {
+      openLive:  Number(row?.live  ?? 0),
+      openPaper: Number(row?.paper ?? 0),
+      openTotal: Number(row?.total ?? 0),
+    };
   } catch {
     // Fail-OPEN for the READ path only. The execution-side gate
     // (`liveUserExecution.ts` 0LIQ) fails CLOSED on the same query —
     // showing 0 here just means the customer sees a default-looking
     // status widget; we never authorize a trade based on this value.
-    return 0;
+    return { openLive: 0, openPaper: 0, openTotal: 0 };
+  }
+}
+
+async function readUserTradingMode(userId: string): Promise<"paper" | "live"> {
+  try {
+    const [row] = await db
+      .select({ mode: userSettingsTable.tradingMode })
+      .from(userSettingsTable)
+      .where(eq(userSettingsTable.userId, userId))
+      .limit(1);
+    return row?.mode === "live" ? "live" : "paper";
+  } catch {
+    return "paper";
   }
 }
 
@@ -92,12 +114,21 @@ router.get(
   async (req, res): Promise<void> => {
     const userId = (req as AuthReq).clerkUserId;
     try {
-      const [gate, openLiveCount, availableCashUsd, tradeSizeUsd] = await Promise.all([
+      const [gate, openCounts, availableCashUsd, tradeSizeUsd, runtimeMode] = await Promise.all([
         resolveAiTradingGate(userId),
-        countUserOpenLivePositions(userId),
+        countUserOpenPositionsByMode(userId),
         readUserCashBalance(userId),
         readUserTradeSize(userId),
+        readUserTradingMode(userId),
       ]);
+      const { openLive: openLiveCount, openPaper: openPaperCount, openTotal: openTotalCount } = openCounts;
+      // Mode-aware badge count. Paper mode → count paper rows; live mode →
+      // count live rows. NO mixed/global leakage. `openLiveCount` is kept as
+      // a distinct field because `evaluateLiquidityGuard` MUST use the live-
+      // only count for plan-cap math (a paper user with 5 paper rows on a
+      // 3-cap starter plan must NOT be told "close one"). UI badges read
+      // `openCount`; gate math reads `openLiveCount`.
+      const openCount = runtimeMode === "live" ? openLiveCount : openPaperCount;
 
       // Operators are not subject to the per-plan cap, but we still
       // surface the underlying numbers so the admin diagnostic widget
@@ -112,36 +143,41 @@ router.get(
         availableCashUsd,
       });
 
-      // [READ_SOURCE_LIQUIDITY] — PER_USER but DB-backed, NOT registry-backed.
-      // `openLiveCount` comes from `countUserOpenLivePositions(userId)` which
-      // runs `SELECT COUNT(*) FROM sim_positions WHERE userId=$1 AND exchange
-      // IS NOT NULL`. This is the same row set that `userSimRegistry.getOrLoad`
-      // hydrates from, so the two MUST agree. If they don't, look for the
-      // matching `STATE_DB_DIVERGENCE` line from getUserAccountSummary in the
-      // same poll window — that proves the in-memory registry is stale vs DB.
-      // This endpoint feeds the "{n}/{max} OPEN" badge on Trade.tsx (the
-      // "AI EXECUTION BANNER 2 OPEN" the user is currently seeing).
+      // [OPEN_BADGE_SOURCE] — PER_USER, mode-aware, DB-backed.
+      // `openCount` is the mode-resolved count the UI badge renders.
+      // `openLiveCount` stays as the live-only count `evaluateLiquidityGuard`
+      // requires for plan-cap math. Both are surfaced so the UI can show the
+      // right number while the gate stays honest.
       req.log.info({
-        tag:             "READ_SOURCE_LIQUIDITY",
-        sourceOfTruth:   "sim_positions WHERE userId AND exchange IS NOT NULL (DB)",
+        tag:             "OPEN_BADGE_SOURCE",
+        sourceOfTruth:   "sim_positions WHERE userId (DB, mode-filtered)",
+        runtimeSource:   "user_settings.tradingMode",
         scope:           "PER_USER_DB",
         perUserAware:    true,
         userId,
-        openPositions:   openLiveCount,
+        tradingMode:     runtimeMode,
+        openPositions:   openCount,
+        dbOpenPositions: openTotalCount,
+        openLiveCount,
+        openPaperCount,
         planMaxOpen:     PLAN_MAX_OPEN_POSITIONS[plan] ?? 0,
         remainingSlots:  verdict.remainingSlots,
         plan,
         isAdmin:         gate.isAdmin,
-      }, "[READ_SOURCE_LIQUIDITY] per-user DB count — drives Trade banner 'N/M OPEN'");
+      }, "[OPEN_BADGE_SOURCE] mode-aware per-user DB count — drives Trade banner 'N/M OPEN'");
       res.json({
         userId,
         plan,
         isAdmin:           gate.isAdmin,
+        tradingMode:       runtimeMode,
         tradeSizeUsd,
         allowedTradeSizes: ALLOWED_TRADE_SIZES,
         defaultTradeSize:  DEFAULT_TRADE_SIZE_USD,
         planMaxOpen:       PLAN_MAX_OPEN_POSITIONS[plan] ?? 0,
         openLiveCount,
+        openPaperCount,
+        openTotalCount,
+        openCount,            // ← mode-aware badge count (UI reads this)
         remainingSlots:    verdict.remainingSlots,
         availableCashUsd:  verdict.availableCashUsd,
         requiredCashUsd:   verdict.requiredCashUsd,

@@ -83,15 +83,19 @@ router.get("/simulation/account", requireAuth, async (req, res): Promise<void> =
     const openPositions =
       (data as { positions?: unknown[] }).positions?.length ?? 0;
     req.log.info({
-      tag:           "READ_SOURCE_SIM_ACCOUNT",
+      tag:           "EQUITY_PANEL_HYDRATED",
       stage:         "read",
       endpoint:      "/api/simulation/account",
       source:        "userSimRegistry.getUserAccountSummary",
+      accountSource: "userSimRegistry.getUserAccountSummary",
       scope:         "PER_USER",  // ← per-user, sees live fills
       perUserAware:  true,
       userId,
       openPositions,
-    }, "[READ_SOURCE_SIM_ACCOUNT] per-user sim_positions — includes live fills");
+      realized:      (data as { totalRealized?: number }).totalRealized ?? 0,
+      unrealized:    (data as { unrealizedPnL?: number }).unrealizedPnL ?? 0,
+      equity:        (data as { equity?: number }).equity ?? 0,
+    }, "[EQUITY_PANEL_HYDRATED] per-user sim_positions — includes live fills");
     res.json(data);
   } catch (err) {
     req.log.error({ err, userId }, "GET /simulation/account failed");

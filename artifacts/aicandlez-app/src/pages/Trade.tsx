@@ -685,6 +685,9 @@ export default function Trade() {
     allowedTradeSizes:   readonly number[];
     planMaxOpen:         number;
     openLiveCount:       number;
+    openPaperCount?:     number;
+    openCount?:          number;
+    tradingMode?:        "paper" | "live";
     remainingSlots:      number;
     availableCashUsd:    number;
     requiredCashUsd:     number;
@@ -772,7 +775,7 @@ export default function Trade() {
             </span>
             <span style={{ fontSize:9, color:DIM, fontFamily:MONO,
               letterSpacing:"0.08em" }}>
-              {planLabel} · {liquidity?.openLiveCount ?? 0}/{liquidity?.planMaxOpen ?? 0} OPEN
+              {planLabel} · {liquidity?.openCount ?? liquidity?.openLiveCount ?? 0}/{liquidity?.planMaxOpen ?? 0} OPEN
             </span>
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:6 }}>

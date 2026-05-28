@@ -5478,6 +5478,9 @@ export function PortalCustomerShell() {
     tradeSizeUsd:        number;
     planMaxOpen:         number;
     openLiveCount:       number;
+    openPaperCount?:     number;
+    openCount?:          number;
+    tradingMode?:        "paper" | "live";
     remainingSlots:      number;
     liquidityProtected:  boolean;
     planCapacityReached: boolean;
@@ -5991,7 +5994,7 @@ export function PortalCustomerShell() {
               {liquidityStatus.plan === "pro" ? "PRO" : liquidityStatus.plan === "starter" ? "STARTER" : "FREE"} OPEN
             </span>
             <span style={{ color: T.TEXT_1, fontWeight: 700 }}>
-              {liquidityStatus.openLiveCount}/{liquidityStatus.planMaxOpen}
+              {liquidityStatus.openCount ?? liquidityStatus.openLiveCount}/{liquidityStatus.planMaxOpen}
             </span>
           </span>
           <span style={{ flex: 1, minWidth: 0 }}>

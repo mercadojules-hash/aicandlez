@@ -108,17 +108,22 @@ router.get("/mobile/portfolio", requireAuth, async (req, res) => {
       unrealizedPnL: p.unrealizedPnL,
     }));
     req.log.info({
-      tag:            "READ_SOURCE_PORTFOLIO",
+      tag:            "LIVE_TRADES_HYDRATED",
       stage:          "read",
       endpoint:       "/api/mobile/portfolio",
       source:         "userSimRegistry.getUserAccountSummary",
+      accountSource:  "userSimRegistry.getUserAccountSummary",
+      runtimeSource:  "getExchangeStatus",
       scope:          "PER_USER",
       perUserAware:   true,
       userId,
+      tradingMode:    ex.mode,
       openPositions:  positions.length,
+      realized:       acct.totalRealized ?? 0,
+      unrealized:     acct.unrealizedPnL ?? 0,
+      equity:         acct.equity ?? 0,
       exchange:       ex.exchangeName,
-      mode:           ex.mode,
-    }, "[READ_SOURCE_PORTFOLIO] per-user sim_positions — sees customer live fills");
+    }, "[LIVE_TRADES_HYDRATED] per-user sim_positions — sees customer live fills");
     res.json({
       balances:   ex.simBalances,
       positions,

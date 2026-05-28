@@ -415,7 +415,7 @@ export async function getUserAccountSummary(userId: string) {
   // ultimately consumes via this function) against the DB row count for
   // `sim_positions WHERE userId=…`. Any drift means the in-memory registry
   // is stale relative to the DB — i.e. SOME write path mutated DB but
-  // NOT the in-memory state, or vice versa. Tagged READ_SOURCE_CANONICAL
+  // NOT the in-memory state, or vice versa. Tagged ACCOUNT_HYDRATED
   // because this function IS the canonical per-user account SoT — every
   // /api/{account,simulation/account,mobile/portfolio,mobile/positions,
   // portfolio/overview} endpoint funnels through here.
@@ -428,8 +428,8 @@ export async function getUserAccountSummary(userId: string) {
     dbOpenPositions = Number(row?.n ?? 0);
   } catch (err) {
     logger.warn(
-      { tag: "READ_SOURCE_CANONICAL", userId, err },
-      "[READ_SOURCE_CANONICAL] DB count probe failed — divergence check skipped",
+      { tag: "ACCOUNT_HYDRATED", subtag: "db_probe_failed", userId, err },
+      "[ACCOUNT_HYDRATED] DB count probe failed — divergence check skipped",
     );
   }
   if (dbOpenPositions !== -1 && dbOpenPositions !== state.positions.length) {
@@ -460,19 +460,21 @@ export async function getUserAccountSummary(userId: string) {
 
   logger.info(
     {
-      tag:              "READ_SOURCE_CANONICAL",
+      tag:              "ACCOUNT_HYDRATED",
       sourceOfTruth:    "userSimRegistry.getUserAccountSummary",
+      accountSource:    "userSimRegistry.getUserAccountSummary",
+      runtimeSource:    "userSimRegistry (in-memory state, DB-hydrated)",
       scope:            "PER_USER",
       userId,
       openPositions:    state.positions.length,
       dbOpenPositions,  // -1 when probe failed
       cashBalance:      parseFloat(state.account.cashBalance.toFixed(2)),
-      totalRealized:    parseFloat(state.account.totalRealized.toFixed(2)),
-      unrealizedPnL:    parseFloat(unrealizedTotal.toFixed(2)),
+      realized:         parseFloat(state.account.totalRealized.toFixed(2)),
+      unrealized:       parseFloat(unrealizedTotal.toFixed(2)),
       equity:           parseFloat(equity.toFixed(2)),
       registryHit:      registry.has(userId),
     },
-    "[READ_SOURCE_CANONICAL] per-user account summary computed",
+    "[ACCOUNT_HYDRATED] per-user account summary computed (canonical SoT)",
   );
 
   // Lifetime broker commission paid across every closed leg (entry + exit fees
