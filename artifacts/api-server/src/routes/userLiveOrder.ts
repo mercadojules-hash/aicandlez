@@ -111,10 +111,54 @@ router.post(
       return;
     }
 
-    const userId = (req as { auth?: { userId?: string } }).auth?.userId;
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized", correlationId });
-      return;
+    // ── FIX: read userId from req.clerkUserId (populated by requireAuth) ────
+    // Previously this read `req.auth?.userId` directly, which is the raw
+    // Clerk middleware shape. In some token-transport modes (Bearer-only,
+    // no __session cookie — exactly Tanika's case: hasAuthorization=true,
+    // hasSessionCookie=false), `req.auth.userId` was undefined even though
+    // Clerk had successfully validated the JWT and `requireAuth` had set
+    // `req.clerkUserId`. That mismatch returned a bare
+    // `{ error: "Unauthorized" }` 401 with no log, no telemetry, no
+    // errorCode — which the frontend then mislabeled as a Coinbase
+    // exchange reject via `errCode ?? "exchange_reject"`.
+    //
+    // requireAuth is the SoT for userId on this route. If we reached this
+    // line, it's populated.
+    const userId = (req as Request & { clerkUserId: string }).clerkUserId;
+
+    // ── TEMPORARY DIAGNOSTIC (remove after next successful BUY) ─────────────
+    // One-shot log proving the diagnosis: dump req.auth's shape alongside
+    // req.clerkUserId so Render logs show exactly what req.auth?.userId
+    // was when the old check rejected. Will be removed once we see a
+    // successful Coinbase fill come through this path.
+    {
+      const rawAuth = (req as { auth?: unknown }).auth;
+      const authShape = (() => {
+        if (rawAuth == null)            return "null";
+        if (typeof rawAuth === "function") return "function";
+        if (typeof rawAuth === "object") {
+          const a = rawAuth as Record<string, unknown>;
+          return {
+            type:                   "object",
+            hasUserId:              "userId" in a,
+            userIdType:             typeof a.userId,
+            userIdTruthy:           !!a.userId,
+            hasSessionId:           "sessionId" in a,
+            sessionIdTruthy:        !!a.sessionId,
+            hasSessionClaims:       "sessionClaims" in a,
+            sessionClaimsUserIdSet: typeof (a.sessionClaims as { userId?: unknown } | undefined)?.userId === "string",
+            keys:                   Object.keys(a).slice(0, 20),
+          };
+        }
+        return typeof rawAuth;
+      })();
+      req.log?.info?.({
+        tag:              "LIVE_ORDER_AUTH_SHAPE_DIAG",
+        correlationId,
+        clerkUserIdSet:   !!userId,
+        clerkUserIdPrefix: userId ? userId.slice(0, 12) : null,
+        reqAuthShape:     authShape,
+      }, "[LIVE_ORDER_AUTH_SHAPE_DIAG] req.auth shape vs req.clerkUserId (TEMP — remove after next successful BUY)");
     }
 
     const requestedSize = parsed.sizeUSD ?? DEFAULT_SIZE_USD;
