@@ -14,6 +14,19 @@ import {
 } from "./liveUserExecution.js";
 import { CATALOG_BY_ID } from "../services/exchanges/catalog.js";
 import { recordPerformanceFee, resolveFeePolicy } from "./feeLedger.js";
+import { resolveCorrelation } from "./executionTelemetry.js";
+
+// Synchronous equity proxy used by close-path instrumentation. Equity here =
+// cashBalance + Σ position.sizeUSD (entry notional). It is NOT a live MTM —
+// computing that requires async ticker fetches we cannot await mid-mutation.
+// The diagnostic value of equityBefore/After comes from showing the discrete
+// jump: `cash += closedSizeUSD + realizedPnL - fees` and `sizeUSD` leaves
+// `positions[]`, so the delta must equal `realizedPnL - netFees - platformFee`.
+function equityProxy(state: UserSimState): number {
+  let total = state.account.cashBalance;
+  for (const p of state.positions) total += p.sizeUSD;
+  return parseFloat(total.toFixed(2));
+}
 
 // Compute a fill commission for a live trade leg using the exchange catalog's
 // default taker fee rate. Returns null for paper fills (no broker, no fee).
@@ -241,8 +254,11 @@ async function loadFromDB(userId: string): Promise<UserSimState> {
   return state;
 }
 
-async function persistAccount(state: UserSimState): Promise<void> {
-  await db
+async function persistAccount(
+  state: UserSimState,
+  ctx?: { correlationId?: string | null; symbol?: string; positionId?: string; tag?: string },
+): Promise<void> {
+  const result = await db
     .update(simAccountsTable)
     .set({
       cashBalance:   state.account.cashBalance,
@@ -250,7 +266,49 @@ async function persistAccount(state: UserSimState): Promise<void> {
       totalTrades:   state.account.totalTrades,
       updatedAt:     new Date(),
     })
-    .where(eq(simAccountsTable.userId, state.account.userId));
+    .where(eq(simAccountsTable.userId, state.account.userId))
+    .returning({ userId: simAccountsTable.userId });
+
+  const rowCount = result.length;
+  if (rowCount === 0) {
+    // Silent-failure suspect for the "realized stays $0" convergence bug:
+    // UPDATE matched zero rows (account row absent for this userId), so
+    // in-memory mutations to cashBalance / totalRealized are NOT durable
+    // and the next process restart or getOrLoad cache miss will re-hydrate
+    // a stale state. Surface as ERROR so this never goes unnoticed again.
+    logger.error(
+      {
+        tag:           "ACCOUNT_PERSIST_NOOP",
+        sourceOfTruth: "userSimRegistry.persistAccount",
+        userId:        state.account.userId,
+        correlationId: ctx?.correlationId ?? null,
+        symbol:        ctx?.symbol,
+        positionId:    ctx?.positionId,
+        callerTag:     ctx?.tag,
+        rowCount,
+        cashBalance:   state.account.cashBalance,
+        totalRealized: state.account.totalRealized,
+      },
+      "persistAccount UPDATE matched 0 rows — sim_accounts row missing for userId; account state will NOT be durable",
+    );
+  } else {
+    logger.info(
+      {
+        tag:           "ACCOUNT_SUMMARY_PERSISTED",
+        sourceOfTruth: "userSimRegistry.persistAccount",
+        userId:        state.account.userId,
+        correlationId: ctx?.correlationId ?? null,
+        symbol:        ctx?.symbol,
+        positionId:    ctx?.positionId,
+        callerTag:     ctx?.tag,
+        rowCount,
+        cashBalance:   state.account.cashBalance,
+        totalRealized: state.account.totalRealized,
+        totalTrades:   state.account.totalTrades,
+      },
+      "persistAccount UPDATE committed",
+    );
+  }
 }
 
 // ── Enrich positions with live prices ─────────────────────────────────────────
@@ -573,6 +631,41 @@ export async function closeUserPosition(
 
   const pos = state.positions[idx]!;
 
+  // ── Close-path instrumentation (convergence bug trace) ──────────────────
+  // Five tags emitted across the close lifecycle so log-grep can confirm
+  // each stage actually fires: CLOSE_POSITION → POSITION_CLOSED →
+  // REALIZED_PNL_APPLIED → ACCOUNT_SUMMARY_UPDATED → EQUITY_RECONCILED.
+  // sourceOfTruth is always "userSimRegistry" — no other code path mutates
+  // per-user account state. Any divergence in account/equity readings
+  // downstream MUST originate elsewhere (cache, alternate close path that
+  // bypasses this function, or stale getOrLoad registry entry).
+  const correlationId      = resolveCorrelation(positionId);
+  const closeSymbol        = pos.symbol;
+  const realizedPnLBefore  = parseFloat(state.account.totalRealized.toFixed(2));
+  const cashBalanceBefore  = parseFloat(state.account.cashBalance.toFixed(2));
+  const equityBefore       = equityProxy(state);
+  const openPositionsBefore = state.positions.length;
+  logger.info(
+    {
+      tag:               "CLOSE_POSITION",
+      stage:             "enter",
+      sourceOfTruth:     "userSimRegistry.closeUserPosition",
+      correlationId,
+      userId,
+      positionId,
+      symbol:            closeSymbol,
+      side:              pos.side,
+      closeReason,
+      isLive:            !!(pos.exchange && pos.exchangeOrderId),
+      exchange:          pos.exchange ?? null,
+      realizedPnLBefore,
+      cashBalanceBefore,
+      equityBefore,
+      openPositionsBefore,
+    },
+    "[CLOSE_POSITION] entering closeUserPosition",
+  );
+
   // For live positions, submit a real broker-side close order first.
   // Use the broker's fill price (when available) as the canonical exit
   // price so realized PnL matches the actual exchange execution.
@@ -750,6 +843,35 @@ export async function closeUserPosition(
   state.account.cashBalance  += closedSizeUSD + realizedPnL - netFees - platformFeeUSD;
   state.account.totalRealized += realizedPnL - netFees - platformFeeUSD;
   state.account.totalTrades  += 1;
+
+  // [REALIZED_PNL_APPLIED] — in-memory mutation done. If this fires but
+  // ACCOUNT_SUMMARY_PERSISTED never does (or fires with rowCount=0), the
+  // failure is in the DB UPDATE — not in the close arithmetic.
+  const realizedPnLAfter = parseFloat(state.account.totalRealized.toFixed(2));
+  const cashBalanceAfter = parseFloat(state.account.cashBalance.toFixed(2));
+  logger.info(
+    {
+      tag:               "REALIZED_PNL_APPLIED",
+      stage:             "in-memory-mutation",
+      sourceOfTruth:     "userSimRegistry.closeUserPosition",
+      correlationId,
+      userId,
+      positionId,
+      symbol:            closeSymbol,
+      closedSizeUSD,
+      realizedPnL:       parseFloat(realizedPnL.toFixed(2)),
+      netFees:           parseFloat(netFees.toFixed(4)),
+      platformFeeUSD,
+      realizedPnLBefore,
+      realizedPnLAfter,
+      realizedPnLDelta:  parseFloat((realizedPnLAfter - realizedPnLBefore).toFixed(2)),
+      cashBalanceBefore,
+      cashBalanceAfter,
+      cashBalanceDelta:  parseFloat((cashBalanceAfter - cashBalanceBefore).toFixed(2)),
+    },
+    "[REALIZED_PNL_APPLIED] in-memory account state mutated — DB persistence pending",
+  );
+
   if (isPartial) {
     pos.quantity = parseFloat((pos.quantity - closedQty).toFixed(8));
     pos.sizeUSD  = parseFloat((pos.sizeUSD - closedSizeUSD).toFixed(2));
@@ -767,6 +889,23 @@ export async function closeUserPosition(
     state.positions.splice(idx, 1);
   }
   state.tradeHistory.unshift(trade);
+
+  logger.info(
+    {
+      tag:                "POSITION_CLOSED",
+      stage:              "position-removed",
+      sourceOfTruth:      "userSimRegistry.closeUserPosition",
+      correlationId,
+      userId,
+      positionId,
+      symbol:             closeSymbol,
+      isPartial,
+      openPositionsBefore,
+      openPositionsAfter: state.positions.length,
+      tradeHistoryLen:    state.tradeHistory.length,
+    },
+    "[POSITION_CLOSED] position removed from in-memory state",
+  );
 
   const positionMutation = isPartial
     ? db.update(simPositionsTable)
@@ -806,8 +945,69 @@ export async function closeUserPosition(
       sandbox:                trade.sandbox === true,
     }),
     positionMutation,
-    persistAccount(state),
+    persistAccount(state, { correlationId, symbol: closeSymbol, positionId, tag: "closeUserPosition" }),
   ]);
+
+  // [ACCOUNT_SUMMARY_UPDATED] — DB writes for trade + position + account
+  // all committed (Promise.all settled). At this point the next call to
+  // getUserAccountSummary(userId) MUST return the updated realized/cash
+  // values. If frontend still shows stale numbers after this fires, the
+  // divergence is on the read side: stale query cache, a frontend reading
+  // from /api/mobile/portfolio (global) instead of /api/account
+  // (per-user), or a stale registry entry on a different process.
+  const equityAfter = equityProxy(state);
+  logger.info(
+    {
+      tag:               "ACCOUNT_SUMMARY_UPDATED",
+      stage:             "db-committed",
+      sourceOfTruth:     "userSimRegistry.closeUserPosition",
+      correlationId,
+      userId,
+      positionId,
+      symbol:            closeSymbol,
+      realizedPnLBefore,
+      realizedPnLAfter,
+      cashBalanceBefore,
+      cashBalanceAfter,
+      equityBefore,
+      equityAfter,
+      totalTrades:       state.account.totalTrades,
+    },
+    "[ACCOUNT_SUMMARY_UPDATED] sim_accounts + sim_trades + sim_positions DB writes committed",
+  );
+
+  // [EQUITY_RECONCILED] — Final convergence check. Expected invariant:
+  //   equityDelta === realizedPnL - netFees - platformFeeUSD
+  // (closedSizeUSD leaves positions[] and re-enters cash, so it nets to 0
+  // in the equity proxy — only the realized PnL net of fees changes equity.)
+  // Logged as WARN when the invariant breaks so the post-close convergence
+  // bug surfaces immediately instead of hiding inside a quiet info line.
+  const equityDelta   = parseFloat((equityAfter - equityBefore).toFixed(2));
+  const expectedDelta = parseFloat((realizedPnL - netFees - platformFeeUSD).toFixed(2));
+  const reconciled    = Math.abs(equityDelta - expectedDelta) < 0.02;
+  (reconciled ? logger.info : logger.warn).call(
+    logger,
+    {
+      tag:            "EQUITY_RECONCILED",
+      stage:          "post-commit-check",
+      sourceOfTruth:  "userSimRegistry.closeUserPosition",
+      correlationId,
+      userId,
+      positionId,
+      symbol:         closeSymbol,
+      equityBefore,
+      equityAfter,
+      equityDelta,
+      expectedDelta,
+      reconciled,
+      realizedPnL:    parseFloat(realizedPnL.toFixed(2)),
+      netFees:        parseFloat(netFees.toFixed(4)),
+      platformFeeUSD,
+    },
+    reconciled
+      ? "[EQUITY_RECONCILED] equity delta matches expected realizedPnL net of fees"
+      : "[EQUITY_RECONCILED] MISMATCH — equity delta does not match expected realizedPnL net of fees",
+  );
 
   logger.info(
     { userId, positionId, realizedPnL: trade.realizedPnL, netFees, platformFeeUSD, platformFeeSkipReason, closeReason },
