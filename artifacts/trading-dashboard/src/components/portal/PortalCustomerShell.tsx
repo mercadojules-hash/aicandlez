@@ -32,6 +32,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getArmedForLive, setArmedForLive } from "@/hooks/useArmedForLive";
 import { useStrictRuntimeMode } from "@/hooks/useStrictRuntimeMode";
+import { useReconnectResync } from "@/hooks/useReconnectResync";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAuth, useClerk, useUser } from "@clerk/react";
 import {
@@ -5096,6 +5097,11 @@ export function PortalCustomerShell() {
   // Phase 3 Step 2b — read the strict-runtime flag once at the shell
   // level and forward to surfaces with PAPER/LIVE labels.
   const strictRuntime = useStrictRuntimeMode();
+  // Phase 3 Step 3 — reconnect resync gate. After visibility/online
+  // events, `resyncing` flips true until the next successful snapshot
+  // fetch (or 8s fail-safe). MyAccountRailPaper renders "resyncing"
+  // instead of "paper sim" while this is true under strict mode.
+  const { resyncing: runtimeResyncing } = useReconnectResync();
   const liveTotalUsd  = runtimeState?.totalEquityUSD ?? 0;
   const displayEquity = isLiveRuntime ? liveTotalUsd : (paperStats.equity || STARTING_EQUITY);
   const liveExchange  = isLiveRuntime ? (runtimeState?.activeExchange ?? null) : null;
@@ -6274,7 +6280,7 @@ export function PortalCustomerShell() {
               liveMode={isLiveRuntime}
               liveExchange={liveExchange}
               strictRuntime={strictRuntime}
-              runtimePending={runtimePending}
+              runtimePending={runtimePending || runtimeResyncing}
             />
             <CustomerBlotterPanelOpen rows={blotterOpenRows} entitled={entitled} />
             <CustomerBlotterPanelHistory rows={paperHistory} />
