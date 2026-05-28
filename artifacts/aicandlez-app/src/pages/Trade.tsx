@@ -562,6 +562,61 @@ export default function Trade() {
     const wins    = history.filter(t => t.pnl > 0).length;
     const winPct  = history.length > 0 ? Math.round((wins / history.length) * 100) : 0;
 
+  // ── [CONVERGENCE_TRACE] ─────────────────────────────────────────────────
+  // Phase 5 client-side source-of-truth probe for the
+  //   "Trade History shows fills but Live Trades stays empty / OPEN=0"
+  // regression. Emits one console.debug per render with the EXACT data
+  // source each panel reads from. If the three sources don't agree on
+  // open-position count, the convergence bug is reproducing live.
+  //
+  // Expected (BROKEN) state: Live Trades & OPEN read from
+  //   /api/mobile/portfolio (global simulationEngine — NOT per-user)
+  // while Trade History reads from
+  //   /api/simulation/trades (per-user sim_trades — sees live fills).
+  //
+  // See .local/docs/execution-lifecycle-convergence.md.
+  if (typeof window !== "undefined") {
+    // eslint-disable-next-line no-console
+    console.debug("[CONVERGENCE_TRACE]", {
+      tag:           "CONVERGENCE_TRACE",
+      runtimeMode:   isLive ? "live" : "paper",
+      brokerActive:  isAlpacaActive,
+      liveTrades: {
+        source:         isAlpacaActive && alpacaMapped.length > 0
+          ? "/api/exchange/alpaca/positions (broker direct)"
+          : "/api/mobile/portfolio (global simulationEngine — NOT per-user)",
+        queryKey:       isAlpacaActive && alpacaMapped.length > 0
+          ? ["alpaca-positions"]
+          : ["mobile-portfolio"],
+        renderedCount:  positions.length,
+        scope:          isAlpacaActive ? "BROKER" : "GLOBAL",
+      },
+      openCount: {
+        source:         isAlpacaActive && alpacaMapped.length > 0
+          ? "/api/exchange/alpaca/positions (broker direct)"
+          : "/api/mobile/portfolio (global simulationEngine — NOT per-user)",
+        queryKey:       isAlpacaActive && alpacaMapped.length > 0
+          ? ["alpaca-positions"]
+          : ["mobile-portfolio"],
+        renderedCount:  positions.length,
+        scope:          isAlpacaActive ? "BROKER" : "GLOBAL",
+      },
+      tradeHistory: {
+        source:         "/api/simulation/trades (per-user sim_trades)",
+        queryKey:       ["sim-trades"],
+        renderedCount:  history.length,
+        scope:          "PER_USER",
+      },
+      convergence: {
+        liveTradesReadsFromSameSourceAsOpenCount: true,   // both read mobile-portfolio
+        liveTradesReadsFromSameSourceAsHistory:   false,  // BUG: different scope
+        note: "Live Trades + OPEN are GLOBAL; Trade History is PER_USER. " +
+              "Customer live BUYs land in PER_USER sim_positions but are " +
+              "never read by the GLOBAL portfolio endpoint.",
+      },
+    });
+  }
+
   // ── Live AI confidence: avg confidence across symbols currently scored by engine
   const breakdowns = symbolsData?.symbols ?? [];
   const confidence = breakdowns.length > 0

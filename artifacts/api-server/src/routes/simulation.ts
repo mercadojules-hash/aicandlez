@@ -46,10 +46,32 @@ router.get("/account/fees/monthly", requireAuth, async (req, res): Promise<void>
 });
 
 // GET /simulation/account
+//
+// [READ_SOURCE_SIM_ACCOUNT] — Phase 5 convergence diagnostic.
+// SOURCE OF TRUTH: `userSimRegistry.getUserAccountSummary(userId)` —
+// per-user. Reads from `sim_positions` table + in-memory state.positions
+// for the requesting user only. THIS is where `registerLiveUserFill`
+// writes land, so this endpoint DOES reflect live customer fills.
+//
+// Customer-portal dashboard uses this endpoint (query key
+// ["customer-simulation-account"]). PWA does NOT use this endpoint
+// — that's the bug. See .local/docs/execution-lifecycle-convergence.md.
 router.get("/simulation/account", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
   try {
     const data = await getUserAccountSummary(userId);
+    const openPositions =
+      (data as { positions?: unknown[] }).positions?.length ?? 0;
+    req.log.info({
+      tag:           "READ_SOURCE_SIM_ACCOUNT",
+      stage:         "read",
+      endpoint:      "/api/simulation/account",
+      source:        "userSimRegistry.getUserAccountSummary",
+      scope:         "PER_USER",  // ← per-user, sees live fills
+      perUserAware:  true,
+      userId,
+      openPositions,
+    }, "[READ_SOURCE_SIM_ACCOUNT] per-user sim_positions — includes live fills");
     res.json(data);
   } catch (err) {
     req.log.error({ err, userId }, "GET /simulation/account failed");
@@ -58,10 +80,25 @@ router.get("/simulation/account", requireAuth, async (req, res): Promise<void> =
 });
 
 // GET /simulation/trades — closed trade history
+//
+// [READ_SOURCE_SIM_TRADES] — per-user `sim_trades`. Includes both
+// PAPER and LIVE rows (mode is tagged per-row). This is why Trade
+// History shows live fills correctly even when Live Trades panel
+// (which reads /mobile/portfolio → global engine) does not.
 router.get("/simulation/trades", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
   try {
     const trades = await getUserTradeHistory(userId);
+    req.log.info({
+      tag:           "READ_SOURCE_SIM_TRADES",
+      stage:         "read",
+      endpoint:      "/api/simulation/trades",
+      source:        "userSimRegistry.getUserTradeHistory",
+      scope:         "PER_USER",
+      perUserAware:  true,
+      userId,
+      tradeCount:    trades.length,
+    }, "[READ_SOURCE_SIM_TRADES] per-user sim_trades — paper + live");
     res.json({ trades });
   } catch (err) {
     req.log.error({ err, userId }, "GET /simulation/trades failed");

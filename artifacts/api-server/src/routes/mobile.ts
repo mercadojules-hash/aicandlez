@@ -74,13 +74,39 @@ router.get("/mobile/status", (_req, res) => {
 
 // ── Portfolio snapshot ────────────────────────────────────────────────────────
 // GET /api/mobile/portfolio
-router.get("/mobile/portfolio", async (_req, res) => {
+//
+// [READ_SOURCE_PORTFOLIO] — Phase 5 convergence diagnostic.
+// SOURCE OF TRUTH: `simulationEngine.getAccountSummary()` — this is the
+// GLOBAL system-wide simulation engine, NOT per-user. It does NOT see
+// fills written by `registerLiveUserFill` (which target the per-user
+// `userSimRegistry` + `sim_positions` table).
+//
+// Known divergence (see .local/docs/execution-lifecycle-convergence.md):
+//   - Customer LIVE BUY → executeCustomerOrder → registerLiveUserFill →
+//     per-user `sim_positions` row.
+//   - This endpoint → global simulationEngine → does NOT include that row.
+//   - Result: Trade History (which reads per-user `sim_trades`) shows
+//     the fill on close, but Live Trades panel + OPEN count (which read
+//     this endpoint) never see the open position. THIS IS THE BUG.
+router.get("/mobile/portfolio", async (req, res) => {
   try {
     const acct = await getAccountSummary();
     const ex   = getExchangeStatus();
+    const positions = acct.positions ?? [];
+    req.log.info({
+      tag:            "READ_SOURCE_PORTFOLIO",
+      stage:          "read",
+      endpoint:       "/api/mobile/portfolio",
+      source:         "simulationEngine.getAccountSummary",
+      scope:          "GLOBAL",   // ← NOT per-user
+      perUserAware:   false,
+      openPositions:  positions.length,
+      exchange:       ex.exchangeName,
+      mode:           ex.mode,
+    }, "[READ_SOURCE_PORTFOLIO] global simulationEngine — does NOT see per-user live fills");
     res.json({
       balances:   ex.simBalances,
-      positions:  acct.positions ?? [],
+      positions,
       totalValue: acct.equity ?? 0,
       openPnL:    acct.unrealizedPnL ?? 0,
       exchange:   ex.exchangeName,
@@ -94,10 +120,20 @@ router.get("/mobile/portfolio", async (_req, res) => {
 
 // ── Open positions ────────────────────────────────────────────────────────────
 // GET /api/mobile/positions
-router.get("/mobile/positions", async (_req, res) => {
+// [READ_SOURCE_POSITIONS] — same global SoT as /mobile/portfolio.
+router.get("/mobile/positions", async (req, res) => {
   try {
     const acct = await getAccountSummary();
     const positions = acct.positions ?? [];
+    req.log.info({
+      tag:           "READ_SOURCE_POSITIONS",
+      stage:         "read",
+      endpoint:      "/api/mobile/positions",
+      source:        "simulationEngine.getAccountSummary",
+      scope:         "GLOBAL",   // ← NOT per-user
+      perUserAware:  false,
+      openPositions: positions.length,
+    }, "[READ_SOURCE_POSITIONS] global simulationEngine — see convergence doc");
     res.json({ positions, count: positions.length, ts: Date.now() });
   } catch {
     res.json({ positions: [], count: 0, ts: Date.now() });
