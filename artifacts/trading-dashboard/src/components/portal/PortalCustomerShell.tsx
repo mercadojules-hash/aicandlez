@@ -36,9 +36,10 @@ import { useReconnectResync } from "@/hooks/useReconnectResync";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAuth, useClerk, useUser } from "@clerk/react";
 import {
-  Activity, AlertTriangle, Bell, CheckCircle2, Clock, Database, Filter, Globe,
-  LineChart as LineChartIcon, Link2, Lock, LogOut, MonitorPlay, PieChart, Power,
-  Radar, Radio, Search, Shield, Star, Target, Terminal, Timer, User as UserIcon,
+  Activity, AlertTriangle, Bell, CheckCircle2, ChevronRight, Clock, Cpu, Database, Filter, Globe,
+  Home as HomeIcon, LineChart as LineChartIcon, Link2, Lock, LogOut, MonitorPlay, PieChart, Power,
+  Radar, Radio, Search, Settings, Shield, ShieldCheck, Star, Target, Terminal, Timer, TrendingUp,
+  User as UserIcon, Wallet, Zap,
 } from "lucide-react";
 
 import { authFetch } from "../../lib/authFetch";
@@ -6160,26 +6161,176 @@ export function PortalCustomerShell() {
           </span>
         </div>
       )}
-      {/* Pass 8.0 — CUSTOMER cinematic dashboard.
-          Everything ABOVE the LIVE OPPORTUNITY BATTLEFIELD is now a
-          single premium top header: brand + PAPER chip + big
-          CONNECT TO AN EXCHANGE CTA + ACCOUNT / DISCLAIMER / SIGN OUT.
-          No operator pulse ribbon, no admin telemetry, no engine
-          throughput strip, no SearchBar, no AI ring, no
-          AIRiskControlsPanel, no OperatorTelemetryStrip. This is a
-          customer-facing surface, not an internal operator terminal.
-          (EnableLiveAITradingBar is mounted further down — directly
-          above the battlefield — as the primary PAPER → LIVE
-          conversion surface; it is NOT operator ARM LIVE.) */}
-      <CustomerTopHeader
-        isExchangeConnected={(runtimeState?.connectedExchanges ?? []).some(c => c.status === "active")}
-        plan={plan}
-        onConnect={() => !isPaid ? setUpgrade(true) : setConnectOpen(true)}
-        onSignOut={() => void portalSignOut()}
-        onAccount={() => setAccount(true)}
-        onDisclaimer={() => setDisclaimer(true)}
-        onNotifications={() => setAccount(true)}
-      />
+      {/* PHASE 9 — Candidate B (UserDashboard) graduated chrome.
+          Replaces CustomerTopHeader with the mockup's TOP BRAND STRIP
+          + HORIZONTAL NAV. All values bound to existing hooks/state:
+          nowShell, engineStatus, opportunities, displayEquity,
+          serverAccount/paperStats, plan, isPaid, isLiveRuntime,
+          liveExchange, diagUser, query/setQuery. Zero backend changes.
+          Original `CustomerTopHeader` component definition is preserved
+          further down for one-line rollback. */}
+      {(() => {
+        const clockStr = `${new Date(nowShell).toISOString().split("T")[1]?.split(".")[0]} UTC`;
+        const longCount  = opportunities.filter(o => o.direction === "LONG").length;
+        const shortCount = opportunities.filter(o => o.direction === "SHORT").length;
+        const totalDir   = longCount + shortCount;
+        const lPct = totalDir ? Math.round((longCount  / totalDir) * 100) : 0;
+        const sPct = totalDir ? 100 - lPct                                : 0;
+        const avgConf = opportunities.length
+          ? Math.round(opportunities.reduce((s, o) => s + (o.convictionScore ?? 0), 0) / opportunities.length)
+          : 0;
+        const aiIntel = Math.min(10, Math.round((avgConf / 10) * 10) / 10);
+        const todayPnl = serverAccountReady
+          ? (serverAccount?.positions ?? []).reduce((s, p) => s + Number(p.unrealizedPnL ?? 0), 0)
+          : paperStats.todayPnl;
+        const equityFmt = displayEquity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const pnlFmt = (todayPnl >= 0 ? "+" : "−") + "$" + Math.abs(todayPnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const initialsSafe = (
+          diagUser?.firstName?.charAt(0) ||
+          diagUser?.username?.charAt(0) ||
+          diagUser?.primaryEmailAddress?.emailAddress?.charAt(0) ||
+          "U"
+        ).toUpperCase();
+        const liveBadge = isLiveRuntime ? `LIVE${liveExchange ? ` · ${liveExchange.toUpperCase()}` : ""}` : "PAPER TRADING";
+        const planLabel = (plan === "pro" ? "PRO" : plan === "starter" ? "STARTER" : "FREE");
+        return (
+          <>
+            {/* TOP BRAND STRIP */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 16, height: 34, padding: "0 16px",
+              fontSize: 10, letterSpacing: T.TRACK_LABEL, color: T.TEXT_2,
+              background: T.BG_TERMINAL, borderBottom: `1px solid rgba(124,255,0,0.10)`,
+              fontFamily: T.FONT_MONO, flexWrap: "wrap",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}>
+                <div style={{ display: "grid", placeItems: "center", height: 20, width: 20, background: T.NEON, color: T.BG_BLACK }}>
+                  <Zap size={12} strokeWidth={3} />
+                </div>
+                <span style={{ color: T.TEXT_0, letterSpacing: "-0.02em", fontSize: 13, fontWeight: 700 }}>AICandlez</span>
+                <span style={{ color: T.TEXT_3, fontSize: 9, letterSpacing: T.TRACK_LABEL }}>v2.1 · CUSTOMER</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Clock size={10} style={{ color: T.TEXT_3 }} /> {clockStr}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{
+                  height: 6, width: 6, borderRadius: 9999,
+                  background: engineStatus?.running ? T.NEON : T.RED,
+                  boxShadow: engineStatus?.running ? `0 0 6px ${T.NEON}` : `0 0 6px ${T.RED}`,
+                }} />
+                <span style={{ color: engineStatus?.running ? T.NEON : T.RED, fontWeight: 700 }}>
+                  {engineStatus?.running ? "ENGINE ONLINE" : "ENGINE OFFLINE"}
+                </span>
+              </div>
+              <div>AI INTEL <span style={{ fontWeight: 700, color: T.TEXT_0 }}>{aiIntel.toFixed(1)}</span></div>
+              <div>L/S <span style={{ fontWeight: 700, color: T.TEXT_0 }}>{lPct}/{sPct}</span></div>
+              <div>AVG CONF <span style={{ fontWeight: 700, color: T.TEXT_0 }}>{avgConf}%</span></div>
+              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{
+                  padding: "3px 8px", fontSize: 9, fontWeight: 700, letterSpacing: T.TRACK_TITLE,
+                  color: isLiveRuntime ? T.NEON : T.AMBER,
+                  border: `1px solid ${isLiveRuntime ? T.NEON : T.AMBER}66`,
+                  background: isLiveRuntime ? "rgba(102,255,102,0.06)" : "rgba(255,176,32,0.06)",
+                }}>
+                  {liveBadge}
+                </div>
+                <div>EQUITY <span style={{ fontWeight: 700, color: T.TEXT_0, fontVariantNumeric: "tabular-nums" }}>${equityFmt}</span></div>
+                <div>DAY <span style={{ fontWeight: 700, color: todayPnl >= 0 ? T.NEON : T.RED, fontVariantNumeric: "tabular-nums" }}>{pnlFmt}</span></div>
+                <button
+                  onClick={() => setAccount(true)}
+                  aria-label="Notifications"
+                  style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", color: T.TEXT_2, display: "flex" }}
+                >
+                  <Bell size={13} />
+                </button>
+                <button
+                  onClick={() => setAccount(true)}
+                  aria-label="Account"
+                  style={{
+                    display: "grid", placeItems: "center", height: 24, width: 24, fontSize: 10, fontWeight: 700,
+                    color: T.NEON, background: T.BG_CARD, border: `1px solid rgba(124,255,0,0.18)`, cursor: "pointer",
+                  }}
+                >
+                  {initialsSafe}
+                </button>
+              </div>
+            </div>
+
+            {/* HORIZONTAL NAV STRIP */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 4, minHeight: 36, padding: "0 16px",
+              background: T.BG_TERMINAL, borderBottom: `1px solid rgba(124,255,0,0.10)`,
+              fontFamily: T.FONT_MONO, flexWrap: "wrap",
+            }}>
+              {([
+                { label: "HOME",      icon: HomeIcon,   active: true,  href: "/portal" },
+                { label: "SIGNALS",   icon: Radio,      active: false, href: "/portal" },
+                { label: "TRADE",     icon: TrendingUp, active: false, href: "/market" },
+                { label: "PORTFOLIO", icon: Wallet,     active: false, href: "/portfolio" },
+                { label: "PROFILE",   icon: UserIcon,   active: false, onClick: () => setAccount(true) },
+              ] as const).map((n) => (
+                <a
+                  key={n.label}
+                  href={"href" in n ? n.href : "#"}
+                  onClick={(e) => {
+                    if ("onClick" in n) { e.preventDefault(); n.onClick(); }
+                  }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "6px 12px",
+                    fontSize: 11, fontWeight: 600, letterSpacing: T.TRACK_LABEL,
+                    color: n.active ? T.BG_BLACK : T.TEXT_2,
+                    background: n.active ? T.NEON : "transparent",
+                    textDecoration: "none",
+                    border: `1px solid ${n.active ? T.NEON : "transparent"}`,
+                    transition: `all ${T.TX_FAST}`,
+                  }}
+                >
+                  <n.icon size={12} />
+                  {n.label}
+                </a>
+              ))}
+              <div style={{ margin: "0 12px", height: 16, width: 1, background: "rgba(124,255,0,0.18)" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10, color: T.TEXT_3 }}>
+                <Star size={11} /> Watchlist
+                <ChevronRight size={10} />
+                <span style={{ color: T.TEXT_0 }}>BTC · ETH · SOL · MAJORS</span>
+              </div>
+              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 8, padding: "4px 8px",
+                  background: T.BG_CARD, border: `1px solid rgba(124,255,0,0.10)`, color: T.TEXT_2,
+                  fontSize: 10, minWidth: 240, maxWidth: 320, flex: "1 1 240px",
+                }}>
+                  <Search size={11} />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search asset or AI opportunity… (BTC · ETH · SOL · DOGE · WIF)"
+                    style={{
+                      background: "transparent", border: "none", outline: "none",
+                      color: "inherit", flex: 1, fontFamily: "inherit", fontSize: "inherit", minWidth: 0,
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={() => !isPaid ? setUpgrade(true) : setConnectOpen(true)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "5px 12px",
+                    fontSize: 10, fontWeight: 700, letterSpacing: T.TRACK_LABEL,
+                    color: T.BG_BLACK, background: T.NEON, border: "none", cursor: "pointer",
+                  }}
+                >
+                  <Zap size={11} strokeWidth={3} />
+                  {isLiveRuntime ? "LIVE EXCHANGE CONNECTED" : isPaid ? "CONNECT EXCHANGE" : "ENABLE LIVE AI TRADING"}
+                </button>
+                <span style={{ fontSize: 9, color: T.TEXT_3, letterSpacing: T.TRACK_LABEL }}>
+                  PLAN · <span style={{ color: T.TEXT_0, fontWeight: 700 }}>{planLabel}</span>
+                </span>
+              </div>
+            </div>
+          </>
+        );
+      })()}
       {engineStatus?.dataFeedHealth && !engineStatus.dataFeedHealth.healthy && (
         <DataFeedBanner health={engineStatus.dataFeedHealth} />
       )}
@@ -6198,9 +6349,107 @@ export function PortalCustomerShell() {
           pointerEvents: "none", zIndex: 0,
         }} />
 
-        {/* LIVE OPPORTUNITY BATTLEFIELD framing — visually the start of
-            the page, exactly per direction. */}
-        <CustomerBattlefieldHeader engine={engineStatus} entitled={entitled} />
+        {/* PHASE 9 — UserDashboard (candidate B) KPI TILE STRIP.
+            Replaces CustomerBattlefieldHeader. Pure read-only derivations
+            from `opportunities`, `engineStatus`, `signalsPerMin`,
+            `portalPosture`, `blotterOpenCount`, `filteredMajors/Alts`.
+            Original CustomerBattlefieldHeader component definition is
+            preserved further down for one-line rollback. */}
+        {(() => {
+          const oppCount = opportunities.length;
+          const avgConf = oppCount
+            ? Math.round(opportunities.reduce((s, o) => s + (o.convictionScore ?? 0), 0) / oppCount)
+            : 0;
+          const regimeLabel = portalPosture || "NEUTRAL";
+          const regimeBlurb = regimeLabel === "RISK-ON"   ? "Bull regime · risk-on flow"
+                            : regimeLabel === "DEFENSIVE" ? "Defensive posture · tight risk"
+                            : regimeLabel === "LOW-VOL"   ? "Compressed range · scalp tier"
+                            :                                "Mixed regime · selective AI";
+          const excel = opportunities.filter(o => (o.convictionScore ?? 0) >= 85).length;
+          const good  = opportunities.filter(o => (o.convictionScore ?? 0) >= 70 && (o.convictionScore ?? 0) < 85).length;
+          const fair  = opportunities.filter(o => (o.convictionScore ?? 0) >= 50 && (o.convictionScore ?? 0) < 70).length;
+          const weak  = opportunities.filter(o => (o.convictionScore ?? 0) < 50).length;
+          const maxBucket = Math.max(excel, good, fair, weak, 1);
+          const sigsHr = engineStatus?.signalsGenerated ?? 0;
+          const running = !!engineStatus?.running;
+          const longC  = opportunities.filter(o => o.direction === "LONG").length;
+          const shortC = opportunities.filter(o => o.direction === "SHORT").length;
+          const tileBase: CSSProperties = {
+            display: "flex", flexDirection: "column", gap: 8, padding: "10px 12px",
+            background: T.BG_CARD, border: `1px solid rgba(124,255,0,0.10)`,
+            fontFamily: T.FONT_MONO,
+          };
+          const labelStyle: CSSProperties = {
+            fontSize: 9, fontWeight: 600, letterSpacing: T.TRACK_TITLE, color: T.TEXT_3,
+          };
+          const Bar = ({ label, value, max, color }: { label: string; value: number; max: number; color: string }) => (
+            <div style={{ display: "grid", gridTemplateColumns: "52px 1fr 28px", alignItems: "center", gap: 8 }}>
+              <div style={{ fontSize: 9, letterSpacing: T.TRACK_LABEL, color: T.TEXT_2 }}>{label}</div>
+              <div style={{ height: 5, background: "rgba(255,255,255,0.05)" }}>
+                <div style={{ height: "100%", width: `${(value / max) * 100}%`, background: color, transition: `width ${T.TX_MED}` }} />
+              </div>
+              <div style={{ textAlign: "right", fontSize: 10, fontWeight: 600, color, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+            </div>
+          );
+          return (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+              <div style={tileBase}>
+                <div style={labelStyle}>AI CONFIDENCE</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    display: "grid", placeItems: "center", height: 48, width: 48,
+                    borderRadius: 9999, border: `2px solid ${T.NEON}`,
+                    color: T.NEON, fontWeight: 700, fontSize: 14,
+                    boxShadow: `0 0 12px ${T.NEON_GLOW}`,
+                    fontVariantNumeric: "tabular-nums",
+                  }}>{avgConf}</div>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <div style={{
+                      fontSize: 10, letterSpacing: T.TRACK_LABEL, fontWeight: 700,
+                      color: avgConf >= 65 ? T.NEON : avgConf >= 50 ? T.AMBER : T.RED,
+                    }}>
+                      {avgConf >= 65 ? "BULLISH" : avgConf >= 50 ? "MIXED" : "BEARISH"}
+                    </div>
+                    <div style={{ fontSize: 9, color: T.TEXT_3 }}>Composite</div>
+                  </div>
+                </div>
+              </div>
+              <div style={tileBase}>
+                <div style={labelStyle}>MARKET REGIME</div>
+                <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.02em", color: T.NEON }}>{regimeLabel}</div>
+                <div style={{ fontSize: 9, color: T.TEXT_3 }}>{regimeBlurb}</div>
+              </div>
+              <div style={tileBase}>
+                <div style={labelStyle}>SIGNAL QUALITY</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <Bar label="EXCEL" value={excel} max={maxBucket} color={T.NEON} />
+                  <Bar label="GOOD"  value={good}  max={maxBucket} color={T.LIME} />
+                  <Bar label="FAIR"  value={fair}  max={maxBucket} color={T.AMBER} />
+                  <Bar label="WEAK"  value={weak}  max={maxBucket} color={T.RED} />
+                </div>
+              </div>
+              <div style={tileBase}>
+                <div style={labelStyle}>OPPORTUNITY MIX</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "4px 8px", fontSize: 10, color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}>
+                  <span>MAJORS</span><span style={{ textAlign: "right", color: T.TEXT_0 }}>{filteredMajors.length}</span>
+                  <span>ALTS</span><span style={{ textAlign: "right", color: T.TEXT_0 }}>{filteredAlts.length}</span>
+                  <span>LONG</span><span style={{ textAlign: "right", color: T.NEON }}>{longC}</span>
+                  <span>SHORT</span><span style={{ textAlign: "right", color: T.RED }}>{shortC}</span>
+                </div>
+              </div>
+              <div style={tileBase}>
+                <div style={labelStyle}>AI THROUGHPUT</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "4px 8px", fontSize: 10, color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}>
+                  <span>SIGS</span><span style={{ textAlign: "right", color: T.TEXT_0 }}>{sigsHr}</span>
+                  <span>RATE</span><span style={{ textAlign: "right", color: T.TEXT_0 }}>{signalsPerMin.toFixed(1)}/m</span>
+                  <span>ENGINE</span><span style={{ textAlign: "right", color: running ? T.NEON : T.RED }}>{running ? "ONLINE" : "OFFLINE"}</span>
+                  <span>OPEN</span><span style={{ textAlign: "right", color: T.TEXT_0 }}>{blotterOpenCount}</span>
+                  <span>OPPS</span><span style={{ textAlign: "right", color: T.TEXT_0 }}>{oppCount}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Task #199 — Runtime switcher chip row. Mounted only on the
             customer shell (admin shell never imports it), preserving
@@ -6338,6 +6587,52 @@ export function PortalCustomerShell() {
           equityUsd={displayEquity}
         />
 
+        {/* PHASE 9 — UserDashboard filter pill strip. Wired to existing
+            `filter`/`setFilter` (type `Filt`) so the underlying
+            `filteredOpps` → `filteredMajors`/`filteredAlts` derivation
+            (CONVICTION_V2/V3) recomputes against the same pool. All
+            existing filter semantics (LONG/SHORT/MEME/HIGH_CONF/etc.)
+            preserved — zero schema change. */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 4, padding: "6px 8px",
+          background: T.BG_TERMINAL, border: `1px solid rgba(124,255,0,0.10)`,
+          fontFamily: T.FONT_MONO, flexWrap: "wrap",
+        }}>
+          <Filter size={11} style={{ color: T.TEXT_3, marginRight: 6 }} />
+          {([
+            ["ALL",       "ALL"],
+            ["MAJORS",    "MAJORS"],
+            ["ALTS",      "ALTS"],
+            ["MEME",      "MEME"],
+            ["HIGH ≥75",  "HIGH_CONF"],
+            ["READY",     "READY"],
+            ["BREAKOUT",  "BREAKOUT"],
+            ["MOMENTUM",  "MOMENTUM"],
+            ["TRENDING",  "TRENDING"],
+            ["SCALP",     "SCALP"],
+            ["LONG",      "LONG"],
+            ["SHORT",     "SHORT"],
+          ] as ReadonlyArray<readonly [string, Filt]>).map(([label, val]) => {
+            const on = filter === val;
+            return (
+              <button
+                key={val}
+                onClick={() => setFilter(val)}
+                style={{
+                  padding: "5px 9px", fontSize: 9.5, fontWeight: 600, letterSpacing: T.TRACK_LABEL,
+                  color: on ? T.BG_BLACK : T.TEXT_2,
+                  background: on ? T.NEON : "transparent",
+                  border: `1px solid ${on ? T.NEON : "rgba(124,255,0,0.10)"}`,
+                  cursor: "pointer",
+                  transition: `all ${T.TX_FAST}`,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Battlefield body — dual crypto matrix on the left,
             MY ACCOUNT rail (380px) on the right with PERFORMANCE
             chart + LIVE TRADES + TRADE HISTORY.
@@ -6425,6 +6720,38 @@ export function PortalCustomerShell() {
           </aside>
         </section>
       </main>
+
+      {/* PHASE 9 — UserDashboard bottom status bar. Read-only telemetry
+          mirror of state already surfaced at the top. */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 16, minHeight: 30, padding: "0 16px",
+        background: T.BG_TERMINAL, borderTop: `1px solid rgba(124,255,0,0.10)`,
+        fontSize: 10, letterSpacing: T.TRACK_LABEL, color: T.TEXT_2,
+        fontFamily: T.FONT_MONO, flexWrap: "wrap",
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 6, fontWeight: 600,
+          color: engineStatus?.running ? T.NEON : T.RED,
+        }}>
+          <span style={{
+            height: 6, width: 6, borderRadius: 9999,
+            background: engineStatus?.running ? T.NEON : T.RED,
+            boxShadow: engineStatus?.running ? `0 0 6px ${T.NEON}` : "none",
+          }} />
+          MARKET PULSE
+        </div>
+        <div>{opportunities.length} symbols</div>
+        <div>Signals/min <span style={{ fontWeight: 700, color: T.TEXT_0, fontVariantNumeric: "tabular-nums" }}>{signalsPerMin.toFixed(1)}</span></div>
+        <div>Open <span style={{ fontWeight: 700, color: T.TEXT_0, fontVariantNumeric: "tabular-nums" }}>{blotterOpenCount}</span></div>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+          <Settings size={11} style={{ color: T.TEXT_3 }} />
+          <span style={{ color: isLiveRuntime ? T.NEON : T.AMBER, fontWeight: 700 }}>
+            {isLiveRuntime
+              ? `LIVE MODE${liveExchange ? ` · ${liveExchange.toUpperCase()}` : ""}`
+              : "PAPER MODE · NO REAL ORDERS"}
+          </span>
+        </div>
+      </div>
 
       <UpgradeModal    open={upgrade}    onClose={() => setUpgrade(false)} gate={disclaimerGate} />
       <AccountModal    open={account}    onClose={() => setAccount(false)} tier={plan} onUpgrade={() => setUpgrade(true)} />
