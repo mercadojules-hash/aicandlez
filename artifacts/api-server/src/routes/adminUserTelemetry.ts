@@ -398,6 +398,41 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
       durationMs: Date.now() - sqlStartedAt,
     }, "[ADMIN_USERS_SQL_OK]");
 
+    // [ADMIN_USERS_ROW_SCHEMA] — Phase-5 diagnostic for the
+    // /api/admin/users 500 regression. Snapshots the raw first row coming
+    // back from pg so on-call can see column keys + per-column `typeof` +
+    // the presence of any of the four serializer landmines:
+    //   - BigInt    → res.json throws `Do not know how to serialize a BigInt`
+    //   - Date      → safe (ISO string), but logged for completeness
+    //   - undefined → drops keys silently — usually fine, but worth flagging
+    //   - object    → must be plain (no circulars). Captured shallowly.
+    // Fires only when rowCount > 0 to avoid noise on empty result sets.
+    if (rows.length > 0) {
+      const first = rows[0] ?? {};
+      const keyTypes: Record<string, string> = {};
+      const bigIntKeys: string[] = [];
+      const dateKeys:   string[] = [];
+      const undefinedKeys: string[] = [];
+      for (const k of Object.keys(first)) {
+        const v = (first as Record<string, unknown>)[k];
+        const t = typeof v;
+        keyTypes[k] = v === null ? "null" : t;
+        if (t === "bigint")               bigIntKeys.push(k);
+        if (v instanceof Date)            dateKeys.push(k);
+        if (v === undefined)              undefinedKeys.push(k);
+      }
+      req.log.info({
+        tag:            "ADMIN_USERS_ROW_SCHEMA",
+        stage:          "sql-probe",
+        rowCount:       rows.length,
+        firstRowKeys:   Object.keys(first),
+        keyTypes,
+        bigIntKeys,
+        dateKeys,
+        undefinedKeys,
+      }, "[ADMIN_USERS_ROW_SCHEMA] first raw DB row schema");
+    }
+
     // "Online" heuristic — last activity within 10 min. Cheap and DB-derivable.
     const now = Date.now();
     const mapStartedAt = Date.now();
@@ -605,6 +640,60 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
       filters:   { q: q || null, plan: planFilter || null, status: statusF || null, hasLive },
       timestamp: now,
     };
+    // [ADMIN_USERS_PAYLOAD_PROBE] — Phase-5 diagnostic. Walks the
+    // assembled payload (depth-capped, first user only) hunting for the
+    // four serializer landmines BEFORE JSON.stringify gets a chance to
+    // throw. The path of any offending value is logged so on-call can
+    // jump straight to the offending mapper field (e.g.
+    // "users[0].tradeLimit.remaining = bigint").
+    //
+    // Bounded scan: depth ≤ 4, first user only, short-circuits on first
+    // 5 hits per kind. Cheap enough to run every request; the structured
+    // log is what makes the difference between "500 with no clue" and
+    // "500 + exact field path".
+    const probeStartedAt = Date.now();
+    const probeHits: Array<{ path: string; kind: string; sample?: string }> = [];
+    function probe(value: unknown, path: string, depth: number, seen: WeakSet<object>): void {
+      if (probeHits.length >= 20 || depth > 4) return;
+      if (typeof value === "bigint") {
+        probeHits.push({ path, kind: "bigint", sample: String(value) });
+        return;
+      }
+      if (value instanceof Date) {
+        probeHits.push({ path, kind: "date", sample: value.toISOString() });
+        return;
+      }
+      if (typeof value === "function") {
+        probeHits.push({ path, kind: "function" });
+        return;
+      }
+      if (value === null || typeof value !== "object") return;
+      if (seen.has(value as object)) {
+        probeHits.push({ path, kind: "circular" });
+        return;
+      }
+      seen.add(value as object);
+      if (Array.isArray(value)) {
+        // Sample first element only — payload arrays here are homogenous.
+        if (value.length > 0) probe(value[0], `${path}[0]`, depth + 1, seen);
+      } else {
+        for (const k of Object.keys(value as Record<string, unknown>)) {
+          if (probeHits.length >= 20) break;
+          probe((value as Record<string, unknown>)[k], `${path}.${k}`, depth + 1, seen);
+        }
+      }
+    }
+    probe(payload, "payload", 0, new WeakSet());
+    if (probeHits.length > 0) {
+      req.log.warn({
+        tag:        "ADMIN_USERS_PAYLOAD_PROBE",
+        stage:      "pre-serialize",
+        rowCount:   users.length,
+        hits:       probeHits,
+        durationMs: Date.now() - probeStartedAt,
+      }, "[ADMIN_USERS_PAYLOAD_PROBE] non-JSON-safe values detected in payload");
+    }
+
     // [ADMIN_USERS_SERIALIZE_FAIL] — JSON serialization can still throw
     // (e.g. circular ref slipping in, BigInt drift from a future column
     // type change). Catching here lets us emit a structured log that
