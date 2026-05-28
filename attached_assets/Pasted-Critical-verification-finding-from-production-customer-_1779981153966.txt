@@ -1,0 +1,95 @@
+Critical verification finding from production customer portal:
+
+The UI/runtime migration is now working correctly. Candidate B customer shell is live and rendering properly for non-admin users.
+
+However, all trades in the LIVE TRADES panel are still labeled:
+
+PAPER
+
+even while:
+
+* Coinbase is connected
+* LIVE READY state is active
+* AI execution is armed
+* customer portal is hydrated
+* positions are opening correctly
+
+This means the execution runtime is still routing through paper execution/fanout instead of true live broker execution.
+
+This is NOT a frontend issue anymore.
+
+Need a strict execution-mode audit only.
+
+DO NOT redesign UI.
+DO NOT modify customer shell chrome.
+DO NOT touch hydration/query/UI rendering.
+DO NOT touch trading dashboard layout.
+DO NOT touch telemetry presentation.
+
+Scope:
+execution-mode verification only.
+
+Need exact verification of the live execution gating path for customer accounts using Coinbase.
+
+Investigate:
+
+1. What condition causes trade rows to render with:
+   PAPER
+   in the Live Trades panel.
+
+2. Determine whether runtimeMode is still:
+   "paper"
+
+3. Verify whether any of these are forcing fallback:
+
+   * liveTradingEnabled = false
+   * forcePaper = true
+   * paperFallbackActive = true
+   * simulation mode still selected internally
+   * execution gate not armed
+   * exchange adapter still using simulated fills
+   * account-level mode mismatch
+   * Coinbase runtime connected but not promoted to live execution
+
+4. Trace the exact lifecycle:
+   UI ARM
+   → execution request
+   → broker adapter
+   → fill persistence
+   → trade hydration
+   → LIVE TRADES row badge generation
+
+5. Identify the exact field/function responsible for rendering:
+   PAPER
+   on each trade row.
+
+6. Determine whether:
+
+   * live trades are actually simulated
+     OR
+   * real broker fills are occurring but incorrectly labeled as paper.
+
+7. Confirm whether:
+   exchange != null
+   is being persisted on fills/positions/trades.
+
+8. Verify whether live fills are writing into:
+   sim_positions
+   with exchange populated,
+   or whether they are still using the paper execution path.
+
+Important:
+No speculative fixes.
+No architecture rewrites.
+No broad refactors.
+
+Need:
+
+* exact failing layer
+* exact runtime mode state
+* exact execution gate state
+* exact persistence mode
+* exact reason PAPER badges still render under LIVE READY Coinbase runtime.
+
+Read-only investigation first.
+No modifications until root cause is proven.
