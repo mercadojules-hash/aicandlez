@@ -96,6 +96,30 @@ router.get("/simulation/account", requireAuth, async (req, res): Promise<void> =
       unrealized:    (data as { unrealizedPnL?: number }).unrealizedPnL ?? 0,
       equity:        (data as { equity?: number }).equity ?? 0,
     }, "[EQUITY_PANEL_HYDRATED] per-user sim_positions — includes live fills");
+    // [SERVER_QUERY_RESULT] — Convergence diagnostic. Mirrors the canonical
+    // response the customer portal will receive on its ["customer-simulation-
+    // account"] query. Pair with client-side [CLIENT_QUERY_RESULT] to confirm
+    // server↔client agree on positionCount/equity at the same userId.
+    const allPositions = (data as { positions?: Array<{ exchange?: string | null }> }).positions ?? [];
+    const livePositionCount = allPositions.filter(p => p.exchange != null && p.exchange !== "").length;
+    req.log.info({
+      tag:           "SERVER_QUERY_RESULT",
+      endpoint:      "/api/simulation/account",
+      queryKey:      "customer-simulation-account",
+      userId,
+      // Pair-comparison semantics: client `openCount` in LIVE mode filters
+      // to exchange!=null, so compare against `livePositionCount` (not
+      // `positionCount`). `positionCount` is the unfiltered server total
+      // for context when paper + live rows coexist.
+      positionCount: openPositions,
+      livePositionCount,
+      paperPositionCount: openPositions - livePositionCount,
+      equity:        (data as { equity?: number }).equity ?? 0,
+      totalRealized: (data as { totalRealized?: number }).totalRealized ?? 0,
+      totalTrades:   (data as { totalTrades?: number }).totalTrades ?? 0,
+      hasLiveRows:   livePositionCount > 0,
+      timestamp:     Date.now(),
+    }, "[SERVER_QUERY_RESULT] customer-simulation-account");
     res.json(data);
   } catch (err) {
     req.log.error({ err, userId }, "GET /simulation/account failed");

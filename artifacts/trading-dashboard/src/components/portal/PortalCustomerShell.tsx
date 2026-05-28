@@ -5221,6 +5221,99 @@ export function PortalCustomerShell() {
   const blotterOpenRows = isLiveRuntime ? liveOpenRows : paperOpenRows;
   const blotterOpenCount = blotterOpenRows.length;
 
+  // ── [CLIENT_QUERY_SOURCE/RESULT/EMPTY] convergence diagnostic ───────────
+  // Emits which data source is driving the OPEN/Live Trades/Unrealized/Equity
+  // panels on this render, the current values, and a distinct EMPTY marker
+  // when openCount=0 (so silent staleness is loudly visible in console).
+  // Investigation-only — no behavior change.
+  const { user: diagUser } = useUser();
+  const userId = diagUser?.id ?? null;
+  const clientQuerySourceRef = useRef<string | null>(null);
+  useEffect(() => {
+    const mode = isLiveRuntime ? "live" : "paper";
+    const source = isLiveRuntime
+      ? {
+          openCount:   "serverAccount.positions[].filter(exchange)",
+          liveTrades:  "serverAccount.positions[].filter(exchange)",
+          unrealized:  "serverAccount.positions[].sum(unrealizedPnL)",
+          equity:      "runtimeState.totalEquityUSD",
+          tradeHistory:"usePaperTrades.history  (in-memory)",
+          queryKeys:   ["customer-simulation-account", "runtime-state"],
+          endpoints:   ["/api/simulation/account", "/api/user/runtime-state"],
+        }
+      : {
+          openCount:   "usePaperTrades.open  (in-memory, NO server hydration)",
+          liveTrades:  "usePaperTrades.open  (in-memory, NO server hydration)",
+          unrealized:  "usePaperTrades.stats.unrealizedPnl  (in-memory)",
+          equity:      "usePaperTrades.stats.equity || STARTING_EQUITY  (in-memory)",
+          tradeHistory:"usePaperTrades.history  (in-memory; populated by manual fires only)",
+          queryKeys:   [] as string[],   // ← no server query feeds these in paper mode
+          endpoints:   [] as string[],
+        };
+    const sourceSig = `${mode}:${source.openCount}`;
+    if (clientQuerySourceRef.current !== sourceSig) {
+      clientQuerySourceRef.current = sourceSig;
+      // eslint-disable-next-line no-console
+      console.info("[CLIENT_QUERY_SOURCE]", {
+        runtimeMode: mode,
+        runtimeReady: !runtimePending,
+        userId: userId ?? null,
+        openCountSource:   source.openCount,
+        liveTradesSource:  source.liveTrades,
+        unrealizedSource:  source.unrealized,
+        equitySource:      source.equity,
+        tradeHistorySource:source.tradeHistory,
+        subscribedQueryKeys: source.queryKeys,
+        subscribedEndpoints: source.endpoints,
+        serverAccountQueryEnabled: isLiveRuntime,
+        timestamp: Date.now(),
+      });
+    }
+  }, [isLiveRuntime, runtimePending, userId]);
+
+  useEffect(() => {
+    const mode = isLiveRuntime ? "live" : "paper";
+    const liveUnrealized = (serverAccount?.positions ?? []).reduce(
+      (s, p) => s + Number(p.unrealizedPnL ?? 0), 0,
+    );
+    // eslint-disable-next-line no-console
+    console.info("[CLIENT_QUERY_RESULT]", {
+      runtimeMode:  mode,
+      userId:       userId ?? null,
+      openCount:    blotterOpenCount,
+      liveTradesRowCount: blotterOpenRows.length,
+      unrealized:   isLiveRuntime ? liveUnrealized : paperStats.unrealizedPnl,
+      equity:       displayEquity,
+      realized:     isLiveRuntime ? Number(serverAccount?.totalRealized ?? 0) : paperStats.realizedPnl,
+      paperStoreOpen:    openTrades.length,
+      paperStoreHistory: paperHistory.length,
+      serverAccountPresent: !!serverAccount,
+      serverAccountPositions: serverAccount?.positions?.length ?? null,
+      serverAccountTotalTrades: serverAccount?.totalTrades ?? null,
+      timestamp:    Date.now(),
+    });
+    if (blotterOpenCount === 0) {
+      // eslint-disable-next-line no-console
+      console.warn("[CLIENT_QUERY_EMPTY]", {
+        panel:        "OPEN+LiveTrades",
+        runtimeMode:  mode,
+        userId:       userId ?? null,
+        reason:       isLiveRuntime
+          ? "serverAccount.positions filter(exchange!=null) returned 0 rows"
+          : "usePaperTrades.open is empty (in-memory store; server-side AI fan-out writes to sim_positions but PAPER mode never subscribes to /api/simulation/account)",
+        serverAccountEnabled: isLiveRuntime,
+        serverAccountPresent: !!serverAccount,
+        serverPositionsRaw:   serverAccount?.positions?.length ?? null,
+        paperStoreOpen:       openTrades.length,
+        timestamp:    Date.now(),
+      });
+    }
+  }, [
+    isLiveRuntime, userId, blotterOpenCount, blotterOpenRows.length,
+    displayEquity, paperStats.unrealizedPnl, paperStats.realizedPnl,
+    serverAccount, openTrades.length, paperHistory.length,
+  ]);
+
   // Pass 3.3: ONE shell-level 1Hz tick — passed as a prop to
   // `OperatorPulseRibbon`, `OpportunityMatrix`, and
   // `OperatorTelemetryStrip` (which already accepts `now`). The ribbon
