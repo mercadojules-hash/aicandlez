@@ -504,6 +504,8 @@ export function SignalRow({ spec, breakdown }: Props) {
       disabledReason,
     });
     if (!entry || entry <= 0) {
+      // eslint-disable-next-line no-console
+      console.log("[TRADE_BRANCH]", "PAPER_NO_ENTRY", { symbol: spec.symbol });
       toast({
         title: "MARKET FEED WARMING UP",
         description: `${spec.display} — waiting for live price`,
@@ -512,6 +514,38 @@ export function SignalRow({ spec, breakdown }: Props) {
     }
     const sl = side === "LONG" ? entry * 0.98  : entry * 1.02;
     const tp = side === "LONG" ? entry * 1.045 : entry * 0.955;
+
+    // [TRADE_BRANCH_DECISION] — TEMP instrumentation (2026-05-28). Dumps
+    // the full predicate snapshot the gate at L519 will evaluate so the
+    // exact false predicate that forces the PAPER fallback in production
+    // is visible in the browser console. Remove once the LIVE-routing
+    // regression is resolved.
+    // eslint-disable-next-line no-console
+    console.log("[TRADE_BRANCH_DECISION]", {
+      symbol:           spec.symbol,
+      side,
+      runtimeMode:      portalMode.mode,
+      isCustomerPortal: portalMode.isCustomerPortal,
+      canUseLive:       portalMode.canUseLive,
+      hasExchange:      portalMode.hasExchange,
+      armedForLive,
+      disabledReason,
+      tier:             portalMode.tier,
+      liveLockReason:   portalMode.liveLockReason,
+      paperSandboxEnabled: portalMode.paperSandboxEnabled,
+      isOperatorRole,
+      // predicate-by-predicate breakdown so the FALSE one is obvious
+      pred_isCustomerPortal: !!portalMode.isCustomerPortal,
+      pred_modeIsLive:       portalMode.mode === "LIVE",
+      pred_canUseLive:       !!portalMode.canUseLive,
+      pred_hasExchange:      !!portalMode.hasExchange,
+      pred_armedForLive:     !!armedForLive,
+      gateWillPass:
+        !!portalMode.isCustomerPortal &&
+        portalMode.mode === "LIVE" &&
+        !!portalMode.canUseLive &&
+        !!portalMode.hasExchange,
+    });
 
     // LIVE routing — only when the customer Portal mode toggle is engaged
     // AND the tier permits live exec AND a validated exchange is connected.
@@ -522,6 +556,10 @@ export function SignalRow({ spec, breakdown }: Props) {
       portalMode.canUseLive &&
       portalMode.hasExchange
     ) {
+      // eslint-disable-next-line no-console
+      console.log("[TRADE_BRANCH]", armedForLive ? "LIVE" : "LIVE_BLOCKED_NOT_ARMED", {
+        symbol: spec.symbol, side, armedForLive,
+      });
       // Per-session live gate. Live BUY clicks are blocked until the
       // user activates AI trading at least once this session (the
       // ACTIVATE AI TRADING bar auto-arms; see PortalCustomerShell
@@ -649,6 +687,8 @@ export function SignalRow({ spec, breakdown }: Props) {
     // BUY click leak into the operator Kraken path. Customer is PAPER-only
     // by locked invariant — non-admins fall through to `firePaper()`.
     if (isOperatorRole) {
+      // eslint-disable-next-line no-console
+      console.log("[TRADE_BRANCH]", "OPERATOR_KRAKEN", { symbol: spec.symbol, side });
       if (operatorOrderInFlightRef.current) {
         toast({
           title: `OPERATOR ORDER IN FLIGHT — ${spec.label}`,
@@ -708,6 +748,21 @@ export function SignalRow({ spec, breakdown }: Props) {
       return;
     }
 
+    // eslint-disable-next-line no-console
+    console.log("[TRADE_BRANCH]", "PAPER_FALLTHROUGH", {
+      symbol: spec.symbol,
+      side,
+      reason: !portalMode.isCustomerPortal
+        ? "no_customer_portal_provider"
+        : portalMode.mode !== "LIVE"
+          ? "runtime_mode_not_live"
+          : !portalMode.canUseLive
+            ? "tier_cannot_use_live"
+            : !portalMode.hasExchange
+              ? "no_exchange_connected"
+              : "unknown",
+      paperSandboxEnabled: portalMode.paperSandboxEnabled,
+    });
     firePaper(side, sl, tp);
   };
   const change24hPos = change24h >= 0;
