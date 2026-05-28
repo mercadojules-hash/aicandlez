@@ -1,0 +1,82 @@
+We have isolated the production issue down to frontend routing/component mounting.
+
+Current verified state:
+
+* trade.aicandlez.com is serving from the Render service:
+  aicandlez-trade
+* Deployment/build pipeline is healthy
+* Latest commits ARE deployed
+* Backend fixes ARE live
+* DB fixes ARE live
+* Hydration fixes ARE live
+* auto_mode fix IS live
+* Production JS bundle is current
+* Browser cache/DNS issues have been eliminated
+
+Critical finding:
+
+Production `/portal` is still rendering the LEGACY customer portal component even though the newer customer portal code exists in the repo.
+
+Evidence gathered:
+
+1. `window.location.pathname`
+   returns:
+   `/portal`
+
+2. localStorage confirms:
+   `aicandlez.customer.aiAutoTrade.v1 = true`
+
+3. DOM inspection confirms the modern design system/build is deployed:
+
+* IBM Plex Mono
+* modern neon token system
+* updated spacing/layout system
+* current trading-dashboard bundle
+
+BUT:
+
+4. Runtime UI still renders the older battlefield customer shell:
+
+* orange/yellow wave charts
+* legacy Majors/Alts layout
+* older operator-style portal
+
+5. Console test:
+   `document.body.innerText.includes("Top 30 Cryptos")`
+   returns:
+   `false`
+
+This proves the NEW customer portal component is not mounted at runtime.
+
+Root cause is now believed to be ONE of:
+
+* `/portal` route still wired to legacy component
+* legacy Portal component import still active
+* new PortalCustomerShell not connected to router
+* conditional render selecting old shell
+* wrong route export in production build
+* stale router branch still mounted for customer users
+
+Please audit ALL routing and component mounting related to:
+
+* `/portal`
+* `PortalCustomerShell`
+* customer portal router
+* customer shell exports/imports
+* route registration
+* conditional role/runtime rendering
+
+Specifically inspect:
+
+* React Router route definitions
+* `<Route path="/portal" ... />`
+* customer shell imports
+* lazy-loaded portal modules
+* any role-based shell selection
+* legacy battlefield shell references
+
+Goal:
+Production `/portal` must render the NEW customer portal shell/layout instead of the legacy battlefield portal.
+
+This is no longer a cache/deployment/Render/DNS issue.
+It is now strictly a frontend routing/component selection issue.
