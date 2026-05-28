@@ -36,7 +36,9 @@ const REPO_ROOT = join(import.meta.dirname, "..", "..");
 const SCAN_DIRS = ["artifacts/api-server/src"];
 
 /** Phase 2 Step 1: warn only — flip to `false` at Step-5 cutover. */
-const WARN_ONLY = true;
+// Phase 5 (Task #210) — promoted from warn to error. Direct writes to
+// position tables outside the positionStore SoT are now blocking.
+const WARN_ONLY = false;
 
 /** Files allowed to write the position / trade tables directly.
  *
