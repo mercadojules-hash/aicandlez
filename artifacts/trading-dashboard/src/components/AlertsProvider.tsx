@@ -3,6 +3,7 @@ import {
   createContext, useContext, useState, useEffect, useRef, useCallback,
 } from "react";
 import { useAuth } from "@clerk/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { TrendingUp, TrendingDown, Zap, CheckCircle2, X, Volume2, VolumeX } from "lucide-react";
 
@@ -225,8 +226,31 @@ interface EngineStatus {
   mtfConfirmedCount: number;
 }
 
+// ── Hydration query keys invalidated on every execution/account event ────────
+// Keep this list in sync with the keys consumers actually use; over-invalidation
+// is acceptable (a few extra refetches), under-invalidation leaves panels stale.
+const HYDRATION_QUERY_KEYS: readonly string[] = [
+  "mobile-portfolio",
+  "sim-account",
+  "sim-trades",
+  "execution-state",
+  "runtime-state",
+  "user-ai-liquidity",
+];
+
+// Server-broadcast WS event types that must trigger client-side hydration.
+const HYDRATION_EVENTS: ReadonlySet<string> = new Set([
+  "trade_executed",
+  "position_opened",
+  "position_closed",
+  "account_updated",
+  "live_trades_hydrated",
+  "ai_fanout_executed",
+]);
+
 export function AlertsProvider({ children }: { children: React.ReactNode }) {
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isSignedIn, userId } = useAuth();
+  const qc = useQueryClient();
 
   // Hide all operator/debug chrome (LIVE/POLL websocket pip, sound toggle,
   // alert toasts) on the customer portal — those are operator surfaces and
@@ -349,7 +373,59 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
           title?: string;
           message?: string;
           timestamp?: number;
+          runtimeMode?: "paper" | "live" | string;
         };
+
+        // ── Hydration invalidation ─────────────────────────────────────────────
+        // Any execution/account/fanout event from the server must invalidate
+        // the client query cache so the dashboard panels (OPEN count, Live
+        // Trades, Trade History, Realized/Unrealized, Equity) refetch without
+        // waiting for their poll interval.
+        const HYDRATION_EVENTS = new Set([
+          "trade_executed",
+          "position_opened",
+          "position_closed",
+          "account_updated",
+          "live_trades_hydrated",
+          "ai_fanout_executed",
+        ]);
+        if (HYDRATION_EVENTS.has(msg.type)) {
+          const ts = msg.timestamp ?? Date.now();
+          // eslint-disable-next-line no-console
+          console.info("[CLIENT_HYDRATION_INVALIDATE]", {
+            eventType: msg.type,
+            queryKeys: HYDRATION_QUERY_KEYS,
+            userId: userId ?? null,
+            runtimeMode: msg.runtimeMode ?? null,
+            timestamp: ts,
+          });
+          Promise.all(
+            HYDRATION_QUERY_KEYS.map((key) =>
+              qc.invalidateQueries({ queryKey: [key], refetchType: "active" }),
+            ),
+          )
+            .then(() => {
+              // eslint-disable-next-line no-console
+              console.info("[CLIENT_HYDRATION_REFETCHED]", {
+                eventType: msg.type,
+                queryKeys: HYDRATION_QUERY_KEYS,
+                userId: userId ?? null,
+                runtimeMode: msg.runtimeMode ?? null,
+                timestamp: Date.now(),
+              });
+            })
+            .catch((err: unknown) => {
+              // eslint-disable-next-line no-console
+              console.warn("[CLIENT_HYDRATION_FAILED]", {
+                eventType: msg.type,
+                queryKeys: HYDRATION_QUERY_KEYS,
+                userId: userId ?? null,
+                runtimeMode: msg.runtimeMode ?? null,
+                timestamp: Date.now(),
+                error: err instanceof Error ? err.message : String(err),
+              });
+            });
+        }
 
         if (msg.type === "signal" && msg.symbol && msg.action && msg.action !== "HOLD") {
           const id    = msg.id ?? `ws-sig-${msg.symbol}-${msg.timestamp ?? Date.now()}`;
