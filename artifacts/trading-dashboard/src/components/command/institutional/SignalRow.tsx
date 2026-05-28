@@ -25,6 +25,7 @@ import { usePortalMode } from "@/contexts/PortalModeContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCustomerPlan, openUpgrade, type Plan } from "@/hooks/useCustomerPlan";
 import { useArmedForLive } from "@/hooks/useArmedForLive";
+import { useGetSettings } from "@workspace/api-client-react";
 
 import { authFetch } from "../../../lib/authFetch";
 import { notifyRejection, type RejectionErrorCode } from "@/lib/rejectionToast";
@@ -227,6 +228,19 @@ export function SignalRow({ spec, breakdown }: Props) {
     if (breakdown?.avgConfidence) return Math.round(breakdown.avgConfidence);
     return 58 + (h % 38); // 58-95
   }, [breakdown, h]);
+
+  // ── TEMP OBSERVABILITY (additive, display-only) ───────────────────────────
+  // Per-user min-confidence + raw volume %, surfaced on the customer-only
+  // "WHY NOT TRADE?" strip below. react-query dedups useGetSettings across
+  // every mounted row (single fetch). Reads ONLY — nothing here feeds
+  // fireTrade / gating / routing / execution. Pure transparency layer.
+  const { data: userSettings } = useGetSettings();
+  const minConf = typeof userSettings?.minConfidence === "number"
+    ? Math.round(userSettings.minConfidence)
+    : null;
+  const volPct = typeof breakdown?.volumeRatio === "number"
+    ? Math.round(breakdown.volumeRatio * 100)
+    : null;
 
   const signalType: SignalType = TYPES[h % TYPES.length];
 
@@ -1118,6 +1132,16 @@ export function SignalRow({ spec, breakdown }: Props) {
         )}
       </div>
     </div>
+    {insightsEnabled && breakdown && (
+      <WhyNotTradeStrip
+        conf={conf}
+        minConf={minConf}
+        volPct={volPct}
+        volumePass={!!breakdown.volumeConfirmed}
+        sideways={(breakdown.marketCondition ?? "").toLowerCase() === "sideways"}
+        blockReason={breakdown.blockReason ?? ""}
+      />
+    )}
     {insightsEnabled && insightsOpen && (
       <SignalInsightsDrawer
         direction={direction}
@@ -1132,6 +1156,90 @@ export function SignalRow({ spec, breakdown }: Props) {
         plan={plan}
       />
     )}
+    </div>
+  );
+}
+
+// ── WhyNotTradeStrip (TEMP OBSERVABILITY · additive, display-only) ─────────
+// Always-visible transparency band rendered under each customer signal row.
+// Surfaces the exact gate state behind a BUY/SELL attempt so customers can
+// see *why* a signal did not trade: confidence vs the user's min-confidence,
+// current volume % vs the 20-bar average + the volume-gate pass/fail, and the
+// sideways-filter pass/fail, plus the engine's own blockReason. It reads
+// breakdown fields ONLY — it never calls, mutates, or branches any trading /
+// execution logic. Customer-only (gated by `insightsEnabled` at the call
+// site); admin /command never mounts it.
+function WhyNotTradeStrip({
+  conf, minConf, volPct, volumePass, sideways, blockReason,
+}: {
+  conf:        number;
+  minConf:     number | null;
+  volPct:      number | null;
+  volumePass:  boolean;
+  sideways:    boolean;
+  blockReason: string;
+}) {
+  const confPass = minConf == null ? null : conf >= minConf;
+  const reason = blockReason && blockReason !== "None" ? blockReason : null;
+  const tradeReady = confPass !== false && volumePass && !sideways && !reason;
+
+  const Chip = ({ label, value, pass, title }: {
+    label: string; value: string; pass: boolean | null; title?: string;
+  }) => {
+    const c = pass == null ? N.TEXT_2 : pass ? N.LONG : N.SHORT;
+    return (
+      <div title={title} style={{
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "2px 7px", borderRadius: 4,
+        border: `1px solid ${c}55`, background: `${c}12`,
+      }}>
+        <span style={{ color: N.TEXT_3, fontSize: 7.5, fontWeight: 800, letterSpacing: "0.14em" }}>
+          {label}
+        </span>
+        <span style={{ color: c, fontSize: 9, fontWeight: 800, fontFamily: N.FONT_MONO }}>
+          {value}
+        </span>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{
+      padding: "6px 12px 8px 14px",
+      borderTop: `1px dashed ${N.BORDER}`,
+      background: tradeReady ? `${N.LONG}08` : `${N.SHORT}08`,
+      display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6,
+      fontFamily: N.FONT_MONO,
+    }}>
+      <span style={{
+        color: tradeReady ? N.LONG : N.WARN,
+        fontSize: 8, fontWeight: 800, letterSpacing: "0.16em", marginRight: 2,
+      }}>
+        {tradeReady ? "TRADE-READY" : "WHY NOT TRADE?"}
+      </span>
+      <Chip
+        label="CONF"
+        value={minConf == null ? `${conf}` : `${conf} / ${minConf}`}
+        pass={confPass}
+        title="AI confidence vs your minimum confidence to trade"
+      />
+      <Chip
+        label="VOL"
+        value={volPct == null ? "—" : `${volPct}% / 85%`}
+        pass={volumePass}
+        title="Current 5m bar volume as % of the 20-bar average · gate requires ≥85%"
+      />
+      <Chip
+        label="SIDEWAYS"
+        value={sideways ? "BLOCK" : "CLEAR"}
+        pass={!sideways}
+        title="Sideways-market filter · blocks entries when the market is ranging"
+      />
+      {reason && (
+        <span style={{ color: N.TEXT_2, fontSize: 8.5, fontWeight: 700 }}>
+          · {reason}
+        </span>
+      )}
     </div>
   );
 }

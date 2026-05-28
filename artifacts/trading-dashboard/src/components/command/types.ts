@@ -33,6 +33,11 @@ export interface SymBreakdown {
   blockReason:     string;
   lastUpdated:     number;
   volumeConfirmed: boolean;
+  /** TEMP OBSERVABILITY (additive, display-only): current 5m bar volume as a
+   *  fraction of the prior-20-bar average (1 = 100%). Surfaced on the customer
+   *  card as "volume % vs 20-bar average". Optional for backward compatibility
+   *  with engines that predate the field. No execution path reads this. */
+  volumeRatio?:    number;
   marketCondition: string;
   trend1H:         string;
   /** LOW-CONFIDENCE FILTER — separation of signal visibility from execution

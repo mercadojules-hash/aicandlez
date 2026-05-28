@@ -90,6 +90,10 @@ export interface SymbolBreakdown {
   lastUpdated:     number;
   // Quality filters
   volumeConfirmed: boolean;
+  // TEMP OBSERVABILITY (additive, display-only): current 5m bar volume as a
+  // fraction of the prior-20-bar average (1 = 100%). Surfaced on the customer
+  // card as "volume % vs 20-bar average". No execution path reads this field.
+  volumeRatio:     number;
   marketCondition: "trending" | "sideways" | "neutral";
   trend1H:         "bullish" | "bearish" | "unknown";
   // ── LOW-CONFIDENCE FILTER (separation of visibility vs execution) ────────
@@ -451,6 +455,8 @@ interface MTFResult {
   displayConfidence: number;     // DISPLAY conviction — render layer reads this
   blockReason:     string;
   volumeConfirmed: boolean;
+  // TEMP OBSERVABILITY (additive, display-only): see SymbolBreakdown.volumeRatio.
+  volumeRatio:     number;
   marketCondition: "trending" | "sideways" | "neutral";
   trend1H:         "bullish" | "bearish" | "unknown";
 }
@@ -592,11 +598,18 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
 
   // ── Volume confirmation filter ─────────────────────────────────────────────
   let volumeConfirmed = true;
+  // TEMP OBSERVABILITY (additive, display-only): capture the raw current-bar
+  // volume as a fraction of the 20-bar average so the customer card can show
+  // "volume % vs 20-bar average". No decision branches on `volumeRatio`; the
+  // gate boolean below is byte-for-byte unchanged. Defaults to 1 (=100%) when
+  // there is insufficient history (same condition under which the gate passes).
+  let volumeRatio = 1;
   if (candles5m.length >= 5) {
     const recentVols  = candles5m.slice(-21, -1).map((c) => c.volume);
     const avgVol      = recentVols.reduce((a, b) => a + b, 0) / recentVols.length;
     const currentVol  = candles5m[candles5m.length - 1]?.volume ?? 0;
     volumeConfirmed   = currentVol >= avgVol * 0.85;
+    volumeRatio       = avgVol > 0 ? currentVol / avgVol : 1;
   }
 
   // ── Market condition: sideways / trending ──────────────────────────────────
@@ -656,7 +669,7 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
   return {
     symbol, fast, slow, fastSnap, slowSnap,
     mtfConfirmed, agreedAction, avgConfidence, displayConfidence, blockReason,
-    volumeConfirmed, marketCondition, trend1H,
+    volumeConfirmed, volumeRatio, marketCondition, trend1H,
   };
 }
 
@@ -1591,6 +1604,7 @@ async function tick() {
         blockReason:       mtf.blockReason,
         lastUpdated:       Date.now(),
         volumeConfirmed:   mtf.volumeConfirmed,
+        volumeRatio:       mtf.volumeRatio,
         marketCondition:   mtf.marketCondition,
         trend1H:           mtf.trend1H,
         executionEligible,
