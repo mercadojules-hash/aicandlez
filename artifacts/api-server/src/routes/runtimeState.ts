@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, userExchangeConnectionsTable, userSettingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { loadBalanceForRow, type BalanceConnection } from "./userExchanges.js";
 import { logger } from "../lib/logger.js";
@@ -180,6 +180,75 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
     }
 
     const liveReady = mode === "live" && activeExchange !== null;
+
+    // ── Cohort-predicate unification (live-execution writeback) ──────────
+    // The AI engine's live fan-out cohort (`listLiveExecutionUsers()` in
+    // lib/liveUserExecution.ts) selects users with:
+    //   isDefault=true AND status="active" AND tradingMode="live"
+    // The aggregator above resolves `mode="live"` from just status+ok+
+    // (auto-promotion OR explicit pin). Without persisting the decision,
+    // a connect-time row (isDefault=false, tradingMode="paper" defaults)
+    // can report liveReady=true here while being silently excluded from
+    // the engine cohort — fan-out then routes the user through
+    // listPaperAutoTradeUsers() → sim_positions.exchange=NULL → "PAPER"
+    // badge in the LIVE TRADES blotter.
+    //
+    // Surgical fix: whenever we resolve liveReady=true, persist the
+    // engine-cohort columns to match. Clear isDefault on the user's
+    // other rows first (one-default invariant — same pattern as
+    // POST /api/user/exchanges/:exchange/default at userExchanges.ts:932-945),
+    // then set isDefault=true + tradingMode="live" on the active row.
+    // Best-effort: any failure is logged but never breaks hydration.
+    if (liveReady && activeExchange) {
+      const activeRow = rows.find(r => r.exchange === activeExchange);
+      const needsPromotion = !!activeRow
+        && (activeRow.isDefault !== true || activeRow.tradingMode !== "live");
+      if (needsPromotion) {
+        try {
+          const now = new Date();
+          // Atomic two-step under a single transaction so concurrent
+          // hydration polls cannot interleave and leave two rows with
+          // isDefault=true for the same user (one-default invariant).
+          // GET-mutation note: this route is requireAuth-gated and the
+          // mutation is idempotent (no-op once `needsPromotion=false`),
+          // mirroring the same DB state the aggregator just read.
+          await db.transaction(async (tx) => {
+            await tx
+              .update(userExchangeConnectionsTable)
+              .set({ isDefault: false, updatedAt: now })
+              .where(
+                and(
+                  eq(userExchangeConnectionsTable.userId,   userId),
+                  ne(userExchangeConnectionsTable.exchange, activeExchange),
+                ),
+              );
+            await tx
+              .update(userExchangeConnectionsTable)
+              .set({ isDefault: true, tradingMode: "live", updatedAt: now })
+              .where(
+                and(
+                  eq(userExchangeConnectionsTable.userId,   userId),
+                  eq(userExchangeConnectionsTable.exchange, activeExchange),
+                ),
+              );
+          });
+          logger.info({
+            tag:           "RUNTIME_AUTOPROMOTE_PERSISTED",
+            userId,
+            exchange:      activeExchange,
+            previousIsDefault:   activeRow!.isDefault,
+            previousTradingMode: activeRow!.tradingMode,
+            autoPromoted,
+          }, "[RUNTIME_AUTOPROMOTE_PERSISTED] cohort-predicate writeback ok");
+        } catch (writebackErr) {
+          logger.warn({
+            err: writebackErr instanceof Error ? writebackErr.message : String(writebackErr),
+            userId,
+            exchange: activeExchange,
+          }, "runtimeState: live-cohort writeback failed (hydration unaffected)");
+        }
+      }
+    }
 
     const payload: CustomerTradingRuntimeContext = {
       mode,
