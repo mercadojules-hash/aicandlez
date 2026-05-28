@@ -3735,7 +3735,22 @@ function TradeSizeStrip({
               role="radio"
               aria-checked={active}
               disabled={disabled}
-              onClick={() => { if (!disabled) onChange(n); }}
+              onClick={() => {
+                // [SIZE_SELECT] — diagnostic log for the 2026-05-28
+                // "pills ignored" regression. Captures every click,
+                // including the no-op disabled case, so on-call can
+                // confirm whether the click reached the handler or
+                // was intercepted upstream (overlay / pointer-events).
+                // eslint-disable-next-line no-console
+                console.info("[SIZE_SELECT]", {
+                  requestedSize:  n,
+                  currentSize:    value,
+                  disabled,
+                  liquidityBlocked: liquidity.blocked,
+                  reachedHandler: true,
+                });
+                if (!disabled) onChange(n);
+              }}
               style={{
                 fontFamily: T.FONT_MONO, fontSize: 11, fontWeight: 800,
                 letterSpacing: "0.10em",
@@ -4232,15 +4247,17 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   // dominant visual message is the active green state.
   return (
     <>
-    {/* Trade size stays visible (read-only) while AI is armed so the
-        customer always sees the per-entry size their slots are sized to
-        and the live cushion health. Picker is disabled — to change size
-        the user must DISABLE first (intentional: prevents accidentally
-        re-sizing an in-flight position cohort). */}
+    {/* Trade size stays interactive while AI is armed (2026-05-28 fix —
+        previously hard-disabled in this branch, which caused the
+        reported "pills look enabled but clicks ignored" regression
+        because the active pill rendered at opacity 1). New size applies
+        to NEW entries only; in-flight positions retain their original
+        size by design (server reads `preferredLiveOrderSizeUsd` at
+        order-placement time). */}
     <TradeSizeStrip
       value={tradeSize}
       onChange={setTradeSize}
-      disabled={true}
+      disabled={false}
       liquidity={liquidity}
     />
     {errorBanner}

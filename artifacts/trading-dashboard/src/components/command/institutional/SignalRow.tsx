@@ -469,6 +469,33 @@ export function SignalRow({ spec, breakdown }: Props) {
   const operatorOrderInFlightRef = useRef(false);
   const armedForLive = useArmedForLive();
   const fireTrade = (side: "LONG" | "SHORT") => {
+    // [MANUAL_BUY_CLICK] — top-of-funnel diagnostic log added 2026-05-28
+    // for the customer "click ignored / partial execute" report. Fires
+    // BEFORE every early-return gate so on-call can grep which branch
+    // the click resolved to (price warmup / armed gate / live submit /
+    // operator submit / paper sim) for any reported missed execution.
+    const disabledReason: string | null =
+      (!entry || entry <= 0) ? "no_entry_price"
+      : (portalMode.isCustomerPortal && portalMode.mode === "LIVE" &&
+         portalMode.canUseLive && portalMode.hasExchange && !armedForLive) ? "not_armed_for_live"
+      : (portalMode.isCustomerPortal && portalMode.mode === "LIVE" &&
+         (!portalMode.canUseLive || !portalMode.hasExchange)) ? "live_locked_falling_back_to_paper"
+      : null;
+    // eslint-disable-next-line no-console
+    console.info("[MANUAL_BUY_CLICK]", {
+      symbol:         spec.symbol,
+      side,
+      selectedSize:   liveSize,
+      entry,
+      runtimeMode:    portalMode.mode,
+      isCustomerPortal: portalMode.isCustomerPortal,
+      canUseLive:     portalMode.canUseLive,
+      hasExchange:    portalMode.hasExchange,
+      armedForLive,
+      isOperator:     isOperatorRole,
+      operatorInFlight: operatorOrderInFlightRef.current,
+      disabledReason,
+    });
     if (!entry || entry <= 0) {
       toast({
         title: "MARKET FEED WARMING UP",
