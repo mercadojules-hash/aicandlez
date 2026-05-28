@@ -308,9 +308,10 @@ router.post(
       // positionId→correlationId mapping so the eventual close emit
       // (loop-driven, no upstream id) can preserve the chain.
       if (persistenceResult === "persisted") {
-        rememberCorrelation(mirroredPositionId, correlationId);
-        rememberCorrelation(result.exchangeOrderId ?? null, correlationId);
+        rememberCorrelation(mirroredPositionId, correlationId, "manual");
+        rememberCorrelation(result.exchangeOrderId ?? null, correlationId, "manual");
       }
+      const persistPid = mirroredPositionId ?? result.exchangeOrderId ?? null;
       emitTelemetry({
         tag:               "POSITION_PERSISTED",
         correlationId,
@@ -320,13 +321,34 @@ router.post(
         exchange:          result.exchange ?? null,
         runtimeMode,
         persistenceResult,
-        positionId:        mirroredPositionId ?? result.exchangeOrderId ?? null,
+        positionId:        persistPid,
         latencyMs:         Date.now() - acceptedAt,
         trigger:           "manual",
         side:              parsed.side,
         sizeUSD,
         fillPrice:         result.fillPrice ?? null,
       });
+      // LIVE_TRADES_HYDRATED — strictly AFTER POSITION_PERSISTED so the
+      // grep chain reads in lifecycle order. Only emit when persistence
+      // succeeded (a failed mirror means the live-trades panel has
+      // nothing to hydrate).
+      if (persistenceResult === "persisted") {
+        emitTelemetry({
+          tag:               "LIVE_TRADES_HYDRATED",
+          correlationId,
+          userId,
+          symbol:            parsed.symbol,
+          normalizedSymbol:  parsed.symbol,
+          exchange:          result.exchange ?? null,
+          runtimeMode,
+          persistenceResult: "persisted",
+          positionId:        persistPid,
+          latencyMs:         Date.now() - acceptedAt,
+          trigger:           "manual",
+          side:              parsed.side,
+          sizeUSD,
+        });
+      }
 
       res.json({
         ok:              true,

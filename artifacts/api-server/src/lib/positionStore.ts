@@ -49,6 +49,7 @@ import { executionStreamBus } from "./executionStreamBus.js";
 import {
   emit               as emitTelemetry,
   resolveCorrelation,
+  resolveTrigger,
   forgetCorrelation,
 } from "./executionTelemetry.js";
 import {
@@ -167,6 +168,13 @@ export async function closePosition(
     const origCorr = resolveCorrelation(positionId)
       ?? resolveCorrelation(t.exchangeOrderId ?? null)
       ?? `close-${positionId}`;
+    // Recall the OPENING trigger ("manual"|"ai") so the close row's
+    // `trigger` reflects who initiated the trade — not the close-driving
+    // loop. Default "ai" preserves the canonical `manual|ai` contract
+    // when the position predates this process (mapping evicted).
+    const origTrigger = resolveTrigger(positionId)
+      ?? resolveTrigger(t.exchangeOrderId ?? null)
+      ?? "ai";
     emitTelemetry({
       tag:               "POSITION_CLOSED",
       correlationId:     origCorr,
@@ -178,7 +186,7 @@ export async function closePosition(
       persistenceResult: "persisted",
       positionId,
       latencyMs:         t.durationMs ?? 0,
-      trigger:           "system",
+      trigger:           origTrigger,
       side:              t.side,
       sizeUSD:           t.sizeUSD,
       realizedPnL:       t.realizedPnL,
@@ -259,26 +267,10 @@ export function notifyFillExecuted(args: {
         dryRun:          args.dryRun === true,
       },
     });
-    // Phase 4 (Task #209) — emit LIVE_TRADES_HYDRATED on every gateway-
-    // notify so the customer's live-trades panel hydration funnel shows
-    // up in the correlationId grep chain. Rate-limited 1/sec/user.
-    if (args.correlationId) {
-      emitTelemetry({
-        tag:               "LIVE_TRADES_HYDRATED",
-        correlationId:     args.correlationId,
-        userId:            args.userId,
-        symbol:            args.symbol,
-        normalizedSymbol:  args.symbol,
-        exchange:          args.exchange ?? null,
-        runtimeMode:       args.sandbox || args.dryRun ? "sandbox" : "live",
-        persistenceResult: "persisted",
-        positionId:        args.exchangeOrderId ?? null,
-        latencyMs:         0,
-        trigger:           args.trigger,
-        side:              args.side,
-        sizeUSD:           args.sizeUSD,
-      });
-    }
+    // NOTE (Phase 4 chain order): LIVE_TRADES_HYDRATED is emitted from
+    // the caller (route handler / fan-out) AFTER POSITION_PERSISTED, not
+    // here. Emitting it inline would put HYDRATED before PERSISTED in the
+    // log chain — see chain spec in `executionTelemetry.ts` header.
   } catch (err) {
     // Telemetry must never break execution. Log + swallow.
     logger.warn(

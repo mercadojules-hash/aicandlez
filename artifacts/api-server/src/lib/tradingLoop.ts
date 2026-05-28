@@ -898,6 +898,27 @@ async function autoExecute(
             sizeUSD,
             signalId,
           });
+          // AI_TRADE_NORMALIZED — mirror of MANUAL_TRADE_NORMALIZED for
+          // the auto-trade fan-out so the grep chain has the same shape
+          // across both customer surfaces. Symbol is engine-native at
+          // this stage; adapter-specific normalization happens inside
+          // placeLiveAutoOrderForUser.
+          emitTelemetry({
+            tag:               "AI_TRADE_NORMALIZED",
+            correlationId,
+            userId:            u.userId,
+            symbol,
+            normalizedSymbol:  symbol,
+            exchange:          u.exchange ?? null,
+            runtimeMode:       "live",
+            persistenceResult: "pending",
+            positionId:        null,
+            latencyMs:         0,
+            trigger:           "ai",
+            side,
+            sizeUSD,
+            signalId,
+          });
           return executeCustomerOrder({
             trigger:       "ai",
             userId:        u.userId,
@@ -958,10 +979,11 @@ async function autoExecute(
       // the positionId→correlationId mapping so the eventual close emit
       // (loop-driven trailing stop / SL / TP / manual) preserves the chain.
       if (corrId && persistenceResult === "persisted") {
-        rememberCorrelation(mirroredPositionId, corrId);
-        rememberCorrelation(r.exchangeOrderId ?? null, corrId);
+        rememberCorrelation(mirroredPositionId, corrId, "ai");
+        rememberCorrelation(r.exchangeOrderId ?? null, corrId, "ai");
       }
       if (corrId) {
+        const persistPid = mirroredPositionId ?? r.exchangeOrderId ?? null;
         emitTelemetry({
           tag:               "POSITION_PERSISTED",
           correlationId:     corrId,
@@ -971,7 +993,7 @@ async function autoExecute(
           exchange:          r.exchange ?? null,
           runtimeMode:       "live",
           persistenceResult,
-          positionId:        mirroredPositionId ?? r.exchangeOrderId ?? null,
+          positionId:        persistPid,
           latencyMs:         0,
           trigger:           "ai",
           side,
@@ -979,6 +1001,26 @@ async function autoExecute(
           signalId,
           fillPrice:         r.fillPrice ?? null,
         });
+        // LIVE_TRADES_HYDRATED — emitted AFTER POSITION_PERSISTED in the
+        // AI funnel (chain-order requirement). Only on success.
+        if (persistenceResult === "persisted") {
+          emitTelemetry({
+            tag:               "LIVE_TRADES_HYDRATED",
+            correlationId:     corrId,
+            userId:            r.userId,
+            symbol,
+            normalizedSymbol:  symbol,
+            exchange:          r.exchange ?? null,
+            runtimeMode:       "live",
+            persistenceResult: "persisted",
+            positionId:        persistPid,
+            latencyMs:         0,
+            trigger:           "ai",
+            side,
+            sizeUSD,
+            signalId,
+          });
+        }
       }
     }
 

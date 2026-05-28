@@ -41,13 +41,17 @@ export type ExecutionTag =
   | "MANUAL_TRADE_REQUEST"
   | "AI_TRADE_REQUEST"
   | "MANUAL_TRADE_NORMALIZED"
+  | "AI_TRADE_NORMALIZED"
   | "EXECUTION_GATEWAY_ACCEPTED"
   | "POSITION_PERSISTED"
   | "LIVE_TRADES_HYDRATED"
   | "POSITION_CLOSED"
   | "EXECUTION_REJECTED";
 
-export type ExecutionTrigger = "manual" | "ai" | "system";
+/** Canonical trigger contract. Phase 4 spec restricts `trigger` to the
+ *  two customer-funnel sources; the close path recalls the original
+ *  opening trigger via `resolveTrigger(positionId)`. */
+export type ExecutionTrigger = "manual" | "ai";
 
 export type RuntimeMode = "paper" | "live" | "sandbox";
 
@@ -76,12 +80,14 @@ export interface ExecutionTelemetryRow {
   [extra: string]:   unknown;
 }
 
-/** Tags that always emit, even when verbose=false. These are the audit-
- *  grade events the compliance/on-call story depends on. */
+/** Tags that always emit, even when verbose=false. Phase 4 spec defines
+ *  these as the only two audit-grade tags that survive the verbose
+ *  collapse — everything else is diagnostic. POSITION_CLOSED is NOT
+ *  audit per spec; downstream realized-PnL persistence is the SoT for
+ *  that fact. */
 const AUDIT_TAGS: ReadonlySet<ExecutionTag> = new Set<ExecutionTag>([
   "EXECUTION_GATEWAY_ACCEPTED",
   "EXECUTION_REJECTED",
-  "POSITION_CLOSED",
 ]);
 
 /** Tags subject to 1/sec/user rate-limit. */
@@ -115,11 +121,19 @@ export function genCorrelationId(): string {
 // close decision). Surviving a process restart is NOT a requirement for
 // telemetry chain correlation. Bounded by `CORR_CAP`.
 const CORR_CAP = 25_000;
-const corrByPosition = new Map<string, string>();
+interface PositionCorrelation {
+  correlationId: string;
+  trigger:       ExecutionTrigger;
+}
+const corrByPosition = new Map<string, PositionCorrelation>();
 
-export function rememberCorrelation(positionId: string | null | undefined, correlationId: string | null | undefined): void {
+export function rememberCorrelation(
+  positionId:    string | null | undefined,
+  correlationId: string | null | undefined,
+  trigger:       ExecutionTrigger,
+): void {
   if (!positionId || !correlationId) return;
-  corrByPosition.set(positionId, correlationId);
+  corrByPosition.set(positionId, { correlationId, trigger });
   if (corrByPosition.size > CORR_CAP) {
     // Drop oldest half by recreating from recent slice.
     const recent = Array.from(corrByPosition.entries()).slice(-CORR_CAP / 2);
@@ -133,7 +147,16 @@ export function rememberCorrelation(positionId: string | null | undefined, corre
  *  Callers fall back to `close-<positionId>` so the row still validates. */
 export function resolveCorrelation(positionId: string | null | undefined): string | null {
   if (!positionId) return null;
-  return corrByPosition.get(positionId) ?? null;
+  return corrByPosition.get(positionId)?.correlationId ?? null;
+}
+
+/** Return the trade's opening trigger ("manual"|"ai") for `positionId`,
+ *  or `null` when unknown. Used by POSITION_CLOSED so the close row's
+ *  `trigger` field reflects who opened the trade rather than the system
+ *  loop that triggered the close. */
+export function resolveTrigger(positionId: string | null | undefined): ExecutionTrigger | null {
+  if (!positionId) return null;
+  return corrByPosition.get(positionId)?.trigger ?? null;
 }
 
 /** Drop the mapping after close — bounds memory. */
@@ -193,7 +216,7 @@ export function validateRow(row: ExecutionTelemetryRow): string | null {
   if (typeof row.latencyMs !== "number" || !Number.isFinite(row.latencyMs) || row.latencyMs < 0) {
     return "latencyMs must be a non-negative number";
   }
-  if (!["manual", "ai", "system"].includes(row.trigger)) return "trigger invalid";
+  if (!["manual", "ai"].includes(row.trigger)) return "trigger invalid";
   if (row.rejectionReason != null && typeof row.rejectionReason !== "string") {
     return "rejectionReason must be string when present";
   }

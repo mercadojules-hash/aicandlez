@@ -67,7 +67,7 @@ describe("validateRow", () => {
       validateRow(row({ persistenceResult: "x" as unknown as "persisted" })),
     ).toMatch(/persistenceResult/);
     expect(
-      validateRow(row({ trigger: "operator" as unknown as "manual" })),
+      validateRow(row({ trigger: "system" as unknown as "manual" })),
     ).toMatch(/trigger/);
   });
 
@@ -95,6 +95,12 @@ describe("verbose flag", () => {
     try {
       emit(row({ tag: "MANUAL_TRADE_REQUEST", userId: "v_user_1" }));
       emit(row({ tag: "MANUAL_TRADE_NORMALIZED", userId: "v_user_1" }));
+      emit(row({
+        tag:               "POSITION_CLOSED",
+        userId:            "v_user_1",
+        persistenceResult: "persisted",
+        positionId:        "p_1",
+      }));
       expect(info).not.toHaveBeenCalled();
 
       emit(row({
