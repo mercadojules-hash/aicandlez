@@ -23,7 +23,32 @@ router.get("/candles", async (req, res) => {
   const timeframe = (TIMEFRAME_MAP[rawTf] ?? rawTf).toLowerCase();
   const limit     = Math.min(parseInt((req.query.limit as string) ?? "200", 10), 500);
 
+  // Caller context captured for 400 diagnostics — surfaces which
+  // frontend component is firing for an unsupported symbol so we can
+  // identify the offending caller without guessing.
+  const referer   = (req.headers["referer"] as string | undefined) ?? null;
+  const userAgent = (req.headers["user-agent"] as string | undefined) ?? null;
+  const optionalAuth = req as unknown as { auth?: { userId?: string } };
+  const userId    = optionalAuth.auth?.userId ?? null;
+  const adapterKnown = Object.prototype.hasOwnProperty.call(SYMBOL_MAP, rawSymbol)
+                    || Object.prototype.hasOwnProperty.call(SYMBOL_MAP, symbol);
+
   if (!SUPPORTED_SYMBOLS.includes(symbol)) {
+    req.log.warn(
+      {
+        tag:            "CANDLES_REJECTED",
+        reason:         "symbol_unsupported",
+        rawSymbol,
+        normalizedSymbol: symbol,
+        timeframe,
+        adapterKnown,
+        referer,
+        userAgent,
+        userId,
+        callerHint:     req.query["caller"] ?? null,
+      },
+      "[CANDLES_REJECTED] symbol not in adapter universe",
+    );
     res.status(400).json({
       error: `Symbol "${symbol}" not supported. Use: ${SUPPORTED_SYMBOLS.join(", ")}`,
     });
@@ -31,6 +56,19 @@ router.get("/candles", async (req, res) => {
   }
 
   if (!SUPPORTED_TIMEFRAMES.includes(timeframe)) {
+    req.log.warn(
+      {
+        tag:        "CANDLES_REJECTED",
+        reason:     "timeframe_unsupported",
+        symbol,
+        rawTimeframe: rawTf,
+        timeframe,
+        referer,
+        userAgent,
+        userId,
+      },
+      "[CANDLES_REJECTED] timeframe not supported",
+    );
     res.status(400).json({
       error: `Timeframe "${timeframe}" not supported. Use: ${SUPPORTED_TIMEFRAMES.join(", ")}`,
     });

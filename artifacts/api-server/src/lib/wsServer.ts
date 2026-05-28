@@ -11,6 +11,7 @@ interface WsClient {
   userId:        string;
   subscriptions: Set<string>;
   isAlive:       boolean;
+  connectedAt:   number;
 }
 
 const clients = new Map<WebSocket, WsClient>();
@@ -70,9 +71,20 @@ export function createWsServer(server: Server): WebSocketServer {
   const heartbeat = setInterval(() => {
     for (const [ws, client] of clients) {
       if (!client.isAlive) {
+        const uptimeMs = Date.now() - client.connectedAt;
         clients.delete(ws);
         ws.terminate();
-        logger.info({ userId: client.userId }, "WS client timed out — terminated");
+        logger.info(
+          {
+            tag:                 "WS_DISCONNECTED",
+            subtag:              "heartbeat_timeout",
+            userId:              client.userId,
+            uptimeMs,
+            activeSubscriptions: [...client.subscriptions],
+            totalClients:        clients.size,
+          },
+          "[WS_DISCONNECTED] heartbeat timeout — terminated",
+        );
         continue;
       }
       client.isAlive = false;
@@ -103,36 +115,92 @@ async function handleConnection(ws: WebSocket, req: InstanceType<typeof import("
     }
   }
 
+  // Origin captured for instrumentation only — surfaces whether the
+  // failing handshake is coming from app./trade./admintrade. so we can
+  // tell cross-origin proxy misroutes apart from genuine auth failures.
+  const origin    = (req.headers["origin"] as string | undefined) ?? null;
+  const userAgent = (req.headers["user-agent"] as string | undefined) ?? null;
+
   if (!token) {
+    logger.warn(
+      { tag: "WS_AUTH_REJECTED", reason: "missing_token", origin, userAgent, totalClients: clients.size },
+      "[WS_AUTH_REJECTED] handshake rejected — missing token",
+    );
     ws.close(4001, "Unauthorized: missing token");
     return;
   }
 
   const userId = await authenticateToken(token);
   if (!userId) {
+    logger.warn(
+      { tag: "WS_AUTH_REJECTED", reason: "invalid_token", origin, userAgent, totalClients: clients.size },
+      "[WS_AUTH_REJECTED] handshake rejected — invalid token",
+    );
     ws.close(4003, "Unauthorized: invalid token");
     return;
   }
 
+  const connectedAt = Date.now();
   const client: WsClient = {
     ws,
     userId,
     // Default subscriptions — client can change these after connect
     subscriptions: new Set(["BTCUSD", "ETHUSD", "SOLUSD"]),
     isAlive: true,
+    connectedAt,
   };
   clients.set(ws, client);
 
   send(ws, "connected", { userId, subscriptions: [...client.subscriptions] });
-  logger.info({ userId, total: clients.size }, "WS client connected");
+  logger.info(
+    {
+      tag:                 "WS_CONNECTED",
+      userId,
+      origin,
+      activeSubscriptions: [...client.subscriptions],
+      totalClients:        clients.size,
+      connectedAt,
+    },
+    "[WS_CONNECTED] client established",
+  );
 
   ws.on("message", (data) => {
     try {
       const msg = JSON.parse(data.toString()) as { type: string; symbols?: string[] };
       if (msg.type === "subscribe" && Array.isArray(msg.symbols)) {
-        msg.symbols.forEach((s) => client.subscriptions.add(String(s).toUpperCase()));
+        const added: string[] = [];
+        msg.symbols.forEach((s) => {
+          const sym = String(s).toUpperCase();
+          if (!client.subscriptions.has(sym)) added.push(sym);
+          client.subscriptions.add(sym);
+        });
+        logger.info(
+          {
+            tag:                 "WS_SUBSCRIBED",
+            userId,
+            added,
+            activeSubscriptions: [...client.subscriptions],
+            uptimeMs:            Date.now() - client.connectedAt,
+          },
+          "[WS_SUBSCRIBED] client added subscriptions",
+        );
       } else if (msg.type === "unsubscribe" && Array.isArray(msg.symbols)) {
-        msg.symbols.forEach((s) => client.subscriptions.delete(String(s).toUpperCase()));
+        const removed: string[] = [];
+        msg.symbols.forEach((s) => {
+          const sym = String(s).toUpperCase();
+          if (client.subscriptions.delete(sym)) removed.push(sym);
+        });
+        logger.info(
+          {
+            tag:                 "WS_SUBSCRIBED",
+            subtag:              "unsubscribe",
+            userId,
+            removed,
+            activeSubscriptions: [...client.subscriptions],
+            uptimeMs:            Date.now() - client.connectedAt,
+          },
+          "[WS_SUBSCRIBED] client removed subscriptions",
+        );
       } else if (msg.type === "ping") {
         send(ws, "pong", {});
       }
@@ -141,13 +209,37 @@ async function handleConnection(ws: WebSocket, req: InstanceType<typeof import("
 
   ws.on("pong", () => { client.isAlive = true; });
 
-  ws.on("close", () => {
+  ws.on("close", (code, reason) => {
+    const uptimeMs = Date.now() - client.connectedAt;
     clients.delete(ws);
-    logger.info({ userId, total: clients.size }, "WS client disconnected");
+    logger.info(
+      {
+        tag:                 "WS_DISCONNECTED",
+        subtag:              "client_close",
+        userId,
+        code,
+        reason:              reason?.toString() || null,
+        uptimeMs,
+        activeSubscriptions: [...client.subscriptions],
+        totalClients:        clients.size,
+      },
+      "[WS_DISCONNECTED] client closed connection",
+    );
   });
 
   ws.on("error", (err) => {
-    logger.error({ err, userId }, "WS client error");
+    const uptimeMs = Date.now() - client.connectedAt;
+    logger.error(
+      {
+        tag:          "WS_DISCONNECTED",
+        subtag:       "socket_error",
+        userId,
+        err,
+        uptimeMs,
+        totalClients: clients.size,
+      },
+      "[WS_DISCONNECTED] socket error",
+    );
     clients.delete(ws);
   });
 }
@@ -190,15 +282,49 @@ export function broadcastTrade(trade: {
   sizeUSD: number;
   userId?: string;
 }): void {
-  if (clients.size === 0) return;
+  // Hydration-chain instrumentation: every executed trade SHOULD push a
+  // `trade_executed` event to the relevant user's WS, which the client
+  // is expected to translate into invalidateQueries(["mobile-portfolio",
+  // "sim-account", "sim-trades"]). When totalClients=0 (or recipients=0
+  // for a userId-scoped event), the push is SILENTLY dropped and the
+  // panels go stale until their poll interval lapses (10–60s).
+  if (clients.size === 0) {
+    logger.warn(
+      {
+        tag:          "WS_HYDRATE_INVALIDATE",
+        subtag:       "skipped_no_clients",
+        eventType:    "trade_executed",
+        targetUserId: trade.userId ?? null,
+        symbol:       trade.symbol,
+        invalidateKeysHint: ["mobile-portfolio", "sim-account", "sim-trades"],
+      },
+      "[WS_HYDRATE_INVALIDATE] trade_executed push skipped — no WS clients connected (panels will go stale)",
+    );
+    return;
+  }
   const msg = JSON.stringify({ type: "trade_executed", ...trade, timestamp: Date.now() });
+  let recipients = 0;
   for (const [ws, client] of clients) {
     if (ws.readyState !== WebSocket.OPEN) continue;
     // User-scoped trades → send only to that user; global broadcasts → send to all
     if (!trade.userId || client.userId === trade.userId) {
-      try { ws.send(msg); } catch { clients.delete(ws); }
+      try { ws.send(msg); recipients++; } catch { clients.delete(ws); }
     }
   }
+  logger.info(
+    {
+      tag:          "WS_HYDRATE_INVALIDATE",
+      eventType:    "trade_executed",
+      targetUserId: trade.userId ?? null,
+      symbol:       trade.symbol,
+      recipients,
+      totalClients: clients.size,
+      invalidateKeysHint: ["mobile-portfolio", "sim-account", "sim-trades"],
+    },
+    recipients === 0
+      ? "[WS_HYDRATE_INVALIDATE] trade_executed published but 0 recipients matched targetUserId (panels will go stale)"
+      : "[WS_HYDRATE_INVALIDATE] trade_executed published",
+  );
 }
 
 export function broadcastSystemStatus(status: {
@@ -256,12 +382,36 @@ export function broadcastToUser(
   type:    WsEventType,
   payload: Record<string, unknown>,
 ): void {
-  if (clients.size === 0) return;
+  if (clients.size === 0) {
+    logger.warn(
+      {
+        tag:          "WS_HYDRATE_INVALIDATE",
+        subtag:       "skipped_no_clients",
+        eventType:    type,
+        targetUserId: userId,
+      },
+      "[WS_HYDRATE_INVALIDATE] user-scoped push skipped — no WS clients connected",
+    );
+    return;
+  }
   const msg = JSON.stringify({ type, ...payload, timestamp: Date.now() });
+  let recipients = 0;
   for (const [ws, client] of clients) {
     if (ws.readyState === WebSocket.OPEN && client.userId === userId) {
-      try { ws.send(msg); } catch { clients.delete(ws); }
+      try { ws.send(msg); recipients++; } catch { clients.delete(ws); }
     }
+  }
+  if (recipients === 0) {
+    logger.warn(
+      {
+        tag:          "WS_HYDRATE_INVALIDATE",
+        subtag:       "no_matching_user",
+        eventType:    type,
+        targetUserId: userId,
+        totalClients: clients.size,
+      },
+      "[WS_HYDRATE_INVALIDATE] user-scoped push published but 0 recipients matched targetUserId",
+    );
   }
 }
 
