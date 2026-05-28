@@ -165,6 +165,18 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
   const cached = readCache(key);
   if (cached !== null) { res.json(cached); return; }
 
+  // [ADMIN_USERS_REQUEST] — diagnostic added 2026-05-28 for the
+  // "Failed to load users" regression. Captures every request that
+  // miss-traverses the cache so on-call can correlate the failing
+  // call with the SQL/serialize/mapper error logged below.
+  const adminUsersStartedAt = Date.now();
+  req.log.info({
+    tag: "ADMIN_USERS_REQUEST",
+    stage: "start",
+    adminId: getAdminId(req),
+    query: req.query,
+  }, "[ADMIN_USERS_REQUEST] start");
+
   try {
     const q          = String(req.query["q"] ?? "").trim().toLowerCase();
     const planFilter = String(req.query["plan"] ?? "").trim().toLowerCase();
@@ -379,16 +391,34 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
 
     // "Online" heuristic — last activity within 10 min. Cheap and DB-derivable.
     const now = Date.now();
+    // [ADMIN_USERS_ROW_FAIL] — per-row try/catch so one malformed row
+    // (bad date / NaN / unexpected null) DEGRADES into a skeleton row
+    // instead of throwing the whole `rows.map()` and 500-ing the entire
+    // grid. Acceptance criteria from the 2026-05-28 regression report:
+    // "Operator USERS grid should render even if one user row is
+    // malformed. Bad rows should degrade gracefully instead of killing
+    // the entire collection render."
+    let rowFailures = 0;
     const users = rows.map((r) => {
+      const clerkUserId = String(r["clerk_user_id"] ?? "unknown");
+      try {
       const last = Number(r["last_activity_at"] ?? 0);
       const lastTrade = r["last_trade_ms"] == null ? null : Number(r["last_trade_ms"]);
+      // Hardened ISO conversion: a malformed `trial_ends_at` (legacy
+      // string row, drift, etc.) would otherwise throw RangeError out
+      // of `.toISOString()` and torch the whole list.
+      let trialEndsAtIso: string | null = null;
+      if (r["trial_ends_at"] != null) {
+        const t = new Date(String(r["trial_ends_at"])).getTime();
+        if (Number.isFinite(t)) trialEndsAtIso = new Date(t).toISOString();
+      }
       return {
         clerkUserId:         String(r["clerk_user_id"]),
         email:               String(r["email"]),
         role:                String(r["role"]),
         plan:                String(r["plan"]),
         planStatus:          String(r["plan_status"]),
-        trialEndsAt:         r["trial_ends_at"] == null ? null : new Date(String(r["trial_ends_at"])).toISOString(),
+        trialEndsAt:         trialEndsAtIso,
         // Complimentary marker: FREE comp has no Stripe sub but has trial_ends_at;
         // STARTER/PRO comp has both. Real paid trials also have both — operator
         // distinguishes via audit log. UI labels both as "TRIAL · Nd" (neutral).
@@ -480,6 +510,71 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         // revenue is materialised separately from Stripe in BillingAdmin.
         revenueGenerated:    Number(r["fees_generated"] ?? 0) + Number(r["mrr_usd"] ?? 0),
       };
+      } catch (rowErr) {
+        rowFailures += 1;
+        req.log.error({
+          tag: "ADMIN_USERS_ROW_FAIL",
+          stage: "row-map",
+          failingClerkUserId: clerkUserId,
+          failingEmail:       r["email"] == null ? null : String(r["email"]),
+          err:                rowErr instanceof Error ? { message: rowErr.message, stack: rowErr.stack } : rowErr,
+        }, "[ADMIN_USERS_ROW_FAIL] row mapper threw — degrading to skeleton");
+        // Skeleton row — preserves identity so the grid still renders a
+        // row (with a visible degraded marker via planStatus='error')
+        // instead of dropping the user silently or 500ing the entire
+        // collection. tradeLimit defaults to a safe plan-default shape.
+        return {
+          clerkUserId,
+          email:              r["email"] == null ? "" : String(r["email"]),
+          role:               "user",
+          plan:               "free",
+          planStatus:         "error",
+          trialEndsAt:        null,
+          isComplimentary:    false,
+          adminStatus:        "active",
+          createdAt:          null,
+          mrrUsd:             0,
+          aiEnabled:          false,
+          positionSizeUsd:    null,
+          maxActivePositions: null,
+          minConfidence:      null,
+          riskLevel:          null,
+          tradesCount:        0,
+          wins:               0,
+          losses:             0,
+          winRate:            null,
+          totalPnl:           0,
+          feesGenerated:      0,
+          liveTradesCount:    0,
+          lastTradeMs:        null,
+          openPositions:      0,
+          openExposureUsd:    0,
+          openLivePositions:  0,
+          exchangeTotal:      0,
+          exchangeActive:     0,
+          exchangeError:      0,
+          hasLiveExchange:    false,
+          tradeCapTier:       50,
+          tradesToday:        0,
+          equityUsd:          0,
+          tradeLimit: {
+            used24h:        0,
+            capTier:        50,
+            source:         "plan-default" as const,
+            planDefaultCap: 50,
+            remaining:      50,
+            blocked:        false,
+            reason:         "ok" as const,
+          },
+          lastActivityAt:     null,
+          onlineNow:          false,
+          activeExchange:     null,
+          exchangesConnected: 0,
+          aiUsage24h:         0,
+          sessionStatus:      "offline" as const,
+          revenueGenerated:   0,
+        };
+      }
     });
 
     const payload = {
@@ -492,11 +587,55 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
       filters:   { q: q || null, plan: planFilter || null, status: statusF || null, hasLive },
       timestamp: now,
     };
+    // [ADMIN_USERS_SERIALIZE_FAIL] — JSON serialization can still throw
+    // (e.g. circular ref slipping in, BigInt drift from a future column
+    // type change). Catching here lets us emit a structured log that
+    // identifies the serialize stage as the failing surface, instead
+    // of conflating it with SQL/mapper errors at the outer catch.
+    let serialized: string;
+    try {
+      serialized = JSON.stringify(payload);
+    } catch (serErr) {
+      req.log.error({
+        tag: "ADMIN_USERS_SERIALIZE_FAIL",
+        stage: "serialize",
+        rowCount: users.length,
+        rowFailures,
+        err: serErr instanceof Error ? { message: serErr.message, stack: serErr.stack } : serErr,
+      }, "[ADMIN_USERS_SERIALIZE_FAIL] JSON.stringify(payload) threw");
+      res.status(500).json({ error: "Failed to load users", stage: "serialize" });
+      return;
+    }
+
+    req.log.info({
+      tag: "ADMIN_USERS_REQUEST",
+      stage: "ok",
+      rowCount: users.length,
+      rowFailures,
+      total: countRow?.total ?? 0,
+      durationMs: Date.now() - adminUsersStartedAt,
+    }, "[ADMIN_USERS_REQUEST] ok");
+
     writeCache(key, payload);
-    res.json(payload);
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.send(serialized);
   } catch (err) {
-    req.log.error({ err }, "GET /admin/users failed");
-    res.status(500).json({ error: "Failed to load users" });
+    // Surface the underlying error message in the response so on-call
+    // (admin-only route) can read the root cause from the network tab
+    // without round-tripping through the server logs. Includes the
+    // failing stage so SQL vs mapper vs serialize is grep-able.
+    req.log.error({
+      tag: "ADMIN_USERS_REQUEST",
+      stage: "fail",
+      adminId: getAdminId(req),
+      durationMs: Date.now() - adminUsersStartedAt,
+      err: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+    }, "[ADMIN_USERS_REQUEST] failed");
+    res.status(500).json({
+      error: "Failed to load users",
+      message: err instanceof Error ? err.message : String(err),
+      stage: "sql-or-prepare",
+    });
   }
 });
 
