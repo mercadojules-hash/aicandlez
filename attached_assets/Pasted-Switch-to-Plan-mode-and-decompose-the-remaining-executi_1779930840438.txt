@@ -1,0 +1,125 @@
+Switch to Plan mode and decompose the remaining execution-state convergence work into ordered project tasks with explicit dependencies and acceptance criteria.
+
+I do NOT want a single mega-build pass touching all real-money execution code at once.
+
+Break the remaining work into isolated, reviewable phases.
+
+Required decomposition:
+
+PHASE 1 — Unified Execution Gateway
+Goal:
+AI engine + manual BUY/SELL must share ONE execution service.
+
+Requirements:
+
+* remove fragmented manual trade paths
+* all customer executions flow through same gateway
+* same authorization
+* same runtime checks
+* same exchange adapter
+* same persistence hooks
+* same telemetry emission
+
+Acceptance:
+manual and AI trades produce identical execution lifecycle logs.
+
+---
+
+PHASE 2 — Persistence + Live Position Convergence
+Goal:
+Live Trades, Trade History, unrealized PnL, OPEN count, and runtime telemetry all hydrate from ONE canonical source.
+
+Requirements:
+
+* eliminate fragmented local UI stores
+* remove divergent polling paths
+* unify open-position persistence
+* unify fills/history persistence
+* unify runtime position hydration
+
+Acceptance:
+executed trade appears simultaneously in:
+
+* OPEN positions
+* LIVE TRADES
+* TRADE HISTORY
+* unrealized pnl
+* telemetry counters
+
+---
+
+PHASE 3 — Runtime State Synchronization
+Goal:
+customer LIVE mode behaves deterministically.
+
+Requirements:
+
+* remove silent paper fallback
+* remove stale “paper sim” labels
+* unify LIVE/PAPER runtime semantics
+* websocket/runtime state reconciliation
+* deterministic reconnect hydration
+
+Acceptance:
+LIVE runtime never silently downgrades to paper.
+
+---
+
+PHASE 4 — Structured Execution Telemetry
+Goal:
+every execution lifecycle stage becomes traceable.
+
+Required logs:
+
+* [MANUAL_TRADE_REQUEST]
+* [MANUAL_TRADE_NORMALIZED]
+* [EXECUTION_GATEWAY_ACCEPTED]
+* [POSITION_PERSISTED]
+* [LIVE_TRADES_HYDRATED]
+* [POSITION_CLOSED]
+* [EXECUTION_REJECTED]
+
+Include:
+
+* exchange
+* runtimeMode
+* normalizedSymbol
+* persistenceResult
+* positionId
+* latencyMs
+* rejectionReason
+
+Acceptance:
+on-call can reconstruct an entire trade lifecycle from logs alone.
+
+---
+
+PHASE 5 — Regression + Stability Pass
+Goal:
+ensure customer runtime behaves like a brokerage surface, not a fragmented simulator.
+
+Requirements:
+
+* refresh/reconnect tests
+* websocket recovery
+* hydration replay
+* stale-state prevention
+* optimistic-state reconciliation
+* operator override regression
+* trade-cap regression
+* exchange-switch regression
+
+Acceptance:
+customer runtime survives refresh/reconnect without desync.
+
+For each phase provide:
+
+* estimated blast radius
+* touched packages
+* migration risk
+* rollback strategy
+* dependencies
+* recommended implementation order
+
+Do NOT begin implementation yet.
+Return the execution-convergence project plan first.
