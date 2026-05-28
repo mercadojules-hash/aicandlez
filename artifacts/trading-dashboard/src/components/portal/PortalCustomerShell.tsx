@@ -78,6 +78,7 @@ import { useUserRole } from "../../hooks/useUserRole";
 import { useRuntimeState, runtimeLabel, RUNTIME_STATE_QUERY_KEY } from "../../hooks/useRuntimeState";
 import { RuntimeSwitcher } from "./RuntimeSwitcher";
 import { useDisclaimerGate } from "../../hooks/useDisclaimerGate";
+import { PortalModeProvider } from "@/contexts/PortalModeContext";
 import { SessionEnvBadge } from "./SessionEnvBadge";
 import {
   AccountModal, UpgradeModal, DisclaimerModal,
@@ -5669,7 +5670,21 @@ export function PortalCustomerShell() {
     return null;
   }
 
+  // 2026-05 wrapper-restoration regression fix — Candidate B graduation
+  // dropped the <PortalModeProvider> wrapper that AdminPortalLegacy used to
+  // mount, so `usePortalMode()` inside the SignalRow tree was silently
+  // returning its inert default (isCustomerPortal:false, mode:"PAPER",
+  // canUseLive:false, hasExchange:false). That made every customer manual
+  // BUY/SELL skip the LIVE gate (SignalRow.tsx:519) and route through
+  // firePaperSim → "PAPER LONG EXECUTED · SIMULATED" toast + sim_positions
+  // rows with exchange=NULL, regardless of server liveReady. Restoring the
+  // wrapper with the SAME prop semantics legacy used:
+  //   tier        = useCustomerPlan()                 (already in scope as `plan`)
+  //   hasExchange = runtimeState.connectedExchanges   (already fetched at L5076)
+  // No new network calls; no UI change; no Candidate B logic touched.
+  const hasExchange = (runtimeState?.connectedExchanges?.length ?? 0) > 0;
   return (
+    <PortalModeProvider tier={plan} hasExchange={hasExchange}>
     <div className="cd-portal-root" style={{
       minHeight: "100dvh",
       background: T.BG_BLACK,
@@ -6805,6 +6820,7 @@ export function PortalCustomerShell() {
         onSignOut={() => void portalSignOut()}
       />
     </div>
+    </PortalModeProvider>
   );
 }
 
