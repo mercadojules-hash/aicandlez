@@ -238,22 +238,17 @@ export function SignalRow({ spec, breakdown }: Props) {
             rejectionReason:   errCode ?? "unknown",
             error:             r.error,
           });
-          toast({
-            variant: "destructive",
-            title: `LIVE ORDER REJECTED — ${spec.label}`,
-            description: (r.error ?? "Live exchange rejected the order") + supportedHint,
-          });
-          // Phase 3 Step 4b — also pipe through the centralized rejection
-          // dispatcher so the 30s (errorCode, symbol) dedupe window
-          // catches repeat-fire spam from rapid manual taps and from the
-          // background auto-trade loop hitting the same gate. The above
-          // bespoke toast carries supportedExchanges context; this call
-          // is additive and dedupe-guarded to avoid a double-toast on
-          // the first occurrence within the window.
+          // Phase 3 Step 4b — single rejection-toast path. The
+          // centralized dispatcher dedupes by (errorCode, symbol) over
+          // a 30s window, which prevents spam from rapid manual taps
+          // and from the auto-trade loop re-hitting the same gate.
+          // The supportedExchanges hint (previously appended to a
+          // bespoke destructive toast) is folded into `detail` so it
+          // still reaches the user without double-toasting.
           notifyRejection({
             errorCode: (errCode ?? "exchange_reject") as RejectionErrorCode,
             symbol:    spec.symbol,
-            detail:    r.error,
+            detail:    (r.error ?? "Live exchange rejected the order") + supportedHint,
           });
           return;
         }

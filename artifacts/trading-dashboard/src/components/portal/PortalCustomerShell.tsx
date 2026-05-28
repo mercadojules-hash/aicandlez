@@ -4462,7 +4462,7 @@ function CustomerStatusChip({ label, value, color }: { label: string; value: str
 function MyAccountRailPaper({
   equityUsd, todayPnl, realized, unrealized, fillsToday, openCount,
   history, engine, entitled = false, liveMode = false, liveExchange = null,
-  strictRuntime = false,
+  strictRuntime = false, runtimePending = false,
 }: {
   equityUsd:   number;
   todayPnl:    number;
@@ -4481,12 +4481,16 @@ function MyAccountRailPaper({
      misclassifying real capital as simulated. */
   liveMode?:     boolean;
   liveExchange?: string | null;
-  /* Phase 3 Step 2b — under strict runtime mode, when `liveMode` is
-     false but the runtime aggregator hasn't confirmed a paper-only
-     state, render "resyncing" instead of "paper sim" so the hero
-     never falsely tags a LIVE-eligible customer as PAPER during the
-     reconnect snapshot window. Flag off (default) = legacy label. */
-  strictRuntime?: boolean;
+  /* Phase 3 Step 2b — under strict runtime mode, render "resyncing"
+     ONLY when the runtime aggregator hasn't returned yet
+     (`runtimePending=true`). When the server confirms PAPER mode, the
+     normal "paper sim" label is correct and renders unchanged. This
+     tri-state (live / paper / syncing) preserves invariant that
+     displayed mode matches server mode during stable sessions, and
+     only diverges to "resyncing" during the reconnect snapshot
+     window. Flag off (default) = legacy "paper sim" always. */
+  strictRuntime?:  boolean;
+  runtimePending?: boolean;
 }) {
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -4576,7 +4580,7 @@ function MyAccountRailPaper({
           fontSize: 12, fontWeight: 700,
           color: pctToday >= 0 ? N.LONG : N.SHORT, letterSpacing: "0.04em",
         }}>
-          {pctToday >= 0 ? "+" : ""}{pctToday.toFixed(2)}% TODAY · {liveMode ? `live · ${(liveExchange ?? "broker").toLowerCase()}` : (strictRuntime ? "resyncing" : "paper sim")}
+          {pctToday >= 0 ? "+" : ""}{pctToday.toFixed(2)}% TODAY · {liveMode ? `live · ${(liveExchange ?? "broker").toLowerCase()}` : (strictRuntime && runtimePending ? "resyncing" : "paper sim")}
         </span>
       </div>
 
@@ -5066,7 +5070,7 @@ export function PortalCustomerShell() {
   // extra network is incurred. `runtimeMode` drives the LiveControlBar
   // state below; "live" only flips the displayed runtime context, not
   // order routing (kill switch + Task #200 gate still apply).
-  const { data: runtimeState } = useRuntimeState();
+  const { data: runtimeState, isPending: runtimePending } = useRuntimeState();
   const qc = useQueryClient();
   // Note: `LiveControlBar.state` intentionally stays "PAPER" on the
   // customer surface even when the runtime switcher is set to LIVE.
@@ -6270,6 +6274,7 @@ export function PortalCustomerShell() {
               liveMode={isLiveRuntime}
               liveExchange={liveExchange}
               strictRuntime={strictRuntime}
+              runtimePending={runtimePending}
             />
             <CustomerBlotterPanelOpen rows={blotterOpenRows} entitled={entitled} />
             <CustomerBlotterPanelHistory rows={paperHistory} />

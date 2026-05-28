@@ -566,18 +566,14 @@ export function SignalRow({ spec, breakdown }: Props) {
             rejectionReason:  errCode ?? "unknown",
             error:            r.error,
           });
-          toast({
-            variant: "destructive",
-            title: `LIVE ORDER REJECTED — ${spec.label}`,
-            description: (r.error ?? "Live exchange rejected the order") + supportedHint,
-          });
-          // Phase 3 Step 4b — centralized dispatcher (dedupe-guarded).
-          // See PWA SignalRow for design notes; this is the dashboard
-          // mirror so both surfaces dedupe across the same code path.
+          // Phase 3 Step 4b — single rejection-toast path through the
+          // centralized dispatcher (30s (errorCode, symbol) dedupe).
+          // Folds supportedExchanges hint into `detail` so the user
+          // still sees "supported on KRAKEN" without a second toast.
           notifyRejection({
             errorCode: (errCode ?? "exchange_reject") as RejectionErrorCode,
             symbol:    spec.symbol,
-            detail:    r.error,
+            detail:    (r.error ?? "Live exchange rejected the order") + supportedHint,
           });
           return;
         }

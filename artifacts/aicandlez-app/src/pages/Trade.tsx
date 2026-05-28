@@ -3,6 +3,7 @@ import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/rea
 import { api, type MobileStatus, type Portfolio, type SimTrade, type AlpacaPosition, type SignalBreakdown } from "@/lib/api";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { useStrictRuntimeMode } from "@/hooks/useStrictRuntimeMode";
+import { useRuntimeState } from "@/hooks/useRuntimeState";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
 import { EnableLiveCTA } from "@/components/EnableLiveCTA";
@@ -230,11 +231,15 @@ function TpSlBar({ sl, tp, current, up }: { sl:number; tp:number; current:number
 
 // ── Position card ─────────────────────────────────────────────────────────────────
 function PositionCard({ pos, tick, sparkPoints }: { pos: Portfolio["positions"][number]; tick: number; sparkPoints?: number[] }) {
-  // Phase 3 Step 2b — read flag + broker state locally so the
-  // SIMULATION chip suppression below stays a one-line gate without
-  // adding new props to every caller.
+  // Phase 3 Step 2b — gate SIMULATION chip on the CANONICAL runtime
+  // mode from the server aggregator (`/api/user/runtime-state`), NOT
+  // broker connection status (which is orthogonal — a user can have
+  // a connected broker while still resolved to PAPER by the
+  // aggregator). With the strict flag off (default), legacy behavior
+  // preserved regardless of runtime mode.
   const strictRuntimeMode = useStrictRuntimeMode();
-  const { status: brokerStatus } = useBrokerConnection();
+  const { data: runtimeState } = useRuntimeState();
+  const isLiveRuntime = runtimeState?.mode === "live";
   const pnl     = pos.unrealizedPnL ?? 0;
   const up      = pnl >= 0;
   const col     = up ? G : R;
@@ -343,7 +348,7 @@ function PositionCard({ pos, tick, sparkPoints }: { pos: Portfolio["positions"][
                 chip is suppressed when the user is on a live-active broker
                 so PAPER affordances don't mislabel a LIVE-routed surface.
                 With the flag off (default), legacy behavior preserved. */}
-            {!(strictRuntimeMode && brokerStatus === "live_active") && (
+            {!(strictRuntimeMode && isLiveRuntime) && (
               <span style={{
                 padding:"2px 8px",
                 background:"rgba(0,229,255,0.06)",
