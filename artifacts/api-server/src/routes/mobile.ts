@@ -5,6 +5,7 @@ import { engineStats } from "../lib/tradingLoop.js";
 import { getExchangeStatus } from "../lib/exchangeEngine.js";
 import { getStatus as getRiskStatus } from "../lib/riskEngine.js";
 import { getAccountSummary } from "../lib/simulationEngine.js";
+import { getUserAccountSummary } from "../lib/userSimRegistry.js";
 import { getTicker, SUPPORTED_SYMBOLS } from "../lib/marketData.js";
 import { userEngineRegistry } from "../services/users/UserEngineRegistry.js";
 import { drawdownProtection } from "../services/risk/DrawdownProtection.js";
@@ -75,35 +76,49 @@ router.get("/mobile/status", (_req, res) => {
 // ── Portfolio snapshot ────────────────────────────────────────────────────────
 // GET /api/mobile/portfolio
 //
-// [READ_SOURCE_PORTFOLIO] — Phase 5 convergence diagnostic.
-// SOURCE OF TRUTH: `simulationEngine.getAccountSummary()` — this is the
-// GLOBAL system-wide simulation engine, NOT per-user. It does NOT see
-// fills written by `registerLiveUserFill` (which target the per-user
-// `userSimRegistry` + `sim_positions` table).
+// [READ_SOURCE_PORTFOLIO] — Phase 5 convergence FIX.
 //
-// Known divergence (see .local/docs/execution-lifecycle-convergence.md):
-//   - Customer LIVE BUY → executeCustomerOrder → registerLiveUserFill →
-//     per-user `sim_positions` row.
-//   - This endpoint → global simulationEngine → does NOT include that row.
-//   - Result: Trade History (which reads per-user `sim_trades`) shows
-//     the fill on close, but Live Trades panel + OPEN count (which read
-//     this endpoint) never see the open position. THIS IS THE BUG.
-router.get("/mobile/portfolio", async (req, res) => {
+// SOURCE OF TRUTH (post-fix): `userSimRegistry.getUserAccountSummary(userId)`
+// — PER-USER. Reads `state.positions` (in-memory) + `sim_positions` table for
+// the authenticated user. This is the same backing store that
+// `registerLiveUserFill` writes to, so customer LIVE fills now flow through
+// to this endpoint immediately.
+//
+// `requireAuth` is mandatory: without a userId we cannot read the per-user
+// store. `balances` / `exchange` / `mode` continue to come from
+// `getExchangeStatus()` because those are runtime/exchange-status fields,
+// not user state — keeping them here preserves the existing client contract
+// in `artifacts/aicandlez-app/src/lib/api.ts → interface Portfolio`.
+//
+// Position shape is mapped UserSimPosition → PWA `Position` (size = quantity).
+//
+// See .local/docs/execution-lifecycle-convergence.md (Convergence Fix section).
+router.get("/mobile/portfolio", requireAuth, async (req, res) => {
+  const userId = (req as AuthReq).clerkUserId;
   try {
-    const acct = await getAccountSummary();
+    const acct = await getUserAccountSummary(userId);
     const ex   = getExchangeStatus();
-    const positions = acct.positions ?? [];
+    const positions = (acct.positions ?? []).map((p) => ({
+      id:            p.id,
+      symbol:        p.symbol,
+      side:          p.side,
+      size:          p.quantity,
+      entryPrice:    p.entryPrice,
+      currentPrice:  (p as { currentPrice?: number }).currentPrice,
+      unrealizedPnL: p.unrealizedPnL,
+    }));
     req.log.info({
       tag:            "READ_SOURCE_PORTFOLIO",
       stage:          "read",
       endpoint:       "/api/mobile/portfolio",
-      source:         "simulationEngine.getAccountSummary",
-      scope:          "GLOBAL",   // ← NOT per-user
-      perUserAware:   false,
+      source:         "userSimRegistry.getUserAccountSummary",
+      scope:          "PER_USER",
+      perUserAware:   true,
+      userId,
       openPositions:  positions.length,
       exchange:       ex.exchangeName,
       mode:           ex.mode,
-    }, "[READ_SOURCE_PORTFOLIO] global simulationEngine — does NOT see per-user live fills");
+    }, "[READ_SOURCE_PORTFOLIO] per-user sim_positions — sees customer live fills");
     res.json({
       balances:   ex.simBalances,
       positions,
@@ -114,28 +129,40 @@ router.get("/mobile/portfolio", async (req, res) => {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Portfolio unavailable";
+    req.log.error({ err, userId }, "GET /mobile/portfolio failed");
     res.status(500).json({ error: msg });
   }
 });
 
 // ── Open positions ────────────────────────────────────────────────────────────
 // GET /api/mobile/positions
-// [READ_SOURCE_POSITIONS] — same global SoT as /mobile/portfolio.
-router.get("/mobile/positions", async (req, res) => {
+// [READ_SOURCE_POSITIONS] — same per-user SoT as /mobile/portfolio.
+router.get("/mobile/positions", requireAuth, async (req, res) => {
+  const userId = (req as AuthReq).clerkUserId;
   try {
-    const acct = await getAccountSummary();
-    const positions = acct.positions ?? [];
+    const acct = await getUserAccountSummary(userId);
+    const positions = (acct.positions ?? []).map((p) => ({
+      id:            p.id,
+      symbol:        p.symbol,
+      side:          p.side,
+      size:          p.quantity,
+      entryPrice:    p.entryPrice,
+      currentPrice:  (p as { currentPrice?: number }).currentPrice,
+      unrealizedPnL: p.unrealizedPnL,
+    }));
     req.log.info({
       tag:           "READ_SOURCE_POSITIONS",
       stage:         "read",
       endpoint:      "/api/mobile/positions",
-      source:        "simulationEngine.getAccountSummary",
-      scope:         "GLOBAL",   // ← NOT per-user
-      perUserAware:  false,
+      source:        "userSimRegistry.getUserAccountSummary",
+      scope:         "PER_USER",
+      perUserAware:  true,
+      userId,
       openPositions: positions.length,
-    }, "[READ_SOURCE_POSITIONS] global simulationEngine — see convergence doc");
+    }, "[READ_SOURCE_POSITIONS] per-user sim_positions — convergence fix");
     res.json({ positions, count: positions.length, ts: Date.now() });
-  } catch {
+  } catch (err) {
+    req.log.error({ err, userId }, "GET /mobile/positions failed");
     res.json({ positions: [], count: 0, ts: Date.now() });
   }
 });

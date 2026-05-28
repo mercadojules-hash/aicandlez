@@ -563,56 +563,62 @@ export default function Trade() {
     const winPct  = history.length > 0 ? Math.round((wins / history.length) * 100) : 0;
 
   // ── [CONVERGENCE_TRACE] ─────────────────────────────────────────────────
-  // Phase 5 client-side source-of-truth probe for the
-  //   "Trade History shows fills but Live Trades stays empty / OPEN=0"
-  // regression. Emits one console.debug per render with the EXACT data
-  // source each panel reads from. If the three sources don't agree on
-  // open-position count, the convergence bug is reproducing live.
+  // Phase 5 client-side source-of-truth probe. After the convergence fix
+  // (api-server `/api/mobile/portfolio` now reads
+  // `userSimRegistry.getUserAccountSummary(userId)`), Live Trades + OPEN
+  // count + Trade History all read PER_USER stores backed by the same
+  // `sim_positions`/`sim_trades` tables that `registerLiveUserFill`
+  // writes to. Emits one console.debug per render so on-call can verify
+  // counts agree across panels after a customer BUY.
   //
-  // Expected (BROKEN) state: Live Trades & OPEN read from
-  //   /api/mobile/portfolio (global simulationEngine — NOT per-user)
-  // while Trade History reads from
-  //   /api/simulation/trades (per-user sim_trades — sees live fills).
+  // Alpaca branch is unchanged (broker-direct positions when an Alpaca
+  // broker session is active). For all other customers, scope is
+  // PER_USER on every read.
   //
-  // See .local/docs/execution-lifecycle-convergence.md.
+  // See .local/docs/execution-lifecycle-convergence.md (Convergence Fix).
   if (typeof window !== "undefined") {
+    const livePanelSource = isAlpacaActive && alpacaMapped.length > 0
+      ? {
+          source:   "/api/exchange/alpaca/positions (broker direct)",
+          queryKey: ["alpaca-positions"] as const,
+          scope:    "BROKER" as const,
+        }
+      : {
+          source:   "/api/mobile/portfolio (per-user userSimRegistry)",
+          queryKey: ["mobile-portfolio"] as const,
+          scope:    "PER_USER" as const,
+        };
     // eslint-disable-next-line no-console
     console.debug("[CONVERGENCE_TRACE]", {
       tag:           "CONVERGENCE_TRACE",
       runtimeMode:   isLive ? "live" : "paper",
       brokerActive:  isAlpacaActive,
       liveTrades: {
-        source:         isAlpacaActive && alpacaMapped.length > 0
-          ? "/api/exchange/alpaca/positions (broker direct)"
-          : "/api/mobile/portfolio (global simulationEngine — NOT per-user)",
-        queryKey:       isAlpacaActive && alpacaMapped.length > 0
-          ? ["alpaca-positions"]
-          : ["mobile-portfolio"],
-        renderedCount:  positions.length,
-        scope:          isAlpacaActive ? "BROKER" : "GLOBAL",
+        ...livePanelSource,
+        renderedCount: positions.length,
       },
       openCount: {
-        source:         isAlpacaActive && alpacaMapped.length > 0
-          ? "/api/exchange/alpaca/positions (broker direct)"
-          : "/api/mobile/portfolio (global simulationEngine — NOT per-user)",
-        queryKey:       isAlpacaActive && alpacaMapped.length > 0
-          ? ["alpaca-positions"]
-          : ["mobile-portfolio"],
-        renderedCount:  positions.length,
-        scope:          isAlpacaActive ? "BROKER" : "GLOBAL",
+        ...livePanelSource,
+        renderedCount: positions.length,
       },
       tradeHistory: {
         source:         "/api/simulation/trades (per-user sim_trades)",
-        queryKey:       ["sim-trades"],
+        queryKey:       ["sim-trades"] as const,
         renderedCount:  history.length,
-        scope:          "PER_USER",
+        scope:          "PER_USER" as const,
+      },
+      unrealizedPnL: {
+        source:         livePanelSource.source,
+        renderedValue:  openPnL,
+        scope:          livePanelSource.scope,
       },
       convergence: {
-        liveTradesReadsFromSameSourceAsOpenCount: true,   // both read mobile-portfolio
-        liveTradesReadsFromSameSourceAsHistory:   false,  // BUG: different scope
-        note: "Live Trades + OPEN are GLOBAL; Trade History is PER_USER. " +
-              "Customer live BUYs land in PER_USER sim_positions but are " +
-              "never read by the GLOBAL portfolio endpoint.",
+        liveTradesReadsFromSameSourceAsOpenCount: true,
+        liveTradesReadsFromSameSourceAsHistory:
+          livePanelSource.scope === "PER_USER",
+        note: "Post-fix: /api/mobile/portfolio is per-user-aware. " +
+              "Live Trades, OPEN, unrealized PnL, and Trade History all " +
+              "derive from per-user sim_positions / sim_trades.",
       },
     });
   }
