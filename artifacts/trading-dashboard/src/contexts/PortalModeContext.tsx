@@ -26,6 +26,23 @@ export type PortalTier = "free" | "starter" | "pro";
 
 const STORAGE_KEY = "acl_portal_mode_v1";
 const SANDBOX_STORAGE_KEY = "acl_portal_paper_sandbox_v1";
+// 2026-05-28 — sticky flag set ONLY when the user explicitly chose PAPER
+// via the runtime switcher AFTER LIVE was actually available
+// (liveReady + hasExchange + canUseLive). If set, auto-promotion to LIVE
+// is suppressed for this user/device until they explicitly toggle back.
+// Set==="1" → explicit paper override is sticky.
+const EXPLICIT_PAPER_KEY = "acl_portal_mode_explicit_paper_v1";
+
+function readExplicitPaper(): boolean {
+  try { return localStorage.getItem(EXPLICIT_PAPER_KEY) === "1"; }
+  catch { return false; }
+}
+function writeExplicitPaper(on: boolean) {
+  try {
+    if (on) localStorage.setItem(EXPLICIT_PAPER_KEY, "1");
+    else    localStorage.removeItem(EXPLICIT_PAPER_KEY);
+  } catch { /* tolerate quota errors */ }
+}
 
 /**
  * Exchanges with a public testnet / sandbox host that the adapter factory
@@ -84,12 +101,26 @@ interface PortalModeContextValue {
 const PortalModeContext = createContext<PortalModeContextValue | null>(null);
 
 interface ProviderProps {
-  tier:        PortalTier;
-  hasExchange: boolean;
-  children:    ReactNode;
+  tier:             PortalTier;
+  hasExchange:      boolean;
+  /**
+   * Server-truth signal that the runtime aggregator has resolved this user
+   * to a healthy active live exchange (mirrors `/api/user/runtime-state`
+   * `liveReady`). When TRUE and the user has NOT explicitly forced paper,
+   * the provider auto-promotes local `mode` from PAPER → LIVE so the
+   * SignalRow execution gate (which reads provider state, not server
+   * state) matches the top strip "LIVE READY" chrome.
+   *
+   * Without this signal, provider initializes to PAPER from localStorage
+   * default and never flips — producing the 2026-05-28 regression where
+   * `LIVE READY · COINBASE` shows in the header but `fireTrade` falls
+   * through to `firePaperSim` because `portalMode.mode === "PAPER"`.
+   */
+  runtimeLiveReady?: boolean;
+  children:         ReactNode;
 }
 
-export function PortalModeProvider({ tier, hasExchange, children }: ProviderProps) {
+export function PortalModeProvider({ tier, hasExchange, runtimeLiveReady = false, children }: ProviderProps) {
   const canUseLive = tier === "starter" || tier === "pro";
 
   const [mode, setModeState] = useState<PortalMode>(() => {
@@ -141,7 +172,43 @@ export function PortalModeProvider({ tier, hasExchange, children }: ProviderProp
     if (m === "LIVE" && !canUseLive) return;
     setModeState(m);
     writeStored(m);
-  }, [canUseLive]);
+    // 2026-05-28 sticky-paper override. Set the sticky flag ONLY when the
+    // user explicitly chooses PAPER while LIVE is actually available
+    // (canUseLive + hasExchange + runtimeLiveReady) — otherwise picking
+    // PAPER under a locked-out condition would spuriously suppress
+    // future auto-promotion. Clearing on LIVE re-opt-in.
+    if (m === "PAPER" && canUseLive && hasExchange && runtimeLiveReady) {
+      writeExplicitPaper(true);
+    } else if (m === "LIVE") {
+      writeExplicitPaper(false);
+    }
+  }, [canUseLive, hasExchange, runtimeLiveReady]);
+
+  // 2026-05-28 auto-promotion — sync provider local `mode` to server-truth
+  // `liveReady` so SignalRow.fireTrade's gate (reads provider state) stops
+  // diverging from the runtime-state aggregator (powers the LIVE READY
+  // header chrome). Conditions must ALL hold:
+  //   • runtimeLiveReady === true        (server says ready)
+  //   • hasExchange === true             (provider has an exchange)
+  //   • canUseLive === true              (paid tier)
+  //   • mode === "PAPER"                 (we're behind)
+  //   • !readExplicitPaper()             (user has not explicitly opted out)
+  // The opposite direction (LIVE → PAPER) is INTENTIONALLY one-way here —
+  // demoting to PAPER when liveReady drops would be jarring mid-session
+  // (e.g. transient balance poll failure). The existing tier-downgrade
+  // effect above still snaps free-tier back to PAPER unconditionally.
+  useEffect(() => {
+    if (
+      runtimeLiveReady &&
+      hasExchange &&
+      canUseLive &&
+      mode === "PAPER" &&
+      !readExplicitPaper()
+    ) {
+      setModeState("LIVE");
+      writeStored("LIVE");
+    }
+  }, [runtimeLiveReady, hasExchange, canUseLive, mode]);
 
   const liveLockReason = useMemo<string | null>(() => {
     if (!canUseLive) return "Upgrade to unlock LIVE";

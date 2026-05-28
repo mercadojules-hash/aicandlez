@@ -5683,8 +5683,12 @@ export function PortalCustomerShell() {
   //   hasExchange = runtimeState.connectedExchanges   (already fetched at L5076)
   // No new network calls; no UI change; no Candidate B logic touched.
   const hasExchange = (runtimeState?.connectedExchanges?.length ?? 0) > 0;
+  // 2026-05-28 — forward server-truth liveReady so the provider can
+  // auto-promote local mode PAPER → LIVE and stop SignalRow.fireTrade
+  // from diverging from the LIVE READY header chrome.
+  const runtimeLiveReady = !!runtimeState?.liveReady;
   return (
-    <PortalModeProvider tier={plan} hasExchange={hasExchange}>
+    <PortalModeProvider tier={plan} hasExchange={hasExchange} runtimeLiveReady={runtimeLiveReady}>
     <div className="cd-portal-root" style={{
       minHeight: "100dvh",
       background: T.BG_BLACK,
