@@ -1,0 +1,68 @@
+Approve the decomposition exactly as proposed and switch to Plan mode.
+
+The architecture is now complex enough that doing Phases 1–5 as one giant Build-mode mutation would create too much regression risk across real-money execution paths.
+
+The sequencing you outlined is architecturally correct:
+
+Unified execution gateway
+Persistence/hydration convergence
+Runtime state synchronization
+Structured execution telemetry
+Regression/stability pass
+
+That dependency chain is the right order because:
+
+execution authority must converge BEFORE hydration
+hydration must converge BEFORE runtime synchronization
+runtime synchronization must stabilize BEFORE telemetry becomes trustworthy
+telemetry must exist BEFORE a meaningful regression pass
+
+The biggest value in your plan is that it explicitly defines:
+
+single source of truth
+write authority
+read authority
+forbidden patterns after each phase
+
+That is exactly what prevents future task agents from accidentally reintroducing:
+
+paper fallbacks
+dual persistence paths
+fragmented hydration
+divergent execution services
+
+You should specifically preserve and enforce this invariant permanently:
+
+Customer LIVE runtime must never silently downgrade to PAPER execution.
+
+That one rule alone will eliminate an entire class of future bugs.
+
+I would also explicitly require each phase to include:
+
+rollback checkpoint
+invariant verification checklist
+“known temporary fragmentation allowed during this phase”
+structured before/after state diagrams
+
+before implementation begins.
+
+Then:
+
+Flip workspace to Plan mode
+Tell Replit:
+“Create the tasks exactly as documented.”
+Review each generated task individually before assignment
+Execute sequentially — never parallelize Phases 1–4
+
+Do NOT parallelize:
+
+gateway
+persistence
+hydration
+runtime synchronization
+
+Those are authority-layer mutations and should remain serialized.
+
+Only Phase 5 should fan out into parallel regression testing.
+
+Your platform is now crossing from “feature assembly” into “distributed trading system refinement.” The planning discipline matters now more than raw coding speed.
