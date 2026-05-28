@@ -39,6 +39,14 @@ export function requirePlan(minimum: Plan) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = (req as Request & { clerkUserId?: string }).clerkUserId;
     if (!userId) {
+      req.log?.warn?.({
+        tag:    "REQUIRE_PLAN_REJECT",
+        reason: "no_clerk_user_id_on_req",
+        method: req.method,
+        url:    req.originalUrl,
+        minimum,
+        status: 401,
+      }, "[REQUIRE_PLAN_REJECT] no_clerk_user_id_on_req → 401");
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
@@ -85,6 +93,17 @@ export function requirePlan(minimum: Plan) {
       const requiredRank  = PLAN_RANK[minimum] ?? 0;
 
       if (userPlanRank < requiredRank) {
+        req.log?.warn?.({
+          tag:          "REQUIRE_PLAN_REJECT",
+          reason:       "MEMBERSHIP_REQUIRED",
+          userId,
+          method:       req.method,
+          url:          req.originalUrl,
+          currentPlan:  userPlan,
+          requiredPlan: minimum,
+          userRole:     user?.role ?? null,
+          status:       402,
+        }, "[REQUIRE_PLAN_REJECT] MEMBERSHIP_REQUIRED → 402");
         res.status(402).json({
           error:         "Membership required for live exchange connectivity",
           code:          "MEMBERSHIP_REQUIRED",
@@ -97,6 +116,16 @@ export function requirePlan(minimum: Plan) {
 
       const status = user?.planStatus ?? "none";
       if (minimum !== "free" && status !== "active" && status !== "trialing" && status !== "none") {
+        req.log?.warn?.({
+          tag:        "REQUIRE_PLAN_REJECT",
+          reason:     "SUBSCRIPTION_INACTIVE",
+          userId,
+          method:     req.method,
+          url:        req.originalUrl,
+          planStatus: status,
+          currentPlan: userPlan,
+          status:     402,
+        }, "[REQUIRE_PLAN_REJECT] SUBSCRIPTION_INACTIVE → 402");
         res.status(402).json({
           error:       "Subscription is not active",
           code:        "SUBSCRIPTION_INACTIVE",

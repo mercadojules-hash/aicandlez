@@ -64,6 +64,16 @@ export const requireDisclaimer = async (
       .limit(1);
 
     if (!consent) {
+      req.log?.warn?.({
+        tag:               "REQUIRE_DISCLAIMER_REJECT",
+        reason:            "no_consent_for_current_version",
+        userId,
+        method:            req.method,
+        url:               req.originalUrl,
+        disclaimerVersion: DISCLAIMER_VERSION,
+        userRole:          user?.role ?? null,
+        status:            412,
+      }, "[REQUIRE_DISCLAIMER_REJECT] no_consent_for_current_version → 412");
       res.status(412).json({
         error:             "Risk disclaimer acceptance required",
         needsDisclaimer:   true,

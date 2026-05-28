@@ -16,6 +16,22 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
   const auth = getAuth(req);
   const userId = (auth?.sessionClaims?.userId as string | undefined) ?? auth?.userId;
   if (!userId) {
+    // [REQUIRE_AUTH_REJECT] — log-only diagnostic so we can distinguish
+    // "client never sent a session" (this branch) from downstream gate
+    // rejects (plan/disclaimer) when chasing a connect-flow regression.
+    req.log?.warn?.({
+      tag:               "REQUIRE_AUTH_REJECT",
+      reason:            "no_session",
+      method:            req.method,
+      url:               req.originalUrl,
+      hasAuthorization:  !!req.headers.authorization,
+      authScheme:        typeof req.headers.authorization === "string"
+        ? req.headers.authorization.split(" ")[0]
+        : null,
+      hasCookie:         !!req.headers.cookie,
+      origin:            req.headers.origin ?? null,
+      status:            401,
+    }, "[REQUIRE_AUTH_REJECT] no_session → 401");
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
@@ -30,6 +46,15 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     clerkSessionId:  auth?.sessionId ?? null,
   });
   if (!sessionVerdict.allow) {
+    req.log?.warn?.({
+      tag:        "REQUIRE_AUTH_REJECT",
+      reason:     "session_revoked",
+      userId,
+      method:     req.method,
+      url:        req.originalUrl,
+      sessionRevokedReason: sessionVerdict.reason,
+      status:     401,
+    }, "[REQUIRE_AUTH_REJECT] session_revoked → 401");
     res.status(401).json({
       error:     sessionVerdict.reason,
       errorCode: "session_revoked",
@@ -47,6 +72,15 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
   try {
     const verdict = await getUserStatusVerdict(userId);
     if (!verdict.allowAuth) {
+      req.log?.warn?.({
+        tag:        "REQUIRE_AUTH_REJECT",
+        reason:     "user_status_blocked",
+        userId,
+        method:     req.method,
+        url:        req.originalUrl,
+        userStatus: verdict.status,
+        status:     403,
+      }, "[REQUIRE_AUTH_REJECT] user_status_blocked → 403");
       res.status(403).json({
         error:      verdict.reason ?? `Account ${verdict.status}`,
         errorCode:  "user_status_blocked",

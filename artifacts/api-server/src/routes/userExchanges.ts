@@ -15,7 +15,7 @@ import { EXCHANGE_CATALOG, CATALOG_BY_ID, CONNECTABLE_EXCHANGE_IDS } from "../se
 import { makeAdapter } from "../services/exchanges/adapterFactory.js";
 import type { AlpacaAdapter } from "../services/exchanges/adapters/AlpacaAdapter.js";
 import type { ExchangeCredentials } from "../services/vault/CredentialVault.js";
-import type { Request } from "express";
+import type { Request, Response, NextFunction } from "express";
 
 // ── User exchange connection routes ───────────────────────────────────────────
 //
@@ -154,7 +154,72 @@ router.get("/user/exchanges", requireAuth, async (req, res): Promise<void> => {
 // PAID-ONLY: free users may NEVER POST exchange credentials. requirePlan
 // performs the admin bypass + 402 MEMBERSHIP_REQUIRED response. The
 // disclaimer gate still runs afterwards for non-admin paid users.
-router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requireDisclaimer, async (req, res): Promise<void> => {
+//
+// ── [EXCHANGE_ONBOARDING_ARRIVAL] pre-auth tracker ───────────────────────────
+// Fires BEFORE the requireAuth chain so we can disambiguate "request never
+// arrived at the server" (no log at all) from "auth/plan/disclaimer
+// blocked it" (arrival fires, gate reject fires, but `connect received`
+// does not). Body is NOT inspected here — express.json hasn't necessarily
+// parsed by middleware-mount time in all paths and we never want raw
+// credentials echoed in logs. Header fingerprint only.
+const logConnectArrival = (req: Request, _res: Response, next: NextFunction): void => {
+  req.log?.info?.({
+    tag:              "EXCHANGE_ONBOARDING_ARRIVAL",
+    method:           req.method,
+    url:              req.originalUrl,
+    origin:           req.headers.origin ?? null,
+    referer:          req.headers.referer ?? null,
+    host:             req.headers.host ?? null,
+    contentType:      req.headers["content-type"] ?? null,
+    contentLength:    req.headers["content-length"] ?? null,
+    hasAuthorization: !!req.headers.authorization,
+    authScheme:       typeof req.headers.authorization === "string"
+      ? req.headers.authorization.split(" ")[0]
+      : null,
+    hasCookie:        !!req.headers.cookie,
+    userAgent:        typeof req.headers["user-agent"] === "string"
+      ? req.headers["user-agent"].slice(0, 120)
+      : null,
+    ip:               req.ip ?? null,
+  }, "[EXCHANGE_ONBOARDING_ARRIVAL] request hit /user/exchanges/connect (pre-auth)");
+  next();
+};
+
+// ── respondConnect() — terminal response logger ──────────────────────────────
+// Wraps every `res.json()` / `res.status(N).json(B)` exit point in the
+// connect handler so the EXACT payload returned to the frontend is in the
+// log stream. Never echoes credentials (handler never passes them in).
+// Logged shape: status, top-level body keys, and a slim summary of
+// known fields (ok, error, code, errorCode). Full body is JSON-stringified
+// at info level so the test harness can grep one line for the response.
+function respondConnect(
+  req:    Request,
+  res:    Response,
+  status: number,
+  body:   Record<string, unknown>,
+  reason: string,
+): void {
+  const bodyKeys = Object.keys(body);
+  req.log?.info?.({
+    tag:        "EXCHANGE_ONBOARDING_RESPONSE",
+    reason,
+    status,
+    bodyKeys,
+    ok:         body["ok"] ?? null,
+    errorField: typeof body["error"] === "string" ? body["error"] : null,
+    code:       body["code"] ?? null,
+    errorCode:  body["errorCode"] ?? null,
+    autoPromoted: body["autoPromoted"] ?? null,
+    needsDisclaimer: body["needsDisclaimer"] ?? null,
+    // Compact JSON dump (single-line) so the entire payload echo is in one
+    // log row — never includes raw credentials because the handler never
+    // puts them on the response body.
+    payload:    JSON.stringify(body).slice(0, 2000),
+  }, `[EXCHANGE_ONBOARDING_RESPONSE] ${reason} → ${status}`);
+  res.status(status).json(body);
+}
+
+router.post("/user/exchanges/connect", logConnectArrival, requireAuth, requirePlan("starter"), requireDisclaimer, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
   const { exchange, apiKey, apiSecret, passphrase, label, demoMode } = req.body as {
     exchange:    string;
@@ -165,6 +230,23 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
     demoMode?:   boolean;
   };
 
+  // Email + role lookup for full Clerk identity in the audit trail. Single
+  // SELECT, fail-soft — if it errors we still continue with userId-only
+  // logging (the connect path itself doesn't depend on this).
+  let identityEmail: string | null = null;
+  let identityRole:  string | null = null;
+  try {
+    const [u] = await db
+      .select({ email: usersTable.email, role: usersTable.role })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, userId))
+      .limit(1);
+    identityEmail = u?.email ?? null;
+    identityRole  = u?.role ?? null;
+  } catch (err) {
+    req.log.warn({ userId, err: (err as Error).message }, "[EXCHANGE_ONBOARDING] identity lookup failed (non-fatal)");
+  }
+
   // [EXCHANGE_ONBOARDING] — entry. Capture payload SHAPE only (never keys/secrets).
   // Includes apiKeyPrefix (first 4 chars, hint-only), lengths, and PEM detection
   // so we can tell at a glance which Coinbase key format the user pasted
@@ -174,6 +256,8 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
   // implicitly confirms all three gates cleared.
   req.log.info({
     userId,
+    identityEmail,
+    identityRole,
     exchange,
     demoMode:            demoMode === true,
     apiKeyPrefix:        typeof apiKey === "string" ? apiKey.slice(0, 4) : null,
@@ -195,26 +279,26 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
 
   if (!exchange || !apiKey || !apiSecret) {
     req.log.warn({ userId, exchange, status: 400, reason: "missing_fields" }, "[EXCHANGE_ONBOARDING] reject");
-    res.status(400).json({ error: "exchange, apiKey, and apiSecret are required" });
+    respondConnect(req, res, 400, { error: "exchange, apiKey, and apiSecret are required" }, "missing_fields");
     return;
   }
   if (!CONNECTABLE_EXCHANGE_IDS.has(exchange)) {
     req.log.warn({ userId, exchange, status: 400, reason: "unsupported_exchange" }, "[EXCHANGE_ONBOARDING] reject");
-    res.status(400).json({ error: `Unsupported exchange: ${exchange}` });
+    respondConnect(req, res, 400, { error: `Unsupported exchange: ${exchange}` }, "unsupported_exchange");
     return;
   }
 
   const meta = CATALOG_BY_ID[exchange]!;
   if (meta.requiresPassphrase && !passphrase) {
     req.log.warn({ userId, exchange, status: 400, reason: "missing_passphrase" }, "[EXCHANGE_ONBOARDING] reject");
-    res.status(400).json({ error: `${exchange} requires a passphrase` });
+    respondConnect(req, res, 400, { error: `${exchange} requires a passphrase` }, "missing_passphrase");
     return;
   }
 
   // Basic format checks — prevent obviously invalid keys from hitting the exchange
   if (apiKey.trim().length < 8 || apiSecret.trim().length < 8) {
     req.log.warn({ userId, exchange, status: 400, reason: "key_too_short" }, "[EXCHANGE_ONBOARDING] reject");
-    res.status(400).json({ error: "API key and secret must be at least 8 characters" });
+    respondConnect(req, res, 400, { error: "API key and secret must be at least 8 characters" }, "key_too_short");
     return;
   }
 
@@ -247,10 +331,10 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
       err:        (err as Error).message,
       stage:      "runConnectionTest_throw",
     }, "[EXCHANGE_VALIDATE] threw (returning 422)");
-    res.status(422).json({
+    respondConnect(req, res, 422, {
       ok:    false,
       error: `Connection test failed: ${(err as Error).message}`,
-    });
+    }, "validate_threw");
     return;
   }
 
@@ -259,10 +343,10 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
       userId, exchange,
       adapterErr: testResult.error ?? null,
     }, "[EXCHANGE_VALIDATE] credentials rejected (no read access, returning 422)");
-    res.status(422).json({
+    respondConnect(req, res, 422, {
       ok:    false,
       error: testResult.error ?? "Credentials could not authenticate with the exchange. Check your API key and secret.",
-    });
+    }, "credentials_rejected");
     return;
   }
 
@@ -278,7 +362,7 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
     req.log.info({ userId, exchange, blobLen: encryptedBlob.length }, "[EXCHANGE_SAVE] vault encrypt ok");
   } catch (err) {
     req.log.error({ userId, exchange, err: (err as Error).message }, "[EXCHANGE_SAVE] vault encrypt FAILED");
-    res.status(500).json({ error: "Failed to encrypt credentials" });
+    respondConnect(req, res, 500, { error: "Failed to encrypt credentials" }, "vault_encrypt_failed");
     return;
   }
 
@@ -477,16 +561,16 @@ router.post("/user/exchanges/connect", requireAuth, requirePlan("starter"), requ
       }, "[AUTO_PROMOTION_BLOCKED] reason=lookup_failed (non-fatal)");
     }
 
-    res.json({
+    respondConnect(req, res, 200, {
       ok:              true,
       connection:      refreshedRow ? safeRow(refreshedRow) : null,
       permissions:     testResult.permissions,
       balanceSnapshot: balanceSnapshot ?? null,
       autoPromoted,
-    });
+    }, "success");
   } catch (err) {
     req.log.error({ userId, exchange, err: (err as Error).message }, "[EXCHANGE_SAVE] db upsert FAILED (returning 500)");
-    res.status(500).json({ error: "Failed to save connection" });
+    respondConnect(req, res, 500, { error: "Failed to save connection" }, "db_upsert_failed");
   }
 });
 
