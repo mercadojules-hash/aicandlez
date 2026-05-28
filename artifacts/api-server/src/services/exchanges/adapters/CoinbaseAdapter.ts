@@ -7,6 +7,50 @@ import type {
   OrderBook,
 } from "../types.js";
 import { emptyAccount, simulatedOrder } from "./BinanceAdapter.js";
+import { logger } from "../../../lib/logger.js";
+
+// 2026-05-28 — Coinbase rejection instrumentation. Customer hit
+// "Exchange rejected order — Unauthorized" with no surfaced status code
+// or response body. These helpers preserve the full Coinbase HTTP
+// response (status + body, capped to a sane length) so on-call can
+// distinguish 401 Unauthorized (auth/scope) vs 400 Bad Request
+// (malformed payload) vs 403 Forbidden (IP allow-list / suspended key)
+// vs 429 (rate limit) without re-instrumenting on every incident.
+const COINBASE_ERR_BODY_MAX = 1500;
+
+/** Thrown by HTTP helpers when Coinbase returns non-2xx or a JSON error. */
+class CoinbaseHttpError extends Error {
+  readonly statusCode: number;
+  readonly rawBody:    string;
+  readonly endpoint:   string;
+  readonly method:     string;
+  constructor(method: string, endpoint: string, statusCode: number, rawBody: string, summary: string) {
+    super(`Coinbase ${method} ${endpoint} → ${statusCode}: ${summary}`);
+    this.name       = "CoinbaseHttpError";
+    this.statusCode = statusCode;
+    this.rawBody    = rawBody.slice(0, COINBASE_ERR_BODY_MAX);
+    this.endpoint   = endpoint;
+    this.method     = method;
+  }
+}
+
+/** Best-effort one-shot summary of the failure for the surfaced error text. */
+function summariseCoinbaseError(raw: string): string {
+  if (!raw) return "(empty body)";
+  try {
+    const p = JSON.parse(raw) as Record<string, unknown>;
+    const parts: string[] = [];
+    if (p["error"])            parts.push(String(p["error"]));
+    if (p["error_response"])   parts.push(JSON.stringify(p["error_response"]));
+    if (p["message"])          parts.push(String(p["message"]));
+    if (p["error_details"])    parts.push(JSON.stringify(p["error_details"]));
+    if (p["failure_reason"])   parts.push(String(p["failure_reason"]));
+    if (p["preview_failure_reason"]) parts.push(String(p["preview_failure_reason"]));
+    return parts.length > 0 ? parts.join(" · ") : raw.slice(0, 300);
+  } catch {
+    return raw.slice(0, 300);
+  }
+}
 
 // ── CoinbaseAdapter ───────────────────────────────────────────────────────────
 //
@@ -476,32 +520,116 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
     };
   }
 
-  private parseOrThrow<T>(data: string, op: string): T {
+  /**
+   * 2026-05-28 — rewritten to preserve the raw HTTP status code and full
+   * response body via `CoinbaseHttpError`. Previously a 401 with body
+   * `{ "error": "Unauthorized" }` was surfaced as the bare string
+   * "Unauthorized" with no status code, no endpoint, no key-type context,
+   * no structured log line — making customer auth rejections impossible
+   * to triage without re-instrumenting on every incident.
+   */
+  private parseOrThrow<T>(method: string, path: string, statusCode: number, data: string): T {
+    // Non-2xx → ALWAYS throw with full body preserved, regardless of JSON-ness.
+    if (statusCode < 200 || statusCode >= 300) {
+      const summary = summariseCoinbaseError(data);
+      throw new CoinbaseHttpError(method, path, statusCode, data, summary);
+    }
     let parsed: unknown;
-    try { parsed = JSON.parse(data); } catch { throw new Error(`${op}: non-JSON response — ${data.slice(0, 200)}`); }
+    try { parsed = JSON.parse(data); }
+    catch { throw new CoinbaseHttpError(method, path, statusCode, data, `non-JSON response (${data.length} bytes)`); }
     const p = parsed as Record<string, unknown>;
-    if (p["error"] || p["message"]) {
-      throw new Error(`${op}: ${p["error"] ?? p["message"]}`);
+    // Some Coinbase endpoints return 200 with a body-level error (e.g. order
+    // rejected for buying power / unsupported product) — still surface those
+    // through the same typed error so callers see status+body uniformly.
+    if (p["error"] || p["message"] || p["error_response"]) {
+      const summary = summariseCoinbaseError(data);
+      throw new CoinbaseHttpError(method, path, statusCode, data, summary);
     }
     return parsed as T;
   }
 
+  /** Log line emitted before every HTTPS send. Includes key-type + key prefix only — never the secret. */
+  private logAuthRequest(method: string, path: string, hasBody: boolean) {
+    let detectedKeyType: string;
+    try { detectedKeyType = this.keyType; }
+    catch (e) { detectedKeyType = `key_type_error: ${e instanceof Error ? e.message : String(e)}`; }
+    logger.info({
+      tag:           "COINBASE_AUTH_REQUEST",
+      method,
+      endpoint:      path,
+      host:          this.BASE,
+      keyType:       detectedKeyType,
+      keyPrefix:     (this.config.apiKey ?? "").slice(0, 16),
+      keyLen:        (this.config.apiKey ?? "").length,
+      secretLen:     (this.config.apiSecret ?? "").length,
+      secretIsPem:   (this.config.apiSecret ?? "").includes("-----BEGIN"),
+      hasBody,
+    }, "[COINBASE_AUTH_REQUEST]");
+  }
+
+  /** Log line emitted on every HTTPS response (success OR failure). */
+  private logAuthResponse(method: string, path: string, statusCode: number, bodyLen: number) {
+    const ok = statusCode >= 200 && statusCode < 300;
+    logger.info({
+      tag:        "COINBASE_AUTH_RESPONSE",
+      method,
+      endpoint:   path,
+      statusCode,
+      ok,
+      bodyLen,
+    }, "[COINBASE_AUTH_RESPONSE]");
+  }
+
+  /** Log line emitted on every failure with full surfaced body (capped). */
+  private logAuthFailure(method: string, path: string, statusCode: number, rawBody: string, err: Error) {
+    logger.error({
+      tag:          "COINBASE_AUTH_FAILURE",
+      method,
+      endpoint:     path,
+      statusCode,
+      errorName:    err.name,
+      errorMessage: err.message,
+      rawBody:      rawBody.slice(0, COINBASE_ERR_BODY_MAX),
+      keyPrefix:    (this.config.apiKey ?? "").slice(0, 16),
+    }, "[COINBASE_AUTH_FAILURE]");
+  }
+
   private get<T>(path: string): Promise<T> {
+    this.logAuthRequest("GET", path, false);
     return new Promise((resolve, reject) => {
       https.get({ hostname: this.BASE, path, headers: this.authHeaders("GET", path) }, res => {
         let data = "";
+        const status = res.statusCode ?? 0;
         res.on("data", c => { data += c; });
-        res.on("end", () => { try { resolve(this.parseOrThrow<T>(data, "GET " + path)); } catch (e) { reject(e); } });
+        res.on("end", () => {
+          this.logAuthResponse("GET", path, status, data.length);
+          try { resolve(this.parseOrThrow<T>("GET", path, status, data)); }
+          catch (e) {
+            const err = e as Error;
+            this.logAuthFailure("GET", path, status, data, err);
+            reject(err);
+          }
+        });
       }).on("error", reject);
     });
   }
 
   private signedGet<T>(path: string): Promise<T> {
+    this.logAuthRequest("GET", path, false);
     return new Promise((resolve, reject) => {
       https.get({ hostname: this.BASE, path, headers: this.authHeaders("GET", path) }, res => {
         let data = "";
+        const status = res.statusCode ?? 0;
         res.on("data", c => { data += c; });
-        res.on("end", () => { try { resolve(this.parseOrThrow<T>(data, "GET " + path)); } catch (e) { reject(e); } });
+        res.on("end", () => {
+          this.logAuthResponse("GET", path, status, data.length);
+          try { resolve(this.parseOrThrow<T>("GET", path, status, data)); }
+          catch (e) {
+            const err = e as Error;
+            this.logAuthFailure("GET", path, status, data, err);
+            reject(err);
+          }
+        });
       }).on("error", reject);
     });
   }
@@ -509,11 +637,29 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
   private signedPost<T>(path: string, body: unknown): Promise<T> {
     const bodyStr = JSON.stringify(body);
     const headers = { ...this.authHeaders("POST", path, bodyStr), "Content-Length": String(Buffer.byteLength(bodyStr)) };
+    this.logAuthRequest("POST", path, true);
+    // One-shot per-request body log so on-call can reproduce the rejected
+    // payload verbatim. Truncated to avoid log bloat. Secrets are never
+    // in order bodies — safe to log in full at this size cap.
+    logger.debug({
+      tag:      "COINBASE_REQUEST_BODY",
+      endpoint: path,
+      body:     bodyStr.slice(0, COINBASE_ERR_BODY_MAX),
+    }, "[COINBASE_REQUEST_BODY]");
     return new Promise((resolve, reject) => {
       const req = https.request({ hostname: this.BASE, path, method: "POST", headers }, res => {
         let data = "";
+        const status = res.statusCode ?? 0;
         res.on("data", c => { data += c; });
-        res.on("end", () => { try { resolve(this.parseOrThrow<T>(data, "POST " + path)); } catch (e) { reject(e); } });
+        res.on("end", () => {
+          this.logAuthResponse("POST", path, status, data.length);
+          try { resolve(this.parseOrThrow<T>("POST", path, status, data)); }
+          catch (e) {
+            const err = e as Error;
+            this.logAuthFailure("POST", path, status, data, err);
+            reject(err);
+          }
+        });
       });
       req.on("error", reject);
       req.write(bodyStr);

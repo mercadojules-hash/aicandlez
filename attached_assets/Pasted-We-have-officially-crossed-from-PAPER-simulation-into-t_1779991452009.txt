@@ -1,0 +1,89 @@
+We have officially crossed from PAPER simulation into the REAL LIVE Coinbase execution path.
+
+The portal/runtime synchronization issue is now resolved.
+
+Verified evidence:
+
+* LIVE READY active
+* AI EXECUTION ARMED
+* Manual BUY opens the trade sizing modal correctly
+* submitLive() is firing
+* Backend is reaching the Coinbase adapter
+* The UI is now returning:
+  "Exchange rejected order — Unauthorized"
+
+This proves the system is no longer failing the paper/live gate.
+
+The remaining issue is now strictly Coinbase authentication/authorization.
+
+I need a focused Coinbase adapter investigation only — do NOT modify portal runtime logic, provider logic, SignalRow routing, or trade branching anymore.
+
+Please investigate the exact Coinbase rejection source.
+
+Targets:
+
+1. Log the FULL Coinbase response payload inside the adapter
+
+   * status code
+   * error body
+   * error type/message
+   * account/portfolio identifiers
+   * endpoint being called
+
+2. Verify whether we are using:
+
+   * Coinbase Advanced Trade API keys
+   * NOT legacy Coinbase Pro keys
+
+3. Verify required scopes/permissions:
+
+   * trade
+   * wallet/accounts read
+   * portfolio access
+   * advanced trade enabled
+
+4. Verify auth signing:
+
+   * timestamp
+   * signature
+   * passphrase handling
+   * API key formatting
+   * header construction
+
+5. Check for environment mismatch:
+
+   * sandbox vs production
+   * wrong portfolio/account ID
+   * restricted API key
+   * IP whitelist restrictions
+
+6. Add explicit structured logs:
+   [COINBASE_AUTH_REQUEST]
+   [COINBASE_AUTH_RESPONSE]
+   [COINBASE_AUTH_FAILURE]
+
+7. Do NOT swallow the Coinbase error.
+   Surface the raw rejection reason cleanly.
+
+8. Verify whether the order payload itself is malformed:
+
+   * product_id format (ex: SNX-USD vs SNXUSD)
+   * order type
+   * quote/base size formatting
+   * decimal precision
+
+9. Confirm whether:
+   /api/user/live-order
+   → Coinbase adapter
+   → createOrder()
+   is reaching the actual exchange endpoint successfully before rejection.
+
+10. Preserve all existing LIVE execution architecture.
+    The live/paper routing problem is solved already.
+
+Expected outcome:
+
+* Next manual BUY should either:
+  a) successfully place a real Coinbase order
+  OR
+  b) return the exact Coinbase authorization failure reason in logs/UI.
