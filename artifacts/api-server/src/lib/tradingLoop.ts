@@ -16,6 +16,7 @@ import {
 import { executeCustomerOrder } from "./executionGateway.js";
 import { registerLiveUserFill } from "./userSimRegistry.js";
 import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "./executionTelemetry.js";
+import { notifyFillHydrated } from "./positionStore.js";
 import { validateTrade } from "./riskEngine.js";
 import { checkTrailingStops } from "./trailingStopEngine.js";
 import { computeCorrelationMatrix } from "./correlationEngine.js";
@@ -876,19 +877,45 @@ async function autoExecute(
         error:   err instanceof Error ? err.message : String(err),
       })),
       Promise.all(
-        liveUsers.map((u) => {
+        (() => {
+          // Phase 4 AI dedup — collapse duplicate (userId, symbol) rows
+          // within a tick so a misconfigured `listLiveExecutionUsers()`
+          // (or a future per-connection fan-out) can't double-fire an
+          // AI order for the same user+symbol on the same signal. The
+          // Set is tick-scoped (lives only for this map() pass).
+          const seen = new Set<string>();
+          const deduped = liveUsers.filter((u) => {
+            const key = `${u.userId}:${symbol}`;
+            if (seen.has(key)) {
+              logger.warn(
+                { userId: u.userId, symbol, signalId },
+                "[AI_TICK_DEDUP] dropped duplicate (userId,symbol) in tick fan-out",
+              );
+              return false;
+            }
+            seen.add(key);
+            return true;
+          });
+          return deduped;
+        })().map((u) => {
           // Phase 4 (Task #209) — one correlationId per (user, symbol, tick)
           // so the AI fan-out funnel is grep-correlatable end-to-end. Emit
           // [AI_TRADE_REQUEST] before handing off so on-call can see the
           // request before any gateway/exec gate fires.
           const correlationId = genCorrelationId();
+          // Canonical normalization for AI: engine-native uppercased
+          // symbol, and exchange = the user's connected adapter (already
+          // resolved by listLiveExecutionUsers). This is the canonical
+          // form the gateway/adapter will receive.
+          const resolvedSymbol   = symbol.trim().toUpperCase();
+          const resolvedExchange = u.exchange ?? null;
           emitTelemetry({
             tag:               "AI_TRADE_REQUEST",
             correlationId,
             userId:            u.userId,
             symbol,
-            normalizedSymbol:  symbol,
-            exchange:          u.exchange ?? null,
+            normalizedSymbol:  resolvedSymbol,
+            exchange:          resolvedExchange,
             runtimeMode:       "live",
             persistenceResult: "pending",
             positionId:        null,
@@ -898,18 +925,16 @@ async function autoExecute(
             sizeUSD,
             signalId,
           });
-          // AI_TRADE_NORMALIZED — mirror of MANUAL_TRADE_NORMALIZED for
-          // the auto-trade fan-out so the grep chain has the same shape
-          // across both customer surfaces. Symbol is engine-native at
-          // this stage; adapter-specific normalization happens inside
-          // placeLiveAutoOrderForUser.
+          // AI_TRADE_NORMALIZED — emitted AFTER canonical resolve so
+          // `normalizedSymbol`+`exchange` reflect what the adapter will
+          // actually receive (vs the raw input form).
           emitTelemetry({
             tag:               "AI_TRADE_NORMALIZED",
             correlationId,
             userId:            u.userId,
             symbol,
-            normalizedSymbol:  symbol,
-            exchange:          u.exchange ?? null,
+            normalizedSymbol:  resolvedSymbol,
+            exchange:          resolvedExchange,
             runtimeMode:       "live",
             persistenceResult: "pending",
             positionId:        null,
@@ -1001,24 +1026,26 @@ async function autoExecute(
           signalId,
           fillPrice:         r.fillPrice ?? null,
         });
-        // LIVE_TRADES_HYDRATED — emitted AFTER POSITION_PERSISTED in the
-        // AI funnel (chain-order requirement). Only on success.
+        // Hydration: stream event + LIVE_TRADES_HYDRATED telemetry —
+        // both AFTER POSITION_PERSISTED so timing reconstruction lines
+        // up with real lifecycle order. Only on successful persistence.
         if (persistenceResult === "persisted") {
-          emitTelemetry({
-            tag:               "LIVE_TRADES_HYDRATED",
-            correlationId:     corrId,
-            userId:            r.userId,
+          notifyFillHydrated({
+            trigger:         "ai",
+            correlationId:   corrId,
+            userId:          r.userId,
             symbol,
-            normalizedSymbol:  symbol,
-            exchange:          r.exchange ?? null,
-            runtimeMode:       "live",
-            persistenceResult: "persisted",
-            positionId:        persistPid,
-            latencyMs:         0,
-            trigger:           "ai",
             side,
             sizeUSD,
-            signalId,
+            fillPrice:       r.fillPrice ?? null,
+            quantity:        r.quantity  ?? null,
+            exchange:        r.exchange  ?? null,
+            exchangeOrderId: r.exchangeOrderId ?? null,
+            positionId:      persistPid,
+            runtimeMode:     "live",
+            latencyMs:       0,
+            sandbox:         false,
+            dryRun:          r.dryRun === true,
           });
         }
       }

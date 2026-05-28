@@ -226,14 +226,19 @@ export async function snapshot(userId: string): Promise<ExecutionStateSnapshot> 
 
 // ── Gateway hook (telemetry-only) ───────────────────────────────────────
 
-/** Emit a `position_filled` stream event from the execution gateway on
- *  every successful customer order. Telemetry-only — no DB write
- *  (the legacy mirror in `userLiveOrder.ts` / `tradingLoop.ts` is still
- *  the writer until Step 5). Once Step 5 lands, those call sites will
- *  call `recordFill()` and this helper retires. */
-export function notifyFillExecuted(args: {
+/** Emit the post-persistence `position_filled` stream event AND
+ *  `[LIVE_TRADES_HYDRATED]` telemetry row. Phase 4 invariant: both
+ *  signals must fire in lifecycle order — strictly AFTER the legacy
+ *  mirror write (POSITION_PERSISTED) completes — so on-call timing
+ *  reconstruction (stream-delivery time === HYDRATED time) is honest.
+ *
+ *  Callers (`routes/userLiveOrder.ts`, `lib/tradingLoop.ts` fan-out)
+ *  invoke this exactly once per successful persisted fill. Both calls
+ *  are wrapped in try/catch internally — telemetry must never break
+ *  execution. */
+export function notifyFillHydrated(args: {
   trigger:         "manual" | "ai";
-  correlationId?:  string;
+  correlationId:   string;
   userId:          string;
   symbol:          string;
   side:            "BUY" | "SELL";
@@ -242,6 +247,9 @@ export function notifyFillExecuted(args: {
   quantity?:       number | null;
   exchange?:       string | null;
   exchangeOrderId?: string | null;
+  positionId?:     string | null;
+  runtimeMode:     "live" | "sandbox";
+  latencyMs?:      number;
   sandbox?:        boolean;
   dryRun?:         boolean;
 }): void {
@@ -255,11 +263,11 @@ export function notifyFillExecuted(args: {
       price:    args.fillPrice ?? undefined,
       exchange: args.exchange ?? undefined,
       mode:     args.sandbox || args.dryRun ? "test" : "live",
-      message:  `[POSITION_STORE] gateway notify ${args.trigger} ${args.symbol} ${args.side} $${args.sizeUSD}`,
+      message:  `[POSITION_STORE] hydrated ${args.trigger} ${args.symbol} ${args.side} $${args.sizeUSD}`,
       details: {
         gatewayNotify:   true,
         trigger:         args.trigger,
-        correlationId:   args.correlationId ?? null,
+        correlationId:   args.correlationId,
         userId:          args.userId,
         quantity:        args.quantity ?? null,
         exchangeOrderId: args.exchangeOrderId ?? null,
@@ -267,15 +275,25 @@ export function notifyFillExecuted(args: {
         dryRun:          args.dryRun === true,
       },
     });
-    // NOTE (Phase 4 chain order): LIVE_TRADES_HYDRATED is emitted from
-    // the caller (route handler / fan-out) AFTER POSITION_PERSISTED, not
-    // here. Emitting it inline would put HYDRATED before PERSISTED in the
-    // log chain — see chain spec in `executionTelemetry.ts` header.
+    emitTelemetry({
+      tag:               "LIVE_TRADES_HYDRATED",
+      correlationId:     args.correlationId,
+      userId:            args.userId,
+      symbol:            args.symbol,
+      normalizedSymbol:  args.symbol,
+      exchange:          args.exchange ?? null,
+      runtimeMode:       args.runtimeMode,
+      persistenceResult: "persisted",
+      positionId:        args.positionId ?? args.exchangeOrderId ?? null,
+      latencyMs:         args.latencyMs ?? 0,
+      trigger:           args.trigger,
+      side:              args.side,
+      sizeUSD:           args.sizeUSD,
+    });
   } catch (err) {
-    // Telemetry must never break execution. Log + swallow.
     logger.warn(
-      { err, userId: args.userId, symbol: args.symbol },
-      "positionStore.notifyFillExecuted failed (non-fatal)",
+      { err, userId: args.userId, symbol: args.symbol, correlationId: args.correlationId },
+      "positionStore.notifyFillHydrated failed (non-fatal)",
     );
   }
 }

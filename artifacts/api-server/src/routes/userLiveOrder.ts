@@ -22,6 +22,7 @@ import { registerLiveUserFill } from "../lib/userSimRegistry.js";
 import { TIER_MAX_SIZE_USD, type TierPlan } from "../lib/tierLimits.js";
 import { getSupportedExchanges, UnsupportedSymbolError } from "../lib/marketData.js";
 import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "../lib/executionTelemetry.js";
+import { notifyFillHydrated } from "../lib/positionStore.js";
 
 type Plan = TierPlan;
 const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, enterprise: 3 };
@@ -205,18 +206,22 @@ router.post(
     }
     const sizeUSD = requestedSize;
 
-    // [MANUAL_TRADE_NORMALIZED] — emitted after body parse + plan/cap
-    // gates pass and just before we hand off to the gateway. The symbol
-    // is already engine-native ("BTCUSD") from the client — adapter-
-    // specific normalization happens deeper inside placeLiveAutoOrderForUser
-    // but the request-time view of normalizedSymbol is the engine form.
+    // [MANUAL_TRADE_NORMALIZED] — emitted AFTER canonical symbol
+    // resolution. `getSupportedExchanges()` is the SoT for which adapter
+    // the gateway will route to; the first supported exchange is the
+    // resolved target. `normalizedSymbol` is the engine-canonical form
+    // (uppercased, whitespace-stripped) — the same value adapter
+    // normalization receives downstream.
+    const supportedForSymbol = getSupportedExchanges(parsed.symbol);
+    const resolvedSymbol     = parsed.symbol.trim().toUpperCase();
+    const resolvedExchange   = supportedForSymbol[0] ?? null;
     emitTelemetry({
       tag:               "MANUAL_TRADE_NORMALIZED",
       correlationId,
       userId,
       symbol:            parsed.symbol,
-      normalizedSymbol:  parsed.symbol,
-      exchange:          null,
+      normalizedSymbol:  resolvedSymbol,
+      exchange:          resolvedExchange,
       runtimeMode,
       persistenceResult: "pending",
       positionId:        null,
@@ -224,6 +229,7 @@ router.post(
       trigger:           "manual",
       side:              parsed.side,
       sizeUSD,
+      supportedExchanges: supportedForSymbol,
     });
 
     try {
@@ -328,25 +334,26 @@ router.post(
         sizeUSD,
         fillPrice:         result.fillPrice ?? null,
       });
-      // LIVE_TRADES_HYDRATED — strictly AFTER POSITION_PERSISTED so the
-      // grep chain reads in lifecycle order. Only emit when persistence
-      // succeeded (a failed mirror means the live-trades panel has
-      // nothing to hydrate).
+      // Hydration: stream event + LIVE_TRADES_HYDRATED telemetry — both
+      // strictly AFTER POSITION_PERSISTED so timing reconstruction lines
+      // up with real lifecycle order. Only on successful persistence.
       if (persistenceResult === "persisted") {
-        emitTelemetry({
-          tag:               "LIVE_TRADES_HYDRATED",
+        notifyFillHydrated({
+          trigger:         "manual",
           correlationId,
           userId,
-          symbol:            parsed.symbol,
-          normalizedSymbol:  parsed.symbol,
-          exchange:          result.exchange ?? null,
-          runtimeMode,
-          persistenceResult: "persisted",
-          positionId:        persistPid,
-          latencyMs:         Date.now() - acceptedAt,
-          trigger:           "manual",
-          side:              parsed.side,
+          symbol:          parsed.symbol,
+          side:            parsed.side,
           sizeUSD,
+          fillPrice:       result.fillPrice ?? null,
+          quantity:        result.quantity  ?? null,
+          exchange:        result.exchange  ?? null,
+          exchangeOrderId: result.exchangeOrderId ?? null,
+          positionId:      persistPid,
+          runtimeMode,
+          latencyMs:       Date.now() - acceptedAt,
+          sandbox:         parsed.useSandbox === true,
+          dryRun:          result.dryRun === true,
         });
       }
 

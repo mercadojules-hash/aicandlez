@@ -20,7 +20,10 @@ import {
   type LiveUserOrderRequest,
   type LiveUserOrderResult,
 } from "./liveUserExecution.js";
-import { notifyFillExecuted } from "./positionStore.js";
+// Phase 4 chain order: the gateway no longer emits position_filled or
+// LIVE_TRADES_HYDRATED. Callers fire `notifyFillHydrated()` AFTER the
+// legacy mirror write (POSITION_PERSISTED) so stream delivery and
+// telemetry chain order both reflect real lifecycle order.
 import {
   emit as emitTelemetry,
   genCorrelationId,
@@ -154,20 +157,7 @@ export async function executeCustomerOrder(
       },
       "[EXECUTION_GATEWAY_EXECUTED] customer order filled",
     );
-    notifyFillExecuted({
-      trigger,
-      correlationId,
-      userId:          legacyReq.userId,
-      symbol:          legacyReq.symbol,
-      side:            legacyReq.side,
-      sizeUSD:         legacyReq.sizeUSD,
-      fillPrice:       legacyResult.fillPrice ?? null,
-      quantity:        legacyResult.quantity ?? null,
-      exchange:        legacyResult.exchange ?? null,
-      exchangeOrderId: legacyResult.exchangeOrderId ?? null,
-      sandbox:         legacyReq.useSandbox === true,
-      dryRun:          legacyResult.dryRun === true,
-    });
+    // Hydration stream + telemetry deferred to caller (post-persist).
   }
 
   return { ...legacyResult, trigger, correlationId };
