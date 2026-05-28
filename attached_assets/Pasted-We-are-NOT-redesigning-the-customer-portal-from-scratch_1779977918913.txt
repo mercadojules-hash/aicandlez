@@ -1,0 +1,58 @@
+We are NOT redesigning the customer portal from scratch.
+
+The current investigation proved:
+
+* production deployments are healthy
+* backend/database fixes are healthy
+* routing is healthy
+* /portal IS mounting PortalCustomerShell
+* the currently-rendered battlefield layout is the active production customer shell
+
+However:
+
+The UI currently rendering in production is NOT the newer dashboard experience we were actively developing during recent passes.
+
+This means one of the following is true:
+
+* the newer dashboard exists in another component/file/package
+* the newer dashboard exists only in preview/dev code
+* the newer dashboard was never wired into PortalCustomerShell
+* the newer dashboard changes were applied to a different shell
+* or recent UI work modified adjacent systems without replacing the actual mounted customer layout
+
+This is NOT a request to redesign the portal from scratch.
+
+This is now a source-tracing task.
+
+Please audit the repo and identify:
+
+1. Where the newer customer dashboard implementation actually exists
+2. Which component/file contains the newer UI we were recently developing
+3. Whether that implementation:
+
+   * was never committed
+   * exists in another branch
+   * exists in another package/app
+   * exists behind a condition
+   * exists only in preview mode
+   * or was overwritten
+
+Specifically search for:
+
+* recent customer portal UI work
+* larger neon institutional layouts
+* expanded analytics containers
+* newer live-trading shell
+* top-crypto matrix implementations
+* recent portal passes
+* newer customer telemetry layouts
+* dashboard iterations from the recent pass work
+
+Goal:
+Locate the actual newer dashboard implementation we were actively building and determine why production PortalCustomerShell is not reflecting it.
+
+Do NOT redesign.
+Do NOT rewrite the portal.
+Do NOT replace architecture.
+
+This is now a repo archaeology / integration audit to locate the newer customer shell implementation that appears to have diverged from the currently-mounted production shell.
