@@ -47,6 +47,11 @@
 import { logger } from "./logger.js";
 import { executionStreamBus } from "./executionStreamBus.js";
 import {
+  emit               as emitTelemetry,
+  resolveCorrelation,
+  forgetCorrelation,
+} from "./executionTelemetry.js";
+import {
   placeUserOrder            as _placeUserOrder,
   registerLiveUserFill      as _registerLiveUserFill,
   closeUserPosition         as _closeUserPosition,
@@ -152,6 +157,37 @@ export async function closePosition(
         durationMs:     t.durationMs,
       },
     });
+    // Phase 4 (Task #209) — preserve the ORIGINAL trade correlationId
+    // through close so the lifecycle grep chain stays unbroken
+    // (REQUEST → ACCEPTED → PERSISTED → CLOSED, one id end-to-end). The
+    // chain was bridged by `rememberCorrelation(positionId, corrId)` at
+    // persistence sites (userLiveOrder.ts mirror, tradingLoop.ts fan-out
+    // mirror, paper openPosition above). If unknown (process restart),
+    // fall back to a deterministic close-id so the row still validates.
+    const origCorr = resolveCorrelation(positionId)
+      ?? resolveCorrelation(t.exchangeOrderId ?? null)
+      ?? `close-${positionId}`;
+    emitTelemetry({
+      tag:               "POSITION_CLOSED",
+      correlationId:     origCorr,
+      userId,
+      symbol:            t.symbol,
+      normalizedSymbol:  t.symbol,
+      exchange:          t.exchange ?? null,
+      runtimeMode:       isLive ? "live" : "paper",
+      persistenceResult: "persisted",
+      positionId,
+      latencyMs:         t.durationMs ?? 0,
+      trigger:           "system",
+      side:              t.side,
+      sizeUSD:           t.sizeUSD,
+      realizedPnL:       t.realizedPnL,
+      realizedPnLPct:    t.realizedPnLPct,
+      closeReason,
+    });
+    // Bound the in-memory positionId→correlationId map.
+    forgetCorrelation(positionId);
+    if (t.exchangeOrderId) forgetCorrelation(t.exchangeOrderId);
   }
   return result;
 }
@@ -189,6 +225,7 @@ export async function snapshot(userId: string): Promise<ExecutionStateSnapshot> 
  *  call `recordFill()` and this helper retires. */
 export function notifyFillExecuted(args: {
   trigger:         "manual" | "ai";
+  correlationId?:  string;
   userId:          string;
   symbol:          string;
   side:            "BUY" | "SELL";
@@ -214,6 +251,7 @@ export function notifyFillExecuted(args: {
       details: {
         gatewayNotify:   true,
         trigger:         args.trigger,
+        correlationId:   args.correlationId ?? null,
         userId:          args.userId,
         quantity:        args.quantity ?? null,
         exchangeOrderId: args.exchangeOrderId ?? null,
@@ -221,6 +259,26 @@ export function notifyFillExecuted(args: {
         dryRun:          args.dryRun === true,
       },
     });
+    // Phase 4 (Task #209) — emit LIVE_TRADES_HYDRATED on every gateway-
+    // notify so the customer's live-trades panel hydration funnel shows
+    // up in the correlationId grep chain. Rate-limited 1/sec/user.
+    if (args.correlationId) {
+      emitTelemetry({
+        tag:               "LIVE_TRADES_HYDRATED",
+        correlationId:     args.correlationId,
+        userId:            args.userId,
+        symbol:            args.symbol,
+        normalizedSymbol:  args.symbol,
+        exchange:          args.exchange ?? null,
+        runtimeMode:       args.sandbox || args.dryRun ? "sandbox" : "live",
+        persistenceResult: "persisted",
+        positionId:        args.exchangeOrderId ?? null,
+        latencyMs:         0,
+        trigger:           args.trigger,
+        side:              args.side,
+        sizeUSD:           args.sizeUSD,
+      });
+    }
   } catch (err) {
     // Telemetry must never break execution. Log + swallow.
     logger.warn(

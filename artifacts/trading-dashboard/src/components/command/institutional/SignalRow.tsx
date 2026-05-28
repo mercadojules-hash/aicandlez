@@ -341,6 +341,7 @@ export function SignalRow({ spec, breakdown }: Props) {
   /** Submit a real-money order through the user's connected exchange. */
   const submitLive = async (
     sym: string, side: "BUY" | "SELL", sizeUSD: number, useSandbox: boolean = false,
+    correlationId?: string,
   ): Promise<{
     ok: boolean;
     error?: string;
@@ -350,6 +351,7 @@ export function SignalRow({ spec, breakdown }: Props) {
     fillPrice?: number;
     exchangeOrderId?: string;
     dryRun?: boolean;
+    correlationId?: string;
   }> => {
     try {
       const token = await getToken().catch(() => null);
@@ -359,9 +361,11 @@ export function SignalRow({ spec, breakdown }: Props) {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(correlationId ? { "X-Correlation-Id": correlationId } : {}),
         },
         body: JSON.stringify({ symbol: sym, side, sizeUSD, useSandbox }),
       });
+      const echoedId = res.headers.get("X-Correlation-Id") ?? correlationId;
       if (!res.ok) {
         // Propagate the structured error envelope so the LIVE-rejection
         // path can render the supported-venue hint ("supported on KRAKEN")
@@ -378,6 +382,7 @@ export function SignalRow({ spec, breakdown }: Props) {
           errorCode:          body.errorCode,
           supportedExchanges: body.supportedExchanges,
           exchange:           body.exchange,
+          correlationId:      echoedId ?? undefined,
         };
       }
       const body = (await res.json().catch(() => ({}))) as {
@@ -392,6 +397,7 @@ export function SignalRow({ spec, breakdown }: Props) {
         exchange:        body.exchange,
         exchangeOrderId: body.exchangeOrderId,
         dryRun:          body.dryRun,
+        correlationId:   echoedId ?? undefined,
       };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -529,22 +535,28 @@ export function SignalRow({ spec, breakdown }: Props) {
         });
         return;
       }
-      // [MANUAL_TRADE_REQUEST] — client-side structured log so on-call can
-      // grep the funnel across browser sessions when triaging customer
-      // reports. Mirrors the server tag emitted in /api/user/live-order.
+      // Phase 4 (Task #209) — client-minted correlationId stamped on the
+      // X-Correlation-Id header and on the client console MANUAL_TRADE_*
+      // tags. Server echoes it back so on-call greps one id from browser
+      // console → pino → trade history.
+      const correlationId =
+        (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+          ? crypto.randomUUID()
+          : `cid-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       console.info("[MANUAL_TRADE_REQUEST]", {
+        correlationId,
         symbol:    spec.symbol,
         side,
         sizeUSD:   liveSize,
         runtime:   "LIVE",
-        exchange:  null, // unknown until server resolves user's connection
+        exchange:  null,
         confidence: conf,
       });
       toast({
         title: `LIVE ORDER SUBMITTED — ${spec.label}`,
         description: `${side} · routing to your connected exchange · $${liveSize} notional · AI ${conf}%`,
       });
-      void submitLive(spec.symbol, side === "LONG" ? "BUY" : "SELL", liveSize).then(r => {
+      void submitLive(spec.symbol, side === "LONG" ? "BUY" : "SELL", liveSize, false, correlationId).then(r => {
         if (!r.ok) {
           // 2026-05 unification — NEVER silently fall back to PAPER when the
           // customer is in LIVE runtime with an armed exchange. Surface the
@@ -557,6 +569,7 @@ export function SignalRow({ spec, breakdown }: Props) {
             ? ` · supported on ${supported.join(", ").toUpperCase()}`
             : "";
           console.error("[MANUAL_TRADE_REJECTED]", {
+            correlationId:    r.correlationId ?? correlationId,
             symbol:           spec.symbol,
             side,
             runtime:          "LIVE",
@@ -578,6 +591,7 @@ export function SignalRow({ spec, breakdown }: Props) {
           return;
         }
         console.info("[MANUAL_TRADE_EXECUTED]", {
+          correlationId:     r.correlationId ?? correlationId,
           symbol:            spec.symbol,
           side,
           runtime:           "LIVE",

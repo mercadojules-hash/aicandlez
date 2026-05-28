@@ -124,6 +124,7 @@ export function SignalRow({ spec, breakdown }: Props) {
   /** Submit a real-money order through the user's connected exchange. */
   const submitLive = async (
     sym: string, side: "BUY" | "SELL", sizeUSD: number,
+    correlationId?: string,
   ): Promise<{
     ok: boolean;
     error?: string;
@@ -133,13 +134,18 @@ export function SignalRow({ spec, breakdown }: Props) {
     fillPrice?: number;
     exchangeOrderId?: string;
     dryRun?: boolean;
+    correlationId?: string;
   }> => {
     try {
       const res = await authFetch(`/api/user/live-order`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(correlationId ? { "X-Correlation-Id": correlationId } : {}),
+        },
         body: JSON.stringify({ symbol: sym, side, sizeUSD }),
       });
+      const echoedId = res.headers.get("X-Correlation-Id") ?? correlationId;
       if (!res.ok) {
         // Propagate structured error envelope so LIVE-reject UI can
         // render supported-venue hints + structured rejection logs.
@@ -155,6 +161,7 @@ export function SignalRow({ spec, breakdown }: Props) {
           errorCode:          body.errorCode,
           supportedExchanges: body.supportedExchanges,
           exchange:           body.exchange,
+          correlationId:      echoedId ?? undefined,
         };
       }
       const body = (await res.json().catch(() => ({}))) as {
@@ -169,6 +176,7 @@ export function SignalRow({ spec, breakdown }: Props) {
         exchange:        body.exchange,
         exchangeOrderId: body.exchangeOrderId,
         dryRun:          body.dryRun,
+        correlationId:   echoedId ?? undefined,
       };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -205,8 +213,15 @@ export function SignalRow({ spec, breakdown }: Props) {
     // LIVE routing — when the customer has a paid plan + live-active broker.
     // Free / paper / disconnected users continue on the paper path.
     if (canRouteLive) {
-      // [MANUAL_TRADE_REQUEST] — mirror of trading-dashboard SignalRow.
+      // Phase 4 (Task #209) — client-minted correlationId carried via
+      // X-Correlation-Id header + every client console MANUAL_TRADE_*
+      // log so the funnel is grep-correlatable end-to-end.
+      const correlationId =
+        (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+          ? crypto.randomUUID()
+          : `cid-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       console.info("[MANUAL_TRADE_REQUEST]", {
+        correlationId,
         symbol:     spec.symbol,
         side,
         sizeUSD:    100,
@@ -218,7 +233,7 @@ export function SignalRow({ spec, breakdown }: Props) {
         title: `LIVE ORDER SUBMITTED — ${spec.label}`,
         description: `${side} · routing to your connected exchange · AI ${conf}%`,
       });
-      void submitLive(spec.symbol, side === "LONG" ? "BUY" : "SELL", 100).then(r => {
+      void submitLive(spec.symbol, side === "LONG" ? "BUY" : "SELL", 100, correlationId).then(r => {
         if (!r.ok) {
           // 2026-05 unification — never silently fall back to PAPER in
           // LIVE runtime. Surface the structured server error so the
@@ -229,6 +244,7 @@ export function SignalRow({ spec, breakdown }: Props) {
             ? ` · supported on ${supported.join(", ").toUpperCase()}`
             : "";
           console.error("[MANUAL_TRADE_REJECTED]", {
+            correlationId:     r.correlationId ?? correlationId,
             symbol:            spec.symbol,
             side,
             runtime:           "LIVE",
@@ -253,6 +269,7 @@ export function SignalRow({ spec, breakdown }: Props) {
           return;
         }
         console.info("[MANUAL_TRADE_EXECUTED]", {
+          correlationId:     r.correlationId ?? correlationId,
           symbol:            spec.symbol,
           side,
           runtime:           "LIVE",

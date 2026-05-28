@@ -6,8 +6,10 @@
  * engaged. Free tier and missing-connection cases are rejected; the client
  * is expected to fall back to PAPER and surface a one-shot toast.
  *
- * Admins never call this endpoint — their /portal is admin-only and uses
- * server-side env Kraken keys via /api/exchange/order/execute (operator-only).
+ * Phase 4 (Task #209) — accepts `X-Correlation-Id` from the client (or
+ * mints one) and threads it through every downstream telemetry row +
+ * echoes it back in the response header so the client log chain stays
+ * linked end-to-end.
  */
 
 import { Router, type IRouter } from "express";
@@ -19,6 +21,7 @@ import { executeCustomerOrder } from "../lib/executionGateway.js";
 import { registerLiveUserFill } from "../lib/userSimRegistry.js";
 import { TIER_MAX_SIZE_USD, type TierPlan } from "../lib/tierLimits.js";
 import { getSupportedExchanges, UnsupportedSymbolError } from "../lib/marketData.js";
+import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "../lib/executionTelemetry.js";
 
 type Plan = TierPlan;
 const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, enterprise: 3 };
@@ -48,30 +51,31 @@ router.post(
   "/user/live-order",
   requireAuth,
   async (req, res): Promise<void> => {
+    // ── Phase 4 correlationId resolution ───────────────────────────────
+    // Accept client-minted UUID via X-Correlation-Id; fall back to a
+    // freshly minted one. Echo back as both response header and JSON
+    // field so the client can stamp its [MANUAL_TRADE_EXECUTED] /
+    // [MANUAL_TRADE_REJECTED] logs with the same id and on-call can
+    // grep one id across the full funnel.
+    const headerId = req.get("X-Correlation-Id");
+    const correlationId = headerId && headerId.length >= 8 && headerId.length <= 64
+      ? headerId
+      : genCorrelationId();
+    res.setHeader("X-Correlation-Id", correlationId);
+    const acceptedAt = Date.now();
+
     const parsed = parseBody(req.body);
     if (!parsed) {
-      res.status(400).json({ error: "Invalid request body" });
+      res.status(400).json({ error: "Invalid request body", correlationId });
       return;
     }
 
     const userId = (req as { auth?: { userId?: string } }).auth?.userId;
     if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized", correlationId });
       return;
     }
 
-    // Per-tier risk cap. Customers may pick their own per-trade size in the
-    // Portal SignalRow size picker; the request body carries the chosen
-    // sizeUSD. We enforce the tier cap server-side regardless — the client
-    // hint is advisory. Default to $100 when the client omits the field
-    // (legacy callers / paranoid fallback).
-    //
-    // Sandbox / testnet flow: when `useSandbox` is true, the order routes
-    // through the exchange's public testnet (no real money). We still
-    // require an exchange that supports a sandbox host (`hasSandbox`) and
-    // an authenticated user — but we bypass the plan paywall and the
-    // per-tier sizeUSD ceiling, since sandbox is the paper-trading path.
-    // The 100_000 schema cap in parseBody remains the absolute ceiling.
     const requestedSize = parsed.sizeUSD ?? DEFAULT_SIZE_USD;
     let userPlan: Plan = "free";
     let isOperator = false;
@@ -85,32 +89,78 @@ router.post(
       userPlan   = (u?.plan ?? "free") as Plan;
     } catch (err) {
       req.log.warn(
-        { userId, err: err instanceof Error ? err.message : String(err) },
+        { userId, correlationId, err: err instanceof Error ? err.message : String(err) },
         "userLiveOrder: tier lookup failed — falling back to free plan",
       );
     }
 
-    // Customer-portal live-execution kill switch (Task #157). Non-admin
-    // callers are hard-rejected unless the global flag is explicitly
-    // re-enabled via env. Same gate as `placeLiveAutoOrderForUser` —
-    // duplicated here so we don't even hit the tier-cap branch from a
-    // leaked client. Sandbox calls are blocked too (still hit broker net).
+    const runtimeMode = parsed.useSandbox ? "sandbox" : "live";
+
+    // [MANUAL_TRADE_REQUEST] — Phase 4 canonical row. Server-stamped on
+    // receipt even when the client also emits one (the client emit lives
+    // in the browser console; the server emit lives in pino).
+    emitTelemetry({
+      tag:               "MANUAL_TRADE_REQUEST",
+      correlationId,
+      userId,
+      symbol:            parsed.symbol,
+      normalizedSymbol:  parsed.symbol,
+      exchange:          null,
+      runtimeMode,
+      persistenceResult: "pending",
+      positionId:        null,
+      latencyMs:         0,
+      trigger:           "manual",
+      side:              parsed.side,
+      sizeUSD:           requestedSize,
+      isOperator,
+      userPlan,
+    });
+
     if (!isOperator && !isCustomerLiveExecutionEnabled()) {
-      req.log.warn(
-        { userId, symbol: parsed.symbol, side: parsed.side },
-        "userLiveOrder: rejected — customer_live_execution_disabled",
-      );
+      emitTelemetry({
+        tag:               "EXECUTION_REJECTED",
+        correlationId,
+        userId,
+        symbol:            parsed.symbol,
+        normalizedSymbol:  parsed.symbol,
+        exchange:          null,
+        runtimeMode,
+        persistenceResult: "skipped",
+        positionId:        null,
+        latencyMs:         Date.now() - acceptedAt,
+        rejectionReason:   "customer_live_execution_disabled",
+        trigger:           "manual",
+        side:              parsed.side,
+        sizeUSD:           requestedSize,
+      });
       res.status(403).json({
         ok:        false,
         errorCode: "customer_live_execution_disabled",
         error:     "Live execution is operated by AICandlez and is not available from the customer portal.",
+        correlationId,
       });
       return;
     }
 
     if (!parsed.useSandbox) {
-      // Real-money path → enforce plan gate + tier cap.
       if (!isOperator && (PLAN_RANK[userPlan] ?? 0) < PLAN_RANK.starter) {
+        emitTelemetry({
+          tag:               "EXECUTION_REJECTED",
+          correlationId,
+          userId,
+          symbol:            parsed.symbol,
+          normalizedSymbol:  parsed.symbol,
+          exchange:          null,
+          runtimeMode,
+          persistenceResult: "skipped",
+          positionId:        null,
+          latencyMs:         Date.now() - acceptedAt,
+          rejectionReason:   "MEMBERSHIP_REQUIRED",
+          trigger:           "manual",
+          side:              parsed.side,
+          sizeUSD:           requestedSize,
+        });
         res.status(402).json({
           ok:           false,
           errorCode:    "MEMBERSHIP_REQUIRED",
@@ -118,6 +168,7 @@ router.post(
           currentPlan:  userPlan,
           requiredPlan: "starter",
           upgradeUrl:   "/subscribe",
+          correlationId,
         });
         return;
       }
@@ -125,98 +176,88 @@ router.post(
         ? 100_000
         : (TIER_MAX_SIZE_USD[userPlan] ?? 0);
       if (requestedSize > tierCap) {
+        emitTelemetry({
+          tag:               "EXECUTION_REJECTED",
+          correlationId,
+          userId,
+          symbol:            parsed.symbol,
+          normalizedSymbol:  parsed.symbol,
+          exchange:          null,
+          runtimeMode,
+          persistenceResult: "skipped",
+          positionId:        null,
+          latencyMs:         Date.now() - acceptedAt,
+          rejectionReason:   "SIZE_EXCEEDS_TIER_CAP",
+          trigger:           "manual",
+          side:              parsed.side,
+          sizeUSD:           requestedSize,
+          tierCap,
+        });
         res.status(409).json({
           ok:        false,
           errorCode: "SIZE_EXCEEDS_TIER_CAP",
           error:     `Order size $${requestedSize} exceeds your plan's per-trade cap of $${tierCap}`,
           tierCap,
+          correlationId,
         });
         return;
       }
     }
     const sizeUSD = requestedSize;
 
-    // [MANUAL_TRADE_REQUEST] — structured request log so on-call can
-    // grep one tag across the manual-BUY funnel + correlate against
-    // [MANUAL_TRADE_EXECUTED]/[MANUAL_TRADE_REJECTED] for the same
-    // request. `runtime` is "live" or "sandbox"; the actual exchange
-    // is unknown until `placeLiveAutoOrderForUser` resolves it.
-    req.log.info(
-      {
-        tag:               "MANUAL_TRADE_REQUEST",
-        userId,
-        normalizedSymbol:  parsed.symbol,
-        side:              parsed.side,
-        sizeUSD,
-        runtime:           parsed.useSandbox ? "sandbox" : "live",
-        // Unknown at request time — resolved by placeLiveAutoOrderForUser.
-        // Kept as a null placeholder for grep-friendly schema uniformity
-        // across REQUEST/EXECUTED/REJECTED tags.
-        exchange:          null,
-        persistenceResult: null,
-        positionId:        null,
-        rejectionReason:   null,
-        isOperator,
-        userPlan,
-      },
-      "[MANUAL_TRADE_REQUEST] manual customer order received",
-    );
+    // [MANUAL_TRADE_NORMALIZED] — emitted after body parse + plan/cap
+    // gates pass and just before we hand off to the gateway. The symbol
+    // is already engine-native ("BTCUSD") from the client — adapter-
+    // specific normalization happens deeper inside placeLiveAutoOrderForUser
+    // but the request-time view of normalizedSymbol is the engine form.
+    emitTelemetry({
+      tag:               "MANUAL_TRADE_NORMALIZED",
+      correlationId,
+      userId,
+      symbol:            parsed.symbol,
+      normalizedSymbol:  parsed.symbol,
+      exchange:          null,
+      runtimeMode,
+      persistenceResult: "pending",
+      positionId:        null,
+      latencyMs:         Date.now() - acceptedAt,
+      trigger:           "manual",
+      side:              parsed.side,
+      sizeUSD,
+    });
 
     try {
-      // Phase-1 unification (Task #206): manual customer BUY/SELL routes
-      // through the single execution gateway alongside the AI fan-out so
-      // both surfaces emit the canonical `[EXECUTION_GATEWAY_*]` log tags
-      // with `trigger: "manual"`. Behavior is byte-identical to the prior
-      // direct `placeLiveAutoOrderForUser` call.
       const result = await executeCustomerOrder({
-        trigger:    "manual",
+        trigger:       "manual",
         userId,
-        symbol:     parsed.symbol,
-        side:       parsed.side,
+        symbol:        parsed.symbol,
+        side:          parsed.side,
         sizeUSD,
-        useSandbox: parsed.useSandbox,
+        useSandbox:    parsed.useSandbox,
+        correlationId,
       });
 
       if (!result.success) {
-        req.log.warn(
-          {
-            tag:               "MANUAL_TRADE_REJECTED",
-            userId,
-            normalizedSymbol:  parsed.symbol,
-            exchange:          result.exchange,
-            runtime:           parsed.useSandbox ? "sandbox" : "live",
-            persistenceResult: "skipped",
-            positionId:        null,
-            rejectionReason:   result.errorCode ?? "unknown",
-            error:             result.error,
-          },
-          "[MANUAL_TRADE_REJECTED] placement failed",
-        );
-        // unsupported_symbol → 400 (client error). Everything else → 409.
+        // Gateway already emitted [EXECUTION_REJECTED]; route handler
+        // doesn't re-emit. Echo correlationId in the response body so the
+        // client can correlate the toast back to the funnel.
         const status = result.errorCode === "unsupported_symbol" ? 400 : 409;
         res.status(status).json({
           ok:                 false,
           errorCode:          result.errorCode,
           error:              result.error,
           exchange:           result.exchange,
-          // Echo supportedExchanges so the client can render
-          // "Not on Coinbase — try Kraken" without re-deriving.
           supportedExchanges: result.errorCode === "unsupported_symbol"
             ? getSupportedExchanges(parsed.symbol)
             : undefined,
+          correlationId,
         });
         return;
       }
 
-      // Track persistence outcome for the [MANUAL_TRADE_EXECUTED] log
-      // emitted below. Flipped to "failed" inside the mirror catch.
       let persistenceResult: "persisted" | "failed" | "skipped" = "persisted";
+      let mirroredPositionId: string | null = null;
 
-      // Mirror the live fill into the user's sim registry (cache + DB) so the
-      // position appears immediately in the customer's portal panels
-      // (`/api/simulation/account`, `/api/simulation/trades`) with `exchange`
-      // populated → Trade History/Active Trades render the LIVE chip.
-      // SL/TP defaults mirror SignalRow's PAPER fallback (2% / 4.5%).
       try {
         const entry = result.fillPrice ?? 0;
         const qty   = result.quantity  ?? (entry > 0 ? sizeUSD / entry : 0);
@@ -229,7 +270,9 @@ router.post(
           const tp = parsed.side === "BUY"
             ? entry * (1 + TP_PCT / 100)
             : entry * (1 - TP_PCT / 100);
-          await registerLiveUserFill({
+          const orderId = result.exchangeOrderId
+            ?? `LIVE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          const pos = await registerLiveUserFill({
             userId,
             symbol:                 parsed.symbol,
             side:                   parsed.side,
@@ -239,44 +282,51 @@ router.post(
             stopLoss:               parseFloat(sl.toFixed(2)),
             takeProfit:             parseFloat(tp.toFixed(2)),
             exchange:               result.exchange ?? "unknown",
-            exchangeOrderId:        result.exchangeOrderId
-                                    ?? `LIVE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            exchangeOrderId:        orderId,
             entryFeeBroker:         result.brokerFee,
             entryFeeBrokerCurrency: result.brokerFeeCurrency,
             sandbox:                parsed.useSandbox,
           });
+          mirroredPositionId = pos?.id ?? orderId;
         }
       } catch (mirrorErr) {
-        // Mirror failure is non-fatal — the broker order is still placed.
         persistenceResult = "failed";
         req.log.warn(
           {
-            tag:               "MANUAL_TRADE_EXECUTED",
+            correlationId,
             userId,
-            normalizedSymbol:  parsed.symbol,
-            exchange:          result.exchange,
-            runtime:           parsed.useSandbox ? "sandbox" : "live",
-            persistenceResult,
-            positionId:        null,
-            err:               mirrorErr instanceof Error ? mirrorErr.message : String(mirrorErr),
+            err: mirrorErr instanceof Error ? mirrorErr.message : String(mirrorErr),
           },
-          "[MANUAL_TRADE_EXECUTED] registerLiveUserFill failed (broker fill still placed)",
+          "userLiveOrder: registerLiveUserFill failed (broker fill still placed)",
         );
       }
 
-      req.log.info(
-        {
-          tag:               "MANUAL_TRADE_EXECUTED",
-          userId,
-          normalizedSymbol:  parsed.symbol,
-          exchange:          result.exchange,
-          runtime:           parsed.useSandbox ? "sandbox" : "live",
-          persistenceResult,
-          positionId:        result.exchangeOrderId ?? null,
-          fillPrice:         result.fillPrice,
-        },
-        "[MANUAL_TRADE_EXECUTED] broker fill confirmed",
-      );
+      // [POSITION_PERSISTED] — canonical Phase 4 row after the legacy
+      // mirror completes. persistenceResult reflects the actual outcome
+      // ("persisted" | "failed"); LIVE_TRADES_HYDRATED already fired
+      // from `notifyFillExecuted` inside the gateway. Remember the
+      // positionId→correlationId mapping so the eventual close emit
+      // (loop-driven, no upstream id) can preserve the chain.
+      if (persistenceResult === "persisted") {
+        rememberCorrelation(mirroredPositionId, correlationId);
+        rememberCorrelation(result.exchangeOrderId ?? null, correlationId);
+      }
+      emitTelemetry({
+        tag:               "POSITION_PERSISTED",
+        correlationId,
+        userId,
+        symbol:            parsed.symbol,
+        normalizedSymbol:  parsed.symbol,
+        exchange:          result.exchange ?? null,
+        runtimeMode,
+        persistenceResult,
+        positionId:        mirroredPositionId ?? result.exchangeOrderId ?? null,
+        latencyMs:         Date.now() - acceptedAt,
+        trigger:           "manual",
+        side:              parsed.side,
+        sizeUSD,
+        fillPrice:         result.fillPrice ?? null,
+      });
 
       res.json({
         ok:              true,
@@ -285,31 +335,30 @@ router.post(
         fillPrice:       result.fillPrice,
         quantity:        result.quantity,
         dryRun:          result.dryRun ?? false,
+        correlationId,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // 2026-05 unification — prefer the typed `UnsupportedSymbolError`
-      // (thrown by adapters whose `normaliseSymbol` no longer silently
-      // synthesizes pairs). Fall back to the legacy regex on .message
-      // for any unconverted adapter or for the plain Error thrown by
-      // BaseExchangeAdapter.normaliseSymbolGeneric.
       const isUnsupported =
         err instanceof UnsupportedSymbolError ||
         /^Unsupported symbol:/.test(msg);
-      req.log.error(
-        {
-          tag:               "MANUAL_TRADE_REJECTED",
-          userId,
-          normalizedSymbol:  parsed.symbol,
-          exchange:          null,
-          runtime:           parsed.useSandbox ? "sandbox" : "live",
-          persistenceResult: "skipped",
-          positionId:        null,
-          rejectionReason:   isUnsupported ? "unsupported_symbol" : "internal_error",
-          error:             msg,
-        },
-        "[MANUAL_TRADE_REJECTED] unexpected error",
-      );
+      emitTelemetry({
+        tag:               "EXECUTION_REJECTED",
+        correlationId,
+        userId,
+        symbol:            parsed.symbol,
+        normalizedSymbol:  parsed.symbol,
+        exchange:          null,
+        runtimeMode,
+        persistenceResult: "skipped",
+        positionId:        null,
+        latencyMs:         Date.now() - acceptedAt,
+        rejectionReason:   isUnsupported ? "unsupported_symbol" : "internal_error",
+        trigger:           "manual",
+        side:              parsed.side,
+        sizeUSD,
+        error:             msg,
+      });
       res.status(isUnsupported ? 400 : 500).json({
         ok:                 false,
         errorCode:          isUnsupported ? "unsupported_symbol" : "internal_error",
@@ -317,6 +366,7 @@ router.post(
         supportedExchanges: isUnsupported
           ? getSupportedExchanges(parsed.symbol)
           : undefined,
+        correlationId,
       });
     }
   },

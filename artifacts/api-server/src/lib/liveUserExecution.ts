@@ -70,6 +70,13 @@ export interface LiveUserOrderRequest {
    * the caller must fall back to the internal simulator and never set this.
    */
   useSandbox?: boolean;
+  /**
+   * Phase 4 (Task #209) — canonical correlationId stamped on every
+   * downstream telemetry row. Optional so existing internal callers don't
+   * have to thread one in for unit tests; the gateway / route handlers
+   * always pass one through in production.
+   */
+  correlationId?: string;
 }
 
 export interface LiveUserOrderResult {

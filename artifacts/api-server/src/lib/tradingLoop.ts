@@ -15,6 +15,7 @@ import {
 } from "./liveUserExecution.js";
 import { executeCustomerOrder } from "./executionGateway.js";
 import { registerLiveUserFill } from "./userSimRegistry.js";
+import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "./executionTelemetry.js";
 import { validateTrade } from "./riskEngine.js";
 import { checkTrailingStops } from "./trailingStopEngine.js";
 import { computeCorrelationMatrix } from "./correlationEngine.js";
@@ -875,16 +876,33 @@ async function autoExecute(
         error:   err instanceof Error ? err.message : String(err),
       })),
       Promise.all(
-        liveUsers.map((u) =>
-          // Phase-1 unification (Task #206): AI fan-out routes through
-          // the single execution gateway alongside the manual portal
-          // BUY/SELL path. Behavior-preserving — the gateway delegates
-          // to `placeLiveAutoOrderForUser` and adds canonical
-          // `[EXECUTION_GATEWAY_*]` log tags with `trigger: "ai"`.
-          executeCustomerOrder({
-            trigger: "ai",
-            userId:  u.userId,
+        liveUsers.map((u) => {
+          // Phase 4 (Task #209) — one correlationId per (user, symbol, tick)
+          // so the AI fan-out funnel is grep-correlatable end-to-end. Emit
+          // [AI_TRADE_REQUEST] before handing off so on-call can see the
+          // request before any gateway/exec gate fires.
+          const correlationId = genCorrelationId();
+          emitTelemetry({
+            tag:               "AI_TRADE_REQUEST",
+            correlationId,
+            userId:            u.userId,
+            symbol,
+            normalizedSymbol:  symbol,
+            exchange:          u.exchange ?? null,
+            runtimeMode:       "live",
+            persistenceResult: "pending",
+            positionId:        null,
+            latencyMs:         0,
+            trigger:           "ai",
+            side,
+            sizeUSD,
+            signalId,
+          });
+          return executeCustomerOrder({
+            trigger:       "ai",
+            userId:        u.userId,
             symbol, side, sizeUSD,
+            correlationId,
           }).catch(
             (err): LiveUserOrderResult => ({
               success:   false,
@@ -893,8 +911,8 @@ async function autoExecute(
               errorCode: "exchange_reject",
               error:     err instanceof Error ? err.message : String(err),
             }),
-          ),
-        ),
+          );
+        }),
       ),
     ]);
 
@@ -902,12 +920,16 @@ async function autoExecute(
     // so the position appears immediately in the customer's portal.
     const userSuccesses = userResults.filter((r) => r.success);
     for (const r of userSuccesses) {
+      const corrId = (r as LiveUserOrderResult & { correlationId?: string }).correlationId;
+      let persistenceResult: "persisted" | "failed" = "persisted";
+      let mirroredPositionId: string | null = null;
       try {
         const userEntry = r.fillPrice ?? price;
         const userQty   = r.quantity  ?? sizeUSD / userEntry;
         const userSL    = side === "BUY" ? userEntry * (1 - settings.stopLossPercent   / 100) : userEntry * (1 + settings.stopLossPercent   / 100);
         const userTP    = side === "BUY" ? userEntry * (1 + settings.takeProfitPercent / 100) : userEntry * (1 - settings.takeProfitPercent / 100);
-        await registerLiveUserFill({
+        const orderId = r.exchangeOrderId ?? `LIVE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const pos = await registerLiveUserFill({
           userId:          r.userId,
           symbol,
           side,
@@ -918,15 +940,45 @@ async function autoExecute(
           stopLoss:        parseFloat(userSL.toFixed(2)),
           takeProfit:      parseFloat(userTP.toFixed(2)),
           exchange:        r.exchange ?? "unknown",
-          exchangeOrderId: r.exchangeOrderId ?? `LIVE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          exchangeOrderId: orderId,
           entryFeeBroker:         r.brokerFee,
           entryFeeBrokerCurrency: r.brokerFeeCurrency,
         });
+        mirroredPositionId = pos?.id ?? orderId;
       } catch (e) {
+        persistenceResult = "failed";
         logger.warn(
-          { userId: r.userId, exchange: r.exchange, err: e instanceof Error ? e.message : String(e) },
+          { userId: r.userId, exchange: r.exchange, correlationId: corrId, err: e instanceof Error ? e.message : String(e) },
           "Live fan-out: failed to mirror fill into sim registry",
         );
+      }
+      // Phase 4 (Task #209) — POSITION_PERSISTED canonical row stamped
+      // with the gateway-returned correlationId so the AI funnel grep
+      // chain stays linked through the persistence step. Also remember
+      // the positionId→correlationId mapping so the eventual close emit
+      // (loop-driven trailing stop / SL / TP / manual) preserves the chain.
+      if (corrId && persistenceResult === "persisted") {
+        rememberCorrelation(mirroredPositionId, corrId);
+        rememberCorrelation(r.exchangeOrderId ?? null, corrId);
+      }
+      if (corrId) {
+        emitTelemetry({
+          tag:               "POSITION_PERSISTED",
+          correlationId:     corrId,
+          userId:            r.userId,
+          symbol,
+          normalizedSymbol:  symbol,
+          exchange:          r.exchange ?? null,
+          runtimeMode:       "live",
+          persistenceResult,
+          positionId:        mirroredPositionId ?? r.exchangeOrderId ?? null,
+          latencyMs:         0,
+          trigger:           "ai",
+          side,
+          sizeUSD,
+          signalId,
+          fillPrice:         r.fillPrice ?? null,
+        });
       }
     }
 
