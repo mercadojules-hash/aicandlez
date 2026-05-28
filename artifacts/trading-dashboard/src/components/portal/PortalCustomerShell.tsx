@@ -31,6 +31,7 @@ import {
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getArmedForLive, setArmedForLive } from "@/hooks/useArmedForLive";
+import { useStrictRuntimeMode } from "@/hooks/useStrictRuntimeMode";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAuth, useClerk, useUser } from "@clerk/react";
 import {
@@ -4461,6 +4462,7 @@ function CustomerStatusChip({ label, value, color }: { label: string; value: str
 function MyAccountRailPaper({
   equityUsd, todayPnl, realized, unrealized, fillsToday, openCount,
   history, engine, entitled = false, liveMode = false, liveExchange = null,
+  strictRuntime = false,
 }: {
   equityUsd:   number;
   todayPnl:    number;
@@ -4479,6 +4481,12 @@ function MyAccountRailPaper({
      misclassifying real capital as simulated. */
   liveMode?:     boolean;
   liveExchange?: string | null;
+  /* Phase 3 Step 2b — under strict runtime mode, when `liveMode` is
+     false but the runtime aggregator hasn't confirmed a paper-only
+     state, render "resyncing" instead of "paper sim" so the hero
+     never falsely tags a LIVE-eligible customer as PAPER during the
+     reconnect snapshot window. Flag off (default) = legacy label. */
+  strictRuntime?: boolean;
 }) {
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -4568,7 +4576,7 @@ function MyAccountRailPaper({
           fontSize: 12, fontWeight: 700,
           color: pctToday >= 0 ? N.LONG : N.SHORT, letterSpacing: "0.04em",
         }}>
-          {pctToday >= 0 ? "+" : ""}{pctToday.toFixed(2)}% TODAY · {liveMode ? `live · ${(liveExchange ?? "broker").toLowerCase()}` : "paper sim"}
+          {pctToday >= 0 ? "+" : ""}{pctToday.toFixed(2)}% TODAY · {liveMode ? `live · ${(liveExchange ?? "broker").toLowerCase()}` : (strictRuntime ? "resyncing" : "paper sim")}
         </span>
       </div>
 
@@ -5081,6 +5089,9 @@ export function PortalCustomerShell() {
   // remain paper-derived for now — wiring live trade history is a
   // separate Task #206 follow-up.
   const isLiveRuntime = runtimeState?.mode === "live";
+  // Phase 3 Step 2b — read the strict-runtime flag once at the shell
+  // level and forward to surfaces with PAPER/LIVE labels.
+  const strictRuntime = useStrictRuntimeMode();
   const liveTotalUsd  = runtimeState?.totalEquityUSD ?? 0;
   const displayEquity = isLiveRuntime ? liveTotalUsd : (paperStats.equity || STARTING_EQUITY);
   const liveExchange  = isLiveRuntime ? (runtimeState?.activeExchange ?? null) : null;
@@ -6258,6 +6269,7 @@ export function PortalCustomerShell() {
               entitled={entitled}
               liveMode={isLiveRuntime}
               liveExchange={liveExchange}
+              strictRuntime={strictRuntime}
             />
             <CustomerBlotterPanelOpen rows={blotterOpenRows} entitled={entitled} />
             <CustomerBlotterPanelHistory rows={paperHistory} />

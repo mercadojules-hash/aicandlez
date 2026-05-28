@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type MobileStatus, type Portfolio, type SimTrade, type AlpacaPosition, type SignalBreakdown } from "@/lib/api";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
+import { useStrictRuntimeMode } from "@/hooks/useStrictRuntimeMode";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
 import { UpgradeBanner } from "@/components/UpgradeBanner";
 import { EnableLiveCTA } from "@/components/EnableLiveCTA";
@@ -229,6 +230,11 @@ function TpSlBar({ sl, tp, current, up }: { sl:number; tp:number; current:number
 
 // ── Position card ─────────────────────────────────────────────────────────────────
 function PositionCard({ pos, tick, sparkPoints }: { pos: Portfolio["positions"][number]; tick: number; sparkPoints?: number[] }) {
+  // Phase 3 Step 2b — read flag + broker state locally so the
+  // SIMULATION chip suppression below stays a one-line gate without
+  // adding new props to every caller.
+  const strictRuntimeMode = useStrictRuntimeMode();
+  const { status: brokerStatus } = useBrokerConnection();
   const pnl     = pos.unrealizedPnL ?? 0;
   const up      = pnl >= 0;
   const col     = up ? G : R;
@@ -333,14 +339,20 @@ function PositionCard({ pos, tick, sparkPoints }: { pos: Portfolio["positions"][
             </span>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-            <span style={{
-              padding:"2px 8px",
-              background:"rgba(0,229,255,0.06)",
-              border:"1px solid rgba(0,229,255,0.18)",
-              borderRadius:4,
-              fontSize:7.5, fontFamily:SANS, fontWeight:700,
-              color:"rgba(0,229,255,0.75)", letterSpacing:"0.10em",
-            }}>SIMULATION</span>
+            {/* Phase 3 Step 2b — under strict runtime mode, the SIMULATION
+                chip is suppressed when the user is on a live-active broker
+                so PAPER affordances don't mislabel a LIVE-routed surface.
+                With the flag off (default), legacy behavior preserved. */}
+            {!(strictRuntimeMode && brokerStatus === "live_active") && (
+              <span style={{
+                padding:"2px 8px",
+                background:"rgba(0,229,255,0.06)",
+                border:"1px solid rgba(0,229,255,0.18)",
+                borderRadius:4,
+                fontSize:7.5, fontFamily:SANS, fontWeight:700,
+                color:"rgba(0,229,255,0.75)", letterSpacing:"0.10em",
+              }}>SIMULATION</span>
+            )}
           </div>
         </div>
 
@@ -486,6 +498,7 @@ function SectionHead({ label, count, color = GR }: {
 export default function Trade() {
   const qc = useQueryClient();
   const { openOnboarding, status: brokerStatus } = useBrokerConnection();
+  const strictRuntimeMode = useStrictRuntimeMode();
   const tick = useLiveTimer();
   const [openTrade, setOpenTrade] = useState<SimTrade | null>(null);
 

@@ -23,6 +23,7 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { toast } from "@/hooks/use-toast";
 import { authFetch } from "@/lib/authFetch";
+import { notifyRejection, type RejectionErrorCode } from "@/lib/rejectionToast";
 
 function fmt(n: number): string {
   if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -241,6 +242,18 @@ export function SignalRow({ spec, breakdown }: Props) {
             variant: "destructive",
             title: `LIVE ORDER REJECTED — ${spec.label}`,
             description: (r.error ?? "Live exchange rejected the order") + supportedHint,
+          });
+          // Phase 3 Step 4b — also pipe through the centralized rejection
+          // dispatcher so the 30s (errorCode, symbol) dedupe window
+          // catches repeat-fire spam from rapid manual taps and from the
+          // background auto-trade loop hitting the same gate. The above
+          // bespoke toast carries supportedExchanges context; this call
+          // is additive and dedupe-guarded to avoid a double-toast on
+          // the first occurrence within the window.
+          notifyRejection({
+            errorCode: (errCode ?? "exchange_reject") as RejectionErrorCode,
+            symbol:    spec.symbol,
+            detail:    r.error,
           });
           return;
         }

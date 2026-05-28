@@ -27,6 +27,7 @@ import { useCustomerPlan, openUpgrade, type Plan } from "@/hooks/useCustomerPlan
 import { useArmedForLive } from "@/hooks/useArmedForLive";
 
 import { authFetch } from "../../../lib/authFetch";
+import { notifyRejection, type RejectionErrorCode } from "@/lib/rejectionToast";
 // API base URL — mirrors Portal.tsx resolution so production cross-origin
 // API calls (api.aicandlez.com) work when SignalRow is rendered from any
 // host. In dev it falls back to same-origin so the shared proxy handles it.
@@ -569,6 +570,14 @@ export function SignalRow({ spec, breakdown }: Props) {
             variant: "destructive",
             title: `LIVE ORDER REJECTED — ${spec.label}`,
             description: (r.error ?? "Live exchange rejected the order") + supportedHint,
+          });
+          // Phase 3 Step 4b — centralized dispatcher (dedupe-guarded).
+          // See PWA SignalRow for design notes; this is the dashboard
+          // mirror so both surfaces dedupe across the same code path.
+          notifyRejection({
+            errorCode: (errCode ?? "exchange_reject") as RejectionErrorCode,
+            symbol:    spec.symbol,
+            detail:    r.error,
           });
           return;
         }
