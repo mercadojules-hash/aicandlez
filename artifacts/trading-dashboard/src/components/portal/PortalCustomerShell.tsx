@@ -5103,7 +5103,17 @@ export function PortalCustomerShell() {
   // instead of "paper sim" while this is true under strict mode.
   const { resyncing: runtimeResyncing } = useReconnectResync();
   const liveTotalUsd  = runtimeState?.totalEquityUSD ?? 0;
-  const displayEquity = isLiveRuntime ? liveTotalUsd : (paperStats.equity || STARTING_EQUITY);
+  // Equity sourcing:
+  //   • LIVE  → runtimeState.totalEquityUSD (broker-polled)
+  //   • PAPER → serverAccount.equity when present (canonical, includes
+  //             AI-fan-out paper positions), else fall back to the local
+  //             in-memory paperStats.equity, else STARTING_EQUITY for a
+  //             brand-new sim. Previously paper mode only read paperStats
+  //             so AI-fan-out paper equity was invisible until manual fire.
+  // NOTE: `serverAccount` is declared further down (line ~5151); the actual
+  // `displayEquity` constant is computed BELOW that declaration as
+  // `resolvedDisplayEquity` and aliased as `displayEquity` so the
+  // existing prop wire-up keeps working byte-for-byte.
   const liveExchange  = isLiveRuntime ? (runtimeState?.activeExchange ?? null) : null;
 
   // Task #206 — Live-vs-paper execution classification consistency.
@@ -5139,6 +5149,12 @@ export function PortalCustomerShell() {
     totalRealized: number;
     positions:     ServerSimPosition[];
   };
+  // Convergence fix: previously gated `enabled: isLiveRuntime`, which left
+  // PAPER-mode customers with no subscriber to /api/simulation/account.
+  // Server-side AI fan-out writes paper positions to `sim_positions` per
+  // user; that endpoint returns them. We now poll in both modes so the
+  // portal blotter, OPEN count, Unrealized, and Equity reflect AI-driven
+  // paper positions without waiting for the user to switch runtime modes.
   const { data: serverAccount } = useQuery<ServerAccountSummary>({
     queryKey:        ["customer-simulation-account"],
     queryFn:         async () => {
@@ -5148,9 +5164,17 @@ export function PortalCustomerShell() {
     },
     refetchInterval: 8_000,
     staleTime:       4_000,
-    enabled:         isLiveRuntime,
     retry:           false,
   });
+
+  // Resolved equity for both runtime modes — declared AFTER serverAccount.
+  // LIVE  → broker-polled runtimeState.totalEquityUSD (unchanged).
+  // PAPER → serverAccount.equity (canonical; reflects AI fan-out paper
+  //         positions) when present, else local paperStats.equity, else
+  //         STARTING_EQUITY for a brand-new sim.
+  const displayEquity = isLiveRuntime
+    ? liveTotalUsd
+    : (Number(serverAccount?.equity ?? 0) || paperStats.equity || STARTING_EQUITY);
 
   // Task #207 — post-close equity reconciliation. In LIVE runtime the
   // headline equity surface reads `runtimeState.totalEquityUSD`, which
@@ -5188,37 +5212,46 @@ export function PortalCustomerShell() {
       void qc.invalidateQueries({ queryKey: RUNTIME_STATE_QUERY_KEY });
     }
   }, [isLiveRuntime, serverAccount, qc]);
-  const liveOpenRows = useMemo(() => {
-    if (!isLiveRuntime) return [] as Array<{
-      id: string; symbol: string; display: string; side: "LONG" | "SHORT";
-      entry: number; last: number; pnl: number; pnlPct: number; origin: string;
-    }>;
-    return (serverAccount?.positions ?? [])
-      .filter(p => p.exchange != null && p.exchange !== "")
-      .map(p => {
-        const rawSide = String(p.side ?? "").toUpperCase();
-        const side: "LONG" | "SHORT" = rawSide === "SHORT" || rawSide === "SELL" ? "SHORT" : "LONG";
-        return {
-          id:      String(p.id),
-          symbol:  p.symbol,
-          display: p.symbol,
-          side,
-          entry:   Number(p.entryPrice) || 0,
-          last:    Number(p.currentPrice ?? p.entryPrice) || 0,
-          pnl:     Number(p.unrealizedPnL ?? 0),
-          pnlPct:  Number(p.unrealizedPnLPct ?? 0),
-          origin:  String(p.exchange ?? "").toUpperCase(),
-        };
-      });
-  }, [isLiveRuntime, serverAccount]);
-  // Paper rows always carry the PAPER origin chip so they're never
-  // visually confused with broker fills, even if a future change
-  // ever mixes the two feeds.
+  // Convergence fix — single canonical mapping for ALL server-known
+  // positions in BOTH runtime modes. Origin chip = exchange (uppercased)
+  // when present, else "PAPER" so broker fills and AI-fan-out paper
+  // rows stay visually distinct without filtering one out. Previously
+  // this was `liveOpenRows` and was gated `if (!isLiveRuntime) return []`
+  // — which left PAPER mode invisible to /api/simulation/account.
+  const serverOpenRows = useMemo(() => {
+    return (serverAccount?.positions ?? []).map(p => {
+      const rawSide = String(p.side ?? "").toUpperCase();
+      const side: "LONG" | "SHORT" = rawSide === "SHORT" || rawSide === "SELL" ? "SHORT" : "LONG";
+      const exch = String(p.exchange ?? "").trim();
+      return {
+        id:      String(p.id),
+        symbol:  p.symbol,
+        display: p.symbol,
+        side,
+        entry:   Number(p.entryPrice) || 0,
+        last:    Number(p.currentPrice ?? p.entryPrice) || 0,
+        pnl:     Number(p.unrealizedPnL ?? 0),
+        pnlPct:  Number(p.unrealizedPnLPct ?? 0),
+        origin:  exch ? exch.toUpperCase() : "PAPER",
+      };
+    });
+  }, [serverAccount]);
+  // Local paper-store rows are kept ONLY as a fallback for purely
+  // local/manual paper sandbox behavior (e.g. server endpoint
+  // temporarily unavailable, or fast-path render before the first
+  // /api/simulation/account response). When the server account
+  // response has loaded, it is canonical.
   const paperOpenRows = useMemo(
     () => openTrades.map(t => ({ ...t, origin: "PAPER" })),
     [openTrades],
   );
-  const blotterOpenRows = isLiveRuntime ? liveOpenRows : paperOpenRows;
+  const serverAccountReady = serverAccount != null;
+  // Blotter source-of-truth resolution:
+  //   • serverAccount loaded → use serverOpenRows in BOTH paper & live.
+  //   • serverAccount not yet loaded → fall back to in-memory paper rows
+  //     (no flash of empty state on first paint, preserves manual-fire
+  //     behavior in the local sandbox case).
+  const blotterOpenRows = serverAccountReady ? serverOpenRows : paperOpenRows;
   const blotterOpenCount = blotterOpenRows.length;
 
   // ── [CLIENT_QUERY_SOURCE/RESULT/EMPTY] convergence diagnostic ───────────
@@ -5231,26 +5264,33 @@ export function PortalCustomerShell() {
   const clientQuerySourceRef = useRef<string | null>(null);
   useEffect(() => {
     const mode = isLiveRuntime ? "live" : "paper";
-    const source = isLiveRuntime
-      ? {
-          openCount:   "serverAccount.positions[].filter(exchange)",
-          liveTrades:  "serverAccount.positions[].filter(exchange)",
-          unrealized:  "serverAccount.positions[].sum(unrealizedPnL)",
-          equity:      "runtimeState.totalEquityUSD",
-          tradeHistory:"usePaperTrades.history  (in-memory)",
-          queryKeys:   ["customer-simulation-account", "runtime-state"],
-          endpoints:   ["/api/simulation/account", "/api/user/runtime-state"],
-        }
-      : {
-          openCount:   "usePaperTrades.open  (in-memory, NO server hydration)",
-          liveTrades:  "usePaperTrades.open  (in-memory, NO server hydration)",
-          unrealized:  "usePaperTrades.stats.unrealizedPnl  (in-memory)",
-          equity:      "usePaperTrades.stats.equity || STARTING_EQUITY  (in-memory)",
-          tradeHistory:"usePaperTrades.history  (in-memory; populated by manual fires only)",
-          queryKeys:   [] as string[],   // ← no server query feeds these in paper mode
-          endpoints:   [] as string[],
-        };
-    const sourceSig = `${mode}:${source.openCount}`;
+    // Post-fix sourcing: serverAccount drives OPEN/Live/Unrealized in BOTH
+    // modes when loaded; usePaperTrades is only the fallback before first
+    // server response or if the endpoint is unavailable.
+    const source = {
+      openCount:    serverAccountReady
+        ? "serverAccount.positions[]"
+        : "usePaperTrades.open  (fallback — serverAccount not yet loaded)",
+      liveTrades:   serverAccountReady
+        ? "serverAccount.positions[]"
+        : "usePaperTrades.open  (fallback — serverAccount not yet loaded)",
+      unrealized:   serverAccountReady
+        ? "serverAccount.positions[].sum(unrealizedPnL)"
+        : "usePaperTrades.stats.unrealizedPnl  (fallback)",
+      equity:       isLiveRuntime
+        ? "runtimeState.totalEquityUSD"
+        : (serverAccountReady
+            ? "serverAccount.equity"
+            : "paperStats.equity || STARTING_EQUITY  (fallback)"),
+      tradeHistory: "usePaperTrades.history  (in-memory; populated by manual fires + paper-store mirroring)",
+      queryKeys:    isLiveRuntime
+        ? ["customer-simulation-account", "runtime-state"]
+        : ["customer-simulation-account"],
+      endpoints:    isLiveRuntime
+        ? ["/api/simulation/account", "/api/user/runtime-state"]
+        : ["/api/simulation/account"],
+    };
+    const sourceSig = `${mode}:${source.openCount}:${source.equity}`;
     if (clientQuerySourceRef.current !== sourceSig) {
       clientQuerySourceRef.current = sourceSig;
       // eslint-disable-next-line no-console
@@ -5265,15 +5305,17 @@ export function PortalCustomerShell() {
         tradeHistorySource:source.tradeHistory,
         subscribedQueryKeys: source.queryKeys,
         subscribedEndpoints: source.endpoints,
-        serverAccountQueryEnabled: isLiveRuntime,
+        // Post-fix: serverAccount query now runs in BOTH paper and live.
+        serverAccountQueryEnabled: true,
+        serverAccountReady,
         timestamp: Date.now(),
       });
     }
-  }, [isLiveRuntime, runtimePending, userId]);
+  }, [isLiveRuntime, runtimePending, userId, serverAccountReady]);
 
   useEffect(() => {
     const mode = isLiveRuntime ? "live" : "paper";
-    const liveUnrealized = (serverAccount?.positions ?? []).reduce(
+    const serverUnrealized = (serverAccount?.positions ?? []).reduce(
       (s, p) => s + Number(p.unrealizedPnL ?? 0), 0,
     );
     // eslint-disable-next-line no-console
@@ -5282,12 +5324,12 @@ export function PortalCustomerShell() {
       userId:       userId ?? null,
       openCount:    blotterOpenCount,
       liveTradesRowCount: blotterOpenRows.length,
-      unrealized:   isLiveRuntime ? liveUnrealized : paperStats.unrealizedPnl,
+      unrealized:   serverAccountReady ? serverUnrealized : paperStats.unrealizedPnl,
       equity:       displayEquity,
-      realized:     isLiveRuntime ? Number(serverAccount?.totalRealized ?? 0) : paperStats.realizedPnl,
+      realized:     serverAccountReady ? Number(serverAccount?.totalRealized ?? 0) : paperStats.realizedPnl,
       paperStoreOpen:    openTrades.length,
       paperStoreHistory: paperHistory.length,
-      serverAccountPresent: !!serverAccount,
+      serverAccountPresent: serverAccountReady,
       serverAccountPositions: serverAccount?.positions?.length ?? null,
       serverAccountTotalTrades: serverAccount?.totalTrades ?? null,
       timestamp:    Date.now(),
@@ -5298,11 +5340,11 @@ export function PortalCustomerShell() {
         panel:        "OPEN+LiveTrades",
         runtimeMode:  mode,
         userId:       userId ?? null,
-        reason:       isLiveRuntime
-          ? "serverAccount.positions filter(exchange!=null) returned 0 rows"
-          : "usePaperTrades.open is empty (in-memory store; server-side AI fan-out writes to sim_positions but PAPER mode never subscribes to /api/simulation/account)",
-        serverAccountEnabled: isLiveRuntime,
-        serverAccountPresent: !!serverAccount,
+        reason:       serverAccountReady
+          ? "serverAccount loaded with positions=[] (no open server-side positions for this user — paper or live)"
+          : "serverAccount not yet loaded AND usePaperTrades.open is empty (pre-hydration fallback path)",
+        serverAccountEnabled: true,
+        serverAccountPresent: serverAccountReady,
         serverPositionsRaw:   serverAccount?.positions?.length ?? null,
         paperStoreOpen:       openTrades.length,
         timestamp:    Date.now(),
@@ -5311,7 +5353,7 @@ export function PortalCustomerShell() {
   }, [
     isLiveRuntime, userId, blotterOpenCount, blotterOpenRows.length,
     displayEquity, paperStats.unrealizedPnl, paperStats.realizedPnl,
-    serverAccount, openTrades.length, paperHistory.length,
+    serverAccount, serverAccountReady, openTrades.length, paperHistory.length,
   ]);
 
   // Pass 3.3: ONE shell-level 1Hz tick — passed as a prop to
@@ -6229,7 +6271,7 @@ export function PortalCustomerShell() {
           opportunities={opportunities}
           engine={engineStatus}
           history={paperHistory}
-          openCount={openTrades.length}
+          openCount={blotterOpenCount}
           posture={portalPosture}
           plan={plan}
         />
@@ -6247,7 +6289,7 @@ export function PortalCustomerShell() {
           engine={engineStatus}
           breakdowns={engineStatus?.symbolBreakdowns}
           signalsPerMin={signalsPerMin}
-          openCount={openTrades.length}
+          openCount={blotterOpenCount}
           history={paperHistory}
         />
 
@@ -6290,7 +6332,7 @@ export function PortalCustomerShell() {
             operator telemetry leakage. */}
         <EnableLiveAITradingBar
           engineOnline={!!engineStatus?.running}
-          openPaper={openTrades.length}
+          openPaper={blotterOpenCount}
           slotCap={plan === "pro" ? 12 : plan === "starter" ? 3 : 3}
           onUpgrade={() => setUpgrade(true)}
           equityUsd={displayEquity}
@@ -6357,16 +6399,16 @@ export function PortalCustomerShell() {
                 local paper store. Paper runtime is unchanged. */}
             <MyAccountRailPaper
               equityUsd={displayEquity}
-              todayPnl={isLiveRuntime
+              todayPnl={serverAccountReady
                 ? (serverAccount?.positions ?? []).reduce((s, p) => s + Number(p.unrealizedPnL ?? 0), 0)
                 : paperStats.todayPnl}
-              realized={isLiveRuntime
+              realized={serverAccountReady
                 ? Number(serverAccount?.totalRealized ?? 0)
                 : paperStats.realizedPnl}
-              unrealized={isLiveRuntime
+              unrealized={serverAccountReady
                 ? (serverAccount?.positions ?? []).reduce((s, p) => s + Number(p.unrealizedPnL ?? 0), 0)
                 : paperStats.unrealizedPnl}
-              fillsToday={isLiveRuntime
+              fillsToday={serverAccountReady
                 ? Number(serverAccount?.totalTrades ?? 0)
                 : paperHistory.filter(t => new Date(t.closedAt).toDateString() === new Date().toDateString()).length}
               openCount={blotterOpenCount}
