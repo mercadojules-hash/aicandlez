@@ -71,3 +71,21 @@ id = "W4nVibsSwsO5xmeu8qygP"
 uri = "file://artifacts/trading-dashboard/public/aicandlez-production.zip"
 type = "unspecified"
 title = "AICandlez Production Export — includes artifacts/aicandelz-mobile/"
+
+[[outputs]]
+id = "y7JYNWxf08agLTpKI6LC8"
+uri = "file://screenshots/candidate-A-PersonalTerminal.jpg"
+type = "image"
+title = "CANDIDATE A — PersonalTerminal (ungraduated · May 26 · newest mockup)"
+
+[[outputs]]
+id = "bZx8BpjcAM40K-hdAczsN"
+uri = "file://screenshots/candidate-B-UserDashboard.jpg"
+type = "image"
+title = "CANDIDATE B — UserDashboard (ungraduated · May 26 · approved-direction sibling)"
+
+[[outputs]]
+id = "I8ES7dC7zllwnTFG1Vb9S"
+uri = "file://screenshots/baseline-CommandDeck.jpg"
+type = "image"
+title = "BASELINE — CommandDeck (graduated · what's LIVE in production today as PortalCustomerShell)"
