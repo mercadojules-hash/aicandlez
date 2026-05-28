@@ -14,7 +14,13 @@ import {
   type LiveUserOrderResult,
 } from "./liveUserExecution.js";
 import { executeCustomerOrder } from "./executionGateway.js";
-import { registerLiveUserFill } from "./userSimRegistry.js";
+import {
+  registerLiveUserFill,
+  placeUserOrder,
+  listPaperAutoTradeUsers,
+  listOpenPaperPositionsBySymbol,
+  closeUserPosition,
+} from "./userSimRegistry.js";
 import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "./executionTelemetry.js";
 import { notifyFillHydrated } from "./positionStore.js";
 import { validateTrade } from "./riskEngine.js";
@@ -1097,6 +1103,24 @@ async function autoExecute(
       liveExchangeOrderId = first.exchangeOrderId;
     }
   } else {
+    // ── PAPER / SIM branch ────────────────────────────────────────────────
+    //
+    // Canonical convergence model (Phase 5 paper-side fix):
+    //
+    //   GLOBAL world  → simulationEngine.positions[] + tradesTable
+    //                   (OPERATOR-ONLY mirror; tagged [GLOBAL_MIRROR_WRITE].
+    //                    No customer-facing surface may read from here.)
+    //
+    //   PER-USER world → sim_positions / sim_trades / sim_accounts via
+    //                    placeUserOrder() — fanned out to every user with
+    //                    user_settings.autoMode = true AND tradingMode != 'live'.
+    //                    This is the canonical source of truth for the
+    //                    customer Portal / PWA (openPositions, equity,
+    //                    realizedPnL, Live Trades, Trade History).
+    //
+    // Both writes happen on the same signal. The global mirror stays in
+    // place until telemetry parity is verified and per-user convergence
+    // stabilizes (then it can be retired behind a feature flag).
     const result = await placeOrder({ symbol, side, sizeUSD });
     if (!result.success) {
       engineStats.tradesBlocked++;
@@ -1118,6 +1142,113 @@ async function autoExecute(
       return { executed: false, blockReason: `Sim engine: ${result.error}` };
     }
     pos = result.position!;
+    logger.info(
+      {
+        tag:          "GLOBAL_MIRROR_WRITE",
+        store:        "simulationEngine.positions[]",
+        scope:        "GLOBAL",
+        perUserAware: false,
+        symbol, side, sizeUSD,
+        positionId:   pos.id,
+        entryPrice:   pos.entryPrice,
+      },
+      "[GLOBAL_MIRROR_WRITE] paper position opened in global simulationEngine (operator-only mirror)",
+    );
+
+    // ── Per-user paper fan-out — canonical convergence write ────────────
+    //
+    // Selection: user_settings.autoMode=true AND tradingMode!='live'.
+    // `placeUserOrder` applies its own per-user gates (status guard,
+    // balance check), so any rejection surfaces as [AI_FANOUT_SKIPPED]
+    // with a structured reason instead of failing the whole tick.
+    try {
+      const fanoutCorrelationId = genCorrelationId();
+      const eligibleUsers       = await listPaperAutoTradeUsers();
+
+      logger.info(
+        {
+          tag:            "AI_FANOUT_ELIGIBLE",
+          correlationId:  fanoutCorrelationId,
+          eligibleCount:  eligibleUsers.length,
+          symbol, side, signalId,
+          runtimeMode:    "paper",
+        },
+        `[AI_FANOUT_ELIGIBLE] ${eligibleUsers.length} paper-mode AI auto-trade users eligible for ${symbol} ${side}`,
+      );
+
+      // Fan out in parallel — each user's open is independent. We capture
+      // each outcome with userId+reason so on-call can grep a single
+      // correlationId across the whole tick fan-out.
+      await Promise.all(eligibleUsers.map(async (u) => {
+        try {
+          const userResult = await placeUserOrder(u.userId, {
+            symbol,
+            side,
+            sizeUSD:    u.positionSizeUSD,
+            signalId:   signalId ?? undefined,
+            stopLoss:   side === "BUY"
+              ? parseFloat((pos.entryPrice * (1 - u.stopLossPercent   / 100)).toFixed(2))
+              : parseFloat((pos.entryPrice * (1 + u.stopLossPercent   / 100)).toFixed(2)),
+            takeProfit: side === "BUY"
+              ? parseFloat((pos.entryPrice * (1 + u.takeProfitPercent / 100)).toFixed(2))
+              : parseFloat((pos.entryPrice * (1 - u.takeProfitPercent / 100)).toFixed(2)),
+          });
+          if (userResult.success) {
+            logger.info(
+              {
+                tag:           "AI_FANOUT_EXECUTED",
+                correlationId: fanoutCorrelationId,
+                userId:        u.userId,
+                runtimeMode:   "paper",
+                symbol, side,
+                sizeUSD:       u.positionSizeUSD,
+                signalId,
+                positionId:    userResult.position?.id ?? null,
+                entryPrice:    userResult.position?.entryPrice ?? null,
+                store:         "sim_positions",
+                scope:         "PER_USER",
+                perUserAware:  true,
+              },
+              "[AI_FANOUT_EXECUTED] paper position opened in per-user sim_positions (canonical)",
+            );
+          } else {
+            logger.info(
+              {
+                tag:           "AI_FANOUT_SKIPPED",
+                correlationId: fanoutCorrelationId,
+                userId:        u.userId,
+                runtimeMode:   "paper",
+                symbol, side,
+                sizeUSD:       u.positionSizeUSD,
+                signalId,
+                reason:        userResult.error ?? "unknown",
+              },
+              "[AI_FANOUT_SKIPPED] paper fan-out rejected by per-user gate",
+            );
+          }
+        } catch (err) {
+          logger.warn(
+            {
+              tag:           "AI_FANOUT_SKIPPED",
+              correlationId: fanoutCorrelationId,
+              userId:        u.userId,
+              runtimeMode:   "paper",
+              symbol, side,
+              sizeUSD:       u.positionSizeUSD,
+              signalId,
+              reason:        err instanceof Error ? err.message : String(err),
+            },
+            "[AI_FANOUT_SKIPPED] paper fan-out threw — user fall-through",
+          );
+        }
+      }));
+    } catch (err) {
+      // Fan-out failure must NEVER break the global tick — log and continue.
+      logger.warn(
+        { err: err instanceof Error ? err.message : String(err), symbol, side },
+        "Paper AI fan-out: outer failure (eligibility query / Promise.all)",
+      );
+    }
   }
 
   // ── Execution confirmed ────────────────────────────────────────────────────
@@ -1125,6 +1256,21 @@ async function autoExecute(
   const takeProfit = side === "BUY" ? pos.entryPrice * (1 + settings.takeProfitPercent / 100) : pos.entryPrice * (1 - settings.takeProfitPercent / 100);
   const tradeMode  = isTest ? "test" : (isLiveExec ? "live" : "auto");
 
+  // [GLOBAL_MIRROR_WRITE] — `tradesTable` has no `user_id` column and is
+  // the operator-only audit/telemetry mirror. Customer surfaces must read
+  // from `sim_trades` (per-user) via getUserAccountSummary / mobile routes.
+  logger.info(
+    {
+      tag:          "GLOBAL_MIRROR_WRITE",
+      store:        "tradesTable",
+      scope:        "GLOBAL",
+      perUserAware: false,
+      symbol, side, sizeUSD,
+      positionId:   pos.id,
+      mode:         tradeMode,
+    },
+    "[GLOBAL_MIRROR_WRITE] inserting global tradesTable row (operator-only mirror)",
+  );
   await db.insert(tradesTable).values({
     id:         genId(),
     symbol,
@@ -1209,6 +1355,107 @@ async function runTrailingStops() {
       engineStats.trailingStopHits++;
       const meta = positionMeta.get(view.positionId);
       logger.info({ positionId: view.positionId, symbol: view.symbol, gainPct: view.gainFromEntryPct }, "Trailing stop triggered");
+
+      // ── Per-user PAPER close fan-out (canonical convergence — Phase 5) ──
+      //
+      // The global trailing-stop engine just closed `view.positionId` in
+      // `simulationEngine.positions[]`. That global close is operator-only
+      // telemetry (`[GLOBAL_MIRROR_WRITE]` semantics). Every PAPER user with
+      // an open position on the same symbol must now also close in their
+      // canonical store via `closeUserPosition`, which fires the full
+      // CLOSE_POSITION → REALIZED_PNL_APPLIED → POSITION_CLOSED →
+      // ACCOUNT_SUMMARY_UPDATED → EQUITY_RECONCILED chain that the
+      // customer-facing readers depend on.
+      //
+      // Live (`exchange IS NOT NULL`) per-user positions are excluded by
+      // `listOpenPaperPositionsBySymbol`; live closes flow through the live
+      // execution gateway path on their own.
+      try {
+        const closeCorrelationId = genCorrelationId();
+        const eligible           = await listOpenPaperPositionsBySymbol(view.symbol);
+        logger.info(
+          {
+            tag:           "AI_FANOUT_ELIGIBLE",
+            phase:         "close",
+            correlationId: closeCorrelationId,
+            symbol:        view.symbol,
+            eligibleCount: eligible.length,
+            globalPositionId: view.positionId,
+            reason:        "TRAILING_STOP",
+            runtimeMode:   "paper",
+          },
+          `[AI_FANOUT_ELIGIBLE] close fan-out for ${view.symbol} TRAILING_STOP — ${eligible.length} per-user paper positions`,
+        );
+        await Promise.all(eligible.map(async (row) => {
+          try {
+            const closeResult = await closeUserPosition(row.userId, row.positionId, "TRAILING_STOP");
+            if (closeResult.success) {
+              logger.info(
+                {
+                  tag:           "AI_FANOUT_EXECUTED",
+                  phase:         "close",
+                  correlationId: closeCorrelationId,
+                  userId:        row.userId,
+                  symbol:        view.symbol,
+                  positionId:    row.positionId,
+                  reason:        "TRAILING_STOP",
+                  runtimeMode:   "paper",
+                  scope:         "PER_USER",
+                  perUserAware:  true,
+                },
+                "[AI_FANOUT_EXECUTED] per-user paper close on TRAILING_STOP",
+              );
+            } else {
+              logger.info(
+                {
+                  tag:           "AI_FANOUT_SKIPPED",
+                  phase:         "close",
+                  correlationId: closeCorrelationId,
+                  userId:        row.userId,
+                  symbol:        view.symbol,
+                  positionId:    row.positionId,
+                  reason:        closeResult.error ?? "closeUserPosition returned not-success",
+                  runtimeMode:   "paper",
+                },
+                "[AI_FANOUT_SKIPPED] per-user paper close rejected",
+              );
+            }
+          } catch (err) {
+            logger.warn(
+              {
+                tag:           "AI_FANOUT_SKIPPED",
+                phase:         "close",
+                correlationId: closeCorrelationId,
+                userId:        row.userId,
+                symbol:        view.symbol,
+                positionId:    row.positionId,
+                reason:        err instanceof Error ? err.message : String(err),
+                runtimeMode:   "paper",
+              },
+              "[AI_FANOUT_SKIPPED] per-user paper close threw",
+            );
+          }
+        }));
+      } catch (err) {
+        logger.warn(
+          { err: err instanceof Error ? err.message : String(err), symbol: view.symbol },
+          "Paper close fan-out: outer failure (eligibility query / Promise.all)",
+        );
+      }
+
+      logger.info(
+        {
+          tag:           "GLOBAL_MIRROR_WRITE",
+          phase:         "close",
+          store:         "simulationEngine.positions[]",
+          scope:         "GLOBAL",
+          perUserAware:  false,
+          symbol:        view.symbol,
+          positionId:    view.positionId,
+          reason:        "TRAILING_STOP",
+        },
+        "[GLOBAL_MIRROR_WRITE] global trailing-stop close (operator-only mirror)",
+      );
       await db.insert(logsTable).values({
         id: genId(), type: "trade", level: "success",
         message: `Trailing stop triggered: ${view.symbol} closed at gain ${view.gainFromEntryPct >= 0 ? "+" : ""}${view.gainFromEntryPct.toFixed(2)}%`,

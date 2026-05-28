@@ -3,8 +3,9 @@ import {
   simAccountsTable,
   simPositionsTable,
   simTradesTable,
+  userSettingsTable,
 } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
 import { getTicker, SUPPORTED_SYMBOLS } from "./marketData.js";
 import { logger } from "./logger.js";
 import {
@@ -516,6 +517,95 @@ export interface UserOrderRequest {
   signalId?: string;
   stopLoss?: number;
   takeProfit?: number;
+}
+
+/**
+ * Eligible paper-mode AI auto-trade fan-out targets.
+ *
+ * Selection invariant (negotiated in Phase 5 — paper-side convergence fix):
+ *   user_settings.autoMode      = true   — explicit AI auto-trade opt-in
+ *   user_settings.tradingMode  != 'live' — paper / simulation runtime only
+ *
+ * Per-user `placeUserOrder` then layers on its own `userStatusGuard`
+ * suspension check (so disabled accounts fall through with a structured
+ * SKIPPED tag instead of being silently included here).
+ *
+ * Returns each user's preferred paper position size so the loop can honor
+ * the customer's chosen sizing instead of forcing a single global notional.
+ */
+export async function listPaperAutoTradeUsers(): Promise<
+  Array<{ userId: string; positionSizeUSD: number; stopLossPercent: number; takeProfitPercent: number }>
+> {
+  try {
+    const rows = await db
+      .select({
+        userId:             userSettingsTable.userId,
+        positionSizeUSD:    userSettingsTable.positionSizeUSD,
+        stopLossPercent:    userSettingsTable.stopLossPercent,
+        takeProfitPercent:  userSettingsTable.takeProfitPercent,
+        tradingMode:        userSettingsTable.tradingMode,
+      })
+      .from(userSettingsTable)
+      .where(
+        and(
+          eq(userSettingsTable.autoMode, true),
+        ),
+      );
+    return rows
+      .filter((r) => r.tradingMode !== "live")
+      .map((r) => ({
+        userId:            r.userId,
+        positionSizeUSD:   r.positionSizeUSD,
+        stopLossPercent:   r.stopLossPercent,
+        takeProfitPercent: r.takeProfitPercent,
+      }));
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "userSimRegistry: listPaperAutoTradeUsers query failed",
+    );
+    return [];
+  }
+}
+
+/**
+ * Find all PAPER open positions for `symbol` across users with AI auto-trade
+ * enabled. Used by the trailing-stop fan-out to mirror autonomous global
+ * closes into each eligible user's per-user store.
+ *
+ * Paper-only filter: `exchange IS NULL` excludes live (exchange-routed) fills
+ * — those already have their own close paths via the live execution gateway.
+ */
+export async function listOpenPaperPositionsBySymbol(
+  symbol: string,
+): Promise<Array<{ userId: string; positionId: string }>> {
+  const norm = normalizeSymbol(symbol);
+  try {
+    const rows = await db
+      .select({
+        userId:     simPositionsTable.userId,
+        positionId: simPositionsTable.id,
+      })
+      .from(simPositionsTable)
+      .innerJoin(
+        userSettingsTable,
+        eq(userSettingsTable.userId, simPositionsTable.userId),
+      )
+      .where(
+        and(
+          eq(simPositionsTable.symbol, norm),
+          sql`${simPositionsTable.exchange} IS NULL`,
+          eq(userSettingsTable.autoMode, true),
+        ),
+      );
+    return rows;
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err), symbol: norm },
+      "userSimRegistry: listOpenPaperPositionsBySymbol query failed",
+    );
+    return [];
+  }
 }
 
 export async function placeUserOrder(userId: string, req: UserOrderRequest): Promise<{
