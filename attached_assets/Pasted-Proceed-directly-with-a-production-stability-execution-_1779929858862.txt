@@ -1,0 +1,141 @@
+Proceed directly with a production-stability + execution-unification task. We now have enough evidence to stop patching symptoms individually and converge the customer execution architecture.
+
+Current confirmed regressions:
+
+/admin/users intermittently fails to hydrate
+UI shows:
+"Failed to load users. Click REFRESH to retry."
+Recent hardening prevented total crashes, but the endpoint is still throwing somewhere in the request lifecycle.
+Need full trace logging around:
+SQL query
+mapper
+serialization
+response send
+Add explicit stage logs:
+[ADMIN_USERS_SQL_OK]
+[ADMIN_USERS_MAP_OK]
+[ADMIN_USERS_SERIALIZE_OK]
+[ADMIN_USERS_RESPONSE_OK]
+[ADMIN_USERS_FATAL]
+Include durationMs + rowCount.
+Goal:
+admin panel must NEVER white-screen or fail the entire collection because of one malformed row.
+Manual BUY/SELL execution is still using fragmented legacy routing
+Evidence:
+Unsupported symbol: HYPEUSD
+Unsupported symbol: MKRUSD
+LIVE runtime active
+AI runtime active
+AI engine opens positions
+manual trades fail inconsistently
+Live Trades panel desyncs from actual runtime state
+
+Root cause hypothesis:
+Manual BUY buttons are NOT using the same normalized execution adapter as AI auto-execution.
+
+Required architectural fix:
+
+UNIFY ALL CUSTOMER EXECUTION PATHS.
+
+Every trade path MUST route through the SAME:
+
+symbol normalizer
+exchange adapter
+persistence layer
+telemetry emitter
+live position store
+
+No parallel "paper fallback" branch for customer LIVE runtime.
+
+Implementation requirements:
+
+A. Centralize symbol normalization
+Create one canonical resolver:
+
+normalizeExecutionSymbol(symbol, exchange)
+
+Examples:
+
+BTCUSD → BTC-USD (Coinbase)
+ETHUSD → ETH-USD
+MKRUSD → MKR-USD
+HYPEUSD → reject gracefully if unsupported
+never silently synthesize invalid pairs
+
+B. Manual BUY/SELL must use SAME execution gateway as AI engine
+Audit every:
+
+fireTrade
+manual BUY
+SELL
+quick trade
+signal-row action
+
+and route them through the SAME live execution service AI uses.
+
+C. Remove fragmented persistence paths
+Currently:
+
+unrealized PnL updates
+runtime state updates
+BUT Live Trades / Trade History often empty
+
+This means telemetry and persistence are disconnected.
+
+Need ONE source of truth:
+
+open positions store
+fills
+trade history
+unrealized pnl
+live trades panel
+
+D. Structured logs required
+Add:
+
+[MANUAL_TRADE_REQUEST]
+[MANUAL_TRADE_NORMALIZED]
+[MANUAL_TRADE_EXECUTED]
+[MANUAL_TRADE_REJECTED]
+[POSITION_PERSISTED]
+[LIVE_TRADES_HYDRATED]
+
+Include:
+
+symbol
+normalizedSymbol
+exchange
+runtimeMode
+persistenceResult
+positionId
+error reason
+
+E. UI consistency
+If runtime mode is LIVE:
+
+remove ALL "paper sim" labels
+remove "paper trade not persisted"
+remove hidden paper fallback behavior
+
+Customer should either:
+
+execute LIVE
+OR
+receive explicit LIVE rejection
+
+Never silently downgrade to paper.
+
+F. Acceptance criteria
+
+After fix:
+
+/admin/users loads reliably every refresh
+BUY/SELL works for supported Coinbase assets
+unsupported assets fail gracefully with explicit reason
+LIVE TRADES hydrates immediately after execution
+TRADE HISTORY persists fills correctly
+unrealized PnL matches persisted positions
+no “paper sim” labels while LIVE mode active
+all customer executions use ONE unified execution pipeline
+
+This is now an execution-state convergence task, not a UI patch task.

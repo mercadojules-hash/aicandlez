@@ -211,6 +211,7 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
     const planArg  = planFilter || null;
     const statArg  = statusF || null;
 
+    const sqlStartedAt = Date.now();
     const rows = await db.execute(sql`
       WITH trade_agg AS (
         SELECT
@@ -389,8 +390,17 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
         AND (${hasLive} = false OR COALESCE(c.has_live, false) = true)
     `).then(r => r.rows as Array<{ total: number }>);
 
+    req.log.info({
+      tag: "ADMIN_USERS_SQL_OK",
+      stage: "sql",
+      rowCount: rows.length,
+      total: countRow?.total ?? 0,
+      durationMs: Date.now() - sqlStartedAt,
+    }, "[ADMIN_USERS_SQL_OK]");
+
     // "Online" heuristic — last activity within 10 min. Cheap and DB-derivable.
     const now = Date.now();
+    const mapStartedAt = Date.now();
     // [ADMIN_USERS_ROW_FAIL] — per-row try/catch so one malformed row
     // (bad date / NaN / unexpected null) DEGRADES into a skeleton row
     // instead of throwing the whole `rows.map()` and 500-ing the entire
@@ -577,6 +587,14 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
       }
     });
 
+    req.log.info({
+      tag: "ADMIN_USERS_MAP_OK",
+      stage: "map",
+      rowCount: users.length,
+      rowFailures,
+      durationMs: Date.now() - mapStartedAt,
+    }, "[ADMIN_USERS_MAP_OK]");
+
     const payload = {
       users,
       page,
@@ -592,6 +610,7 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
     // type change). Catching here lets us emit a structured log that
     // identifies the serialize stage as the failing surface, instead
     // of conflating it with SQL/mapper errors at the outer catch.
+    const serializeStartedAt = Date.now();
     let serialized: string;
     try {
       serialized = JSON.stringify(payload);
@@ -608,29 +627,37 @@ router.get("/admin/users", ...requireOperator, async (req, res): Promise<void> =
     }
 
     req.log.info({
-      tag: "ADMIN_USERS_REQUEST",
-      stage: "ok",
-      rowCount: users.length,
-      rowFailures,
-      total: countRow?.total ?? 0,
-      durationMs: Date.now() - adminUsersStartedAt,
-    }, "[ADMIN_USERS_REQUEST] ok");
+      tag: "ADMIN_USERS_SERIALIZE_OK",
+      stage: "serialize",
+      bytes: serialized.length,
+      durationMs: Date.now() - serializeStartedAt,
+    }, "[ADMIN_USERS_SERIALIZE_OK]");
 
     writeCache(key, payload);
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.send(serialized);
+
+    req.log.info({
+      tag: "ADMIN_USERS_RESPONSE_OK",
+      stage: "response",
+      rowCount: users.length,
+      rowFailures,
+      total: countRow?.total ?? 0,
+      bytes: serialized.length,
+      durationMs: Date.now() - adminUsersStartedAt,
+    }, "[ADMIN_USERS_RESPONSE_OK]");
   } catch (err) {
     // Surface the underlying error message in the response so on-call
     // (admin-only route) can read the root cause from the network tab
     // without round-tripping through the server logs. Includes the
     // failing stage so SQL vs mapper vs serialize is grep-able.
     req.log.error({
-      tag: "ADMIN_USERS_REQUEST",
+      tag: "ADMIN_USERS_FATAL",
       stage: "fail",
       adminId: getAdminId(req),
       durationMs: Date.now() - adminUsersStartedAt,
       err: err instanceof Error ? { message: err.message, stack: err.stack } : err,
-    }, "[ADMIN_USERS_REQUEST] failed");
+    }, "[ADMIN_USERS_FATAL]");
     res.status(500).json({
       error: "Failed to load users",
       message: err instanceof Error ? err.message : String(err),
