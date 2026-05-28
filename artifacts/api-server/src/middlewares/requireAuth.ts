@@ -19,18 +19,70 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     // [REQUIRE_AUTH_REJECT] — log-only diagnostic so we can distinguish
     // "client never sent a session" (this branch) from downstream gate
     // rejects (plan/disclaimer) when chasing a connect-flow regression.
+    //
+    // Enriched (Task: Tanika auth-chain trace) to pinpoint WHY clerkMiddleware
+    // didn't populate req.auth.userId. Three failure shapes we need to
+    // distinguish on a single log line:
+    //   (a) hasAuthorization=false && hasCookie=false → authFetch never
+    //       attached credentials (Clerk JS not loaded, getToken() returned
+    //       null, fetch wasn't routed through authFetch, browser stripped
+    //       cookies on the cross-subdomain hop)
+    //   (b) hasCookie=true / hasAuthorization=true but Clerk still rejected
+    //       → token signature failed (wrong instance/audience), token
+    //       expired, __session cookie stale post-revoke, partition mismatch
+    //   (c) authReason populated → Clerk's own diagnostic for why it
+    //       declined the session
+    const cookieHeader = typeof req.headers.cookie === "string" ? req.headers.cookie : "";
+    const cookieNames = cookieHeader
+      ? cookieHeader.split(";").map(c => c.split("=")[0]?.trim() ?? "").filter(Boolean).slice(0, 20)
+      : [];
+    const authHeader = typeof req.headers.authorization === "string" ? req.headers.authorization : "";
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const xff = req.headers["x-forwarded-host"];
+    const xffFirst = Array.isArray(xff) ? xff[0] : typeof xff === "string" ? xff.split(",")[0]?.trim() : null;
+    // Best-effort Clerk reason extraction — newer @clerk/express versions
+    // expose `reason` on the signed-out AuthObject. Wrap so older versions
+    // (or shape drift) never throw out of a log line.
+    let clerkReason: string | null = null;
+    let clerkSessionId: string | null = null;
+    let clerkSessionStatus: string | null = null;
+    try {
+      const a = auth as unknown as {
+        reason?: string;
+        sessionId?: string | null;
+        sessionStatus?: string;
+        sessionClaims?: unknown;
+      } | null;
+      clerkReason         = typeof a?.reason === "string" ? a.reason : null;
+      clerkSessionId      = typeof a?.sessionId === "string" ? a.sessionId : null;
+      clerkSessionStatus  = typeof a?.sessionStatus === "string" ? a.sessionStatus : null;
+    } catch { /* never throw from a log line */ }
     req.log?.warn?.({
-      tag:               "REQUIRE_AUTH_REJECT",
-      reason:            "no_session",
-      method:            req.method,
-      url:               req.originalUrl,
-      hasAuthorization:  !!req.headers.authorization,
-      authScheme:        typeof req.headers.authorization === "string"
-        ? req.headers.authorization.split(" ")[0]
+      tag:                "REQUIRE_AUTH_REJECT",
+      reason:             "no_session",
+      method:             req.method,
+      url:                req.originalUrl,
+      hasAuthorization:   !!authHeader,
+      authScheme:         authHeader ? authHeader.split(" ")[0] : null,
+      bearerLen:          bearerToken.length || 0,
+      bearerPrefix:       bearerToken ? bearerToken.slice(0, 8) : null,
+      hasCookie:          !!cookieHeader,
+      cookieNames,
+      hasSessionCookie:   cookieNames.includes("__session"),
+      hasClientCookie:    cookieNames.includes("__client"),
+      origin:             req.headers.origin ?? null,
+      referer:            req.headers.referer ?? null,
+      host:               req.headers.host ?? null,
+      xForwardedHost:     xffFirst ?? null,
+      xForwardedProto:    req.headers["x-forwarded-proto"] ?? null,
+      userAgent:          typeof req.headers["user-agent"] === "string"
+        ? req.headers["user-agent"].slice(0, 120)
         : null,
-      hasCookie:         !!req.headers.cookie,
-      origin:            req.headers.origin ?? null,
-      status:            401,
+      clerkReason,
+      clerkSessionId:     clerkSessionId ? `${clerkSessionId.slice(0, 8)}…` : null,
+      clerkSessionStatus,
+      ip:                 req.ip ?? null,
+      status:             401,
     }, "[REQUIRE_AUTH_REJECT] no_session → 401");
     res.status(401).json({ error: "Unauthorized" });
     return;

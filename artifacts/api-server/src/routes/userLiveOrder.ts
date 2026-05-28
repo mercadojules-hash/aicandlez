@@ -12,7 +12,7 @@
  * linked end-to-end.
  */
 
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth.js";
@@ -30,6 +30,45 @@ const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, enterpris
 const router: IRouter = Router();
 
 const DEFAULT_SIZE_USD = 100;
+
+// ── Pre-auth arrival logger ──────────────────────────────────────────────────
+// Fires BEFORE `requireAuth` so we can tell "request never reached api-server"
+// (no [LIVE_ORDER_ARRIVAL] line) apart from "request arrived but Clerk
+// rejected the session" (arrival line present, followed by
+// [REQUIRE_AUTH_REJECT] no_session). Header fingerprint only — no body.
+const logLiveOrderArrival = (req: Request, _res: Response, next: NextFunction): void => {
+  const cookieHeader = typeof req.headers.cookie === "string" ? req.headers.cookie : "";
+  const cookieNames = cookieHeader
+    ? cookieHeader.split(";").map(c => c.split("=")[0]?.trim() ?? "").filter(Boolean).slice(0, 20)
+    : [];
+  const authHeader = typeof req.headers.authorization === "string" ? req.headers.authorization : "";
+  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  req.log?.info?.({
+    tag:                "LIVE_ORDER_ARRIVAL",
+    method:             req.method,
+    url:                req.originalUrl,
+    correlationId:      req.get("X-Correlation-Id") ?? null,
+    origin:             req.headers.origin ?? null,
+    referer:            req.headers.referer ?? null,
+    host:               req.headers.host ?? null,
+    xForwardedHost:     req.headers["x-forwarded-host"] ?? null,
+    contentType:        req.headers["content-type"] ?? null,
+    contentLength:      req.headers["content-length"] ?? null,
+    hasAuthorization:   !!authHeader,
+    authScheme:         authHeader ? authHeader.split(" ")[0] : null,
+    bearerLen:          bearerToken.length || 0,
+    bearerPrefix:       bearerToken ? bearerToken.slice(0, 8) : null,
+    hasCookie:          !!cookieHeader,
+    cookieNames,
+    hasSessionCookie:   cookieNames.includes("__session"),
+    hasClientCookie:    cookieNames.includes("__client"),
+    userAgent:          typeof req.headers["user-agent"] === "string"
+      ? req.headers["user-agent"].slice(0, 120)
+      : null,
+    ip:                 req.ip ?? null,
+  }, "[LIVE_ORDER_ARRIVAL] request hit /user/live-order (pre-auth)");
+  next();
+};
 
 function parseBody(raw: unknown): { symbol: string; side: "BUY" | "SELL"; sizeUSD?: number; useSandbox: boolean } | null {
   if (!raw || typeof raw !== "object") return null;
@@ -50,6 +89,7 @@ function parseBody(raw: unknown): { symbol: string; side: "BUY" | "SELL"; sizeUS
 
 router.post(
   "/user/live-order",
+  logLiveOrderArrival,
   requireAuth,
   async (req, res): Promise<void> => {
     // ── Phase 4 correlationId resolution ───────────────────────────────

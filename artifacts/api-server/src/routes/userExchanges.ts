@@ -123,7 +123,42 @@ function safeRow(row: typeof userExchangeConnectionsTable.$inferSelect) {
 // Returns all of the authenticated user's exchange connections.
 // Includes connection metadata + exchange info. Never returns raw keys.
 
-router.get("/user/exchanges", requireAuth, async (req, res): Promise<void> => {
+// Pre-auth arrival tap on the exchange list endpoint — this is the FIRST
+// /api/user/* call the PWA portal makes on mount, so if Tanika's session is
+// failing at the Clerk layer this is where we'll see it first (alongside
+// [REQUIRE_AUTH_REJECT] no_session). Header fingerprint only.
+const logExchangesListArrival = (req: Request, _res: Response, next: NextFunction): void => {
+  const cookieHeader = typeof req.headers.cookie === "string" ? req.headers.cookie : "";
+  const cookieNames = cookieHeader
+    ? cookieHeader.split(";").map(c => c.split("=")[0]?.trim() ?? "").filter(Boolean).slice(0, 20)
+    : [];
+  const authHeader = typeof req.headers.authorization === "string" ? req.headers.authorization : "";
+  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  req.log?.info?.({
+    tag:                "EXCHANGES_LIST_ARRIVAL",
+    method:             req.method,
+    url:                req.originalUrl,
+    origin:             req.headers.origin ?? null,
+    referer:            req.headers.referer ?? null,
+    host:               req.headers.host ?? null,
+    xForwardedHost:     req.headers["x-forwarded-host"] ?? null,
+    hasAuthorization:   !!authHeader,
+    authScheme:         authHeader ? authHeader.split(" ")[0] : null,
+    bearerLen:          bearerToken.length || 0,
+    bearerPrefix:       bearerToken ? bearerToken.slice(0, 8) : null,
+    hasCookie:          !!cookieHeader,
+    cookieNames,
+    hasSessionCookie:   cookieNames.includes("__session"),
+    hasClientCookie:    cookieNames.includes("__client"),
+    userAgent:          typeof req.headers["user-agent"] === "string"
+      ? req.headers["user-agent"].slice(0, 120)
+      : null,
+    ip:                 req.ip ?? null,
+  }, "[EXCHANGES_LIST_ARRIVAL] request hit GET /user/exchanges (pre-auth)");
+  next();
+};
+
+router.get("/user/exchanges", logExchangesListArrival, requireAuth, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
   try {
     const rows = await db
