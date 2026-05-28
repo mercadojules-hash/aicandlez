@@ -5676,7 +5676,23 @@ export function PortalCustomerShell() {
       color: T.TEXT_1,
       fontFamily: T.FONT_MONO,
       display: "flex", flexDirection: "column",
+      borderTop: "6px solid #B026FF",
     }}>
+      {/* TEMP DIAGNOSTIC MARKER — Phase 9 graduation proof.
+          Confirms production routing is mounting the graduated
+          PortalCustomerShell (Candidate B). Remove after verification. */}
+      <div style={{
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100000,
+        background: "#B026FF", color: "#fff",
+        fontFamily: "JetBrains Mono, ui-monospace, monospace",
+        fontSize: 13, fontWeight: 900, letterSpacing: "0.30em",
+        padding: "8px 16px", textAlign: "center",
+        textShadow: "0 0 8px rgba(0,0,0,0.6)",
+        boxShadow: "0 4px 12px rgba(176,38,255,0.6)",
+        pointerEvents: "none",
+      }}>
+        ● CANDIDATE B ACTIVE · PortalCustomerShell (graduated) ●
+      </div>
       <style>{`
         /* Customer-only confidence dominance. Rows inside SignalsRow are
            already sorted by AI confidence DESC, so a top→bottom vertical

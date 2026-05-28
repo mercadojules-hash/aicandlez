@@ -4099,7 +4099,24 @@ function AdminPortalShellInner() {
       color: T.TEXT_1,
       fontFamily: T.FONT_MONO,
       display: "flex", flexDirection: "column",
+      borderTop: "6px solid #FF3B30",
     }}>
+      {/* TEMP DIAGNOSTIC MARKER — Phase 9 graduation proof.
+          Confirms when production routing is mounting the ADMIN shell
+          (NOT Candidate B). Admin accounts hitting /portal land here
+          via Portal.tsx isAdmin dispatch. Remove after verification. */}
+      <div style={{
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100000,
+        background: "#FF3B30", color: "#fff",
+        fontFamily: "JetBrains Mono, ui-monospace, monospace",
+        fontSize: 13, fontWeight: 900, letterSpacing: "0.30em",
+        padding: "8px 16px", textAlign: "center",
+        textShadow: "0 0 8px rgba(0,0,0,0.6)",
+        boxShadow: "0 4px 12px rgba(255,59,48,0.6)",
+        pointerEvents: "none",
+      }}>
+        ● ADMIN SHELL ACTIVE · AdminPortalShell (NOT Candidate B) ●
+      </div>
       <style>{`
         @keyframes rail-pulse {
           0%   { opacity: 0.70; }
