@@ -231,6 +231,22 @@ const KRAKEN_SYMBOLS: Record<string, string> = {
 
 export type LiveVenue = "coinbase" | "kraken";
 
+// Binance pair table — mirrors `BinanceAdapter.SYMBOL_MAP`. Kept here so
+// `normalizeExecutionSymbol` can pre-flight a Binance order without
+// importing the adapter (which would create a marketData → adapter →
+// marketData cycle). When you add a Binance pair, add it in BOTH places.
+const BINANCE_SYMBOLS: Record<string, string> = {
+  BTCUSD:  "BTCUSDT",
+  ETHUSD:  "ETHUSDT",
+  SOLUSD:  "SOLUSDT",
+  XRPUSD:  "XRPUSDT",
+  DOGEUSD: "DOGEUSDT",
+  AVAXUSD: "AVAXUSDT",
+  LINKUSD: "LINKUSDT",
+  ADAUSD:  "ADAUSDT",
+  BNBUSD:  "BNBUSDT",
+};
+
 export function isSymbolSupportedOn(symbol: string, venue: LiveVenue): boolean {
   const sym = symbol.trim().toUpperCase();
   if (venue === "coinbase") return Object.prototype.hasOwnProperty.call(COINBASE_SYMBOLS, sym);
@@ -252,6 +268,85 @@ export function normalizeSymbolForVenue(symbol: string, venue: LiveVenue): strin
   if (venue === "coinbase") return COINBASE_SYMBOLS[sym] ?? null;
   if (venue === "kraken")   return KRAKEN_SYMBOLS[sym]   ?? null;
   return null;
+}
+
+/** ── Canonical execution-symbol resolver (2026-05 unification) ───────────
+ *
+ *  Single source of truth used by every customer-execution path:
+ *    - `placeLiveAutoOrderForUser` pre-flight
+ *    - `userLiveOrder` route
+ *    - AI engine + manual BUY/SELL (planned: gateway pass)
+ *
+ *  Contract:
+ *    - input  = legacy `<SYM>USD` symbol (e.g. `HYPEUSD`) + exchange id
+ *               from `EXCHANGE_CATALOG` (lower-case slug e.g. "coinbase")
+ *    - output = discriminated union; callers MUST handle the unsupported
+ *               branch explicitly — there is no silent fallback to a
+ *               synthesized pair (which is how `HYPEUSDT` ended up shipping
+ *               to Binance and `MKRUSD` ended up at Coinbase).
+ *
+ *  Coverage today: coinbase, kraken, binance. Other exchanges return
+ *  `{ ok: false, reason: "no_map" }` — caller decides whether to abstain
+ *  (let the adapter throw) or hard-reject. Pre-flight uses "no_map" as
+ *  a soft signal (does not block); the adapter still has its own check.
+ */
+export type NormalizedExecutionExchange = "coinbase" | "kraken" | "binance";
+
+export type NormalizeExecutionResult =
+  | { ok: true;  exchange: NormalizedExecutionExchange; native: string }
+  | { ok: false; reason: "unsupported_symbol"; supportedExchanges: LiveVenue[] }
+  | { ok: false; reason: "no_map"; supportedExchanges: LiveVenue[] };
+
+export function normalizeExecutionSymbol(
+  symbol: string,
+  exchangeId: string,
+): NormalizeExecutionResult {
+  const sym       = symbol.trim().toUpperCase();
+  const venue     = exchangeId.trim().toLowerCase();
+  const supported = getSupportedExchanges(sym);
+
+  if (venue === "coinbase") {
+    const native = COINBASE_SYMBOLS[sym];
+    return native
+      ? { ok: true, exchange: "coinbase", native }
+      : { ok: false, reason: "unsupported_symbol", supportedExchanges: supported };
+  }
+  if (venue === "kraken") {
+    const native = KRAKEN_SYMBOLS[sym];
+    return native
+      ? { ok: true, exchange: "kraken", native }
+      : { ok: false, reason: "unsupported_symbol", supportedExchanges: supported };
+  }
+  if (venue === "binance") {
+    const native = BINANCE_SYMBOLS[sym];
+    return native
+      ? { ok: true, exchange: "binance", native }
+      : { ok: false, reason: "unsupported_symbol", supportedExchanges: supported };
+  }
+  // Exchanges we don't have a map for (cryptocom/bybit/okx/kucoin/etc).
+  // Pre-flight callers treat this as "abstain" rather than reject so we
+  // don't introduce regressions for venues that previously worked via
+  // adapter-internal mapping. The adapter is still authoritative.
+  return { ok: false, reason: "no_map", supportedExchanges: supported };
+}
+
+/** Typed error thrown by adapters when a caller hands them an unknown
+ *  symbol. Routes catch via `instanceof` (not regex on .message) so the
+ *  rejection path is deterministic and grep-able. Defined in marketData
+ *  rather than the adapter base class so non-adapter callers can also
+ *  throw / catch it without crossing service boundaries. */
+export class UnsupportedSymbolError extends Error {
+  readonly errorCode = "unsupported_symbol" as const;
+  readonly symbol: string;
+  readonly exchange: string;
+  readonly supportedExchanges: LiveVenue[];
+  constructor(symbol: string, exchange: string, supportedExchanges: LiveVenue[]) {
+    super(`Unsupported symbol: ${symbol} on ${exchange}`);
+    this.name = "UnsupportedSymbolError";
+    this.symbol             = symbol;
+    this.exchange           = exchange;
+    this.supportedExchanges = supportedExchanges;
+  }
 }
 
 // Coinbase candle granularity is seconds; Kraken is minutes.

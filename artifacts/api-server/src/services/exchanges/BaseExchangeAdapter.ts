@@ -244,6 +244,16 @@ export abstract class BaseExchangeAdapter extends EventEmitter {
   }
 
   protected normaliseSymbolGeneric(symbol: string, suffix: string): string {
+    // 2026-05 unification — only accept legitimate `<BASE>USD` inputs.
+    // Without this guard the helper happily returns nonsense for inputs
+    // that don't end in `USD` (e.g. `HYPE-USD` → `HYPE-USD` unchanged),
+    // which would be silently shipped to the broker. Adapters using
+    // this fallback must surface the rejection upstream; we throw a
+    // plain Error here (adapters don't all import marketData yet —
+    // upgrade to UnsupportedSymbolError when they do).
+    if (!/^[A-Z0-9]+USD$/.test(symbol)) {
+      throw new Error(`Unsupported symbol: ${symbol}`);
+    }
     return symbol.replace("USD", suffix);
   }
 }

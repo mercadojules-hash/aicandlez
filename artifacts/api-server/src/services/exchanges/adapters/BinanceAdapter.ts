@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import https from "node:https";
 import { BaseExchangeAdapter } from "../BaseExchangeAdapter.js";
+import { UnsupportedSymbolError, getSupportedExchanges } from "../../../lib/marketData.js";
 import type {
   AdapterConfig, PlaceOrderRequest, CancelOrderRequest,
   StandardOrder, StandardAccount, StandardCandle, StandardTicker,
@@ -60,7 +61,16 @@ export class BinanceAdapter extends BaseExchangeAdapter {
   }
 
   normaliseSymbol(symbol: string): string {
-    return SYMBOL_MAP[symbol] ?? symbol.replace("USD", "USDT");
+    // 2026-05 unification — refuse to silently synthesize a `<SYM>USDT`
+    // pair from `<SYM>USD` when the asset isn't on our verified Binance
+    // pair table. Pre-unification this would ship `HYPEUSDT` to Binance
+    // and the real broker would 400 with an opaque error after we'd
+    // already debited paper telemetry. Now we throw a typed
+    // `UnsupportedSymbolError` BEFORE the network call so the route
+    // layer can hand back a structured `errorCode:"unsupported_symbol"`.
+    const native = SYMBOL_MAP[symbol];
+    if (!native) throw new UnsupportedSymbolError(symbol, "binance", getSupportedExchanges(symbol));
+    return native;
   }
 
   denormaliseSymbol(native: string): string {

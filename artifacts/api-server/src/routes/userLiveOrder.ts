@@ -17,7 +17,7 @@ import { requireAuth } from "../middlewares/requireAuth.js";
 import { placeLiveAutoOrderForUser, isCustomerLiveExecutionEnabled } from "../lib/liveUserExecution.js";
 import { registerLiveUserFill } from "../lib/userSimRegistry.js";
 import { TIER_MAX_SIZE_USD, type TierPlan } from "../lib/tierLimits.js";
-import { getSupportedExchanges } from "../lib/marketData.js";
+import { getSupportedExchanges, UnsupportedSymbolError } from "../lib/marketData.js";
 
 type Plan = TierPlan;
 const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, enterprise: 3 };
@@ -281,11 +281,14 @@ router.post(
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // Unexpected throws from the adapter (e.g. legacy "Unsupported
-      // symbol: X" raised inside marketData.ts before the pre-check
-      // catches them) are normalized into a structured rejection so the
-      // client can react. Defaults to 500 for true infra failures.
-      const isUnsupported = /^Unsupported symbol:/.test(msg);
+      // 2026-05 unification — prefer the typed `UnsupportedSymbolError`
+      // (thrown by adapters whose `normaliseSymbol` no longer silently
+      // synthesizes pairs). Fall back to the legacy regex on .message
+      // for any unconverted adapter or for the plain Error thrown by
+      // BaseExchangeAdapter.normaliseSymbolGeneric.
+      const isUnsupported =
+        err instanceof UnsupportedSymbolError ||
+        /^Unsupported symbol:/.test(msg);
       req.log.error(
         {
           tag:               "MANUAL_TRADE_REJECTED",

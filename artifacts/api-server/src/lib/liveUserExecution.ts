@@ -12,7 +12,7 @@ import { ensureFreshAlpacaCreds } from "../services/exchanges/AlpacaTokenRefresh
 import { hasSandbox, makeAdapter } from "../services/exchanges/adapterFactory.js";
 import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
 import type { StandardOrder } from "../services/exchanges/types.js";
-import { getTicker, getSupportedExchanges, isSymbolSupportedOn, type LiveVenue } from "./marketData.js";
+import { getTicker, normalizeExecutionSymbol } from "./marketData.js";
 import { logger } from "./logger.js";
 import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
 import { getTradeLimitVerdict, invalidateTradeLimitCache } from "./tradeLimitEngine.js";
@@ -1188,34 +1188,39 @@ export async function placeLiveAutoOrderForUser(
   }
 
   // 2.5 Pre-execution venue symbol-support check (hoisted above getTicker
-  // per 2026-05-28 fix). Symbols removed from the registry (e.g. MKRUSD
-  // after Coinbase delisting + Kraken not-listed) must return the
-  // structured `unsupported_symbol` errorCode rather than a downstream
-  // `price_unavailable` from the failing ticker call — clients key off
-  // errorCode to render the "supported on X" hint. Only enforced for
-  // venues with a symbol table; other exchanges fall through to the
-  // adapter's own validation (see step 5 — that block is now redundant
-  // for the coinbase/kraken case but kept as a defense-in-depth guard).
-  if (row.exchange === "coinbase" || row.exchange === "kraken") {
-    const venue: LiveVenue = row.exchange;
-    if (!isSymbolSupportedOn(symbol, venue)) {
-      const supported = getSupportedExchanges(symbol);
-      const msg = supported.length > 0
-        ? `${symbol} is not listed on ${venue} — try ${supported.join(" or ")}`
-        : `${symbol} is not listed on any supported venue`;
-      logger.warn(
-        { userId, symbol, exchange: row.exchange, supportedExchanges: supported },
-        "placeLiveAutoOrderForUser: unsupported_symbol pre-check (pre-ticker)",
-      );
-      await emitFailureNotification(userId, symbol, side, msg, row.exchange);
-      return {
-        success:   false,
+  // per 2026-05-28 fix). 2026-05 unification: now routes through the
+  // canonical `normalizeExecutionSymbol` resolver so coinbase / kraken /
+  // binance ALL pre-flight through the same code path that the gateway
+  // pass (planned) will share with AI-engine + manual BUY/SELL. Symbols
+  // removed from the registry (e.g. MKRUSD, HYPEUSD on coinbase) return
+  // the structured `unsupported_symbol` errorCode + `supportedExchanges`
+  // hint rather than a downstream `price_unavailable` from the failing
+  // ticker call. `no_map` venues abstain — the adapter's own
+  // UnsupportedSymbolError still catches misses (see step 5).
+  const preflightNormalize = normalizeExecutionSymbol(symbol, row.exchange);
+  if (preflightNormalize.ok === false && preflightNormalize.reason === "unsupported_symbol") {
+    const msg = preflightNormalize.supportedExchanges.length > 0
+      ? `${symbol} is not listed on ${row.exchange} — try ${preflightNormalize.supportedExchanges.join(" or ")}`
+      : `${symbol} is not listed on any supported venue`;
+    logger.warn(
+      {
+        tag:                "SYMBOL_NORMALIZE_REJECT",
         userId,
-        exchange:  row.exchange,
-        errorCode: "unsupported_symbol",
-        error:     msg,
-      };
-    }
+        symbol,
+        exchange:           row.exchange,
+        supportedExchanges: preflightNormalize.supportedExchanges,
+        stage:              "pre-ticker",
+      },
+      "[SYMBOL_NORMALIZE_REJECT] placeLiveAutoOrderForUser pre-ticker",
+    );
+    await emitFailureNotification(userId, symbol, side, msg, row.exchange);
+    return {
+      success:   false,
+      userId,
+      exchange:  row.exchange,
+      errorCode: "unsupported_symbol",
+      error:     msg,
+    };
   }
 
   // 3. Reference price → base quantity
@@ -1275,34 +1280,53 @@ export async function placeLiveAutoOrderForUser(
     return { success: false, userId, exchange: row.exchange, errorCode: "no_sandbox", error: msg };
   }
 
-  // 2026-05 unification — pre-check symbol support against the routed
-  // venue BEFORE building the adapter, so customers see a structured
-  // `unsupported_symbol` errorCode + list of venues that DO carry the
-  // pair (e.g. GRTUSD on Coinbase succeeds now; XMRUSD on Coinbase
-  // returns `supportedExchanges:["kraken"]`). Without this the request
-  // would hit the adapter and surface a generic "Unsupported symbol"
-  // string the client couldn't act on. Only enforced for the two
-  // venues we have symbol tables for; other exchanges (Binance/OKX/
-  // KuCoin) fall through to the adapter's own validation.
-  if (row.exchange === "coinbase" || row.exchange === "kraken") {
-    const venue: LiveVenue = row.exchange;
-    if (!isSymbolSupportedOn(symbol, venue)) {
-      const supported = getSupportedExchanges(symbol);
-      const msg = supported.length > 0
-        ? `${symbol} is not listed on ${venue} — try ${supported.join(" or ")}`
-        : `${symbol} is not listed on any supported venue`;
-      logger.warn(
-        { userId, symbol, exchange: row.exchange, supportedExchanges: supported },
-        "placeLiveAutoOrderForUser: unsupported_symbol pre-check",
-      );
-      return {
-        success:   false,
+  // 2026-05 unification — single canonical pre-flight via
+  // `normalizeExecutionSymbol`. Replaces the prior coinbase/kraken-only
+  // `isSymbolSupportedOn` branch with the catalogue-wide resolver:
+  //   - `ok:true`               → proceed to adapter
+  //   - `unsupported_symbol`    → hard reject with structured errorCode
+  //                               and the venues that DO carry the pair
+  //   - `no_map`                → abstain at this layer (we have no
+  //                               symbol table for that venue); the
+  //                               adapter's own validation is still
+  //                               authoritative and will throw
+  //                               UnsupportedSymbolError on miss.
+  // Logs `[SYMBOL_NORMALIZE_REJECT]` so the rejection is grep-able
+  // separately from generic adapter throws.
+  const normalize = normalizeExecutionSymbol(symbol, row.exchange);
+  if (normalize.ok === false && normalize.reason === "unsupported_symbol") {
+    const msg = normalize.supportedExchanges.length > 0
+      ? `${symbol} is not listed on ${row.exchange} — try ${normalize.supportedExchanges.join(" or ")}`
+      : `${symbol} is not listed on any supported venue`;
+    logger.warn(
+      {
+        tag:                "SYMBOL_NORMALIZE_REJECT",
         userId,
-        exchange:  row.exchange,
-        errorCode: "unsupported_symbol",
-        error:     msg,
-      };
-    }
+        symbol,
+        exchange:           row.exchange,
+        supportedExchanges: normalize.supportedExchanges,
+      },
+      "[SYMBOL_NORMALIZE_REJECT] placeLiveAutoOrderForUser pre-flight",
+    );
+    return {
+      success:   false,
+      userId,
+      exchange:  row.exchange,
+      errorCode: "unsupported_symbol",
+      error:     msg,
+    };
+  }
+  if (normalize.ok === true) {
+    logger.debug(
+      {
+        tag:      "SYMBOL_NORMALIZE_OK",
+        userId,
+        symbol,
+        exchange: row.exchange,
+        native:   normalize.native,
+      },
+      "[SYMBOL_NORMALIZE_OK] placeLiveAutoOrderForUser pre-flight",
+    );
   }
 
   let adapter: BaseExchangeAdapter;
