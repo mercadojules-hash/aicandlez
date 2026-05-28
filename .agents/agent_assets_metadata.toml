@@ -89,3 +89,15 @@ id = "I8ES7dC7zllwnTFG1Vb9S"
 uri = "file://screenshots/baseline-CommandDeck.jpg"
 type = "image"
 title = "BASELINE — CommandDeck (graduated · what's LIVE in production today as PortalCustomerShell)"
+
+[[outputs]]
+id = "tar66MMFx6E6dO_sCCRSW"
+uri = "file://screenshots/why-not-trade-desktop.jpg"
+type = "image"
+title = "Customer portal — WHY NOT TRADE? strips (desktop)"
+
+[[outputs]]
+id = "10Jctbihuzc6tAg_OKTXY"
+uri = "file://screenshots/why-not-trade-mobile.jpg"
+type = "image"
+title = "Customer portal — responsive layout (mobile)"

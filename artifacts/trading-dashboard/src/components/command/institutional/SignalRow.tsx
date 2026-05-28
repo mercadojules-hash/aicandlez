@@ -36,6 +36,25 @@ const apiBaseUrl: string = (
   (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? ""
 ).replace(/\/$/, "");
 
+// ── DEV-only customer-preview gate ───────────────────────────────────────────
+// Mirrors `shouldForceCustomerPreview()` in Portal.tsx. When an admin opens the
+// customer shell via `?previewCustomer=1` on a .replit.dev preview origin, the
+// real role is still admin so `isOperatorRole` stays true and the customer-only
+// WHY-NOT-TRADE strip would never mount. This DEV-only flag lets the strip
+// render in that sanctioned preview so the exact customer surface can be
+// verified. Hard-gated on `import.meta.env.DEV` → Vite tree-shakes it out of the
+// production bundle, so real admins on real `/command` never see it (locked
+// invariant preserved). Does NOT touch auth, routing, or any execution path.
+function isDevCustomerPreview(): boolean {
+  if (!import.meta.env.DEV) return false;
+  if (typeof window === "undefined") return false;
+  try {
+    return new URLSearchParams(window.location.search).get("previewCustomer") === "1";
+  } catch {
+    return false;
+  }
+}
+
 function fmt(n: number): string {
   if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
   if (n >= 1)    return n.toFixed(2);
@@ -794,7 +813,7 @@ export function SignalRow({ spec, breakdown }: Props) {
   // /command would briefly render the WHY toggle + click handler before
   // role resolves, violating the byte-identical invariant. Treat unknown
   // role as operator (most conservative) until resolved.
-  const insightsEnabled = !roleLoading && !isOperatorRole;
+  const insightsEnabled = (!roleLoading && !isOperatorRole) || isDevCustomerPreview();
   const [insightsOpen, setInsightsOpen] = useState(false);
 
   // AI reasoning lines — synthesized from real breakdown signals (EMA, RSI,
