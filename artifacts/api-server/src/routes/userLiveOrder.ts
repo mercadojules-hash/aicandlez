@@ -14,7 +14,8 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth.js";
-import { placeLiveAutoOrderForUser, isCustomerLiveExecutionEnabled } from "../lib/liveUserExecution.js";
+import { isCustomerLiveExecutionEnabled } from "../lib/liveUserExecution.js";
+import { executeCustomerOrder } from "../lib/executionGateway.js";
 import { registerLiveUserFill } from "../lib/userSimRegistry.js";
 import { TIER_MAX_SIZE_USD, type TierPlan } from "../lib/tierLimits.js";
 import { getSupportedExchanges, UnsupportedSymbolError } from "../lib/marketData.js";
@@ -162,7 +163,13 @@ router.post(
     );
 
     try {
-      const result = await placeLiveAutoOrderForUser({
+      // Phase-1 unification (Task #206): manual customer BUY/SELL routes
+      // through the single execution gateway alongside the AI fan-out so
+      // both surfaces emit the canonical `[EXECUTION_GATEWAY_*]` log tags
+      // with `trigger: "manual"`. Behavior is byte-identical to the prior
+      // direct `placeLiveAutoOrderForUser` call.
+      const result = await executeCustomerOrder({
+        trigger:    "manual",
         userId,
         symbol:     parsed.symbol,
         side:       parsed.side,

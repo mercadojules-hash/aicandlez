@@ -10,10 +10,10 @@ import { placeOrder, getAccountSummary } from "./simulationEngine.js";
 import { placeLiveAutoOrder } from "./exchangeEngine.js";
 import {
   listLiveExecutionUsers,
-  placeLiveAutoOrderForUser,
   isDryRunEnabled,
   type LiveUserOrderResult,
 } from "./liveUserExecution.js";
+import { executeCustomerOrder } from "./executionGateway.js";
 import { registerLiveUserFill } from "./userSimRegistry.js";
 import { validateTrade } from "./riskEngine.js";
 import { checkTrailingStops } from "./trailingStopEngine.js";
@@ -876,7 +876,16 @@ async function autoExecute(
       })),
       Promise.all(
         liveUsers.map((u) =>
-          placeLiveAutoOrderForUser({ userId: u.userId, symbol, side, sizeUSD }).catch(
+          // Phase-1 unification (Task #206): AI fan-out routes through
+          // the single execution gateway alongside the manual portal
+          // BUY/SELL path. Behavior-preserving — the gateway delegates
+          // to `placeLiveAutoOrderForUser` and adds canonical
+          // `[EXECUTION_GATEWAY_*]` log tags with `trigger: "ai"`.
+          executeCustomerOrder({
+            trigger: "ai",
+            userId:  u.userId,
+            symbol, side, sizeUSD,
+          }).catch(
             (err): LiveUserOrderResult => ({
               success:   false,
               userId:    u.userId,

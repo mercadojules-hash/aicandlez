@@ -12,6 +12,7 @@
     "backfill-close-order-ids": "tsx ./src/backfill-close-order-ids-cli.ts",
     "backfill-open-order-ids": "tsx ./src/backfill-open-order-ids-cli.ts",
     "check-no-bare-api-fetch": "tsx ./src/check-no-bare-api-fetch.ts",
+    "check-no-direct-adapter-orders": "tsx ./src/check-no-direct-adapter-orders.ts",
     "backfill-runtime-exchange": "tsx ./src/backfill-runtime-exchange.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
