@@ -1,0 +1,104 @@
+We now have definitive proof this is a multi-store convergence failure — not an execution failure.
+
+Current screenshot proves THREE different runtime truths simultaneously:
+
+1. AI EXECUTION BANNER
+   Shows:
+
+* “2 OPEN”
+
+2. TRADE HISTORY
+   Shows:
+
+* XMRUSD closed
+* INJUSD closed
+* realized profits persisted correctly
+
+3. ACCOUNT + LIVE TRADES
+   Shows:
+
+* OPEN = 0
+* NO OPEN POSITIONS
+* Realized = $0.00
+
+These states are mathematically incompatible.
+
+The AI runtime clearly knows positions are open.
+The Trade History system clearly knows trades closed profitably.
+But the account summary/live trades layer still reads stale or divergent state.
+
+This strongly suggests:
+
+AI runtime state source:
+userSimRegistry / execution runtime
+
+Trade History source:
+sim_trades / close persistence
+
+Account summary source:
+still global simulationEngine.getAccountSummary()
+or stale cache/query hydration
+
+Live Trades source:
+likely /api/mobile/portfolio or another endpoint not bound to the per-user runtime store
+
+At this point this is no longer:
+
+* execution failure
+* AI failure
+* exchange failure
+* BUY mutation failure
+* persistence failure
+
+This is specifically:
+runtime/account/live-trades state fragmentation.
+
+Need immediate convergence work:
+
+1. Identify EVERY source feeding:
+
+* OPEN count
+* Live Trades
+* Realized PnL
+* Unrealized PnL
+* Equity
+* AI runtime OPEN count
+
+2. Instrument each read endpoint with:
+
+* sourceOfTruth
+* userId
+* openPositions
+* realizedPnL
+* unrealizedPnL
+* queryKey/cache source
+* correlationId if available
+
+3. Force all customer-facing account surfaces to hydrate from ONE canonical per-user account state service.
+
+Architectural invariant needed now:
+
+There must be exactly ONE authoritative source for:
+
+* open positions
+* realized pnl
+* unrealized pnl
+* equity
+* account summary
+
+The current system clearly has:
+
+* runtime engine truth
+* trade persistence truth
+* account summary truth
+
+all diverging independently.
+
+Most important clue:
+The runtime banner itself already knows “2 OPEN”.
+That means the execution runtime is already correct internally.
+
+The account widgets are simply not subscribed to the same canonical store/query.
+
+Do NOT patch this piecemeal anymore.
+This now needs a deliberate canonical account-state convergence pass.

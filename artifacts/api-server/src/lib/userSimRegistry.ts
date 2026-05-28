@@ -4,7 +4,7 @@ import {
   simPositionsTable,
   simTradesTable,
 } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { getTicker, SUPPORTED_SYMBOLS } from "./marketData.js";
 import { logger } from "./logger.js";
 import {
@@ -408,12 +408,71 @@ export async function getUserMonthlyFees(
 
 export async function getUserAccountSummary(userId: string) {
   const state   = await getOrLoad(userId);
+
+  // ── Canonical convergence audit ─────────────────────────────────────────
+  // Compare in-memory `state.positions.length` (what every per-user reader
+  // ultimately consumes via this function) against the DB row count for
+  // `sim_positions WHERE userId=…`. Any drift means the in-memory registry
+  // is stale relative to the DB — i.e. SOME write path mutated DB but
+  // NOT the in-memory state, or vice versa. Tagged READ_SOURCE_CANONICAL
+  // because this function IS the canonical per-user account SoT — every
+  // /api/{account,simulation/account,mobile/portfolio,mobile/positions,
+  // portfolio/overview} endpoint funnels through here.
+  let dbOpenPositions = -1;
+  try {
+    const [row] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(simPositionsTable)
+      .where(eq(simPositionsTable.userId, userId));
+    dbOpenPositions = Number(row?.n ?? 0);
+  } catch (err) {
+    logger.warn(
+      { tag: "READ_SOURCE_CANONICAL", userId, err },
+      "[READ_SOURCE_CANONICAL] DB count probe failed — divergence check skipped",
+    );
+  }
+  if (dbOpenPositions !== -1 && dbOpenPositions !== state.positions.length) {
+    // ERROR-level: this is the convergence bug the user is hunting.
+    // Customer sees "2 OPEN" from a DB-backed reader while in-memory
+    // (sim-account/mobile-portfolio) shows 0 → exactly this divergence.
+    logger.error(
+      {
+        tag:                   "STATE_DB_DIVERGENCE",
+        sourceOfTruth:         "userSimRegistry.getUserAccountSummary",
+        userId,
+        inMemoryOpenPositions: state.positions.length,
+        dbOpenPositions,
+        delta:                 dbOpenPositions - state.positions.length,
+        inMemoryIds:           state.positions.map((p) => p.id),
+        hint:                  "in-memory registry stale vs sim_positions table — close path likely splice'd memory but DB delete failed/skipped, OR a writer pushed to DB without updating registry",
+      },
+      "[STATE_DB_DIVERGENCE] in-memory state.positions diverges from sim_positions DB count",
+    );
+  }
+
   const enriched = await enrichPositions(state.positions);
   const unrealizedTotal = enriched.reduce((s, p) => s + (p.unrealizedPnL ?? 0), 0);
   const positionValue   = enriched.reduce((s, p) => s + (p.marketValue ?? p.sizeUSD), 0);
   const equity          = state.account.cashBalance + positionValue;
   const totalPnL        = equity - state.account.startingBalance;
   const totalPnLPct     = (totalPnL / state.account.startingBalance) * 100;
+
+  logger.info(
+    {
+      tag:              "READ_SOURCE_CANONICAL",
+      sourceOfTruth:    "userSimRegistry.getUserAccountSummary",
+      scope:            "PER_USER",
+      userId,
+      openPositions:    state.positions.length,
+      dbOpenPositions,  // -1 when probe failed
+      cashBalance:      parseFloat(state.account.cashBalance.toFixed(2)),
+      totalRealized:    parseFloat(state.account.totalRealized.toFixed(2)),
+      unrealizedPnL:    parseFloat(unrealizedTotal.toFixed(2)),
+      equity:           parseFloat(equity.toFixed(2)),
+      registryHit:      registry.has(userId),
+    },
+    "[READ_SOURCE_CANONICAL] per-user account summary computed",
+  );
 
   // Lifetime broker commission paid across every closed leg (entry + exit fees
   // on sim_trades for this user). Stays at 0 for paper-only users since paper

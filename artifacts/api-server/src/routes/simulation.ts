@@ -20,6 +20,26 @@ router.get("/account", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
   try {
     const data = await getUserAccountSummary(userId);
+    // [READ_SOURCE_ACCOUNT] — same per-user SoT as /simulation/account.
+    // This is the endpoint the PWA polls (queryKey ["sim-account"], 60s
+    // stale). If `openPositions` here disagrees with READ_SOURCE_LIQUIDITY
+    // for the same user in the same window → STATE_DB_DIVERGENCE will fire
+    // from getUserAccountSummary above. The two reads are the smoking gun.
+    const openPositions =
+      (data as { positions?: unknown[] }).positions?.length ?? 0;
+    req.log.info({
+      tag:            "READ_SOURCE_ACCOUNT",
+      endpoint:       "/api/account",
+      sourceOfTruth:  "userSimRegistry.getUserAccountSummary",
+      scope:          "PER_USER",
+      perUserAware:   true,
+      userId,
+      openPositions,
+      equity:         (data as { equity?: number }).equity,
+      totalRealized:  (data as { totalRealized?: number }).totalRealized,
+      unrealizedPnL:  (data as { unrealizedPnL?: number }).unrealizedPnL,
+      queryKey:       "sim-account",
+    }, "[READ_SOURCE_ACCOUNT] PWA canonical per-user account read");
     res.json(data);
   } catch (err) {
     req.log.error({ err, userId }, "GET /account failed");

@@ -112,6 +112,27 @@ router.get(
         availableCashUsd,
       });
 
+      // [READ_SOURCE_LIQUIDITY] — PER_USER but DB-backed, NOT registry-backed.
+      // `openLiveCount` comes from `countUserOpenLivePositions(userId)` which
+      // runs `SELECT COUNT(*) FROM sim_positions WHERE userId=$1 AND exchange
+      // IS NOT NULL`. This is the same row set that `userSimRegistry.getOrLoad`
+      // hydrates from, so the two MUST agree. If they don't, look for the
+      // matching `STATE_DB_DIVERGENCE` line from getUserAccountSummary in the
+      // same poll window — that proves the in-memory registry is stale vs DB.
+      // This endpoint feeds the "{n}/{max} OPEN" badge on Trade.tsx (the
+      // "AI EXECUTION BANNER 2 OPEN" the user is currently seeing).
+      req.log.info({
+        tag:             "READ_SOURCE_LIQUIDITY",
+        sourceOfTruth:   "sim_positions WHERE userId AND exchange IS NOT NULL (DB)",
+        scope:           "PER_USER_DB",
+        perUserAware:    true,
+        userId,
+        openPositions:   openLiveCount,
+        planMaxOpen:     PLAN_MAX_OPEN_POSITIONS[plan] ?? 0,
+        remainingSlots:  verdict.remainingSlots,
+        plan,
+        isAdmin:         gate.isAdmin,
+      }, "[READ_SOURCE_LIQUIDITY] per-user DB count — drives Trade banner 'N/M OPEN'");
       res.json({
         userId,
         plan,

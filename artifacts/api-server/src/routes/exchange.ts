@@ -28,8 +28,29 @@ import { auditLogger } from "../services/telemetry/AuditLogger.js";
 const router = Router();
 
 // ── Status ───────────────────────────────────────────────────────────────────
-router.get("/exchange/status", ...requireOperator, (_req, res) => {
-  res.json(getExchangeStatus());
+router.get("/exchange/status", ...requireOperator, (req, res) => {
+  const status = getExchangeStatus();
+  // [READ_SOURCE_EXCHANGE_STATUS] — GLOBAL scope. Reads
+  // `simulationEngine.positions[]` (global in-memory array) via
+  // `exchangeEngine.getExchangeStatus()`. This is the *operator* mirror of
+  // the shared engine, NOT a per-user view. If a customer-facing widget
+  // ever surfaces these numbers, it WILL diverge from any per-user reader
+  // (those funnel through `getUserAccountSummary`). Tag exists so log
+  // greps can prove the OPEN count this endpoint reports is global, not
+  // attributable to the polling user.
+  req.log.info({
+    tag:                 "READ_SOURCE_EXCHANGE_STATUS",
+    sourceOfTruth:       "simulationEngine.positions[] (GLOBAL)",
+    scope:               "GLOBAL",
+    perUserAware:        false,
+    callerUserId:        (req as { clerkUserId?: string }).clerkUserId,
+    openPositions:       (status as unknown as { openPositionsCount?: number; positions?: unknown[] }).openPositionsCount
+                           ?? (status as unknown as { positions?: unknown[] }).positions?.length
+                           ?? null,
+    exchange:            status.exchangeName,
+    mode:                status.mode,
+  }, "[READ_SOURCE_EXCHANGE_STATUS] operator-only GLOBAL engine snapshot");
+  res.json(status);
 });
 
 // ── Orders list ───────────────────────────────────────────────────────────────
