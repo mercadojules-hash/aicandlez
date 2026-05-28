@@ -100,6 +100,24 @@ process.on("unhandledRejection", (reason) => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 server.listen(finalPort, "0.0.0.0", async () => {
   logger.info({ port: finalPort }, "API server listening");
+  // 2026-05-28 — [LIVE_VALIDATION_MODE] tag. Customer requested a clean
+  // validation window where every newly visible position/trade row is
+  // guaranteed to be a real post-fix LIVE broker fill (not a stale paper
+  // sim row). All DB-side sim_positions / sim_trades + operator `trades`
+  // were cleared just before this boot, and `registerLiveUserFill` /
+  // close-path persistence now emit `tag: "LIVE_VALIDATION_MODE"` on
+  // every real fill, so `grep '[LIVE_VALIDATION_MODE]'` over api-server
+  // logs returns exactly the new real executions. Remove once full LIVE
+  // execution is validated end-to-end.
+  logger.info({
+    tag:             "LIVE_VALIDATION_MODE",
+    phase:           "boot",
+    bootedAt:        new Date().toISOString(),
+    cleanBaseline:   true,
+    cleanedTables:   ["trades", "sim_accounts (admin)"],
+    alreadyEmpty:    ["sim_positions", "sim_trades", "user_notifications"],
+    preserved:       ["users", "user_settings", "user_exchange_connections", "subscriptions", "user_risk_settings", "user_trade_limits", "audit_log"],
+  }, "[LIVE_VALIDATION_MODE] api-server booted with clean trade baseline");
   // Boot diagnostics — exchange env presence (booleans only, never log secrets)
   logger.info({
     EXCHANGE_LIVE_ENABLED: process.env["EXCHANGE_LIVE_ENABLED"] === "true",

@@ -763,8 +763,20 @@ export async function registerLiveUserFill(params: {
   });
 
   logger.info(
-    { userId: params.userId, symbol: position.symbol, side: position.side, exchange: position.exchange, exchangeOrderId: position.exchangeOrderId },
-    "UserSimRegistry: live fill mirrored",
+    {
+      tag:             "LIVE_VALIDATION_MODE",
+      phase:           "open",
+      userId:          params.userId,
+      symbol:          position.symbol,
+      side:            position.side,
+      exchange:        position.exchange,
+      exchangeOrderId: position.exchangeOrderId,
+      sandbox:         position.sandbox === true,
+      entryPrice:      position.entryPrice,
+      sizeUSD:         position.sizeUSD,
+      persistedToSimPositions: true,
+    },
+    "[LIVE_VALIDATION_MODE] real broker fill persisted to sim_positions",
   );
   return position;
 }
@@ -1098,6 +1110,33 @@ export async function closeUserPosition(
     positionMutation,
     persistAccount(state, { correlationId, symbol: closeSymbol, positionId, tag: "closeUserPosition" }),
   ]);
+
+  // [LIVE_VALIDATION_MODE] — emitted on close ONLY when the closing trade
+  // carried a real broker exchange tag, so grep over api-server logs returns
+  // exactly the realised real fills (never paper sim closes).
+  if (trade.exchange) {
+    logger.info(
+      {
+        tag:                  "LIVE_VALIDATION_MODE",
+        phase:                "close",
+        userId,
+        symbol:               trade.symbol,
+        side:                 trade.side,
+        exchange:             trade.exchange,
+        exchangeOrderId:      trade.exchangeOrderId,
+        exchangeCloseOrderId: trade.exchangeCloseOrderId,
+        sandbox:              trade.sandbox === true,
+        entryPrice:           trade.entryPrice,
+        exitPrice:            trade.exitPrice,
+        realizedPnL:          trade.realizedPnL,
+        realizedPnLPct:       trade.realizedPnLPct,
+        durationMs:           trade.durationMs,
+        closeReason:          trade.closeReason,
+        persistedToSimTrades: true,
+      },
+      "[LIVE_VALIDATION_MODE] real broker close persisted to sim_trades",
+    );
+  }
 
   // [ACCOUNT_SUMMARY_UPDATED] — DB writes for trade + position + account
   // all committed (Promise.all settled). At this point the next call to
