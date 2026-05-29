@@ -161,7 +161,7 @@ All adapters run in **simulation mode** when API keys are absent — no real ord
 
 | Filter | Default | Description |
 |--------|---------|-------------|
-| Volume confirmation | **ON** | Current 5m volume ≥ 85% of 20-bar rolling average |
+| Volume confirmation | **ON** | Current 5m volume ≥ 65% of 20-bar rolling average |
 | Sideways filter | Always ON | Blocks when EMA9/EMA21 spread < 0.15% on both timeframes |
 | 1H trend alignment | **OFF** | Requires 1H EMA9 to align with signal direction |
 | Min confidence | **60** | Minimum adjusted confidence to execute |

@@ -66,7 +66,7 @@ export function scoreSignal(
   if (!signal.volumeConfirmed) {
     const d = -8;
     conf += d;
-    adjustments.push({ factor: "Volume", delta: d, reason: "Volume below 85% rolling avg — penalising" });
+    adjustments.push({ factor: "Volume", delta: d, reason: "Volume below 65% rolling avg — penalising" });
   } else {
     const d = +4;
     conf += d;

@@ -1103,7 +1103,7 @@ export default function Settings() {
                   a locked-on row so customers understand it is not optional.
                   Admins keep the live toggle for diagnostic / override. */}
               {isAdmin ? (
-                <ToggleSwitch value={merged.volumeFilter ?? true} onChange={v => set("volumeFilter", v)} label="VOLUME CONFIRMATION" desc="Only trade when current 5m volume ≥ 85% of 20-bar rolling average · ADMIN OVERRIDE" />
+                <ToggleSwitch value={merged.volumeFilter ?? true} onChange={v => set("volumeFilter", v)} label="VOLUME CONFIRMATION" desc="Only trade when current 5m volume ≥ 65% of 20-bar rolling average · ADMIN OVERRIDE" />
               ) : (
                 <div
                   title="Mandatory platform safety control. Prevents trades on low-liquidity bars where slippage, spread manipulation, and thin-order-book volatility can cause poor fills."
@@ -1115,7 +1115,7 @@ export default function Settings() {
                     </div>
                     <div className="mt-1 text-[10px] font-mono leading-snug text-emerald-200/60">
                       Baseline execution safeguard — blocks trades on low-liquidity bars
-                      (current 5m volume must be ≥ 85% of 20-bar rolling average) to
+                      (current 5m volume must be ≥ 65% of 20-bar rolling average) to
                       protect against slippage, poor fills, spread manipulation, and
                       thin-order-book volatility. Always ON for all customer accounts;
                       applies equally to Kraken, Coinbase, Binance, and paper / sim.

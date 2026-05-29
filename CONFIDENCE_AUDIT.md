@@ -117,7 +117,7 @@ Items frequently named in marketing copy / dashboard surfaces but **never inputs
 | Regime classification | `RegimeClassifier.ts` exists; only consumed by the **dead** `ConfidenceScorer.scoreSignal`. |
 | Macro weighting | Never implemented. |
 | Sentiment weighting | `sentimentEngine.ts` exists; surfaces a Sentiment AI page but does **not** feed `runAIDecision()` confidence. |
-| Volume confirmation | Exists in `tradingLoop.ts:382-389` as a **boolean execution gate** (≥85% of 20-bar avg). Not a confidence input. |
+| Volume confirmation | Exists in `tradingLoop.ts` as a **boolean execution gate** (≥65% of 20-bar avg; SoT `VOLUME_GATE_FRACTION`, lowered from 85% on 2026-05-29). Not a confidence input. |
 | 1H trend alignment | Same — execution gate, not a confidence input. |
 | MTF +10/-12 bonus | Only in dead `ConfidenceScorer`. Never applied. |
 

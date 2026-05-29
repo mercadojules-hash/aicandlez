@@ -518,7 +518,7 @@ export default function SignalDebug() {
               <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/10 border border-border/30">
                 <div>
                   <div className="text-xs font-semibold text-foreground/80">Volume Confirmation</div>
-                  <div className="text-[10px] text-muted-foreground/50 mt-0.5">Block low-volume signals (current &lt; 85% of avg)</div>
+                  <div className="text-[10px] text-muted-foreground/50 mt-0.5">Block low-volume signals (current &lt; 65% of avg)</div>
                 </div>
                 <button
                   onClick={() => filterMutation.mutate({ volumeFilter: !(d?.volumeFilter ?? true) })}

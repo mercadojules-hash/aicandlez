@@ -228,7 +228,9 @@ Render services: `aicandlez-trade`, `aicandlez-admintrade`,
 
 **Global trading loop** (`lib/tradingLoop.ts`): EMA+RSI engine, MTF funnel
 (5m/15m/1H), volume + sideways + 1H-trend filters. Default
-`minConfidence=60`. Volume ≥85% of 20-bar avg, sideways block <0.15%
+`minConfidence=60`. Volume ≥65% of 20-bar avg (controlled live test
+2026-05-29, lowered from 85%; SoT `VOLUME_GATE_FRACTION` in tradingLoop.ts),
+sideways block <0.15%
 spread, 1H trend OFF by default.
 
 **Per-user state** (`lib/userSimRegistry.ts`): `Map<userId, UserSimState>`,

@@ -94,6 +94,13 @@ export interface TimeframeSnapshot {
  */
 export const BASELINE_MIN_CONFIDENCE = 60;
 
+// Single source of truth for the mandatory volume safety gate. Current-bar
+// volume must be >= this fraction of the prior-20-bar average for
+// `volumeConfirmed` to be true. Controlled live test (2026-05-29): lowered
+// 0.85 -> 0.65. The execution gate AND any user-facing rejection copy derive
+// from this constant so the enforced threshold and the message can never drift.
+export const VOLUME_GATE_FRACTION = 0.65;
+
 export interface SymbolBreakdown {
   symbol:          string;
   fast:            TimeframeSnapshot;   // 5m
@@ -766,7 +773,8 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
     // while preserving a meaningful liquidity safeguard. All other gates
     // (confidence, MTF, sideways, 1H trend, risk, hard stop, EXIT_ENGINE_V2,
     // position sizing, max positions, exchange health) are unchanged.
-    volumeConfirmed   = currentVol >= avgVol * 0.65;
+    // Threshold lives in VOLUME_GATE_FRACTION (SoT) so messaging cannot drift.
+    volumeConfirmed   = currentVol >= avgVol * VOLUME_GATE_FRACTION;
     volumeRatio       = avgVol > 0 ? currentVol / avgVol : 1;
   }
 

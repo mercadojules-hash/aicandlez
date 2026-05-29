@@ -22,7 +22,7 @@ import { logsTable, riskThrottleEventsTable } from "@workspace/db";
 import crypto from "crypto";
 import { evaluateRiskGate } from "./riskGate.js";
 import { isAiDisclaimerAccepted } from "./aiDisclaimer.js";
-import { engineStats, BASELINE_MIN_CONFIDENCE } from "./tradingLoop.js";
+import { engineStats, BASELINE_MIN_CONFIDENCE, VOLUME_GATE_FRACTION } from "./tradingLoop.js";
 import { resolveAiTradingGate } from "./aiTradingGate.js";
 import {
   ALLOWED_TRADE_SIZES,
@@ -582,7 +582,7 @@ export async function placeLiveAutoOrderForUser(
       const volumeOk = bd?.volumeConfirmed === true;
       if (!volumeOk) {
         const reason = bd
-          ? "Volume below 85% of 20-bar average — order rejected by mandatory volume safety gate."
+          ? `Volume below ${Math.round(VOLUME_GATE_FRACTION * 100)}% of 20-bar average — order rejected by mandatory volume safety gate.`
           : "No recent volume analysis available for this symbol — order rejected by mandatory volume safety gate.";
         await emitFailureNotification(userId, symbol, side, reason);
         executionStreamBus.emitEvent({

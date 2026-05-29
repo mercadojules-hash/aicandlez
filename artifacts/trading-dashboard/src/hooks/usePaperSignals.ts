@@ -180,7 +180,7 @@ function volFromBreakdown(b: SymBreakdown): OpportunityVM["vol"] {
   // POPULATION RESTORE (2026-05-26, Fix A): "LOW VOL" now fires only when
   // the engine EXPLICITLY classifies the regime as low/quiet. The previous
   // `!volumeConfirmed → LOW VOL` mapping was binary-thresholded against the
-  // strict 85%-of-20-bar-avg gate, which on a typical tick flipped ~17 of
+  // strict volume gate (then 85%, now 65% of 20-bar avg), which on a typical tick flipped ~17 of
   // 19 cards to LOW VOL — collapsing visual density AND excluding them
   // from the cohort pool (Fix C). Net effect was a near-empty board even
   // when the engine had real signals. NORMAL is now the institutional
@@ -284,7 +284,7 @@ function trendStrengthFromBreakdown(b: SymBreakdown): number {
 }
 
 /** Liquidity / volume confirmation (0..100). The engine already gates on
- *  bar-volume >= 85% of 20-bar avg → `volumeConfirmed`. Unconfirmed
+ *  bar-volume >= 65% of 20-bar avg → `volumeConfirmed`. Unconfirmed
  *  keeps a non-zero floor (35) so a symbol with weak volume but real
  *  signal can still earn moderate conviction from other factors. */
 function liquidityScoreFromBreakdown(b: SymBreakdown): number {

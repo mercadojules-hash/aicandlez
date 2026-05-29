@@ -1244,9 +1244,9 @@ function WhyNotTradeStrip({
       />
       <Chip
         label="VOL"
-        value={volPct == null ? "—" : `${volPct}% / 85%`}
+        value={volPct == null ? "—" : `${volPct}% / 65%`}
         pass={volumePass}
-        title="Current 5m bar volume as % of the 20-bar average · gate requires ≥85%"
+        title="Current 5m bar volume as % of the 20-bar average · gate requires ≥65%"
       />
       <Chip
         label="SIDEWAYS"

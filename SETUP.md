@@ -242,7 +242,7 @@ Configure via `POST /api/engine/filters`:
 
 | Filter | Default | Description |
 |--------|---------|-------------|
-| `volumeFilter` | `true` | Volume ≥ 85% of 20-bar rolling avg |
+| `volumeFilter` | `true` | Volume ≥ 65% of 20-bar rolling avg |
 | `require1HTrend` | `false` | 1H EMA9 must align with signal direction |
 | Sideways filter | Always ON | EMA spread < 0.15% blocks signal |
 | Min confidence | 60 | Minimum adjusted confidence |

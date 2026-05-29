@@ -161,7 +161,7 @@ The global `riskEngine.ts` maintains a **single shared config** (kill switch, po
 | Take-profit enforcement | ✅ | Stored on trade open; loop checks on tick |
 | Trailing stop validation | ✅ | `trailingStopEngine.ts` — high-water mark per position |
 | MTF confirmation requirement | ✅ | 5m + 15m must agree (bypassed only on high-confidence override ≥60%) |
-| Volume confirmation filter | ✅ | Volume must be ≥85% of 20-bar average (default ON) |
+| Volume confirmation filter | ✅ | Volume must be ≥65% of 20-bar average (default ON) |
 | Sideways market filter | ✅ | EMA9/21 spread <0.15% on both TFs — always active |
 | Max concurrent positions | ✅ | `maxActivePositions` — default 3 |
 
