@@ -101,3 +101,9 @@ id = "10Jctbihuzc6tAg_OKTXY"
 uri = "file://screenshots/why-not-trade-mobile.jpg"
 type = "image"
 title = "why-not-trade-mobile.jpg — Customer portal, responsive layout (mobile)"
+
+[[outputs]]
+id = "38Nv9r89ZGXI4evv_6awM"
+uri = "file://.local/docs/per-user-tier-trade-limits-spec.md"
+type = "text"
+title = "Per-User Tier-Based Trade Limits — Design Spec"
