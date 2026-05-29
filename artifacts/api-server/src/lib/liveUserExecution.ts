@@ -477,6 +477,30 @@ export async function listLiveExecutionUsers(): Promise<Array<{ userId: string; 
  * connected exchange. All upstream gates (confidence floor, MTF,
  * risk engine, kill switch) must have already passed.
  */
+// TEMP (controlled live test 2026-05-29): structured execution-trace logs that
+// mark each stage of the live customer pipeline so we can confirm orders reach
+// the broker and validate the end-to-end Coinbase path. Written to the `logs`
+// table (queryable) AND the pino console. Remove once the volume gate / daily
+// cap are tightened back after the first confirmed live fill.
+async function recordExecTrace(
+  event: string,
+  level: "info" | "warn" | "error",
+  details: Record<string, unknown>,
+): Promise<void> {
+  logger.info({ execTrace: event, ...details }, event);
+  try {
+    await db.insert(logsTable).values({
+      id:      crypto.randomUUID(),
+      type:    "trade",
+      level,
+      message: event,
+      details: { ...details, execTrace: event },
+    });
+  } catch (err) {
+    logger.warn({ err, event }, "recordExecTrace insert failed");
+  }
+}
+
 export async function placeLiveAutoOrderForUser(
   req: LiveUserOrderRequest,
 ): Promise<LiveUserOrderResult> {
@@ -637,10 +661,20 @@ export async function placeLiveAutoOrderForUser(
     if (!operatorVol) {
       const bd = engineStats.symbolBreakdowns[symbol];
       const volumeOk = bd?.volumeConfirmed === true;
+      await recordExecTrace("execution_reached_volume_gate", "info", {
+        userId, symbol, side, sizeUSD,
+        hasBreakdown: !!bd, volumeConfirmed: bd?.volumeConfirmed ?? null,
+        gateFraction: VOLUME_GATE_FRACTION,
+      });
       if (!volumeOk) {
         const reason = bd
           ? `Volume below ${Math.round(VOLUME_GATE_FRACTION * 100)}% of 20-bar average — order rejected by mandatory volume safety gate.`
           : "No recent volume analysis available for this symbol — order rejected by mandatory volume safety gate.";
+        await recordExecTrace("execution_volume_reject", "warn", {
+          userId, symbol, side, sizeUSD,
+          hasBreakdown: !!bd, volumeConfirmed: bd?.volumeConfirmed ?? null,
+          gateFraction: VOLUME_GATE_FRACTION,
+        });
         await emitFailureNotification(userId, symbol, side, reason);
         executionStreamBus.emitEvent({
           type:     "order_rejected",
@@ -664,6 +698,11 @@ export async function placeLiveAutoOrderForUser(
         }
         return { success: false, userId, errorCode: "volume_safety_gate", error: reason };
       }
+      await recordExecTrace("execution_volume_pass", "info", {
+        userId, symbol, side, sizeUSD,
+        volumeConfirmed: bd?.volumeConfirmed ?? null,
+        gateFraction: VOLUME_GATE_FRACTION,
+      });
     }
   }
 
@@ -1405,7 +1444,14 @@ export async function placeLiveAutoOrderForUser(
     return { success: false, userId, exchange: row.exchange, errorCode: "unsupported", error: msg };
   }
 
+  // Tracks whether a real broker fill landed. Once true, a throw from any
+  // downstream side-effect (notification, cache invalidation) must NOT emit a
+  // false `execution_order_rejected` — the order already filled.
+  let filled = false;
   try {
+    await recordExecTrace(`execution_submitted_${row.exchange.toLowerCase()}`, "info", {
+      userId, symbol, side, sizeUSD, exchange: row.exchange, qtyBase, referencePrice,
+    });
     let order = await adapter.placeOrder({
       symbol,
       side:     side === "BUY" ? "buy" : "sell",
@@ -1447,10 +1493,16 @@ export async function placeLiveAutoOrderForUser(
           status: order.status, timedOut, filledQty: order.filledQty, requestedQty },
         "liveUserExecution: open order not filled",
       );
+      await recordExecTrace("execution_order_rejected", "warn", {
+        userId, symbol, side, exchange: row.exchange,
+        status: order.status, timedOut, error: reasonMsg,
+      });
       await emitFailureNotification(userId, symbol, side, reasonMsg, row.exchange);
       return { success: false, userId, exchange: row.exchange, errorCode: "exchange_reject", error: reasonMsg };
     }
 
+    // Past the hard-failure branch — the order is a real fill (full or partial).
+    filled = true;
     const fill = order.avgFillPrice > 0 ? order.avgFillPrice : referencePrice;
     // Prefer the broker-reported commission when the adapter actually
     // populated `fee.source === "broker"`. Estimates (catalog rate * notional)
@@ -1493,11 +1545,23 @@ export async function placeLiveAutoOrderForUser(
         ? { note, data: { partial, timedOut, requestedQty, status: order.status } }
         : undefined,
     );
+    await recordExecTrace("execution_order_accepted", "info", {
+      userId, symbol, side, exchange: row.exchange,
+      exchangeOrderId: result.exchangeOrderId,
+      fillPrice: result.fillPrice, quantity: result.quantity,
+    });
     invalidateTradeLimitCache(userId);
     return result;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.warn({ userId, exchange: row.exchange, symbol, side, err: msg }, "liveUserExecution: adapter placeOrder failed");
+    // Only a genuine pre-fill failure is a rejection. A throw after `filled`
+    // (e.g. notification/cache side-effect) must not masquerade as a reject.
+    if (!filled) {
+      await recordExecTrace("execution_order_rejected", "error", {
+        userId, symbol, side, exchange: row.exchange, error: msg,
+      });
+    }
     await emitFailureNotification(userId, symbol, side, `Exchange rejected order: ${msg}`, row.exchange);
     return { success: false, userId, exchange: row.exchange, errorCode: "exchange_reject", error: msg };
   }

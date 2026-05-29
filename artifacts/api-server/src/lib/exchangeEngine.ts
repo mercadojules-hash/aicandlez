@@ -8,6 +8,7 @@ import { CryptoDotComAdapter, CRYPTOCOM_CONFIG } from "../services/exchanges/ada
 import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
 import { executionStreamBus } from "./executionStreamBus.js";
 import { logger } from "./logger.js";
+import { db, logsTable } from "@workspace/db";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -921,6 +922,30 @@ export interface LiveAutoOrderResultExtended extends LiveAutoOrderResult {
  *   live_mode_off · kill_switch · paused · not_capable · adapter_init ·
  *   ticker_fetch · invalid_price · qty_zero · broker_reject
  */
+// TEMP (controlled live test 2026-05-29): structured execution-trace logs for
+// the operator/engine -> broker path so we can confirm orders reach the
+// exchange and validate the end-to-end live Coinbase pipeline. Written to the
+// `logs` table (queryable) AND the pino console. Remove once the volume gate /
+// daily cap are tightened back after the first confirmed live fill.
+async function recordExecTrace(
+  event: string,
+  level: "info" | "warn" | "error",
+  details: Record<string, unknown>,
+): Promise<void> {
+  logger.info({ execTrace: event, ...details }, event);
+  try {
+    await db.insert(logsTable).values({
+      id:      crypto.randomUUID(),
+      type:    "trade",
+      level,
+      message: event,
+      details: { ...details, execTrace: event },
+    });
+  } catch (err) {
+    logger.warn({ err, event }, "recordExecTrace insert failed");
+  }
+}
+
 export async function placeLiveAutoOrder(req: {
   symbol:  string;
   side:    "BUY" | "SELL";
@@ -990,6 +1015,10 @@ export async function placeLiveAutoOrder(req: {
 
   const clientId = `loop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const t0 = Date.now();
+  await recordExecTrace(`execution_submitted_${_selectedExchange.toLowerCase()}`, "info", {
+    symbol: req.symbol, side: req.side, sizeUSD: req.sizeUSD,
+    exchange: _selectedExchange, qtyBase, referencePrice, clientId,
+  });
   let order: Awaited<ReturnType<BaseExchangeAdapter["placeOrder"]>>;
   try {
     order = await adapter.placeOrder({
@@ -1001,9 +1030,15 @@ export async function placeLiveAutoOrder(req: {
     });
   } catch (err) {
     const latencyMs = Date.now() - t0;
+    const brokerErr = err instanceof Error ? err.message : String(err);
+    await recordExecTrace("execution_order_rejected", "error", {
+      symbol: req.symbol, side: req.side, sizeUSD: req.sizeUSD,
+      exchange: _selectedExchange, gate: "broker_reject", error: brokerErr,
+      latencyMs, clientId, qtyBase, referencePrice,
+    });
     return reject(
       "broker_reject",
-      err instanceof Error ? err.message : String(err),
+      brokerErr,
       { latencyMs, clientId, qtyBase, referencePrice },
     );
   }
@@ -1034,6 +1069,25 @@ export async function placeLiveAutoOrder(req: {
     message:  `LIVE FILLED ${req.symbol} ${req.side} $${req.sizeUSD} @ $${fill.toFixed(2)} on ${_selectedExchange} (id=${exchangeOrderId})`,
     details:  { exchangeOrderId, filledQty, fillPrice: fill, latencyMs },
   });
+
+  // Only trace an acceptance when the broker actually reported a fill. A
+  // payload with no fill (status open/rejected/cancelled, zero qty, zero avg
+  // price) is traced as a rejection so the telemetry can't show a phantom fill.
+  const trulyFilled =
+    order.status === "filled" || order.filledQty > 0 || order.avgFillPrice > 0;
+  if (trulyFilled) {
+    await recordExecTrace("execution_order_accepted", "info", {
+      symbol: req.symbol, side: req.side, sizeUSD: req.sizeUSD,
+      exchange: _selectedExchange, exchangeOrderId,
+      fillPrice: fill, quantity: filledQty, latencyMs, status: order.status,
+    });
+  } else {
+    await recordExecTrace("execution_order_rejected", "warn", {
+      symbol: req.symbol, side: req.side, sizeUSD: req.sizeUSD,
+      exchange: _selectedExchange, exchangeOrderId,
+      status: order.status, latencyMs, reason: "no_fill_reported",
+    });
+  }
 
   return {
     success:         true,

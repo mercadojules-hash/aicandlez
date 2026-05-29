@@ -97,9 +97,12 @@ export const BASELINE_MIN_CONFIDENCE = 60;
 // Single source of truth for the mandatory volume safety gate. Current-bar
 // volume must be >= this fraction of the prior-20-bar average for
 // `volumeConfirmed` to be true. Controlled live test (2026-05-29): lowered
-// 0.85 -> 0.65. The execution gate AND any user-facing rejection copy derive
-// from this constant so the enforced threshold and the message can never drift.
-export const VOLUME_GATE_FRACTION = 0.65;
+// 0.85 -> 0.65 -> 0.35. TEMPORARY: 0.35 relaxes the gate to drive execution
+// frequency up while validating the live Coinbase pipeline end-to-end; tighten
+// back after the first confirmed live fill. The execution gate AND any
+// user-facing rejection copy derive from this constant so the enforced
+// threshold and the message can never drift.
+export const VOLUME_GATE_FRACTION = 0.35;
 
 export interface SymbolBreakdown {
   symbol:          string;
