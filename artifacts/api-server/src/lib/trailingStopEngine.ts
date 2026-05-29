@@ -59,6 +59,14 @@ export interface TrailingStopView {
   triggered:        boolean;
   activatedAt:      number | null;
   triggeredAt:      number | null;
+  // Authoritative close fill (set only on the tick that triggers + closes the
+  // position). Sourced from simulationEngine.closePosition's returned trade so
+  // any downstream persistence (EXIT_ENGINE_V2 trades-row close) writes the SAME
+  // exit price / realized PnL as the in-memory close, instead of re-deriving from
+  // the trailing-check snapshot price.
+  closeExitPrice?:      number;
+  closeRealizedPnL?:    number;
+  closeRealizedPnLPct?: number;
 }
 
 export interface StopCheckResult {
@@ -104,6 +112,10 @@ export async function checkTrailingStops(): Promise<StopCheckResult> {
     const gainPct     = ((curPrice - state.entryPrice) / state.entryPrice) * 100;
     const activateAt  = state.entryPrice * (1 + config.activateAfterPct / 100);
 
+    let closeExitPrice:      number | undefined;
+    let closeRealizedPnL:    number | undefined;
+    let closeRealizedPnLPct: number | undefined;
+
     if (!state.triggered) {
       // Update high watermark
       if (curPrice > state.highWatermark) state.highWatermark = curPrice;
@@ -124,8 +136,15 @@ export async function checkTrailingStops(): Promise<StopCheckResult> {
         state.triggered   = true;
         state.triggeredAt = Date.now();
         triggeredSymbols.push(NAMES[pos.symbol] ?? pos.symbol);
-        // Auto-close the position via simulation engine
-        await closePosition(pos.id).catch(() => {/* swallow */});
+        // Auto-close the position via simulation engine. Capture the authoritative
+        // fill (exit price + realized PnL) so downstream persistence writes the
+        // same numbers as the in-memory close instead of re-deriving them.
+        const closeRes = await closePosition(pos.id).catch(() => null);
+        if (closeRes?.success && closeRes.trade) {
+          closeExitPrice      = closeRes.trade.exitPrice;
+          closeRealizedPnL    = closeRes.trade.realizedPnL;
+          closeRealizedPnLPct = closeRes.trade.realizedPnLPct;
+        }
       }
     }
 
@@ -153,6 +172,9 @@ export async function checkTrailingStops(): Promise<StopCheckResult> {
       triggered:         state.triggered,
       activatedAt:       state.activatedAt,
       triggeredAt:       state.triggeredAt,
+      closeExitPrice,
+      closeRealizedPnL,
+      closeRealizedPnLPct,
     });
   }
 

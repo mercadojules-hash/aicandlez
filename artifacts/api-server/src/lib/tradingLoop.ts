@@ -1,12 +1,12 @@
 import crypto from "crypto";
 import { db } from "@workspace/db";
 import { signalsTable, logsTable, settingsTable, tradesTable } from "@workspace/db";
-import { eq, and, gte } from "drizzle-orm";
+import { eq, and, gte, gt, inArray, count } from "drizzle-orm";
 import { settingsStore } from "./settingsStore.js";
 import { getCandles, SUPPORTED_SYMBOLS, type Candle } from "./marketData.js";
 import { runAIDecision, type AIDecisionResult } from "./aiReasoning.js";
 import { computeRSI, computeEMA, computeMACD } from "./indicators.js";
-import { placeOrder, getAccountSummary } from "./simulationEngine.js";
+import { placeOrder, getAccountSummary, hydrateOpenPositions, type SimPosition } from "./simulationEngine.js";
 import { placeLiveAutoOrder } from "./exchangeEngine.js";
 import {
   listLiveExecutionUsers,
@@ -35,6 +35,16 @@ import { executionStreamBus, getSafeTestMode } from "./executionStreamBus.js";
 import { logger } from "./logger.js";
 
 function genId() { return crypto.randomUUID(); }
+
+// ── EXIT_ENGINE_V2 feature flag ─────────────────────────────────────────────────
+// Phase 1+ exit-lifecycle redesign. When OFF (default) the engine behaves exactly
+// as before (volatile in-memory positions, in-memory cap gate, no automated
+// trades-table close). When ON: open positions rehydrate from the `trades` table
+// on boot, the cap gate counts persisted open rows, the `trades.id` is linked to
+// the simulation position id, and automated closes persist back to `trades`.
+function isExitEngineV2(): boolean {
+  return process.env.EXIT_ENGINE_V2 === "true";
+}
 
 // ── Per-symbol breakdown (for debug panel) ────────────────────────────────────
 
@@ -147,6 +157,7 @@ interface EngineStats {
   mtfBlockCount:      number;
   trailingStopHits:   number;
   correlationBlocks:  number;
+  positionsRehydrated: number;
   testMode:           boolean;
   require1HTrend:     boolean;
   volumeFilter:       boolean;
@@ -187,6 +198,7 @@ export const engineStats: EngineStats = {
   mtfBlockCount:      0,
   trailingStopHits:   0,
   correlationBlocks:  0,
+  positionsRehydrated: 0,
   testMode:           false,  // OFF by default: strict MTF + volume + confidence-gate confirmation required (safe for live-money paths). Flip ON via POST /api/engine/testmode for dev-only signal flooding.
   require1HTrend:     false,   // GATE flag (line ~1247). Default OFF so 1H disagreement doesn't newly block signals if testMode is ever flipped off. Compute is decoupled — see computeMTFDecision where trend1H is always computed for the displayConfidence boost.
   volumeFilter:       true,
@@ -272,6 +284,112 @@ interface PositionMeta {
 }
 
 const positionMeta = new Map<string, PositionMeta>();
+
+// ── EXIT_ENGINE_V2 DB helpers ────────────────────────────────────────────────────
+// The global engine writes `trades` rows with mode auto/live/test (manual/simulated
+// rows come from other paths and are NOT part of the in-memory positions[]). The
+// cap gate and boot rehydration both operate on exactly this set so they stay
+// consistent with one another.
+const V2_TRADE_MODES = ["auto", "live", "test"];
+
+// Single predicate shared by the cap gate AND boot rehydration so the two sets are
+// provably identical: an open, global-engine row with sane entry economics. Without
+// the price>0 / amount>0 floor, a malformed open row could inflate the cap (blocking
+// new trades) yet be skipped by rehydration (never closed) — a durable divergence.
+function openGlobalPositionsPredicate() {
+  return and(
+    eq(tradesTable.status, "open"),
+    inArray(tradesTable.mode, V2_TRADE_MODES),
+    gt(tradesTable.price, 0),
+    gt(tradesTable.amount, 0),
+  );
+}
+
+// Count persisted open global-engine positions from the `trades` table. Used by the
+// max-active-positions gate so the cap survives restarts.
+async function countOpenTradePositions(): Promise<number> {
+  const rows = await db
+    .select({ value: count() })
+    .from(tradesTable)
+    .where(openGlobalPositionsPredicate());
+  return rows[0]?.value ?? 0;
+}
+
+// Rehydrate open global-engine positions from the `trades` table into the in-memory
+// simulationEngine on boot, and rebuild positionMeta so the trailing-stop monitor +
+// journal have entry context. Returns the number restored.
+async function rehydrateOpenPositions(): Promise<number> {
+  const rows = await db
+    .select()
+    .from(tradesTable)
+    .where(openGlobalPositionsPredicate());
+
+  const restored: SimPosition[] = [];
+  for (const row of rows) {
+    const entryPrice = row.price;
+    const sizeUSD    = row.amount;
+    if (!entryPrice || entryPrice <= 0 || !sizeUSD || sizeUSD <= 0) {
+      // Defensive: the SQL predicate already excludes these, so reaching here
+      // would indicate a query/schema drift. Keep the guard as a safety net.
+      logger.warn({ tradeId: row.id, symbol: row.symbol }, "[EXIT_ENGINE_V2] skipping rehydrate of malformed trade row");
+      continue;
+    }
+    const side: "BUY" | "SELL" = row.side === "SELL" ? "SELL" : "BUY";
+    restored.push({
+      id:         row.id,
+      symbol:     row.symbol,
+      side,
+      quantity:   sizeUSD / entryPrice,
+      entryPrice,
+      entryTime:  row.timestamp instanceof Date ? row.timestamp.getTime() : Date.now(),
+      sizeUSD,
+    });
+    positionMeta.set(row.id, {
+      signalId:     row.signalId ?? "rehydrated",
+      reasoning:    row.reason ?? "rehydrated position",
+      shortSummary: row.reason ?? "rehydrated position",
+      indicators:   { rsi: 0, macd: 0, ema20: 0, ema50: 0 },
+      side,
+      sizeUSD,
+    });
+  }
+
+  const n = hydrateOpenPositions(restored);
+  engineStats.positionsRehydrated = n;
+  logger.info({ rehydrated: n, scanned: rows.length }, "[EXIT_ENGINE_V2] rehydrated open positions from trades table");
+  return n;
+}
+
+// Persist an automated close back to the linked `trades` row. The row id equals
+// the simulation position id (set at insert time when the flag is on). `exitPrice`,
+// `pnl` and `pnlPercent` are the AUTHORITATIVE values from
+// simulationEngine.closePosition's returned trade so the DB row matches the
+// in-memory close exactly. The write is a single conditional UPDATE guarded by
+// `status='open'` and `.returning()` so it is idempotent — a duplicate/concurrent
+// close after the row is already closed is a no-op, not a double-write.
+async function markTradeRowClosed(
+  positionId: string,
+  exitPrice:  number,
+  pnl:        number,
+  pnlPercent: number,
+  reason:     string,
+): Promise<void> {
+  const updated = await db
+    .update(tradesTable)
+    .set({
+      status:     "closed",
+      exitPrice:  parseFloat(exitPrice.toFixed(2)),
+      pnl:        parseFloat(pnl.toFixed(2)),
+      pnlPercent: parseFloat(pnlPercent.toFixed(2)),
+      closedAt:   new Date(),
+      reason,
+    })
+    .where(and(eq(tradesTable.id, positionId), eq(tradesTable.status, "open")))
+    .returning({ id: tradesTable.id });
+  if (updated.length === 0) {
+    logger.warn({ positionId }, "[EXIT_ENGINE_V2] no open trades row to close for position (already closed or unmapped)");
+  }
+}
 
 // ── Settings ───────────────────────────────────────────────────────────────────
 
@@ -778,8 +896,13 @@ async function autoExecute(
 
   // ── Gate 1: max concurrent open positions ──────────────────────────────────
   if (settings.maxActivePositions > 0) {
-    const account = await getAccountSummary();
-    const openCount = account.positions.length;
+    // EXIT_ENGINE_V2: count PERSISTED open positions from the `trades` table so
+    // the cap survives restarts (the in-memory array used to reset to empty on
+    // every deploy, then refill — orphaning DB rows). Flag OFF keeps the legacy
+    // in-memory count for byte-identical behavior.
+    const openCount = isExitEngineV2()
+      ? await countOpenTradePositions()
+      : (await getAccountSummary()).positions.length;
     if (openCount >= settings.maxActivePositions) {
       engineStats.tradesBlocked++;
       const msg = `Auto-trade blocked for ${symbol} ${side}: max active positions (${settings.maxActivePositions}) reached — currently ${openCount} open`;
@@ -1284,8 +1407,11 @@ async function autoExecute(
     },
     "[GLOBAL_MIRROR_WRITE] inserting global tradesTable row (operator-only mirror)",
   );
+  // EXIT_ENGINE_V2: link the `trades` row id to the simulation position id so the
+  // automated close path (runTrailingStops) and boot rehydration can map a
+  // position 1:1 to its persisted row. Flag OFF keeps the legacy random row id.
   await db.insert(tradesTable).values({
-    id:         genId(),
+    id:         isExitEngineV2() ? pos.id : genId(),
     symbol,
     side,
     amount:     sizeUSD,
@@ -1474,6 +1600,31 @@ async function runTrailingStops() {
         message: `Trailing stop triggered: ${view.symbol} closed at gain ${view.gainFromEntryPct >= 0 ? "+" : ""}${view.gainFromEntryPct.toFixed(2)}%`,
         details: { positionId: view.positionId, symbol: view.symbol, gainFromEntryPct: view.gainFromEntryPct },
       });
+
+      // EXIT_ENGINE_V2: persist the automated close back to the linked `trades`
+      // row so the lifecycle is durable (row id == position id when the flag was
+      // on at open time). Flag OFF leaves the trades row untouched (legacy: no
+      // automated trades-table close ever happened).
+      if (isExitEngineV2()) {
+        // Prefer the authoritative close fill surfaced by the trailing engine
+        // (simulationEngine.closePosition's returned trade). Fall back to the
+        // trailing-check snapshot only if the close result was unavailable (e.g.
+        // closePosition failed) — in that degraded case the in-memory position
+        // was NOT removed, so we intentionally skip the DB close to avoid marking
+        // a row closed that is still open in memory.
+        const exitPrice = view.closeExitPrice;
+        const pnl       = view.closeRealizedPnL;
+        const pnlPct    = view.closeRealizedPnLPct;
+        if (exitPrice !== undefined && pnl !== undefined && pnlPct !== undefined) {
+          try {
+            await markTradeRowClosed(view.positionId, exitPrice, pnl, pnlPct, "TRAILING_STOP");
+          } catch (err) {
+            logger.warn({ err, positionId: view.positionId }, "[EXIT_ENGINE_V2] failed to persist automated trades-table close");
+          }
+        } else {
+          logger.warn({ positionId: view.positionId, symbol: view.symbol }, "[EXIT_ENGINE_V2] in-memory close fill unavailable; skipping DB close to avoid memory/DB divergence");
+        }
+      }
       if (meta) {
         try {
           await addJournalEntry({
@@ -1770,7 +1921,23 @@ export function startTradingLoop() {
   engineStats.running   = true;
   engineStats.startedAt = Date.now();
 
-  void tick();
+  // EXIT_ENGINE_V2: rehydrate open positions from the `trades` table BEFORE the
+  // first tick so the trailing-stop monitor + cap gate see the persisted state
+  // immediately (instead of an empty in-memory array that orphans DB rows). Flag
+  // OFF preserves the legacy boot path (straight to tick, empty positions).
+  if (isExitEngineV2()) {
+    void (async () => {
+      try {
+        await rehydrateOpenPositions();
+      } catch (err) {
+        logger.error({ err }, "[EXIT_ENGINE_V2] rehydration failed on boot");
+      } finally {
+        void tick();
+      }
+    })();
+  } else {
+    void tick();
+  }
 
   loopHandle = setInterval(() => { void tick(); }, LOOP_INTERVAL_MS);
 

@@ -98,6 +98,25 @@ export function clearAllPositions(): number {
   return count;
 }
 
+// ── Rehydration (EXIT_ENGINE_V2) ────────────────────────────────────────────────
+// Restore open positions from a persisted source (the `trades` table) into the
+// in-memory array on boot. Without this, every Render restart wipes `positions[]`
+// to empty, so the trailing-stop monitor has nothing to evaluate and the
+// max-active-positions gate resets — orphaning the persisted rows. Cash is
+// reduced by the committed capital so equity / summary math stays consistent.
+export function hydrateOpenPositions(rows: SimPosition[]): number {
+  positions = rows.map((r) => ({ ...r }));
+  const committed = positions.reduce((sum, p) => sum + p.sizeUSD, 0);
+  account.cashBalance = parseFloat((account.startingBalance - committed).toFixed(2));
+  return positions.length;
+}
+
+// Read-only snapshot of the raw in-memory open positions (no live enrichment).
+// Used by the cap gate / diagnostics that need a synchronous count.
+export function getRawOpenPositions(): SimPosition[] {
+  return [...positions];
+}
+
 export async function getAccountSummary() {
   const enriched = await enrichPositions();
   const unrealizedTotal = enriched.reduce((sum, p) => sum + (p.unrealizedPnL ?? 0), 0);
