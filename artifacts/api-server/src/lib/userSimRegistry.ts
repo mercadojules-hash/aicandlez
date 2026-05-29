@@ -146,13 +146,46 @@ function newId(state: UserSimState): string {
 
 const registry = new Map<string, UserSimState>();
 
+// In-flight load memoization. Without this, two concurrent first-touch calls
+// for the same userId (e.g. the trailing-stop fan-out closing multiple
+// positions for a user whose state isn't cached yet) each miss the registry,
+// each `loadFromDB`, and each `registry.set` a SEPARATE UserSimState object.
+// The second close then computes its account delta off a stale base and the
+// absolute-write persist clobbers the first — the lost-update race proven in
+// the Phase 2 verification. Sharing one in-flight promise guarantees a single
+// canonical UserSimState per user even under concurrent cold-cache access.
+const inflightLoads = new Map<string, Promise<UserSimState>>();
+
 async function getOrLoad(userId: string): Promise<UserSimState> {
   const existing = registry.get(userId);
   if (existing) return existing;
 
-  const state = await loadFromDB(userId);
-  registry.set(userId, state);
-  return state;
+  let pending = inflightLoads.get(userId);
+  if (!pending) {
+    pending = loadFromDB(userId)
+      .then((state) => {
+        registry.set(userId, state);
+        return state;
+      })
+      .finally(() => {
+        inflightLoads.delete(userId);
+      });
+    inflightLoads.set(userId, pending);
+  }
+  return pending;
+}
+
+// Test-only: evict cached in-memory state so the next getOrLoad rehydrates from
+// the database. Used by the concurrency suite to simulate a process restart for
+// the recovery scenario. Not referenced by any production code path.
+export function __clearRegistryForTests(userId?: string): void {
+  if (userId !== undefined) {
+    registry.delete(userId);
+    inflightLoads.delete(userId);
+  } else {
+    registry.clear();
+    inflightLoads.clear();
+  }
 }
 
 async function loadFromDB(userId: string): Promise<UserSimState> {
@@ -310,6 +343,140 @@ async function persistAccount(
       "persistAccount UPDATE committed",
     );
   }
+}
+
+// ── Atomic, idempotent close persistence ──────────────────────────────────────
+//
+// Replaces the prior `Promise.all([insert sim_trade, position mutation,
+// persistAccount])` block from closeUserPosition. That block lost updates under
+// concurrent same-user closes because persistAccount wrote ABSOLUTE account
+// values computed from (possibly stale / duplicated) in-memory state, so two
+// simultaneous closes clobbered each other's cash/realized/trade-count deltas.
+//
+// finalizeClose performs all three writes inside ONE transaction and settles
+// the account with SQL-side increments (`cash = cash + Δ`) so simultaneous
+// closes accumulate correctly regardless of in-memory state. The position
+// delete/update is guarded by `.returning()`: when it matches zero rows the
+// position was already closed by a concurrent or duplicate call, so we abort
+// without inserting a second sim_trade or crediting the account again
+// (idempotency). The RETURNING on the account UPDATE hands back the
+// authoritative post-settlement totals so the caller can reconcile in-memory
+// state to durable truth.
+//
+// Single-close behaviour is identical to the legacy path (increment from base
+// == absolute write of base+Δ); only the concurrent-correctness changes. This
+// is a pure correctness fix and is intentionally NOT gated behind
+// EXIT_ENGINE_V2 — the per-user close fan-out runs regardless of that flag.
+export async function finalizeClose(args: {
+  userId:        string;
+  positionId:    string;
+  trade:         UserSimTrade;
+  cashDelta:     number;
+  realizedDelta: number;
+  isPartial:     boolean;
+  partial?:      { quantity: number; sizeUSD: number; entryFeeBroker: number | null; expectedQuantity: number };
+}): Promise<{
+  applied: boolean;
+  account?: { cashBalance: number; totalRealized: number; totalTrades: number };
+}> {
+  const { userId, positionId, trade, cashDelta, realizedDelta, isPartial, partial } = args;
+
+  return db.transaction(async (tx) => {
+    // 1. Position mutation FIRST — its `.returning()` is the idempotency gate.
+    //    A full close DELETEs the row; a partial close UPDATEs the remaining
+    //    quantity/size. Zero rows back from a full close means another close
+    //    already removed this position.
+    //    For a partial close the WHERE also pins the EXPECTED pre-close
+    //    quantity (optimistic concurrency). A duplicate/concurrent partial
+    //    close of the same row reads the same pre-close quantity, so once the
+    //    first commit has reduced it the second's predicate no longer matches
+    //    → zero rows → idempotent skip (no second trade row, no double credit).
+    //    Sequential legitimate partials still apply because each carries the
+    //    then-current quantity. (param↔real coercion is exact here: the
+    //    expected value was hydrated FROM the same real column.)
+    const posRows = isPartial
+      ? await tx
+          .update(simPositionsTable)
+          .set({
+            quantity:       partial!.quantity,
+            sizeUSD:        partial!.sizeUSD,
+            entryFeeBroker: partial!.entryFeeBroker,
+          })
+          .where(
+            and(
+              eq(simPositionsTable.id, positionId),
+              eq(simPositionsTable.quantity, partial!.expectedQuantity),
+            ),
+          )
+          .returning({ id: simPositionsTable.id })
+      : await tx
+          .delete(simPositionsTable)
+          .where(eq(simPositionsTable.id, positionId))
+          .returning({ id: simPositionsTable.id });
+
+    if (posRows.length === 0) {
+      // Already closed by a concurrent / duplicate call — abort the whole
+      // transaction body without inserting a second trade row or crediting
+      // the account again.
+      return { applied: false };
+    }
+
+    // 2. Append the closed-trade row.
+    await tx.insert(simTradesTable).values({
+      id:              trade.id,
+      userId,
+      symbol:          trade.symbol,
+      side:            trade.side,
+      quantity:        trade.quantity,
+      entryPrice:      trade.entryPrice,
+      exitPrice:       trade.exitPrice,
+      entryTime:       trade.entryTime,
+      exitTime:        trade.exitTime,
+      sizeUSD:         trade.sizeUSD,
+      realizedPnL:     trade.realizedPnL,
+      realizedPnLPct:  trade.realizedPnLPct,
+      durationMs:      trade.durationMs,
+      closeReason:     trade.closeReason,
+      exchange:             trade.exchange ?? null,
+      exchangeOrderId:      trade.exchangeOrderId ?? null,
+      exchangeCloseOrderId: trade.exchangeCloseOrderId ?? null,
+      entryFee:             trade.entryFee ?? null,
+      exitFee:              trade.exitFee ?? null,
+      entryFeeBroker:         trade.entryFeeBroker ?? null,
+      entryFeeBrokerCurrency: trade.entryFeeBrokerCurrency ?? null,
+      exitFeeBroker:          trade.exitFeeBroker ?? null,
+      exitFeeBrokerCurrency:  trade.exitFeeBrokerCurrency ?? null,
+      sandbox:                trade.sandbox === true,
+    });
+
+    // 3. Atomic account settlement — SQL-side increments, NOT read-modify-write.
+    //    This is the core lost-update fix: each close adds its own delta to the
+    //    committed column value, so N simultaneous closes converge to
+    //    base + Σ deltas with no clobbering.
+    const acct = await tx
+      .update(simAccountsTable)
+      .set({
+        cashBalance:   sql`${simAccountsTable.cashBalance} + ${cashDelta}`,
+        totalRealized: sql`${simAccountsTable.totalRealized} + ${realizedDelta}`,
+        totalTrades:   sql`${simAccountsTable.totalTrades} + 1`,
+        updatedAt:     new Date(),
+      })
+      .where(eq(simAccountsTable.userId, userId))
+      .returning({
+        cashBalance:   simAccountsTable.cashBalance,
+        totalRealized: simAccountsTable.totalRealized,
+        totalTrades:   simAccountsTable.totalTrades,
+      });
+
+    if (acct.length === 0) {
+      // No account row → seed/FK invariant broken. Throw to roll the whole
+      // transaction back (position stays open, no orphan trade row, no
+      // half-applied settlement).
+      throw new Error(`finalizeClose: sim_accounts row missing for userId=${userId}`);
+    }
+
+    return { applied: true, account: acct[0] };
+  });
 }
 
 // ── Enrich positions with live prices ─────────────────────────────────────────
@@ -1003,20 +1170,115 @@ export async function closeUserPosition(
   // Platform performance fee (3% of net realized on profitable closes) is
   // additionally deducted here so the user receives the net amount (e.g.
   // +$100 realized → $3 platform fee → +$97 net to account).
-  state.account.cashBalance  += closedSizeUSD + realizedPnL - netFees - platformFeeUSD;
-  state.account.totalRealized += realizedPnL - netFees - platformFeeUSD;
-  state.account.totalTrades  += 1;
+  // ── Atomic settlement (finalizeClose) ─────────────────────────────────────
+  // Compute the deltas this close applies, then persist trade + position +
+  // account in ONE transaction with SQL-side account increments. cashDelta is
+  // the freed entry notional plus net realized PnL minus broker + platform
+  // fees; realizedDelta is the same minus the freed notional (which nets to
+  // zero in the equity proxy). The in-memory account is NO LONGER mutated
+  // optimistically here — it is reconciled below from the transaction's
+  // authoritative RETURNING so concurrent same-user closes cannot drift.
+  const cashDelta     = closedSizeUSD + realizedPnL - netFees - platformFeeUSD;
+  const realizedDelta = realizedPnL - netFees - platformFeeUSD;
 
-  // [REALIZED_PNL_APPLIED] — in-memory mutation done. If this fires but
-  // ACCOUNT_SUMMARY_PERSISTED never does (or fires with rowCount=0), the
-  // failure is in the DB UPDATE — not in the close arithmetic.
+  let partialUpdate: { quantity: number; sizeUSD: number; entryFeeBroker: number | null; expectedQuantity: number } | undefined;
+  if (isPartial) {
+    const newQty  = parseFloat((pos.quantity - closedQty).toFixed(8));
+    const newSize = parseFloat((pos.sizeUSD - closedSizeUSD).toFixed(2));
+    // Carry forward only the unallocated portion of the broker-reported entry
+    // fee — otherwise a follow-up partial close would re-charge the
+    // already-consumed slice. Preserve sign (maker rebates stay negative).
+    let newEntryFeeBroker: number | null = pos.entryFeeBroker ?? null;
+    if (pos.entryFeeBroker !== undefined && entryFeeBrokerProRated !== undefined) {
+      newEntryFeeBroker = parseFloat((pos.entryFeeBroker - entryFeeBrokerProRated).toFixed(8));
+    }
+    partialUpdate = {
+      quantity:         newQty,
+      sizeUSD:          newSize,
+      entryFeeBroker:   newEntryFeeBroker,
+      expectedQuantity: pos.quantity,
+    };
+  }
+
+  const finalize = await finalizeClose({
+    userId,
+    positionId,
+    trade,
+    cashDelta,
+    realizedDelta,
+    isPartial,
+    partial: partialUpdate,
+  });
+
+  // Idempotency: the position row was already removed (full close) or already
+  // advanced past our expected pre-close quantity (partial close) by a
+  // concurrent or duplicate call. No second trade row was inserted and the
+  // account was NOT credited again. Reconcile THIS position from durable DB
+  // truth (so a stale cache cannot keep a phantom/old-quantity row), then
+  // report not-success so the trailing-stop fan-out logs AI_FANOUT_SKIPPED
+  // instead of double-counting.
+  if (!finalize.applied) {
+    const [dbPos] = await db
+      .select({ quantity: simPositionsTable.quantity, sizeUSD: simPositionsTable.sizeUSD })
+      .from(simPositionsTable)
+      .where(eq(simPositionsTable.id, positionId))
+      .limit(1);
+    const staleIdx = state.positions.findIndex((p) => p.id === positionId);
+    if (staleIdx !== -1) {
+      if (dbPos === undefined) {
+        // Row gone (winning full close) — drop the phantom from cache.
+        state.positions.splice(staleIdx, 1);
+      } else {
+        // Row advanced (winning partial close) — converge cache to DB values.
+        state.positions[staleIdx]!.quantity = dbPos.quantity;
+        state.positions[staleIdx]!.sizeUSD  = dbPos.sizeUSD;
+      }
+    }
+    logger.info(
+      {
+        tag:             "CLOSE_IDEMPOTENT_SKIP",
+        sourceOfTruth:   "userSimRegistry.finalizeClose",
+        correlationId,
+        userId,
+        positionId,
+        symbol:          closeSymbol,
+        isPartial,
+        reconciledTo:    dbPos === undefined ? "removed" : "db-quantity",
+      },
+      "[CLOSE_IDEMPOTENT_SKIP] position already closed/advanced by a concurrent close — settlement skipped (no double credit); cache reconciled to DB",
+    );
+    return { success: false, error: `Position ${positionId} already closed` };
+  }
+
+  // ── Reconcile in-memory state to durable DB truth ─────────────────────────
+  // The account totals come straight from the atomic increment's RETURNING, so
+  // even when several closes for this user committed concurrently the cached
+  // state converges to exactly what the DB holds (no read-modify-write).
+  const settledAccount = finalize.account!;
+  const liveIdx = state.positions.findIndex((p) => p.id === positionId);
+  if (isPartial) {
+    if (liveIdx !== -1) {
+      state.positions[liveIdx]!.quantity       = partialUpdate!.quantity;
+      state.positions[liveIdx]!.sizeUSD        = partialUpdate!.sizeUSD;
+      state.positions[liveIdx]!.entryFeeBroker = partialUpdate!.entryFeeBroker ?? undefined;
+    }
+  } else if (liveIdx !== -1) {
+    state.positions.splice(liveIdx, 1);
+  }
+  state.tradeHistory.unshift(trade);
+  state.account.cashBalance   = settledAccount.cashBalance;
+  state.account.totalRealized = settledAccount.totalRealized;
+  state.account.totalTrades   = settledAccount.totalTrades;
+
+  // [REALIZED_PNL_APPLIED] — account settled atomically in the DB transaction
+  // and the cached state reconciled to the committed totals (from RETURNING).
   const realizedPnLAfter = parseFloat(state.account.totalRealized.toFixed(2));
   const cashBalanceAfter = parseFloat(state.account.cashBalance.toFixed(2));
   logger.info(
     {
       tag:               "REALIZED_PNL_APPLIED",
-      stage:             "in-memory-mutation",
-      sourceOfTruth:     "userSimRegistry.closeUserPosition",
+      stage:             "atomic-settlement",
+      sourceOfTruth:     "userSimRegistry.finalizeClose",
       correlationId,
       userId,
       positionId,
@@ -1032,26 +1294,8 @@ export async function closeUserPosition(
       cashBalanceAfter,
       cashBalanceDelta:  parseFloat((cashBalanceAfter - cashBalanceBefore).toFixed(2)),
     },
-    "[REALIZED_PNL_APPLIED] in-memory account state mutated — DB persistence pending",
+    "[REALIZED_PNL_APPLIED] account settled atomically (SQL increment) and cached state reconciled to DB",
   );
-
-  if (isPartial) {
-    pos.quantity = parseFloat((pos.quantity - closedQty).toFixed(8));
-    pos.sizeUSD  = parseFloat((pos.sizeUSD - closedSizeUSD).toFixed(2));
-    // Carry forward only the unallocated portion of the broker-reported
-    // entry fee — otherwise a follow-up partial close would re-charge the
-    // already-consumed slice and cumulative entry fees would exceed what
-    // the broker actually billed.
-    if (pos.entryFeeBroker !== undefined && entryFeeBrokerProRated !== undefined) {
-      // Preserve sign — a maker rebate (negative fee) must continue to
-      // accrue against subsequent partial closes, not be clamped away.
-      const remaining = pos.entryFeeBroker - entryFeeBrokerProRated;
-      pos.entryFeeBroker = parseFloat(remaining.toFixed(8));
-    }
-  } else {
-    state.positions.splice(idx, 1);
-  }
-  state.tradeHistory.unshift(trade);
 
   logger.info(
     {
@@ -1069,47 +1313,6 @@ export async function closeUserPosition(
     },
     "[POSITION_CLOSED] position removed from in-memory state",
   );
-
-  const positionMutation = isPartial
-    ? db.update(simPositionsTable)
-        .set({
-          quantity: pos.quantity,
-          sizeUSD:  pos.sizeUSD,
-          entryFeeBroker: pos.entryFeeBroker ?? null,
-        })
-        .where(eq(simPositionsTable.id, positionId))
-    : db.delete(simPositionsTable).where(eq(simPositionsTable.id, positionId));
-
-  await Promise.all([
-    db.insert(simTradesTable).values({
-      id:              trade.id,
-      userId,
-      symbol:          trade.symbol,
-      side:            trade.side,
-      quantity:        trade.quantity,
-      entryPrice:      trade.entryPrice,
-      exitPrice:       trade.exitPrice,
-      entryTime:       trade.entryTime,
-      exitTime:        trade.exitTime,
-      sizeUSD:         trade.sizeUSD,
-      realizedPnL:     trade.realizedPnL,
-      realizedPnLPct:  trade.realizedPnLPct,
-      durationMs:      trade.durationMs,
-      closeReason:     trade.closeReason,
-      exchange:             trade.exchange ?? null,
-      exchangeOrderId:      trade.exchangeOrderId ?? null,
-      exchangeCloseOrderId: trade.exchangeCloseOrderId ?? null,
-      entryFee:             trade.entryFee ?? null,
-      exitFee:              trade.exitFee ?? null,
-      entryFeeBroker:         trade.entryFeeBroker ?? null,
-      entryFeeBrokerCurrency: trade.entryFeeBrokerCurrency ?? null,
-      exitFeeBroker:          trade.exitFeeBroker ?? null,
-      exitFeeBrokerCurrency:  trade.exitFeeBrokerCurrency ?? null,
-      sandbox:                trade.sandbox === true,
-    }),
-    positionMutation,
-    persistAccount(state, { correlationId, symbol: closeSymbol, positionId, tag: "closeUserPosition" }),
-  ]);
 
   // [LIVE_VALIDATION_MODE] — emitted on close ONLY when the closing trade
   // carried a real broker exchange tag, so grep over api-server logs returns
