@@ -377,6 +377,30 @@ Note: do not drop these columns once production has any LIVE trades or
 admin actions persisted — the data is required by `getTradeLimitVerdict`,
 `userStatusGuard`, and the customer trade-receipt rendering paths.
 
+### 7b. `user_trade_limits.use_plan_default` follow-on (May 2026)
+
+The Task #174 migration above created `user_trade_limits` WITHOUT
+`use_plan_default`. The column was later added to
+`lib/db/src/schema/userTradeLimits.ts` (the authoritative plan-default vs
+operator-override discriminator) and pushed to dev, but prod never received
+a follow-on migration — so `GET /api/admin/users`
+(`adminUserTelemetry.ts` L344 `SELECT tl.use_plan_default`) 500'd the entire
+operator USERS grid ("Failed to load users") once the schema-probe fallbacks
+were stripped. Applied directly against `RENDER_PROD_DATABASE_URL`:
+
+```sql
+ALTER TABLE user_trade_limits
+  ADD COLUMN IF NOT EXISTS use_plan_default boolean NOT NULL DEFAULT true;
+```
+
+Purely additive; `DEFAULT true` matches the schema default (every existing
+row resolves to PLAN DEFAULT, the pre-drift behavior). Rollback (only before
+re-introducing schema-probe fallbacks):
+
+```sql
+ALTER TABLE user_trade_limits DROP COLUMN IF EXISTS use_plan_default;
+```
+
 Schema tables:
 | Table                       | Purpose                          |
 |-----------------------------|----------------------------------|
