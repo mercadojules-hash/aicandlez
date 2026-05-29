@@ -136,7 +136,7 @@ export function OnboardingFlow() {
   const effectivePlan = sub.data?.isComplimentary
     ? (sub.data?.effectivePlan ?? "pro")
     : sub.data?.plan;
-  const hasLiveSub = !!sub.data && (effectivePlan === "starter" || effectivePlan === "pro");
+  const hasLiveSub = !!sub.data && (effectivePlan === "starter" || effectivePlan === "pro" || effectivePlan === "elite");
   const connectedCount = (exchanges.data?.exchanges ?? []).filter(e => e.connected).length;
   const introSeen = typeof window !== "undefined" && localStorage.getItem(LS_INTRO_SEEN) === "1";
 
@@ -555,7 +555,7 @@ function RuntimeReadyStep({ plan, onStart }: { plan: string; onStart: () => void
     style: "currency", currency: "USD", maximumFractionDigits: 2,
   });
   const exchange = runtime?.activeExchange ?? null;
-  const aiLimit  = plan === "pro" ? 12 : 3;
+  const aiLimit  = plan === "elite" ? 12 : plan === "pro" ? 6 : 3;
 
   return (
     <ModalShell onClose={onStart} maxWidth={600}>
@@ -642,7 +642,7 @@ function RuntimeReadyStep({ plan, onStart }: { plan: string; onStart: () => void
       <ReadyRow
         Icon={Cpu}
         title="AI Auto Trade is ready"
-        body={`Your ${plan === "pro" ? "AI Trading Pro" : "AI Trading"} plan can run up to ${aiLimit} concurrent AI trades. Start it from the portal whenever you're ready — pause or stop any time.`}
+        body={`Your ${plan === "elite" ? "AI Trading Elite VIP" : plan === "pro" ? "AI Trading Pro" : "AI Trading"} plan can run up to ${aiLimit} concurrent AI trades. Start it from the portal whenever you're ready — pause or stop any time.`}
       />
       <ReadyRow
         Icon={TrendingUp}

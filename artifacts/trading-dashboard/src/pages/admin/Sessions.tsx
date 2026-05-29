@@ -261,7 +261,7 @@ export default function AdminSessions() {
                       </td>
                       <td className="px-3 py-2.5">
                         <span className="text-[8px] font-bold font-mono uppercase"
-                          style={{ color: s.plan === "pro" ? "#cc55ff" : s.plan === "starter" ? "#00aaff" : "#4a6a80" }}>
+                          style={{ color: s.plan === "elite" ? "#ffaa33" : s.plan === "pro" ? "#cc55ff" : s.plan === "starter" ? "#00aaff" : "#4a6a80" }}>
                           {s.plan ?? "free"}
                         </span>
                         {s.role && s.role !== "user" && (

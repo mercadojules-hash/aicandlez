@@ -39,16 +39,23 @@ Forward work = `aicandlez-app` PWA + `trading-dashboard`. `natura-*` frozen.
 
 **No `$5.99` anywhere in the codebase.**
 
-| Plan ID   | Name           | Price   | Capacity              |
-| --------- | -------------- | ------- | --------------------- |
-| `free`    | Paper Trading  | Free    | Simulated only        |
-| `starter` | AI Trading     | $39.99  | Up to **3** AI trades |
-| `pro`     | AI Trading Pro | $79.99  | Up to **12** AI trades|
+| Plan ID   | Name            | Price    | Daily | Concurrent |
+| --------- | --------------- | -------- | ----- | ---------- |
+| `free`    | Paper Trading   | Free     | 10    | 0 (paper)  |
+| `starter` | AI Trading      | $49.95   | 50    | **3**      |
+| `pro`     | AI Trading Pro  | $99.95   | 100   | **6**      |
+| `elite`   | AI Trading Elite VIP | $199.95 | 200 | **12**    |
 
+- Free = paper only; paid tiers = live only. Admin/super-admin = unlimited.
+- Runtime is subscription-driven: no sub → paper; active paid sub → live;
+  canceled/expired → live disabled, paper re-enabled.
+- Stripe price IDs via env `STRIPE_PRICE_{STARTER,PRO,ELITE}_MONTHLY`;
+  legacy starter/pro grandfathered via `STRIPE_PRICE_{STARTER,PRO}_LEGACY`
+  (comma-separated) in `planFromPriceId`.
 - Performance fee on **profitable closed trades only · never on losses**
   (`PERFORMANCE_FEE_LABEL` from `lib/fees`)
 - Monthly · cancel anytime · Stripe customer portal for downgrades
-- SoT: `SubscriptionContext.tsx` (`plan` = `free`/`starter`/`pro`)
+- SoT: `SubscriptionContext.tsx` (`plan` = `free`/`starter`/`pro`/`elite`)
 - API: `POST /billing/checkout`, `POST /billing/portal`, `GET /billing/subscription`
 
 ---
@@ -329,14 +336,18 @@ Logic in `artifacts/aicandlez-app/src/pages/Home.tsx`.
 
 ## Controlled-beta operational mode
 
-- **Concurrent live-trade cap = 3** (customer side). Enforced in
-  `placeLiveAutoOrderForUser` gate 0c by counting open
+- **Platform-wide concurrent live-trade cap = 25** (customer side).
+  Enforced in `placeLiveAutoOrderForUser` gate 0c by counting open
   `sim_positions WHERE exchange IS NOT NULL` across all users.
   Admin/super-admin bypass; operator path (no userId) not gated here.
+  Raised from the original controlled-beta value of 3 → 25 (Task 2 / Q2)
+  so per-tier concurrency (elite up to 12) is actually reachable platform
+  -wide; per-user ceilings are still enforced by `liquidityGuard`
+  (`PLAN_MAX_OPEN_POSITIONS` free0/starter3/pro6/elite12).
 - Rejected: `errorCode: "concurrent_live_cap_reached"` + user
   notification + `executionStreamBus order_rejected` + `logs` row.
 - Tune via env `LIVE_EXECUTION_CONCURRENT_CAP` (no redeploy). `0`
-  disables. Default `DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP=3` in
+  disables. Default `DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP=25` in
   `liveUserExecution.ts`.
 - **Known TOCTOU race** (acceptable at scale): gate reads positions then
   places broker order without reservation; N concurrent placements can

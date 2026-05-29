@@ -22,7 +22,7 @@ import {
 } from "react";
 
 export type PortalMode = "PAPER" | "LIVE";
-export type PortalTier = "free" | "starter" | "pro";
+export type PortalTier = "free" | "starter" | "pro" | "elite";
 
 const STORAGE_KEY = "acl_portal_mode_v1";
 const SANDBOX_STORAGE_KEY = "acl_portal_paper_sandbox_v1";
@@ -121,7 +121,7 @@ interface ProviderProps {
 }
 
 export function PortalModeProvider({ tier, hasExchange, runtimeLiveReady = false, children }: ProviderProps) {
-  const canUseLive = tier === "starter" || tier === "pro";
+  const canUseLive = tier === "starter" || tier === "pro" || tier === "elite";
 
   const [mode, setModeState] = useState<PortalMode>(() => {
     const stored = readStored();

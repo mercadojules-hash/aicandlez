@@ -21,7 +21,7 @@ const CONSENT_ITEMS = [
   },
   {
     id:    "acceptedMembershipFee",
-    label: "I understand AICandlez offers a 3-tier subscription — Paper Trading (free) · AI Trading ($39.99/mo) · AI Trading Pro ($79.99/mo) — covering platform access, infrastructure, and AI compute. The subscription fee applies regardless of trading performance.",
+    label: "I understand AICandlez offers a tiered subscription — Paper Trading (free) · AI Trading ($49.95/mo) · AI Trading Pro ($99.95/mo) · AI Trading Elite VIP ($199.95/mo) — covering platform access, infrastructure, and AI compute. The subscription fee applies regardless of trading performance.",
   },
   {
     id:    "acceptedPerformanceFee",
@@ -175,9 +175,9 @@ export function LiveConsentModal({ open, onConsented, onCancel }: LiveConsentMod
               fontSize: 18, fontFamily: "monospace", fontWeight: 700,
               color: "#00f0ff", textShadow: "0 0 12px #00f0ff60",
               lineHeight: 1.2,
-            }}>$39.99 · $79.99</div>
+            }}>$49.95 · $99.95 · $199.95</div>
             <div style={{ fontSize: 8, fontFamily: "monospace", color: "#3a6080",
-              letterSpacing: "0.14em", marginTop: 3 }}>AI TRADING · PRO / MO</div>
+              letterSpacing: "0.14em", marginTop: 3 }}>AI TRADING · PRO · ELITE VIP / MO</div>
             <div style={{ fontSize: 8, fontFamily: "monospace", color: "#2a5070",
               letterSpacing: "0.1em", marginTop: 1 }}>PAPER TRADING FREE</div>
           </div>

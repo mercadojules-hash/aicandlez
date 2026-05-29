@@ -34,7 +34,7 @@ import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { PLAN_FEATURES } from "../routes/billing.js";
 
-export type AiTradingPlan = "free" | "starter" | "pro";
+export type AiTradingPlan = "free" | "starter" | "pro" | "elite";
 
 export interface AiTradingGate {
   allowed:         boolean;
@@ -85,7 +85,7 @@ export async function resolveAiTradingGate(userId: string): Promise<AiTradingGat
   const isAdmin = role === "admin" || role === "super-admin";
   const planRaw = user?.plan ?? "free";
   const plan: AiTradingPlan =
-    planRaw === "starter" || planRaw === "pro" ? planRaw : "free";
+    planRaw === "starter" || planRaw === "pro" || planRaw === "elite" ? planRaw : "free";
   const status  = user?.planStatus ?? null;
   const isComplimentary = !!user && isComplimentaryActive(user);
 

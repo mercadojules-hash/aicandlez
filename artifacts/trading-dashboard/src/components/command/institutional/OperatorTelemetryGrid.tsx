@@ -637,7 +637,7 @@ function SubscriptionPanel({ data }: { data: MembershipsResponse | undefined }) 
             </div>
             <div className="text-[12px] font-extrabold tabular-nums"
               style={{
-                color: plan === "pro" ? N.BRAND : plan === "starter" ? N.LONG : N.TEXT_1,
+                color: plan === "elite" ? N.GOLD : plan === "pro" ? N.BRAND : plan === "starter" ? N.LONG : N.TEXT_1,
                 fontFamily: N.FONT_MONO,
               }}>
               {fmtInt(planMap[plan] ?? 0)}

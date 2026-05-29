@@ -509,7 +509,7 @@ export default function Exchanges() {
   // grant bypasses requirePlan too). See `getEffectivePlan` in
   // lib/api.ts for the full rationale.
   const effectivePlan = getEffectivePlan(sub);
-  const isPaid     = effectivePlan === "starter" || effectivePlan === "pro";
+  const isPaid     = effectivePlan === "starter" || effectivePlan === "pro" || effectivePlan === "elite";
   const canConnect = isOperator || isPaid;
 
   const handleConnectClick = (ex: ExchangeEntry) => {

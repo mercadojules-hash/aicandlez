@@ -115,7 +115,7 @@ const T = {
   TX_MED:        "200ms ease",
 } as const;
 
-type Plan = "free" | "starter" | "pro";
+type Plan = "free" | "starter" | "pro" | "elite";
 
 /* ──────────────────────────────────────────────────────────────────────── */
 /* Operator Pulse Ribbon                                                    */
@@ -148,7 +148,7 @@ function useCustomerPlan(): Plan {
     },
   });
   const p = data?.plan;
-  return p === "starter" || p === "pro" ? p : "free";
+  return p === "starter" || p === "pro" || p === "elite" ? p : "free";
 }
 
 /* ──────────────────────────────────────────────────────────────────────── */

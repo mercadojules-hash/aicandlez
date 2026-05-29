@@ -583,7 +583,7 @@ function serialize5xx(
 // Audit row uses action="manual_plan_override" with previousPlan/newPlan
 // in payload so the recovery is fully traceable.
 
-const PLAN_ENUM = z.enum(["free", "starter", "pro"]);
+const PLAN_ENUM = z.enum(["free", "starter", "pro", "elite"]);
 const PLAN_STATUS_ENUM = z.enum([
   "none", "active", "trialing", "past_due", "canceled", "unpaid", "incomplete", "incomplete_expired",
 ]);
@@ -701,19 +701,40 @@ const StripeResyncBody = z.object({
 interface ResolvedStripeState {
   customerId:     string;
   subscriptionId: string | null;
-  plan:           "free" | "starter" | "pro";
+  plan:           "free" | "starter" | "pro" | "elite";
   planStatus:     string;
   trialEndsAt:    Date | null;
   subscription:   Stripe.Subscription | null;
 }
 
+/** Parse a comma-separated env list of legacy Stripe price IDs (old prices we
+ *  no longer sell but must keep mapping for already-subscribed users). */
+function legacyPriceIds(envKey: string): string[] {
+  return (process.env[envKey] ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.startsWith("price_"));
+}
+
 /** Reverse `resolvePriceIdForPlan` using the same env vars. Falls back to
- *  null when the price ID doesn't match either configured tier — caller
- *  must decide whether to keep the existing local plan or downgrade. */
-function planFromPriceId(priceId: string | null | undefined): "starter" | "pro" | null {
+ *  null when the price ID doesn't match any configured tier — caller must
+ *  decide whether to keep the existing local plan or downgrade.
+ *
+ *  Grandfathering: legacy Starter/Pro price IDs (the OLD $39.99 / $79.99
+ *  prices, e.g. price_1TZPqFIzLCdrkUtzWyDLLMmA /
+ *  price_1TZPqGIzLCdrkUtzMVJLcxb1) are mapped to their tiers via the
+ *  `STRIPE_PRICE_STARTER_LEGACY` / `STRIPE_PRICE_PRO_LEGACY` env lists so
+ *  existing subscribers keep their entitlement without touching the old
+ *  Stripe prices. Legacy IDs are documented here for rollback only. */
+function planFromPriceId(
+  priceId: string | null | undefined,
+): "starter" | "pro" | "elite" | null {
   if (!priceId) return null;
   if (priceId === resolvePriceIdForPlan("starter")) return "starter";
   if (priceId === resolvePriceIdForPlan("pro"))     return "pro";
+  if (priceId === resolvePriceIdForPlan("elite"))   return "elite";
+  if (legacyPriceIds("STRIPE_PRICE_STARTER_LEGACY").includes(priceId)) return "starter";
+  if (legacyPriceIds("STRIPE_PRICE_PRO_LEGACY").includes(priceId))     return "pro";
   return null;
 }
 

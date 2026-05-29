@@ -74,7 +74,7 @@ function useExchangeBalances() {
 interface AiTradingState {
   enabled: boolean;
   allowed: boolean;
-  plan:    "free" | "starter" | "pro";
+  plan:    "free" | "starter" | "pro" | "elite";
   isAdmin: boolean;
   reason:  string | null;
 }
@@ -1420,7 +1420,7 @@ function TerminalInner() {
 
   /* AI autotrade — derive max-trade capacity from plan tier. Free=0 disables
    * the toggle path (server gate returns 402 anyway). */
-  const aiMaxTrades = aiTrading.isAdmin ? 99 : aiTrading.plan === "pro" ? 12 : aiTrading.plan === "starter" ? 3 : 0;
+  const aiMaxTrades = aiTrading.isAdmin ? 99 : aiTrading.plan === "elite" ? 12 : aiTrading.plan === "pro" ? 6 : aiTrading.plan === "starter" ? 3 : 0;
   const [aiBusy, setAiBusy] = useState(false);
   const [aiUpgradeFlash, setAiUpgradeFlash] = useState(false);
   /* aiArming = staged activation; true only while transitioning OFF→ON.

@@ -30,12 +30,12 @@ export function UpgradeModal({ open, onClose, gate }: {
   gate: (action: () => void) => void;
 }) {
   const { getToken, isSignedIn } = useAuth();
-  const [pending, setPending] = useState<"starter" | "pro" | null>(null);
+  const [pending, setPending] = useState<"starter" | "pro" | "elite" | null>(null);
   const [error,   setError]   = useState<string | null>(null);
 
   if (!open) return null;
 
-  const startCheckout = async (planId: "starter" | "pro") => {
+  const startCheckout = async (planId: "starter" | "pro" | "elite") => {
     if (pending) return;
     setPending(planId);
     setError(null);
@@ -144,6 +144,10 @@ export function UpgradeModal({ open, onClose, gate }: {
                     pending={pending === "pro"}
                     disabled={pending !== null}
                     onSelect={() => gate(() => { void startCheckout("pro"); })} />
+          <PlanCard plan="elite"
+                    pending={pending === "elite"}
+                    disabled={pending !== null}
+                    onSelect={() => gate(() => { void startCheckout("elite"); })} />
         </div>
 
         {error && (
@@ -180,14 +184,16 @@ export function UpgradeModal({ open, onClose, gate }: {
 function PlanCard({
   plan, pending = false, disabled = false, onSelect,
 }: {
-  plan:      "starter" | "pro";
+  plan:      "starter" | "pro" | "elite";
   pending?:  boolean;
   disabled?: boolean;
   onSelect:  () => void;
 }) {
   const data = plan === "starter"
-    ? { name: "AI Trading",     price: "$39.99", cap: "3 concurrent AI trades",                              color: N.BRAND }
-    : { name: "AI Trading Pro", price: "$79.99", cap: "12 concurrent AI trades · crypto majors + alts + emerging", color: N.BRAND_BRT };
+    ? { name: "AI Trading",          price: "$49.95",  cap: "50 trades/day · 3 concurrent AI trades",                          color: N.BRAND }
+    : plan === "pro"
+    ? { name: "AI Trading Pro",      price: "$99.95",  cap: "100 trades/day · 6 concurrent AI trades · crypto majors + alts + emerging", color: N.BRAND_BRT }
+    : { name: "AI Trading Elite VIP", price: "$199.95", cap: "200 trades/day · 12 concurrent AI trades · full crypto universe", color: N.BRAND_BRT };
   const isDim = disabled && !pending;
   return (
     <button

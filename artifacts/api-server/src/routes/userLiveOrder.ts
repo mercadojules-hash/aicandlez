@@ -25,7 +25,7 @@ import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "..
 import { notifyFillHydrated } from "../lib/positionStore.js";
 
 type Plan = TierPlan;
-const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, enterprise: 3 };
+const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, elite: 3, enterprise: 4 };
 
 const router: IRouter = Router();
 

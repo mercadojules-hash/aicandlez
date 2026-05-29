@@ -98,7 +98,7 @@ function RequiresSubscriptionScreen() {
         </div>
         <div style={{ fontSize: 24, fontFamily: "monospace", fontWeight: 800, color: "#00aaff",
           marginBottom: 4 }}>
-          $39.99
+          $49.95
         </div>
         <div style={{ fontSize: 9, fontFamily: "monospace", color: "#2a4060",
           letterSpacing: "0.1em", marginBottom: 18 }}>

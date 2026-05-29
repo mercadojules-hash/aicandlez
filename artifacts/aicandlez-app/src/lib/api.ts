@@ -168,12 +168,12 @@ export interface Subscription {
  */
 export function getEffectivePlan(
   sub: Subscription | undefined | null,
-): "free" | "starter" | "pro" {
+): "free" | "starter" | "pro" | "elite" {
   if (!sub) return "free";
   const raw = sub.isComplimentary
     ? (sub.effectivePlan ?? "pro")
     : (sub.plan ?? "free");
-  return raw === "starter" || raw === "pro" ? raw : "free";
+  return raw === "starter" || raw === "pro" || raw === "elite" ? raw : "free";
 }
 
 export interface Plan {

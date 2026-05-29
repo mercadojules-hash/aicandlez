@@ -55,7 +55,7 @@ export function EnableLiveCTA({
           fontSize: 9.5, fontFamily: SANS, fontWeight: 600,
           color: "#5A726A", letterSpacing: 0.4,
         }}>
-          Free · up to 6 concurrent AI trades &nbsp;·&nbsp; Pro · up to 12 concurrent
+          Starter · up to 3 concurrent AI trades &nbsp;·&nbsp; Elite VIP · up to 12 concurrent
         </div>
       )}
     </div>

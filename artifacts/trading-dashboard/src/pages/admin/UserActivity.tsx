@@ -177,7 +177,7 @@ export default function AdminUserActivity() {
                       </td>
                       <td className="px-3 py-2.5">
                         <span className="text-[8px] font-bold font-mono uppercase"
-                          style={{ color: u.plan === "pro" ? "#cc55ff" : u.plan === "starter" ? "#00aaff" : "#4a6a80" }}>
+                          style={{ color: u.plan === "elite" ? "#ffaa33" : u.plan === "pro" ? "#cc55ff" : u.plan === "starter" ? "#00aaff" : "#4a6a80" }}>
                           {u.plan || "free"}
                         </span>
                       </td>

@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { db } from "@workspace/db";
-import { signalsTable, logsTable, settingsTable, tradesTable } from "@workspace/db";
+import { signalsTable, logsTable, settingsTable, tradesTable, userNotificationsTable } from "@workspace/db";
 import { eq, and, gte, gt, inArray, count } from "drizzle-orm";
 import { settingsStore } from "./settingsStore.js";
 import { getCandles, SUPPORTED_SYMBOLS, type Candle } from "./marketData.js";
@@ -14,6 +14,7 @@ import {
   type LiveUserOrderResult,
 } from "./liveUserExecution.js";
 import { executeCustomerOrder } from "./executionGateway.js";
+import { getTradeLimitVerdict, invalidateTradeLimitCache } from "./tradeLimitEngine.js";
 import {
   registerLiveUserFill,
   placeUserOrder,
@@ -1334,6 +1335,51 @@ async function autoExecute(
       // correlationId across the whole tick fan-out.
       await Promise.all(eligibleUsers.map(async (u) => {
         try {
+          // ── Per-user daily PAPER trade-limit gate ───────────────────
+          // Free tier is paper-only and capped (default 10 / 24h).
+          // Admin / super-admin short-circuit to unlimited inside the
+          // engine. Blocked users are skipped (not failed) so the tick
+          // continues for everyone else.
+          const paperVerdict = await getTradeLimitVerdict(u.userId, "paper");
+          if (paperVerdict.blocked) {
+            logger.info(
+              {
+                tag:           "AI_FANOUT_SKIPPED",
+                correlationId: fanoutCorrelationId,
+                userId:        u.userId,
+                runtimeMode:   "paper",
+                symbol, side,
+                sizeUSD:       u.positionSizeUSD,
+                signalId,
+                reason:        "trade_limit_exhausted",
+                used24h:       paperVerdict.used24h,
+                capTier:       paperVerdict.capTier,
+              },
+              "[AI_FANOUT_SKIPPED] paper fan-out blocked by daily trade-limit",
+            );
+            try {
+              await db.insert(userNotificationsTable).values({
+                userId:  u.userId,
+                type:    "trade_limit_reached",
+                title:   "Daily paper trade limit reached",
+                message: `You've used all ${paperVerdict.capTier} of your daily paper trades. Upgrade for live trading with higher limits.`,
+                data:    {
+                  scope:    "paper",
+                  used24h:  paperVerdict.used24h,
+                  capTier:  paperVerdict.capTier,
+                  resetsAt: paperVerdict.windowResetsAt,
+                },
+                read:    false,
+              });
+            } catch (notifErr) {
+              logger.warn(
+                { userId: u.userId, err: notifErr instanceof Error ? notifErr.message : String(notifErr) },
+                "tradingLoop: failed to persist trade_limit_reached notification",
+              );
+            }
+            return;
+          }
+
           const userResult = await placeUserOrder(u.userId, {
             symbol,
             side,
@@ -1364,6 +1410,9 @@ async function autoExecute(
               },
               "[AI_FANOUT_EXECUTED] paper position opened in per-user sim_positions (canonical)",
             );
+            // New paper open landed — bust the cached paper verdict so the
+            // next tick re-counts against the daily cap immediately.
+            invalidateTradeLimitCache(u.userId, "paper");
           } else {
             logger.info(
               {

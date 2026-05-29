@@ -121,6 +121,7 @@ function pctColor(n: number) {
 
 function planColor(plan: string): string {
   switch ((plan || "").toLowerCase()) {
+    case "elite":   return "#ffaa33";
     case "pro":     return "#cc55ff";
     case "starter": return "#00aaff";
     default:        return "#4a6a80";
@@ -355,7 +356,7 @@ function UserIntelligencePanel({
   const [reason, setReason]     = useState("");
   const [days, setDays]         = useState<number>(30);
   const [capTier, setCapTier]   = useState<number>(3);
-  const [compPlan, setCompPlan] = useState<"free" | "starter" | "pro">("pro");
+  const [compPlan, setCompPlan] = useState<"free" | "starter" | "pro" | "elite">("pro");
   const [compPaperOnly, setCompPaperOnly] = useState<boolean>(true);
   const [compCapOverride, setCompCapOverride] = useState<number | null>(null);
 
@@ -621,11 +622,12 @@ function UserIntelligencePanel({
                   <div style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: C.dim, marginBottom: 6 }}>
                     MEMBERSHIP TIER
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                     {([
                       { p: "free",    label: "FREE",    sub: "Paper only" },
                       { p: "starter", label: "STARTER", sub: "≤ 3 AI live" },
-                      { p: "pro",     label: "PRO",     sub: "≤ 12 AI · Eq" },
+                      { p: "pro",     label: "PRO",     sub: "≤ 6 AI live" },
+                      { p: "elite",   label: "ELITE",   sub: "≤ 12 AI live" },
                     ] as const).map(({ p, label, sub }) => {
                       const disabled = hasSub && p !== "free";
                       return (
@@ -2505,7 +2507,7 @@ function EntitlementsTab({ clerkUserId }: { clerkUserId: string }) {
 function PlanRecoverySection({ clerkUserId }: { clerkUserId: string }) {
   const qc = useQueryClient();
   const { isSuperAdmin } = useUserRole();
-  const [plan, setPlan] = useState<"free" | "starter" | "pro">("starter");
+  const [plan, setPlan] = useState<"free" | "starter" | "pro" | "elite">("starter");
   const [note, setNote] = useState("");
 
   type RecoveryResult = {
@@ -2523,7 +2525,7 @@ function PlanRecoverySection({ clerkUserId }: { clerkUserId: string }) {
   }
 
   const overrideMutation = useMutation({
-    mutationFn: async (args: { plan: "free" | "starter" | "pro"; note: string }) => {
+    mutationFn: async (args: { plan: "free" | "starter" | "pro" | "elite"; note: string }) => {
       const res = await authFetch(`/api/admin/users/${clerkUserId}/plan-override`, {
         method: "POST",
         body:   JSON.stringify(args),
@@ -2592,7 +2594,7 @@ function PlanRecoverySection({ clerkUserId }: { clerkUserId: string }) {
     resyncMutation.mutate({ note: trimmed });
   }
 
-  const planBtn = (value: "free" | "starter" | "pro", label: string) => {
+  const planBtn = (value: "free" | "starter" | "pro" | "elite", label: string) => {
     const active = plan === value;
     return (
       <button
@@ -2646,8 +2648,9 @@ function PlanRecoverySection({ clerkUserId }: { clerkUserId: string }) {
         }}>PLAN</div>
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
           {planBtn("free",    "FREE")}
-          {planBtn("starter", "STARTER · $39.99")}
-          {planBtn("pro",     "PRO · $79.99")}
+          {planBtn("starter", "STARTER · $49.95")}
+          {planBtn("pro",     "PRO · $99.95")}
+          {planBtn("elite",   "ELITE · $199.95")}
         </div>
 
         <div style={{
@@ -2658,7 +2661,7 @@ function PlanRecoverySection({ clerkUserId }: { clerkUserId: string }) {
           value={note}
           onChange={(e) => setNote(e.target.value)}
           disabled={disabled}
-          placeholder="e.g. Stripe checkout succeeded $39.99 2026-05-27 but webhook didn't fire — restoring entitlement."
+          placeholder="e.g. Stripe checkout succeeded $49.95 2026-05-27 but webhook didn't fire — restoring entitlement."
           rows={2}
           style={{
             width: "100%", padding: "8px 10px", fontSize: 10, fontFamily: "monospace",
@@ -3266,7 +3269,7 @@ export default function Admin() {
   const isSuperAdmin = role === "super-admin";
 
   const [search,   setSearch]   = useState("");
-  const [planFilter, setPlanFilter]     = useState<"" | "free" | "starter" | "pro">("");
+  const [planFilter, setPlanFilter]     = useState<"" | "free" | "starter" | "pro" | "elite">("");
   const [statusFilter, setStatusFilter] = useState<"" | "active" | "force_paper" | "suspended" | "disabled">("");
   const [sortKey,  setSortKey]  = useState<SortKey>("lastActivityAt");
   const [sortAsc,  setSortAsc]  = useState(false);
@@ -3494,7 +3497,7 @@ export default function Admin() {
 
             {/* Plan filter */}
             <div className="flex items-center gap-1">
-              {([{ v: "", label: "ALL PLANS" }, { v: "free", label: "FREE" }, { v: "starter", label: "STARTER" }, { v: "pro", label: "PRO" }] as const).map(f => (
+              {([{ v: "", label: "ALL PLANS" }, { v: "free", label: "FREE" }, { v: "starter", label: "STARTER" }, { v: "pro", label: "PRO" }, { v: "elite", label: "ELITE" }] as const).map(f => (
                 <button key={f.v} onClick={() => { setPlanFilter(f.v as typeof planFilter); setPage(0); }}
                   className="px-2.5 py-1 rounded font-mono text-[8px] font-bold transition-all border"
                   style={planFilter === f.v
@@ -3858,7 +3861,7 @@ export default function Admin() {
             <div className="text-[9px] font-mono font-bold tracking-[0.2em] mb-3" style={{ color: "#4a6a80" }}>
               PLAN TIER DISTRIBUTION
             </div>
-            {(["pro", "starter", "free"] as const).map(plan => {
+            {(["elite", "pro", "starter", "free"] as const).map(plan => {
               const count = users.filter(u => (u.plan || "free").toLowerCase() === plan).length;
               const pct   = users.length > 0 ? Math.round((count / users.length) * 100) : 0;
               const color = planColor(plan);

@@ -54,7 +54,7 @@ interface SubRow {
   lastActivityAt: number | null;
 }
 
-type PlanTier = "starter" | "pro";
+type PlanTier = "starter" | "pro" | "elite";
 
 function fmtDollar(n: number) {
   if (Math.abs(n) >= 1_000_000) return `${n < 0 ? "-" : ""}$${(Math.abs(n) / 1_000_000).toFixed(2)}M`;
@@ -64,6 +64,7 @@ function fmtDollar(n: number) {
 
 function planColor(p: string) {
   switch ((p || "").toLowerCase()) {
+    case "elite":   return "#ffaa33";
     case "pro":     return "#cc55ff";
     case "starter": return "#00aaff";
     default:        return "#4a6a80";
@@ -75,7 +76,7 @@ function classifySub(u: SubRow): "comp" | "trial" | "active" | "expired" | "free
   const expired = trialMs !== null && trialMs < Date.now();
   if (u.isComplimentary)                          return expired ? "expired" : "comp";
   if (u.planStatus === "trialing" && trialMs)     return expired ? "expired" : "trial";
-  if (u.plan === "starter" || u.plan === "pro")   return "active";
+  if (u.plan === "starter" || u.plan === "pro" || u.plan === "elite")   return "active";
   return "free";
 }
 
@@ -511,7 +512,7 @@ function SubscriptionActionModal({
                       borderRadius: 4, color: tier === t ? planColor(t) : "#7a9eb8",
                       fontFamily: "monospace", fontSize: 11, fontWeight: 700, cursor: "pointer",
                     }}>
-                    {t.toUpperCase()} {t === "starter" ? "$39.99" : "$79.99"}
+                    {t.toUpperCase()} {t === "starter" ? "$49.95" : t === "pro" ? "$99.95" : "$199.95"}
                   </button>
                 ))}
               </div>

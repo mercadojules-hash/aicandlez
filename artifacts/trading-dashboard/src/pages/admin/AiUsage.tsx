@@ -60,7 +60,7 @@ function fmtAgo(iso: string | null): string {
 
 export default function AdminAiUsage() {
   const [q, setQ] = useState("");
-  const [planFilter, setPlanFilter] = useState<"all"|"free"|"starter"|"pro">("all");
+  const [planFilter, setPlanFilter] = useState<"all"|"free"|"starter"|"pro"|"elite">("all");
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery<Resp>({
     queryKey: ["admin-ai-usage"],
@@ -139,7 +139,7 @@ export default function AdminAiUsage() {
         <div className="flex items-center gap-1 px-2 py-1 rounded border"
           style={{ background: "#010C18", borderColor: "#0E2235" }}>
           <span className="text-[8px] font-bold font-mono tracking-[0.18em]" style={{ color: "#3a5a70" }}>PLAN</span>
-          {(["all","free","starter","pro"] as const).map(p => (
+          {(["all","free","starter","pro","elite"] as const).map(p => (
             <button key={p} onClick={() => setPlanFilter(p)}
               className="px-1.5 py-0.5 rounded text-[8px] font-mono uppercase"
               style={{
@@ -186,9 +186,9 @@ export default function AdminAiUsage() {
                   <td className="px-2 py-2">
                     <span className="px-1.5 py-0.5 rounded text-[8px] font-bold tracking-[0.15em]"
                       style={{
-                        background: r.plan === "pro" ? "#00ff8a14" : r.plan === "starter" ? "#00aaff14" : "#7a9eb814",
-                        color:      r.plan === "pro" ? "#00ff8a"   : r.plan === "starter" ? "#00aaff"   : "#7a9eb8",
-                        border:     `1px solid ${r.plan === "pro" ? "#00ff8a40" : r.plan === "starter" ? "#00aaff40" : "#7a9eb840"}`,
+                        background: r.plan === "elite" ? "#cc55ff14" : r.plan === "pro" ? "#00ff8a14" : r.plan === "starter" ? "#00aaff14" : "#7a9eb814",
+                        color:      r.plan === "elite" ? "#cc55ff"   : r.plan === "pro" ? "#00ff8a"   : r.plan === "starter" ? "#00aaff"   : "#7a9eb8",
+                        border:     `1px solid ${r.plan === "elite" ? "#cc55ff40" : r.plan === "pro" ? "#00ff8a40" : r.plan === "starter" ? "#00aaff40" : "#7a9eb840"}`,
                       }}>{(r.plan ?? "free").toUpperCase()}</span>
                   </td>
                   <td className="px-2 py-2">

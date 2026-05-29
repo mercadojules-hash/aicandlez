@@ -16,7 +16,7 @@ import crypto from "node:crypto";
 //   - Subscription tier
 //   - Encrypted exchange credentials  (see CredentialVault)
 
-export type SubscriptionTier = "free" | "starter" | "pro" | "enterprise";
+export type SubscriptionTier = "free" | "starter" | "pro" | "elite" | "enterprise";
 export type UserRole         = "trader" | "admin" | "readonly";
 export type AIPersonality    = "conservative" | "balanced" | "aggressive";
 
@@ -140,6 +140,16 @@ export const TIER_LIMITS: Record<SubscriptionTier, {
     hasLiveTrading:         true,
     hasCopyTrading:         true,
     hasPrioritySupport:     false,
+  },
+  elite: {
+    maxExchangeConnections: 10,
+    maxActivePositions:     100,
+    maxTradesPerDay:        200,
+    aiRequestsPerDay:       -1,
+    backtestHistoryDays:    730,
+    hasLiveTrading:         true,
+    hasCopyTrading:         true,
+    hasPrioritySupport:     true,
   },
   enterprise: {
     maxExchangeConnections: -1,     // unlimited

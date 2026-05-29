@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { db, userExchangeConnectionsTable, userSettingsTable } from "@workspace/db";
+import { db, userExchangeConnectionsTable, userSettingsTable, usersTable } from "@workspace/db";
 import { and, eq, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { loadBalanceForRow, type BalanceConnection } from "./userExchanges.js";
+import { isComplimentaryActive } from "../lib/aiTradingGate.js";
 import { logger } from "../lib/logger.js";
 import type { Request } from "express";
 
@@ -102,6 +103,35 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
       .limit(1);
     const activeRuntimeExchange: string | null = settingsRow?.activeRuntimeExchange ?? null;
 
+    // ── Subscription-driven runtime gate (Task 2) ───────────────────────
+    // Runtime mode is subscription-driven: no active paid subscription →
+    // paper only; active paid sub → live eligible; canceled/expired →
+    // paper. Admin/super-admin and complimentary accounts are always live-
+    // eligible. This is the SoT for "free can never reach live"; the
+    // exchange-health / ARM / kill-switch gates below still independently
+    // govern whether a live order actually ships.
+    const [userRow] = await db
+      .select({
+        plan:                   usersTable.plan,
+        planStatus:             usersTable.planStatus,
+        role:                   usersTable.role,
+        isComplimentaryAccount: usersTable.isComplimentaryAccount,
+        feeWaiverActive:        usersTable.feeWaiverActive,
+        feeWaiverUntil:         usersTable.feeWaiverUntil,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, userId))
+      .limit(1);
+
+    const role          = userRow?.role ?? "user";
+    const isAdmin       = role === "admin" || role === "super-admin";
+    const isComplimentary = !!userRow && isComplimentaryActive(userRow);
+    const planStr       = userRow?.plan ?? "free";
+    const statusStr     = userRow?.planStatus ?? null;
+    const hasActivePaidSub =
+      planStr !== "free" && (statusStr === "active" || statusStr === "trialing");
+    const subscriptionAllowsLive = isAdmin || isComplimentary || hasActivePaidSub;
+
     const rows = await db
       .select()
       .from(userExchangeConnectionsTable)
@@ -177,6 +207,22 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
         activeExchange = healthyLive[0]!.exchange;
         autoPromoted = true;
       }
+    }
+
+    // Subscription gate override: regardless of exchange health or explicit
+    // pin, a user with no active paid subscription stays paper. This makes
+    // the subscription the single switch between paper and live runtime.
+    if (!subscriptionAllowsLive && mode === "live") {
+      logger.info({
+        tag:        "RUNTIME_SUB_FORCED_PAPER",
+        userId,
+        plan:       planStr,
+        planStatus: statusStr,
+        autoPromoted,
+      }, "[RUNTIME_SUB_FORCED_PAPER] no active paid subscription — runtime forced to paper");
+      mode = "paper";
+      activeExchange = null;
+      autoPromoted = false;
     }
 
     const liveReady = mode === "live" && activeExchange !== null;

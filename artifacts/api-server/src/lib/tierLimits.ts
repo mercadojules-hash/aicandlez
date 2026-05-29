@@ -12,13 +12,29 @@
  * ceiling for any path remains the 100_000 schema cap in parseBody.
  */
 
-export type TierPlan = "free" | "starter" | "pro" | "enterprise";
+export type TierPlan = "free" | "starter" | "pro" | "elite" | "enterprise";
 
 export const TIER_MAX_SIZE_USD: Record<TierPlan, number> = {
   free:       0,
   starter:    500,
   pro:        2500,
+  elite:      5000,
   enterprise: 100_000,
+};
+
+/**
+ * FUTURE — capital-under-management ceiling per tier (display / architecture
+ * only). NOT ENFORCED by any gate in this task (explicit NON-GOAL). Carried
+ * here so a `maxCapitalManagedUSD` gate can be added later without redesigning
+ * the subscription system. Distinct from the per-ORDER `TIER_MAX_SIZE_USD`
+ * cap above. `enterprise`/admin = unlimited (sentinel -1).
+ */
+export const TIER_MAX_CAPITAL_MANAGED_USD: Record<TierPlan, number> = {
+  free:       0,
+  starter:    2_500,
+  pro:        10_000,
+  elite:      50_000,
+  enterprise: -1,
 };
 
 /** Hard absolute ceiling enforced by request validation. */

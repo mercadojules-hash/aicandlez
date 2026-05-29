@@ -130,8 +130,11 @@ export function isCustomerLiveExecutionEnabled(): boolean {
  * count reaches the cap, every subsequent customer live order — manual or
  * auto-trade fan-out — is rejected with `concurrent_live_cap_reached`.
  *
- * Default = 3 during controlled beta. Operator can ratchet up via env:
- *   LIVE_EXECUTION_CONCURRENT_CAP=5   (then 10, etc.) without a redeploy.
+ * Default = 25 — a platform-wide backstop sized above the sum of a small
+ * cohort of paid tiers (per-user concurrency is independently enforced by
+ * `liquidityGuard.PLAN_MAX_OPEN_POSITIONS`: starter 3 / pro 6 / elite 12).
+ * Operator can ratchet via env:
+ *   LIVE_EXECUTION_CONCURRENT_CAP=50   without a redeploy.
  *
  * Set to `0` to disable the gate entirely (legacy behavior).
  *
@@ -141,7 +144,7 @@ export function isCustomerLiveExecutionEnabled(): boolean {
  * controls. Admin / super-admin users authenticated on the customer path
  * also bypass.
  */
-export const DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP = 3;
+export const DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP = 25;
 
 export function getLiveExecutionConcurrentCap(): number {
   const raw = process.env["LIVE_EXECUTION_CONCURRENT_CAP"];
@@ -777,7 +780,7 @@ export async function placeLiveAutoOrderForUser(
   // risk budget (0d). Two failure modes, both customer-protective:
   //
   //   (a) plan_max_positions_reached — user's open LIVE position count
-  //       already meets the plan-tier ceiling (starter=3, pro=12, free=0).
+  //       already meets the plan-tier ceiling (starter=3, pro=6, elite=12, free=0).
   //       Even with infinite cash, the AI cannot open another entry.
   //
   //   (b) liquidity_protected — user does have an open slot, but their

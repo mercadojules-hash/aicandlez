@@ -31,9 +31,9 @@ import { isComplimentaryActive } from "../lib/aiTradingGate.js";
 // because they don't go through this middleware.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Plan = "free" | "starter" | "pro" | "enterprise";
+type Plan = "free" | "starter" | "pro" | "elite" | "enterprise";
 
-const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, enterprise: 3 };
+const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, elite: 3, enterprise: 4 };
 
 export function requirePlan(minimum: Plan) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {

@@ -799,7 +799,7 @@ router.get("/admin/users/:id/audit", ...requireOperator, async (req, res): Promi
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CreateCompSubBodySchema = z.object({
-  plan:      z.enum(["free", "starter", "pro"]),
+  plan:      z.enum(["free", "starter", "pro", "elite"]),
   days:      z.number().int().min(1).max(365),
   paperOnly: z.boolean().default(true),
   capTier:   z.number().int().refine(v => TRADE_LIMIT_CAP_TIERS.includes(v as typeof TRADE_LIMIT_CAP_TIERS[number]), {

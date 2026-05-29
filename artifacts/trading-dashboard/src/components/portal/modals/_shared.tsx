@@ -26,7 +26,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 
 export { N };
-export type Plan = "free" | "starter" | "pro";
+export type Plan = "free" | "starter" | "pro" | "elite";
 
 const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 export const apiBaseUrl = (

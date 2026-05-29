@@ -66,7 +66,7 @@ export function FeatureGate({ feature, description, locked, children }: FeatureG
             cursor: "pointer",
             transition: "background 0.15s",
           }}>
-          {plan === "starter" ? "Upgrade to Pro" : "Unlock — from $39.99/mo"}
+          {plan === "starter" ? "Upgrade to Pro" : "Unlock — from $49.95/mo"}
         </button>
       </div>
     </div>

@@ -22,25 +22,38 @@
  * Existing positions are not touched — the customer can still monitor and
  * close them via the normal AI exit logic. Only new entries are gated.
  *
- * Plan tier capacity (free=0, starter=3, pro=12) is also enforced here so
- * the operational ceiling stays in one file. The platform-wide concurrent
- * cap (`LIVE_EXECUTION_CONCURRENT_CAP`, default 3) remains a SEPARATE gate
- * upstream — this guard is per-user, plan-scoped, and additive.
+ * Plan tier capacity (free=0, starter=3, pro=6, elite=12) is also enforced
+ * here so the operational ceiling stays in one file. The platform-wide
+ * concurrent cap (`LIVE_EXECUTION_CONCURRENT_CAP`, default 25) remains a
+ * SEPARATE gate upstream — this guard is per-user, plan-scoped, and additive.
  */
 
-export type CustomerPlan = "free" | "starter" | "pro";
+export type CustomerPlan = "free" | "starter" | "pro" | "elite";
+
+/** Display label per plan tier (drives user-facing cap messages). */
+export const PLAN_LABEL: Record<CustomerPlan, string> = {
+  free:    "Free",
+  starter: "Starter",
+  pro:     "Pro",
+  elite:   "Elite VIP",
+};
 
 /**
  * Maximum simultaneous open AI positions per plan tier.
  *
  * - free    = 0   (no AI execution; paper-only product surface)
- * - starter = 3   (per task brief)
- * - pro     = 12  (per replit.md billing ladder)
+ * - starter = 3   (per locked tier ladder)
+ * - pro     = 6   (per locked tier ladder)
+ * - elite   = 12  (per locked tier ladder)
+ *
+ * Admin / super-admin bypass this guard entirely (role-based, enforced
+ * upstream in liveUserExecution).
  */
 export const PLAN_MAX_OPEN_POSITIONS: Record<CustomerPlan, number> = {
   free:    0,
   starter: 3,
-  pro:     12,
+  pro:     6,
+  elite:   12,
 };
 
 /** Customer trade-size presets surfaced in the PWA + Portal pickers. */
@@ -70,7 +83,7 @@ export const LIQUIDITY_PROTECTED_MESSAGE =
 
 /** Standard user-facing message when the plan capacity gate fires. */
 export const PLAN_MAX_POSITIONS_MESSAGE = (plan: CustomerPlan, cap: number): string =>
-  `${plan === "starter" ? "Starter" : "Pro"} plan allows up to ${cap} concurrent AI position${cap === 1 ? "" : "s"} — close one before opening a new entry.`;
+  `${PLAN_LABEL[plan] ?? "Your"} plan allows up to ${cap} concurrent AI position${cap === 1 ? "" : "s"} — close one before opening a new entry.`;
 
 export interface LiquidityGuardInput {
   plan:              CustomerPlan;

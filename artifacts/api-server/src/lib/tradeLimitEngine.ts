@@ -37,10 +37,16 @@ import {
   UNLIMITED_TRADE_LIMIT_CAP,
   getPlanDefaultCap,
 } from "@workspace/db";
-import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, sql } from "drizzle-orm";
 import { logger } from "./logger.js";
 
 export type TradeLimitSource = "plan-default" | "operator-override";
+
+/** Which runtime's opens the cap is counted against. `live` = rows with
+ *  `exchange IS NOT NULL` (paid tiers). `paper` = rows with
+ *  `exchange IS NULL` (free tier). The plan-default cap itself is the
+ *  same resolution; only the counted universe differs. */
+export type TradeLimitRuntime = "paper" | "live";
 
 export interface TradeLimitVerdict {
   userId:         string;
@@ -65,21 +71,37 @@ const CACHE_TTL_MS = 5_000;
 interface CacheEntry { verdict: TradeLimitVerdict; expiresAt: number }
 const cache = new Map<string, CacheEntry>();
 
+/** Cache key is per (user, runtime) — paper and live opens are counted
+ *  independently so a free user's paper usage and a paid user's live
+ *  usage never share a cached verdict. */
+function cacheKey(userId: string, runtime: TradeLimitRuntime): string {
+  return `${userId}:${runtime}`;
+}
+
 /** Reset the per-user cache. Test-only; production paths rely on TTL. */
 export function __resetTradeLimitCacheForTests(): void {
   cache.clear();
 }
 
-/** Invalidate a single user's cached verdict (call right after recording
- *  a new live open OR after an operator writes an override). */
-export function invalidateTradeLimitCache(userId: string): void {
-  cache.delete(userId);
+/** Invalidate a user's cached verdict (call right after recording a new
+ *  open OR after an operator writes an override). When `runtime` is
+ *  omitted, both paper and live verdicts are cleared. */
+export function invalidateTradeLimitCache(userId: string, runtime?: TradeLimitRuntime): void {
+  if (runtime) {
+    cache.delete(cacheKey(userId, runtime));
+    return;
+  }
+  cache.delete(cacheKey(userId, "paper"));
+  cache.delete(cacheKey(userId, "live"));
 }
 
 interface ResolvedCap {
   capTier:        number;
   source:         TradeLimitSource;
   planDefaultCap: number;
+  /** True iff the user's role is admin / super-admin — caps are bypassed
+   *  entirely (unlimited) regardless of plan or override. */
+  roleUnlimited:  boolean;
 }
 
 async function resolveCap(userId: string): Promise<ResolvedCap> {
@@ -91,6 +113,7 @@ async function resolveCap(userId: string): Promise<ResolvedCap> {
     const [row] = await db
       .select({
         plan:              usersTable.plan,
+        role:              usersTable.role,
         capTier:           userTradeLimitsTable.capTier,
         usePlanDefault:    userTradeLimitsTable.usePlanDefault,
         overrideExpiresAt: userTradeLimitsTable.overrideExpiresAt,
@@ -102,30 +125,49 @@ async function resolveCap(userId: string): Promise<ResolvedCap> {
 
     const planDefaultCap = getPlanDefaultCap(row?.plan ?? null);
 
+    // Role short-circuit — admin / super-admin are uncapped (unlimited)
+    // on every runtime, regardless of plan or operator override.
+    if (row?.role === "admin" || row?.role === "super-admin") {
+      return {
+        capTier:        UNLIMITED_TRADE_LIMIT_CAP,
+        source:         "plan-default",
+        planDefaultCap,
+        roleUnlimited:  true,
+      };
+    }
+
     if (!row || row.capTier === null || row.usePlanDefault !== false) {
       // No row, no override flag set, or operator explicitly chose
       // "use plan default" → plan tier wins.
-      return { capTier: planDefaultCap, source: "plan-default", planDefaultCap };
+      return { capTier: planDefaultCap, source: "plan-default", planDefaultCap, roleUnlimited: false };
     }
     if (row.overrideExpiresAt && row.overrideExpiresAt.getTime() < Date.now()) {
       // Override window elapsed → revert to plan default. Operators
       // who want a permanent bump set overrideExpiresAt = null.
-      return { capTier: planDefaultCap, source: "plan-default", planDefaultCap };
+      return { capTier: planDefaultCap, source: "plan-default", planDefaultCap, roleUnlimited: false };
     }
-    return { capTier: row.capTier, source: "operator-override", planDefaultCap };
+    return { capTier: row.capTier, source: "operator-override", planDefaultCap, roleUnlimited: false };
   } catch (err) {
     logger.warn(
       { userId, err: err instanceof Error ? err.message : String(err) },
       "tradeLimitEngine: cap lookup failed — defaulting to FREE plan default",
     );
     const fallback = getPlanDefaultCap(null);
-    return { capTier: fallback, source: "plan-default", planDefaultCap: fallback };
+    return { capTier: fallback, source: "plan-default", planDefaultCap: fallback, roleUnlimited: false };
   }
 }
 
 interface WindowOpens { count: number; oldestOpenEpochMs: number | null }
 
-async function countLiveOpensInWindow(userId: string, cutoffMs: number): Promise<WindowOpens> {
+async function countOpensInWindow(
+  userId:   string,
+  cutoffMs: number,
+  runtime:  TradeLimitRuntime,
+): Promise<WindowOpens> {
+  // Paper runtime counts simulated opens (exchange IS NULL); live runtime
+  // counts broker-mirrored opens (exchange IS NOT NULL).
+  const exchangePredicate = (col: typeof simPositionsTable.exchange | typeof simTradesTable.exchange) =>
+    runtime === "live" ? isNotNull(col) : isNull(col);
   try {
     const [openRows, closedRows] = await Promise.all([
       db
@@ -137,7 +179,7 @@ async function countLiveOpensInWindow(userId: string, cutoffMs: number): Promise
         .where(
           and(
             eq(simPositionsTable.userId, userId),
-            isNotNull(simPositionsTable.exchange),
+            exchangePredicate(simPositionsTable.exchange),
             gte(simPositionsTable.entryTime, cutoffMs),
           ),
         ),
@@ -150,7 +192,7 @@ async function countLiveOpensInWindow(userId: string, cutoffMs: number): Promise
         .where(
           and(
             eq(simTradesTable.userId, userId),
-            isNotNull(simTradesTable.exchange),
+            exchangePredicate(simTradesTable.exchange),
             gte(simTradesTable.entryTime, cutoffMs),
           ),
         ),
@@ -203,12 +245,16 @@ export function buildVerdict(args: {
   };
 }
 
-export async function getTradeLimitVerdict(userId: string): Promise<TradeLimitVerdict> {
+export async function getTradeLimitVerdict(
+  userId:  string,
+  runtime: TradeLimitRuntime = "live",
+): Promise<TradeLimitVerdict> {
   const now = Date.now();
-  const cached = cache.get(userId);
+  const key = cacheKey(userId, runtime);
+  const cached = cache.get(key);
   if (cached && cached.expiresAt > now) return cached.verdict;
   const resolved = await resolveCap(userId);
-  const { count, oldestOpenEpochMs } = await countLiveOpensInWindow(userId, now - WINDOW_MS);
+  const { count, oldestOpenEpochMs } = await countOpensInWindow(userId, now - WINDOW_MS, runtime);
   const verdict = buildVerdict({
     userId,
     used24h:           count,
@@ -218,6 +264,6 @@ export async function getTradeLimitVerdict(userId: string): Promise<TradeLimitVe
     oldestOpenEpochMs,
     nowMs:             now,
   });
-  cache.set(userId, { verdict, expiresAt: now + CACHE_TTL_MS });
+  cache.set(key, { verdict, expiresAt: now + CACHE_TTL_MS });
   return verdict;
 }

@@ -26,9 +26,10 @@ export type PaywallReason = "trial_expired" | "live_trading" | "feature_locked" 
 
 // Internal plan keys (kept stable for DB enum compatibility):
 //   free    → Paper Trading
-//   starter → AI Trading ($39.99/mo)
-//   pro     → AI Trading Pro ($79.99/mo)
-export type SubPlan   = "free" | "starter" | "pro";
+//   starter → AI Trading ($49.95/mo)
+//   pro     → AI Trading Pro ($99.95/mo)
+//   elite   → AI Trading Elite VIP ($199.95/mo)
+export type SubPlan   = "free" | "starter" | "pro" | "elite";
 export type SubStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid" | null;
 
 export interface SubscriptionState {
@@ -60,7 +61,7 @@ export interface SubscriptionState {
 const DEFAULT_LIMITS = {
   exchanges:        1 as number | string,
   positions:        3 as number | string,
-  trades:           5 as number | string,
+  trades:           10 as number | string,
   liveTrading:      false,
   concurrentTrades: 0,
   aiAutoTrade:      false,

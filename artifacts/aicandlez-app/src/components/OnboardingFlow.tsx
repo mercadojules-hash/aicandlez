@@ -832,7 +832,7 @@ function IntroContent({ onDone }: { onDone: () => void }) {
       <PWAIntroRow emoji="✋" title="Trade manually"
         body="Buy and sell any supported asset yourself, on your schedule. AI signals stay visible so you can confirm or override every move." />
       <PWAIntroRow emoji="🤖" title="Let AI trade for you"
-        body="Auto Trade executes high-confidence signals on your behalf — up to 3 concurrent trades on AI Trading, 12 on AI Trading Pro. Pause or stop AI anytime." />
+        body="Auto Trade executes high-confidence signals on your behalf — up to 3 concurrent trades on Starter, 6 on Pro, 12 on Elite VIP. Pause or stop AI anytime." />
       <PWAIntroRow emoji="🛡" title="You always keep custody"
         body="Funds remain in your own regulated crypto exchange account. AICandlez never holds customer money and withdrawal permissions are never requested." />
 

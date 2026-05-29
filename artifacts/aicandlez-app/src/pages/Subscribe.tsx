@@ -58,13 +58,22 @@ const VISUAL: Record<string, {
     border:       "rgba(124,255,0,0.38)",
     borderActive: "rgba(124,255,0,0.75)",
     accent:       BRAND_BRGT,
+    capacity:     "6 Concurrent AI Trades",
+  },
+  elite: {
+    label: "AICandlez Elite VIP", caption: "Maximum AI capacity. Full crypto universe. White-glove execution.",
+    badge: "UPGRADE",
+    glow:         "rgba(124,255,0,0.36)",
+    border:       "rgba(124,255,0,0.38)",
+    borderActive: "rgba(124,255,0,0.75)",
+    accent:       BRAND_BRGT,
     capacity:     "12 Concurrent AI Trades",
     elite:        true,
   },
 };
 
 // Display order — visual upgrade ladder.
-const ORDER = ["free", "starter", "pro"];
+const ORDER = ["free", "starter", "pro", "elite"];
 
 export default function Subscribe() {
   const [, setLocation] = useLocation();
@@ -131,7 +140,7 @@ export default function Subscribe() {
         </div>
         <div style={{ fontSize: 12.5, fontFamily: SANS, color: GR, lineHeight: 1.5 }}>
           Free Paper Trading is included. Subscribe to enable Live AI execution
-          and AI Auto Trade. Upgrade for expanded AI capacity and equities.
+          and AI Auto Trade. Upgrade for expanded AI capacity.
         </div>
       </div>
 
@@ -161,7 +170,7 @@ export default function Subscribe() {
                   <div style={{ fontSize: 8, fontFamily: SANS, fontWeight: 600,
                     color: active ? v.accent : reached ? GR : DIM,
                     letterSpacing: 0.6, textTransform: "uppercase" as const, whiteSpace: "nowrap" as const }}>
-                    {id === "free" ? "Free" : id === "starter" ? "AICandlez Starter" : "AICandlez Pro"}
+                    {id === "free" ? "Free" : v.label}
                   </div>
                 </div>
                 {i < ORDER.length - 1 && (
@@ -256,7 +265,7 @@ export default function Subscribe() {
                     fontSize: 24, fontFamily: SANS, fontWeight: 800,
                     color: plan.id === "free" ? W : v.accent,
                     letterSpacing: -0.8, lineHeight: 1,
-                    textShadow: plan.id === "pro" ? `0 0 18px ${v.glow}` : "none",
+                    textShadow: v.elite ? `0 0 18px ${v.glow}` : "none",
                   }}>{priceUsd}</div>
                   {plan.price_monthly > 0 && (
                     <div style={{ fontSize: 9.5, fontFamily: SANS, color: DIM,

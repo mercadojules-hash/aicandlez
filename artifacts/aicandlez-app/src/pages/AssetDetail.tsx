@@ -1100,7 +1100,7 @@ export default function AssetDetail({ routeSym, routeType }: AssetDetailProps = 
                   : autoActive ? "rgba(102,255,102,0.80)" : "rgba(102,255,102,0.62)",
                 letterSpacing:"0.14em", textTransform:"uppercase" as const, fontWeight:700 }}>
                 {autoLocked
-                  ? `AI Auto Trade is a paid feature · Starts at $39.99/mo`
+                  ? `AI Auto Trade is a paid feature · Starts at $49.95/mo`
                   : autoActive
                     ? `AI managing ${sym} · ${conf}% confidence · Stop-loss active`
                     : `Let AI trade ${sym} · ${conf}% confidence · Risk-calibrated`}

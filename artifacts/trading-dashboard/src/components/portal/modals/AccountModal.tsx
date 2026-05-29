@@ -35,12 +35,14 @@ export function AccountModal({
   const name  = user?.fullName || user?.firstName || user?.username || "Account";
 
   const planLabel =
-    tier === "pro"     ? "AI Trading Pro · $79.99 / mo"
-    : tier === "starter" ? "AI Trading · $39.99 / mo"
+    tier === "elite"   ? "AI Trading Elite VIP · $199.95 / mo"
+    : tier === "pro"     ? "AI Trading Pro · $99.95 / mo"
+    : tier === "starter" ? "AI Trading · $49.95 / mo"
     : "Paper Trading · Free";
   const planColor = tier === "free" ? N.TEXT_1 : N.BRAND;
   const capacity  =
-    tier === "pro" ? "Up to 12 concurrent AI trades" :
+    tier === "elite" ? "Up to 12 concurrent AI trades" :
+    tier === "pro" ? "Up to 6 concurrent AI trades" :
     tier === "starter" ? "Up to 3 concurrent AI trades" :
     "Simulated only";
 

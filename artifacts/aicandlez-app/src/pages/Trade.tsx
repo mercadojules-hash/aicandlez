@@ -679,7 +679,7 @@ export default function Trade() {
   // 0LIQ enforces both the plan-tier max-open and the cash cushion against
   // the same numbers — the UI just mirrors what the server already knows.
   type LiquidityStatus = {
-    plan:                "free" | "starter" | "pro";
+    plan:                "free" | "starter" | "pro" | "elite";
     isAdmin:             boolean;
     tradeSizeUsd:        number;
     allowedTradeSizes:   readonly number[];
@@ -710,7 +710,7 @@ export default function Trade() {
   });
   const SIZE_PRESETS = [10, 20, 50, 100] as const;
   const activeSize   = liquidity?.tradeSizeUsd ?? 10;
-  const planLabel    = liquidity?.plan === "pro" ? "PRO" : liquidity?.plan === "starter" ? "STARTER" : "FREE";
+  const planLabel    = liquidity?.plan === "elite" ? "ELITE" : liquidity?.plan === "pro" ? "PRO" : liquidity?.plan === "starter" ? "STARTER" : "FREE";
 
   return (
     <div className="page-enter" style={{ background:BG, minHeight:"100%", paddingBottom:28 }}>

@@ -656,7 +656,7 @@ export default function Home() {
   // Effective plan — complimentary accounts surface as their entitled
   // tier so the Home hero shows "Pro" instead of "Trial" for them.
   const plan = getEffectivePlan(sub);
-  const planLabel = plan === "pro" || plan === "starter" ? "Pro" : "Trial";
+  const planLabel = plan === "elite" || plan === "pro" || plan === "starter" ? "Pro" : "Trial";
 
   const breakdowns: Record<string, SignalBreakdown> = signalsData?.breakdowns ?? {};
   const tickerMap: Record<string, MobileTicker> = useMemo(() => {

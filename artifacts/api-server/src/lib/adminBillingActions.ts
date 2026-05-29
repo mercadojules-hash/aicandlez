@@ -117,8 +117,11 @@ export async function createComplimentarySubscription(opts: {
 
 /** Resolve a Stripe monthly price ID for a plan tier. Env-first, matches the
  *  same resolution used by customer-facing checkout. */
-export function resolvePriceIdForPlan(plan: "starter" | "pro"): string | null {
-  const envKey = plan === "starter" ? "STRIPE_PRICE_STARTER_MONTHLY" : "STRIPE_PRICE_PRO_MONTHLY";
+export function resolvePriceIdForPlan(plan: "starter" | "pro" | "elite"): string | null {
+  const envKey =
+    plan === "starter" ? "STRIPE_PRICE_STARTER_MONTHLY" :
+    plan === "pro"     ? "STRIPE_PRICE_PRO_MONTHLY"     :
+    "STRIPE_PRICE_ELITE_MONTHLY";
   const val = process.env[envKey];
   return val && val.startsWith("price_") ? val : null;
 }

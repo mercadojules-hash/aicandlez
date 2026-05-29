@@ -266,7 +266,7 @@ const ExchangeStatusBadge = memo(function ExchangeStatusBadge({ plan }: { plan: 
 interface AiTradingState {
   enabled: boolean;
   allowed: boolean;
-  plan:    "free" | "starter" | "pro";
+  plan:    "free" | "starter" | "pro" | "elite";
   isAdmin: boolean;
   reason:  string | null;
 }
@@ -370,6 +370,7 @@ const OperatorPulseRibbon = memo(function OperatorPulseRibbon({
   // (paused when the tab is hidden via the visibility-aware `useNow1s`).
   const now = useMemo(() => new Date(nowMs), [nowMs]);
   const planLabel =
+    plan === "elite"   ? "ELITE VIP · CRYPTO · PRIORITY EXEC" :
     plan === "pro"     ? "PRO · CRYPTO · PRIORITY EXEC" :
     plan === "starter" ? "STARTER · CRYPTO · AI EXEC"   :
                          "FREE · PAPER · 7-DAY TRIAL";
@@ -3957,7 +3958,7 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
             <span style={{
               color: "rgba(255,235,200,0.85)", fontSize: 10, letterSpacing: T.TRACK_LABEL, marginTop: 2,
             }}>
-              AI AUTO TRADE IS A PAID FEATURE  ·  STARTS AT $39.99/MO  ·  CANCEL ANYTIME
+              AI AUTO TRADE IS A PAID FEATURE  ·  STARTS AT $49.95/MO  ·  CANCEL ANYTIME
             </span>
           </div>
           <div style={{
@@ -4880,11 +4881,13 @@ function CustomerTopHeader({
 
   // Subscription tier chip — color-scaled by plan tier.
   const tierMeta =
-    plan === "pro"
-      ? { label: "PRO",     color: N.GOLD_BRT }
-      : plan === "starter"
-        ? { label: "STARTER", color: N.BRAND_BRT }
-        : { label: "FREE",    color: N.TEXT_2 };
+    plan === "elite"
+      ? { label: "ELITE VIP", color: N.GOLD_BRT }
+      : plan === "pro"
+        ? { label: "PRO",     color: N.GOLD_BRT }
+        : plan === "starter"
+          ? { label: "STARTER", color: N.BRAND_BRT }
+          : { label: "FREE",    color: N.TEXT_2 };
 
   return (
     <div className="cd-customer-top-header" style={{
@@ -5061,7 +5064,7 @@ export function PortalCustomerShell() {
   // badge). Real-money execution remains gated by the server-side
   // `customer_live_execution_disabled` kill switch and the global
   // `LIVE_EXECUTION_CONCURRENT_CAP` — these UX shifts do not enable fills.
-  const entitled = plan === "starter" || plan === "pro";
+  const entitled = plan === "starter" || plan === "pro" || plan === "elite";
   // Direct sign-out for the toolbar SIGN OUT button — same useClerk hook
   // used by AccountModal so revoke + cookie clear behavior is identical.
   const { signOut: portalSignOut } = useClerk();
@@ -5611,7 +5614,7 @@ export function PortalCustomerShell() {
   // on admin sessions.
   const { getToken: liqGetToken } = useAuth();
   const { data: liquidityStatus } = useQuery<{
-    plan:                "free" | "starter" | "pro";
+    plan:                "free" | "starter" | "pro" | "elite";
     tradeSizeUsd:        number;
     planMaxOpen:         number;
     openLiveCount:       number;
@@ -6162,7 +6165,7 @@ export function PortalCustomerShell() {
           </span>
           <span>
             <span style={{ color: T.TEXT_3, marginRight: 6 }}>
-              {liquidityStatus.plan === "pro" ? "PRO" : liquidityStatus.plan === "starter" ? "STARTER" : "FREE"} OPEN
+              {liquidityStatus.plan === "elite" ? "ELITE" : liquidityStatus.plan === "pro" ? "PRO" : liquidityStatus.plan === "starter" ? "STARTER" : "FREE"} OPEN
             </span>
             <span style={{ color: T.TEXT_1, fontWeight: 700 }}>
               {liquidityStatus.openCount ?? liquidityStatus.openLiveCount}/{liquidityStatus.planMaxOpen}
@@ -6227,7 +6230,7 @@ export function PortalCustomerShell() {
           "U"
         ).toUpperCase();
         const liveBadge = isLiveRuntime ? `LIVE${liveExchange ? ` · ${liveExchange.toUpperCase()}` : ""}` : "PAPER TRADING";
-        const planLabel = (plan === "pro" ? "PRO" : plan === "starter" ? "STARTER" : "FREE");
+        const planLabel = (plan === "elite" ? "ELITE VIP" : plan === "pro" ? "PRO" : plan === "starter" ? "STARTER" : "FREE");
         return (
           <>
             {/* TOP BRAND STRIP */}
@@ -6617,7 +6620,7 @@ export function PortalCustomerShell() {
         <EnableLiveAITradingBar
           engineOnline={!!engineStatus?.running}
           openPaper={blotterOpenCount}
-          slotCap={plan === "pro" ? 12 : plan === "starter" ? 3 : 3}
+          slotCap={plan === "elite" ? 12 : plan === "pro" ? 6 : plan === "starter" ? 3 : 3}
           onUpgrade={() => setUpgrade(true)}
           equityUsd={displayEquity}
         />

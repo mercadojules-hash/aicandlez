@@ -47,8 +47,8 @@ const CARDS: Card[] = [
     title:   "AI Automation",
     body:    "After activating a subscription and connecting an exchange, you can optionally enable autonomous AI execution. AI trading is OFF by default — you stay in control.",
     bullets: [
-      "Up to 3 concurrent AI trades on AICandlez Starter — $39.99/mo",
-      "Up to 12 concurrent AI trades on AICandlez Pro — $79.99/mo",
+      "Up to 3 concurrent AI trades on AICandlez Starter — $49.95/mo",
+      "Up to 12 concurrent AI trades on AICandlez Elite VIP — $199.95/mo",
       "3% performance fee on profitable closed trades only · never on losses",
       "Toggle AI execution on or off at any time",
     ],

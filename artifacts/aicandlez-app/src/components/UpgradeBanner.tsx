@@ -92,10 +92,10 @@ export function UpgradeBanner() {
         }}/>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: W, marginBottom: 2, letterSpacing: 0.1 }}>
-            Unlock 12 concurrent AI trades + equities
+            Unlock up to 12 concurrent AI trades
           </div>
           <div style={{ fontSize: 10, color: GR }}>
-            AICandlez Pro · $79.99/mo · advanced AI scanners
+            AICandlez Pro · $99.95/mo · Elite VIP · $199.95/mo
           </div>
         </div>
         <BannerBtn color={BRAND_BRIGHT} border="rgba(124,255,0,0.32)" onClick={() => navigate("/subscribe")}>
@@ -117,7 +117,7 @@ export function UpgradeBanner() {
             Paper Trading Active — Unlock Live AI Execution
           </div>
           <div style={{ fontSize: 10, color: GR }}>
-            AICandlez Starter from $39.99/mo · Pro $79.99/mo
+            AICandlez Starter from $49.95/mo · Pro $99.95/mo
           </div>
         </div>
         <BannerBtn color={BRAND_BRIGHT} border="rgba(124,255,0,0.40)" onClick={() => showPaywall("feature_locked")}>

@@ -58,7 +58,7 @@ const DIM        = "#5A726A";
 const SANS       = "'SF Pro Display','Inter',system-ui,-apple-system,sans-serif";
 const MONO       = "'SF Mono','JetBrains Mono','Roboto Mono',Consolas,monospace";
 
-type PlanId = "free" | "starter" | "pro";
+type PlanId = "free" | "starter" | "pro" | "elite";
 
 interface PlanMeta {
   id:        PlanId;
@@ -103,12 +103,13 @@ const PLANS: PlanMeta[] = [
     id: "starter",
     name:     "AICandlez Starter",
     caption:  "Live AI execution on crypto. AI Auto Trade. Real positions.",
-    price:    "$39.99",
-    priceNum: "39.99",
+    price:    "$49.95",
+    priceNum: "49.95",
     capacity: "Up to 3 Concurrent AI Trades",
     features: [
       "Live AI execution enabled",
       "AI Auto Trade enabled",
+      "Up to 50 AI trades per day",
       "Up to 3 concurrent AI trades",
       "Crypto AI execution",
       "AI portfolio tracking",
@@ -120,18 +121,19 @@ const PLANS: PlanMeta[] = [
     accent: BRAND,
     glow:   "rgba(102,255,102,0.22)",
     border: "rgba(102,255,102,0.28)",
-    ctaStart:   "Start AICandlez Starter — $39.99/MO",
-    ctaUpgrade: "Upgrade to AICandlez Starter — $39.99/MO",
+    ctaStart:   "Start AICandlez Starter — $49.95/MO",
+    ctaUpgrade: "Upgrade to AICandlez Starter — $49.95/MO",
   },
   {
     id: "pro",
     name:     "AICandlez Pro",
     caption:  "Expanded AI capacity, crypto majors + alts + emerging, priority execution.",
-    price:    "$79.99",
-    priceNum: "79.99",
-    capacity: "Up to 12 Concurrent AI Trades",
+    price:    "$99.95",
+    priceNum: "99.95",
+    capacity: "Up to 6 Concurrent AI Trades",
     features: [
-      "Up to 12 concurrent AI trades",
+      "Up to 100 AI trades per day",
+      "Up to 6 concurrent AI trades",
       "Priority AI execution",
       "Crypto AI trading (majors + alts + emerging)",
       "Advanced AI scanners",
@@ -144,8 +146,33 @@ const PLANS: PlanMeta[] = [
     accent: BRAND_BRGT,
     glow:   "rgba(124,255,0,0.36)",
     border: "rgba(124,255,0,0.38)",
-    ctaStart:   "Start AICandlez Pro — $79.99/MO",
-    ctaUpgrade: "Upgrade to Pro — $79.99/MO",
+    ctaStart:   "Start AICandlez Pro — $99.95/MO",
+    ctaUpgrade: "Upgrade to Pro — $99.95/MO",
+  },
+  {
+    id: "elite",
+    name:     "AICandlez Elite VIP",
+    caption:  "Maximum AI capacity across the full crypto universe. VIP execution.",
+    price:    "$199.95",
+    priceNum: "199.95",
+    capacity: "Up to 12 Concurrent AI Trades",
+    features: [
+      "Up to 200 AI trades per day",
+      "Up to 12 concurrent AI trades",
+      "VIP priority AI execution",
+      "Full crypto universe (majors + alts + emerging)",
+      "Advanced AI scanners",
+      "Expanded AI confidence engine",
+      "Enhanced analytics",
+      "Advanced AI automation controls",
+      "Priority execution layer",
+      `${PERFORMANCE_FEE_LABEL} performance fee on profitable trades only`,
+    ],
+    accent: BRAND_BRGT,
+    glow:   "rgba(124,255,0,0.36)",
+    border: "rgba(124,255,0,0.38)",
+    ctaStart:   "Start AICandlez Elite VIP — $199.95/MO",
+    ctaUpgrade: "Upgrade to Elite VIP — $199.95/MO",
     elite:    true,
   },
 ];
@@ -166,6 +193,10 @@ function statusBadge(plan: PlanId, current: PlanId, sub: Subscription | undefine
     if (plan === "starter") {
       return { text: "ACTIVE", bg: "rgba(102,255,102,0.16)",
         border: "rgba(102,255,102,0.45)", color: BRAND };
+    }
+    if (plan === "elite") {
+      return { text: "ELITE ACTIVE", bg: "rgba(124,255,0,0.14)",
+        border: "rgba(124,255,0,0.45)", color: BRAND_BRGT };
     }
     return { text: "PRO ACTIVE", bg: "rgba(124,255,0,0.14)",
       border: "rgba(124,255,0,0.45)", color: BRAND_BRGT };

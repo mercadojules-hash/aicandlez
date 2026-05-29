@@ -55,36 +55,38 @@ export const PLAN_FEATURES: Record<string, {
   };
 }> = {
   // ── PAPER TRADING (FREE) ────────────────────────────────────────────────────
-  // Signals + simulated buy/sell only. No live AI execution.
+  // Signals + simulated buy/sell only. No live AI execution. 10 paper trades/day.
   free: {
     name:          "Paper Trading",
     price_monthly: 0,
     price_yearly:  0,
-    description:   "AI signals + paper trading. No live execution.",
+    description:   "AI signals + paper trading. 10 paper trades / day. No live execution.",
     features: [
       "AI signals",
       "Paper trading only",
+      "Up to 10 paper trades / day",
       "Market scanning",
       "AI confidence engine",
       "Watchlists",
       "Simulated buy/sell only",
     ],
     limits: {
-      exchanges: 1, positions: 3, trades: 5,
+      exchanges: 1, positions: 3, trades: 10,
       concurrentTrades: 0, liveTrading: false, aiAutoTrade: false, equitiesAI: false,
     },
   },
 
-  // ── AI TRADING — $39.99/month ───────────────────────────────────────────────
+  // ── AI TRADING — $49.95/month ───────────────────────────────────────────────
   // Plan key kept as `starter` for DB enum compatibility with existing users.
   starter: {
     name:           "AICandlez Starter",
-    price_monthly:  3999,   // $39.99 in cents (Stripe standard)
-    price_yearly:   39990,  // $399.90/yr — 2 months free
-    description:    "Live AI execution + AI Auto Trade. 3 concurrent AI trades. 3% performance fee on profitable closed trades only.",
+    price_monthly:  4995,   // $49.95 in cents (Stripe standard)
+    price_yearly:   49950,  // $499.50/yr — 2 months free
+    description:    "Live AI execution + AI Auto Trade. 50 trades/day, 3 concurrent AI trades. 3% performance fee on profitable closed trades only.",
     performanceFee: PERFORMANCE_FEE_RATE,
     features: [
       "Live AI execution enabled",
+      "Up to 50 trades / day",
       "Up to 3 concurrent AI trades",
       "AI Auto Trade enabled",
       "Crypto AI execution",
@@ -100,16 +102,17 @@ export const PLAN_FEATURES: Record<string, {
     },
   },
 
-  // ── AI TRADING PRO — $79.99/month ───────────────────────────────────────────
+  // ── AI TRADING PRO — $99.95/month ───────────────────────────────────────────
   // Plan key kept as `pro` for DB enum compatibility with existing users.
   pro: {
     name:           "AICandlez Pro",
-    price_monthly:  7999,   // $79.99 in cents
-    price_yearly:   79990,  // $799.90/yr — 2 months free
-    description:    "Expanded AI capacity. 12 concurrent trades. Crypto majors + alts + emerging. Priority execution. 3% performance fee on profitable closed trades only.",
+    price_monthly:  9995,   // $99.95 in cents
+    price_yearly:   99950,  // $999.50/yr — 2 months free
+    description:    "Expanded AI capacity. 100 trades/day, 6 concurrent trades. Priority execution. 3% performance fee on profitable closed trades only.",
     performanceFee: PERFORMANCE_FEE_RATE,
     features: [
-      "Up to 12 concurrent AI trades",
+      "Up to 100 trades / day",
+      "Up to 6 concurrent AI trades",
       "Priority AI execution",
       "Crypto AI trading (majors + alts + emerging)",
       "Advanced AI scanners",
@@ -119,8 +122,33 @@ export const PLAN_FEATURES: Record<string, {
       "3% performance fee on profitable trades only",
     ],
     limits: {
-      exchanges: 5, positions: 50, trades: "unlimited",
-      concurrentTrades: 12, liveTrading: true, aiAutoTrade: true, equitiesAI: true,
+      exchanges: 5, positions: 50, trades: 100,
+      concurrentTrades: 6, liveTrading: true, aiAutoTrade: true, equitiesAI: false,
+    },
+  },
+
+  // ── AI TRADING ELITE VIP — $199.95/month ─────────────────────────────────────
+  // Highest tier. 200 trades/day, 12 concurrent live AI trades.
+  elite: {
+    name:           "AICandlez Elite VIP",
+    price_monthly:  19995,  // $199.95 in cents
+    price_yearly:   199950, // $1,999.50/yr — 2 months free
+    description:    "Maximum AI capacity. 200 trades/day, 12 concurrent trades. White-glove execution. 3% performance fee on profitable closed trades only.",
+    performanceFee: PERFORMANCE_FEE_RATE,
+    features: [
+      "Up to 200 trades / day",
+      "Up to 12 concurrent AI trades",
+      "Highest-priority AI execution",
+      "Full crypto universe (majors + alts + emerging)",
+      "Elite AI scanners + confidence engine",
+      "Premium analytics suite",
+      "Advanced AI automation controls",
+      "Priority support",
+      "3% performance fee on profitable trades only",
+    ],
+    limits: {
+      exchanges: 10, positions: 100, trades: 200,
+      concurrentTrades: 12, liveTrading: true, aiAutoTrade: true, equitiesAI: false,
     },
   },
 };
@@ -194,12 +222,16 @@ router.get("/billing/plans", async (_req, res): Promise<void> => {
     // Both the new branded names ("AI Trading", "AI Trading Pro", "Paper
     // Trading") and the legacy names ("Starter", "Pro", "Free") are accepted.
     const NAME_TO_KEY: Record<string, string> = {
-      "paper trading":  "free",
-      "free":           "free",
-      "ai trading":     "starter",
-      "starter":        "starter",
-      "ai trading pro": "pro",
-      "pro":            "pro",
+      "paper trading":      "free",
+      "free":               "free",
+      "ai trading":         "starter",
+      "starter":            "starter",
+      "ai trading pro":     "pro",
+      "pro":                "pro",
+      "ai trading elite":   "elite",
+      "ai trading elite vip": "elite",
+      "elite":              "elite",
+      "elite vip":          "elite",
     };
     const priceMap: Record<string, { monthly?: string; yearly?: string }> = {};
     for (const row of priceRows) {
@@ -297,6 +329,7 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
     const nextTier: TierPlan | null =
       planStr === "free"    ? "starter" :
       planStr === "starter" ? "pro"     :
+      planStr === "pro"     ? "elite"   :
       null;
     const nextTierLiveOrderCapUSD = nextTier
       ? TIER_MAX_SIZE_USD[nextTier]
@@ -382,6 +415,7 @@ router.post("/billing/checkout", requireAuth, requireDisclaimer, async (req, res
     const envKey =
       body.planId === "starter" ? `STRIPE_PRICE_STARTER_${period}` :
       body.planId === "pro"     ? `STRIPE_PRICE_PRO_${period}`     :
+      body.planId === "elite"   ? `STRIPE_PRICE_ELITE_${period}`   :
       null;
     if (envKey) {
       const fromEnv = process.env[envKey];
@@ -398,12 +432,16 @@ router.post("/billing/checkout", requireAuth, requireDisclaimer, async (req, res
           WHERE p.active = true
         `);
         const NAME_TO_KEY: Record<string, string> = {
-          "paper trading":  "free",
-          "free":           "free",
-          "ai trading":     "starter",
-          "starter":        "starter",
-          "ai trading pro": "pro",
-          "pro":            "pro",
+          "paper trading":      "free",
+          "free":               "free",
+          "ai trading":         "starter",
+          "starter":            "starter",
+          "ai trading pro":     "pro",
+          "pro":                "pro",
+          "ai trading elite":   "elite",
+          "ai trading elite vip": "elite",
+          "elite":              "elite",
+          "elite vip":          "elite",
         };
         const desiredInterval = body.billingPeriod === "yearly" ? "year" : "month";
         for (const r of result.rows as Array<{ product_name: string; price_id: string; interval: string }>) {

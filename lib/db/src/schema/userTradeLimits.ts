@@ -6,9 +6,12 @@ import { usersTable } from "./users";
 //   1. PLAN DEFAULT (default for every new user, `usePlanDefault=true`)
 //      The engine ignores `capTier` and resolves the cap from the user's
 //      billing plan via `PLAN_DEFAULT_TRADE_LIMIT_CAP`:
-//        free    →  50 trades / 24h
-//        starter → 100 trades / 24h
-//        pro     → 200 trades / 24h
+//        free    →  10 trades / 24h  (paper-only product surface)
+//        starter →  50 trades / 24h
+//        pro     → 100 trades / 24h
+//        elite   → 200 trades / 24h
+//      Admin / super-admin are short-circuited to UNLIMITED in the engine
+//      (role-based) and never resolve a plan default here.
 //
 //   2. OPERATOR OVERRIDE (`usePlanDefault=false`)
 //      The engine uses the row's `capTier`. `capTier === -1` is the
@@ -34,18 +37,22 @@ export const userTradeLimitsTable = pgTable("user_trade_limits", {
 export type UserTradeLimit       = typeof userTradeLimitsTable.$inferSelect;
 export type InsertUserTradeLimit = typeof userTradeLimitsTable.$inferInsert;
 
-export const TRADE_LIMIT_CAP_TIERS = [50, 100, 200, -1] as const;
+// Operator-override preset ladder (offered in the admin drawer). Mirrors
+// the plan-default tiers (10 / 50 / 100 / 200) plus the UNLIMITED sentinel.
+export const TRADE_LIMIT_CAP_TIERS = [10, 50, 100, 200, -1] as const;
 export const DEFAULT_TRADE_LIMIT_CAP = 50;
 export const UNLIMITED_TRADE_LIMIT_CAP = -1;
 
-/** Per-plan default cap on live AI trades per rolling 24h window.
- *  Source of truth for the new tier ladder (Task: operator override
- *  surface). Operator overrides set `usePlanDefault=false` and write
- *  the desired `capTier` (or `-1` for unlimited). */
-export const PLAN_DEFAULT_TRADE_LIMIT_CAP: Record<"free" | "starter" | "pro", number> = {
-  free:    50,
-  starter: 100,
-  pro:     200,
+/** Per-plan default cap on AI trades per rolling 24h window. Source of
+ *  truth for the tier ladder. The cap applies to the user's ACTIVE
+ *  runtime: paper opens for free, live opens for paid tiers. Operator
+ *  overrides set `usePlanDefault=false` and write the desired `capTier`
+ *  (or `-1` for unlimited). Admin / super-admin bypass entirely. */
+export const PLAN_DEFAULT_TRADE_LIMIT_CAP: Record<"free" | "starter" | "pro" | "elite", number> = {
+  free:    10,
+  starter: 50,
+  pro:     100,
+  elite:   200,
 };
 
 export type PlanTierForCap = keyof typeof PLAN_DEFAULT_TRADE_LIMIT_CAP;
@@ -54,7 +61,7 @@ export type PlanTierForCap = keyof typeof PLAN_DEFAULT_TRADE_LIMIT_CAP;
  *  to the FREE default for unknown / legacy plan strings so the engine
  *  never returns NaN. */
 export function getPlanDefaultCap(plan: string | null | undefined): number {
-  if (plan === "starter" || plan === "pro" || plan === "free") {
+  if (plan === "starter" || plan === "pro" || plan === "free" || plan === "elite") {
     return PLAN_DEFAULT_TRADE_LIMIT_CAP[plan];
   }
   return PLAN_DEFAULT_TRADE_LIMIT_CAP.free;

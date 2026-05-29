@@ -83,7 +83,7 @@ export default function Consent() {
             letterSpacing: "0.12em", marginBottom: 10 }}>FEE SUMMARY</div>
           {[
             ["Performance Fee",     `${PERFORMANCE_FEE_LABEL} of profitable trades`],
-            ["Monthly Subscription","AICandlez Starter $39.99 · AICandlez Pro $79.99 / month"],
+            ["Monthly Subscription","AICandlez Starter $49.95 · Pro $99.95 · Elite VIP $199.95 / month"],
             ["Fee on Losses",       "NONE"],
             ["Withdrawal Access",   "NEVER REQUESTED"],
           ].map(([k, v]) => (
@@ -163,7 +163,7 @@ export default function Consent() {
             fontFamily: "system-ui, sans-serif" }}>
             I confirm that I have read and agree to the{" "}
             <strong style={{ color: "#e8f4ff" }}>{PERFORMANCE_FEE_LABEL} performance fee</strong> on profitable
-            trades, the <strong style={{ color: "#e8f4ff" }}>monthly subscription (AICandlez Starter $39.99 or AICandlez Pro $79.99)</strong>,
+            trades, the <strong style={{ color: "#e8f4ff" }}>monthly subscription (AICandlez Starter $49.95, Pro $99.95, or Elite VIP $199.95)</strong>,
             and the risk disclosures. I understand that cryptocurrency trading carries
             substantial risk of loss.
           </div>

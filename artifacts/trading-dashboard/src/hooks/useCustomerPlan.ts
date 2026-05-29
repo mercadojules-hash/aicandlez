@@ -20,7 +20,7 @@ import { useAuth } from "@clerk/react";
 //   @clerk/clerk-react — it would break the type-deduped singleton.
 import { authFetch } from "../lib/authFetch";
 
-export type Plan = "free" | "starter" | "pro";
+export type Plan = "free" | "starter" | "pro" | "elite";
 
 const apiBaseUrl: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
@@ -80,7 +80,7 @@ export function useCustomerPlan(): Plan {
   const p = data?.isComplimentary
     ? (data?.effectivePlan ?? "pro")
     : data?.plan;
-  return p === "starter" || p === "pro" ? p : "free";
+  return p === "starter" || p === "pro" || p === "elite" ? p : "free";
 }
 
 export interface CustomerEntitlement {

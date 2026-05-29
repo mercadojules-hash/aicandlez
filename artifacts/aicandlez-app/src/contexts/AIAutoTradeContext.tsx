@@ -17,7 +17,7 @@ import { authFetch } from "@/lib/authFetch";
 import { getArmedForLive, setArmedForLive } from "@/hooks/useArmedForLive";
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 
-type Plan = "free" | "starter" | "pro";
+type Plan = "free" | "starter" | "pro" | "elite";
 
 interface AiTradingStateResponse {
   enabled: boolean;
