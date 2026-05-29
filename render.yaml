@@ -76,6 +76,17 @@ services:
         value: https://aicandlez.com,https://www.aicandlez.com,https://app.aicandlez.com,https://trade.aicandlez.com,https://admintrade.aicandlez.com,https://dashboard.aicandlez.com,https://aicandlez-dashboard.onrender.com,https://aicandlez-trade.onrender.com,https://aicandlez-admintrade.onrender.com,https://aicandlez-app.onrender.com
       - key: EXCHANGE_LIVE_ENABLED
         value: "false"
+      # Customer live-execution master gate (placeLiveAutoOrderForUser). Independent
+      # of EXCHANGE_LIVE_ENABLED (which only gates the operator/admin env-key path).
+      # true = eligible customers (active paid sub + healthy connected exchange +
+      # ARM + disclaimer) can place real-money orders. Controlled-beta enablement.
+      - key: CUSTOMER_LIVE_EXECUTION_ENABLED
+        value: "true"
+      # Exit-engine v2: persist automated closes to the `trades` table, rehydrate
+      # open positions on boot, persisted-row cap gate, position<->trade id linkage.
+      # Required for live trade accounting + close-lifecycle validation.
+      - key: EXIT_ENGINE_V2
+        value: "true"
       # Task #162 Phase B: Stripe return host fallback for the API service.
       # Per-request Origin header takes precedence when allow-listed; this
       # env is the canonical fallback when no Origin is supplied (ops scripts,
