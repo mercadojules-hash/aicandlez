@@ -200,6 +200,16 @@ interface EngineStats {
   // Ring buffer keeps memory bounded; percentile compute happens on
   // read at the route (cheap at N=400).
   confSamples:        number[];
+  // TEMP [VOL_GATE_TEST] — controlled live-test telemetry tied to the 65%
+  // volume-gate change (2026-05-29). Cumulative counters since boot, surfaced
+  // on /api/engine/status. Remove when the controlled test window closes.
+  volGateTest: {
+    rejectedByConfidence: number;
+    rejectedByVolume:     number;
+    passedAllGates:       number;
+    ordersSubmitted:      number;
+    positionsOpened:      number;
+  };
 }
 
 export const engineStats: EngineStats = {
@@ -231,6 +241,13 @@ export const engineStats: EngineStats = {
   lastTrade:          null,
   errors:             [],
   confSamples:        [],
+  volGateTest: {
+    rejectedByConfidence: 0,
+    rejectedByVolume:     0,
+    passedAllGates:       0,
+    ordersSubmitted:      0,
+    positionsOpened:      0,
+  },
 };
 
 // CONVICTION_V2 — ring buffer cap. 400 ≈ 20–30 min at current symbol
@@ -606,7 +623,7 @@ interface MTFResult {
 //
 // Modifiers (additive, applied to raw avgConfidence, clamped 0-100):
 //   +18  mtfConfirmed (both 5m and 15m agree in direction)
-//   +8   volumeConfirmed (current bar ≥ 85% of 20-bar avg)
+//   +8   volumeConfirmed (current bar ≥ 65% of 20-bar avg)
 //   +6   marketCondition === "trending"  (EMA spread ≥ 0.30%)
 //   -12  marketCondition === "sideways"  (EMA spread < 0.15%)
 //   +4   trend1H aligned with agreedAction (1H EMA agrees w/ trade dir)
@@ -744,7 +761,12 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
     const recentVols  = candles5m.slice(-21, -1).map((c) => c.volume);
     const avgVol      = recentVols.reduce((a, b) => a + b, 0) / recentVols.length;
     const currentVol  = candles5m[candles5m.length - 1]?.volume ?? 0;
-    volumeConfirmed   = currentVol >= avgVol * 0.85;
+    // Controlled live test (2026-05-29): mandatory volume gate lowered from
+    // 85% → 65% of the prior-20-bar average to increase trade opportunities
+    // while preserving a meaningful liquidity safeguard. All other gates
+    // (confidence, MTF, sideways, 1H trend, risk, hard stop, EXIT_ENGINE_V2,
+    // position sizing, max positions, exchange health) are unchanged.
+    volumeConfirmed   = currentVol >= avgVol * 0.65;
     volumeRatio       = avgVol > 0 ? currentVol / avgVol : 1;
   }
 
@@ -2059,6 +2081,14 @@ async function tick() {
       if (!shouldTrade && signalBlockReason && effectiveAction !== "HOLD") {
         const isConfBlock =
           signalBlockReason.startsWith("Low confidence");
+        // TEMP [VOL_GATE_TEST] — attribute each rejected actionable signal to
+        // its first failing gate (confidence vs volume). Remove with the rest
+        // of the volGateTest block when the controlled test window closes.
+        if (isConfBlock) {
+          engineStats.volGateTest.rejectedByConfidence++;
+        } else if (signalBlockReason === "Volume below average (low-volume filter)") {
+          engineStats.volGateTest.rejectedByVolume++;
+        }
         executionStreamBus.emitEvent({
           type:       isConfBlock ? "confidence_too_low" : "signal_rejected",
           severity:   "warn",
@@ -2072,6 +2102,13 @@ async function tick() {
       }
 
       if (shouldTrade) {
+        // TEMP [VOL_GATE_TEST] — signal cleared every signal-quality gate
+        // (confidence, MTF, volume, sideways, 1H) and is entering the order
+        // path. `ordersSubmitted` counts each autoExecute attempt; downstream
+        // gates inside autoExecute (positions cap, daily limit, risk,
+        // correlation, exchange health) may still block before a fill.
+        engineStats.volGateTest.passedAllGates++;
+        engineStats.volGateTest.ordersSubmitted++;
         const primaryDecision = mtf.fast;
         const execResult = await autoExecute(
           id5m,
@@ -2084,6 +2121,7 @@ async function tick() {
           testMode,
           mtf.avgConfidence,
         );
+        if (execResult.executed) engineStats.volGateTest.positionsOpened++;
 
         // Update signal log with execution result
         const logEntry = engineStats.recentSignalLog.find((e) => e.id === id5m);
@@ -2099,6 +2137,19 @@ async function tick() {
       if (engineStats.errors.length > 20) engineStats.errors.shift();
     }
   }
+
+  // TEMP [VOL_GATE_TEST] — controlled live-test funnel snapshot (cumulative
+  // since boot) emitted once per tick so Render logs carry a time-series of
+  // the 65% volume-gate impact. Remove when the controlled test window closes.
+  logger.info({
+    tag:                  "VOL_GATE_TEST",
+    volumeGatePct:        65,
+    rejectedByConfidence: engineStats.volGateTest.rejectedByConfidence,
+    rejectedByVolume:     engineStats.volGateTest.rejectedByVolume,
+    passedAllGates:       engineStats.volGateTest.passedAllGates,
+    ordersSubmitted:      engineStats.volGateTest.ordersSubmitted,
+    positionsOpened:      engineStats.volGateTest.positionsOpened,
+  }, "[VOL_GATE_TEST] gate funnel snapshot");
 
   // Hard SL/TP enforcement runs BEFORE the profit-only trailing pass so a
   // breached stop is force-closed even on a trade that never went green.

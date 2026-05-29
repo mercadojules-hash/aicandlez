@@ -71,6 +71,10 @@ router.get("/engine/status", (_req, res) => {
       blockedMTF: engineStats.funnelBlockedMTF,
       executed:   engineStats.funnelExecuted,
     },
+    // TEMP [VOL_GATE_TEST] — controlled live-test telemetry for the 65% volume
+    // gate (cumulative since boot). Remove with the engineStats.volGateTest
+    // block when the controlled test window closes.
+    volGateTest:        engineStats.volGateTest,
     symbolBreakdowns:   engineStats.symbolBreakdowns,
     recentSignalLog:    engineStats.recentSignalLog,
     lastSignal:         engineStats.lastSignal,
