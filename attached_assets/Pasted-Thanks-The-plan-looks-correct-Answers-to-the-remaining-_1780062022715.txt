@@ -1,0 +1,104 @@
+Thanks. The plan looks correct.
+
+Answers to the remaining open items:
+
+Q1 — Elite Per-Order Size
+
+Approved.
+
+Set:
+
+* Starter = $500 max order size
+* Pro = $2,500 max order size
+* Elite VIP = $5,000 max order size
+
+This is separate from the future "capital managed" concept and should follow the existing TIER_MAX_SIZE_USD architecture.
+
+---
+
+Q2 — Platform-Wide Live Cap
+
+Do not leave the global live cap at 3.
+
+That was appropriate for the controlled beta but it conflicts with the new subscription model.
+
+For now:
+
+* Raise the platform-wide live cap to 25.
+* Keep it as an emergency safety backstop only.
+* Do not use it as a customer-facing limit.
+
+Customer-facing limits are:
+
+Starter = 3 concurrent positions
+Pro = 6 concurrent positions
+Elite VIP = 12 concurrent positions
+
+The platform-wide cap should simply prevent runaway exposure while we scale.
+
+---
+
+Q3 — Legacy Stripe Price IDs
+
+We do have legacy subscribers that must be preserved.
+
+Please identify the currently configured legacy Starter and Pro price IDs from the existing Stripe environment variables and billing mappings.
+
+If they cannot be reliably identified from the codebase, tell me exactly where to retrieve them from Stripe and I will provide them.
+
+Do not break existing subscribers.
+
+Grandfather all existing subscribers onto their current pricing.
+
+---
+
+Additional Approval
+
+Proceed using the finalized business model:
+
+FREE
+
+* Paper only
+* 10 trades/day
+* No live trading
+
+STARTER
+
+* $49.95/month
+* Live only
+* 50 trades/day
+* 3 concurrent positions
+
+PRO
+
+* $99.95/month
+* Live only
+* 100 trades/day
+* 6 concurrent positions
+
+ELITE VIP
+
+* $199.95/month
+* Live only
+* 200 trades/day
+* 12 concurrent positions
+
+Subscription expiration/cancellation:
+
+* Automatically return user to Free tier
+* Re-enable paper trading
+* Disable live trading
+* Preserve all trading history
+
+Preserve:
+
+* EXIT_ENGINE_V2
+* Hard stop-loss enforcement
+* Confidence gates
+* Volume gates
+* Live readiness checks
+* ARM/session authorization
+* Exchange safety checks
+* Existing risk engine protections
+
+Once legacy price IDs are confirmed, proceed with the build according to the file-level implementation plan and deployment checklist.
