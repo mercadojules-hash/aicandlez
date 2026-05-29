@@ -175,8 +175,12 @@ role-gated; never merge the two worlds.
   - LEFT = `CryptoMajorsSignalsPanel` (CRYPTO_MAJORS_30: BTC ETH SOL XRP
     ADA AVAX DOGE LINK DOT MATIC LTC BCH UNI ATOM NEAR APT ARB OP INJ SUI
     TON TRX ETC ICP FIL HBAR AAVE MKR XLM ALGO)
-  - RIGHT = `CryptoAltsMemesPanel` (XMR HYPE SAND MANA AXS GRT SNX CRV
-    COMP LDO RNDR FTM FET RUNE KAS PEPE WIF BONK JUP PYTH TIA SEI STX)
+  - RIGHT = `CryptoAltsMemesPanel` (SAND MANA AXS GRT SNX CRV
+    COMP LDO RNDR FET PEPE WIF BONK JUP PYTH TIA SEI STX) — XMR/HYPE/FTM/
+    RUNE/KAS removed 2026-05-29 (symbol-universe reconciliation): not in the
+    engine-analyzed universe (COINBASE_SYMBOLS), so structurally untradeable.
+    Authoritative backstop = customer-execution gate 0UNI in
+    `api-server lib/liveUserExecution.ts` (`symbol_not_in_universe`).
   - Customer chrome = `<LiveControlBar state="PAPER">` (readonly, no
     onToggle). Admin chrome = `<LiveControlBar state={cryptoState}
     onToggle={toggleCryptoLive}>` (ARM LIVE-capable).

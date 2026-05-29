@@ -12,7 +12,7 @@ import { ensureFreshAlpacaCreds } from "../services/exchanges/AlpacaTokenRefresh
 import { hasSandbox, makeAdapter } from "../services/exchanges/adapterFactory.js";
 import type { BaseExchangeAdapter } from "../services/exchanges/BaseExchangeAdapter.js";
 import type { StandardOrder } from "../services/exchanges/types.js";
-import { getTicker, normalizeExecutionSymbol } from "./marketData.js";
+import { getTicker, normalizeExecutionSymbol, SUPPORTED_SYMBOLS } from "./marketData.js";
 import { logger } from "./logger.js";
 import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
 import { getTradeLimitVerdict, invalidateTradeLimitCache } from "./tradeLimitEngine.js";
@@ -95,7 +95,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached";
+  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached";
   error?:          string;
 }
 
@@ -552,6 +552,63 @@ export async function placeLiveAutoOrderForUser(
       // UP-size — the customer's pick is the ceiling.
       const requested = Number.isFinite(sizeUSD) && sizeUSD > 0 ? sizeUSD : preferred;
       sizeUSD = Math.min(requested, preferred);
+    }
+  }
+
+  // 0UNI. MANDATORY symbol-universe alignment gate.
+  //
+  // Customer execution symbols MUST be the intersection of the customer's
+  // connected-exchange universe AND the engine ANALYZED universe
+  // (`SUPPORTED_SYMBOLS` = the symbols the trading loop iterates and for which
+  // it computes `engineStats.symbolBreakdowns`). A symbol outside that set can
+  // NEVER have a breakdown, so the downstream 0VOL gate would always reject it
+  // with the misleading "No recent volume analysis available" message after a
+  // wasted broker-creds round-trip. We reject earlier, here, with a precise
+  // `symbol_not_in_universe` errorCode so structurally-impossible symbols
+  // (e.g. Kraken-only XMR/RUNE/FTM/KAS, or HYPE which is listed on neither
+  // engine venue, for a Coinbase customer) never reach execution.
+  //
+  // This is the engine-universe half of the intersection. The exchange half is
+  // enforced downstream by adapter symbol normalization
+  // (`normalizeSymbolForVenue` → null → `unsupported_symbol`), so a symbol that
+  // is in the engine universe but unsupported on THIS customer's connected
+  // venue is still rejected before any real order ships.
+  //
+  // This gate does NOT touch confidence, MTF, volume thresholds, risk,
+  // position sizing, or trade limits — it only restricts WHICH symbols are
+  // eligible to enter those existing gates. Operators bypass (mirrors 0VOL):
+  // the operator diagnostic path uses `placeLiveAutoOrder` (no userId) and may
+  // legitimately probe symbols.
+  {
+    const uniSym = symbol.trim().toUpperCase();
+    const operatorUni = await isOperatorRole(userId);
+    if (!operatorUni && !SUPPORTED_SYMBOLS.includes(uniSym)) {
+      const reason =
+        `${uniSym} is outside the engine-analyzed execution universe — ` +
+        `no signal breakdown is ever computed for it, so the order was ` +
+        `rejected by the symbol-universe alignment gate.`;
+      await emitFailureNotification(userId, symbol, side, reason);
+      executionStreamBus.emitEvent({
+        type:     "order_rejected",
+        severity: "warn",
+        symbol, side, sizeUSD, mode: "live",
+        gate:     "symbol_universe",
+        reason:   "symbol_not_in_universe",
+        message:  `Live order REJECTED ${symbol} ${side} $${sizeUSD}: ${reason}`,
+        details:  { userId },
+      });
+      try {
+        await db.insert(logsTable).values({
+          id:      crypto.randomUUID(),
+          type:    "trade",
+          level:   "warn",
+          message: `[symbol_not_in_universe] ${reason}`,
+          details: { userId, symbol, normalizedSymbol: uniSym, side, sizeUSD, errorCode: "symbol_not_in_universe" },
+        });
+      } catch (err) {
+        logger.warn({ err, userId }, "liveUserExecution: universe-gate log insert failed");
+      }
+      return { success: false, userId, errorCode: "symbol_not_in_universe", error: reason };
     }
   }
 

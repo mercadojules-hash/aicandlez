@@ -55,8 +55,10 @@ export const CRYPTO_20: TickerSpec[] = [
 
   /* ── Extended universe — reachable via search ───────────────────────── */
   { symbol: "XLMUSD",   label: "XLM",   display: "XLM/USD",   color: "#7D00FF", kind: "crypto", name: "Stellar",       aliases: ["lumens"] },
-  { symbol: "XMRUSD",   label: "XMR",   display: "XMR/USD",   color: "#FF6600", kind: "crypto", name: "Monero",        aliases: ["privacy"] },
-  { symbol: "HYPEUSD",  label: "HYPE",  display: "HYPE/USD",  color: "#97FCE4", kind: "crypto", name: "Hyperliquid",   aliases: ["hyperliquid"] },
+  // XMR / HYPE removed 2026-05-29 (symbol-universe reconciliation) — not in the
+  // engine-analyzed universe (COINBASE_SYMBOLS); no breakdown ever computed, so
+  // they were structurally untradeable. Server gate 0UNI is the authoritative
+  // backstop; removed here so the customer universe matches the engine.
   { symbol: "TONUSD",   label: "TON",   display: "TON/USD",   color: "#0098EA", kind: "crypto", name: "Toncoin",       aliases: ["telegram"] },
   { symbol: "TRXUSD",   label: "TRX",   display: "TRX/USD",   color: "#EF0027", kind: "crypto", name: "Tron" },
   { symbol: "ETCUSD",   label: "ETC",   display: "ETC/USD",   color: "#3AB83A", kind: "crypto", name: "Ethereum Classic" },
@@ -76,10 +78,9 @@ export const CRYPTO_20: TickerSpec[] = [
   { symbol: "COMPUSD",  label: "COMP",  display: "COMP/USD",  color: "#00D395", kind: "crypto", name: "Compound" },
   { symbol: "LDOUSD",   label: "LDO",   display: "LDO/USD",   color: "#F69988", kind: "crypto", name: "Lido DAO",      aliases: ["staking"] },
   { symbol: "RNDRUSD",  label: "RNDR",  display: "RNDR/USD",  color: "#B53AFB", kind: "crypto", name: "Render" },
-  { symbol: "FTMUSD",   label: "FTM",   display: "FTM/USD",   color: "#13B5EC", kind: "crypto", name: "Fantom" },
+  // FTM removed 2026-05-29 (symbol-universe reconciliation) — not in engine universe.
   { symbol: "FETUSD",   label: "FET",   display: "FET/USD",   color: "#003A6A", kind: "crypto", name: "Fetch.ai",      aliases: ["ai"] },
-  { symbol: "RUNEUSD",  label: "RUNE",  display: "RUNE/USD",  color: "#33FF99", kind: "crypto", name: "Thorchain" },
-  { symbol: "KASUSD",   label: "KAS",   display: "KAS/USD",   color: "#70C7BA", kind: "crypto", name: "Kaspa" },
+  // RUNE / KAS removed 2026-05-29 (symbol-universe reconciliation) — not in engine universe.
   { symbol: "PEPEUSD",  label: "PEPE",  display: "PEPE/USD",  color: "#4BA539", kind: "crypto", name: "Pepe",          aliases: ["meme"] },
   { symbol: "WIFUSD",   label: "WIF",   display: "WIF/USD",   color: "#FFB6C1", kind: "crypto", name: "Dogwifhat",     aliases: ["meme"] },
   { symbol: "BONKUSD",  label: "BONK",  display: "BONK/USD",  color: "#FFA500", kind: "crypto", name: "Bonk",          aliases: ["meme"] },
@@ -108,9 +109,13 @@ export const CRYPTO_MAJORS_30: TickerSpec[] = CRYPTO_20.filter(t =>
 );
 
 export const CRYPTO_ALTS_MEMES: TickerSpec[] = CRYPTO_20.filter(t =>
+  // XMR/HYPE/FTM/RUNE/KAS removed 2026-05-29 (symbol-universe reconciliation):
+  // none are in the engine-analyzed universe (COINBASE_SYMBOLS), so they could
+  // never produce a signal breakdown or a fillable customer order. Server gate
+  // 0UNI (liveUserExecution.ts) is the authoritative backstop.
   new Set([
-    "XMRUSD","HYPEUSD","SANDUSD","MANAUSD","AXSUSD","GRTUSD","SNXUSD","CRVUSD",
-    "COMPUSD","LDOUSD","RNDRUSD","FTMUSD","FETUSD","RUNEUSD","KASUSD",
+    "SANDUSD","MANAUSD","AXSUSD","GRTUSD","SNXUSD","CRVUSD",
+    "COMPUSD","LDOUSD","RNDRUSD","FETUSD",
     "PEPEUSD","WIFUSD","BONKUSD","JUPUSD","PYTHUSD","TIAUSD","SEIUSD","STXUSD",
   ]).has(t.symbol),
 );

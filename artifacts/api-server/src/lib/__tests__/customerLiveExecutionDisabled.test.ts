@@ -48,7 +48,13 @@ vi.mock("../../services/exchanges/adapterFactory.js", () => ({ hasSandbox: () =>
 vi.mock("../../services/notifications/NotificationDispatcher.js", () => ({
   NotificationDispatcher: { notifyUser: vi.fn() },
 }));
-vi.mock("../marketData.js",        () => ({ getTicker: vi.fn(async () => 50000) }));
+vi.mock("../marketData.js",        () => ({
+  getTicker: vi.fn(async () => 50000),
+  // Gate 0UNI (symbol-universe alignment) reads SUPPORTED_SYMBOLS. BTCUSD is
+  // the symbol every kill-switch test uses, so it must be present or the gate
+  // would falsely reject the "proceeds past the gate" cases.
+  SUPPORTED_SYMBOLS: ["BTCUSD", "ETHUSD", "SOLUSD"],
+}));
 vi.mock("../tradeLimitEngine.js",  () => ({
   getTradeLimitVerdict:        vi.fn(async () => ({ blocked: false })),
   invalidateTradeLimitCache:   vi.fn(),
@@ -154,6 +160,52 @@ describe("placeLiveAutoOrderForUser — customer kill switch", () => {
       userId: "ghost", symbol: "BTCUSD", side: "BUY", sizeUSD: 100,
     });
     expect(result.errorCode).toBe("customer_live_execution_disabled");
+  });
+});
+
+describe("placeLiveAutoOrderForUser — symbol-universe gate (0UNI)", () => {
+  // Kill switch must be ON so we reach 0UNI (it sits after the 0PRE kill
+  // switch). Mock SUPPORTED_SYMBOLS = [BTCUSD, ETHUSD, SOLUSD]; anything else
+  // is "not in universe" for a non-operator.
+  beforeEach(() => {
+    process.env["CUSTOMER_LIVE_EXECUTION_ENABLED"] = "true";
+    execStreamMock.emitEvent.mockClear();
+    dbMock.insert.mockClear();
+    nextRoleRow = { role: "user" };
+  });
+  afterEach(() => {
+    delete process.env["CUSTOMER_LIVE_EXECUTION_ENABLED"];
+  });
+
+  it("rejects non-operator order on a symbol outside the engine universe", async () => {
+    const result = await placeLiveAutoOrderForUser({
+      userId: "user_abc", symbol: "XMRUSD", side: "BUY", sizeUSD: 100,
+    });
+    expect(result.success).toBe(false);
+    expect(result.errorCode).toBe("symbol_not_in_universe");
+    expect(execStreamMock.emitEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type:   "order_rejected",
+        gate:   "symbol_universe",
+        reason: "symbol_not_in_universe",
+      }),
+    );
+    expect(dbMock.insert).toHaveBeenCalled();
+  });
+
+  it("admin bypasses the universe gate (off-universe symbol not rejected here)", async () => {
+    nextRoleRow = { role: "admin" };
+    const result = await placeLiveAutoOrderForUser({
+      userId: "admin_xyz", symbol: "XMRUSD", side: "BUY", sizeUSD: 100,
+    });
+    expect(result.errorCode).not.toBe("symbol_not_in_universe");
+  });
+
+  it("in-universe symbol passes the gate (canonicalizes whitespace/case)", async () => {
+    const result = await placeLiveAutoOrderForUser({
+      userId: "user_abc", symbol: " btcusd ", side: "BUY", sizeUSD: 100,
+    });
+    expect(result.errorCode).not.toBe("symbol_not_in_universe");
   });
 });
 
