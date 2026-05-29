@@ -90,7 +90,7 @@ router.get("/engine/status", (_req, res) => {
     // `null` when sample size is too small to infer percentiles
     // (<20 samples — usually the first minute after engine start).
     // Buckets are percentages of samples crossing each threshold:
-    //   gte60 = baseline gate · gte80 = live-execution floor.
+    //   gte60 = baseline gate · gte65 = live-execution floor.
     // Use to validate that the calibrated base curve (aiReasoning.ts)
     // produces an actually-reachable distribution in production.
     confDistribution:   computeConfDistribution(),

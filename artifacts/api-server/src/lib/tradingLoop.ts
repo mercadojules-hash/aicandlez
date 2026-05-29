@@ -109,7 +109,7 @@ export interface SymbolBreakdown {
   agreedAction:    string;
   avgConfidence:   number;
   // Pass E3 — display-only confidence (LOCKED INVARIANT).
-  // `avgConfidence` drives EXECUTION (80% live floor, riskGate,
+  // `avgConfidence` drives EXECUTION (65% live floor, riskGate,
   // KrakenAdapter, concurrent-trade cap). It is bytewise unchanged.
   // `displayConfidence` is the human-facing context-enriched
   // confidence: avgConfidence + MTF-agreement bonus + volume bonus
@@ -611,7 +611,7 @@ interface MTFResult {
   slowSnap:        TimeframeSnapshot;
   mtfConfirmed:    boolean;
   agreedAction:    "BUY" | "SELL" | "HOLD";
-  avgConfidence:   number;       // EXECUTION confidence — 80% live floor reads this
+  avgConfidence:   number;       // EXECUTION confidence — 65% live floor reads this
   displayConfidence: number;     // DISPLAY conviction — render layer reads this
   blockReason:     string;
   volumeConfirmed: boolean;
@@ -751,7 +751,8 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
   // requirement (`mtfConfirmed` above still requires `bothBuy || bothSell`
   // AND `trendAligned`) while letting the dominant-conviction TF carry
   // more of the score. The execution floor (LIVE_EXECUTION_MIN_CONFIDENCE
-  // = 80) is unchanged; we are calibrating, not weakening.
+  // = 65) is applied downstream at Gate 0; this blend only calibrates the
+  // fused score, it does not gate.
   const hi = Math.max(fast.confidence, slow.confidence);
   const lo = Math.min(fast.confidence, slow.confidence);
   const avgConfidence = parseFloat((hi * 0.65 + lo * 0.35).toFixed(1));
@@ -881,12 +882,16 @@ async function isCorrelationBlocked(symbol: string): Promise<boolean> {
 /**
  * Hard live-execution confidence floor.
  *
- * Operator policy: real-money / live exchange orders MUST NEVER be placed
- * with AI confidence below this threshold, regardless of any other gate.
- * Simulation/test paths are unaffected — this rule only fires when the
- * exchange engine is in LIVE mode.
+ * Operator policy (updated 2026-05-29): real-money / live exchange orders
+ * MUST NOT be placed with AI confidence below this threshold, regardless of
+ * any other gate. Lowered 80 → 65 to align the live-execution floor with the
+ * configured confidence threshold (65) instead of an internal hardcoded 80.
+ * Confidence < 65 → hard reject; >= 65 → eligible to proceed through the
+ * remaining gates (volume, MTF, sideways, risk, position limits, exchange /
+ * account / universe validation — all unchanged). Simulation/test paths are
+ * unaffected — this rule only fires when the exchange engine is in LIVE mode.
  */
-export const LIVE_EXECUTION_MIN_CONFIDENCE = 80;
+export const LIVE_EXECUTION_MIN_CONFIDENCE = 65;
 
 async function autoExecute(
   signalId:     string,
@@ -1973,7 +1978,7 @@ async function tick() {
         slow:              mtf.slowSnap,
         mtfConfirmed:      mtf.mtfConfirmed,
         agreedAction:      mtf.agreedAction,
-        avgConfidence:     mtf.avgConfidence,       // EXECUTION (80% live floor, riskGate, KrakenAdapter)
+        avgConfidence:     mtf.avgConfidence,       // EXECUTION (65% live floor, riskGate, KrakenAdapter)
         displayConfidence: mtf.displayConfidence,   // DISPLAY ONLY (render layer)
         blockReason:       mtf.blockReason,
         lastUpdated:       Date.now(),

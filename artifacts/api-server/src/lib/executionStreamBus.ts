@@ -109,7 +109,7 @@ export const executionStreamBus = new ExecutionStreamBus();
 export interface SafeTestModeState {
   active:                  boolean;
   expiresAt:               number | null;
-  liveConfidenceFloorOverride: number | null;  // e.g. 60 (vs default 80)
+  liveConfidenceFloorOverride: number | null;  // e.g. 60 (vs default 65)
   minOrderUsdOverride:     number | null;      // e.g. 10  (allow tiny $100-balance trades)
   reason:                  string | null;
   activatedBy:             string | null;
