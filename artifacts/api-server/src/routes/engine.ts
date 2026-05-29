@@ -58,6 +58,7 @@ router.get("/engine/status", (_req, res) => {
     mtfConfirmedCount:  engineStats.mtfConfirmedCount,
     mtfBlockCount:      engineStats.mtfBlockCount,
     trailingStopHits:   engineStats.trailingStopHits,
+    hardStopHits:       engineStats.hardStopHits,
     correlationBlocks:  engineStats.correlationBlocks,
     testMode:           engineStats.testMode,
     require1HTrend:     engineStats.require1HTrend,

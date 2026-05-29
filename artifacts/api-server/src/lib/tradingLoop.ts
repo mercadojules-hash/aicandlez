@@ -19,8 +19,10 @@ import {
   placeUserOrder,
   listPaperAutoTradeUsers,
   listOpenPaperPositionsBySymbol,
+  listOpenPositionsForRiskMonitor,
   closeUserPosition,
 } from "./userSimRegistry.js";
+import { getTicker } from "./marketData.js";
 import { emit as emitTelemetry, genCorrelationId, rememberCorrelation } from "./executionTelemetry.js";
 import { notifyFillHydrated } from "./positionStore.js";
 import { validateTrade } from "./riskEngine.js";
@@ -44,6 +46,19 @@ function genId() { return crypto.randomUUID(); }
 // the simulation position id, and automated closes persist back to `trades`.
 function isExitEngineV2(): boolean {
   return process.env.EXIT_ENGINE_V2 === "true";
+}
+
+// ── Hard stop-loss / take-profit enforcement (Task 1 — blocking safety) ─────────
+// Per-tick monitor that force-closes any open per-user position (paper OR live)
+// once price breaches the fixed stop-loss / take-profit price stored on the
+// position at open time. This is INDEPENDENT of the profit-only trailing-stop
+// engine (`trailingStopEngine`), which never arms on a trade that stays
+// underwater — so without this monitor a losing trade had unbounded downside.
+//
+// Default ON: this is a safety fix, not an opt-in feature. Set
+// `HARD_STOP_ENFORCEMENT_ENABLED=false` to disable (kill switch only).
+function isHardStopEnforcementEnabled(): boolean {
+  return process.env.HARD_STOP_ENFORCEMENT_ENABLED !== "false";
 }
 
 // ── Per-symbol breakdown (for debug panel) ────────────────────────────────────
@@ -156,6 +171,7 @@ interface EngineStats {
   mtfConfirmedCount:  number;
   mtfBlockCount:      number;
   trailingStopHits:   number;
+  hardStopHits:       number;
   correlationBlocks:  number;
   positionsRehydrated: number;
   testMode:           boolean;
@@ -197,6 +213,7 @@ export const engineStats: EngineStats = {
   mtfConfirmedCount:  0,
   mtfBlockCount:      0,
   trailingStopHits:   0,
+  hardStopHits:       0,
   correlationBlocks:  0,
   positionsRehydrated: 0,
   testMode:           false,  // OFF by default: strict MTF + volume + confidence-gate confirmation required (safe for live-money paths). Flip ON via POST /api/engine/testmode for dev-only signal flooding.
@@ -1484,6 +1501,133 @@ async function autoExecute(
   return { executed: true, blockReason: null };
 }
 
+// ── Hard stop-loss / take-profit monitor (Task 1 — blocking safety) ─────────────
+//
+// Runs every tick BEFORE the trailing-stop pass. Enumerates every open per-user
+// position (paper + live) that carries a fixed SL/TP price, fetches the current
+// price once per symbol, and force-closes any position whose price has breached
+// its stop-loss or take-profit. Closes route through `closeUserPosition`, which
+// fires the full EXIT_ENGINE_V2 close chain (and the live broker close for live
+// positions) — only the TRIGGER is new here.
+//
+// Breach semantics (SL/TP prices are pre-computed at open from `side`):
+//   BUY  → STOP_LOSS  when price <= stopLoss ; TAKE_PROFIT when price >= takeProfit
+//   SELL → STOP_LOSS  when price >= stopLoss ; TAKE_PROFIT when price <= takeProfit
+// Stop-loss is checked first so capital protection always wins a tie.
+async function runHardStopMonitor() {
+  if (!isHardStopEnforcementEnabled()) return;
+  try {
+    const positions = await listOpenPositionsForRiskMonitor();
+    if (positions.length === 0) return;
+
+    // Fetch each symbol's current price once, reuse across that symbol's
+    // positions. A failed ticker fetch skips that symbol this tick (the next
+    // tick retries) rather than closing on a stale/zero price.
+    const symbols    = [...new Set(positions.map((p) => p.symbol))];
+    const priceBySym = new Map<string, number>();
+    await Promise.all(symbols.map(async (sym) => {
+      try {
+        const ticker = await getTicker(sym);
+        if (ticker.price > 0) priceBySym.set(sym, ticker.price);
+      } catch {
+        /* skip symbol this tick */
+      }
+    }));
+
+    const correlationId = genCorrelationId();
+    await Promise.all(positions.map(async (p) => {
+      const price = priceBySym.get(p.symbol);
+      if (price === undefined) return;
+
+      const isBuy = p.side === "BUY";
+      let reason: "STOP_LOSS" | "TAKE_PROFIT" | null = null;
+      if (p.stopLoss !== null) {
+        if (isBuy ? price <= p.stopLoss : price >= p.stopLoss) reason = "STOP_LOSS";
+      }
+      if (reason === null && p.takeProfit !== null) {
+        if (isBuy ? price >= p.takeProfit : price <= p.takeProfit) reason = "TAKE_PROFIT";
+      }
+      if (reason === null) return;
+
+      const runtimeMode = p.exchange ? "LIVE" : "PAPER";
+      try {
+        const closeResult = await closeUserPosition(p.userId, p.positionId, reason);
+        if (closeResult.success) {
+          engineStats.hardStopHits++;
+          logger.info(
+            {
+              tag:           "HARD_STOP_TRIGGERED",
+              correlationId,
+              userId:        p.userId,
+              positionId:    p.positionId,
+              symbol:        p.symbol,
+              side:          p.side,
+              reason,
+              entryPrice:    p.entryPrice,
+              triggerPrice:  price,
+              stopLoss:      p.stopLoss,
+              takeProfit:    p.takeProfit,
+              mode:          runtimeMode,
+              realizedPnLPct: closeResult.trade?.realizedPnLPct,
+            },
+            `[HARD_STOP_TRIGGERED] ${reason} ${runtimeMode} ${p.symbol} ${p.side} @ ${price} (entry ${p.entryPrice})`,
+          );
+          executionStreamBus.emitEvent({
+            type:     "position_closed",
+            severity: reason === "STOP_LOSS" ? "warn" : "success",
+            symbol:   p.symbol,
+            side:     isBuy ? "BUY" : "SELL",
+            price,
+            mode:     p.exchange ? "live" : "simulation",
+            exchange: p.exchange ?? undefined,
+            reason,
+            message:  `${reason} hard close — ${runtimeMode} ${p.symbol} @ $${price.toFixed(2)}`,
+            details:  {
+              userId:        p.userId,
+              positionId:    p.positionId,
+              entryPrice:    p.entryPrice,
+              realizedPnLPct: closeResult.trade?.realizedPnLPct,
+            },
+          });
+        } else {
+          // Position already gone (e.g. closed by trailing pass / manual close
+          // earlier this tick) surfaces as not-found — benign.
+          logger.info(
+            {
+              tag:        "HARD_STOP_SKIPPED",
+              correlationId,
+              userId:     p.userId,
+              positionId: p.positionId,
+              symbol:     p.symbol,
+              reason:     closeResult.error ?? "closeUserPosition returned not-success",
+              mode:       runtimeMode,
+            },
+            "[HARD_STOP_SKIPPED] hard-stop close not applied",
+          );
+        }
+      } catch (err) {
+        logger.warn(
+          {
+            tag:        "HARD_STOP_SKIPPED",
+            correlationId,
+            userId:     p.userId,
+            positionId: p.positionId,
+            symbol:     p.symbol,
+            reason:     err instanceof Error ? err.message : String(err),
+            mode:       runtimeMode,
+          },
+          "[HARD_STOP_SKIPPED] hard-stop close threw",
+        );
+      }
+    }));
+  } catch (err) {
+    logger.error(
+      { err: err instanceof Error ? err.message : String(err) },
+      "runHardStopMonitor: unexpected failure",
+    );
+  }
+}
+
 // ── Trailing stop tick ─────────────────────────────────────────────────────────
 
 async function runTrailingStops() {
@@ -1907,6 +2051,9 @@ async function tick() {
     }
   }
 
+  // Hard SL/TP enforcement runs BEFORE the profit-only trailing pass so a
+  // breached stop is force-closed even on a trade that never went green.
+  await runHardStopMonitor();
   await runTrailingStops();
 }
 

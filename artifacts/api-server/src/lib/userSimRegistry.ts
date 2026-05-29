@@ -5,7 +5,7 @@ import {
   simTradesTable,
   userSettingsTable,
 } from "@workspace/db";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, or, isNotNull } from "drizzle-orm";
 import { getTicker, SUPPORTED_SYMBOLS } from "./marketData.js";
 import { logger } from "./logger.js";
 import {
@@ -777,6 +777,58 @@ export async function listOpenPaperPositionsBySymbol(
   }
 }
 
+/**
+ * Enumerate EVERY open per-user position (paper AND live) that carries a
+ * stop-loss and/or take-profit price, for the hard-stop risk monitor in the
+ * trading loop. Unlike `listOpenPaperPositionsBySymbol`, this is NOT gated on
+ * `autoMode` — a per-position SL/TP is a risk contract that must be honored
+ * regardless of whether AI auto-trading is currently enabled, and it includes
+ * live positions (`exchange IS NOT NULL`) so real-money downside is capped too.
+ *
+ * The monitor closes breaches via `closeUserPosition`, which routes live closes
+ * through the broker and fires the full EXIT_ENGINE_V2 close chain.
+ */
+export async function listOpenPositionsForRiskMonitor(): Promise<
+  Array<{
+    userId:     string;
+    positionId: string;
+    symbol:     string;
+    side:       string;
+    entryPrice: number;
+    stopLoss:   number | null;
+    takeProfit: number | null;
+    exchange:   string | null;
+  }>
+> {
+  try {
+    const rows = await db
+      .select({
+        userId:     simPositionsTable.userId,
+        positionId: simPositionsTable.id,
+        symbol:     simPositionsTable.symbol,
+        side:       simPositionsTable.side,
+        entryPrice: simPositionsTable.entryPrice,
+        stopLoss:   simPositionsTable.stopLoss,
+        takeProfit: simPositionsTable.takeProfit,
+        exchange:   simPositionsTable.exchange,
+      })
+      .from(simPositionsTable)
+      .where(
+        or(
+          isNotNull(simPositionsTable.stopLoss),
+          isNotNull(simPositionsTable.takeProfit),
+        ),
+      );
+    return rows;
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "userSimRegistry: listOpenPositionsForRiskMonitor query failed",
+    );
+    return [];
+  }
+}
+
 export async function placeUserOrder(userId: string, req: UserOrderRequest): Promise<{
   success: boolean;
   position?: UserSimPosition;
@@ -948,6 +1000,16 @@ export async function registerLiveUserFill(params: {
   return position;
 }
 
+// In-flight close guard. The DB-side `finalizeClose` idempotency gate prevents
+// double-CREDIT, but for LIVE positions the broker close order
+// (`placeLiveCloseOrderForUser`) is submitted BEFORE that gate — so two
+// concurrent callers (e.g. the hard-stop monitor and a manual close) could each
+// submit a real broker close for the same position. This Set claims a position
+// id for the duration of one close attempt so only the first caller reaches the
+// broker; the others short-circuit. Single-process is sufficient because the
+// per-user registry state (and all close paths) live in this one process.
+const inFlightCloses = new Set<string>();
+
 export async function closeUserPosition(
   userId: string,
   positionId: string,
@@ -958,6 +1020,19 @@ export async function closeUserPosition(
   if (idx === -1) {
     return { success: false, error: `Position ${positionId} not found` };
   }
+
+  // Claim this position for the duration of the close. A concurrent attempt
+  // (already past this point and possibly mid-broker-submit) short-circuits
+  // here so we never fire a second real broker close order.
+  if (inFlightCloses.has(positionId)) {
+    logger.info(
+      { userId, positionId, closeReason },
+      "UserSimRegistry: close already in flight for this position — skipping duplicate",
+    );
+    return { success: false, error: `Position ${positionId} close already in flight` };
+  }
+  inFlightCloses.add(positionId);
+  try {
 
   const pos = state.positions[idx]!;
 
@@ -1457,6 +1532,10 @@ export async function closeUserPosition(
   }
 
   return { success: true, trade };
+
+  } finally {
+    inFlightCloses.delete(positionId);
+  }
 }
 
 export async function getUserTradeHistory(userId: string): Promise<UserSimTrade[]> {
