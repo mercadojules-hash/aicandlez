@@ -1,0 +1,124 @@
+Update to the previously approved Task 2 specification.
+
+After further review, we are NOT implementing daily profit caps.
+
+Do NOT build any feature that limits a user's realized P&L or daily earnings.
+
+Instead, use the following finalized business model:
+
+FREE
+
+* Paper trading only
+* No live trading access
+* 10 AI trades per day
+* Returns to this state whenever a paid subscription expires or is canceled
+
+STARTER ($49.95/month)
+
+* Live trading only
+* 50 AI trades per day
+* 3 concurrent positions
+* Preserve all existing live safeguards
+
+PRO ($99.95/month)
+
+* Live trading only
+* 100 AI trades per day
+* 6 concurrent positions
+* Preserve all existing live safeguards
+
+ELITE VIP ($199.95/month)
+
+* Live trading only
+* 200 AI trades per day
+* 12 concurrent positions
+* Preserve all existing live safeguards
+
+ADMIN
+
+* Unlimited daily trades
+* Unlimited concurrent positions
+* Role-based bypass for admin accounts (Jules and spouse)
+
+Important business rule:
+
+A user can never be both paper and live simultaneously.
+
+Runtime mode is determined by subscription status:
+
+* Free = Paper Only
+* Paid Subscription = Live Only
+* Subscription Expired/Canceled = Automatically return to Paper Only
+
+Do NOT implement any profit ceiling.
+
+Do NOT stop trading because a user earned too much money.
+
+Instead, control usage through:
+
+1. Daily trade allocations
+2. Concurrent position limits
+3. Existing confidence gates
+4. Existing volume gates
+5. Existing risk engine
+6. Existing hard stop-loss enforcement
+7. Existing EXIT_ENGINE_V2 lifecycle
+
+Additional enhancement:
+
+Replace any future concept of profit limits with "capital managed" controls.
+
+Future framework:
+
+Starter:
+
+* 50 trades/day
+* 3 concurrent positions
+* Suggested max capital managed: $2,500
+
+Pro:
+
+* 100 trades/day
+* 6 concurrent positions
+* Suggested max capital managed: $10,000
+
+Elite VIP:
+
+* 200 trades/day
+* 12 concurrent positions
+* Suggested max capital managed: $50,000
+
+Admin:
+
+* Unlimited
+
+Do not enforce capital-managed limits in this task.
+
+Simply structure the architecture so those limits can be added later without redesigning the subscription system.
+
+Stripe IDs:
+
+STARTER
+Product ID: prod_UYOneI9XsCT0Br
+Price ID: price_1TcQDxI3nFFqtg3anZqn26u9
+
+PRO
+Product ID: prod_UYOpyiav0YI5ym
+Price ID: price_1TZI2Fi3nFFqtg3aXIMxGhOP
+
+ELITE VIP
+Product ID: prod_UbdXYLmd94WubK
+Price ID: price_1TcQGWI3nFFqtg3atoJDW2NX
+
+Before deployment:
+
+* Confirm legacy subscribers remain grandfathered.
+* Confirm free users cannot access live trading.
+* Confirm paid users cannot access paper mode.
+* Confirm cancellation automatically returns users to paper mode.
+* Confirm one user's trade allocation never impacts another user's allocation.
+* Confirm EXIT_ENGINE_V2 remains unchanged.
+* Confirm hard stop-loss enforcement remains active.
+* Confirm all existing live-money safeguards remain active.
+
+Please provide the file-level implementation plan and deployment checklist before production rollout.
