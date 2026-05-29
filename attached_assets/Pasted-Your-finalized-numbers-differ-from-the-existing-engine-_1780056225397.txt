@@ -1,0 +1,26 @@
+Your finalized numbers differ from the existing engine defaults, so I'll update the spec to lock in your exact tier ladder and adjust the examples. No production changes — just refining the plan document.
+
+
+Planning content deduplication
+My second edit left a duplicated sentence at the end of section 6. Let me remove it.
+
+The spec now reflects your finalized tier ladder. The document is complete and consistent — no production changes made, as requested.
+
+Summary of the locked plan
+Tiers (now locked in the spec):
+
+Tier	Daily cap	Live?
+Free	10/day (paper only — confirm value)	No
+Starter	50/day	Yes
+Pro	100/day	Yes
+Elite VIP	200/day (new tier)	Yes
+Admin (you + your wife)	Unlimited (role bypass)	Yes
+The key insight that makes this tractable: a per-user, tier-based limit engine already exists (tradeLimitEngine.ts) and is already enforced on live orders. The work is mostly wiring + extension, not greenfield:
+
+Part B first (blocking): the hard stop-loss enforcement gap — the "2% max loss" is stored but never enforced (proven: losses hit −9.1%, all closed by a reconciliation sweep). A per-tick hard-stop monitor must be built and verified before any frequency increase.
+Part A: extend PLAN_DEFAULT_TRADE_LIMIT_CAP to { free:10, starter:50, pro:100, elite_vip:200 }, make the engine paper-aware (count exchange IS NULL opens per user in rolling 24h), enforce it inside the paper fan-out, and demote the global Gate 2 to operator-only so it never gates customers.
+All your guardrails are explicitly preserved in §5: EXIT_ENGINE_V2 (admission-only change, close lifecycle untouched), live safeguards (env kill switch, liveReady, ARM, concurrent-3 cap, withdrawal promise), and the confidence/volume/risk gates (riskEngine Gate 4 is additive, not replaced). Per-user independence is guaranteed because each user is evaluated against their own rolling-24h window — one user hitting their cap emits [AI_FANOUT_SKIPPED] and the loop continues for everyone else.
+
+Migration is flagged and reversible: PER_USER_PAPER_LIMITS_ENABLED (default off) → dev cutover → prod, with instant rollback by flipping the flag. Schema changes are additive (no rollback needed).
+
+One thing worth your confirmation when you're ready to build: the Free paper cap — I recommended 10/day as "limited," but that's the one number you described qualitatively rather than exactly. Everything else is locked to your spec.
