@@ -37,6 +37,25 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      # ── Stripe plan price IDs (non-secret identifiers) ──────────────────────
+      # Forward map (resolvePriceIdForPlan) + reverse map (planFromPriceId).
+      # ELITE is the $199.95 tier. *_LEGACY grandfather existing starter/pro
+      # subscribers without touching the old Stripe prices. These are plain
+      # price IDs, not secrets, so they live in the blueprint (version-tracked).
+      - key: STRIPE_PRICE_STARTER_MONTHLY
+        value: price_1TcQDxI3nFFqtg3anZqn26u9
+      - key: STRIPE_PRICE_PRO_MONTHLY
+        value: price_1TZI2Fi3nFFqtg3aXIMxGhOP
+      - key: STRIPE_PRICE_ELITE_MONTHLY
+        value: price_1TcQGWI3nFFqtg3atoJDW2NX
+      - key: STRIPE_PRICE_STARTER_LEGACY
+        value: price_1TZPqFIzLCdrkUtzWyDLLMmA
+      - key: STRIPE_PRICE_PRO_LEGACY
+        value: price_1TZPqGIzLCdrkUtzMVJLcxb1
+      # Platform-wide concurrent live-trade cap (Task 2 / Q2). Code default is
+      # already 25; declared here so prod is explicit and version-tracked.
+      - key: LIVE_EXECUTION_CONCURRENT_CAP
+        value: "25"
       - key: KRAKEN_API_KEY
         sync: false
       - key: KRAKEN_API_SECRET
