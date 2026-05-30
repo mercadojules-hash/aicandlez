@@ -1,0 +1,62 @@
+Before making any limit changes, I want to verify that the entitlement system is functioning correctly.
+
+Background:
+
+AICandlez was designed as a multi-user platform capable of supporting large-scale adoption. Trade limits and active-position limits were intended to be enforced per user based on subscription tier, not through global platform-wide defaults.
+
+The recent investigation showed:
+
+* 462 entries blocked by maxTradesPerDay
+* 57 entries blocked by maxActivePositions
+* apparent defaults of 5 trades/day and 3 positions
+
+I need to determine whether recent code changes unintentionally bypassed the entitlement system.
+
+Please investigate:
+
+1. Are maxTradesPerDay and maxActivePositions currently sourced from:
+
+   * user tier entitlements
+   * user settings
+   * platform defaults
+   * hardcoded runtime values
+
+2. Which source currently wins if multiple values exist?
+
+3. For the following accounts, show the effective limits currently being enforced:
+
+   * [mercadojules@gmail.com](mailto:mercadojules@gmail.com)
+   * [teedelgado@gmail.com](mailto:teedelgado@gmail.com)
+   * [info@mixtapepsd.com](mailto:info@mixtapepsd.com)
+
+4. For each subscription tier, show:
+
+   * daily trade limit
+   * max active positions
+
+5. Identify any code path where:
+
+   * a global default of 5 trades/day
+   * a global default of 3 positions
+
+is overriding tier entitlements.
+
+Desired architecture:
+
+Normal users:
+
+* Limits come from their subscription tier.
+
+Admin/operator accounts:
+
+* [mercadojules@gmail.com](mailto:mercadojules@gmail.com)
+* [teedelgado@gmail.com](mailto:teedelgado@gmail.com)
+* [info@mixtapepsd.com](mailto:info@mixtapepsd.com)
+
+should be able to operate under elevated testing limits while the platform is being tuned.
+
+During tuning, these admin accounts should not be artificially constrained by development defaults that prevent adequate strategy validation.
+
+Do not change limits yet.
+
+First provide a complete entitlement flow audit showing exactly where effective trade limits and position limits are being sourced and enforced.
