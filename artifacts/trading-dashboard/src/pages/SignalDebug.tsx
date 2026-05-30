@@ -7,6 +7,7 @@ import {
   Zap, BarChart2, Clock, Filter, ArrowRight,
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, Tooltip } from "recharts";
+import ExecutionFunnelPanel from "@/components/ExecutionFunnelPanel";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -410,6 +411,9 @@ export default function SignalDebug() {
           Refresh
         </button>
       </div>
+
+      {/* ── Execution funnel (why no trades) ── */}
+      <ExecutionFunnelPanel />
 
       {isLoading && (
         <div className="flex items-center justify-center h-32 text-muted-foreground/40">
