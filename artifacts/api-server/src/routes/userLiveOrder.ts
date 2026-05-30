@@ -70,7 +70,7 @@ const logLiveOrderArrival = (req: Request, _res: Response, next: NextFunction): 
   next();
 };
 
-function parseBody(raw: unknown): { symbol: string; side: "BUY" | "SELL"; sizeUSD?: number; useSandbox: boolean } | null {
+function parseBody(raw: unknown): { symbol: string; side: "BUY" | "SELL"; sizeUSD?: number; useSandbox: boolean; armedForLive: boolean } | null {
   if (!raw || typeof raw !== "object") return null;
   const b = raw as Record<string, unknown>;
   const symbol = typeof b.symbol === "string" ? b.symbol.trim() : "";
@@ -83,8 +83,9 @@ function parseBody(raw: unknown): { symbol: string; side: "BUY" | "SELL"; sizeUS
     if (!Number.isFinite(n) || n <= 0 || n > 100_000) return null;
     sizeUSD = n;
   }
-  const useSandbox = b.useSandbox === true;
-  return { symbol, side, sizeUSD, useSandbox };
+  const useSandbox   = b.useSandbox === true;
+  const armedForLive = b.armedForLive === true;
+  return { symbol, side, sizeUSD, useSandbox, armedForLive };
 }
 
 router.post(
@@ -229,6 +230,49 @@ router.post(
     }
 
     if (!parsed.useSandbox) {
+      // ── Server-side ARM gate ───────────────────────────────────────────
+      // The per-session ARM flag is a client-side UX gate (`armedForLive`),
+      // but it must ALSO be enforced on the backend so a direct API call
+      // (curl / replayed request) can't place a real-money order while the
+      // UI session is "disarmed". Mirrors the AI-trading enable route's
+      // `runtime_not_armed` (412) contract. Operators bypass — operator
+      // tooling is governed by separate controls. This is independent of
+      // (and additive to) the env kill switch checked above.
+      if (!isOperator && !parsed.armedForLive) {
+        emitTelemetry({
+          tag:               "EXECUTION_REJECTED",
+          correlationId,
+          userId,
+          symbol:            parsed.symbol,
+          normalizedSymbol:  parsed.symbol,
+          exchange:          null,
+          runtimeMode,
+          persistenceResult: "skipped",
+          positionId:        null,
+          latencyMs:         Date.now() - acceptedAt,
+          rejectionReason:   "runtime_not_armed",
+          trigger:           "manual",
+          side:              parsed.side,
+          sizeUSD:           requestedSize,
+        });
+        req.log.warn({
+          tag:           "ARM_LIVE_REJECTED",
+          userId,
+          correlationId,
+          reason:        "runtime_not_armed",
+          errorCode:     "runtime_not_armed",
+          surface:       "user_live_order",
+          httpStatus:    412,
+        }, "[ARM_LIVE_REJECTED] runtime_not_armed (manual live-order)");
+        res.status(412).json({
+          ok:        false,
+          errorCode: "runtime_not_armed",
+          error:     "Live execution isn't armed for this session. Tap ACTIVATE AI TRADING in the portal to authorize real-money orders, then retry.",
+          needsArm:  true,
+          correlationId,
+        });
+        return;
+      }
       if (!isOperator && (PLAN_RANK[userPlan] ?? 0) < PLAN_RANK.starter) {
         emitTelemetry({
           tag:               "EXECUTION_REJECTED",

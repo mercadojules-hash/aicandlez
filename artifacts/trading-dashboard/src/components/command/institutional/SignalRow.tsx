@@ -24,7 +24,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePortalMode } from "@/contexts/PortalModeContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCustomerPlan, openUpgrade, type Plan } from "@/hooks/useCustomerPlan";
-import { useArmedForLive } from "@/hooks/useArmedForLive";
+import { useArmedForLive, getArmedForLive } from "@/hooks/useArmedForLive";
 import { useGetSettings } from "@workspace/api-client-react";
 
 import { authFetch } from "../../../lib/authFetch";
@@ -396,7 +396,7 @@ export function SignalRow({ spec, breakdown }: Props) {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...(correlationId ? { "X-Correlation-Id": correlationId } : {}),
         },
-        body: JSON.stringify({ symbol: sym, side, sizeUSD, useSandbox }),
+        body: JSON.stringify({ symbol: sym, side, sizeUSD, useSandbox, armedForLive: getArmedForLive() }),
       });
       const echoedId = res.headers.get("X-Correlation-Id") ?? correlationId;
       if (!res.ok) {
