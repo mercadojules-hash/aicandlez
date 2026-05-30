@@ -39,3 +39,15 @@ close back to a global row; you must act on the global book directly.
 from a global hard-stop if `runHardStopMonitor` already covers that trigger per-user
 (double-book closes of the same trigger). `markTradeRowClosed` is idempotent
 (status='open' guarded + `.returning()`), so concurrent/duplicate ticks are safe.
+
+**Recovery — draining a saturated global cap:** because the cap is COUNTED FROM
+THE DB (`countOpenTradePositions`) and boot rehydration uses the SAME predicate
+(`openGlobalPositionsPredicate`), a one-time flatten is just: `UPDATE trades SET
+status='closed', exit_price=price, pnl=0, pnl_percent=0, closed_at=now(),
+reason='RECONCILED' WHERE status='open' AND mode IN ('auto','live','test') AND
+price>0 AND amount>0;` then **restart api-server** so in-memory simulationEngine
+rehydrates from the now-empty open set (otherwise the closed rows stay resident
+in memory until restart). Breakeven (`exit=price`, pnl=0) is the correct
+non-fabricating choice for phantom paper rows — it's a global operator paper
+book, never customer money. After restart, confirm `tradesExecuted` starts
+incrementing and `tradesBlocked` stays 0 in `GET /api/engine/status`.
