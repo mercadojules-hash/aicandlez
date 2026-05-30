@@ -3664,6 +3664,14 @@ interface LiquidityState {
   required:       number;
   /** Cash projected to remain after currently-open slots reserve capital. */
   available:      number;
+  /** Round-trip fee envelope component of `required` (USD). */
+  fees:           number;
+  /** Absolute safety cushion component of `required` (USD). */
+  safety:         number;
+  /** Capital already reserved by currently-open slots (USD). */
+  reserved:       number;
+  /** Shortfall when blocked (`required - available`, floored at 0). */
+  shortfall:      number;
   /** True when new entries must be blocked to preserve the safety cushion. */
   blocked:        boolean;
 }
@@ -3684,7 +3692,8 @@ function computeLiquidityState(
   const reserved  = openPaper * tradeSize;
   const available = Math.max(0, equityUsd - reserved);
   const blocked   = remainingSlots > 0 && available < required;
-  return { tradeSize, remainingSlots, required, available, blocked };
+  const shortfall = blocked ? Math.max(0, required - available) : 0;
+  return { tradeSize, remainingSlots, required, available, fees, safety, reserved, shortfall, blocked };
 }
 
 function TradeSizeStrip({
@@ -3695,6 +3704,10 @@ function TradeSizeStrip({
   disabled:  boolean;
   liquidity: LiquidityState;
 }) {
+  const fmtUsd = (n: number) =>
+    Number.isFinite(n)
+      ? `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : "—";
   const subline = liquidity.blocked
     ? `LIQUIDITY PROTECTED  ·  AI paused new entries to preserve fee/cash cushion`
     : `AI risks up to $${liquidity.tradeSize} per entry  ·  ${liquidity.remainingSlots} slot${liquidity.remainingSlots === 1 ? "" : "s"} available  ·  cushion ${liquidity.available >= liquidity.required ? "OK" : "LOW"}`;
@@ -3703,6 +3716,20 @@ function TradeSizeStrip({
     : liquidity.available >= liquidity.required
       ? "rgba(214,255,214,0.85)"
       : T.AMBER;
+  // Diagnostic breakdown — exposes the exact numbers the cushion gate
+  // compares so the customer (and admins previewing the customer shell)
+  // can see WHY new entries are paused, not just that they are. Always
+  // rendered; amber-tinted when the gate is active.
+  const diagReason = liquidity.blocked ? "LIQUIDITY_PROTECTED" : "OK";
+  const diagLine =
+    `REASON ${diagReason}  ·  THRESHOLD ${fmtUsd(liquidity.required)}  ·  ` +
+    `BUYING POWER ${fmtUsd(liquidity.available)}` +
+    (liquidity.blocked ? `  ·  SHORTFALL ${fmtUsd(liquidity.shortfall)}` : "");
+  const diagCalc =
+    `CALC ${fmtUsd(liquidity.tradeSize)} × ${liquidity.remainingSlots} slot${liquidity.remainingSlots === 1 ? "" : "s"} ` +
+    `+ fees ${fmtUsd(liquidity.fees)} + cushion ${fmtUsd(liquidity.safety)} = ${fmtUsd(liquidity.required)}` +
+    (liquidity.reserved > 0 ? `  ·  reserved ${fmtUsd(liquidity.reserved)}` : "") +
+    `  ·  ${liquidity.available < liquidity.required ? "available < required" : "available ≥ required"}`;
   return (
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -3727,6 +3754,21 @@ function TradeSizeStrip({
           overflow: "hidden", textOverflow: "ellipsis",
         }}>
           {subline}
+        </span>
+        {/* Liquidity-guard diagnostic breakdown — required vs available,
+            the calc components, and the exact comparison the gate makes. */}
+        <span style={{
+          fontSize: 9, fontWeight: 700,
+          color: liquidity.blocked ? T.AMBER : N.TEXT_3,
+          letterSpacing: "0.08em", whiteSpace: "normal", lineHeight: 1.45,
+        }}>
+          {diagLine}
+        </span>
+        <span style={{
+          fontSize: 8.5, fontWeight: 600, color: N.TEXT_3,
+          letterSpacing: "0.06em", whiteSpace: "normal", lineHeight: 1.45,
+        }}>
+          {diagCalc}
         </span>
       </div>
       <div role="radiogroup" aria-label="Trade size per entry" style={{
@@ -5673,6 +5715,12 @@ export function PortalCustomerShell() {
     openCount?:          number;
     tradingMode?:        "paper" | "live";
     remainingSlots:      number;
+    availableCashUsd?:   number;
+    requiredCashUsd?:    number;
+    feeBufferPct?:       number;
+    safetyCushionUsd?:   number;
+    reasonCode?:         "ok" | "plan_max_positions_reached" | "liquidity_protected";
+    isAdmin?:            boolean;
     liquidityProtected:  boolean;
     planCapacityReached: boolean;
     message:             string | null;
@@ -6208,6 +6256,9 @@ export function PortalCustomerShell() {
           color:       T.TEXT_2,
           flexWrap:    "wrap",
         }}>
+          <span style={{ color: T.TEXT_3, fontWeight: 700, letterSpacing: "0.16em" }}>
+            LIQUIDITY GUARD · SERVER
+          </span>
           <span>
             <span style={{ color: T.TEXT_3, marginRight: 6 }}>TRADE SIZE</span>
             <span style={{ color: T.NEON, fontWeight: 700 }}>
@@ -6248,6 +6299,79 @@ export function PortalCustomerShell() {
                   : "OK"}
             </span>
           </span>
+          {/* Authoritative diagnostic breakdown — mirrors the execution-side
+              0LIQ gate exactly (same lib/liquidityGuard.ts math). Surfaces
+              the threshold, buying power, reason code, and the values being
+              compared so the guard state is never opaque. `availableCashUsd`
+              here = the customer's sim cash balance (NOT live exchange
+              equity) — that is the input the server gate actually uses. */}
+          {(() => {
+            const fmtUsd = (n: number | undefined) =>
+              typeof n === "number" && Number.isFinite(n)
+                ? `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : "—";
+            const req = liquidityStatus.requiredCashUsd;
+            const avail = liquidityStatus.availableCashUsd;
+            const feePct = liquidityStatus.feeBufferPct;
+            const cushion = liquidityStatus.safetyCushionUsd;
+            const reason = liquidityStatus.reasonCode
+              ?? (liquidityStatus.liquidityProtected
+                ? "liquidity_protected"
+                : liquidityStatus.planCapacityReached
+                  ? "plan_max_positions_reached"
+                  : "ok");
+            const shortfall = typeof req === "number" && typeof avail === "number"
+              ? Math.max(0, req - avail)
+              : undefined;
+            const accent = liquidityStatus.liquidityProtected
+              ? "#FF9400"
+              : liquidityStatus.planCapacityReached
+                ? "#FF5050"
+                : T.NEON;
+            const cmp = typeof req === "number" && typeof avail === "number"
+              ? (avail < req ? "available < required" : "available ≥ required")
+              : "";
+            // In the plan-capacity-reached state the gate returns
+            // requiredCashUsd=0 (cash math is not the binding constraint),
+            // so suppress the cash calc to avoid a contradictory "= $0.00".
+            const calc = liquidityStatus.planCapacityReached
+              ? "PLAN CAP GATE · cash calc not applicable (close a position to free a slot)"
+              : typeof req === "number"
+                ? `${fmtUsd(liquidityStatus.tradeSizeUsd)} × ${liquidityStatus.remainingSlots} slot${liquidityStatus.remainingSlots === 1 ? "" : "s"}`
+                  + ` × (1 + ${typeof feePct === "number" ? (feePct * 100).toFixed(1) : "—"}% fee) + ${fmtUsd(cushion)} cushion = ${fmtUsd(req)}`
+                : "";
+            const Field = ({ label, value, color }: { label: string; value: string; color?: string }) => (
+              <span style={{ whiteSpace: "nowrap" }}>
+                <span style={{ color: T.TEXT_3, marginRight: 6 }}>{label}</span>
+                <span style={{ color: color ?? T.TEXT_1, fontWeight: 700 }}>{value}</span>
+              </span>
+            );
+            return (
+              <span style={{
+                flexBasis: "100%", display: "flex", flexWrap: "wrap",
+                alignItems: "center", gap: 16, marginTop: 2,
+                paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.06)",
+                fontSize: 9.5, letterSpacing: "0.08em",
+              }}>
+                <Field label="REASON" value={reason} color={accent} />
+                <Field label="THRESHOLD" value={fmtUsd(req)} color={accent} />
+                <Field label="BUYING POWER" value={fmtUsd(avail)} />
+                {liquidityStatus.liquidityProtected && (
+                  <Field label="SHORTFALL" value={fmtUsd(shortfall)} color={accent} />
+                )}
+                {calc && (
+                  <span style={{ color: T.TEXT_3, whiteSpace: "normal", minWidth: 0 }}>
+                    CALC {calc}{cmp ? `  ·  ${cmp}` : ""}
+                  </span>
+                )}
+                {liquidityStatus.isAdmin && (
+                  <span style={{ color: "#5AB0FF", fontWeight: 700, whiteSpace: "nowrap" }}>
+                    ADMIN BYPASS · GUARD NOT ENFORCED ON YOUR LIVE ORDERS
+                  </span>
+                )}
+              </span>
+            );
+          })()}
         </div>
       )}
       {/* PHASE 9 — Candidate B (UserDashboard) graduated chrome.
