@@ -8,6 +8,7 @@ import type {
 } from "../types.js";
 import { emptyAccount, simulatedOrder } from "./BinanceAdapter.js";
 import { logger } from "../../../lib/logger.js";
+import { SYMBOL_MAP as COINBASE_PRODUCT_IDS } from "../../../lib/marketData.js";
 
 // 2026-05-28 — Coinbase rejection instrumentation. Customer hit
 // "Exchange rejected order — Unauthorized" with no surfaced status code
@@ -63,18 +64,27 @@ function summariseCoinbaseError(raw: string): string {
 //
 // Symbol normalisation:
 //   "BTCUSD" → "BTC-USD"
+//
+// Coinbase Advanced Trade product_ids are dash-separated (BASE-QUOTE). The
+// engine emits dashless symbols ("NEARUSD"). The single source of truth for
+// the engine→Coinbase mapping is `COINBASE_SYMBOLS` in lib/marketData.ts
+// (re-exported there as SYMBOL_MAP) — it already carries every Coinbase
+// rebrand that dash-insertion cannot derive (RNDR→RENDER, MATIC→POL, …).
+// `normaliseSymbol` consults that canonical map first and falls back to
+// algorithmic dash-insertion before the quote currency, so any analyzed
+// symbol not yet in the map is still tradeable instead of being silently
+// rejected at the broker with "Invalid product_id".
 
-const SYMBOL_MAP: Record<string, string> = {
-  BTCUSD:  "BTC-USD",
-  ETHUSD:  "ETH-USD",
-  SOLUSD:  "SOL-USD",
-  XRPUSD:  "XRP-USD",
-  DOGEUSD: "DOGE-USD",
-  AVAXUSD: "AVAX-USD",
-  LINKUSD: "LINK-USD",
-  ADAUSD:  "ADA-USD",
-};
-const REVERSE_MAP = Object.fromEntries(Object.entries(SYMBOL_MAP).map(([k, v]) => [v, k]));
+// First-occurrence-wins reverse map (engine-native ← product_id) so legacy
+// aliases (e.g. POL-USD ← POLUSD, not MATICUSD) resolve to the canonical key.
+const REVERSE_MAP: Record<string, string> = {};
+for (const [engineSym, productId] of Object.entries(COINBASE_PRODUCT_IDS)) {
+  if (!(productId in REVERSE_MAP)) REVERSE_MAP[productId] = engineSym;
+}
+
+// Quote currencies Coinbase quotes against. Longest-first so "USDC"/"USDT"
+// match before "USD".
+const QUOTE_CURRENCIES = ["USDC", "USDT", "USDS", "USD", "EUR", "GBP", "BTC", "ETH"];
 
 const TF_SECS: Record<string, number> = {
   "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400,
@@ -103,7 +113,20 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
   }
 
   normaliseSymbol(symbol: string): string {
-    return SYMBOL_MAP[symbol] ?? symbol;
+    const sym = symbol.trim().toUpperCase();
+    // Already a Coinbase product_id (BASE-QUOTE).
+    if (sym.includes("-")) return sym;
+    // Canonical engine→Coinbase map (carries rebrands like RNDR→RENDER).
+    const mapped = COINBASE_PRODUCT_IDS[sym];
+    if (mapped) return mapped;
+    // Derive: insert a dash before the recognised quote currency.
+    for (const quote of QUOTE_CURRENCIES) {
+      if (sym.length > quote.length && sym.endsWith(quote)) {
+        return `${sym.slice(0, -quote.length)}-${quote}`;
+      }
+    }
+    // Unknown quote — return unchanged (broker will reject loudly).
+    return sym;
   }
 
   denormaliseSymbol(native: string): string {

@@ -1,0 +1,1 @@
+- [Coinbase symbol mapping SoT](coinbase-symbol-mapping.md) — adapter.placeOrder gets RAW engine symbol (not normalize.native); each adapter's normaliseSymbol is authoritative; SoT = COINBASE_SYMBOLS in lib/marketData.ts (carries RNDR→RENDER, MATIC→POL rebrands).
