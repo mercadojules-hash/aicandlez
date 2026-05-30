@@ -31,6 +31,7 @@ import {
 } from "../lib/trading.js";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
 import { getExecutionFunnelSnapshot } from "../lib/executionFunnel.js";
+import { getSignalFunnelSnapshot, resetSignalFunnel } from "../lib/signalFunnel.js";
 
 const router = Router();
 // All engine-control routes are operator-only (super-admin / admin).
@@ -81,15 +82,29 @@ router.get("/engine/status", (_req, res) => {
     // blocked at the confidence stage). attempted/succeeded track the operator
     // engine path (per executionFunnel.ts contract).
     executionFunnel: (() => {
-      const s = getExecutionFunnelSnapshot();
-      const bs = s.blockedByStage;
-      const candidates =
-        bs.confidence + bs.risk + bs.liquidity + bs.exchange + bs.positionLimits +
-        s.executionAttempted;
+      // Sourced from the per-signal SIGNAL_FUNNEL trace (signalFunnel.ts) — a
+      // TRUE pass-through funnel, not the bus-block-count approximation used
+      // previously. Existing field names are preserved for widget back-compat;
+      // the additional stage counters below let any surface render the full
+      // funnel without hitting the operator-gated /engine/signal-funnel route.
+      const f = getSignalFunnelSnapshot();
       return {
-        passedConfidence:   Math.max(0, candidates - bs.confidence),
-        executionAttempted: s.executionAttempted,
-        executionSucceeded: s.executionSucceeded,
+        // Back-compat trio (unchanged field names).
+        passedConfidence:     f.passedConfidence,
+        executionAttempted:   f.executionAttempted,
+        executionSucceeded:   f.executionSucceeded,
+        // Full pass-through funnel (cumulative since boot/reset).
+        signalsEvaluated:     f.signalsEvaluated,
+        passedMTF:            f.passedMTF,
+        passedVolume:         f.passedVolume,
+        passedSpread:         f.passedSideways,
+        passedTrend1H:        f.passedTrend1H,
+        reachedExecution:     f.reachedExecution,
+        passedPositionLimits: f.passedPositionLimits,
+        passedCooldown:       f.passedCooldown,
+        passedDuplicate:      f.passedDuplicate,
+        passedRisk:           f.passedRisk,
+        passedExchange:       f.passedExchange,
       };
     })(),
     // TEMP [VOL_GATE_TEST] — controlled live-test telemetry for the 65% volume
@@ -116,6 +131,24 @@ router.get("/engine/status", (_req, res) => {
     // produces an actually-reachable distribution in production.
     confDistribution:   computeConfDistribution(),
   });
+});
+
+// ── GET /engine/signal-funnel ─────────────────────────────────────────────────
+// Operator-only forensic view of the per-signal execution funnel. Returns the
+// full pass-through counters (signalsEvaluated → ... → executionSucceeded),
+// the rejection-by-gate histogram, and the most recent per-signal traces (each
+// with a Y/N result for every gate + the final result and rejection reason).
+// Pure diagnostic telemetry — reads the in-memory ring populated by
+// tradingLoop.ts tick(); changes nothing about execution.
+router.get("/engine/signal-funnel", ...requireOperator, (_req, res) => {
+  res.json(getSignalFunnelSnapshot());
+});
+
+// POST /engine/signal-funnel/reset — zero the cumulative counters + trace ring
+// so a fresh measurement window can be started (e.g. after a config change).
+router.post("/engine/signal-funnel/reset", ...requireOperator, (_req, res) => {
+  resetSignalFunnel();
+  res.json({ ok: true, resetAt: Date.now() });
 });
 
 router.post("/engine/start", ...requireOperator, (_req, res) => {

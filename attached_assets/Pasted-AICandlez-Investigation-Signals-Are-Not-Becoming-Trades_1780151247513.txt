@@ -1,0 +1,97 @@
+AICandlez Investigation – Signals Are Not Becoming Trades
+
+We now have enough telemetry to identify the bottleneck.
+
+Current observations:
+
+Execution Funnel
+
+Signals Generated: 3,000+
+Passed Confidence: 0–2
+Execution Attempts: 0
+Execution Success: 0
+
+At the same time, the engine is continuously surfacing trade candidates on the portal:
+
+Examples visible on screen:
+
+AAVE = 50 confidence
+INJ = 46 confidence
+RNDR = 45 confidence
+LINK = 38 confidence
+XRP = 38 confidence
+
+The scanner is clearly working.
+
+The problem appears to be somewhere between:
+
+Signal Generated
+↓
+Passed Confidence
+↓
+Execution Candidate
+↓
+Execution Attempt
+↓
+Trade Open
+Investigation Required
+
+Please instrument and log the exact rejection reason for every signal.
+
+For each signal, I want to see:
+
+Asset
+Confidence
+Passed Confidence? (Y/N)
+Passed Liquidity? (Y/N)
+Passed Position Limit? (Y/N)
+Passed Cooldown? (Y/N)
+Passed Duplicate Asset Check? (Y/N)
+Passed Spread Filter? (Y/N)
+Passed Volume Filter? (Y/N)
+Passed Exchange Validation? (Y/N)
+Passed Risk Engine? (Y/N)
+
+Final Result:
+EXECUTED
+or
+REJECTED
+
+Rejection Reason:
+<reason>
+New Telemetry Needed
+
+Add counters to the Execution Funnel:
+
+Signals Generated
+Passed Confidence
+Passed Risk
+Passed Liquidity
+Passed Position Limits
+Passed Cooldown
+Passed Exchange Validation
+Execution Attempts
+Execution Success
+Important
+
+Do NOT change thresholds yet.
+
+Do NOT lower confidence.
+
+Do NOT modify liquidity rules.
+
+First determine exactly where the funnel collapse occurs.
+
+The engine is generating thousands of signals but producing almost zero execution attempts. We need to identify the specific gate that is blocking trades before making any behavioral changes.
+
+Additional Validation
+
+I manually added AAVEUSD and the trade path worked.
+
+This suggests:
+
+Exchange connectivity is functional.
+Order placement is functional.
+The issue is likely occurring before execution is attempted.
+
+Please identify the exact stage where candidates are being rejected and provide counts for each rejection reason.

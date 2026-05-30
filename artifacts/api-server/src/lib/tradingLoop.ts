@@ -35,9 +35,16 @@ import { broadcastSignal, broadcastTrade } from "./wsServer.js";
 import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { executionStreamBus, getSafeTestMode } from "./executionStreamBus.js";
+import { recordSignalTrace, classifyDownstream, type SignalTrace } from "./signalFunnel.js";
 import { logger } from "./logger.js";
 
 function genId() { return crypto.randomUUID(); }
+
+// SIGNAL_FUNNEL log helper: render a tri-state gate result (true/false/not-
+// evaluated) as Y / N / — for the structured per-signal funnel log line.
+function ynNull(v: boolean | null): "Y" | "N" | "—" {
+  return v === null ? "—" : v ? "Y" : "N";
+}
 
 // ── EXIT_ENGINE_V2 feature flag ─────────────────────────────────────────────────
 // Phase 1+ exit-lifecycle redesign. When OFF (default) the engine behaves exactly
@@ -2175,6 +2182,12 @@ async function tick() {
         }
       }
 
+      // SIGNAL_FUNNEL: outcome of the order path, captured for the per-signal
+      // funnel trace assembled after this block. Defaults assume the signal
+      // never reached execution (the common case when the collapse is upstream).
+      let execExecuted   = false;
+      let execBlockReason: string | null = null;
+
       if (shouldTrade) {
         // TEMP [VOL_GATE_TEST] — signal cleared every signal-quality gate
         // (confidence, MTF, volume, sideways, 1H) and is entering the order
@@ -2195,6 +2208,8 @@ async function tick() {
           testMode,
           mtf.avgConfidence,
         );
+        execExecuted   = execResult.executed;
+        execBlockReason = execResult.blockReason;
         if (execResult.executed) {
           engineStats.volGateTest.positionsOpened++;
           // CONF EXPERIMENT: greppable executed marker for the engine/operator
@@ -2214,6 +2229,115 @@ async function tick() {
           logEntry.blockReason = execResult.blockReason;
           logEntry.executedAs  = execResult.executed ? (testMode ? "test" : "auto") : null;
         }
+      }
+
+      // ── SIGNAL_FUNNEL — per-signal funnel trace (diagnostic telemetry) ──────
+      // Records a Y/N result for every gate, in funnel order, for each
+      // DIRECTIONAL candidate (at least one timeframe is non-HOLD). This is the
+      // instrumentation that answers "exactly which gate stops thousands of
+      // signals from becoming trades" — it changes NO thresholds and gates
+      // nothing; it only observes the decisions made above. Downstream gates
+      // are derived from autoExecute's existing blockReason (autoExecute itself
+      // is untouched). Engine-gate booleans mirror the `shouldTrade` formula:
+      // a gate that is bypassed by the high-confidence override counts as
+      // passed, matching the actual execution decision.
+      const fnDirectional = mtf.fast.decision !== "HOLD" || mtf.slow.decision !== "HOLD";
+      if (fnDirectional) {
+        const fnSide: "BUY" | "SELL" =
+          (effectiveAction !== "HOLD" ? effectiveAction : bestSingleAction) as "BUY" | "SELL";
+        const confFloor = highConfOverride ? 60 : confThresh;
+
+        const gConfidence = mtf.avgConfidence >= confFloor;
+        const gMTF        = mtf.mtfConfirmed || highConfOverride || testSingleTF;
+        const gVolume     = volumeGatePass   || highConfOverride;
+        const gSideways   = sidewaysGatePass || highConfOverride;
+        const gTrend1H    = trend1HGatePass  || highConfOverride;
+
+        // First failing engine gate → headline rejection reason.
+        let fnRejGate:   string | null = null;
+        let fnRejReason: string | null = null;
+        if (!gConfidence) {
+          fnRejGate = "confidence";
+          fnRejReason = `Confidence ${mtf.avgConfidence.toFixed(1)}% < ${confFloor}% floor`;
+        } else if (!gMTF) {
+          fnRejGate = "mtf";
+          fnRejReason = mtf.blockReason || "Multi-timeframe disagreement (5m/15m)";
+        } else if (!gVolume) {
+          fnRejGate = "volume";
+          fnRejReason = "Volume below average (low-volume filter)";
+        } else if (!gSideways) {
+          fnRejGate = "sideways";
+          fnRejReason = "Sideways / range-bound market (spread filter)";
+        } else if (!gTrend1H) {
+          fnRejGate = "trend1h";
+          fnRejReason = `1H trend conflict (trend=${mtf.trend1H}, signal=${fnSide})`;
+        } else if (!shouldTrade) {
+          // All engine gates passed but the engine itself is disabled.
+          fnRejGate = settings.autoMode ? "kill_switch" : "auto_mode_off";
+          fnRejReason = settings.autoMode ? "Kill switch active" : "Auto-mode off";
+        }
+
+        const trace: SignalTrace = {
+          ts:                  Date.now(),
+          symbol,
+          side:                fnSide,
+          confidence:          mtf.avgConfidence,
+          passedConfidence:    gConfidence,
+          passedMTF:           gConfidence && gMTF,
+          passedVolume:        gConfidence && gMTF && gVolume,
+          passedSideways:      gConfidence && gMTF && gVolume && gSideways,
+          passedTrend1H:       gConfidence && gMTF && gVolume && gSideways && gTrend1H,
+          reachedExecution:    shouldTrade,
+          passedPositionLimit: null,
+          passedCooldown:      null,
+          passedDuplicate:     null,
+          passedRisk:          null,
+          passedExchange:      null,
+          executionAttempted:  false,
+          finalResult:         "REJECTED",
+          rejectionGate:       fnRejGate,
+          rejectionReason:     fnRejReason,
+        };
+
+        if (shouldTrade) {
+          const ds = classifyDownstream(execBlockReason, execExecuted);
+          trace.passedPositionLimit = ds.passedPositionLimit;
+          trace.passedCooldown      = ds.passedCooldown;
+          trace.passedDuplicate     = ds.passedDuplicate;
+          trace.passedRisk          = ds.passedRisk;
+          trace.passedExchange      = ds.passedExchange;
+          trace.executionAttempted  = ds.executionAttempted;
+          trace.finalResult         = execExecuted ? "EXECUTED" : "REJECTED";
+          trace.rejectionGate       = execExecuted ? null : ds.rejectionGate;
+          trace.rejectionReason     = execExecuted ? null : ds.rejectionReason;
+        }
+
+        recordSignalTrace(trace);
+
+        logger.info(
+          {
+            tag:        "SIGNAL_FUNNEL",
+            symbol,
+            side:       fnSide,
+            confidence: mtf.avgConfidence,
+            gates: {
+              confidence:    trace.passedConfidence    ? "Y" : "N",
+              mtf:           trace.passedMTF            ? "Y" : "N",
+              volume:        trace.passedVolume         ? "Y" : "N",
+              spread:        trace.passedSideways       ? "Y" : "N",
+              trend1h:       trace.passedTrend1H        ? "Y" : "N",
+              positionLimit: ynNull(trace.passedPositionLimit),
+              cooldown:      ynNull(trace.passedCooldown),
+              duplicate:     ynNull(trace.passedDuplicate),
+              risk:          ynNull(trace.passedRisk),
+              exchange:      ynNull(trace.passedExchange),
+            },
+            finalResult:     trace.finalResult,
+            rejectionGate:   trace.rejectionGate,
+            rejectionReason: trace.rejectionReason,
+          },
+          `[SIGNAL_FUNNEL] ${symbol} ${fnSide} @ ${mtf.avgConfidence.toFixed(1)}% → ${trace.finalResult}${trace.rejectionGate ? ` (${trace.rejectionGate})` : ""}`,
+        );
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
