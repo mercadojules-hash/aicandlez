@@ -37,17 +37,30 @@ async function initStripe(): Promise<void> {
     const { getStripeSync } = await import("./stripeClient.js");
     const stripeSync = await getStripeSync();
 
-    // Prefer explicit WEBHOOK_BASE_URL (production Railway/Render) over auto-detect
-    const webhookBase =
-      process.env["WEBHOOK_BASE_URL"] ??
-      (process.env["REPLIT_DOMAINS"]
-        ? `https://${process.env["REPLIT_DOMAINS"]!.split(",")[0]}`
-        : `http://localhost:${finalPort}`);
+    // Option B — MANUAL webhook ownership in production.
+    // The prod endpoint is created once by hand in the Stripe dashboard and its
+    // signing secret lives in STRIPE_WEBHOOK_SECRET on Render. We must NOT let
+    // stripe-replit-sync auto-create/rotate/delete it: every recreate mints a
+    // fresh whsec_ into stripe._managed_webhooks while verification reads the env
+    // secret → signature mismatch. Auto-registration stays on ONLY outside
+    // production (Replit dev), where there is no env secret and the DB-managed
+    // secret drives verification.
+    if (process.env["NODE_ENV"] !== "production") {
+      const webhookBase =
+        process.env["WEBHOOK_BASE_URL"] ??
+        (process.env["REPLIT_DOMAINS"]
+          ? `https://${process.env["REPLIT_DOMAINS"]!.split(",")[0]}`
+          : `http://localhost:${finalPort}`);
 
-    await stripeSync.findOrCreateManagedWebhook(`${webhookBase}/api/stripe/webhook`);
-    logger.info({ webhookBase }, "Stripe webhook configured");
+      await stripeSync.findOrCreateManagedWebhook(`${webhookBase}/api/stripe/webhook`);
+      logger.info({ webhookBase }, "Stripe webhook auto-registered (non-production)");
+    } else {
+      logger.info(
+        "Production: Stripe webhook endpoint is manually managed — auto-registration skipped (Option B)",
+      );
+    }
 
-    // Backfill runs async — does not block startup
+    // Backfill runs async — does not block startup. Does NOT touch webhook endpoints.
     stripeSync.syncBackfill()
       .then(() => logger.info("Stripe backfill complete"))
       .catch((err: unknown) => logger.warn({ err }, "Stripe backfill failed (non-fatal)"));

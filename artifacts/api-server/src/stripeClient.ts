@@ -112,11 +112,13 @@ export async function getStripeSync(): Promise<StripeSync> {
 
   const { secretKey } = await getCredentials();
 
-  // Resolve webhook secret: env > DB-managed. On Render we always use env;
-  // the DB-managed lookup is only relevant when stripe-replit-sync's auto
-  // webhook registrar has populated `stripe._managed_webhooks` (Replit dev).
+  // Resolve webhook secret: env > DB-managed. Option B (manual webhook
+  // ownership): in PRODUCTION the env secret is the single source of truth
+  // (boot-enforced by validateEnv), so the DB-managed fallback is restricted to
+  // non-production. This prevents prod from ever silently verifying against a
+  // stale stripe._managed_webhooks secret left behind by the dev auto-registrar.
   let webhookSecret: string | undefined = process.env["STRIPE_WEBHOOK_SECRET"];
-  if (!webhookSecret) {
+  if (!webhookSecret && process.env["NODE_ENV"] !== "production") {
     try {
       const { Pool } = await import("pg");
       const pool = new Pool({ connectionString: databaseUrl, max: 1 });

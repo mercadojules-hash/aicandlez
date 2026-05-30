@@ -12,6 +12,10 @@ const REQUIRED_PRODUCTION: string[] = [
   "CLERK_PUBLISHABLE_KEY",
   "SESSION_SECRET",
   "VAULT_MASTER_KEY",   // AES-256 master key for CredentialVault — see CredentialVault.ts
+  "STRIPE_WEBHOOK_SECRET", // Option B (manual webhook ownership): env is the single
+                           // source of truth for signature verification. Hard-fail
+                           // here so prod can never silently fall back to a stale
+                           // stripe._managed_webhooks secret.
 ];
 
 // ── Recommended (warn if absent) ──────────────────────────────────────────────
