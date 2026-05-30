@@ -30,7 +30,7 @@ import {
   memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode, type CSSProperties,
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getArmedForLive, setArmedForLive } from "@/hooks/useArmedForLive";
+import { getArmedForLive, setArmedForLive, useArmedForLive } from "@/hooks/useArmedForLive";
 import { useStrictRuntimeMode } from "@/hooks/useStrictRuntimeMode";
 import { useReconnectResync } from "@/hooks/useReconnectResync";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -3792,6 +3792,27 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
 }) {
   const { enabled, allowed, isAdmin, setEnabledAsync } = useAiTradingState();
   const engineLabel = engineOnline ? "AI ENGINE · ONLINE" : "AI ENGINE · WARMING UP";
+
+  // ── Session-armed truth (Task #200 ARM gate) ──────────────────────────────
+  // `armedForLive` is a per-session, NON-persisted flag (useArmedForLive) that
+  // resets to false on EVERY page load by design. The persisted `autoMode`
+  // (`enabled`) survives a hard refresh, so without this gate the bar would
+  // render the green "AI EXECUTION ARMED" state off `enabled` alone — even
+  // though the live BUY path is disarmed and the server rejects every order
+  // with LIVE_BLOCKED_NOT_ARMED (errorCode `runtime_not_armed`).
+  //
+  // FAIL-CLOSED: only a POSITIVELY-resolved paper runtime suppresses the
+  // re-arm requirement. While the runtime query is still loading/unresolved
+  // (`runtimeState === undefined`, e.g. cold hard refresh or a transient
+  // fetch error), we treat an enabled-but-unarmed session as needing re-arm
+  // so the green ARMED state can NEVER flash before we've confirmed the
+  // runtime is paper. Resolved-paper → paper AI shows active normally (paper
+  // orders never require the live ARM flag and keep firing server-side);
+  // resolved-live → keep requiring an explicit per-session arm.
+  const armedSession   = useArmedForLive();
+  const { data: runtimeState } = useRuntimeState();
+  const isPaperRuntime = runtimeState?.mode === "paper";
+  const needsRearm     = enabled && !armedSession && !isPaperRuntime;
   const [tradeSize, setTradeSize] = useTradeSizeUsd();
   const liquidity = useMemo(
     () => computeLiquidityState(tradeSize, openPaper, slotCap, equityUsd),
@@ -4122,7 +4143,13 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   // click handler becomes a no-op (server-side capital checks remain
   // authoritative). Trade-size strip stays interactive so the user can
   // pick a smaller size to clear the protection state.
-  if (!enabled) {
+  if (!enabled || needsRearm) {
+    // `showRearm` = AI is enabled server-side but this session is not armed
+    // (typically after a hard refresh on a live runtime). We render the RED
+    // re-arm CTA; clicking it re-arms (`setArmedForLive(true)` inside
+    // `runActivation`) and re-posts enable so the session and server resync.
+    // Liquidity protection (amber) still takes visual precedence when active.
+    const showRearm = needsRearm && !liquidity.blocked;
     const offTone   = liquidity.blocked ? T.AMBER : T.RED;
     const offBgLow  = liquidity.blocked
       ? "linear-gradient(90deg, rgba(255,176,32,0.22) 0%, rgba(255,176,32,0.12) 50%, rgba(255,176,32,0.22) 100%)"
@@ -4150,7 +4177,11 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
         onClick={() => setEnabled(true)}
         aria-label={liquidity.blocked
           ? "Liquidity protection active — new AI entries blocked"
-          : (activating ? "Activating AI trading…" : "Click to enable AI trading")}
+          : activating
+          ? "Activating AI trading…"
+          : showRearm
+          ? "Live trading not armed — click to re-arm this session"
+          : "Click to enable AI trading"}
         aria-disabled={liquidity.blocked || activating}
         aria-busy={activating}
         style={{
@@ -4200,7 +4231,7 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
             <Power size={16} color={offTone} />
             <span style={{
               fontSize: 11, color: offTone, fontWeight: 800, letterSpacing: "0.20em",
-            }}>{liquidity.blocked ? "AI PAUSED" : "AI DISABLED"}</span>
+            }}>{liquidity.blocked ? "AI PAUSED" : showRearm ? "NOT ARMED" : "AI DISABLED"}</span>
           </div>
           <div style={{
             display: "flex", flexDirection: "column", alignItems: "center",
@@ -4213,7 +4244,11 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
                 ? "0 0 8px rgba(255,176,32,0.27)"
                 : "0 0 8px rgba(255,48,64,0.27)",
             }}>
-              {liquidity.blocked ? "LIQUIDITY PROTECTED" : "TAP TO ACTIVATE AI TRADING"}
+              {liquidity.blocked
+                ? "LIQUIDITY PROTECTED"
+                : showRearm
+                ? "TAP TO RE-ARM LIVE TRADING"
+                : "TAP TO ACTIVATE AI TRADING"}
             </span>
             <span style={{
               color: liquidity.blocked
@@ -4223,6 +4258,8 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
             }}>
               {liquidity.blocked
                 ? "AI paused new entries to preserve fee/cash cushion"
+                : showRearm
+                ? "LIVE SESSION DISARMED AFTER REFRESH  ·  RE-ARM TO RESUME EXECUTION"
                 : `${engineLabel}  ·  AI STANDS DOWN UNTIL YOU AUTHORIZE`}
             </span>
           </div>
@@ -4237,7 +4274,7 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
               ? "0 0 14px rgba(255,176,32,0.33)"
               : "0 0 14px rgba(255,48,64,0.33)",
           }}>
-            {liquidity.blocked ? "PROTECTED" : "ACTIVATE →"}
+            {liquidity.blocked ? "PROTECTED" : showRearm ? "RE-ARM →" : "ACTIVATE →"}
           </div>
         </div>
       </button>

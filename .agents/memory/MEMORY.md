@@ -1,1 +1,2 @@
 - [Coinbase live-order compliance](coinbase-symbol-mapping.md) — adapter.normaliseSymbol is the authoritative converter at submit; validate against product spec (precision/min-size/min-notional/tradability) locally before sending or the broker rejects one trade at a time.
+- [Customer ARM visual gate](customer-arm-visual-gate.md) — green "AI EXECUTION ARMED" must follow per-session armedForLive (resets false on load), not persisted autoMode; fail-closed when runtime unresolved, else UI lies while backend returns LIVE_BLOCKED_NOT_ARMED.
