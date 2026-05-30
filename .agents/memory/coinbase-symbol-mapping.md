@@ -29,3 +29,17 @@ adapter doing symbol conversion should consult that map, not duplicate it.
 product_ids, import the venue map from `marketData.ts` and use it as primary,
 with algorithmic dash-insertion (longest-first quote-currency suffix) only as a
 fallback for symbols not yet in the map. Trim+uppercase input first.
+
+## Coinbase market-order body (separate bug, same adapter)
+
+`market_market_ioc` requires `base_size` for SELL (quote_size is BUY-only).
+The engine sizes orders in BASE units (`req.qty`), so the adapter sends
+`base_size` for both sides. The old code sent `quote_size = qty*(limitPrice ??
+1)` — invalid field for SELL and a meaningless value (no limitPrice on market
+orders → base qty × 1). Zero Coinbase customer fills had ever occurred, so this
+was masked behind the product_id bug.
+
+**Remaining risk:** adapter has NO per-product precision handling. Coinbase
+needs base_size rounded to the product `base_increment` and >= `base_min_size`;
+`req.qty.toFixed(8)` can still trip a precision / min-notional 400. Fetch
+`/api/v3/brokerage/products/{id}`, cache base_increment + base_min_size, round.

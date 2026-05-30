@@ -271,7 +271,13 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
     };
 
     if (req.type === "market") {
-      body["order_configuration"] = { market_market_ioc: { quote_size: (req.qty * (req.limitPrice ?? 1)).toFixed(2) } };
+      // Coinbase `market_market_ioc`: a market SELL MUST specify `base_size`
+      // (the quantity of the base asset); `quote_size` is BUY-only. The engine
+      // always sizes orders in base units (`req.qty` = base quantity), so use
+      // `base_size` for both sides. The previous `quote_size` form both used a
+      // SELL-invalid field AND miscomputed the value (`qty * (limitPrice ?? 1)`
+      // collapsed to the base quantity, not the USD notional).
+      body["order_configuration"] = { market_market_ioc: { base_size: req.qty.toFixed(8) } };
     } else {
       body["order_configuration"] = {
         limit_limit_gtc: { base_size: req.qty.toFixed(8), limit_price: req.limitPrice!.toFixed(2) },
