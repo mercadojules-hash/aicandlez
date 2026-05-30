@@ -6,7 +6,7 @@ import { settingsStore } from "./settingsStore.js";
 import { getCandles, SUPPORTED_SYMBOLS, type Candle } from "./marketData.js";
 import { runAIDecision, type AIDecisionResult } from "./aiReasoning.js";
 import { computeRSI, computeEMA, computeMACD } from "./indicators.js";
-import { placeOrder, getAccountSummary, hydrateOpenPositions, type SimPosition } from "./simulationEngine.js";
+import { placeOrder, getAccountSummary, hydrateOpenPositions, closePosition, type SimPosition } from "./simulationEngine.js";
 import { placeLiveAutoOrder } from "./exchangeEngine.js";
 import {
   listLiveExecutionUsers,
@@ -1721,6 +1721,139 @@ async function runHardStopMonitor() {
   }
 }
 
+// ── Global hard-stop tick (EXIT_ENGINE_V2 cap convergence) ───────────────────────
+//
+// The global `simulationEngine` positions ARE the `trades`-table rows (id-linked
+// under EXIT_ENGINE_V2) that feed the max-active-positions cap
+// (`countOpenTradePositions`). Until now they were only ever closed by the
+// profit-only trailing pass — a global position that breaches a fixed SL/TP but
+// never activates a trailing stop stayed open forever, inflating the cap and
+// starving `autoExecute` (the 0-exec-attempts blocker). This pass mirrors
+// `runHardStopMonitor` for the GLOBAL book: it force-closes any global position
+// whose price breached its SL/TP and marks the linked `trades` row closed via
+// `markTradeRowClosed`, so the cap self-heals as positions exit.
+//
+// Per-user positions are intentionally NOT touched here — `runHardStopMonitor`
+// already enforces per-user SL/TP against `sim_positions`. This pass is purely the
+// global/cap convergence path, so there is no double-close of per-user books.
+//
+// Breach semantics match `runHardStopMonitor` (SL checked first; capital
+// protection wins a tie):
+//   BUY  → STOP_LOSS price <= stopLoss ; TAKE_PROFIT price >= takeProfit
+//   SELL → STOP_LOSS price >= stopLoss ; TAKE_PROFIT price <= takeProfit
+async function runGlobalHardStops() {
+  if (!isExitEngineV2()) return;
+  if (!isHardStopEnforcementEnabled()) return;
+  try {
+    const openRows = await db
+      .select({
+        id:         tradesTable.id,
+        symbol:     tradesTable.symbol,
+        side:       tradesTable.side,
+        stopLoss:   tradesTable.stopLoss,
+        takeProfit: tradesTable.takeProfit,
+      })
+      .from(tradesTable)
+      .where(openGlobalPositionsPredicate());
+    if (openRows.length === 0) return;
+
+    // Fetch each symbol's current price once, reuse across that symbol's rows.
+    // A failed ticker fetch skips that symbol this tick (next tick retries)
+    // rather than closing on a stale/zero price.
+    const symbols    = [...new Set(openRows.map((r) => r.symbol))];
+    const priceBySym = new Map<string, number>();
+    await Promise.all(symbols.map(async (sym) => {
+      try {
+        const ticker = await getTicker(sym);
+        if (ticker.price > 0) priceBySym.set(sym, ticker.price);
+      } catch {
+        /* skip symbol this tick */
+      }
+    }));
+
+    const correlationId = genCorrelationId();
+    for (const row of openRows) {
+      const price = priceBySym.get(row.symbol);
+      if (price === undefined) continue;
+
+      const isBuy = row.side !== "SELL";
+      let reason: "STOP_LOSS" | "TAKE_PROFIT" | null = null;
+      if (row.stopLoss !== null && row.stopLoss !== undefined) {
+        if (isBuy ? price <= row.stopLoss : price >= row.stopLoss) reason = "STOP_LOSS";
+      }
+      if (reason === null && row.takeProfit !== null && row.takeProfit !== undefined) {
+        if (isBuy ? price >= row.takeProfit : price <= row.takeProfit) reason = "TAKE_PROFIT";
+      }
+      if (reason === null) continue;
+
+      try {
+        // closePosition fetches the authoritative live exit price + computes
+        // realized PnL, removing the position from in-memory simulationEngine.
+        const closeRes = await closePosition(row.id);
+        if (closeRes.success && closeRes.trade) {
+          engineStats.hardStopHits++;
+          // markTradeRowClosed is idempotent (status='open' guarded + .returning()),
+          // so a concurrent/duplicate close after the row is already closed is a no-op.
+          await markTradeRowClosed(
+            row.id,
+            closeRes.trade.exitPrice,
+            closeRes.trade.realizedPnL,
+            closeRes.trade.realizedPnLPct,
+            reason,
+          );
+          positionMeta.delete(row.id);
+          logger.info(
+            {
+              tag:          "GLOBAL_HARD_STOP_TRIGGERED",
+              correlationId,
+              positionId:   row.id,
+              symbol:       row.symbol,
+              side:         row.side,
+              reason,
+              triggerPrice: price,
+              stopLoss:     row.stopLoss,
+              takeProfit:   row.takeProfit,
+              realizedPnLPct: closeRes.trade.realizedPnLPct,
+            },
+            `[GLOBAL_HARD_STOP_TRIGGERED] ${reason} ${row.symbol} ${row.side} @ ${price} (exit ${closeRes.trade.exitPrice})`,
+          );
+        } else {
+          // Position breached its stop in the DB but is absent from in-memory
+          // simulationEngine (memory/DB divergence). Leave the row open so boot
+          // rehydration reconciles it rather than marking a row closed without a
+          // real close fill.
+          logger.warn(
+            {
+              tag:        "GLOBAL_HARD_STOP_SKIPPED",
+              correlationId,
+              positionId: row.id,
+              symbol:     row.symbol,
+              reason:     closeRes.error ?? "closePosition returned not-success",
+            },
+            "[GLOBAL_HARD_STOP_SKIPPED] global position not in memory; trades row left open for rehydrate reconciliation",
+          );
+        }
+      } catch (err) {
+        logger.warn(
+          {
+            tag:        "GLOBAL_HARD_STOP_SKIPPED",
+            correlationId,
+            positionId: row.id,
+            symbol:     row.symbol,
+            reason:     err instanceof Error ? err.message : String(err),
+          },
+          "[GLOBAL_HARD_STOP_SKIPPED] global hard-stop close threw",
+        );
+      }
+    }
+  } catch (err) {
+    logger.error(
+      { err: err instanceof Error ? err.message : String(err) },
+      "runGlobalHardStops: unexpected failure",
+    );
+  }
+}
+
 // ── Trailing stop tick ─────────────────────────────────────────────────────────
 
 async function runTrailingStops() {
@@ -2314,7 +2447,11 @@ async function tick() {
 
   // Hard SL/TP enforcement runs BEFORE the profit-only trailing pass so a
   // breached stop is force-closed even on a trade that never went green.
+  // runHardStopMonitor covers per-user `sim_positions`; runGlobalHardStops covers
+  // the global `trades`-table book (the max-active-positions cap source) so those
+  // rows actually close on SL/TP instead of only on a trailing trigger.
   await runHardStopMonitor();
+  await runGlobalHardStops();
   await runTrailingStops();
 }
 
