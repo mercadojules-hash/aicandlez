@@ -44,7 +44,8 @@ export interface RuntimeState {
   activeRuntimeExchange: string | null;
   autoPromoted:          boolean;
   liveReady:             boolean;
-  totalEquityUSD:        number;
+  totalEquityUSD:        number;    // SUM of all healthy connections
+  activeEquityUSD:       number;    // active exchange ONLY (headline equity)
   connectedExchanges:    RuntimeConnection[];
   fetchedAt:             number;
 }
@@ -107,12 +108,18 @@ export function useSetRuntimeExchange() {
           if (value === "paper") {
             return { ...previous, activeRuntimeExchange: "paper",
                      mode: "paper", activeExchange: null,
-                     autoPromoted: false, liveReady: false };
+                     autoPromoted: false, liveReady: false,
+                     activeEquityUSD: 0 };
           }
           if (value && previous.connectedExchanges.some(c => c.exchange === value && c.ok)) {
+            // Optimistically point the headline equity at the selected
+            // exchange's balance so it doesn't flash 0/stale before the
+            // refetch settles (server re-derivation is authoritative).
+            const sel = previous.connectedExchanges.find(c => c.exchange === value && c.ok);
             return { ...previous, activeRuntimeExchange: value,
                      mode: "live", activeExchange: value,
-                     autoPromoted: false, liveReady: true };
+                     autoPromoted: false, liveReady: true,
+                     activeEquityUSD: sel?.totalEquityUSD ?? 0 };
           }
           return { ...previous, activeRuntimeExchange: value };
         })();

@@ -5152,9 +5152,12 @@ export function PortalCustomerShell() {
   // fetch (or 8s fail-safe). MyAccountRailPaper renders "resyncing"
   // instead of "paper sim" while this is true under strict mode.
   const { resyncing: runtimeResyncing } = useReconnectResync();
-  const liveTotalUsd  = runtimeState?.totalEquityUSD ?? 0;
+  const liveTotalUsd  = runtimeState?.activeEquityUSD ?? 0;
   // Equity sourcing:
-  //   • LIVE  → runtimeState.totalEquityUSD (broker-polled)
+  //   • LIVE  → runtimeState.activeEquityUSD (ACTIVE exchange ONLY — the
+  //             same exchange the runtime label + risk gate + execution
+  //             engine reference; NOT the sum of every connected exchange.
+  //             Per-exchange balances live in the CONNECTED EXCHANGES panel.)
   //   • PAPER → serverAccount.equity when present (canonical, includes
   //             AI-fan-out paper positions), else fall back to the local
   //             in-memory paperStats.equity, else STARTING_EQUITY for a
@@ -6802,6 +6805,65 @@ export function PortalCustomerShell() {
               strictRuntime={strictRuntime}
               runtimePending={runtimePending || runtimeResyncing}
             />
+            {/* CONNECTED EXCHANGES — informational per-exchange balances.
+                Decoupled from runtime math: the headline equity + risk gate
+                + execution engine reference ONLY the active exchange
+                (`activeEquityUSD`); this panel simply lets the customer see
+                every connected broker's balance without affecting which
+                account the runtime evaluates. */}
+            {(runtimeState?.connectedExchanges?.length ?? 0) > 0 && (
+              <section style={{
+                background: T.BG_TERMINAL,
+                border: `1px solid rgba(124,255,0,0.10)`,
+                fontFamily: T.FONT_MONO,
+              }}>
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "8px 10px", borderBottom: `1px solid rgba(124,255,0,0.08)`,
+                  fontSize: 9.5, fontWeight: 700, letterSpacing: T.TRACK_LABEL, color: T.TEXT_3,
+                }}>
+                  <span>CONNECTED EXCHANGES</span>
+                  <span style={{ opacity: 0.6 }}>BALANCE</span>
+                </div>
+                {(runtimeState?.connectedExchanges ?? []).map((c) => {
+                  const isActiveEx = isLiveRuntime && c.exchange === liveExchange;
+                  return (
+                    <div key={c.exchange} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "8px 10px", borderBottom: `1px solid rgba(124,255,0,0.05)`,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                        <span style={{
+                          width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                          background: c.ok ? T.NEON : T.RED,
+                        }} />
+                        <span style={{
+                          fontSize: 11, fontWeight: 600, color: T.TEXT_1,
+                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                        }}>
+                          {(c.label || c.exchange).toUpperCase()}
+                        </span>
+                        {isActiveEx && (
+                          <span style={{
+                            fontSize: 8, fontWeight: 700, letterSpacing: T.TRACK_LABEL,
+                            color: T.BG_BLACK, background: T.NEON,
+                            padding: "1px 5px", borderRadius: 2, flexShrink: 0,
+                          }}>ACTIVE</span>
+                        )}
+                      </div>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                        color: c.ok ? T.TEXT_0 : T.TEXT_3, flexShrink: 0, marginLeft: 8,
+                      }}>
+                        {c.ok
+                          ? `$${nz(c.totalEquityUSD).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : (c.error ? "SYNC FAILED" : "—")}
+                      </span>
+                    </div>
+                  );
+                })}
+              </section>
+            )}
             <CustomerBlotterPanelOpen rows={blotterOpenRows} entitled={entitled} />
             <CustomerBlotterPanelHistory rows={paperHistory} />
           </aside>

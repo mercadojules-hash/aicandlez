@@ -69,7 +69,8 @@ interface CustomerTradingRuntimeContext {
   mode:                   RuntimeMode;
   activeExchange:         string | null;
   connectedExchanges:     ExchangeConnectionState[];
-  totalEquityUSD:         number;
+  totalEquityUSD:         number;    // SUM of all healthy connections (Connected Exchanges section)
+  activeEquityUSD:        number;    // active exchange ONLY (headline equity — matches runtime/risk/exec)
   liveReady:              boolean;
   activeRuntimeExchange:  string | null;    // raw stored preference
   autoPromoted:           boolean;          // true iff stored=null AND we auto-resolved to live
@@ -227,6 +228,14 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
 
     const liveReady = mode === "live" && activeExchange !== null;
 
+    // Headline equity must reference the SAME exchange/account the runtime
+    // label + risk gate + execution engine use — the ACTIVE exchange only,
+    // NOT the sum of all connected exchanges (`totalEquityUSD`). In paper
+    // mode this is 0; the client renders the paper account equity instead.
+    const activeEquityUSD = mode === "live" && activeExchange
+      ? (connectedExchanges.find(c => c.exchange === activeExchange)?.totalEquityUSD ?? 0)
+      : 0;
+
     // ── Cohort-predicate unification (live-execution writeback) ──────────
     // The AI engine's live fan-out cohort (`listLiveExecutionUsers()` in
     // lib/liveUserExecution.ts) selects users with:
@@ -301,6 +310,7 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
       activeExchange,
       connectedExchanges,
       totalEquityUSD,
+      activeEquityUSD,
       liveReady,
       activeRuntimeExchange,
       autoPromoted,

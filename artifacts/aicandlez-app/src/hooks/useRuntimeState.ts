@@ -36,7 +36,8 @@ export interface RuntimeState {
   activeRuntimeExchange: string | null;
   autoPromoted:          boolean;
   liveReady:             boolean;
-  totalEquityUSD:        number;
+  totalEquityUSD:        number;    // SUM of all healthy connections
+  activeEquityUSD:       number;    // active exchange ONLY (headline equity)
   connectedExchanges:    RuntimeConnection[];
   fetchedAt:             number;
 }
