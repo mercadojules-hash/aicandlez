@@ -1,42 +1,39 @@
 ---
-name: ARM enforcement model (customer live orders)
-description: Where the per-session "ARM" requirement is and is NOT enforced across live-order entry points; which gates actually protect real money.
+name: ARM enforcement model (live trading)
+description: How the per-session ARM (armedForLive) interlock actually works server vs client, and which live-order paths re-check it. Read before touching ARM / live-order gates.
 ---
 
-# ARM enforcement model for customer live orders
+# ARM enforcement model
 
-`armedForLive` is a **client-side, module-scoped** session flag
-(trading-dashboard `hooks/useArmedForLive.ts`) that resets to `false` on every
-page load. There is **no `armedForLive` field on the server**. The server's
-only per-session arm enforcement happens at the AI-trading *enable* route
-(`aiTrading.ts`), which requires an interactive-arm flag in the request body
-to turn on LIVE auto-mode (rejects with `[ARM_LIVE_REJECTED] runtime_not_armed`
-otherwise). Once enabled, the persisted `user_settings.autoMode` drives the
-loop fan-out — there is no per-tick session re-check (the arm happened at
-enable time).
+ARM (`armedForLive`) is a per-session **client** interlock: source of truth is an
+in-memory module store (`trading-dashboard useArmedForLive.ts` `getArmedForLive()`).
+Server gates that "enforce" ARM do so by trusting a client-supplied
+`armedForLive: boolean` in the request body:
 
-Live-order entry points and arm status:
-- **Manual customer BUY/SELL**: `SignalRow.fireTrade` (client) gates on
-  `!armedForLive` before calling `POST /api/user/live-order`. The server route
-  → `executeCustomerOrder` → `placeLiveAutoOrderForUser` does **NOT** re-verify
-  a session arm. A direct API call could therefore place a live order while the
-  UI session is "disarmed" — still subject to the env kill switch + all gates
-  below, but not to the client arm.
-- **AI auto fan-out** (`tradingLoop.ts` customer loop): arm satisfied at
-  autoMode-enable time; gate `0a2 user_ai_disabled` (= autoMode off) blocks
-  execution when disabled.
-- **Operator path** `POST /api/exchange/order/execute`: no arm by design,
-  `requireOperator`-gated, platform-credential institutional path.
+- Manual customer live order: `api-server routes/userLiveOrder.ts` — non-operator +
+  `!armedForLive` → 412 `runtime_not_armed` / `needsArm:true`. Operators bypass.
+- AI auto-trade **activation**: `api-server routes/aiTrading.ts` — `wouldBeLive &&
+  !armedForLive` → 412 `runtime_not_armed`. Checked once, at toggle time.
 
-`placeLiveAutoOrderForUser` gate list (the real-money protections, independent
-of any arm flag): `0PRE` customer_live_execution_disabled (env kill switch),
-`0SIZE` size clamp, `0UNI` symbol_not_in_universe, `0VOL` volume gate, `0a`
-user_status_blocked, `0a2` user_ai_disabled, `0b` trade_limit_exhausted, `0c`
-concurrent_live_cap_reached, `0LIQ` liquidity/plan_max_positions, `0d` risk
-gate, `0e` ai_disclaimer_not_accepted, `0f` low_confidence_signal.
+**Why this matters / constraints:**
+- ARM is a **confirmation interlock** (protects the account owner from accidental
+  live fires), NOT a forgery-proof security boundary. An authenticated user can
+  POST `armedForLive:true` directly and pass the gate. That is acceptable because
+  real money is independently gated by **server-authoritative** controls that ARM
+  does not replace: env kill switch (`CUSTOMER_LIVE_EXECUTION_ENABLED` /
+  `customer_live_execution_disabled`), `liveReady` from the runtime aggregator
+  (computed from exchange health), and confidence/volume/risk/concurrency gates.
+- **AI auto-execution per-tick path** (`tradingLoop` →
+  `lib/liveUserExecution.ts placeLiveAutoOrderForUser`) does **NOT** re-check ARM.
+  ARM for AI is enforced only at activation. Persisted `autoMode` keeps executing
+  live after a page refresh without re-arming. This is the one "live while UI
+  shows disarmed" path.
 
-**Why:** future "add a live-order path" or "harden ARM" work must know the arm
-is a UI affordance, not a server gate, on the manual route. If true server-side
-arm enforcement is ever required for manual orders, add an explicit per-session
-check in the `/api/user/live-order` route — typecheck-clean changes elsewhere
-will not close that gap.
+**How to apply:** If a task asks for "no live order can fire while disarmed" as a
+hard boundary, the current model does not deliver it. True server-authoritative ARM
+= a session-bound arm flag/nonce (session table or cache) set only by an explicit
+arm endpoint, TTL'd, invalidated on refresh/rotation/logout, validated in
+`userLiveOrder.ts` instead of trusting the body, plus a per-tick ARM check in
+`placeLiveAutoOrderForUser`. That is a distinct, larger task — confirm product
+intent (especially whether the server-side AI loop should require per-session ARM
+at all) before building.
