@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import crypto from "node:crypto";
 import cors from "cors";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
@@ -201,6 +202,55 @@ app.post(
       logger.error("Stripe webhook: req.body is not a Buffer — express.json() ran first");
       res.status(500).json({ error: "Webhook configuration error" });
       return;
+    }
+
+    // ── TEMP DIAGNOSTIC #2 (remove after webhook signature debug) ───────────
+    // Definitive raw-body / secret self-test, run IMMEDIATELY before
+    // constructEvent. Recomputes Stripe's v1 HMAC locally from the EXACT raw
+    // buffer + env secret and compares to the header. Distinguishes
+    // "secret wrong / endpoint or mode mismatch" (body intact, HMAC ≠ v1)
+    // from "raw body altered in transit" (length/sha mismatch). The secret
+    // value is used only as an HMAC key here and is NEVER logged.
+    try {
+      const selfSecret          = process.env.STRIPE_WEBHOOK_SECRET;
+      const rawBuf              = req.body as Buffer;
+      const contentLengthHeader = Number(req.headers["content-length"] ?? -1);
+      const parts               = sig.split(",").map((kv) => kv.split("="));
+      const t                   = parts.find((p) => p[0] === "t")?.[1] ?? "";
+      const v1s                 = parts.filter((p) => p[0] === "v1").map((p) => p[1] ?? "");
+
+      let hmacMatchesAnyV1: boolean | null = null;
+      let expectedHmacPrefix = "";
+      if (selfSecret && t) {
+        const signedPayload = `${t}.${rawBuf.toString("utf8")}`;
+        const expected = crypto
+          .createHmac("sha256", selfSecret)
+          .update(signedPayload, "utf8")
+          .digest("hex");
+        hmacMatchesAnyV1   = v1s.includes(expected);
+        expectedHmacPrefix = expected.slice(0, 10);
+      }
+
+      const nowSec = Math.floor(Date.now() / 1000);
+      logger.info(
+        {
+          contentLengthHeader,
+          bufferByteLength:      rawBuf.length,
+          lengthMatch:           contentLengthHeader === rawBuf.length,
+          bodySha256Prefix:      crypto.createHash("sha256").update(rawBuf).digest("hex").slice(0, 12),
+          bodyStartsWithBrace:   rawBuf.length > 0 && rawBuf[0] === 0x7b,           // '{'
+          bodyEndsWithBrace:     rawBuf.length > 0 && rawBuf[rawBuf.length - 1] === 0x7d, // '}'
+          sigTimestamp:          t,
+          v1SchemeCount:         v1s.length,
+          timestampSkewSeconds:  t ? nowSec - Number(t) : null,
+          hmacMatchesAnyV1,       // ← THE answer: true = secret+body BOTH correct
+          expectedHmacPrefix,     // derived value, NOT the secret
+          firstReceivedV1Prefix: (v1s[0] ?? "").slice(0, 10),
+        },
+        "[STRIPE_WEBHOOK_DIAG2] signature self-test",
+      );
+    } catch (diagErr) {
+      logger.warn({ err: diagErr }, "[STRIPE_WEBHOOK_DIAG2] self-test failed");
     }
 
     try {

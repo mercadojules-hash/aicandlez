@@ -35,3 +35,18 @@ A real signing secret is `whsec_` + ~32 chars. `source:"db"`/`"none"` in prod =
 Render env not actually loaded → redeploy / fix the var, don't chase the value.
 Route is mounted before `express.json()` with `express.raw({type:"application/json"})`
 — required for raw-body signature verification; reordering breaks it.
+
+## Definitive secret-vs-body self-test (diagnostic technique)
+When `source=env`, secret length/prefix look right, body is a Buffer, yet
+constructEvent still throws "No signatures found": recompute Stripe's v1
+signature locally and compare. `signedPayload = `${t}.${rawBuf.toString("utf8")}``,
+`expected = HMAC_SHA256(key=WHOLE whsec_ secret string, signedPayload).hex`,
+then check `v1Values.includes(expected)`. Also compare `content-length` header
+vs `buffer.length` (proxy-alteration detector) and sha256 the buffer.
+**Interpretation:** `hmacMatchesAnyV1=true` → secret+body both correct (look
+elsewhere / timestamp). `false` + `lengthMatch=true` → **wrong secret** (wrong
+endpoint or test-vs-live mode — each endpoint+mode has its own whsec_).
+`false` + `lengthMatch=false` → **raw body altered in transit** (proxy/CDN
+re-encoded it). stripe-replit-sync's processWebhook uses the SAME config secret
++ SAME buffer (constructEventAsync) — it is NOT a different-body/secret path.
+**Why:** narrows the two remaining causes after env/secret are ruled in.
