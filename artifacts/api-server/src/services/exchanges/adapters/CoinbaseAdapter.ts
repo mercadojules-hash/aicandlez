@@ -53,6 +53,55 @@ function summariseCoinbaseError(raw: string): string {
   }
 }
 
+/**
+ * Number of decimal places implied by a Coinbase increment value.
+ * "0.01" → 2, "1" → 0, 1e-8 (0.00000001) → 8. Uses Number#toString so
+ * trailing zeros from Coinbase ("0.01000000") don't inflate the count.
+ */
+function incrementDecimals(inc: number): number {
+  if (!Number.isFinite(inc) || inc <= 0) return 8;
+  const s = inc.toString();
+  const eIdx = s.indexOf("e-");
+  if (eIdx !== -1) return parseInt(s.slice(eIdx + 2), 10);
+  const dot = s.indexOf(".");
+  return dot === -1 ? 0 : s.length - dot - 1;
+}
+
+/** Normalised, cache-ready Coinbase product spec used by the order pre-check. */
+interface ProductSpec {
+  productId:       string;
+  baseIncrement:   number;
+  baseDecimals:    number;
+  quoteIncrement:  number;
+  quoteDecimals:   number;
+  baseMinSize:     number;  // 0 = unknown / no constraint
+  quoteMinSize:    number;  // 0 = unknown / no constraint (min notional)
+  price:           number;  // reference price for notional estimate
+  tradingDisabled: boolean; // offline / explicitly disabled — no orders at all
+  cancelOnly:      boolean; // only cancels accepted
+  viewOnly:        boolean; // read-only
+  limitOnly:       boolean; // market orders rejected
+  postOnly:        boolean; // only maker limit orders
+  auctionMode:     boolean; // standard orders rejected during auction
+}
+
+/**
+ * Thrown by the local Coinbase order pre-check when an order would violate a
+ * product constraint (precision, min base size, min notional, trading halt).
+ * Surfaced to the caller WITHOUT ever sending the order to Coinbase, so we
+ * never discover these rejections one live trade at a time.
+ */
+class CoinbaseValidationError extends Error {
+  readonly productId: string;
+  readonly reasons:   string[];
+  constructor(productId: string, reasons: string[]) {
+    super(`Coinbase pre-check rejected ${productId}: ${reasons.join("; ")}`);
+    this.name      = "CoinbaseValidationError";
+    this.productId = productId;
+    this.reasons   = reasons;
+  }
+}
+
 // ── CoinbaseAdapter ───────────────────────────────────────────────────────────
 //
 // Coinbase Advanced Trade REST adapter.
@@ -107,6 +156,11 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
     testnet: null,
   });
   private orderSeq = 1;
+
+  // Per-product spec cache (precision + minimums). Keyed by product_id.
+  // Specs change rarely; a 1h TTL keeps order latency low while staying fresh.
+  private readonly productCache = new Map<string, { spec: ProductSpec; at: number }>();
+  private static readonly PRODUCT_TTL_MS = 60 * 60 * 1000;
 
   constructor(config: Partial<AdapterConfig> = {}) {
     super({ ...COINBASE_CONFIG, ...config });
@@ -259,44 +313,227 @@ export class CoinbaseAdapter extends BaseExchangeAdapter {
     };
   }
 
+  /**
+   * Fetch (and cache) the Coinbase product spec for a normalised product_id.
+   * Precision + minimums change rarely, so a 1h TTL keeps order latency low.
+   * Fails CLOSED: a fetch error propagates and the order is rejected rather
+   * than sent un-validated — the caller surfaces it as a normal rejection.
+   */
+  private async getProductSpec(productId: string): Promise<ProductSpec> {
+    const hit = this.productCache.get(productId);
+    if (hit && Date.now() - hit.at < CoinbaseAdapter.PRODUCT_TTL_MS) return hit.spec;
+
+    let raw: CbProduct;
+    try {
+      raw = await this.withRetry(
+        () => this.get<CbProduct>(`/api/v3/brokerage/products/${productId}`),
+        3, 300, "getProduct",
+      );
+    } catch (err) {
+      // Availability vs. compliance: if we have a previously-fetched (now
+      // stale) spec, serve it with a warning rather than block all trading on
+      // a transient products-endpoint outage. Only fail closed when we have
+      // never successfully fetched this product.
+      if (hit) {
+        logger.warn({
+          tag:        "COINBASE_PRODUCT_SPEC_STALE",
+          product_id: productId,
+          age_ms:     Date.now() - hit.at,
+          error:      err instanceof Error ? err.message : String(err),
+        }, "[COINBASE_PRODUCT_SPEC_STALE]");
+        return hit.spec;
+      }
+      throw err;
+    }
+
+    const baseIncrement  = parseFloat(raw.base_increment  ?? "") || 0;
+    const quoteIncrement = parseFloat(raw.quote_increment ?? "") || 0;
+    const spec: ProductSpec = {
+      productId,
+      baseIncrement,
+      baseDecimals:    incrementDecimals(baseIncrement),
+      quoteIncrement,
+      quoteDecimals:   incrementDecimals(quoteIncrement),
+      baseMinSize:     parseFloat(raw.base_min_size  ?? "") || 0,
+      quoteMinSize:    parseFloat(raw.quote_min_size ?? "") || 0,
+      price:           parseFloat(raw.price          ?? "") || 0,
+      tradingDisabled: raw.trading_disabled === true || raw.status === "offline",
+      cancelOnly:      raw.cancel_only  === true,
+      viewOnly:        raw.view_only    === true,
+      limitOnly:       raw.limit_only   === true,
+      postOnly:        raw.post_only    === true,
+      auctionMode:     raw.auction_mode === true,
+    };
+    this.productCache.set(productId, { spec, at: Date.now() });
+    logger.debug({ tag: "COINBASE_PRODUCT_SPEC", ...spec }, "[COINBASE_PRODUCT_SPEC]");
+    return spec;
+  }
+
+  /** Floor a value to the product's increment grid and format with its decimals. */
+  private roundDownToIncrement(value: number, increment: number): { value: number; str: string } {
+    if (!(increment > 0)) return { value, str: value.toFixed(8) };
+    const decimals = incrementDecimals(increment);
+    const steps    = Math.floor(value / increment + 1e-9);
+    const rounded  = steps * increment;
+    return { value: rounded, str: rounded.toFixed(decimals) };
+  }
+
+  /**
+   * Reject locally (without hitting Coinbase) when the order would violate a
+   * product constraint. Throws CoinbaseValidationError with explicit logging.
+   */
+  private assertCoinbaseCompliant(p: {
+    productId: string; side: string; type: string; baseSize: number; baseSizeStr: string;
+    notional: number; reqQty: number; spec: ProductSpec;
+  }): void {
+    const reasons: string[] = [];
+    // Tradability: states that reject ANY order, then market-specific states.
+    if (p.spec.tradingDisabled) reasons.push("product trading disabled/offline");
+    if (p.spec.viewOnly)        reasons.push("product view_only (no orders accepted)");
+    if (p.spec.cancelOnly)      reasons.push("product cancel_only (no new orders)");
+    if (p.spec.auctionMode)     reasons.push("product in auction_mode (standard orders rejected)");
+    if (p.type === "market" && (p.spec.limitOnly || p.spec.postOnly)) {
+      reasons.push(`product is ${p.spec.limitOnly ? "limit_only" : "post_only"} — market orders rejected`);
+    }
+    // Precision / sizing.
+    if (!(p.baseSize > 0)) {
+      reasons.push(`base_size rounds to 0 (req ${p.reqQty} @ base_increment ${p.spec.baseIncrement || "n/a"})`);
+    }
+    if (p.spec.baseMinSize > 0 && p.baseSize < p.spec.baseMinSize) {
+      reasons.push(`base_size ${p.baseSizeStr} < base_min_size ${p.spec.baseMinSize}`);
+    }
+    // Min notional: when the product declares a minimum we MUST be able to
+    // verify it — a missing/zero reference price is itself a reject (fail
+    // closed) rather than a silent skip.
+    if (p.spec.quoteMinSize > 0) {
+      if (!(p.notional > 0)) {
+        reasons.push(`cannot verify min notional (quote_min_size ${p.spec.quoteMinSize}): no positive reference price`);
+      } else if (p.notional < p.spec.quoteMinSize) {
+        reasons.push(`notional ${p.notional.toFixed(2)} < min notional (quote_min_size) ${p.spec.quoteMinSize}`);
+      }
+    }
+    if (reasons.length > 0) {
+      logger.error({
+        tag:           "COINBASE_PRECHECK_REJECT",
+        product_id:    p.productId,
+        side:          p.side,
+        base_size:     p.baseSizeStr,
+        notional:      Number(p.notional.toFixed(2)),
+        base_increment: p.spec.baseIncrement,
+        base_min_size: p.spec.baseMinSize,
+        quote_min_size: p.spec.quoteMinSize,
+        reasons,
+      }, "[COINBASE_PRECHECK_REJECT]");
+      throw new CoinbaseValidationError(p.productId, reasons);
+    }
+  }
+
   async placeOrder(req: PlaceOrderRequest): Promise<StandardOrder> {
     this.checkOrderRateLimit();
-    if (!this.isConfigured()) return simulatedOrder("Coinbase", req, this.normaliseSymbol(req.symbol), this.config);
+    const productId = this.normaliseSymbol(req.symbol);
+    if (!this.isConfigured()) return simulatedOrder("Coinbase", req, productId, this.config);
 
     const clientId = req.clientId ?? `CB-${Date.now()}-${this.orderSeq++}`;
+
+    // ── Coinbase-compliance pre-check ──────────────────────────────────────
+    // Round to the product's base_increment and validate against base_min_size
+    // and min notional BEFORE building the payload, so precision/min-notional
+    // rejections are caught locally instead of one live trade at a time.
+    const spec        = await this.getProductSpec(productId);
+    const rounded     = this.roundDownToIncrement(req.qty, spec.baseIncrement);
+    const baseSize    = rounded.value;
+    const baseSizeStr = rounded.str;
+    // Reference price for the notional check: explicit limit price → cached
+    // product price → live ticker. The ticker fallback ensures min-notional is
+    // actually verifiable for market orders when the product spec carries no
+    // price (otherwise assertCoinbaseCompliant fails closed).
+    let refPrice = req.limitPrice ?? spec.price;
+    if (!(refPrice > 0)) {
+      try { refPrice = (await this.getTicker(req.symbol)).last; }
+      catch { /* leave 0 — validator will reject if a min notional exists */ }
+    }
+    const notional    = baseSize * refPrice;
+    this.assertCoinbaseCompliant({
+      productId, side: req.side.toUpperCase(), type: req.type, baseSize, baseSizeStr, notional, reqQty: req.qty, spec,
+    });
+
     const body: Record<string, unknown> = {
       client_order_id: clientId,
-      product_id:      this.normaliseSymbol(req.symbol),
+      product_id:      productId,
       side:            req.side.toUpperCase(),
     };
-
+    // We always size in base units, so `quote_size` is never submitted.
+    const quoteSizeStr: string | null = null;
     if (req.type === "market") {
       // Coinbase `market_market_ioc`: a market SELL MUST specify `base_size`
       // (the quantity of the base asset); `quote_size` is BUY-only. The engine
       // always sizes orders in base units (`req.qty` = base quantity), so use
-      // `base_size` for both sides. The previous `quote_size` form both used a
-      // SELL-invalid field AND miscomputed the value (`qty * (limitPrice ?? 1)`
-      // collapsed to the base quantity, not the USD notional).
-      body["order_configuration"] = { market_market_ioc: { base_size: req.qty.toFixed(8) } };
+      // `base_size` for both sides.
+      body["order_configuration"] = { market_market_ioc: { base_size: baseSizeStr } };
     } else {
       body["order_configuration"] = {
-        limit_limit_gtc: { base_size: req.qty.toFixed(8), limit_price: req.limitPrice!.toFixed(2) },
+        limit_limit_gtc: { base_size: baseSizeStr, limit_price: req.limitPrice!.toFixed(spec.quoteDecimals || 2) },
       };
     }
 
-    const data = await this.withRetry(
-      () => this.signedPost<CbOrderResponse>("/api/v3/brokerage/orders", body),
-      3, 500, "placeOrder",
-    );
-    const fill = parseFloat(data.order?.average_filled_price ?? req.limitPrice?.toFixed(2) ?? "0");
-    const qty  = parseFloat(data.order?.filled_size ?? req.qty.toFixed(8));
+    // Final normalised payload — the single line on-call uses to compare what
+    // we built vs. what Coinbase returns.
+    logger.info({
+      tag:        "COINBASE_NORMALIZED_PAYLOAD",
+      symbol:     req.symbol,
+      product_id: productId,
+      side:       req.side.toUpperCase(),
+      type:       req.type,
+      base_size:  baseSizeStr,
+      quote_size: quoteSizeStr,
+      notional:   Number(notional.toFixed(2)),
+      ref_price:  refPrice,
+      base_increment: spec.baseIncrement,
+      base_min_size:  spec.baseMinSize,
+      quote_min_size: spec.quoteMinSize,
+    }, "[COINBASE_NORMALIZED_PAYLOAD]");
+
+    let data: CbOrderResponse;
+    try {
+      data = await this.withRetry(
+        () => this.signedPost<CbOrderResponse>("/api/v3/brokerage/orders", body),
+        3, 500, "placeOrder",
+      );
+    } catch (err) {
+      logger.error({
+        tag:        "COINBASE_ORDER_RESULT",
+        ok:         false,
+        product_id: productId,
+        side:       req.side.toUpperCase(),
+        base_size:  baseSizeStr,
+        quote_size: quoteSizeStr,
+        notional:   Number(notional.toFixed(2)),
+        response:   err instanceof Error ? err.message : String(err),
+      }, "[COINBASE_ORDER_RESULT]");
+      throw err;
+    }
+
+    logger.info({
+      tag:        "COINBASE_ORDER_RESULT",
+      ok:         !!data.success,
+      product_id: productId,
+      side:       req.side.toUpperCase(),
+      base_size:  baseSizeStr,
+      quote_size: quoteSizeStr,
+      notional:   Number(notional.toFixed(2)),
+      order_id:   data.order_id ?? null,
+      response:   JSON.stringify(data).slice(0, 800),
+    }, "[COINBASE_ORDER_RESULT]");
+
+    const fill = parseFloat(data.order?.average_filled_price ?? "") || refPrice;
+    const qty  = parseFloat(data.order?.filled_size ?? "") || baseSize;
     const fee  = this.computeFee(qty * fill, true);
     return {
       id:              clientId,
       exchangeOrderId: data.order_id ?? clientId,
       exchange:        "Coinbase",
       symbol:          req.symbol,
-      nativeSymbol:    this.normaliseSymbol(req.symbol),
+      nativeSymbol:    productId,
       side:            req.side,
       type:            req.type,
       status:          data.success ? "filled" : "rejected",
@@ -710,4 +947,21 @@ interface CbOrder {
 interface CbOrderResponse {
   success: boolean; order_id?: string;
   order?: { average_filled_price?: string; filled_size?: string };
+}
+// Coinbase Advanced Trade product spec (GET /api/v3/brokerage/products/{id}).
+// All size fields are strings; absent fields are treated as "no constraint".
+interface CbProduct {
+  product_id:       string;
+  price?:           string;  // current spot price (reference for notional)
+  base_increment?:  string;  // smallest base-size step (precision)
+  quote_increment?: string;  // smallest quote/limit-price step (precision)
+  base_min_size?:   string;  // minimum base size
+  quote_min_size?:  string;  // minimum order value in quote ccy (min notional)
+  trading_disabled?: boolean;
+  status?:          string;  // "online" | "offline" | ...
+  view_only?:       boolean; // read-only, no orders
+  cancel_only?:     boolean; // only cancels accepted
+  limit_only?:      boolean; // only limit orders (market rejected)
+  post_only?:       boolean; // only maker limit orders
+  auction_mode?:    boolean; // in auction, standard orders rejected
 }
