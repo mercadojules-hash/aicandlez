@@ -1,0 +1,96 @@
+New focused task: trace Signal Passed Confidence → Execution Attempt and find why 132 qualified signals = 0 exec attempts. Read-only, findings first. Let me pull the live execution funnel and locate the counter code in parallel.
+
+
+3 actions
+The live funnel is decisive. Look at the gate sequence:
+
+reachedExecution:     74
+passedPositionLimits:  3   ← 71 signals die HERE
+passedCooldown:        3
+passedDuplicate:       3
+passedRisk:            3
+passedExchange:        3
+executionAttempted:    3
+
+tradesBlocked: 71 = exactly the 74→3 drop. Every rejection is at the position-limits gate. executionAttempted only increments after position-limits + cooldown + duplicate + risk + exchange all pass — so when position limits rejects everything (your snapshot), Exec Attempts stays 0. Let me read the exact gate code and confirm what limit it's enforcing.
+
+
+2 actions
+The funnel counters come from a downstream-state object inside autoExecute. Let me read the execution path (autoExecute + the funnel assembly) and find where passedPositionLimits actually increments — that's the gate killing 71 of 74.
+
+
+2 actions
+The position-limit gate lives in autoExecute (line 920), using countOpenTradePositions() (387, called at 956). Let me read both to find the exact limit and why 71/74 fail it.
+
+
+2 actions
+Found it — Gate 1: max concurrent open positions (line 949-973). When openCount >= settings.maxActivePositions, every signal is blocked with tradesBlocked++ and never reaches the execution attempt. This is the 74→3 cliff. Let me confirm the actual values: what countOpenTradePositions() returns now and what maxActivePositions is set to.
+
+
+3 actions
+maxActivePositions default = 3 (global engine cap, 0 = unlimited). Gate 1 blocks when openCount >= 3, where openCount = open rows in the trades table (survives restarts via rehydrateOpenPositions). You have exactly 3 live positions (Coinbase 2 + Kraken 1) — let me confirm the open trades rows to see if they're saturating the cap.
+
+
+2 actions
+43 OPEN rows in the trades table (vs cap of 3). Let me confirm V2_TRADE_MODES, the exact filtered count, and the open rows by mode (the timestamp column is a real timestamp type, not bigint).
+
+
+2 actions
+Root cause confirmed. Let me run one verification query to characterize the 43 open trades rows (the cap source) against the actual open positions — to distinguish genuinely-open from orphaned/never-closed rows.
+
+
+2 actions
+Root cause fully confirmed. Here are the findings.
+
+The blocker: maxActivePositions cap (=3) is permanently saturated
+Exact code path that gates "Exec Attempts": autoExecute() → Gate 1: max concurrent open positions (tradingLoop.ts:949–973).
+
+if (settings.maxActivePositions > 0) {                       // default = 3
+  const openCount = await countOpenTradePositions();        // counts OPEN rows in `trades`
+  if (openCount >= settings.maxActivePositions) {           // 43 >= 3  → TRUE
+    engineStats.tradesBlocked++;
+    return { executed: false, blockReason: "Max active positions (3)" };  // ← returns BEFORE exec attempt
+  }
+}
+
+executionAttempted / tradesExecuted++ only fire after Gate 1 passes. countOpenTradePositions() counts open rows in the trades table (status='open' AND mode IN (auto,live,test) AND price>0 AND amount>0). Right now that count is 43, against a cap of 3. So 43 >= 3 is true on every tick → every confidence-qualified signal is rejected at Gate 1 → Exec Attempts stays at 0 (or plateaus at exactly 3 right after a fresh start before the count rebuilds).
+
+Live funnel confirms the cliff is here and nowhere else:
+
+reachedExecution:     74
+passedPositionLimits:  3   ← 71 blocked HERE  (== tradesBlocked: 71)
+passedCooldown:        3   (0 lost)
+passedDuplicate:       3   (0 lost)
+passedRisk:            3   (0 lost)
+passedExchange:        3   (0 lost)
+
+Your 8 questions (for the qualified signals that reached execution)
+#	Gate	Rejected
+1	Liquidity guard (per-user PLAN_MAX_OPEN_POSITIONS)	0 — never reached; global gate fires first
+2	Risk gate (validateTrade)	0
+3	Cooldown	0
+4	Duplicate	0
+5	Max position limits (Gate 1, maxActivePositions=3)	71 — the entire blockage
+6	Exchange validation	0
+7	Symbol mapping / pair validation	0
+8	Other (correlation filter, etc.)	0
+(Separately, 261 passed-confidence → 74 reached execution; the 261→74 drop is the pre-execution quality funnel — MTF 136, volume 86, spread/trend 74. Those are signal filters, not execution gates.)
+
+Why the cap is stuck at 43 — and why nothing shows as closed (same bug)
+The trades table is full of orphaned "open" rows that were never marked closed:
+
+trades table: 43 open / 1 closed (lifetime).
+sim_trades (per-user history): 23+ closed today.
+INJUSD: 14 open rows in trades, but 0 open positions and 21 INJUSD closes today in sim_trades. Symbols like XLMUSD, ICPUSD, ATOMUSD, OPUSD, ALGOUSD sit "open" in trades but aren't in the live book at all.
+Cause: markTradeRowClosed() (the function that flips a global trades row to status='closed') has exactly one call site — tradingLoop.ts:1857, inside the global TRAILING_STOP branch only. The per-user close paths (closeUserPosition, used by the hard-stop SL/TP monitor and the fan-out) close sim_positions/sim_trades but never mark the corresponding global trades row closed. So every SL/TP/per-user exit leaves a phantom "open" row behind.
+
+That single bug produces both symptoms you reported:
+
+Exec Attempts = 0 — phantom open rows inflate countOpenTradePositions() to 43, permanently saturating the maxActivePositions=3 cap → Gate 1 blocks all AI signals.
+No AI positions show closed in Trade History — the global trades table only ever marks rows closed via the trailing branch, so it shows 1 closed vs 43 open, even though per-user sim_trades did record this morning's closes.
+The genuinely-open positions (29 in sim_positions) are additionally not breaching SL/TP in the current flat market (prior finding) — but even those 29 alone already exceed the cap of 3.
+
+Root cause (one sentence)
+The global trades-table close-marking (markTradeRowClosed) only runs in the trailing-stop branch, so SL/TP and per-user exits leave orphaned status='open' rows that pile up (43 now) and saturate the maxActivePositions=3 Gate-1 cap, which short-circuits autoExecute() before it can ever increment Exec Attempts.
+
+I've made no changes per your instruction. The fix would target close-propagation (route every exit through markTradeRowClosed, or compute the cap from the live book instead of the orphan-prone trades rows) and/or the cap value — but I'll wait for your go-ahead before implementing.
