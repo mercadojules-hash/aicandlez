@@ -1,0 +1,95 @@
+Proceed with the following:
+
+1. Validation Reset Framework
+   Build the admin-gated reset endpoint (Option B).
+
+Requirements:
+
+* Admin-only access
+* Reset arbitrary user validation accounts
+* Reset:
+
+  * total_realized = 0
+  * total_trades = 0
+  * cash_balance = 100000
+  * starting_balance = 100000
+  * delete sim_positions
+  * delete sim_trades
+* Audit log every reset to user_admin_actions
+* Do NOT execute a reset yet. Build the framework only.
+
+Reason:
+I want a repeatable validation harness for future testing instead of manually logging into each account.
+
+2. Fills Today
+   Implement the real solution, not the relabel.
+
+Requirements:
+
+* FILLS TODAY must represent actual fills today.
+* Count from sim_trades where closedAt >= startOfToday.
+* Surface via /api/simulation/account.
+* Remove dependence on lifetime total_trades.
+* Keep total_trades as a separate lifetime metric internally.
+
+The current label is misleading.
+
+3. Confidence Visibility
+   Implement Hybrid Option A.
+
+Trade-related alerts should display:
+
+Execution Confidence: XX
+Conviction Score: YY
+
+Execution Confidence must appear first because it is the value that actually controls order eligibility.
+
+Also indicate:
+
+PASSING MIN CONFIDENCE
+or
+BELOW MIN CONFIDENCE
+
+based on the user's active threshold.
+
+Goal:
+A user should never see "Conviction 76" and assume a trade is executable when execution confidence is actually 50.
+
+4. Execution Logging
+   No changes required.
+
+The lifecycle trace appears complete:
+
+execution_reached_volume_gate
+execution_volume_pass
+execution_submitted_coinbase
+execution_order_accepted
+execution_order_rejected
+
+Good work. Leave this intact.
+
+5. Coinbase Universe
+   No changes required.
+
+The audit confirms:
+
+* 47 displayed assets
+* 47 tradable on Coinbase
+* 0 unsupported assets displayed
+
+This removes one major variable from live-trading validation.
+
+Additional Request
+
+Now that the ARM-state bug has been fixed, please verify that every path which can submit a live order checks armedForLive before execution.
+
+I want a short report listing:
+
+* All live-order entry points
+* Whether armedForLive is checked
+* File + function name
+* Any path that could bypass the session-arm requirement
+
+I want confidence that there are no remaining routes that can place a live order while the session is disarmed.
+
+The ARM-state fix is one of the most important fixes we've made so far. I want complete verification before continuing real-money testing.

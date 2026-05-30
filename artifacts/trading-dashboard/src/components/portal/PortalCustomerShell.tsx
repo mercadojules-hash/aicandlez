@@ -69,6 +69,7 @@ import { AIDisclaimerModal } from "../AIDisclaimerModal";
 import aiCandlezLogoHorizontal from "@assets/aicandlez-logo-horizontal-master_1779691403317.png";
 import aiCandlezLogoBrandCell from "@assets/aicandlez-logo-horizontal-master_1779871004819.png";
 import { usePaperSignals, type OpportunityVM } from "../../hooks/usePaperSignals";
+import { useGetSettings } from "@workspace/api-client-react";
 import { useCustomerPlan, useCustomerEntitlement, type Plan, UPGRADE_EVENT } from "../../hooks/useCustomerPlan";
 import { toast } from "@/hooks/use-toast";
 import { calibrateRawConfidence } from "../../lib/conviction";
@@ -5124,6 +5125,13 @@ export function PortalCustomerShell() {
   // flip the execution bar into a state that implies armed routing.
   const { majors, alts, opportunities, engine, isLoading, isError } = usePaperSignals();
   const { stats: paperStats, openTrade, open: openTrades, history: paperHistory } = usePaperTrades();
+  // User's active min EXECUTION-confidence floor — drives the PASSING/BELOW
+  // verdict in signal toasts (Confidence Visibility Hybrid A). null until
+  // settings load; react-query dedups this across the surface.
+  const { data: alertSettings } = useGetSettings();
+  const alertMinConfidence = typeof alertSettings?.minConfidence === "number"
+    ? Math.round(alertSettings.minConfidence)
+    : null;
   // Task #205 — equity hydration. When runtime aggregator reports the
   // customer is in LIVE mode against a healthy exchange connection, the
   // headline equity surfaces MUST reflect the broker total (e.g.
@@ -5188,6 +5196,9 @@ export function PortalCustomerShell() {
     equity:        number;
     positionCount: number;
     totalTrades:   number;
+    // Real per-day fills (trades CLOSED today, UTC). Distinct from the
+    // lifetime `totalTrades` counter — see api-server getUserAccountSummary.
+    fillsToday:    number;
     totalRealized: number;
     positions:     ServerSimPosition[];
   };
@@ -6638,6 +6649,7 @@ export function PortalCustomerShell() {
         <SignalNotificationDispatcher
           opportunities={opportunities}
           engine={engineStatus}
+          minConfidence={alertMinConfidence}
         />
 
         {/* Phase 8.1 follow-up — ENABLE LIVE AI TRADING conversion strip.
@@ -6779,8 +6791,8 @@ export function PortalCustomerShell() {
                 ? (serverAccount?.positions ?? []).reduce((s, p) => s + Number(p.unrealizedPnL ?? 0), 0)
                 : paperStats.unrealizedPnl}
               fillsToday={serverAccountReady
-                ? Number(serverAccount?.totalTrades ?? 0)
-                : paperHistory.filter(t => new Date(t.closedAt).toDateString() === new Date().toDateString()).length}
+                ? Number(serverAccount?.fillsToday ?? 0)
+                : paperHistory.filter(t => new Date(t.closedAt).toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10)).length}
               openCount={blotterOpenCount}
               history={paperHistory}
               engine={engineStatus}
@@ -8205,15 +8217,35 @@ function CredibilityStrip({
 /* per symbol so the stream stays quiet enough to feel premium.               */
 /* ──────────────────────────────────────────────────────────────────────── */
 function SignalNotificationDispatcher({
-  opportunities, engine,
+  opportunities, engine, minConfidence,
 }: {
   opportunities: ReadonlyArray<OpportunityVM>;
   engine:        EngineLite | undefined;
+  // User's active minimum EXECUTION-confidence threshold (from
+  // useGetSettings().minConfidence). null when not yet loaded — the
+  // PASSING/BELOW verdict is then omitted rather than guessed.
+  minConfidence: number | null;
 }) {
   // Per-symbol last-notified state. Module-scoped via ref so it survives
   // re-renders without leaking memory across pages.
   const stateRef = useRef<Map<string, { conv: number; dir: string; lastAt: number }>>(new Map());
   const bootedRef = useRef(false);
+
+  // Hybrid A confidence line: EXECUTION confidence FIRST (the value that
+  // actually gates order eligibility), THEN conviction (the calibrated
+  // display score), THEN whether execution confidence clears the user's
+  // active minConfidence. Prevents "Conviction 76" from implying a trade
+  // is executable when execution confidence is below the floor.
+  const confidenceLine = (o: OpportunityVM): string => {
+    const exec = Math.round(o.execConfidence ?? 0);
+    const conv = Math.round(o.convictionScore ?? 0);
+    const base = `Execution Confidence: ${exec} · Conviction Score: ${conv}`;
+    if (minConfidence == null) return base;
+    const verdict = exec >= minConfidence
+      ? `PASSING MIN CONFIDENCE (${minConfidence})`
+      : `BELOW MIN CONFIDENCE (${minConfidence})`;
+    return `${base} · ${verdict}`;
+  };
 
   useEffect(() => {
     if (!engine?.running) return;
@@ -8254,18 +8286,18 @@ function SignalNotificationDispatcher({
 
       // ELITE: crossed 90
       if (prev.conv < 90 && conv >= 90) {
-        title = `${o.symbol} · ELITE signal detected`;
-        description = `Conviction ${Math.round(conv)} · ${dir}`;
+        title = `${o.symbol} · ELITE signal detected · ${dir}`;
+        description = confidenceLine(o);
       }
       // STRONG: crossed 80 (but not 90 in same tick)
       else if (prev.conv < 80 && conv >= 80) {
-        title = `${o.symbol} crossed ${Math.round(conv)} conviction`;
-        description = `AI tracking ${dir} setup`;
+        title = `${o.symbol} crossed ${Math.round(conv)} conviction · ${dir}`;
+        description = confidenceLine(o);
       }
       // Direction flip on a high-conviction name
       else if (prev.dir !== dir && conv >= 70) {
         title = `${o.symbol} flipped ${dir}`;
-        description = `Conviction holding at ${Math.round(conv)}`;
+        description = confidenceLine(o);
       }
 
       if (title) {
@@ -8276,7 +8308,7 @@ function SignalNotificationDispatcher({
         stateRef.current.set(o.symbol, { conv, dir, lastAt: prev.lastAt });
       }
     }
-  }, [opportunities, engine?.running]);
+  }, [opportunities, engine?.running, minConfidence]);
 
   return null;
 }

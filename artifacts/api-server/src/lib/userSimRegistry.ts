@@ -5,7 +5,7 @@ import {
   simTradesTable,
   userSettingsTable,
 } from "@workspace/db";
-import { eq, desc, sql, and, or, isNotNull } from "drizzle-orm";
+import { eq, desc, sql, and, or, isNotNull, gte } from "drizzle-orm";
 import { getTicker, SUPPORTED_SYMBOLS } from "./marketData.js";
 import { logger } from "./logger.js";
 import {
@@ -659,6 +659,24 @@ export async function getUserAccountSummary(userId: string) {
     0,
   );
 
+  // FILLS · TODAY — real per-day metric: count of trades CLOSED since 00:00
+  // UTC today. `sim_trades.exitTime` is the authoritative close timestamp
+  // (epoch ms). This is DISTINCT from the lifetime `totalTrades` counter on
+  // sim_accounts, which only ever increments and is kept separately above.
+  const startOfTodayUtc = new Date();
+  startOfTodayUtc.setUTCHours(0, 0, 0, 0);
+  const startOfTodayMs = startOfTodayUtc.getTime();
+  const todayFillRows = await db
+    .select({ id: simTradesTable.id })
+    .from(simTradesTable)
+    .where(
+      and(
+        eq(simTradesTable.userId, userId),
+        gte(simTradesTable.exitTime, startOfTodayMs),
+      ),
+    );
+  const fillsToday = todayFillRows.length;
+
   return {
     balance:       parseFloat(state.account.cashBalance.toFixed(2)),
     startBalance:  state.account.startingBalance,
@@ -668,6 +686,7 @@ export async function getUserAccountSummary(userId: string) {
     unrealizedPnL: parseFloat(unrealizedTotal.toFixed(2)),
     positionCount: state.positions.length,
     totalTrades:   state.account.totalTrades,
+    fillsToday,
     totalRealized: parseFloat(state.account.totalRealized.toFixed(2)),
     totalFeesPaid: parseFloat(totalFeesPaid.toFixed(2)),
     positions:     enriched.map((p) => ({
@@ -1543,22 +1562,39 @@ export async function getUserTradeHistory(userId: string): Promise<UserSimTrade[
   return [...state.tradeHistory];
 }
 
-export async function resetUserSimulation(userId: string): Promise<void> {
+export async function resetUserSimulation(userId: string): Promise<{
+  before: {
+    cashBalance:     number;
+    startingBalance: number;
+    totalRealized:   number;
+    totalTrades:     number;
+  };
+}> {
   const state = await getOrLoad(userId);
+
+  const before = {
+    cashBalance:     state.account.cashBalance,
+    startingBalance: state.account.startingBalance,
+    totalRealized:   state.account.totalRealized,
+    totalTrades:     state.account.totalTrades,
+  };
 
   await Promise.all([
     db.delete(simPositionsTable).where(eq(simPositionsTable.userId, userId)),
     db.delete(simTradesTable).where(eq(simTradesTable.userId, userId)),
     db.update(simAccountsTable)
-      .set({ cashBalance: 100_000, totalRealized: 0, totalTrades: 0, updatedAt: new Date() })
+      .set({ startingBalance: 100_000, cashBalance: 100_000, totalRealized: 0, totalTrades: 0, updatedAt: new Date() })
       .where(eq(simAccountsTable.userId, userId)),
   ]);
 
-  state.account.cashBalance  = 100_000;
-  state.account.totalRealized = 0;
-  state.account.totalTrades  = 0;
-  state.positions            = [];
-  state.tradeHistory         = [];
+  state.account.startingBalance = 100_000;
+  state.account.cashBalance     = 100_000;
+  state.account.totalRealized   = 0;
+  state.account.totalTrades     = 0;
+  state.positions               = [];
+  state.tradeHistory            = [];
 
   logger.info({ userId }, "UserSimRegistry: simulation reset");
+
+  return { before };
 }

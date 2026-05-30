@@ -63,6 +63,7 @@ import {
   type StripeSubscriptionOutcome,
 } from "../lib/adminBillingActions.js";
 import { invalidateTradeLimitCache } from "../lib/tradeLimitEngine.js";
+import { resetUserSimulation } from "../lib/userSimRegistry.js";
 import { executionStreamBus, type ExecStreamType } from "../lib/executionStreamBus.js";
 import { __invalidateAdminUserTelemetryCache } from "./adminUserTelemetry.js";
 import {
@@ -296,6 +297,39 @@ router.post("/admin/users/:id/activate",    ...requireOperator, makeStatusHandle
 router.post("/admin/users/:id/suspend",     ...requireOperator, makeStatusHandler("suspended"));
 router.post("/admin/users/:id/disable",     ...requireOperator, makeStatusHandler("disabled"));
 router.post("/admin/users/:id/force_paper", ...requireOperator, makeStatusHandler("force_paper"));
+
+// ── Validation-account reset (operator harness) ──────────────────────────────
+// Resets a TARGET user's simulation account to baseline: starting_balance and
+// cash_balance → $100,000, total_realized → 0, total_trades → 0, and clears all
+// open sim_positions + closed sim_trades. Built as a repeatable validation
+// harness so operators don't have to log into each account by hand. Every
+// reset is audit-logged to user_admin_actions with a before-snapshot. Follows
+// the same act-then-audit pattern as makeStatusHandler (non-transactional);
+// audit failures bubble to a 500 so the action is never silently unlogged.
+router.post("/admin/users/:id/sim_reset", ...requireOperator, async (req, res): Promise<void> => {
+  const ctx = resolveActor(req, res);
+  if (!ctx) return;
+  const parsed = StatusBodySchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid body" });
+    return;
+  }
+  const { note, reason } = parsed.data;
+  const after = { startingBalance: 100_000, cashBalance: 100_000, totalRealized: 0, totalTrades: 0 };
+  try {
+    const { before } = await resetUserSimulation(ctx.targetId);
+    await writeAudit({
+      actorId:  ctx.actorId,
+      targetId: ctx.targetId,
+      action:   "sim_reset",
+      payload:  { note, reason: reason ?? null, before, after },
+    });
+    res.json({ ok: true, reset: after, before });
+  } catch (err) {
+    req.log.error({ err, targetId: ctx.targetId }, "admin sim_reset failed");
+    res.status(500).json({ error: "Failed to reset simulation account" });
+  }
+});
 
 // ── Trade-limit override ─────────────────────────────────────────────────────
 
