@@ -99,21 +99,27 @@ export interface TimeframeSnapshot {
  * on `executionEligible === true`. Display surfaces may still render
  * the underlying signal but must not surface "TRADE NOW" affordances.
  */
-// ── CONF EXPERIMENT (controlled production 65→50 confidence experiment) ───────
-// Single env-overridable knob driving EVERY live-execution confidence floor so
-// the experiment can be flipped or reverted WITHOUT a redeploy. Default 50 =
-// experiment ACTIVE (lowered from the prior 60/65). Set EXPERIMENT_CONF_FLOOR=65
-// to restore the prior institutional floor. This drives, in lockstep:
+// ── CONF EXPERIMENT (controlled production 65→50→40 confidence experiment) ────
+// Single env-overridable knob driving the ONE live-execution confidence floor so
+// the experiment can be flipped or reverted WITHOUT a redeploy. Default 40 =
+// experiment ACTIVE (lowered from the prior 50, itself from 60/65). Set
+// EXPERIMENT_CONF_FLOOR=65 to restore the prior institutional floor, or =35 if
+// trade volume remains insufficient at 40 (do NOT go to 30 yet). This is the
+// SINGLE confidence source of truth — it drives, in lockstep:
 //   • engine signal generation        (confThresh in tick())
 //   • executionEligible UI/exec flag   (BASELINE_MIN_CONFIDENCE, below)
-//   • per-user live gate clamp         (liveUserExecution.ts gate 0f)
 //   • operator live floor              (LIVE_EXECUTION_MIN_CONFIDENCE)
-// INTENTIONALLY UNCHANGED: highConfOverride (60), volume gate, MTF agreement,
-// sideways filter, SL/TP, position sizing. This is data-gathering only — NOT a
-// permanent optimization.
-export const EXPERIMENT_CONF_FLOOR = Number(process.env.EXPERIMENT_CONF_FLOOR ?? "50");
-/** Confidence band [lo,hi] the experiment is measuring (inclusive). */
-export const EXPERIMENT_CONF_BAND = { lo: 50, hi: 64 } as const;
+// Redundant downstream confidence re-checks (operator Gate 0 live-floor,
+// customer per-user minConfidence clamp, unreachable >=60 highConfOverride)
+// have been removed — every execution path now gates solely on
+// `executionEligible`. INTENTIONALLY UNCHANGED: volume gate, MTF agreement,
+// sideways filter, SL/TP, position sizing, kill switches, per-tier/concurrent
+// caps. This is data-gathering only — NOT a permanent optimization.
+export const EXPERIMENT_CONF_FLOOR = Number(process.env.EXPERIMENT_CONF_FLOOR ?? "40");
+/** Confidence band [lo,hi] the experiment is measuring (inclusive). lo tracks
+ *  the active EXPERIMENT_CONF_FLOOR (40) so telemetry covers newly-eligible
+ *  40-49 signals; hi stays 64 (the band below the legacy 65 institutional floor). */
+export const EXPERIMENT_CONF_BAND = { lo: 40, hi: 64 } as const;
 /** True when an engine confidence falls inside the experiment measurement band. */
 export function inConfExperimentBand(c: number): boolean {
   return c >= EXPERIMENT_CONF_BAND.lo && c <= EXPERIMENT_CONF_BAND.hi;

@@ -29,7 +29,7 @@ The engine produces two confidence values per symbol. Conflating them causes fal
 
 # Confidence has ONE execution authority: `executionEligible`
 
-The engine's `SymbolBreakdown.executionEligible` flag is the **single source of truth** for whether a signal may execute. It folds in the confidence floor (`BASELINE_MIN_CONFIDENCE`, derived from `EXPERIMENT_CONF_FLOOR`, currently 50) plus MTF agreement, sideways/HOLD-bias blocks. There must be exactly ONE confidence comparison in the whole execution path.
+The engine's `SymbolBreakdown.executionEligible` flag is the **single source of truth** for whether a signal may execute. It folds in the confidence floor (`BASELINE_MIN_CONFIDENCE`, derived from `EXPERIMENT_CONF_FLOOR`, env-overridable, default lowered 65→50→40) plus MTF agreement, sideways/HOLD-bias blocks. There must be exactly ONE confidence comparison in the whole execution path.
 
 **Why:** the path previously re-checked confidence in three places — the engine tick's `highConfOverride` (unreachable ≥60 override), `autoExecute`'s operator "Gate 0" live-floor, and `liveUserExecution` gate 0f's per-user `minConfidence` clamp. They were redundant duplicates of the same comparison (the per-user clamp was already pinned to the engine floor, so it never tightened beyond baseline). The stacked checks made autonomous trading unpredictable and starved execution. All three were removed; `executionEligible` is now authoritative. Changing the floor = change `EXPERIMENT_CONF_FLOOR` only, never reintroduce a second gate.
 
