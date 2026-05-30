@@ -54,6 +54,8 @@ export interface UserSimPosition {
   signalId?: string;
   stopLoss?: number;
   takeProfit?: number;
+  /** Engine avgConfidence (%) at open — carried for confidence-band analysis. */
+  confidence?: number;
   currentPrice?: number;
   unrealizedPnL?: number;
   unrealizedPnLPct?: number;
@@ -86,6 +88,8 @@ export interface UserSimTrade {
   realizedPnLPct: number;
   durationMs: number;
   closeReason: string;
+  /** Engine avgConfidence (%) at open, copied from the position at close. */
+  confidence?: number;
   exchange?: string;
   exchangeOrderId?: string;
   exchangeCloseOrderId?: string;
@@ -241,6 +245,11 @@ async function loadFromDB(userId: string): Promise<UserSimState> {
       entryFeeBroker:         p.entryFeeBroker ?? undefined,
       entryFeeBrokerCurrency: p.entryFeeBrokerCurrency ?? undefined,
       sandbox:                p.sandbox === true,
+      // CONF EXPERIMENT: rehydrate the open-time confidence so a process
+      // restart (frequent on Render) does not strand the value — otherwise
+      // the eventual close would persist sim_trades.confidence = null and
+      // corrupt 65-vs-50 attribution.
+      confidence:             p.confidence ?? undefined,
     })),
     tradeHistory: dbTrades.map((t) => {
       const entryFee = t.entryFee ?? undefined;
@@ -275,6 +284,9 @@ async function loadFromDB(userId: string): Promise<UserSimState> {
       exitFeeBroker:          t.exitFeeBroker ?? undefined,
       exitFeeBrokerCurrency:  t.exitFeeBrokerCurrency ?? undefined,
       sandbox:                t.sandbox === true,
+      // CONF EXPERIMENT: carry the persisted open-time confidence through
+      // restart so in-memory trade history matches the durable sim_trades row.
+      confidence:             t.confidence ?? undefined,
       });
     }),
     idSeq: 0,
@@ -437,6 +449,7 @@ export async function finalizeClose(args: {
       realizedPnLPct:  trade.realizedPnLPct,
       durationMs:      trade.durationMs,
       closeReason:     trade.closeReason,
+      confidence:      trade.confidence ?? null,
       exchange:             trade.exchange ?? null,
       exchangeOrderId:      trade.exchangeOrderId ?? null,
       exchangeCloseOrderId: trade.exchangeCloseOrderId ?? null,
@@ -703,6 +716,8 @@ export interface UserOrderRequest {
   side:   "BUY" | "SELL";
   sizeUSD: number;
   signalId?: string;
+  /** Engine avgConfidence (%) at open — persisted for confidence-band analysis. */
+  confidence?: number;
   stopLoss?: number;
   takeProfit?: number;
 }
@@ -904,6 +919,7 @@ export async function placeUserOrder(userId: string, req: UserOrderRequest): Pro
     entryTime:  Date.now(),
     sizeUSD:    parseFloat(sizeUSD.toFixed(2)),
     signalId:   req.signalId,
+    confidence: req.confidence,
     stopLoss:   req.stopLoss,
     takeProfit: req.takeProfit,
   };
@@ -922,6 +938,7 @@ export async function placeUserOrder(userId: string, req: UserOrderRequest): Pro
       entryTime:  position.entryTime,
       sizeUSD:    position.sizeUSD,
       signalId:   position.signalId ?? null,
+      confidence: position.confidence ?? null,
       stopLoss:   position.stopLoss ?? null,
       takeProfit: position.takeProfit ?? null,
     }),
@@ -947,6 +964,8 @@ export async function registerLiveUserFill(params: {
   entryPrice:      number;
   sizeUSD:         number;
   signalId?:       string;
+  /** Engine avgConfidence (%) at open — persisted for confidence-band analysis. */
+  confidence?:     number;
   stopLoss?:       number;
   takeProfit?:     number;
   exchange:        string;
@@ -970,6 +989,7 @@ export async function registerLiveUserFill(params: {
     entryTime:       Date.now(),
     sizeUSD:         parseFloat(params.sizeUSD.toFixed(2)),
     signalId:        params.signalId,
+    confidence:      params.confidence,
     stopLoss:        params.stopLoss,
     takeProfit:      params.takeProfit,
     exchange:        params.exchange,
@@ -991,6 +1011,7 @@ export async function registerLiveUserFill(params: {
     entryTime:       position.entryTime,
     sizeUSD:         position.sizeUSD,
     signalId:        position.signalId ?? null,
+    confidence:      position.confidence ?? null,
     stopLoss:        position.stopLoss ?? null,
     takeProfit:      position.takeProfit ?? null,
     exchange:        position.exchange ?? null,
@@ -1239,6 +1260,7 @@ export async function closeUserPosition(
     realizedPnLPct:  parseFloat(realizedPnLPct.toFixed(3)),
     durationMs:      exitTime - pos.entryTime,
     closeReason:     isPartial ? `${closeReason}_PARTIAL` : closeReason,
+    confidence:      pos.confidence,
     platformFeeUSD:  platformFeeUSD > 0 ? platformFeeUSD : undefined,
     platformFeeRate: platformFeeUSD > 0 ? platformFeeRate : undefined,
     platformFeeSkipReason,

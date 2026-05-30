@@ -17,6 +17,10 @@ export const simTradesTable = pgTable("sim_trades", {
   realizedPnL:    real("realized_pnl").notNull(),
   realizedPnLPct: real("realized_pnl_pct").notNull(),
   durationMs:     bigint("duration_ms", { mode: "number" }).notNull(),
+  // Engine avgConfidence (%) at open, copied from sim_positions at close so
+  // realized performance can be sliced by confidence band (50–64 experiment).
+  // NULL for trades closed before this column existed / paths without a value.
+  confidence:     real("confidence"),
   closeReason:    text("close_reason").default("MANUAL"),
   // Populated when this trade was executed against a live broker account
   // (per-user `user_exchange_connections`). NULL for paper/sim fills.

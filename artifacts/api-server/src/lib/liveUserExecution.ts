@@ -22,7 +22,7 @@ import { logsTable, riskThrottleEventsTable } from "@workspace/db";
 import crypto from "crypto";
 import { evaluateRiskGate } from "./riskGate.js";
 import { isAiDisclaimerAccepted } from "./aiDisclaimer.js";
-import { engineStats, BASELINE_MIN_CONFIDENCE, VOLUME_GATE_FRACTION } from "./tradingLoop.js";
+import { engineStats, BASELINE_MIN_CONFIDENCE, EXPERIMENT_CONF_FLOOR, VOLUME_GATE_FRACTION } from "./tradingLoop.js";
 import { resolveAiTradingGate } from "./aiTradingGate.js";
 import {
   ALLOWED_TRADE_SIZES,
@@ -1135,6 +1135,13 @@ export async function placeLiveAutoOrderForUser(
       } catch (err) {
         logger.warn({ err, userId }, "liveUserExecution: minConfidence lookup failed — falling back to engine baseline");
       }
+
+      // CONF EXPERIMENT: clamp the per-user live floor DOWN to the experiment
+      // knob (default 50) so the platform-wide 50-floor experiment actually
+      // reaches customers whose personal user_settings.minConfidence is higher
+      // (schema default 60). Never RAISES a user who chose a lower personal
+      // floor. Revert with EXPERIMENT_CONF_FLOOR=65.
+      userMinConfidence = Math.min(userMinConfidence, EXPERIMENT_CONF_FLOOR);
 
       const breakdown = engineStats.symbolBreakdowns[symbol];
       if (!breakdown) {

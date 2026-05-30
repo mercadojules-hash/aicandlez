@@ -92,7 +92,26 @@ export interface TimeframeSnapshot {
  * on `executionEligible === true`. Display surfaces may still render
  * the underlying signal but must not surface "TRADE NOW" affordances.
  */
-export const BASELINE_MIN_CONFIDENCE = 60;
+// ── CONF EXPERIMENT (controlled production 65→50 confidence experiment) ───────
+// Single env-overridable knob driving EVERY live-execution confidence floor so
+// the experiment can be flipped or reverted WITHOUT a redeploy. Default 50 =
+// experiment ACTIVE (lowered from the prior 60/65). Set EXPERIMENT_CONF_FLOOR=65
+// to restore the prior institutional floor. This drives, in lockstep:
+//   • engine signal generation        (confThresh in tick())
+//   • executionEligible UI/exec flag   (BASELINE_MIN_CONFIDENCE, below)
+//   • per-user live gate clamp         (liveUserExecution.ts gate 0f)
+//   • operator live floor              (LIVE_EXECUTION_MIN_CONFIDENCE)
+// INTENTIONALLY UNCHANGED: highConfOverride (60), volume gate, MTF agreement,
+// sideways filter, SL/TP, position sizing. This is data-gathering only — NOT a
+// permanent optimization.
+export const EXPERIMENT_CONF_FLOOR = Number(process.env.EXPERIMENT_CONF_FLOOR ?? "50");
+/** Confidence band [lo,hi] the experiment is measuring (inclusive). */
+export const EXPERIMENT_CONF_BAND = { lo: 50, hi: 64 } as const;
+/** True when an engine confidence falls inside the experiment measurement band. */
+export function inConfExperimentBand(c: number): boolean {
+  return c >= EXPERIMENT_CONF_BAND.lo && c <= EXPERIMENT_CONF_BAND.hi;
+}
+export const BASELINE_MIN_CONFIDENCE = EXPERIMENT_CONF_FLOOR;
 
 // Single source of truth for the mandatory volume safety gate. Current-bar
 // volume must be >= this fraction of the prior-20-bar average for
@@ -894,7 +913,8 @@ async function isCorrelationBlocked(symbol: string): Promise<boolean> {
  * account / universe validation — all unchanged). Simulation/test paths are
  * unaffected — this rule only fires when the exchange engine is in LIVE mode.
  */
-export const LIVE_EXECUTION_MIN_CONFIDENCE = 65;
+// CONF EXPERIMENT: operator live floor now tracks the experiment knob (was 65).
+export const LIVE_EXECUTION_MIN_CONFIDENCE = EXPERIMENT_CONF_FLOOR;
 
 async function autoExecute(
   signalId:     string,
@@ -1181,6 +1201,7 @@ async function autoExecute(
           entryPrice:      userEntry,
           sizeUSD,
           signalId,
+          confidence,
           stopLoss:        parseFloat(userSL.toFixed(2)),
           takeProfit:      parseFloat(userTP.toFixed(2)),
           exchange:        r.exchange ?? "unknown",
@@ -1189,6 +1210,13 @@ async function autoExecute(
           entryFeeBrokerCurrency: r.brokerFeeCurrency,
         });
         mirroredPositionId = pos?.id ?? orderId;
+        // CONF EXPERIMENT: per-customer LIVE fill in the measurement band [50,64].
+        if (inConfExperimentBand(confidence)) {
+          logger.info(
+            { tag: "CONF_EXP_5064", outcome: "executed", scope: "customer_live", userId: r.userId, symbol, side, confidence, exchangeOrderId: orderId },
+            `[CONF_EXP_5064] live fill ${symbol} ${side} @ ${confidence.toFixed(1)}% user=${r.userId}`,
+          );
+        }
       } catch (e) {
         persistenceResult = "failed";
         logger.warn(
@@ -1423,6 +1451,7 @@ async function autoExecute(
             side,
             sizeUSD:    u.positionSizeUSD,
             signalId:   signalId ?? undefined,
+            confidence,
             stopLoss:   side === "BUY"
               ? parseFloat((pos.entryPrice * (1 - u.stopLossPercent   / 100)).toFixed(2))
               : parseFloat((pos.entryPrice * (1 + u.stopLossPercent   / 100)).toFixed(2)),
@@ -1451,6 +1480,13 @@ async function autoExecute(
             // New paper open landed — bust the cached paper verdict so the
             // next tick re-counts against the daily cap immediately.
             invalidateTradeLimitCache(u.userId, "paper");
+            // CONF EXPERIMENT: per-customer PAPER fill in the measurement band [50,64].
+            if (inConfExperimentBand(confidence)) {
+              logger.info(
+                { tag: "CONF_EXP_5064", outcome: "executed", scope: "customer_paper", userId: u.userId, symbol, side, confidence, positionId: userResult.position?.id ?? null },
+                `[CONF_EXP_5064] paper fill ${symbol} ${side} @ ${confidence.toFixed(1)}% user=${u.userId}`,
+              );
+            }
           } else {
             logger.info(
               {
@@ -2004,7 +2040,11 @@ async function tick() {
       }, "MTF analysis");
 
       const testMode   = engineStats.testMode;
-      const confThresh = testMode ? 20 : settings.minConfidence;
+      // CONF EXPERIMENT: force the engine signal floor to the experiment knob
+      // (default 50) instead of the operator-configured settings.minConfidence,
+      // so 50–59 confidence signals are generated + fanned out platform-wide.
+      // Revert by setting EXPERIMENT_CONF_FLOOR=65 (or restoring this line).
+      const confThresh = testMode ? 20 : EXPERIMENT_CONF_FLOOR;
 
       // Test mode: allow single-TF signal at modest confidence
       const testSingleTF =
@@ -2115,6 +2155,24 @@ async function tick() {
           reason:     signalBlockReason,
           message:    `Signal rejected ${symbol} ${effectiveAction}: ${signalBlockReason}`,
         });
+
+        // CONF EXPERIMENT: durable record of every actionable candidate REJECTED
+        // while confidence sits in the measurement band [50,64] — these are the
+        // trades the 50-floor experiment forgoes; capture the failing gate so
+        // post-hoc analysis can weigh rejected-band quality against executed.
+        if (inConfExperimentBand(mtf.avgConfidence)) {
+          const cText = mtf.avgConfidence.toFixed(1);
+          logger.info(
+            { tag: "CONF_EXP_5064", outcome: "rejected", symbol, side: effectiveAction, confidence: mtf.avgConfidence, reason: signalBlockReason },
+            `[CONF_EXP_5064] rejected ${symbol} ${effectiveAction} @ ${cText}% — ${signalBlockReason}`,
+          );
+          // Fire-and-forget: never await or throw inside the per-symbol tick.
+          void db.insert(logsTable).values({
+            id: genId(), type: "trade", level: "info",
+            message: `[CONF_EXP_5064] rejected ${symbol} ${effectiveAction} @ ${cText}%: ${signalBlockReason}`,
+            details: { tag: "CONF_EXP_5064", outcome: "rejected", symbol, side: effectiveAction, confidence: mtf.avgConfidence, reason: signalBlockReason },
+          }).catch(() => { /* best-effort telemetry — never block the loop */ });
+        }
       }
 
       if (shouldTrade) {
@@ -2137,7 +2195,18 @@ async function tick() {
           testMode,
           mtf.avgConfidence,
         );
-        if (execResult.executed) engineStats.volGateTest.positionsOpened++;
+        if (execResult.executed) {
+          engineStats.volGateTest.positionsOpened++;
+          // CONF EXPERIMENT: greppable executed marker for the engine/operator
+          // order path (per-customer fan-out fills are logged at their own
+          // sites below). Durable per-trade record = sim_trades.confidence.
+          if (inConfExperimentBand(mtf.avgConfidence)) {
+            logger.info(
+              { tag: "CONF_EXP_5064", outcome: "executed", scope: "engine", symbol, side: effectiveAction, confidence: mtf.avgConfidence },
+              `[CONF_EXP_5064] executed ${symbol} ${effectiveAction} @ ${mtf.avgConfidence.toFixed(1)}%`,
+            );
+          }
+        }
 
         // Update signal log with execution result
         const logEntry = engineStats.recentSignalLog.find((e) => e.id === id5m);
