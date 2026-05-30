@@ -1,0 +1,124 @@
+We have confirmed the AI Live Trading ARM-state bug and the fail-closed re-arm fix is working correctly. After refresh, the bar now defaults to NOT ARMED and requires explicit re-arming before any live execution can occur. That was a major root cause of the LIVE_BLOCKED_NOT_ARMED events we were seeing.
+
+Now I want to clean up the execution validation environment and improve observability before continuing live execution testing.
+
+Please investigate and implement the following:
+
+1. Validation Account Reset
+   The current account summary shows:
+
+* Realized PnL: +$24.69
+* Fills Today: 21
+* Open Positions: 0
+* Trade History: Empty
+
+This appears to be an orphaned ledger state where historical counters remain while the underlying trade tables are empty.
+
+Please:
+
+* Identify the source of the $24.69 realized value.
+* Identify the source of the 21 fills.
+* Determine whether these are lifetime counters or daily counters.
+* Provide the exact tables and fields involved.
+* Add a safe validation-account reset mechanism so we can reset:
+
+  * realized PnL = 0
+  * fills = 0
+  * open positions = 0
+  * trade history = 0
+  * starting balance restored to baseline
+
+Do not perform the reset yet. First report findings and proposed implementation.
+
+2. Fills Today Label Audit
+   The UI currently displays:
+
+FILLS TODAY = 21
+
+Based on investigation, this appears to be reading a lifetime trade counter.
+
+Please verify.
+
+If confirmed:
+
+* Either relabel it to "FILLS TOTAL"
+  OR
+* Make the metric truly represent today's fills using date-filtered trade history.
+
+Report which approach you recommend.
+
+3. Confidence Visibility Audit
+   We discovered that:
+
+Alert Feed:
+
+* Uses convictionScore
+* Example: LINK Conviction = 76
+
+Signal Card:
+
+* Uses avgConfidence
+* Example: LINK Execution Confidence = 50
+
+Execution Engine:
+
+* Uses avgConfidence against minConfidence threshold.
+
+This creates a user experience problem because a user sees:
+
+"LINK flipped LONG – Conviction 76"
+
+but the trade can still fail confidence checks because execution confidence may be much lower.
+
+Please evaluate:
+
+Option A:
+Display both values:
+
+* Conviction Score
+* Execution Confidence
+
+Option B:
+Display only execution confidence in trade-related alerts.
+
+Option C:
+Alternative approach.
+
+Provide recommendation only. No implementation yet.
+
+4. Live Execution Validation Logging
+   Now that the ARM-state bug is fixed, I want maximum visibility into the next candidate that reaches execution.
+
+Please verify that logs exist for:
+
+* execution_reached_volume_gate
+* execution_volume_pass
+* execution_submitted_coinbase
+* execution_order_accepted
+* execution_order_rejected
+
+For each event, identify:
+
+* file
+* function
+* trigger condition
+
+I want confirmation that we can trace the complete lifecycle of the next trade candidate.
+
+5. Coinbase Asset Universe Audit
+   We previously observed numerous symbols being displayed that Coinbase does not appear to support.
+
+Please provide:
+
+* Total symbols displayed
+* Total Coinbase tradable symbols
+* Symbols currently displayed but not tradable on Coinbase
+* Whether those symbols are filtered before execution or only rejected later
+
+Recommend the best architecture:
+A. Filter non-tradable assets before display
+B. Display all assets but mark broker compatibility
+C. Other recommendation
+
+Goal:
+Before we continue live execution testing, I want a clean validation account, accurate dashboard metrics, clear confidence reporting, and full visibility into the next trade candidate that attempts execution.
