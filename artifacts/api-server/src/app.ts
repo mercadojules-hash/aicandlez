@@ -11,6 +11,7 @@ import {
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware.js";
 import { WebhookHandlers } from "./webhookHandlers.js";
+import { describeWebhookSecret } from "./stripeClient.js";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 
@@ -166,6 +167,29 @@ app.post(
   express.raw({ type: "application/json" }),
   async (req, res): Promise<void> => {
     const signature = req.headers["stripe-signature"];
+
+    // ── TEMP DIAGNOSTIC (remove after webhook signature debug) ──────────────
+    // Reports header presence, secret source/length, and body integrity.
+    // NEVER logs the secret value itself.
+    try {
+      const wh = await describeWebhookSecret();
+      logger.info(
+        {
+          endpointPath:           req.originalUrl,
+          signatureHeaderPresent: Boolean(signature),
+          webhookSecretLoaded:    wh.loaded,
+          webhookSecretSource:    wh.source,
+          webhookSecretLength:    wh.length,
+          webhookSecretPrefixOk:  wh.prefixOk,
+          bodyIsBuffer:           Buffer.isBuffer(req.body),
+          bodyLength:             Buffer.isBuffer(req.body) ? (req.body as Buffer).length : -1,
+        },
+        "[STRIPE_WEBHOOK_DIAG] inbound delivery",
+      );
+    } catch (diagErr) {
+      logger.warn({ err: diagErr }, "[STRIPE_WEBHOOK_DIAG] diagnostic logging failed");
+    }
+
     if (!signature) {
       res.status(400).json({ error: "Missing stripe-signature header" });
       return;

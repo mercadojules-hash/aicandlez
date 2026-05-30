@@ -141,3 +141,56 @@ export async function getStripeSync(): Promise<StripeSync> {
     stripeWebhookSecret: webhookSecret,
   });
 }
+
+// ── TEMP DIAGNOSTIC (remove after webhook signature debug) ───────────────────
+// Mirrors getStripeSync()'s webhook-secret resolution (env → DB-managed table)
+// and reports metadata ONLY. Never returns or logs the secret value itself.
+export interface WebhookSecretInfo {
+  source:   "env" | "db" | "none";
+  loaded:   boolean;
+  length:   number;
+  prefixOk: boolean; // true if it starts with the Stripe webhook prefix "whsec_"
+}
+
+export async function describeWebhookSecret(): Promise<WebhookSecretInfo> {
+  const envSecret = process.env["STRIPE_WEBHOOK_SECRET"];
+  if (envSecret) {
+    return {
+      source:   "env",
+      loaded:   true,
+      length:   envSecret.length,
+      prefixOk: envSecret.startsWith("whsec_"),
+    };
+  }
+
+  // env empty/unset → getStripeSync falls back to the DB-managed table.
+  const databaseUrl = process.env["DATABASE_URL"];
+  if (databaseUrl) {
+    try {
+      const { Pool } = await import("pg");
+      const pool = new Pool({ connectionString: databaseUrl, max: 1 });
+      try {
+        const r = await pool.query<{ secret: string }>(
+          `SELECT secret FROM stripe._managed_webhooks
+            WHERE enabled = true OR status = 'enabled'
+            ORDER BY updated_at DESC LIMIT 1`,
+        );
+        const dbSecret = r.rows[0]?.secret;
+        if (dbSecret) {
+          return {
+            source:   "db",
+            loaded:   true,
+            length:   dbSecret.length,
+            prefixOk: dbSecret.startsWith("whsec_"),
+          };
+        }
+      } finally {
+        await pool.end();
+      }
+    } catch {
+      /* table absent — fall through to "none" */
+    }
+  }
+
+  return { source: "none", loaded: false, length: 0, prefixOk: false };
+}
