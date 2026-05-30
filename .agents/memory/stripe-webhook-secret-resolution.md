@@ -50,3 +50,23 @@ endpoint or test-vs-live mode — each endpoint+mode has its own whsec_).
 re-encoded it). stripe-replit-sync's processWebhook uses the SAME config secret
 + SAME buffer (constructEventAsync) — it is NOT a different-body/secret path.
 **Why:** narrows the two remaining causes after env/secret are ruled in.
+
+## Managed-endpoint rotation desync (ROOT CAUSE of prod "No signatures found")
+The app calls `stripeSync.findOrCreateManagedWebhook(${WEBHOOK_BASE_URL}/api/stripe/webhook)`
+on EVERY boot (api-server src/index.ts initStripe). In stripe-replit-sync
+(dist/index.js findOrCreateManagedWebhook ~2140) it only REUSES the endpoint if a
+`stripe._managed_webhooks` DB row matches AND Stripe `retrieve` returns
+status="enabled"; otherwise it `webhookEndpoints.del` + `webhookEndpoints.create`
+(~2159/2186/2209/2216) → **Stripe mints a NEW whsec_ each recreate**, stored in
+`stripe._managed_webhooks.secret` (schema prop "secret"), NEVER written to env.
+But our `getStripeSync` resolves webhookSecret = **env STRIPE_WEBHOOK_SECRET FIRST**,
+DB only as fallback. So: managed endpoint signs with the rotated DB secret while
+Render verifies with the stale env secret → guaranteed signature failure. The
+POST/DELETE /v1/webhook_endpoints churn in Stripe logs = the recreate loop (DB row
+missing / account (test-vs-live) mismatch / disabled / 404 → never reuses).
+**Fix model: pick ONE owner.** Either (a) fully MANAGED: delete env
+STRIPE_WEBHOOK_SECRET so verification reads the live DB secret, AND make the boot
+reuse stable (ensure the `_managed_webhooks` row + Stripe endpoint persist on the
+SAME prod DB/account so it stops recreating); or (b) fully MANUAL: stop calling
+findOrCreateManagedWebhook at boot, create one endpoint by hand, put ITS whsec_ in
+env. Never run both — env-priority + auto-rotation = permanent desync.

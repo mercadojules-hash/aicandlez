@@ -1,0 +1,87 @@
+We have a new lead in the Stripe webhook investigation.
+
+DO NOT revisit:
+
+* Render deployment status
+* GitHub sync
+* Missing STRIPE_WEBHOOK_SECRET
+* Missing Stripe-Signature header
+* Middleware ordering
+* express.raw() vs express.json()
+
+Those have already been verified.
+
+New evidence:
+
+Stripe logs show repeated API activity against:
+
+POST /v1/webhook_endpoints
+DELETE /v1/webhook_endpoints/{id}
+
+followed by successful creation of a webhook endpoint managed by:
+
+managed_by: "stripe-sync"
+
+The created endpoint is:
+
+https://api.aicandlez.com/api/stripe/webhook
+
+and Stripe returned a signing secret as part of the webhook endpoint object.
+
+We need to investigate whether stripe-replit-sync is creating/replacing webhook endpoints and causing a signing-secret mismatch.
+
+Tasks:
+
+1. Search the entire codebase and all dependencies for:
+
+* stripe.webhookEndpoints.create
+* webhookEndpoints.create
+* webhook_endpoints.create
+* createWebhookEndpoint
+* stripe-sync
+* stripe-replit-sync
+
+2. Determine:
+
+* Which code is creating webhook endpoints.
+* Why webhook endpoints are being created repeatedly.
+* Whether old webhook endpoints are being deleted.
+* Whether a new signing secret is generated each time.
+
+3. Trace the lifecycle of the returned webhook secret.
+
+For every webhook endpoint creation:
+
+* Where does Stripe return the secret?
+* Where is that secret stored?
+* Is it persisted to a database?
+* Is it written to environment variables?
+* Is it expected to replace STRIPE_WEBHOOK_SECRET?
+
+4. Verify whether this scenario is possible:
+
+Stripe Sync creates a new webhook endpoint
+→ Stripe generates a new whsec_ secret
+→ Stripe begins signing events with the new secret
+→ Render continues verifying with the old STRIPE_WEBHOOK_SECRET
+→ StripeSignatureVerificationError occurs
+
+5. Provide:
+
+* Exact filenames
+* Exact line numbers
+* Full call chain from webhook endpoint creation to webhook verification
+
+6. Determine whether the webhook verification path is using:
+
+* The endpoint secret created by stripe-sync
+  OR
+* STRIPE_WEBHOOK_SECRET from Render
+
+and explain how those values are kept synchronized.
+
+Important:
+
+The Stripe logs show webhook endpoint creation and deletion activity occurring around the same timeframe as the verification failures. We need to determine whether webhook secret rotation is occurring and whether Render is verifying against a stale secret.
+
+Do not speculate. Follow the actual code path and provide evidence with filenames and line numbers.
