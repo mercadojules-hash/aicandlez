@@ -35,9 +35,15 @@ interface PanelProps {
      wider-tracked weight so it visually dominates the panel header.
      Default false → /command rendering is byte-identical. */
   dominantTitle?:    boolean;
+  /* Customer-only (Phase 9.1) external filter. When provided, only
+     tickers whose symbol is in this set are classified/rendered — this is
+     how the customer /portal pill strip (ALL/MAJORS/ALTS/MEME/HIGH/READY/
+     …/LONG/SHORT) drives the dual crypto matrix. Admin /command never
+     passes it → undefined → no restriction → byte-identical rendering. */
+  allowedSymbols?:   ReadonlySet<string>;
 }
 
-function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlaceholder, dominantTitle }: PanelProps) {
+function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlaceholder, dominantTitle, allowedSymbols }: PanelProps) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [query,  setQuery]  = useState("");
   const [focused, setFocused] = useState(false);
@@ -58,6 +64,7 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlacehol
     const longs:  Array<{ spec: TickerSpec; breakdown?: SymBreakdown }> = [];
     const shorts: Array<{ spec: TickerSpec; breakdown?: SymBreakdown }> = [];
     for (const t of tickers) {
+      if (allowedSymbols && !allowedSymbols.has(t.symbol)) continue;
       if (!matches(t)) continue;
       const b = breakdowns[t.symbol];
       if (resolveDirection(t.symbol, b) === "LONG") longs.push({ spec: t, breakdown: b });
@@ -81,7 +88,7 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlacehol
     longs.sort(byConfidenceDesc);
     shorts.sort(byConfidenceDesc);
     return { longs, shorts };
-  }, [tickers, breakdowns, query]);
+  }, [tickers, breakdowns, query, allowedSymbols]);
 
   const counts = { l: classified.longs.length, s: classified.shorts.length };
   const totalVisible = counts.l + counts.s;
@@ -91,7 +98,13 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlacehol
     filter === "LONG"  ? counts.l :
     filter === "SHORT" ? counts.s :
     totalVisible;
-  const emptyState = query && visibleInTab === 0;
+  // Customer surface (Phase 9.1): an external filter (the portal pill
+  // strip) can hide every row even with no search query. `allowedSymbols`
+  // is only ever passed by the customer shell — admin /command leaves it
+  // undefined, so `filterEmpty` is always false there and this whole
+  // branch stays byte-identical.
+  const filterEmpty = !!allowedSymbols && totalVisible === 0;
+  const emptyState = (query && visibleInTab === 0) || filterEmpty;
 
   return (
     <div
@@ -251,7 +264,9 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlacehol
               flexShrink: 0,
             }}
           >
-            {query ? `${totalVisible} MATCH` : `${tickers.length} TRACKED`}
+            {query
+              ? `${totalVisible} MATCH`
+              : `${allowedSymbols ? tickers.filter((t) => allowedSymbols.has(t.symbol)).length : tickers.length} TRACKED`}
           </span>
         </div>
       </div>
@@ -268,7 +283,9 @@ function SignalsPanel({ label, sub, icon, brand, tickers, engine, searchPlacehol
             fontWeight: 700,
             fontFamily: N.FONT_MONO,
           }}>
-            {totalVisible === 0
+            {!query
+              ? "NO SETUPS MATCH FILTER"
+              : totalVisible === 0
               ? `NO MATCH FOR "${query.toUpperCase()}"`
               : `NO ${filter} MATCH FOR "${query.toUpperCase()}" · ${totalVisible} IN OTHER DIRECTION`}
           </div>
@@ -380,7 +397,7 @@ export function SignalsRow({ engine }: { engine?: EngineStatus }) {
  * Right column = CRYPTO_ALTS_MEMES (HYPE GRT SNX … PEPE WIF BONK JUP …)
  * Same row component / same BUY/SELL routing as the original /command grid.
  */
-export function CryptoMajorsSignalsPanel({ engine, dominantTitle }: { engine?: EngineStatus; dominantTitle?: boolean }) {
+export function CryptoMajorsSignalsPanel({ engine, dominantTitle, allowedSymbols }: { engine?: EngineStatus; dominantTitle?: boolean; allowedSymbols?: ReadonlySet<string> }) {
   return (
     <SignalsPanel
       label={dominantTitle ? "TOP 30 CRYPTOS" : "TOP 30 CRYPTO MAJORS"}
@@ -391,11 +408,12 @@ export function CryptoMajorsSignalsPanel({ engine, dominantTitle }: { engine?: E
       engine={engine}
       searchPlaceholder="Search Crypto Majors…"
       dominantTitle={dominantTitle}
+      allowedSymbols={allowedSymbols}
     />
   );
 }
 
-export function CryptoAltsMemesPanel({ engine, dominantTitle }: { engine?: EngineStatus; dominantTitle?: boolean }) {
+export function CryptoAltsMemesPanel({ engine, dominantTitle, allowedSymbols }: { engine?: EngineStatus; dominantTitle?: boolean; allowedSymbols?: ReadonlySet<string> }) {
   return (
     <SignalsPanel
       label="ALTS & MEMECOINS"
@@ -406,6 +424,7 @@ export function CryptoAltsMemesPanel({ engine, dominantTitle }: { engine?: Engin
       engine={engine}
       searchPlaceholder="Search Alts & Memes…"
       dominantTitle={dominantTitle}
+      allowedSymbols={allowedSymbols}
     />
   );
 }

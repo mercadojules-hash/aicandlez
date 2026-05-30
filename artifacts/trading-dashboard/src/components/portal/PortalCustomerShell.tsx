@@ -2104,7 +2104,7 @@ function filterOpps(opps: OpportunityVM[], query: string, filter: Filt): Opportu
       case "MAJORS":    return o.assetClass === "MAJOR";
       case "ALTS":      return o.assetClass === "ALT";
       case "MEME":      return MEME_UNIVERSE.has(o.symbol);
-      case "HIGH_CONF": return o.convictionScore >= 70;
+      case "HIGH_CONF": return o.convictionScore >= 75;
       case "READY":     return o.readiness === "READY";
       case "LONG":      return o.direction === "LONG";
       case "SHORT":     return o.direction === "SHORT";
@@ -5593,6 +5593,20 @@ export function PortalCustomerShell() {
     [filteredOpps],
   );
 
+  // Phase 9.1 — wire the customer filter pill strip into the dual crypto
+  // matrix panels. The panels (CryptoMajorsSignalsPanel /
+  // CryptoAltsMemesPanel) render fixed universes and previously ignored
+  // `filter` entirely, so clicking a pill changed nothing on the cards.
+  // We derive the set of symbols matching the active filter — reusing
+  // `filterOpps`' authoritative semantics over the FULL `opportunities`
+  // universe (query excluded; each panel keeps its own search box) — and
+  // pass it to both panels. ALL → undefined → no restriction, so the
+  // admin /command panels (which never pass this prop) stay byte-identical.
+  const panelAllowedSymbols = useMemo<ReadonlySet<string> | undefined>(() => {
+    if (filter === "ALL") return undefined;
+    return new Set(filterOpps(opportunities, "", filter).map(o => o.symbol));
+  }, [opportunities, filter]);
+
   // Pass 6.1 — symbol universe for the IdleScanningPanel rotation.
   // Pulled from `opportunities` (not `filteredOpps`) so the user sees
   // the engine sweeping its entire scan pool regardless of active
@@ -6569,24 +6583,17 @@ export function PortalCustomerShell() {
             Original CustomerBattlefieldHeader component definition is
             preserved further down for one-line rollback. */}
         {(() => {
-          const oppCount = opportunities.length;
-          const avgConf = oppCount
-            ? Math.round(opportunities.reduce((s, o) => s + (o.convictionScore ?? 0), 0) / oppCount)
-            : 0;
+          // Phase 9.1 — top analytics row simplified to surface "what the
+          // AI sees" rather than internal telemetry. SIGNAL QUALITY,
+          // OPPORTUNITY MIX and AI THROUGHPUT were removed; AI CONFIDENCE
+          // was relocated to the LiveIntelligenceBand (replacing the old
+          // BREAKOUT PROBABILITY gauge). MARKET REGIME stays as the single
+          // posture banner.
           const regimeLabel = portalPosture || "NEUTRAL";
           const regimeBlurb = regimeLabel === "RISK-ON"   ? "Bull regime · risk-on flow"
                             : regimeLabel === "DEFENSIVE" ? "Defensive posture · tight risk"
                             : regimeLabel === "LOW-VOL"   ? "Compressed range · scalp tier"
                             :                                "Mixed regime · selective AI";
-          const excel = opportunities.filter(o => (o.convictionScore ?? 0) >= 85).length;
-          const good  = opportunities.filter(o => (o.convictionScore ?? 0) >= 70 && (o.convictionScore ?? 0) < 85).length;
-          const fair  = opportunities.filter(o => (o.convictionScore ?? 0) >= 50 && (o.convictionScore ?? 0) < 70).length;
-          const weak  = opportunities.filter(o => (o.convictionScore ?? 0) < 50).length;
-          const maxBucket = Math.max(excel, good, fair, weak, 1);
-          const sigsHr = engineStatus?.signalsGenerated ?? 0;
-          const running = !!engineStatus?.running;
-          const longC  = opportunities.filter(o => o.direction === "LONG").length;
-          const shortC = opportunities.filter(o => o.direction === "SHORT").length;
           const tileBase: CSSProperties = {
             display: "flex", flexDirection: "column", gap: 8, padding: "10px 12px",
             background: T.BG_CARD, border: `1px solid rgba(124,255,0,0.10)`,
@@ -6595,70 +6602,12 @@ export function PortalCustomerShell() {
           const labelStyle: CSSProperties = {
             fontSize: 9, fontWeight: 600, letterSpacing: T.TRACK_TITLE, color: T.TEXT_3,
           };
-          const Bar = ({ label, value, max, color }: { label: string; value: number; max: number; color: string }) => (
-            <div style={{ display: "grid", gridTemplateColumns: "52px 1fr 28px", alignItems: "center", gap: 8 }}>
-              <div style={{ fontSize: 9, letterSpacing: T.TRACK_LABEL, color: T.TEXT_2 }}>{label}</div>
-              <div style={{ height: 5, background: "rgba(255,255,255,0.05)" }}>
-                <div style={{ height: "100%", width: `${(value / max) * 100}%`, background: color, transition: `width ${T.TX_MED}` }} />
-              </div>
-              <div style={{ textAlign: "right", fontSize: 10, fontWeight: 600, color, fontVariantNumeric: "tabular-nums" }}>{value}</div>
-            </div>
-          );
           return (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-              <div style={tileBase}>
-                <div style={labelStyle}>AI CONFIDENCE</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{
-                    display: "grid", placeItems: "center", height: 48, width: 48,
-                    borderRadius: 9999, border: `2px solid ${T.NEON}`,
-                    color: T.NEON, fontWeight: 700, fontSize: 14,
-                    boxShadow: `0 0 12px ${T.NEON_GLOW}`,
-                    fontVariantNumeric: "tabular-nums",
-                  }}>{avgConf}</div>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <div style={{
-                      fontSize: 10, letterSpacing: T.TRACK_LABEL, fontWeight: 700,
-                      color: avgConf >= 65 ? T.NEON : avgConf >= 50 ? T.AMBER : T.RED,
-                    }}>
-                      {avgConf >= 65 ? "BULLISH" : avgConf >= 50 ? "MIXED" : "BEARISH"}
-                    </div>
-                    <div style={{ fontSize: 9, color: T.TEXT_3 }}>Composite</div>
-                  </div>
-                </div>
-              </div>
               <div style={tileBase}>
                 <div style={labelStyle}>MARKET REGIME</div>
                 <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.02em", color: T.NEON }}>{regimeLabel}</div>
                 <div style={{ fontSize: 9, color: T.TEXT_3 }}>{regimeBlurb}</div>
-              </div>
-              <div style={tileBase}>
-                <div style={labelStyle}>SIGNAL QUALITY</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <Bar label="EXCEL" value={excel} max={maxBucket} color={T.NEON} />
-                  <Bar label="GOOD"  value={good}  max={maxBucket} color={T.LIME} />
-                  <Bar label="FAIR"  value={fair}  max={maxBucket} color={T.AMBER} />
-                  <Bar label="WEAK"  value={weak}  max={maxBucket} color={T.RED} />
-                </div>
-              </div>
-              <div style={tileBase}>
-                <div style={labelStyle}>OPPORTUNITY MIX</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "4px 8px", fontSize: 10, color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}>
-                  <span>MAJORS</span><span style={{ textAlign: "right", color: T.TEXT_0 }}>{filteredMajors.length}</span>
-                  <span>ALTS</span><span style={{ textAlign: "right", color: T.TEXT_0 }}>{filteredAlts.length}</span>
-                  <span>LONG</span><span style={{ textAlign: "right", color: T.NEON }}>{longC}</span>
-                  <span>SHORT</span><span style={{ textAlign: "right", color: T.RED }}>{shortC}</span>
-                </div>
-              </div>
-              <div style={tileBase}>
-                <div style={labelStyle}>AI THROUGHPUT</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "4px 8px", fontSize: 10, color: T.TEXT_2, fontVariantNumeric: "tabular-nums" }}>
-                  <span>SIGS</span><span style={{ textAlign: "right", color: T.TEXT_0 }}>{sigsHr}</span>
-                  <span>RATE</span><span style={{ textAlign: "right", color: T.TEXT_0 }}>{signalsPerMin.toFixed(1)}/m</span>
-                  <span>ENGINE</span><span style={{ textAlign: "right", color: running ? T.NEON : T.RED }}>{running ? "ONLINE" : "OFFLINE"}</span>
-                  <span>OPEN</span><span style={{ textAlign: "right", color: T.TEXT_0 }}>{blotterOpenCount}</span>
-                  <span>OPPS</span><span style={{ textAlign: "right", color: T.TEXT_0 }}>{oppCount}</span>
-                </div>
               </div>
             </div>
           );
@@ -6891,10 +6840,10 @@ export function PortalCustomerShell() {
                 wrapper below. The underlying CryptoMajorsSignalsPanel
                 JSX and /command rendering stay byte-identical. */}
             <div className="cd-customer-majors-panel">
-              <CryptoMajorsSignalsPanel engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} dominantTitle />
+              <CryptoMajorsSignalsPanel engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} dominantTitle allowedSymbols={panelAllowedSymbols} />
             </div>
             {/* ALTS & MEMECOINS — same sort contract. */}
-            <CryptoAltsMemesPanel    engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} dominantTitle />
+            <CryptoAltsMemesPanel    engine={engineStatus as unknown as InstitutionalEngineStatus | undefined} dominantTitle allowedSymbols={panelAllowedSymbols} />
           </div>
 
           <aside className="cd-customer-battlefield-aside" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -8125,50 +8074,61 @@ function LiveIntelligenceBand({
       </LIBCell>
 
       {/* ────────────────────────────────────────────────────────────── */}
-      {/* BOX 5 — BREAKOUT PROBABILITY                                   */}
+      {/* BOX 5 — AI CONFIDENCE (composite)                              */}
+      {/* Relocated from the top KPI strip (Phase 9.1). Composite read of */}
+      {/* the engine's average conviction across the tracked universe —   */}
+      {/* "how convinced is the AI right now." Distinct from BOX 1, which */}
+      {/* surfaces the single peak signal confidence.                    */}
       {/* ────────────────────────────────────────────────────────────── */}
-      <LIBCell label="BREAKOUT PROBABILITY" sub={live ? `${m.eliteCount} ≥ 80 CONV` : "—"}>
-        <svg viewBox="0 0 100 100" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-          <defs>
-            <radialGradient id="lib-break-grad" cx="50%" cy="50%" r="50%">
-              <stop offset="0%"   stopColor={T.NEON} stopOpacity="0.18" />
-              <stop offset="100%" stopColor={T.NEON} stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <circle cx="50" cy="50" r="42" fill="url(#lib-break-grad)" />
-          <circle cx="50" cy="50" r="40" fill="none" stroke={`${T.NEON}18`} strokeWidth="7" />
-          <circle
-            cx="50" cy="50" r="40" fill="none"
-            stroke={T.NEON} strokeWidth="7" strokeLinecap="round"
-            strokeDasharray={`${(m.breakoutPct / 100) * (2 * Math.PI * 40)} 999`}
-            transform="rotate(-90 50 50)"
-            style={{
-              filter: `drop-shadow(0 0 6px ${T.NEON})`,
-              transition: "stroke-dasharray 700ms ease",
-              animation: live && m.breakoutPct > 0 ? "lib-arc-glow 2.8s ease-in-out infinite" : "none",
-            }}
-          />
-          {/* Inner dashed reference ring */}
-          <circle cx="50" cy="50" r="28" fill="none" stroke={`${T.NEON}33`} strokeWidth="0.4" strokeDasharray="1 3" />
-        </svg>
-        <div style={{
-          position: "relative", zIndex: 1,
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          width: "100%", height: "100%",
-        }}>
-          <span style={{
-            fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 900,
-            color: T.NEON, lineHeight: 1,
-            fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em",
-            textShadow: `0 0 12px ${T.NEON}66`,
-          }}>
-            {m.breakoutPct}%
-          </span>
-          <span style={{ fontSize: 9, letterSpacing: "0.22em", color: T.TEXT_3, marginTop: 4 }}>
-            ELITE BAND
-          </span>
-        </div>
-      </LIBCell>
+      {(() => {
+        const conf = Math.round(m.avgConv ?? 0);
+        const band = conf >= 65 ? "BULLISH" : conf >= 50 ? "MIXED" : "BEARISH";
+        const bandColor = conf >= 65 ? T.NEON : conf >= 50 ? T.AMBER : T.RED;
+        return (
+          <LIBCell label="AI CONFIDENCE" sub={live ? band : "—"} accent={bandColor}>
+            <svg viewBox="0 0 100 100" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+              <defs>
+                <radialGradient id="lib-aiconf-grad" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%"   stopColor={bandColor} stopOpacity="0.18" />
+                  <stop offset="100%" stopColor={bandColor} stopOpacity="0" />
+                </radialGradient>
+              </defs>
+              <circle cx="50" cy="50" r="42" fill="url(#lib-aiconf-grad)" />
+              <circle cx="50" cy="50" r="40" fill="none" stroke={`${bandColor}18`} strokeWidth="7" />
+              <circle
+                cx="50" cy="50" r="40" fill="none"
+                stroke={bandColor} strokeWidth="7" strokeLinecap="round"
+                strokeDasharray={`${(conf / 100) * (2 * Math.PI * 40)} 999`}
+                transform="rotate(-90 50 50)"
+                style={{
+                  filter: `drop-shadow(0 0 6px ${bandColor})`,
+                  transition: "stroke-dasharray 700ms ease",
+                  animation: live && conf > 0 ? "lib-arc-glow 2.8s ease-in-out infinite" : "none",
+                }}
+              />
+              {/* Inner dashed reference ring */}
+              <circle cx="50" cy="50" r="28" fill="none" stroke={`${bandColor}33`} strokeWidth="0.4" strokeDasharray="1 3" />
+            </svg>
+            <div style={{
+              position: "relative", zIndex: 1,
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              width: "100%", height: "100%",
+            }}>
+              <span style={{
+                fontSize: "clamp(30px, 3.8vw, 48px)", fontWeight: 900,
+                color: bandColor, lineHeight: 1,
+                fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em",
+                textShadow: `0 0 12px ${bandColor}66`,
+              }}>
+                {conf > 0 ? conf : "—"}
+              </span>
+              <span style={{ fontSize: 9, letterSpacing: "0.22em", color: T.TEXT_3, marginTop: 4 }}>
+                COMPOSITE
+              </span>
+            </div>
+          </LIBCell>
+        );
+      })()}
 
       {/* ────────────────────────────────────────────────────────────── */}
       {/* BOX 6 — MARKET HEAT (radial conviction array)                  */}
