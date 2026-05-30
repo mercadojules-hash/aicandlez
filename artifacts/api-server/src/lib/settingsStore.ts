@@ -12,8 +12,11 @@
 //
 // maxActivePositions is in-memory only (not in DB schema).
 //   0 = no cap on concurrent open positions.
-// maxTradesPerDay = 0 means unlimited daily trades — Gate 2 in autoExecute()
-//   skips the daily count check entirely.
+// maxTradesPerDay is a LEGACY no-op knob. The engine-level "Gate 2" daily
+//   throttle it once drove has been REMOVED — daily throughput is now governed
+//   solely by the per-user subscription entitlement system
+//   (trade_limit_exhausted in liveUserExecution.ts). The field is retained only
+//   for schema/back-compat; autoExecute no longer reads it.
 
 export interface PersistedSettings {
   autoMode:            boolean;
@@ -22,14 +25,14 @@ export interface PersistedSettings {
   allocation:          number;
   stopLossPercent:     number;
   takeProfitPercent:   number;
-  maxTradesPerDay:     number;  // 0 = unlimited
+  maxTradesPerDay:     number;  // LEGACY no-op (engine daily throttle removed)
   maxActivePositions:  number;  // 0 = unlimited; default 3
 }
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
 // autoMode is TRUE so paper trading starts immediately on first run —
 // no database or additional configuration required.
-// maxTradesPerDay = 0 means unlimited (no daily cap enforced by the engine loop).
+// maxTradesPerDay is a LEGACY no-op (engine daily throttle removed); kept 0.
 const DEFAULTS: PersistedSettings = {
   autoMode:            true,
   killSwitch:          false,
@@ -37,7 +40,7 @@ const DEFAULTS: PersistedSettings = {
   allocation:          1000,
   stopLossPercent:     2,
   takeProfitPercent:   4,
-  maxTradesPerDay:     0,    // 0 = unlimited daily trades
+  maxTradesPerDay:     0,    // LEGACY no-op (engine daily throttle removed)
   maxActivePositions:  3,    // max concurrent open positions (0 = unlimited)
 };
 

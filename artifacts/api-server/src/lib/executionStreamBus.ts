@@ -109,7 +109,10 @@ export const executionStreamBus = new ExecutionStreamBus();
 export interface SafeTestModeState {
   active:                  boolean;
   expiresAt:               number | null;
-  liveConfidenceFloorOverride: number | null;  // e.g. 60 (vs default 65)
+  liveConfidenceFloorOverride: number | null;  // LEGACY no-op — the engine
+  // live-confidence floor it overrode has been removed; confidence authority is
+  // now the engine's unified `executionEligible` flag. Retained for telemetry
+  // back-compat only; autoExecute no longer reads this value.
   minOrderUsdOverride:     number | null;      // e.g. 10  (allow tiny $100-balance trades)
   reason:                  string | null;
   activatedBy:             string | null;

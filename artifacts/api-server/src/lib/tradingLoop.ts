@@ -510,18 +510,6 @@ async function fetchSettings(): Promise<LoopSettings> {
   return settingsStore.get();
 }
 
-// ── Daily trade count (loop-initiated trades only) ────────────────────────────
-// Returns the number of auto/test trades placed today via the engine loop.
-// Force-test trades are excluded from this count (mode check covers it).
-
-async function countTodayLoopTrades(): Promise<number> {
-  const midnight = new Date();
-  midnight.setHours(0, 0, 0, 0);
-  const rows = await db.select().from(tradesTable)
-    .where(and(eq(tradesTable.mode, "auto"), gte(tradesTable.timestamp, midnight)));
-  return rows.length;
-}
-
 // ── Signal log helper ──────────────────────────────────────────────────────────
 
 function appendSignalLog(entry: SignalLogEntry) {
@@ -935,46 +923,21 @@ async function autoExecute(
   confidence:   number,
 ): Promise<{ executed: boolean; blockReason: string | null }> {
 
-  // ── Gate 0: live-mode confidence floor (safe-test-mode aware) ──────────────
-  // No live order may ever be submitted below the institutional confidence
-  // threshold. Safe Test Mode (admin-only, time-boxed) may temporarily lower
-  // the floor — never below the 40% floor enforced by the SafeTestMode API.
-  // Sim paths are unaffected (live mode check below).
+  // ── Exchange-mode resolution (for execution-stream tagging) ────────────────
+  // The legacy "Gate 0: live-mode confidence floor" has been REMOVED. The
+  // engine's unified `executionEligible` flag (computed once per tick in the
+  // signal pass against BASELINE_MIN_CONFIDENCE) is now the single source of
+  // truth for confidence — signals below the floor never reach autoExecute, so
+  // re-checking confidence here was a redundant duplicate gate. We still resolve
+  // the exchange mode so downstream gate emits carry the correct sim/live/test
+  // tag. Hard safety gates (positions, risk, correlation, exchange validation)
+  // are unchanged below.
   let exModeForStream: "simulation" | "live" | "test" = "simulation";
   try {
     const { getExchangeStatus } = await import("./exchangeEngine.js");
     const exMode = getExchangeStatus().mode;
     const isLiveMode = exMode !== "simulation";
     exModeForStream = isTest ? "test" : (isLiveMode ? "live" : "simulation");
-    const stm = getSafeTestMode();
-    const effectiveFloor =
-      isLiveMode && stm.active && stm.liveConfidenceFloorOverride !== null
-        ? stm.liveConfidenceFloorOverride
-        : LIVE_EXECUTION_MIN_CONFIDENCE;
-    if (isLiveMode && !isTest && confidence < effectiveFloor) {
-      engineStats.tradesBlocked++;
-      const msg = `Live execution blocked for ${symbol} ${side}: confidence ${confidence.toFixed(1)}% < ${effectiveFloor}% floor${stm.active ? " (safe-test-mode active)" : ""}`;
-      logger.warn({ symbol, side, confidence, floor: effectiveFloor, mode: exMode, safeTestMode: stm.active }, msg);
-      await db.insert(logsTable).values({
-        id: genId(), type: "trade", level: "warn",
-        message: msg,
-        details: { symbol, side, confidence, floor: effectiveFloor, mode: exMode, safeTestMode: stm.active },
-      });
-      auditLogger.append("system", "TRADE_REJECTED", {
-        symbol, side, confidence, floor: effectiveFloor, gate: "live_confidence_floor", safeTestMode: stm.active,
-      }, { symbol, severity: "warn" });
-      executionStreamBus.emitEvent({
-        type:     "live_floor_blocked",
-        severity: "warn",
-        symbol, side, confidence,
-        gate:     "live_confidence_floor",
-        mode:     "live",
-        reason:   `confidence ${confidence.toFixed(1)}% < ${effectiveFloor}% floor`,
-        message:  msg,
-        details:  { floor: effectiveFloor, safeTestModeActive: stm.active },
-      });
-      return { executed: false, blockReason: `Below ${effectiveFloor}% live-execution threshold (${confidence.toFixed(1)}%)` };
-    }
   } catch { /* fail-open to existing gates only on import error */ }
 
   // ── Gate 1: max concurrent open positions ──────────────────────────────────
@@ -1004,22 +967,16 @@ async function autoExecute(
     }
   }
 
-  // ── Gate 2: daily trade count (0 = unlimited) ──────────────────────────────
-  if (settings.maxTradesPerDay > 0) {
-    const todayCount = await countTodayLoopTrades();
-    if (todayCount >= settings.maxTradesPerDay) {
-      engineStats.tradesBlocked++;
-      const msg = `Auto-trade blocked for ${symbol}: daily limit (${settings.maxTradesPerDay}) reached`;
-      logger.info({ symbol, side, todayCount }, msg);
-      await db.insert(logsTable).values({ id: genId(), type: "trade", level: "warn", message: msg, details: { symbol, side } });
-      executionStreamBus.emitEvent({
-        type: "daily_limit_blocked", severity: "warn",
-        symbol, side, gate: "daily_trade_limit", mode: exModeForStream,
-        reason: `${todayCount}/${settings.maxTradesPerDay} today`, message: msg,
-      });
-      return { executed: false, blockReason: "Daily limit" };
-    }
-  }
+  // ── (removed) global daily-trade throttle ──────────────────────────────────
+  // The engine-level `maxTradesPerDay` cap has been REMOVED. It was a single
+  // global integer ceiling on the whole engine's daily trades that, once hit,
+  // starved every remaining candidate platform-wide and could not express
+  // per-tier policy. Daily throughput is now governed solely by the per-user
+  // subscription entitlement system (trade_limit_exhausted in
+  // liveUserExecution.ts), which preserves tier limits for normal customers and
+  // unlimited access for designated QA / admin accounts. Exposure remains bound
+  // by the position-count cap (Gate 1), platform concurrent-position cap, and
+  // the risk engine (Gate 4) below.
 
   // ── Gate 3: correlation filter ─────────────────────────────────────────────
   const corrBlocked = await isCorrelationBlocked(symbol);
@@ -2074,41 +2031,28 @@ async function tick() {
         (testAction === "BUY"  && mtf.trend1H === "bullish") ||
         (testAction === "SELL" && mtf.trend1H === "bearish");
 
-      // ── High-confidence override (≥ 60%) ──────────────────────────────────
-      // Strong AI conviction bypasses MTF + quality filters. Hard stops (kill
-      // switch, max positions, risk engine) are still enforced in autoExecute.
-      const bestSingleAction: "BUY" | "SELL" | "HOLD" =
-        (mtf.fast.confidence >= mtf.slow.confidence && mtf.fast.decision !== "HOLD")
-          ? mtf.fast.decision as "BUY" | "SELL"
-          : (mtf.slow.decision !== "HOLD" ? mtf.slow.decision as "BUY" | "SELL" : "HOLD");
-
-      const highConfOverride =
-        !testMode &&
-        settings.autoMode &&
-        !settings.killSwitch &&
-        mtf.avgConfidence >= 60 &&
-        bestSingleAction !== "HOLD";
-
-      // When override fires without MTF agreement, take the stronger single-TF direction
-      const effectiveAction: "BUY" | "SELL" | "HOLD" =
-        highConfOverride && !mtf.mtfConfirmed ? bestSingleAction : testAction;
+      // ── Unified execution decision ────────────────────────────────────────
+      // `executionEligible` (computed above) is the SINGLE source of truth for
+      // confidence + MTF agreement + sideways + HOLD-bias. The legacy ">=60
+      // high-confidence override" path (which bypassed MTF/quality filters) has
+      // been removed — execution now follows the same unified flag everywhere,
+      // gated only by the remaining engine quality filters (volume, 1H trend)
+      // and the operator auto-mode / kill-switch. Hard stops (positions cap,
+      // risk engine, correlation, exchange validation) still live in autoExecute.
+      const effectiveAction: "BUY" | "SELL" | "HOLD" = testAction;
 
       const shouldTrade =
         settings.autoMode &&
         !settings.killSwitch &&
-        (mtf.mtfConfirmed || testSingleTF || highConfOverride) &&
+        executionEligible &&
         effectiveAction !== "HOLD" &&
-        mtf.avgConfidence >= (highConfOverride ? 60 : confThresh) &&
-        (volumeGatePass   || highConfOverride) &&
-        (sidewaysGatePass || highConfOverride) &&
-        (trend1HGatePass  || highConfOverride);
+        volumeGatePass &&
+        trend1HGatePass;
 
       // Determine block reason for signal log
       let signalBlockReason: string | null = null;
       if (!settings.autoMode) {
         signalBlockReason = "Auto-mode off";
-      } else if (highConfOverride) {
-        signalBlockReason = null; // high-conf override — executing
       } else if (!mtf.mtfConfirmed && !testSingleTF) {
         signalBlockReason = mtf.blockReason;
       } else if (mtf.avgConfidence < confThresh) {
@@ -2125,7 +2069,7 @@ async function tick() {
         id:           id5m,
         symbol,
         timeframe:    "5m+15m",
-        decision:     highConfOverride && !mtf.mtfConfirmed ? bestSingleAction : mtf.agreedAction,
+        decision:     mtf.agreedAction,
         confidence:   mtf.avgConfidence,
         shortSummary: mtf.fast.shortSummary,
         blockReason:  signalBlockReason,
@@ -2239,19 +2183,21 @@ async function tick() {
       // nothing; it only observes the decisions made above. Downstream gates
       // are derived from autoExecute's existing blockReason (autoExecute itself
       // is untouched). Engine-gate booleans mirror the `shouldTrade` formula:
-      // a gate that is bypassed by the high-confidence override counts as
-      // passed, matching the actual execution decision.
+      // the high-confidence override has been removed, so each gate stands on
+      // its own and `executionEligible` is the unified confidence authority.
       const fnDirectional = mtf.fast.decision !== "HOLD" || mtf.slow.decision !== "HOLD";
       if (fnDirectional) {
         const fnSide: "BUY" | "SELL" =
-          (effectiveAction !== "HOLD" ? effectiveAction : bestSingleAction) as "BUY" | "SELL";
-        const confFloor = highConfOverride ? 60 : confThresh;
+          (effectiveAction !== "HOLD"
+            ? effectiveAction
+            : (mtf.fast.decision !== "HOLD" ? mtf.fast.decision : mtf.slow.decision)) as "BUY" | "SELL";
+        const confFloor = confThresh;
 
         const gConfidence = mtf.avgConfidence >= confFloor;
-        const gMTF        = mtf.mtfConfirmed || highConfOverride || testSingleTF;
-        const gVolume     = volumeGatePass   || highConfOverride;
-        const gSideways   = sidewaysGatePass || highConfOverride;
-        const gTrend1H    = trend1HGatePass  || highConfOverride;
+        const gMTF        = mtf.mtfConfirmed || testSingleTF;
+        const gVolume     = volumeGatePass;
+        const gSideways   = sidewaysGatePass;
+        const gTrend1H    = trend1HGatePass;
 
         // First failing engine gate → headline rejection reason.
         let fnRejGate:   string | null = null;
