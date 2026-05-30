@@ -52,13 +52,14 @@ export function RuntimeSwitcher() {
   }
 
   const chips = [
-    { key: "paper",  label: "PAPER", active: state.mode === "paper", live: false, ok: true },
+    { key: "paper",  label: "PAPER", active: state.mode === "paper", live: false, ok: true, canTrade: true },
     ...state.connectedExchanges.map(c => ({
-      key:    c.exchange,
-      label:  c.exchange.toUpperCase(),
-      active: state.mode === "live" && state.activeExchange === c.exchange,
-      live:   true,
-      ok:     c.ok,
+      key:      c.exchange,
+      label:    c.exchange.toUpperCase(),
+      active:   state.mode === "live" && state.activeExchange === c.exchange,
+      live:     true,
+      ok:       c.ok,
+      canTrade: c.canTrade !== false,
     })),
   ];
 
@@ -71,36 +72,51 @@ export function RuntimeSwitcher() {
     <div role="radiogroup" aria-label="Trading runtime" style={rowStyle}>
       <span style={legendStyle}>RUNTIME</span>
       <div style={scrollerStyle}>
-        {chips.map(chip => (
+        {chips.map(chip => {
+          const unhealthy    = chip.live && !chip.ok;
+          const unauthorized = chip.live && chip.canTrade === false;
+          // Only Connected + Healthy + trade-authorized live exchanges are
+          // selectable; PAPER is always selectable. Blocked chips can't be
+          // tapped so the user can't silently fall back to paper.
+          const selectable   = !chip.live || (!unhealthy && !unauthorized);
+          const disabled     = isPending || !selectable;
+          return (
           <button
             key={chip.key}
             role="radio"
             aria-checked={chip.active}
-            disabled={isPending}
-            title={chip.live
-              ? `${chip.label} — runtime display. Orders continue as paper until you tap ACTIVATE AI TRADING in the portal.`
-              : "Paper trading — simulated capital, no real orders."}
-            onClick={() => onSelect(chip.key, chip.live)}
+            aria-disabled={!selectable}
+            disabled={disabled}
+            title={!chip.live
+              ? "Paper trading — simulated capital, no real orders."
+              : unhealthy
+                ? `${chip.label} — balances failed to sync. Reconnect this exchange before trading on it.`
+                : unauthorized
+                  ? `${chip.label} — API key is not authorized for trading.`
+                  : `${chip.label} — runtime display. Orders continue as paper until you tap ACTIVATE AI TRADING in the portal.`}
+            onClick={() => { if (selectable) onSelect(chip.key, chip.live); }}
             style={{
               ...chipBaseStyle,
               borderColor: chip.active ? C.BORDER_ACTIVE : C.BORDER,
               color:       chip.active ? C.BRAND : C.TEXT_0,
               background:  chip.active ? "rgba(102,255,102,0.07)" : "rgba(255,255,255,0.02)",
               boxShadow:   chip.active ? `0 0 12px ${C.BRAND_GLOW}` : "none",
-              opacity:     chip.ok ? 1 : 0.55,
-              cursor:      isPending ? "wait" : "pointer",
+              opacity:     selectable ? 1 : 0.4,
+              cursor:      isPending ? "wait" : selectable ? "pointer" : "not-allowed",
             }}
           >
             <span aria-hidden style={{
               width: 5, height: 5, borderRadius: "50%",
-              background: chip.active ? C.BRAND
-                        : !chip.ok    ? C.DANGER
+              background: chip.active   ? C.BRAND
+                        : unhealthy     ? C.DANGER
+                        : unauthorized  ? "#FFB020"
                         : C.TEXT_2,
               boxShadow:  chip.active ? `0 0 6px ${C.BRAND}` : "none",
             }} />
             {chip.label}
           </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

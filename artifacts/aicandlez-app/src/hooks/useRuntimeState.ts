@@ -22,6 +22,7 @@ export interface RuntimeConnection {
   isDefault:             boolean;
   tradingMode:           string;
   ok:                    boolean;
+  canTrade?:             boolean;    // API key authorized for trading (false = blocked in switcher)
   totalEquityUSD:        number;
   balances:              Record<string, { free: number; locked: number; total: number }>;
   lastUpdated:           number;

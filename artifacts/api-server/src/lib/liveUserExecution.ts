@@ -95,7 +95,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached";
+  errorCode?:      "no_connection" | "not_trade_authorized" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached";
   error?:          string;
 }
 
@@ -451,8 +451,9 @@ export async function listLiveExecutionUsers(): Promise<Array<{ userId: string; 
   try {
     const rows = await db
       .select({
-        userId:   userExchangeConnectionsTable.userId,
-        exchange: userExchangeConnectionsTable.exchange,
+        userId:      userExchangeConnectionsTable.userId,
+        exchange:    userExchangeConnectionsTable.exchange,
+        permissions: userExchangeConnectionsTable.permissions,
       })
       .from(userExchangeConnectionsTable)
       .where(
@@ -462,7 +463,14 @@ export async function listLiveExecutionUsers(): Promise<Array<{ userId: string; 
           eq(userExchangeConnectionsTable.tradingMode, "live"),
         ),
       );
-    return rows;
+    // Exclude connections whose key is EXPLICITLY not trade-authorized so a
+    // stale isDefault/live row can never re-enter the live auto fan-out
+    // cohort. The open-path guard in placeLiveAutoOrderForUser is the hard
+    // stop; this just keeps the cohort clean (no wasted fan-out / log noise).
+    // Missing/undecided permissions remain eligible (backward compat).
+    return rows
+      .filter(r => r.permissions?.trade !== false)
+      .map(r => ({ userId: r.userId, exchange: r.exchange }));
   } catch (err) {
     logger.warn(
       { err: err instanceof Error ? err.message : String(err) },
@@ -1272,6 +1280,22 @@ export async function placeLiveAutoOrderForUser(
     const msg = "No default live exchange connection configured";
     await emitFailureNotification(userId, symbol, side, msg);
     return { success: false, userId, errorCode: "no_connection", error: msg };
+  }
+
+  // 1b. Trade-authorization gate (defense-in-depth at the real-money
+  // chokepoint). Runtime-state resolution + the cohort writeback + PUT
+  // /user/settings now all exclude trade-unauthorized venues, but a row
+  // PREVIOUSLY promoted to isDefault/live could still survive with an API
+  // key whose detected permissions are explicitly { trade: false }. Refuse
+  // to OPEN a live position on such a connection so no real order can ship
+  // through an unauthorized venue. Missing/undecided permissions are treated
+  // as authorized (backward compat). NOTE: this gate is intentionally on the
+  // OPEN path only — `placeLiveCloseOrderForUser` is NOT gated, so an exit
+  // is never trapped by a permission flag.
+  if (row.permissions?.trade === false) {
+    const msg = `${row.exchange} API key is not authorized for trading — reconnect with trade permission enabled`;
+    await emitFailureNotification(userId, symbol, side, msg, row.exchange);
+    return { success: false, userId, exchange: row.exchange, errorCode: "not_trade_authorized", error: msg };
   }
 
   // 2. Decrypt credentials

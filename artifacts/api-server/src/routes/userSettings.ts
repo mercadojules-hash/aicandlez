@@ -163,7 +163,10 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
         patch[k] = v;
       } else if (typeof v === "string" && v.length > 0) {
         const [conn] = await db
-          .select({ id: userExchangeConnectionsTable.id })
+          .select({
+            id:          userExchangeConnectionsTable.id,
+            permissions: userExchangeConnectionsTable.permissions,
+          })
           .from(userExchangeConnectionsTable)
           .where(and(
             eq(userExchangeConnectionsTable.userId, userId),
@@ -180,6 +183,28 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
           res.status(409).json({
             error:     `Cannot set activeRuntimeExchange to "${v}": no active connection for that exchange.`,
             errorCode: "no_active_connection",
+          });
+          return;
+        }
+        // Authorization gate (server-side companion to the client switcher's
+        // `canTrade` selectability gate). Refuse to pin a runtime exchange
+        // whose API key is EXPLICITLY not authorized for trading — otherwise
+        // a direct API call could route the runtime (and, via the
+        // runtime-state cohort writeback, the live execution engine) to a
+        // trade-unauthorized venue. Missing/undecided permissions are treated
+        // as authorized (backward compat with connections recorded before
+        // permission detection existed) so existing live users aren't locked
+        // out. The GET /user/runtime-state `healthyLive` predicate enforces
+        // the same `canTrade` check, so resolution + writeback agree.
+        if (conn.permissions?.trade === false) {
+          req.log.warn({
+            userId, attemptedExchange: v,
+            tag: "RUNTIME_WRITE_REJECTED",
+            reason: "not_trade_authorized",
+          }, "[RUNTIME_WRITE_REJECTED] PUT /user/settings refused activeRuntimeExchange (no trade permission)");
+          res.status(409).json({
+            error:     `Cannot set activeRuntimeExchange to "${v}": this API key is not authorized for trading.`,
+            errorCode: "not_trade_authorized",
           });
           return;
         }

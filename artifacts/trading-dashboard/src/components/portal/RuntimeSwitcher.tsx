@@ -87,32 +87,46 @@ export function RuntimeSwitcher() {
     <div role="radiogroup" aria-label="Trading runtime" style={rowStyle}>
       <span style={legendStyle}>RUNTIME</span>
       {chips.map(chip => {
-        const unhealthy = chip.live && chip.conn ? !chip.conn.ok : false;
-        const tooltip = chip.live
-          ? `${chip.label} — runtime display. Orders continue as paper until you tap ACTIVATE AI TRADING in the portal (server kill-switch, subscription, disclaimer, and runtime gates still apply).`
-          : "Paper trading — simulated capital, no real orders.";
+        const unhealthy    = chip.live && chip.conn ? !chip.conn.ok : false;
+        const unauthorized = chip.live && chip.conn ? chip.conn.canTrade === false : false;
+        // Only Connected + Healthy + trade-authorized live exchanges are
+        // selectable. PAPER is always selectable. A blocked chip cannot be
+        // clicked, so the user can't silently fall back to paper by picking
+        // a dead or unauthorized venue (the aggregator would refuse to
+        // promote it to live anyway — this just makes that explicit in UI).
+        const selectable = !chip.live || (!unhealthy && !unauthorized);
+        const tooltip = !chip.live
+          ? "Paper trading — simulated capital, no real orders."
+          : unhealthy
+            ? `${chip.label} — balances failed to sync. Reconnect this exchange before trading on it.`
+            : unauthorized
+              ? `${chip.label} — API key is not authorized for trading. Re-add the key with trade permission.`
+              : `${chip.label} — runtime display. Orders continue as paper until you tap ACTIVATE AI TRADING in the portal (server kill-switch, subscription, disclaimer, and runtime gates still apply).`;
+        const disabled = isPending || !selectable;
         return (
           <button
             key={chip.key}
             role="radio"
             aria-checked={chip.active}
+            aria-disabled={!selectable}
             title={tooltip}
-            disabled={isPending}
-            onClick={() => onSelect(chip.key, chip.live)}
+            disabled={disabled}
+            onClick={() => { if (selectable) onSelect(chip.key, chip.live); }}
             style={{
               ...chipBaseStyle,
               borderColor: chip.active ? C.BORDER_ACTIVE : C.BORDER,
               color:       chip.active ? C.BRAND : C.TEXT_0,
               background:  chip.active ? "rgba(102,255,102,0.07)" : "rgba(255,255,255,0.02)",
               boxShadow:   chip.active ? `0 0 14px ${C.BRAND_GLOW}` : "none",
-              opacity:     unhealthy ? 0.55 : 1,
-              cursor:      isPending ? "wait" : "pointer",
+              opacity:     selectable ? 1 : 0.4,
+              cursor:      isPending ? "wait" : selectable ? "pointer" : "not-allowed",
             }}
           >
             <span aria-hidden style={{
               width: 5, height: 5, borderRadius: "50%",
-              background: chip.active ? C.BRAND
-                        : unhealthy   ? C.DANGER
+              background: chip.active   ? C.BRAND
+                        : unhealthy     ? C.DANGER
+                        : unauthorized  ? "#FFB020"
                         : C.TEXT_2,
               boxShadow:  chip.active ? `0 0 6px ${C.BRAND}` : "none",
             }} />

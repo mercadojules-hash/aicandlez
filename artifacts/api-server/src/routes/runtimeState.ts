@@ -59,6 +59,7 @@ interface ExchangeConnectionState {
   label:                  string | null;
   status:                 string;           // "active" | "error" | "revoked"
   ok:                     boolean;          // balance poll succeeded just now
+  canTrade:               boolean;          // API key authorized for trading (permissions.trade !== false)
   error:                  string | null;
   lastBalanceFetchAt:     Date | null;
   lastBalanceFetchError:  string | null;
@@ -86,6 +87,12 @@ function shapeConnection(
     label:                 row.label,
     status:                row.status,
     ok:                    snapshot.ok,
+    // Trade authorization: derived from the permissions detected during the
+    // last successful connection test. Only an EXPLICIT `trade: false` marks
+    // the key unauthorized — a missing/undecided permissions blob is treated
+    // as authorized so legacy connections (recorded before permission
+    // detection) are never silently locked out of the runtime switcher.
+    canTrade:              row.permissions?.trade !== false,
     error:                 snapshot.error ?? null,
     lastBalanceFetchAt:    row.lastBalanceFetchAt,
     lastBalanceFetchError: row.lastBalanceFetchError,
@@ -183,7 +190,13 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
       .filter(c => c.ok)
       .reduce((sum, c) => sum + (Number.isFinite(c.totalEquityUSD) ? c.totalEquityUSD : 0), 0);
 
-    const healthyLive = connectedExchanges.filter(c => c.status === "active" && c.ok);
+    // "Healthy + live-eligible" = active connection, balance poll ok, AND the
+    // API key is authorized for trading. The `canTrade` term keeps runtime
+    // resolution (and the cohort writeback that promotes the active exchange
+    // to isDefault/live for the execution engine) from ever pinning a
+    // trade-unauthorized venue — the server-side companion to the switcher's
+    // selectability gate and the PUT /user/settings authorization check.
+    const healthyLive = connectedExchanges.filter(c => c.status === "active" && c.ok && c.canTrade);
 
     let mode: RuntimeMode      = "paper";
     let activeExchange: string | null = null;
