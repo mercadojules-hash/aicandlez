@@ -12,6 +12,8 @@ import {
 // per test ({ plan, capTier, usePlanDefault, overrideExpiresAt }).
 type MockRow = {
   plan:              string | null;
+  role?:             string | null;
+  isInternal?:       boolean | null;
   capTier:           number | null;
   usePlanDefault:    boolean | null;
   overrideExpiresAt: Date | null;
@@ -129,20 +131,20 @@ describe("tradeLimitEngine.resolveCap (plan default + operator override)", () =>
     mod.__resetTradeLimitCacheForTests();
   });
 
-  it("starter plan with no override row → plan default = 100", async () => {
+  it("starter plan with no override row → plan default", async () => {
     mockJoinedRow = { plan: "starter", capTier: null, usePlanDefault: null, overrideExpiresAt: null };
     const { getTradeLimitVerdict } = await import("../tradeLimitEngine.js");
     const v = await getTradeLimitVerdict("u-starter-noop");
     expect(v.capTier).toBe(PLAN_DEFAULT_TRADE_LIMIT_CAP.starter);
     expect(v.source).toBe("plan-default");
-    expect(v.planDefaultCap).toBe(100);
+    expect(v.planDefaultCap).toBe(PLAN_DEFAULT_TRADE_LIMIT_CAP.starter);
   });
 
-  it("pro plan with usePlanDefault=true → plan default = 200 (ignores capTier)", async () => {
+  it("pro plan with usePlanDefault=true → plan default (ignores capTier)", async () => {
     mockJoinedRow = { plan: "pro", capTier: 50, usePlanDefault: true, overrideExpiresAt: null };
     const { getTradeLimitVerdict } = await import("../tradeLimitEngine.js");
     const v = await getTradeLimitVerdict("u-pro-default");
-    expect(v.capTier).toBe(200);
+    expect(v.capTier).toBe(PLAN_DEFAULT_TRADE_LIMIT_CAP.pro);
     expect(v.source).toBe("plan-default");
   });
 
@@ -152,7 +154,22 @@ describe("tradeLimitEngine.resolveCap (plan default + operator override)", () =>
     const v = await getTradeLimitVerdict("u-starter-overridden");
     expect(v.capTier).toBe(200);
     expect(v.source).toBe("operator-override");
-    expect(v.planDefaultCap).toBe(100);
+    expect(v.planDefaultCap).toBe(PLAN_DEFAULT_TRADE_LIMIT_CAP.starter);
+  });
+
+  it("internal-QA account → UNLIMITED regardless of plan or override", async () => {
+    // starter plan, no operator override, but is_internal_account=true.
+    mockJoinedRow = {
+      plan: "starter", role: "user", isInternal: true,
+      capTier: null, usePlanDefault: null, overrideExpiresAt: null,
+    };
+    const { getTradeLimitVerdict } = await import("../tradeLimitEngine.js");
+    const v = await getTradeLimitVerdict("u-internal-qa");
+    expect(v.capTier).toBe(UNLIMITED_TRADE_LIMIT_CAP);
+    expect(v.remaining).toBe(Number.POSITIVE_INFINITY);
+    expect(v.blocked).toBe(false);
+    // Plan-default cap is still surfaced for the operator drawer badge.
+    expect(v.planDefaultCap).toBe(PLAN_DEFAULT_TRADE_LIMIT_CAP.starter);
   });
 
   it("UNLIMITED override propagates through verdict", async () => {

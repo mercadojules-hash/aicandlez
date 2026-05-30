@@ -114,6 +114,7 @@ async function resolveCap(userId: string): Promise<ResolvedCap> {
       .select({
         plan:              usersTable.plan,
         role:              usersTable.role,
+        isInternal:        usersTable.isInternalAccount,
         capTier:           userTradeLimitsTable.capTier,
         usePlanDefault:    userTradeLimitsTable.usePlanDefault,
         overrideExpiresAt: userTradeLimitsTable.overrideExpiresAt,
@@ -125,9 +126,12 @@ async function resolveCap(userId: string): Promise<ResolvedCap> {
 
     const planDefaultCap = getPlanDefaultCap(row?.plan ?? null);
 
-    // Role short-circuit — admin / super-admin are uncapped (unlimited)
-    // on every runtime, regardless of plan or operator override.
-    if (row?.role === "admin" || row?.role === "super-admin") {
+    // Role / QA short-circuit — admin / super-admin AND internal-QA accounts
+    // (`users.is_internal_account`) are uncapped (unlimited) on every
+    // runtime, regardless of plan or operator override. The internal flag is
+    // the maintainable QA-exemption mechanism: it grants unlimited trade
+    // throttling without having to elevate the account to an operator role.
+    if (row?.role === "admin" || row?.role === "super-admin" || row?.isInternal === true) {
       return {
         capTier:        UNLIMITED_TRADE_LIMIT_CAP,
         source:         "plan-default",

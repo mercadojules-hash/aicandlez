@@ -54,6 +54,9 @@ vi.mock("../marketData.js",        () => ({
   // the symbol every kill-switch test uses, so it must be present or the gate
   // would falsely reject the "proceeds past the gate" cases.
   SUPPORTED_SYMBOLS: ["BTCUSD", "ETHUSD", "SOLUSD"],
+  // CoinbaseAdapter builds a reverse product-id map from SYMBOL_MAP at module
+  // load; without it the suite fails to collect (import-time throw).
+  SYMBOL_MAP: { BTCUSD: "BTC-USD", ETHUSD: "ETH-USD", SOLUSD: "SOL-USD" },
 }));
 vi.mock("../tradeLimitEngine.js",  () => ({
   getTradeLimitVerdict:        vi.fn(async () => ({ blocked: false })),

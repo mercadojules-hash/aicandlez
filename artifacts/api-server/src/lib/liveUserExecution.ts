@@ -196,6 +196,35 @@ async function isOperatorRole(userId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Internal / QA account check (`users.is_internal_account`). These are
+ * platform development accounts exempt from tier ENTITLEMENT throttling —
+ * the daily-trade cap (gate 0b), the platform-wide concurrent cap (gate 0c),
+ * and the plan-tier max-open-positions cap (gate 0LIQ part A). They STILL
+ * respect the liquidity cushion, the per-user risk budget (gate 0d), trade
+ * sizing, stop-loss / take-profit, and exchange balance availability. This
+ * is the maintainable QA-exemption mechanism: a single boolean on the user
+ * row, independent of the admin/operator role (so QA accounts don't inherit
+ * operator privileges or the broader operator gate-bypass). Fail-closed
+ * (throttle as a normal customer) on lookup error.
+ */
+async function isInternalAccount(userId: string): Promise<boolean> {
+  try {
+    const [u] = await db
+      .select({ isInternal: usersTable.isInternalAccount })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, userId))
+      .limit(1);
+    return u?.isInternal === true;
+  } catch (err) {
+    logger.warn(
+      { userId, err: err instanceof Error ? err.message : String(err) },
+      "liveUserExecution: internal-account lookup failed — assuming non-internal (fail-closed)",
+    );
+    return false;
+  }
+}
+
 export interface LiveUserCloseRequest {
   userId:    string;
   symbol:    string;          // engine-native ("BTCUSD")
@@ -848,7 +877,10 @@ export async function placeLiveAutoOrderForUser(
   const concurrentCap = getLiveExecutionConcurrentCap();
   if (concurrentCap > 0) {
     const operator = await isOperatorRole(userId);
-    if (!operator) {
+    // Operators (admin/super-admin) AND internal/QA accounts bypass the
+    // platform-wide controlled-beta concurrent cap entirely.
+    const internal = operator ? false : await isInternalAccount(userId);
+    if (!operator && !internal) {
       const openLive = await countOpenLivePositions();
       if (openLive >= concurrentCap) {
         const msg = `Platform live-execution capacity reached (${openLive}/${concurrentCap} concurrent live trades) — controlled-beta limit`;
@@ -901,6 +933,9 @@ export async function placeLiveAutoOrderForUser(
   if (!useSandbox) {
     const operatorLiq = await isOperatorRole(userId);
     if (!operatorLiq) {
+      // Internal/QA accounts skip the plan-tier max-open-positions cap but
+      // STILL run the liquidity cushion (sized to the single pending entry).
+      const internalLiq = await isInternalAccount(userId);
       try {
         const [gate, openLiveRow, cashRow] = await Promise.all([
           resolveAiTradingGate(userId),
@@ -917,10 +952,11 @@ export async function placeLiveAutoOrderForUser(
         ]);
 
         const verdict = evaluateLiquidityGuard({
-          plan:             gate.plan,
-          openLiveCount:    Number(openLiveRow[0]?.n ?? 0),
-          tradeSizeUsd:     sizeUSD,
-          availableCashUsd: Number(cashRow[0]?.cash ?? 0),
+          plan:                gate.plan,
+          openLiveCount:       Number(openLiveRow[0]?.n ?? 0),
+          tradeSizeUsd:        sizeUSD,
+          availableCashUsd:    Number(cashRow[0]?.cash ?? 0),
+          unlimitedPositions:  internalLiq,
         });
 
         if (!verdict.ok) {

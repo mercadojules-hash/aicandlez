@@ -93,6 +93,15 @@ export interface LiquidityGuardInput {
   tradeSizeUsd:      number;
   /** Cash the customer has available to deploy (NOT total equity). */
   availableCashUsd:  number;
+  /**
+   * Entitlement-exempt (operator / internal-QA) accounts. When true the
+   * plan-tier max-open-positions cap (Gate A) is skipped entirely and the
+   * liquidity cushion (Gate B) funds only the single pending entry rather
+   * than the whole tier slot count. Liquidity protection is still enforced;
+   * the position count simply isn't tier-bounded. `planMaxOpen` /
+   * `remainingSlots` echo `-1` (unlimited sentinel) in the result.
+   */
+  unlimitedPositions?: boolean;
 }
 
 export interface LiquidityGuardResult {
@@ -116,18 +125,28 @@ export interface LiquidityGuardResult {
  * produce a "looks fine" verdict.
  */
 export function evaluateLiquidityGuard(input: LiquidityGuardInput): LiquidityGuardResult {
-  const plan             = input.plan;
-  const planMaxOpen      = PLAN_MAX_OPEN_POSITIONS[plan] ?? 0;
-  const openLiveCount    = Math.max(0, Math.floor(input.openLiveCount));
-  const tradeSizeUsd     = Math.max(0, input.tradeSizeUsd);
-  const availableCashUsd = Math.max(0, input.availableCashUsd);
+  const plan               = input.plan;
+  const unlimitedPositions = input.unlimitedPositions === true;
+  const planMaxOpen        = PLAN_MAX_OPEN_POSITIONS[plan] ?? 0;
+  const openLiveCount      = Math.max(0, Math.floor(input.openLiveCount));
+  const tradeSizeUsd       = Math.max(0, input.tradeSizeUsd);
+  const availableCashUsd   = Math.max(0, input.availableCashUsd);
 
-  const remainingSlots = Math.max(0, planMaxOpen - openLiveCount);
+  const remainingSlots = unlimitedPositions
+    ? Number.POSITIVE_INFINITY
+    : Math.max(0, planMaxOpen - openLiveCount);
+
+  // Echo values for the result object. Unlimited-position accounts surface
+  // the `-1` unlimited sentinel rather than an unbounded Infinity (which
+  // would serialize to null) or a misleading finite tier value.
+  const echoPlanMaxOpen    = unlimitedPositions ? -1 : planMaxOpen;
+  const echoRemainingSlots = unlimitedPositions ? -1 : remainingSlots;
 
   // Gate A — plan capacity. Even a customer with infinite cash cannot
   // exceed their tier's open-position cap. Free → always blocked here
-  // because cap=0.
-  if (remainingSlots <= 0) {
+  // because cap=0. SKIPPED for entitlement-exempt (operator / internal-QA)
+  // accounts, which have no tier position ceiling.
+  if (!unlimitedPositions && remainingSlots <= 0) {
     return {
       ok:               false,
       reasonCode:       "plan_max_positions_reached",
@@ -142,23 +161,26 @@ export function evaluateLiquidityGuard(input: LiquidityGuardInput): LiquidityGua
   }
 
   // Gate B — liquidity cushion.
-  //   required = tradeSize × remainingSlots × (1 + feeBuffer) + cushion
-  // This is the cash floor to safely RUN every remaining slot at the
-  // customer's chosen size with a round-trip fee allowance and a small
-  // absolute safety margin on top. If the customer's available cash is
-  // below this floor, opening a NEW entry would put the AI session at
-  // risk of running dry on fees / margin partway through, so we pause
-  // new entries before that happens.
+  //   required = tradeSize × slots × (1 + feeBuffer) + cushion
+  // For normal accounts `slots` = every remaining tier slot, so the floor
+  // is the cash to safely RUN all of them at the customer's chosen size
+  // with a round-trip fee allowance and a small absolute safety margin. For
+  // entitlement-exempt accounts there is no finite slot count, so the floor
+  // funds just the single pending entry (slots=1) — liquidity protection
+  // still applies, it simply isn't multiplied by an unbounded slot count.
+  // Either way, if available cash is below this floor we pause new entries
+  // before the AI session risks running dry on fees / margin mid-trade.
+  const slotsForCushion = unlimitedPositions ? 1 : remainingSlots;
   const requiredCashUsd =
-    tradeSizeUsd * remainingSlots * (1 + FEE_BUFFER_PCT) + LIQUIDITY_SAFETY_CUSHION_USD;
+    tradeSizeUsd * slotsForCushion * (1 + FEE_BUFFER_PCT) + LIQUIDITY_SAFETY_CUSHION_USD;
 
   if (availableCashUsd < requiredCashUsd) {
     return {
       ok:               false,
       reasonCode:       "liquidity_protected",
       message:          LIQUIDITY_PROTECTED_MESSAGE,
-      planMaxOpen,
-      remainingSlots,
+      planMaxOpen:      echoPlanMaxOpen,
+      remainingSlots:   echoRemainingSlots,
       requiredCashUsd,
       availableCashUsd,
       feeBufferPct:     FEE_BUFFER_PCT,
@@ -170,8 +192,8 @@ export function evaluateLiquidityGuard(input: LiquidityGuardInput): LiquidityGua
     ok:               true,
     reasonCode:       "ok",
     message:          null,
-    planMaxOpen,
-    remainingSlots,
+    planMaxOpen:      echoPlanMaxOpen,
+    remainingSlots:   echoRemainingSlots,
     requiredCashUsd,
     availableCashUsd,
     feeBufferPct:     FEE_BUFFER_PCT,
