@@ -30,6 +30,7 @@ import {
   calculatePnL,
 } from "../lib/trading.js";
 import { requireAuth, requireRole } from "../middlewares/requireAuth.js";
+import { getExecutionFunnelSnapshot } from "../lib/executionFunnel.js";
 
 const router = Router();
 // All engine-control routes are operator-only (super-admin / admin).
@@ -71,6 +72,26 @@ router.get("/engine/status", (_req, res) => {
       blockedMTF: engineStats.funnelBlockedMTF,
       executed:   engineStats.funnelExecuted,
     },
+    // Customer-safe execution-funnel rollup (read-only telemetry, NOT an
+    // execution-rule change). Sourced from the same getExecutionFunnelSnapshot()
+    // that powers the admin /debug panel, exposed here so the non-admin
+    // PortalCustomerShell EXECUTION FUNNEL widget can read it without hitting
+    // the admin-gated /api/admin/execution-funnel route. passedConfidence =
+    // actionable candidates that cleared the confidence gate (everything not
+    // blocked at the confidence stage). attempted/succeeded track the operator
+    // engine path (per executionFunnel.ts contract).
+    executionFunnel: (() => {
+      const s = getExecutionFunnelSnapshot();
+      const bs = s.blockedByStage;
+      const candidates =
+        bs.confidence + bs.risk + bs.liquidity + bs.exchange + bs.positionLimits +
+        s.executionAttempted;
+      return {
+        passedConfidence:   Math.max(0, candidates - bs.confidence),
+        executionAttempted: s.executionAttempted,
+        executionSucceeded: s.executionSucceeded,
+      };
+    })(),
     // TEMP [VOL_GATE_TEST] — controlled live-test telemetry for the 65% volume
     // gate (cumulative since boot). Remove with the engineStats.volGateTest
     // block when the controlled test window closes.

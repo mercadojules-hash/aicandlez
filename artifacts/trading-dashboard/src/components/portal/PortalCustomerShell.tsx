@@ -952,6 +952,11 @@ type EngineLite = {
   loopIntervalMs?:    number;
   signalCounts?:      { BUY?: number; SELL?: number; HOLD?: number };
   funnel?:            { total?: number; passedMTF?: number; blockedMTF?: number; executed?: number };
+  /* Read-only execution-funnel rollup from /api/engine/status. Powers the
+     customer EXECUTION FUNNEL widget (replaced the old MARKET HEAT cell).
+     passedConfidence = actionable candidates that cleared the confidence
+     gate; attempted/succeeded track the operator engine path. */
+  executionFunnel?:   { passedConfidence?: number; executionAttempted?: number; executionSucceeded?: number };
   recentSignalLog?:   ReadonlyArray<ReasoningEntry>;
   // Pass 4.2 — server-side candle feed health. When healthy === false
   // the shell renders <DataFeedBanner /> so the empty-engine state is
@@ -6576,42 +6581,10 @@ export function PortalCustomerShell() {
           pointerEvents: "none", zIndex: 0,
         }} />
 
-        {/* PHASE 9 — UserDashboard (candidate B) KPI TILE STRIP.
-            Replaces CustomerBattlefieldHeader. Pure read-only derivations
-            from `opportunities`, `engineStatus`, `signalsPerMin`,
-            `portalPosture`, `blotterOpenCount`, `filteredMajors/Alts`.
-            Original CustomerBattlefieldHeader component definition is
-            preserved further down for one-line rollback. */}
-        {(() => {
-          // Phase 9.1 — top analytics row simplified to surface "what the
-          // AI sees" rather than internal telemetry. SIGNAL QUALITY,
-          // OPPORTUNITY MIX and AI THROUGHPUT were removed; AI CONFIDENCE
-          // was relocated to the LiveIntelligenceBand (replacing the old
-          // BREAKOUT PROBABILITY gauge). MARKET REGIME stays as the single
-          // posture banner.
-          const regimeLabel = portalPosture || "NEUTRAL";
-          const regimeBlurb = regimeLabel === "RISK-ON"   ? "Bull regime · risk-on flow"
-                            : regimeLabel === "DEFENSIVE" ? "Defensive posture · tight risk"
-                            : regimeLabel === "LOW-VOL"   ? "Compressed range · scalp tier"
-                            :                                "Mixed regime · selective AI";
-          const tileBase: CSSProperties = {
-            display: "flex", flexDirection: "column", gap: 8, padding: "10px 12px",
-            background: T.BG_CARD, border: `1px solid rgba(124,255,0,0.10)`,
-            fontFamily: T.FONT_MONO,
-          };
-          const labelStyle: CSSProperties = {
-            fontSize: 9, fontWeight: 600, letterSpacing: T.TRACK_TITLE, color: T.TEXT_3,
-          };
-          return (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-              <div style={tileBase}>
-                <div style={labelStyle}>MARKET REGIME</div>
-                <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.02em", color: T.NEON }}>{regimeLabel}</div>
-                <div style={{ fontSize: 9, color: T.TEXT_3 }}>{regimeBlurb}</div>
-              </div>
-            </div>
-          );
-        })()}
+        {/* MARKET REGIME posture row removed — non-actionable for customers
+            and consumed a full row of vertical space. Content below now
+            shifts up so more assets are visible without scrolling. The live
+            posture still drives the LiveIntelligenceBand (posture={portalPosture}). */}
 
         {/* Task #199 — Runtime switcher chip row. Mounted only on the
             customer shell (admin shell never imports it), preserving
@@ -7759,23 +7732,6 @@ function LiveIntelligenceBand({
     pressurePct >= 50 ? "#7CFF00" :
     pressurePct >= 25 ? "#FFC857" :
                         "#ff6b6b";
-  const heatTier =
-    m.avgConv >= 75 ? "HOT"    :
-    m.avgConv >= 60 ? "ACTIVE" :
-    m.avgConv >= 45 ? "MIXED"  :
-                      "QUIET";
-  const heatTierColor =
-    m.avgConv >= 75 ? T.NEON :
-    m.avgConv >= 60 ? "#7CFF00" :
-    m.avgConv >= 45 ? "#FFC857" :
-                      "#9aa39c";
-
-  // Top 12 conviction targets, ranked, for the radial heat array.
-  const heatCells = useMemo(() => {
-    return [...opportunities]
-      .sort((a, b) => (b.convictionScore ?? 0) - (a.convictionScore ?? 0))
-      .slice(0, 12);
-  }, [opportunities]);
 
   return (
     <section
@@ -8131,63 +8087,67 @@ function LiveIntelligenceBand({
       })()}
 
       {/* ────────────────────────────────────────────────────────────── */}
-      {/* BOX 6 — MARKET HEAT (radial conviction array)                  */}
-      {/* Top 12 by conviction placed around a clock face. Color tier +  */}
-      {/* selective blink for elite (≥75) cells.                         */}
+      {/* BOX 6 — EXECUTION FUNNEL                                        */}
+      {/* Replaced MARKET HEAT (avg-conviction array). Surfaces what the  */}
+      {/* AI is actually DOING: signals generated → cleared the           */}
+      {/* confidence gate → became execution attempts → filled. The       */}
+      {/* descending bars make the drop-off legible at a glance, which is */}
+      {/* the whole point: it explains why trades are / aren't created.   */}
+      {/* Read-only telemetry from /api/engine/status (engine.executionFunnel) — */}
+      {/* no confidence / liquidity / risk / execution-rule change.       */}
       {/* ────────────────────────────────────────────────────────────── */}
-      <LIBCell label="MARKET HEAT" sub={live ? `AVG ${m.avgConv.toFixed(0)} · ${heatTier}` : "WARMING"} accent={heatTierColor}>
-        <svg viewBox="0 0 100 100" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-          <circle cx="50" cy="50" r="44" fill="none" stroke={`${T.NEON}22`} strokeWidth="0.4" />
-          <circle cx="50" cy="50" r="30" fill="none" stroke={`${T.NEON}1a`} strokeWidth="0.4" strokeDasharray="1 2" />
-          {Array.from({ length: 12 }).map((_, i) => {
-            const cell = heatCells[i];
-            const a = (i * 30 - 90) * Math.PI / 180;
-            const x = 50 + Math.cos(a) * 36;
-            const y = 50 + Math.sin(a) * 36;
-            const conv = cell?.convictionScore ?? 0;
-            const filled = !!cell;
-            const cellColor =
-              conv >= 80 ? T.NEON      :
-              conv >= 60 ? "#7CFF00"   :
-              conv >= 45 ? "#FFC857"   :
-              filled     ? "#9aa39c"   :
-                           "#2a2f2a";
-            return (
-              <g key={i}>
-                {filled && (
-                  <line x1="50" y1="50" x2={x} y2={y}
-                    stroke={`${cellColor}33`} strokeWidth="0.4" />
-                )}
-                <circle cx={x} cy={y}
-                  r={filled ? (conv >= 80 ? 4 : conv >= 60 ? 3.4 : 2.8) : 2}
-                  fill={filled ? cellColor : "transparent"}
-                  stroke={filled ? "none" : `${T.NEON}33`}
-                  strokeDasharray={filled ? "" : "1 1"}
-                  opacity={filled ? (conv >= 60 ? 1 : 0.75) : 0.4}
-                  style={{
-                    filter: filled && conv >= 60 ? `drop-shadow(0 0 3px ${cellColor})` : "none",
-                    animation: filled && live && conv >= 75
-                      ? `lib-heat-blink ${1.8 + (i % 5) * 0.25}s ease-in-out infinite`
-                      : "none",
-                  }} />
-                {filled && conv >= 80 && (
-                  <circle cx={x} cy={y} r="6" fill="none" stroke={cellColor} strokeWidth="0.4" opacity="0.6"
-                    style={{ animation: `lib-ring-pulse ${2.4 + (i % 3) * 0.4}s ease-in-out infinite`, transformOrigin: `${x}px ${y}px` }} />
-                )}
-              </g>
-            );
-          })}
-          {/* Center reading */}
-          <text x="50" y="48" textAnchor="middle"
-            style={{ fontFamily: T.FONT_MONO, fontSize: 18, fontWeight: 800, fill: heatTierColor }}>
-            {m.avgConv.toFixed(0)}
-          </text>
-          <text x="50" y="60" textAnchor="middle"
-            style={{ fontFamily: T.FONT_MONO, fontSize: 5.5, letterSpacing: "0.3em", fill: T.TEXT_3 }}>
-            AVG CONV
-          </text>
-        </svg>
-      </LIBCell>
+      {(() => {
+        const ef         = engine?.executionFunnel;
+        const generated  = engine?.signalsGenerated ?? 0;
+        const passedConf = ef?.passedConfidence ?? 0;
+        const attempts   = ef?.executionAttempted ?? 0;
+        const success    = ef?.executionSucceeded ?? 0;
+        const top        = Math.max(generated, passedConf, attempts, success, 1);
+        const rows: ReadonlyArray<{ label: string; value: number; color: string }> = [
+          { label: "SIGNALS GENERATED", value: generated,  color: T.NEON },
+          { label: "PASSED CONFIDENCE", value: passedConf, color: "#7CFF00" },
+          { label: "EXEC ATTEMPTS",     value: attempts,   color: "#FFC857" },
+          { label: "EXEC SUCCESS",      value: success,    color: success > 0 ? T.NEON : "#ff6b6b" },
+        ];
+        return (
+          <LIBCell label="EXECUTION FUNNEL" sub={live ? "LIVE" : "WARMING"} accent={T.NEON}>
+            <div
+              title="What the AI is doing right now: signals generated → how many cleared the confidence gate → how many became live execution attempts → how many filled. Attempt/success counts reflect the live engine execution path."
+              style={{
+                position: "absolute", inset: 0,
+                display: "flex", flexDirection: "column", justifyContent: "center",
+                gap: 10, padding: "34px 16px 16px",
+              }}>
+              {rows.map((r) => {
+                const pct = r.value > 0 ? Math.max(3, Math.min(100, (r.value / top) * 100)) : 0;
+                return (
+                  <div key={r.label}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 3 }}>
+                      <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: "0.14em", color: T.TEXT_3, fontFamily: T.FONT_MONO }}>
+                        {r.label}
+                      </span>
+                      <span style={{
+                        fontSize: 15, fontWeight: 800, color: r.color,
+                        fontVariantNumeric: "tabular-nums", fontFamily: T.FONT_MONO,
+                        textShadow: r.value > 0 ? `0 0 8px ${r.color}55` : "none",
+                      }}>
+                        {r.value.toLocaleString()}
+                      </span>
+                    </div>
+                    <div style={{ height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%", width: `${pct}%`, background: r.color, borderRadius: 2,
+                        boxShadow: pct > 0 ? `0 0 6px ${r.color}` : "none",
+                        transition: "width 600ms ease",
+                      }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </LIBCell>
+        );
+      })()}
     </section>
   );
 }

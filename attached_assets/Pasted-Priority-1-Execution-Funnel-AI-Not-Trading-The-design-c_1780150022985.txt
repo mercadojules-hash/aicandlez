@@ -1,0 +1,86 @@
+Priority #1 – Execution Funnel / AI Not Trading
+
+The design cleanup is secondary. The critical issue is that the AI is generating signals but not executing trades.
+
+Current observations:
+
+* Engine Signals have exceeded 1,400 after the latest deploy.
+* The live signal feed continuously generates opportunities (XLM, RNDR, FET, TIA, etc.).
+* Coinbase currently has 1 open position.
+* Kraken currently has 0 open positions.
+* AI Execs remain near zero.
+* New positions are not being opened despite a constant stream of opportunities.
+
+The scanner is clearly functioning.
+
+The issue appears to be somewhere in the execution funnel.
+
+Please use the new execution-funnel telemetry to determine exactly where signals are being blocked and provide the counts for:
+
+Signals Generated
+↓
+Passed Confidence
+↓
+Passed Risk
+↓
+Passed Liquidity
+↓
+Passed Exchange Validation
+↓
+Passed Position Limits
+↓
+Execution Attempts
+↓
+Execution Successes
+
+Also provide a ranked breakdown of rejection reasons, such as:
+
+* confidence threshold
+* liquidity protection
+* duplicate asset protection
+* max positions reached
+* trade cap reached
+* exchange validation
+* cooldown
+* spread/volume filter
+* any other gate
+
+At 1,400+ signals with almost no executions, the bottleneck is no longer signal generation. We need to identify the exact gate that is suppressing trades.
+
+---
+
+Priority #2 – Portal Layout Cleanup
+
+Remove the entire "Market Regime" row.
+
+Current row:
+
+Market Regime
+LOW-VOL
+Compressed range
+Scalp tier
+
+This information is not actionable for the user and consumes a full row of vertical space.
+
+Delete the row completely and shift all content upward so more assets are visible without scrolling.
+
+Also replace the current "Market Heat" widget.
+
+Suggested replacement:
+
+Execution Funnel Widget
+
+* Signals Generated
+* Passed Confidence
+* Execution Attempts
+* Execution Successes
+
+This provides meaningful operational information to users and helps explain what the AI is actually doing.
+
+---
+
+Important
+
+Do not make any additional confidence-threshold, liquidity, risk, or execution-rule changes until we see the funnel telemetry results.
+
+The platform is now producing signals consistently. The next step is identifying exactly why those signals are not becoming trades.
