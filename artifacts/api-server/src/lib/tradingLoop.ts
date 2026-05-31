@@ -1006,7 +1006,16 @@ async function autoExecute(
     exModeForStream = isTest ? "test" : (isLiveMode ? "live" : "simulation");
   } catch { /* fail-open to existing gates only on import error */ }
 
-  // ── Gate 1: max concurrent open positions ──────────────────────────────────
+  // ── Gate 1: max concurrent open positions (OPERATOR/GLOBAL book ONLY) ───────
+  // CUSTOMER-EXECUTION INVARIANT: this cap bounds the OPERATOR's OWN global
+  // `trades` book. It must NOT short-circuit the customer fan-out (live + paper),
+  // which is independently protected by each customer's OWN gates (plan
+  // max-positions, daily cap, liquidity, risk, duplicate, exchange + connection
+  // validation, concurrent-live cap) inside placeLiveAutoOrderForUser /
+  // placeUserOrder. When the global book is full we therefore set a flag and
+  // SKIP ONLY the operator's own open further below — the fan-out still runs so
+  // a saturated operator book can no longer starve real customer execution.
+  let operatorBookFull = false;
   if (settings.maxActivePositions > 0) {
     // EXIT_ENGINE_V2: count PERSISTED open positions from the `trades` table so
     // the cap survives restarts (the in-memory array used to reset to empty on
@@ -1016,20 +1025,14 @@ async function autoExecute(
       ? await countOpenTradePositions()
       : (await getAccountSummary()).positions.length;
     if (openCount >= settings.maxActivePositions) {
-      engineStats.tradesBlocked++;
-      const msg = `Auto-trade blocked for ${symbol} ${side}: max active positions (${settings.maxActivePositions}) reached — currently ${openCount} open`;
-      logger.info({ symbol, side, openCount, maxActivePositions: settings.maxActivePositions }, msg);
+      operatorBookFull = true;
+      const msg = `Operator/global book full for ${symbol} ${side}: max active positions (${settings.maxActivePositions}) reached — currently ${openCount} open. Skipping operator open; customer fan-out continues with per-user gates.`;
+      logger.info({ tag: "OPERATOR_BOOK_FULL", symbol, side, openCount, maxActivePositions: settings.maxActivePositions }, msg);
       await db.insert(logsTable).values({
         id: genId(), type: "trade", level: "warn",
         message: msg,
-        details: { symbol, side, openCount, maxActivePositions: settings.maxActivePositions },
+        details: { symbol, side, openCount, maxActivePositions: settings.maxActivePositions, operatorOpenSkipped: true, customerFanoutContinues: true },
       });
-      executionStreamBus.emitEvent({
-        type: "max_positions_blocked", severity: "warn",
-        symbol, side, gate: "max_active_positions", mode: exModeForStream,
-        reason: `${openCount}/${settings.maxActivePositions} open`, message: msg,
-      });
-      return { executed: false, blockReason: `Max active positions (${settings.maxActivePositions})` };
     }
   }
 
@@ -1135,6 +1138,10 @@ async function autoExecute(
   let pos: { id: string; entryPrice: number };
   let liveExchange:        string | undefined;
   let liveExchangeOrderId: string | undefined;
+  // Count of per-user PAPER fills produced by the fan-out below — used (together
+  // with customerLiveSuccesses) to resolve the execution outcome when the
+  // operator's own open is skipped because the global book is full.
+  let paperFanoutFills = 0;
 
   // ── Customer LIVE fan-out — DECOUPLED from operator/global live mode ────────
   // Customer live execution is governed SOLELY by CUSTOMER_LIVE_EXECUTION_ENABLED
@@ -1391,7 +1398,7 @@ async function autoExecute(
     }
   }
 
-  if (isLiveExec) {
+  if (isLiveExec && !operatorBookFull) {
     // ── Operator env-key path (admintrade.aicandlez.com) — GLOBAL live mode ──
     // Anchors the operator-level audit trail + risk view. The customer fan-out
     // already ran above (decoupled). If NEITHER the operator path NOR any
@@ -1437,6 +1444,20 @@ async function autoExecute(
       liveExchange        = first.exchange;
       liveExchangeOrderId = first.exchangeOrderId;
     }
+  } else if (isLiveExec && operatorBookFull) {
+    // ── Operator/global book full (LIVE mode) ──────────────────────────────
+    // Skip the operator's OWN live open. The decoupled customer LIVE fan-out
+    // already ran above with each customer's per-user gates; anchor `pos` to a
+    // customer fill if one landed so the operator-skip finalizer can resolve.
+    // The operator's own global `trades` row is NOT written (would exceed cap).
+    if (customerLiveSuccesses.length > 0) {
+      const first = customerLiveSuccesses[0]!;
+      pos = { id: first.exchangeOrderId ?? genId(), entryPrice: first.fillPrice ?? price };
+      liveExchange        = first.exchange;
+      liveExchangeOrderId = first.exchangeOrderId;
+    } else {
+      pos = { id: `GLOBALFULL-${genId()}`, entryPrice: price };
+    }
   } else {
     // ── PAPER / SIM branch ────────────────────────────────────────────────
     //
@@ -1456,8 +1477,10 @@ async function autoExecute(
     // Both writes happen on the same signal. The global mirror stays in
     // place until telemetry parity is verified and per-user convergence
     // stabilizes (then it can be retired behind a feature flag).
-    const result = await placeOrder({ symbol, side, sizeUSD });
-    if (!result.success) {
+    // Global book full → skip the operator's OWN global sim open (would push the
+    // operator book past its cap); the per-user paper fan-out below still runs.
+    const result = operatorBookFull ? null : await placeOrder({ symbol, side, sizeUSD });
+    if (result && !result.success) {
       // Observability note (not a money-correctness issue): the decoupled
       // customer LIVE fan-out above may already have persisted real fills to
       // sim_positions this tick. Those positions are self-managed by the
@@ -1496,19 +1519,30 @@ async function autoExecute(
       });
       return { executed: false, blockReason: `Sim engine: ${result.error}` };
     }
-    pos = result.position!;
-    logger.info(
-      {
-        tag:          "GLOBAL_MIRROR_WRITE",
-        store:        "simulationEngine.positions[]",
-        scope:        "GLOBAL",
-        perUserAware: false,
-        symbol, side, sizeUSD,
-        positionId:   pos.id,
-        entryPrice:   pos.entryPrice,
-      },
-      "[GLOBAL_MIRROR_WRITE] paper position opened in global simulationEngine (operator-only mirror)",
-    );
+    if (operatorBookFull) {
+      // Anchor pos to the SIGNAL price so the per-user paper fan-out below can
+      // compute SL/TP and open INDEPENDENT per-user positions (sim_positions),
+      // which are bound by per-user caps, NOT the operator/global cap.
+      pos = { id: `GLOBALFULL-${genId()}`, entryPrice: price };
+      logger.info(
+        { tag: "OPERATOR_OPEN_SKIPPED", reason: "global_book_full", symbol, side, maxActivePositions: settings.maxActivePositions },
+        "[OPERATOR_OPEN_SKIPPED] operator global book full — skipping operator paper open; running per-user paper fan-out",
+      );
+    } else {
+      pos = result!.position!;
+      logger.info(
+        {
+          tag:          "GLOBAL_MIRROR_WRITE",
+          store:        "simulationEngine.positions[]",
+          scope:        "GLOBAL",
+          perUserAware: false,
+          symbol, side, sizeUSD,
+          positionId:   pos.id,
+          entryPrice:   pos.entryPrice,
+        },
+        "[GLOBAL_MIRROR_WRITE] paper position opened in global simulationEngine (operator-only mirror)",
+      );
+    }
 
     // ── Per-user paper fan-out — canonical convergence write ────────────
     //
@@ -1617,6 +1651,7 @@ async function autoExecute(
               : parseFloat((pos.entryPrice * (1 - u.takeProfitPercent / 100)).toFixed(2)),
           });
           if (userResult.success) {
+            paperFanoutFills++;
             logger.info(
               {
                 tag:           "AI_FANOUT_EXECUTED",
@@ -1682,6 +1717,30 @@ async function autoExecute(
         "Paper AI fan-out: outer failure (eligibility query / Promise.all)",
       );
     }
+  }
+
+  // ── Operator open skipped (global book full) — finalize via fan-out only ────
+  // The operator's OWN global open was intentionally skipped because the global
+  // `trades` book is at its cap. The customer LIVE + paper fan-outs (independent
+  // per-user books) already ran above with their own per-user gates. We MUST NOT
+  // insert a global `trades` row here (it would push the operator book past its
+  // cap and confuse the global exit monitor / maxActivePositions count). Report
+  // execution based on whether any per-user fill landed this tick.
+  if (operatorBookFull) {
+    const perUserFills = customerLiveSuccesses.length + paperFanoutFills;
+    logger.info(
+      {
+        tag:                "OPERATOR_BOOK_FULL_FANOUT",
+        symbol, side, signalId,
+        customerFills:      customerLiveSuccesses.length,
+        paperFills:         paperFanoutFills,
+        maxActivePositions: settings.maxActivePositions,
+      },
+      `[OPERATOR_BOOK_FULL_FANOUT] ${symbol} ${side}: operator open skipped (global book ${settings.maxActivePositions} full) — ${perUserFills} per-user fill(s) (live=${customerLiveSuccesses.length}, paper=${paperFanoutFills})`,
+    );
+    return perUserFills > 0
+      ? { executed: true,  blockReason: null }
+      : { executed: false, blockReason: `Operator book full (${settings.maxActivePositions}); no per-user fill` };
   }
 
   // ── Execution confirmed ────────────────────────────────────────────────────
