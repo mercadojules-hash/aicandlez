@@ -1,0 +1,110 @@
+AICandlez Production Trading Debugging — Phase 2
+
+Current production status:
+
+Customer:
+
+* [teedelgado@gmail.com](mailto:teedelgado@gmail.com)
+* Coinbase connected
+* Equity ≈ $613
+* Position Size = $10
+* Max Open Positions = 12
+* 2 currently open positions
+
+Production funnel right now:
+
+* Signals Generated: 1,500
+* Passed Confidence: 52
+* Exec Attempts: 0
+* Exec Success: 0
+
+Completed work already verified:
+
+* Stale position deadlock fixed
+* Self-heal added
+* Global cap raised
+* Customer fan-out verified working
+* Live Coinbase fills verified
+* Open positions verified
+* Trade history verified
+* MTF confirmation relaxed and deployed
+* Production confirmed running new MTF code
+
+Do NOT investigate MTF again.
+
+Do NOT generate another architecture report.
+
+The problem now is:
+
+52 signals passed confidence and 0 reached execution attempts.
+
+That means confidence-qualified signals are still dying somewhere after confidence and before order submission.
+
+Required task:
+
+Instrument and report the exact post-confidence funnel for the last 6 hours.
+
+Show counts for:
+
+1. Passed Confidence
+2. Rejected by MTF
+3. Rejected by Volume
+4. Rejected by Sideways Filter
+5. Rejected by Duplicate Position Protection
+6. Rejected by Existing Position Logic
+7. Rejected by Risk Engine
+8. Rejected by Liquidity Guard
+9. Rejected by Position Limit
+10. Rejected by Exchange Validation
+11. Reached Execution Candidate
+12. Execution Attempts
+13. Execution Success
+
+I want actual counts and percentages.
+
+Example:
+
+Passed Confidence: 52
+Volume Rejects: 18
+Sideways Rejects: 22
+Duplicate Rejects: 4
+Risk Rejects: 3
+Execution Candidates: 5
+Execution Attempts: 5
+Execution Success: 4
+
+Do not provide lifetime telemetry.
+
+Do not provide estimates.
+
+Do not provide theories.
+
+Use actual production data from the most recent trading window.
+
+Additionally:
+
+The customer portal and runtime settings must match.
+
+Current intended runtime settings:
+
+* Position Size = $10
+* Max Open Positions = 12
+
+Verify the portal is displaying the actual runtime values being enforced by the engine.
+
+Final deliverable:
+
+1. Exact post-confidence rejection breakdown.
+2. Dominant bottleneck.
+3. Proposed production fix.
+4. Expected increase in execution candidates after the fix.
+5. Deployment plan.
+
+The objective is simple:
+
+Move from:
+
+* Passed Confidence = 52
+* Exec Attempts = 0
+
+to a healthy flow where confidence-qualified signals are actually reaching execution.
