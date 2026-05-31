@@ -70,3 +70,25 @@ reuse stable (ensure the `_managed_webhooks` row + Stripe endpoint persist on th
 SAME prod DB/account so it stops recreating); or (b) fully MANUAL: stop calling
 findOrCreateManagedWebhook at boot, create one endpoint by hand, put ITS whsec_ in
 env. Never run both — env-priority + auto-rotation = permanent desync.
+
+## Option B leaves a pre-existing DUPLICATE endpoint (the real prod trap)
+Gating findOrCreateManagedWebhook behind NODE_ENV!=="production" stops NEW
+creation but does NOT remove a managed endpoint that was already created on an
+earlier prod boot. Result: TWO Stripe `webhook_endpoint`s on the SAME URL
+(`/api/stripe/webhook`) — the hand-made one (secret in env) AND the lingering
+`metadata.managed_by="stripe-sync"` one (its own secret, mirrored in
+`stripe._managed_webhooks`, status="enabled", livemode=true). **Stripe fans every
+event out to BOTH same-URL endpoints as TWO separate deliveries, each signed with
+that endpoint's own secret.** The env secret satisfies exactly one → those
+deliveries 200; the other endpoint's deliveries 400 with "No signatures found
+matching" while DIAG shows source=env, body intact, hmacMatchesAnyV1=false. So
+intermittent/"half" failures + a clean local self-test = duplicate endpoint, NOT
+a wrong/rotated single secret.
+**Diagnose (read-only):** query prod `stripe._managed_webhooks` via
+RENDER_PROD_DATABASE_URL (pg resolves only via createRequire to the absolute
+.pnpm pg path; ESM "pg" import + executeSql-prod both fail). Print url, status,
+livemode, created, and a sha256(secret).slice(0,12) fingerprint — never the
+value. Compare that fingerprint to sha256 of the Render env secret.
+**Fix (data/dashboard, NO code change, NO deploy):** delete the managed endpoint
+in Stripe + its `stripe._managed_webhooks` row, leaving only the manual endpoint
+whose whsec_ is in env. Destructive → confirm before executing.
