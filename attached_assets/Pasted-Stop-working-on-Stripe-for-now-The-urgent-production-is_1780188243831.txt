@@ -1,0 +1,124 @@
+Stop working on Stripe for now. The urgent production issue is that Live AI Trading is not functioning correctly.
+
+Current symptoms:
+
+* No Live AI Trades are opening.
+* Trade History is empty or not updating.
+* Trades I manually clicked/bought myself are not closing.
+* We previously saw heavy blocking in the execution funnel, which may explain why many manual buy attempts did not go through.
+* The product is not usable if the AI trader does not open, manage, close, and record trades.
+
+Do not make cosmetic dashboard changes. Do not work on Stripe. Focus only on the live trading engine and trade-history pipeline.
+
+Tasks:
+
+1. Audit the full Live AI Trade pipeline:
+
+   * signal generation
+   * confidence filtering
+   * volume/liquidity filtering
+   * MTF confirmation
+   * execution gate
+   * liveTradingEnabled gate
+   * exchange mode
+   * account/balance validation
+   * order placement
+   * open-position tracking
+   * stop-loss / take-profit / trailing-stop management
+   * trade close logic
+   * trade persistence
+   * trade-history API response
+   * dashboard trade-history rendering
+
+2. Identify exactly where trades are being blocked.
+
+I need clear counts/logs for:
+
+* signals generated
+* signals passing confidence
+* signals blocked by confidence
+* signals blocked by volume/liquidity
+* signals blocked by MTF
+* signals blocked by liveTradingEnabled
+* signals blocked by exchange/account/balance/API-key validation
+* execution attempts
+* execution successes
+* execution failures
+* open positions detected
+* close attempts
+* close successes
+* close failures
+* last trade written to database
+* trade-history API response count
+
+3. Check why manually clicked trades did not go through.
+
+Trace the manual buy/click path separately from AI auto-trade:
+
+* frontend button click
+* API endpoint called
+* backend receives request
+* validation gates
+* execution decision
+* exchange/simulation order result
+* DB trade write
+* dashboard refresh
+
+If a manual trade is blocked, tell me exactly which gate blocked it and why.
+
+4. Check why existing/manual trades are not closing.
+
+Trace:
+
+* position monitor loop
+* open positions source
+* stop-loss check
+* take-profit check
+* trailing-stop check
+* exit execution
+* close trade DB update
+* trade history update
+
+If the close loop is not running, fix it.
+If it is running but not seeing positions, fix the sync.
+If it sees positions but refuses to close, identify the blocking condition.
+
+5. Check why Trade History is empty.
+
+Verify:
+
+* database table being written to
+* latest rows in trade table
+* API endpoint returning history
+* dashboard component consuming the endpoint
+* whether dashboard is reading simulation trades while backend writes live trades, or vice versa
+
+6. Give me a production-safe fix plan first.
+
+Before changing code, report:
+
+* root cause
+* exact files involved
+* exact blockers found
+* whether live execution is disabled, blocked, or failing
+* whether trade persistence is broken
+* whether trade history is reading the wrong source
+
+7. After the fix, verify with endpoints/logs:
+
+* /api/engine/status
+* /api/simulation/trades
+* live/open positions endpoint if available
+* account/balance endpoint
+* trade-history endpoint
+* execution funnel telemetry
+
+Expected result:
+
+* AI trader can open valid trades when conditions pass.
+* Manual buy attempts either execute or show the exact blocking reason.
+* Open positions are monitored and closed when SL/TP/trailing-stop conditions hit.
+* Trade History shows opened and closed trades.
+* Execution funnel clearly explains every block instead of silently failing.
+
+Important: minimize paid investigation time. Do not do broad refactors. Find the exact block, fix only that, and verify.
