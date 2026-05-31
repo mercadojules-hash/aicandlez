@@ -30,6 +30,20 @@ whole affected-table data layer goes down in prod — e.g. `loadFromDB`'s `.sele
 the in-memory registry hydrates empty (Open Positions 0, empty feeds, $0 P&L), AND live fills
 fail to persist (real money spent, no row). Reads break, not just writes.
 
+## Verifying whether prod is running fresh code (Render deploy boundary)
+
+The Replit dev container CANNOT trigger a Render deploy or set/read Render service env. Pushing
+to `origin/main` (GitHub) only makes code *available*; the live process restarts only when Render
+redeploys. To check if prod is on a given commit WITHOUT Render access: compare the running
+engine's `startedAt` (`GET /api/engine/status`, unauthenticated) against the commit's
+`git show -s --format=%ci`. If `startedAt` precedes the commit time, prod is on OLD code — full
+stop, env vars are irrelevant. You can also infer the effective `maxActivePositions` from
+`executionFunnel`: `reachedExecution>0` with `passedPositionLimits==0` ⇒ Gate 1 saturated
+(openBook >= cap). New `render.yaml` env keys are NOT live until Render syncs the blueprint /
+redeploys — declaring `value: "12"` in render.yaml does nothing to the running process by itself.
+Immediate no-redeploy unblock = admin `PUT /api/settings` (`maxActivePositions`/`n`) runtime
+override, but that needs an operator Clerk session (the dev container has none).
+
 **How to apply:** Any time you change the app schema, you MUST also apply it to
 `RENDER_PROD_DATABASE_URL` (additive nullable cols: `ALTER TABLE … ADD COLUMN IF NOT EXISTS …`
 via a direct `pg` connection — `executeSql` prod is read-only and points at the wrong/empty
