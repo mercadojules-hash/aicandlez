@@ -42,6 +42,13 @@ export interface RuntimeConnection {
 export interface RuntimeState {
   mode:                  "paper" | "live";
   activeExchange:        string | null;
+  // Task #216 — full set of live venues. Single-active users: 0 or 1 element
+  // (mirrors `activeExchange`). Parallel users: every healthy live connection.
+  activeExchanges:       string[];
+  // Task #216 — true when this user's multi-exchange parallel capability is on.
+  multiExchangeParallel: boolean;
+  // Task #216 — effective per-exchange open-position cap (engine-enforced).
+  perExchangeMax:        number;
   activeRuntimeExchange: string | null;
   autoPromoted:          boolean;
   liveReady:             boolean;

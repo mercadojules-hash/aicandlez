@@ -1220,16 +1220,20 @@ async function autoExecute(
     );
 
     if (customerLiveEnabled && liveUsers.length > 0) {
-      // Phase 4 AI dedup — collapse duplicate (userId, symbol) rows within a
-      // tick so a misconfigured `listLiveExecutionUsers()` can't double-fire an
-      // AI order for the same user+symbol on the same signal. Tick-scoped.
+      // Phase 4 AI dedup — collapse duplicate rows within a tick so a
+      // misconfigured `listLiveExecutionUsers()` can't double-fire an AI order
+      // for the same destination on the same signal. Tick-scoped.
+      // Task #216 — the dedup key includes the EXCHANGE so a parallel user's
+      // Coinbase BTC and Kraken BTC are treated as distinct destinations and
+      // both fan out; for single-exchange users this is identical to the old
+      // (userId, symbol) key.
       const seen = new Set<string>();
       const deduped = liveUsers.filter((u) => {
-        const key = `${u.userId}:${symbol}`;
+        const key = `${u.userId}:${u.exchange}:${symbol}`;
         if (seen.has(key)) {
           logger.warn(
-            { userId: u.userId, symbol, signalId },
-            "[AI_TICK_DEDUP] dropped duplicate (userId,symbol) in tick fan-out",
+            { userId: u.userId, exchange: u.exchange, symbol, signalId },
+            "[AI_TICK_DEDUP] dropped duplicate (userId,exchange,symbol) in tick fan-out",
           );
           return false;
         }
@@ -1284,6 +1288,10 @@ async function autoExecute(
             userId:        u.userId,
             symbol, side, sizeUSD,
             correlationId,
+            // Task #216 — route this fan-out leg to the SPECIFIC venue the
+            // cohort lister resolved. Parallel users get one leg per exchange;
+            // for single-exchange users this is just their one connection.
+            targetExchange: u.exchange,
           }).catch(
             (err): LiveUserOrderResult => ({
               success:   false,

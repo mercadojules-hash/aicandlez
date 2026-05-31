@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { db, userExchangeConnectionsTable, userSettingsTable, usersTable } from "@workspace/db";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth.js";
 import { loadBalanceForRow, type BalanceConnection } from "./userExchanges.js";
 import { isComplimentaryActive } from "../lib/aiTradingGate.js";
+import { effectivePerExchangeMax } from "../lib/multiExchangeParallel.js";
 import { logger } from "../lib/logger.js";
 import type { Request } from "express";
 
@@ -69,6 +70,13 @@ interface ExchangeConnectionState {
 interface CustomerTradingRuntimeContext {
   mode:                   RuntimeMode;
   activeExchange:         string | null;
+  // Task #216 — full set of live venues. Single-active users: 0 or 1 element
+  // (mirrors `activeExchange`). Parallel users: every healthy live connection.
+  activeExchanges:        string[];
+  // Task #216 — true when this user's multi-exchange parallel capability is on.
+  multiExchangeParallel:  boolean;
+  // Task #216 — effective per-exchange open-position cap (engine-enforced).
+  perExchangeMax:         number;
   connectedExchanges:     ExchangeConnectionState[];
   totalEquityUSD:         number;    // SUM of all healthy connections (Connected Exchanges section)
   activeEquityUSD:        number;    // active exchange ONLY (headline equity — matches runtime/risk/exec)
@@ -105,11 +113,25 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
   const t0     = Date.now();
   try {
     const [settingsRow] = await db
-      .select({ activeRuntimeExchange: userSettingsTable.activeRuntimeExchange })
+      .select({
+        activeRuntimeExchange: userSettingsTable.activeRuntimeExchange,
+        // Task #216 — per-user multi-exchange PARALLEL capability + override.
+        multiExchangeParallel: userSettingsTable.multiExchangeParallelEnabled,
+        perExchangeMax:        userSettingsTable.perExchangeMaxPositions,
+      })
       .from(userSettingsTable)
       .where(eq(userSettingsTable.userId, userId))
       .limit(1);
     const activeRuntimeExchange: string | null = settingsRow?.activeRuntimeExchange ?? null;
+    const multiExchangeParallel = settingsRow?.multiExchangeParallel === true;
+    // Effective per-exchange open-position cap surfaced so the portal can
+    // render "Coinbase x/20 · Kraken y/20" with the SAME number the engine
+    // enforces. NULL override → DEFAULT_PER_EXCHANGE_MAX (single source of
+    // truth in multiExchangeParallel.ts).
+    const perExchangeMax = effectivePerExchangeMax({
+      enabled:        multiExchangeParallel,
+      perExchangeMax: settingsRow?.perExchangeMax ?? null,
+    });
 
     // ── Subscription-driven runtime gate (Task 2) ───────────────────────
     // Runtime mode is subscription-driven: no active paid subscription →
@@ -201,8 +223,30 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
     let mode: RuntimeMode      = "paper";
     let activeExchange: string | null = null;
     let autoPromoted           = false;
+    // Task #216 — the full set of venues the runtime considers live. For
+    // single-active (default) users this is at most one element (mirrors
+    // `activeExchange`). For parallel-enabled users it is EVERY healthy live
+    // connection so both Coinbase AND Kraken render + trade simultaneously.
+    let activeExchanges: string[] = [];
 
-    if (activeRuntimeExchange === "paper") {
+    if (multiExchangeParallel) {
+      // PARALLEL users: every healthy, trade-authorized live connection is
+      // active at once. The explicit "paper" opt-out is still honored so the
+      // user can fall back to simulation. `activeExchange` keeps the FIRST
+      // venue for backward-compatible single-value consumers; `activeExchanges`
+      // carries the full list.
+      if (activeRuntimeExchange === "paper") {
+        mode = "paper";
+        activeExchange = null;
+        activeExchanges = [];
+      } else if (healthyLive.length > 0) {
+        mode = "live";
+        activeExchanges = healthyLive.map(c => c.exchange);
+        activeExchange = activeExchanges[0] ?? null;
+        // Auto-promoted iff there was no explicit non-paper pin.
+        autoPromoted = !(activeRuntimeExchange && activeRuntimeExchange !== "paper");
+      }
+    } else if (activeRuntimeExchange === "paper") {
       mode = "paper";
       activeExchange = null;
     } else if (activeRuntimeExchange && activeRuntimeExchange !== "paper") {
@@ -236,6 +280,7 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
       }, "[RUNTIME_SUB_FORCED_PAPER] no active paid subscription — runtime forced to paper");
       mode = "paper";
       activeExchange = null;
+      activeExchanges = [];
       autoPromoted = false;
     }
 
@@ -245,8 +290,16 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
     // label + risk gate + execution engine use — the ACTIVE exchange only,
     // NOT the sum of all connected exchanges (`totalEquityUSD`). In paper
     // mode this is 0; the client renders the paper account equity instead.
+    // Task #216 — for PARALLEL users the headline equity is the SUM of every
+    // active venue (both Coinbase + Kraken accounts fund live trades at once),
+    // since there is no single "active exchange" to anchor it to. Single-active
+    // users keep the active-exchange-only headline (unchanged).
     const activeEquityUSD = mode === "live" && activeExchange
-      ? (connectedExchanges.find(c => c.exchange === activeExchange)?.totalEquityUSD ?? 0)
+      ? (multiExchangeParallel
+          ? connectedExchanges
+              .filter(c => activeExchanges.includes(c.exchange))
+              .reduce((sum, c) => sum + (Number.isFinite(c.totalEquityUSD) ? c.totalEquityUSD : 0), 0)
+          : (connectedExchanges.find(c => c.exchange === activeExchange)?.totalEquityUSD ?? 0))
       : 0;
 
     // ── Cohort-predicate unification (live-execution writeback) ──────────
@@ -267,7 +320,99 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
     // POST /api/user/exchanges/:exchange/default at userExchanges.ts:932-945),
     // then set isDefault=true + tradingMode="live" on the active row.
     // Best-effort: any failure is logged but never breaks hydration.
-    if (liveReady && activeExchange) {
+    if (multiExchangeParallel) {
+      // PARALLEL cohort reconciliation (Task #216). The engine cohort lister
+      // (`listLiveExecutionUsers`) fans out EVERY row with status="active" &&
+      // tradingMode="live" for parallel users, so the persisted `tradingMode`
+      // column MUST track venue HEALTH deterministically or a degraded venue
+      // lingers in the live fan-out (invariant: healthy-only parallel cohort):
+      //   - every healthy+authorized venue (in `activeExchanges`) → "live"
+      //   - every other venue currently marked "live" → DEMOTE to "paper"
+      //     (this is the missing reverse of promotion — covers a venue whose
+      //     balance health degraded, AND the all-degraded case where
+      //     `activeExchanges` is empty and `liveReady=false`).
+      // One-default invariant preserved: isDefault=true on the FIRST active
+      // venue only, cleared everywhere else (or entirely when nothing is live).
+      // Best-effort; never breaks hydration. Runs unconditionally for parallel
+      // users (gated by `needsWriteback` so the tx is a no-op once converged).
+      const primary: string | null = activeExchanges[0] ?? null;
+      // Stale-live = currently tradingMode="live" but NOT a healthy active venue.
+      const staleLiveExchanges = rows
+        .filter(r => r.tradingMode === "live" && !activeExchanges.includes(r.exchange))
+        .map(r => r.exchange);
+      const needsWriteback =
+        staleLiveExchanges.length > 0 ||
+        rows.some(r => {
+          if (activeExchanges.includes(r.exchange)) {
+            const wantDefault = r.exchange === primary;
+            return r.tradingMode !== "live" || r.isDefault !== wantDefault;
+          }
+          // Non-active rows for this user must not retain isDefault.
+          return r.isDefault === true;
+        });
+      if (needsWriteback) {
+        try {
+          const now = new Date();
+          await db.transaction(async (tx) => {
+            // 1. Clear isDefault on every row first (one-default invariant).
+            await tx
+              .update(userExchangeConnectionsTable)
+              .set({ isDefault: false, updatedAt: now })
+              .where(eq(userExchangeConnectionsTable.userId, userId));
+            // 2. Demote stale (non-healthy) live venues back to "paper" so the
+            //    engine cohort can never fan them out while degraded.
+            if (staleLiveExchanges.length > 0) {
+              await tx
+                .update(userExchangeConnectionsTable)
+                .set({ tradingMode: "paper", updatedAt: now })
+                .where(
+                  and(
+                    eq(userExchangeConnectionsTable.userId, userId),
+                    inArray(userExchangeConnectionsTable.exchange, staleLiveExchanges),
+                  ),
+                );
+            }
+            // 3. Promote every healthy active venue to tradingMode="live".
+            if (activeExchanges.length > 0) {
+              await tx
+                .update(userExchangeConnectionsTable)
+                .set({ tradingMode: "live", updatedAt: now })
+                .where(
+                  and(
+                    eq(userExchangeConnectionsTable.userId, userId),
+                    inArray(userExchangeConnectionsTable.exchange, activeExchanges),
+                  ),
+                );
+            }
+            // 4. Set isDefault=true on the primary active venue only (if any).
+            if (primary) {
+              await tx
+                .update(userExchangeConnectionsTable)
+                .set({ isDefault: true, updatedAt: now })
+                .where(
+                  and(
+                    eq(userExchangeConnectionsTable.userId,   userId),
+                    eq(userExchangeConnectionsTable.exchange, primary),
+                  ),
+                );
+            }
+          });
+          logger.info({
+            tag:             "RUNTIME_PARALLEL_WRITEBACK",
+            userId,
+            activeExchanges,
+            primary,
+            demoted:         staleLiveExchanges,
+          }, "[RUNTIME_PARALLEL_WRITEBACK] multi-exchange cohort writeback ok");
+        } catch (writebackErr) {
+          logger.warn({
+            err: writebackErr instanceof Error ? writebackErr.message : String(writebackErr),
+            userId,
+            activeExchanges,
+          }, "runtimeState: parallel-cohort writeback failed (hydration unaffected)");
+        }
+      }
+    } else if (liveReady && activeExchange) {
       const activeRow = rows.find(r => r.exchange === activeExchange);
       const needsPromotion = !!activeRow
         && (activeRow.isDefault !== true || activeRow.tradingMode !== "live");
@@ -321,6 +466,9 @@ router.get("/user/runtime-state", requireAuth, async (req, res): Promise<void> =
     const payload: CustomerTradingRuntimeContext = {
       mode,
       activeExchange,
+      activeExchanges,
+      multiExchangeParallel,
+      perExchangeMax,
       connectedExchanges,
       totalEquityUSD,
       activeEquityUSD,

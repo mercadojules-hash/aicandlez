@@ -127,18 +127,27 @@ interface LiveExposure {
   openNotionalUsd: number;
 }
 
-async function getUserLiveExposure(userId: string): Promise<LiveExposure> {
+async function getUserLiveExposure(userId: string, exchangeScope?: string): Promise<LiveExposure> {
   try {
+    // Task #216 — parallel users budget each exchange independently, so the
+    // caller may scope exposure to a single venue. Non-parallel callers omit
+    // `exchangeScope` and continue to count every live position for the user.
+    const where = exchangeScope
+      ? and(
+          eq(simPositionsTable.userId, userId),
+          eq(simPositionsTable.exchange, exchangeScope),
+        )
+      : and(
+          eq(simPositionsTable.userId, userId),
+          isNotNull(simPositionsTable.exchange),
+        );
     const [row] = await db
       .select({
         n: sql<number>`count(*)::int`,
         s: sql<number>`coalesce(sum(${simPositionsTable.sizeUSD}), 0)::float8`,
       })
       .from(simPositionsTable)
-      .where(and(
-        eq(simPositionsTable.userId, userId),
-        isNotNull(simPositionsTable.exchange),
-      ));
+      .where(where);
     return {
       openCount:       Number(row?.n ?? 0),
       openNotionalUsd: Number(row?.s ?? 0),
@@ -185,16 +194,27 @@ async function priceUserLiveAccount(exchange: string, balances: Record<string, {
   return total;
 }
 
-async function readUserLiveEquity(userId: string): Promise<number | null> {
+async function readUserLiveEquity(userId: string, exchangeScope?: string): Promise<number | null> {
+  // Task #216 — parallel users price the SPECIFIC venue this evaluation is
+  // scoped to (so caps resolve against the right account), not the single
+  // isDefault connection. Non-parallel callers omit `exchangeScope` and keep
+  // reading the default live connection.
   const [row] = await db
     .select()
     .from(userExchangeConnectionsTable)
-    .where(and(
-      eq(userExchangeConnectionsTable.userId,      userId),
-      eq(userExchangeConnectionsTable.isDefault,   true),
-      eq(userExchangeConnectionsTable.status,      "active"),
-      eq(userExchangeConnectionsTable.tradingMode, "live"),
-    ))
+    .where(exchangeScope
+      ? and(
+          eq(userExchangeConnectionsTable.userId,      userId),
+          eq(userExchangeConnectionsTable.exchange,    exchangeScope),
+          eq(userExchangeConnectionsTable.status,      "active"),
+          eq(userExchangeConnectionsTable.tradingMode, "live"),
+        )
+      : and(
+          eq(userExchangeConnectionsTable.userId,      userId),
+          eq(userExchangeConnectionsTable.isDefault,   true),
+          eq(userExchangeConnectionsTable.status,      "active"),
+          eq(userExchangeConnectionsTable.tradingMode, "live"),
+        ))
     .limit(1);
   if (!row) return null;
   const creds = vault.decryptBlob(userId, row.encryptedBlob);
@@ -223,14 +243,17 @@ async function readUserPaperEquity(userId: string): Promise<number | null> {
   return total > 0 ? total : null;
 }
 
-async function getUserEquityUsdSafe(userId: string): Promise<number | null> {
+async function getUserEquityUsdSafe(userId: string, exchangeScope?: string): Promise<number | null> {
   const now = Date.now();
-  const cached = _userEquityCache.get(userId);
+  // Cache key is per-(user, scope) so a parallel user's two venues don't
+  // clobber each other's cached equity.
+  const cacheKey = exchangeScope ? `${userId}::${exchangeScope}` : userId;
+  const cached = _userEquityCache.get(cacheKey);
   if (cached && (now - cached.ts) < EQUITY_CACHE_TTL_MS) return cached.equity;
 
   let equity: number | null = null;
   try {
-    equity = await readUserLiveEquity(userId);
+    equity = await readUserLiveEquity(userId, exchangeScope);
   } catch (err) {
     logger.warn({ err, userId }, "riskGate: per-user live equity read failed — trying paper fallback");
   }
@@ -241,7 +264,7 @@ async function getUserEquityUsdSafe(userId: string): Promise<number | null> {
       logger.warn({ err, userId }, "riskGate: per-user paper equity read failed");
     }
   }
-  _userEquityCache.set(userId, { equity, ts: now });
+  _userEquityCache.set(cacheKey, { equity, ts: now });
   return equity;
 }
 
@@ -265,17 +288,39 @@ function resolveUsd(value: number, unit: RiskUnit, equityUsd: number): number {
 export async function composeRiskSnapshot(
   userId: string,
   intendedSizeUsd: number,
-  opts?: { equityUsdOverride?: number | null },
+  opts?: {
+    equityUsdOverride?: number | null;
+    /**
+     * Task #216 — scope exposure + equity to a SINGLE exchange (parallel
+     * users budget each venue independently). Omit for normal accounts.
+     */
+    exchangeScope?: string;
+    /**
+     * Task #216 — replace the user's `maxSimultaneousTrades` cap (Cap 2)
+     * with this explicit per-exchange ceiling. Omit for normal accounts.
+     */
+    maxSimultaneousOverride?: number;
+  },
 ): Promise<{ snapshot: RiskSnapshot; equityAvailable: boolean }> {
+  const exchangeScope = opts?.exchangeScope;
   const [settings, exposure, equityFetched] = await Promise.all([
     loadRiskSettings(userId),
-    getUserLiveExposure(userId),
+    getUserLiveExposure(userId, exchangeScope),
     opts?.equityUsdOverride !== undefined
       ? Promise.resolve(opts.equityUsdOverride)
-      : getUserEquityUsdSafe(userId),
+      : getUserEquityUsdSafe(userId, exchangeScope),
   ]);
   const equityAvailable = equityFetched !== null;
   const equityUsd = equityFetched ?? 0;
+
+  // Per-exchange override for the concurrent-trades cap (Cap 2) only. All
+  // other caps (per-trade, allocation, reserve) keep the user's own settings.
+  const maxSimultaneousTrades =
+    typeof opts?.maxSimultaneousOverride === "number"
+    && Number.isFinite(opts.maxSimultaneousOverride)
+    && opts.maxSimultaneousOverride > 0
+      ? Math.floor(opts.maxSimultaneousOverride)
+      : settings.maxSimultaneousTrades;
 
   const maxCapitalPerTradeUsd = resolveUsd(settings.maxCapitalPerTradeValue, settings.maxCapitalPerTradeUnit, equityUsd);
   const maxTotalAllocationUsd = resolveUsd(settings.maxTotalAllocationValue, settings.maxTotalAllocationUnit, equityUsd);
@@ -286,7 +331,7 @@ export async function composeRiskSnapshot(
   // The maximum new-trade size is the most restrictive of three numbers:
   //   per-trade cap, allocation headroom, free capital after reserve.
   const maxNextSizeUsd        = Math.max(0, Math.min(maxCapitalPerTradeUsd, allocationHeadroomUsd, freeCapitalUsd));
-  const slotsRemaining        = Math.max(0, settings.maxSimultaneousTrades - exposure.openCount);
+  const slotsRemaining        = Math.max(0, maxSimultaneousTrades - exposure.openCount);
 
   return {
     snapshot: {
@@ -294,7 +339,7 @@ export async function composeRiskSnapshot(
       openCount:       exposure.openCount,
       openNotionalUsd: exposure.openNotionalUsd,
       intendedSizeUsd,
-      effective: { maxCapitalPerTradeUsd, maxSimultaneousTrades: settings.maxSimultaneousTrades, maxTotalAllocationUsd, reserveCashUsd },
+      effective: { maxCapitalPerTradeUsd, maxSimultaneousTrades, maxTotalAllocationUsd, reserveCashUsd },
       derived:   { freeCapitalUsd, allocationHeadroomUsd, maxNextSizeUsd, slotsRemaining },
       settings,
     },
@@ -323,9 +368,16 @@ export async function isRiskBypassRole(userId: string): Promise<boolean> {
 export async function evaluateRiskGate(args: {
   userId:         string;
   intendedSizeUsd: number;
+  /** Task #216 — scope the risk budget to a single exchange (parallel users). */
+  exchangeScope?: string;
+  /** Task #216 — per-exchange override for the concurrent-trades cap (Cap 2). */
+  maxSimultaneousOverride?: number;
 }): Promise<RiskVerdict> {
-  const { userId, intendedSizeUsd } = args;
-  const { snapshot, equityAvailable } = await composeRiskSnapshot(userId, intendedSizeUsd);
+  const { userId, intendedSizeUsd, exchangeScope, maxSimultaneousOverride } = args;
+  const { snapshot, equityAvailable } = await composeRiskSnapshot(userId, intendedSizeUsd, {
+    exchangeScope,
+    maxSimultaneousOverride,
+  });
 
   // Opt-out short-circuit. Caller still records the event with
   // `risk_disabled_by_user` so the operator audit shows who's bypassing

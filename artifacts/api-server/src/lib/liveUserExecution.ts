@@ -32,6 +32,7 @@ import {
   evaluateLiquidityGuard,
 } from "./liquidityGuard.js";
 import { simAccountsTable } from "@workspace/db";
+import { loadParallelConfig, effectivePerExchangeMax } from "./multiExchangeParallel.js";
 
 // ── Per-user live execution bridge ────────────────────────────────────────────
 //
@@ -78,6 +79,15 @@ export interface LiveUserOrderRequest {
    * always pass one through in production.
    */
   correlationId?: string;
+  /**
+   * Multi-exchange PARALLEL routing (Task #216). When set, the order is routed
+   * to THIS specific connected exchange (resolved by userId+exchange instead of
+   * the single isDefault connection), and every per-user gate that counts open
+   * live positions (0LIQ plan/liquidity guard, 0d risk Cap 2) is scoped to this
+   * exchange so each venue enforces its own independent cap. Only honored for
+   * users whose `multiExchangeParallelEnabled` flag is on; ignored otherwise.
+   */
+  targetExchange?: string;
 }
 
 export interface LiveUserOrderResult {
@@ -479,16 +489,25 @@ async function emitFailureNotification(
  */
 export async function listLiveExecutionUsers(): Promise<Array<{ userId: string; exchange: string }>> {
   try {
+    // Task #216 — left-join `user_settings` so we know which users are
+    // PARALLEL-enabled. For a parallel user we return ONE entry per healthy
+    // active+live connection (Coinbase AND Kraken both fan out); for every
+    // other user we keep the single isDefault/live row (locked behavior).
     const rows = await db
       .select({
         userId:      userExchangeConnectionsTable.userId,
         exchange:    userExchangeConnectionsTable.exchange,
+        isDefault:   userExchangeConnectionsTable.isDefault,
         permissions: userExchangeConnectionsTable.permissions,
+        parallel:    userSettingsTable.multiExchangeParallelEnabled,
       })
       .from(userExchangeConnectionsTable)
+      .leftJoin(
+        userSettingsTable,
+        eq(userSettingsTable.userId, userExchangeConnectionsTable.userId),
+      )
       .where(
         and(
-          eq(userExchangeConnectionsTable.isDefault,   true),
           eq(userExchangeConnectionsTable.status,      "active"),
           eq(userExchangeConnectionsTable.tradingMode, "live"),
         ),
@@ -500,6 +519,9 @@ export async function listLiveExecutionUsers(): Promise<Array<{ userId: string; 
     // Missing/undecided permissions remain eligible (backward compat).
     return rows
       .filter(r => r.permissions?.trade !== false)
+      // Parallel users → every healthy live connection. Everyone else →
+      // their single default live connection (unchanged single-active rule).
+      .filter(r => (r.parallel === true ? true : r.isDefault === true))
       .map(r => ({ userId: r.userId, exchange: r.exchange }));
   } catch (err) {
     logger.warn(
@@ -582,6 +604,18 @@ export async function placeLiveAutoOrderForUser(
       return { success: false, userId, errorCode: "customer_live_execution_disabled", error: msg };
     }
   }
+
+  // 0PAR. Multi-exchange PARALLEL scoping (Task #216). Load the per-user
+  // capability once. When the user is parallel-enabled AND the caller routed
+  // this order to a specific venue (`targetExchange`), every per-user gate
+  // that counts open live positions (0LIQ, 0d) is scoped to that single venue
+  // and the cap is replaced by the user's `perExchangeMax` (default 20). For
+  // every non-parallel user (or a parallel user without an explicit target),
+  // `scopedExchange` stays undefined and the gates behave exactly as before.
+  const parallelCfg = await loadParallelConfig(userId);
+  const scopedExchange: string | undefined =
+    parallelCfg.enabled && req.targetExchange ? req.targetExchange : undefined;
+  const perExchangeMax = effectivePerExchangeMax(parallelCfg);
 
   // 0SIZE. Customer trade-size enforcement (after kill switch, before all
   // downstream gates). The AI trading loop fan-out passes a globally-uniform
@@ -938,14 +972,29 @@ export async function placeLiveAutoOrderForUser(
       // STILL run the liquidity cushion (sized to the single pending entry).
       const internalLiq = await isInternalAccount(userId);
       try {
+        // TOCTOU note (Task #216): this per-exchange cap (and the riskGate
+        // Cap-2 per-venue count) is count-then-place with no reservation, so N
+        // concurrent placements on the SAME (user, exchange) can overshoot the
+        // per-exchange ceiling by up to N−1 — the same accepted race already
+        // documented for the platform-wide gate 0c. Acceptable at the two-
+        // account beta scale; before widening, harden with an advisory lock or
+        // `SELECT … FOR UPDATE` on the per-(user,exchange) position count.
         const [gate, openLiveRow, cashRow] = await Promise.all([
           resolveAiTradingGate(userId),
+          // Task #216 — parallel users count open LIVE positions PER VENUE so
+          // each exchange enforces its own independent cap; everyone else
+          // counts every live position (unchanged).
           db.select({ n: sql<number>`count(*)::int` })
             .from(simPositionsTable)
-            .where(and(
-              eq(simPositionsTable.userId, userId),
-              isNotNull(simPositionsTable.exchange),
-            )),
+            .where(scopedExchange
+              ? and(
+                  eq(simPositionsTable.userId, userId),
+                  eq(simPositionsTable.exchange, scopedExchange),
+                )
+              : and(
+                  eq(simPositionsTable.userId, userId),
+                  isNotNull(simPositionsTable.exchange),
+                )),
           db.select({ cash: simAccountsTable.cashBalance })
             .from(simAccountsTable)
             .where(eq(simAccountsTable.userId, userId))
@@ -958,6 +1007,9 @@ export async function placeLiveAutoOrderForUser(
           tradeSizeUsd:        sizeUSD,
           availableCashUsd:    Number(cashRow[0]?.cash ?? 0),
           unlimitedPositions:  internalLiq,
+          // Parallel users replace the plan-tier max-open cap with their
+          // per-exchange ceiling (default 20). Undefined for everyone else.
+          ...(scopedExchange ? { maxOpenOverride: perExchangeMax } : {}),
         });
 
         if (!verdict.ok) {
@@ -1058,7 +1110,16 @@ export async function placeLiveAutoOrderForUser(
   {
     const operatorRisk = await isOperatorRole(userId);
     if (!operatorRisk) {
-      const verdict = await evaluateRiskGate({ userId, intendedSizeUsd: sizeUSD });
+      const verdict = await evaluateRiskGate({
+        userId,
+        intendedSizeUsd: sizeUSD,
+        // Task #216 — parallel users budget each venue independently: scope
+        // exposure/equity to this exchange and cap concurrent trades (Cap 2)
+        // at the per-exchange ceiling. Undefined for everyone else.
+        ...(scopedExchange
+          ? { exchangeScope: scopedExchange, maxSimultaneousOverride: perExchangeMax }
+          : {}),
+      });
       if (!verdict.allowed) {
         const { reasonCode, reasonText, snapshot } = verdict;
         await emitFailureNotification(userId, symbol, side, reasonText);
@@ -1268,18 +1329,26 @@ export async function placeLiveAutoOrderForUser(
     }
   }
 
-  // 1. Resolve default live connection
+  // 1. Resolve the live connection to execute on.
+  // Task #216 — parallel users route to the SPECIFIC venue this order was
+  // fanned out to (`scopedExchange`), resolved by userId+exchange. Everyone
+  // else resolves their single isDefault live connection (unchanged).
   const [row] = await db
     .select()
     .from(userExchangeConnectionsTable)
-    .where(
-      and(
-        eq(userExchangeConnectionsTable.userId,      userId),
-        eq(userExchangeConnectionsTable.isDefault,   true),
-        eq(userExchangeConnectionsTable.status,      "active"),
-        eq(userExchangeConnectionsTable.tradingMode, "live"),
-      ),
-    )
+    .where(scopedExchange
+      ? and(
+          eq(userExchangeConnectionsTable.userId,      userId),
+          eq(userExchangeConnectionsTable.exchange,    scopedExchange),
+          eq(userExchangeConnectionsTable.status,      "active"),
+          eq(userExchangeConnectionsTable.tradingMode, "live"),
+        )
+      : and(
+          eq(userExchangeConnectionsTable.userId,      userId),
+          eq(userExchangeConnectionsTable.isDefault,   true),
+          eq(userExchangeConnectionsTable.status,      "active"),
+          eq(userExchangeConnectionsTable.tradingMode, "live"),
+        ))
     .limit(1);
 
   if (!row) {
@@ -1671,14 +1740,21 @@ export async function placeLiveCloseOrderForUser(
     };
   }
 
-  // 1. Resolve default live connection
+  // 1. Resolve the live connection for the EXCHANGE THAT OPENED THIS POSITION.
+  // Task #216 — parallel users hold open positions on more than one venue at
+  // once (Coinbase AND Kraken), and only ONE of those connections is
+  // isDefault. Resolving by the position's own `exchange` (instead of
+  // isDefault) lets an exit close on the correct venue regardless of which is
+  // default, and removes the `exchange_mismatch` trap. For single-exchange
+  // users the position's exchange IS their default connection, so this
+  // resolves the identical row — no behavior change.
   const [row] = await db
     .select()
     .from(userExchangeConnectionsTable)
     .where(
       and(
         eq(userExchangeConnectionsTable.userId,      userId),
-        eq(userExchangeConnectionsTable.isDefault,   true),
+        eq(userExchangeConnectionsTable.exchange,    exchange),
         eq(userExchangeConnectionsTable.status,      "active"),
         eq(userExchangeConnectionsTable.tradingMode, "live"),
       ),
@@ -1686,15 +1762,9 @@ export async function placeLiveCloseOrderForUser(
     .limit(1);
 
   if (!row) {
-    const msg = "No default live exchange connection configured for close";
+    const msg = `No active live ${exchange} connection configured for close`;
     await emitFailureNotification(userId, symbol, closeSide, msg, exchange);
     return { success: false, userId, exchange, errorCode: "no_connection", error: msg };
-  }
-
-  if (row.exchange !== exchange) {
-    const msg = `Default live connection is ${row.exchange} but position opened on ${exchange}`;
-    await emitFailureNotification(userId, symbol, closeSide, msg, exchange);
-    return { success: false, userId, exchange, errorCode: "exchange_mismatch", error: msg };
   }
 
   // 2. Decrypt credentials

@@ -27,6 +27,26 @@ export const userSettingsTable = pgTable("user_settings", {
 
   preferredExchange:  varchar("preferred_exchange", { length: 50 }).notNull().default("Kraken"),
 
+  // ── Multi-exchange PARALLEL trading (Task #216) — per-user capability ──────
+  // When TRUE, the customer's AI live fan-out routes the SAME signal to EVERY
+  // healthy, trade-authorized live connection simultaneously (e.g. Coinbase
+  // AND Kraken at once) instead of the platform-default single-active-exchange
+  // behavior. Each connected exchange then enforces its OWN independent
+  // open-position cap (`perExchangeMaxPositions`), so one venue's open trades
+  // never consume another venue's slots.
+  //
+  // Default FALSE — every existing customer keeps the locked single-active-
+  // exchange runtime. This flag is provisioned only for a small allow-list of
+  // accounts; it does NOT change any platform-wide or plan-tier default.
+  multiExchangeParallelEnabled: boolean("multi_exchange_parallel_enabled").notNull().default(false),
+
+  // Per-(user, exchange) maximum simultaneous open LIVE positions when
+  // `multiExchangeParallelEnabled` is on. NULL → fall back to the parallel
+  // default (20). Applied independently to each connected exchange, replacing
+  // the plan-tier max-open cap for parallel users only. Non-parallel users
+  // ignore this column entirely (their plan-tier cap still governs).
+  perExchangeMaxPositions: integer("per_exchange_max_positions"),
+
   // CUSTOMER RUNTIME CONTEXT — Task #198 foundation column. Source of
   // truth for which trading runtime the customer's portal/PWA is
   // currently scoped to:

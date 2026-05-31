@@ -102,6 +102,15 @@ export interface LiquidityGuardInput {
    * `remainingSlots` echo `-1` (unlimited sentinel) in the result.
    */
   unlimitedPositions?: boolean;
+  /**
+   * Multi-exchange PARALLEL override (Task #216). When set, the plan-tier
+   * max-open-positions cap (Gate A) is replaced by this explicit ceiling and
+   * `openLiveCount` is expected to already be scoped to a SINGLE exchange by
+   * the caller. Used only for the small allow-list of parallel-enabled users
+   * so each connected exchange enforces its own independent cap. Ignored when
+   * `unlimitedPositions` is true (operator/QA bypass wins).
+   */
+  maxOpenOverride?: number;
 }
 
 export interface LiquidityGuardResult {
@@ -127,7 +136,15 @@ export interface LiquidityGuardResult {
 export function evaluateLiquidityGuard(input: LiquidityGuardInput): LiquidityGuardResult {
   const plan               = input.plan;
   const unlimitedPositions = input.unlimitedPositions === true;
-  const planMaxOpen        = PLAN_MAX_OPEN_POSITIONS[plan] ?? 0;
+  // Task #216 — parallel users replace the plan-tier ceiling with an explicit
+  // per-exchange override (caller scopes `openLiveCount` to one exchange).
+  const hasOverride        = !unlimitedPositions
+    && typeof input.maxOpenOverride === "number"
+    && Number.isFinite(input.maxOpenOverride)
+    && input.maxOpenOverride > 0;
+  const planMaxOpen        = hasOverride
+    ? Math.floor(input.maxOpenOverride as number)
+    : (PLAN_MAX_OPEN_POSITIONS[plan] ?? 0);
   const openLiveCount      = Math.max(0, Math.floor(input.openLiveCount));
   const tradeSizeUsd       = Math.max(0, input.tradeSizeUsd);
   const availableCashUsd   = Math.max(0, input.availableCashUsd);

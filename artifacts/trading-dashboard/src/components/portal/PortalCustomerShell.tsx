@@ -5357,6 +5357,27 @@ export function PortalCustomerShell() {
   const blotterOpenRows = serverAccountReady ? serverOpenRows : paperOpenRows;
   const blotterOpenCount = blotterOpenRows.length;
 
+  // ── Task #216 — per-exchange parallel-runtime derivations ───────────────
+  // `isMultiExchangeParallel` gates the per-exchange OPEN/limit chips so the
+  // single-active surface is byte-identical for every other customer.
+  const isMultiExchangeParallel = runtimeState?.multiExchangeParallel === true;
+  // Engine-enforced per-exchange open-position cap (server SoT, default 20).
+  const perExchangeLimit = runtimeState?.perExchangeMax ?? 20;
+  // Open LIVE positions grouped by venue. Built from the same blotter rows
+  // the LIVE TRADES panel renders (origin = uppercased exchange, "PAPER" for
+  // sim) so the count always matches what the customer sees. Keyed lowercase
+  // for case-insensitive lookup against connectedExchanges[].exchange.
+  const openCountByExchange = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of blotterOpenRows) {
+      const ex = (r.origin ?? "").trim();
+      if (!ex || ex === "PAPER") continue;
+      const key = ex.toLowerCase();
+      m.set(key, (m.get(key) ?? 0) + 1);
+    }
+    return m;
+  }, [blotterOpenRows]);
+
   // ── [CLIENT_QUERY_SOURCE/RESULT/EMPTY] convergence diagnostic ───────────
   // Emits which data source is driving the OPEN/Live Trades/Unrealized/Equity
   // panels on this render, the current values, and a distinct EMPTY marker
@@ -6869,10 +6890,21 @@ export function PortalCustomerShell() {
                   fontSize: 9.5, fontWeight: 700, letterSpacing: T.TRACK_LABEL, color: T.TEXT_3,
                 }}>
                   <span>CONNECTED EXCHANGES</span>
-                  <span style={{ opacity: 0.6 }}>BALANCE</span>
+                  {/* Task #216 — parallel users also see per-exchange OPEN/limit. */}
+                  <span style={{ opacity: 0.6 }}>
+                    {isMultiExchangeParallel ? "OPEN · BALANCE" : "BALANCE"}
+                  </span>
                 </div>
                 {(runtimeState?.connectedExchanges ?? []).map((c) => {
-                  const isActiveEx = isLiveRuntime && c.exchange === liveExchange;
+                  // Task #216 — for parallel users EVERY healthy live venue is
+                  // active, so highlight any exchange in `activeExchanges`; for
+                  // single-active users keep the single `liveExchange` match.
+                  const isActiveEx = isMultiExchangeParallel
+                    ? (isLiveRuntime && (runtimeState?.activeExchanges ?? []).includes(c.exchange))
+                    : (isLiveRuntime && c.exchange === liveExchange);
+                  // Per-exchange open LIVE position count (case-insensitive
+                  // match against the position rows' exchange origin).
+                  const openOnEx = openCountByExchange.get(c.exchange.toLowerCase()) ?? 0;
                   return (
                     <div key={c.exchange} style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -6897,14 +6929,28 @@ export function PortalCustomerShell() {
                           }}>ACTIVE</span>
                         )}
                       </div>
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, fontVariantNumeric: "tabular-nums",
-                        color: c.ok ? T.TEXT_0 : T.TEXT_3, flexShrink: 0, marginLeft: 8,
-                      }}>
-                        {c.ok
-                          ? `$${nz(c.totalEquityUSD).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : (c.error ? "SYNC FAILED" : "—")}
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginLeft: 8 }}>
+                        {/* Task #216 — per-exchange open/limit chip (parallel only).
+                            The cap shown is the SAME perExchangeMax the engine
+                            enforces, so the customer sees Coinbase x/20 · Kraken y/20. */}
+                        {isMultiExchangeParallel && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                            letterSpacing: T.TRACK_LABEL,
+                            color: openOnEx >= perExchangeLimit ? T.AMBER : T.TEXT_2,
+                          }}>
+                            {openOnEx}/{perExchangeLimit}
+                          </span>
+                        )}
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                          color: c.ok ? T.TEXT_0 : T.TEXT_3,
+                        }}>
+                          {c.ok
+                            ? `$${nz(c.totalEquityUSD).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : (c.error ? "SYNC FAILED" : "—")}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
