@@ -5148,7 +5148,15 @@ function CustomerBlotterShell({
       // battlefield column row-cap, so the eye reads the entire rail at
       // the same density). /command is untouched — this shell is only
       // mounted by PortalCustomerShell.
-      maxHeight: 720, boxShadow: `inset 0 0 24px ${accent}08`,
+      //
+      // UPDATE — flex-fill. With the battlefield section now `stretch`-aligned
+      // and viewport-sized, the rail is as tall as the matrix. `flex: 1` +
+      // `minHeight: 0` lets LIVE TRADES and TRADE HISTORY share the remaining
+      // vertical space equally (their bodies scroll internally), so the rail
+      // bottom aligns with the matrix instead of leaving dead space. The
+      // maxHeight is raised to a high ceiling so it never caps the fill on
+      // tall monitors but still bounds the stacked mobile/tablet grid layout.
+      maxHeight: 1100, flex: 1, minHeight: 0, boxShadow: `inset 0 0 24px ${accent}08`,
     }}>
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -6230,19 +6238,24 @@ export function PortalCustomerShell() {
            /command terminal (which renders the same SignalsRow without
            this wrapper) is unaffected. */
         .cd-customer-battlefield-matrix .blotter-scroll {
+          /* Soft scroll-edge hint only. The previous mask faded the bottom
+             ~45% of the column, which dimmed real, tradable rows into dead
+             space and undercut the "maximize visible opportunities" goal.
+             Now only the last ~6% gets a gentle fade to signal scrollability
+             while every conviction-ranked row above it reads at full
+             intensity. Confidence DESC sort upstream still puts the
+             strongest setups on top. */
           -webkit-mask-image: linear-gradient(
             180deg,
             #000 0%,
-            #000 55%,
-            rgba(0,0,0,0.82) 80%,
-            rgba(0,0,0,0.62) 100%
+            #000 94%,
+            rgba(0,0,0,0.78) 100%
           );
                   mask-image: linear-gradient(
             180deg,
             #000 0%,
-            #000 55%,
-            rgba(0,0,0,0.82) 80%,
-            rgba(0,0,0,0.62) 100%
+            #000 94%,
+            rgba(0,0,0,0.78) 100%
           );
         }
         /* Phase 8.1 — TEN-ROW VIEWPORT LOCK (customer /portal only).
@@ -6269,14 +6282,33 @@ export function PortalCustomerShell() {
            so the stacked phone viewport still shows ~9 rows without
            dominating the screen. Virtualization / DOM-keeping behavior
            in SignalRow is unchanged — only the visible viewport is
-           constrained. */
+           constrained.
+
+           UPDATE — DYNAMIC VIEWPORT SIZING. The fixed 1220px cap (~10 rows)
+           left tall monitors with one column-height regardless of available
+           space and short laptops with a hard scroll. The column now sizes
+           to the viewport: calc(100vh - 200px) lets the matrix grow to use
+           whatever vertical room the screen offers (a 1440–4K monitor clears
+           ~14-15+ conviction-ranked rows before any scroll), while a
+           min-height floor keeps roughly the prior ~8-10 rows on a 13–15"
+           laptop so the right-rail account/trades telemetry stays readable.
+           The 200px offset reserves the top brand header + portal pill strip
+           + liquidity guard strip. Each SignalRow still renders ~108-118px;
+           row count is now a function of the live viewport, not a constant.
+           Confidence DESC sort + 5pt bucket stability guard upstream remain
+           authoritative for which rows surface first. */
         .cd-customer-battlefield-matrix .blotter-scroll {
-          max-height: 1220px !important;
+          /* dvh (not vh) so mobile/tablet browser chrome — the collapsing
+             address bar — doesn't over- or under-size the column and break
+             the "fits without scrolling" target. */
+          max-height: calc(100dvh - 200px) !important;
+          min-height: 880px !important;
           overflow-y: auto !important;
         }
         @media (max-width: 720px) {
           .cd-customer-battlefield-matrix .blotter-scroll {
             max-height: 1080px !important;
+            min-height: 0 !important;
           }
         }
         /* Phase 8.1 — MAJORS HEADER RENAME (customer /portal only).
@@ -7193,7 +7225,12 @@ export function PortalCustomerShell() {
         <section
           className={`grid cd-customer-battlefield-grid${eliteActive ? " cd-elite-glow" : ""}`}
           style={{
-            gap: 14, alignItems: "start",
+            /* `stretch` (was `start`) makes the right rail match the matrix
+               column height. The dual crypto matrix is the tallest column
+               (now viewport-sized), so the aside stretches to it and the LIVE
+               TRADES / TRADE HISTORY blotters flex-grow to fill — eliminating
+               the dead space that `start` left below the rail. */
+            gap: 14, alignItems: "stretch",
           }}
         >
           <div
