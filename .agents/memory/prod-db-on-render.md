@@ -30,6 +30,21 @@ whole affected-table data layer goes down in prod — e.g. `loadFromDB`'s `.sele
 the in-memory registry hydrates empty (Open Positions 0, empty feeds, $0 P&L), AND live fills
 fail to persist (real money spent, no row). Reads break, not just writes.
 
+## Per-user tables are keyed by Clerk user ID, NOT users.id UUID
+
+`sim_positions`, `sim_trades`, `sim_accounts`, `user_settings`, and
+`user_exchange_connections` all store `user_id = users.clerk_user_id` (the
+`user_3...` string from `req.clerkUserId`), NOT the `users.id` UUID.
+
+**Why:** every per-user route resolves `userId = (req).clerkUserId` and passes
+that straight into the registry/DB; the `users` table UUID PK is never used as
+the foreign key.
+
+**How to apply:** When verifying a user from their email, first read
+`users.clerk_user_id` and query all per-user tables with THAT value. Querying
+those tables with `users.id` (the UUID) returns 0 rows and falsely looks like
+"the write path never persisted" — it's just the wrong key.
+
 ## Verifying whether prod is running fresh code (Render deploy boundary)
 
 The Replit dev container CANNOT trigger a Render deploy or set/read Render service env. Pushing
