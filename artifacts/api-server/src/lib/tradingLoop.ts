@@ -87,6 +87,22 @@ function getGlobalPositionMaxHoldMs(): number {
   return Number.isFinite(n) && n >= 0 ? n : DEFAULT_GLOBAL_POSITION_MAX_HOLD_MS;
 }
 
+// ── Per-symbol concurrency cap (diversification entry gate) ──────────────────────
+// Caps how many concurrent open global-engine positions a single symbol may hold.
+// ENTRY-ONLY: enforced when evaluating NEW entries in `autoExecute`; it never
+// closes, modifies, merges, or otherwise touches existing open positions, and is
+// fully independent of SL/TP, trailing-stop, position-manager, and trade-history
+// logic. Prevents one asset from consuming every active-position slot so the
+// global cap holds a diversified book. Default 1. Set
+// `MAX_POSITIONS_PER_SYMBOL=0` to disable (no per-symbol limit).
+const DEFAULT_MAX_POSITIONS_PER_SYMBOL = 1;
+export function getMaxPositionsPerSymbol(): number {
+  const raw = process.env.MAX_POSITIONS_PER_SYMBOL;
+  if (raw === undefined || raw === "") return DEFAULT_MAX_POSITIONS_PER_SYMBOL;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : DEFAULT_MAX_POSITIONS_PER_SYMBOL;
+}
+
 // ── Per-symbol breakdown (for debug panel) ────────────────────────────────────
 
 export interface TimeframeSnapshot {
@@ -407,6 +423,18 @@ async function countOpenTradePositions(): Promise<number> {
     .select({ value: count() })
     .from(tradesTable)
     .where(openGlobalPositionsPredicate());
+  return rows[0]?.value ?? 0;
+}
+
+// Count persisted open global-engine positions for ONE symbol. Used by the
+// per-symbol diversification cap (entry gate). Identical predicate to the global
+// cap, narrowed to the symbol, so the count survives restarts and stays provably
+// consistent with `countOpenTradePositions`.
+async function countOpenTradePositionsForSymbol(symbol: string): Promise<number> {
+  const rows = await db
+    .select({ value: count() })
+    .from(tradesTable)
+    .where(and(openGlobalPositionsPredicate(), eq(tradesTable.symbol, symbol)));
   return rows[0]?.value ?? 0;
 }
 
@@ -988,6 +1016,39 @@ async function autoExecute(
         reason: `${openCount}/${settings.maxActivePositions} open`, message: msg,
       });
       return { executed: false, blockReason: `Max active positions (${settings.maxActivePositions})` };
+    }
+  }
+
+  // ── Gate 1b: per-symbol concurrency cap (diversification) ──────────────────
+  // ENTRY-ONLY. Blocks a NEW entry when the symbol already holds >= the per-symbol
+  // ceiling of open global-engine positions, so one asset can't consume every
+  // active-position slot. Existing open positions are GRANDFATHERED — this gate
+  // runs only on the new-entry path and never closes/modifies/merges anything,
+  // nor touches SL/TP, trailing, position-manager, or trade-history logic. Counts
+  // the SAME persisted open-position set as Gate 1 (narrowed to this symbol) so it
+  // survives restarts and stays consistent. When a symbol is capped the loop
+  // simply skips it and keeps scanning other symbols for the next opportunity.
+  // Default 1; tune via env MAX_POSITIONS_PER_SYMBOL (0 = unlimited).
+  const maxPerSymbol = getMaxPositionsPerSymbol();
+  if (maxPerSymbol > 0) {
+    const openForSymbol = isExitEngineV2()
+      ? await countOpenTradePositionsForSymbol(symbol)
+      : (await getAccountSummary()).positions.filter((p) => p.symbol === symbol).length;
+    if (openForSymbol >= maxPerSymbol) {
+      engineStats.tradesBlocked++;
+      const msg = `Auto-trade blocked for ${symbol} ${side}: per-symbol cap (${maxPerSymbol}) reached — currently ${openForSymbol} open for ${symbol}`;
+      logger.info({ symbol, side, openForSymbol, maxPositionsPerSymbol: maxPerSymbol }, msg);
+      await db.insert(logsTable).values({
+        id: genId(), type: "trade", level: "warn",
+        message: msg,
+        details: { symbol, side, openForSymbol, maxPositionsPerSymbol: maxPerSymbol },
+      });
+      executionStreamBus.emitEvent({
+        type: "max_positions_blocked", severity: "warn",
+        symbol, side, gate: "max_positions_per_symbol", mode: exModeForStream,
+        reason: `${openForSymbol}/${maxPerSymbol} open for ${symbol}`, message: msg,
+      });
+      return { executed: false, blockReason: `Per-symbol cap (${maxPerSymbol})` };
     }
   }
 
