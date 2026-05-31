@@ -92,3 +92,22 @@ value. Compare that fingerprint to sha256 of the Render env secret.
 **Fix (data/dashboard, NO code change, NO deploy):** delete the managed endpoint
 in Stripe + its `stripe._managed_webhooks` row, leaving only the manual endpoint
 whose whsec_ is in env. Destructive → confirm before executing.
+
+## ALWAYS cross-check live Stripe, not just the DB row (it lags)
+The `stripe._managed_webhooks` DB row can be STALE vs live Stripe: the recreate
+loop deletes+recreates the managed endpoint with a NEW id AND can change the URL
+(observed `api.`→`app.` between two boots 30 min apart) WITHOUT updating the DB
+row. So a DB row's `id`/`url`/`secret` may point at an endpoint Stripe already
+deleted (`webhookEndpoints.del` → `resource_missing`). Authoritative check =
+`stripe.webhookEndpoints.list({limit:100})` with the LIVE key (env
+STRIPE_SECRET_KEY may already be sk_live in the workspace; verify prefix).
+Removing the stale DB row is pure hygiene — when env STRIPE_WEBHOOK_SECRET is set,
+prod NEVER consults the DB (env-first; DB fallback is non-prod only), so it does
+NOT change prod delivery/verification outcome.
+**Secret-match cannot be done via API:** Stripe never returns an endpoint's
+signing secret on list/retrieve (only once at create). Confirm a manual endpoint
+matches env only by Dashboard "reveal" + sha256[:12] compare against the env
+secret hashed on the host that actually runs (Render), never locally (local
+STRIPE_WEBHOOK_SECRET is often unset). To probe the prod route from a shell, POST
+a junk `Stripe-Signature` — a real verifier returns the app's JSON 400, a static
+SPA host returns index.html/200 (distinguishes routing from verification).
