@@ -51,3 +51,30 @@ in memory until restart). Breakeven (`exit=price`, pnl=0) is the correct
 non-fabricating choice for phantom paper rows — it's a global operator paper
 book, never customer money. After restart, confirm `tradesExecuted` starts
 incrementing and `tradesBlocked` stays 0 in `GET /api/engine/status`.
+
+**Restart is NOT required to free the cap.** The cap is read fresh from the DB
+every tick (`await countOpenTradePositions()`, no cache), so a DB-side close of
+the stale open rows frees Gate 1 within one loop interval (~60s) on the live
+process. Verified: after a manual flatten, prod stopped emitting the
+`"max active positions"` block log immediately and fell through to normal
+downstream filters (`Sideways/range-bound market`). Restart only evicts the
+orphaned in-memory `simulationEngine` positions (cosmetic) — the cap itself is
+already drained by the DB write.
+
+**Two deadlock modes even `runGlobalHardStops` can't resolve** (and why a
+self-heal exists): the SL/TP pass `continue`s and never closes a global row when
+(1) the symbol has **no live ticker** (delisted/untradeable — price lookup
+fails) so SL/TP can't be evaluated, or (2) the position is **absent from
+in-memory `simulationEngine`** (boot rehydration gap) so `closePosition` returns
+not-success and the row is intentionally left open for reconciliation. Both leak
+cap slots forever.
+
+**Self-heal guard:** `runGlobalCapSelfHeal()` (separate fn, called right after
+`runGlobalHardStops` in the tick) force-closes any global row open longer than
+`GLOBAL_POSITION_MAX_HOLD_MS` (default 24h; `0` disables). It tries
+`closePosition`+`markTradeRowClosed` first; if unmanageable, it does a flat
+administrative close (`exit=entry, pnl=0, pnlPct=0`) so the cap always frees.
+**Why gated ONLY on `isExitEngineV2()`, NOT `isHardStopEnforcementEnabled()`:**
+the latter is an unrelated SL/TP kill switch — coupling an anti-deadlock safety
+control to it would let ops silently re-enable cap starvation. Scoped to the
+GLOBAL `trades` book only; never touches `sim_positions` (customer real money).

@@ -69,6 +69,24 @@ function isHardStopEnforcementEnabled(): boolean {
   return process.env.HARD_STOP_ENFORCEMENT_ENABLED !== "false";
 }
 
+// ── Global-book cap self-heal (max-hold force-close) ────────────────────────────
+// A global `trades` row that has no live ticker (delisted/untradeable symbol) or
+// is absent from in-memory simulationEngine (rehydration gap) can NEVER be closed
+// by the SL/TP pass in `runGlobalHardStops`, yet keeps counting toward
+// `maxActivePositions` (Gate 1). Enough of these and the cap deadlocks — every new
+// candidate is rejected at `passedPositionLimits` and the engine opens 0 trades.
+// This ceiling force-closes any global row open longer than the limit so the cap
+// self-heals. Scoped to the GLOBAL `trades` book ONLY — per-user `sim_positions`
+// (real-money, fixed SL/TP governance) are never touched here.
+// Default 24h. Set `GLOBAL_POSITION_MAX_HOLD_MS=0` to disable.
+const DEFAULT_GLOBAL_POSITION_MAX_HOLD_MS = 24 * 60 * 60 * 1000;
+function getGlobalPositionMaxHoldMs(): number {
+  const raw = process.env.GLOBAL_POSITION_MAX_HOLD_MS;
+  if (raw === undefined || raw === "") return DEFAULT_GLOBAL_POSITION_MAX_HOLD_MS;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_GLOBAL_POSITION_MAX_HOLD_MS;
+}
+
 // ── Per-symbol breakdown (for debug panel) ────────────────────────────────────
 
 export interface TimeframeSnapshot {
@@ -1854,6 +1872,101 @@ async function runGlobalHardStops() {
   }
 }
 
+// ── Global-book cap self-heal (anti-deadlock) ───────────────────────────────────
+// Force-closes any GLOBAL `trades` row open longer than the max-hold ceiling.
+// Subsumes BOTH cap-deadlock modes that `runGlobalHardStops` cannot resolve:
+//   (1) no live ticker feed (delisted/untradeable symbol) → SL/TP pass can never
+//       evaluate it; (2) absent from in-memory simulationEngine (rehydration gap)
+//       → closePosition can never close it. Either way the row keeps counting
+//       toward `maxActivePositions` (Gate 1) forever, starving autoExecute.
+//
+// Deliberately INDEPENDENT of `runGlobalHardStops` and gated ONLY by
+// `isExitEngineV2()` (the global book exists only under V2) — it must NOT be
+// disabled by `HARD_STOP_ENFORCEMENT_ENABLED`, which is an unrelated SL/TP kill
+// switch. Its own kill switch is `GLOBAL_POSITION_MAX_HOLD_MS=0`.
+//
+// Scoped to the GLOBAL `trades` book ONLY — per-user `sim_positions` (customer
+// real-money, governed by separate fixed SL/TP exit governance) are never touched.
+async function runGlobalCapSelfHeal() {
+  if (!isExitEngineV2()) return;
+  const maxHoldMs = getGlobalPositionMaxHoldMs();
+  if (maxHoldMs <= 0) return;
+  try {
+    const now       = Date.now();
+    const staleRows = await db
+      .select({
+        id:        tradesTable.id,
+        symbol:    tradesTable.symbol,
+        side:      tradesTable.side,
+        price:     tradesTable.price,
+        timestamp: tradesTable.timestamp,
+      })
+      .from(tradesTable)
+      .where(openGlobalPositionsPredicate());
+    if (staleRows.length === 0) return;
+
+    const correlationId = genCorrelationId();
+    for (const row of staleRows) {
+      const openedAtMs = row.timestamp instanceof Date
+        ? row.timestamp.getTime()
+        : new Date(row.timestamp as unknown as string).getTime();
+      if (!Number.isFinite(openedAtMs)) continue;
+      const ageMs = now - openedAtMs;
+      if (ageMs < maxHoldMs) continue;
+
+      try {
+        // Prefer a real market close (authoritative exit price + PnL) when the
+        // position is still in memory.
+        const closeRes = await closePosition(row.id).catch(() => null);
+        if (closeRes?.success && closeRes.trade) {
+          await markTradeRowClosed(
+            row.id,
+            closeRes.trade.exitPrice,
+            closeRes.trade.realizedPnL,
+            closeRes.trade.realizedPnLPct,
+            "MAX_HOLD_FORCE_CLOSE",
+          );
+        } else {
+          // Unmanageable (no ticker / not in memory): flat administrative close at
+          // entry — no authoritative fill exists, so record zero realized P&L
+          // (exit=entry, pnl=0, pnlPct=0) rather than a synthetic mark. This is
+          // the operator-only mirror book, never a customer/real-money position.
+          await markTradeRowClosed(row.id, row.price, 0, 0, "MAX_HOLD_FORCE_CLOSE");
+        }
+        positionMeta.delete(row.id);
+        engineStats.hardStopHits++;
+        logger.info(
+          {
+            tag:        "GLOBAL_MAX_HOLD_FORCE_CLOSE",
+            correlationId,
+            positionId: row.id,
+            symbol:     row.symbol,
+            side:       row.side,
+            ageMs,
+            maxHoldMs,
+          },
+          `[GLOBAL_MAX_HOLD_FORCE_CLOSE] cap self-heal — force-closed ${row.symbol} ${row.side} (age ${Math.round(ageMs / 3_600_000)}h)`,
+        );
+      } catch (err) {
+        logger.warn(
+          {
+            tag:        "GLOBAL_MAX_HOLD_SKIPPED",
+            positionId: row.id,
+            symbol:     row.symbol,
+            reason:     err instanceof Error ? err.message : String(err),
+          },
+          "[GLOBAL_MAX_HOLD_SKIPPED] force-close threw",
+        );
+      }
+    }
+  } catch (err) {
+    logger.error(
+      { err: err instanceof Error ? err.message : String(err) },
+      "runGlobalCapSelfHeal: unexpected failure",
+    );
+  }
+}
+
 // ── Trailing stop tick ─────────────────────────────────────────────────────────
 
 async function runTrailingStops() {
@@ -2452,6 +2565,7 @@ async function tick() {
   // rows actually close on SL/TP instead of only on a trailing trigger.
   await runHardStopMonitor();
   await runGlobalHardStops();
+  await runGlobalCapSelfHeal();
   await runTrailingStops();
 }
 
