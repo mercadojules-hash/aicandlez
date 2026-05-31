@@ -85,6 +85,18 @@ export const userSettingsTable = pgTable("user_settings", {
   // column drifts back into the allowed range over time.
   preferredLiveOrderSizeUsd: real("preferred_live_order_size_usd").notNull().default(10),
 
+  // Majors / Alts / Memes allocation weights (Task #219). Integer percentages
+  // that MUST sum to 100. Biases the customer AI live fan-out so each category
+  // gets a share of the user's open-position budget proportional to its weight
+  // (soft cap — a category whose weight is > 0 is never hard-excluded). NULL →
+  // no biasing (the locked pre-#219 behavior where every category competes
+  // freely for slots). Only consulted on the customer live execution path.
+  categoryAllocation: jsonb("category_allocation").$type<{
+    majors: number;
+    alts:   number;
+    memes:  number;
+  }>(),
+
   // When ON, paper-mode BUY/SELL on the customer Portal routes real orders
   // through the connected exchange's public sandbox / testnet (via the
   // adapter `testnet: true` host switch) instead of the internal simulator.

@@ -4,6 +4,7 @@ export * from "./settings";
 export * from "./logs";
 export * from "./users";
 export * from "./userSettings";
+export * from "./userExchangeSettings";
 export * from "./simAccounts";
 export * from "./simPositions";
 export * from "./simTrades";

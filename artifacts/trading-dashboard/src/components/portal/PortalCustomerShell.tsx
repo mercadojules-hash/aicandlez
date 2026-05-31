@@ -3660,6 +3660,322 @@ function useTradeSizeUsd(): [TradeSizeUsd, (n: TradeSizeUsd) => void] {
   return [size, update];
 }
 
+// ── Per-customer execution funnel (Task #219) ─────────────────────────────────
+// The portal historically rendered the GLOBAL engine funnel
+// (`engine.executionFunnel`, anonymous, all users), so a customer could see
+// "16 attempts / 3 fills" that had nothing to do with their own orders. This
+// hook polls `GET /api/user/execution-funnel`, which returns ONLY the signed-in
+// customer's own live-order attempts plus a reason breakdown for the failures.
+type CustomerFunnelReason =
+  | "confidence" | "duplicate" | "cooldown" | "risk" | "exchange"
+  | "slot_cap" | "liquidity" | "allocation" | "other";
+
+interface CustomerFunnelSnapshot {
+  since:     number;
+  attempts:  number;
+  successes: number;
+  failures:  number;
+  byReason:  Array<{ reason: CustomerFunnelReason; count: number }>;
+  recent:    Array<{ at: number; symbol: string; side: string; exchange: string | null; success: boolean; reason: CustomerFunnelReason | null }>;
+}
+
+const FUNNEL_REASON_LABEL: Record<CustomerFunnelReason, string> = {
+  confidence: "LOW CONFIDENCE",
+  duplicate:  "ALREADY OPEN",
+  cooldown:   "DAILY LIMIT",
+  risk:       "RISK GATE",
+  exchange:   "EXCHANGE REJECT",
+  slot_cap:   "SLOT CAP",
+  liquidity:  "LIQUIDITY HOLD",
+  allocation: "ALLOCATION LIMIT",
+  other:      "OTHER",
+};
+
+function useCustomerExecutionFunnel(): CustomerFunnelSnapshot | null {
+  const [snap, setSnap] = useState<CustomerFunnelSnapshot | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchOnce = async (): Promise<void> => {
+      try {
+        const res = await authFetch("/api/user/execution-funnel");
+        if (!res.ok) return;
+        const json = await res.json() as CustomerFunnelSnapshot;
+        if (!cancelled) setSnap(json);
+      } catch { /* transport failure — keep last snapshot */ }
+    };
+    void fetchOnce();
+    const timer = setInterval(() => void fetchOnce(), 5_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, []);
+  return snap;
+}
+
+// ── Allocation weights + per-exchange sizing (Task #219) ──────────────────────
+// Two customer controls, grouped into one collapsible strip so they share a
+// single mount point and don't disturb the locked LiveControlBar branches:
+//   1. MAJORS / ALTS / MEMES allocation weights (must sum to 100) — biases AI
+//      symbol selection toward the customer's preferred category mix. Cleared
+//      (null) = balanced / no bias (preserves prior behavior).
+//   2. Per-exchange trade size — overrides the global preferred size for a
+//      specific connected exchange (e.g. Coinbase $20 / Kraken $10). "DEFAULT"
+//      clears the override so the engine falls back to the global size.
+// Both persist through authFetch; the server is authoritative and validates.
+const ALLOC_CATEGORIES = [
+  { key: "majors", label: "MAJORS", hint: "BTC ETH SOL XRP" },
+  { key: "alts",   label: "ALTS",   hint: "LINK UNI AAVE" },
+  { key: "memes",  label: "MEMES",  hint: "PEPE WIF BONK" },
+] as const;
+type AllocKey = typeof ALLOC_CATEGORIES[number]["key"];
+type AllocWeights = Record<AllocKey, number>;
+const DEFAULT_ALLOC: AllocWeights = { majors: 60, alts: 30, memes: 10 };
+
+interface ExchangeSettingsRow {
+  exchange:  string;
+  connected: boolean;
+  settings:  { tradeSizeUsd: number | null; maxPositions: number | null } | null;
+}
+
+function AllocationAndSizingStrip({ entitled }: { entitled: boolean }) {
+  const [open, setOpen] = useState(false);
+
+  // ── Allocation state ──────────────────────────────────────────────────────
+  const [allocEnabled, setAllocEnabled] = useState<boolean>(false);
+  const [draft, setDraft] = useState<AllocWeights>(DEFAULT_ALLOC);
+  const [allocMsg, setAllocMsg] = useState<string | null>(null);
+
+  // ── Per-exchange sizing state ─────────────────────────────────────────────
+  const [exchanges, setExchanges] = useState<ExchangeSettingsRow[]>([]);
+  const [exMsg, setExMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await authFetch("/api/user/settings");
+        if (res.ok) {
+          const json = await res.json() as { categoryAllocation?: Partial<AllocWeights> | null };
+          if (!cancelled && json.categoryAllocation && typeof json.categoryAllocation === "object") {
+            const a = json.categoryAllocation;
+            const norm: AllocWeights = {
+              majors: Math.round(Number(a.majors) || 0),
+              alts:   Math.round(Number(a.alts)   || 0),
+              memes:  Math.round(Number(a.memes)  || 0),
+            };
+            if (norm.majors + norm.alts + norm.memes === 100) {
+              setAllocEnabled(true);
+              setDraft(norm);
+            }
+          }
+        }
+      } catch { /* ignore — defaults stand */ }
+      try {
+        const res = await authFetch("/api/user/exchanges");
+        if (res.ok) {
+          const json = await res.json() as { exchanges?: ExchangeSettingsRow[] };
+          if (!cancelled) setExchanges((json.exchanges ?? []).filter(e => e.connected));
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const sum   = draft.majors + draft.alts + draft.memes;
+  const valid = sum === 100;
+
+  const saveAlloc = useCallback(async (next: AllocWeights | null) => {
+    setAllocMsg(null);
+    try {
+      const res = await authFetch("/api/user/settings", {
+        method:  "PUT",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ categoryAllocation: next }),
+      });
+      setAllocMsg(res.ok ? (next ? "SAVED" : "CLEARED") : "SAVE FAILED");
+    } catch { setAllocMsg("SAVE FAILED"); }
+    setTimeout(() => setAllocMsg(null), 2500);
+  }, []);
+
+  const saveExchangeSize = useCallback(async (exchange: string, tradeSizeUsd: number | null) => {
+    setExMsg(null);
+    // Optimistic local update so the chip reflects the choice instantly.
+    setExchanges(prev => prev.map(e =>
+      e.exchange === exchange
+        ? { ...e, settings: { tradeSizeUsd, maxPositions: e.settings?.maxPositions ?? null } }
+        : e));
+    try {
+      const res = await authFetch(`/api/user/exchanges/${encodeURIComponent(exchange)}/settings`, {
+        method:  "PUT",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ tradeSizeUsd }),
+      });
+      setExMsg(res.ok ? `${exchange.toUpperCase()} SAVED` : "SAVE FAILED");
+    } catch { setExMsg("SAVE FAILED"); }
+    setTimeout(() => setExMsg(null), 2500);
+  }, []);
+
+  // Hidden entirely for non-entitled (free) customers — allocation + per-
+  // exchange sizing are paid-tier affordances (server also gates the PUTs).
+  if (!entitled) return null;
+
+  const lbl: React.CSSProperties = { fontSize: 9, fontWeight: 700, letterSpacing: "0.16em", color: T.TEXT_3, fontFamily: T.FONT_MONO };
+  const chipBase: React.CSSProperties = {
+    fontFamily: T.FONT_MONO, fontSize: 10, fontWeight: 800, letterSpacing: "0.08em",
+    padding: "5px 10px", borderRadius: 3, cursor: "pointer", minWidth: 48,
+  };
+
+  return (
+    <div style={{
+      borderTop: `1px solid ${T.BORDER}`, borderBottom: `1px solid ${T.BORDER}`,
+      background: "rgba(0,0,0,0.40)", fontFamily: T.FONT_MONO,
+    }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        style={{
+          width: "100%", appearance: "none", cursor: "pointer", textAlign: "left",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 12, padding: "10px 16px", background: "transparent", border: "none",
+        }}
+      >
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.22em", color: T.NEON }}>
+          AI ALLOCATION &amp; PER-EXCHANGE SIZING
+        </span>
+        <span style={{ fontSize: 10, color: T.TEXT_3 }}>{open ? "▾ HIDE" : "▸ EDIT"}</span>
+      </button>
+
+      {open && (
+        <div style={{ padding: "4px 16px 16px", display: "flex", flexDirection: "column", gap: 18 }}>
+          {/* ── ALLOCATION WEIGHTS ─────────────────────────────────────────── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <span style={lbl}>CATEGORY ALLOCATION</span>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 9, color: T.TEXT_2 }}>
+                <input
+                  type="checkbox"
+                  checked={allocEnabled}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setAllocEnabled(on);
+                    if (!on) void saveAlloc(null);
+                  }}
+                />
+                BIAS SELECTION
+              </label>
+            </div>
+            {allocEnabled ? (
+              <>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {ALLOC_CATEGORIES.map(c => (
+                    <div key={c.key} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 92 }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, color: T.TEXT_1, letterSpacing: "0.10em" }}>{c.label}</span>
+                      <span style={{ fontSize: 7.5, color: T.TEXT_3, letterSpacing: "0.06em" }}>{c.hint}</span>
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <input
+                          type="number" min={0} max={100} step={5}
+                          value={draft[c.key]}
+                          onChange={(e) => {
+                            const v = Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0)));
+                            setDraft(d => ({ ...d, [c.key]: v }));
+                          }}
+                          style={{
+                            width: 58, fontFamily: T.FONT_MONO, fontSize: 13, fontWeight: 800,
+                            color: T.NEON, background: "rgba(102,255,102,0.06)",
+                            border: `1px solid ${T.NEON}44`, borderRadius: 3, padding: "4px 6px",
+                            textAlign: "right",
+                          }}
+                        />
+                        <span style={{ fontSize: 11, color: T.TEXT_3 }}>%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: valid ? T.NEON : T.AMBER, letterSpacing: "0.10em" }}>
+                    SUM {sum}% {valid ? "· OK" : "· MUST EQUAL 100"}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!valid}
+                    onClick={() => void saveAlloc(draft)}
+                    style={{
+                      ...chipBase,
+                      color:      valid ? "#0A0A0A" : T.TEXT_3,
+                      background: valid ? T.NEON : "rgba(255,255,255,0.05)",
+                      border:     `1px solid ${valid ? T.NEON : T.BORDER}`,
+                      cursor:     valid ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    SAVE WEIGHTS
+                  </button>
+                  {allocMsg && <span style={{ fontSize: 9, color: allocMsg === "SAVE FAILED" ? T.RED : T.NEON }}>{allocMsg}</span>}
+                </div>
+              </>
+            ) : (
+              <span style={{ fontSize: 9, color: T.TEXT_3, fontStyle: "italic" }}>
+                Balanced — the AI selects across all categories without bias.
+              </span>
+            )}
+          </div>
+
+          {/* ── PER-EXCHANGE TRADE SIZE ────────────────────────────────────── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span style={lbl}>PER-EXCHANGE TRADE SIZE</span>
+            {exchanges.length === 0 ? (
+              <span style={{ fontSize: 9, color: T.TEXT_3, fontStyle: "italic" }}>
+                Connect an exchange to set an independent size per venue.
+              </span>
+            ) : (
+              exchanges.map(ex => {
+                const cur = ex.settings?.tradeSizeUsd ?? null; // null = default
+                return (
+                  <div key={ex.exchange} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: T.TEXT_1, minWidth: 84, letterSpacing: "0.08em" }}>
+                      {ex.exchange.toUpperCase()}
+                    </span>
+                    <div role="radiogroup" aria-label={`${ex.exchange} trade size`} style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+                      <button
+                        type="button" role="radio" aria-checked={cur === null}
+                        onClick={() => void saveExchangeSize(ex.exchange, null)}
+                        style={{
+                          ...chipBase,
+                          color:      cur === null ? "#0A0A0A" : T.TEXT_2,
+                          background: cur === null ? T.NEON : "rgba(102,255,102,0.06)",
+                          border:     `1px solid ${cur === null ? T.NEON : `${T.NEON}33`}`,
+                        }}
+                      >
+                        DEFAULT
+                      </button>
+                      {TRADE_SIZES_USD.map(n => {
+                        const active = cur === n;
+                        return (
+                          <button
+                            key={n} type="button" role="radio" aria-checked={active}
+                            onClick={() => void saveExchangeSize(ex.exchange, n)}
+                            style={{
+                              ...chipBase,
+                              color:      active ? "#0A0A0A" : T.TEXT_1,
+                              background: active ? T.NEON : "rgba(102,255,102,0.06)",
+                              border:     `1px solid ${active ? T.NEON : `${T.NEON}33`}`,
+                            }}
+                          >
+                            ${n}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            {exMsg && <span style={{ fontSize: 9, color: exMsg === "SAVE FAILED" ? T.RED : T.NEON }}>{exMsg}</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface LiquidityState {
   /** Per-entry size selected by the customer (USD). */
   tradeSize:      TradeSizeUsd;
@@ -6665,6 +6981,12 @@ export function PortalCustomerShell() {
             safe-execution gate ships. */}
         <RuntimeSwitcher />
 
+        {/* Task #219 — AI allocation weights + per-exchange trade sizing.
+            Customer-only (paid tiers; server gates the PUTs). Self-contained
+            collapsible strip mounted here so the locked LiveControlBar
+            branches stay untouched. */}
+        <AllocationAndSizingStrip entitled={entitled} />
+
         {/* Unified LIVE AI CRYPTO EXECUTION bar — single bar spanning
             both columns. State derives from the runtime context (Task
             #199): "paper" → PAPER capital language; "live" → LIVE
@@ -6789,7 +7111,16 @@ export function PortalCustomerShell() {
             operator telemetry leakage. */}
         <EnableLiveAITradingBar
           engineOnline={!!engineStatus?.running}
-          openPaper={blotterOpenCount}
+          /* Task #218 — banner counter grain must MATCH the cap grain below.
+             `slotCap` is per-exchange (`perExchangeLimit`) in parallel mode, so
+             pairing it with the GLOBAL open count produced impossible readouts
+             like "25 OPEN / 20 MAX" even though no single venue exceeded 20.
+             In parallel mode we show the busiest venue's open count (the
+             binding per-exchange constraint); non-parallel keeps the global
+             count, which already matches the plan-tier cap. */
+          openPaper={isMultiExchangeParallel
+            ? Math.max(0, ...openCountByExchange.values())
+            : blotterOpenCount}
           /* Task #217 — parallel multi-exchange users are governed by the
              engine-enforced PER-EXCHANGE cap (`perExchangeMax`, e.g. 20),
              not the plan-tier slot ladder. Showing the tier cap (pro→6) on a
@@ -7747,6 +8078,7 @@ function LiveIntelligenceBand({
   history:       ReadonlyArray<{ symbol: string; display: string; pnl: number; pnlPct: number; closedAt: number; openedAt: number }>;
 }) {
   const live = !!engine?.running;
+  const customerFunnel = useCustomerExecutionFunnel();
 
   const m = useMemo(() => {
     const n = opportunities.length;
@@ -8194,38 +8526,39 @@ function LiveIntelligenceBand({
       })()}
 
       {/* ────────────────────────────────────────────────────────────── */}
-      {/* BOX 6 — EXECUTION FUNNEL                                        */}
-      {/* Replaced MARKET HEAT (avg-conviction array). Surfaces what the  */}
-      {/* AI is actually DOING: signals generated → cleared the           */}
-      {/* confidence gate → became execution attempts → filled. The       */}
-      {/* descending bars make the drop-off legible at a glance, which is */}
-      {/* the whole point: it explains why trades are / aren't created.   */}
-      {/* Read-only telemetry from /api/engine/status (engine.executionFunnel) — */}
-      {/* no confidence / liquidity / risk / execution-rule change.       */}
+      {/* BOX 6 — MY EXECUTION FUNNEL (per-customer, Task #219)           */}
+      {/* Previously rendered the GLOBAL engine funnel (anonymous, all    */}
+      {/* users) which made "16 attempts / 3 fills" meaningless to a      */}
+      {/* single customer. Now sourced from GET /api/user/execution-funnel */}
+      {/* — ONLY this signed-in customer's own live-order attempts, with  */}
+      {/* a reason breakdown of WHY their failed attempts dropped. No     */}
+      {/* confidence / liquidity / risk / execution-rule change.          */}
       {/* ────────────────────────────────────────────────────────────── */}
       {(() => {
-        const ef         = engine?.executionFunnel;
-        const generated  = engine?.signalsGenerated ?? 0;
-        const passedConf = ef?.passedConfidence ?? 0;
-        const attempts   = ef?.executionAttempted ?? 0;
-        const success    = ef?.executionSucceeded ?? 0;
-        const top        = Math.max(generated, passedConf, attempts, success, 1);
-        const rows: ReadonlyArray<{ label: string; value: number; color: string }> = [
-          { label: "SIGNALS GENERATED", value: generated,  color: T.NEON },
-          { label: "PASSED CONFIDENCE", value: passedConf, color: "#7CFF00" },
-          { label: "EXEC ATTEMPTS",     value: attempts,   color: "#FFC857" },
-          { label: "EXEC SUCCESS",      value: success,    color: success > 0 ? T.NEON : "#ff6b6b" },
+        const f         = customerFunnel;
+        const attempts  = f?.attempts  ?? 0;
+        const filled    = f?.successes ?? 0;
+        const failures  = f?.failures  ?? 0;
+        // Top failure reasons (descending), only those that actually fired.
+        const reasons   = (f?.byReason ?? [])
+          .filter((r) => r.count > 0)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 4);
+        const top       = Math.max(attempts, 1);
+        const headRows: ReadonlyArray<{ label: string; value: number; color: string }> = [
+          { label: "MY ATTEMPTS", value: attempts, color: "#FFC857" },
+          { label: "FILLED",      value: filled,   color: filled > 0 ? T.NEON : "#ff6b6b" },
         ];
         return (
-          <LIBCell label="EXECUTION FUNNEL" sub={live ? "LIVE" : "WARMING"} accent={T.NEON}>
+          <LIBCell label="MY EXECUTION FUNNEL" sub={attempts > 0 ? "YOUR ORDERS" : live ? "STANDING BY" : "WARMING"} accent={T.NEON}>
             <div
-              title="What the AI is doing right now: signals generated → how many cleared the confidence gate → how many became live execution attempts → how many filled. Attempt/success counts reflect the live engine execution path."
+              title="Your own live-order attempts since the engine last started: how many the AI tried to place for you, how many filled, and — for the ones that didn't — the reason each was held back."
               style={{
                 position: "absolute", inset: 0,
                 display: "flex", flexDirection: "column", justifyContent: "center",
-                gap: 10, padding: "34px 16px 16px",
+                gap: 8, padding: "34px 14px 14px",
               }}>
-              {rows.map((r) => {
+              {headRows.map((r) => {
                 const pct = r.value > 0 ? Math.max(3, Math.min(100, (r.value / top) * 100)) : 0;
                 return (
                   <div key={r.label}>
@@ -8234,7 +8567,7 @@ function LiveIntelligenceBand({
                         {r.label}
                       </span>
                       <span style={{
-                        fontSize: 15, fontWeight: 800, color: r.color,
+                        fontSize: 16, fontWeight: 800, color: r.color,
                         fontVariantNumeric: "tabular-nums", fontFamily: T.FONT_MONO,
                         textShadow: r.value > 0 ? `0 0 8px ${r.color}55` : "none",
                       }}>
@@ -8251,6 +8584,32 @@ function LiveIntelligenceBand({
                   </div>
                 );
               })}
+
+              {/* Reason breakdown — why attempts didn't fill. Only shown    */}
+              {/* when there are failures to explain.                       */}
+              {failures > 0 && reasons.length > 0 && (
+                <div style={{ marginTop: 4, borderTop: `1px solid ${T.BORDER}`, paddingTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ fontSize: 7, fontWeight: 700, letterSpacing: "0.16em", color: T.TEXT_3, fontFamily: T.FONT_MONO }}>
+                    HELD BACK · {failures.toLocaleString()}
+                  </span>
+                  {reasons.map((r) => (
+                    <div key={r.reason} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                      <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: "0.10em", color: T.TEXT_2, fontFamily: T.FONT_MONO }}>
+                        {FUNNEL_REASON_LABEL[r.reason]}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: "#FFC857", fontVariantNumeric: "tabular-nums", fontFamily: T.FONT_MONO }}>
+                        {r.count.toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {attempts === 0 && (
+                <span style={{ marginTop: 6, fontSize: 9, color: T.TEXT_3, fontStyle: "italic", fontFamily: T.FONT_MONO, textAlign: "center" }}>
+                  No live attempts yet — the AI will record yours here.
+                </span>
+              )}
             </div>
           </LIBCell>
         );

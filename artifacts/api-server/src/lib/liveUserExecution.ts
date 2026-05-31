@@ -2,6 +2,7 @@ import { db } from "@workspace/db";
 import {
   simPositionsTable,
   userExchangeConnectionsTable,
+  userExchangeSettingsTable,
   userNotificationsTable,
   userSettingsTable,
   usersTable,
@@ -28,9 +29,11 @@ import { resolveAiTradingGate } from "./aiTradingGate.js";
 import {
   ALLOWED_TRADE_SIZES,
   DEFAULT_TRADE_SIZE_USD,
+  PLAN_MAX_OPEN_POSITIONS,
   coerceTradeSizeToPreset,
   evaluateLiquidityGuard,
 } from "./liquidityGuard.js";
+import { categoryForSymbol, type SymbolCategory } from "./symbolCategories.js";
 import { simAccountsTable } from "@workspace/db";
 import { loadParallelConfig, effectivePerExchangeMax } from "./multiExchangeParallel.js";
 
@@ -106,7 +109,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "not_trade_authorized" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached";
+  errorCode?:      "no_connection" | "not_trade_authorized" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached" | "allocation_limit";
   error?:          string;
 }
 
@@ -615,7 +618,50 @@ export async function placeLiveAutoOrderForUser(
   const parallelCfg = await loadParallelConfig(userId);
   const scopedExchange: string | undefined =
     parallelCfg.enabled && req.targetExchange ? req.targetExchange : undefined;
-  const perExchangeMax = effectivePerExchangeMax(parallelCfg);
+  let perExchangeMax = effectivePerExchangeMax(parallelCfg);
+
+  // Per-exchange settings (Task #219). Loaded once for the venue this leg
+  // routes to and reused by 0SIZE (trade size) and the perExchangeMax override
+  // below. Both columns are nullable — null means "fall back to the global
+  // value", so a user who never configured per-exchange overrides behaves
+  // exactly as before.
+  let perExchangeTradeSize: number | null = null;
+  {
+    const venue = req.targetExchange ?? null;
+    if (venue) {
+      try {
+        const [exRow] = await db
+          .select({
+            size: userExchangeSettingsTable.tradeSizeUsd,
+            maxPositions: userExchangeSettingsTable.maxPositions,
+          })
+          .from(userExchangeSettingsTable)
+          .where(
+            and(
+              eq(userExchangeSettingsTable.userId, userId),
+              eq(userExchangeSettingsTable.exchange, venue),
+            ),
+          )
+          .limit(1);
+        if (exRow?.size != null && Number.isFinite(exRow.size) && exRow.size > 0) {
+          perExchangeTradeSize = exRow.size;
+        }
+        // The per-exchange max-positions override only applies when this leg is
+        // actually venue-scoped (parallel + target), so the 0LIQ/0d position
+        // counts are likewise scoped to that one exchange.
+        if (
+          scopedExchange &&
+          exRow?.maxPositions != null &&
+          Number.isInteger(exRow.maxPositions) &&
+          exRow.maxPositions > 0
+        ) {
+          perExchangeMax = exRow.maxPositions;
+        }
+      } catch (err) {
+        logger.warn({ err, userId, venue }, "liveUserExecution: per-exchange settings lookup failed — using global defaults");
+      }
+    }
+  }
 
   // 0SIZE. Customer trade-size enforcement (after kill switch, before all
   // downstream gates). The AI trading loop fan-out passes a globally-uniform
@@ -632,22 +678,30 @@ export async function placeLiveAutoOrderForUser(
     const operatorSize = await isOperatorRole(userId);
     if (!operatorSize) {
       let preferred: number = DEFAULT_TRADE_SIZE_USD;
-      try {
-        const [row] = await db
-          .select({ size: userSettingsTable.preferredLiveOrderSizeUsd })
-          .from(userSettingsTable)
-          .where(eq(userSettingsTable.userId, userId))
-          .limit(1);
-        preferred = coerceTradeSizeToPreset(row?.size);
-      } catch (err) {
-        logger.warn({ err, userId }, "liveUserExecution: trade-size lookup failed — using default preset");
+      // PER-EXCHANGE trade size (Task #219). When this leg routes to a specific
+      // venue and the customer configured an explicit per-exchange size for it
+      // (`perExchangeTradeSize`, loaded once in 0PAR above), THAT size is
+      // authoritative for this venue (e.g. Coinbase $20, Kraken $10). Otherwise
+      // we fall back to the user-global preferred size preset
+      // (`user_settings.preferredLiveOrderSizeUsd`). The resolved size is the
+      // customer's explicit choice, so it is used directly — the downstream
+      // 0LIQ liquidity guard and 0d risk gate still validate affordability and
+      // per-user risk budget against this size, so larger picks remain safe.
+      if (perExchangeTradeSize != null) {
+        preferred = perExchangeTradeSize;
+      } else {
+        try {
+          const [row] = await db
+            .select({ size: userSettingsTable.preferredLiveOrderSizeUsd })
+            .from(userSettingsTable)
+            .where(eq(userSettingsTable.userId, userId))
+            .limit(1);
+          preferred = coerceTradeSizeToPreset(row?.size);
+        } catch (err) {
+          logger.warn({ err, userId }, "liveUserExecution: trade-size lookup failed — using default preset");
+        }
       }
-      // Clamp to MIN: caller's request is treated as an upper bound (the
-      // engine may have legacy callers proposing $50/$100), but the
-      // customer's preferred size always wins when smaller. We never
-      // UP-size — the customer's pick is the ceiling.
-      const requested = Number.isFinite(sizeUSD) && sizeUSD > 0 ? sizeUSD : preferred;
-      sizeUSD = Math.min(requested, preferred);
+      sizeUSD = preferred;
     }
   }
 
@@ -1098,6 +1152,128 @@ export async function placeLiveAutoOrderForUser(
           logger.warn({ err: logErr, userId }, "liveUserExecution: 0LIQ fail-closed log insert failed");
         }
         return { success: false, userId, errorCode: "liquidity_protected", error: msg };
+      }
+    }
+  }
+
+  // 0ALLOC. Category allocation soft-cap (Task #219). The customer can bias the
+  // AI's selection across Majors / Alts / Memes by assigning each a percentage
+  // weight (summing to 100, stored in `user_settings.category_allocation`).
+  // Each category receives a share of the user's open-position budget
+  // proportional to its weight; once a category is already holding its share,
+  // the AI stops opening new entries in it so the freed slots flow to the
+  // under-weight categories. This is a SOFT cap — a category whose weight is
+  // > 0 always keeps at least one slot (never hard-excluded), so the bias
+  // shapes the mix without starving any enabled category. A weight of 0 is an
+  // explicit opt-out (the only hard exclusion). NULL allocation → skipped
+  // entirely (the locked pre-#219 behavior). Operator bypass; this is a
+  // customer preference, never applied to the operator path. Runs AFTER the
+  // hard liquidity/plan caps (0LIQ) and before the per-user risk budget (0d).
+  {
+    const operatorAlloc = await isOperatorRole(userId);
+    if (!operatorAlloc) {
+      try {
+        const [allocRow] = await db
+          .select({ allocation: userSettingsTable.categoryAllocation })
+          .from(userSettingsTable)
+          .where(eq(userSettingsTable.userId, userId))
+          .limit(1);
+        const allocation = allocRow?.allocation ?? null;
+        if (allocation) {
+          const cat = categoryForSymbol(symbol);
+          const rawWeight = Number(allocation[cat]);
+          const weight = Number.isFinite(rawWeight) && rawWeight > 0 ? rawWeight : 0;
+
+          // Budget = the number of open LIVE slots this leg competes for:
+          // per-exchange ceiling when venue-scoped (parallel), else the
+          // plan-tier max-open cap. Internal/QA accounts have no plan cap, so
+          // their budget falls back to the per-exchange/plan default already
+          // resolved for sizing — allocation still biases their mix.
+          const budget = scopedExchange
+            ? perExchangeMax
+            : (PLAN_MAX_OPEN_POSITIONS[(await resolveAiTradingGate(userId)).plan] ?? 0);
+
+          // target = this category's share of the budget. weight 0 → 0 slots
+          // (explicit opt-out). weight > 0 → at least 1 slot (soft floor) so an
+          // enabled category is never starved by rounding.
+          const target = weight <= 0
+            ? 0
+            : Math.max(1, Math.round((budget * weight) / 100));
+
+          // Count the user's CURRENT open LIVE positions in this category,
+          // scoped to the venue when parallel. Symbols are classified in JS via
+          // the same SoT, so the count and the budget share stay consistent.
+          const openRows = await db
+            .select({ symbol: simPositionsTable.symbol })
+            .from(simPositionsTable)
+            .where(scopedExchange
+              ? and(
+                  eq(simPositionsTable.userId, userId),
+                  eq(simPositionsTable.exchange, scopedExchange),
+                )
+              : and(
+                  eq(simPositionsTable.userId, userId),
+                  isNotNull(simPositionsTable.exchange),
+                ));
+          let currentCatCount = 0;
+          for (const r of openRows) {
+            if (typeof r.symbol === "string" && categoryForSymbol(r.symbol) === (cat as SymbolCategory)) {
+              currentCatCount += 1;
+            }
+          }
+
+          if (currentCatCount >= target) {
+            const msg = weight <= 0
+              ? `Allocation Limit · ${cat} is set to 0% — the AI is not opening ${cat} positions for this account.`
+              : `Allocation Limit · ${cat} already holds its ${weight}% share (${currentCatCount}/${target}). The AI is steering new entries toward your under-weight categories.`;
+            await emitFailureNotification(userId, symbol, side, msg);
+            executionStreamBus.emitEvent({
+              type:     "order_rejected",
+              severity: "warn",
+              symbol, side, sizeUSD, mode: "live",
+              gate:     "allocation_limit",
+              reason:   "allocation_limit",
+              message:  msg,
+              ...(scopedExchange ? { exchange: scopedExchange } : {}),
+              details: {
+                userId,
+                category:        cat,
+                weight,
+                budget,
+                target,
+                currentCatCount,
+              },
+            });
+            try {
+              await db.insert(logsTable).values({
+                id:      crypto.randomUUID(),
+                type:    "trade",
+                level:   "warn",
+                message: `[allocation_limit] ${msg}`,
+                details: {
+                  userId,
+                  symbol,
+                  side,
+                  category:        cat,
+                  weight,
+                  budget,
+                  target,
+                  currentCatCount,
+                  errorCode:       "allocation_limit",
+                  ...(scopedExchange ? { exchange: scopedExchange } : {}),
+                },
+              });
+            } catch (err) {
+              logger.warn({ err, userId }, "liveUserExecution: 0ALLOC log insert failed");
+            }
+            return { success: false, userId, errorCode: "allocation_limit", error: msg };
+          }
+        }
+      } catch (err) {
+        // Fail OPEN: allocation biasing is a preference, not a real-money
+        // safety gate. A lookup failure must not block an otherwise-valid
+        // order — the hard caps (0LIQ/0d) still protect the account.
+        logger.warn({ err, userId, symbol }, "liveUserExecution: 0ALLOC evaluation failed — skipping allocation bias");
       }
     }
   }

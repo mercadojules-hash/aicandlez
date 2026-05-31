@@ -37,6 +37,7 @@ function defaultSettings(userId: string) {
     preferredExchange:           "Kraken",
     activeRuntimeExchange:       null as string | null,
     preferredLiveOrderSizeUsd:   DEFAULT_TRADE_SIZE_USD,
+    categoryAllocation:          null as { majors: number; alts: number; memes: number } | null,
     paperSandboxEnabled:         false,
     notificationsTradeExec:      true,
     notificationsSignals:        false,
@@ -135,6 +136,7 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
     "preferredExchange",
     "activeRuntimeExchange",
     "preferredLiveOrderSizeUsd",
+    "categoryAllocation",
     "paperSandboxEnabled",
     "notificationsTradeExec", "notificationsSignals", "notificationsRiskAlerts",
     "notificationsLiveFills",
@@ -262,6 +264,34 @@ router.put("/user/settings", requireAuth, async (req, res): Promise<void> => {
         return;
       }
       patch[k] = n;
+    } else if (k === "categoryAllocation") {
+      // Majors / Alts / Memes allocation weights (Task #219). Three integer
+      // percentages that MUST sum to exactly 100. `null` clears the bias and
+      // restores the locked pre-#219 behavior (every category competes freely).
+      if (v === null) {
+        patch[k] = null;
+        continue;
+      }
+      if (!v || typeof v !== "object") {
+        res.status(400).json({ error: "categoryAllocation must be null or an object with majors/alts/memes weights" });
+        return;
+      }
+      const incoming = v as Record<string, unknown>;
+      const weights: { majors: number; alts: number; memes: number } = { majors: 0, alts: 0, memes: 0 };
+      for (const key of ["majors", "alts", "memes"] as const) {
+        const raw = typeof incoming[key] === "string" ? Number(incoming[key]) : incoming[key];
+        if (typeof raw !== "number" || !Number.isFinite(raw) || !Number.isInteger(raw) || raw < 0 || raw > 100) {
+          res.status(400).json({ error: `categoryAllocation.${key} must be an integer between 0 and 100` });
+          return;
+        }
+        weights[key] = raw;
+      }
+      const sum = weights.majors + weights.alts + weights.memes;
+      if (sum !== 100) {
+        res.status(400).json({ error: `categoryAllocation weights must sum to 100 (got ${sum})` });
+        return;
+      }
+      patch[k] = weights;
     } else {
       patch[k] = v;
     }

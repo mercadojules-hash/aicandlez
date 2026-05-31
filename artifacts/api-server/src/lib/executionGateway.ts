@@ -30,6 +30,7 @@ import {
   type ExecutionTrigger as TelemetryTrigger,
   type RuntimeMode,
 } from "./executionTelemetry.js";
+import { recordCustomerAttempt } from "./customerExecutionAttribution.js";
 
 /** Where a customer order originated. */
 export type ExecutionTrigger = "manual" | "ai";
@@ -118,8 +119,35 @@ export async function executeCustomerOrder(
       { tag: "EXECUTION_GATEWAY_REJECTED", correlationId, trigger, userId: legacyReq.userId, error: msg },
       "[EXECUTION_GATEWAY_REJECTED] customer order threw uncaught exception",
     );
+    // Per-customer execution-funnel attribution (Task #219). The throw path is
+    // still a real customer attempt outcome — record it as a failure so the
+    // portal funnel never undercounts attempts. Pure telemetry; we rethrow
+    // unchanged so execution semantics are untouched.
+    recordCustomerAttempt({
+      userId:    legacyReq.userId,
+      symbol:    legacyReq.symbol,
+      side:      legacyReq.side,
+      exchange:  legacyReq.targetExchange ?? null,
+      success:   false,
+      errorCode: "uncaught_exception",
+    });
     throw err;
   }
+
+  // Per-customer execution-funnel attribution (Task #219). Record EVERY
+  // customer order outcome (this gateway is the locked single chokepoint for
+  // AI fan-out + manual pill) keyed by userId, so the portal can show the
+  // user their OWN attempts/fills and a classified breakdown of failures —
+  // instead of the anonymous GLOBAL engine funnel. Pure telemetry; never
+  // affects execution.
+  recordCustomerAttempt({
+    userId:    legacyReq.userId,
+    symbol:    legacyReq.symbol,
+    side:      legacyReq.side,
+    exchange:  legacyResult.exchange ?? legacyReq.targetExchange ?? null,
+    success:   legacyResult.success,
+    errorCode: legacyResult.errorCode,
+  });
 
   if (!legacyResult.success) {
     emitTelemetry({

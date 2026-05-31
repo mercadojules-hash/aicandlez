@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { userExchangeConnectionsTable, userNotificationsTable, userSettingsTable, usersTable } from "@workspace/db";
+import { userExchangeConnectionsTable, userExchangeSettingsTable, userNotificationsTable, userSettingsTable, usersTable } from "@workspace/db";
 import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
 import { eq, and, or, isNull, ne } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
@@ -161,10 +161,25 @@ const logExchangesListArrival = (req: Request, _res: Response, next: NextFunctio
 router.get("/user/exchanges", logExchangesListArrival, requireAuth, async (req, res): Promise<void> => {
   const userId = (req as AuthReq).clerkUserId;
   try {
-    const rows = await db
-      .select()
-      .from(userExchangeConnectionsTable)
-      .where(eq(userExchangeConnectionsTable.userId, userId));
+    const [rows, settingsRows] = await Promise.all([
+      db
+        .select()
+        .from(userExchangeConnectionsTable)
+        .where(eq(userExchangeConnectionsTable.userId, userId)),
+      // Per-exchange trade-sizing settings (Task #219). null columns mean
+      // "fall back to the user-global preferred size / plan cap" — the engine
+      // resolves the fallback, the UI shows the override when present.
+      db
+        .select({
+          exchange:     userExchangeSettingsTable.exchange,
+          tradeSizeUsd: userExchangeSettingsTable.tradeSizeUsd,
+          maxPositions: userExchangeSettingsTable.maxPositions,
+        })
+        .from(userExchangeSettingsTable)
+        .where(eq(userExchangeSettingsTable.userId, userId)),
+    ]);
+
+    const settingsByExchange = new Map(settingsRows.map(s => [s.exchange, s]));
 
     // Build response: all exchanges from catalog (with per-user connection status)
     const connectedSet = new Set(rows.map(r => r.exchange));
@@ -172,6 +187,12 @@ router.get("/user/exchanges", logExchangesListArrival, requireAuth, async (req, 
       exchange:    entry.id,
       connected:   connectedSet.has(entry.id),
       connection:  rows.find(r => r.exchange === entry.id) ? safeRow(rows.find(r => r.exchange === entry.id)!) : null,
+      settings:    settingsByExchange.get(entry.id)
+        ? {
+            tradeSizeUsd: settingsByExchange.get(entry.id)!.tradeSizeUsd,
+            maxPositions: settingsByExchange.get(entry.id)!.maxPositions,
+          }
+        : null,
       meta:        entry,
     }));
 
@@ -179,6 +200,101 @@ router.get("/user/exchanges", logExchangesListArrival, requireAuth, async (req, 
   } catch (err) {
     req.log.error({ err }, "GET /user/exchanges failed");
     res.status(500).json({ error: "Failed to load exchange connections" });
+  }
+});
+
+// ── PUT /api/user/exchanges/:exchange/settings ───────────────────────────────
+// Per-exchange live-execution settings (Task #219). Upserts the customer's
+// per-(user, exchange) trade size and (optional) max-open-positions override.
+// Body: { tradeSizeUsd?: number|null, maxPositions?: number|null }.
+//   - tradeSizeUsd null → fall back to user-global preferred size
+//   - maxPositions null → fall back to the parallel per-exchange default
+// Both fields are optional in the body; an omitted field is left unchanged on
+// an existing row (or stays NULL on insert). At least one must be present.
+const PER_EXCHANGE_MIN_SIZE_USD = 5;
+const PER_EXCHANGE_MAX_SIZE_USD = 100_000;
+const PER_EXCHANGE_MAX_POSITIONS = 100;
+
+router.put("/user/exchanges/:exchange/settings", requireAuth, requirePlan("starter"), async (req, res): Promise<void> => {
+  const userId   = (req as AuthReq).clerkUserId;
+  const exchange = String(req.params["exchange"] ?? "").trim();
+  const body     = (req.body ?? {}) as Record<string, unknown>;
+
+  if (!exchange || !CONNECTABLE_EXCHANGE_IDS.has(exchange)) {
+    res.status(400).json({ error: `Unknown exchange "${exchange}"` });
+    return;
+  }
+
+  const hasSize = Object.prototype.hasOwnProperty.call(body, "tradeSizeUsd");
+  const hasMax  = Object.prototype.hasOwnProperty.call(body, "maxPositions");
+  if (!hasSize && !hasMax) {
+    res.status(400).json({ error: "Provide tradeSizeUsd and/or maxPositions" });
+    return;
+  }
+
+  const values: { userId: string; exchange: string; tradeSizeUsd?: number | null; maxPositions?: number | null; updatedAt: Date } = {
+    userId,
+    exchange,
+    updatedAt: new Date(),
+  };
+
+  if (hasSize) {
+    const raw = body["tradeSizeUsd"];
+    if (raw === null) {
+      values.tradeSizeUsd = null;
+    } else {
+      const n = typeof raw === "string" ? Number(raw) : raw;
+      if (typeof n !== "number" || !Number.isFinite(n) || n < PER_EXCHANGE_MIN_SIZE_USD || n > PER_EXCHANGE_MAX_SIZE_USD) {
+        res.status(400).json({ error: `tradeSizeUsd must be null or a number between ${PER_EXCHANGE_MIN_SIZE_USD} and ${PER_EXCHANGE_MAX_SIZE_USD}` });
+        return;
+      }
+      values.tradeSizeUsd = n;
+    }
+  }
+
+  if (hasMax) {
+    const raw = body["maxPositions"];
+    if (raw === null) {
+      values.maxPositions = null;
+    } else {
+      const n = typeof raw === "string" ? Number(raw) : raw;
+      if (typeof n !== "number" || !Number.isInteger(n) || n < 1 || n > PER_EXCHANGE_MAX_POSITIONS) {
+        res.status(400).json({ error: `maxPositions must be null or an integer between 1 and ${PER_EXCHANGE_MAX_POSITIONS}` });
+        return;
+      }
+      values.maxPositions = n;
+    }
+  }
+
+  try {
+    // JIT-provision the parent users row (FK) the same way getOrCreateSettings
+    // does, so a fresh session that raced ahead of /auth/me can't FK-violate.
+    await db
+      .insert(usersTable)
+      .values({ clerkUserId: userId, email: "", role: "user" })
+      .onConflictDoNothing();
+
+    const setOnConflict: Record<string, unknown> = { updatedAt: values.updatedAt };
+    if (hasSize) setOnConflict["tradeSizeUsd"] = values.tradeSizeUsd ?? null;
+    if (hasMax)  setOnConflict["maxPositions"] = values.maxPositions ?? null;
+
+    const [row] = await db
+      .insert(userExchangeSettingsTable)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [userExchangeSettingsTable.userId, userExchangeSettingsTable.exchange],
+        set:    setOnConflict,
+      })
+      .returning({
+        exchange:     userExchangeSettingsTable.exchange,
+        tradeSizeUsd: userExchangeSettingsTable.tradeSizeUsd,
+        maxPositions: userExchangeSettingsTable.maxPositions,
+      });
+
+    res.json({ ok: true, settings: row ?? null });
+  } catch (err) {
+    req.log.error({ err, userId, exchange }, "PUT /user/exchanges/:exchange/settings failed");
+    res.status(500).json({ error: "Failed to save per-exchange settings" });
   }
 });
 
