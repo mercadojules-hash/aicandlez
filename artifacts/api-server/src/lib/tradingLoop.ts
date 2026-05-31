@@ -1122,58 +1122,64 @@ async function autoExecute(
   let liveExchange:        string | undefined;
   let liveExchangeOrderId: string | undefined;
 
-  if (isLiveExec) {
-    // ── Resolve live-execution targets ────────────────────────────────────
-    // Customers with a default+active+live `user_exchange_connections` row
-    // get an order routed through THEIR own connected exchange. The
-    // operator process-env path (admintrade.aicandlez.com) is ALWAYS
-    // attempted in parallel so the platform-level audit trail + risk view
-    // is preserved. If neither path succeeds, the trade is rejected.
-    // Customer fan-out is gated by the customer-portal kill switch
-    // (Task #157). When disabled (default), customer rows are skipped
-    // entirely so we don't spam per-user rejection logs every signal.
-    // Operator env-key path always runs.
+  // ── Customer LIVE fan-out — DECOUPLED from operator/global live mode ────────
+  // Customer live execution is governed SOLELY by CUSTOMER_LIVE_EXECUTION_ENABLED
+  // + the per-customer runtime/safety gates inside executeCustomerOrder →
+  // placeLiveAutoOrderForUser (kill switch, account status, AI-enabled, daily
+  // trade limit, concurrent cap, risk engine, liquidity guard, disclaimer,
+  // confidence floor, symbol-universe + exchange validation, position sizing,
+  // SL/TP). It NO LONGER requires the global/operator engine to be in live mode
+  // (isLiveExec) — so eligible customers receive REAL positions on every
+  // successful AI execution, whether the global engine is paper or live. This
+  // runs exactly once per autoExecute pass; the operator env-key path below
+  // stays gated on isLiveExec. Customers handled here are recorded in
+  // `customerFanoutUserIds` and excluded from the paper fan-out so no user can
+  // get both a live AND a paper position on the same signal.
+  const customerLiveSuccesses: LiveUserOrderResult[] = [];
+  const customerFanoutUserIds = new Set<string>();
+  {
     const { isCustomerLiveExecutionEnabled } = await import("./liveUserExecution.js");
-    const liveUsers = isCustomerLiveExecutionEnabled()
-      ? await listLiveExecutionUsers()
-      : [];
+    const customerLiveEnabled = isCustomerLiveExecutionEnabled();
+    const liveUsers = customerLiveEnabled ? await listLiveExecutionUsers() : [];
+    for (const u of liveUsers) customerFanoutUserIds.add(u.userId);
 
-    const [operatorResult, userResults] = await Promise.all([
-      placeLiveAutoOrder({ symbol, side, sizeUSD }).catch((err): Awaited<ReturnType<typeof placeLiveAutoOrder>> => ({
-        success: false,
-        error:   err instanceof Error ? err.message : String(err),
-      })),
-      Promise.all(
-        (() => {
-          // Phase 4 AI dedup — collapse duplicate (userId, symbol) rows
-          // within a tick so a misconfigured `listLiveExecutionUsers()`
-          // (or a future per-connection fan-out) can't double-fire an
-          // AI order for the same user+symbol on the same signal. The
-          // Set is tick-scoped (lives only for this map() pass).
-          const seen = new Set<string>();
-          const deduped = liveUsers.filter((u) => {
-            const key = `${u.userId}:${symbol}`;
-            if (seen.has(key)) {
-              logger.warn(
-                { userId: u.userId, symbol, signalId },
-                "[AI_TICK_DEDUP] dropped duplicate (userId,symbol) in tick fan-out",
-              );
-              return false;
-            }
-            seen.add(key);
-            return true;
-          });
-          return deduped;
-        })().map((u) => {
+    logger.info(
+      {
+        tag:            "CUSTOMER_FANOUT_START",
+        customerLiveEnabled,
+        eligibleCount:  liveUsers.length,
+        globalLiveMode: isLiveExec,
+        symbol, side, signalId,
+      },
+      `[CUSTOMER_FANOUT_START] ${customerLiveEnabled ? `${liveUsers.length} live customers` : "disabled"} for ${symbol} ${side} (globalLiveMode=${isLiveExec})`,
+    );
+
+    if (customerLiveEnabled && liveUsers.length > 0) {
+      // Phase 4 AI dedup — collapse duplicate (userId, symbol) rows within a
+      // tick so a misconfigured `listLiveExecutionUsers()` can't double-fire an
+      // AI order for the same user+symbol on the same signal. Tick-scoped.
+      const seen = new Set<string>();
+      const deduped = liveUsers.filter((u) => {
+        const key = `${u.userId}:${symbol}`;
+        if (seen.has(key)) {
+          logger.warn(
+            { userId: u.userId, symbol, signalId },
+            "[AI_TICK_DEDUP] dropped duplicate (userId,symbol) in tick fan-out",
+          );
+          return false;
+        }
+        seen.add(key);
+        return true;
+      });
+
+      const userResults = await Promise.all(
+        deduped.map((u) => {
           // Phase 4 (Task #209) — one correlationId per (user, symbol, tick)
-          // so the AI fan-out funnel is grep-correlatable end-to-end. Emit
-          // [AI_TRADE_REQUEST] before handing off so on-call can see the
-          // request before any gateway/exec gate fires.
+          // so the AI fan-out funnel is grep-correlatable end-to-end.
           const correlationId = genCorrelationId();
-          // Canonical normalization for AI: engine-native uppercased
-          // symbol, and exchange = the user's connected adapter (already
-          // resolved by listLiveExecutionUsers). This is the canonical
-          // form the gateway/adapter will receive.
+          // Canonical normalization for AI: engine-native uppercased symbol,
+          // and exchange = the user's connected adapter (resolved by
+          // listLiveExecutionUsers) — the form the gateway/adapter receives.
           const resolvedSymbol   = symbol.trim().toUpperCase();
           const resolvedExchange = u.exchange ?? null;
           emitTelemetry({
@@ -1192,9 +1198,6 @@ async function autoExecute(
             sizeUSD,
             signalId,
           });
-          // AI_TRADE_NORMALIZED — emitted AFTER canonical resolve so
-          // `normalizedSymbol`+`exchange` reflect what the adapter will
-          // actually receive (vs the raw input form).
           emitTelemetry({
             tag:               "AI_TRADE_NORMALIZED",
             correlationId,
@@ -1226,126 +1229,175 @@ async function autoExecute(
             }),
           );
         }),
-      ),
-    ]);
+      );
 
-    // Mirror each per-user fill into the user's sim registry (cache + DB)
-    // so the position appears immediately in the customer's portal.
-    const userSuccesses = userResults.filter((r) => r.success);
-    for (const r of userSuccesses) {
-      const corrId = (r as LiveUserOrderResult & { correlationId?: string }).correlationId;
-      let persistenceResult: "persisted" | "failed" = "persisted";
-      let mirroredPositionId: string | null = null;
-      try {
-        const userEntry = r.fillPrice ?? price;
-        const userQty   = r.quantity  ?? sizeUSD / userEntry;
-        const userSL    = side === "BUY" ? userEntry * (1 - settings.stopLossPercent   / 100) : userEntry * (1 + settings.stopLossPercent   / 100);
-        const userTP    = side === "BUY" ? userEntry * (1 + settings.takeProfitPercent / 100) : userEntry * (1 - settings.takeProfitPercent / 100);
-        const orderId = r.exchangeOrderId ?? `LIVE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        const pos = await registerLiveUserFill({
-          userId:          r.userId,
-          symbol,
-          side,
-          quantity:        userQty,
-          entryPrice:      userEntry,
-          sizeUSD,
-          signalId,
-          confidence,
-          stopLoss:        parseFloat(userSL.toFixed(2)),
-          takeProfit:      parseFloat(userTP.toFixed(2)),
-          exchange:        r.exchange ?? "unknown",
-          exchangeOrderId: orderId,
-          entryFeeBroker:         r.brokerFee,
-          entryFeeBrokerCurrency: r.brokerFeeCurrency,
-        });
-        mirroredPositionId = pos?.id ?? orderId;
-        // CONF EXPERIMENT: per-customer LIVE fill in the measurement band [50,64].
-        if (inConfExperimentBand(confidence)) {
-          logger.info(
-            { tag: "CONF_EXP_5064", outcome: "executed", scope: "customer_live", userId: r.userId, symbol, side, confidence, exchangeOrderId: orderId },
-            `[CONF_EXP_5064] live fill ${symbol} ${side} @ ${confidence.toFixed(1)}% user=${r.userId}`,
-          );
-        }
-      } catch (e) {
-        persistenceResult = "failed";
-        logger.warn(
-          { userId: r.userId, exchange: r.exchange, correlationId: corrId, err: e instanceof Error ? e.message : String(e) },
-          "Live fan-out: failed to mirror fill into sim registry",
-        );
-      }
-      // Phase 4 (Task #209) — POSITION_PERSISTED canonical row stamped
-      // with the gateway-returned correlationId so the AI funnel grep
-      // chain stays linked through the persistence step. Also remember
-      // the positionId→correlationId mapping so the eventual close emit
-      // (loop-driven trailing stop / SL / TP / manual) preserves the chain.
-      if (corrId && persistenceResult === "persisted") {
-        rememberCorrelation(mirroredPositionId, corrId, "ai");
-        rememberCorrelation(r.exchangeOrderId ?? null, corrId, "ai");
-      }
-      if (corrId) {
-        const persistPid = mirroredPositionId ?? r.exchangeOrderId ?? null;
-        emitTelemetry({
-          tag:               "POSITION_PERSISTED",
-          correlationId:     corrId,
-          userId:            r.userId,
-          symbol,
-          normalizedSymbol:  symbol,
-          exchange:          r.exchange ?? null,
-          runtimeMode:       "live",
-          persistenceResult,
-          positionId:        persistPid,
-          latencyMs:         0,
-          trigger:           "ai",
-          side,
-          sizeUSD,
-          signalId,
-          fillPrice:         r.fillPrice ?? null,
-        });
-        // Hydration: stream event + LIVE_TRADES_HYDRATED telemetry —
-        // both AFTER POSITION_PERSISTED so timing reconstruction lines
-        // up with real lifecycle order. Only on successful persistence.
-        if (persistenceResult === "persisted") {
-          notifyFillHydrated({
-            trigger:         "ai",
-            correlationId:   corrId,
+      // Mirror each per-user fill into the user's sim registry (cache + DB) so
+      // the position appears immediately in the customer's Portal / PWA —
+      // sim_positions → Open Positions / Live Trades / equity / buying power,
+      // and sim_trades / Trade History on close.
+      const userSuccesses = userResults.filter((r) => r.success);
+      for (const r of userSuccesses) {
+        const corrId = (r as LiveUserOrderResult & { correlationId?: string }).correlationId;
+        let persistenceResult: "persisted" | "failed" = "persisted";
+        let mirroredPositionId: string | null = null;
+        try {
+          const userEntry = r.fillPrice ?? price;
+          const userQty   = r.quantity  ?? sizeUSD / userEntry;
+          const userSL    = side === "BUY" ? userEntry * (1 - settings.stopLossPercent   / 100) : userEntry * (1 + settings.stopLossPercent   / 100);
+          const userTP    = side === "BUY" ? userEntry * (1 + settings.takeProfitPercent / 100) : userEntry * (1 - settings.takeProfitPercent / 100);
+          const orderId = r.exchangeOrderId ?? `LIVE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          const userPos = await registerLiveUserFill({
             userId:          r.userId,
             symbol,
             side,
+            quantity:        userQty,
+            entryPrice:      userEntry,
             sizeUSD,
-            fillPrice:       r.fillPrice ?? null,
-            quantity:        r.quantity  ?? null,
-            exchange:        r.exchange  ?? null,
-            exchangeOrderId: r.exchangeOrderId ?? null,
-            positionId:      persistPid,
-            runtimeMode:     "live",
-            latencyMs:       0,
-            sandbox:         false,
-            dryRun:          r.dryRun === true,
+            signalId,
+            confidence,
+            stopLoss:        parseFloat(userSL.toFixed(2)),
+            takeProfit:      parseFloat(userTP.toFixed(2)),
+            exchange:        r.exchange ?? "unknown",
+            exchangeOrderId: orderId,
+            entryFeeBroker:         r.brokerFee,
+            entryFeeBrokerCurrency: r.brokerFeeCurrency,
           });
+          mirroredPositionId = userPos?.id ?? orderId;
+          logger.info(
+            {
+              tag:            "CUSTOMER_POSITION_CREATED",
+              userId:         r.userId,
+              exchange:       r.exchange ?? null,
+              symbol, side, sizeUSD,
+              entryPrice:     userEntry,
+              quantity:       userQty,
+              positionId:     mirroredPositionId,
+              stopLoss:       parseFloat(userSL.toFixed(2)),
+              takeProfit:     parseFloat(userTP.toFixed(2)),
+              signalId,
+              globalLiveMode: isLiveExec,
+              store:          "sim_positions",
+            },
+            `[CUSTOMER_POSITION_CREATED] ${r.userId} ${symbol} ${side} @ ${userEntry} on ${r.exchange ?? "unknown"} (pos=${mirroredPositionId})`,
+          );
+          // CONF EXPERIMENT: per-customer LIVE fill in the measurement band [50,64].
+          if (inConfExperimentBand(confidence)) {
+            logger.info(
+              { tag: "CONF_EXP_5064", outcome: "executed", scope: "customer_live", userId: r.userId, symbol, side, confidence, exchangeOrderId: orderId },
+              `[CONF_EXP_5064] live fill ${symbol} ${side} @ ${confidence.toFixed(1)}% user=${r.userId}`,
+            );
+          }
+        } catch (e) {
+          persistenceResult = "failed";
+          logger.warn(
+            { userId: r.userId, exchange: r.exchange, correlationId: corrId, err: e instanceof Error ? e.message : String(e) },
+            "Live fan-out: failed to mirror fill into sim registry",
+          );
+        }
+        // Phase 4 (Task #209) — POSITION_PERSISTED canonical row stamped with
+        // the gateway-returned correlationId so the AI funnel grep chain stays
+        // linked through persistence. Also remember positionId→correlationId so
+        // the eventual close emit (trailing / SL / TP / manual) preserves it.
+        if (corrId && persistenceResult === "persisted") {
+          rememberCorrelation(mirroredPositionId, corrId, "ai");
+          rememberCorrelation(r.exchangeOrderId ?? null, corrId, "ai");
+        }
+        if (corrId) {
+          const persistPid = mirroredPositionId ?? r.exchangeOrderId ?? null;
+          emitTelemetry({
+            tag:               "POSITION_PERSISTED",
+            correlationId:     corrId,
+            userId:            r.userId,
+            symbol,
+            normalizedSymbol:  symbol,
+            exchange:          r.exchange ?? null,
+            runtimeMode:       "live",
+            persistenceResult,
+            positionId:        persistPid,
+            latencyMs:         0,
+            trigger:           "ai",
+            side,
+            sizeUSD,
+            signalId,
+            fillPrice:         r.fillPrice ?? null,
+          });
+          if (persistenceResult === "persisted") {
+            notifyFillHydrated({
+              trigger:         "ai",
+              correlationId:   corrId,
+              userId:          r.userId,
+              symbol,
+              side,
+              sizeUSD,
+              fillPrice:       r.fillPrice ?? null,
+              quantity:        r.quantity  ?? null,
+              exchange:        r.exchange  ?? null,
+              exchangeOrderId: r.exchangeOrderId ?? null,
+              positionId:      persistPid,
+              runtimeMode:     "live",
+              latencyMs:       0,
+              sandbox:         false,
+              dryRun:          r.dryRun === true,
+            });
+          }
         }
       }
-    }
 
-    if (userResults.length > 0) {
-      const failed = userResults.length - userSuccesses.length;
+      // Explicit per-customer rejection logging (with reason) for every user
+      // whose order did NOT fill, so on-call can see exactly why a customer was
+      // skipped on an otherwise-successful AI execution.
+      for (const r of userResults) {
+        if (r.success) continue;
+        logger.info(
+          {
+            tag:       "CUSTOMER_POSITION_REJECTED",
+            userId:    r.userId,
+            exchange:  r.exchange ?? null,
+            errorCode: r.errorCode ?? "unknown",
+            reason:    r.error ?? "unknown",
+            symbol, side, sizeUSD, signalId,
+          },
+          `[CUSTOMER_POSITION_REJECTED] ${r.userId} ${symbol} ${side}: ${r.errorCode ?? r.error ?? "unknown"}`,
+        );
+      }
+
+      customerLiveSuccesses.push(...userSuccesses);
+
       logger.info(
-        { symbol, side, totalUsers: userResults.length, succeeded: userSuccesses.length, failed, dryRun: isDryRunEnabled() },
-        "Live fan-out completed",
+        {
+          tag:        "CUSTOMER_FANOUT_COMPLETE",
+          totalUsers: userResults.length,
+          succeeded:  userSuccesses.length,
+          failed:     userResults.length - userSuccesses.length,
+          symbol, side, signalId,
+          dryRun:     isDryRunEnabled(),
+        },
+        `[CUSTOMER_FANOUT_COMPLETE] ${symbol} ${side}: ${userSuccesses.length}/${userResults.length} customer positions created`,
       );
     }
+  }
 
-    // If neither the operator path nor any per-user fan-out succeeded,
-    // treat as a hard rejection (matches the original single-path semantics).
-    if (!operatorResult.success && userSuccesses.length === 0) {
-      const reason = operatorResult.error ?? (liveUsers.length > 0
-        ? `All ${liveUsers.length} customer fan-outs failed`
+  if (isLiveExec) {
+    // ── Operator env-key path (admintrade.aicandlez.com) — GLOBAL live mode ──
+    // Anchors the operator-level audit trail + risk view. The customer fan-out
+    // already ran above (decoupled). If NEITHER the operator path NOR any
+    // customer fan-out produced a fill, the global tick is a hard rejection
+    // (matches the original single-path semantics).
+    const operatorResult = await placeLiveAutoOrder({ symbol, side, sizeUSD }).catch((err): Awaited<ReturnType<typeof placeLiveAutoOrder>> => ({
+      success: false,
+      error:   err instanceof Error ? err.message : String(err),
+    }));
+
+    if (!operatorResult.success && customerLiveSuccesses.length === 0) {
+      const reason = operatorResult.error ?? (customerFanoutUserIds.size > 0
+        ? `All ${customerFanoutUserIds.size} customer fan-outs failed`
         : "Live mode active but no execution target available");
       engineStats.tradesBlocked++;
-      logger.warn({ symbol, side, error: reason, liveUsers: liveUsers.length }, "Live auto-trade rejected by exchange bridge");
+      logger.warn({ symbol, side, error: reason, liveUsers: customerFanoutUserIds.size }, "Live auto-trade rejected by exchange bridge");
       await db.insert(logsTable).values({
         id: genId(), type: "trade", level: "critical",
         message: `Live auto-trade failed for ${symbol} ${side}: ${reason}`,
-        details: { symbol, side, error: reason, mode: "live", liveUsers: liveUsers.length },
+        details: { symbol, side, error: reason, mode: "live", liveUsers: customerFanoutUserIds.size },
       });
       auditLogger.append("system", "TRADE_REJECTED", {
         symbol, side, error: reason, gate: "live_exchange_bridge",
@@ -1366,7 +1418,7 @@ async function autoExecute(
       liveExchange        = operatorResult.exchange;
       liveExchangeOrderId = operatorResult.exchangeOrderId;
     } else {
-      const first = userSuccesses[0]!;
+      const first = customerLiveSuccesses[0]!;
       pos = { id: first.exchangeOrderId ?? genId(), entryPrice: first.fillPrice ?? price };
       liveExchange        = first.exchange;
       liveExchangeOrderId = first.exchangeOrderId;
@@ -1392,6 +1444,26 @@ async function autoExecute(
     // stabilizes (then it can be retired behind a feature flag).
     const result = await placeOrder({ symbol, side, sizeUSD });
     if (!result.success) {
+      // Observability note (not a money-correctness issue): the decoupled
+      // customer LIVE fan-out above may already have persisted real fills to
+      // sim_positions this tick. Those positions are self-managed by the
+      // per-user SL/TP exit monitor and are INDEPENDENT of the global book, so
+      // a global-sim rejection does NOT strand them. We deliberately do NOT
+      // fabricate a global `trades` row anchored to a customer fill here — the
+      // global simulationEngine has no position, and a synthetic global row
+      // would confuse the global exit monitor / maxActivePositions cap. This
+      // tick is rejected for the GLOBAL book only; the customer fills stand.
+      if (customerLiveSuccesses.length > 0) {
+        logger.warn(
+          {
+            tag:           "CUSTOMER_FANOUT_SALVAGE",
+            symbol, side,
+            error:         result.error,
+            customerFills: customerLiveSuccesses.length,
+          },
+          `[CUSTOMER_FANOUT_SALVAGE] global sim placeOrder failed for ${symbol} ${side} but ${customerLiveSuccesses.length} customer LIVE fill(s) already persisted to sim_positions (self-managed, independent of the global book) — global tick rejected, customer positions stand`,
+        );
+      }
       engineStats.tradesBlocked++;
       logger.warn({ symbol, side, error: result.error }, "Auto-trade rejected by simulation engine");
       await db.insert(logsTable).values({
@@ -1432,7 +1504,29 @@ async function autoExecute(
     // with a structured reason instead of failing the whole tick.
     try {
       const fanoutCorrelationId = genCorrelationId();
-      const eligibleUsers       = await listPaperAutoTradeUsers();
+      const eligibleUsersRaw    = await listPaperAutoTradeUsers();
+      // Duplicate-prevention: a user already handled by the decoupled customer
+      // LIVE fan-out this tick must NOT also receive a paper position. The two
+      // selectors key off DIFFERENT tradingMode columns
+      // (user_exchange_connections vs user_settings) and can overlap, so guard
+      // explicitly here rather than relying on disjointness.
+      const eligibleUsers = eligibleUsersRaw.filter((u) => {
+        if (customerFanoutUserIds.has(u.userId)) {
+          logger.info(
+            {
+              tag:           "AI_FANOUT_SKIPPED",
+              correlationId: fanoutCorrelationId,
+              userId:        u.userId,
+              runtimeMode:   "paper",
+              symbol, side, signalId,
+              reason:        "handled_by_live_fanout",
+            },
+            "[AI_FANOUT_SKIPPED] paper fan-out skipped — user already handled by live fan-out this tick",
+          );
+          return false;
+        }
+        return true;
+      });
 
       logger.info(
         {
