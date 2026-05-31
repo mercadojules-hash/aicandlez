@@ -29,6 +29,21 @@ export interface PersistedSettings {
   maxActivePositions:  number;  // 0 = unlimited; default 3
 }
 
+// ── Global concurrent-position cap (env-configurable) ────────────────────────
+// Seeds the in-memory store's `maxActivePositions` at boot. This is the GLOBAL
+// AI-engine cap enforced by Gate 1 in tradingLoop.ts — NOT a per-user/tier cap.
+// No longer hardcoded: tune via env MAX_ACTIVE_POSITIONS without a code change
+// (the admin PUT /api/settings setter can still override at runtime). 0 =
+// unlimited. Invalid/negative input falls back to the safe default. Fractional
+// values are floored.
+const DEFAULT_MAX_ACTIVE_POSITIONS = 3;
+function resolveMaxActivePositions(): number {
+  const raw = process.env.MAX_ACTIVE_POSITIONS;
+  if (raw === undefined || raw === "") return DEFAULT_MAX_ACTIVE_POSITIONS;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : DEFAULT_MAX_ACTIVE_POSITIONS;
+}
+
 // ── Defaults ─────────────────────────────────────────────────────────────────
 // autoMode is TRUE so paper trading starts immediately on first run —
 // no database or additional configuration required.
@@ -41,7 +56,7 @@ const DEFAULTS: PersistedSettings = {
   stopLossPercent:     2,
   takeProfitPercent:   4,
   maxTradesPerDay:     0,    // LEGACY no-op (engine daily throttle removed)
-  maxActivePositions:  3,    // max concurrent open positions (0 = unlimited)
+  maxActivePositions:  resolveMaxActivePositions(),  // GLOBAL cap; env MAX_ACTIVE_POSITIONS (0 = unlimited)
 };
 
 let _store: PersistedSettings = { ...DEFAULTS };

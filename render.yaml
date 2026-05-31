@@ -56,6 +56,13 @@ services:
       # already 25; declared here so prod is explicit and version-tracked.
       - key: LIVE_EXECUTION_CONCURRENT_CAP
         value: "25"
+      # GLOBAL AI-engine concurrent-position cap (Gate 1 in tradingLoop.ts).
+      # Seeds settingsStore.maxActivePositions at boot. NOT a per-user/tier cap.
+      # Code default is 3; raised to 12 so a single saturated symbol cluster no
+      # longer deadlocks new entries across other symbols. 0 = unlimited. Tune
+      # without a code change; admin PUT /api/settings can still override live.
+      - key: MAX_ACTIVE_POSITIONS
+        value: "12"
       - key: KRAKEN_API_KEY
         sync: false
       - key: KRAKEN_API_SECRET

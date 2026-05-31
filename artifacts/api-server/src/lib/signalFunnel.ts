@@ -192,6 +192,19 @@ export function classifyDownstream(
       rejectionGate: "position_limit", rejectionReason: r,
     };
   }
+  // Per-symbol diversification cap (Gate 1b) sits AFTER the global position
+  // limit: the GLOBAL cap passed but this symbol already holds its per-symbol
+  // max, so the entry is blocked. Reported as its OWN gate (`per_symbol_cap`)
+  // so it never masquerades as `exchange_validation` and never falsely counts
+  // as an execution attempt. passedPositionLimit=true (the global cap was OK);
+  // downstream gates are not evaluated.
+  if (r.startsWith("Per-symbol cap")) {
+    return {
+      passedPositionLimit: true, passedCooldown: null, passedDuplicate: null,
+      passedRisk: null, passedExchange: null, executionAttempted: false,
+      rejectionGate: "per_symbol_cap", rejectionReason: r,
+    };
+  }
   if (r === "Daily limit") {
     return {
       passedPositionLimit: true, passedCooldown: false, passedDuplicate: null,
