@@ -30,6 +30,19 @@ whole affected-table data layer goes down in prod — e.g. `loadFromDB`'s `.sele
 the in-memory registry hydrates empty (Open Positions 0, empty feeds, $0 P&L), AND live fills
 fail to persist (real money spent, no row). Reads break, not just writes.
 
+## `pg` "multiple decimal points" trap when SELECTing numeric/timestamp cols
+
+Selecting `real`/`numeric`/`timestamp` columns (e.g. `size_usd`, `realized_pnl`,
+`entry_time`) from `sim_positions`/`sim_trades`/`trades` via the `pg` driver throws
+`multiple decimal points`. `setTypeParser(1700/701/700,…)` and `row_to_json()` do
+NOT fix it (it fails before/independent of client result parsing).
+
+**How to apply:** for prod forensics, SELECT **text columns only** (`user_id`,
+`symbol`, `side`, `exchange`, `exchange_order_id`, `close_reason`, etc.) — those
+work reliably. If you need a numeric/timestamp value, cast/format defensively
+server-side (`to_char(...)` sometimes still trips it, so prefer pulling the row by
+text keys and getting the number another way) rather than selecting the raw column.
+
 ## Per-user tables are keyed by Clerk user ID, NOT users.id UUID
 
 `sim_positions`, `sim_trades`, `sim_accounts`, `user_settings`, and
