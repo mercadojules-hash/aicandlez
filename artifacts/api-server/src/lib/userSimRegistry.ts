@@ -832,6 +832,7 @@ export async function listOpenPositionsForRiskMonitor(): Promise<
     stopLoss:   number | null;
     takeProfit: number | null;
     exchange:   string | null;
+    entryTime:  number | null;
   }>
 > {
   try {
@@ -845,6 +846,7 @@ export async function listOpenPositionsForRiskMonitor(): Promise<
         stopLoss:   simPositionsTable.stopLoss,
         takeProfit: simPositionsTable.takeProfit,
         exchange:   simPositionsTable.exchange,
+        entryTime:  simPositionsTable.entryTime,
       })
       .from(simPositionsTable)
       .where(

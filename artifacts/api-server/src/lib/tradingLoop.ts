@@ -87,6 +87,49 @@ function getGlobalPositionMaxHoldMs(): number {
   return Number.isFinite(n) && n >= 0 ? n : DEFAULT_GLOBAL_POSITION_MAX_HOLD_MS;
 }
 
+// ── Per-user LIVE position exit enhancements (trailing-stop + max-hold) ──────────
+// Live (`exchange IS NOT NULL`) per-user `sim_positions` historically had ONLY a
+// fixed SL/TP exit (`runHardStopMonitor`). In a flat market that sits inside the
+// SL/TP band, a real-money position could stay open indefinitely (observed: 18–27h
+// holds). These two ceilings make the live exit lifecycle active rather than purely
+// passive:
+//   1. Trailing-stop — locks in profit once a position has run favourably. It only
+//      arms once the trail sits above entry (the fixed SL still owns all downside),
+//      so it targets a profitable exit; the realised broker fill can still differ
+//      slightly from the trigger price on a gap/slippage.
+//   2. Max-hold — a hard time ceiling so no live position can be held forever.
+//      Evaluated price-independently so it fires even if the market-data feed is down.
+//
+// Both are LIVE-only here; paper trailing is owned by `runTrailingStops` and the
+// global book by `runGlobalCapSelfHeal`. Tunable via env, no redeploy.
+
+// Trailing distance (percent). When unset, the monitor derives the distance from
+// each position's own stored stop-loss band (so it honours the user's configured
+// risk). Set `LIVE_TRAILING_STOP_PERCENT=0` to disable live trailing entirely.
+function getLiveTrailingStopPercentOverride(): number | null {
+  const raw = process.env.LIVE_TRAILING_STOP_PERCENT;
+  if (raw === undefined || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+// Max-hold for live per-user positions. Mirrors the global book default (24h ON).
+// Set `LIVE_POSITION_MAX_HOLD_MS=0` to disable.
+const DEFAULT_LIVE_POSITION_MAX_HOLD_MS = 24 * 60 * 60 * 1000;
+function getLivePositionMaxHoldMs(): number {
+  const raw = process.env.LIVE_POSITION_MAX_HOLD_MS;
+  if (raw === undefined || raw === "") return DEFAULT_LIVE_POSITION_MAX_HOLD_MS;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_LIVE_POSITION_MAX_HOLD_MS;
+}
+
+// In-memory high/low-water marks for live trailing stops, keyed by positionId.
+// BUY positions track the highest price seen; SELL the lowest. The map is pruned
+// each tick to the set of currently-open live positions so it cannot leak. State
+// is intentionally process-local: on restart the water mark re-anchors to the
+// current price (conservative — trailing simply re-arms after the next run-up).
+const liveTrailWaterMarks = new Map<string, { high: number; low: number }>();
+
 // ── Per-symbol concurrency cap (diversification entry gate) ──────────────────────
 // Caps how many concurrent open global-engine positions a single symbol may hold.
 // ENTRY-ONLY: enforced when evaluating NEW entries in `autoExecute`; it never
@@ -1873,26 +1916,138 @@ async function runHardStopMonitor() {
       }
     }));
 
-    const correlationId = genCorrelationId();
-    await Promise.all(positions.map(async (p) => {
-      const price = priceBySym.get(p.symbol);
-      if (price === undefined) return;
+    const correlationId      = genCorrelationId();
+    const trailOverridePct   = getLiveTrailingStopPercentOverride();
+    const liveMaxHoldMs      = getLivePositionMaxHoldMs();
+    const nowMs              = Date.now();
 
-      const isBuy = p.side === "BUY";
-      let reason: "STOP_LOSS" | "TAKE_PROFIT" | null = null;
-      if (p.stopLoss !== null) {
-        if (isBuy ? price <= p.stopLoss : price >= p.stopLoss) reason = "STOP_LOSS";
+    // Prune water marks for positions no longer open (prevents unbounded growth).
+    const openPositionIds = new Set(positions.map((p) => p.positionId));
+    for (const id of liveTrailWaterMarks.keys()) {
+      if (!openPositionIds.has(id)) liveTrailWaterMarks.delete(id);
+    }
+
+    await Promise.all(positions.map(async (p) => {
+      const isBuy  = p.side === "BUY";
+      const isLive = !!p.exchange;
+      const price  = priceBySym.get(p.symbol);
+
+      // Age is computed price-independently so the max-hold ceiling can fire even
+      // when the market-data feed is down. A hard time ceiling that depended on a
+      // ticker being available wouldn't be a hard ceiling.
+      const ageMs    = isLive && p.entryTime !== null && Number.isFinite(p.entryTime)
+        ? nowMs - p.entryTime
+        : null;
+      const ageHours = ageMs !== null ? ageMs / 3_600_000 : null;
+
+      // ── Exit decision (priority: SL → TP → trailing → max-hold) ──────────────
+      let reason: "STOP_LOSS" | "TAKE_PROFIT" | "TRAILING_STOP" | "MAX_HOLD" | null = null;
+      let trailPct:   number | null = null;
+      let trailStop:  number | null = null;
+      let trailArmed = false;
+      let highWater:  number | null = null;
+      let lowWater:   number | null = null;
+
+      // Price-dependent exits (SL → TP → live trailing). Skipped on a missing /
+      // stale price — never close on a zero/absent price; the next tick retries.
+      if (price !== undefined) {
+        if (p.stopLoss !== null) {
+          if (isBuy ? price <= p.stopLoss : price >= p.stopLoss) reason = "STOP_LOSS";
+        }
+        if (reason === null && p.takeProfit !== null) {
+          if (isBuy ? price >= p.takeProfit : price <= p.takeProfit) reason = "TAKE_PROFIT";
+        }
+
+        // Trailing stop is LIVE-only here. Paper trailing is owned by
+        // `runTrailingStops`; the global book by `runGlobalCapSelfHeal`.
+        if (isLive) {
+          // Derive trailing distance: env override wins; otherwise mirror the
+          // position's own stop-loss band so it honours the user's configured risk.
+          if (trailOverridePct !== null) {
+            trailPct = trailOverridePct;
+          } else if (p.stopLoss !== null && p.entryPrice > 0) {
+            trailPct = (Math.abs(p.entryPrice - p.stopLoss) / p.entryPrice) * 100;
+          }
+
+          if (trailPct !== null && trailPct > 0) {
+            const wm = liveTrailWaterMarks.get(p.positionId) ?? { high: p.entryPrice, low: p.entryPrice };
+            if (price > wm.high) wm.high = price;
+            if (price < wm.low)  wm.low  = price;
+            liveTrailWaterMarks.set(p.positionId, wm);
+            highWater = wm.high;
+            lowWater  = wm.low;
+
+            if (isBuy) {
+              trailStop  = wm.high * (1 - trailPct / 100);
+              // Armed only once the trail sits above entry, so it targets locking
+              // in profit while the fixed stop-loss owns the downside. This is the
+              // intended trigger price — the actual broker market-close fill can
+              // still land slightly below entry on a gap/slippage between this
+              // trigger tick and the fill.
+              trailArmed = trailStop > p.entryPrice;
+              if (reason === null && trailArmed && price <= trailStop) reason = "TRAILING_STOP";
+            } else {
+              trailStop  = wm.low * (1 + trailPct / 100);
+              trailArmed = trailStop < p.entryPrice;
+              if (reason === null && trailArmed && price >= trailStop) reason = "TRAILING_STOP";
+            }
+          }
+        }
       }
-      if (reason === null && p.takeProfit !== null) {
-        if (isBuy ? price >= p.takeProfit : price <= p.takeProfit) reason = "TAKE_PROFIT";
+
+      // Price-independent exit: hard max-hold ceiling (LIVE-only). Evaluated even
+      // when price is unavailable so a stuck position can always be force-closed;
+      // `closeUserPosition` fetches its own authoritative broker fill price.
+      if (reason === null && isLive && liveMaxHoldMs > 0 && ageMs !== null && ageMs >= liveMaxHoldMs) {
+        reason = "MAX_HOLD";
       }
+
+      // Per-position eval row — proves the live exit loop evaluated this position
+      // this tick (last-eval timestamp = `evaluatedAt`) and records its full SL /
+      // TP / trailing state. Emitted even when price is unavailable so liveness
+      // stays observable.
+      if (isLive) {
+        logger.info(
+          {
+            tag:         "LIVE_POSITION_EVAL",
+            correlationId,
+            evaluatedAt: nowMs,
+            userId:      p.userId,
+            positionId:  p.positionId,
+            symbol:      p.symbol,
+            side:        p.side,
+            exchange:    p.exchange,
+            price:       price ?? null,
+            entryPrice:  p.entryPrice,
+            stopLoss:    p.stopLoss,
+            takeProfit:  p.takeProfit,
+            trailPct:    trailPct !== null ? parseFloat(trailPct.toFixed(4)) : null,
+            trailStop:   trailStop !== null ? parseFloat(trailStop.toFixed(6)) : null,
+            trailArmed,
+            highWater,
+            lowWater,
+            ageHours:    ageHours !== null ? parseFloat(ageHours.toFixed(2)) : null,
+            decision:    reason ?? (price === undefined ? "HOLD_NO_PRICE" : "HOLD"),
+          },
+          `[LIVE_POSITION_EVAL] ${p.symbol} ${p.side} @ ${price ?? "n/a"} (entry ${p.entryPrice}, SL ${p.stopLoss}, TP ${p.takeProfit}) → ${reason ?? "HOLD"}`,
+        );
+      }
+
       if (reason === null) return;
 
-      const runtimeMode = p.exchange ? "LIVE" : "PAPER";
+      const runtimeMode = isLive ? "LIVE" : "PAPER";
+      // Display price for logging/stream only. The authoritative exit price is
+      // resolved inside `closeUserPosition` (broker fill for live); on the
+      // price-independent max-hold path `price` may be undefined, so fall back to
+      // entry for presentation.
+      const displayPrice = price ?? p.entryPrice;
       try {
         const closeResult = await closeUserPosition(p.userId, p.positionId, reason);
         if (closeResult.success) {
-          engineStats.hardStopHits++;
+          if (reason === "TRAILING_STOP") engineStats.trailingStopHits++;
+          else                            engineStats.hardStopHits++;
+          if (p.exchange) liveTrailWaterMarks.delete(p.positionId);
+          const pnlPct = closeResult.trade?.realizedPnLPct;
           logger.info(
             {
               tag:           "HARD_STOP_TRIGGERED",
@@ -1903,33 +2058,41 @@ async function runHardStopMonitor() {
               side:          p.side,
               reason,
               entryPrice:    p.entryPrice,
-              triggerPrice:  price,
+              triggerPrice:  price ?? null,
               stopLoss:      p.stopLoss,
               takeProfit:    p.takeProfit,
+              trailStop,
+              ageHours:      ageHours !== null ? parseFloat(ageHours.toFixed(2)) : null,
               mode:          runtimeMode,
-              realizedPnLPct: closeResult.trade?.realizedPnLPct,
+              realizedPnLPct: pnlPct,
             },
-            `[HARD_STOP_TRIGGERED] ${reason} ${runtimeMode} ${p.symbol} ${p.side} @ ${price} (entry ${p.entryPrice})`,
+            `[HARD_STOP_TRIGGERED] ${reason} ${runtimeMode} ${p.symbol} ${p.side} @ ${price ?? "n/a"} (entry ${p.entryPrice})`,
           );
+          // Loss-bearing exits (SL always; MAX_HOLD when it closed underwater)
+          // surface as "warn"; profit-locking exits (TP, trailing, profitable
+          // max-hold) as "success".
+          const isLossExit =
+            reason === "STOP_LOSS" ||
+            (reason === "MAX_HOLD" && typeof pnlPct === "number" && pnlPct < 0);
           executionStreamBus.emitEvent({
             type:     "position_closed",
-            severity: reason === "STOP_LOSS" ? "warn" : "success",
+            severity: isLossExit ? "warn" : "success",
             symbol:   p.symbol,
             side:     isBuy ? "BUY" : "SELL",
-            price,
+            price:    displayPrice,
             mode:     p.exchange ? "live" : "simulation",
             exchange: p.exchange ?? undefined,
             reason,
-            message:  `${reason} hard close — ${runtimeMode} ${p.symbol} @ $${price.toFixed(2)}`,
+            message:  `${reason} close — ${runtimeMode} ${p.symbol} @ $${displayPrice.toFixed(2)}`,
             details:  {
               userId:        p.userId,
               positionId:    p.positionId,
               entryPrice:    p.entryPrice,
-              realizedPnLPct: closeResult.trade?.realizedPnLPct,
+              realizedPnLPct: pnlPct,
             },
           });
         } else {
-          // Position already gone (e.g. closed by trailing pass / manual close
+          // Position already gone (e.g. closed by another pass / manual close
           // earlier this tick) surfaces as not-found — benign.
           logger.info(
             {
@@ -1939,6 +2102,7 @@ async function runHardStopMonitor() {
               positionId: p.positionId,
               symbol:     p.symbol,
               reason:     closeResult.error ?? "closeUserPosition returned not-success",
+              triggerReason: reason,
               mode:       runtimeMode,
             },
             "[HARD_STOP_SKIPPED] hard-stop close not applied",
@@ -1953,6 +2117,7 @@ async function runHardStopMonitor() {
             positionId: p.positionId,
             symbol:     p.symbol,
             reason:     err instanceof Error ? err.message : String(err),
+            triggerReason: reason,
             mode:       runtimeMode,
           },
           "[HARD_STOP_SKIPPED] hard-stop close threw",
