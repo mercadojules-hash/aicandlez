@@ -799,26 +799,40 @@ async function computeMTFDecision(symbol: string): Promise<MTFResult> {
   const fastSnap = buildTimeframeSnapshot(fast, candles5m);
   const slowSnap = buildTimeframeSnapshot(slow, candles15m);
 
-  // CONVICTION_V2 (B): "directional + non-contradicting" MTF agreement.
-  // Old (strict identical): both timeframes had to emit the same BUY/SELL.
-  // That rejected early breakouts where 5m fires BUY but 15m hasn't crossed
-  // the ±1.5 totalScore threshold yet (still HOLD). New: one timeframe must
-  // be directional, the other must not contradict (HOLD is allowed). SELL
-  // on the opposite side still hard-blocks confirmation — contradiction
-  // protection is preserved.
-  const bothBuy  = fast.decision === "BUY"  && slow.decision !== "SELL";
-  const bothSell = fast.decision === "SELL" && slow.decision !== "BUY";
-  const trendAligned = Math.sign(fast.totalScore) === Math.sign(slow.totalScore) && fast.totalScore !== 0;
+  // MTF_RELAX (2026-05-31): reduce the multi-timeframe confirmation
+  // requirement by ~50% to lift the dominant post-confidence bottleneck
+  // (183 of 395 post-confidence signals were dying here in production).
+  //
+  // Old logic stacked TWO requirements:
+  //   1. fast (5m) directional AND slow (15m) non-contradicting, AND
+  //   2. `trendAligned` — sign(fast.totalScore) === sign(slow.totalScore)
+  //      with fast.totalScore !== 0.
+  // The trend-sign clause (2) was the binding filter: it rejected setups
+  // where one timeframe was clearly directional and the other was
+  // neutral/HOLD but its near-zero score leaned the opposite way.
+  //
+  // New logic: confirm when EITHER timeframe is directional and the OTHER
+  // does NOT contradict it (neutral/HOLD allowed). The strict trend-sign
+  // alignment clause is dropped and the directional driver is now symmetric
+  // (either 5m OR 15m may carry the direction). Opposite directional
+  // decisions (5m BUY vs 15m SELL, or vice versa) STILL hard-block
+  // confirmation — contradiction protection and the MTF gate itself are
+  // fully preserved; only the full-agreement requirement is relaxed.
+  const bothBuy  = (fast.decision === "BUY"  || slow.decision === "BUY")
+                && fast.decision !== "SELL" && slow.decision !== "SELL";
+  const bothSell = (fast.decision === "SELL" || slow.decision === "SELL")
+                && fast.decision !== "BUY"  && slow.decision !== "BUY";
 
-  const mtfConfirmed  = (bothBuy || bothSell) && trendAligned;
+  const mtfConfirmed  = bothBuy || bothSell;
   const agreedAction: "BUY" | "SELL" | "HOLD" = bothBuy ? "BUY" : bothSell ? "SELL" : "HOLD";
   // CONVICTION_V2 (2026-05-26): replace symmetric arithmetic mean with a
   // stronger-TF-weighted blend. Plain `(fast+slow)/2` let a weak TF drag
   // a confirmed aligned signal under the gate (e.g. 5m=72, 15m=48 → 60,
   // which evaluates against BASELINE_MIN_CONFIDENCE = 60 as a boundary
   // miss). The 0.65/0.35 weighting preserves MTF confirmation as a hard
-  // requirement (`mtfConfirmed` above still requires `bothBuy || bothSell`
-  // AND `trendAligned`) while letting the dominant-conviction TF carry
+  // requirement (`mtfConfirmed` above still requires a directional,
+  // non-contradicting `bothBuy || bothSell`) while letting the
+  // dominant-conviction TF carry
   // more of the score. The execution floor (LIVE_EXECUTION_MIN_CONFIDENCE
   // = 65) is applied downstream at Gate 0; this blend only calibrates the
   // fused score, it does not gate.
