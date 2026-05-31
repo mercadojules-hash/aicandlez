@@ -37,6 +37,20 @@ eventual (depends on runtime-state hydration polling); the open-path hard stop
 in `placeLiveAutoOrderForUser` independently rejects orders to unhealthy/
 unauthorized venues, so real money is safe even if a stale row briefly lingers.
 
+## Close-path must NOT gate on tradingMode (regression trap)
+
+`placeLiveCloseOrderForUser` must resolve the venue connection by
+`(userId, exchange, status="active")` — NEVER by `tradingMode="live"`.
+
+**Why:** the demotion half of the cohort writeback flips a degraded venue to
+`tradingMode="paper"` while positions may still be OPEN on it. A
+`tradingMode="live"` predicate on the close path then returns `no_connection`
+→ open positions become uncloseable until re-promotion. Caught in code review.
+
+**How to apply:** open-path (fan-out + trade-auth + tradingMode) gates real
+money entries; the close/exit path is risk-reducing and must always resolve so
+exits survive a transient demotion. Kill switch still guards the close path.
+
 ## Per-venue isolation
 
 For parallel users, open-position counting, the cap override

@@ -1740,7 +1740,7 @@ export async function placeLiveCloseOrderForUser(
     };
   }
 
-  // 1. Resolve the live connection for the EXCHANGE THAT OPENED THIS POSITION.
+  // 1. Resolve the connection for the EXCHANGE THAT OPENED THIS POSITION.
   // Task #216 — parallel users hold open positions on more than one venue at
   // once (Coinbase AND Kraken), and only ONE of those connections is
   // isDefault. Resolving by the position's own `exchange` (instead of
@@ -1748,6 +1748,13 @@ export async function placeLiveCloseOrderForUser(
   // default, and removes the `exchange_mismatch` trap. For single-exchange
   // users the position's exchange IS their default connection, so this
   // resolves the identical row — no behavior change.
+  //
+  // CLOSE-PATH MUST NOT gate on `tradingMode="live"`. The parallel healthy-only
+  // cohort writeback (runtimeState.ts) demotes a degraded venue to
+  // tradingMode="paper" to keep it out of the OPEN fan-out — but positions may
+  // still be open on that venue and MUST remain closeable. Resolving by
+  // (userId, exchange, status="active") keeps exits working through a transient
+  // demotion; trade-authorization remains an OPEN-path concern only.
   const [row] = await db
     .select()
     .from(userExchangeConnectionsTable)
@@ -1756,13 +1763,12 @@ export async function placeLiveCloseOrderForUser(
         eq(userExchangeConnectionsTable.userId,      userId),
         eq(userExchangeConnectionsTable.exchange,    exchange),
         eq(userExchangeConnectionsTable.status,      "active"),
-        eq(userExchangeConnectionsTable.tradingMode, "live"),
       ),
     )
     .limit(1);
 
   if (!row) {
-    const msg = `No active live ${exchange} connection configured for close`;
+    const msg = `No active ${exchange} connection configured for close`;
     await emitFailureNotification(userId, symbol, closeSide, msg, exchange);
     return { success: false, userId, exchange, errorCode: "no_connection", error: msg };
   }
