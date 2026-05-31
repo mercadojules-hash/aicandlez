@@ -1,0 +1,153 @@
+We now have enough production evidence to stop theorizing and fix the remaining execution pipeline issues.
+
+Issue #1 — Successful executions are not reconciling with Live Trades or Trade History
+
+Current production metrics:
+
+Signals Generated: 39,534
+Passed Confidence: 1,836
+Exec Attempts: 313
+Exec Success: 8
+
+Observed behavior:
+
+Multiple "TRADE EXECUTED" popups have been captured in production (TON, APT, INJ, etc.).
+Exec Success increased from 3 → 4 → 6 → 8.
+Live Trades only increased by 1 net position.
+Trade History remains empty.
+Equity changes do not consistently reflect the number of successful executions.
+
+Examples captured:
+
+TON popup displayed "TRADE EXECUTED"
+TONUSD later appeared in Live Trades
+Exec Success increased
+Trade History remained empty
+
+This proves at least part of the execution pipeline is functioning, but the accounting is not reconciling.
+
+Required investigation
+
+Trace every Exec Success increment in production.
+
+For each successful execution provide:
+
+Timestamp
+Symbol
+Coinbase Order ID
+Coinbase Fill ID
+Whether order was filled
+Whether position record was created
+Whether Live Trades record was created
+Whether Trade History record was created
+Whether equity update was applied
+
+Specifically reconcile:
+
+Exec Success = 8
+
+against:
+
+Current Live Trades
+Current Open Positions
+Current Trade History Records
+Current Filled Orders
+
+Every successful execution must exist in one of two places:
+
+Open position (Live Trades)
+
+OR
+
+Closed position (Trade History)
+
+There should never be a successful execution that disappears from both.
+
+Issue #2 — Success counter may be incrementing before persistence completes
+
+Verify whether:
+
+executionSuccess++
+
+is occurring before:
+
+position creation
+trade history creation
+broker fill persistence
+
+If so, move success accounting to the final confirmed persistence stage.
+
+A successful execution should only be counted after:
+
+broker confirms fill
+database persistence succeeds
+position/trade record exists
+Issue #3 — Increase maximum concurrent live positions
+
+Current trade size:
+
+$10 per trade
+
+Current account equity:
+
+~$632
+
+Current max positions:
+
+6
+
+Increase:
+
+MAX_CONCURRENT_POSITIONS
+
+from current value to:
+
+20
+
+Reason:
+
+$10 sizing leaves significant cushion.
+We intentionally lowered position size.
+The current cap is unnecessarily restricting throughput.
+We want more opportunities active simultaneously while keeping risk small.
+
+Show:
+
+Old value
+New value
+Location changed
+Issue #4 — Report all remaining execution blockers
+
+Provide a ranked list of every remaining production blocker preventing:
+
+Exec Attempts → Exec Success
+
+conversion.
+
+For each blocker include:
+
+rejection count
+percentage of attempts blocked
+exact code location
+exact reason
+
+Rank highest to lowest impact.
+
+Important clarification
+
+The goal is NOT:
+
+313 attempts = 8 successes
+
+The goal is to identify every remaining gate between attempts and execution and remove unnecessary bottlenecks while maintaining risk controls.
+
+Provide the exact production numbers showing:
+
+313 attempts
+8 successes
+
+What blocked the other 305 attempts?
+
+with percentages for each blocker.
+
+Do not provide theories. Trace the production execution path and provide the actual counts from live production data.
