@@ -1,0 +1,155 @@
+Multi-Exchange Parallel Trading Implementation (Info + Tee Accounts)
+
+We want to move beyond a single active exchange model.
+
+Goal
+
+Allow both connected exchanges to trade simultaneously for the same user account.
+
+Example:
+
+info@mixtapepsd.com
+
+Coinbase active
+Kraken active
+Both able to open/manage positions concurrently
+
+teedelgado@gmail.com
+
+Coinbase active
+Kraken active
+Both able to open/manage positions concurrently
+
+The user should not have to switch between exchanges or maintain separate browser windows.
+
+Required Changes
+1. Enable Parallel Exchange Execution
+
+Current behavior appears to use a single active exchange.
+
+Replace with:
+
+User
+ ├── Coinbase Engine
+ └── Kraken Engine
+
+Both engines should:
+
+Scan independently
+Execute independently
+Maintain independent position limits
+Maintain independent risk calculations
+Maintain independent balances
+
+A Coinbase position should never consume a Kraken slot and vice versa.
+
+2. Increase Position Limits
+
+For these users only:
+
+info@mixtapepsd.com
+
+max_active_positions = 20
+max_simultaneous_trades = 20
+
+teedelgado@gmail.com
+
+max_active_positions = 20
+max_simultaneous_trades = 20
+
+Apply on:
+
+User risk settings
+User settings
+Any execution gate enforcing lower limits
+
+Do NOT change platform-wide defaults.
+
+Do NOT change plan/tier limits globally.
+
+This is a per-user override only.
+
+3. Separate Exchange Limits
+
+Desired behavior:
+
+Coinbase:
+20 max positions
+
+Kraken:
+20 max positions
+
+Total possible:
+
+20 Coinbase
++
+20 Kraken
+=
+40 total open positions
+
+The exchanges should not share a common cap.
+
+4. Make It Visible In UI
+
+Current UI only shows:
+
+MAX POSITIONS 6
+
+Replace with something explicit:
+
+Coinbase:
+Open 3 / 20
+
+Kraken:
+Open 2 / 20
+
+or
+
+Coinbase (3/20)
+Kraken (2/20)
+
+Users must be able to see:
+
+Exchange name
+Open positions
+Position limit
+Balance
+
+without opening separate windows.
+
+5. Exchange Attribution
+
+Add Exchange column everywhere:
+
+Live Trades
+
+Exchange	Symbol	Side	PnL
+Coinbase	TONUSD	Long	
+Kraken	ETHUSD	Long	
+
+Trade History
+
+Exchange	Symbol	Entry	Exit	PnL
+
+Users must always know which exchange owns each position.
+
+6. Verify Existing Trades
+
+After implementation:
+
+Existing Coinbase positions must remain intact.
+Kraken positions must appear alongside them.
+No position loss during migration.
+No duplicate execution.
+Deliverables
+
+Please provide:
+
+Current enforced position limit for:
+info@mixtapepsd.com
+teedelgado@gmail.com
+Confirmation that both exchanges can trade simultaneously.
+Confirmation that each exchange has an independent 20-position cap.
+Screenshot or evidence showing UI visibility of both exchange position counts.
+
+One caution: I would not tie the position limit increase to future deposits. Have Replit verify the risk model can safely handle 20-per-exchange with your current balances first. With $250 on Kraken, 20 concurrent positions at $10 each plus fees and reserves is feasible, but the engine may still have buying-power guards that prevent all 20 from being used simultaneously. The UI should show the configured limit separately from what buying power currently allows.
