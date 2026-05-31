@@ -5270,6 +5270,53 @@ export function PortalCustomerShell() {
     retry:           false,
   });
 
+  // Task #217 — customer TRADE HISTORY closed-trade feed. Reads the per-user
+  // `sim_trades` table (paper + live, mode-tagged) via /api/simulation/trades —
+  // the same DB-backed endpoint the admin portal already consumes. Replaces the
+  // in-memory paper-only `usePaperTrades.history`, which only held trades the
+  // customer manually fired in the current browser session, so server-side AI
+  // fan-out closes and live broker fills never appeared (showed "NO CLOSED
+  // TRADES" even when sim_trades had rows). Origin chip = exchange (uppercased)
+  // when present, else "PAPER" — same convention as the OPEN blotter rows.
+  type ServerClosedTrade = {
+    id:             string;
+    symbol:         string;
+    side:           "BUY" | "SELL";
+    entryPrice:     number;
+    exitPrice:      number;
+    exitTime:       number;
+    realizedPnL:    number;
+    realizedPnLPct: number;
+    exchange?:      string | null;
+  };
+  const { data: serverTradesResp } = useQuery<{ trades: ServerClosedTrade[] }>({
+    queryKey:        ["customer-simulation-trades"],
+    queryFn:         async () => {
+      const resp = await authFetch("/api/simulation/trades");
+      if (!resp.ok) throw new Error(`/api/simulation/trades ${resp.status}`);
+      return (await resp.json()) as { trades: ServerClosedTrade[] };
+    },
+    refetchInterval: 8_000,
+    staleTime:       4_000,
+    retry:           false,
+  });
+  const serverTradeHistory = useMemo(
+    () => [...(serverTradesResp?.trades ?? [])]
+      .sort((a, b) => (b.exitTime ?? 0) - (a.exitTime ?? 0))
+      .map(t => ({
+        id:      t.id,
+        symbol:  t.symbol,
+        display: shortPair(t.symbol),
+        side:    (t.side === "BUY" ? "LONG" : "SHORT") as "LONG" | "SHORT",
+        entry:   Number(t.entryPrice) || 0,
+        exit:    Number(t.exitPrice) || 0,
+        pnl:     Number(t.realizedPnL) || 0,
+        pnlPct:  Number(t.realizedPnLPct) || 0,
+        origin:  t.exchange ? t.exchange.toUpperCase() : "PAPER",
+      })),
+    [serverTradesResp],
+  );
+
   // Resolved equity for both runtime modes — declared AFTER serverAccount.
   // LIVE  → broker-polled runtimeState.totalEquityUSD (unchanged).
   // PAPER → serverAccount.equity (canonical; reflects AI fan-out paper
@@ -5313,6 +5360,10 @@ export function PortalCustomerShell() {
     if (cur.totalTrades !== prev.totalTrades || cur.totalRealized !== prev.totalRealized) {
       lastReconciledRef.current = cur;
       void qc.invalidateQueries({ queryKey: RUNTIME_STATE_QUERY_KEY });
+      // Task #217 — a bumped trade count means a position just closed, so
+      // refresh the DB-backed TRADE HISTORY feed immediately rather than
+      // waiting for its 8s poll.
+      void qc.invalidateQueries({ queryKey: ["customer-simulation-trades"] });
     }
   }, [isLiveRuntime, serverAccount, qc]);
   // Convergence fix — single canonical mapping for ALL server-known
@@ -6739,7 +6790,14 @@ export function PortalCustomerShell() {
         <EnableLiveAITradingBar
           engineOnline={!!engineStatus?.running}
           openPaper={blotterOpenCount}
-          slotCap={plan === "elite" ? 12 : plan === "pro" ? 6 : plan === "starter" ? 3 : 3}
+          /* Task #217 — parallel multi-exchange users are governed by the
+             engine-enforced PER-EXCHANGE cap (`perExchangeMax`, e.g. 20),
+             not the plan-tier slot ladder. Showing the tier cap (pro→6) on a
+             parallel account was misleading because the runtime never enforced
+             6. Non-parallel users keep the plan-tier ceiling unchanged. */
+          slotCap={isMultiExchangeParallel
+            ? perExchangeLimit
+            : (plan === "elite" ? 12 : plan === "pro" ? 6 : plan === "starter" ? 3 : 3)}
           onUpgrade={() => setUpgrade(true)}
           equityUsd={displayEquity}
         />
@@ -6957,7 +7015,10 @@ export function PortalCustomerShell() {
               </section>
             )}
             <CustomerBlotterPanelOpen rows={blotterOpenRows} entitled={entitled} />
-            <CustomerBlotterPanelHistory rows={paperHistory} />
+            {/* Task #217 — DB-backed closed-trade feed (paper + live,
+                mode-tagged) instead of the in-memory session-only paper
+                history that left AI fan-out / live closes invisible. */}
+            <CustomerBlotterPanelHistory rows={serverTradeHistory} />
           </aside>
         </section>
       </main>
