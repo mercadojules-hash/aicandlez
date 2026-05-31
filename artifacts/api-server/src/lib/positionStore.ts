@@ -46,6 +46,8 @@
 
 import { logger } from "./logger.js";
 import { executionStreamBus } from "./executionStreamBus.js";
+import { broadcastTrade } from "./wsServer.js";
+import { recordCustomerBrokerFilled } from "./customerExecMetrics.js";
 import {
   emit               as emitTelemetry,
   resolveCorrelation,
@@ -253,6 +255,32 @@ export function notifyFillHydrated(args: {
   sandbox?:        boolean;
   dryRun?:         boolean;
 }): void {
+  // Issue #2: this is the SINGLE guaranteed post-persistence hook — it fires
+  // exactly once per persisted customer fill (from both the AI fan-out and the
+  // manual /api/user/live-order paths) strictly AFTER the broker accepted the
+  // order AND the position record was written. The "Customer Broker Orders
+  // Filled" metric is therefore incremented HERE and nowhere else, so it can
+  // never run ahead of a real persisted fill. Dry-run (synthetic) fills are
+  // excluded so the counter only ever reflects real broker money.
+  if (!args.dryRun) {
+    recordCustomerBrokerFilled();
+    // Real customer fill → push a userId-scoped "trade_executed" tagged
+    // source="customer" so ONLY this customer sees the "TRADE EXECUTED" popup.
+    if (typeof args.fillPrice === "number" && Number.isFinite(args.fillPrice)) {
+      try {
+        broadcastTrade({
+          symbol:  args.symbol,
+          side:    args.side,
+          price:   args.fillPrice,
+          sizeUSD: args.sizeUSD,
+          userId:  args.userId,
+          source:  "customer",
+        });
+      } catch {
+        // WS push is best-effort — must never break execution.
+      }
+    }
+  }
   try {
     executionStreamBus.emitEvent({
       type:     "position_filled",

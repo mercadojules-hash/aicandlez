@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, Tooltip } from "recharts";
 import ExecutionFunnelPanel from "@/components/ExecutionFunnelPanel";
+import ExecutionMetricsPanel from "@/components/ExecutionMetricsPanel";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -414,6 +415,9 @@ export default function SignalDebug() {
 
       {/* ── Execution funnel (why no trades) ── */}
       <ExecutionFunnelPanel />
+
+      {/* ── Execution metrics (simulated vs real broker + reconciliation) ── */}
+      <ExecutionMetricsPanel />
 
       {isLoading && (
         <div className="flex items-center justify-center h-32 text-muted-foreground/40">

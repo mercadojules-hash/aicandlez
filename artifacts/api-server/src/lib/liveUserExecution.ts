@@ -23,6 +23,7 @@ import crypto from "crypto";
 import { evaluateRiskGate } from "./riskGate.js";
 import { isAiDisclaimerAccepted } from "./aiDisclaimer.js";
 import { engineStats, VOLUME_GATE_FRACTION } from "./tradingLoop.js";
+import { recordCustomerBrokerSubmitted, recordBrokerReject } from "./customerExecMetrics.js";
 import { resolveAiTradingGate } from "./aiTradingGate.js";
 import {
   ALLOWED_TRADE_SIZES,
@@ -1488,6 +1489,10 @@ export async function placeLiveAutoOrderForUser(
     await recordExecTrace(`execution_submitted_${row.exchange.toLowerCase()}`, "info", {
       userId, symbol, side, sizeUSD, exchange: row.exchange, qtyBase, referencePrice,
     });
+    // Issue #2 metric: a customer live order has been DISPATCHED to the broker.
+    // This is "submitted", not "filled" — the filled counter only advances after
+    // broker-accept + persistence (positionStore.notifyFillHydrated).
+    recordCustomerBrokerSubmitted();
     let order = await adapter.placeOrder({
       symbol,
       side:     side === "BUY" ? "buy" : "sell",
@@ -1534,6 +1539,7 @@ export async function placeLiveAutoOrderForUser(
         status: order.status, timedOut, error: reasonMsg,
       });
       await emitFailureNotification(userId, symbol, side, reasonMsg, row.exchange);
+      recordBrokerReject();
       return { success: false, userId, exchange: row.exchange, errorCode: "exchange_reject", error: reasonMsg };
     }
 
@@ -1599,6 +1605,7 @@ export async function placeLiveAutoOrderForUser(
       });
     }
     await emitFailureNotification(userId, symbol, side, `Exchange rejected order: ${msg}`, row.exchange);
+    if (!filled) recordBrokerReject();
     return { success: false, userId, exchange: row.exchange, errorCode: "exchange_reject", error: msg };
   }
 }

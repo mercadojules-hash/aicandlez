@@ -17,6 +17,14 @@ export interface Alert {
   body: string;
   confidence?: number;
   timestamp: number;
+  /**
+   * Issue #2 popup discriminator (only meaningful for type==="trade"):
+   *   "customer"  → a real customer broker fill        → "TRADE EXECUTED"
+   *   "operator"  → global operator/sim book open       → "OPERATOR BOOK EXECUTION"
+   *   "simulated" → paper / test / unknown simulated    → "SIMULATED EXECUTION"
+   * Defaults to "operator" when absent (legacy global broadcasts).
+   */
+  tradeKind?: "customer" | "operator" | "simulated";
 }
 
 interface AlertsCtx {
@@ -129,7 +137,14 @@ interface TradeFlash {
   id: string;
   symbol: string;
   body: string;
+  kind: "customer" | "operator" | "simulated";
 }
+
+const TRADE_FLASH_LABEL: Record<TradeFlash["kind"], string> = {
+  customer:  "TRADE EXECUTED",
+  operator:  "OPERATOR BOOK EXECUTION",
+  simulated: "SIMULATED EXECUTION",
+};
 
 function TradeFlashBanner({ flash, onDone }: { flash: TradeFlash; onDone: () => void }) {
   const [phase, setPhase] = useState<"in" | "hold" | "out">("in");
@@ -166,7 +181,7 @@ function TradeFlashBanner({ flash, onDone }: { flash: TradeFlash; onDone: () => 
         <div className="flex items-center gap-3">
           <Zap className="w-8 h-8" style={{ color }} />
           <span className="text-3xl sm:text-4xl font-black tracking-widest uppercase" style={{ color }}>
-            TRADE EXECUTED
+            {TRADE_FLASH_LABEL[flash.kind]}
           </span>
           <Zap className="w-8 h-8" style={{ color }} />
         </div>
@@ -295,11 +310,18 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (alert.type === "trade") {
-      setTradeFlash({ id: alert.id, symbol: alert.symbol, body: alert.body });
+      const kind = alert.tradeKind ?? "operator";
+      // Issue #2: on the customer portal, ONLY a real customer broker fill may
+      // raise the full-screen execution banner. Operator/sim book opens are a
+      // global engine signal, not this customer's money, so they are suppressed
+      // here — they were the source of the misleading "TRADE EXECUTED" popups.
+      if (!isPortal || kind === "customer") {
+        setTradeFlash({ id: alert.id, symbol: alert.symbol, body: alert.body, kind });
+      }
     }
 
     setAlerts((prev) => [alert, ...prev].slice(0, MAX_VISIBLE));
-  }, [soundEnabled]);
+  }, [soundEnabled, isPortal]);
 
   const dismiss = useCallback((id: string) => {
     setAlerts((prev) => prev.filter((a) => a.id !== id));
@@ -374,6 +396,8 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
           message?: string;
           timestamp?: number;
           runtimeMode?: "paper" | "live" | string;
+          source?: "operator" | "customer" | string;
+          simulated?: boolean;
         };
 
         // ── Hydration invalidation ─────────────────────────────────────────────
@@ -445,13 +469,26 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
         if (msg.type === "trade_executed" && msg.symbol) {
           const id  = msg.id ?? `ws-trade-${msg.symbol}-${msg.timestamp ?? Date.now()}`;
           const sym = msg.symbol.replace("USD", "");
+          // Issue #2 labeling: source="customer" is the only real broker fill;
+          // source="operator" is the global operator/sim book; everything else
+          // (or an explicit simulated flag) is a simulation.
+          const tradeKind: Alert["tradeKind"] =
+            msg.source === "customer" ? "customer" :
+            msg.source === "operator" ? "operator" :
+            msg.simulated             ? "simulated" :
+                                        "operator";
+          const verb =
+            tradeKind === "customer"  ? "Trade Executed" :
+            tradeKind === "operator"  ? "Operator Book Execution" :
+                                        "Simulated Execution";
           push({
             id,
             type:      "trade",
             symbol:    msg.symbol,
-            title:     `Trade Executed — ${sym} ${msg.side ?? ""}`,
+            title:     `${verb} — ${sym} ${msg.side ?? ""}`,
             body:      `$${(msg.sizeUSD ?? 0).toFixed(0)} @ $${(msg.price ?? 0).toFixed(2)}`,
             timestamp: msg.timestamp ?? Date.now(),
+            tradeKind,
           });
         }
 
@@ -532,14 +569,18 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
           if (entry.executedAs) {
             const tradeAlertId = `trade-${entry.id}`;
+            // Poll fallback reads the GLOBAL engine status (tradesExecuted /
+            // executedAs) — these are operator/sim book opens, never a specific
+            // customer's broker fill, so they are tagged "operator".
             push({
               id:         tradeAlertId,
               type:       "trade",
               symbol:     entry.symbol,
-              title:      `Trade Executed — ${symLbl} ${entry.decision}`,
+              title:      `Operator Book Execution — ${symLbl} ${entry.decision}`,
               body:       `${entry.executedAs === "test" ? "Test" : "Auto"} trade placed · conf ${(Number.isFinite(Number(entry.confidence)) ? Number(entry.confidence) : 0).toFixed(0)}%`,
               confidence: Number.isFinite(Number(entry.confidence)) ? Number(entry.confidence) : undefined,
               timestamp:  entry.timestamp,
+              tradeKind:  "operator",
             });
           }
         }
@@ -551,9 +592,10 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
             id:        tradeId,
             type:      "trade",
             symbol:    "",
-            title:     "Trade Executed",
-            body:      `${tc} total trades executed this session`,
+            title:     "Operator Book Execution",
+            body:      `${tc} total operator/sim executions this session`,
             timestamp: Date.now(),
+            tradeKind: "operator",
           });
         }
         prevTradeCount.current = tc;

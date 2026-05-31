@@ -281,6 +281,16 @@ export function broadcastTrade(trade: {
   price:   number;
   sizeUSD: number;
   userId?: string;
+  /**
+   * Issue #2 labeling discriminator. "operator" = global operator/sim book
+   * open (simulated, broadcast to all clients); "customer" = a real customer
+   * broker fill (userId-scoped). Clients use this to render the correct popup
+   * label and to suppress operator-book flashes on the customer portal.
+   * Absent on legacy callers (treated as operator/global by clients).
+   */
+  source?:    "operator" | "customer";
+  simulated?: boolean;
+  mode?:      string;
 }): void {
   // Hydration-chain instrumentation: every executed trade SHOULD push a
   // `trade_executed` event to the relevant user's WS, which the client

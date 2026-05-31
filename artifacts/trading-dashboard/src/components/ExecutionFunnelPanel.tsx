@@ -153,7 +153,7 @@ export default function ExecutionFunnelPanel() {
     { key: "exchange", label: "Passed Exchange Validation", count: passedExchange, blocked: bs.exchange, icon: Plug, tone: "neutral" },
     { key: "positionLimits", label: "Passed Position Limits", count: passedPositions, blocked: bs.positionLimits, icon: Layers, tone: "neutral" },
     { key: "attempted", label: "Execution Attempted", count: attempted, blocked: 0, icon: Send, tone: "neutral" },
-    { key: "succeeded", label: "Execution Succeeded", count: succeeded, blocked: 0, icon: CheckCircle2, tone: "good" },
+    { key: "succeeded", label: "Operator Sim Executions", count: succeeded, blocked: 0, icon: CheckCircle2, tone: "good" },
   ];
 
   const maxCount = Math.max(candidates, 1);

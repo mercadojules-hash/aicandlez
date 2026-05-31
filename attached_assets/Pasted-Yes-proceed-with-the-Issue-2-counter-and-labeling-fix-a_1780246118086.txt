@@ -1,0 +1,87 @@
+Yes, proceed with the Issue #2 counter and labeling fix as a proper code change.
+
+The latest production investigation confirms that the current dashboard metrics are conflating multiple execution paths and are creating confusion during live testing.
+
+Please implement the following:
+
+1. Separate operator/simulated executions from customer broker executions.
+
+Current issue:
+
+* "Exec Success" is counting operator/simulated executions.
+* Live Trades and Trade History are showing customer broker activity.
+* This makes it appear that successful executions are disappearing.
+
+Create separate metrics:
+
+Operator Sim Executions
+Customer Broker Orders Submitted
+Customer Broker Orders Filled
+Customer Live Positions
+Customer Closed Trades
+Broker Rejects
+
+2. Change the execution counter logic.
+
+Do not increment Customer Broker Success until:
+
+* Broker accepts the order
+* Position persistence succeeds
+* Position record exists
+
+A customer execution should never be counted as successful before persistence is complete.
+
+3. Update popup labeling.
+
+If a popup represents a simulated/operator execution, do not display:
+
+"TRADE EXECUTED"
+
+Instead clearly identify it as:
+
+"SIMULATED EXECUTION"
+
+or
+
+"OPERATOR BOOK EXECUTION"
+
+Only use:
+
+"TRADE EXECUTED"
+
+when a real customer broker fill has occurred.
+
+4. Add reconciliation diagnostics.
+
+For every customer broker fill, the system should be able to reconcile:
+
+Broker Order ID
+Position Record
+Live Trade Record
+Trade History Record
+
+No customer fill should ever exist without a traceable record path.
+
+5. Preserve current concurrency changes.
+
+Leave the following production settings unchanged:
+
+[info@mixtapepsd.com](mailto:info@mixtapepsd.com)
+
+* max_simultaneous_trades = 20
+* max_active_positions = 20
+
+[teedelgado@gmail.com](mailto:teedelgado@gmail.com)
+
+* max_simultaneous_trades = 20
+* max_active_positions = 20
+
+Do not modify plan tiers or customer-wide limits.
+
+After deployment provide:
+
+* Before/after dashboard screenshots
+* Updated metric definitions
+* Example of one simulated execution
+* Example of one real broker execution
+* Confirmation that counters reconcile correctly

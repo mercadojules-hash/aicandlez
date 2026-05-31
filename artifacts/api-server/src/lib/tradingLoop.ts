@@ -32,6 +32,7 @@ import { computeCorrelationMatrix } from "./correlationEngine.js";
 import { addJournalEntry } from "./tradeJournalEngine.js";
 import { sendTradeExecutedSMS } from "./notifications.js";
 import { broadcastSignal, broadcastTrade } from "./wsServer.js";
+import { recordOperatorSimExecution } from "./customerExecMetrics.js";
 import { NotificationDispatcher } from "../services/notifications/NotificationDispatcher.js";
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { executionStreamBus, getSafeTestMode } from "./executionStreamBus.js";
@@ -1827,6 +1828,10 @@ async function autoExecute(
 
   engineStats.tradesExecuted++;
   engineStats.funnelExecuted++;
+  // Issue #2: this is the GLOBAL operator/sim book opening a position — a
+  // simulated open, NOT a customer broker order. Tracked under its own metric
+  // so the dashboard never conflates it with real customer broker fills.
+  recordOperatorSimExecution();
   engineStats.lastTradeAt = Date.now();
   engineStats.lastTrade   = { symbol, side, sizeUSD, price: pos.entryPrice, reason: shortSummary, mode: tradeMode };
 
@@ -1872,12 +1877,18 @@ async function autoExecute(
     data:      { symbol, side, price: pos.entryPrice, sizeUSD, mode: tradeMode },
   }).catch(() => {});
 
-  // Broadcast trade execution in real time to connected WebSocket clients
+  // Broadcast trade execution in real time to connected WebSocket clients.
+  // Issue #2: this is the GLOBAL operator/sim book open. Tag it source="operator"
+  // + simulated=true so clients label it "OPERATOR BOOK EXECUTION" and customer
+  // portals suppress it — "TRADE EXECUTED" is reserved for real customer fills.
   broadcastTrade({
     symbol,
     side,
-    price:   pos.entryPrice,
-    sizeUSD: sizeUSD,
+    price:     pos.entryPrice,
+    sizeUSD:   sizeUSD,
+    source:    "operator",
+    simulated: true,
+    mode:      tradeMode,
   });
 
   return { executed: true, blockReason: null };
