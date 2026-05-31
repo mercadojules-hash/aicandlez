@@ -1,0 +1,90 @@
+This is a real-money execution-path change. I need to see the exact structure of autoExecute around the isLiveExec branch and the customer-side gates before refactoring. Let me read the relevant ranges and the customer-execution module in parallel.
+
+
+4 actions
+I now have the complete structure. The fix is localized to tradingLoop.ts autoExecute — the customer LIVE fan-out is trapped inside if (isLiveExec). executeCustomerOrder/placeLiveAutoOrderForUser already enforce all per-customer safety gates (and notably do NOT check global live mode — only CUSTOMER_LIVE_EXECUTION_ENABLED + runtime checks). Let me confirm the helper signatures and imports before refactoring.
+
+
+2 actions
+Let me read executeCustomerOrder (the gateway wrapper) and registerLiveUserFill to confirm they don't internally depend on global live mode and that the writer is canonical.
+
+
+3 actions
+The customer-side helpers enforce all safety gates and don't check global live mode — so the fix is purely the if (isLiveExec) wrapper in tradingLoop.ts. One critical risk to nail down before editing: in SIM mode the paper fan-out (listPaperAutoTradeUsers) will now run alongside the new decoupled live fan-out (listLiveExecutionUsers). I must ensure a user can't be in both lists and get a double position. Let me read both selectors.
+
+
+5 actions
+Both selectors confirmed: listLiveExecutionUsers filters on user_exchange_connections.tradingMode='live', while listPaperAutoTradeUsers filters on user_settings.tradingMode != 'live' — different columns, so a user could land in both lists. I'll add an explicit exclusion guard to prevent double-creation. Let me re-read the exact region I'm going to restructure to get byte-accurate text for the edit.
+
+
+2 actions
+I have the exact text. Now I'll refactor: hoist the customer LIVE fan-out out of the if (isLiveExec) wrapper so it runs on every successful execution (gated only by CUSTOMER_LIVE_EXECUTION_ENABLED + the per-customer gates), add a duplicate-prevention guard against the paper fan-out, and add the required lifecycle logging.
+
+
+4 actions
+Edits applied. Now let me typecheck the API server to confirm the refactor compiles.
+
+
+3 actions
+Typecheck passes. Let me run the full workspace typecheck and restart the API server to confirm it boots cleanly with the refactor.
+
+
+2 actions
+The natura-ai/natura-web errors are pre-existing failures in frozen artifacts (missing Expo module declarations — unrelated to my change). My change is confined to api-server, which typechecks clean. Let me confirm the API server booted cleanly after the edit and that I only touched the intended file, then run code review.
+
+
+3 actions
+Only tradingLoop.ts changed and the API server restarted cleanly. Let me verify the new fan-out logging is firing in dev and check for any boot errors, then run code review in parallel.
+
+
+3 actions
+No boot errors. The new tags haven't appeared yet simply because no signal has cleared all gates to trigger autoExecute since the restart — expected. Now let me run the code review.
+
+
+3 actions
+The architect approves the decoupling and confirms all safety gates remain enforced. The one substantive concern is the SIM-mode ordering inconsistency. Let me look at the paper branch's placeOrder failure handling to close that gap cleanly (mirror the live-branch fallback: if global sim fails but customers filled, anchor to the customer success instead of hard-rejecting).
+
+
+2 actions
+Let me read the start of the placeOrder failure block so I can modify it to mirror the live-branch fallback.
+
+
+2 actions
+The architect's concern is observability, not money-safety: per the two-book invariant, customer LIVE positions persist independently in sim_positions (self-managed by the per-user SL/TP monitor) regardless of the global book. If global sim placeOrder fails, the global book genuinely has no position — fabricating a global trades row anchored to a customer's live fill would confuse the global exit monitor / maxActivePositions cap. So the correct fix is a clarifying log on that rare path, not a fabricated global row. Let me add it.
+
+
+Edited tradingLoop.ts
+Now let me typecheck and restart the API server to confirm the final state compiles and boots.
+
+
+Ran cd
+Typecheck clean and the API server is running with new logs. Let me restart the API server to load the salvage-log change and confirm a clean boot.
+
+
+3 actions
+API server boots cleanly — trading loop started, no errors.
+
+Now, on requirement #7 (e2e prod verification): the change is local and prod auto-deploys from origin/main on merge — I cannot trigger a Render deploy or place real-money orders on prod from this dev container. I've verified the logic compiles, boots, and the local trading loop runs. E2e prod verification must happen post-deploy. Let me record the durable decision in memory and write the commit message.
+
+
+2 actions
+I notice a corrupted line in the topic file ("+ery autoExecute"). Let me fix it, add the index entry, and write the commit message.
+
+
+3 actions
+All edits are complete, typecheck is clean, and the API server boots and runs the trading loop without errors. The follow-up tasks #214/#215 ("Phase 5 — Regression + Stability Pass") remain relevant and cover the architect's regression-test suggestions, so I won't re-propose.
+
+
+Confirming task completion status
+The task has already been merged by the platform, so it's effectively complete. Here's a summary of what was done:
+
+Customer LIVE execution is now decoupled from the global/operator engine's live mode.
+
+The customer LIVE fan-out (per-user order → placeLiveAutoOrderForUser → mirror into sim_positions) was hoisted out of the if (isLiveExec) wrapper into a standalone block gated only by CUSTOMER_LIVE_EXECUTION_ENABLED plus the per-customer runtime/safety checks. It now runs on every successful AI execution whether the global engine is in paper or live mode.
+All existing safety, risk, sizing, SL/TP, eligibility, and kill-switch gates are untouched — they still live inside placeLiveAutoOrderForUser.
+The operator env-key path stays gated on global live mode; its rejection/fallback logic now reads the customer results.
+Duplicate prevention: users handled by the live fan-out are excluded from the paper fan-out (logged AI_FANOUT_SKIPPED), because the two cohort selectors key off different tradingMode columns and can overlap.
+Added lifecycle logging: CUSTOMER_FANOUT_START, CUSTOMER_POSITION_CREATED, CUSTOMER_POSITION_REJECTED (with errorCode + reason), CUSTOMER_FANOUT_COMPLETE, plus a CUSTOMER_FANOUT_SALVAGE note for the rare global-sim-failure edge.
+One deliberate decision: on the rare path where the global sim placeOrder fails after customer fills already persisted, I did not fabricate a synthetic global trades row (it would corrupt the global exit monitor / position cap, which tracks a separate book). The customer positions live independently in sim_positions and self-manage, so I logged a clear salvage note instead.
+
+Verified locally: api-server typecheck clean, server boots, trading loop running. Code review by the architect approved the decoupling and confirmed all safety gates remain enforced. Real-money e2e on production happens via the Render deploy from origin/main — that can't be triggered from this dev container.
