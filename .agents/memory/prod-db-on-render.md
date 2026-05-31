@@ -30,6 +30,16 @@ whole affected-table data layer goes down in prod — e.g. `loadFromDB`'s `.sele
 the in-memory registry hydrates empty (Open Positions 0, empty feeds, $0 P&L), AND live fills
 fail to persist (real money spent, no row). Reads break, not just writes.
 
+**Diagnostic nuance (don't get fooled):** only statements that *reference the missing column*
+throw. NARROW projected selects that list only pre-existing columns (e.g.
+`db.select({autoMode: ...})`) keep working — so the app looks *partly* healthy. In one incident
+`GET /user/ai-trading/state` (narrow `auto_mode` select) + runtime-state (narrow) kept returning
+data, so the UI showed "AI ENABLED / LIVE READY / N OPEN" while every UNprojected
+`db.select().from(t)` (and `.returning()` after insert, e.g. `getOrCreateSettings`) 500'd. The
+green state is real (flag persisted earlier); the red banner is the unprojected path failing
+around it. Raw `psql SELECT *` ALSO works (Postgres expands `*` at runtime), so test with the
+*explicit* column name to reproduce, not `SELECT *`.
+
 ## `pg` "multiple decimal points" trap when SELECTing numeric/timestamp cols
 
 Selecting `real`/`numeric`/`timestamp` columns (e.g. `size_usd`, `realized_pnl`,
