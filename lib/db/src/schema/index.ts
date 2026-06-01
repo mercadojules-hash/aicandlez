@@ -17,6 +17,7 @@ export * from "./auditLog";
 export * from "./userTradeLimits";
 export * from "./userAdminStatus";
 export * from "./userAdminActions";
+export * from "./accountReconciliations";
 export * from "./userSessions";
 export * from "./userExchangeVisibility";
 export * from "./userCredits";

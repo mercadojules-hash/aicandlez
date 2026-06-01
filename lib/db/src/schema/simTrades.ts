@@ -50,6 +50,13 @@ export const simTradesTable = pgTable("sim_trades", {
   // open-side `sim_positions.sandbox` flag so closed trades can carry the
   // TESTNET pill in the Portal trade-history feed.
   sandbox:                boolean("sandbox").notNull().default(false),
+  // Operator reconciliation marker. NULL = an ordinary, trusted record that
+  // counts toward realized P&L. Non-NULL = flagged by the account
+  // reconciliation tool and EXCLUDED from the recomputed realized ledger
+  // (e.g. "LEGACY_INCIDENT" for unlimited-position-incident backlog closes
+  // that have no verifiable broker fill). Rows are tagged, never deleted, so
+  // the audit trail survives.
+  reconciliationTag: text("reconciliation_tag"),
   createdAt:      timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   index("sim_trades_user_idx").on(t.userId),

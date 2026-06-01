@@ -9,7 +9,7 @@ import {
   X, Gift, SlidersHorizontal, PauseCircle, PlayCircle, Ban,
   Power, Unplug, Loader2, CloudDownload,
   UserCircle, Briefcase, History, Cpu,
-  Eye, EyeOff, RotateCcw,
+  Eye, EyeOff, RotateCcw, Scale,
 } from "lucide-react";
 import type { EngineStatus, FeeSummary, ExchangeStatus } from "@/components/command/types";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -241,6 +241,7 @@ type ActionPanel =
   | "cancel_sub"
   | "revoke_exchange"
   | "emergency"
+  | "reconcile"
   | null;
 
 type IntelTab = "profile" | "exchanges" | "trading" | "entitlements" | "actions";
@@ -574,6 +575,11 @@ function UserIntelligencePanel({
                 desc="Restore active status (clears suspended/disabled/force_paper)."
                 color="#00ff8a" onClick={() => setPanel("activate")} />
 
+              <SectionLabel>LEDGER</SectionLabel>
+              <ActionButton icon={Scale}             label="Reconcile Account"
+                desc="Recompute realized P&L from verified records, excluding incident backlog. Preview before applying."
+                color="#00aaff" onClick={() => setPanel("reconcile")} />
+
               <SectionLabel>MODERATION</SectionLabel>
               <ActionButton icon={PauseCircle}       label="Suspend User"
                 desc="Block trading, retain account."
@@ -906,9 +912,277 @@ function UserIntelligencePanel({
               onBack={() => setPanel(null)}
               cta="EMERGENCY DISABLE" />
           )}
+
+          {panel === "reconcile" && (
+            <ReconcilePanel
+              clerkUserId={user.clerkUserId}
+              onBack={() => setPanel(null)}
+              onApplied={() => {
+                qc.invalidateQueries({ queryKey: ["admin-users"] });
+                qc.invalidateQueries({ queryKey: ["admin-user-detail", user.clerkUserId] });
+              }}
+            />
+          )}
         </div>
       </div>
     </>
+  );
+}
+
+// ── Account reconciliation panel (operator ledger correction) ────────────────
+
+interface ReconAffectedTrade {
+  id:          string;
+  symbol:      string;
+  netRealized: number;
+  closeReason: string | null;
+  exchange:    string | null;
+  exitTime:    number;
+}
+
+interface ReconResult {
+  targetUserId:       string;
+  hasAccount:         boolean;
+  prevRealized:       number;
+  newRealized:        number;
+  delta:              number;
+  prevTotalTrades:    number;
+  newTotalTrades:     number;
+  taggedCount:        number;
+  verifiedCount:      number;
+  paperKeptCount:     number;
+  alreadyTaggedCount: number;
+  affectedTrades:     ReconAffectedTrade[];
+  applied:            boolean;
+}
+
+interface ReconHistoryRow {
+  id:              string;
+  prevRealized:    number;
+  newRealized:     number;
+  prevTotalTrades: number;
+  newTotalTrades:  number;
+  taggedCount:     number;
+  verifiedCount:   number;
+  note:            string | null;
+  createdAt:       string;
+}
+
+function fmtUsdSigned(n: number): string {
+  const sign = n > 0 ? "+" : n < 0 ? "−" : "";
+  return `${sign}$${Math.abs(n).toFixed(2)}`;
+}
+
+function ReconcilePanel({ clerkUserId, onBack, onApplied }: {
+  clerkUserId: string;
+  onBack: () => void;
+  onApplied: () => void;
+}) {
+  const qc = useQueryClient();
+  const [note, setNote] = useState("");
+  const C = {
+    border: "#0d1e2e", text: "#EAF2FF", dim: "#7a9eb8", faint: "#4a6a80",
+    panel: "#010C18", good: "#00ff8a", warn: "#ffaa00", info: "#00aaff", bad: "#ff3355",
+  };
+
+  const previewQuery = useQuery<ReconResult>({
+    queryKey: ["admin-reconcile-preview", clerkUserId],
+    enabled: Boolean(clerkUserId),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const res = await authFetch(`/api/admin/users/${clerkUserId}/reconcile/preview`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json() as ReconResult;
+    },
+  });
+
+  const historyQuery = useQuery<{ history: ReconHistoryRow[] }>({
+    queryKey: ["admin-reconcile-history", clerkUserId],
+    enabled: Boolean(clerkUserId),
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const res = await authFetch(`/api/admin/users/${clerkUserId}/reconcile/history`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json() as { history: ReconHistoryRow[] };
+    },
+  });
+
+  const applyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await authFetch(`/api/admin/users/${clerkUserId}/reconcile`, {
+        method: "POST",
+        body: JSON.stringify({ note: note.trim() || undefined }),
+      });
+      const text = await res.text();
+      let json: unknown = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) {
+        const errMsg = (json as { error?: string } | null)?.error ?? `HTTP ${res.status}`;
+        throw new Error(errMsg);
+      }
+      return json as ReconResult;
+    },
+    onSuccess: () => {
+      toast({ title: "Reconciliation applied", description: "Realized P&L ledger recomputed from verified records." });
+      setNote("");
+      previewQuery.refetch();
+      historyQuery.refetch();
+      onApplied();
+    },
+    onError: (err: Error) => {
+      toast({ title: "Reconciliation failed", description: err.message });
+    },
+  });
+
+  const p = previewQuery.data;
+  const nothingToDo = p ? (p.taggedCount - p.alreadyTaggedCount === 0 && Math.abs(p.delta) < 0.005) : false;
+
+  return (
+    <ActionForm title="RECONCILE ACCOUNT" onBack={onBack}>
+      <p style={{ fontSize: 10, color: C.dim, lineHeight: 1.55, marginBottom: 12 }}>
+        Recomputes realized P&L and closed-trade count from VERIFIED records only —
+        broker-attributed live fills + legitimate paper trades. Incident-backlog rows
+        (no broker fill) are <strong style={{ color: C.text }}>tagged, never deleted</strong>,
+        and excluded from the ledger. Every apply writes an immutable audit row.
+      </p>
+
+      {previewQuery.isLoading && (
+        <div style={{ fontSize: 10, fontFamily: "monospace", color: C.dim, padding: "12px 0" }}>
+          <Loader2 className="w-3 h-3 inline animate-spin" /> Computing preview…
+        </div>
+      )}
+      {previewQuery.isError && (
+        <div style={{ fontSize: 10, fontFamily: "monospace", color: C.bad, padding: "12px 0" }}>
+          Failed to load preview. <button onClick={() => previewQuery.refetch()}
+            style={{ color: C.info, background: "transparent", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {p && !p.hasAccount && (
+        <div style={{ fontSize: 10, fontFamily: "monospace", color: C.warn, padding: "12px 0" }}>
+          No simulation account found for this user — nothing to reconcile.
+        </div>
+      )}
+
+      {p && p.hasAccount && (
+        <>
+          {/* Before vs after */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+            <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: "10px 12px" }}>
+              <div style={{ fontSize: 8, fontFamily: "monospace", color: C.faint, letterSpacing: "0.1em", marginBottom: 4 }}>
+                CURRENT REALIZED
+              </div>
+              <div style={{ fontSize: 16, fontFamily: "monospace", fontWeight: 700, color: p.prevRealized < 0 ? C.bad : C.text }}>
+                {fmtUsdSigned(p.prevRealized)}
+              </div>
+              <div style={{ fontSize: 8, fontFamily: "monospace", color: C.faint, marginTop: 4 }}>
+                {p.prevTotalTrades} trades
+              </div>
+            </div>
+            <div style={{ background: C.panel, border: `1px solid ${C.good}40`, borderRadius: 6, padding: "10px 12px" }}>
+              <div style={{ fontSize: 8, fontFamily: "monospace", color: C.faint, letterSpacing: "0.1em", marginBottom: 4 }}>
+                RECOMPUTED REALIZED
+              </div>
+              <div style={{ fontSize: 16, fontFamily: "monospace", fontWeight: 700, color: p.newRealized < 0 ? C.bad : C.good }}>
+                {fmtUsdSigned(p.newRealized)}
+              </div>
+              <div style={{ fontSize: 8, fontFamily: "monospace", color: C.faint, marginTop: 4 }}>
+                {p.newTotalTrades} trades · Δ {fmtUsdSigned(p.delta)}
+              </div>
+            </div>
+          </div>
+
+          {/* Counts */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 12 }}>
+            <ReconStat label="VERIFIED KEPT" value={String(p.verifiedCount)} color={C.good} />
+            <ReconStat label="PAPER KEPT" value={String(p.paperKeptCount)} color={C.info} />
+            <ReconStat label="INCIDENT TAGGED" value={String(p.taggedCount)} color={C.warn} />
+          </div>
+
+          {/* Affected trades */}
+          {p.affectedTrades.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: C.dim, marginBottom: 6 }}>
+                EXCLUDED / TAGGED ROWS ({p.affectedTrades.length})
+              </div>
+              <div style={{ maxHeight: 160, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 6 }}>
+                {p.affectedTrades.map((t) => (
+                  <div key={t.id} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "6px 10px", borderBottom: `1px solid ${C.border}`,
+                    fontFamily: "monospace", fontSize: 9,
+                  }}>
+                    <span style={{ color: C.text, fontWeight: 700 }}>{t.symbol}</span>
+                    <span style={{ color: C.faint }}>{t.closeReason ?? "—"}</span>
+                    <span style={{ color: t.netRealized < 0 ? C.bad : C.dim }}>{fmtUsdSigned(t.netRealized)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {nothingToDo ? (
+            <div style={{ fontSize: 10, fontFamily: "monospace", color: C.good, padding: "8px 0" }}>
+              ✓ Ledger already matches verified records — nothing to apply.
+            </div>
+          ) : (
+            <>
+              <NoteInput note={note} setNote={setNote} />
+              <SubmitButton
+                onClick={() => applyMutation.mutate()}
+                disabled={applyMutation.isPending}
+                pending={applyMutation.isPending}
+                color={C.info}>
+                {applyMutation.isPending ? "Applying…" : "Confirm & apply reconciliation"}
+              </SubmitButton>
+            </>
+          )}
+        </>
+      )}
+
+      {/* History */}
+      {historyQuery.data && historyQuery.data.history.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: C.dim, marginBottom: 6 }}>
+            RECONCILIATION HISTORY
+          </div>
+          {historyQuery.data.history.map((h) => (
+            <div key={h.id} style={{
+              background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6,
+              padding: "8px 10px", marginBottom: 6, fontFamily: "monospace", fontSize: 9,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", color: C.text }}>
+                <span>{fmtUsdSigned(h.prevRealized)} → {fmtUsdSigned(h.newRealized)}</span>
+                <span style={{ color: C.faint }}>{new Date(h.createdAt).toLocaleString()}</span>
+              </div>
+              <div style={{ color: C.faint, marginTop: 3 }}>
+                {h.taggedCount} tagged · {h.verifiedCount} verified{h.note ? ` · ${h.note}` : ""}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </ActionForm>
+  );
+}
+
+function ReconStat({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div style={{ background: "#010C18", border: "1px solid #0d1e2e", borderRadius: 4, padding: "8px 6px", textAlign: "center" }}>
+      <div style={{ fontSize: 7, fontFamily: "monospace", color: "#4a6a80", letterSpacing: "0.08em", marginBottom: 3 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 14, fontFamily: "monospace", fontWeight: 700, color }}>
+        {value}
+      </div>
+    </div>
   );
 }
 
