@@ -19,6 +19,21 @@ export const userSettingsTable = pgTable("user_settings", {
   stopLossPercent:    real("stop_loss_percent").notNull().default(2),
   takeProfitPercent:  real("take_profit_percent").notNull().default(4),
 
+  // ── Account-level live-exit controls (Task #220) ──────────────────────────
+  // Trailing-stop distance (percent) and max-hold ceiling (hours) for LIVE
+  // positions. NULLABLE on purpose so existing rows keep the EXACT pre-#220
+  // behavior:
+  //   - `trailingStopPercent` NULL → the live monitor mirrors each position's
+  //     own stored stop-loss band (the locked default). A concrete value sets
+  //     an explicit trailing distance; `0` disables live trailing.
+  //   - `maxHoldHours` NULL → fall back to the env/default 24h ceiling. A
+  //     concrete value sets a per-account ceiling; `0` disables max-hold.
+  // SL/TP percent live in `stopLossPercent`/`takeProfitPercent` above (already
+  // per-account). The env operator overrides (`LIVE_TRAILING_STOP_PERCENT`,
+  // `LIVE_POSITION_MAX_HOLD_MS`), when set, still win globally.
+  trailingStopPercent: real("trailing_stop_percent"),
+  maxHoldHours:        real("max_hold_hours"),
+
   autoMode:           boolean("auto_mode").notNull().default(false),
   tradingMode:        varchar("trading_mode", { length: 50 }).notNull().default("simulation"),
 

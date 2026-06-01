@@ -546,7 +546,7 @@ function UserIntelligencePanel({
             <ExchangesTab detail={detail} loading={detailQuery.isLoading} />
           )}
           {tab === "trading" && (
-            <TradingTab detail={detail} loading={detailQuery.isLoading} />
+            <TradingTab detail={detail} loading={detailQuery.isLoading} clerkUserId={user.clerkUserId} />
           )}
           {tab === "entitlements" && (
             <EntitlementsTab clerkUserId={user.clerkUserId} />
@@ -3200,13 +3200,305 @@ function EntitlementsExchangeSection({
   );
 }
 
+// ── ADMIN EXIT CONTROLS (Task #220) ──────────────────────────────────────────
+// Operator-facing per-account / per-exchange live-exit overrides. Mirrors the
+// customer surface but every write requires an audit note. Persists via the
+// admin-scoped routes which reuse the exact same validated helpers + bounds as
+// the customer routes, then write a user_admin_actions row.
+interface AdminExitAccount {
+  stopLossPercent: number; takeProfitPercent: number;
+  trailingStopPercent: number | null; maxHoldHours: number | null;
+}
+interface AdminExitExchangeRow {
+  exchange: string;
+  takeProfitPercent: number | null; stopLossPercent: number | null;
+  trailingStopPercent: number | null; maxHoldHours: number | null;
+}
+interface AdminExitConfigResponse {
+  account:   AdminExitAccount;
+  exchanges: AdminExitExchangeRow[];
+  defaults:  { stopLossPercent: number; takeProfitPercent: number; maxHoldHours: number };
+  bounds:    Record<string, { min: number; max: number }>;
+}
+
+const adminNumOrNull = (s: string): number | null => {
+  const t = s.trim();
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+};
+
+function AdminExitField({ label, hint, value, onChange }: {
+  label: string; hint: string; value: string; onChange: (v: string) => void;
+}) {
+  return (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: 8, fontFamily: "monospace", color: "#4a6a80",
+        letterSpacing: "0.1em", marginBottom: 4 }}>{label}</div>
+      <input
+        inputMode="decimal"
+        value={value}
+        placeholder={hint}
+        onChange={e => onChange(e.target.value)}
+        style={{
+          width: "100%", background: "#000814", border: "1px solid #0d1e2e",
+          borderRadius: 3, padding: "7px 9px", color: "#EAF2FF",
+          fontFamily: "monospace", fontSize: 11, outline: "none",
+          boxSizing: "border-box" as const,
+        }}
+      />
+    </div>
+  );
+}
+
+function AdminExitControlsSection({ clerkUserId, detail }: {
+  clerkUserId: string;
+  detail: UserDetailResponse | null;
+}) {
+  const qc = useQueryClient();
+  const [note, setNote] = useState("");
+
+  const { data, isLoading } = useQuery<AdminExitConfigResponse>({
+    queryKey: ["admin-exit-config", clerkUserId],
+    enabled:  Boolean(clerkUserId),
+    queryFn: async () => {
+      const res = await authFetch(`/api/admin/users/${clerkUserId}/exit-config`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json() as AdminExitConfigResponse;
+    },
+  });
+
+  const [acct, setAcct] = useState<{ tp: string; sl: string; trail: string; hold: string }>(
+    { tp: "", sl: "", trail: "", hold: "" });
+
+  useEffect(() => {
+    if (!data) return;
+    setAcct({
+      tp:    String(data.account.takeProfitPercent),
+      sl:    String(data.account.stopLossPercent),
+      trail: data.account.trailingStopPercent == null ? "" : String(data.account.trailingStopPercent),
+      hold:  data.account.maxHoldHours == null ? "" : String(data.account.maxHoldHours),
+    });
+  }, [data]);
+
+  function requireNote(): string | null {
+    const t = note.trim();
+    if (!t) { toast({ title: "Note required", description: "Audit-trail note cannot be empty." }); return null; }
+    return t;
+  }
+
+  const saveAccount = useMutation({
+    mutationFn: async () => {
+      const n = requireNote();
+      if (!n) throw new Error("note_required");
+      const res = await authFetch(`/api/admin/users/${clerkUserId}/exit-config`, {
+        method: "PUT",
+        body: JSON.stringify({
+          note: n,
+          takeProfitPercent: adminNumOrNull(acct.tp) ?? data?.defaults.takeProfitPercent ?? 4,
+          stopLossPercent:   adminNumOrNull(acct.sl) ?? data?.defaults.stopLossPercent ?? 2,
+          trailingStopPercent: adminNumOrNull(acct.trail),
+          maxHoldHours:        adminNumOrNull(acct.hold),
+        }),
+      });
+      const text = await res.text();
+      let json: unknown = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) throw new Error((json as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
+      return json as AdminExitConfigResponse;
+    },
+    onSuccess: (resp) => {
+      qc.setQueryData(["admin-exit-config", clerkUserId], resp);
+      qc.invalidateQueries({ queryKey: ["admin-user-detail", clerkUserId] });
+      toast({ title: "Exit config saved", description: "Account defaults updated · audit-logged." });
+      setNote("");
+    },
+    onError: (err: Error) => { if (err.message !== "note_required") toast({ title: "Save failed", description: err.message }); },
+  });
+
+  const conns = (detail?.exchangeConnections ?? []);
+  const connectedExchanges = Array.from(new Set(conns.map(c => c.exchange)));
+
+  return (
+    <div>
+      <TabSectionLabel icon={SlidersHorizontal}>LIVE EXIT CONTROLS</TabSectionLabel>
+      {isLoading && !data ? <TabLoading /> : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* Audit note — required for every write below */}
+          <div>
+            <div style={{ fontSize: 8, fontFamily: "monospace", color: "#4a6a80",
+              letterSpacing: "0.1em", marginBottom: 4 }}>AUDIT NOTE (REQUIRED)</div>
+            <input
+              value={note}
+              placeholder="Reason for this exit-config change…"
+              onChange={e => setNote(e.target.value)}
+              style={{
+                width: "100%", background: "#000814", border: "1px solid #0d1e2e",
+                borderRadius: 3, padding: "7px 9px", color: "#EAF2FF",
+                fontFamily: "monospace", fontSize: 11, outline: "none",
+                boxSizing: "border-box" as const,
+              }}
+            />
+          </div>
+
+          {/* Account default */}
+          <div style={{ background: "#010C18", border: "1px solid #0d1e2e", borderRadius: 4, padding: "10px 12px" }}>
+            <div style={{ fontSize: 8.5, fontFamily: "monospace", fontWeight: 700, color: "#ffaa00",
+              letterSpacing: "0.14em", marginBottom: 9 }}>ACCOUNT DEFAULT</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <AdminExitField label="TAKE PROFIT %" hint="4" value={acct.tp}
+                onChange={v => setAcct(p => ({ ...p, tp: v }))} />
+              <AdminExitField label="STOP LOSS %" hint="2" value={acct.sl}
+                onChange={v => setAcct(p => ({ ...p, sl: v }))} />
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <AdminExitField label="TRAILING %" hint="mirror SL" value={acct.trail}
+                onChange={v => setAcct(p => ({ ...p, trail: v }))} />
+              <AdminExitField label="MAX HOLD (HRS)" hint="24" value={acct.hold}
+                onChange={v => setAcct(p => ({ ...p, hold: v }))} />
+            </div>
+            <button
+              onClick={() => { if (!saveAccount.isPending) saveAccount.mutate(); }}
+              disabled={saveAccount.isPending}
+              style={{
+                width: "100%", padding: "8px 0", background: "#ffaa0014",
+                border: "1px solid #ffaa0044", borderRadius: 3, color: "#ffaa00",
+                fontFamily: "monospace", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+                cursor: saveAccount.isPending ? "wait" : "pointer",
+              }}>
+              {saveAccount.isPending ? "SAVING…" : "SAVE ACCOUNT DEFAULTS"}
+            </button>
+          </div>
+
+          {/* Per-exchange overrides */}
+          {connectedExchanges.length > 0 && (
+            <div>
+              <div style={{ fontSize: 8.5, fontFamily: "monospace", fontWeight: 700, color: "#ffaa00",
+                letterSpacing: "0.14em", marginBottom: 4, marginTop: 4 }}>PER-EXCHANGE OVERRIDES</div>
+              <div style={{ fontSize: 8, fontFamily: "monospace", color: "#4a6a80", marginBottom: 8 }}>
+                Blank field = inherit account default.
+              </div>
+              {connectedExchanges.map(ex => (
+                <AdminExitExchangeEditor
+                  key={ex}
+                  clerkUserId={clerkUserId}
+                  exchange={ex}
+                  account={data?.account ?? null}
+                  row={(data?.exchanges ?? []).find(x => x.exchange === ex) ?? null}
+                  getNote={requireNote}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminExitExchangeEditor({ clerkUserId, exchange, account, row, getNote }: {
+  clerkUserId: string;
+  exchange: string;
+  account: AdminExitAccount | null;
+  row: AdminExitExchangeRow | null;
+  getNote: () => string | null;
+}) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<{ tp: string; sl: string; trail: string; hold: string }>({
+    tp:    row?.takeProfitPercent   == null ? "" : String(row.takeProfitPercent),
+    sl:    row?.stopLossPercent     == null ? "" : String(row.stopLossPercent),
+    trail: row?.trailingStopPercent == null ? "" : String(row.trailingStopPercent),
+    hold:  row?.maxHoldHours        == null ? "" : String(row.maxHoldHours),
+  });
+
+  // Resync draft when the server row changes (load / refetch / save / clear),
+  // otherwise the editor keeps its first-render snapshot and drifts from truth.
+  useEffect(() => {
+    setDraft({
+      tp:    row?.takeProfitPercent   == null ? "" : String(row.takeProfitPercent),
+      sl:    row?.stopLossPercent     == null ? "" : String(row.stopLossPercent),
+      trail: row?.trailingStopPercent == null ? "" : String(row.trailingStopPercent),
+      hold:  row?.maxHoldHours        == null ? "" : String(row.maxHoldHours),
+    });
+  }, [row?.takeProfitPercent, row?.stopLossPercent, row?.trailingStopPercent, row?.maxHoldHours]);
+
+  const writeMut = useMutation({
+    mutationFn: async (kind: "save" | "clear") => {
+      const n = getNote();
+      if (!n) throw new Error("note_required");
+      const res = await authFetch(`/api/admin/users/${clerkUserId}/exit-config/${encodeURIComponent(exchange)}`, {
+        method: kind === "save" ? "PUT" : "DELETE",
+        body: JSON.stringify(kind === "save" ? {
+          note: n,
+          takeProfitPercent:   adminNumOrNull(draft.tp),
+          stopLossPercent:     adminNumOrNull(draft.sl),
+          trailingStopPercent: adminNumOrNull(draft.trail),
+          maxHoldHours:        adminNumOrNull(draft.hold),
+        } : { note: n }),
+      });
+      const text = await res.text();
+      let json: unknown = null;
+      try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+      if (!res.ok) throw new Error((json as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
+      return { kind, resp: json as AdminExitConfigResponse };
+    },
+    onSuccess: ({ kind, resp }) => {
+      qc.setQueryData(["admin-exit-config", clerkUserId], resp);
+      if (kind === "clear") setDraft({ tp: "", sl: "", trail: "", hold: "" });
+      toast({ title: kind === "clear" ? "Override cleared" : "Override saved",
+        description: `${exchange.toUpperCase()} · audit-logged.` });
+    },
+    onError: (err: Error) => { if (err.message !== "note_required") toast({ title: "Failed", description: err.message }); },
+  });
+
+  const acctHint = (n: number | null | undefined, fb: string) => n == null ? fb : String(n);
+
+  return (
+    <div style={{ background: "#010C18", border: "1px solid #0d1e2e", borderRadius: 4, padding: "9px 11px", marginBottom: 8 }}>
+      <div style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 700, color: "#EAF2FF",
+        letterSpacing: "0.08em", marginBottom: 8 }}>{exchange.toUpperCase()}</div>
+      <div style={{ display: "flex", gap: 7, marginBottom: 7 }}>
+        <AdminExitField label="TP %" hint={acctHint(account?.takeProfitPercent, "4")} value={draft.tp}
+          onChange={v => setDraft(p => ({ ...p, tp: v }))} />
+        <AdminExitField label="SL %" hint={acctHint(account?.stopLossPercent, "2")} value={draft.sl}
+          onChange={v => setDraft(p => ({ ...p, sl: v }))} />
+      </div>
+      <div style={{ display: "flex", gap: 7, marginBottom: 9 }}>
+        <AdminExitField label="TRAIL %" hint={acctHint(account?.trailingStopPercent, "mirror SL")} value={draft.trail}
+          onChange={v => setDraft(p => ({ ...p, trail: v }))} />
+        <AdminExitField label="MAX HOLD H" hint={acctHint(account?.maxHoldHours, "24")} value={draft.hold}
+          onChange={v => setDraft(p => ({ ...p, hold: v }))} />
+      </div>
+      <div style={{ display: "flex", gap: 7 }}>
+        <button
+          onClick={() => { if (!writeMut.isPending) writeMut.mutate("save"); }}
+          disabled={writeMut.isPending}
+          style={{
+            flex: 1, padding: "7px 0", background: "#ffaa0014", border: "1px solid #ffaa0044",
+            borderRadius: 3, color: "#ffaa00", fontFamily: "monospace", fontSize: 9.5,
+            fontWeight: 700, letterSpacing: "0.06em", cursor: writeMut.isPending ? "wait" : "pointer",
+          }}>SAVE</button>
+        <button
+          onClick={() => { if (!writeMut.isPending) writeMut.mutate("clear"); }}
+          disabled={writeMut.isPending}
+          style={{
+            padding: "7px 14px", background: "transparent", border: "1px solid #0d1e2e",
+            borderRadius: 3, color: "#7a9eb8", fontFamily: "monospace", fontSize: 9.5,
+            fontWeight: 700, letterSpacing: "0.06em", cursor: writeMut.isPending ? "wait" : "pointer",
+          }}>RESET</button>
+      </div>
+    </div>
+  );
+}
+
 // ── TRADING TAB ──────────────────────────────────────────────────────────────
 // Aggregate engine performance + recent positions + recent closes. Prefers
 // detail aggregates when available; falls back to the grid row's totals
 // during initial load so the operator never sees an empty surface.
-function TradingTab({ detail, loading }: {
+function TradingTab({ detail, loading, clerkUserId }: {
   detail: UserDetailResponse | null;
   loading: boolean;
+  clerkUserId: string;
 }) {
   const agg = detail?.aggregates ?? null;
   const positions = detail?.positions ?? [];
@@ -3214,6 +3506,7 @@ function TradingTab({ detail, loading }: {
 
   return (
     <div>
+      <AdminExitControlsSection clerkUserId={clerkUserId} detail={detail} />
       <TabSectionLabel icon={TrendingUp}>PERFORMANCE</TabSectionLabel>
       {loading && !detail ? <TabLoading /> : (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>

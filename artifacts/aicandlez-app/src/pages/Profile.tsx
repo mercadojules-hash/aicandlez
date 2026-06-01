@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useClerk } from "@clerk/react";
 import { useLocation } from "wouter";
 import { api, getEffectivePlan, type Portfolio, type Subscription, type SimAccount, type SimTrade } from "@/lib/api";
+import { authFetch } from "@/lib/authFetch";
 import { PERFORMANCE_FEE_LABEL } from "@/lib/fees";
 import { useBrokerConnection } from "@/contexts/BrokerConnectionContext";
 import { BrokerStatusCard } from "@/components/BrokerStatusCard";
@@ -1032,6 +1033,302 @@ function useExchangeOutagePrefs() {
   return { emailEnabled, pushEnabled, setPref };
 }
 
+// ── Exit Controls (Task #220) ─────────────────────────────────────────────────
+// Per-account + per-exchange live-exit overrides: take-profit %, stop-loss %,
+// trailing-stop %, max-hold hours. Empty SL/TP falls back to the account
+// default; empty trailing/max-hold = inherit (account → engine default of
+// mirror-SL band / 24h). Per-exchange empty = inherit account.
+interface ExitBound { min: number; max: number }
+interface ExitAccount {
+  stopLossPercent: number; takeProfitPercent: number;
+  trailingStopPercent: number | null; maxHoldHours: number | null;
+}
+interface ExitExchangeRow {
+  exchange: string;
+  takeProfitPercent: number | null; stopLossPercent: number | null;
+  trailingStopPercent: number | null; maxHoldHours: number | null;
+}
+interface ExitConfigResponse {
+  account:   ExitAccount;
+  exchanges: ExitExchangeRow[];
+  defaults:  { stopLossPercent: number; takeProfitPercent: number; maxHoldHours: number };
+  bounds:    Record<string, ExitBound>;
+}
+
+const numOrNull = (s: string): number | null => {
+  const t = s.trim();
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+};
+
+function ExitNumField({ label, hint, value, onChange }: {
+  label: string; hint: string; value: string; onChange: (v: string) => void;
+}) {
+  return (
+    <div style={{ flex:1, minWidth:0 }}>
+      <div style={{ fontSize:8, fontFamily:SANS, fontWeight:600, color:GR,
+        letterSpacing:"0.10em", textTransform:"uppercase" as const, marginBottom:5 }}>{label}</div>
+      <input
+        inputMode="decimal"
+        value={value}
+        placeholder={hint}
+        onChange={e => onChange(e.target.value)}
+        style={{
+          width:"100%", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.11)",
+          borderRadius:9, padding:"9px 11px", color:W, fontFamily:MONO, fontSize:13,
+          outline:"none", boxSizing:"border-box" as const, transition:"border-color 0.15s ease",
+        }}
+        onFocus={e => e.target.style.borderColor = "rgba(102,255,102,0.40)"}
+        onBlur={e  => e.target.style.borderColor = "rgba(255,255,255,0.11)"}
+      />
+    </div>
+  );
+}
+
+// Exit-config transport: routes through the locked authFetch primitive (Clerk
+// Bearer cookie-fallback + ApiContractError on non-JSON). Takes an api-style
+// path (no `/api` prefix) to match the rest of this file's call sites.
+async function exitApi<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await authFetch(`/api${path}`, {
+    method,
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+  const text = await res.text();
+  let json: unknown = null;
+  try { json = text ? JSON.parse(text) : null; } catch { /* noop */ }
+  if (!res.ok) throw new Error((json as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
+  return json as T;
+}
+
+function ExitControlsSection() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery<ExitConfigResponse>({
+    queryKey: ["user-exit-config"],
+    queryFn:  () => exitApi<ExitConfigResponse>("GET", "/user/exit-config"),
+  });
+  const { data: exData } = useQuery<{ exchanges: ExchangeListEntry[] }>({
+    queryKey: ["user-exchanges"],
+    queryFn:  () => api.get("/user/exchanges"),
+  });
+
+  // Account-level draft (strings so empty = inherit/default).
+  const [acct, setAcct] = useState<{ tp:string; sl:string; trail:string; hold:string }>(
+    { tp:"", sl:"", trail:"", hold:"" });
+  const [acctSaved, setAcctSaved] = useState(false);
+
+  // Seed the account draft once config loads.
+  useEffect(() => {
+    if (!data) return;
+    setAcct({
+      tp:    String(data.account.takeProfitPercent),
+      sl:    String(data.account.stopLossPercent),
+      trail: data.account.trailingStopPercent == null ? "" : String(data.account.trailingStopPercent),
+      hold:  data.account.maxHoldHours == null ? "" : String(data.account.maxHoldHours),
+    });
+  }, [data]);
+
+  const saveAccount = useMutation({
+    mutationFn: () => {
+      const body: Record<string, unknown> = {
+        // SL/TP must be concrete — empty falls back to the engine default.
+        takeProfitPercent: numOrNull(acct.tp) ?? data?.defaults.takeProfitPercent ?? 4,
+        stopLossPercent:   numOrNull(acct.sl) ?? data?.defaults.stopLossPercent ?? 2,
+        // Nullable: empty = inherit (mirror-SL band / 24h engine default).
+        trailingStopPercent: numOrNull(acct.trail),
+        maxHoldHours:        numOrNull(acct.hold),
+      };
+      return exitApi<ExitConfigResponse>("PUT", "/user/exit-config", body);
+    },
+    onSuccess: (resp) => {
+      qc.setQueryData(["user-exit-config"], resp);
+      setAcctSaved(true);
+      setTimeout(() => setAcctSaved(false), 2200);
+    },
+  });
+
+  const connected = (exData?.exchanges ?? []).filter(e => e.connected);
+
+  return (
+    <div style={{ marginBottom:18 }}>
+      <SectionHead label="Exit Controls" accent="rgba(255,148,0,0.65)"/>
+      <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, padding:"14px 16px" }}>
+        <div style={{ fontSize:9, fontFamily:SANS, color:GR, lineHeight:1.55, marginBottom:14 }}>
+          Tune how the AI exits live positions. Take-profit and stop-loss apply to every
+          live trade. Trailing-stop and max-hold are optional — leave blank to use the
+          platform defaults (trailing mirrors your stop-loss band · 24h max hold).
+        </div>
+
+        {isLoading ? (
+          <div style={{ fontSize:11, fontFamily:SANS, color:DIM, padding:"8px 0" }}>Loading…</div>
+        ) : (
+          <>
+            {/* Account defaults */}
+            <div style={{ fontSize:8.5, fontFamily:SANS, fontWeight:700, color:"rgba(255,148,0,0.75)",
+              letterSpacing:"0.14em", textTransform:"uppercase" as const, marginBottom:10 }}>
+              Account Default
+            </div>
+            <div style={{ display:"flex", gap:10, marginBottom:10 }}>
+              <ExitNumField label="Take Profit %" hint="4" value={acct.tp}
+                onChange={v => setAcct(p => ({ ...p, tp:v }))}/>
+              <ExitNumField label="Stop Loss %" hint="2" value={acct.sl}
+                onChange={v => setAcct(p => ({ ...p, sl:v }))}/>
+            </div>
+            <div style={{ display:"flex", gap:10, marginBottom:14 }}>
+              <ExitNumField label="Trailing Stop %" hint="mirror SL" value={acct.trail}
+                onChange={v => setAcct(p => ({ ...p, trail:v }))}/>
+              <ExitNumField label="Max Hold (hrs)" hint="24" value={acct.hold}
+                onChange={v => setAcct(p => ({ ...p, hold:v }))}/>
+            </div>
+            <button
+              onClick={() => { if (!saveAccount.isPending) saveAccount.mutate(); }}
+              disabled={saveAccount.isPending}
+              style={{
+                width:"100%", padding:"11px 0",
+                background: acctSaved ? "rgba(102,255,102,0.12)" : "rgba(255,148,0,0.08)",
+                border:`1px solid ${acctSaved ? "rgba(102,255,102,0.45)" : "rgba(255,148,0,0.32)"}`,
+                borderRadius:10, color: acctSaved ? C : "#FFB347",
+                fontFamily:SANS, fontSize:11, fontWeight:700, letterSpacing:"0.06em",
+                cursor: saveAccount.isPending ? "wait" : "pointer",
+                transition:"all 0.2s ease",
+              }}>
+              {saveAccount.isPending ? "SAVING…" : acctSaved ? "✓ SAVED" : "SAVE ACCOUNT DEFAULTS"}
+            </button>
+            {saveAccount.isError && (
+              <div style={{ marginTop:8, fontSize:9, fontFamily:SANS, color:"#FF6478" }}>
+                {(saveAccount.error as Error)?.message ?? "Failed to save"}
+              </div>
+            )}
+
+            {/* Per-exchange overrides */}
+            {connected.length > 0 && (
+              <div style={{ marginTop:18, paddingTop:16, borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ fontSize:8.5, fontFamily:SANS, fontWeight:700, color:"rgba(255,148,0,0.75)",
+                  letterSpacing:"0.14em", textTransform:"uppercase" as const, marginBottom:4 }}>
+                  Per-Exchange Overrides
+                </div>
+                <div style={{ fontSize:8.5, fontFamily:SANS, color:DIM, lineHeight:1.5, marginBottom:12 }}>
+                  Leave blank to inherit your account default for that field.
+                </div>
+                {connected.map(e => (
+                  <ExitExchangeEditor
+                    key={e.exchange}
+                    exchange={e.exchange}
+                    label={e.meta?.name ?? e.exchange}
+                    row={(data?.exchanges ?? []).find(x => x.exchange === e.exchange) ?? null}
+                    account={data?.account ?? null}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ExitExchangeEditor({ exchange, label, row, account }: {
+  exchange: string; label: string;
+  row: ExitExchangeRow | null; account: ExitAccount | null;
+}) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<{ tp:string; sl:string; trail:string; hold:string }>({
+    tp:    row?.takeProfitPercent   == null ? "" : String(row.takeProfitPercent),
+    sl:    row?.stopLossPercent     == null ? "" : String(row.stopLossPercent),
+    trail: row?.trailingStopPercent == null ? "" : String(row.trailingStopPercent),
+    hold:  row?.maxHoldHours        == null ? "" : String(row.maxHoldHours),
+  });
+  const [saved, setSaved] = useState(false);
+
+  // Resync draft when the server row changes (initial load / refetch / save /
+  // clear). Without this the editor would keep its first-render snapshot and
+  // drift from server truth after the config query resolves or updates.
+  useEffect(() => {
+    setDraft({
+      tp:    row?.takeProfitPercent   == null ? "" : String(row.takeProfitPercent),
+      sl:    row?.stopLossPercent     == null ? "" : String(row.stopLossPercent),
+      trail: row?.trailingStopPercent == null ? "" : String(row.trailingStopPercent),
+      hold:  row?.maxHoldHours        == null ? "" : String(row.maxHoldHours),
+    });
+  }, [row?.takeProfitPercent, row?.stopLossPercent, row?.trailingStopPercent, row?.maxHoldHours]);
+
+  const save = useMutation({
+    mutationFn: () => exitApi<ExitConfigResponse>("PUT", `/user/exit-config/${encodeURIComponent(exchange)}`, {
+      takeProfitPercent:   numOrNull(draft.tp),
+      stopLossPercent:     numOrNull(draft.sl),
+      trailingStopPercent: numOrNull(draft.trail),
+      maxHoldHours:        numOrNull(draft.hold),
+    }),
+    onSuccess: (resp) => {
+      qc.setQueryData(["user-exit-config"], resp);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    },
+  });
+
+  const clear = useMutation({
+    mutationFn: () => exitApi<ExitConfigResponse>("DELETE", `/user/exit-config/${encodeURIComponent(exchange)}`),
+    onSuccess: (resp) => {
+      qc.setQueryData(["user-exit-config"], resp);
+      setDraft({ tp:"", sl:"", trail:"", hold:"" });
+    },
+  });
+
+  const acctHint = (n: number | null | undefined, fallback: string) =>
+    n == null ? fallback : String(n);
+
+  return (
+    <div style={{ marginBottom:12, padding:"12px 13px",
+      background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.06)", borderRadius:11 }}>
+      <div style={{ fontSize:11, fontFamily:SANS, fontWeight:600, color:W, marginBottom:10 }}>{label}</div>
+      <div style={{ display:"flex", gap:9, marginBottom:9 }}>
+        <ExitNumField label="TP %" hint={acctHint(account?.takeProfitPercent, "4")} value={draft.tp}
+          onChange={v => setDraft(p => ({ ...p, tp:v }))}/>
+        <ExitNumField label="SL %" hint={acctHint(account?.stopLossPercent, "2")} value={draft.sl}
+          onChange={v => setDraft(p => ({ ...p, sl:v }))}/>
+      </div>
+      <div style={{ display:"flex", gap:9, marginBottom:11 }}>
+        <ExitNumField label="Trail %" hint={acctHint(account?.trailingStopPercent, "mirror SL")} value={draft.trail}
+          onChange={v => setDraft(p => ({ ...p, trail:v }))}/>
+        <ExitNumField label="Max Hold h" hint={acctHint(account?.maxHoldHours, "24")} value={draft.hold}
+          onChange={v => setDraft(p => ({ ...p, hold:v }))}/>
+      </div>
+      <div style={{ display:"flex", gap:8 }}>
+        <button
+          onClick={() => { if (!save.isPending) save.mutate(); }}
+          disabled={save.isPending}
+          style={{
+            flex:1, padding:"9px 0",
+            background: saved ? "rgba(102,255,102,0.12)" : "rgba(255,148,0,0.08)",
+            border:`1px solid ${saved ? "rgba(102,255,102,0.45)" : "rgba(255,148,0,0.30)"}`,
+            borderRadius:8, color: saved ? C : "#FFB347",
+            fontFamily:SANS, fontSize:10, fontWeight:700, letterSpacing:"0.05em",
+            cursor: save.isPending ? "wait" : "pointer", transition:"all 0.2s ease",
+          }}>
+          {save.isPending ? "SAVING…" : saved ? "✓ SAVED" : "SAVE"}
+        </button>
+        <button
+          onClick={() => { if (!clear.isPending) clear.mutate(); }}
+          disabled={clear.isPending}
+          style={{
+            padding:"9px 16px", background:"rgba(255,255,255,0.03)",
+            border:"1px solid rgba(255,255,255,0.10)", borderRadius:8, color:DIM,
+            fontFamily:SANS, fontSize:10, fontWeight:700, letterSpacing:"0.05em",
+            cursor: clear.isPending ? "wait" : "pointer",
+          }}>
+          {clear.isPending ? "…" : "RESET"}
+        </button>
+      </div>
+      {save.isError && (
+        <div style={{ marginTop:7, fontSize:9, fontFamily:SANS, color:"#FF6478" }}>
+          {(save.error as Error)?.message ?? "Failed to save"}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AlertPreferencesSection() {
   const { prefs, update, toggleAlert } = useFeedbackPrefs();
   const pushNotifs = usePushNotifications();
@@ -1749,6 +2046,9 @@ export default function Profile() {
             ⚡ All settings persist across sessions. Paper mode is never a restriction on AI scanning.
           </div>
         </div>
+
+        {/* ── Exit Controls (per-account / per-exchange live-exit overrides) ── */}
+        <ExitControlsSection/>
 
         {/* ── Alert & Feedback Preferences (notification scaffolding) ──────── */}
         <AlertPreferencesSection/>

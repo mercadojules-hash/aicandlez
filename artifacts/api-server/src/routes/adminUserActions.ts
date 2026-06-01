@@ -152,7 +152,7 @@ interface ActorCtx {
 
 /** Pull + validate the actor/target pair, enforce no-self-action. Returns null
  *  on rejection (response already sent). */
-function resolveActor(req: Request, res: Response): ActorCtx | null {
+export function resolveActor(req: Request, res: Response): ActorCtx | null {
   const actorId  = (req as AuthReq).clerkUserId;
   const targetId = String(req.params["id"] ?? "");
   if (!targetId) {
@@ -188,7 +188,7 @@ interface AuditOpts {
 // transaction `tx` slot in wherever a top-level `db` would.
 type DbExecutor = Pick<typeof db, "insert" | "update" | "delete" | "select">;
 
-async function writeAudit(opts: AuditOpts, executor: DbExecutor = db): Promise<string> {
+export async function writeAudit(opts: AuditOpts, executor: DbExecutor = db): Promise<string> {
   const id = randomUUID();
   await executor.insert(userAdminActionsTable).values({
     id,

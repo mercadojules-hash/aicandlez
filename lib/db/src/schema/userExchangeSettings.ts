@@ -34,6 +34,18 @@ export const userExchangeSettingsTable = pgTable(
     // per-exchange default. Only consulted for parallel-enabled users.
     maxPositions: integer("max_positions"),
 
+    // ── Per-exchange live-exit overrides (Task #220) ────────────────────────
+    // Each NULL → inherit the account-level value (user_settings). A concrete
+    // value overrides ONLY for fills routed to this exchange, letting a
+    // customer run e.g. tighter stops on Kraken than Coinbase. `trailingStop`
+    // `0` disables trailing for this exchange; `maxHoldHours` `0` disables the
+    // max-hold ceiling for this exchange. SL/TP are clamped to safe ranges on
+    // write (see `clampExitValue` in `lib/exitConfig.ts`).
+    takeProfitPercent:   real("take_profit_percent"),
+    stopLossPercent:     real("stop_loss_percent"),
+    trailingStopPercent: real("trailing_stop_percent"),
+    maxHoldHours:        real("max_hold_hours"),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

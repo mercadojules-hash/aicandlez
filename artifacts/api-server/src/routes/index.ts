@@ -64,6 +64,8 @@ import userRiskSettingsRouter from "./userRiskSettings.js";
 import adminRiskEventsRouter from "./adminRiskEvents.js";
 import aiDisclaimerRouter from "./aiDisclaimer.js";
 import userAiLiquidityRouter from "./userAiLiquidity.js";
+import exitConfigRouter from "./exitConfig.js";
+import adminExitConfigRouter from "./adminExitConfig.js";
 
 const router: IRouter = Router();
 
@@ -78,6 +80,8 @@ router.use(aiTradingRouter);
 router.use(userAiLiquidityRouter);
 router.use(userNotificationsRouter);
 router.use(userExchangesRouter);
+router.use(exitConfigRouter);
+router.use(adminExitConfigRouter);
 router.use(runtimeStateRouter);
 router.use(userLiveOrderRouter);
 router.use(userExecutionFunnelRouter);

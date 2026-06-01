@@ -37,6 +37,7 @@ import { NotificationDispatcher } from "../services/notifications/NotificationDi
 import { auditLogger } from "../services/telemetry/AuditLogger.js";
 import { executionStreamBus, getSafeTestMode } from "./executionStreamBus.js";
 import { recordSignalTrace, classifyDownstream, type SignalTrace } from "./signalFunnel.js";
+import { resolveExitConfig, buildExitConfigResolver } from "./exitConfig.js";
 import { logger } from "./logger.js";
 
 function genId() { return crypto.randomUUID(); }
@@ -104,15 +105,10 @@ function getGlobalPositionMaxHoldMs(): number {
 // Both are LIVE-only here; paper trailing is owned by `runTrailingStops` and the
 // global book by `runGlobalCapSelfHeal`. Tunable via env, no redeploy.
 
-// Trailing distance (percent). When unset, the monitor derives the distance from
-// each position's own stored stop-loss band (so it honours the user's configured
-// risk). Set `LIVE_TRAILING_STOP_PERCENT=0` to disable live trailing entirely.
-function getLiveTrailingStopPercentOverride(): number | null {
-  const raw = process.env.LIVE_TRAILING_STOP_PERCENT;
-  if (raw === undefined || raw === "") return null;
-  const n = Number(raw);
-  return Number.isFinite(n) && n >= 0 ? n : null;
-}
+// Live trailing-stop distance resolution moved to `lib/exitConfig.ts`
+// (`getLiveTrailingStopPercentOverride` + per-account / per-exchange config,
+// Task #220). The env var `LIVE_TRAILING_STOP_PERCENT` still acts as the global
+// operator override there.
 
 // Max-hold for live per-user positions. Mirrors the global book default (24h ON).
 // Set `LIVE_POSITION_MAX_HOLD_MS=0` to disable.
@@ -1387,8 +1383,13 @@ async function autoExecute(
         try {
           const userEntry = r.fillPrice ?? price;
           const userQty   = r.quantity  ?? sizeUSD / userEntry;
-          const userSL    = side === "BUY" ? userEntry * (1 - settings.stopLossPercent   / 100) : userEntry * (1 + settings.stopLossPercent   / 100);
-          const userTP    = side === "BUY" ? userEntry * (1 + settings.takeProfitPercent / 100) : userEntry * (1 - settings.takeProfitPercent / 100);
+          // Per-account / per-exchange exit config (Task #220). Resolves the
+          // customer's own SL/TP for THIS exchange, falling back to their
+          // account default → 2/4. Replaces the prior global `settings.*` band
+          // so each customer's live fills honour their configured risk.
+          const exitCfg   = await resolveExitConfig(r.userId, r.exchange ?? null);
+          const userSL    = side === "BUY" ? userEntry * (1 - exitCfg.stopLossPercent   / 100) : userEntry * (1 + exitCfg.stopLossPercent   / 100);
+          const userTP    = side === "BUY" ? userEntry * (1 + exitCfg.takeProfitPercent / 100) : userEntry * (1 - exitCfg.takeProfitPercent / 100);
           const orderId = r.exchangeOrderId ?? `LIVE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
           const userPos = await registerLiveUserFill({
             userId:          r.userId,
@@ -2007,8 +2008,12 @@ async function runHardStopMonitor() {
     }));
 
     const correlationId      = genCorrelationId();
-    const trailOverridePct   = getLiveTrailingStopPercentOverride();
-    const liveMaxHoldMs      = getLivePositionMaxHoldMs();
+    // Per-account / per-exchange exit config (Task #220), batch-loaded for every
+    // open position in two queries. Resolves trailing distance + max-hold ceiling
+    // per (userId, exchange); env operator overrides still win globally.
+    const resolveExit        = await buildExitConfigResolver(
+      positions.map((p) => ({ userId: p.userId, exchange: p.exchange })),
+    );
     const nowMs              = Date.now();
 
     // Prune water marks for positions no longer open (prevents unbounded growth).
@@ -2021,6 +2026,7 @@ async function runHardStopMonitor() {
       const isBuy  = p.side === "BUY";
       const isLive = !!p.exchange;
       const price  = priceBySym.get(p.symbol);
+      const exitCfg = resolveExit(p.userId, p.exchange);
 
       // Age is computed price-independently so the max-hold ceiling can fire even
       // when the market-data feed is down. A hard time ceiling that depended on a
@@ -2051,10 +2057,12 @@ async function runHardStopMonitor() {
         // Trailing stop is LIVE-only here. Paper trailing is owned by
         // `runTrailingStops`; the global book by `runGlobalCapSelfHeal`.
         if (isLive) {
-          // Derive trailing distance: env override wins; otherwise mirror the
-          // position's own stop-loss band so it honours the user's configured risk.
-          if (trailOverridePct !== null) {
-            trailPct = trailOverridePct;
+          // Derive trailing distance (Task #220): the resolved config already
+          // folds env override → per-exchange → account. A concrete value sets
+          // an explicit distance; `null` means "mirror the position's own
+          // stop-loss band" (the locked default) so it honours configured risk.
+          if (exitCfg.trailingStopPercent !== null) {
+            trailPct = exitCfg.trailingStopPercent;
           } else if (p.stopLoss !== null && p.entryPrice > 0) {
             trailPct = (Math.abs(p.entryPrice - p.stopLoss) / p.entryPrice) * 100;
           }
@@ -2088,7 +2096,7 @@ async function runHardStopMonitor() {
       // Price-independent exit: hard max-hold ceiling (LIVE-only). Evaluated even
       // when price is unavailable so a stuck position can always be force-closed;
       // `closeUserPosition` fetches its own authoritative broker fill price.
-      if (reason === null && isLive && liveMaxHoldMs > 0 && ageMs !== null && ageMs >= liveMaxHoldMs) {
+      if (reason === null && isLive && exitCfg.maxHoldMs > 0 && ageMs !== null && ageMs >= exitCfg.maxHoldMs) {
         reason = "MAX_HOLD";
       }
 
