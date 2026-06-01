@@ -113,3 +113,9 @@ id = "S0Q8qjdfUJ1Ul1_-MiFYd"
 uri = "file://reports/launch-readiness-report.md"
 type = "text"
 title = "AICandlez — Pre-Launch Profit Validation & Readiness Report"
+
+[[outputs]]
+id = "-0IrwJoMvKM7cqQvl20O0"
+uri = "file://reports/profitability-optimization-report.md"
+type = "text"
+title = "AICandlez — Profitability Optimization Report"

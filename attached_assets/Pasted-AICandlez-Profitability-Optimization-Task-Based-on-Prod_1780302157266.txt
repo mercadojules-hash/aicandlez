@@ -1,0 +1,182 @@
+AICandlez Profitability Optimization Task (Based on Production Validation #221)
+
+Before making any code changes, use the findings from the completed #221 Production Profit Validation Report as the source of truth.
+
+Current objective:
+
+Increase real-world profitability, profit factor, and win rate while preserving capital protection and risk controls. This is a pre-launch optimization pass using the two internal test accounts ([info@mixtapepsd.com](mailto:info@mixtapepsd.com) and [teedelgado@gmail.com](mailto:teedelgado@gmail.com)).
+
+Do NOT redesign the platform. Do NOT rebuild existing systems. Focus only on changes that have a measurable impact on profitability.
+
+Priority #1 — Investigate Instant Stop-Outs
+
+The #221 report identified approximately 24% of trades closing via STOP_LOSS within 4–6 seconds of entry.
+
+Determine:
+
+* Why stop-losses are triggering immediately after entry.
+* Whether stop-loss evaluation is occurring on the entry candle.
+* Whether spread, slippage, mark price, or entry execution timing is causing false exits.
+* Whether synthetic stop logic is firing before trade stabilization.
+
+Provide root cause and proposed fix.
+
+Do NOT deploy changes until the cause is confirmed.
+
+Priority #2 — Symbol Performance Optimization
+
+Analyze all live production trades.
+
+Identify:
+
+Top-performing symbols:
+
+* Highest net P&L
+* Highest profit factor
+* Highest win rate
+
+Worst-performing symbols:
+
+* Lowest net P&L
+* Lowest profit factor
+* Lowest win rate
+
+Current report already shows:
+
+Strong performers:
+
+* TON
+* HBAR
+
+Weak performers:
+
+* STX
+* INJ
+
+Validate these findings against full production trade history.
+
+Recommend:
+
+* Symbols to promote
+* Symbols to reduce weighting
+* Symbols to temporarily disable
+* Symbols requiring more data
+
+Priority #3 — Category Allocation Optimization
+
+Current evidence suggests majors outperform alts.
+
+Simulate:
+
+Configuration A
+
+* Majors 75%
+* Alts 20%
+* Memes 5%
+
+Configuration B
+
+* Majors 80%
+* Alts 15%
+* Memes 5%
+
+Configuration C
+
+* Dynamic allocation based on rolling profitability
+
+Provide projected impact on:
+
+* Win rate
+* Profit factor
+* Net realized P&L
+
+Priority #4 — Exit Optimization
+
+Current production configuration:
+
+* Stop Loss = 2%
+* Take Profit = 4%
+* Trailing Stop = not fully utilized
+* Max Hold = 24 hours
+
+Simulate:
+
+Scenario 1
+
+* SL 2%
+* TP 4%
+* Trailing 1.5%
+
+Scenario 2
+
+* SL 2%
+* TP 5%
+* Trailing 1.5%
+
+Scenario 3
+
+* SL 2%
+* TP 6%
+* Trailing 2%
+
+Determine which produces:
+
+* Highest profit factor
+* Highest net realized P&L
+* Best risk-adjusted return
+
+Priority #5 — Confidence Quality Review
+
+The #221 report shows executed trades averaging confidence in the mid-40s despite configured minimum confidence levels of 60–65.
+
+Audit:
+
+* Actual execution confidence logic
+* Stored confidence values
+* Any mismatch between displayed confidence and execution confidence
+
+Determine whether raising execution quality thresholds improves profitability or unnecessarily reduces opportunity count.
+
+Priority #6 — Capital Scaling Recommendations
+
+Using actual production trade data:
+
+Provide recommended settings for:
+
+$10 trade size
+$20 trade size
+$50 trade size
+$100 trade size
+
+For each size recommend:
+
+* Concurrent positions
+* Daily trade target
+* Estimated capital requirement
+* Risk profile
+
+Goal:
+
+Maximize profitability without materially increasing account risk.
+
+Deliverable
+
+Produce a Profitability Optimization Report containing:
+
+1. Root cause of instant stop-outs.
+2. Recommended symbol allocations.
+3. Recommended category allocations.
+4. Recommended exit settings.
+5. Recommended confidence settings.
+6. Recommended capital scaling settings.
+7. Estimated improvement in:
+
+   * Profit factor
+   * Win rate
+   * Net realized P&L
+
+Do NOT deploy changes yet.
+
+Provide recommendations first.
+
+After review, we will approve the final production optimization package for deployment.
