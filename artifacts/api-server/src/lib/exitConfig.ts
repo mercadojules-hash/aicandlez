@@ -17,14 +17,17 @@ import { eq, and, inArray } from "drizzle-orm";
  *      inherit the account default.
  *   3. Account default — `user_settings`. SL/TP are always present (NOT NULL
  *      cols); trailing / max-hold are nullable.
- *   4. Hardcoded default — SL 2 %, TP 4 %, trailing = mirror SL band, max-hold
- *      24h. These reproduce the EXACT pre-#220 live behavior, so an account
- *      that never touches the controls keeps today's exits byte-for-byte.
+ *   4. Hardcoded default — SL 2 %, TP 4 %, trailing 1.5 %, max-hold 24h.
+ *      Production Optimization P4 set the default trailing to a fixed 1.5 %;
+ *      previously it fell through to null (= "mirror the position's own stored
+ *      stop-loss band"). SL/TP/max-hold defaults are unchanged. An account that
+ *      never touches the controls now trails at 1.5 %.
  *
- * `trailingStopPercent === null` is meaningful: it tells the live monitor to
- * mirror each position's own stored stop-loss band (the locked default), rather
- * than apply a fixed distance. An explicit `0` disables trailing; `0` max-hold
- * disables the time ceiling.
+ * `trailingStopPercent === null` is still honored by the live monitor (mirror
+ * each position's own stored stop-loss band) if a row explicitly carries it, but
+ * after P4 the resolver no longer PRODUCES null from defaults — an unconfigured
+ * account resolves to the fixed 1.5 %. An explicit `0` disables trailing; `0`
+ * max-hold disables the time ceiling.
  */
 
 export const EXIT_DEFAULTS = {
@@ -147,8 +150,9 @@ function resolveFrom(
     account?.takeProfitPercent ??
     EXIT_DEFAULTS.takeProfitPercent;
 
-  // Trailing: env override wins; else per-exchange; else account; else null
-  // (= mirror SL band — the locked default the monitor already implements).
+  // Trailing: env override wins; else per-exchange; else account; else the
+  // fixed 1.5 % default (Production Optimization P4; previously null = mirror
+  // the position's own SL band).
   let trailingStopPercent: number | null;
   if (envTrailPct !== null) {
     trailingStopPercent = envTrailPct;

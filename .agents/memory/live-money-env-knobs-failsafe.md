@@ -10,8 +10,7 @@ finite + range guard and fall back to a hard-coded safe default on bad input.
 **Why:** Bare `Number(process.env.X ?? "default")` returns `NaN` for a malformed
 value ("abc", ""). `NaN` comparisons are always false, so a buffered/catastrophic
 breach check silently evaluates false and the **live stop-loss can stop firing** —
-a fail-OPEN real-money safety regression. Caught in architect review of the
-Production Optimization Package P1.
+a fail-OPEN real-money safety regression.
 
 **How to apply:** Use a `parseKnob(name, raw, fallback, min, max)` helper that
 returns the fallback when `!Number.isFinite(n) || out of range`, collects the bad
