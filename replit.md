@@ -2,7 +2,8 @@
 
 Institutional AI crypto trading SaaS. pnpm monorepo, TypeScript.
 
-> Active architecture only. Phase / pass narration lives in git history.
+> Current production system + active operational knowledge only. Phase/pass
+> narration lives in git history; archived context in `docs/replit-history.md`.
 
 ---
 
@@ -21,15 +22,15 @@ See `pnpm-workspace` skill for workspace structure and TS project refs.
 
 ## Artifacts
 
-| Artifact            | Kind   | Path             | Role                                         |
-| ------------------- | ------ | ---------------- | -------------------------------------------- |
-| `landing`           | web    | `/`              | Public marketing (signed-out)                |
-| `aicandlez-app`     | web    | `/aicandlez-app` | **Primary PWA** — mobile-first customer      |
-| `trading-dashboard` | web    | `/dashboard`     | Operator console + customer desktop portal   |
-| `api-server`        | api    | `/api`           | Shared Express backend                       |
-| `natura-ai`         | mobile | `/natura-ai`     | Expo wellness app — **frozen**               |
-| `natura-web`        | web    | `/natura-web`    | Legacy companion — frozen                    |
-| `mockup-sandbox`    | design | `/sandbox`       | Canvas iframe variant previews               |
+| Artifact            | Kind   | Path             | Role                                       |
+| ------------------- | ------ | ---------------- | ------------------------------------------ |
+| `landing`           | web    | `/`              | Public marketing (signed-out)              |
+| `aicandlez-app`     | web    | `/aicandlez-app` | **Primary PWA** — mobile-first customer    |
+| `trading-dashboard` | web    | `/dashboard`     | Operator console + customer desktop portal |
+| `api-server`        | api    | `/api`           | Shared Express backend                     |
+| `natura-ai`         | mobile | `/natura-ai`     | Expo wellness app — **frozen**             |
+| `natura-web`        | web    | `/natura-web`    | Legacy companion — **frozen**              |
+| `mockup-sandbox`    | design | `/sandbox`       | Canvas iframe variant previews             |
 
 Forward work = `aicandlez-app` PWA + `trading-dashboard`. `natura-*` frozen.
 
@@ -39,12 +40,12 @@ Forward work = `aicandlez-app` PWA + `trading-dashboard`. `natura-*` frozen.
 
 **No `$5.99` anywhere in the codebase.**
 
-| Plan ID   | Name            | Price    | Daily | Concurrent |
-| --------- | --------------- | -------- | ----- | ---------- |
-| `free`    | Paper Trading   | Free     | 10    | 0 (paper)  |
-| `starter` | AI Trading      | $49.95   | 50    | **3**      |
-| `pro`     | AI Trading Pro  | $99.95   | 100   | **6**      |
-| `elite`   | AI Trading Elite VIP | $199.95 | 200 | **12**    |
+| Plan ID   | Name                 | Price    | Daily | Concurrent |
+| --------- | -------------------- | -------- | ----- | ---------- |
+| `free`    | Paper Trading        | Free     | 10    | 0 (paper)  |
+| `starter` | AI Trading           | $49.95   | 50    | **3**      |
+| `pro`     | AI Trading Pro       | $99.95   | 100   | **6**      |
+| `elite`   | AI Trading Elite VIP | $199.95  | 200   | **12**     |
 
 - Free = paper only; paid tiers = live only. Admin/super-admin = unlimited.
 - Runtime is subscription-driven: no sub → paper; active paid → live;
@@ -79,13 +80,13 @@ PWA does NOT render its own desktop terminal.
 
 ### Cross-host matrix
 
-| Host                                | Customer default | Admin default |
-| ----------------------------------- | ---------------- | ------------- |
-| `aicandlez.com` (landing)           | CTAs → `trade.`  | CTAs → `trade.` |
-| `app.aicandlez.com` (PWA)           | PWA mobile       | PWA mobile    |
-| `trade.aicandlez.com` (customer)    | `/portal`        | `/command`    |
-| `admintrade.aicandlez.com` (admin)  | x-host → `trade./portal` | `/command` |
-| `api.aicandlez.com`                 | API only         | API only      |
+| Host                                | Customer default         | Admin default   |
+| ----------------------------------- | ------------------------ | --------------- |
+| `aicandlez.com` (landing)           | CTAs → `trade.`          | CTAs → `trade.` |
+| `app.aicandlez.com` (PWA)           | PWA mobile               | PWA mobile      |
+| `trade.aicandlez.com` (customer)    | `/portal`                | `/command`      |
+| `admintrade.aicandlez.com` (admin)  | x-host → `trade./portal` | `/command`      |
+| `api.aicandlez.com`                 | API only                 | API only        |
 
 Required build env: `VITE_TRADE_URL`, `VITE_APP_URL`,
 `VITE_TRADING_DASHBOARD_URL`, `VITE_DEFAULT_LANDING`,
@@ -155,8 +156,9 @@ role-gated; never merge the two worlds.
 ## Active customer portal architecture (`trading-dashboard`)
 
 - `pages/Portal.tsx` — thin role router. Customer → `<PortalCustomerShell />`;
-  admin → `<AdminPortalShell />` (or `<AdminPortalLegacy />` rollback hatch via
-  `VITE_ADMIN_PORTAL_LEGACY=true`; `AdminPortalLegacy` byte-frozen).
+  admin → `<AdminPortalShell />` (legacy `<AdminPortalLegacy />` rollback hatch
+  via `VITE_ADMIN_PORTAL_LEGACY=true`, byte-frozen — see
+  `docs/replit-history.md`).
   **Operator → customer-view override:** an admin can opt into the customer
   surface at `/portal` via the floating "View as Customer" toggle (localStorage
   `aicandlez:operator-customer-view`, or `?previewCustomer=1|0`). Clerk role +
@@ -197,8 +199,8 @@ role-gated; never merge the two worlds.
 - `admintrade.aicandlez.com/*` — admin portal (trading-dashboard static,
   separate Render service). Default landing = `/command`. NO paper, NO tier
   gates, unlimited execution, live Kraken only.
-- `dashboard.aicandlez.com/*` — preserved during migration; retired post
-  trade./admintrade. cutover.
+- `dashboard.aicandlez.com/*` — **legacy**, being retired post `trade.`/
+  `admintrade.` cutover (migration context: `docs/replit-history.md`).
 
 Render services: `aicandlez-trade`, `aicandlez-admintrade`,
 `aicandlez-dashboard` in `render.yaml`. CORS allow-list on api.
@@ -264,6 +266,37 @@ Admin switches via `CommandBar` (`POST /api/exchange/select` →
 - Admin operator (`isOperatorRole` only) → `/api/exchange/order/execute`
   (Kraken env path, server `requireOperator`-gated).
 - Else → `firePaper(...)` (paper sim).
+
+**Customer live-execution gate stack** (`placeLiveAutoOrderForUser` — the single
+customer chokepoint for both the AI fan-out and manual `/api/user/live-order`;
+operators bypass these gates). In order, the live-only gates include: 0UNI
+(`symbol_not_in_universe`), **0SYM** per-symbol disable list + size multiplier
+(`symbol_disabled`, SoT `symbolPolicy.ts`), **0TREND** SELL-only 1H-trend filter
+(`sell_blocked_bullish_1h`, behind `LIVE_BLOCK_SELLS_IN_BULLISH_1H`, default
+OFF), 0c platform concurrent-cap (`concurrent_live_cap_reached`), risk gates,
+and **0ALLOC** category-allocation soft-cap (falls back to
+`DEFAULT_CATEGORY_ALLOCATION` majors-heavy when an account has no explicit
+allocation). Paper/sim never routes through this function.
+
+**SELL-only 1H-trend filter (approved strategy change):** when
+`LIVE_BLOCK_SELLS_IN_BULLISH_1H=true`, a new customer LIVE **SELL** (short) is
+blocked while the engine's current 1H trend (EMA9 vs EMA21, read from
+`engineStats.symbolBreakdowns`, not recomputed) is `bullish`; SELL allowed on
+`bearish`/`unknown`. BUY unchanged. Default OFF = legacy. Block logs carry user,
+exchange, symbol, confidence, 1H trend, reason `SELL_BLOCKED_BULLISH_1H`.
+
+**LIVE stop-loss stabilization:** the 2% stop **level** is unchanged; the LIVE
+**trigger** is de-noised via a stabilization grace + consecutive-breach confirm,
+with a catastrophic-move override fast-path (`runHardStopMonitor` in
+`tradingLoop.ts`). Knobs: `LIVE_STOP_STABILIZATION_MS` (default 90000),
+`LIVE_STOP_CATASTROPHIC_MULT` (default 2.5×), `LIVE_STOP_IMMEDIATE_FRACTION`
+(immediate-fire band, must sit inside the catastrophic band). Paper SL untouched.
+
+**Exit config** (`lib/exitConfig.ts`): SL 2% / TP 4% / max-hold 24h; trailing
+default **2%** (`EXIT_DEFAULTS.trailingStopPercent`). Precedence: per-exchange →
+account → env `LIVE_TRAILING_STOP_PERCENT` → hardcoded default; `0` = disabled.
+Env is a gap-filler only and must NOT override an explicit per-account/exchange
+edit.
 
 **Trading-mode presets** (`lib/tradingModePresets.ts`): conservative/balanced/
 aggressive bundles that WRITE already-wired fields (minConfidence,
@@ -365,13 +398,17 @@ priority-ordered decision tree reading `breakdowns` + `tickersData`. Logic in
   broker order without reservation; N concurrent placements can overshoot by
   N−1. Before widening cap, harden with advisory lock or `SELECT … FOR UPDATE`.
 
-## On-call (P0-01 mitigation)
+---
+
+## On-call (billing-hold safety)
 
 `forceRestoreBilling` and `waiveAllPendingFees` are super-admin only.
 - Maintain **two active super-admin Clerk users** at all times.
 - 72-hour restore grace window in `evaluateAndEnforceBillingHold` —
   force-restore stays durable across re-evaluations. Window resets on every
   admin action.
+
+(Incident origin archived in `docs/replit-history.md`.)
 
 ---
 
@@ -420,7 +457,13 @@ deploy, migrations, checklist), `render.yaml` (services + headers),
   `VITE_APP_URL`, `VITE_TRADING_DASHBOARD_URL`, `VITE_DEFAULT_LANDING`,
   `VITE_CUSTOMER_PORTAL_URL`, `CUSTOMER_APP_BASE_URL`.
 - **Operational toggles:** `CUSTOMER_LIVE_EXECUTION_ENABLED`,
-  `LIVE_EXECUTION_CONCURRENT_CAP`.
+  `LIVE_EXECUTION_CONCURRENT_CAP`, `LIVE_BLOCK_SELLS_IN_BULLISH_1H` (SELL-only
+  1H filter; default OFF).
+- **Live stop/exit tuning:** `LIVE_STOP_STABILIZATION_MS` (default 90000),
+  `LIVE_STOP_CATASTROPHIC_MULT` (default 2.5), `LIVE_STOP_IMMEDIATE_FRACTION`,
+  `LIVE_TRAILING_STOP_PERCENT` (gap-filler; default 2%).
+- **Symbol policy (optional, env-tunable):** live disable list + per-symbol size
+  multipliers (SoT defaults in `symbolPolicy.ts`).
 - **Production-only:** `CLERK_SECRET_KEY_LIVE`,
   `VITE_CLERK_PUBLISHABLE_KEY_LIVE`.
 
