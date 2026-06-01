@@ -107,3 +107,9 @@ id = "38Nv9r89ZGXI4evv_6awM"
 uri = "file://.local/docs/per-user-tier-trade-limits-spec.md"
 type = "text"
 title = "Per-User Tier-Based Trade Limits — Design Spec"
+
+[[outputs]]
+id = "S0Q8qjdfUJ1Ul1_-MiFYd"
+uri = "file://reports/launch-readiness-report.md"
+type = "text"
+title = "AICandlez — Pre-Launch Profit Validation & Readiness Report"
