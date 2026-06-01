@@ -228,6 +228,17 @@ Render services: `aicandlez-trade`, `aicandlez-admintrade`,
   auto-provisioned. Prod swaps to `*_LIVE` variants.
 - `lib/db/src/schema/users.ts` — `users` (clerkUserId, email,
   role: `user`/`admin`/`super-admin`).
+- **Role allowlists (`api-server lib/adminAllowlist.ts`) are AUTHORITATIVE.**
+  `/auth/me` resolves role on every login: `SUPER_ADMIN_EMAILS` →
+  `super-admin`; `OPERATOR_ADMIN_EMAILS` → `admin`; otherwise → `user`. It
+  both promotes AND downgrades — a stale `admin` whose email left
+  `OPERATOR_ADMIN_EMAILS` is reset to `user` on next login (super-admin is
+  the lone exception, never auto-demoted). Revoke operator access by removing
+  the email + redeploy. Current state: `OPERATOR_ADMIN_EMAILS` is **empty** (see
+  `adminAllowlist.ts` for the authoritative literal values); the only admin is
+  the single designated super-admin account. All other accounts are customers
+  and land in `PortalCustomerShell` (Candidate B) — the production customer
+  dashboard.
 - Server: `clerkProxyMiddleware` (prod) → `clerkMiddleware` →
   `requireAuth` / `requireRole`. `requireAuth` calls `touchSession()` →
   `user_sessions` (indexed SELECT, debounced 60s writes, fail-open).

@@ -1,0 +1,50 @@
+The recent operator-role changes are routing accounts into the wrong experience.
+
+Please make the following changes:
+
+1. **Candidate B (PortalCustomerShell) should be the default dashboard for all users.**
+
+   * This includes:
+
+     * [info@mixtapepsd.com](mailto:info@mixtapepsd.com)
+     * [teedelgado@gmail.com](mailto:teedelgado@gmail.com)
+     * all normal customer accounts
+   * The dashboard on the left side of my screenshot is the correct dashboard and should remain the primary production experience.
+
+2. **Remove the large red "CANDIDATE B ACTIVE" banner from the top.**
+
+   * Candidate B is no longer a candidate. It is the production customer dashboard.
+   * The purple/red development banners are no longer needed for customers.
+
+3. **Only [mercadojules@gmail.com](mailto:mercadojules@gmail.com) should have access to the Admin Dashboard.**
+
+   * [mercadojules@gmail.com](mailto:mercadojules@gmail.com) = Admin / Operator Console
+   * [info@mixtapepsd.com](mailto:info@mixtapepsd.com) = Customer Dashboard
+   * [teedelgado@gmail.com](mailto:teedelgado@gmail.com) = Customer Dashboard
+
+4. **Do not replace the customer dashboard with the Admin Dashboard.**
+
+   * The customer dashboard contains:
+
+     * Home
+     * Signals
+     * Trade
+     * Portfolio
+     * Profile
+     * Watchlist
+     * Per-exchange sizing
+     * Trade history
+     * Execution funnel
+     * Customer account views
+   * This is the preferred trading interface.
+
+5. **Verify that the recent operator-role changes did not modify or regress the customer dashboard.**
+
+   * The dashboard currently shown on my wife's account is the version I want all customer accounts using.
+   * Confirm that no customer-facing functionality, layout, sizing controls, trade history, execution funnel, or portfolio components were altered during the operator-role work.
+
+6. **Admin access should remain available only through [mercadojules@gmail.com](mailto:mercadojules@gmail.com).**
+
+   * The Admin Dashboard should not automatically replace the customer dashboard for other accounts.
+
+Please restore the routing so customer accounts land directly in the customer trading dashboard and only [mercadojules@gmail.com](mailto:mercadojules@gmail.com) lands in the Admin Dashboard.

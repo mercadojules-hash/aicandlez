@@ -27,14 +27,18 @@ export function isSuperAdminEmail(email: string | null | undefined): boolean {
 // path, /command console) but NOT super-admin powers (billing force-restore /
 // fee waiver). A super-admin email is never downgraded to admin (see auth.ts).
 //
-// Lower-cased + trimmed comparisons. To add another operator, append to the
-// array and redeploy.
+// This allowlist is AUTHORITATIVE for the operator `admin` role: /auth/me both
+// promotes listed emails AND downgrades any stale `admin` whose email is no
+// longer here back to `user` (super-admin is never auto-demoted). To grant
+// operator access, append the email + redeploy; to revoke it, remove the email
+// + redeploy (the account self-corrects to a plain customer on next login).
+//
+// Currently intentionally EMPTY: admin/operator access is restricted to the
+// single super-admin (mercadojules@gmail.com). info@mixtapepsd.com and
+// teedelgado@gmail.com were previously here but are now customer accounts.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const OPERATOR_ADMIN_EMAILS: readonly string[] = [
-  "info@mixtapepsd.com",
-  "teedelgado@gmail.com",
-];
+export const OPERATOR_ADMIN_EMAILS: readonly string[] = [];
 
 export function isOperatorAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;

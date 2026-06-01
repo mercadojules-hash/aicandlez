@@ -34,16 +34,13 @@ router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
     }
   }
 
-  // Allowlist-driven role: super-admin wins; otherwise operator allowlist →
-  // `admin` (operator surface, no super-admin powers). Never downgrades a
-  // super-admin who also happens to be on the operator list.
+  // Allowlist-driven role, AUTHORITATIVE in both directions for the operator
+  // `admin` role: super-admin wins; otherwise operator allowlist → `admin`;
+  // otherwise → `user`. A super-admin is NEVER auto-downgraded here (on-call
+  // safety: super-admin removal is a deliberate manual action, not a silent
+  // side effect of an /auth/me call).
   const shouldBeSuperAdmin    = isSuperAdminEmail(email);
   const shouldBeOperatorAdmin = !shouldBeSuperAdmin && isOperatorAdminEmail(email);
-  const targetRole: "super-admin" | "admin" | undefined = shouldBeSuperAdmin
-    ? "super-admin"
-    : shouldBeOperatorAdmin
-      ? "admin"
-      : undefined;
 
   const [existing] = await db
     .select()
@@ -51,23 +48,40 @@ router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
     .where(eq(usersTable.clerkUserId, clerkUserId));
 
   if (existing) {
-    // Re-assert allowlisted role on every login (defends against accidental
-    // role downgrades in the DB). Guard: an operator-allowlist match must NEVER
-    // downgrade an account already stored as super-admin.
-    const isDowngradeFromSuperAdmin =
-      existing.role === "super-admin" && targetRole !== "super-admin";
-    if (targetRole && existing.role !== targetRole && !isDowngradeFromSuperAdmin) {
+    // Resolve the role this account SHOULD have. The operator allowlist is
+    // authoritative: an account previously promoted to `admin` whose email is
+    // no longer listed is reset to `user` — this is how operator access is
+    // revoked (remove the email from the allowlist + redeploy). The lone
+    // exception is super-admin, which is never auto-demoted.
+    let desiredRole: "super-admin" | "admin" | "user";
+    if (shouldBeSuperAdmin) {
+      desiredRole = "super-admin";
+    } else if (existing.role === "super-admin") {
+      desiredRole = "super-admin"; // never auto-downgrade a super-admin
+    } else if (shouldBeOperatorAdmin) {
+      desiredRole = "admin";
+    } else {
+      desiredRole = "user";
+    }
+
+    if (existing.role !== desiredRole) {
       const [updated] = await db
         .update(usersTable)
-        .set({ role: targetRole, updatedAt: new Date() })
+        .set({ role: desiredRole, updatedAt: new Date() })
         .where(eq(usersTable.clerkUserId, clerkUserId))
         .returning();
-      req.log.info({ clerkUserId, email, role: targetRole }, "Role auto-promoted");
+      const isPromotion =
+        (existing.role === "user" && desiredRole !== "user") ||
+        (existing.role === "admin" && desiredRole === "super-admin");
+      req.log.info(
+        { clerkUserId, email, previousRole: existing.role, role: desiredRole },
+        isPromotion ? "Role auto-promoted" : "Role auto-corrected (downgrade)",
+      );
       auditLogger.append(clerkUserId, "ADMIN_ACTION", {
-        action:       "ROLE_PROMOTED",
+        action:       isPromotion ? "ROLE_PROMOTED" : "ROLE_DOWNGRADED",
         email,
         previousRole: existing.role,
-        newRole:      targetRole,
+        newRole:      desiredRole,
       }, { severity: "warn", ipAddress: ipAddress ?? undefined });
       res.json(updated);
       return;
@@ -76,12 +90,18 @@ router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  const newUserRole: "super-admin" | "admin" | "user" = shouldBeSuperAdmin
+    ? "super-admin"
+    : shouldBeOperatorAdmin
+      ? "admin"
+      : "user";
+
   const [created] = await db
     .insert(usersTable)
     .values({
       clerkUserId,
       email,
-      role: targetRole ?? "user",
+      role: newUserRole,
     })
     .returning();
 
