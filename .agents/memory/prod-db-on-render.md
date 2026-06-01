@@ -30,6 +30,12 @@ whole affected-table data layer goes down in prod — e.g. `loadFromDB`'s `.sele
 the in-memory registry hydrates empty (Open Positions 0, empty feeds, $0 P&L), AND live fills
 fail to persist (real money spent, no row). Reads break, not just writes.
 
+**Recovery is restart-free:** `getOrLoad` writes the registry only on a *successful* `loadFromDB`
+(`.then(state => registry.set(...))`); a rejected load is never cached and the in-flight promise is
+cleared in `.finally`. So the instant the missing column is added to prod, the next request
+re-hydrates cleanly — no Render restart required. Apply the additive `ALTER` and per-user reads
+self-heal on the following poll.
+
 **Diagnostic nuance (don't get fooled):** only statements that *reference the missing column*
 throw. NARROW projected selects that list only pre-existing columns (e.g.
 `db.select({autoMode: ...})`) keep working — so the app looks *partly* healthy. In one incident
