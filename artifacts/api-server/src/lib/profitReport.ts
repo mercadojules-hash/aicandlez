@@ -28,6 +28,14 @@ export interface ProfitReportTrade {
 export interface ProfitReportFunnel {
   attempts: number;
   successes: number;
+  /**
+   * Epoch ms the funnel counters started accumulating from. The funnel is an
+   * in-memory, since-process-start counter, whereas the realized P&L below is
+   * all-time (persisted `sim_trades`). Surfacing this lets the UI scope the
+   * attempt→fill conversion ("since engine start") so the two windows are not
+   * silently conflated.
+   */
+  since: number;
 }
 
 export type CloseReasonKey =
@@ -79,6 +87,12 @@ export interface ProfitReport {
   attemptToFillRate: number;
   attempts: number;
   fills: number;
+  /**
+   * Epoch ms the attempt/fill counters started from (engine/process start).
+   * The conversion above is scoped to THIS window; realized P&L stats are
+   * all-time. The UI labels attempt→fill accordingly so they are not conflated.
+   */
+  funnelSince: number;
   /** Realized P&L grouped by category, desc. */
   byCategory: Array<{ category: SymbolCategory; realizedPnL: number; trades: number }>;
   /** Realized P&L grouped by exchange (live legs only), desc. */
@@ -189,6 +203,7 @@ export function computeProfitReport(
     attemptToFillRate: parseFloat(attemptToFillRate.toFixed(4)),
     attempts,
     fills,
+    funnelSince: funnel.since,
     byCategory,
     byExchange,
     bySymbol,

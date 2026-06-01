@@ -1233,6 +1233,311 @@ function ModeStat({ label, value }: { label:string; value:string }) {
   );
 }
 
+// ── Profit-optimization read-only intelligence (features #5/#6/#7) ────────────
+// Three advisory surfaces that read the customer's OWN production data:
+//   • Concurrency guidance — balance-aware safe slot count (does not change caps)
+//   • Execution blockers   — where live-order attempts drop, tunable vs safety
+//   • Profit report        — realized performance + closes-by-reason breakdown
+// All read-only; no execution behaviour changes here.
+function usd(n: number): string {
+  const v = Number.isFinite(n) ? n : 0;
+  const sign = v < 0 ? "-" : "";
+  return `${sign}$${Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+}
+function holdLabel(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "—";
+  const h = ms / 3_600_000;
+  if (h >= 1) return `${h.toFixed(1)}h`;
+  const m = ms / 60_000;
+  if (m >= 1) return `${m.toFixed(0)}m`;
+  return `${Math.round(ms / 1000)}s`;
+}
+
+interface ConcurrencyTier { tradeSizeUSD:number; conservative:number; balanced:number; aggressive:number; }
+interface ConcurrencyRec {
+  equityUSD:number; tradeSizeUSD:number; plan:string; planMaxPositions:number|null;
+  recommended:number; capLimitedByPlan:boolean; capLimitedByBalance:boolean;
+  reserveFraction:number; perTier:ConcurrencyTier[]; note:string; equitySource:"live"|"paper";
+}
+
+function ConcurrencySection() {
+  const { data, isLoading } = useQuery<ConcurrencyRec>({
+    queryKey: ["user-concurrency-rec"],
+    queryFn:  () => exitApi<ConcurrencyRec>("GET", "/user/concurrency-recommendation"),
+  });
+  return (
+    <div style={{ marginBottom:18 }}>
+      <SectionHead label="Concurrency Guidance" accent="rgba(0,200,255,0.65)"/>
+      <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, padding:"14px 16px" }}>
+        <div style={{ fontSize:9, fontFamily:SANS, color:GR, lineHeight:1.55, marginBottom:12 }}>
+          How many positions your balance can fund at once while keeping a cash cushion.
+          Advisory only — your plan and risk caps are unchanged.
+        </div>
+        {isLoading ? (
+          <div style={{ fontSize:11, fontFamily:SANS, color:DIM, padding:"8px 0" }}>Loading…</div>
+        ) : !data ? (
+          <div style={{ fontSize:11, fontFamily:SANS, color:DIM, padding:"8px 0" }}>Unavailable.</div>
+        ) : (
+          <>
+            <div style={{ display:"flex", alignItems:"flex-end", gap:14, marginBottom:12, flexWrap:"wrap" }}>
+              <div>
+                <div style={{ fontSize:28, fontFamily:SANS, fontWeight:700, color:"#33CCFF", lineHeight:1 }}>
+                  {data.recommended}
+                </div>
+                <div style={{ fontSize:8, fontFamily:SANS, color:DIM, letterSpacing:"0.10em", marginTop:3 }}>
+                  RECOMMENDED SLOTS
+                </div>
+              </div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:"4px 10px", paddingBottom:3 }}>
+                <ModeStat label="Equity" value={`${usd(data.equityUSD)} (${data.equitySource})`}/>
+                <ModeStat label="Size" value={`$${data.tradeSizeUSD}`}/>
+                <ModeStat label="Plan cap" value={data.planMaxPositions == null ? "∞" : String(data.planMaxPositions)}/>
+                <ModeStat label="Cushion" value={`${Math.round(data.reserveFraction*100)}%`}/>
+              </div>
+            </div>
+            <div style={{ fontSize:9, fontFamily:SANS, color: data.capLimitedByPlan ? GOLD : GR, lineHeight:1.5, marginBottom:12 }}>
+              {data.note}
+            </div>
+            <div style={{ fontSize:8, fontFamily:SANS, fontWeight:700, color:"rgba(0,200,255,0.75)",
+              letterSpacing:"0.14em", marginBottom:8 }}>BY TRADE SIZE</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              <div style={{ display:"flex", fontSize:8, fontFamily:MONO, color:DIM, letterSpacing:"0.06em" }}>
+                <span style={{ flex:1 }}>SIZE</span>
+                <span style={{ width:60, textAlign:"right" }}>SAFE</span>
+                <span style={{ width:60, textAlign:"right" }}>BALANCED</span>
+                <span style={{ width:60, textAlign:"right" }}>MAX</span>
+              </div>
+              {data.perTier.map((t) => {
+                const active = t.tradeSizeUSD === data.tradeSizeUSD;
+                return (
+                  <div key={t.tradeSizeUSD} style={{
+                    display:"flex", fontSize:10, fontFamily:MONO,
+                    color: active ? W : GR, fontWeight: active ? 700 : 400,
+                    padding:"4px 6px", borderRadius:6,
+                    background: active ? "rgba(0,200,255,0.06)" : "transparent",
+                  }}>
+                    <span style={{ flex:1 }}>${t.tradeSizeUSD}{active ? " ◂" : ""}</span>
+                    <span style={{ width:60, textAlign:"right" }}>{t.conservative}</span>
+                    <span style={{ width:60, textAlign:"right" }}>{t.balanced}</span>
+                    <span style={{ width:60, textAlign:"right" }}>{t.aggressive}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface BlockerRow {
+  reason:string; label:string; blockerClass:"tunable"|"entitlement"|"safety";
+  tunableViaPreset:boolean; explanation:string; action:string; count:number;
+}
+interface BlockerReport {
+  since:number; attempts:number; successes:number; failures:number; fillRate:number;
+  blockers:BlockerRow[]; summary:{ tunable:number; entitlement:number; safety:number };
+}
+const BLOCKER_CLASS_META: Record<BlockerRow["blockerClass"], { label:string; color:string; bg:string }> = {
+  tunable:     { label:"TUNABLE",     color:C,        bg:"rgba(102,255,102,0.10)" },
+  entitlement: { label:"PLAN",        color:"#33CCFF",bg:"rgba(0,200,255,0.10)" },
+  safety:      { label:"SAFETY",      color:GOLD,     bg:"rgba(255,210,0,0.10)" },
+};
+
+function ExecutionBlockersSection() {
+  const { data, isLoading } = useQuery<BlockerReport>({
+    queryKey: ["user-execution-blockers"],
+    queryFn:  () => exitApi<BlockerReport>("GET", "/user/execution-blockers"),
+  });
+  const active = (data?.blockers ?? []).filter(b => b.count > 0);
+  return (
+    <div style={{ marginBottom:18 }}>
+      <SectionHead label="Execution Blockers" accent="rgba(255,148,0,0.65)"/>
+      <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, padding:"14px 16px" }}>
+        <div style={{ fontSize:9, fontFamily:SANS, color:GR, lineHeight:1.55, marginBottom:12 }}>
+          Where your live-order attempts were held back since the engine started.
+          <span style={{ color:C }}> Tunable</span> blockers can be relaxed with a trading mode;
+          <span style={{ color:GOLD }}> safety</span> blockers protect you and stay on.
+        </div>
+        {isLoading ? (
+          <div style={{ fontSize:11, fontFamily:SANS, color:DIM, padding:"8px 0" }}>Loading…</div>
+        ) : !data ? (
+          <div style={{ fontSize:11, fontFamily:SANS, color:DIM, padding:"8px 0" }}>Unavailable.</div>
+        ) : (
+          <>
+            <div style={{ display:"flex", gap:"4px 10px", flexWrap:"wrap", marginBottom:12 }}>
+              <ModeStat label="Attempts" value={String(data.attempts)}/>
+              <ModeStat label="Fills" value={String(data.successes)}/>
+              <ModeStat label="Fill rate" value={`${Math.round(data.fillRate*100)}%`}/>
+              <ModeStat label="Blocked" value={String(data.failures)}/>
+            </div>
+            {active.length === 0 ? (
+              <div style={{ fontSize:10, fontFamily:SANS, color:DIM, padding:"6px 0" }}>
+                No blocked attempts recorded yet.
+              </div>
+            ) : (
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {active.map((b) => {
+                  const m = BLOCKER_CLASS_META[b.blockerClass];
+                  return (
+                    <div key={b.reason} style={{
+                      border:`1px solid ${E}`, borderRadius:10, padding:"10px 12px",
+                      background:"rgba(255,255,255,0.02)",
+                    }}>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+                        <span style={{ fontSize:11, fontFamily:SANS, fontWeight:600, color:W }}>{b.label}</span>
+                        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                          <span style={{ fontSize:8, fontFamily:SANS, fontWeight:700, letterSpacing:"0.06em",
+                            color:m.color, padding:"2px 7px", borderRadius:5, background:m.bg }}>{m.label}</span>
+                          <span style={{ fontSize:13, fontFamily:MONO, fontWeight:700, color:GR }}>{b.count}</span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize:8.5, fontFamily:SANS, color:GR, lineHeight:1.5, marginTop:4 }}>{b.explanation}</div>
+                      <div style={{ fontSize:8.5, fontFamily:SANS, color: b.tunableViaPreset ? C : DIM, lineHeight:1.5, marginTop:2 }}>{b.action}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface RankedPnL { key:string; realizedPnL:number; trades:number; }
+interface ProfitReportData {
+  tradeCount:number; wins:number; losses:number; winRate:number; totalRealizedPnL:number;
+  avgWin:number; avgLoss:number; profitFactor:number|null; avgHoldMs:number;
+  attemptToFillRate:number; attempts:number; fills:number; funnelSince:number;
+  byCategory:Array<{ category:string; realizedPnL:number; trades:number }>;
+  byExchange:RankedPnL[]; bySymbol:RankedPnL[];
+  closesByReason:Array<{ reason:string; count:number }>;
+}
+const CLOSE_REASON_LABEL: Record<string, string> = {
+  TAKE_PROFIT:"Take Profit", STOP_LOSS:"Stop Loss", TRAILING_STOP:"Trailing Stop",
+  MAX_HOLD:"Max Hold", MANUAL:"Manual", OTHER:"Other",
+};
+
+function ProfitReportSection() {
+  const { data, isLoading } = useQuery<ProfitReportData>({
+    queryKey: ["user-profit-report"],
+    queryFn:  () => exitApi<ProfitReportData>("GET", "/user/profit-report"),
+  });
+  const pnlColor = (n:number) => n > 0 ? C : n < 0 ? "rgba(255,90,90,0.9)" : GR;
+  return (
+    <div style={{ marginBottom:18 }}>
+      <SectionHead label="Profit Report" accent="rgba(124,255,0,0.65)"/>
+      <div style={{ background:CARD, border:`1px solid ${E}`, borderRadius:16, padding:"14px 16px" }}>
+        <div style={{ fontSize:9, fontFamily:SANS, color:GR, lineHeight:1.55, marginBottom:12 }}>
+          Your realized performance across closed trades, with the breakdown of how
+          positions closed (take-profit, trailing, stop-loss, max-hold).
+        </div>
+        {isLoading ? (
+          <div style={{ fontSize:11, fontFamily:SANS, color:DIM, padding:"8px 0" }}>Loading…</div>
+        ) : !data ? (
+          <div style={{ fontSize:11, fontFamily:SANS, color:DIM, padding:"8px 0" }}>Unavailable.</div>
+        ) : data.tradeCount === 0 ? (
+          <div style={{ fontSize:10, fontFamily:SANS, color:DIM, padding:"6px 0" }}>
+            No closed trades yet. Metrics appear once positions close.
+          </div>
+        ) : (
+          <>
+            <div style={{ display:"flex", alignItems:"flex-end", gap:14, marginBottom:14, flexWrap:"wrap" }}>
+              <div>
+                <div style={{ fontSize:24, fontFamily:SANS, fontWeight:700, color:pnlColor(data.totalRealizedPnL), lineHeight:1 }}>
+                  {usd(data.totalRealizedPnL)}
+                </div>
+                <div style={{ fontSize:8, fontFamily:SANS, color:DIM, letterSpacing:"0.10em", marginTop:3 }}>
+                  NET REALIZED P&amp;L
+                </div>
+              </div>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px 14px", marginBottom:14 }}>
+              <Metric label="Win rate" value={`${Math.round(data.winRate*100)}%`} sub={`${data.wins}W / ${data.losses}L`}/>
+              <Metric label="Profit factor" value={data.profitFactor == null ? "∞" : data.profitFactor.toFixed(2)} sub={`${data.tradeCount} trades`}/>
+              <Metric label="Avg winner" value={usd(data.avgWin)} color={C}/>
+              <Metric label="Avg loser" value={usd(data.avgLoss)} color="rgba(255,90,90,0.9)"/>
+              <Metric label="Attempt→fill" value={`${Math.round(data.attemptToFillRate*100)}%`} sub={`${data.fills}/${data.attempts} · since engine start`}/>
+              <Metric label="Avg hold" value={holdLabel(data.avgHoldMs)}/>
+            </div>
+
+            <div style={{ fontSize:8, fontFamily:SANS, fontWeight:700, color:"rgba(124,255,0,0.75)",
+              letterSpacing:"0.14em", marginBottom:8 }}>CLOSES BY REASON</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:14 }}>
+              {data.closesByReason.filter(r => r.count > 0).length === 0 ? (
+                <span style={{ fontSize:9, fontFamily:SANS, color:DIM }}>None yet.</span>
+              ) : data.closesByReason.filter(r => r.count > 0).map((r) => (
+                <span key={r.reason} style={{
+                  fontSize:9, fontFamily:MONO, color:GR, padding:"4px 8px", borderRadius:6,
+                  background:"rgba(255,255,255,0.03)", border:`1px solid ${E}`,
+                }}>
+                  {CLOSE_REASON_LABEL[r.reason] ?? r.reason} <span style={{ color:W, fontWeight:700 }}>{r.count}</span>
+                </span>
+              ))}
+            </div>
+
+            {data.byCategory.length > 0 && (
+              <>
+                <div style={{ fontSize:8, fontFamily:SANS, fontWeight:700, color:"rgba(124,255,0,0.75)",
+                  letterSpacing:"0.14em", marginBottom:8 }}>BY CATEGORY</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:5, marginBottom:14 }}>
+                  {data.byCategory.map((c) => (
+                    <RankRow key={c.category} label={c.category.toUpperCase()} trades={c.trades} pnl={c.realizedPnL} pnlColor={pnlColor}/>
+                  ))}
+                </div>
+              </>
+            )}
+            {data.byExchange.length > 0 && (
+              <>
+                <div style={{ fontSize:8, fontFamily:SANS, fontWeight:700, color:"rgba(124,255,0,0.75)",
+                  letterSpacing:"0.14em", marginBottom:8 }}>BY EXCHANGE</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:5, marginBottom:14 }}>
+                  {data.byExchange.map((e) => (
+                    <RankRow key={e.key} label={e.key} trades={e.trades} pnl={e.realizedPnL} pnlColor={pnlColor}/>
+                  ))}
+                </div>
+              </>
+            )}
+            {data.bySymbol.length > 0 && (
+              <>
+                <div style={{ fontSize:8, fontFamily:SANS, fontWeight:700, color:"rgba(124,255,0,0.75)",
+                  letterSpacing:"0.14em", marginBottom:8 }}>TOP SYMBOLS</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                  {data.bySymbol.map((s) => (
+                    <RankRow key={s.key} label={s.key} trades={s.trades} pnl={s.realizedPnL} pnlColor={pnlColor}/>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value, sub, color }: { label:string; value:string; sub?:string; color?:string }) {
+  return (
+    <div>
+      <div style={{ fontSize:8, fontFamily:SANS, color:DIM, letterSpacing:"0.08em", marginBottom:3 }}>{label.toUpperCase()}</div>
+      <div style={{ fontSize:15, fontFamily:SANS, fontWeight:700, color: color ?? W, lineHeight:1 }}>{value}</div>
+      {sub && <div style={{ fontSize:8, fontFamily:MONO, color:GR, marginTop:2 }}>{sub}</div>}
+    </div>
+  );
+}
+function RankRow({ label, trades, pnl, pnlColor }: { label:string; trades:number; pnl:number; pnlColor:(n:number)=>string }) {
+  return (
+    <div style={{ display:"flex", alignItems:"center", fontSize:10, fontFamily:MONO }}>
+      <span style={{ flex:1, color:W }}>{label}</span>
+      <span style={{ width:50, textAlign:"right", color:DIM }}>{trades}t</span>
+      <span style={{ width:80, textAlign:"right", color:pnlColor(pnl), fontWeight:700 }}>{usd(pnl)}</span>
+    </div>
+  );
+}
+
 function ExitControlsSection() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery<ExitConfigResponse>({
@@ -2184,6 +2489,15 @@ export default function Profile() {
 
         {/* ── Exit Controls (per-account / per-exchange live-exit overrides) ── */}
         <ExitControlsSection/>
+
+        {/* ── Concurrency guidance (balance-aware, advisory only) ──────────── */}
+        <ConcurrencySection/>
+
+        {/* ── Execution blockers (tunable vs core-safety) ──────────────────── */}
+        <ExecutionBlockersSection/>
+
+        {/* ── Consolidated profit report (realized perf + closes by reason) ── */}
+        <ProfitReportSection/>
 
         {/* ── Alert & Feedback Preferences (notification scaffolding) ──────── */}
         <AlertPreferencesSection/>

@@ -53,6 +53,7 @@ router.get(
     const report = computeProfitReport(trades, {
       attempts: funnel.attempts,
       successes: funnel.successes,
+      since: funnel.since,
     });
 
     res.json(report);

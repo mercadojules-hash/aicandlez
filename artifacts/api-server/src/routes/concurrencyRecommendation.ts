@@ -51,6 +51,8 @@ router.get(
     const [settingsRow] = await db
       .select({
         preferredLiveOrderSizeUsd: userSettingsTable.preferredLiveOrderSizeUsd,
+        positionSizeUSD:           userSettingsTable.positionSizeUSD,
+        activeRuntimeExchange:     userSettingsTable.activeRuntimeExchange,
       })
       .from(userSettingsTable)
       .where(eq(userSettingsTable.userId, userId))
@@ -60,37 +62,58 @@ router.get(
     const isUnlimited =
       role === "admin" || role === "super-admin" || !!userRow?.isInternalAccount;
     const plan = asPlan(userRow?.plan);
-    const tradeSizeUSD = settingsRow?.preferredLiveOrderSizeUsd ?? 10;
+    const liveTradeSizeUSD  = settingsRow?.preferredLiveOrderSizeUsd ?? 10;
+    const paperTradeSizeUSD = settingsRow?.positionSizeUSD ?? liveTradeSizeUSD;
+    const activeRuntimeExchange = settingsRow?.activeRuntimeExchange ?? null;
 
-    // Equity sourcing: prefer the funded active live venue; fall back to paper.
+    // Equity sourcing: resolve the customer's ACTIVE live venue using the same
+    // decision rule the runtime state uses (honor an explicit
+    // `activeRuntimeExchange` pin; otherwise auto-promote when there is exactly
+    // ONE active live connection), NOT just `isDefault`. Fall back to paper
+    // equity when no single funded live venue resolves. Trade size follows the
+    // resolved mode so the recommendation reflects the size that actually ships
+    // (live → preferredLiveOrderSizeUsd; paper → positionSizeUSD).
     let equityUSD = 0;
     let equitySource: "live" | "paper" = "paper";
+    let tradeSizeUSD = paperTradeSizeUSD;
 
-    const [liveConn] = await db
-      .select()
-      .from(userExchangeConnectionsTable)
-      .where(
-        and(
-          eq(userExchangeConnectionsTable.userId, userId),
-          eq(userExchangeConnectionsTable.isDefault, true),
-          eq(userExchangeConnectionsTable.status, "active"),
-          eq(userExchangeConnectionsTable.tradingMode, "live"),
-        ),
-      )
-      .limit(1);
-
-    if (liveConn) {
-      try {
-        const snap = await loadBalanceForRow(userId, liveConn);
-        if (snap.ok && Number.isFinite(snap.totalEquityUSD) && snap.totalEquityUSD > 0) {
-          equityUSD = snap.totalEquityUSD;
-          equitySource = "live";
-        }
-      } catch (err) {
-        req.log.warn(
-          { tag: "CONCURRENCY_REC", userId, err },
-          "[CONCURRENCY_REC] live balance poll failed — falling back to paper equity",
+    // Explicit paper opt-out short-circuits any live resolution.
+    if (activeRuntimeExchange !== "paper") {
+      const liveConns = await db
+        .select()
+        .from(userExchangeConnectionsTable)
+        .where(
+          and(
+            eq(userExchangeConnectionsTable.userId, userId),
+            eq(userExchangeConnectionsTable.status, "active"),
+            eq(userExchangeConnectionsTable.tradingMode, "live"),
+          ),
         );
+
+      // Resolve the single active venue: a specific pin wins; else auto-promote
+      // only when exactly one live connection exists (two → stay paper until the
+      // user picks, mirroring the runtime aggregator).
+      let activeConn: (typeof liveConns)[number] | undefined;
+      if (activeRuntimeExchange) {
+        activeConn = liveConns.find((c) => c.exchange === activeRuntimeExchange);
+      } else if (liveConns.length === 1) {
+        activeConn = liveConns[0];
+      }
+
+      if (activeConn) {
+        try {
+          const snap = await loadBalanceForRow(userId, activeConn);
+          if (snap.ok && Number.isFinite(snap.totalEquityUSD) && snap.totalEquityUSD > 0) {
+            equityUSD = snap.totalEquityUSD;
+            equitySource = "live";
+            tradeSizeUSD = liveTradeSizeUSD;
+          }
+        } catch (err) {
+          req.log.warn(
+            { tag: "CONCURRENCY_REC", userId, err },
+            "[CONCURRENCY_REC] live balance poll failed — falling back to paper equity",
+          );
+        }
       }
     }
 
