@@ -4216,13 +4216,38 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   // click did nothing. Production bug (May 2026) was that errors
   // other than `needsUpgrade` were silently swallowed; the bar
   // animated but no feedback ever appeared.
-  type ActivationFailure = {
+  type ActivationFailureBody = {
     code:   string;
     title:  string;
     detail: string;
   };
+  // `action` records whether the failed POST was turning AI ON or OFF, so the
+  // reconcile effect + render gate below can suppress only stale ENABLE errors
+  // when the server confirms AI is active, while still surfacing genuine
+  // DISABLE failures (user tried to turn AI off and it didn't take).
+  type ActivationFailure = ActivationFailureBody & { action: "enable" | "disable" };
   const [activationError, setActivationError] = useState<ActivationFailure | null>(null);
   const [activating, setActivating] = useState(false);
+
+  // Reconcile stale activation errors against the authoritative server state.
+  // `activationError` is sticky local state cleared only on the next attempt,
+  // a success, or manual dismiss — it is NOT reconciled with the polled
+  // `GET /user/ai-trading/state` truth. A transient failure on the enable POST
+  // (e.g. a 500 "Failed to update AI trading state", or the re-arm re-post
+  // after a hard refresh) while `autoMode` is ALREADY persisted true leaves a
+  // permanent false "ACTIVATION FAILED" banner even though the trading loop
+  // keeps running (positions/fills/P&L all normal). When the server confirms
+  // AI is enabled, an ENABLE "activation failed" banner is definitionally
+  // wrong — clear it. Depending on `activationError` too means an error raised
+  // WHILE already enabled (the reported case, where `enabled` never
+  // transitions) is also cleared, and the cleared state can't resurface later.
+  // Scoped to `action === "enable"` so a genuine DISABLE failure (user tried to
+  // turn AI off and it didn't take, so `enabled` is still true) is preserved.
+  // Genuine enable failures (AI actually OFF → `enabled === false`) are also
+  // preserved so the user still sees why a real activation did nothing.
+  useEffect(() => {
+    if (enabled && activationError?.action === "enable") setActivationError(null);
+  }, [enabled, activationError]);
 
   // Maps the server's errorCode / HTTP status to a human-readable
   // (title, detail) pair. Falls back to the raw server message so
@@ -4230,7 +4255,7 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   // concrete to grep for in support tickets.
   const mapActivationError = (err: {
     status?: number; errorCode?: string; serverMessage?: string; message?: string;
-  }): ActivationFailure => {
+  }): ActivationFailureBody => {
     const code = err.errorCode ?? (err.status ? `http_${err.status}` : "unknown");
     const fallback = err.serverMessage ?? err.message ?? "Unknown activation failure.";
     switch (code) {
@@ -4395,7 +4420,7 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
         // Every other failure (400/401/403/412/500/network) MUST be
         // surfaced — silent fail was the production bug we're patching.
         const failure = mapActivationError(err);
-        setActivationError(failure);
+        setActivationError({ ...failure, action: next ? "enable" : "disable" });
         // Structured client-side log so the operator console / Sentry
         // hookup (when wired) sees the rejection alongside server logs.
         // eslint-disable-next-line no-console
@@ -4435,7 +4460,12 @@ const EnableLiveAITradingBar = memo(function EnableLiveAITradingBar({
   // Reusable visible error banner — rendered above the OFF-state bar
   // so the user always sees WHY an activation attempt did nothing.
   // Dismissible (X) so the bar can be retried with a clean surface.
-  const errorBanner = activationError ? (
+  // Suppress only stale/transient ENABLE errors while the server confirms AI
+  // is enabled and the loop is trading — so the false "ACTIVATION FAILED"
+  // banner can never render (or flash for a frame before the reconcile effect
+  // clears it). A genuine DISABLE failure (action === "disable", `enabled`
+  // still true) still surfaces, as do all errors in the OFF state.
+  const errorBanner = activationError && !(enabled && activationError.action === "enable") ? (
     <div
       role="alert"
       style={{
