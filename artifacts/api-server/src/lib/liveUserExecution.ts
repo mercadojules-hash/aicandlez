@@ -110,7 +110,7 @@ export interface LiveUserOrderResult {
   dryRun?:         boolean;
   /** True when the order was routed through the exchange's public sandbox. */
   sandbox?:        boolean;
-  errorCode?:      "no_connection" | "not_trade_authorized" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "symbol_disabled" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached" | "allocation_limit";
+  errorCode?:      "no_connection" | "not_trade_authorized" | "decrypt_failed" | "unsupported" | "unsupported_symbol" | "symbol_not_in_universe" | "symbol_disabled" | "sell_blocked_bullish_1h" | "no_sandbox" | "price_unavailable" | "exchange_reject" | "trade_limit_exhausted" | "user_status_blocked" | "customer_live_execution_disabled" | "user_ai_disabled" | "concurrent_live_cap_reached" | "risk_max_per_trade" | "risk_max_simultaneous" | "risk_max_allocation" | "risk_reserve_cash_breach" | "risk_no_equity" | "ai_disclaimer_not_accepted" | "low_confidence_signal" | "volume_safety_gate" | "liquidity_protected" | "plan_max_positions_reached" | "allocation_limit";
   error?:          string;
 }
 
@@ -135,6 +135,32 @@ export interface LiveUserOrderResult {
  */
 export function isCustomerLiveExecutionEnabled(): boolean {
   return process.env["CUSTOMER_LIVE_EXECUTION_ENABLED"] === "true";
+}
+
+/**
+ * SELL-only 1H-trend execution filter (gate 0TREND).
+ *
+ * Live-risk filter derived from production short-book analysis: counter-trend
+ * shorts (SELL entries opened while the 1H trend is bullish) were the dominant
+ * profit leak. When `LIVE_BLOCK_SELLS_IN_BULLISH_1H` is on, a NEW customer LIVE
+ * SELL entry is rejected while the engine's CURRENT 1H trend for the symbol is
+ * `"bullish"` (EMA9 > EMA21 on 1H closes — the engine's existing definition,
+ * read straight from `engineStats.symbolBreakdowns`, never recomputed here).
+ * SELL entries are allowed when the 1H trend is `"bearish"` or `"unknown"`
+ * (treated as neutral). BUY logic is NEVER touched.
+ *
+ * Reversible: default OFF → behavior is byte-identical to legacy. Set to one of
+ * `true` / `1` / `yes` / `on` (case-insensitive) to enable without a redeploy.
+ *
+ * Scope: customer per-user live path only — does NOT change TP/SL/trailing/
+ * max-hold/trade-size/confidence, does NOT touch paper/simulation, and the
+ * operator path (`placeLiveAutoOrder`, no userId) bypasses it (mirrors
+ * 0UNI/0SYM).
+ */
+export function isSellBlockedInBullish1h(): boolean {
+  return /^(true|1|yes|on)$/i.test(
+    (process.env["LIVE_BLOCK_SELLS_IN_BULLISH_1H"] ?? "").trim(),
+  );
 }
 
 /**
@@ -798,6 +824,100 @@ export async function placeLiveAutoOrderForUser(
         logger.warn({ err, userId }, "liveUserExecution: 0SYM log insert failed");
       }
       return { success: false, userId, errorCode: "symbol_disabled", error: reason };
+    }
+  }
+
+  // 0TREND. SELL-only 1H-trend filter (live-risk filter from production
+  // short-book analysis). When LIVE_BLOCK_SELLS_IN_BULLISH_1H is on, a NEW
+  // customer LIVE SELL (short) entry is rejected while the engine's CURRENT 1H
+  // trend for the symbol is "bullish" (EMA9 > EMA21 on 1H closes — read from
+  // engineStats.symbolBreakdowns, the engine's existing definition, never
+  // recomputed here). SELL is allowed when the 1H trend is "bearish" or
+  // "unknown" (neutral). BUY is NEVER affected. Reversible: flag default OFF →
+  // legacy behavior. Operators bypass (mirrors 0UNI/0SYM). This gate does NOT
+  // touch confidence, MTF, volume, risk, sizing, SL/TP/trailing, or max-hold —
+  // it only restricts WHICH new short entries are eligible. Paper/simulation
+  // never reaches this function, so it is unaffected.
+  if (side === "SELL" && isSellBlockedInBullish1h()) {
+    const operatorTrend = await isOperatorRole(userId);
+    if (!operatorTrend) {
+      const bd =
+        engineStats.symbolBreakdowns[symbol] ??
+        engineStats.symbolBreakdowns[symbol.trim().toUpperCase()];
+      const trend1H = bd?.trend1H ?? "unknown";
+      if (trend1H === "bullish") {
+        const confidence = bd?.avgConfidence ?? null;
+        // Resolve the venue for the block log. The AI fan-out passes
+        // `targetExchange`; manual `/api/user/live-order` does not, so fall back
+        // to the user's active/default connection so the log always carries the
+        // exchange the short WOULD have routed to.
+        let exchange: string | null = req.targetExchange ?? null;
+        if (exchange == null) {
+          try {
+            const [conn] = await db
+              .select({ exchange: userExchangeConnectionsTable.exchange })
+              .from(userExchangeConnectionsTable)
+              .where(
+                and(
+                  eq(userExchangeConnectionsTable.userId, userId),
+                  eq(userExchangeConnectionsTable.status, "active"),
+                  eq(userExchangeConnectionsTable.isDefault, true),
+                ),
+              )
+              .limit(1);
+            exchange = conn?.exchange ?? null;
+          } catch (err) {
+            logger.warn({ err, userId }, "liveUserExecution: 0TREND exchange resolve failed");
+          }
+        }
+        const reason =
+          `${symbol.trim().toUpperCase()} SELL blocked — 1H trend is bullish ` +
+          `(counter-trend short filter). Shorts only open when the 1H trend is ` +
+          `bearish or neutral.`;
+        await emitFailureNotification(userId, symbol, side, reason);
+        executionStreamBus.emitEvent({
+          type:     "order_rejected",
+          severity: "warn",
+          symbol, side, sizeUSD, mode: "live",
+          gate:     "sell_blocked_bullish_1h",
+          reason:   "SELL_BLOCKED_BULLISH_1H",
+          message:  `Live order REJECTED ${symbol} ${side}: ${reason}`,
+          details:  { userId, exchange, confidence, trend1H },
+        });
+        logger.info(
+          {
+            userId,
+            exchange,
+            symbol,
+            side,
+            confidence,
+            trend1H,
+            reason: "SELL_BLOCKED_BULLISH_1H",
+          },
+          "[SELL_BLOCKED_BULLISH_1H] customer SELL blocked — 1H trend bullish",
+        );
+        try {
+          await db.insert(logsTable).values({
+            id:      crypto.randomUUID(),
+            type:    "trade",
+            level:   "warn",
+            message: `[SELL_BLOCKED_BULLISH_1H] ${reason}`,
+            details: {
+              userId,
+              exchange,
+              symbol,
+              side,
+              sizeUSD,
+              confidence,
+              trend1H,
+              errorCode: "sell_blocked_bullish_1h",
+            },
+          });
+        } catch (err) {
+          logger.warn({ err, userId }, "liveUserExecution: 0TREND log insert failed");
+        }
+        return { success: false, userId, errorCode: "sell_blocked_bullish_1h", error: reason };
+      }
     }
   }
 
