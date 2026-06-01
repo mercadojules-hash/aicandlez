@@ -1,0 +1,50 @@
+Customer dashboard appears restored and Kraken synchronization has now recovered, but there is still a data integrity issue that needs investigation.
+
+Current production state verified:
+
+* Coinbase = ACTIVE
+* Kraken = ACTIVE
+* Coinbase balance loads correctly ($621.47)
+* Kraken balance loads correctly ($56.31)
+* Customer dashboard loads correctly
+* AI controls, Conviction Radar, Signal Pressure, Execution Funnel, and account telemetry all load correctly
+
+Remaining issue:
+
+Both Live Trades and Trade History are empty.
+
+Dashboard currently shows:
+
+* Open Positions = 0
+* Fills Today = 0
+* Realized P&L = $0.00
+* Unrealized P&L = $0.00
+
+This does not match prior account activity.
+
+Please investigate:
+
+1. Are historical trades still present in the database?
+2. Did the recent portal routing/admin-customer shell changes affect trade ownership attribution?
+3. Is Live Trades querying the correct source after the schema migration and dashboard rollback?
+4. Is Trade History querying the correct table after Task #219 and the schema-drift fix?
+5. Are existing positions being filtered out because of account role changes, operator overrides, or customer/admin dispatch logic?
+6. Can you verify that a newly executed trade would appear immediately in:
+
+   * Live Trades
+   * Trade History
+   * Open Positions
+   * Fills Today
+
+Additional concern:
+
+The dashboard originally showed Kraken SYNC FAILED and later self-healed to ACTIVE. Please review logs during the period when Kraken was failing to sync because that timing may correlate with the disappearance of Live Trades and Trade History.
+
+Before making any further UI changes, please provide:
+
+* Root cause analysis
+* Exact database tables being queried by Live Trades and Trade History
+* Whether historical trade records still exist
+* Whether this is a rendering issue, attribution issue, or data issue
+
+Do not assume the issue is resolved simply because Kraken now shows ACTIVE. The exchange layer appears healthy, but trade visibility and history reporting still appear incomplete.
