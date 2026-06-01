@@ -1056,11 +1056,23 @@ interface ExitConfigResponse {
   bounds:    Record<string, ExitBound>;
 }
 
-const numOrNull = (s: string): number | null => {
-  const t = s.trim();
+// Parse one exit field for submission. Empty = inherit/default (null). A
+// NON-empty but malformed or out-of-range value THROWS a clear error instead of
+// silently coercing to null — otherwise a typo like "2o" would be saved as
+// "inherit" and quietly drop the user's intended stop. Thrown errors surface in
+// the form's save-error line (react-query mutation error).
+const parseExitField = (
+  raw: string,
+  label: string,
+  bound: ExitBound | undefined,
+): number | null => {
+  const t = raw.trim();
   if (t === "") return null;
   const n = Number(t);
-  return Number.isFinite(n) ? n : null;
+  if (!Number.isFinite(n)) throw new Error(`${label}: enter a number, or leave blank to inherit`);
+  if (bound && (n < bound.min || n > bound.max))
+    throw new Error(`${label}: must be between ${bound.min} and ${bound.max}`);
+  return n;
 };
 
 function ExitNumField({ label, hint, value, onChange }: {
@@ -1568,13 +1580,15 @@ function ExitControlsSection() {
 
   const saveAccount = useMutation({
     mutationFn: () => {
+      const b = data?.bounds ?? {};
       const body: Record<string, unknown> = {
-        // SL/TP must be concrete — empty falls back to the engine default.
-        takeProfitPercent: numOrNull(acct.tp) ?? data?.defaults.takeProfitPercent ?? 4,
-        stopLossPercent:   numOrNull(acct.sl) ?? data?.defaults.stopLossPercent ?? 2,
+        // SL/TP must be concrete — empty falls back to the engine default;
+        // malformed/out-of-range throws (never silently coerced to default).
+        takeProfitPercent: parseExitField(acct.tp, "Take Profit", b.takeProfitPercent) ?? data?.defaults.takeProfitPercent ?? 4,
+        stopLossPercent:   parseExitField(acct.sl, "Stop Loss", b.stopLossPercent) ?? data?.defaults.stopLossPercent ?? 2,
         // Nullable: empty = inherit (mirror-SL band / 24h engine default).
-        trailingStopPercent: numOrNull(acct.trail),
-        maxHoldHours:        numOrNull(acct.hold),
+        trailingStopPercent: parseExitField(acct.trail, "Trailing Stop", b.trailingStopPercent),
+        maxHoldHours:        parseExitField(acct.hold, "Max Hold", b.maxHoldHours),
       };
       return exitApi<ExitConfigResponse>("PUT", "/user/exit-config", body);
     },
@@ -1655,6 +1669,7 @@ function ExitControlsSection() {
                     label={e.meta?.name ?? e.exchange}
                     row={(data?.exchanges ?? []).find(x => x.exchange === e.exchange) ?? null}
                     account={data?.account ?? null}
+                    bounds={data?.bounds ?? {}}
                   />
                 ))}
               </div>
@@ -1666,9 +1681,10 @@ function ExitControlsSection() {
   );
 }
 
-function ExitExchangeEditor({ exchange, label, row, account }: {
+function ExitExchangeEditor({ exchange, label, row, account, bounds }: {
   exchange: string; label: string;
   row: ExitExchangeRow | null; account: ExitAccount | null;
+  bounds: Record<string, ExitBound>;
 }) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<{ tp:string; sl:string; trail:string; hold:string }>({
@@ -1693,10 +1709,10 @@ function ExitExchangeEditor({ exchange, label, row, account }: {
 
   const save = useMutation({
     mutationFn: () => exitApi<ExitConfigResponse>("PUT", `/user/exit-config/${encodeURIComponent(exchange)}`, {
-      takeProfitPercent:   numOrNull(draft.tp),
-      stopLossPercent:     numOrNull(draft.sl),
-      trailingStopPercent: numOrNull(draft.trail),
-      maxHoldHours:        numOrNull(draft.hold),
+      takeProfitPercent:   parseExitField(draft.tp, "TP", bounds.takeProfitPercent),
+      stopLossPercent:     parseExitField(draft.sl, "SL", bounds.stopLossPercent),
+      trailingStopPercent: parseExitField(draft.trail, "Trail", bounds.trailingStopPercent),
+      maxHoldHours:        parseExitField(draft.hold, "Max Hold", bounds.maxHoldHours),
     }),
     onSuccess: (resp) => {
       qc.setQueryData(["user-exit-config"], resp);

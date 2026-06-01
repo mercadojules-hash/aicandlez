@@ -3221,11 +3221,23 @@ interface AdminExitConfigResponse {
   bounds:    Record<string, { min: number; max: number }>;
 }
 
-const adminNumOrNull = (s: string): number | null => {
-  const t = s.trim();
+// Parse one exit field for submission. Empty = inherit/default (null). A
+// NON-empty but malformed or out-of-range value THROWS a clear error instead of
+// silently coercing to null — otherwise an operator typo would be persisted as
+// "inherit" and quietly drop the intended exit level. Thrown errors surface via
+// the mutation's onError toast.
+const adminParseExitField = (
+  raw: string,
+  label: string,
+  bound: { min: number; max: number } | undefined,
+): number | null => {
+  const t = raw.trim();
   if (t === "") return null;
   const n = Number(t);
-  return Number.isFinite(n) ? n : null;
+  if (!Number.isFinite(n)) throw new Error(`${label}: enter a number, or leave blank to inherit`);
+  if (bound && (n < bound.min || n > bound.max))
+    throw new Error(`${label}: must be between ${bound.min} and ${bound.max}`);
+  return n;
 };
 
 function AdminExitField({ label, hint, value, onChange }: {
@@ -3295,10 +3307,10 @@ function AdminExitControlsSection({ clerkUserId, detail }: {
         method: "PUT",
         body: JSON.stringify({
           note: n,
-          takeProfitPercent: adminNumOrNull(acct.tp) ?? data?.defaults.takeProfitPercent ?? 4,
-          stopLossPercent:   adminNumOrNull(acct.sl) ?? data?.defaults.stopLossPercent ?? 2,
-          trailingStopPercent: adminNumOrNull(acct.trail),
-          maxHoldHours:        adminNumOrNull(acct.hold),
+          takeProfitPercent: adminParseExitField(acct.tp, "Take Profit", data?.bounds?.takeProfitPercent) ?? data?.defaults.takeProfitPercent ?? 4,
+          stopLossPercent:   adminParseExitField(acct.sl, "Stop Loss", data?.bounds?.stopLossPercent) ?? data?.defaults.stopLossPercent ?? 2,
+          trailingStopPercent: adminParseExitField(acct.trail, "Trailing Stop", data?.bounds?.trailingStopPercent),
+          maxHoldHours:        adminParseExitField(acct.hold, "Max Hold", data?.bounds?.maxHoldHours),
         }),
       });
       const text = await res.text();
@@ -3385,6 +3397,7 @@ function AdminExitControlsSection({ clerkUserId, detail }: {
                   exchange={ex}
                   account={data?.account ?? null}
                   row={(data?.exchanges ?? []).find(x => x.exchange === ex) ?? null}
+                  bounds={data?.bounds ?? {}}
                   getNote={requireNote}
                 />
               ))}
@@ -3396,11 +3409,12 @@ function AdminExitControlsSection({ clerkUserId, detail }: {
   );
 }
 
-function AdminExitExchangeEditor({ clerkUserId, exchange, account, row, getNote }: {
+function AdminExitExchangeEditor({ clerkUserId, exchange, account, row, bounds, getNote }: {
   clerkUserId: string;
   exchange: string;
   account: AdminExitAccount | null;
   row: AdminExitExchangeRow | null;
+  bounds: Record<string, { min: number; max: number }>;
   getNote: () => string | null;
 }) {
   const qc = useQueryClient();
@@ -3430,10 +3444,10 @@ function AdminExitExchangeEditor({ clerkUserId, exchange, account, row, getNote 
         method: kind === "save" ? "PUT" : "DELETE",
         body: JSON.stringify(kind === "save" ? {
           note: n,
-          takeProfitPercent:   adminNumOrNull(draft.tp),
-          stopLossPercent:     adminNumOrNull(draft.sl),
-          trailingStopPercent: adminNumOrNull(draft.trail),
-          maxHoldHours:        adminNumOrNull(draft.hold),
+          takeProfitPercent:   adminParseExitField(draft.tp, "Take Profit", bounds.takeProfitPercent),
+          stopLossPercent:     adminParseExitField(draft.sl, "Stop Loss", bounds.stopLossPercent),
+          trailingStopPercent: adminParseExitField(draft.trail, "Trailing Stop", bounds.trailingStopPercent),
+          maxHoldHours:        adminParseExitField(draft.hold, "Max Hold", bounds.maxHoldHours),
         } : { note: n }),
       });
       const text = await res.text();
