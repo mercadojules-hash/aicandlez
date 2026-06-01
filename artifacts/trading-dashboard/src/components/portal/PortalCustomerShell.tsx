@@ -5458,7 +5458,7 @@ function CustomerHeaderBtn({
   );
 }
 
-export function PortalCustomerShell() {
+export function PortalCustomerShell({ operatorPreview = false }: { operatorPreview?: boolean } = {}) {
   const { isAdmin } = useUserRole();
   const plan = useCustomerPlan();
   // Richer entitlement projection — `isPaid` correctly recognizes
@@ -6175,7 +6175,13 @@ export function PortalCustomerShell() {
       }
     })();
 
-  if (isAdmin && !isDevCustomerPreview) {
+  // Production-capable operator override (Portal.tsx "View as Customer"
+  // toggle). Lets an admin session intentionally render this customer
+  // shell while keeping operator role + /command access. `isDevCustomerPreview`
+  // remains the dev-only URL shortcut. Either one suppresses the refusal.
+  const allowOperatorPreview = operatorPreview || isDevCustomerPreview;
+
+  if (isAdmin && !allowOperatorPreview) {
     if (typeof console !== "undefined") {
       // Surface the refusal so a real Portal.tsx regression is
       // visible in dev/QA rather than silently rendering blank.

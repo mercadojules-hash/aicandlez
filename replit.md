@@ -165,6 +165,15 @@ role-gated; never merge the two worlds.
 - `pages/Portal.tsx` — thin role router. Customer → `<PortalCustomerShell />`;
   admin → `<AdminPortalShell />` (or `<AdminPortalLegacy />` rollback hatch
   via `VITE_ADMIN_PORTAL_LEGACY=true`). `AdminPortalLegacy` is byte-frozen.
+  **Operator → customer-view override:** an admin/operator can opt into the
+  customer Candidate B surface at `/portal` via the floating "View as Customer"
+  toggle (persisted in localStorage `aicandlez:operator-customer-view`, or
+  `?previewCustomer=1|0`). Clerk role + `/command` + all server role checks are
+  untouched — the flag only lets an *admin* render the lower-privilege customer
+  shell (no escalation). Default (no override) preserves the locked admin →
+  AdminPortalShell dispatch. `PortalCustomerShell` takes an `operatorPreview`
+  prop that suppresses its defense-in-depth `isAdmin` render refusal only when
+  the override is set.
 - `components/portal/PortalCustomerShell.tsx` — single primary file. Owns
   shared `nowShell` 1Hz tick, lifted `/api/engine/status` query
   (`["engine-status-portal"]`), `MarketPulse` view-model, `signalsPerMin`

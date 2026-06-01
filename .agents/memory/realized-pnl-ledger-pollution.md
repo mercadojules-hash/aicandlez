@@ -28,14 +28,20 @@ customer realized surface instead.
 
 **Why:** The pre-attribution unlimited-position incident (~May 2026) left positions
 that were later mass-reconciled with no exchange attribution. The losses are real-ish
-but unverifiable; the clean post-fix figure = `SUM over sim_trades WHERE exchange IS
-NOT NULL` only.
+but unverifiable. The clean post-fix figure = `SUM over sim_trades EXCLUDING ONLY the
+incident signature` (i.e. all rows that are NOT `exchange IS NULL AND
+close_reason='RECONCILED_BACKLOG'`). This **keeps legitimate paper rows** (paper trades
+have `exchange IS NULL` too) — do NOT collapse "clean" to "exchange IS NOT NULL only",
+or you would wrongly zero out a paper-only customer's entire realized history.
 
-**How to apply:** To rebuild a trustworthy realized figure, recompute from
-`exchange IS NOT NULL` rows (net of fees) and overwrite `sim_accounts.total_realized`.
-Any reset/reconciliation tool must (1) be operator/admin-only, (2) write to PROD
-(Render DB, not the empty Replit replica), (3) ideally soft-handle the backlog rows
-(tag/exclude rather than hard-delete) so the audit trail survives.
+**How to apply:** To rebuild a trustworthy realized figure, recompute net-of-fees over
+every row EXCEPT the incident signature and overwrite `sim_accounts.total_realized`.
+The shipped operator tool is `lib/accountReconciliation.ts` + routes
+`adminReconciliation.ts` + Admin.tsx `ReconcilePanel`. Any reset/reconciliation tool
+must (1) be operator/admin-only, (2) write to PROD (Render DB, not the empty Replit
+replica), (3) soft-handle the backlog rows (tag with `reconciliation_tag`, never
+hard-delete) so the audit trail survives, (4) share ONE compute path between preview
+(read-only) and apply.
 
 ## Overwriting an accumulator ledger safely (concurrency)
 `sim_accounts.total_realized`/`total_trades` are **accumulators** — the trade-close
