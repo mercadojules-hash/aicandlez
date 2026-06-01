@@ -47,16 +47,16 @@ Forward work = `aicandlez-app` PWA + `trading-dashboard`. `natura-*` frozen.
 | `elite`   | AI Trading Elite VIP | $199.95 | 200 | **12**    |
 
 - Free = paper only; paid tiers = live only. Admin/super-admin = unlimited.
-- Runtime is subscription-driven: no sub → paper; active paid sub → live;
+- Runtime is subscription-driven: no sub → paper; active paid → live;
   canceled/expired → live disabled, paper re-enabled.
-- Stripe price IDs via env `STRIPE_PRICE_{STARTER,PRO,ELITE}_MONTHLY`;
-  legacy starter/pro grandfathered via `STRIPE_PRICE_{STARTER,PRO}_LEGACY`
+- Stripe price IDs via `STRIPE_PRICE_{STARTER,PRO,ELITE}_MONTHLY`; legacy
+  starter/pro grandfathered via `STRIPE_PRICE_{STARTER,PRO}_LEGACY`
   (comma-separated) in `planFromPriceId`.
 - Performance fee on **profitable closed trades only · never on losses**
-  (`PERFORMANCE_FEE_LABEL` from `lib/fees`)
-- Monthly · cancel anytime · Stripe customer portal for downgrades
-- SoT: `SubscriptionContext.tsx` (`plan` = `free`/`starter`/`pro`/`elite`)
-- API: `POST /billing/checkout`, `POST /billing/portal`, `GET /billing/subscription`
+  (`PERFORMANCE_FEE_LABEL` from `lib/fees`).
+- Monthly · cancel anytime · Stripe customer portal for downgrades.
+- SoT: `SubscriptionContext.tsx` (`plan` = `free`/`starter`/`pro`/`elite`).
+- API: `POST /billing/checkout`, `POST /billing/portal`, `GET /billing/subscription`.
 
 ---
 
@@ -69,13 +69,13 @@ Forward work = `aicandlez-app` PWA + `trading-dashboard`. `natura-*` frozen.
 PWA does NOT render its own desktop terminal.
 
 ### trading-dashboard
-- Signed-out `/` → landing; role-routes admin → `/command`, customer → `/portal`
+- Signed-out `/` → landing; role-routes admin → `/command`, customer → `/portal`.
 - `Protected` (any signed-in): `/portal`, `/dashboard`, `/market`, `/ai`,
   `/risk`, `/sim`, `/backtest`, `/optimizer`, `/scanner`, `/portfolio`,
-  `/correlation`, `/journal`, `/validation`, `/sentiment`, `/charts`
+  `/correlation`, `/journal`, `/validation`, `/sentiment`, `/charts`.
 - `ProtectedAdmin` (bounce non-admins → `/portal`): `/command`, `/exchange`,
-  `/syscheck`, `/debug`, `/desktop`, `/institutional`, `/admin`
-- `/settings`, `/sign-in/*`, `/sign-up/*`
+  `/syscheck`, `/debug`, `/desktop`, `/institutional`, `/admin`.
+- `/settings`, `/sign-in/*`, `/sign-up/*`.
 
 ### Cross-host matrix
 
@@ -93,8 +93,8 @@ Required build env: `VITE_TRADE_URL`, `VITE_APP_URL`,
 
 Stripe return URL resolution (`api-server lib/customerAppUrl.ts`): Origin
 header (allow-listed) → `CUSTOMER_APP_BASE_URL` → `WEBHOOK_BASE_URL` →
-`REPLIT_DOMAINS`. Client URLs honored only when origin matches resolved
-host (anti-spoof / anti-open-redirect).
+`REPLIT_DOMAINS`. Client URLs honored only when origin matches resolved host
+(anti-spoof / anti-open-redirect).
 
 Role dispatch (`SignedInHomeRouter`, `AdminOnly`): customer host non-admin
 → `/portal`; admin host non-admin → `CrossAppRedirect`.
@@ -108,42 +108,32 @@ role-gated; never merge the two worlds.
 
 ### CUSTOMER (`trade./portal`, non-admin)
 - **Runtime mode = paper by default; customers may opt into a connected
-  exchange runtime.** Source of truth = `CustomerTradingRuntimeContext`
-  (spec: `.local/docs/customer-runtime-context-spec.md`) hydrated from
-  `GET /api/user/runtime-state`. Modes: `"paper"` (simulated hero +
-  paper trades feed) or `"live"` (live equity + live BUY routing,
-  subject to ARM).
-- Auto-promotion rule: when `user_settings.activeRuntimeExchange IS
-  NULL` AND the user has exactly ONE healthy active connection
-  (status="active", balance poll ok=true), aggregator resolves
-  `mode="live"`, `activeExchange=<that one>`. Two healthy connections
-  → stay paper until user picks (Task #199 switcher UI). Any non-OK
-  state → stay paper. Explicit `"paper"` override is sticky — even
-  with one healthy connection, customer stays paper until they pick
-  an exchange.
-- Server-side kill switch `customer_live_execution_disabled` is
-  **unchanged** — enforced in `placeLiveAutoOrderForUser`,
-  `POST /api/user/live-order`, and `tradingLoop` customer fan-out.
-  Default off; flips only when `CUSTOMER_LIVE_EXECUTION_ENABLED=true`.
-  Admin/super-admin bypass. The runtime mode flipping to `"live"`
-  gives the UI permission to render live affordances; it does NOT
-  bypass this env flag, which still gates real money independently.
-- ARM gate (Task #200, errorCode `runtime_not_armed`) sits between
-  `liveReady=true` and execution. Three independent checks must all
-  pass for a live order to ship: (1) env kill switch off, (2)
-  `liveReady=true` from aggregator, (3) explicit per-session ARM.
+  exchange runtime.** SoT = `CustomerTradingRuntimeContext` (spec:
+  `.local/docs/customer-runtime-context-spec.md`) hydrated from
+  `GET /api/user/runtime-state`. Modes: `"paper"` (simulated hero + paper
+  feed) or `"live"` (live equity + live BUY routing, subject to ARM).
+- Auto-promotion: `activeRuntimeExchange IS NULL` AND exactly ONE healthy
+  active connection (status="active", balance poll ok) → resolves
+  `mode="live"`, `activeExchange=<that one>`. Two healthy → stay paper until
+  user picks (switcher UI). Any non-OK → stay paper. Explicit `"paper"`
+  override is sticky.
+- Server-side kill switch `customer_live_execution_disabled` is **unchanged**
+  — enforced in `placeLiveAutoOrderForUser`, `POST /api/user/live-order`,
+  `tradingLoop` customer fan-out. Default off; flips only when
+  `CUSTOMER_LIVE_EXECUTION_ENABLED=true`. Admin bypass. Runtime flipping to
+  `"live"` only permits live UI affordances; it does NOT bypass this flag.
+- ARM gate (errorCode `runtime_not_armed`) sits between `liveReady=true` and
+  execution. Three independent checks must all pass: (1) env kill switch off,
+  (2) `liveReady=true` from aggregator, (3) explicit per-session ARM.
 - Onboarding + upgrade funnels + tier gates unlock **paper capacity, AI
-  features, AND eligibility to connect a live exchange** (still gated
-  by the three checks above for actual execution).
-- `user_exchange_connections` + ConnectModal are load-bearing under
-  this policy. Per-connection telemetry
-  (`lastBalanceFetchAt`/`lastBalanceFetchError`) is surfaced through
-  the aggregator so the portal can render "balances last synced 12s
-  ago" / sync-failed banners.
-- `PaperTradesProvider` remains mounted, gated `!isAdmin`, used
-  whenever `mode === "paper"`.
-- Customer telemetry + trade history MUST tag rows with mode
-  (`PAPER`/`LIVE`) — unchanged.
+  features, AND eligibility to connect a live exchange** (still gated by the
+  three checks above for actual execution).
+- `user_exchange_connections` + ConnectModal are load-bearing. Per-connection
+  telemetry (`lastBalanceFetchAt`/`lastBalanceFetchError`) surfaced through the
+  aggregator for "balances last synced"/sync-failed banners.
+- `PaperTradesProvider` stays mounted, gated `!isAdmin`, used when
+  `mode === "paper"`.
+- Customer telemetry + trade history MUST tag rows with mode (`PAPER`/`LIVE`).
 
 ### ADMIN (`admintrade./portal`, admin/super-admin)
 - **Real-only.** No paper, no `PaperTradesProvider`, no simulation.
@@ -153,9 +143,11 @@ role-gated; never merge the two worlds.
 ### Rules for future changes
 1. Removing paper/onboarding/upgrade funnels MUST be role-scoped.
 2. Adding onboarding/upgrade/tier/paper affordances MUST hide when
-   `useUserRole()` is `admin`/`super-admin`.
-3. Customer-side `/portal` changes must verify admin path untouched, and
-   vice versa.
+   `useUserRole()` is `admin`/`super-admin`. This also applies to the
+   **aicandlez-app PWA** (`Profile.tsx` trading-mode/exit/intelligence cards
+   are `!isAdmin`-gated).
+3. Customer-side `/portal` changes must verify admin path untouched, and vice
+   versa.
 4. Telemetry + trade history MUST tag rows with mode (`PAPER`/`LIVE`).
 
 ---
@@ -163,40 +155,34 @@ role-gated; never merge the two worlds.
 ## Active customer portal architecture (`trading-dashboard`)
 
 - `pages/Portal.tsx` — thin role router. Customer → `<PortalCustomerShell />`;
-  admin → `<AdminPortalShell />` (or `<AdminPortalLegacy />` rollback hatch
-  via `VITE_ADMIN_PORTAL_LEGACY=true`). `AdminPortalLegacy` is byte-frozen.
-  **Operator → customer-view override:** an admin/operator can opt into the
-  customer Candidate B surface at `/portal` via the floating "View as Customer"
-  toggle (persisted in localStorage `aicandlez:operator-customer-view`, or
-  `?previewCustomer=1|0`). Clerk role + `/command` + all server role checks are
-  untouched — the flag only lets an *admin* render the lower-privilege customer
-  shell (no escalation). Default (no override) preserves the locked admin →
-  AdminPortalShell dispatch. `PortalCustomerShell` takes an `operatorPreview`
-  prop that suppresses its defense-in-depth `isAdmin` render refusal only when
-  the override is set.
+  admin → `<AdminPortalShell />` (or `<AdminPortalLegacy />` rollback hatch via
+  `VITE_ADMIN_PORTAL_LEGACY=true`; `AdminPortalLegacy` byte-frozen).
+  **Operator → customer-view override:** an admin can opt into the customer
+  surface at `/portal` via the floating "View as Customer" toggle (localStorage
+  `aicandlez:operator-customer-view`, or `?previewCustomer=1|0`). Clerk role +
+  `/command` + all server role checks untouched — flag only lets an admin
+  render the lower-privilege customer shell (no escalation).
+  `PortalCustomerShell` takes `operatorPreview` to suppress its defense-in-depth
+  `isAdmin` render refusal only when the override is set.
 - `components/portal/PortalCustomerShell.tsx` — single primary file. Owns
   shared `nowShell` 1Hz tick, lifted `/api/engine/status` query
   (`["engine-status-portal"]`), `MarketPulse` view-model, `signalsPerMin`
   (ref-anchored, 15s warmup).
-- **Dual crypto matrix (current)**: customer `/portal` and admin `/command`
-  both render the proven two-column scroll formula from
+- **Dual crypto matrix:** customer `/portal` and admin `/command` both render
+  the two-column scroll formula from
   `components/command/institutional/SignalsRow.tsx`:
-  - LEFT = `CryptoMajorsSignalsPanel` (CRYPTO_MAJORS_30: BTC ETH SOL XRP
-    ADA AVAX DOGE LINK DOT MATIC LTC BCH UNI ATOM NEAR APT ARB OP INJ SUI
-    TON TRX ETC ICP FIL HBAR AAVE MKR XLM ALGO)
-  - RIGHT = `CryptoAltsMemesPanel` (SAND MANA AXS GRT SNX CRV
-    COMP LDO RNDR FET PEPE WIF BONK JUP PYTH TIA SEI STX) — XMR/HYPE/FTM/
-    RUNE/KAS removed 2026-05-29 (symbol-universe reconciliation): not in the
-    engine-analyzed universe (COINBASE_SYMBOLS), so structurally untradeable.
-    Authoritative backstop = customer-execution gate 0UNI in
+  - LEFT = `CryptoMajorsSignalsPanel` (CRYPTO_MAJORS_30).
+  - RIGHT = `CryptoAltsMemesPanel` (alts + memes). Symbols must be in the
+    engine-analyzed universe (COINBASE_SYMBOLS) or they're structurally
+    untradeable; backstop = customer-execution gate 0UNI in
     `api-server lib/liveUserExecution.ts` (`symbol_not_in_universe`).
-  - Customer chrome = `<LiveControlBar state="PAPER">` (readonly, no
-    onToggle). Admin chrome = `<LiveControlBar state={cryptoState}
-    onToggle={toggleCryptoLive}>` (ARM LIVE-capable).
+  - Customer chrome = `<LiveControlBar state="PAPER">` (readonly). Admin chrome
+    = `<LiveControlBar state={cryptoState} onToggle={toggleCryptoLive}>`
+    (ARM LIVE-capable).
   - No equities on either surface.
-- Animation policy: every motion must answer "what intelligence state is
-  this communicating?". Gated on `isReady`/`isFreshSignal`(<30s)/
-  `isLiveTick`(<10s). Idle systems stay still.
+- Animation policy: every motion answers "what intelligence state is this
+  communicating?". Gated on `isReady`/`isFreshSignal`(<30s)/`isLiveTick`(<10s).
+  Idle systems stay still.
 - Polish tokens: `T.TRACK_LABEL=0.10em`, `T.TRACK_TITLE=0.18em`,
   `T.TRACK_DISPLAY=-0.04em`, `T.TX_FAST=120ms`, `T.TX_MED=200ms`.
   `.cd-scroll` = institutional thin neon scrollbar.
@@ -209,16 +195,16 @@ role-gated; never merge the two worlds.
 - `trade.aicandlez.com/*` — customer portal (trading-dashboard static).
   Default landing = `/portal`.
 - `admintrade.aicandlez.com/*` — admin portal (trading-dashboard static,
-  separate Render service). Default landing = `/command`. NO paper, NO
-  tier gates, unlimited execution, live Kraken only.
+  separate Render service). Default landing = `/command`. NO paper, NO tier
+  gates, unlimited execution, live Kraken only.
 - `dashboard.aicandlez.com/*` — preserved during migration; retired post
   trade./admintrade. cutover.
 
 Render services: `aicandlez-trade`, `aicandlez-admintrade`,
 `aicandlez-dashboard` in `render.yaml`. CORS allow-list on api.
 
-`AdminTopTelemetryBar` (admin-only, gated via `useUserRole()` in
-`Layout.tsx`): 15 metrics from `GET /api/admin/top-telemetry`, 5s poll.
+`AdminTopTelemetryBar` (admin-only, gated via `useUserRole()` in `Layout.tsx`):
+15 metrics from `GET /api/admin/top-telemetry`, 5s poll.
 
 ---
 
@@ -230,60 +216,63 @@ Render services: `aicandlez-trade`, `aicandlez-admintrade`,
   role: `user`/`admin`/`super-admin`).
 - **Role allowlists (`api-server lib/adminAllowlist.ts`) are AUTHORITATIVE.**
   `/auth/me` resolves role on every login: `SUPER_ADMIN_EMAILS` →
-  `super-admin`; `OPERATOR_ADMIN_EMAILS` → `admin`; otherwise → `user`. It
-  both promotes AND downgrades — a stale `admin` whose email left
-  `OPERATOR_ADMIN_EMAILS` is reset to `user` on next login (super-admin is
-  the lone exception, never auto-demoted). Revoke operator access by removing
-  the email + redeploy. Current state: `OPERATOR_ADMIN_EMAILS` is **empty** (see
-  `adminAllowlist.ts` for the authoritative literal values); the only admin is
-  the single designated super-admin account. All other accounts are customers
-  and land in `PortalCustomerShell` (Candidate B) — the production customer
-  dashboard.
-- Server: `clerkProxyMiddleware` (prod) → `clerkMiddleware` →
-  `requireAuth` / `requireRole`. `requireAuth` calls `touchSession()` →
-  `user_sessions` (indexed SELECT, debounced 60s writes, fail-open).
-  Revoked sessions reject 401 with `errorCode: "session_revoked"`.
-- Frontend: `ClerkProvider` + `ClerkQueryClientCacheInvalidator`. All
-  routes redirect to `/sign-in` when unauthenticated. Dark terminal theme.
+  `super-admin`; `OPERATOR_ADMIN_EMAILS` → `admin`; otherwise → `user`. It both
+  promotes AND downgrades — a stale `admin` whose email left
+  `OPERATOR_ADMIN_EMAILS` resets to `user` on next login (super-admin never
+  auto-demoted). Revoke operator access by removing the email + redeploy.
+  Current state: `OPERATOR_ADMIN_EMAILS` is **empty**; the only admin is the
+  single designated super-admin. All other accounts are customers landing in
+  `PortalCustomerShell`.
+- Server: `clerkProxyMiddleware` (prod) → `clerkMiddleware` → `requireAuth` /
+  `requireRole`. `requireAuth` calls `touchSession()` → `user_sessions`
+  (indexed SELECT, debounced 60s writes, fail-open). Revoked sessions reject
+  401 with `errorCode: "session_revoked"`.
+- Frontend: `ClerkProvider` + `ClerkQueryClientCacheInvalidator`. All routes
+  redirect to `/sign-in` when unauthenticated. Dark terminal theme.
 
 ---
 
 ## AI Trading Architecture
 
 **Global trading loop** (`lib/tradingLoop.ts`): EMA+RSI engine, MTF funnel
-(5m/15m/1H), volume + sideways + 1H-trend filters. Default
-`minConfidence=60`. Volume ≥65% of 20-bar avg (controlled live test
-2026-05-29, lowered from 85%; SoT `VOLUME_GATE_FRACTION` in tradingLoop.ts),
-sideways block <0.15%
+(5m/15m/1H), volume + sideways + 1H-trend filters. Default `minConfidence=60`.
+Volume ≥65% of 20-bar avg (SoT `VOLUME_GATE_FRACTION`), sideways block <0.15%
 spread, 1H trend OFF by default.
 
 **Per-user state** (`lib/userSimRegistry.ts`): `Map<userId, UserSimState>`,
-lazy DB-load, instant persistence. All `/api/simulation/*` `requireAuth`-
-gated. Tables: `user_settings`, `sim_accounts`, `sim_positions`,
-`sim_trades`, `user_notifications`. Starting paper balance = $100,000.
+lazy DB-load, instant persistence. All `/api/simulation/*` `requireAuth`-gated.
+Tables: `user_settings`, `sim_accounts`, `sim_positions`, `sim_trades`,
+`user_notifications`. Starting paper balance = $100,000.
 
-**Exchange connections** (`user_exchange_connections`): AES-256-GCM,
-per-user PBKDF2 via `CredentialVault`. Raw keys never plaintext.
-Supported: Kraken, Binance, Coinbase, Bybit, OKX, KuCoin. **Withdrawal
-permissions never requested, never tested, always `false`** (security
-promise). Live default OFF, requires `acknowledged: true`. Connection
-test = `getTicker` + `getAccount` round-trip before DB write. SoT =
-`EXCHANGE_CATALOG`. Per-user visibility via `user_exchange_visibility`
-(presentational only).
+**Exchange connections** (`user_exchange_connections`): AES-256-GCM, per-user
+PBKDF2 via `CredentialVault`. Raw keys never plaintext. Supported: Kraken,
+Binance, Coinbase, Bybit, OKX, KuCoin. **Withdrawal permissions never
+requested, never tested, always `false`** (security promise). Live default OFF,
+requires `acknowledged: true`. Connection test = `getTicker` + `getAccount`
+round-trip before DB write. SoT = `EXCHANGE_CATALOG`. Per-user visibility via
+`user_exchange_visibility` (presentational only).
 
-**Operator multi-exchange routing:** `_selectedExchange` in
-`exchangeEngine.ts` is SoT for `executeOrder()` / `placeLiveAutoOrder()`.
-Boot priority: Kraken → Coinbase → CryptoDotCom → Binance → Gemini →
-Alpaca (first with env keys wins). Admin switches via `CommandBar`
-(`POST /api/exchange/select` → `setSelectedExchange()`); clears balances
-cache. Per-order routing not exposed.
+**Operator multi-exchange routing:** `_selectedExchange` in `exchangeEngine.ts`
+is SoT for `executeOrder()` / `placeLiveAutoOrder()`. Boot priority: Kraken →
+Coinbase → CryptoDotCom → Binance → Gemini → Alpaca (first with env keys wins).
+Admin switches via `CommandBar` (`POST /api/exchange/select` →
+`setSelectedExchange()`); clears balances cache. Per-order routing not exposed.
 
 **BUY routing matrix** (`SignalRow.fireTrade`):
 - Customer LIVE → `/api/user/live-order` (requires `isCustomerPortal &&
-  mode==="LIVE" && canUseLive && hasExchange`)
+  mode==="LIVE" && canUseLive && hasExchange`).
 - Admin operator (`isOperatorRole` only) → `/api/exchange/order/execute`
-  (Kraken env path, server `requireOperator`-gated)
-- Else → `firePaper(...)` (paper sim)
+  (Kraken env path, server `requireOperator`-gated).
+- Else → `firePaper(...)` (paper sim).
+
+**Trading-mode presets** (`lib/tradingModePresets.ts`): conservative/balanced/
+aggressive bundles that WRITE already-wired fields (minConfidence,
+categoryAllocation, account SL/TP/trailing/maxHold, preferredLiveOrderSizeUsd,
+aiPersonality) — no new execution gates. SL stays 2% in every preset; "reduce
+blockers" is opt-in only. `POST/GET /api/user/trading-mode`. Customer UI in
+`Profile.tsx` (`!isAdmin`-gated). Read-only intelligence endpoints (all
+requireAuth, per-user): `GET /api/user/{concurrency-recommendation,
+execution-blockers,profit-report}` — advisory, never change caps.
 
 ---
 
@@ -300,9 +289,11 @@ SameSite=Lax), and throws `ApiContractError` when an OK response returns
 non-JSON (catches "static host returned `index.html`" silent emptying).
 
 **Build-time guardrail:** `pnpm --filter @workspace/scripts run
-check-no-bare-api-fetch` — fails on any bare `fetch("/api/...")` outside
-the two `authFetch.ts` files and `useUserRole.ts` (intentional
-pre-bootstrap `/api/auth/me` with freshly-issued `getToken()`).
+check-no-bare-api-fetch` — fails on any bare `fetch("/api/...")` outside the two
+`authFetch.ts` files and `useUserRole.ts` (intentional pre-bootstrap
+`/api/auth/me` with freshly-issued `getToken()`). NOTE: the guard does NOT catch
+calls that already go through `api.*`/`exitApi` helpers — those still must use
+authFetch under the hood.
 
 `ApiBaseUrlBanner` renders if `VITE_API_BASE_URL` empty at build time.
 
@@ -310,25 +301,25 @@ pre-bootstrap `/api/auth/me` with freshly-issued `getToken()`).
 
 ## UI System (locked, do not redesign)
 
-**Brand:** neon-green. `#66FF66` brand · `#00C853` emerald · `#7CFF00`
-lime · `#39FF14` vivid. BG `#000`/`#050A07`/`#0A1410`/`#0F1F18`.
+**Brand:** neon-green. `#66FF66` brand · `#00C853` emerald · `#7CFF00` lime ·
+`#39FF14` vivid. BG `#000`/`#050A07`/`#0A1410`/`#0F1F18`.
 
 **Tokens:** `artifacts/aicandlez-app/src/index.css` (HSL `--primary`=120°,
 `--brand{-deep,-bright,-vivid,-glow,-bloom,-whisper}`, `--ink-0..3`,
 `--glass-1..3`, animation lib).
 
 **Locked surfaces — do not restructure:** Home (radar + AI Market Scanner +
-Top Gainers + Crypto Signals + Live Trades + Trade History + portfolio
-hero, single-column mobile-first); Signals/Crypto cards; Profile
-structure; bottom nav; brand header.
+Top Gainers + Crypto Signals + Live Trades + Trade History + portfolio hero,
+single-column mobile-first); Signals/Crypto cards; Profile structure; bottom
+nav; brand header.
 
 **Master assets:**
 - `artifacts/aicandlez-app/src/assets/aicandlez-logo-master.png`
 - `artifacts/aicandlez-app/src/assets/aicandlez-icon-master.png`
 
 **AI Market Scanner** (Home radar): 10+ rotating intelligent states,
-priority-ordered decision tree reading `breakdowns` + `tickersData`.
-Logic in `artifacts/aicandlez-app/src/pages/Home.tsx`.
+priority-ordered decision tree reading `breakdowns` + `tickersData`. Logic in
+`artifacts/aicandlez-app/src/pages/Home.tsx`.
 
 **Notification/feedback** (`artifacts/aicandlez-app/src/lib/feedback.ts`):
 `ALERT_DEFINITIONS`, `FeedbackPrefs` (localStorage, master + per-alert),
@@ -344,65 +335,61 @@ Logic in `artifacts/aicandlez-app/src/pages/Home.tsx`.
 - `/admin/users` — grid + telemetry from `GET /api/admin/users`.
 - `/admin/activity`, `/admin/subscriptions`, `/admin/sessions` — pages on
   shared hooks.
-- **User Intelligence Panel** (drawer, 5 tabs: PROFILE / EXCHANGES /
-  TRADING / ENTITLEMENTS / ACTIONS). All mutations audit-logged to
-  `user_admin_actions`.
-- **Sessions** (`user_sessions`): Revoke = best-effort Clerk revoke +
-  atomic local revoke + audit row (super-admin cannot self-revoke).
+- **User Intelligence Panel** (drawer, 5 tabs: PROFILE / EXCHANGES / TRADING /
+  ENTITLEMENTS / ACTIONS). All mutations audit-logged to `user_admin_actions`.
+- **Sessions** (`user_sessions`): Revoke = best-effort Clerk revoke + atomic
+  local revoke + audit row (super-admin cannot self-revoke).
 - **Per-user exchange visibility:** `GET/POST/DELETE
   /api/admin/users/:id/exchange-visibility` — single-tx upsert,
   `.returning()`-gated delete (race-safe).
 
 **api-server route surface:** `/api/exchange/*`, `/api/sentiment/*`,
-`/api/validation/*`, `/api/journal/*`, `/api/simulation/*`,
-`/api/signals/*`, `/api/candles/*`, `/api/backtest/*`, `/api/auth/*`,
-`/api/billing/*`, `/api/user/*`, `/api/admin/*`, `/api/engine/*`.
+`/api/validation/*`, `/api/journal/*`, `/api/simulation/*`, `/api/signals/*`,
+`/api/candles/*`, `/api/backtest/*`, `/api/auth/*`, `/api/billing/*`,
+`/api/user/*`, `/api/admin/*`, `/api/engine/*`.
 
 ---
 
 ## Controlled-beta operational mode
 
-- **Platform-wide concurrent live-trade cap = 25** (customer side).
-  Enforced in `placeLiveAutoOrderForUser` gate 0c by counting open
-  `sim_positions WHERE exchange IS NOT NULL` across all users.
-  Admin/super-admin bypass; operator path (no userId) not gated here.
-  Raised from the original controlled-beta value of 3 → 25 (Task 2 / Q2)
-  so per-tier concurrency (elite up to 12) is actually reachable platform
-  -wide; per-user ceilings are still enforced by `liquidityGuard`
-  (`PLAN_MAX_OPEN_POSITIONS` free0/starter3/pro6/elite12).
-- Rejected: `errorCode: "concurrent_live_cap_reached"` + user
-  notification + `executionStreamBus order_rejected` + `logs` row.
-- Tune via env `LIVE_EXECUTION_CONCURRENT_CAP` (no redeploy). `0`
-  disables. Default `DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP=25` in
-  `liveUserExecution.ts`.
-- **Known TOCTOU race** (acceptable at scale): gate reads positions then
-  places broker order without reservation; N concurrent placements can
-  overshoot by N−1. Before widening cap, harden with advisory lock or
-  `SELECT … FOR UPDATE` (see inline note next to `countOpenLivePositions`).
+- **Platform-wide concurrent live-trade cap = 25** (customer side). Enforced in
+  `placeLiveAutoOrderForUser` gate 0c by counting open `sim_positions WHERE
+  exchange IS NOT NULL` across all users. Admin/super-admin bypass; operator
+  path (no userId) not gated here. Per-user ceilings still enforced by
+  `liquidityGuard` (`PLAN_MAX_OPEN_POSITIONS` free0/starter3/pro6/elite12).
+- Rejected: `errorCode: "concurrent_live_cap_reached"` + user notification +
+  `executionStreamBus order_rejected` + `logs` row.
+- Tune via env `LIVE_EXECUTION_CONCURRENT_CAP` (no redeploy). `0` disables.
+  Default `DEFAULT_LIVE_EXECUTION_CONCURRENT_CAP=25` in `liveUserExecution.ts`.
+- **Known TOCTOU race** (acceptable at scale): gate reads positions then places
+  broker order without reservation; N concurrent placements can overshoot by
+  N−1. Before widening cap, harden with advisory lock or `SELECT … FOR UPDATE`.
 
 ## On-call (P0-01 mitigation)
 
 `forceRestoreBilling` and `waiveAllPendingFees` are super-admin only.
 - Maintain **two active super-admin Clerk users** at all times.
 - 72-hour restore grace window in `evaluateAndEnforceBillingHold` —
-  force-restore stays durable across re-evaluations. Window resets on
-  every admin action.
+  force-restore stays durable across re-evaluations. Window resets on every
+  admin action.
 
 ---
 
 ## Production Deployment
 
-See `DEPLOYMENT.md` (domains, DNS, SSL, Clerk prod, push, Render +
-Replit deploy, migrations, checklist), `render.yaml` (services + headers),
+See `DEPLOYMENT.md` (domains, DNS, SSL, Clerk prod, push, Render + Replit
+deploy, migrations, checklist), `render.yaml` (services + headers),
 `.env.production.example`.
 
 - CORS allow-list: `aicandlez.com`, `app.`, `api.`, `trade.`, `admintrade.`.
 - Webhooks: Stripe (`STRIPE_WEBHOOK_SECRET`), Clerk.
+- Prod = Render, autoDeploy on `origin/main` push. Dev `drizzle-kit push` never
+  reaches prod — schema changes need a manual ALTER against
+  `RENDER_PROD_DATABASE_URL` at deploy.
 - **Production export ZIP:** `python3 scripts/build-export-zip.py` →
-  `artifacts/trading-dashboard/public/aicandlez-production.zip` (served
-  via dashboard sidebar). Excludes `node_modules/`, `dist/`, `.git/`,
-  `natura-*`, `mockup-sandbox`, `attached_assets/`, `.local/`,
-  `.replit-artifact/`.
+  `artifacts/trading-dashboard/public/aicandlez-production.zip`. Excludes
+  `node_modules/`, `dist/`, `.git/`, `natura-*`, `mockup-sandbox`,
+  `attached_assets/`, `.local/`, `.replit-artifact/`.
 
 ---
 
@@ -423,11 +410,9 @@ Replit deploy, migrations, checklist), `render.yaml` (services + headers),
 ## Environment Variables
 
 - **Auto-provisioned:** `DATABASE_URL`, `CLERK_SECRET_KEY`,
-  `VITE_CLERK_PUBLISHABLE_KEY`, `SESSION_SECRET`, `VAULT_MASTER_KEY`,
-  `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VITE_VAPID_PUBLIC_KEY`/`VAPID_SUBJECT`.
+  `VITE_CLERK_PUBLISHABLE_KEY`, `SESSION_SECRET`, `VAULT_MASTER_KEY`, VAPID set.
 - **Stripe:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
-  `VITE_STRIPE_PUBLISHABLE_KEY`, `STRIPE_PRICE_STARTER_MONTHLY`,
-  `STRIPE_PRICE_PRO_MONTHLY`.
+  `VITE_STRIPE_PUBLISHABLE_KEY`, `STRIPE_PRICE_{STARTER,PRO,ELITE}_MONTHLY`.
 - **Exchanges (live):** `KRAKEN_API_KEY/SECRET`, `BINANCE_API_KEY/SECRET`,
   `COINBASE_API_KEY/SECRET`, `CRYPTOCOM_API_KEY/SECRET`,
   `EXCHANGE_LIVE_ENABLED=true`.
@@ -444,8 +429,8 @@ Replit deploy, migrations, checklist), `render.yaml` (services + headers),
 ## User Preferences
 
 - Always brand as **AICandlez** (never apex / apexdigital legacy)
-- Performance-fee language always reads "on profitable trades only ·
-  never on losses"
+- Performance-fee language always reads "on profitable trades only · never on
+  losses"
 - Institutional tone — premium, restrained, no arcade/gambling cues
 - Mobile-first PWA = primary user surface; desktop console = operator
 - Withdrawal permissions are never requested from exchanges

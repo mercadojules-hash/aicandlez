@@ -13,6 +13,7 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { PageHeader } from "@/components/PageHeader";
 import { useFeedbackPrefs, ALERT_DEFINITIONS, type AlertKey } from "@/lib/feedback";
 import { useRuntimeState, runtimeLabel } from "@/hooks/useRuntimeState";
+import { useUserRole } from "@/hooks/useUserRole";
 
 // ── Design tokens ────────────────────────────────────────────────────────────────
 // Aligned with the Signals/Crypto/Equities neon-green system.
@@ -1979,6 +1980,12 @@ export default function Profile() {
   const [location, setLocation] = useLocation();
   const { openOnboarding } = useBrokerConnection();
   const qc                 = useQueryClient();
+  // CUSTOMER vs ADMIN portal separation (locked invariant): the trading-mode
+  // presets, exit controls, and the profit/blocker/concurrency intelligence
+  // cards are CUSTOMER affordances. Admin / super-admin operate the real-only
+  // workstation in trading-dashboard and must never see these consumer
+  // controls. Server endpoints stay requireAuth-gated; this is UI defense.
+  const { isAdmin } = useUserRole();
   // Task #199 — runtime label for the Simulation Performance header.
   // Reads the same shared aggregator cache as the chip switcher in
   // App.tsx Shell; flips to "LIVE: KRAKEN" when the user picks live.
@@ -2484,20 +2491,28 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* ── Trading Mode (profit-optimization presets) ───────────────────── */}
-        <TradingModeSection/>
+        {/* ── CUSTOMER-only trading controls + intelligence ──────────────────
+             Hidden for admin / super-admin (locked CUSTOMER vs ADMIN portal
+             separation). Operators run the real-only workstation in
+             trading-dashboard and never see these consumer affordances. */}
+        {!isAdmin && (
+          <>
+            {/* ── Trading Mode (profit-optimization presets) ─────────────── */}
+            <TradingModeSection/>
 
-        {/* ── Exit Controls (per-account / per-exchange live-exit overrides) ── */}
-        <ExitControlsSection/>
+            {/* ── Exit Controls (per-account / per-exchange live-exit) ────── */}
+            <ExitControlsSection/>
 
-        {/* ── Concurrency guidance (balance-aware, advisory only) ──────────── */}
-        <ConcurrencySection/>
+            {/* ── Concurrency guidance (balance-aware, advisory only) ─────── */}
+            <ConcurrencySection/>
 
-        {/* ── Execution blockers (tunable vs core-safety) ──────────────────── */}
-        <ExecutionBlockersSection/>
+            {/* ── Execution blockers (tunable vs core-safety) ────────────── */}
+            <ExecutionBlockersSection/>
 
-        {/* ── Consolidated profit report (realized perf + closes by reason) ── */}
-        <ProfitReportSection/>
+            {/* ── Consolidated profit report (realized perf + closes) ─────── */}
+            <ProfitReportSection/>
+          </>
+        )}
 
         {/* ── Alert & Feedback Preferences (notification scaffolding) ──────── */}
         <AlertPreferencesSection/>
