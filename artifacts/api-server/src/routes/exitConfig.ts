@@ -7,6 +7,7 @@ import { CONNECTABLE_EXCHANGE_IDS } from "../services/exchanges/catalog.js";
 import {
   EXIT_DEFAULTS,
   EXIT_BOUNDS,
+  clampExitValue,
   type ExitField,
 } from "../lib/exitConfig.js";
 import type { Request } from "express";
@@ -46,7 +47,11 @@ function parseExitField(field: ExitField, raw: unknown, allowNull: boolean): Fie
   if (n < min || n > max) {
     return { ok: false, error: `${field} must be between ${min} and ${max}` };
   }
-  return { ok: true, value: parseFloat(n.toFixed(4)) };
+  // Persist through the centralized clamp so EXIT_BOUNDS is the single bounds
+  // authority on every write path (n is already in-range; this rounds to 4dp
+  // and defends against any future bound drift). Customer + admin writes both
+  // reach DB through here → buildAccountPatch / buildExchangePatch.
+  return { ok: true, value: clampExitValue(field, n) };
 }
 
 // JIT-provision the parent users + user_settings rows so a fresh Clerk session
