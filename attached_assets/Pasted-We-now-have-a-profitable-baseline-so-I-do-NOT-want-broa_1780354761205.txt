@@ -1,0 +1,86 @@
+We now have a profitable baseline, so I do NOT want broad strategy changes.
+
+Please investigate and report on the following specific issues only.
+
+1. SHORT POSITION STOP-LOSS DRIFT
+
+Recent production report showed:
+
+* NEAR SELL stopped at approximately -5.03%
+* ICP SELL stopped at approximately -6.10%
+
+while long positions are generally stopping around:
+
+* -2.2% to -2.5%
+
+Please determine:
+
+* Why short positions are still exceeding the intended 2% stop loss.
+* Whether the short-side stop logic differs from the long-side stop logic.
+* Whether borrow availability, exchange execution latency, mark price selection, or stop-monitor logic is causing the drift.
+* Whether this affects Coinbase, Kraken, or both.
+
+No code changes yet.
+Provide root cause and recommendation.
+
+---
+
+2. KRAKEN VS COINBASE POSITION IMBALANCE
+
+The dashboard consistently shows Kraken carrying more open positions than Coinbase.
+
+Please investigate:
+
+* Number of live positions currently open by exchange.
+* Number of trades opened today by exchange.
+* Number of trades closed today by exchange.
+* Win rate by exchange.
+* Realized P&L by exchange.
+* Average hold time by exchange.
+
+Determine:
+
+* Is Kraken simply receiving more qualified signals?
+* Is Coinbase rejecting more trades?
+* Is liquidity protection favoring Kraken?
+* Are Coinbase positions closing faster than Kraken positions?
+* Is there any exchange allocation imbalance in the engine?
+
+---
+
+3. POSITION RECYCLING EFFICIENCY
+
+Review today's production trades only.
+
+Determine:
+
+* Average time from position close to next position open.
+* Whether available cash is sitting idle after profitable exits.
+* Whether there are unnecessary delays preventing capital from being redeployed.
+
+---
+
+4. MOST IMPORTANT QUESTION
+
+Based ONLY on today's live production data:
+
+What is currently limiting profitability the most?
+
+Choose one:
+
+A. Trade size too small
+B. Stop-loss execution
+C. Exchange imbalance
+D. Signal quality
+E. Capital deployment efficiency
+F. Other
+
+Please provide evidence for the answer.
+
+No strategy redesign.
+No TP changes.
+No confidence threshold changes.
+No trailing-stop changes.
+
+I want diagnosis only.
+Keep the report concise.
