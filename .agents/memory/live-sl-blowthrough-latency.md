@@ -29,8 +29,8 @@ stop price was correct; the monitor just reacted too slowly.
   tier and the catastrophic tier.
 
 **Why:** capital protection — cap the realized loss near the intended stop
-instead of letting microstructure-noise protection (the P1 spread/confirm fix)
-become a downside blow-through hole.
+instead of letting the microstructure-noise protection (grace window +
+spread buffer + 2-breach confirm) become a downside blow-through hole.
 
 **How to apply / invariants:**
 - The immediate band MUST stay inside the catastrophic band

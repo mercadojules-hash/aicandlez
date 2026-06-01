@@ -8,6 +8,8 @@ import {
   EXIT_DEFAULTS,
   EXIT_BOUNDS,
   clampExitValue,
+  getLiveTrailingStopPercentOverride,
+  getLivePositionMaxHoldMsOverride,
   type ExitField,
 } from "../lib/exitConfig.js";
 import type { Request } from "express";
@@ -90,11 +92,24 @@ async function loadExitConfig(userId: string) {
     .where(eq(userExchangeSettingsTable.userId, userId));
 
   return {
+    // No account row yet → surface the EFFECTIVE defaults the resolver WOULD
+    // apply for this user (no account + no per-exchange row), not null. This must
+    // mirror resolveFrom's env-aware fallback exactly: trailing = env default
+    // (LIVE_TRAILING_STOP_PERCENT) when set, else 2 %; max-hold = env default
+    // (LIVE_POSITION_MAX_HOLD_MS) when set, else 24h. Returning a plain null — or
+    // a plain hardcoded 2/24 ignoring env — would make the read disagree with
+    // runtime whenever the operator env knob is set (e.g. env=0 disabling
+    // trailing while the UI showed 2 %), and a first save could then clobber the
+    // operator default.
     account: account ?? {
       stopLossPercent:     EXIT_DEFAULTS.stopLossPercent,
       takeProfitPercent:   EXIT_DEFAULTS.takeProfitPercent,
-      trailingStopPercent: null as number | null,
-      maxHoldHours:        null as number | null,
+      trailingStopPercent:
+        (getLiveTrailingStopPercentOverride() ?? EXIT_DEFAULTS.trailingStopPercent) as number | null,
+      maxHoldHours: (() => {
+        const envMs = getLivePositionMaxHoldMsOverride();
+        return (envMs !== null ? envMs / 3_600_000 : null) ?? EXIT_DEFAULTS.maxHoldHours;
+      })() as number | null,
     },
     // Only surface exchanges that actually have at least one exit override set,
     // so the per-exchange rows created purely for tradeSize/maxPositions don't

@@ -9,14 +9,16 @@ import { eq, and, inArray } from "drizzle-orm";
  * %, and max-hold hours — for a given (userId, exchange) pair.
  *
  * Resolution precedence (highest first):
- *   1. Env operator override  — `LIVE_TRAILING_STOP_PERCENT` /
- *      `LIVE_POSITION_MAX_HOLD_MS`. A global escape hatch; when SET it wins for
- *      trailing / max-hold so the operator can tune or kill those exits without
- *      a redeploy. (SL/TP have no env knob.)
- *   2. Per-(user, exchange) override — `user_exchange_settings` columns. NULL →
+ *   1. Per-(user, exchange) override — `user_exchange_settings` columns. NULL →
  *      inherit the account default.
- *   3. Account default — `user_settings`. SL/TP are always present (NOT NULL
+ *   2. Account default — `user_settings`. SL/TP are always present (NOT NULL
  *      cols); trailing / max-hold are nullable.
+ *   3. Env operator default — `LIVE_TRAILING_STOP_PERCENT` /
+ *      `LIVE_POSITION_MAX_HOLD_MS`. A global DEFAULT (not an override): it only
+ *      applies for trailing / max-hold when the account/exchange leave the field
+ *      unset. Per-account / per-exchange edits MUST win over it, otherwise the
+ *      per-account controls would be silently ineffective in any environment
+ *      where the operator env knob is set. (SL/TP have no env knob.)
  *   4. Hardcoded default — SL 2 %, TP 4 %, trailing 2 %, max-hold 24h.
  *      P4 first set the default trailing to a fixed 1.5 %; a post-deploy
  *      counterfactual then widened it to 2 % (1.5 % clipped winners early).
@@ -94,12 +96,14 @@ export interface ResolvedExitConfig {
   letWinnersRun: boolean;
 }
 
-// ── Env operator overrides (global escape hatch) ──────────────────────────────
+// ── Env operator defaults (global fallback, below per-account/exchange) ───────
 
 /**
- * Live trailing-stop override (percent). `null` when the env var is unset —
- * the resolver then falls through to per-exchange / account config. A value of
- * `0` disables live trailing globally.
+ * Live trailing-stop env DEFAULT (percent). `null` when the env var is unset.
+ * Acts as a fallback BELOW per-exchange / account config (see resolveFrom
+ * precedence) — it fills the gap when neither is set, but never overrides an
+ * explicit per-account / per-exchange edit. A value of `0` makes "no trailing"
+ * the default.
  */
 export function getLiveTrailingStopPercentOverride(): number | null {
   const raw = process.env.LIVE_TRAILING_STOP_PERCENT;
@@ -109,13 +113,15 @@ export function getLiveTrailingStopPercentOverride(): number | null {
 }
 
 /**
- * Live max-hold override in milliseconds. `null` when the env var is unset (so
- * per-account config applies); a value of `0` disables max-hold globally.
+ * Live max-hold env DEFAULT in milliseconds. `null` when the env var is unset;
+ * a value of `0` makes "no max-hold" the default. Acts as a fallback BELOW
+ * per-account / per-exchange config (see resolveFrom precedence) — per-account
+ * edits win over it.
  *
  * Distinct from `tradingLoop.getLivePositionMaxHoldMs()` which ALWAYS returns a
  * number (defaulting to 24h) and therefore can't tell "operator set 24h" from
- * "unset". This override-shaped reader is what lets per-account config slot into
- * the gap when the operator has NOT pinned a global ceiling.
+ * "unset". This null-shaped reader is what lets per-account config take priority
+ * and slot the env value in only as a default.
  */
 export function getLivePositionMaxHoldMsOverride(): number | null {
   const raw = process.env.LIVE_POSITION_MAX_HOLD_MS;
@@ -156,33 +162,27 @@ function resolveFrom(
     account?.takeProfitPercent ??
     EXIT_DEFAULTS.takeProfitPercent;
 
-  // Trailing: env override wins; else per-exchange; else account; else the
-  // fixed 2 % default (P4 set 1.5 %, post-deploy counterfactual widened to 2 %;
-  // previously null = mirror the position's own SL band).
-  let trailingStopPercent: number | null;
-  if (envTrailPct !== null) {
-    trailingStopPercent = envTrailPct;
-  } else {
-    trailingStopPercent =
-      perExchange?.trailingStopPercent ??
-      account?.trailingStopPercent ??
-      EXIT_DEFAULTS.trailingStopPercent;
-  }
+  // Trailing precedence: per-exchange override → account default → env DEFAULT
+  // → hardcoded 2 %. Env is a default that fills the gap only when the account /
+  // exchange leave trailing unset; it must NOT override an explicit per-account /
+  // per-exchange edit (doing so would make the per-account controls silently
+  // ineffective wherever LIVE_TRAILING_STOP_PERCENT is set). `0` = trailing
+  // disabled. (P4 set 1.5 %, post-deploy counterfactual widened to 2 %.)
+  const trailingStopPercent: number | null =
+    perExchange?.trailingStopPercent ??
+    account?.trailingStopPercent ??
+    envTrailPct ??
+    EXIT_DEFAULTS.trailingStopPercent;
 
-  // Max-hold: env override wins; else per-exchange hours; else account hours;
-  // else hardcoded 24h. 0 = disabled.
-  let maxHoldMs: number;
-  let maxHoldHours: number;
-  if (envMaxHoldMs !== null) {
-    maxHoldMs    = envMaxHoldMs;
-    maxHoldHours = envMaxHoldMs / 3_600_000;
-  } else {
-    maxHoldHours =
-      perExchange?.maxHoldHours ??
-      account?.maxHoldHours ??
-      EXIT_DEFAULTS.maxHoldHours;
-    maxHoldMs = Math.round(maxHoldHours * 3_600_000);
-  }
+  // Max-hold precedence (same order): per-exchange → account → env DEFAULT →
+  // hardcoded 24h. `0` = disabled. Env hours derived from the ms knob only when
+  // it is set; a per-account/exchange value wins over it.
+  const maxHoldHours: number =
+    perExchange?.maxHoldHours ??
+    account?.maxHoldHours ??
+    (envMaxHoldMs !== null ? envMaxHoldMs / 3_600_000 : null) ??
+    EXIT_DEFAULTS.maxHoldHours;
+  const maxHoldMs = Math.round(maxHoldHours * 3_600_000);
 
   // Let-winners-run is opt-in via the aggressive personality only — every other
   // personality (and a missing row) keeps the hard take-profit behaviour.
