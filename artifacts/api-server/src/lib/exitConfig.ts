@@ -17,23 +17,29 @@ import { eq, and, inArray } from "drizzle-orm";
  *      inherit the account default.
  *   3. Account default — `user_settings`. SL/TP are always present (NOT NULL
  *      cols); trailing / max-hold are nullable.
- *   4. Hardcoded default — SL 2 %, TP 4 %, trailing 1.5 %, max-hold 24h.
- *      Production Optimization P4 set the default trailing to a fixed 1.5 %;
- *      previously it fell through to null (= "mirror the position's own stored
+ *   4. Hardcoded default — SL 2 %, TP 4 %, trailing 2 %, max-hold 24h.
+ *      P4 first set the default trailing to a fixed 1.5 %; a post-deploy
+ *      counterfactual then widened it to 2 % (1.5 % clipped winners early).
+ *      Previously it fell through to null (= "mirror the position's own stored
  *      stop-loss band"). SL/TP/max-hold defaults are unchanged. An account that
- *      never touches the controls now trails at 1.5 %.
+ *      never touches the controls now trails at 2 %.
  *
  * `trailingStopPercent === null` is still honored by the live monitor (mirror
  * each position's own stored stop-loss band) if a row explicitly carries it, but
  * after P4 the resolver no longer PRODUCES null from defaults — an unconfigured
- * account resolves to the fixed 1.5 %. An explicit `0` disables trailing; `0`
+ * account resolves to the fixed 2 %. An explicit `0` disables trailing; `0`
  * max-hold disables the time ceiling.
  */
 
 export const EXIT_DEFAULTS = {
   stopLossPercent:     2,
   takeProfitPercent:   4,
-  trailingStopPercent: 1.5,
+  // P4 introduced a fixed 1.5 % default; a post-deploy counterfactual on live
+  // trades showed 1.5 % clipped winners a touch early (most favourable moves
+  // peaked 2-3 %), so the default trailing distance was widened to 2 %. SL/TP/
+  // max-hold are unchanged. 3 % was evaluated and rejected — too wide for the
+  // observed sub-3 % peaks (it gives the whole move back).
+  trailingStopPercent: 2,
   maxHoldHours:        24,
 } as const;
 
@@ -151,8 +157,8 @@ function resolveFrom(
     EXIT_DEFAULTS.takeProfitPercent;
 
   // Trailing: env override wins; else per-exchange; else account; else the
-  // fixed 1.5 % default (Production Optimization P4; previously null = mirror
-  // the position's own SL band).
+  // fixed 2 % default (P4 set 1.5 %, post-deploy counterfactual widened to 2 %;
+  // previously null = mirror the position's own SL band).
   let trailingStopPercent: number | null;
   if (envTrailPct !== null) {
     trailingStopPercent = envTrailPct;

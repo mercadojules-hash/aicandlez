@@ -268,10 +268,39 @@ export const LIVE_STOP_CONFIRM_TICKS = parseLiveStopKnob(
 //    Floored at 1 (mult ≤ 1 would never trigger) and capped at 10.
 export const LIVE_STOP_CATASTROPHIC_MULT = parseLiveStopKnob(
   "LIVE_STOP_CATASTROPHIC_MULT", process.env.LIVE_STOP_CATASTROPHIC_MULT, 2.5, 1, 10);
+// 5. Immediate-fire band (anti-blow-through): a breach that runs beyond this
+//    FRACTION of the stop distance past the stop fires NOW — bypassing grace +
+//    multi-tick confirmation — so a fast adverse move can't ride the grace /
+//    confirmation window all the way down to the (much wider) catastrophic
+//    level. With a 2% stop and the 0.25 default this caps the intended exit at
+//    ~2.5% loss; tiny breaches in the [buffer, 0.25×) band still require the
+//    spread buffer + N-tick confirmation (preserving the P1 spread-noise fix).
+//    A post-deploy counterfactual showed STOP_LOSS exits closing at -4% to
+//    -5.4% because the only fast-path was the -5% catastrophic tier. Bounded
+//    [0, catastrophic) effectively; floored at 0, capped at 5.
+export const LIVE_STOP_IMMEDIATE_FRACTION = parseLiveStopKnob(
+  "LIVE_STOP_IMMEDIATE_FRACTION", process.env.LIVE_STOP_IMMEDIATE_FRACTION, 0.25, 0, 5);
 if (liveStopEnvWarnings.length > 0) {
   logger.warn(
     { tag: "LIVE_STOP_ENV_INVALID", warnings: liveStopEnvWarnings },
     "[LIVE_STOP_ENV_INVALID] one or more LIVE_STOP_* env knobs were invalid; safe defaults applied",
+  );
+}
+// Cross-knob sanity: the immediate-fire band must sit INSIDE the catastrophic
+// band (fraction < CATASTROPHIC_MULT - 1) or the immediate tier can never fire
+// before the much-wider catastrophic tier — silently de-tuning the anti-
+// blow-through fix back to the -5% regime it was added to eliminate. We only
+// warn (never override an explicit operator value) so the misconfig is visible
+// in boot logs.
+if (LIVE_STOP_IMMEDIATE_FRACTION >= LIVE_STOP_CATASTROPHIC_MULT - 1) {
+  logger.warn(
+    {
+      tag: "LIVE_STOP_IMMEDIATE_DETUNED",
+      immediateFraction:  LIVE_STOP_IMMEDIATE_FRACTION,
+      catastrophicMult:   LIVE_STOP_CATASTROPHIC_MULT,
+      catastrophicBand:   LIVE_STOP_CATASTROPHIC_MULT - 1,
+    },
+    "[LIVE_STOP_IMMEDIATE_DETUNED] LIVE_STOP_IMMEDIATE_FRACTION >= catastrophic band; immediate-fire tier is effectively disabled (stops will only fast-exit at the catastrophic level). Lower LIVE_STOP_IMMEDIATE_FRACTION.",
   );
 }
 
@@ -2111,6 +2140,8 @@ async function runHardStopMonitor() {
 
       // ── Exit decision (priority: SL → TP → trailing → max-hold) ──────────────
       let reason: "STOP_LOSS" | "TAKE_PROFIT" | "TRAILING_STOP" | "MAX_HOLD" | null = null;
+      // Which LIVE stop-loss tier fired (for trigger-vs-execution diagnostics).
+      let slTier: "IMMEDIATE" | "CATASTROPHIC" | "CONFIRMED" | null = null;
       let trailPct:   number | null = null;
       let trailStop:  number | null = null;
       let trailArmed = false;
@@ -2137,6 +2168,14 @@ async function runHardStopMonitor() {
             const bufferedBreach = isBuy
               ? price <= p.stopLoss - buffer
               : price >= p.stopLoss + buffer;
+            // Decisive breach beyond a small fraction of the stop distance: a
+            // genuine, fast adverse move. Fires NOW — bypassing grace + the
+            // multi-tick confirmation — so it can't ride those windows down to
+            // the (much wider) catastrophic level. Primary anti-blow-through
+            // guard; the confirmation path below still owns marginal breaches.
+            const immediateBreach = slDist > 0 && (isBuy
+              ? price <= p.stopLoss - slDist * LIVE_STOP_IMMEDIATE_FRACTION
+              : price >= p.stopLoss + slDist * LIVE_STOP_IMMEDIATE_FRACTION);
             const catastrophic = slDist > 0 && (isBuy
               ? price <= p.stopLoss - slDist * (LIVE_STOP_CATASTROPHIC_MULT - 1)
               : price >= p.stopLoss + slDist * (LIVE_STOP_CATASTROPHIC_MULT - 1));
@@ -2144,6 +2183,13 @@ async function runHardStopMonitor() {
             if (catastrophic) {
               // Real-crash protection — fire now regardless of grace/confirmation.
               reason = "STOP_LOSS";
+              slTier = "CATASTROPHIC";
+              liveStopBreachStreak.delete(p.positionId);
+            } else if (immediateBreach) {
+              // Decisive breach past the immediate band — fire now, bypassing
+              // grace + confirmation so the loss can't run to catastrophic.
+              reason = "STOP_LOSS";
+              slTier = "IMMEDIATE";
               liveStopBreachStreak.delete(p.positionId);
             } else if (withinGrace) {
               // Stabilization window — suppress the normal stop; reset the streak.
@@ -2152,7 +2198,10 @@ async function runHardStopMonitor() {
               // Genuine breach beyond the spread buffer — require N consecutive.
               const streak = (liveStopBreachStreak.get(p.positionId) ?? 0) + 1;
               liveStopBreachStreak.set(p.positionId, streak);
-              if (streak >= LIVE_STOP_CONFIRM_TICKS) reason = "STOP_LOSS";
+              if (streak >= LIVE_STOP_CONFIRM_TICKS) {
+                reason = "STOP_LOSS";
+                slTier = "CONFIRMED";
+              }
             } else {
               // Breach within the spread buffer = noise — reset the streak.
               liveStopBreachStreak.delete(p.positionId);
@@ -2289,6 +2338,29 @@ async function runHardStopMonitor() {
           else                            engineStats.hardStopHits++;
           if (p.exchange) liveTrailWaterMarks.delete(p.positionId);
           const pnlPct = closeResult.trade?.realizedPnLPct;
+          // Trigger-vs-execution diagnostics. `triggerPrice` is the price the
+          // monitor observed when it decided to exit; `executionPrice` is the
+          // authoritative broker fill (live) returned by closeUserPosition.
+          // `slippageVsStopPct` = how far the fill landed PAST the intended stop
+          // (signed by side; +ve = worse than the stop). `excursionVsEntryPct` =
+          // total adverse move entry→fill. Together these quantify any
+          // stop-loss blow-through beyond the configured 2% level.
+          const executionPrice = closeResult.trade?.exitPrice ?? null;
+          const slippageVsStopPct =
+            reason === "STOP_LOSS" && executionPrice !== null &&
+            p.stopLoss !== null && p.stopLoss > 0
+              ? parseFloat(
+                  (((isBuy ? p.stopLoss - executionPrice : executionPrice - p.stopLoss) /
+                    p.stopLoss) * 100).toFixed(4),
+                )
+              : null;
+          const excursionVsEntryPct =
+            executionPrice !== null && p.entryPrice > 0
+              ? parseFloat(
+                  (((isBuy ? executionPrice - p.entryPrice : p.entryPrice - executionPrice) /
+                    p.entryPrice) * 100).toFixed(4),
+                )
+              : null;
           logger.info(
             {
               tag:           "HARD_STOP_TRIGGERED",
@@ -2298,16 +2370,20 @@ async function runHardStopMonitor() {
               symbol:        p.symbol,
               side:          p.side,
               reason,
+              slTier,
               entryPrice:    p.entryPrice,
               triggerPrice:  price ?? null,
+              executionPrice,
               stopLoss:      p.stopLoss,
               takeProfit:    p.takeProfit,
               trailStop,
+              slippageVsStopPct,
+              excursionVsEntryPct,
               ageHours:      ageHours !== null ? parseFloat(ageHours.toFixed(2)) : null,
               mode:          runtimeMode,
               realizedPnLPct: pnlPct,
             },
-            `[HARD_STOP_TRIGGERED] ${reason} ${runtimeMode} ${p.symbol} ${p.side} @ ${price ?? "n/a"} (entry ${p.entryPrice})`,
+            `[HARD_STOP_TRIGGERED] ${reason}${slTier ? `/${slTier}` : ""} ${runtimeMode} ${p.symbol} ${p.side} trigger=${price ?? "n/a"} exec=${executionPrice ?? "n/a"} (entry ${p.entryPrice}, stop ${p.stopLoss}, slipVsStop=${slippageVsStopPct ?? "n/a"}%)`,
           );
           // Loss-bearing exits (SL always; MAX_HOLD when it closed underwater)
           // surface as "warn"; profit-locking exits (TP, trailing, profitable
@@ -3576,8 +3652,11 @@ async function tick() {
   // breached stop is force-closed even on a trade that never went green.
   // runHardStopMonitor covers per-user `sim_positions`; runGlobalHardStops covers
   // the global `trades`-table book (the max-active-positions cap source) so those
-  // rows actually close on SL/TP instead of only on a trailing trigger.
-  await runHardStopMonitor();
+  // rows actually close on SL/TP instead of only on a trailing trigger. The
+  // per-user monitor ALSO runs on its own faster interval (see
+  // STOP_MONITOR_INTERVAL_MS); the guard makes the two callers mutually
+  // exclusive so they never double-fire a close.
+  await runHardStopMonitorGuarded();
   await runManualOperatorLiveStops();
   await runGlobalHardStops();
   await runGlobalCapSelfHeal();
@@ -3588,6 +3667,31 @@ async function tick() {
 
 let loopHandle: ReturnType<typeof setInterval> | null = null;
 const LOOP_INTERVAL_MS = 60_000;
+
+// Dedicated FAST cadence for the per-user LIVE stop-loss / exit monitor. The
+// heavy MTF analysis tick runs every 60s; gating stop enforcement on it meant a
+// breached stop could sit up to a full tick (and, with multi-tick confirmation,
+// up to ~120s) before force-closing — a primary driver of the -4% to -5.4%
+// stop-loss blow-throughs seen post-deploy. Running the monitor every ~10s cuts
+// that worst-case latency by ~6x. Env-tunable (fail-safe default 10s, floor 2s
+// so we never hammer the broker, ceiling 60s = the analysis cadence).
+let stopMonitorHandle: ReturnType<typeof setInterval> | null = null;
+export const STOP_MONITOR_INTERVAL_MS = parseLiveStopKnob(
+  "STOP_MONITOR_INTERVAL_MS", process.env.STOP_MONITOR_INTERVAL_MS, 10000, 2000, 60000);
+
+// Re-entrancy guard shared by the 60s tick and the fast interval so a slow run
+// (e.g. many open positions / slow ticker fetches) can never overlap itself and
+// double-fire a close.
+let stopMonitorRunning = false;
+async function runHardStopMonitorGuarded() {
+  if (stopMonitorRunning) return;
+  stopMonitorRunning = true;
+  try {
+    await runHardStopMonitor();
+  } finally {
+    stopMonitorRunning = false;
+  }
+}
 
 export function startTradingLoop() {
   if (loopHandle) return;
@@ -3615,13 +3719,26 @@ export function startTradingLoop() {
 
   loopHandle = setInterval(() => { void tick(); }, LOOP_INTERVAL_MS);
 
-  logger.info({ intervalMs: LOOP_INTERVAL_MS }, "Trading loop started (MTF + trailing stops + correlation + test mode)");
+  // Fast LIVE stop-loss enforcement, independent of the 60s analysis tick.
+  stopMonitorHandle = setInterval(
+    () => { void runHardStopMonitorGuarded(); },
+    STOP_MONITOR_INTERVAL_MS,
+  );
+
+  logger.info(
+    { intervalMs: LOOP_INTERVAL_MS, stopMonitorIntervalMs: STOP_MONITOR_INTERVAL_MS },
+    "Trading loop started (MTF + trailing stops + correlation + test mode; fast live stop monitor)",
+  );
 }
 
 export function stopTradingLoop() {
   if (loopHandle) {
     clearInterval(loopHandle);
     loopHandle = null;
+  }
+  if (stopMonitorHandle) {
+    clearInterval(stopMonitorHandle);
+    stopMonitorHandle = null;
   }
   engineStats.running = false;
   logger.info("Trading loop stopped");
